@@ -25,9 +25,11 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
 - `app/main.py` — endpoint FastAPI: CRUD web (`/submissions`, `/tasks`, `/pins/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da variabile d'ambiente
+- `app/storage.py` — storage file (filesystem `STORAGE_DIR`, default `./storage`), PDF → PNG, sniffing MIME
 - `tests/test_sync.py` — test end-to-end del protocollo di sync
 - `tests/test_forms.py` — test del validatore moduli
 - `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin
+- `tests/test_files.py` — test upload planimetrie/allegati
 - `ROADMAP.md` — piano giornaliero MVP
 - `form_schema_example.json` — esempio di modulo dinamico (ispezione sicurezza)
 
@@ -82,10 +84,17 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
   `WorkManager` su Android) che, quando c'è connessione, chiama prima
   `/sync/push` per mandare le modifiche locali, poi `/sync/pull` per
   scaricare quelle remote.
-- Upload foto: consiglio di NON mandare le foto dentro il payload JSON di
-  sync. Meglio: al push, il server crea un `Attachment` con uno
-  `upload_url` presigned (es. S3), la foto viene caricata separatamente
-  in background, e solo l'URL finale finisce nel sync.
+- Upload foto: le foto NON viaggiano nel payload JSON di sync. Flusso:
+  1. il device crea l'`Attachment` offline (`file_url: null`) e lo pusha;
+  2. chiama `POST /attachments/presign` → `{upload_url, method}`;
+  3. manda i byte (multipart `file`) a `upload_url`, con retry: è idempotente;
+  4. il server imposta `file_url`, che arriva agli altri device nel pull.
+  Oggi `upload_url` punta a `POST /attachments/{id}/upload`; con S3 diventerà
+  un presigned URL senza cambiare il flusso lato app.
+- Planimetrie: `POST /plans` crea il record, `POST /plans/{id}/file` carica
+  PNG/JPG/PDF (max 20 MB, tipo riconosciuto dal contenuto). Un PDF viene
+  convertito in PNG (prima pagina, lato lungo ≤ 4000 px) e `width_px/height_px`
+  vengono calcolati dal server. I file sono serviti da `GET /files/{key}`.
 
 ## Prossimi passi consigliati
 
