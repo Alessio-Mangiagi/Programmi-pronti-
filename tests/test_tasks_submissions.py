@@ -15,11 +15,12 @@ from tests.conftest import push
 def test_create_submission_valid(client, project, pin):
     r = client.post("/submissions", json={
         "template_id": project["template"]["id"], "pin_id": pin,
-        "data_json": {"esito": "Conforme"}, "submitted_by": "u1",
+        "data_json": {"esito": "Conforme"}, "submitted_by": "ignored",
     })
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["data_json"] == {"esito": "Conforme"} and body["attachments"] == []
+    assert body["submitted_by"] == client.get("/auth/me").json()["id"]  # dal token, non dal payload
     assert client.get(f"/submissions/{body['id']}").json()["id"] == body["id"]
 
 
@@ -68,15 +69,18 @@ def test_sync_push_rejects_invalid_task_status(client, pin):
 
 # ---------- tasks ----------
 
-def test_task_lifecycle_open_to_verified(client, project, pin):
+def test_task_lifecycle_open_to_verified(client, project, pin, users):
     r = client.post("/tasks", json={"pin_id": pin, "title": "Quadro aperto"})
     assert r.status_code == 201 and r.json()["status"] == "open"
+    assert r.json()["created_by"] == client.get("/auth/me").json()["id"]
     tid = r.json()["id"]
+    mario = users["field"]["id"]
 
-    # open -> assigned richiede assegnatario
+    # open -> assigned richiede assegnatario (esistente)
     assert client.patch(f"/tasks/{tid}", json={"status": "assigned"}).status_code == 409
-    r = client.patch(f"/tasks/{tid}", json={"status": "assigned", "assigned_to": "mario"})
-    assert r.json()["status"] == "assigned" and r.json()["assigned_to"] == "mario"
+    assert client.patch(f"/tasks/{tid}", json={"status": "assigned", "assigned_to": "ghost"}).status_code == 422
+    r = client.patch(f"/tasks/{tid}", json={"status": "assigned", "assigned_to": mario})
+    assert r.json()["status"] == "assigned" and r.json()["assigned_to"] == mario
 
     # assigned -> verified salta un passaggio
     r = client.patch(f"/tasks/{tid}", json={"status": "verified"})
@@ -90,21 +94,23 @@ def test_task_lifecycle_open_to_verified(client, project, pin):
     assert client.patch(f"/tasks/{tid}", json={"status": "verified"}).status_code == 200
 
 
-def test_task_reopen_from_resolved(client, pin):
-    tid = client.post("/tasks", json={"pin_id": pin, "title": "t", "assigned_to": "anna"}).json()["id"]
+def test_task_reopen_from_resolved(client, pin, users):
+    anna = users["field"]["id"]
+    tid = client.post("/tasks", json={"pin_id": pin, "title": "t", "assigned_to": anna}).json()["id"]
     assert client.get(f"/tasks/{tid}").json()["status"] == "assigned"
     client.patch(f"/tasks/{tid}", json={"status": "resolved"})
     assert client.patch(f"/tasks/{tid}", json={"status": "open"}).json()["status"] == "open"
 
 
-def test_task_assigning_open_task_moves_to_assigned(client, pin):
+def test_task_assigning_open_task_moves_to_assigned(client, pin, users):
     tid = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()["id"]
-    r = client.patch(f"/tasks/{tid}", json={"assigned_to": "luca", "due_date": "2026-10-01T00:00:00Z"})
+    r = client.patch(f"/tasks/{tid}", json={"assigned_to": users["field"]["id"], "due_date": "2026-10-01T00:00:00Z"})
     assert r.json()["status"] == "assigned" and r.json()["due_date"] == "2026-10-01T00:00:00"
 
 
 def test_task_invalid_status_and_not_found(client, pin):
     tid = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()["id"]
+    assert client.post("/tasks", json={"pin_id": pin, "title": "t", "assigned_to": "ghost"}).status_code == 422
     assert client.patch(f"/tasks/{tid}", json={"status": "done"}).status_code == 422
     assert client.patch("/tasks/nope", json={"title": "x"}).status_code == 404
     assert client.post("/tasks", json={"pin_id": "nope", "title": "t"}).status_code == 404
@@ -119,23 +125,24 @@ def test_task_delete_is_soft_and_synced(client, project, pin):
     assert [t["deleted_at"] is not None for t in pulled if t["id"] == tid] == [True]
 
 
-def test_list_tasks_filters(client, project, pin):
+def test_list_tasks_filters(client, project, pin, users):
     pid = project["project"]["id"]
+    anna = users["field"]["id"]
     other_plan = client.post("/plans", json={
         "project_id": pid, "name": "P1", "file_url": "x", "width_px": 1, "height_px": 1}).json()
     other_pin = str(uuid.uuid4())
     push(client, pins=[{"id": other_pin, "plan_id": other_plan["id"], "x": 0.1, "y": 0.1}])
 
     a = client.post("/tasks", json={"pin_id": pin, "title": "a"}).json()["id"]
-    b = client.post("/tasks", json={"pin_id": pin, "title": "b", "assigned_to": "anna"}).json()["id"]
-    c = client.post("/tasks", json={"pin_id": other_pin, "title": "c", "assigned_to": "anna"}).json()["id"]
+    b = client.post("/tasks", json={"pin_id": pin, "title": "b", "assigned_to": anna}).json()["id"]
+    c = client.post("/tasks", json={"pin_id": other_pin, "title": "c", "assigned_to": anna}).json()["id"]
     client.delete(f"/tasks/{c}")
     d = client.post("/tasks", json={"pin_id": other_pin, "title": "d"}).json()["id"]
 
     ids = lambda **params: {t["id"] for t in client.get(f"/projects/{pid}/tasks", params=params).json()}
     assert ids() == {a, b, d}                       # c cancellato
     assert ids(status="open") == {a, d}
-    assert ids(assigned_to="anna") == {b}
+    assert ids(assigned_to=anna) == {b}
     assert ids(plan_id=other_plan["id"]) == {d}
     assert ids(status="assigned", plan_id=project["plan"]["id"]) == {b}
     assert client.get(f"/projects/{pid}/tasks", params={"status": "nope"}).status_code == 422

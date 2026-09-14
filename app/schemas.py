@@ -14,6 +14,39 @@ def to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+# --- Auth / utenti ---
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    email: str
+    name: str
+    password: str = Field(min_length=8)
+    role: str = "field"
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+class MemberAdd(BaseModel):
+    user_id: str
+
+
 class ProjectCreate(BaseModel):
     name: str
     address: Optional[str] = None
@@ -133,6 +166,7 @@ class TaskOut(BaseModel):
     description: Optional[str] = None
     status: str
     assigned_to: Optional[str] = None
+    created_by: Optional[str] = None
     due_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -197,6 +231,7 @@ class TaskSync(SyncBase):
     description: Optional[str] = None
     status: str = "open"
     assigned_to: Optional[str] = None
+    created_by: Optional[str] = None
     due_date: Optional[datetime] = None
 
     @field_validator("due_date", mode="after")

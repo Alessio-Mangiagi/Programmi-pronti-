@@ -66,7 +66,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - GitHub Actions: `pytest` su SQLite + job Postgres con service container.
 - **DoD**: app parte su Postgres, test verdi in CI.
 
-### Giorno 5 — Auth, membership, seed
+### Giorno 5 — Auth, membership, seed ✅ (2026-09-14, ruolo globale invece che per-progetto: per-progetto in backlog)
 - Tabelle `users` (email, password hash, nome, ruolo) e `project_members` (user, project, ruolo).
 - `POST /auth/login` → JWT; dipendenza `current_user`; tutti gli endpoint filtrano per progetti di cui l'utente è membro.
 - `created_by / submitted_by / assigned_to` valorizzati dal token o validati come utenti esistenti.

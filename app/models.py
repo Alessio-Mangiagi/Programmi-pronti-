@@ -24,12 +24,22 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, String, Text, Float, ForeignKey, DateTime, Enum, JSON, Index
+    Column, String, Text, Float, Boolean, ForeignKey, DateTime, Enum, JSON, Index, MetaData
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
 
-Base = declarative_base()
+# Nomi deterministici per indici/vincoli: servono ad Alembic per generare
+# ALTER TABLE (soprattutto in batch mode su SQLite, dove i vincoli anonimi
+# non si possono modificare).
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+Base = declarative_base(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 
 # JSON generico su SQLite, JSONB su Postgres (indicizzabile, query sui campi).
 JSONType = JSON().with_variant(JSONB(), "postgresql")
@@ -60,6 +70,34 @@ TASK_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.resolved: {TaskStatus.verified, TaskStatus.open},   # open = riaperto
     TaskStatus.verified: set(),
 }
+
+
+class UserRole(str, enum.Enum):
+    admin = "admin"      # tutto, tutti i progetti
+    manager = "manager"  # ufficio: crea progetti/planimetrie/template, verifica task
+    field = "field"      # cantiere: pin, moduli, task nei progetti di cui è membro
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    email = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.field, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class ProjectMember(Base):
+    """Chi vede/opera su un progetto. Gli admin non hanno bisogno di righe qui."""
+    __tablename__ = "project_members"
+
+    project_id = Column(String, ForeignKey("projects.id"), primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True, index=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
 
 class SyncMixin:
@@ -111,7 +149,7 @@ class Pin(SyncMixin, Base):
     x = Column(Float, nullable=False)  # 0.0 - 1.0
     y = Column(Float, nullable=False)  # 0.0 - 1.0
     label = Column(String, nullable=True)
-    created_by = Column(String, nullable=True)  # user id
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     plan = relationship("Plan", back_populates="pins")
     submissions = relationship("FormSubmission", back_populates="pin")
@@ -140,7 +178,7 @@ class FormSubmission(SyncMixin, Base):
     template_id = Column(String, ForeignKey("form_templates.id"), nullable=False)
     pin_id = Column(String, ForeignKey("pins.id"), nullable=False, index=True)
     data_json = Column(JSONType, nullable=False)       # risposte, chiave = field id
-    submitted_by = Column(String, nullable=True)
+    submitted_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     pin = relationship("Pin", back_populates="submissions")
     attachments = relationship("Attachment", back_populates="submission")
@@ -153,7 +191,8 @@ class Task(SyncMixin, Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.open, nullable=False)
-    assigned_to = Column(String, nullable=True)
+    assigned_to = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
     due_date = Column(DateTime, nullable=True)
 
     pin = relationship("Pin", back_populates="tasks")

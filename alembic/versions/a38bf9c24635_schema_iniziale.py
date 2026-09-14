@@ -1,8 +1,8 @@
 """schema iniziale
 
-Revision ID: b97282f5cc5a
+Revision ID: a38bf9c24635
 Revises: 
-Create Date: 2026-09-14 16:31:18.127868
+Create Date: 2026-09-14 16:37:04.316424
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'b97282f5cc5a'
+revision: str = 'a38bf9c24635'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,15 +28,29 @@ def upgrade() -> None:
     sa.Column('schema_def', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_form_templates'))
     )
     op.create_table('projects',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('address', sa.String(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_projects'))
     )
+    op.create_table('users',
+    sa.Column('id', sa.String(), nullable=False),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('password_hash', sa.String(), nullable=False),
+    sa.Column('role', sa.Enum('admin', 'manager', 'field', name='userrole'), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_users'))
+    )
+    with op.batch_alter_table('users', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
+
     op.create_table('plans',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('project_id', sa.String(), nullable=False),
@@ -46,11 +60,22 @@ def upgrade() -> None:
     sa.Column('height_px', sa.Float(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name=op.f('fk_plans_project_id_projects')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_plans'))
     )
     with op.batch_alter_table('plans', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_plans_project_id'), ['project_id'], unique=False)
+
+    op.create_table('project_members',
+    sa.Column('project_id', sa.String(), nullable=False),
+    sa.Column('user_id', sa.String(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name=op.f('fk_project_members_project_id_projects')),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_project_members_user_id_users')),
+    sa.PrimaryKeyConstraint('project_id', 'user_id', name=op.f('pk_project_members'))
+    )
+    with op.batch_alter_table('project_members', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_project_members_user_id'), ['user_id'], unique=False)
 
     op.create_table('pins',
     sa.Column('plan_id', sa.String(), nullable=False),
@@ -62,8 +87,9 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('deleted_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['plan_id'], ['plans.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], name=op.f('fk_pins_created_by_users')),
+    sa.ForeignKeyConstraint(['plan_id'], ['plans.id'], name=op.f('fk_pins_plan_id_plans')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_pins'))
     )
     with op.batch_alter_table('pins', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_pins_plan_id'), ['plan_id'], unique=False)
@@ -78,9 +104,10 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('deleted_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['pin_id'], ['pins.id'], ),
-    sa.ForeignKeyConstraint(['template_id'], ['form_templates.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['pin_id'], ['pins.id'], name=op.f('fk_form_submissions_pin_id_pins')),
+    sa.ForeignKeyConstraint(['submitted_by'], ['users.id'], name=op.f('fk_form_submissions_submitted_by_users')),
+    sa.ForeignKeyConstraint(['template_id'], ['form_templates.id'], name=op.f('fk_form_submissions_template_id_form_templates')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_form_submissions'))
     )
     with op.batch_alter_table('form_submissions', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_form_submissions_pin_id'), ['pin_id'], unique=False)
@@ -92,15 +119,19 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('status', sa.Enum('open', 'assigned', 'resolved', 'verified', name='taskstatus'), nullable=False),
     sa.Column('assigned_to', sa.String(), nullable=True),
+    sa.Column('created_by', sa.String(), nullable=True),
     sa.Column('due_date', sa.DateTime(), nullable=True),
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('deleted_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['pin_id'], ['pins.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['assigned_to'], ['users.id'], name=op.f('fk_tasks_assigned_to_users')),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], name=op.f('fk_tasks_created_by_users')),
+    sa.ForeignKeyConstraint(['pin_id'], ['pins.id'], name=op.f('fk_tasks_pin_id_pins')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_tasks'))
     )
     with op.batch_alter_table('tasks', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_tasks_assigned_to'), ['assigned_to'], unique=False)
         batch_op.create_index(batch_op.f('ix_tasks_pin_id'), ['pin_id'], unique=False)
         batch_op.create_index('ix_tasks_updated_at', ['updated_at'], unique=False)
 
@@ -113,9 +144,9 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('deleted_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['submission_id'], ['form_submissions.id'], ),
-    sa.ForeignKeyConstraint(['task_id'], ['tasks.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['submission_id'], ['form_submissions.id'], name=op.f('fk_attachments_submission_id_form_submissions')),
+    sa.ForeignKeyConstraint(['task_id'], ['tasks.id'], name=op.f('fk_attachments_task_id_tasks')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_attachments'))
     )
     with op.batch_alter_table('attachments', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_attachments_submission_id'), ['submission_id'], unique=False)
@@ -137,6 +168,7 @@ def downgrade() -> None:
     with op.batch_alter_table('tasks', schema=None) as batch_op:
         batch_op.drop_index('ix_tasks_updated_at')
         batch_op.drop_index(batch_op.f('ix_tasks_pin_id'))
+        batch_op.drop_index(batch_op.f('ix_tasks_assigned_to'))
 
     op.drop_table('tasks')
     with op.batch_alter_table('form_submissions', schema=None) as batch_op:
@@ -149,10 +181,18 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_pins_plan_id'))
 
     op.drop_table('pins')
+    with op.batch_alter_table('project_members', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_project_members_user_id'))
+
+    op.drop_table('project_members')
     with op.batch_alter_table('plans', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_plans_project_id'))
 
     op.drop_table('plans')
+    with op.batch_alter_table('users', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_users_email'))
+
+    op.drop_table('users')
     op.drop_table('projects')
     op.drop_table('form_templates')
     # ### end Alembic commands ###

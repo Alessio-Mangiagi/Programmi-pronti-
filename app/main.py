@@ -3,15 +3,21 @@ API core per il sistema tipo Field View.
 
 Avvio locale (dalla root del progetto):
     alembic upgrade head
+    python -m scripts.seed          # utenti/progetto demo (opzionale)
     uvicorn app.main:app --reload
 
 Endpoint principali:
-    /projects, /plans, /form-templates   -> CRUD standard, gestiti da web
+    /auth/login, /auth/me, /users         -> autenticazione (JWT bearer) e utenti
+    /projects, /projects/{id}/members     -> progetti e membri
+    /plans, /form-templates               -> CRUD standard, gestiti da web
     /pins/{id}                            -> pin con submissions/task/foto (plan view)
     /submissions, /tasks                  -> creazione e aggiornamento da web
     /plans/{id}/file, /attachments/{id}/upload, /files/{key} -> upload e download file
     /sync/push                            -> l'app nativa manda le modifiche fatte offline
     /sync/pull?project_id=..&since=..     -> l'app nativa scarica le modifiche dal server
+
+Tutti gli endpoint tranne /auth/login richiedono `Authorization: Bearer <token>`.
+Regole di accesso in app/auth.py.
 
 Strategia di sync (vedi README):
     - Ogni entità creata sul device ha un id UUID generato localmente.
@@ -30,35 +36,121 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from . import models, schemas
-from .forms import validate_schema, validate_submission
-from .database import get_db
-from .models import utcnow, TaskStatus, TASK_TRANSITIONS
+from . import auth
 from . import storage as st
+from .auth import current_user, require_role
+from .database import get_db
+from .forms import validate_schema, validate_submission
+from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
 
 app = FastAPI(title="Field View Starter API")
 
 
-# ---------- CRUD standard (uso da web app) ----------
+# ---------- Auth e utenti ----------
+
+@app.post("/auth/login", response_model=schemas.TokenResponse)
+def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == payload.email.lower().strip()).first()
+    if user is None or not user.is_active or not auth.verify_password(payload.password, user.password_hash):
+        raise HTTPException(401, "invalid credentials")
+    return schemas.TokenResponse(access_token=auth.create_access_token(user), user=user)
+
+
+@app.get("/auth/me", response_model=schemas.UserOut)
+def me(user: models.User = Depends(current_user)):
+    return user
+
+
+@app.post("/users", response_model=schemas.UserOut, status_code=201)
+def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db),
+                _: models.User = Depends(require_role())):
+    """Solo admin."""
+    try:
+        role = UserRole(payload.role)
+    except ValueError:
+        raise HTTPException(422, f"invalid role {payload.role!r}")
+    email = payload.email.lower().strip()
+    if db.query(models.User).filter(models.User.email == email).first():
+        raise HTTPException(409, "email already registered")
+    user = models.User(email=email, name=payload.name, role=role,
+                       password_hash=auth.hash_password(payload.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.get("/users", response_model=list[schemas.UserOut])
+def list_users(db: Session = Depends(get_db), _: models.User = Depends(current_user)):
+    """Elenco utenti attivi: serve a chiunque per assegnare un task."""
+    return db.query(models.User).filter(models.User.is_active.is_(True)).order_by(models.User.name).all()
+
+
+# ---------- Progetti e membri ----------
 
 @app.post("/projects", response_model=schemas.ProjectOut, status_code=201)
-def create_project(payload: schemas.ProjectCreate, db: Session = Depends(get_db)):
+def create_project(payload: schemas.ProjectCreate, db: Session = Depends(get_db),
+                   user: models.User = Depends(require_role(UserRole.manager))):
     project = models.Project(**payload.model_dump())
     db.add(project)
+    db.flush()
+    db.add(models.ProjectMember(project_id=project.id, user_id=user.id))  # il creatore è membro
     db.commit()
     db.refresh(project)
     return project
 
 
 @app.get("/projects", response_model=list[schemas.ProjectOut])
-def list_projects(db: Session = Depends(get_db)):
-    return db.query(models.Project).all()
+def list_projects(db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    ids = auth.accessible_project_ids(db, user)
+    q = db.query(models.Project)
+    if ids is not None:
+        q = q.filter(models.Project.id.in_(ids))
+    return q.order_by(models.Project.name).all()
 
+
+@app.get("/projects/{project_id}", response_model=schemas.ProjectOut)
+def get_project(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    return auth.assert_project_access(db, user, project_id)
+
+
+@app.get("/projects/{project_id}/members", response_model=list[schemas.UserOut])
+def list_members(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    auth.assert_project_access(db, user, project_id)
+    return (db.query(models.User).join(models.ProjectMember, models.ProjectMember.user_id == models.User.id)
+            .filter(models.ProjectMember.project_id == project_id).order_by(models.User.name).all())
+
+
+@app.post("/projects/{project_id}/members", response_model=list[schemas.UserOut], status_code=201)
+def add_member(project_id: str, payload: schemas.MemberAdd, db: Session = Depends(get_db),
+               user: models.User = Depends(require_role(UserRole.manager))):
+    auth.assert_project_access(db, user, project_id)
+    if not db.get(models.User, payload.user_id):
+        raise HTTPException(404, "user not found")
+    if db.get(models.ProjectMember, (project_id, payload.user_id)) is None:
+        db.add(models.ProjectMember(project_id=project_id, user_id=payload.user_id))
+        db.commit()
+    return list_members(project_id, db, user)
+
+
+@app.delete("/projects/{project_id}/members/{user_id}", status_code=204)
+def remove_member(project_id: str, user_id: str, db: Session = Depends(get_db),
+                  user: models.User = Depends(require_role(UserRole.manager))):
+    auth.assert_project_access(db, user, project_id)
+    row = db.get(models.ProjectMember, (project_id, user_id))
+    if row is None:
+        raise HTTPException(404, "member not found")
+    db.delete(row)
+    db.commit()
+
+
+# ---------- Planimetrie e template ----------
 
 @app.post("/plans", response_model=schemas.PlanOut, status_code=201)
-def create_plan(payload: schemas.PlanCreate, db: Session = Depends(get_db)):
-    if not db.get(models.Project, payload.project_id):
-        raise HTTPException(404, "project not found")
+def create_plan(payload: schemas.PlanCreate, db: Session = Depends(get_db),
+                user: models.User = Depends(require_role(UserRole.manager))):
+    auth.assert_project_access(db, user, payload.project_id)
     plan = models.Plan(**payload.model_dump())
     db.add(plan)
     db.commit()
@@ -67,12 +159,14 @@ def create_plan(payload: schemas.PlanCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/projects/{project_id}/plans", response_model=list[schemas.PlanOut])
-def list_plans(project_id: str, db: Session = Depends(get_db)):
-    return db.query(models.Plan).filter(models.Plan.project_id == project_id).all()
+def list_plans(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    auth.assert_project_access(db, user, project_id)
+    return db.query(models.Plan).filter(models.Plan.project_id == project_id).order_by(models.Plan.name).all()
 
 
 @app.post("/form-templates", response_model=schemas.FormTemplateOut, status_code=201)
-def create_form_template(payload: schemas.FormTemplateCreate, db: Session = Depends(get_db)):
+def create_form_template(payload: schemas.FormTemplateCreate, db: Session = Depends(get_db),
+                         _: models.User = Depends(require_role(UserRole.manager))):
     errors = validate_schema(payload.schema_def)
     if errors:
         raise HTTPException(422, detail=errors)
@@ -84,9 +178,11 @@ def create_form_template(payload: schemas.FormTemplateCreate, db: Session = Depe
 
 
 @app.get("/form-templates", response_model=list[schemas.FormTemplateOut])
-def list_form_templates(db: Session = Depends(get_db)):
-    return db.query(models.FormTemplate).all()
+def list_form_templates(db: Session = Depends(get_db), _: models.User = Depends(current_user)):
+    return db.query(models.FormTemplate).order_by(models.FormTemplate.name).all()
 
+
+# ---------- Pin ----------
 
 def _alive(query, model):
     return query.filter(model.deleted_at.is_(None))
@@ -99,12 +195,31 @@ def _with_attachments(schema_cls, obj):
     return out
 
 
-@app.get("/pins/{pin_id}", response_model=schemas.PinDetail)
-def get_pin(pin_id: str, db: Session = Depends(get_db)):
-    """Pin con submissions, task e allegati (non cancellati): apertura da plan view."""
+def _get_pin(db: Session, user: models.User, pin_id: str) -> models.Pin:
     pin = db.get(models.Pin, pin_id)
     if pin is None or pin.deleted_at is not None:
         raise HTTPException(404, "pin not found")
+    auth.assert_project_access(db, user, auth.project_of_pin(pin))
+    return pin
+
+
+def _get_task(db: Session, user: models.User, task_id: str) -> models.Task:
+    task = db.get(models.Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(404, "task not found")
+    auth.assert_project_access(db, user, auth.project_of_task(task))
+    return task
+
+
+def _get_user_or_422(db: Session, user_id: Optional[str], field: str) -> None:
+    if user_id is not None and db.get(models.User, user_id) is None:
+        raise HTTPException(422, f"{field}: user not found")
+
+
+@app.get("/pins/{pin_id}", response_model=schemas.PinDetail)
+def get_pin(pin_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Pin con submissions, task e allegati (non cancellati): apertura da plan view."""
+    pin = _get_pin(db, user, pin_id)
     subs = _alive(db.query(models.FormSubmission).filter_by(pin_id=pin_id), models.FormSubmission).all()
     tasks = _alive(db.query(models.Task).filter_by(pin_id=pin_id), models.Task).all()
     out = schemas.PinDetail.model_validate(pin)
@@ -116,17 +231,16 @@ def get_pin(pin_id: str, db: Session = Depends(get_db)):
 # ---------- Submissions (uso da web) ----------
 
 @app.post("/submissions", response_model=schemas.SubmissionOut, status_code=201)
-def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(get_db)):
+def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(get_db),
+                      user: models.User = Depends(current_user)):
     template = db.get(models.FormTemplate, payload.template_id)
     if template is None:
         raise HTTPException(404, "template not found")
-    pin = db.get(models.Pin, payload.pin_id)
-    if pin is None or pin.deleted_at is not None:
-        raise HTTPException(404, "pin not found")
+    _get_pin(db, user, payload.pin_id)
     errors = validate_submission(template.schema_def, payload.data_json)
     if errors:
         raise HTTPException(422, detail=errors)
-    sub = models.FormSubmission(**payload.model_dump())
+    sub = models.FormSubmission(**payload.model_dump(exclude={"submitted_by"}), submitted_by=user.id)
     db.add(sub)
     db.commit()
     db.refresh(sub)
@@ -134,10 +248,12 @@ def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(g
 
 
 @app.get("/submissions/{submission_id}", response_model=schemas.SubmissionOut)
-def get_submission(submission_id: str, db: Session = Depends(get_db)):
+def get_submission(submission_id: str, db: Session = Depends(get_db),
+                   user: models.User = Depends(current_user)):
     sub = db.get(models.FormSubmission, submission_id)
     if sub is None or sub.deleted_at is not None:
         raise HTTPException(404, "submission not found")
+    auth.assert_project_access(db, user, auth.project_of_submission(sub))
     return _with_attachments(schemas.SubmissionOut, sub)
 
 
@@ -151,11 +267,11 @@ def _parse_status(value: str) -> TaskStatus:
 
 
 @app.post("/tasks", response_model=schemas.TaskOut, status_code=201)
-def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db)):
-    pin = db.get(models.Pin, payload.pin_id)
-    if pin is None or pin.deleted_at is not None:
-        raise HTTPException(404, "pin not found")
-    task = models.Task(**payload.model_dump())
+def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db),
+                user: models.User = Depends(current_user)):
+    _get_pin(db, user, payload.pin_id)
+    _get_user_or_422(db, payload.assigned_to, "assigned_to")
+    task = models.Task(**payload.model_dump(), created_by=user.id)
     task.status = TaskStatus.assigned if payload.assigned_to else TaskStatus.open
     db.add(task)
     db.commit()
@@ -170,9 +286,9 @@ def list_tasks(
     plan_id: Optional[str] = None,
     assigned_to: Optional[str] = None,
     db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
 ):
-    if not db.get(models.Project, project_id):
-        raise HTTPException(404, "project not found")
+    auth.assert_project_access(db, user, project_id)
     q = (db.query(models.Task)
          .join(models.Pin, models.Task.pin_id == models.Pin.id)
          .join(models.Plan, models.Pin.plan_id == models.Plan.id)
@@ -189,23 +305,21 @@ def list_tasks(
 
 
 @app.get("/tasks/{task_id}", response_model=schemas.TaskOut)
-def get_task(task_id: str, db: Session = Depends(get_db)):
-    task = db.get(models.Task, task_id)
-    if task is None or task.deleted_at is not None:
-        raise HTTPException(404, "task not found")
-    return _with_attachments(schemas.TaskOut, task)
+def get_task(task_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    return _with_attachments(schemas.TaskOut, _get_task(db, user, task_id))
 
 
 @app.patch("/tasks/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends(get_db)):
+def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends(get_db),
+                user: models.User = Depends(current_user)):
     """
-    Aggiornamento parziale. Cambi di stato solo lungo TASK_TRANSITIONS (409 altrimenti).
-    Assegnare un task 'open' senza indicare lo stato lo porta automaticamente ad 'assigned'.
+    Aggiornamento parziale. Cambi di stato solo lungo TASK_TRANSITIONS (409 altrimenti);
+    'verified' è riservato a manager/admin. Assegnare un task 'open' senza indicare
+    lo stato lo porta automaticamente ad 'assigned'.
     """
-    task = db.get(models.Task, task_id)
-    if task is None or task.deleted_at is not None:
-        raise HTTPException(404, "task not found")
+    task = _get_task(db, user, task_id)
     changes = payload.model_dump(exclude_unset=True)
+    _get_user_or_422(db, changes.get("assigned_to"), "assigned_to")
 
     if "status" in changes:
         new_status = _parse_status(changes.pop("status"))
@@ -214,6 +328,8 @@ def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends
                 raise HTTPException(409, f"cannot go from {task.status.value} to {new_status.value}")
             if new_status == TaskStatus.assigned and not (changes.get("assigned_to") or task.assigned_to):
                 raise HTTPException(409, "assigned_to is required to move to assigned")
+            if new_status == TaskStatus.verified and not auth.is_manager(user):
+                raise HTTPException(403, "only manager or admin can verify a task")
             task.status = new_status
     elif changes.get("assigned_to") and task.status == TaskStatus.open:
         task.status = TaskStatus.assigned
@@ -227,11 +343,11 @@ def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends
 
 
 @app.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: str, db: Session = Depends(get_db)):
-    """Soft-delete: la cancellazione deve viaggiare nel sync come ogni altra modifica."""
-    task = db.get(models.Task, task_id)
-    if task is None or task.deleted_at is not None:
-        raise HTTPException(404, "task not found")
+def delete_task(task_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Soft-delete (manager/admin o creatore): viaggia nel sync come ogni altra modifica."""
+    task = _get_task(db, user, task_id)
+    if not auth.is_manager(user) and task.created_by != user.id:
+        raise HTTPException(403, "only the creator or a manager can delete a task")
     task.deleted_at = task.updated_at = utcnow()
     db.commit()
 
@@ -250,7 +366,8 @@ async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
 
 
 @app.post("/plans/{plan_id}/file", response_model=schemas.PlanOut)
-async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Session = Depends(get_db),
+                           user: models.User = Depends(require_role(UserRole.manager))):
     """
     Carica l'immagine della planimetria. Un PDF viene convertito in PNG
     (prima pagina) così tutti i client mostrano un'immagine e basta.
@@ -259,6 +376,7 @@ async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Sessi
     plan = db.get(models.Plan, plan_id)
     if plan is None:
         raise HTTPException(404, "plan not found")
+    auth.assert_project_access(db, user, plan.project_id)
     data, mime = await _read_upload(file)
     if mime == "application/pdf":
         try:
@@ -280,15 +398,27 @@ async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Sessi
     return plan
 
 
+def _get_attachment(db: Session, user: models.User, attachment_id: str) -> models.Attachment:
+    att = db.get(models.Attachment, attachment_id)
+    if att is None or att.deleted_at is not None:
+        raise HTTPException(404, "attachment not found")
+    auth.assert_project_access(db, user, auth.project_of_attachment(att))
+    return att
+
+
 @app.post("/attachments", response_model=schemas.AttachmentOut, status_code=201)
-def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(get_db)):
+def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(get_db),
+                      user: models.User = Depends(current_user)):
     """Crea il record (da web); i byte arrivano dopo con /attachments/{id}/upload."""
     if bool(payload.submission_id) == bool(payload.task_id):
         raise HTTPException(422, "exactly one of submission_id or task_id is required")
-    if payload.submission_id and not db.get(models.FormSubmission, payload.submission_id):
-        raise HTTPException(404, "submission not found")
-    if payload.task_id and not db.get(models.Task, payload.task_id):
-        raise HTTPException(404, "task not found")
+    if payload.submission_id:
+        sub = db.get(models.FormSubmission, payload.submission_id)
+        if sub is None:
+            raise HTTPException(404, "submission not found")
+        auth.assert_project_access(db, user, auth.project_of_submission(sub))
+    else:
+        _get_task(db, user, payload.task_id)
     att = models.Attachment(**payload.model_dump())
     db.add(att)
     db.commit()
@@ -297,14 +427,13 @@ def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(g
 
 
 @app.post("/attachments/presign", response_model=schemas.PresignResponse)
-def presign_attachment(payload: schemas.PresignRequest, db: Session = Depends(get_db)):
+def presign_attachment(payload: schemas.PresignRequest, db: Session = Depends(get_db),
+                       user: models.User = Depends(current_user)):
     """
     L'app chiede dove caricare i byte di un allegato già sincronizzato.
     Stub per l'MVP: upload diretto sull'API. In prod restituirà un presigned URL S3.
     """
-    att = db.get(models.Attachment, payload.attachment_id)
-    if att is None or att.deleted_at is not None:
-        raise HTTPException(404, "attachment not found")
+    att = _get_attachment(db, user, payload.attachment_id)
     return schemas.PresignResponse(
         attachment_id=att.id, method="POST",
         upload_url=f"/attachments/{att.id}/upload", max_bytes=st.MAX_UPLOAD_BYTES,
@@ -312,11 +441,10 @@ def presign_attachment(payload: schemas.PresignRequest, db: Session = Depends(ge
 
 
 @app.post("/attachments/{attachment_id}/upload", response_model=schemas.AttachmentOut)
-async def upload_attachment(attachment_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_attachment(attachment_id: str, file: UploadFile = File(...), db: Session = Depends(get_db),
+                            user: models.User = Depends(current_user)):
     """Carica i byte di un allegato. Idempotente: un retry sovrascrive lo stesso file."""
-    att = db.get(models.Attachment, attachment_id)
-    if att is None or att.deleted_at is not None:
-        raise HTTPException(404, "attachment not found")
+    att = _get_attachment(db, user, attachment_id)
     data, mime = await _read_upload(file)
     ext = st.ALLOWED_MIME[mime]
     att.file_url = st.storage.save(f"attachments/{att.id}.{ext}", data)
@@ -329,7 +457,7 @@ async def upload_attachment(attachment_id: str, file: UploadFile = File(...), db
 
 
 @app.get("/files/{key:path}")
-def get_file(key: str):
+def get_file(key: str, _: models.User = Depends(current_user)):
     """Serve i file dello storage locale. Con S3 questo endpoint sparisce (URL diretti)."""
     if not st.storage.exists(key):
         raise HTTPException(404, "file not found")
@@ -339,7 +467,7 @@ def get_file(key: str):
 # ---------- Sync offline-first (uso da app nativa) ----------
 
 def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
-            validate=None) -> schemas.SyncPushResult:
+            validate=None, defaults: Optional[dict] = None) -> schemas.SyncPushResult:
     """
     Upsert idempotente per id con "last write wins".
 
@@ -347,6 +475,7 @@ def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
                (comprese le righe appena flushate nello stesso batch).
     updatable: campi che un push più recente può sovrascrivere.
     validate:  fn(item) -> motivo di rifiuto (str) o None, eseguita dopo le FK.
+    defaults:  valori applicati all'insert quando il campo è nullo (es. created_by).
     """
     res = schemas.SyncPushResult()
     for item in items:
@@ -365,7 +494,10 @@ def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
 
         existing = db.get(model, item.id)
         if existing is None:
-            db.add(model(**item.model_dump()))
+            values = item.model_dump()
+            for k, v in (defaults or {}).items():
+                values[k] = values.get(k) or v
+            db.add(model(**values))
             res.inserted += 1
         elif item.updated_at > existing.updated_at:
             for f in updatable:
@@ -379,19 +511,23 @@ def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
 
 
 @app.post("/sync/push", response_model=schemas.SyncPushResponse)
-def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db)):
+def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db),
+              user: models.User = Depends(current_user)):
     """
     Riceve un batch di modifiche fatte offline sul device e le applica
     con upsert idempotente per id. Le entità con FK verso qualcosa che
-    non esiste vengono rifiutate singolarmente (id in `rejected`), il
-    resto del batch viene comunque applicato.
+    non esiste, non valide, o di progetti a cui l'utente non ha accesso
+    vengono rifiutate singolarmente (`rejected`), il resto del batch passa.
     """
-    pins = _upsert(
-        db, models.Pin, payload.pins,
-        fk_checks={"plan_id": models.Plan},
-        updatable=["x", "y", "label", "deleted_at"],
-    )
+    def forbidden(project_id: str) -> Optional[str]:
+        return None if auth.is_member(db, user, project_id) else "forbidden: not a project member"
+
+    def check_pin(item):
+        return forbidden(db.get(models.Plan, item.plan_id).project_id)
+
     def check_submission(item):
+        if (r := forbidden(auth.project_of_pin(db.get(models.Pin, item.pin_id)))):
+            return r
         # Una cancellazione non deve essere bloccata da dati vecchi non più validi.
         if item.deleted_at is not None:
             return None
@@ -402,28 +538,44 @@ def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db)):
         return None
 
     def check_task(item):
+        if (r := forbidden(auth.project_of_pin(db.get(models.Pin, item.pin_id)))):
+            return r
         try:
             TaskStatus(item.status)
         except ValueError:
             return f"invalid status {item.status!r}"
         return None
 
+    def check_attachment(item):
+        if bool(item.submission_id) == bool(item.task_id):
+            return "exactly one of submission_id or task_id is required"
+        parent = (db.get(models.FormSubmission, item.submission_id) if item.submission_id
+                  else db.get(models.Task, item.task_id))
+        return forbidden(auth.project_of_pin(parent.pin))
+
+    pins = _upsert(
+        db, models.Pin, payload.pins,
+        fk_checks={"plan_id": models.Plan},
+        updatable=["x", "y", "label", "deleted_at"],
+        validate=check_pin, defaults={"created_by": user.id},
+    )
     submissions = _upsert(
         db, models.FormSubmission, payload.submissions,
         fk_checks={"template_id": models.FormTemplate, "pin_id": models.Pin},
         updatable=["data_json", "submitted_by", "deleted_at"],
-        validate=check_submission,
+        validate=check_submission, defaults={"submitted_by": user.id},
     )
     tasks = _upsert(
         db, models.Task, payload.tasks,
-        fk_checks={"pin_id": models.Pin},
+        fk_checks={"pin_id": models.Pin, "assigned_to": models.User, "created_by": models.User},
         updatable=["title", "description", "status", "assigned_to", "due_date", "deleted_at"],
-        validate=check_task,
+        validate=check_task, defaults={"created_by": user.id},
     )
     attachments = _upsert(
         db, models.Attachment, payload.attachments,
         fk_checks={"submission_id": models.FormSubmission, "task_id": models.Task},
         updatable=["file_url", "file_type", "deleted_at"],
+        validate=check_attachment,
     )
     db.commit()
     return schemas.SyncPushResponse(
@@ -441,6 +593,7 @@ def sync_pull(
     project_id: str,
     since: Optional[datetime] = Query(None, description="server_time dell'ultima sync; omesso = tutto"),
     db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
 ):
     """
     Ritorna tutte le modifiche del progetto (fatte da chiunque, su qualsiasi
@@ -448,8 +601,7 @@ def sync_pull(
     userà come `since` alla sync successiva. Le righe con deleted_at
     valorizzato vanno rimosse localmente.
     """
-    if not db.get(models.Project, project_id):
-        raise HTTPException(404, "project not found")
+    auth.assert_project_access(db, user, project_id)
 
     # Catturato PRIMA delle query: se un push arriva durante il pull,
     # il prossimo since lo riprende invece di perderlo.

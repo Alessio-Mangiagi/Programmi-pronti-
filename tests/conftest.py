@@ -12,12 +12,30 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import models
+from app import auth, models
 from app import storage as st
 from app.database import get_db
 from app.main import app
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+
+PASSWORD = "password123"
+
+
+def make_user(session, email, role, name=None):
+    u = models.User(email=email, name=name or email.split("@")[0], role=models.UserRole(role),
+                    password_hash=auth.hash_password(PASSWORD))
+    session.add(u)
+    session.commit()
+    session.refresh(u)
+    return u
+
+
+def login(client, email, password=PASSWORD) -> dict:
+    """Header Authorization per agire come un altro utente: client.get(url, headers=login(...))."""
+    r = client.post("/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 @pytest.fixture(scope="session")
@@ -41,9 +59,30 @@ def client(engine):
             db.close()
 
     app.dependency_overrides[get_db] = override
+    with Session() as s:
+        make_user(s, "admin@test.local", "admin")
     with TestClient(app) as c:
+        # Di default il client agisce da admin; per altri utenti vedi login()/users
+        c.headers.update(login(c, "admin@test.local"))
+        c.session_factory = Session
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def users(client, project):
+    """manager e field membri del progetto, outsider senza membership."""
+    with client.session_factory() as s:
+        out = {}
+        for role in ("manager", "field", "outsider"):
+            u = make_user(s, f"{role}@test.local", "field" if role == "outsider" else role)
+            out[role] = {"id": u.id, "email": u.email}
+    pid = project["project"]["id"]
+    for role in ("manager", "field"):
+        assert client.post(f"/projects/{pid}/members", json={"user_id": out[role]["id"]}).status_code == 201
+    for u in out.values():
+        u["headers"] = login(client, u["email"])
+    return out
 
 
 @pytest.fixture(autouse=True)
