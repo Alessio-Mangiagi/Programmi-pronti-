@@ -28,10 +28,12 @@ Strategia di sync (vedi README):
       ricevuto e riceve solo le modifiche successive, cancellazioni comprese.
     - Conflict resolution MVP: "last write wins" basato su updated_at.
 """
+import os
 from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -45,6 +47,16 @@ from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
 
 app = FastAPI(title="Field View Starter API")
+
+# In sviluppo il frontend gira su Vite (porta 5173) e chiama l'API su 8000.
+# In produzione FastAPI serve web/dist e CORS non serve (stessa origine).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------- Auth e utenti ----------

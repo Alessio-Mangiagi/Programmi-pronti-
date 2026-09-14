@@ -77,7 +77,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 
 ## Settimana 2 — Plan view web
 
-### Giorno 6 — Scaffold web + login
+### Giorno 6 — Scaffold web + login ✅ (2026-09-14, token in localStorage; nessun refresh token: al 401 si rifà login)
 - `web/` con Vite + React + TS, router, client API tipizzato (generato da OpenAPI con `openapi-typescript`).
 - Pagine: login, lista progetti, lista planimetrie del progetto.
 - Layout base (sidebar progetto, header), gestione token in memoria + refresh.
