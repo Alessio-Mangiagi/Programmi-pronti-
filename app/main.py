@@ -8,6 +8,7 @@ Endpoint principali:
     /projects, /plans, /form-templates   -> CRUD standard, gestiti da web
     /pins/{id}                            -> pin con submissions/task/foto (plan view)
     /submissions, /tasks                  -> creazione e aggiornamento da web
+    /plans/{id}/file, /attachments/{id}/upload, /files/{key} -> upload e download file
     /sync/push                            -> l'app nativa manda le modifiche fatte offline
     /sync/pull?project_id=..&since=..     -> l'app nativa scarica le modifiche dal server
 
@@ -23,13 +24,15 @@ Strategia di sync (vedi README):
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .forms import validate_schema, validate_submission
 from .database import engine, get_db
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS
+from . import storage as st
 from .schemas import to_naive_utc
 
 models.Base.metadata.create_all(bind=engine)
@@ -232,6 +235,106 @@ def delete_task(task_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "task not found")
     task.deleted_at = task.updated_at = utcnow()
     db.commit()
+
+
+# ---------- File: planimetrie e allegati ----------
+
+async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
+    """Legge il file entro il limite e ne riconosce il tipo dal contenuto."""
+    data = await file.read(st.MAX_UPLOAD_BYTES + 1)
+    if len(data) > st.MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"file larger than {st.MAX_UPLOAD_BYTES} bytes")
+    mime = st.sniff_mime(data)
+    if mime not in st.ALLOWED_MIME:
+        raise HTTPException(415, "only JPEG, PNG or PDF allowed")
+    return data, mime
+
+
+@app.post("/plans/{plan_id}/file", response_model=schemas.PlanOut)
+async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Carica l'immagine della planimetria. Un PDF viene convertito in PNG
+    (prima pagina) così tutti i client mostrano un'immagine e basta.
+    Le dimensioni in pixel servono ai client per posizionare i pin (x/y relativi).
+    """
+    plan = db.get(models.Plan, plan_id)
+    if plan is None:
+        raise HTTPException(404, "plan not found")
+    data, mime = await _read_upload(file)
+    if mime == "application/pdf":
+        try:
+            data = st.pdf_first_page_to_png(data)
+        except Exception:
+            raise HTTPException(422, "cannot render PDF")
+        ext = "png"
+    else:
+        ext = st.ALLOWED_MIME[mime]
+    try:
+        w, h = st.image_size(data)
+    except Exception:
+        raise HTTPException(422, "cannot read image")
+    plan.file_url = st.storage.save(f"plans/{plan.id}.{ext}", data)
+    plan.width_px, plan.height_px = float(w), float(h)
+    plan.updated_at = utcnow()
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+@app.post("/attachments", response_model=schemas.AttachmentOut, status_code=201)
+def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(get_db)):
+    """Crea il record (da web); i byte arrivano dopo con /attachments/{id}/upload."""
+    if bool(payload.submission_id) == bool(payload.task_id):
+        raise HTTPException(422, "exactly one of submission_id or task_id is required")
+    if payload.submission_id and not db.get(models.FormSubmission, payload.submission_id):
+        raise HTTPException(404, "submission not found")
+    if payload.task_id and not db.get(models.Task, payload.task_id):
+        raise HTTPException(404, "task not found")
+    att = models.Attachment(**payload.model_dump())
+    db.add(att)
+    db.commit()
+    db.refresh(att)
+    return att
+
+
+@app.post("/attachments/presign", response_model=schemas.PresignResponse)
+def presign_attachment(payload: schemas.PresignRequest, db: Session = Depends(get_db)):
+    """
+    L'app chiede dove caricare i byte di un allegato già sincronizzato.
+    Stub per l'MVP: upload diretto sull'API. In prod restituirà un presigned URL S3.
+    """
+    att = db.get(models.Attachment, payload.attachment_id)
+    if att is None or att.deleted_at is not None:
+        raise HTTPException(404, "attachment not found")
+    return schemas.PresignResponse(
+        attachment_id=att.id, method="POST",
+        upload_url=f"/attachments/{att.id}/upload", max_bytes=st.MAX_UPLOAD_BYTES,
+    )
+
+
+@app.post("/attachments/{attachment_id}/upload", response_model=schemas.AttachmentOut)
+async def upload_attachment(attachment_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Carica i byte di un allegato. Idempotente: un retry sovrascrive lo stesso file."""
+    att = db.get(models.Attachment, attachment_id)
+    if att is None or att.deleted_at is not None:
+        raise HTTPException(404, "attachment not found")
+    data, mime = await _read_upload(file)
+    ext = st.ALLOWED_MIME[mime]
+    att.file_url = st.storage.save(f"attachments/{att.id}.{ext}", data)
+    if not att.file_type:
+        att.file_type = "doc" if mime == "application/pdf" else "photo"
+    att.updated_at = utcnow()
+    db.commit()
+    db.refresh(att)
+    return att
+
+
+@app.get("/files/{key:path}")
+def get_file(key: str):
+    """Serve i file dello storage locale. Con S3 questo endpoint sparisce (URL diretti)."""
+    if not st.storage.exists(key):
+        raise HTTPException(404, "file not found")
+    return FileResponse(st.storage.path(key))
 
 
 # ---------- Sync offline-first (uso da app nativa) ----------

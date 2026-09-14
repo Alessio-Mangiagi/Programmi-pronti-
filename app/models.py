@@ -84,9 +84,10 @@ class Plan(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     project_id = Column(String, ForeignKey("projects.id"), nullable=False, index=True)
     name = Column(String, nullable=False)          # es. "Piano terra"
-    file_url = Column(String, nullable=False)       # url nello storage (S3-like)
-    width_px = Column(Float, nullable=False)
-    height_px = Column(Float, nullable=False)
+    # Valorizzati da POST /plans/{id}/file. Nulli finché il file non è caricato.
+    file_url = Column(String, nullable=True)        # url nello storage (S3-like)
+    width_px = Column(Float, nullable=True)
+    height_px = Column(Float, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -160,7 +161,9 @@ class Attachment(SyncMixin, Base):
 
     submission_id = Column(String, ForeignKey("form_submissions.id"), nullable=True, index=True)
     task_id = Column(String, ForeignKey("tasks.id"), nullable=True, index=True)
-    file_url = Column(String, nullable=False)
+    # Nullo finché il file non è stato caricato (l'app crea prima il record
+    # nel sync, poi manda i byte a POST /attachments/{id}/upload).
+    file_url = Column(String, nullable=True)
     file_type = Column(String, nullable=True)  # "photo", "signature", "doc"
 
     submission = relationship("FormSubmission", back_populates="attachments")

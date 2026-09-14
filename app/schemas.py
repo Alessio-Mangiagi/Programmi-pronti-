@@ -28,9 +28,10 @@ class ProjectOut(ProjectCreate):
 class PlanCreate(BaseModel):
     project_id: str
     name: str
-    file_url: str
-    width_px: float
-    height_px: float
+    # Opzionali: normalmente il file arriva dopo con POST /plans/{id}/file.
+    file_url: Optional[str] = None
+    width_px: Optional[float] = None
+    height_px: Optional[float] = None
 
 
 class PlanOut(PlanCreate):
@@ -53,15 +54,33 @@ class FormTemplateOut(FormTemplateCreate):
     updated_at: datetime
 
 
-class AttachmentOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: str
+class AttachmentCreate(BaseModel):
     submission_id: Optional[str] = None
     task_id: Optional[str] = None
-    file_url: str
-    file_type: Optional[str] = None
+    file_type: Optional[str] = None  # "photo", "signature", "doc"
+
+
+class AttachmentOut(AttachmentCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    file_url: Optional[str] = None   # None = byte non ancora caricati
     created_at: datetime
     updated_at: datetime
+
+
+class PresignRequest(BaseModel):
+    attachment_id: str
+
+
+class PresignResponse(BaseModel):
+    """
+    Dove e come caricare i byte di un allegato. Oggi punta all'upload diretto
+    sull'API; con S3 diventerà un presigned PUT e `fields`/`headers` cambieranno.
+    """
+    attachment_id: str
+    method: str
+    upload_url: str
+    max_bytes: int
 
 
 class SubmissionCreate(BaseModel):
@@ -189,7 +208,7 @@ class TaskSync(SyncBase):
 class AttachmentSync(SyncBase):
     submission_id: Optional[str] = None
     task_id: Optional[str] = None
-    file_url: str
+    file_url: Optional[str] = None   # il device lo lascia nullo, lo imposta l'upload
     file_type: Optional[str] = None
 
 

@@ -52,7 +52,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Test per transizioni illegali (409) e filtri.
 - **DoD**: da Swagger si crea pin → submission → task e si porta il task a `verified`.
 
-### Giorno 3 — Upload file (planimetrie e foto)
+### Giorno 3 — Upload file (planimetrie e foto) ✅ (2026-09-14)
 - `app/storage.py`: interfaccia `save(file) → url`, `open(url)`; implementazione filesystem `storage/`; route `GET /files/{path}`.
 - `POST /plans/{id}/file`: accetta PNG/JPG/PDF; PDF → PNG prima pagina con `pypdfium2`; calcola `width_px/height_px` con Pillow.
 - `POST /attachments/{id}/upload`: multipart, aggiorna `file_url`; `POST /attachments/presign` stub che oggi restituisce l'URL di upload diretto (in prod diventa presigned S3).
