@@ -185,6 +185,15 @@ class PinOut(BaseModel):
     updated_at: datetime
 
 
+class PinSummary(PinOut):
+    """Pin + conteggi: basta alla plan view per colorare i marker senza caricare i dettagli."""
+    submissions_count: int = 0
+    tasks_open: int = 0
+    tasks_assigned: int = 0
+    tasks_resolved: int = 0
+    tasks_verified: int = 0
+
+
 class PinDetail(PinOut):
     """Pin con tutto ciò che gli è agganciato: è ciò che apre la plan view al click."""
     submissions: list[SubmissionOut] = []

@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import ProjectsPage from './pages/ProjectsPage'
 import PlansPage from './pages/PlansPage'
+import PlanPage from './pages/PlanPage'
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth()
@@ -27,6 +28,7 @@ export default function App() {
         <Route index element={<Navigate to="/projects" replace />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:projectId/plans" element={<PlansPage />} />
+        <Route path="/projects/:projectId/plans/:planId" element={<PlanPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

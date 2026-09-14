@@ -37,13 +37,13 @@ export default function PlansPage() {
         ) : (
           <div className="grid">
             {plans.map((plan) => (
-              <div key={plan.id} className="card">
+              <Link key={plan.id} to={`/projects/${projectId}/plans/${plan.id}`} className="card card-link">
                 <AuthImage fileUrl={plan.file_url} className="thumb" alt={plan.name} />
                 <h2>{plan.name}</h2>
                 <div className="muted small">
                   {plan.width_px && plan.height_px ? `${plan.width_px} × ${plan.height_px} px` : 'File non caricato'}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

@@ -174,3 +174,36 @@ def test_pin_detail_nested(client, project, pin):
     assert [t["id"] for t in body["tasks"]] == [task["id"]]
     assert [a["id"] for a in body["tasks"][0]["attachments"]] == [att_task]
     assert client.get("/pins/nope").status_code == 404
+
+
+# ---------- pin della planimetria ----------
+
+def test_list_plan_pins_with_counts(client, project, pin, users):
+    plan_id = project["plan"]["id"]
+    tpl = project["template"]["id"]
+    client.post("/submissions", json={"template_id": tpl, "pin_id": pin, "data_json": {"esito": "Conforme"}})
+    client.post("/submissions", json={"template_id": tpl, "pin_id": pin, "data_json": {"esito": "Conforme"}})
+    client.post("/tasks", json={"pin_id": pin, "title": "a"})
+    t = client.post("/tasks", json={"pin_id": pin, "title": "b", "assigned_to": users["field"]["id"]}).json()
+    client.patch(f"/tasks/{t['id']}", json={"status": "resolved"})
+    gone = client.post("/tasks", json={"pin_id": pin, "title": "c"}).json()
+    client.delete(f"/tasks/{gone['id']}")
+    empty_pin = str(uuid.uuid4())
+    deleted_pin = str(uuid.uuid4())
+    push(client, pins=[{"id": empty_pin, "plan_id": plan_id, "x": 0.2, "y": 0.2},
+                       {"id": deleted_pin, "plan_id": plan_id, "x": 0.3, "y": 0.3,
+                        "deleted_at": datetime.now(timezone.utc).isoformat()}])
+
+    r = client.get(f"/plans/{plan_id}/pins")
+    assert r.status_code == 200
+    by_id = {p["id"]: p for p in r.json()}
+    assert set(by_id) == {pin, empty_pin}
+    assert by_id[pin]["submissions_count"] == 2
+    assert (by_id[pin]["tasks_open"], by_id[pin]["tasks_assigned"], by_id[pin]["tasks_resolved"],
+            by_id[pin]["tasks_verified"]) == (1, 0, 1, 0)
+    assert by_id[empty_pin]["submissions_count"] == 0 and by_id[empty_pin]["tasks_open"] == 0
+
+    assert client.get(f"/plans/{plan_id}/pins", headers=users["outsider"]["headers"]).status_code == 403
+    assert client.get("/plans/nope/pins").status_code == 404
+    assert client.get(f"/plans/{plan_id}").json()["name"] == "Piano terra"
+    assert client.get(f"/plans/{plan_id}", headers=users["outsider"]["headers"]).status_code == 403

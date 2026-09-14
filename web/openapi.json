@@ -489,6 +489,99 @@
         }
       }
     },
+    "/plans/{plan_id}": {
+      "get": {
+        "summary": "Get Plan",
+        "operationId": "get_plan_plans__plan_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plans/{plan_id}/pins": {
+      "get": {
+        "summary": "List Plan Pins",
+        "description": "Pin (non cancellati) della planimetria con conteggi di submission e task per stato.",
+        "operationId": "list_plan_pins_plans__plan_id__pins_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PinSummary"
+                  },
+                  "title": "Response List Plan Pins Plans  Plan Id  Pins Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/form-templates": {
       "get": {
         "summary": "List Form Templates",
@@ -1781,6 +1874,94 @@
         ],
         "title": "PinDetail",
         "description": "Pin con tutto ciò che gli è agganciato: è ciò che apre la plan view al click."
+      },
+      "PinSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "submissions_count": {
+            "type": "integer",
+            "title": "Submissions Count",
+            "default": 0
+          },
+          "tasks_open": {
+            "type": "integer",
+            "title": "Tasks Open",
+            "default": 0
+          },
+          "tasks_assigned": {
+            "type": "integer",
+            "title": "Tasks Assigned",
+            "default": 0
+          },
+          "tasks_resolved": {
+            "type": "integer",
+            "title": "Tasks Resolved",
+            "default": 0
+          },
+          "tasks_verified": {
+            "type": "integer",
+            "title": "Tasks Verified",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "plan_id",
+          "x",
+          "y",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PinSummary",
+        "description": "Pin + conteggi: basta alla plan view per colorare i marker senza caricare i dettagli."
       },
       "PinSync": {
         "properties": {

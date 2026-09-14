@@ -166,6 +166,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plans/{plan_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plan */
+        get: operations["get_plan_plans__plan_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{plan_id}/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plan Pins
+         * @description Pin (non cancellati) della planimetria con conteggi di submission e task per stato.
+         */
+        get: operations["list_plan_pins_plans__plan_id__pins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/form-templates": {
         parameters: {
             query?: never;
@@ -624,6 +661,59 @@ export interface components {
              * @default []
              */
             tasks: components["schemas"]["TaskOut"][];
+        };
+        /**
+         * PinSummary
+         * @description Pin + conteggi: basta alla plan view per colorare i marker senza caricare i dettagli.
+         */
+        PinSummary: {
+            /** Id */
+            id: string;
+            /** Plan Id */
+            plan_id: string;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Label */
+            label?: string | null;
+            /** Created By */
+            created_by?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Submissions Count
+             * @default 0
+             */
+            submissions_count: number;
+            /**
+             * Tasks Open
+             * @default 0
+             */
+            tasks_open: number;
+            /**
+             * Tasks Assigned
+             * @default 0
+             */
+            tasks_assigned: number;
+            /**
+             * Tasks Resolved
+             * @default 0
+             */
+            tasks_resolved: number;
+            /**
+             * Tasks Verified
+             * @default 0
+             */
+            tasks_verified: number;
         };
         /** PinSync */
         PinSync: {
@@ -1364,6 +1454,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plan_plans__plan_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plan_pins_plans__plan_id__pins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinSummary"][];
                 };
             };
             /** @description Validation Error */

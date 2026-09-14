@@ -74,10 +74,11 @@ input:focus, select:focus, textarea:focus {
 .small { font-size: 0.85rem; }
 
 /* Layout */
-.layout { display: flex; min-height: 100%; }
+.layout { display: flex; height: 100vh; }
 .sidebar {
   width: var(--sidebar-w);
   flex: none;
+  overflow-y: auto;
   background: var(--text);
   color: #e6e9ee;
   display: flex;
@@ -103,7 +104,7 @@ input:focus, select:focus, textarea:focus {
 .sidebar-footer .btn { margin-top: 0.5rem; background: transparent; color: #c9d0d9; border-color: rgba(255,255,255,0.2); }
 .sidebar-footer .btn:hover { background: rgba(255,255,255,0.08); }
 
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   padding: 0.9rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border);
@@ -146,3 +147,55 @@ input:focus, select:focus, textarea:focus {
   .sidebar-footer .btn { margin: 0; }
   .content { padding: 1rem; }
 }
+
+/* Plan view */
+.plan-page { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.plan-page .error { padding: 0.5rem 1.5rem; }
+.plan-viewer {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  background: #e9ecef;
+  background-image: radial-gradient(#d4d9df 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.plan-viewer-wrapper { width: 100% !important; height: 100% !important; }
+.plan-viewer-content { }
+.plan-canvas { position: relative; box-shadow: 0 2px 12px rgba(0,0,0,0.18); background: #fff; }
+.plan-canvas img { display: block; user-select: none; -webkit-user-drag: none; }
+.plan-viewer-empty { padding: 3rem; text-align: center; color: var(--muted); }
+.plan-toolbar {
+  position: absolute; right: 1rem; bottom: 1rem; display: flex; gap: 0.35rem; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.35rem; box-shadow: var(--shadow);
+}
+.plan-toolbar .btn { padding: 0.3rem 0.65rem; font-size: 1.05rem; line-height: 1; }
+.plan-zoom { min-width: 3.2em; text-align: right; padding-right: 0.3rem; }
+
+/* Pin marker: la punta della goccia è sul punto (x, y) */
+.pin {
+  position: absolute; transform-origin: 50% 100%;
+  width: 28px; height: 37px; padding: 0; border: 0; background: none; cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+}
+.pin svg { display: block; width: 28px; height: 37px; }
+.pin svg path { fill: var(--pin-color, #6b7684); stroke: #fff; stroke-width: 1.5; }
+.pin svg circle { fill: #fff; }
+.pin:hover, .pin-selected { z-index: 2; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.pin-selected svg path { stroke: var(--text); stroke-width: 2.5; }
+.pin-count {
+  position: absolute; top: -6px; right: -8px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--text); color: #fff; font-size: 11px; font-weight: 700;
+  line-height: 18px; text-align: center; border: 1.5px solid #fff;
+}
+.pin-open { --pin-color: #c0392b; }
+.pin-assigned { --pin-color: #d68910; }
+.pin-resolved { --pin-color: #2e8b57; }
+.pin-verified { --pin-color: #6b7684; }
+.pin-submission { --pin-color: #1f5f8b; }
+.pin-empty { --pin-color: #b8c0c9; }
+
+.legend { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
+.legend-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--pin-color); border: 1px solid rgba(0,0,0,0.15); }
+
+.pin-tooltip { position: absolute; left: 1rem; bottom: 1rem; max-width: 320px; z-index: 3; }
+.pin-tooltip .btn { margin-top: 0.5rem; padding: 0.3rem 0.7rem; }

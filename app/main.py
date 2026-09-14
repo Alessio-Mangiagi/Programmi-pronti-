@@ -35,6 +35,7 @@ from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -174,6 +175,49 @@ def create_plan(payload: schemas.PlanCreate, db: Session = Depends(get_db),
 def list_plans(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     auth.assert_project_access(db, user, project_id)
     return db.query(models.Plan).filter(models.Plan.project_id == project_id).order_by(models.Plan.name).all()
+
+
+@app.get("/plans/{plan_id}", response_model=schemas.PlanOut)
+def get_plan(plan_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    plan = db.get(models.Plan, plan_id)
+    if plan is None:
+        raise HTTPException(404, "plan not found")
+    auth.assert_project_access(db, user, plan.project_id)
+    return plan
+
+
+@app.get("/plans/{plan_id}/pins", response_model=list[schemas.PinSummary])
+def list_plan_pins(plan_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Pin (non cancellati) della planimetria con conteggi di submission e task per stato."""
+    plan = db.get(models.Plan, plan_id)
+    if plan is None:
+        raise HTTPException(404, "plan not found")
+    auth.assert_project_access(db, user, plan.project_id)
+
+    pins = _alive(db.query(models.Pin).filter(models.Pin.plan_id == plan_id), models.Pin).all()
+    if not pins:
+        return []
+    pin_ids = [p.id for p in pins]
+
+    sub_counts = dict(
+        db.query(models.FormSubmission.pin_id, func.count())
+        .filter(models.FormSubmission.pin_id.in_(pin_ids), models.FormSubmission.deleted_at.is_(None))
+        .group_by(models.FormSubmission.pin_id).all()
+    )
+    task_counts: dict[tuple[str, TaskStatus], int] = {
+        (pid, status): n for pid, status, n in
+        db.query(models.Task.pin_id, models.Task.status, func.count())
+        .filter(models.Task.pin_id.in_(pin_ids), models.Task.deleted_at.is_(None))
+        .group_by(models.Task.pin_id, models.Task.status).all()
+    }
+    out = []
+    for p in pins:
+        item = schemas.PinSummary.model_validate(p)
+        item.submissions_count = sub_counts.get(p.id, 0)
+        for status in TaskStatus:
+            setattr(item, f"tasks_{status.value}", task_counts.get((p.id, status), 0))
+        out.append(item)
+    return out
 
 
 @app.post("/form-templates", response_model=schemas.FormTemplateOut, status_code=201)

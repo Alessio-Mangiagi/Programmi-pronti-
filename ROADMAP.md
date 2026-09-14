@@ -83,7 +83,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Layout base (sidebar progetto, header), gestione token in memoria + refresh.
 - **DoD**: login con utente seed, navigo fino alla lista planimetrie.
 
-### Giorno 7 — Viewer planimetria con pin
+### Giorno 7 — Viewer planimetria con pin ✅ (2026-09-14)
 - Componente `PlanViewer`: immagine con pan/zoom (`react-zoom-pan-pinch`), overlay pin posizionati in coordinate relative 0-1.
 - Pin colorati per stato del task più critico (aperto=rosso, assegnato=giallo, risolto=verde, verificato=grigio, solo submission=blu).
 - Cluster non necessario: se >300 pin, mostrare solo pin filtrati (giorno 9).
