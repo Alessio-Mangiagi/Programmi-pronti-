@@ -2,6 +2,7 @@
 API core per il sistema tipo Field View.
 
 Avvio locale (dalla root del progetto):
+    alembic upgrade head
     uvicorn app.main:app --reload
 
 Endpoint principali:
@@ -30,12 +31,10 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .forms import validate_schema, validate_submission
-from .database import engine, get_db
+from .database import get_db
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS
 from . import storage as st
 from .schemas import to_naive_utc
-
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Field View Starter API")
 

@@ -1,54 +1,11 @@
 """
-Test end-to-end del protocollo di sync su SQLite in memoria.
+Test end-to-end del protocollo di sync (fixture in conftest.py).
 Esecuzione: pytest -q
 """
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app import models
-from app.database import get_db
-from app.main import app
-
-
-@pytest.fixture()
-def client():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
-    models.Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(bind=engine)
-
-    def override():
-        db = Session()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture()
-def project(client):
-    """Progetto + planimetria + template creati da web."""
-    p = client.post("/projects", json={"name": "Cantiere A"}).json()
-    plan = client.post("/plans", json={
-        "project_id": p["id"], "name": "Piano terra",
-        "file_url": "s3://x/pt.png", "width_px": 1000, "height_px": 800,
-    }).json()
-    tpl = client.post("/form-templates", json={
-        "name": "Ispezione", "schema_def": {"fields": [{"id": "esito", "type": "select", "label": "Esito", "options": ["Conforme", "Non conforme"]}]},
-    }).json()
-    return {"project": p, "plan": plan, "template": tpl}
 
 
 def iso(dt: datetime) -> str:

@@ -7,32 +7,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from tests.test_sync import client, project  # noqa: F401  (fixture)
-
-
-@pytest.fixture()
-def pin(client, project):  # noqa: F811
-    pin_id = str(uuid.uuid4())
-    r = client.post("/sync/push", json={"pins": [{
-        "id": pin_id, "plan_id": project["plan"]["id"], "x": 0.5, "y": 0.5,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }]})
-    assert r.json()["pins"]["inserted"] == 1
-    return pin_id
-
-
-def push(client, **groups):  # noqa: F811
-    now = datetime.now(timezone.utc).isoformat()
-    for items in groups.values():
-        for it in items:
-            it.setdefault("id", str(uuid.uuid4()))
-            it.setdefault("updated_at", now)
-    return client.post("/sync/push", json=groups).json()
+from tests.conftest import push
 
 
 # ---------- submissions ----------
 
-def test_create_submission_valid(client, project, pin):  # noqa: F811
+def test_create_submission_valid(client, project, pin):
     r = client.post("/submissions", json={
         "template_id": project["template"]["id"], "pin_id": pin,
         "data_json": {"esito": "Conforme"}, "submitted_by": "u1",
@@ -43,7 +23,7 @@ def test_create_submission_valid(client, project, pin):  # noqa: F811
     assert client.get(f"/submissions/{body['id']}").json()["id"] == body["id"]
 
 
-def test_create_submission_invalid_data(client, project, pin):  # noqa: F811
+def test_create_submission_invalid_data(client, project, pin):
     r = client.post("/submissions", json={
         "template_id": project["template"]["id"], "pin_id": pin,
         "data_json": {"esito": "Boh", "extra": 1},
@@ -54,13 +34,13 @@ def test_create_submission_invalid_data(client, project, pin):  # noqa: F811
     }
 
 
-def test_create_submission_unknown_template_or_pin(client, project, pin):  # noqa: F811
+def test_create_submission_unknown_template_or_pin(client, project, pin):
     base = {"data_json": {}}
     assert client.post("/submissions", json={**base, "template_id": "nope", "pin_id": pin}).status_code == 404
     assert client.post("/submissions", json={**base, "template_id": project["template"]["id"], "pin_id": "nope"}).status_code == 404
 
 
-def test_sync_push_rejects_invalid_submission_with_reason(client, project, pin):  # noqa: F811
+def test_sync_push_rejects_invalid_submission_with_reason(client, project, pin):
     bad, good = str(uuid.uuid4()), str(uuid.uuid4())
     r = push(client, submissions=[
         {"id": bad, "template_id": project["template"]["id"], "pin_id": pin, "data_json": {"esito": "Boh"}},
@@ -70,7 +50,7 @@ def test_sync_push_rejects_invalid_submission_with_reason(client, project, pin):
     assert r["submissions"]["rejected"] == [{"id": bad, "reason": "data_json: esito: not one of options"}]
 
 
-def test_sync_push_delete_skips_validation(client, project, pin):  # noqa: F811
+def test_sync_push_delete_skips_validation(client, project, pin):
     """Cancellare una submission con dati ormai non validi deve funzionare."""
     sid = str(uuid.uuid4())
     push(client, submissions=[{"id": sid, "template_id": project["template"]["id"], "pin_id": pin,
@@ -81,14 +61,14 @@ def test_sync_push_delete_skips_validation(client, project, pin):  # noqa: F811
     assert r["submissions"]["updated"] == 1 and r["submissions"]["rejected"] == []
 
 
-def test_sync_push_rejects_invalid_task_status(client, pin):  # noqa: F811
+def test_sync_push_rejects_invalid_task_status(client, pin):
     r = push(client, tasks=[{"pin_id": pin, "title": "x", "status": "done"}])
     assert r["tasks"]["rejected"][0]["reason"] == "invalid status 'done'"
 
 
 # ---------- tasks ----------
 
-def test_task_lifecycle_open_to_verified(client, project, pin):  # noqa: F811
+def test_task_lifecycle_open_to_verified(client, project, pin):
     r = client.post("/tasks", json={"pin_id": pin, "title": "Quadro aperto"})
     assert r.status_code == 201 and r.json()["status"] == "open"
     tid = r.json()["id"]
@@ -110,27 +90,27 @@ def test_task_lifecycle_open_to_verified(client, project, pin):  # noqa: F811
     assert client.patch(f"/tasks/{tid}", json={"status": "verified"}).status_code == 200
 
 
-def test_task_reopen_from_resolved(client, pin):  # noqa: F811
+def test_task_reopen_from_resolved(client, pin):
     tid = client.post("/tasks", json={"pin_id": pin, "title": "t", "assigned_to": "anna"}).json()["id"]
     assert client.get(f"/tasks/{tid}").json()["status"] == "assigned"
     client.patch(f"/tasks/{tid}", json={"status": "resolved"})
     assert client.patch(f"/tasks/{tid}", json={"status": "open"}).json()["status"] == "open"
 
 
-def test_task_assigning_open_task_moves_to_assigned(client, pin):  # noqa: F811
+def test_task_assigning_open_task_moves_to_assigned(client, pin):
     tid = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()["id"]
     r = client.patch(f"/tasks/{tid}", json={"assigned_to": "luca", "due_date": "2026-10-01T00:00:00Z"})
     assert r.json()["status"] == "assigned" and r.json()["due_date"] == "2026-10-01T00:00:00"
 
 
-def test_task_invalid_status_and_not_found(client, pin):  # noqa: F811
+def test_task_invalid_status_and_not_found(client, pin):
     tid = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()["id"]
     assert client.patch(f"/tasks/{tid}", json={"status": "done"}).status_code == 422
     assert client.patch("/tasks/nope", json={"title": "x"}).status_code == 404
     assert client.post("/tasks", json={"pin_id": "nope", "title": "t"}).status_code == 404
 
 
-def test_task_delete_is_soft_and_synced(client, project, pin):  # noqa: F811
+def test_task_delete_is_soft_and_synced(client, project, pin):
     tid = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()["id"]
     assert client.delete(f"/tasks/{tid}").status_code == 204
     assert client.get(f"/tasks/{tid}").status_code == 404
@@ -139,7 +119,7 @@ def test_task_delete_is_soft_and_synced(client, project, pin):  # noqa: F811
     assert [t["deleted_at"] is not None for t in pulled if t["id"] == tid] == [True]
 
 
-def test_list_tasks_filters(client, project, pin):  # noqa: F811
+def test_list_tasks_filters(client, project, pin):
     pid = project["project"]["id"]
     other_plan = client.post("/plans", json={
         "project_id": pid, "name": "P1", "file_url": "x", "width_px": 1, "height_px": 1}).json()
@@ -164,7 +144,7 @@ def test_list_tasks_filters(client, project, pin):  # noqa: F811
 
 # ---------- pin detail ----------
 
-def test_pin_detail_nested(client, project, pin):  # noqa: F811
+def test_pin_detail_nested(client, project, pin):
     sub = client.post("/submissions", json={
         "template_id": project["template"]["id"], "pin_id": pin, "data_json": {"esito": "Non conforme"}}).json()
     task = client.post("/tasks", json={"pin_id": pin, "title": "fix"}).json()

@@ -10,14 +10,7 @@ import pytest
 from PIL import Image
 
 from app import storage as st
-from tests.test_sync import client, project  # noqa: F401  (fixture)
-from tests.test_tasks_submissions import pin, push  # noqa: F401  (fixture)
-
-
-@pytest.fixture(autouse=True)
-def tmp_storage(tmp_path, monkeypatch):
-    monkeypatch.setattr(st.storage, "root", tmp_path / "storage")
-    return st.storage
+from tests.conftest import push
 
 
 def png_bytes(w=300, h=200) -> bytes:
@@ -40,7 +33,7 @@ def pdf_bytes(w_pt=842, h_pt=595) -> bytes:
     return buf.getvalue()
 
 
-def upload(client, url, data, name="f.bin", content_type="application/octet-stream"):  # noqa: F811
+def upload(client, url, data, name="f.bin", content_type="application/octet-stream"):
     return client.post(url, files={"file": (name, data, content_type)})
 
 
@@ -61,13 +54,13 @@ def test_storage_rejects_path_traversal(tmp_storage):
 
 # ---------- plans ----------
 
-def test_plan_created_without_file(client, project):  # noqa: F811
+def test_plan_created_without_file(client, project):
     r = client.post("/plans", json={"project_id": project["project"]["id"], "name": "Piano 1"})
     assert r.status_code == 201
     assert r.json()["file_url"] is None and r.json()["width_px"] is None
 
 
-def test_upload_plan_png(client, project):  # noqa: F811
+def test_upload_plan_png(client, project):
     plan_id = project["plan"]["id"]
     r = upload(client, f"/plans/{plan_id}/file", png_bytes(300, 200), "pt.png")
     assert r.status_code == 200, r.text
@@ -82,12 +75,12 @@ def test_upload_plan_png(client, project):  # noqa: F811
     assert pulled["plans"][0]["file_url"] == body["file_url"]
 
 
-def test_upload_plan_jpg_keeps_format(client, project):  # noqa: F811
+def test_upload_plan_jpg_keeps_format(client, project):
     r = upload(client, f"/plans/{project['plan']['id']}/file", jpg_bytes(120, 80), "x.jpg")
     assert r.json()["file_url"].endswith(".jpg") and r.json()["width_px"] == 120
 
 
-def test_upload_plan_pdf_is_rendered_to_png(client, project):  # noqa: F811
+def test_upload_plan_pdf_is_rendered_to_png(client, project):
     r = upload(client, f"/plans/{project['plan']['id']}/file", pdf_bytes(842, 595), "plan.pdf", "application/pdf")
     assert r.status_code == 200, r.text
     body = r.json()
@@ -99,12 +92,12 @@ def test_upload_plan_pdf_is_rendered_to_png(client, project):  # noqa: F811
     assert st.image_size(png) == (3368, 2380)
 
 
-def test_upload_plan_pdf_large_page_is_capped(client, project):  # noqa: F811
+def test_upload_plan_pdf_large_page_is_capped(client, project):
     r = upload(client, f"/plans/{project['plan']['id']}/file", pdf_bytes(2384, 1684), "a1.pdf")  # A1
     assert r.json()["width_px"] == st.PDF_RENDER_MAX_SIDE
 
 
-def test_upload_plan_rejects_bad_type_and_size(client, project):  # noqa: F811
+def test_upload_plan_rejects_bad_type_and_size(client, project):
     url = f"/plans/{project['plan']['id']}/file"
     assert upload(client, url, b"GIF89a" + b"\x00" * 100, "x.gif", "image/gif").status_code == 415
     assert upload(client, url, b"<html>", "x.png", "image/png").status_code == 415  # header mente
@@ -114,7 +107,7 @@ def test_upload_plan_rejects_bad_type_and_size(client, project):  # noqa: F811
     assert upload(client, "/plans/nope/file", png_bytes()).status_code == 404
 
 
-def test_reupload_overwrites_same_key(client, project):  # noqa: F811
+def test_reupload_overwrites_same_key(client, project):
     url = f"/plans/{project['plan']['id']}/file"
     upload(client, url, png_bytes(300, 200))
     r = upload(client, url, png_bytes(50, 50))
@@ -124,7 +117,7 @@ def test_reupload_overwrites_same_key(client, project):  # noqa: F811
 
 # ---------- attachments ----------
 
-def test_attachment_web_flow(client, project, pin):  # noqa: F811
+def test_attachment_web_flow(client, project, pin):
     task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
     r = client.post("/attachments", json={"task_id": task["id"]})
     assert r.status_code == 201 and r.json()["file_url"] is None
@@ -141,7 +134,7 @@ def test_attachment_web_flow(client, project, pin):  # noqa: F811
     assert detail["tasks"][0]["attachments"][0]["file_url"].endswith(".jpg")
 
 
-def test_attachment_create_validation(client, project, pin):  # noqa: F811
+def test_attachment_create_validation(client, project, pin):
     task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
     sub = client.post("/submissions", json={
         "template_id": project["template"]["id"], "pin_id": pin, "data_json": {"esito": "Conforme"}}).json()
@@ -152,7 +145,7 @@ def test_attachment_create_validation(client, project, pin):  # noqa: F811
     assert client.post("/attachments", json={"submission_id": sub["id"], "file_type": "signature"}).status_code == 201
 
 
-def test_attachment_mobile_flow_sync_then_presign_then_upload(client, project, pin):  # noqa: F811
+def test_attachment_mobile_flow_sync_then_presign_then_upload(client, project, pin):
     """Il device crea il record offline (file_url nullo), poi carica i byte."""
     task_id, att_id = str(uuid.uuid4()), str(uuid.uuid4())
     r = push(client,
@@ -178,14 +171,14 @@ def test_attachment_mobile_flow_sync_then_presign_then_upload(client, project, p
     assert [a["file_url"] for a in pulled["attachments"] if a["id"] == att_id] == [r.json()["file_url"]]
 
 
-def test_attachment_upload_pdf_becomes_doc(client, pin):  # noqa: F811
+def test_attachment_upload_pdf_becomes_doc(client, pin):
     task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
     att = client.post("/attachments", json={"task_id": task["id"]}).json()
     r = upload(client, f"/attachments/{att['id']}/upload", pdf_bytes(), "x.pdf")
     assert r.json()["file_type"] == "doc" and r.json()["file_url"].endswith(".pdf")
 
 
-def test_attachment_upload_errors(client, pin):  # noqa: F811
+def test_attachment_upload_errors(client, pin):
     assert upload(client, "/attachments/nope/upload", png_bytes()).status_code == 404
     assert client.post("/attachments/presign", json={"attachment_id": "nope"}).status_code == 404
     task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
@@ -197,6 +190,6 @@ def test_attachment_upload_errors(client, pin):  # noqa: F811
     assert upload(client, f"/attachments/{att['id']}/upload", png_bytes()).status_code == 404
 
 
-def test_get_file_not_found_and_traversal(client):  # noqa: F811
+def test_get_file_not_found_and_traversal(client):
     assert client.get("/files/plans/nope.png").status_code == 404
     assert client.get("/files/../requirements.txt").status_code in (404, 422)

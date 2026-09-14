@@ -1,0 +1,21 @@
+# Solo il database per lo sviluppo locale. L'API gira con uvicorn sulla macchina.
+# Avvio: docker compose up -d   poi   DATABASE_URL=postgresql+psycopg://fieldview:fieldview@localhost:5432/fieldview
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fieldview
+      POSTGRES_PASSWORD: fieldview
+      POSTGRES_DB: fieldview
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fieldview"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

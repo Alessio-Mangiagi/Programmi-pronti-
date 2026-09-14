@@ -26,9 +26,13 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Text, Float, ForeignKey, DateTime, Enum, JSON, Index
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
+
+# JSON generico su SQLite, JSONB su Postgres (indicizzabile, query sui campi).
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 def gen_uuid():
@@ -124,7 +128,7 @@ class FormTemplate(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False)         # es. "Ispezione sicurezza"
     category = Column(String, nullable=True)       # es. "safety", "quality"
-    schema_def = Column(JSON, nullable=False)     # definizione campi
+    schema_def = Column(JSONType, nullable=False)     # definizione campi
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -135,7 +139,7 @@ class FormSubmission(SyncMixin, Base):
 
     template_id = Column(String, ForeignKey("form_templates.id"), nullable=False)
     pin_id = Column(String, ForeignKey("pins.id"), nullable=False, index=True)
-    data_json = Column(JSON, nullable=False)       # risposte, chiave = field id
+    data_json = Column(JSONType, nullable=False)       # risposte, chiave = field id
     submitted_by = Column(String, nullable=True)
 
     pin = relationship("Pin", back_populates="submissions")

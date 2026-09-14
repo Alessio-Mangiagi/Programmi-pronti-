@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from app.forms import validate_schema, validate_submission
-from tests.test_sync import client  # noqa: F401  (fixture)
 
 EXAMPLE = json.loads(
     (Path(__file__).parent.parent / "form_schema_example.json").read_text(encoding="utf-8")
@@ -174,13 +173,13 @@ def test_submission_single_photo_limit():
 
 # ---------- endpoint ----------
 
-def test_post_form_template_accepts_example(client):  # noqa: F811
+def test_post_form_template_accepts_example(client):
     r = client.post("/form-templates", json=EXAMPLE)
     assert r.status_code == 201, r.text
     assert r.json()["schema_def"] == SCHEMA
 
 
-def test_post_form_template_rejects_invalid_schema(client):  # noqa: F811
+def test_post_form_template_rejects_invalid_schema(client):
     r = client.post("/form-templates", json={"name": "X", "schema_def": {"fields": [{"id": "A"}]}})
     assert r.status_code == 422
     detail = r.json()["detail"]
