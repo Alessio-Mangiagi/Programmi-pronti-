@@ -112,7 +112,7 @@ class FormTemplate(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False)         # es. "Ispezione sicurezza"
     category = Column(String, nullable=True)       # es. "safety", "quality"
-    schema_json = Column(JSON, nullable=False)     # definizione campi
+    schema_def = Column(JSON, nullable=False)     # definizione campi
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 

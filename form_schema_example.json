@@ -1,51 +1,71 @@
 {
   "name": "Ispezione sicurezza",
   "category": "safety",
-  "fields": [
-    {
-      "id": "area",
-      "type": "text",
-      "label": "Area ispezionata",
-      "required": true
-    },
-    {
-      "id": "esito",
-      "type": "select",
-      "label": "Esito",
-      "required": true,
-      "options": ["Conforme", "Non conforme", "Da verificare"]
-    },
-    {
-      "id": "dpi_indossati",
-      "type": "checkbox",
-      "label": "DPI indossati correttamente",
-      "required": false
-    },
-    {
-      "id": "note",
-      "type": "textarea",
-      "label": "Note",
-      "required": false
-    },
-    {
-      "id": "foto",
-      "type": "photo",
-      "label": "Foto evidenza",
-      "required": false,
-      "multiple": true
-    },
-    {
-      "id": "firma_ispettore",
-      "type": "signature",
-      "label": "Firma ispettore",
-      "required": true
-    },
-    {
-      "id": "data_ispezione",
-      "type": "date",
-      "label": "Data ispezione",
-      "required": true,
-      "default": "today"
-    }
-  ]
+  "schema_def": {
+    "fields": [
+      {
+        "id": "area",
+        "type": "text",
+        "label": "Area ispezionata",
+        "required": true,
+        "max_length": 120
+      },
+      {
+        "id": "esito",
+        "type": "select",
+        "label": "Esito",
+        "required": true,
+        "options": ["Conforme", "Non conforme", "Da verificare"]
+      },
+      {
+        "id": "rischi",
+        "type": "multiselect",
+        "label": "Rischi rilevati",
+        "options": ["Caduta dall'alto", "Elettrico", "Movimentazione carichi", "Scavi", "Altro"]
+      },
+      {
+        "id": "persone_presenti",
+        "type": "number",
+        "label": "Persone presenti nell'area",
+        "integer": true,
+        "min": 0
+      },
+      {
+        "id": "dpi_indossati",
+        "type": "checkbox",
+        "label": "DPI indossati correttamente",
+        "default": false
+      },
+      {
+        "id": "note",
+        "type": "textarea",
+        "label": "Note",
+        "help": "Descrivere la non conformità e l'azione correttiva proposta"
+      },
+      {
+        "id": "foto",
+        "type": "photo",
+        "label": "Foto evidenza",
+        "multiple": true
+      },
+      {
+        "id": "posizione",
+        "type": "geolocation",
+        "label": "Posizione GPS"
+      },
+      {
+        "id": "firma_ispettore",
+        "type": "signature",
+        "label": "Firma ispettore",
+        "required": true
+      },
+      {
+        "id": "data_ispezione",
+        "type": "date",
+        "label": "Data ispezione",
+        "required": true,
+        "default": "today"
+      }
+    ]
+  }
 }

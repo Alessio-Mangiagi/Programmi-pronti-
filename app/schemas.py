@@ -43,7 +43,7 @@ class PlanOut(PlanCreate):
 class FormTemplateCreate(BaseModel):
     name: str
     category: Optional[str] = None
-    schema_json: dict
+    schema_def: dict
 
 
 class FormTemplateOut(FormTemplateCreate):

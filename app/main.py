@@ -25,6 +25,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from . import models, schemas
+from .forms import validate_schema
 from .database import engine, get_db
 from .models import utcnow
 from .schemas import to_naive_utc
@@ -68,6 +69,9 @@ def list_plans(project_id: str, db: Session = Depends(get_db)):
 
 @app.post("/form-templates", response_model=schemas.FormTemplateOut, status_code=201)
 def create_form_template(payload: schemas.FormTemplateCreate, db: Session = Depends(get_db)):
+    errors = validate_schema(payload.schema_def)
+    if errors:
+        raise HTTPException(422, detail=errors)
     template = models.FormTemplate(**payload.model_dump())
     db.add(template)
     db.commit()

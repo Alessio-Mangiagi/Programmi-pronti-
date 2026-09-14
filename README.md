@@ -22,9 +22,12 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 
 - `app/models.py` — modello dati (Project, Plan, Pin, FormTemplate, FormSubmission, Task, Attachment)
 - `app/schemas.py` — schemi Pydantic per le API, incluso il payload di sync
+- `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
 - `app/main.py` — endpoint FastAPI, incluso `/sync/push` e `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da variabile d'ambiente
 - `tests/test_sync.py` — test end-to-end del protocollo di sync
+- `tests/test_forms.py` — test del validatore moduli
+- `ROADMAP.md` — piano giornaliero MVP
 - `form_schema_example.json` — esempio di modulo dinamico (ispezione sicurezza)
 
 ## Strategia di sync per app native (iOS/Android)

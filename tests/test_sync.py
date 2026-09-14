@@ -46,7 +46,7 @@ def project(client):
         "file_url": "s3://x/pt.png", "width_px": 1000, "height_px": 800,
     }).json()
     tpl = client.post("/form-templates", json={
-        "name": "Ispezione", "schema_json": {"fields": []},
+        "name": "Ispezione", "schema_def": {"fields": [{"id": "esito", "type": "select", "label": "Esito", "options": ["Conforme", "Non conforme"]}]},
     }).json()
     return {"project": p, "plan": plan, "template": tpl}
 
