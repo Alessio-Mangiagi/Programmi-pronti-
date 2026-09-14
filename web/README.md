@@ -17,11 +17,15 @@ npm run api:types      # rigenera src/api/schema.d.ts da openapi.json
 Struttura:
 - `src/api/` — client `openapi-fetch` tipizzato (`client.ts`), alias tipi (`types.ts`)
 - `src/auth/` — token in localStorage, `AuthProvider` (`useAuth`), redirect al login su 401
-- `src/components/` — `Layout` (sidebar + outlet), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin), `PinMarker`
-- `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL)
+- `src/components/` — `Layout` (sidebar + outlet), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin)
+- `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL), `useLookups` (utenti/template per id)
 - `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`
 
 Plan view: l'immagine è resa a dimensione nativa dentro `react-zoom-pan-pinch`;
 i pin sono posizionati in % (x/y relativi 0-1) e scalati di `1/zoom` così restano
 della stessa dimensione a schermo. Colore = stato peggiore tra i task del pin
 (aperto > assegnato > risolto > verificato > solo moduli > vuoto), da `GET /plans/{id}/pins`.
+Interazioni: click pin → pannello (`GET /pins/{id}`); "+ Aggiungi pin" → click sulla
+planimetria → `POST /pins`; drag del marker → `PATCH /pins/{id}` (la classe `pin` è
+esclusa dal panning); rinomina dal titolo del pannello; "Cancella pin" → `DELETE`
+(cascata soft su moduli/task/foto). Esc chiude modalità aggiungi o pannello.

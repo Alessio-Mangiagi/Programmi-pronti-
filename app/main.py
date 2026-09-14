@@ -272,6 +272,54 @@ def _get_user_or_422(db: Session, user_id: Optional[str], field: str) -> None:
         raise HTTPException(422, f"{field}: user not found")
 
 
+@app.post("/pins", response_model=schemas.PinOut, status_code=201)
+def create_pin(payload: schemas.PinCreate, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    plan = db.get(models.Plan, payload.plan_id)
+    if plan is None:
+        raise HTTPException(404, "plan not found")
+    auth.assert_project_access(db, user, plan.project_id)
+    pin = models.Pin(**payload.model_dump(), created_by=user.id)
+    db.add(pin)
+    db.commit()
+    db.refresh(pin)
+    return pin
+
+
+@app.patch("/pins/{pin_id}", response_model=schemas.PinOut)
+def update_pin(pin_id: str, payload: schemas.PinUpdate, db: Session = Depends(get_db),
+               user: models.User = Depends(current_user)):
+    """Sposta (x/y) o rinomina un pin."""
+    pin = _get_pin(db, user, pin_id)
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(pin, k, v)
+    pin.updated_at = utcnow()
+    db.commit()
+    db.refresh(pin)
+    return pin
+
+
+@app.delete("/pins/{pin_id}", status_code=204)
+def delete_pin(pin_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """
+    Soft-delete del pin e di tutto ciò che contiene (submission, task, allegati),
+    così il sync propaga la cancellazione completa. Solo creatore o manager.
+    """
+    pin = _get_pin(db, user, pin_id)
+    if not auth.is_manager(user) and pin.created_by != user.id:
+        raise HTTPException(403, "only the creator or a manager can delete a pin")
+    now = utcnow()
+    for sub in pin.submissions:
+        for att in sub.attachments:
+            att.deleted_at = att.updated_at = now
+        sub.deleted_at = sub.updated_at = now
+    for task in pin.tasks:
+        for att in task.attachments:
+            att.deleted_at = att.updated_at = now
+        task.deleted_at = task.updated_at = now
+    pin.deleted_at = pin.updated_at = now
+    db.commit()
+
+
 @app.get("/pins/{pin_id}", response_model=schemas.PinDetail)
 def get_pin(pin_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     """Pin con submissions, task e allegati (non cancellati): apertura da plan view."""

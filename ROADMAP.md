@@ -89,7 +89,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Cluster non necessario: se >300 pin, mostrare solo pin filtrati (giorno 9).
 - **DoD**: la planimetria demo si vede, zoom fluido, pin nella posizione corretta a ogni zoom.
 
-### Giorno 8 — Interazione pin
+### Giorno 8 — Interazione pin ✅ (2026-09-14)
 - Click pin → pannello laterale con submissions, task, foto (da `GET /pins/{id}`).
 - Aggiunta pin: modalità "aggiungi", click sulla planimetria, label, salvataggio.
 - Spostamento pin con drag; cancellazione (soft-delete).

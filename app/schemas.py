@@ -173,6 +173,19 @@ class TaskOut(BaseModel):
     attachments: list[AttachmentOut] = []
 
 
+class PinCreate(BaseModel):
+    plan_id: str
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+    label: Optional[str] = None
+
+
+class PinUpdate(BaseModel):
+    x: Optional[float] = Field(None, ge=0.0, le=1.0)
+    y: Optional[float] = Field(None, ge=0.0, le=1.0)
+    label: Optional[str] = None
+
+
 class PinOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

@@ -207,3 +207,43 @@ def test_list_plan_pins_with_counts(client, project, pin, users):
     assert client.get("/plans/nope/pins").status_code == 404
     assert client.get(f"/plans/{plan_id}").json()["name"] == "Piano terra"
     assert client.get(f"/plans/{plan_id}", headers=users["outsider"]["headers"]).status_code == 403
+
+
+# ---------- CRUD pin da web ----------
+
+def test_pin_create_update_delete(client, project, users):
+    plan_id = project["plan"]["id"]
+    f, m, o = users["field"]["headers"], users["manager"]["headers"], users["outsider"]["headers"]
+
+    r = client.post("/pins", json={"plan_id": plan_id, "x": 0.4, "y": 0.6, "label": "Colonna B3"}, headers=f)
+    assert r.status_code == 201, r.text
+    pin = r.json()
+    assert pin["created_by"] == users["field"]["id"] and pin["x"] == 0.4
+    assert client.post("/pins", json={"plan_id": plan_id, "x": 1.5, "y": 0}).status_code == 422
+    assert client.post("/pins", json={"plan_id": "nope", "x": 0, "y": 0}).status_code == 404
+    assert client.post("/pins", json={"plan_id": plan_id, "x": 0, "y": 0}, headers=o).status_code == 403
+
+    r = client.patch(f"/pins/{pin['id']}", json={"x": 0.45, "label": "Colonna B4"}, headers=m)
+    assert (r.json()["x"], r.json()["y"], r.json()["label"]) == (0.45, 0.6, "Colonna B4")
+    assert client.patch(f"/pins/{pin['id']}", json={"x": 0.1}, headers=o).status_code == 403
+
+    # contenuto agganciato: la cancellazione del pin cancella tutto in cascata (soft)
+    task = client.post("/tasks", json={"pin_id": pin["id"], "title": "t"}).json()
+    sub = client.post("/submissions", json={"template_id": project["template"]["id"], "pin_id": pin["id"],
+                                            "data_json": {"esito": "Conforme"}}).json()
+    att = client.post("/attachments", json={"task_id": task["id"]}).json()
+
+    assert client.delete(f"/pins/{pin['id']}", headers=o).status_code == 403
+    manager_pin = client.post("/pins", json={"plan_id": plan_id, "x": 0.1, "y": 0.1}, headers=m).json()
+    assert client.delete(f"/pins/{manager_pin['id']}", headers=f).status_code == 403  # non creatore
+    assert client.delete(f"/pins/{pin['id']}", headers=f).status_code == 204          # creatore
+    assert client.get(f"/pins/{pin['id']}").status_code == 404
+    assert client.get(f"/tasks/{task['id']}").status_code == 404
+    assert client.get(f"/submissions/{sub['id']}").status_code == 404
+    assert client.post("/attachments/presign", json={"attachment_id": att["id"]}).status_code == 404
+    assert [p["id"] for p in client.get(f"/plans/{plan_id}/pins").json()] == [manager_pin["id"]]
+
+    pulled = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()
+    deleted = {row["id"] for group in ("pins", "tasks", "submissions", "attachments")
+               for row in pulled[group] if row["deleted_at"]}
+    assert {pin["id"], task["id"], sub["id"], att["id"]} <= deleted

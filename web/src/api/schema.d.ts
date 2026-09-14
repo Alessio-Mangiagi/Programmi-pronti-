@@ -221,6 +221,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Pin */
+        post: operations["create_pin_pins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pins/{pin_id}": {
         parameters: {
             query?: never;
@@ -235,10 +252,19 @@ export interface paths {
         get: operations["get_pin_pins__pin_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Pin
+         * @description Soft-delete del pin e di tutto ciò che contiene (submission, task, allegati),
+         *     così il sync propaga la cancellazione completa. Solo creatore o manager.
+         */
+        delete: operations["delete_pin_pins__pin_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Pin
+         * @description Sposta (x/y) o rinomina un pin.
+         */
+        patch: operations["update_pin_pins__pin_id__patch"];
         trace?: never;
     };
     "/submissions": {
@@ -624,6 +650,17 @@ export interface components {
             /** User Id */
             user_id: string;
         };
+        /** PinCreate */
+        PinCreate: {
+            /** Plan Id */
+            plan_id: string;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Label */
+            label?: string | null;
+        };
         /**
          * PinDetail
          * @description Pin con tutto ciò che gli è agganciato: è ciò che apre la plan view al click.
@@ -661,6 +698,31 @@ export interface components {
              * @default []
              */
             tasks: components["schemas"]["TaskOut"][];
+        };
+        /** PinOut */
+        PinOut: {
+            /** Id */
+            id: string;
+            /** Plan Id */
+            plan_id: string;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Label */
+            label?: string | null;
+            /** Created By */
+            created_by?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * PinSummary
@@ -736,6 +798,15 @@ export interface components {
             label?: string | null;
             /** Created By */
             created_by?: string | null;
+        };
+        /** PinUpdate */
+        PinUpdate: {
+            /** X */
+            x?: number | null;
+            /** Y */
+            y?: number | null;
+            /** Label */
+            label?: string | null;
         };
         /** PlanCreate */
         PlanCreate: {
@@ -1582,6 +1653,39 @@ export interface operations {
             };
         };
     };
+    create_pin_pins_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_pin_pins__pin_id__get: {
         parameters: {
             query?: never;
@@ -1600,6 +1704,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_pin_pins__pin_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pin_pins__pin_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinOut"];
                 };
             };
             /** @description Validation Error */
