@@ -12,8 +12,12 @@ python -m venv .venv
 pip install -r requirements.txt
 cp .env.example .env         # DATABASE_URL, STORAGE_DIR, SECRET_KEY
 alembic upgrade head         # crea/aggiorna le tabelle
+python -m scripts.seed       # utenti, progetto, planimetria e template demo
 uvicorn app.main:app --reload
 ```
+
+Login demo (`POST /auth/login`, poi "Authorize" in Swagger con il token):
+`admin@fieldview.local`, `manager@fieldview.local`, `field@fieldview.local` / `demo1234`.
 
 Database: senza `.env` si usa `sqlite:///./fieldview.db`. Per Postgres:
 `docker compose up -d` (Postgres 16 su :5432) e `DATABASE_URL` come in `.env.example`.
@@ -32,6 +36,8 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/models.py` — modello dati (Project, Plan, Pin, FormTemplate, FormSubmission, Task, Attachment)
 - `app/schemas.py` — schemi Pydantic per le API, incluso il payload di sync
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
+- `app/auth.py` — JWT, ruoli (`admin`/`manager`/`field`), accesso per progetto
+- `scripts/seed.py` — dati demo idempotenti
 - `app/main.py` — endpoint FastAPI: CRUD web (`/submissions`, `/tasks`, `/pins/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da `.env`/ambiente
 - `alembic/` — migrazioni (`alembic upgrade head`)
@@ -41,8 +47,28 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/test_forms.py` — test del validatore moduli
 - `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin
 - `tests/test_files.py` — test upload planimetrie/allegati
+- `tests/test_auth.py` — test login, ruoli, visibilità per progetto
 - `ROADMAP.md` — piano giornaliero MVP
 - `form_schema_example.json` — esempio di modulo dinamico (ispezione sicurezza)
+
+## Autenticazione e permessi
+
+Tutti gli endpoint tranne `/auth/login` richiedono `Authorization: Bearer <JWT>`
+(`SECRET_KEY` e `ACCESS_TOKEN_HOURS` in `.env`). Ruolo globale per utente:
+
+| Azione | admin | manager | field |
+|--------|:-----:|:-------:|:-----:|
+| Vedere un progetto | tutti | se membro | se membro |
+| Creare progetti, planimetrie, template; gestire membri | ✓ | ✓ (membro) | – |
+| Creare utenti | ✓ | – | – |
+| Pin, moduli, task, foto nei progetti di cui si è membri | ✓ | ✓ | ✓ |
+| Portare un task a `verified` | ✓ | ✓ | – |
+| Cancellare un task | ✓ | ✓ | solo i propri |
+
+`created_by` / `submitted_by` vengono sempre dal token (anche nel sync push,
+se il device li lascia vuoti). `assigned_to` deve essere un utente esistente.
+Nel sync push le righe di progetti a cui l'utente non appartiene sono rifiutate
+singolarmente con `reason: "forbidden: ..."`. Ruoli per-progetto: backlog.
 
 ## Strategia di sync per app native (iOS/Android)
 
@@ -109,8 +135,6 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
 
 ## Prossimi passi consigliati
 
-1. Aggiungere autenticazione (JWT) e permessi per progetto/utente
-2. Costruire la plan view web (planimetria + pin cliccabili) che consuma
+1. Costruire la plan view web (planimetria + pin cliccabili) che consuma
    `/projects/{id}/plans` e i pin associati
-3. Definire 2-3 `FormTemplate` fissi (partendo da `form_schema_example.json`)
-   prima di costruire un form builder visuale
+2. Form builder web sopra i 3 template del seed
