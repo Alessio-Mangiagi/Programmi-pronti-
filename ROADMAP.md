@@ -59,7 +59,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Limiti: 20 MB, whitelist MIME.
 - **DoD**: carico un PDF via Swagger, ottengo un PNG servito da `/files/...` con dimensioni corrette.
 
-### Giorno 4 — Postgres, migrazioni, CI
+### Giorno 4 — Postgres, migrazioni, CI ✅ (2026-09-14, Postgres verificato solo in CI: niente Docker in locale)
 - `docker-compose.yml` con Postgres 16; `DATABASE_URL` da `.env`.
 - Alembic: init, migrazione iniziale generata dai modelli, `alembic upgrade head` nel README.
 - `JSON` → `JSONB` su Postgres (tipo condizionale), indici su `updated_at` verificati.

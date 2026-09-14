@@ -10,10 +10,19 @@ task, sync offline-first per app native.
 python -m venv .venv
 .venv\Scripts\activate       # Windows  (Linux/Mac: source .venv/bin/activate)
 pip install -r requirements.txt
+cp .env.example .env         # DATABASE_URL, STORAGE_DIR, SECRET_KEY
+alembic upgrade head         # crea/aggiorna le tabelle
 uvicorn app.main:app --reload
 ```
 
-Test: `pytest -q` (SQLite in memoria, nessun setup).
+Database: senza `.env` si usa `sqlite:///./fieldview.db`. Per Postgres:
+`docker compose up -d` (Postgres 16 su :5432) e `DATABASE_URL` come in `.env.example`.
+Le tabelle si creano SOLO con Alembic (`alembic upgrade head`); dopo ogni
+modifica a `app/models.py`: `alembic revision --autogenerate -m "..."` e
+controllare il file generato.
+
+Test: `pytest -q` (SQLite in memoria, nessun setup). Con `TEST_DATABASE_URL`
+impostata i test girano su quel DB (la CI lo fa su Postgres).
 
 Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 (Swagger) e provare subito gli endpoint.
@@ -24,7 +33,9 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/schemas.py` — schemi Pydantic per le API, incluso il payload di sync
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
 - `app/main.py` — endpoint FastAPI: CRUD web (`/submissions`, `/tasks`, `/pins/{id}`) e `/sync/push` / `/sync/pull`
-- `app/database.py` — engine/session; `DATABASE_URL` da variabile d'ambiente
+- `app/database.py` — engine/session; `DATABASE_URL` da `.env`/ambiente
+- `alembic/` — migrazioni (`alembic upgrade head`)
+- `tests/conftest.py` — fixture condivise (client, project, pin, push)
 - `app/storage.py` — storage file (filesystem `STORAGE_DIR`, default `./storage`), PDF → PNG, sniffing MIME
 - `tests/test_sync.py` — test end-to-end del protocollo di sync
 - `tests/test_forms.py` — test del validatore moduli
@@ -98,11 +109,8 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
 
 ## Prossimi passi consigliati
 
-1. Passare da SQLite a Postgres (`DATABASE_URL=postgresql://...` in ambiente)
-   e introdurre Alembic per le migrazioni
-2. Aggiungere autenticazione (JWT) e permessi per progetto/utente
-3. Aggiungere endpoint per upload allegati con presigned URL
-4. Costruire la plan view web (planimetria + pin cliccabili) che consuma
+1. Aggiungere autenticazione (JWT) e permessi per progetto/utente
+2. Costruire la plan view web (planimetria + pin cliccabili) che consuma
    `/projects/{id}/plans` e i pin associati
-5. Definire 2-3 `FormTemplate` fissi (partendo da `form_schema_example.json`)
+3. Definire 2-3 `FormTemplate` fissi (partendo da `form_schema_example.json`)
    prima di costruire un form builder visuale
