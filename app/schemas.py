@@ -1,0 +1,145 @@
+from datetime import datetime, timezone
+from typing import Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """
+    Normalizza qualsiasi datetime a UTC naive: il client può mandare
+    "2026-09-14T10:00:00+02:00" o "…Z", il DB (SQLite) salva naive.
+    Senza questa normalizzazione il confronto naive vs aware alza TypeError.
+    """
+    if dt is None or dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    address: Optional[str] = None
+
+
+class ProjectOut(ProjectCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    created_at: datetime
+
+
+class PlanCreate(BaseModel):
+    project_id: str
+    name: str
+    file_url: str
+    width_px: float
+    height_px: float
+
+
+class PlanOut(PlanCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class FormTemplateCreate(BaseModel):
+    name: str
+    category: Optional[str] = None
+    schema_json: dict
+
+
+class FormTemplateOut(FormTemplateCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# --- Modelli "sync" ---
+# Payload che l'app nativa manda quando torna online.
+# `id` è un UUID v4 generato sul device al momento della creazione (offline),
+# così il server può fare upsert idempotente anche se il pacchetto arriva
+# duplicato o in ritardo, e una submission/task creata offline può puntare
+# a un pin creato offline nello stesso batch (stesso id ovunque).
+# `deleted_at` valorizzato = il device ha cancellato l'entità.
+
+class SyncBase(BaseModel):
+    id: str
+    updated_at: datetime
+    deleted_at: Optional[datetime] = None
+
+    @field_validator("updated_at", "deleted_at", mode="after")
+    @classmethod
+    def _naive(cls, v):
+        return to_naive_utc(v)
+
+
+class PinSync(SyncBase):
+    plan_id: str
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+    label: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+class FormSubmissionSync(SyncBase):
+    template_id: str
+    pin_id: str
+    data_json: dict
+    submitted_by: Optional[str] = None
+
+
+class TaskSync(SyncBase):
+    pin_id: str
+    title: str
+    description: Optional[str] = None
+    status: str = "open"
+    assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
+
+    @field_validator("due_date", mode="after")
+    @classmethod
+    def _naive_due(cls, v):
+        return to_naive_utc(v)
+
+
+class AttachmentSync(SyncBase):
+    submission_id: Optional[str] = None
+    task_id: Optional[str] = None
+    file_url: str
+    file_type: Optional[str] = None
+
+
+class SyncPushRequest(BaseModel):
+    pins: list[PinSync] = []
+    submissions: list[FormSubmissionSync] = []
+    tasks: list[TaskSync] = []
+    attachments: list[AttachmentSync] = []
+
+
+class SyncPushResult(BaseModel):
+    inserted: int = 0
+    updated: int = 0
+    skipped: int = 0   # push più vecchio di quanto già sul server (last write wins)
+    rejected: list[str] = []  # id rifiutati (es. FK verso entità inesistente)
+
+
+class SyncPushResponse(BaseModel):
+    status: str = "ok"
+    pins: SyncPushResult
+    submissions: SyncPushResult
+    tasks: SyncPushResult
+    attachments: SyncPushResult
+    server_time: datetime
+
+
+class SyncPullResponse(BaseModel):
+    """
+    Tutto ciò che è cambiato dopo `since` per un dato progetto.
+    Le righe con deleted_at valorizzato vanno rimosse localmente dal client.
+    """
+    plans: list[dict]
+    form_templates: list[dict]
+    pins: list[dict]
+    submissions: list[dict]
+    tasks: list[dict]
+    attachments: list[dict]
+    server_time: datetime

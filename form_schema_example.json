@@ -1,0 +1,51 @@
+{
+  "name": "Ispezione sicurezza",
+  "category": "safety",
+  "fields": [
+    {
+      "id": "area",
+      "type": "text",
+      "label": "Area ispezionata",
+      "required": true
+    },
+    {
+      "id": "esito",
+      "type": "select",
+      "label": "Esito",
+      "required": true,
+      "options": ["Conforme", "Non conforme", "Da verificare"]
+    },
+    {
+      "id": "dpi_indossati",
+      "type": "checkbox",
+      "label": "DPI indossati correttamente",
+      "required": false
+    },
+    {
+      "id": "note",
+      "type": "textarea",
+      "label": "Note",
+      "required": false
+    },
+    {
+      "id": "foto",
+      "type": "photo",
+      "label": "Foto evidenza",
+      "required": false,
+      "multiple": true
+    },
+    {
+      "id": "firma_ispettore",
+      "type": "signature",
+      "label": "Firma ispettore",
+      "required": true
+    },
+    {
+      "id": "data_ispezione",
+      "type": "date",
+      "label": "Data ispezione",
+      "required": true,
+      "default": "today"
+    }
+  ]
+}
