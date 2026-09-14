@@ -23,10 +23,11 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/models.py` — modello dati (Project, Plan, Pin, FormTemplate, FormSubmission, Task, Attachment)
 - `app/schemas.py` — schemi Pydantic per le API, incluso il payload di sync
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
-- `app/main.py` — endpoint FastAPI, incluso `/sync/push` e `/sync/pull`
+- `app/main.py` — endpoint FastAPI: CRUD web (`/submissions`, `/tasks`, `/pins/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da variabile d'ambiente
 - `tests/test_sync.py` — test end-to-end del protocollo di sync
 - `tests/test_forms.py` — test del validatore moduli
+- `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin
 - `ROADMAP.md` — piano giornaliero MVP
 - `form_schema_example.json` — esempio di modulo dinamico (ispezione sicurezza)
 
@@ -46,7 +47,8 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
    tutto ciò che ha creato/modificato/cancellato offline a `POST /sync/push`
    (`pins`, `submissions`, `tasks`, `attachments`). Il server applica i
    gruppi in quest'ordine con upsert per `id`. Le righe con FK verso
-   entità inesistenti vengono rifiutate singolarmente (`rejected: [id]`),
+   entità inesistenti, o con `data_json` non valido rispetto al template,
+   vengono rifiutate singolarmente (`rejected: [{id, reason}]`),
    il resto del batch passa. La risposta riporta per gruppo
    `inserted / updated / skipped / rejected`.
 
