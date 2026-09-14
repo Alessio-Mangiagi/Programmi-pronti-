@@ -14,6 +14,7 @@ cp .env.example .env         # DATABASE_URL, STORAGE_DIR, SECRET_KEY
 alembic upgrade head         # crea/aggiorna le tabelle
 python -m scripts.seed       # utenti, progetto, planimetria e template demo
 uvicorn app.main:app --reload
+cd web && npm install && npm run dev   # frontend su http://localhost:5173
 ```
 
 Login demo (`POST /auth/login`, poi "Authorize" in Swagger con il token):
@@ -48,6 +49,8 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin
 - `tests/test_files.py` — test upload planimetrie/allegati
 - `tests/test_auth.py` — test login, ruoli, visibilità per progetto
+- `web/` — frontend React (vedi `web/README.md`)
+- `scripts/export_openapi.py` — esporta `web/openapi.json` per i tipi TS
 - `ROADMAP.md` — piano giornaliero MVP
 - `form_schema_example.json` — esempio di modulo dinamico (ispezione sicurezza)
 
