@@ -45,7 +45,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Test `tests/test_forms.py`: schema valido/invalido, submission mancante required, tipo sbagliato, opzione fuori lista.
 - **DoD**: `pytest` verde, `POST /form-templates` rifiuta schemi malformati con 422.
 
-### Giorno 2 — Validazione submission + CRUD task
+### Giorno 2 — Validazione submission + CRUD task ✅ (2026-09-14)
 - Hook di `validate_submission` in `/sync/push` (submission invalide → `rejected` con motivo) e in nuovo `POST /submissions` (web).
 - Endpoint REST task: `POST /tasks`, `GET /projects/{id}/tasks` (filtri `status, plan_id, assigned_to`), `PATCH /tasks/{id}` (transizioni consentite: `open→assigned→resolved→verified`, `resolved→open` per riapertura).
 - `GET /pins/{id}` con submissions + tasks + attachments annidati (serve alla plan view).

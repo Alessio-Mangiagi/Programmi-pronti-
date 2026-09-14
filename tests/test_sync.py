@@ -169,7 +169,7 @@ def test_bad_fk_rejected_but_batch_applied(client, project):
         ],
     }).json()
     assert r["tasks"]["inserted"] == 1
-    assert r["tasks"]["rejected"] == [bad]
+    assert r["tasks"]["rejected"] == [{"id": bad, "reason": "pin_id not found"}]
 
 
 def test_pull_unknown_project_404(client):

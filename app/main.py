@@ -6,6 +6,8 @@ Avvio locale (dalla root del progetto):
 
 Endpoint principali:
     /projects, /plans, /form-templates   -> CRUD standard, gestiti da web
+    /pins/{id}                            -> pin con submissions/task/foto (plan view)
+    /submissions, /tasks                  -> creazione e aggiornamento da web
     /sync/push                            -> l'app nativa manda le modifiche fatte offline
     /sync/pull?project_id=..&since=..     -> l'app nativa scarica le modifiche dal server
 
@@ -25,9 +27,9 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from . import models, schemas
-from .forms import validate_schema
+from .forms import validate_schema, validate_submission
 from .database import engine, get_db
-from .models import utcnow
+from .models import utcnow, TaskStatus, TASK_TRANSITIONS
 from .schemas import to_naive_utc
 
 models.Base.metadata.create_all(bind=engine)
@@ -84,27 +86,179 @@ def list_form_templates(db: Session = Depends(get_db)):
     return db.query(models.FormTemplate).all()
 
 
+def _alive(query, model):
+    return query.filter(model.deleted_at.is_(None))
+
+
+def _with_attachments(schema_cls, obj):
+    out = schema_cls.model_validate(obj)
+    out.attachments = [schemas.AttachmentOut.model_validate(a)
+                       for a in obj.attachments if a.deleted_at is None]
+    return out
+
+
+@app.get("/pins/{pin_id}", response_model=schemas.PinDetail)
+def get_pin(pin_id: str, db: Session = Depends(get_db)):
+    """Pin con submissions, task e allegati (non cancellati): apertura da plan view."""
+    pin = db.get(models.Pin, pin_id)
+    if pin is None or pin.deleted_at is not None:
+        raise HTTPException(404, "pin not found")
+    subs = _alive(db.query(models.FormSubmission).filter_by(pin_id=pin_id), models.FormSubmission).all()
+    tasks = _alive(db.query(models.Task).filter_by(pin_id=pin_id), models.Task).all()
+    out = schemas.PinDetail.model_validate(pin)
+    out.submissions = [_with_attachments(schemas.SubmissionOut, x) for x in subs]
+    out.tasks = [_with_attachments(schemas.TaskOut, x) for x in tasks]
+    return out
+
+
+# ---------- Submissions (uso da web) ----------
+
+@app.post("/submissions", response_model=schemas.SubmissionOut, status_code=201)
+def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(get_db)):
+    template = db.get(models.FormTemplate, payload.template_id)
+    if template is None:
+        raise HTTPException(404, "template not found")
+    pin = db.get(models.Pin, payload.pin_id)
+    if pin is None or pin.deleted_at is not None:
+        raise HTTPException(404, "pin not found")
+    errors = validate_submission(template.schema_def, payload.data_json)
+    if errors:
+        raise HTTPException(422, detail=errors)
+    sub = models.FormSubmission(**payload.model_dump())
+    db.add(sub)
+    db.commit()
+    db.refresh(sub)
+    return _with_attachments(schemas.SubmissionOut, sub)
+
+
+@app.get("/submissions/{submission_id}", response_model=schemas.SubmissionOut)
+def get_submission(submission_id: str, db: Session = Depends(get_db)):
+    sub = db.get(models.FormSubmission, submission_id)
+    if sub is None or sub.deleted_at is not None:
+        raise HTTPException(404, "submission not found")
+    return _with_attachments(schemas.SubmissionOut, sub)
+
+
+# ---------- Task (uso da web) ----------
+
+def _parse_status(value: str) -> TaskStatus:
+    try:
+        return TaskStatus(value)
+    except ValueError:
+        raise HTTPException(422, f"invalid status {value!r}")
+
+
+@app.post("/tasks", response_model=schemas.TaskOut, status_code=201)
+def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db)):
+    pin = db.get(models.Pin, payload.pin_id)
+    if pin is None or pin.deleted_at is not None:
+        raise HTTPException(404, "pin not found")
+    task = models.Task(**payload.model_dump())
+    task.status = TaskStatus.assigned if payload.assigned_to else TaskStatus.open
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return _with_attachments(schemas.TaskOut, task)
+
+
+@app.get("/projects/{project_id}/tasks", response_model=list[schemas.TaskOut])
+def list_tasks(
+    project_id: str,
+    status: Optional[str] = None,
+    plan_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    if not db.get(models.Project, project_id):
+        raise HTTPException(404, "project not found")
+    q = (db.query(models.Task)
+         .join(models.Pin, models.Task.pin_id == models.Pin.id)
+         .join(models.Plan, models.Pin.plan_id == models.Plan.id)
+         .filter(models.Plan.project_id == project_id)
+         .filter(models.Task.deleted_at.is_(None), models.Pin.deleted_at.is_(None)))
+    if status:
+        q = q.filter(models.Task.status == _parse_status(status))
+    if plan_id:
+        q = q.filter(models.Pin.plan_id == plan_id)
+    if assigned_to:
+        q = q.filter(models.Task.assigned_to == assigned_to)
+    q = q.order_by(models.Task.created_at.desc())
+    return [_with_attachments(schemas.TaskOut, t) for t in q.all()]
+
+
+@app.get("/tasks/{task_id}", response_model=schemas.TaskOut)
+def get_task(task_id: str, db: Session = Depends(get_db)):
+    task = db.get(models.Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(404, "task not found")
+    return _with_attachments(schemas.TaskOut, task)
+
+
+@app.patch("/tasks/{task_id}", response_model=schemas.TaskOut)
+def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends(get_db)):
+    """
+    Aggiornamento parziale. Cambi di stato solo lungo TASK_TRANSITIONS (409 altrimenti).
+    Assegnare un task 'open' senza indicare lo stato lo porta automaticamente ad 'assigned'.
+    """
+    task = db.get(models.Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(404, "task not found")
+    changes = payload.model_dump(exclude_unset=True)
+
+    if "status" in changes:
+        new_status = _parse_status(changes.pop("status"))
+        if new_status != task.status:
+            if new_status not in TASK_TRANSITIONS[task.status]:
+                raise HTTPException(409, f"cannot go from {task.status.value} to {new_status.value}")
+            if new_status == TaskStatus.assigned and not (changes.get("assigned_to") or task.assigned_to):
+                raise HTTPException(409, "assigned_to is required to move to assigned")
+            task.status = new_status
+    elif changes.get("assigned_to") and task.status == TaskStatus.open:
+        task.status = TaskStatus.assigned
+
+    for k, v in changes.items():
+        setattr(task, k, v)
+    task.updated_at = utcnow()
+    db.commit()
+    db.refresh(task)
+    return _with_attachments(schemas.TaskOut, task)
+
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: str, db: Session = Depends(get_db)):
+    """Soft-delete: la cancellazione deve viaggiare nel sync come ogni altra modifica."""
+    task = db.get(models.Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(404, "task not found")
+    task.deleted_at = task.updated_at = utcnow()
+    db.commit()
+
+
 # ---------- Sync offline-first (uso da app nativa) ----------
 
-def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str]) -> schemas.SyncPushResult:
+def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
+            validate=None) -> schemas.SyncPushResult:
     """
     Upsert idempotente per id con "last write wins".
 
     fk_checks: {campo_fk: Model} — ogni FK viene verificata contro il DB
                (comprese le righe appena flushate nello stesso batch).
     updatable: campi che un push più recente può sovrascrivere.
+    validate:  fn(item) -> motivo di rifiuto (str) o None, eseguita dopo le FK.
     """
     res = schemas.SyncPushResult()
     for item in items:
         # FK: rifiuta la singola riga invece di rompere il commit dell'intero batch
-        bad_fk = False
+        reason = None
         for field, fk_model in fk_checks.items():
             fk_value = getattr(item, field)
             if fk_value is not None and db.get(fk_model, fk_value) is None:
-                bad_fk = True
+                reason = f"{field} not found"
                 break
-        if bad_fk:
-            res.rejected.append(item.id)
+        if reason is None and validate is not None:
+            reason = validate(item)
+        if reason is not None:
+            res.rejected.append(schemas.RejectedItem(id=item.id, reason=reason))
             continue
 
         existing = db.get(model, item.id)
@@ -135,15 +289,34 @@ def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db)):
         fk_checks={"plan_id": models.Plan},
         updatable=["x", "y", "label", "deleted_at"],
     )
+    def check_submission(item):
+        # Una cancellazione non deve essere bloccata da dati vecchi non più validi.
+        if item.deleted_at is not None:
+            return None
+        schema = db.get(models.FormTemplate, item.template_id).schema_def
+        errors = validate_submission(schema, item.data_json)
+        if errors:
+            return "data_json: " + "; ".join(f"{e['field']}: {e['message']}" for e in errors)
+        return None
+
+    def check_task(item):
+        try:
+            TaskStatus(item.status)
+        except ValueError:
+            return f"invalid status {item.status!r}"
+        return None
+
     submissions = _upsert(
         db, models.FormSubmission, payload.submissions,
         fk_checks={"template_id": models.FormTemplate, "pin_id": models.Pin},
         updatable=["data_json", "submitted_by", "deleted_at"],
+        validate=check_submission,
     )
     tasks = _upsert(
         db, models.Task, payload.tasks,
         fk_checks={"pin_id": models.Pin},
         updatable=["title", "description", "status", "assigned_to", "due_date", "deleted_at"],
+        validate=check_task,
     )
     attachments = _upsert(
         db, models.Attachment, payload.attachments,

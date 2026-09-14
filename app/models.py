@@ -47,6 +47,17 @@ class TaskStatus(str, enum.Enum):
     verified = "verified"
 
 
+# Transizioni ammesse via PATCH /tasks (web). Il sync offline NON le applica:
+# un device può aver fatto open->assigned->resolved senza rete e pushare solo
+# lo stato finale, quindi lì vale il last-write-wins sul valore.
+TASK_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
+    TaskStatus.open: {TaskStatus.assigned},
+    TaskStatus.assigned: {TaskStatus.resolved, TaskStatus.open},
+    TaskStatus.resolved: {TaskStatus.verified, TaskStatus.open},   # open = riaperto
+    TaskStatus.verified: set(),
+}
+
+
 class SyncMixin:
     """Colonne comuni a tutte le entità che viaggiano nel sync."""
     id = Column(String, primary_key=True, default=gen_uuid)

@@ -53,6 +53,91 @@ class FormTemplateOut(FormTemplateCreate):
     updated_at: datetime
 
 
+class AttachmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    submission_id: Optional[str] = None
+    task_id: Optional[str] = None
+    file_url: str
+    file_type: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SubmissionCreate(BaseModel):
+    template_id: str
+    pin_id: str
+    data_json: dict
+    submitted_by: Optional[str] = None
+
+
+class SubmissionOut(SubmissionCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    attachments: list[AttachmentOut] = []
+
+
+class TaskCreate(BaseModel):
+    pin_id: str
+    title: str
+    description: Optional[str] = None
+    assigned_to: Optional[str] = None   # se valorizzato il task nasce già "assigned"
+    due_date: Optional[datetime] = None
+
+    @field_validator("due_date", mode="after")
+    @classmethod
+    def _naive_due(cls, v):
+        return to_naive_utc(v)
+
+
+class TaskUpdate(BaseModel):
+    """PATCH parziale: solo i campi presenti vengono modificati."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
+
+    @field_validator("due_date", mode="after")
+    @classmethod
+    def _naive_due(cls, v):
+        return to_naive_utc(v)
+
+
+class TaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    pin_id: str
+    title: str
+    description: Optional[str] = None
+    status: str
+    assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    attachments: list[AttachmentOut] = []
+
+
+class PinOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    plan_id: str
+    x: float
+    y: float
+    label: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PinDetail(PinOut):
+    """Pin con tutto ciò che gli è agganciato: è ciò che apre la plan view al click."""
+    submissions: list[SubmissionOut] = []
+    tasks: list[TaskOut] = []
+
+
 # --- Modelli "sync" ---
 # Payload che l'app nativa manda quando torna online.
 # `id` è un UUID v4 generato sul device al momento della creazione (offline),
@@ -115,11 +200,16 @@ class SyncPushRequest(BaseModel):
     attachments: list[AttachmentSync] = []
 
 
+class RejectedItem(BaseModel):
+    id: str
+    reason: str  # es. "pin_id not found", "data_json: esito: not one of options"
+
+
 class SyncPushResult(BaseModel):
     inserted: int = 0
     updated: int = 0
     skipped: int = 0   # push più vecchio di quanto già sul server (last write wins)
-    rejected: list[str] = []  # id rifiutati (es. FK verso entità inesistente)
+    rejected: list[RejectedItem] = []  # righe rifiutate singolarmente, con motivo
 
 
 class SyncPushResponse(BaseModel):
