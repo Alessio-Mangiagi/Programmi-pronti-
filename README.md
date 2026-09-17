@@ -181,7 +181,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 29: dashboard web (Recharts)
+1. Giorno 30: rilascio MVP (Dockerfile prod, backup, S3, documentazione)
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli

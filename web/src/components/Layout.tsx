@@ -26,6 +26,7 @@ export default function Layout() {
               <div className="nav-section" title={project?.name}>
                 {project?.name ?? 'Progetto'}
               </div>
+              <NavLink to={`/projects/${projectId}/dashboard`}>Dashboard</NavLink>
               <NavLink to={`/projects/${projectId}/plans`}>Planimetrie</NavLink>
               <NavLink to={`/projects/${projectId}/tasks`} end className={({ isActive }) => (isActive && !mine ? 'active' : '')}>
                 Task

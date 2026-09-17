@@ -392,3 +392,16 @@ input:focus, select:focus, textarea:focus {
 .row-muted { opacity: 0.6; }
 @media (max-width: 1100px) { .builder { grid-template-columns: 1fr 1fr; } .builder-preview { grid-column: 1 / -1; } }
 @media (max-width: 700px) { .builder { grid-template-columns: 1fr; } }
+
+/* Dashboard */
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.stat-tile { display: flex; flex-direction: column; gap: 0.15rem; color: inherit; }
+.stat-tile:hover { text-decoration: none; border-color: var(--primary); }
+.stat-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.stat-value { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+.stat-bad .stat-value { color: var(--danger); }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1rem; }
+.chart-card h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+.chart-card .recharts-wrapper { cursor: default; }
+.chart-card .legend { margin-top: 0.4rem; }
+@media (max-width: 500px) { .chart-grid { grid-template-columns: 1fr; } }

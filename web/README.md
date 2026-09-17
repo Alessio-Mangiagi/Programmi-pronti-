@@ -20,7 +20,7 @@ Struttura:
 - `src/auth/` — token in localStorage, `AuthProvider` (`useAuth`), redirect al login su 401
 - `src/components/` — `Layout` (sidebar + outlet), `Toast` (`ToastProvider`/`useToast`, notifiche in basso), `Loading` (spinner), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin), `PlanUploadForm` (nuova planimetria / file mancante), `PinFilters` (barra filtri ↔ query string)
 - `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL), `useLookups` (utenti/template per id)
-- `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`, `TasksPage` (tabella task del progetto), `TemplatesPage` (lista template: modifica/duplica/archivia), `TemplateEditorPage` (form builder v1)
+- `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`, `TasksPage` (tabella task del progetto), `TemplatesPage` (lista template: modifica/duplica/archivia), `TemplateEditorPage` (form builder v1), `DashboardPage` (card + 4 grafici Recharts da `/stats`, filtri in URL, click → vista task filtrata, vista tabella)
 - `src/forms/` — `DynamicForm` (un controllo per tipo di campo, errori inline tradotti), `fields/` (`PhotoInput`, `SignatureInput`, `GeolocationInput`), `SubmissionForm` (scelta template → compila → salva; con `submission` modifica via PATCH e cancella gli allegati tolti), `SubmissionDetail` (sola lettura → Modifica / Crea task), `TaskForm`, `nonConformity.ts` (regola "Non conforme" + bozza task), `attachments.ts` (foto/firme locali come File + object URL)
 - `src/components/Modal.tsx` — modale con Esc/click fuori; `body[data-modal-open]` dice alla plan view di ignorare Esc
 
@@ -99,3 +99,9 @@ gli errori compaiono sul campo e bloccano il salvataggio. Un template con
 compilazioni è in sola lettura (nome/categoria a parte) con "Duplica e modifica".
 `useLookups` carica anche i template archiviati (servono per aprire vecchie
 submission); `PinPanel` propone solo quelli attivi per "Compila modulo".
+
+Dashboard: colori di stato = palette del prodotto (le barre sono etichettate
+sull'asse, mai colore da solo); le due serie del trend usano `#2563b8` / `#c2410c`,
+validati con lo script dataviz (CVD e contrasto ok). Grafici a barre orizzontali
+monocromatici per planimetrie e template. "Tabella" mostra gli stessi numeri in
+forma tabellare.

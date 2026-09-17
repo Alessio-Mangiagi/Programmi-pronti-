@@ -214,7 +214,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Filtri: intervallo date, template, planimetria, assegnatario. Query SQL aggregate, non calcoli in Python.
 - **DoD**: risposta < 300 ms sul dataset demo con 5.000 task.
 
-### Giorno 29 — Dashboard web
+### Giorno 29 — Dashboard web ✅ (2026-09-17)
 - 4 grafici (Recharts): task per stato (barre), trend creati vs risolti (linee), aperti per zona/planimetria (barre orizzontali), submissions per template (barre). Card riassuntive: aperti, scaduti, chiusi negli ultimi 7 giorni.
 - Click su grafico → vista task filtrata.
 - **DoD**: un manager capisce lo stato del cantiere in 10 secondi.
