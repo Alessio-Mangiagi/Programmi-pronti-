@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import Layout from './components/Layout'
+import Loading from './components/Loading'
 import LoginPage from './pages/LoginPage'
 import ProjectsPage from './pages/ProjectsPage'
 import PlansPage from './pages/PlansPage'
@@ -9,7 +10,7 @@ import PlanPage from './pages/PlanPage'
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="content muted">Caricamento…</div>
+  if (loading) return <Loading className="content" />
   if (!user) return <Navigate to="/login" replace />
   return children
 }

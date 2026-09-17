@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { Project } from '../api/types'
 import { isManager, useAuth } from '../auth/AuthContext'
+import Loading from '../components/Loading'
 
 export default function ProjectsPage() {
   const { user } = useAuth()
@@ -60,7 +61,7 @@ export default function ProjectsPage() {
         )}
         {error && <p className="error">{error}</p>}
         {projects === null ? (
-          <p className="muted">Caricamento…</p>
+          <Loading />
         ) : projects.length === 0 ? (
           <div className="empty">Nessun progetto. {isManager(user) ? 'Creane uno.' : 'Chiedi a un responsabile di aggiungerti.'}</div>
         ) : (

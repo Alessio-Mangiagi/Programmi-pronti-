@@ -9,6 +9,7 @@ npm install
 npm run dev            # http://localhost:5173
 npm run build          # tsc + vite build -> dist/
 npm run api:types      # rigenera src/api/schema.d.ts da openapi.json
+npm run e2e            # smoke test Playwright (vedi sotto)
 ```
 
 `openapi.json` si aggiorna dal backend con `python -m scripts.export_openapi`
@@ -17,7 +18,7 @@ npm run api:types      # rigenera src/api/schema.d.ts da openapi.json
 Struttura:
 - `src/api/` — client `openapi-fetch` tipizzato (`client.ts`), alias tipi (`types.ts`), upload con progresso via XHR (`upload.ts`)
 - `src/auth/` — token in localStorage, `AuthProvider` (`useAuth`), redirect al login su 401
-- `src/components/` — `Layout` (sidebar + outlet), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin), `PlanUploadForm` (nuova planimetria / file mancante), `PinFilters` (barra filtri ↔ query string)
+- `src/components/` — `Layout` (sidebar + outlet), `Toast` (`ToastProvider`/`useToast`, notifiche in basso), `Loading` (spinner), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin), `PlanUploadForm` (nuova planimetria / file mancante), `PinFilters` (barra filtri ↔ query string)
 - `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL), `useLookups` (utenti/template per id)
 - `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`
 
@@ -43,3 +44,18 @@ topbar (nessun reload: `PlanPage` rimonta `PlanView` con `key={planId}`). La log
 lato server (`GET /plans/{id}/pins?…`); la legenda conta i pin mostrati, il riepilogo
 "N di M pin" i totali. Creare un pin con un filtro attivo azzera il filtro (il pin
 nuovo è vuoto e non lo passerebbe).
+
+Errori: i form (login, upload) mostrano l'errore inline; tutte le altre azioni
+(crea/sposta/cancella pin, rinomina, caricamento pin) passano da `useToast()`.
+Un 401 su qualsiasi chiamata mostra "Sessione scaduta" e riporta al login.
+
+Responsive: sotto 1024px la sidebar diventa una barra in alto; sotto 900px il
+pannello pin è un foglio in basso (45% dell'altezza) così la planimetria resta
+larga anche su tablet in verticale.
+
+Smoke test (`e2e/smoke.spec.ts`, `playwright.config.ts`): il `webServer` fa
+`npm run build` e lancia `python -m scripts.e2e_server --port 8001`, che crea
+`web/.e2e/` (SQLite + storage), applica le migrazioni, esegue il seed demo e
+serve API + `dist` con `app.server` — quindi il test copre anche il deploy unico.
+Python: `.venv` del progetto se esiste, altrimenti `PYTHON` o `python` nel PATH.
+Prima volta: `npx playwright install chromium`.

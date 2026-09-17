@@ -115,16 +115,28 @@ export default function PinFilters({ value, onChange, templates, members, shown,
         </select>
       </div>
       <div className="filter-group">
-        <label className="filter-label" htmlFor="f-from">
-          Dal
-        </label>
-        <input id="f-from" type="date" value={value.dateFrom} max={value.dateTo || undefined} onChange={(e) => set({ dateFrom: e.target.value })} />
-      </div>
-      <div className="filter-group">
-        <label className="filter-label" htmlFor="f-to">
-          Al
-        </label>
-        <input id="f-to" type="date" value={value.dateTo} min={value.dateFrom || undefined} onChange={(e) => set({ dateTo: e.target.value })} />
+        <span className="filter-label" id="f-period">
+          Periodo
+        </span>
+        <div className="filter-dates" role="group" aria-labelledby="f-period">
+          <input
+            id="f-from"
+            type="date"
+            aria-label="Dal"
+            value={value.dateFrom}
+            max={value.dateTo || undefined}
+            onChange={(e) => set({ dateFrom: e.target.value })}
+          />
+          <span className="muted small">–</span>
+          <input
+            id="f-to"
+            type="date"
+            aria-label="Al"
+            value={value.dateTo}
+            min={value.dateFrom || undefined}
+            onChange={(e) => set({ dateTo: e.target.value })}
+          />
+        </div>
       </div>
       <div className="filter-group filter-summary">
         <span className="muted small">

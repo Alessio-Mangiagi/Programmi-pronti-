@@ -4,6 +4,8 @@ import type { Attachment, PinDetail, TaskStatus } from '../api/types'
 import { isManager, useAuth } from '../auth/AuthContext'
 import type { Lookups } from '../hooks/useLookups'
 import AuthImage from './AuthImage'
+import Loading from './Loading'
+import { useToast } from './Toast'
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: 'Aperto',
@@ -27,6 +29,7 @@ function fmtDate(iso: string) {
 /** Pannello laterale con tutto ciò che è agganciato a un pin. */
 export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) {
   const { user } = useAuth()
+  const toast = useToast()
   const [pin, setPin] = useState<PinDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [label, setLabel] = useState('')
@@ -51,7 +54,7 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
       params: { path: { pin_id: pinId } },
       body: { label: label.trim() || null },
     })
-    if (error) return setError(errorMessage(error))
+    if (error) return toast.error(errorMessage(error))
     setEditingLabel(false)
     await load()
     onChanged()
@@ -60,7 +63,8 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
   async function remove() {
     if (!confirm('Cancellare il pin con tutti i moduli, task e foto collegati?')) return
     const { error } = await api.DELETE('/pins/{pin_id}', { params: { path: { pin_id: pinId } } })
-    if (error) return setError(errorMessage(error))
+    if (error) return toast.error(errorMessage(error))
+    toast.success('Pin cancellato')
     onChanged()
     onClose()
   }
@@ -96,7 +100,7 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
       </div>
       {error && <p className="error">{error}</p>}
       {!pin ? (
-        <p className="muted">Caricamento…</p>
+        !error && <Loading />
       ) : (
         <>
           <p className="muted small">

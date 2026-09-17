@@ -44,3 +44,34 @@ jobs:
       - run: alembic check
       # I test ricreano le tabelle a ogni test sul DB di TEST_DATABASE_URL
       - run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: pip install -r requirements.txt
+      - run: npm ci
+        working-directory: web
+      - run: npm run lint
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      # Smoke test end-to-end: build di produzione servita da app.server su SQLite (scripts/e2e_server.py)
+      - run: npm run e2e
+        working-directory: web
+        env:
+          PYTHON: python
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/test-results

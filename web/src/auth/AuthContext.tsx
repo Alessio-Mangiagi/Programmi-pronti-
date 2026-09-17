@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, errorMessage } from '../api/client'
 import type { User } from '../api/types'
 import { getToken, setToken, setUnauthorizedHandler } from './token'
+import { useToast } from '../components/Toast'
 
 type AuthState = {
   user: User | null
@@ -15,15 +16,20 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(!!getToken())
+  const toast = useToast()
 
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
   }, [])
 
+  // 401 da qualsiasi chiamata: token scaduto o revocato -> avviso e ritorno al login.
   useEffect(() => {
-    setUnauthorizedHandler(logout)
-  }, [logout])
+    setUnauthorizedHandler(() => {
+      if (getToken()) toast.info('Sessione scaduta: accedi di nuovo')
+      logout()
+    })
+  }, [logout, toast])
 
   // Al primo caricamento, se c'è un token salvato, verifica che sia ancora valido.
   useEffect(() => {

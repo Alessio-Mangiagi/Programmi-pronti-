@@ -14,6 +14,8 @@ import PinFilters, {
   type PinFilterState,
 } from '../components/PinFilters'
 import PlanUploadForm from '../components/PlanUploadForm'
+import Loading from '../components/Loading'
+import { useToast } from '../components/Toast'
 import { PIN_LEVEL_LABEL, pinLevel, type PinLevel } from '../components/PinMarker'
 import { useLookups } from '../hooks/useLookups'
 import { useProject } from '../hooks/useProject'
@@ -28,6 +30,7 @@ export default function PlanPage() {
 
 function PlanView({ projectId, planId }: { projectId: string; planId: string }) {
   const navigate = useNavigate()
+  const toast = useToast()
   const { user } = useAuth()
   const project = useProject(projectId)
   const lookups = useLookups()
@@ -42,6 +45,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
   const [filteredPins, setFilteredPins] = useState<PinSummary[] | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [addMode, setAddMode] = useState(false)
+  // Solo per il caricamento della planimetria (404/403): gli errori delle azioni vanno nei toast.
   const [error, setError] = useState<string | null>(null)
 
   // Dati di progetto: lista planimetrie (per il selettore) e membri (per il filtro assegnatario).
@@ -62,11 +66,11 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
         ? api.GET('/plans/{plan_id}/pins', { params: { path: { plan_id: planId }, query: filtersToQuery(filters) } })
         : Promise.resolve(null),
     ])
-    if (all.error) return setError(errorMessage(all.error))
+    if (all.error) return toast.error(errorMessage(all.error))
     setAllPins(all.data ?? [])
-    if (filtered?.error) return setError(errorMessage(filtered.error))
+    if (filtered?.error) return toast.error(errorMessage(filtered.error))
     setFilteredPins(filtered ? (filtered.data ?? []) : null)
-  }, [planId, filters, filtering])
+  }, [planId, filters, filtering, toast])
 
   useEffect(() => {
     api.GET('/plans/{plan_id}', { params: { path: { plan_id: planId } } }).then(({ data, error }) => {
@@ -101,7 +105,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
 
   async function addPin(x: number, y: number) {
     const { data, error } = await api.POST('/pins', { body: { plan_id: planId, x, y, label: null } })
-    if (error) return setError(errorMessage(error))
+    if (error) return toast.error(errorMessage(error))
     setAddMode(false)
     // un pin appena creato è vuoto e non passerebbe i filtri: li azzeriamo per mostrarlo
     if (filtering) setFilters(EMPTY_FILTERS)
@@ -116,12 +120,13 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
     setFilteredPins(move)
     const { error } = await api.PATCH('/pins/{pin_id}', { params: { path: { pin_id: pin.id } }, body: { x, y } })
     if (error) {
-      setError(errorMessage(error))
+      toast.error(errorMessage(error))
       loadPins()
     }
   }
 
   function onUploaded(updated: Plan) {
+    toast.success('Planimetria caricata')
     setPlan(updated)
     setPlans((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
   }
@@ -193,14 +198,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
         />
       )}
       <div className="plan-page">
-        {error && (
-          <p className="error">
-            {error}{' '}
-            <button className="btn small" onClick={() => setError(null)}>
-              ok
-            </button>
-          </p>
-        )}
+        {error && <div className="empty">{error}</div>}
         <div className="plan-split">
           {plan && !plan.file_url && canUpload ? (
             <div className="content">
@@ -219,7 +217,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
               onMovePin={movePin}
             />
           ) : (
-            !error && <div className="plan-viewer-empty">Caricamento…</div>
+            !error && <Loading className="plan-viewer-empty" />
           )}
           {selectedId && (
             <PinPanel pinId={selectedId} lookups={lookups} onClose={() => setSelectedId(null)} onChanged={loadPins} />

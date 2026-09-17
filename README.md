@@ -28,6 +28,20 @@ controllare il file generato.
 
 Test: `pytest -q` (SQLite in memoria, nessun setup). Con `TEST_DATABASE_URL`
 impostata i test girano su quel DB (la CI lo fa su Postgres).
+Smoke test browser: `cd web && npm run e2e` (Playwright: build di produzione +
+`scripts/e2e_server.py` su SQLite usa-e-getta con seed demo, vedi `web/README.md`).
+
+## Deploy unico (API + web sulla stessa porta)
+
+`uvicorn app.server:app` monta l'API sotto `/api` (Swagger su `/api/docs`) e serve
+`web/dist` alla radice con fallback a `index.html` per le route React. Serve la
+build (`cd web && npm run build`), altrimenti `/` spiega cosa manca.
+
+Tutto in container: `docker compose up --build` → Postgres + app su
+`http://localhost:8000`. All'avvio il container esegue `alembic upgrade head` e,
+con `SEED_DEMO=1` (default nel compose), il seed demo. Variabili: `SECRET_KEY`,
+`ACCESS_TOKEN_HOURS`, `SEED_DEMO` (dal `.env` o dall'ambiente); i file caricati
+finiscono nel volume `appdata` (`/data/storage`).
 
 Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 (Swagger) e provare subito gli endpoint.
@@ -41,6 +55,9 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `scripts/seed.py` — dati demo idempotenti
 - `app/main.py` — endpoint FastAPI: CRUD web (`/submissions`, `/tasks`, `/pins/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da `.env`/ambiente
+- `app/server.py` — entry point di produzione: `/api` + statici di `web/dist` (SPA fallback)
+- `scripts/e2e_server.py` — server per gli smoke test Playwright (SQLite temporaneo + seed + `app.server`)
+- `Dockerfile`, `scripts/entrypoint.sh` — immagine unica (build web + API), migrazioni all'avvio
 - `alembic/` — migrazioni (`alembic upgrade head`)
 - `tests/conftest.py` — fixture condivise (client, project, pin, push)
 - `app/storage.py` — storage file (filesystem `STORAGE_DIR`, default `./storage`), PDF → PNG, sniffing MIME
@@ -49,6 +66,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin
 - `tests/test_files.py` — test upload planimetrie/allegati
 - `tests/test_auth.py` — test login, ruoli, visibilità per progetto
+- `tests/test_server.py` — test del mount `/api` e del fallback SPA
 - `web/` — frontend React (vedi `web/README.md`)
 - `scripts/export_openapi.py` — esporta `web/openapi.json` per i tipi TS
 - `ROADMAP.md` — piano giornaliero MVP
@@ -147,5 +165,5 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 10: smoke test Playwright, FastAPI che serve `web/dist`, toast errori
+1. Giorno 11: `packages/form-core` (tipi schema + validazione condivisa web/mobile)
 2. Form builder web sopra i 3 template del seed

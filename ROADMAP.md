@@ -101,7 +101,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Cambio planimetria senza ricaricare la pagina.
 - **DoD**: carico un PDF dal web e in 10 secondi ci metto un pin sopra.
 
-### Giorno 10 — Rifinitura + smoke test + build
+### Giorno 10 — Rifinitura + smoke test + build ✅ (2026-09-17, Docker non verificato in locale: Dockerfile/compose scritti, da provare al primo `docker compose up`)
 - Playwright: login → apri planimetria → crea pin → verifica in pannello.
 - FastAPI serve `web/dist` come static (single deploy); CORS in dev.
 - Gestione errori (toast), stati di caricamento, responsive tablet.

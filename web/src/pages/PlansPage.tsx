@@ -4,13 +4,16 @@ import { api, errorMessage } from '../api/client'
 import type { Plan } from '../api/types'
 import { isManager, useAuth } from '../auth/AuthContext'
 import AuthImage from '../components/AuthImage'
+import Loading from '../components/Loading'
 import PlanUploadForm from '../components/PlanUploadForm'
+import { useToast } from '../components/Toast'
 import { useProject } from '../hooks/useProject'
 
 export default function PlansPage() {
   const { projectId = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const toast = useToast()
   const project = useProject(projectId)
   const [plans, setPlans] = useState<Plan[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,12 +46,15 @@ export default function PlansPage() {
           <PlanUploadForm
             projectId={projectId}
             onCancel={() => setCreating(false)}
-            onDone={(plan) => navigate(`/projects/${projectId}/plans/${plan.id}`)}
+            onDone={(plan) => {
+              toast.success(`Planimetria "${plan.name}" caricata`)
+              navigate(`/projects/${projectId}/plans/${plan.id}`)
+            }}
           />
         )}
         {error && <p className="error">{error}</p>}
         {plans === null ? (
-          <p className="muted">Caricamento…</p>
+          <Loading />
         ) : plans.length === 0 ? (
           <div className="empty">
             Nessuna planimetria.{' '}
