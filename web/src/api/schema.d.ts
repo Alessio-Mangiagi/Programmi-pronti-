@@ -268,7 +268,97 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Update Project
+         * @description Nome, indirizzo, commessa di appartenenza (manager/admin membri del progetto).
+         */
+        patch: operations["update_project_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/commessa-params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Commessa Params */
+        get: operations["list_commessa_params_commessa_params_get"];
+        put?: never;
+        /**
+         * Create Commessa Param
+         * @description Solo admin: nuovo parametro a scelta multipla.
+         */
+        post: operations["create_commessa_param_commessa_params_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/commessa-params/{param_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Commessa Param
+         * @description Solo admin: elimina il parametro e i suoi valori da tutte le commesse.
+         */
+        delete: operations["delete_commessa_param_commessa_params__param_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Commessa Param
+         * @description Solo admin. Rinominare/rimuovere un'opzione già usata la toglie dalle commesse
+         *     che l'avevano (i valori orfani non restano); passare a scelta singola tiene la prima.
+         */
+        patch: operations["update_commessa_param_commessa_params__param_id__patch"];
+        trace?: never;
+    };
+    "/commesse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Commesse
+         * @description Commesse con i cantieri accessibili all'utente (sottomenù della barra in alto).
+         *     Chi non è manager vede solo le commesse in cui ha almeno un cantiere.
+         */
+        get: operations["list_commesse_commesse_get"];
+        put?: never;
+        /** Create Commessa */
+        post: operations["create_commessa_commesse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/commesse/{commessa_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Commessa */
+        get: operations["get_commessa_commesse__commessa_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Commessa */
+        patch: operations["update_commessa_commesse__commessa_id__patch"];
         trace?: never;
     };
     "/projects/{project_id}/members": {
@@ -882,6 +972,114 @@ export interface components {
             /** File */
             file: string;
         };
+        /** CommessaCreate */
+        CommessaCreate: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Client */
+            client?: string | null;
+            /**
+             * Params
+             * @default {}
+             */
+            params: {
+                [key: string]: string[];
+            };
+        };
+        /** CommessaOut */
+        CommessaOut: {
+            /** Id */
+            id: string;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Client */
+            client?: string | null;
+            /**
+             * Params
+             * @default {}
+             */
+            params: {
+                [key: string]: string[];
+            };
+            /** Archived At */
+            archived_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Projects
+             * @default []
+             */
+            projects: components["schemas"]["ProjectOut"][];
+        };
+        /**
+         * CommessaParamCreate
+         * @description Parametro a scelta multipla definito dall'admin: nome + opzioni (stringhe non vuote, senza doppioni).
+         */
+        CommessaParamCreate: {
+            /** Name */
+            name: string;
+            /** Options */
+            options: string[];
+            /**
+             * Multi
+             * @default true
+             */
+            multi: boolean;
+        };
+        /** CommessaParamOut */
+        CommessaParamOut: {
+            /** Name */
+            name: string;
+            /** Options */
+            options: string[];
+            /**
+             * Multi
+             * @default true
+             */
+            multi: boolean;
+            /** Id */
+            id: string;
+            /** Position */
+            position: number;
+            /**
+             * Used By
+             * @default 0
+             */
+            used_by: number;
+        };
+        /** CommessaParamUpdate */
+        CommessaParamUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Options */
+            options?: string[] | null;
+            /** Multi */
+            multi?: boolean | null;
+            /** Position */
+            position?: number | null;
+        };
+        /** CommessaUpdate */
+        CommessaUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Client */
+            client?: string | null;
+            /** Params */
+            params?: {
+                [key: string]: string[];
+            } | null;
+            /** Archived */
+            archived?: boolean | null;
+        };
         /** EventOut */
         EventOut: {
             /** Id */
@@ -1254,6 +1452,8 @@ export interface components {
             name: string;
             /** Address */
             address?: string | null;
+            /** Commessa Id */
+            commessa_id?: string | null;
         };
         /** ProjectOut */
         ProjectOut: {
@@ -1261,6 +1461,8 @@ export interface components {
             name: string;
             /** Address */
             address?: string | null;
+            /** Commessa Id */
+            commessa_id?: string | null;
             /** Id */
             id: string;
             /**
@@ -1268,6 +1470,15 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** ProjectUpdate */
+        ProjectUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Commessa Id */
+            commessa_id?: string | null;
         };
         /** PushTokenIn */
         PushTokenIn: {
@@ -2113,7 +2324,9 @@ export interface operations {
     };
     list_projects_projects_get: {
         parameters: {
-            query?: never;
+            query?: {
+                commessa_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2127,6 +2340,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2182,6 +2404,288 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_commessa_params_commessa_params_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaParamOut"][];
+                };
+            };
+        };
+    };
+    create_commessa_param_commessa_params_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommessaParamCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaParamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_commessa_param_commessa_params__param_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                param_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_commessa_param_commessa_params__param_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                param_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommessaParamUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaParamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_commesse_commesse_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_commessa_commesse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommessaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_commessa_commesse__commessa_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                commessa_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_commessa_commesse__commessa_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                commessa_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommessaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaOut"];
                 };
             };
             /** @description Validation Error */

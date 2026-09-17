@@ -57,6 +57,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/auth.py` — JWT, ruoli (`admin`/`manager`/`field`), accesso per progetto
 - `app/stats.py` — aggregati SQL per `GET /projects/{id}/stats` (task per stato, aperti per planimetria, moduli per template, serie giornaliera creati/risolti, scaduti) + `tasks.resolved_at`
 - `app/notify.py`, `app/worker.py` — template, sender SMTP/Expo/console, `process_pending`, loop del worker
+- `app/models.py: Commessa, CommessaParam` — commesse (raggruppano i cantieri; barra in alto del web con sottomenù cantieri) e parametri personalizzati a scelta multipla definiti dall'admin (`/admin/parametri`), valorizzati per commessa e usati come filtro in Progetti
 - `app/audit.py` — registro operazioni (`audit_log`): catalogo azioni + `record()` chiamato dagli endpoint nella stessa transazione; spazio admin web `/admin/users`, `/admin/audit`
 - `app/events.py` — outbox eventi (`events`) + regole di notifica (`notifications` pending), scritti nella stessa transazione da web e sync push
 - `scripts/seed.py` — dati demo idempotenti

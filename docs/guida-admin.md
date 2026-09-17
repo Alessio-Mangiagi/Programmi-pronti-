@@ -23,8 +23,23 @@
 Membri di progetto: `POST /projects/{id}/members` con `user_id`. Preferenze notifica
 per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).
 
+- **Parametri commessa** (`/admin/parametri`): campi a scelta multipla (o singola) personalizzati,
+  es. "Tipologia lavori: Edilizia civile / Stradale / Impianti". Ogni commessa li valorizza;
+  in Progetti compaiono come etichette e come filtri. Rinominare o togliere un'opzione la
+  toglie anche dalle commesse che la usavano; eliminare il parametro cancella i suoi valori.
+
+## Commesse e cantieri
+La **barra in alto** seleziona la commessa; il suo sottomenù elenca i cantieri associati
+(clic → planimetrie del cantiere; la sezione aperta — task, dashboard — si conserva cambiando
+cantiere). Aprendo un cantiere da un link la commessa si allinea da sola. **Progetti** mostra
+i cantieri raggruppati per commessa con codice, committente e parametri; **+ Nuova commessa**
+(codice univoco, oggetto, committente, parametri), **Modifica/Archivia**, **+ Cantiere**
+dentro la commessa. I cantieri senza commessa stanno nel gruppo "Cantieri non associati".
+Chi non è manager vede solo le commesse in cui ha almeno un cantiere.
+API: `GET/POST/PATCH /commesse`, `PATCH /projects/{id}` (`commessa_id`), `GET/POST/PATCH/DELETE /commessa-params`.
+
 ## Setup di un cantiere (web, come manager)
-1. **Progetti → + Nuovo progetto**.
+1. **Progetti → + Nuova commessa** (se non c'è) → **+ Cantiere** nella commessa.
 2. **Planimetrie → + Nuova planimetria**: PNG/JPG/PDF (la prima pagina del PDF viene
    convertita). Una planimetria senza file si carica dopo dalla sua pagina.
 3. **Moduli** (sidebar): i 3 template demo (ispezione sicurezza, punch list, diario)

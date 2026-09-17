@@ -103,10 +103,26 @@ def main():
             users[role] = u
             print(("creato " if created else "esiste ") + f"utente {email} ({role})")
 
+        # Parametri personalizzati e commesse (giorno 31): il cantiere demo sta nella prima
+        tipologia, _ = get_or_create(db, models.CommessaParam, name="Tipologia lavori", defaults={
+            "options": ["Edilizia civile", "Stradale", "Impianti", "Restauro"], "multi": True, "position": 1})
+        procedura, _ = get_or_create(db, models.CommessaParam, name="Procedura", defaults={
+            "options": ["Appalto pubblico", "Privato", "Subappalto"], "multi": False, "position": 2})
+        commessa, _ = get_or_create(db, models.Commessa, code="C-2026-014", defaults={
+            "name": "Riqualificazione scuola Da Vinci", "client": "Comune di Milano",
+            "params": {tipologia.id: ["Edilizia civile", "Impianti"], procedura.id: ["Appalto pubblico"]}})
+        get_or_create(db, models.Commessa, code="C-2026-021", defaults={
+            "name": "Manutenzione SP 12", "client": "Città Metropolitana di Milano",
+            "params": {tipologia.id: ["Stradale"], procedura.id: ["Appalto pubblico"]}})
         project, _ = get_or_create(db, models.Project, name="Cantiere demo",
                                    defaults={"address": "Via del Cantiere 1, Milano"})
+        if project.commessa_id is None:
+            project.commessa_id = commessa.id
+        secondo, _ = get_or_create(db, models.Project, name="Palestra e mensa",
+                                   defaults={"address": "Via Leonardo 7, Milano", "commessa_id": commessa.id})
         for u in users.values():
             get_or_create(db, models.ProjectMember, project_id=project.id, user_id=u.id)
+            get_or_create(db, models.ProjectMember, project_id=secondo.id, user_id=u.id)
 
         plan, created = get_or_create(db, models.Plan, project_id=project.id, name="Piano terra")
         if created or not plan.file_url:

@@ -13,6 +13,8 @@ import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditorPage from './pages/TemplateEditorPage'
 import UsersPage from './pages/admin/UsersPage'
 import AuditPage from './pages/admin/AuditPage'
+import ParamsPage from './pages/admin/ParamsPage'
+import { CommesseProvider } from './commesse/CommesseContext'
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth()
@@ -28,7 +30,9 @@ export default function App() {
       <Route
         element={
           <RequireAuth>
-            <Layout />
+            <CommesseProvider>
+              <Layout />
+            </CommesseProvider>
           </RequireAuth>
         }
       >
@@ -42,6 +46,7 @@ export default function App() {
         <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/audit" element={<AuditPage />} />
+        <Route path="/admin/parametri" element={<ParamsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

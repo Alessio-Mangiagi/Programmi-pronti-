@@ -132,12 +132,69 @@ class MemberAdd(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     address: Optional[str] = None
+    commessa_id: Optional[str] = None
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    commessa_id: Optional[str] = None   # "" o null = nessuna commessa
 
 
 class ProjectOut(ProjectCreate):
     model_config = ConfigDict(from_attributes=True)
     id: str
     created_at: datetime
+
+
+# ---------- Commesse e parametri personalizzati ----------
+
+class CommessaParamCreate(BaseModel):
+    """Parametro a scelta multipla definito dall'admin: nome + opzioni (stringhe non vuote, senza doppioni)."""
+    name: str = Field(min_length=1)
+    options: list[str] = Field(min_length=1)
+    multi: bool = True
+
+
+class CommessaParamUpdate(BaseModel):
+    name: Optional[str] = None
+    options: Optional[list[str]] = None
+    multi: Optional[bool] = None
+    position: Optional[int] = None
+
+
+class CommessaParamOut(CommessaParamCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    position: int
+    used_by: int = 0   # quante commesse hanno almeno un valore
+
+
+class CommessaCreate(BaseModel):
+    code: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    client: Optional[str] = None
+    params: dict[str, list[str]] = {}   # {param_id: [opzione, ...]}, validato contro i parametri definiti
+
+
+class CommessaUpdate(BaseModel):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    client: Optional[str] = None
+    params: Optional[dict[str, list[str]]] = None
+    archived: Optional[bool] = None
+
+
+class CommessaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    code: str
+    name: str
+    client: Optional[str] = None
+    params: dict[str, list[str]] = {}
+    archived_at: Optional[datetime] = None
+    created_at: datetime
+    projects: list[ProjectOut] = []   # solo i cantieri accessibili all'utente
 
 
 class PlanCreate(BaseModel):

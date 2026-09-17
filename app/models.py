@@ -24,7 +24,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, String, Text, Float, Boolean, ForeignKey, DateTime, Enum, JSON, Index, MetaData
+    Column, String, Text, Float, Boolean, ForeignKey, DateTime, Enum, JSON, Index, Integer, MetaData, true
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
@@ -43,6 +43,11 @@ Base = declarative_base(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 
 # JSON generico su SQLite, JSONB su Postgres (indicizzabile, query sui campi).
 JSONType = JSON().with_variant(JSONB(), "postgresql")
+
+
+def sa_true():
+    from sqlalchemy import true
+    return true()
 
 
 def gen_uuid():
@@ -111,15 +116,53 @@ class SyncMixin:
     deleted_at = Column(DateTime, nullable=True)
 
 
+class CommessaParam(Base):
+    """
+    Parametro personalizzato a scelta multipla definito dall'admin (es. "Tipologia
+    lavori": Edilizia / Stradale / Impianti). Ogni commessa ne valorizza zero o più
+    opzioni in `Commessa.params` ({param_id: [opzione, ...]}).
+    """
+    __tablename__ = "commessa_params"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    name = Column(String, nullable=False)
+    options = Column(JSONType, nullable=False, default=list)   # lista di stringhe, ordine = ordine di visualizzazione
+    multi = Column(Boolean, default=True, nullable=False, server_default=true())  # False = una sola opzione
+    position = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class Commessa(Base):
+    """
+    Commessa (appalto/contratto): raggruppa i cantieri (Project). Selezionata
+    dalla barra in alto del web; i cantieri associati sono il suo sottomenù.
+    """
+    __tablename__ = "commesse"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    code = Column(String, nullable=False, unique=True, index=True)   # es. C-2026-014
+    name = Column(String, nullable=False)
+    client = Column(String, nullable=True)                           # committente / ente appaltante
+    params = Column(JSONType, nullable=False, default=dict)          # {param_id: [opzione, ...]}
+    archived_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    projects = relationship("Project", back_populates="commessa", order_by="Project.name")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False)
     address = Column(String, nullable=True)
+    commessa_id = Column(String, ForeignKey("commesse.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=utcnow)
 
     plans = relationship("Plan", back_populates="project")
+    commessa = relationship("Commessa", back_populates="projects")
 
 
 class Plan(Base):

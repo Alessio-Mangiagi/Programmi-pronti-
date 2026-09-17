@@ -243,3 +243,10 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Ogni giorno: aprire la sezione, eseguire i task, spuntare la DoD, commit con messaggio `giorno N: <obiettivo>`.
 - Se un giorno sfora, non comprimere il successivo: spostare i task residui in cima al giorno dopo e annotarlo qui.
 - Cambiare le assunzioni in testa al file prima di cambiare il piano.
+
+## Dopo l'MVP (2026-09-17)
+- ✅ **Brand Cosedil** sul web: palette `#0c4577`/`#65bc7b`, Ubuntu/Inter/Open Sans, icone SVG (commit `34effba`).
+- ✅ **Spazio admin**: gestione utenti + registro operazioni `audit_log` (commit `90e0bdf`).
+- ✅ **Commesse**: barra in alto con sottomenù dei cantieri, Progetti raggruppati, parametri personalizzati a scelta multipla (admin).
+- ⏸ App mobile: commesse e parametri non ancora esposti (il sync resta per progetto).
+
