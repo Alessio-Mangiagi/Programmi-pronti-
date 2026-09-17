@@ -8,6 +8,7 @@ import Loading from '../components/Loading'
 import { TASK_STATUS_LABEL } from '../components/PinPanel'
 import { useToast } from '../components/Toast'
 import { useProject } from '../hooks/useProject'
+import Icon from '../components/Icon'
 
 type TaskItem = components['schemas']['TaskListItem']
 
@@ -272,7 +273,7 @@ export default function TasksPage() {
                     </td>
                     <td>
                       <Link to={`/projects/${projectId}/plans/${t.plan_id}?pin=${t.pin_id}`} title="Vedi sulla planimetria">
-                        📍 {t.plan_name}
+                        <Icon name="map-pin" /> {t.plan_name}
                         {t.pin_label && <span className="muted"> · {t.pin_label}</span>}
                       </Link>
                     </td>

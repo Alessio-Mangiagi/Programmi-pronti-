@@ -12,10 +12,11 @@ import { useProject } from '../hooks/useProject'
 type Stats = components['schemas']['StatsOut']
 
 // Colori: stato = palette di stato del prodotto (barre etichettate sull'asse, mai colore da solo);
-// serie del trend = due tinte categoriche validate (scripts/validate_palette.js: ALL CHECKS PASS).
-const STATUS_COLOR: Record<string, string> = { open: '#c0392b', assigned: '#d68910', resolved: '#2e8b57', verified: '#6b7684' }
-const SERIES = { created: '#2563b8', resolved: '#c2410c' }
-const MONO = '#2563b8'
+// serie del trend = blu/verde Cosedil validati (scripts/validate_palette.js: ALL CHECKS PASS).
+const STATUS_COLOR: Record<string, string> = { open: '#c0392b', assigned: '#b8730a', resolved: '#3f8f55', verified: '#6b7075' }
+const SERIES = { created: '#1477b8', resolved: '#3f8f55' }
+const MONO = '#1477b8'
+const INK = { grid: '#e5e7eb', tick: '#434549', label: '#212326', cursor: '#f2f3f5' }
 
 const fmtDay = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
 
@@ -186,11 +187,11 @@ export default function DashboardPage() {
                   <h2>Task per stato</h2>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={statusData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} onClick={(e) => e?.activeLabel && navigate(tasksUrl({ status: statusData.find((d) => d.label === e.activeLabel)!.status }))}>
-                      <CartesianGrid vertical={false} stroke="#e5e8ec" />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7684' }} />
-                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7684' }} />
-                      <Tooltip cursor={{ fill: '#f2f4f7' }} formatter={(v) => [v, 'task']} />
-                      <Bar dataKey="n" radius={[4, 4, 0, 0]} maxBarSize={48} label={{ position: 'top', fontSize: 12, fill: '#1c2430' }} cursor="pointer" shape={(p: { x?: number; y?: number; width?: number; height?: number; payload?: { status: string } }) => <rect x={p.x} y={p.y} width={p.width} height={p.height} rx={4} fill={STATUS_COLOR[p.payload?.status ?? 'open']} />} />
+                      <CartesianGrid vertical={false} stroke={INK.grid} />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.tick }} />
+                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.tick }} />
+                      <Tooltip cursor={{ fill: INK.cursor }} formatter={(v) => [v, 'task']} />
+                      <Bar dataKey="n" radius={[4, 4, 0, 0]} maxBarSize={48} label={{ position: 'top', fontSize: 12, fill: INK.label }} cursor="pointer" shape={(p: { x?: number; y?: number; width?: number; height?: number; payload?: { status: string } }) => <rect x={p.x} y={p.y} width={p.width} height={p.height} rx={4} fill={STATUS_COLOR[p.payload?.status ?? 'open']} />} />
                     </BarChart>
                   </ResponsiveContainer>
                   <p className="muted small">Clicca una barra per vedere i task.</p>
@@ -200,9 +201,9 @@ export default function DashboardPage() {
                   <h2>Creati vs risolti · ultimi {stats.series.length} giorni</h2>
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={stats.series} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                      <CartesianGrid vertical={false} stroke="#e5e8ec" />
-                      <XAxis dataKey="date" tickFormatter={fmtDay} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7684' }} minTickGap={24} />
-                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7684' }} />
+                      <CartesianGrid vertical={false} stroke={INK.grid} />
+                      <XAxis dataKey="date" tickFormatter={fmtDay} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.tick }} minTickGap={24} />
+                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.tick }} />
                       <Tooltip labelFormatter={(d) => fmtDay(String(d))} />
                       <Line type="monotone" dataKey="created" name="Creati" stroke={SERIES.created} strokeWidth={2} dot={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} />
                       <Line type="monotone" dataKey="resolved" name="Risolti" stroke={SERIES.resolved} strokeWidth={2} dot={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} />
@@ -225,11 +226,11 @@ export default function DashboardPage() {
                   ) : (
                     <ResponsiveContainer width="100%" height={Math.max(120, 36 * openByPlan.length + 24)}>
                       <BarChart data={openByPlan} layout="vertical" margin={{ top: 4, right: 32, left: 8, bottom: 0 }} onClick={(e) => e?.activeLabel && navigate(tasksUrl({ plan: String(openByPlan.find((d) => d.plan_name === e.activeLabel)?.plan_id ?? ''), status: ['open', 'assigned'] }))}>
-                        <CartesianGrid horizontal={false} stroke="#e5e8ec" />
-                        <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7684' }} />
-                        <YAxis type="category" dataKey="plan_name" width={120} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#1c2430' }} />
-                        <Tooltip cursor={{ fill: '#f2f4f7' }} formatter={(v) => [v, 'aperti']} />
-                        <Bar dataKey="open" fill={MONO} radius={[0, 4, 4, 0]} maxBarSize={22} label={{ position: 'right', fontSize: 12, fill: '#1c2430' }} cursor="pointer" />
+                        <CartesianGrid horizontal={false} stroke={INK.grid} />
+                        <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.tick }} />
+                        <YAxis type="category" dataKey="plan_name" width={120} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.label }} />
+                        <Tooltip cursor={{ fill: INK.cursor }} formatter={(v) => [v, 'aperti']} />
+                        <Bar dataKey="open" fill={MONO} radius={[0, 4, 4, 0]} maxBarSize={22} label={{ position: 'right', fontSize: 12, fill: INK.label }} cursor="pointer" />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -242,11 +243,11 @@ export default function DashboardPage() {
                   ) : (
                     <ResponsiveContainer width="100%" height={Math.max(120, 36 * byTemplate.length + 24)}>
                       <BarChart data={byTemplate} layout="vertical" margin={{ top: 4, right: 32, left: 8, bottom: 0 }}>
-                        <CartesianGrid horizontal={false} stroke="#e5e8ec" />
-                        <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7684' }} />
-                        <YAxis type="category" dataKey="template_name" width={140} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#1c2430' }} />
-                        <Tooltip cursor={{ fill: '#f2f4f7' }} formatter={(v) => [v, 'moduli']} />
-                        <Bar dataKey="count" fill={MONO} radius={[0, 4, 4, 0]} maxBarSize={22} label={{ position: 'right', fontSize: 12, fill: '#1c2430' }} />
+                        <CartesianGrid horizontal={false} stroke={INK.grid} />
+                        <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.tick }} />
+                        <YAxis type="category" dataKey="template_name" width={140} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: INK.label }} />
+                        <Tooltip cursor={{ fill: INK.cursor }} formatter={(v) => [v, 'moduli']} />
+                        <Bar dataKey="count" fill={MONO} radius={[0, 4, 4, 0]} maxBarSize={22} label={{ position: 'right', fontSize: 12, fill: INK.label }} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -270,25 +271,25 @@ function StatsTable({ stats }: { stats: Stats }) {
           {(['open', 'assigned', 'resolved', 'verified'] as const).map((s) => (
             <tr key={s}>
               <th>Task {TASK_STATUS_LABEL[s].toLowerCase()}</th>
-              <td>{stats.tasks_by_status[s] ?? 0}</td>
+              <td className="num">{stats.tasks_by_status[s] ?? 0}</td>
             </tr>
           ))}
           {stats.open_by_plan.map((p) => (
             <tr key={String(p.plan_id)}>
               <th>Aperti · {String(p.plan_name)}</th>
-              <td>{String(p.open)}</td>
+              <td className="num">{String(p.open)}</td>
             </tr>
           ))}
           {stats.submissions_by_template.map((t) => (
             <tr key={String(t.template_id)}>
               <th>Moduli · {String(t.template_name)}</th>
-              <td>{String(t.count)}</td>
+              <td className="num">{String(t.count)}</td>
             </tr>
           ))}
           {stats.series.map((d) => (
             <tr key={d.date}>
               <th>{d.date}</th>
-              <td>
+              <td className="num">
                 creati {d.created} · risolti {d.resolved}
               </td>
             </tr>

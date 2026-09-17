@@ -14,7 +14,11 @@ export default function Layout() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">FV</span> Field View
+          <span className="brand-mark">FV</span>
+          <span>
+            Field View
+            <span className="brand-sub">Cosedil S.p.A.</span>
+          </span>
         </div>
         <nav className="nav">
           <NavLink to="/projects" end>

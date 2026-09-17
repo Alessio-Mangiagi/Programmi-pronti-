@@ -12,6 +12,7 @@ import SubmissionDetail from '../forms/SubmissionDetail'
 import TaskForm from '../forms/TaskForm'
 import { findNonConformity, taskDraftFromSubmission } from '../forms/nonConformity'
 import type { FormData, FormSchema } from '@fieldview/form-core'
+import Icon from './Icon'
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: 'Aperto',
@@ -104,11 +105,11 @@ export default function PinPanel({ pinId, lookups, members, onClose, onChanged }
           </form>
         ) : (
           <h2 onClick={() => setEditingLabel(true)} title="Clicca per rinominare" className="pin-title">
-            {pin?.label || 'Pin senza etichetta'} <span className="muted small">✎</span>
+            {pin?.label || 'Pin senza etichetta'} <Icon name="pencil" className="muted" />
           </h2>
         )}
         <button className="btn pin-close" onClick={onClose} aria-label="Chiudi">
-          ×
+          <Icon name="x" />
         </button>
       </div>
       {error && <p className="error">{error}</p>}

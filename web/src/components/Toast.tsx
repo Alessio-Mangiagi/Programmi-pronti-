@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import Icon from './Icon'
 
 type Kind = 'error' | 'success' | 'info'
 type Toast = { id: number; kind: Kind; text: string }
@@ -39,7 +40,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} className={`toast toast-${t.kind}`} role={t.kind === 'error' ? 'alert' : 'status'}>
             <span>{t.text}</span>
             <button type="button" className="toast-close" onClick={() => dismiss(t.id)} aria-label="Chiudi">
-              ×
+              <Icon name="x" />
             </button>
           </div>
         ))}

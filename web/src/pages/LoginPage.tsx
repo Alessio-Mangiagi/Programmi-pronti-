@@ -32,8 +32,13 @@ export default function LoginPage() {
     <div className="login-page">
       <form className="card login-card" onSubmit={onSubmit}>
         <div className="brand">
-          <span className="brand-mark">FV</span> Field View
+          <span className="brand-mark">FV</span>
+          <span>
+            Field View
+            <span className="brand-sub">Cosedil S.p.A.</span>
+          </span>
         </div>
+        <p className="login-tagline">Costruiamo il tuo domani</p>
         <div className="field">
           <label htmlFor="email">Email</label>
           <input

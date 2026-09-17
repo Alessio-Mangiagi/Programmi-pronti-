@@ -31,7 +31,7 @@ export default function SignatureInput({ value, attachments, readOnly, invalid, 
     ctx.lineWidth = 2.2
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.strokeStyle = '#1c2430'
+    ctx.strokeStyle = '#212326'
   }, [value])
 
   function point(e: PointerEvent<HTMLCanvasElement>) {

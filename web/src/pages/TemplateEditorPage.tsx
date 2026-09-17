@@ -8,6 +8,7 @@ import Loading from '../components/Loading'
 import { useToast } from '../components/Toast'
 import DynamicForm from '../forms/DynamicForm'
 import { CATEGORY_LABEL } from './TemplatesPage'
+import Icon from '../components/Icon'
 
 const TYPE_LABEL: Record<FieldType, string> = {
   text: 'Testo breve',
@@ -217,13 +218,13 @@ function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved:
                   {!locked && (
                     <span className="field-row-actions">
                       <button type="button" className="btn small" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Sposta su">
-                        ↑
+                        <Icon name="arrow-up" />
                       </button>
                       <button type="button" className="btn small" onClick={() => move(i, 1)} disabled={i === fields.length - 1} aria-label="Sposta giù">
-                        ↓
+                        <Icon name="arrow-down" />
                       </button>
                       <button type="button" className="btn small btn-danger" onClick={() => remove(i)} aria-label="Rimuovi campo">
-                        ×
+                        <Icon name="x" />
                       </button>
                     </span>
                   )}

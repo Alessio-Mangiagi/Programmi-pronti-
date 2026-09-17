@@ -68,6 +68,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/conftest.py` — fixture condivise (client, project, pin, push)
 - `app/storage.py` — storage file (filesystem `STORAGE_DIR`, default `./storage`), PDF → PNG, sniffing MIME
 - `tests/test_sync.py` — test end-to-end del protocollo di sync
+- `web/src/index.css` — design system Cosedil (palette `#0c4577`/`#65bc7b`, font Ubuntu/Inter/Open Sans, ombre blu, motion sobrio); token in `:root`, icone SVG in `web/src/components/Icon.tsx` (niente emoji nella UI)
 - `tests/test_forms.py` — test del validatore moduli
 - `tests/test_forms_fixtures.py` — gli stessi casi di `packages/form-core/fixtures/cases.json`
 - `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin

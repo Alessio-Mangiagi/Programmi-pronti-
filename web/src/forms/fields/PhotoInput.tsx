@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import type { PhotoField } from '@fieldview/form-core'
 import AuthImage from '../../components/AuthImage'
 import { isLocal, newLocalAttachment, PHOTO_ACCEPT, PHOTO_MAX_BYTES, type AttachmentMap, type LocalAttachment } from '../attachments'
+import Icon from '../../components/Icon'
 
 type Props = {
   field: PhotoField
@@ -66,7 +67,7 @@ export default function PhotoInput({ field, value, attachments, readOnly, invali
               <AttachmentThumb attachments={attachments} id={id} />
               {!readOnly && (
                 <button type="button" className="photo-remove" onClick={() => remove(id)} aria-label="Rimuovi foto">
-                  ×
+                  <Icon name="x" />
                 </button>
               )}
             </div>
@@ -75,7 +76,7 @@ export default function PhotoInput({ field, value, attachments, readOnly, invali
       )}
       {!readOnly && (multiple || value.length === 0) && (
         <label className="btn photo-add">
-          {value.length === 0 ? '📷 Aggiungi foto' : '📷 Altra foto'}
+          <Icon name="camera" /> {value.length === 0 ? 'Aggiungi foto' : 'Altra foto'}
           <input
             id={`df-${field.id}`}
             ref={inputRef}

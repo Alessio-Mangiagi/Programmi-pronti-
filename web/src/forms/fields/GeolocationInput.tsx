@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Geolocation } from '@fieldview/form-core'
+import Icon from '../../components/Icon'
 
 type Props = {
   value: Geolocation | null
@@ -55,7 +56,7 @@ export default function GeolocationInput({ value, readOnly, invalid, onChange }:
         </label>
         {!readOnly && (
           <button type="button" className="btn" onClick={locate} disabled={busy}>
-            {busy ? 'Ricerca…' : '📍 Posizione attuale'}
+            {busy ? 'Ricerca…' : <><Icon name="crosshair" /> Posizione attuale</>}
           </button>
         )}
       </div>

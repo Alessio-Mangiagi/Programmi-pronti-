@@ -24,7 +24,7 @@ per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).
 ## Operatività quotidiana (ufficio)
 - **Dashboard**: aperti, scaduti, chiusi negli ultimi 7 giorni, trend; click su un
   grafico → task filtrati.
-- **Task**: tabella con cambio stato/assegnatario/scadenza inline; "📍" apre la
+- **Task**: tabella con cambio stato/assegnatario/scadenza inline; l'icona pin apre la
   planimetria sul pin. **Verificato** chiude il ciclo (solo manager/admin).
 - **Notifiche**: assegnatario su assegnazione; creatore del task su risoluzione;
   manager del progetto su non conformità. Registro eventi: `GET /projects/{id}/events`.
