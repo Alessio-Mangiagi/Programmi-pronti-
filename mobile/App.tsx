@@ -1,10 +1,12 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
+import type React from 'react'
 import { ActivityIndicator, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from './src/auth/AuthContext'
-import { DbProvider } from './src/db/DbContext'
+import { DbProvider, useDb } from './src/db/DbContext'
+import { wipeLocalData } from './src/db/wipe'
 import { SyncProvider } from './src/sync/SyncContext'
 import SyncBar from './src/components/SyncBar'
 import type { RootStackParamList } from './src/navigation'
@@ -51,16 +53,22 @@ function Routes() {
   )
 }
 
+/** Al logout i dati locali vengono svuotati: un altro utente non deve vedere i progetti del precedente. */
+function AuthWithWipe({ children }: { children: React.ReactNode }) {
+  const db = useDb()
+  return <AuthProvider onLogout={() => wipeLocalData(db)}>{children}</AuthProvider>
+}
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <DbProvider>
-        <AuthProvider>
+        <AuthWithWipe>
           <NavigationContainer>
             <StatusBar style="auto" />
             <Routes />
           </NavigationContainer>
-        </AuthProvider>
+        </AuthWithWipe>
       </DbProvider>
     </GestureHandlerRootView>
   )

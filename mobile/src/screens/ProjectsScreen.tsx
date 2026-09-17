@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useCallback, useEffect, useState } from 'react'
-import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
 import { useAuth } from '../auth/AuthContext'
 import { listProjects, refreshProjects } from '../data/catalog'
 import { useSync } from '../sync/SyncContext'
@@ -16,7 +16,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Projects'>
 export default function ProjectsScreen({ navigation }: Props) {
   const db = useDb()
   const { api, user, logout } = useAuth()
-  const { sync } = useSync()
+  const { sync, pending } = useSync()
   const [projects, setProjects] = useState<Project[]>(() => listProjects(db))
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,13 +52,24 @@ export default function ProjectsScreen({ navigation }: Props) {
               <Text style={[styles.badge, { backgroundColor: '#fdecea', color: colors.danger }]}>⚠ {issues}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={logout} accessibilityLabel="Esci">
+          <TouchableOpacity
+            onPress={() => {
+              const waiting = pending.dirty + pending.uploads
+              if (!waiting) return logout()
+              Alert.alert('Modifiche non inviate', `${waiting} elementi non sono ancora sul server: uscendo andranno persi. Sincronizza prima.`, [
+                { text: 'Annulla', style: 'cancel' },
+                { text: 'Sincronizza', onPress: () => sync() },
+                { text: 'Esci comunque', style: 'destructive', onPress: logout },
+              ])
+            }}
+            accessibilityLabel="Esci"
+          >
             <Text style={{ color: colors.primary }}>{user?.name?.split(' ')[0] ?? 'Esci'} ↪</Text>
           </TouchableOpacity>
         </View>
       ),
     })
-  }, [navigation, logout, user, issues])
+  }, [navigation, logout, user, issues, pending, sync])
 
   return (
     <View style={styles.screen}>

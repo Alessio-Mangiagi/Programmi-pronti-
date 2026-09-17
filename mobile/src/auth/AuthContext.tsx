@@ -12,6 +12,7 @@ type AuthState = {
   loading: boolean
   api: Api
   login: (email: string, password: string) => Promise<void>
+  /** chiude la sessione; `onWipe` (fornito dall'app) svuota i dati locali se l'utente cambia */
   logout: () => Promise<void>
 }
 
@@ -23,15 +24,16 @@ const USER_KEY = 'fieldview.user'
  * token, l'utente salvato viene mostrato subito (offline) e verificato con
  * /auth/me quando la rete c'è; un 401 chiude la sessione.
  */
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   const logout = useCallback(async () => {
     await setToken(null)
     await SecureStore.deleteItemAsync(USER_KEY)
+    onLogout?.()
     setUser(null)
-  }, [])
+  }, [onLogout])
 
   const api = useMemo(() => createApi({ baseUrl: API_URL, getToken, onUnauthorized: () => logout() }), [logout])
 

@@ -188,7 +188,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Barra di stato sync: ultima sync, elementi in attesa, errori.
 - **DoD**: nessuna azione manuale necessaria per sincronizzare in uso normale.
 
-### Giorno 25 — Giornata di test sul campo
+### Giorno 25 — Giornata di test sul campo ⏸ (2026-09-17: preparato — checklist in `docs/test-sul-campo.md`, `eas.json`, scenari automatizzabili in test, wipe al logout; la giornata su device e le build EAS restano da fare)
 - Checklist scenari: rete assente all'avvio, rete che cade a metà compilazione, app uccisa con coda piena, due device sullo stesso pin, cambio utente.
 - Fix dei bug trovati; build interne (EAS) per iOS TestFlight e Android APK.
 - **DoD**: checklist completata, build installabili distribuite agli intervistati.

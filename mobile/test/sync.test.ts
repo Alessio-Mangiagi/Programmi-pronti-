@@ -450,3 +450,51 @@ describe('giorno 23: task mobile', () => {
     expect(allowedTransitions(getTask(db, open.id)!, me)).toEqual([])
   })
 })
+
+describe('giorno 25: scenari da campo automatizzabili', () => {
+  it('app uccisa con coda piena: al riavvio (DB su file) le righe dirty e gli upload ripartono', async () => {
+    const { mkdtempSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const file = join(mkdtempSync(join(tmpdir(), 'fv-')), 'app.db')
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+    const { saveSubmissionLocally } = await import('../src/data/submissions')
+    const { pendingCounts } = await import('../src/sync/status')
+
+    // sessione 1: compila offline, poi "l'app muore"
+    let db = openNodeDb(file)
+    db.insert(schema.projects).values({ id: projectId, name: 'P', created_at: nowIso(), updated_at: nowIso() }).run()
+    await pullProject(db, api, projectId)
+    const tpl = db.select().from(schema.formTemplates).where(eq(schema.formTemplates.name, 'Punch list (difetto)')).get()!
+    const pin = alivePins(db)[0]
+    saveSubmissionLocally(db, { pinId: pin.id, templateId: tpl.id, data: { descrizione: 'x', categoria: 'Altro', gravita: 'Bassa', foto: ['k1', 'k2'] }, attachments: { k1: { uri: 'file:///k1.png', kind: 'photo' }, k2: { uri: 'file:///k2.png', kind: 'photo' } }, userId: null })
+    expect(pendingCounts(db)).toMatchObject({ dirty: 3, uploads: 2 })
+
+    // sessione 2: nuovo processo, stesso file
+    db = openNodeDb(file)
+    expect(pendingCounts(db)).toMatchObject({ dirty: 3, uploads: 2 })
+    const res = await syncAll(db, api, {
+      projectIds: [projectId],
+      uploads: { buildForm: async (_u, name, mime) => { const f = new FormData(); f.append('file', new Blob([new Uint8Array(PNG)], { type: mime }), name); return f } },
+    })
+    expect(res.push.rejected).toBe(0)
+    expect(res.uploads).toMatchObject({ uploaded: 2, pending: 0 })
+    expect(pendingCounts(db)).toMatchObject({ dirty: 0, uploads: 0 })
+  })
+
+  it('cambio utente: il wipe svuota tutto, il nuovo utente riparte dal suo pull', async () => {
+    const { wipeLocalData } = await import('../src/db/wipe')
+    const db = device()
+    await pullProject(db, api, projectId)
+    expect(alivePins(db).length).toBeGreaterThan(0)
+    wipeLocalData(db)
+    expect(db.select().from(schema.projects).all()).toHaveLength(0)
+    expect(db.select().from(schema.pins).all()).toHaveLength(0)
+    expect(db.select().from(schema.syncState).all()).toHaveLength(0)
+    // il nuovo utente (field) ripete il primo pull completo
+    const fieldApi = await server.login('field@fieldview.local')
+    db.insert(schema.projects).values({ id: projectId, name: 'P', created_at: nowIso(), updated_at: nowIso() }).run()
+    const res = await pullProject(db, fieldApi, projectId)
+    expect(res.received.pins).toBeGreaterThan(0)
+  })
+})
