@@ -1120,6 +1120,11 @@ export interface components {
              */
             skipped: number;
             /**
+             * Skipped Ids
+             * @default []
+             */
+            skipped_ids: string[];
+            /**
              * Rejected
              * @default []
              */

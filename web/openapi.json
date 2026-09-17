@@ -3192,6 +3192,14 @@
             "title": "Skipped",
             "default": 0
           },
+          "skipped_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped Ids",
+            "default": []
+          },
           "rejected": {
             "items": {
               "$ref": "#/components/schemas/RejectedItem"

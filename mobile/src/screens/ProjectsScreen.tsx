@@ -4,6 +4,7 @@ import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-na
 import { useAuth } from '../auth/AuthContext'
 import { listProjects, refreshProjects } from '../data/catalog'
 import { syncAll } from '../sync'
+import { listSyncIssues } from './SyncIssuesScreen'
 import { useDb } from '../db/DbContext'
 import type { Project } from '../db/schema'
 import type { RootStackParamList } from '../navigation'
@@ -18,6 +19,7 @@ export default function ProjectsScreen({ navigation }: Props) {
   const [projects, setProjects] = useState<Project[]>(() => listProjects(db))
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [issues, setIssues] = useState(() => listSyncIssues(db).length)
 
   const refresh = useCallback(async () => {
     setRefreshing(true)
@@ -28,6 +30,7 @@ export default function ProjectsScreen({ navigation }: Props) {
       // push delle modifiche locali + pull di ogni progetto (planimetrie, pin, moduli, task)
       const res = await syncAll(db, api)
       if (res.errors.length) setError(res.errors[0])
+      setIssues(listSyncIssues(db).length)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Aggiornamento non riuscito')
     } finally {
@@ -42,12 +45,19 @@ export default function ProjectsScreen({ navigation }: Props) {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={logout} accessibilityLabel="Esci">
-          <Text style={{ color: colors.primary }}>{user?.name?.split(' ')[0] ?? 'Esci'} ↪</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          {issues > 0 && (
+            <TouchableOpacity onPress={() => navigation.navigate('SyncIssues')} accessibilityLabel="Elementi non sincronizzati">
+              <Text style={[styles.badge, { backgroundColor: '#fdecea', color: colors.danger }]}>⚠ {issues}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={logout} accessibilityLabel="Esci">
+            <Text style={{ color: colors.primary }}>{user?.name?.split(' ')[0] ?? 'Esci'} ↪</Text>
+          </TouchableOpacity>
+        </View>
       ),
     })
-  }, [navigation, logout, user])
+  }, [navigation, logout, user, issues])
 
   return (
     <View style={styles.screen}>

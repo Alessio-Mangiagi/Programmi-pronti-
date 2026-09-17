@@ -24,7 +24,7 @@ Struttura:
 - `src/data/catalog.ts` — query di catalogo (progetti, planimetrie) e `refreshProjects`
 - `src/data/mutations.ts` — scritture locali (`createPin`, `updateTask`, `createSubmission`, …): `updated_at` = adesso, `dirty = true`; `retryRejected`/`discardRejected` per le righe in `sync_log`
 - `src/sync/` — `pull.ts` (incrementale per progetto, upsert con LWW, conflitti in `sync_log`), `push.ts` (righe dirty → `/sync/push`, dirty azzerato solo se `updated_at` invariato, rifiuti in `sync_log`), `index.ts` (`syncAll`: mutex, push poi pull, errori raccolti), `time.ts`
-- `src/screens/` — `LoginScreen`, `ProjectsScreen` (lista locale + pull-to-refresh), `PlansScreen`
+- `src/screens/` — `LoginScreen`, `ProjectsScreen` (lista locale + pull-to-refresh + badge ⚠ problemi di sync), `PlansScreen`, `SyncIssuesScreen` (righe rifiutate: riprova/scarta; conflitti persi: presa visione)
 - `metro.config.js` — `watchFolders` per `packages/form-core` (dipendenza `file:`)
 
 Sync: `syncAll(db, api)` fa prima il push di tutte le righe `dirty` (un solo batch,
@@ -39,7 +39,11 @@ il server smista per id) e poi `pullProject` per ogni progetto locale con
 - cancellazioni: `deleted_at` locale + push; al pull la riga resta con `deleted_at`
   (le query filtrano `deleted_at IS NULL`).
 `test/sync.test.ts` esegue tutto questo contro il backend reale avviato da
-`scripts/e2e_server.py` (porta 8002, cartella `mobile/.e2e/`).
+`scripts/e2e_server.py` (porta 8002, cartella `mobile/.e2e/`), incluso lo scenario
+"stesso task modificato su web e app offline"; `test/sync-mock.test.ts` ripete le
+regole contro un server finto in memoria (senza Python). Limite noto: LWW è per
+riga, non per campo — se il web cambia la descrizione e l'app (più tardi) il titolo,
+la riga dell'app vince e la descrizione torna a quella che l'app conosceva.
 
 Verifica senza simulatore: `npx expo export --platform android --no-bytecode` produce
 il bundle (Metro risolve tutti i moduli, form-core compreso). L'avvio su simulatore

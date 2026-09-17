@@ -760,6 +760,7 @@ def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
             res.updated += 1
         else:
             res.skipped += 1
+            res.skipped_ids.append(item.id)
     db.flush()  # rende visibili gli insert alle fk_checks del gruppo successivo
     return res
 

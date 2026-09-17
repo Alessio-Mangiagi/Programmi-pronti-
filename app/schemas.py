@@ -309,6 +309,7 @@ class SyncPushResult(BaseModel):
     inserted: int = 0
     updated: int = 0
     skipped: int = 0   # push più vecchio di quanto già sul server (last write wins)
+    skipped_ids: list[str] = []  # quali: il device può segnalare all'utente la modifica persa
     rejected: list[RejectedItem] = []  # righe rifiutate singolarmente, con motivo
 
 

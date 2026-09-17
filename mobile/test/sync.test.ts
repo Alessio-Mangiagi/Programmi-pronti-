@@ -6,7 +6,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Api } from '../src/api/client'
-import { createPin, createSubmission, createTask, deletePin, discardRejected, retryRejected, updatePin } from '../src/data/mutations'
+import { createPin, createSubmission, createTask, deletePin, discardRejected, retryRejected, updatePin, updateTask } from '../src/data/mutations'
 import { openNodeDb } from '../src/db/node'
 import { schema, type AppDb } from '../src/db/types'
 import { pullProject, pushDirty, syncAll } from '../src/sync'
@@ -220,5 +220,50 @@ describe('conflitti e cancellazioni', () => {
     const failed = await syncAll(db, offline as never, [projectId])
     expect(failed.errors).toHaveLength(2)
     expect(db.select().from(schema.pins).where(eq(schema.pins.dirty, true)).all()).toHaveLength(1) // resta da pushare
+  })
+})
+
+describe('giorno 18: stesso task modificato su web e app offline', () => {
+  it('termina senza duplicati né crash, con LWW e traccia del perdente', async () => {
+    const db = device()
+    await pullProject(db, api, projectId)
+    const task = db.select().from(schema.tasks).where(and(isNull(schema.tasks.deleted_at), eq(schema.tasks.status, 'open'))).get()!
+    const countBefore = (await api.get<unknown[]>(`/projects/${projectId}/tasks`)).length
+
+    // app offline: cambia il titolo; poi il web (più tardi) lo assegna
+    updateTask(db, task.id, { title: 'Titolo dal telefono' })
+    await new Promise((r) => setTimeout(r, 20))
+    const members = await api.get<{ id: string; email: string }[]>(`/projects/${projectId}/members`)
+    const franco = members.find((m) => m.email === 'field@fieldview.local')!
+    await api.patch(`/tasks/${task.id}`, { assigned_to: franco.id })
+
+    const res = await syncAll(db, api, [projectId])
+    expect(res.errors).toEqual([])
+    // il push locale è più vecchio: il server lo salta (skipped), il pull porta la versione web
+    expect(res.push.groups?.tasks.skipped).toBe(1)
+    const local = db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id)).get()!
+    expect(local.status).toBe('assigned')
+    expect(local.assigned_to).toBe(franco.id)
+    expect(local.title).toBe(task.title) // la modifica locale è persa...
+    expect(local.dirty).toBe(false)
+    const lost = db.select().from(schema.syncLog).where(eq(schema.syncLog.kind, 'conflict_lost')).all()
+    expect(lost.map((l) => l.entity_id)).toContain(task.id) // ...ma tracciata
+    expect((lost.find((l) => l.entity_id === task.id)!.payload as { title: string }).title).toBe('Titolo dal telefono')
+
+    // nessun duplicato, né in locale né sul server
+    expect(db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id)).all()).toHaveLength(1)
+    expect((await api.get<unknown[]>(`/projects/${projectId}/tasks`)).length).toBe(countBefore)
+
+    // caso opposto: l'app modifica DOPO il web -> al sync vince l'app
+    await api.patch(`/tasks/${task.id}`, { description: 'dal web' })
+    await new Promise((r) => setTimeout(r, 20))
+    updateTask(db, task.id, { title: 'Titolo dal telefono 2' })
+    const res2 = await syncAll(db, api, [projectId])
+    expect(res2.push.groups?.tasks.updated).toBe(1)
+    const remote = await api.get<{ title: string; description: string | null }>(`/tasks/${task.id}`)
+    expect(remote.title).toBe('Titolo dal telefono 2')
+    // LWW è a livello di riga: la riga dell'app (più recente) non conosceva la
+    // descrizione messa dal web e la sovrascrive. Merge per campo = backlog.
+    expect(remote.description).toBeNull()
   })
 })

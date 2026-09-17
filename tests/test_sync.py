@@ -53,7 +53,7 @@ def test_push_is_idempotent(client, project):
     assert client.post("/sync/push", json=payload).json()["pins"]["inserted"] == 1
     # retry di rete: stesso pacchetto due volte
     second = client.post("/sync/push", json=payload).json()["pins"]
-    assert second == {"inserted": 0, "updated": 0, "skipped": 1, "rejected": []}
+    assert second == {"inserted": 0, "updated": 0, "skipped": 1, "skipped_ids": [pin_id], "rejected": []}
     pull = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()
     assert len(pull["pins"]) == 1
 
@@ -69,7 +69,7 @@ def test_last_write_wins_and_tz_normalization(client, project):
     r = client.post("/sync/push", json={"pins": [{
         "id": pin_id, "plan_id": project["plan"]["id"], "x": 0.9, "y": 0.9,
         "label": "OLD", "updated_at": iso(t0 - timedelta(minutes=5))}]}).json()
-    assert r["pins"]["skipped"] == 1
+    assert r["pins"]["skipped"] == 1 and r["pins"]["skipped_ids"] == [pin_id]
     # device C, più nuovo → updated
     r = client.post("/sync/push", json={"pins": [{
         "id": pin_id, "plan_id": project["plan"]["id"], "x": 0.7, "y": 0.7,

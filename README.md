@@ -121,7 +121,8 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
    entità inesistenti, o con `data_json` non valido rispetto al template,
    vengono rifiutate singolarmente (`rejected: [{id, reason}]`),
    il resto del batch passa. La risposta riporta per gruppo
-   `inserted / updated / skipped / rejected`.
+   `inserted / updated / skipped / rejected` più `skipped_ids` (le righe più
+   vecchie di quanto già sul server: il device le segnala come conflitto perso).
 
 3. **Pull**: il device chiama
    `GET /sync/pull?project_id=<id>&since=<server_time precedente>`
@@ -176,7 +177,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 18: schermata "Elementi non sincronizzati" + scenario stesso task modificato su web e app
+1. Giorno 19: progetti e planimetrie offline (cache immagini) nell'app
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli

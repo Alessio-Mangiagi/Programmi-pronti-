@@ -153,7 +153,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Ordine: push poi pull. Mutex per evitare sync concorrenti.
 - **DoD**: modifico un pin dal web, l'app lo riceve; creo un pin in app, il web lo vede.
 
-### Giorno 18 — Conflitti e test sync
+### Giorno 18 — Conflitti e test sync ✅ (2026-09-17; LWW a livello di riga: un campo cambiato solo dal web può essere sovrascritto da una riga più recente dell'app — merge per campo in backlog)
 - LWW: se il pull porta una riga con `updated_at` più recente di una riga locale `dirty`, la locale perde e viene loggata (`sync_log`).
 - Righe `rejected`: schermata "Elementi non sincronizzati" con motivo e azione (elimina/riprova).
 - Test Jest del motore contro un server mock + un test di integrazione contro il backend reale.

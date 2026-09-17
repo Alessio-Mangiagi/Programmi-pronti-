@@ -4,6 +4,9 @@
  * dirty azzerato E riga in sync_log (kind = rejected) con il motivo, così la
  * schermata "Elementi non sincronizzati" può far scegliere: elimina o riprova.
  *
+ * skipped (il server aveva già una versione più recente) -> dirty azzerato e
+ * sync_log (kind = conflict_lost): la versione vincente arriva col pull.
+ *
  * `dirty` viene azzerato solo se `updated_at` è ancora quello pushato: se
  * l'utente ha modificato la riga durante la chiamata, resta dirty e riparte
  * al push successivo.
@@ -15,9 +18,9 @@ import { stripLocal } from './pull'
 import { nowIso } from './time'
 
 type Rejected = { id: string; reason: string }
-type GroupResult = { inserted: number; updated: number; skipped: number; rejected: Rejected[] }
+type GroupResult = { inserted: number; updated: number; skipped: number; skipped_ids: string[]; rejected: Rejected[] }
 export type PushResponse = { status: string; pins: GroupResult; submissions: GroupResult; tasks: GroupResult; attachments: GroupResult; server_time: string }
-export type PushSummary = { sent: number; rejected: number; groups: Omit<PushResponse, 'status' | 'server_time'> | null }
+export type PushSummary = { sent: number; rejected: number; conflicts: number; groups: Omit<PushResponse, 'status' | 'server_time'> | null }
 
 const GROUPS = [
   { name: 'pins', table: schema.pins },
@@ -36,23 +39,27 @@ export async function pushDirty(db: AppDb, api: Api): Promise<PushSummary> {
     sentRows[g.name] = rows.map((r) => ({ id: r.id as string, updated_at: r.updated_at as string }))
     sent += rows.length
   }
-  if (sent === 0) return { sent: 0, rejected: 0, groups: null }
+  if (sent === 0) return { sent: 0, rejected: 0, conflicts: 0, groups: null }
 
   const res = await api.post<PushResponse>('/sync/push', payload)
 
   let rejected = 0
+  let conflicts = 0
   db.transaction((tx) => {
     for (const g of GROUPS) {
       const result = res[g.name]
       const rejectedById = new Map(result.rejected.map((r) => [r.id, r.reason]))
+      const skipped = new Set(result.skipped_ids ?? [])
       for (const { id, updated_at } of sentRows[g.name]) {
         const reason = rejectedById.get(id)
-        if (reason !== undefined) {
+        const kind = reason !== undefined ? 'rejected' : skipped.has(id) ? 'conflict_lost' : null
+        if (kind) {
           const row = tx.select().from(g.table).where(eq(g.table.id, id)).get() as Record<string, unknown> | undefined
           tx.insert(schema.syncLog)
-            .values({ entity: g.name, entity_id: id, kind: 'rejected', reason, payload: row ? stripLocal(row) : null, created_at: nowIso() })
+            .values({ entity: g.name, entity_id: id, kind, reason: reason ?? 'server newer', payload: row ? stripLocal(row) : null, created_at: nowIso() })
             .run()
-          rejected++
+          if (kind === 'rejected') rejected++
+          else conflicts++
         }
         tx.update(g.table)
           .set({ dirty: false } as never)
@@ -64,5 +71,5 @@ export async function pushDirty(db: AppDb, api: Api): Promise<PushSummary> {
   const { status, server_time, ...groups } = res
   void status
   void server_time
-  return { sent, rejected, groups }
+  return { sent, rejected, conflicts, groups }
 }

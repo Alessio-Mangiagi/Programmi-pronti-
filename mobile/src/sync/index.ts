@@ -25,7 +25,7 @@ export const isSyncing = () => inFlight !== null
 
 async function run(db: AppDb, api: Api, projectIds?: string[]): Promise<SyncResult> {
   const errors: string[] = []
-  let push: PushSummary = { sent: 0, rejected: 0, groups: null }
+  let push: PushSummary = { sent: 0, rejected: 0, conflicts: 0, groups: null }
   try {
     push = await pushDirty(db, api)
   } catch (e) {
