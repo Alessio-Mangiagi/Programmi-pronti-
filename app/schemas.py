@@ -35,6 +35,38 @@ class UserOut(BaseModel):
     name: str
     role: str
     is_active: bool
+    notify_email: bool = True
+    notify_push: bool = True
+
+
+class PreferencesUpdate(BaseModel):
+    notify_email: Optional[bool] = None
+    notify_push: Optional[bool] = None
+
+
+class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    type: str
+    entity_type: str
+    entity_id: str
+    project_id: str
+    actor_id: Optional[str] = None
+    payload: dict
+    created_at: datetime
+    processed_at: Optional[datetime] = None
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    event_id: str
+    channel: str
+    status: str
+    error: Optional[str] = None
+    created_at: datetime
+    sent_at: Optional[datetime] = None
+    event: EventOut
 
 
 class TokenResponse(BaseModel):

@@ -197,7 +197,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 
 ## Settimana 6 — Notifiche, dashboard, rilascio
 
-### Giorno 26 — Eventi e regole di notifica
+### Giorno 26 — Eventi e regole di notifica ✅ (2026-09-17)
 - Tabella `events` (outbox): `submission.created`, `task.created`, `task.status_changed`, `task.assigned`; scritta nella stessa transazione della modifica (anche da sync push).
 - Regole MVP: assegnatario notificato su `assigned`; creatore notificato su `resolved`; manager di progetto notificati su `submission.created` con esito non conforme.
 - Preferenze utente minime (email sì/no, push sì/no).

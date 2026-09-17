@@ -44,6 +44,7 @@ from . import storage as st
 from .auth import current_user, require_role
 from .database import get_db
 from .forms import validate_schema, validate_submission
+from . import events
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
 
@@ -73,6 +74,32 @@ def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
 @app.get("/auth/me", response_model=schemas.UserOut)
 def me(user: models.User = Depends(current_user)):
     return user
+
+
+@app.patch("/auth/me/preferences", response_model=schemas.UserOut)
+def update_preferences(payload: schemas.PreferencesUpdate, db: Session = Depends(get_db),
+                       user: models.User = Depends(current_user)):
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(user, k, v)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.get("/auth/me/notifications", response_model=list[schemas.NotificationOut])
+def my_notifications(limit: int = 50, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Le mie notifiche (più recenti prima), con l'evento che le ha generate."""
+    return (db.query(models.Notification).filter(models.Notification.user_id == user.id)
+            .order_by(models.Notification.created_at.desc()).limit(min(limit, 200)).all())
+
+
+@app.get("/projects/{project_id}/events", response_model=list[schemas.EventOut])
+def list_events(project_id: str, limit: int = 100, db: Session = Depends(get_db),
+                user: models.User = Depends(require_role(UserRole.manager))):
+    """Registro eventi del progetto (manager): cosa è successo e quando."""
+    auth.assert_project_access(db, user, project_id)
+    return (db.query(models.Event).filter(models.Event.project_id == project_id)
+            .order_by(models.Event.created_at.desc()).limit(min(limit, 500)).all())
 
 
 @app.post("/users", response_model=schemas.UserOut, status_code=201)
@@ -457,6 +484,8 @@ def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(g
         raise HTTPException(422, detail=errors)
     sub = models.FormSubmission(**payload.model_dump(exclude={"submitted_by"}), submitted_by=user.id)
     db.add(sub)
+    db.flush()
+    events.record_submission_created(db, sub, auth.project_of_pin(sub.pin), user.id)
     db.commit()
     db.refresh(sub)
     return _with_attachments(schemas.SubmissionOut, sub)
@@ -510,6 +539,8 @@ def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db),
     task = models.Task(**payload.model_dump(), created_by=user.id)
     task.status = TaskStatus.assigned if payload.assigned_to else TaskStatus.open
     db.add(task)
+    db.flush()
+    events.record_task_created(db, task, auth.project_of_pin(task.pin), user.id)
     db.commit()
     db.refresh(task)
     return _with_attachments(schemas.TaskOut, task)
@@ -559,6 +590,7 @@ def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends
     lo stato lo porta automaticamente ad 'assigned'.
     """
     task = _get_task(db, user, task_id)
+    before = {"status": task.status.value, "assigned_to": task.assigned_to}
     changes = payload.model_dump(exclude_unset=True)
     _get_user_or_422(db, changes.get("assigned_to"), "assigned_to")
 
@@ -578,6 +610,7 @@ def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends
     for k, v in changes.items():
         setattr(task, k, v)
     task.updated_at = utcnow()
+    events.record_task_changes(db, task, auth.project_of_task(task), user.id, before)
     db.commit()
     db.refresh(task)
     return _with_attachments(schemas.TaskOut, task)
@@ -808,6 +841,12 @@ def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db),
                   else db.get(models.Task, item.task_id))
         return forbidden(auth.project_of_pin(parent.pin))
 
+    # Stato precedente dei task e submission già note: per capire cosa è cambiato davvero.
+    task_before = {t.id: {"status": t.status.value, "assigned_to": t.assigned_to}
+                   for t in db.query(models.Task).filter(models.Task.id.in_([t.id for t in payload.tasks])).all()} if payload.tasks else {}
+    known_subs = {r[0] for r in db.query(models.FormSubmission.id)
+                  .filter(models.FormSubmission.id.in_([x.id for x in payload.submissions])).all()} if payload.submissions else set()
+
     pins = _upsert(
         db, models.Pin, payload.pins,
         fk_checks={"plan_id": models.Plan},
@@ -832,6 +871,19 @@ def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db),
         updatable=["file_url", "file_type", "deleted_at"],
         validate=check_attachment,
     )
+    # Eventi nella stessa transazione del push (solo righe accettate)
+    rejected_subs = {r.id for r in submissions.rejected} | set(submissions.skipped_ids)
+    for item in payload.submissions:
+        if item.id in known_subs or item.id in rejected_subs or item.deleted_at:
+            continue
+        sub = db.get(models.FormSubmission, item.id)
+        events.record_submission_created(db, sub, auth.project_of_pin(sub.pin), user.id)
+    rejected_tasks = {r.id for r in tasks.rejected} | set(tasks.skipped_ids)
+    for item in payload.tasks:
+        if item.id in rejected_tasks or item.deleted_at:
+            continue
+        task = db.get(models.Task, item.id)
+        events.record_task_changes(db, task, auth.project_of_task(task), user.id, task_before.get(item.id))
     db.commit()
     return schemas.SyncPushResponse(
         pins=pins, submissions=submissions, tasks=tasks, attachments=attachments,

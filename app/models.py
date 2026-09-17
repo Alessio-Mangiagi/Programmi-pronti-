@@ -87,6 +87,9 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.field, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    # Preferenze di notifica minime (giorno 26): canali attivi.
+    notify_email = Column(Boolean, default=True, nullable=False)
+    notify_push = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -220,3 +223,41 @@ Index("ix_pins_updated_at", Pin.updated_at)
 Index("ix_form_submissions_updated_at", FormSubmission.updated_at)
 Index("ix_tasks_updated_at", Task.updated_at)
 Index("ix_attachments_updated_at", Attachment.updated_at)
+
+
+class Event(Base):
+    """
+    Outbox degli eventi di dominio, scritta nella stessa transazione della
+    modifica (anche dal sync push): il worker delle notifiche (giorno 27) la
+    consuma. Tipi: submission.created, task.created, task.status_changed, task.assigned.
+    """
+    __tablename__ = "events"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    type = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=False)   # submission | task
+    entity_id = Column(String, nullable=False, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False, index=True)
+    actor_id = Column(String, ForeignKey("users.id"), nullable=True)
+    payload = Column(JSONType, nullable=False, default=dict)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    processed_at = Column(DateTime, nullable=True)
+
+    notifications = relationship("Notification", back_populates="event")
+
+
+class Notification(Base):
+    """Una consegna da fare: evento × destinatario × canale. Il worker la porta a sent/failed."""
+    __tablename__ = "notifications"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    event_id = Column(String, ForeignKey("events.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    channel = Column(String, nullable=False)      # email | push
+    status = Column(String, nullable=False, default="pending", index=True)  # pending | sent | failed
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    sent_at = Column(DateTime, nullable=True)
+
+    event = relationship("Event", back_populates="notifications")
+    user = relationship("User")

@@ -52,6 +52,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/schemas.py` — schemi Pydantic per le API, incluso il payload di sync
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
 - `app/auth.py` — JWT, ruoli (`admin`/`manager`/`field`), accesso per progetto
+- `app/events.py` — outbox eventi (`events`) + regole di notifica (`notifications` pending), scritti nella stessa transazione da web e sync push
 - `scripts/seed.py` — dati demo idempotenti
 - `app/main.py` — endpoint FastAPI: CRUD web (`/submissions` + `PATCH`, `/tasks`, `/pins/{id}`, `DELETE /attachments/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da `.env`/ambiente
@@ -68,6 +69,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/test_files.py` — test upload planimetrie/allegati
 - `tests/test_auth.py` — test login, ruoli, visibilità per progetto
 - `tests/test_server.py` — test del mount `/api` e del fallback SPA
+- `tests/test_events.py` — eventi e notifiche da web e da sync push, preferenze
 - `web/` — frontend React (vedi `web/README.md`)
 - `mobile/` — app Expo offline-first (vedi `mobile/README.md`)
 - `web/src/forms/` — `DynamicForm` (renderer di tutti i tipi di campo) e `SubmissionForm` (compilazione + upload foto/firma)
@@ -177,7 +179,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 26: eventi (outbox) e regole di notifica
+1. Giorno 27: worker notifiche (email SMTP + push Expo)
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
@@ -189,3 +191,15 @@ anche quelli archiviati, per leggere vecchie submission); ogni template porta
 (duplicare e modificare la copia: le submission esistenti non vengono ri-validate).
 Un template archiviato non accetta nuove submission (409). Migrazione
 `a16a6f709710` aggiunge `form_templates.archived_at`.
+
+## Eventi e notifiche
+
+Ogni modifica rilevante scrive un evento nella tabella `events` (outbox) nella stessa
+transazione, sia dagli endpoint web sia da `/sync/push` (solo righe accettate, non i
+retry): `submission.created`, `task.created`, `task.status_changed`, `task.assigned`.
+Le regole MVP (`app/events.py`) generano righe `notifications` (`pending`) per canale
+attivo dell'utente (`notify_email`/`notify_push`, `PATCH /auth/me/preferences`):
+assegnatario su `task.assigned`; creatore del task su `resolved`; manager/admin
+membri del progetto su `submission.created` con una scelta tipo "Non conforme".
+L'autore non viene mai notificato. `GET /auth/me/notifications`, `GET /projects/{id}/events`
+(manager). Il worker che invia (email, push) arriva al giorno 27. Migrazione `5d220dd1f4b7`.

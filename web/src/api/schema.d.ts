@@ -38,6 +38,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Preferences */
+        patch: operations["update_preferences_auth_me_preferences_patch"];
+        trace?: never;
+    };
+    "/auth/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Notifications
+         * @description Le mie notifiche (più recenti prima), con l'evento che le ha generate.
+         */
+        get: operations["my_notifications_auth_me_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events
+         * @description Registro eventi del progetto (manager): cosa è successo e quando.
+         */
+        get: operations["list_events_projects__project_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -636,6 +693,32 @@ export interface components {
             /** File */
             file: string;
         };
+        /** EventOut */
+        EventOut: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Entity Id */
+            entity_id: string;
+            /** Project Id */
+            project_id: string;
+            /** Actor Id */
+            actor_id?: string | null;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Processed At */
+            processed_at?: string | null;
+        };
         /** FormSubmissionSync */
         FormSubmissionSync: {
             /** Id */
@@ -731,6 +814,27 @@ export interface components {
         MemberAdd: {
             /** User Id */
             user_id: string;
+        };
+        /** NotificationOut */
+        NotificationOut: {
+            /** Id */
+            id: string;
+            /** Event Id */
+            event_id: string;
+            /** Channel */
+            channel: string;
+            /** Status */
+            status: string;
+            /** Error */
+            error?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Sent At */
+            sent_at?: string | null;
+            event: components["schemas"]["EventOut"];
         };
         /** PinCreate */
         PinCreate: {
@@ -927,6 +1031,13 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** PreferencesUpdate */
+        PreferencesUpdate: {
+            /** Notify Email */
+            notify_email?: boolean | null;
+            /** Notify Push */
+            notify_push?: boolean | null;
         };
         /** PresignRequest */
         PresignRequest: {
@@ -1302,6 +1413,16 @@ export interface components {
             role: string;
             /** Is Active */
             is_active: boolean;
+            /**
+             * Notify Email
+             * @default true
+             */
+            notify_email: boolean;
+            /**
+             * Notify Push
+             * @default true
+             */
+            notify_push: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -1374,6 +1495,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    update_preferences_auth_me_preferences_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferencesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_notifications_auth_me_notifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_projects__project_id__events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
