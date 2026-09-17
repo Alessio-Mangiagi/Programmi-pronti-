@@ -1,8 +1,11 @@
-# Field View Starter
+# Field View
 
-Backend di partenza (FastAPI + SQLite/Postgres) per il sistema di gestione
-cantiere tipo Trimble Field View: planimetrie con pin, moduli dinamici,
-task, sync offline-first per app native.
+Gestione cantiere tipo Trimble Field View: planimetrie con pin, moduli dinamici,
+task, notifiche, dashboard. Backend FastAPI (SQLite in dev, Postgres in prod),
+web React (`web/`), app Expo offline-first (`mobile/`), logica moduli condivisa
+(`packages/form-core`). Stato: MVP a 30 giorni completato lato codice — vedi
+`ROADMAP.md`, `docs/retrospettiva.md` (cosa manca prima del rilascio) e le guide
+`docs/guida-utente.md` / `docs/guida-admin.md`.
 
 ## Avvio
 
@@ -179,10 +182,19 @@ submission di quel template; `date_from`/`date_to` (data o datetime ISO, estremi
 inclusi, `date_to` con sola data copre tutto il giorno) guardano la creazione del
 pin o di una sua submission/task. I conteggi nella risposta restano i totali del pin.
 
-## Prossimi passi consigliati
+## Produzione
 
-1. Giorno 30: rilascio MVP (Dockerfile prod, backup, S3, documentazione)
-2. Form builder web sopra i 3 template del seed
+`docker compose -f docker-compose.prod.yml up -d --build`: Postgres (non esposto),
+`app` (API + web su `127.0.0.1:8000`, da mettere dietro un reverse proxy TLS),
+`worker` notifiche, `backup` (dump + tar storage notturni in `./backups/`).
+Storage S3-compatible attivabile con `STORAGE_S3_BUCKET` (+ endpoint per MinIO):
+i file restano privati e vengono serviti dall'API via `/files/{key}` con il JWT,
+quindi gli URL nel DB non cambiano tra filesystem e S3. Dettagli in `docs/guida-admin.md`.
+
+## Prossimi passi
+
+1. Giornata di test sul campo con build EAS (`docs/test-sul-campo.md`)
+2. Backlog in `docs/retrospettiva.md`
 
 ## Template dei moduli
 
