@@ -174,5 +174,5 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 14: vista task di progetto (tabella, filtri, cambio stato inline, "vedi sulla planimetria")
+1. Giorno 15: form builder v1 (lista template, editor campi, anteprima live)
 2. Form builder web sopra i 3 template del seed
