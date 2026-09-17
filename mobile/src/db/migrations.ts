@@ -57,6 +57,8 @@ export const MIGRATIONS: string[][] = [
   // 3: bozze dei moduli (chiave = pin + template), per non perdere il lavoro se l'app viene chiusa
   [`CREATE TABLE drafts (key TEXT PRIMARY KEY, pin_id TEXT NOT NULL, template_id TEXT NOT NULL,
       data_json TEXT NOT NULL, attachments_json TEXT NOT NULL, updated_at TEXT NOT NULL)`],
+  // 4: coda upload: quando riprovare (backoff esponenziale) senza toccare updated_at (che è del sync)
+  [`ALTER TABLE attachments ADD COLUMN upload_next_at TEXT`],
 ]
 
 /** Driver minimo che sia expo-sqlite sia better-sqlite3 sanno offrire. */

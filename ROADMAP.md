@@ -173,7 +173,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Salvataggio locale immediato (`dirty=true`), bozze.
 - **DoD**: compilo un'ispezione con 3 foto e firma in modalità aereo.
 
-### Giorno 22 — Foto: coda di upload separata
+### Giorno 22 — Foto: coda di upload separata ✅ (2026-09-17; DoD "20 foto in coda, torna la rete" verificata in Node contro il backend)
 - Foto salvate su filesystem locale, `attachments.local_file_path`; coda upload con retry esponenziale, separata dal sync JSON (che viaggia sempre leggero).
 - Compressione a max 1600px lato lungo prima dell'upload.
 - Stati: `local → uploading → uploaded`; icona sul pin.

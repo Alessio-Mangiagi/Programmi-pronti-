@@ -4,6 +4,10 @@
  * finché la coda di upload non li ha mandati al server.
  */
 import { Directory, File, Paths } from 'expo-file-system'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+
+/** Lato lungo massimo delle foto caricate: qualità sufficiente per un difetto, upload leggero. */
+export const PHOTO_MAX_SIDE = 1600
 
 function attachmentsDir(): Directory {
   const dir = new Directory(Paths.document, 'attachments')
@@ -11,12 +15,21 @@ function attachmentsDir(): Directory {
   return dir
 }
 
-/** Copia una foto (uri del picker/camera) nella cartella allegati. */
-export async function importPhoto(sourceUri: string, id: string): Promise<string> {
-  const ext = (sourceUri.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-  const dest = new File(attachmentsDir(), `${id}.${ext === 'jpeg' ? 'jpg' : ext}`)
+/**
+ * Importa una foto (uri del picker/camera) nella cartella allegati, ridotta a
+ * PHOTO_MAX_SIDE sul lato lungo e ricompressa JPEG: si fa qui, una volta, così
+ * la coda upload manda sempre file piccoli.
+ */
+export async function importPhoto(sourceUri: string, id: string, size?: { width: number; height: number }): Promise<string> {
+  const dest = new File(attachmentsDir(), `${id}.jpg`)
   if (dest.exists) dest.delete()
-  await new File(sourceUri).copy(dest)
+  const ctx = ImageManipulator.manipulate(sourceUri)
+  if (size && Math.max(size.width, size.height) > PHOTO_MAX_SIDE) {
+    ctx.resize(size.width >= size.height ? { width: PHOTO_MAX_SIDE } : { height: PHOTO_MAX_SIDE })
+  }
+  const rendered = await ctx.renderAsync()
+  const out = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 })
+  await new File(out.uri).move(dest)
   return dest.uri
 }
 

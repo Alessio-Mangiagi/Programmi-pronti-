@@ -105,6 +105,8 @@ export const attachments = sqliteTable(
     /** file locale da caricare (coda upload separata dal sync JSON) */
     local_file_path: text('local_file_path'),
     upload_attempts: integer('upload_attempts').notNull().default(0),
+    /** prima di questo istante non si riprova (backoff); null = subito */
+    upload_next_at: text('upload_next_at'),
   },
   (t) => [index('att_submission').on(t.submission_id), index('att_task').on(t.task_id), index('att_dirty').on(t.dirty)],
 )

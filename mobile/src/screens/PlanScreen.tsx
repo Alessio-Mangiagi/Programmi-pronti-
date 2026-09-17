@@ -166,7 +166,10 @@ function PinSheet({ pinId, onClose, onChanged, onFill, canDelete }: SheetProps) 
             <Text style={[styles.badge, { backgroundColor: PIN_COLOR[t.status as PinLevel] + '22', color: PIN_COLOR[t.status as PinLevel] }]}>{STATUS_LABEL[t.status] ?? t.status}</Text>
           </View>
         ))}
-        <Text style={sheet.h3}>Foto ({attachments.filter((a) => a.file_type !== 'signature' && a.file_type !== 'doc').length})</Text>
+        <Text style={sheet.h3}>
+          Foto ({attachments.filter((a) => a.file_type !== 'signature' && a.file_type !== 'doc').length})
+          {attachments.some((a) => !a.file_url && a.local_file_path) && <Text style={{ color: colors.warn }}> · {attachments.filter((a) => !a.file_url && a.local_file_path).length} da caricare</Text>}
+        </Text>
         {canDelete(pin) && (
           <TouchableOpacity style={[styles.btnGhost, { alignSelf: 'flex-start', borderColor: colors.danger }]} onPress={remove}>
             <Text style={{ color: colors.danger, fontWeight: '600' }}>Cancella pin</Text>

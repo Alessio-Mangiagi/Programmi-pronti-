@@ -9,9 +9,10 @@ import { schema, type AppDb } from '../db/types'
 import { cachePlanImages, type CacheSummary, type FilesOptions } from './files'
 import { pullProject, type PullSummary } from './pull'
 import { pushDirty, type PushSummary } from './push'
+import { processUploadQueue, type UploadOptions, type UploadSummary } from './uploads'
 
-export type SyncResult = { push: PushSummary; pulls: Record<string, PullSummary>; files: Record<string, CacheSummary>; errors: string[]; at: string }
-export type SyncOptions = { projectIds?: string[]; files?: FilesOptions }
+export type SyncResult = { push: PushSummary; pulls: Record<string, PullSummary>; files: Record<string, CacheSummary>; uploads: UploadSummary | null; errors: string[]; at: string }
+export type SyncOptions = { projectIds?: string[]; files?: FilesOptions; uploads?: UploadOptions }
 
 let inFlight: Promise<SyncResult> | null = null
 
@@ -26,7 +27,7 @@ export function syncAll(db: AppDb, api: Api, projectIdsOrOptions?: string[] | Sy
 
 export const isSyncing = () => inFlight !== null
 
-async function run(db: AppDb, api: Api, { projectIds, files }: SyncOptions): Promise<SyncResult> {
+async function run(db: AppDb, api: Api, { projectIds, files, uploads }: SyncOptions): Promise<SyncResult> {
   const errors: string[] = []
   let push: PushSummary = { sent: 0, rejected: 0, conflicts: 0, groups: null }
   try {
@@ -47,7 +48,16 @@ async function run(db: AppDb, api: Api, { projectIds, files }: SyncOptions): Pro
     // immagini delle planimetrie in cache: best effort, dopo il pull (che porta i file_url aggiornati)
     if (files) filesOut[id] = await cachePlanImages(db, files, id)
   }
-  return { push, pulls, files: filesOut, errors, at: new Date().toISOString() }
+  // coda upload dopo il push (i record devono esistere sul server) e dopo il pull
+  let uploadsOut: UploadSummary | null = null
+  if (uploads) {
+    try {
+      uploadsOut = await processUploadQueue(db, api, uploads)
+    } catch (e) {
+      errors.push(`uploads: ${(e as Error).message}`)
+    }
+  }
+  return { push, pulls, files: filesOut, uploads: uploadsOut, errors, at: new Date().toISOString() }
 }
 
-export { pullProject, pushDirty }
+export { pullProject, pushDirty, processUploadQueue }

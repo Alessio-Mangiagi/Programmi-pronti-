@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { listProjects, refreshProjects } from '../data/catalog'
 import { syncAll } from '../sync'
 import { expoFileStore } from '../sync/expoFileStore'
+import { rnUploadOptions } from '../sync/rnUpload'
 import { API_URL } from '../config'
 import { getToken } from '../auth/token'
 import { listSyncIssues } from './SyncIssuesScreen'
@@ -31,7 +32,7 @@ export default function ProjectsScreen({ navigation }: Props) {
       await refreshProjects(db, api)
       setProjects(listProjects(db))
       // push delle modifiche locali + pull di ogni progetto (planimetrie, pin, moduli, task)
-      const res = await syncAll(db, api, { files: { baseUrl: API_URL, getToken, store: expoFileStore } })
+      const res = await syncAll(db, api, { files: { baseUrl: API_URL, getToken, store: expoFileStore }, uploads: rnUploadOptions })
       if (res.errors.length) setError(res.errors[0])
       setIssues(listSyncIssues(db).length)
     } catch (e) {

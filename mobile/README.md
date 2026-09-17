@@ -23,6 +23,7 @@ Struttura:
 - `src/db/types.ts` — `AppDb`: tipo comune ai due driver, usato da sync/ e schermate
 - `src/data/catalog.ts` — query di catalogo (progetti, planimetrie) e `refreshProjects`
 - `src/data/mutations.ts` — scritture locali (`createPin`, `updateTask`, `createSubmission`, …): `updated_at` = adesso, `dirty = true`; `retryRejected`/`discardRejected` per le righe in `sync_log`
+- `src/sync/uploads.ts` — coda upload (`processUploadQueue`: presign → multipart; backoff 5s·2ⁿ max 1h in `upload_next_at`, max 20 tentativi, 404/409 = rinuncia); `rnUpload.ts` costruisce il multipart RN
 - `src/sync/files.ts` — cache immagini planimetrie (`cachePlanImages`: scarica in `plans/<id>.<ext>` se `local_file_for != updated_at`), `expoFileStore.ts` (expo-file-system `File`/`Directory`); nei test uno store in memoria
 - `src/sync/` — `pull.ts` (incrementale per progetto, upsert con LWW, conflitti in `sync_log`), `push.ts` (righe dirty → `/sync/push`, dirty azzerato solo se `updated_at` invariato, rifiuti in `sync_log`), `index.ts` (`syncAll`: mutex, push poi pull, errori raccolti), `time.ts`
 - `src/forms/DynamicForm.tsx` — renderer mobile su form-core (TextInput, Switch, chip per select/multiselect, data con "Oggi", foto via expo-image-picker, firma via react-native-signature-canvas in Modal, GPS via expo-location + manuale); `localFiles.ts` copia foto/firme in `<document>/attachments/<id>.<ext>`
@@ -70,3 +71,10 @@ submission e un attachment per ogni foto/firma con lo stesso id usato in
 `data_json` e `local_file_path` al file copiato nella document directory; al sync
 il JSON parte subito (attachment con `file_url` nullo), i byte li manda la coda
 upload (giorno 22). Bozza per pin+template salvata a ogni modifica e ripristinata.
+
+Foto: `importPhoto` ridimensiona a 1600 px sul lato lungo e ricomprime JPEG 0.8
+(expo-image-manipulator) al momento dello scatto. La coda upload gira in coda a
+`syncAll` (dopo push e pull: il record deve già esistere sul server) e manda i
+byte con `POST /attachments/presign` + `POST /attachments/{id}/upload`; stati:
+`file_url` nullo + `local_file_path` = in coda ("N da caricare" nel bottom sheet),
+`file_url` valorizzato = caricato. `local_file_path` resta come cache locale.

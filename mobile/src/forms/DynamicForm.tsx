@@ -177,7 +177,7 @@ function PhotoField({ value, attachments, remoteUris, readOnly, multiple, onChan
     const newIds: string[] = []
     for (const a of res.assets) {
       const id = newId()
-      next[id] = { uri: await importPhoto(a.uri, id), kind: 'photo' }
+      next[id] = { uri: await importPhoto(a.uri, id, { width: a.width, height: a.height }), kind: 'photo' }
       newIds.push(id)
       if (!multiple) break
     }

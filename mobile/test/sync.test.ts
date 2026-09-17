@@ -334,3 +334,69 @@ describe('giorno 21: modulo compilato offline con 3 foto e firma', () => {
     expect(after.dirty).toBe(false)
   })
 })
+
+describe('giorno 22: coda upload foto', () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+  const nodeUpload = (files: Record<string, Buffer>) => ({
+    buildForm: async (uri: string, name: string, mime: string) => {
+      const bytes = files[uri]
+      if (!bytes) throw new Error(`file mancante ${uri}`)
+      const form = new FormData()
+      form.append('file', new Blob([bytes], { type: mime }), name)
+      return form
+    },
+  })
+
+  it('20 foto in coda, torna la rete: tutte caricate senza intervento; file mancante -> backoff, poi riprova', async () => {
+    const { saveSubmissionLocally } = await import('../src/data/submissions')
+    const { pendingUploads, processUploadQueue, backoffMs } = await import('../src/sync/uploads')
+    const db = device()
+    await pullProject(db, api, projectId)
+    const tpl = db.select().from(schema.formTemplates).where(eq(schema.formTemplates.name, 'Punch list (difetto)')).get()!
+    const pin = alivePins(db)[0]
+    const files: Record<string, Buffer> = {}
+    const atts: Record<string, { uri: string; kind: 'photo' }> = {}
+    const ids: string[] = []
+    for (let i = 0; i < 20; i++) {
+      const id = `up-${i}-${Date.now()}`
+      files[`file:///att/${id}.png`] = PNG
+      atts[id] = { uri: `file:///att/${id}.png`, kind: 'photo' }
+      ids.push(id)
+    }
+    const data = { descrizione: 'Crepa', categoria: 'Strutture', gravita: 'Alta', foto: ids }
+    saveSubmissionLocally(db, { pinId: pin.id, templateId: tpl.id, data, attachments: atts, userId: null })
+
+    // offline: la coda non parte senza record sul server (dirty)
+    expect(pendingUploads(db)).toHaveLength(20)
+    expect(await processUploadQueue(db, api, nodeUpload(files))).toEqual({ uploaded: 0, failed: 0, pending: 20 })
+
+    // torna la rete: un solo syncAll fa push + upload di tutto
+    delete files[`file:///att/${ids[3]}.png`] // uno sparisce dal disco
+    const res = await syncAll(db, api, { projectIds: [projectId], uploads: nodeUpload(files) })
+    expect(res.push.rejected).toBe(0)
+    expect(res.uploads).toEqual({ uploaded: 19, failed: 1, pending: 1 })
+    const broken = db.select().from(schema.attachments).where(eq(schema.attachments.id, ids[3])).get()!
+    expect(broken.upload_attempts).toBe(1)
+    expect(broken.upload_next_at).toBeTruthy()
+    expect(backoffMs(1)).toBe(5000)
+    expect(backoffMs(20)).toBe(3_600_000)
+    // il server ha i byte
+    const remote = await api.get<{ submissions: { attachments: { id: string; file_url: string | null; file_type: string }[] }[] }>(`/pins/${pin.id}`)
+    const uploaded = remote.submissions.flatMap((s) => s.attachments).filter((a) => ids.includes(a.id))
+    expect(uploaded.filter((a) => a.file_url).length).toBe(19)
+    expect(uploaded[0].file_url).toMatch(/^\/files\/attachments\//)
+    // non ancora scaduto il backoff: non si riprova; scaduto (now finto): riprova e resta pending se il file manca ancora
+    expect((await processUploadQueue(db, api, nodeUpload(files))).failed).toBe(0)
+    const later = () => new Date(Date.now() + 10_000).toISOString().replace('Z', '')
+    expect((await processUploadQueue(db, api, { ...nodeUpload(files), now: later })).failed).toBe(1)
+    files[`file:///att/${ids[3]}.png`] = PNG
+    const later2 = () => new Date(Date.now() + 60_000).toISOString().replace('Z', '')
+    expect(await processUploadQueue(db, api, { ...nodeUpload(files), now: later2 })).toEqual({ uploaded: 1, failed: 0, pending: 0 })
+    // il pull successivo non riporta indietro file_url né tocca local_file_path
+    await pullProject(db, api, projectId)
+    const done = db.select().from(schema.attachments).where(eq(schema.attachments.id, ids[3])).get()!
+    expect(done.file_url).toBeTruthy()
+    expect(done.local_file_path).toBeTruthy()
+    expect(done.dirty).toBe(false)
+  })
+})
