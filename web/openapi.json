@@ -1625,6 +1625,17 @@
     "schemas": {
       "AttachmentCreate": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "submission_id": {
             "anyOf": [
               {
@@ -1664,6 +1675,10 @@
       },
       "AttachmentOut": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
           "submission_id": {
             "anyOf": [
               {
@@ -1696,10 +1711,6 @@
               }
             ],
             "title": "File Type"
-          },
-          "id": {
-            "type": "string",
-            "title": "Id"
           },
           "file_url": {
             "anyOf": [

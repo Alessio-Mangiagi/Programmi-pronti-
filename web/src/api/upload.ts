@@ -1,17 +1,27 @@
 import { getToken, onUnauthorized } from '../auth/token'
-import type { Plan } from './types'
+import type { Attachment, Plan } from './types'
 
 export const PLAN_FILE_ACCEPT = 'image/png,image/jpeg,application/pdf,.png,.jpg,.jpeg,.pdf'
 export const PLAN_FILE_MAX_BYTES = 20 * 1024 * 1024
+
+/** Immagine della planimetria (PNG/JPG/PDF). */
+export function uploadPlanFile(planId: string, file: File, onProgress?: (fraction: number) => void): Promise<Plan> {
+  return uploadMultipart(`/api/plans/${encodeURIComponent(planId)}/file`, file, onProgress)
+}
+
+/** Byte di un allegato già creato con POST /attachments. */
+export function uploadAttachmentFile(attachmentId: string, file: File, onProgress?: (fraction: number) => void): Promise<Attachment> {
+  return uploadMultipart(`/api/attachments/${encodeURIComponent(attachmentId)}/upload`, file, onProgress)
+}
 
 /**
  * Upload multipart con progresso. `fetch` non espone l'avanzamento dell'invio,
  * quindi qui si usa XMLHttpRequest; il resto del client resta su openapi-fetch.
  */
-export function uploadPlanFile(planId: string, file: File, onProgress?: (fraction: number) => void): Promise<Plan> {
+export function uploadMultipart<T>(url: string, file: File, onProgress?: (fraction: number) => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', `/api/plans/${encodeURIComponent(planId)}/file`)
+    xhr.open('POST', url)
     xhr.setRequestHeader('Authorization', `Bearer ${getToken() ?? ''}`)
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress?.(e.loaded / e.total)
@@ -28,7 +38,7 @@ export function uploadPlanFile(planId: string, file: File, onProgress?: (fractio
       } catch {
         /* risposta non JSON: gestita sotto */
       }
-      if (xhr.status >= 200 && xhr.status < 300 && body) return resolve(body as Plan)
+      if (xhr.status >= 200 && xhr.status < 300 && body) return resolve(body as T)
       const detail = (body as { detail?: unknown } | null)?.detail
       reject(new Error(typeof detail === 'string' ? UPLOAD_ERRORS[detail] ?? detail : `Caricamento fallito (${xhr.status})`))
     }

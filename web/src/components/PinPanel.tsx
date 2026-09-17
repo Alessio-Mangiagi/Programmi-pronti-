@@ -5,7 +5,9 @@ import { isManager, useAuth } from '../auth/AuthContext'
 import type { Lookups } from '../hooks/useLookups'
 import AuthImage from './AuthImage'
 import Loading from './Loading'
+import Modal from './Modal'
 import { useToast } from './Toast'
+import SubmissionForm from '../forms/SubmissionForm'
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: 'Aperto',
@@ -34,6 +36,7 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
   const [error, setError] = useState<string | null>(null)
   const [label, setLabel] = useState('')
   const [editingLabel, setEditingLabel] = useState(false)
+  const [filling, setFilling] = useState(false)
 
   const load = useCallback(async () => {
     const { data, error } = await api.GET('/pins/{pin_id}', { params: { path: { pin_id: pinId } } })
@@ -72,7 +75,7 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
   const canDelete = pin && (isManager(user) || pin.created_by === user?.id)
   const photos: Attachment[] = pin
     ? [...pin.submissions.flatMap((s) => s.attachments), ...pin.tasks.flatMap((t) => t.attachments)].filter(
-        (a) => a.file_url && a.file_type !== 'doc',
+        (a) => a.file_url && a.file_type !== 'doc' && a.file_type !== 'signature',
       )
     : []
 
@@ -108,7 +111,12 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
           </p>
 
           <section>
-            <h3>Moduli ({pin.submissions.length})</h3>
+            <div className="row">
+              <h3>Moduli ({pin.submissions.length})</h3>
+              <button type="button" className="btn small btn-primary" onClick={() => setFilling(true)}>
+                + Compila modulo
+              </button>
+            </div>
             {pin.submissions.length === 0 && <p className="muted small">Nessun modulo compilato.</p>}
             <ul className="list">
               {pin.submissions.map((s) => (
@@ -160,6 +168,20 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
             </button>
           )}
         </>
+      )}
+      {filling && (
+        <Modal title={`Compila modulo — ${pin?.label || 'Pin senza etichetta'}`} onClose={() => setFilling(false)}>
+          <SubmissionForm
+            pinId={pinId}
+            templates={Object.values(lookups.templates)}
+            onCancel={() => setFilling(false)}
+            onSaved={async () => {
+              setFilling(false)
+              await load()
+              onChanged()
+            }}
+          />
+        </Modal>
       )}
     </aside>
   )

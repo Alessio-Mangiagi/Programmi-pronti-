@@ -116,7 +116,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Test unitari con gli stessi casi del giorno 1 (schemi condivisi in `packages/form-core/fixtures`).
 - **DoD**: web e mobile importano `@fieldview/form-core`; validazione identica a quella server.
 
-### Giorno 12 — Renderer modulo web
+### Giorno 12 — Renderer modulo web ✅ (2026-09-17, include già "Compila modulo" dal pannello pin + salvataggio con allegati, previsto al giorno 13)
 - `DynamicForm` che renderizza tutti i tipi: text/textarea/number/checkbox/select/multiselect/date, photo (upload multiplo con anteprima), signature (canvas → PNG), geolocation (Geolocation API + fallback manuale).
 - Errori inline dal validatore, campi required evidenziati.
 - **DoD**: il template "ispezione sicurezza" si compila e salva con foto e firma.

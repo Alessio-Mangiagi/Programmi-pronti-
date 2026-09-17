@@ -580,7 +580,9 @@ def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(g
         auth.assert_project_access(db, user, auth.project_of_submission(sub))
     else:
         _get_task(db, user, payload.task_id)
-    att = models.Attachment(**payload.model_dump())
+    if payload.id and db.get(models.Attachment, payload.id) is not None:
+        raise HTTPException(409, "attachment id already exists")
+    att = models.Attachment(**payload.model_dump(exclude_none=True))
     db.add(att)
     db.commit()
     db.refresh(att)

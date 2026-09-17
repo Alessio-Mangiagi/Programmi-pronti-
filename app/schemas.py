@@ -88,6 +88,9 @@ class FormTemplateOut(FormTemplateCreate):
 
 
 class AttachmentCreate(BaseModel):
+    # Opzionale: UUID generato dal client, così data_json (campi photo/signature)
+    # può referenziare l'allegato prima che esista sul server, come nel sync.
+    id: Optional[str] = None
     submission_id: Optional[str] = None
     task_id: Optional[str] = None
     file_type: Optional[str] = None  # "photo", "signature", "doc"
@@ -95,7 +98,7 @@ class AttachmentCreate(BaseModel):
 
 class AttachmentOut(AttachmentCreate):
     model_config = ConfigDict(from_attributes=True)
-    id: str
+    id: str  # type: ignore[assignment]
     file_url: Optional[str] = None   # None = byte non ancora caricati
     created_at: datetime
     updated_at: datetime

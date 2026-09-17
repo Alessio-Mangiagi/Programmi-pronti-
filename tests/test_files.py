@@ -193,3 +193,14 @@ def test_attachment_upload_errors(client, pin):
 def test_get_file_not_found_and_traversal(client):
     assert client.get("/files/plans/nope.png").status_code == 404
     assert client.get("/files/../requirements.txt").status_code in (404, 422)
+
+
+def test_attachment_create_with_client_id(client, project, pin):
+    sub = client.post("/submissions", json={
+        "template_id": project["template"]["id"], "pin_id": pin, "data_json": {"esito": "Conforme"}}).json()
+    att_id = str(uuid.uuid4())
+    r = client.post("/attachments", json={"id": att_id, "submission_id": sub["id"], "file_type": "photo"})
+    assert r.status_code == 201 and r.json()["id"] == att_id
+    assert client.post("/attachments", json={"id": att_id, "submission_id": sub["id"]}).status_code == 409
+    r = upload(client, f"/attachments/{att_id}/upload", png_bytes(10, 10), "a.png")
+    assert r.status_code == 200 and r.json()["file_url"] == f"/files/attachments/{att_id}.png"

@@ -86,7 +86,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
   // Esc chiude la modalità aggiungi / il pannello
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || document.body.hasAttribute('data-modal-open')) return
       if (addMode) setAddMode(false)
       else setSelectedId(null)
     }

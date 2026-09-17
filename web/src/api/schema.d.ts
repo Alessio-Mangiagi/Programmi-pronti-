@@ -525,6 +525,8 @@ export interface components {
     schemas: {
         /** AttachmentCreate */
         AttachmentCreate: {
+            /** Id */
+            id?: string | null;
             /** Submission Id */
             submission_id?: string | null;
             /** Task Id */
@@ -534,14 +536,14 @@ export interface components {
         };
         /** AttachmentOut */
         AttachmentOut: {
+            /** Id */
+            id: string;
             /** Submission Id */
             submission_id?: string | null;
             /** Task Id */
             task_id?: string | null;
             /** File Type */
             file_type?: string | null;
-            /** Id */
-            id: string;
             /** File Url */
             file_url?: string | null;
             /**
