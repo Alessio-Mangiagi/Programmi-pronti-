@@ -177,7 +177,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 23: task mobile (lista, i miei, cambio stato con foto, offline)
+1. Giorno 24: sync automatico (foreground, connettività, background fetch) + barra di stato
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
