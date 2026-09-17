@@ -177,7 +177,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 21: compilazione moduli mobile (DynamicForm su form-core, foto, firma, GPS)
+1. Giorno 22: coda upload foto (retry, compressione, stati)
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
