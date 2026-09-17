@@ -54,6 +54,9 @@ export const MIGRATIONS: string[][] = [
   ],
   // 2: versione della planimetria scaricata (updated_at del piano al momento del download)
   [`ALTER TABLE plans ADD COLUMN local_file_for TEXT`],
+  // 3: bozze dei moduli (chiave = pin + template), per non perdere il lavoro se l'app viene chiusa
+  [`CREATE TABLE drafts (key TEXT PRIMARY KEY, pin_id TEXT NOT NULL, template_id TEXT NOT NULL,
+      data_json TEXT NOT NULL, attachments_json TEXT NOT NULL, updated_at TEXT NOT NULL)`],
 ]
 
 /** Driver minimo che sia expo-sqlite sia better-sqlite3 sanno offrire. */

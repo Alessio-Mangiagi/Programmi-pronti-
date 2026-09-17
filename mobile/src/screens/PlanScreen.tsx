@@ -30,7 +30,7 @@ const STATUS_LABEL: Record<string, string> = { open: 'Aperto', assigned: 'Assegn
  * non ancora scaricata), pin dal DB locale, tap → bottom sheet, long-press →
  * nuovo pin (dirty, pushato alla prossima sync).
  */
-export default function PlanScreen({ route }: Props) {
+export default function PlanScreen({ route, navigation }: Props) {
   const db = useDb()
   const { user } = useAuth()
   const { planId } = route.params
@@ -92,6 +92,7 @@ export default function PlanScreen({ route }: Props) {
           pinId={selectedId}
           onClose={() => setSelectedId(null)}
           onChanged={reload}
+          onFill={() => navigation.navigate('Submission', { pinId: selectedId })}
           canDelete={(p) => !!user && (user.role !== 'field' || p.created_by === user.id)}
         />
       )}
@@ -99,10 +100,10 @@ export default function PlanScreen({ route }: Props) {
   )
 }
 
-type SheetProps = { pinId: string; onClose: () => void; onChanged: () => void; canDelete: (pin: { created_by: string | null }) => boolean }
+type SheetProps = { pinId: string; onClose: () => void; onChanged: () => void; onFill: () => void; canDelete: (pin: { created_by: string | null }) => boolean }
 
 /** Bottom sheet del pin: etichetta, moduli, task, foto; cancellazione. */
-function PinSheet({ pinId, onClose, onChanged, canDelete }: SheetProps) {
+function PinSheet({ pinId, onClose, onChanged, onFill, canDelete }: SheetProps) {
   const db = useDb()
   const detail = pinDetail(db, pinId)
   if (!detail) return null
@@ -141,7 +142,12 @@ function PinSheet({ pinId, onClose, onChanged, canDelete }: SheetProps) {
         </TouchableOpacity>
       </View>
       <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }}>
-        <Text style={sheet.h3}>Moduli ({submissions.length})</Text>
+        <View style={styles.row}>
+          <Text style={sheet.h3}>Moduli ({submissions.length})</Text>
+          <TouchableOpacity style={[styles.btn, { paddingVertical: 6, paddingHorizontal: 10 }]} onPress={onFill}>
+            <Text style={[styles.btnText, { fontSize: 13 }]}>+ Compila modulo</Text>
+          </TouchableOpacity>
+        </View>
         {submissions.length === 0 && <Text style={styles.muted}>Nessun modulo compilato.</Text>}
         {submissions.map((s) => (
           <View key={s.id} style={sheet.item}>

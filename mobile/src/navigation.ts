@@ -3,5 +3,6 @@ export type RootStackParamList = {
   Projects: undefined
   Plans: { projectId: string; projectName: string }
   Plan: { projectId: string; planId: string; planName: string }
+  Submission: { pinId: string; templateId?: string }
   SyncIssues: undefined
 }

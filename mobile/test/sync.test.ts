@@ -298,3 +298,39 @@ describe('giorno 19: planimetrie offline', () => {
     expect(res2.files[projectId].failed).toBe(1)
   })
 })
+
+describe('giorno 21: modulo compilato offline con 3 foto e firma', () => {
+  it('salvato in locale subito (dirty), bozza cancellata; il JSON passa al push, i file aspettano la coda upload', async () => {
+    const { saveSubmissionLocally, saveDraft, loadDraft } = await import('../src/data/submissions')
+    const db = device()
+    await pullProject(db, api, projectId)
+    const tpl = db.select().from(schema.formTemplates).where(eq(schema.formTemplates.name, 'Ispezione sicurezza')).get()!
+    const pin = alivePins(db)[0]
+    const photos = { f1: { uri: 'file:///att/f1.jpg', kind: 'photo' as const }, f2: { uri: 'file:///att/f2.jpg', kind: 'photo' as const }, f3: { uri: 'file:///att/f3.jpg', kind: 'photo' as const } }
+    const sig = { s1: { uri: 'file:///att/s1.png', kind: 'signature' as const } }
+    const data = { area: 'Vano scala', esito: 'Non conforme', rischi: ['Elettrico'], foto: ['f1', 'f2', 'f3'], firma_ispettore: 's1', data_ispezione: '2026-09-17' }
+    saveDraft(db, pin.id, tpl.id, data, { ...photos, ...sig })
+    expect(loadDraft(db, pin.id, tpl.id)?.attachments_json).toHaveProperty('s1')
+
+    // "modalità aereo": nessuna chiamata di rete qui
+    const sub = saveSubmissionLocally(db, { pinId: pin.id, templateId: tpl.id, data, attachments: { ...photos, ...sig }, userId: null })
+    expect(loadDraft(db, pin.id, tpl.id)).toBeNull()
+    const atts = db.select().from(schema.attachments).where(eq(schema.attachments.submission_id, sub.id)).all()
+    expect(atts).toHaveLength(4)
+    expect(atts.every((a) => a.dirty && a.file_url === null && a.local_file_path)).toBe(true)
+    expect(atts.find((a) => a.id === 's1')?.file_type).toBe('signature')
+
+    // torna la rete: push del JSON (attachment record senza byte), pull mantiene local_file_path
+    const res = await syncAll(db, api, [projectId])
+    expect(res.push.rejected).toBe(0)
+    expect(res.push.groups?.submissions.inserted).toBe(1)
+    expect(res.push.groups?.attachments.inserted).toBe(4)
+    const remote = await api.get<{ submissions: { id: string; attachments: { id: string; file_url: string | null }[] }[] }>(`/pins/${pin.id}`)
+    const rs = remote.submissions.find((s) => s.id === sub.id)!
+    expect(rs.attachments.map((a) => a.id).sort()).toEqual(['f1', 'f2', 'f3', 's1'])
+    expect(rs.attachments.every((a) => a.file_url === null)).toBe(true) // i byte li manda la coda upload (giorno 22)
+    const after = db.select().from(schema.attachments).where(eq(schema.attachments.id, 'f1')).get()!
+    expect(after.local_file_path).toBe('file:///att/f1.jpg')
+    expect(after.dirty).toBe(false)
+  })
+})

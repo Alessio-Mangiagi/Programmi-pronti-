@@ -132,6 +132,16 @@ export const syncLog = sqliteTable('sync_log', {
   created_at: text('created_at').notNull(),
 })
 
+export const drafts = sqliteTable('drafts', {
+  key: text('key').primaryKey(),
+  pin_id: text('pin_id').notNull(),
+  template_id: text('template_id').notNull(),
+  data_json: text('data_json', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
+  /** allegati locali già scattati: { id: { uri, kind } } */
+  attachments_json: text('attachments_json', { mode: 'json' }).notNull().$type<Record<string, { uri: string; kind: string }>>(),
+  updated_at: text('updated_at').notNull(),
+})
+
 export type Project = typeof projects.$inferSelect
 export type Plan = typeof plans.$inferSelect
 export type FormTemplate = typeof formTemplates.$inferSelect

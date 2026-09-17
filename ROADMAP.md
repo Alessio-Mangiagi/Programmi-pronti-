@@ -168,7 +168,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Aggiunta pin con long-press.
 - **DoD**: stessa esperienza del web su tablet 10".
 
-### Giorno 21 — Compilazione moduli mobile
+### Giorno 21 — Compilazione moduli mobile ✅ (2026-09-17; camera/firma/GPS solo su device; salvataggio offline + sync verificati in Node)
 - `DynamicForm` mobile su `form-core`: input nativi, `expo-camera`/`expo-image-picker` per foto, `react-native-signature-canvas` per firma, `expo-location` per geolocalizzazione.
 - Salvataggio locale immediato (`dirty=true`), bozze.
 - **DoD**: compilo un'ispezione con 3 foto e firma in modalità aereo.

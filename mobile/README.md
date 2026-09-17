@@ -25,6 +25,9 @@ Struttura:
 - `src/data/mutations.ts` — scritture locali (`createPin`, `updateTask`, `createSubmission`, …): `updated_at` = adesso, `dirty = true`; `retryRejected`/`discardRejected` per le righe in `sync_log`
 - `src/sync/files.ts` — cache immagini planimetrie (`cachePlanImages`: scarica in `plans/<id>.<ext>` se `local_file_for != updated_at`), `expoFileStore.ts` (expo-file-system `File`/`Directory`); nei test uno store in memoria
 - `src/sync/` — `pull.ts` (incrementale per progetto, upsert con LWW, conflitti in `sync_log`), `push.ts` (righe dirty → `/sync/push`, dirty azzerato solo se `updated_at` invariato, rifiuti in `sync_log`), `index.ts` (`syncAll`: mutex, push poi pull, errori raccolti), `time.ts`
+- `src/forms/DynamicForm.tsx` — renderer mobile su form-core (TextInput, Switch, chip per select/multiselect, data con "Oggi", foto via expo-image-picker, firma via react-native-signature-canvas in Modal, GPS via expo-location + manuale); `localFiles.ts` copia foto/firme in `<document>/attachments/<id>.<ext>`
+- `src/data/submissions.ts` — bozze (tabella `drafts`, autosave) e `saveSubmissionLocally` (submission + attachment per file, tutti dirty, in una transazione)
+- `src/screens/SubmissionScreen.tsx` — scelta template → form → salva in locale (nessuna rete)
 - `src/components/PlanViewer.tsx` — planimetria con pinch/pan/doppio tap (gesture-handler + reanimated), pin in coordinate relative riscalati 1/scale, long-press → coordinate 0-1
 - `src/screens/` — `PlanScreen` (viewer + legenda + bottom sheet del pin: moduli, task, foto, rinomina, cancella; long-press = nuovo pin), `LoginScreen`, `ProjectsScreen` (lista locale + pull-to-refresh + badge ⚠ problemi di sync), `PlansScreen`, `SyncIssuesScreen` (righe rifiutate: riprova/scarta; conflitti persi: presa visione)
 - `metro.config.js` — `watchFolders` per `packages/form-core` (dipendenza `file:`)
@@ -61,3 +64,9 @@ Plan view: immagine da `local_file_path` se in cache, altrimenti dal server con
 bearer nell'header; pin da `listPins` (conteggi task/moduli → colore come sul web);
 long-press → `createPin` (dirty). `babel.config.js` usa `babel-preset-expo`, che
 aggiunge da solo il plugin worklets di reanimated 4.
+
+Moduli: la compilazione non tocca mai la rete. `saveSubmissionLocally` crea la
+submission e un attachment per ogni foto/firma con lo stesso id usato in
+`data_json` e `local_file_path` al file copiato nella document directory; al sync
+il JSON parte subito (attachment con `file_url` nullo), i byte li manda la coda
+upload (giorno 22). Bozza per pin+template salvata a ogni modifica e ripristinata.
