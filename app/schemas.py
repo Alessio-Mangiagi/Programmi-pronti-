@@ -222,9 +222,30 @@ class TaskOut(BaseModel):
     assigned_to: Optional[str] = None
     created_by: Optional[str] = None
     due_date: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     attachments: list[AttachmentOut] = []
+
+
+class StatsSeriesPoint(BaseModel):
+    date: str
+    created: int
+    resolved: int
+
+
+class StatsOut(BaseModel):
+    project_id: str
+    generated_at: datetime
+    tasks_by_status: dict[str, int]
+    tasks_total: int
+    open_by_plan: list[dict]
+    submissions_by_template: list[dict]
+    submissions_total: int
+    series: list[StatsSeriesPoint]
+    overdue: int
+    closed_last_7d: int
+    pins_total: int
 
 
 class TaskListItem(TaskOut):

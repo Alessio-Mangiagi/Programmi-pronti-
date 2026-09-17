@@ -466,6 +466,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Stats
+         * @description Numeri per la dashboard: task per stato, aperti per planimetria, moduli per template, serie giornaliera, scaduti.
+         */
+        get: operations["project_stats_projects__project_id__stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}": {
         parameters: {
             query?: never;
@@ -1131,6 +1151,49 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** StatsOut */
+        StatsOut: {
+            /** Project Id */
+            project_id: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Tasks By Status */
+            tasks_by_status: {
+                [key: string]: number;
+            };
+            /** Tasks Total */
+            tasks_total: number;
+            /** Open By Plan */
+            open_by_plan: {
+                [key: string]: unknown;
+            }[];
+            /** Submissions By Template */
+            submissions_by_template: {
+                [key: string]: unknown;
+            }[];
+            /** Submissions Total */
+            submissions_total: number;
+            /** Series */
+            series: components["schemas"]["StatsSeriesPoint"][];
+            /** Overdue */
+            overdue: number;
+            /** Closed Last 7D */
+            closed_last_7d: number;
+            /** Pins Total */
+            pins_total: number;
+        };
+        /** StatsSeriesPoint */
+        StatsSeriesPoint: {
+            /** Date */
+            date: string;
+            /** Created */
+            created: number;
+            /** Resolved */
+            resolved: number;
+        };
         /** SubmissionCreate */
         SubmissionCreate: {
             /** Template Id */
@@ -1319,6 +1382,8 @@ export interface components {
             created_by?: string | null;
             /** Due Date */
             due_date?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1359,6 +1424,8 @@ export interface components {
             created_by?: string | null;
             /** Due Date */
             due_date?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2477,6 +2544,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_stats_projects__project_id__stats_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                template_id?: string | null;
+                plan_id?: string | null;
+                assigned_to?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsOut"];
                 };
             };
             /** @description Validation Error */

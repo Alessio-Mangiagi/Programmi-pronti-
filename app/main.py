@@ -46,6 +46,7 @@ from .auth import current_user, require_role
 from .database import get_db
 from .forms import validate_schema, validate_submission
 from . import events
+from . import stats as st_stats
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
 
@@ -607,6 +608,24 @@ def list_tasks(
     return out
 
 
+@app.get("/projects/{project_id}/stats", response_model=schemas.StatsOut)
+def project_stats(
+    project_id: str,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    template_id: Optional[str] = None,
+    plan_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    days: int = Query(30, ge=7, le=365),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
+):
+    """Numeri per la dashboard: task per stato, aperti per planimetria, moduli per template, serie giornaliera, scaduti."""
+    auth.assert_project_access(db, user, project_id)
+    return st_stats.project_stats(db, project_id, date_from=to_naive_utc(date_from), date_to=to_naive_utc(date_to),
+                                  template_id=template_id, plan_id=plan_id, assigned_to=assigned_to, days=days)
+
+
 @app.get("/tasks/{task_id}", response_model=schemas.TaskOut)
 def get_task(task_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     return _with_attachments(schemas.TaskOut, _get_task(db, user, task_id))
@@ -635,6 +654,7 @@ def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends
             if new_status == TaskStatus.verified and not auth.is_manager(user):
                 raise HTTPException(403, "only manager or admin can verify a task")
             task.status = new_status
+            st_stats.mark_resolved_at(task, before["status"])
     elif changes.get("assigned_to") and task.status == TaskStatus.open:
         task.status = TaskStatus.assigned
 
@@ -914,6 +934,7 @@ def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db),
         if item.id in rejected_tasks or item.deleted_at:
             continue
         task = db.get(models.Task, item.id)
+        st_stats.mark_resolved_at(task, (task_before.get(item.id) or {}).get("status"))
         events.record_task_changes(db, task, auth.project_of_task(task), user.id, task_before.get(item.id))
     db.commit()
     return schemas.SyncPushResponse(

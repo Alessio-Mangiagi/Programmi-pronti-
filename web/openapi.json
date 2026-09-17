@@ -1537,6 +1537,145 @@
         }
       }
     },
+    "/projects/{project_id}/stats": {
+      "get": {
+        "summary": "Project Stats",
+        "description": "Numeri per la dashboard: task per stato, aperti per planimetria, moduli per template, serie giornaliera, scaduti.",
+        "operationId": "project_stats_projects__project_id__stats_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template Id"
+            }
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "assigned_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned To"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 7,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_id}": {
       "get": {
         "summary": "Get Task",
@@ -3332,6 +3471,107 @@
         ],
         "title": "RejectedItem"
       },
+      "StatsOut": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "tasks_by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Tasks By Status"
+          },
+          "tasks_total": {
+            "type": "integer",
+            "title": "Tasks Total"
+          },
+          "open_by_plan": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Open By Plan"
+          },
+          "submissions_by_template": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Submissions By Template"
+          },
+          "submissions_total": {
+            "type": "integer",
+            "title": "Submissions Total"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/StatsSeriesPoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "closed_last_7d": {
+            "type": "integer",
+            "title": "Closed Last 7D"
+          },
+          "pins_total": {
+            "type": "integer",
+            "title": "Pins Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "generated_at",
+          "tasks_by_status",
+          "tasks_total",
+          "open_by_plan",
+          "submissions_by_template",
+          "submissions_total",
+          "series",
+          "overdue",
+          "closed_last_7d",
+          "pins_total"
+        ],
+        "title": "StatsOut"
+      },
+      "StatsSeriesPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "resolved": {
+            "type": "integer",
+            "title": "Resolved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "created",
+          "resolved"
+        ],
+        "title": "StatsSeriesPoint"
+      },
       "SubmissionCreate": {
         "properties": {
           "template_id": {
@@ -3735,6 +3975,18 @@
             ],
             "title": "Due Date"
           },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -3849,6 +4101,18 @@
               }
             ],
             "title": "Due Date"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
           },
           "created_at": {
             "type": "string",

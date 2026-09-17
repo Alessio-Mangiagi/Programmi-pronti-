@@ -200,6 +200,8 @@ class Task(SyncMixin, Base):
     assigned_to = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     created_by = Column(String, ForeignKey("users.id"), nullable=True)
     due_date = Column(DateTime, nullable=True)
+    # Primo passaggio a resolved (serie "risolti al giorno" della dashboard); azzerato se riaperto.
+    resolved_at = Column(DateTime, nullable=True, index=True)
 
     pin = relationship("Pin", back_populates="tasks")
     attachments = relationship("Attachment", back_populates="task")

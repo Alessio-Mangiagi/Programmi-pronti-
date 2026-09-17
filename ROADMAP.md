@@ -209,7 +209,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Push via Expo Push API; registrazione token dall'app al login.
 - **DoD**: assegno un task dal web, notifica push sul telefono entro 30 s + email.
 
-### Giorno 28 — API dashboard
+### Giorno 28 — API dashboard ✅ (2026-09-17; 5.000 task su SQLite in memoria ben sotto i 300 ms)
 - `GET /projects/{id}/stats`: task per stato, task aperti per planimetria, submissions per template, serie giornaliera creati/risolti ultimi 30 giorni, task scaduti.
 - Filtri: intervallo date, template, planimetria, assegnatario. Query SQL aggregate, non calcoli in Python.
 - **DoD**: risposta < 300 ms sul dataset demo con 5.000 task.
