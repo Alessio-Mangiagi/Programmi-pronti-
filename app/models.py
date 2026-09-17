@@ -248,6 +248,29 @@ class Event(Base):
     notifications = relationship("Notification", back_populates="event")
 
 
+class AuditLog(Base):
+    """
+    Registro operazioni (spazio admin): una riga per azione rilevante, scritta
+    nella transazione dell'endpoint. `actor_email` è denormalizzata così i login
+    falliti e gli utenti disattivati restano leggibili. Mai consumata né cancellata.
+    """
+    __tablename__ = "audit_log"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    action = Column(String, nullable=False, index=True)
+    actor_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    actor_email = Column(String, nullable=True)
+    entity_type = Column(String, nullable=True)
+    entity_id = Column(String, nullable=True, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
+    details = Column(JSONType, nullable=False, default=dict)
+    ip = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+    actor = relationship("User")
+
+
 class Notification(Base):
     """Una consegna da fare: evento × destinatario × canale. Il worker la porta a sent/failed."""
     __tablename__ = "notifications"

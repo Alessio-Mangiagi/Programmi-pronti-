@@ -141,7 +141,7 @@ export interface paths {
         };
         /**
          * List Users
-         * @description Elenco utenti attivi: serve a chiunque per assegnare un task.
+         * @description Elenco utenti attivi: serve a chiunque per assegnare un task. Con `include_inactive` (solo admin) anche i disattivati.
          */
         get: operations["list_users_users_get"];
         put?: never;
@@ -150,6 +150,86 @@ export interface paths {
          * @description Solo admin.
          */
         post: operations["create_user_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update User
+         * @description Solo admin: nome, ruolo, attivo/disattivo, reset password. Un admin non può
+         *     disattivarsi né togliersi il ruolo admin (altrimenti resta un sistema senza amministratori).
+         */
+        patch: operations["update_user_users__user_id__patch"];
+        trace?: never;
+    };
+    "/users/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Users Activity
+         * @description Solo admin: ultimo accesso e conteggio operazioni per utente (per la tabella utenti).
+         */
+        get: operations["users_activity_users_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit Actions */
+        get: operations["audit_actions_audit_actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit
+         * @description Registro operazioni, dal più recente. Filtri: utente, una o più azioni,
+         *     progetto, entità, intervallo date (`date_to` inclusivo se solo data), testo
+         *     libero su email attore / entità / IP. Paginato (`total` per la UI).
+         */
+        get: operations["list_audit_audit_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -625,7 +705,7 @@ export interface paths {
         };
         /**
          * Get File
-         * @description Serve i file dello storage locale. Con S3 questo endpoint sparisce (URL diretti).
+         * @description Serve i file dello storage (filesystem o S3) con il JWT: gli URL nel DB sono sempre /files/<key>.
          */
         get: operations["get_file_files__key__get"];
         put?: never;
@@ -739,6 +819,58 @@ export interface components {
             file_url?: string | null;
             /** File Type */
             file_type?: string | null;
+        };
+        /** AuditActionOut */
+        AuditActionOut: {
+            /** Action */
+            action: string;
+            /** Label */
+            label: string;
+        };
+        /** AuditOut */
+        AuditOut: {
+            /** Id */
+            id: string;
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id?: string | null;
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Actor Name */
+            actor_name?: string | null;
+            /** Entity Type */
+            entity_type?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Project Name */
+            project_name?: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Ip */
+            ip?: string | null;
+            /** User Agent */
+            user_agent?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AuditPage */
+        AuditPage: {
+            /** Items */
+            items: components["schemas"]["AuditOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** Body_upload_attachment_attachments__attachment_id__upload_post */
         Body_upload_attachment_attachments__attachment_id__upload_post: {
@@ -1498,6 +1630,26 @@ export interface components {
             token_type: string;
             user: components["schemas"]["UserOut"];
         };
+        /**
+         * UserActivityOut
+         * @description Riepilogo per utente nello spazio admin: ultimo accesso e numero di operazioni.
+         */
+        UserActivityOut: {
+            /** User Id */
+            user_id: string;
+            /** Last Login */
+            last_login?: string | null;
+            /**
+             * Actions Total
+             * @default 0
+             */
+            actions_total: number;
+            /**
+             * Actions Last 30D
+             * @default 0
+             */
+            actions_last_30d: number;
+        };
         /** UserCreate */
         UserCreate: {
             /** Email */
@@ -1534,6 +1686,20 @@ export interface components {
              * @default true
              */
             notify_push: boolean;
+        };
+        /**
+         * UserUpdate
+         * @description PATCH /users/{id} (solo admin): tutti opzionali; `password` reimposta la password.
+         */
+        UserUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Role */
+            role?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Password */
+            password?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1769,7 +1935,9 @@ export interface operations {
     };
     list_users_users_get: {
         parameters: {
-            query?: never;
+            query?: {
+                include_inactive?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1783,6 +1951,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1807,6 +1984,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    users_activity_users_activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserActivityOut"][];
+                };
+            };
+        };
+    };
+    audit_actions_audit_actions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditActionOut"][];
+                };
+            };
+        };
+    };
+    list_audit_audit_get: {
+        parameters: {
+            query?: {
+                actor_id?: string | null;
+                action?: string[] | null;
+                project_id?: string | null;
+                entity_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                q?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
                 };
             };
             /** @description Validation Error */

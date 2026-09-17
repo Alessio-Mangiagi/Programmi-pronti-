@@ -30,13 +30,13 @@ Strategia di sync (vedi README):
 """
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -46,6 +46,7 @@ from .auth import current_user, require_role
 from .database import get_db
 from .forms import validate_schema, validate_submission
 from . import events
+from . import audit
 from . import stats as st_stats
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
@@ -78,10 +79,17 @@ app.add_middleware(
 # ---------- Auth e utenti ----------
 
 @app.post("/auth/login", response_model=schemas.TokenResponse)
-def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == payload.email.lower().strip()).first()
+def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
+    email = payload.email.lower().strip()
+    user = db.query(models.User).filter(models.User.email == email).first()
     if user is None or not user.is_active or not auth.verify_password(payload.password, user.password_hash):
+        # Traccia anche i tentativi falliti (email tentata, IP): utile per capire abusi e lockout.
+        audit.record(db, "auth.login_failed", actor_email=email, request=request,
+                     details={"reason": "inactive" if user is not None and not user.is_active else "invalid"})
+        db.commit()
         raise HTTPException(401, "invalid credentials")
+    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request)
+    db.commit()
     return schemas.TokenResponse(access_token=auth.create_access_token(user), user=user)
 
 
@@ -135,8 +143,8 @@ def list_events(project_id: str, limit: int = 100, db: Session = Depends(get_db)
 
 
 @app.post("/users", response_model=schemas.UserOut, status_code=201)
-def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db),
-                _: models.User = Depends(require_role())):
+def create_user(payload: schemas.UserCreate, request: Request, db: Session = Depends(get_db),
+                admin: models.User = Depends(require_role())):
     """Solo admin."""
     try:
         role = UserRole(payload.role)
@@ -148,26 +156,158 @@ def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db),
     user = models.User(email=email, name=payload.name, role=role,
                        password_hash=auth.hash_password(payload.password))
     db.add(user)
+    db.flush()
+    audit.record(db, "user.created", admin, entity_type="user", entity_id=user.id, request=request,
+                 details={"email": email, "name": payload.name, "role": role.value})
     db.commit()
     db.refresh(user)
     return user
 
 
 @app.get("/users", response_model=list[schemas.UserOut])
-def list_users(db: Session = Depends(get_db), _: models.User = Depends(current_user)):
-    """Elenco utenti attivi: serve a chiunque per assegnare un task."""
-    return db.query(models.User).filter(models.User.is_active.is_(True)).order_by(models.User.name).all()
+def list_users(include_inactive: bool = False, db: Session = Depends(get_db),
+               user: models.User = Depends(current_user)):
+    """Elenco utenti attivi: serve a chiunque per assegnare un task. Con `include_inactive` (solo admin) anche i disattivati."""
+    q = db.query(models.User)
+    if include_inactive:
+        if user.role != UserRole.admin:
+            raise HTTPException(403, "requires role admin")
+    else:
+        q = q.filter(models.User.is_active.is_(True))
+    return q.order_by(models.User.name).all()
+
+
+@app.patch("/users/{user_id}", response_model=schemas.UserOut)
+def update_user(user_id: str, payload: schemas.UserUpdate, request: Request, db: Session = Depends(get_db),
+                admin: models.User = Depends(require_role())):
+    """
+    Solo admin: nome, ruolo, attivo/disattivo, reset password. Un admin non può
+    disattivarsi né togliersi il ruolo admin (altrimenti resta un sistema senza amministratori).
+    """
+    target = db.get(models.User, user_id)
+    if target is None:
+        raise HTTPException(404, "user not found")
+    changes = payload.model_dump(exclude_unset=True)
+    details: dict = {}
+    if "role" in changes and changes["role"] is not None:
+        try:
+            role = UserRole(changes["role"])
+        except ValueError:
+            raise HTTPException(422, f"invalid role {changes['role']!r}")
+        if target.id == admin.id and role != UserRole.admin:
+            raise HTTPException(409, "cannot remove your own admin role")
+        if role != target.role:
+            details["role"] = {"from": target.role.value, "to": role.value}
+            target.role = role
+    if "name" in changes and changes["name"] is not None:
+        if not changes["name"].strip():
+            raise HTTPException(422, "name must not be empty")
+        if changes["name"] != target.name:
+            details["name"] = {"from": target.name, "to": changes["name"]}
+            target.name = changes["name"]
+    if changes.get("password"):
+        target.password_hash = auth.hash_password(changes["password"])
+        audit.record(db, "user.password_reset", admin, entity_type="user", entity_id=target.id, request=request,
+                     details={"email": target.email})
+    if "is_active" in changes and changes["is_active"] is not None and changes["is_active"] != target.is_active:
+        if target.id == admin.id:
+            raise HTTPException(409, "cannot deactivate yourself")
+        target.is_active = changes["is_active"]
+        audit.record(db, "user.reactivated" if target.is_active else "user.deactivated", admin,
+                     entity_type="user", entity_id=target.id, request=request, details={"email": target.email})
+    if details:
+        audit.record(db, "user.updated", admin, entity_type="user", entity_id=target.id, request=request,
+                     details={"email": target.email, **details})
+    target.updated_at = utcnow()
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+@app.get("/users/activity", response_model=list[schemas.UserActivityOut])
+def users_activity(db: Session = Depends(get_db), _: models.User = Depends(require_role())):
+    """Solo admin: ultimo accesso e conteggio operazioni per utente (per la tabella utenti)."""
+    A = models.AuditLog
+    since = utcnow() - timedelta(days=30)
+    rows = (db.query(A.actor_id,
+                     func.max(case((A.action == "auth.login", A.created_at))),
+                     func.count(A.id),
+                     func.sum(case((A.created_at >= since, 1), else_=0)))
+            .filter(A.actor_id.isnot(None)).group_by(A.actor_id).all())
+    return [schemas.UserActivityOut(user_id=uid, last_login=last, actions_total=int(n or 0),
+                                    actions_last_30d=int(n30 or 0)) for uid, last, n, n30 in rows]
+
+
+# ---------- Registro operazioni (solo admin) ----------
+
+@app.get("/audit/actions", response_model=list[schemas.AuditActionOut])
+def audit_actions(_: models.User = Depends(require_role())):
+    return [schemas.AuditActionOut(action=a, label=audit.ACTION_LABELS.get(a, a)) for a in audit.ACTIONS]
+
+
+@app.get("/audit", response_model=schemas.AuditPage)
+def list_audit(
+    actor_id: Optional[str] = None,
+    action: Optional[list[str]] = Query(default=None),
+    project_id: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    q: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role()),
+):
+    """
+    Registro operazioni, dal più recente. Filtri: utente, una o più azioni,
+    progetto, entità, intervallo date (`date_to` inclusivo se solo data), testo
+    libero su email attore / entità / IP. Paginato (`total` per la UI).
+    """
+    A = models.AuditLog
+    query = db.query(A)
+    if actor_id:
+        query = query.filter(A.actor_id == actor_id)
+    if action:
+        query = query.filter(A.action.in_(action))
+    if project_id:
+        query = query.filter(A.project_id == project_id)
+    if entity_id:
+        query = query.filter(A.entity_id == entity_id)
+    if date_from:
+        query = query.filter(A.created_at >= to_naive_utc(date_from))
+    if date_to:
+        end = to_naive_utc(date_to)
+        if end.time() == datetime.min.time():
+            end = end + timedelta(days=1)
+        query = query.filter(A.created_at < end)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(or_(A.actor_email.ilike(like), A.entity_id.ilike(like), A.ip.ilike(like),
+                                 A.action.ilike(like)))
+    total = query.with_entities(func.count(A.id)).scalar() or 0
+    rows = query.order_by(A.created_at.desc(), A.id.desc()).offset(offset).limit(limit).all()
+    names = {u.id: u.name for u in db.query(models.User).filter(models.User.id.in_({r.actor_id for r in rows if r.actor_id})).all()} if rows else {}
+    projects = {p.id: p.name for p in db.query(models.Project).filter(models.Project.id.in_({r.project_id for r in rows if r.project_id})).all()} if rows else {}
+    items = [schemas.AuditOut(
+        id=r.id, action=r.action, actor_id=r.actor_id, actor_email=r.actor_email,
+        actor_name=names.get(r.actor_id), entity_type=r.entity_type, entity_id=r.entity_id,
+        project_id=r.project_id, project_name=projects.get(r.project_id), details=r.details or {},
+        ip=r.ip, user_agent=r.user_agent, created_at=r.created_at) for r in rows]
+    return schemas.AuditPage(items=items, total=int(total), limit=limit, offset=offset)
 
 
 # ---------- Progetti e membri ----------
 
 @app.post("/projects", response_model=schemas.ProjectOut, status_code=201)
-def create_project(payload: schemas.ProjectCreate, db: Session = Depends(get_db),
+def create_project(payload: schemas.ProjectCreate, request: Request, db: Session = Depends(get_db),
                    user: models.User = Depends(require_role(UserRole.manager))):
     project = models.Project(**payload.model_dump())
     db.add(project)
     db.flush()
     db.add(models.ProjectMember(project_id=project.id, user_id=user.id))  # il creatore è membro
+    audit.record(db, "project.created", user, entity_type="project", entity_id=project.id, project_id=project.id,
+                 request=request, details={"name": project.name})
     db.commit()
     db.refresh(project)
     return project
@@ -220,11 +360,14 @@ def remove_member(project_id: str, user_id: str, db: Session = Depends(get_db),
 # ---------- Planimetrie e template ----------
 
 @app.post("/plans", response_model=schemas.PlanOut, status_code=201)
-def create_plan(payload: schemas.PlanCreate, db: Session = Depends(get_db),
+def create_plan(payload: schemas.PlanCreate, request: Request, db: Session = Depends(get_db),
                 user: models.User = Depends(require_role(UserRole.manager))):
     auth.assert_project_access(db, user, payload.project_id)
     plan = models.Plan(**payload.model_dump())
     db.add(plan)
+    db.flush()
+    audit.record(db, "plan.created", user, entity_type="plan", entity_id=plan.id, project_id=plan.project_id,
+                 request=request, details={"name": plan.name})
     db.commit()
     db.refresh(plan)
     return plan
@@ -337,13 +480,16 @@ def list_plan_pins(
 
 
 @app.post("/form-templates", response_model=schemas.FormTemplateOut, status_code=201)
-def create_form_template(payload: schemas.FormTemplateCreate, db: Session = Depends(get_db),
-                         _: models.User = Depends(require_role(UserRole.manager))):
+def create_form_template(payload: schemas.FormTemplateCreate, request: Request, db: Session = Depends(get_db),
+                         user: models.User = Depends(require_role(UserRole.manager))):
     errors = validate_schema(payload.schema_def)
     if errors:
         raise HTTPException(422, detail=errors)
     template = models.FormTemplate(**payload.model_dump())
     db.add(template)
+    db.flush()
+    audit.record(db, "template.created", user, entity_type="template", entity_id=template.id, request=request,
+                 details={"name": template.name})
     db.commit()
     db.refresh(template)
     return _template_out(db, template)
@@ -376,8 +522,9 @@ def get_form_template(template_id: str, db: Session = Depends(get_db), _: models
 
 
 @app.patch("/form-templates/{template_id}", response_model=schemas.FormTemplateOut)
-def update_form_template(template_id: str, payload: schemas.FormTemplateUpdate, db: Session = Depends(get_db),
-                         _: models.User = Depends(require_role(UserRole.manager))):
+def update_form_template(template_id: str, payload: schemas.FormTemplateUpdate, request: Request,
+                         db: Session = Depends(get_db),
+                         user: models.User = Depends(require_role(UserRole.manager))):
     """
     Nome/categoria/archiviazione sempre; `schema_def` solo se nessuna submission
     usa ancora il template (409 altrimenti: duplicare e modificare la copia).
@@ -395,11 +542,18 @@ def update_form_template(template_id: str, payload: schemas.FormTemplateUpdate, 
         template.schema_def = changes.pop("schema_def")
     if "archived" in changes:
         archived = changes.pop("archived")
+        if archived != (template.archived_at is not None):
+            audit.record(db, "template.archived" if archived else "template.restored", user, entity_type="template",
+                         entity_id=template.id, request=request, details={"name": template.name})
         template.archived_at = utcnow() if archived else None
     if "name" in changes and not (changes["name"] or "").strip():
         raise HTTPException(422, "name must not be empty")
     for k, v in changes.items():
         setattr(template, k, v)
+    edited = sorted(k for k in payload.model_dump(exclude_unset=True) if k != "archived")
+    if edited:
+        audit.record(db, "template.updated", user, entity_type="template", entity_id=template.id, request=request,
+                     details={"name": template.name, "fields": edited})
     template.updated_at = utcnow()
     db.commit()
     db.refresh(template)
@@ -441,38 +595,47 @@ def _get_user_or_422(db: Session, user_id: Optional[str], field: str) -> None:
 
 
 @app.post("/pins", response_model=schemas.PinOut, status_code=201)
-def create_pin(payload: schemas.PinCreate, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+def create_pin(payload: schemas.PinCreate, request: Request, db: Session = Depends(get_db),
+               user: models.User = Depends(current_user)):
     plan = db.get(models.Plan, payload.plan_id)
     if plan is None:
         raise HTTPException(404, "plan not found")
     auth.assert_project_access(db, user, plan.project_id)
     pin = models.Pin(**payload.model_dump(), created_by=user.id)
     db.add(pin)
+    db.flush()
+    audit.record(db, "pin.created", user, entity_type="pin", entity_id=pin.id, project_id=plan.project_id,
+                 request=request, details={"plan_id": plan.id, "label": pin.label})
     db.commit()
     db.refresh(pin)
     return pin
 
 
 @app.patch("/pins/{pin_id}", response_model=schemas.PinOut)
-def update_pin(pin_id: str, payload: schemas.PinUpdate, db: Session = Depends(get_db),
+def update_pin(pin_id: str, payload: schemas.PinUpdate, request: Request, db: Session = Depends(get_db),
                user: models.User = Depends(current_user)):
     """Sposta (x/y) o rinomina un pin."""
     pin = _get_pin(db, user, pin_id)
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for k, v in changes.items():
         setattr(pin, k, v)
     pin.updated_at = utcnow()
+    audit.record(db, "pin.updated", user, entity_type="pin", entity_id=pin.id, project_id=auth.project_of_pin(pin),
+                 request=request, details={"fields": sorted(changes.keys()), "label": pin.label})
     db.commit()
     db.refresh(pin)
     return pin
 
 
 @app.delete("/pins/{pin_id}", status_code=204)
-def delete_pin(pin_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+def delete_pin(pin_id: str, request: Request, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     """
     Soft-delete del pin e di tutto ciò che contiene (submission, task, allegati),
     così il sync propaga la cancellazione completa. Solo creatore o manager.
     """
     pin = _get_pin(db, user, pin_id)
+    audit.record(db, "pin.deleted", user, entity_type="pin", entity_id=pin.id, project_id=auth.project_of_pin(pin),
+                 request=request, details={"label": pin.label, "submissions": len(pin.submissions), "tasks": len(pin.tasks)})
     if not auth.is_manager(user) and pin.created_by != user.id:
         raise HTTPException(403, "only the creator or a manager can delete a pin")
     now = utcnow()
@@ -503,7 +666,7 @@ def get_pin(pin_id: str, db: Session = Depends(get_db), user: models.User = Depe
 # ---------- Submissions (uso da web) ----------
 
 @app.post("/submissions", response_model=schemas.SubmissionOut, status_code=201)
-def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(get_db),
+def create_submission(payload: schemas.SubmissionCreate, request: Request, db: Session = Depends(get_db),
                       user: models.User = Depends(current_user)):
     template = db.get(models.FormTemplate, payload.template_id)
     if template is None:
@@ -517,7 +680,10 @@ def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(g
     sub = models.FormSubmission(**payload.model_dump(exclude={"submitted_by"}), submitted_by=user.id)
     db.add(sub)
     db.flush()
-    events.record_submission_created(db, sub, auth.project_of_pin(sub.pin), user.id)
+    project_id = auth.project_of_pin(sub.pin)
+    events.record_submission_created(db, sub, project_id, user.id)
+    audit.record(db, "submission.created", user, entity_type="submission", entity_id=sub.id, project_id=project_id,
+                 request=request, details={"template": template.name, "pin_id": sub.pin_id})
     db.commit()
     db.refresh(sub)
     return _with_attachments(schemas.SubmissionOut, sub)
@@ -534,8 +700,8 @@ def get_submission(submission_id: str, db: Session = Depends(get_db),
 
 
 @app.patch("/submissions/{submission_id}", response_model=schemas.SubmissionOut)
-def update_submission(submission_id: str, payload: schemas.SubmissionUpdate, db: Session = Depends(get_db),
-                      user: models.User = Depends(current_user)):
+def update_submission(submission_id: str, payload: schemas.SubmissionUpdate, request: Request,
+                      db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     """Modifica delle risposte (chi l'ha compilata o un manager); stesse regole di validazione della creazione."""
     sub = db.get(models.FormSubmission, submission_id)
     if sub is None or sub.deleted_at is not None:
@@ -547,8 +713,13 @@ def update_submission(submission_id: str, payload: schemas.SubmissionUpdate, db:
     errors = validate_submission(template.schema_def, payload.data_json)
     if errors:
         raise HTTPException(422, detail=errors)
+    changed = sorted(k for k in set(sub.data_json or {}) | set(payload.data_json)
+                     if (sub.data_json or {}).get(k) != payload.data_json.get(k))
     sub.data_json = payload.data_json
     sub.updated_at = utcnow()
+    audit.record(db, "submission.updated", user, entity_type="submission", entity_id=sub.id,
+                 project_id=auth.project_of_submission(sub), request=request,
+                 details={"template": template.name, "fields": changed})
     db.commit()
     db.refresh(sub)
     return _with_attachments(schemas.SubmissionOut, sub)
@@ -564,7 +735,7 @@ def _parse_status(value: str) -> TaskStatus:
 
 
 @app.post("/tasks", response_model=schemas.TaskOut, status_code=201)
-def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db),
+def create_task(payload: schemas.TaskCreate, request: Request, db: Session = Depends(get_db),
                 user: models.User = Depends(current_user)):
     _get_pin(db, user, payload.pin_id)
     _get_user_or_422(db, payload.assigned_to, "assigned_to")
@@ -572,7 +743,10 @@ def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db),
     task.status = TaskStatus.assigned if payload.assigned_to else TaskStatus.open
     db.add(task)
     db.flush()
-    events.record_task_created(db, task, auth.project_of_pin(task.pin), user.id)
+    project_id = auth.project_of_pin(task.pin)
+    events.record_task_created(db, task, project_id, user.id)
+    audit.record(db, "task.created", user, entity_type="task", entity_id=task.id, project_id=project_id,
+                 request=request, details={"title": task.title, "assigned_to": task.assigned_to})
     db.commit()
     db.refresh(task)
     return _with_attachments(schemas.TaskOut, task)
@@ -632,7 +806,7 @@ def get_task(task_id: str, db: Session = Depends(get_db), user: models.User = De
 
 
 @app.patch("/tasks/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends(get_db),
+def update_task(task_id: str, payload: schemas.TaskUpdate, request: Request, db: Session = Depends(get_db),
                 user: models.User = Depends(current_user)):
     """
     Aggiornamento parziale. Cambi di stato solo lungo TASK_TRANSITIONS (409 altrimenti);
@@ -662,18 +836,24 @@ def update_task(task_id: str, payload: schemas.TaskUpdate, db: Session = Depends
         setattr(task, k, v)
     task.updated_at = utcnow()
     events.record_task_changes(db, task, auth.project_of_task(task), user.id, before)
+    audit.record(db, "task.updated", user, entity_type="task", entity_id=task.id, project_id=auth.project_of_task(task),
+                 request=request, details={"title": task.title, "fields": sorted(payload.model_dump(exclude_unset=True).keys()),
+                                           "status": {"from": before["status"], "to": task.status.value}
+                                           if before["status"] != task.status.value else None})
     db.commit()
     db.refresh(task)
     return _with_attachments(schemas.TaskOut, task)
 
 
 @app.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+def delete_task(task_id: str, request: Request, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     """Soft-delete (manager/admin o creatore): viaggia nel sync come ogni altra modifica."""
     task = _get_task(db, user, task_id)
     if not auth.is_manager(user) and task.created_by != user.id:
         raise HTTPException(403, "only the creator or a manager can delete a task")
     task.deleted_at = task.updated_at = utcnow()
+    audit.record(db, "task.deleted", user, entity_type="task", entity_id=task.id, project_id=auth.project_of_task(task),
+                 request=request, details={"title": task.title})
     db.commit()
 
 
@@ -691,7 +871,7 @@ async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
 
 
 @app.post("/plans/{plan_id}/file", response_model=schemas.PlanOut)
-async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Session = Depends(get_db),
+async def upload_plan_file(plan_id: str, request: Request, file: UploadFile = File(...), db: Session = Depends(get_db),
                            user: models.User = Depends(require_role(UserRole.manager))):
     """
     Carica l'immagine della planimetria. Un PDF viene convertito in PNG
@@ -718,6 +898,8 @@ async def upload_plan_file(plan_id: str, file: UploadFile = File(...), db: Sessi
     plan.file_url = st.storage.save(f"plans/{plan.id}.{ext}", data)
     plan.width_px, plan.height_px = float(w), float(h)
     plan.updated_at = utcnow()
+    audit.record(db, "plan.file_uploaded", user, entity_type="plan", entity_id=plan.id, project_id=plan.project_id,
+                 request=request, details={"name": plan.name, "mime": mime, "bytes": len(data), "size": [w, h]})
     db.commit()
     db.refresh(plan)
     return plan
@@ -754,13 +936,17 @@ def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(g
 
 
 @app.delete("/attachments/{attachment_id}", status_code=204)
-def delete_attachment(attachment_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+def delete_attachment(attachment_id: str, request: Request, db: Session = Depends(get_db),
+                      user: models.User = Depends(current_user)):
     """Soft-delete di foto/firma (chi ha compilato il modulo o creato il task, oppure un manager)."""
     att = _get_attachment(db, user, attachment_id)
+    parent = att.submission if att.submission_id else att.task
     owner = att.submission.submitted_by if att.submission_id else att.task.created_by
     if not auth.is_manager(user) and owner != user.id:
         raise HTTPException(403, "only the owner or a manager can delete an attachment")
     att.deleted_at = att.updated_at = utcnow()
+    audit.record(db, "attachment.deleted", user, entity_type="attachment", entity_id=att.id,
+                 project_id=auth.project_of_pin(parent.pin), request=request, details={"file_type": att.file_type})
     db.commit()
 
 
@@ -853,7 +1039,7 @@ def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
 
 
 @app.post("/sync/push", response_model=schemas.SyncPushResponse)
-def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db),
+def sync_push(payload: schemas.SyncPushRequest, request: Request, db: Session = Depends(get_db),
               user: models.User = Depends(current_user)):
     """
     Riceve un batch di modifiche fatte offline sul device e le applica
@@ -939,6 +1125,12 @@ def sync_push(payload: schemas.SyncPushRequest, db: Session = Depends(get_db),
         task = db.get(models.Task, item.id)
         st_stats.mark_resolved_at(task, (task_before.get(item.id) or {}).get("status"))
         events.record_task_changes(db, task, auth.project_of_task(task), user.id, task_before.get(item.id))
+    if any((payload.pins, payload.submissions, payload.tasks, payload.attachments)):
+        def _count(res, items):
+            return {"sent": len(items), "inserted": res.inserted, "updated": res.updated, "skipped": res.skipped, "rejected": len(res.rejected)}
+        audit.record(db, "sync.push", user, entity_type="sync", request=request, details={
+            "pins": _count(pins, payload.pins), "submissions": _count(submissions, payload.submissions),
+            "tasks": _count(tasks, payload.tasks), "attachments": _count(attachments, payload.attachments)})
     db.commit()
     return schemas.SyncPushResponse(
         pins=pins, submissions=submissions, tasks=tasks, attachments=attachments,

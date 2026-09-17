@@ -7,7 +7,19 @@
 | `manager` | crea progetti/planimetrie/template, gestisce membri e task, verifica, dashboard |
 | `field` | pin, moduli, task nei progetti di cui è membro |
 
-Utenti: `POST /users` (Swagger `/api/docs`, solo admin) — email, nome, password (≥ 8), ruolo.
+## Spazio admin (web, sidebar → Amministrazione)
+- **Utenti** (`/admin/users`): elenco con ruolo, stato, ultimo accesso e operazioni;
+  **+ Nuovo utente** (email, nome, password iniziale, ruolo), **Modifica** (nome/ruolo),
+  **Password** (reset: comunicarla di persona), **Disattiva/Riattiva** (l'utente non entra
+  più, i suoi dati restano). Un admin non può disattivarsi né togliersi il ruolo.
+- **Registro operazioni** (`/admin/audit`): chi ha fatto cosa, quando e da quale IP —
+  accessi (anche falliti), gestione utenti, progetti/planimetrie/moduli, pin, compilazioni,
+  task, foto, sincronizzazioni dal device. Filtri per utente, azione, progetto, periodo,
+  testo; click su una riga → dettaglio JSON e "Storia di questa entità"; **Esporta CSV**
+  (prime 500 righe del filtro). Le righe sono scritte nella stessa transazione
+  dell'operazione (tabella `audit_log`) e non vengono mai cancellate.
+- API equivalenti: `POST/GET/PATCH /users`, `GET /users/activity`, `GET /audit`, `GET /audit/actions`.
+
 Membri di progetto: `POST /projects/{id}/members` con `user_id`. Preferenze notifica
 per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).
 

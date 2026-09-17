@@ -341,3 +341,59 @@ test('dashboard: card e grafici, click porta alla vista task filtrata', async ({
   expect(page.url()).toMatch(/plan=/)
   await expect(page.locator('.filter-summary')).toContainText(/di \d+ task/)
 })
+
+test('spazio admin: crea utente, reset password, disattiva; registro operazioni con filtri e dettaglio', async ({ page }) => {
+  await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
+  await page.getByRole('link', { name: 'Utenti' }).click()
+  await expect(page.getByRole('heading', { name: 'Utenti' })).toBeVisible()
+  await expect(page.locator('.users-table tbody tr')).toHaveCount(3)
+
+  // crea
+  await page.getByRole('button', { name: '+ Nuovo utente' }).click()
+  const modal = page.getByRole('dialog')
+  await modal.getByLabel('Nome e cognome').fill('Geom. Fabio Restivo')
+  await modal.getByLabel('Email (login)').fill('fabio.restivo@fieldview.local')
+  await modal.getByLabel('Ruolo').selectOption('manager')
+  await modal.getByLabel(/Password iniziale/).fill('cantiere2026')
+  await modal.getByRole('button', { name: 'Crea utente' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'creato' })).toBeVisible()
+  const row = page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' })
+  await expect(row).toContainText('Ufficio')
+
+  // reset password + disattiva (conferma nativa)
+  await row.getByRole('button', { name: 'Password' }).click()
+  await page.getByRole('dialog').getByLabel(/Nuova password/).fill('nuova12345')
+  await page.getByRole('dialog').getByRole('button', { name: 'Reimposta' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'reimpostata' })).toBeVisible()
+  page.once('dialog', (d) => d.accept())
+  await row.getByRole('button', { name: 'Disattiva' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'disattivato' })).toBeVisible()
+  await expect(page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' })).toHaveCount(0) // nascosto di default
+  await page.getByLabel('Mostra disattivati').check()
+  await expect(page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' })).toContainText('Disattivato')
+
+  // registro: storia dell'utente appena gestito
+  await page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' }).getByRole('link', { name: 'Attività' }).click()
+  await expect(page).toHaveURL(/\/admin\/audit\?actor=/)
+  await expect(page.getByRole('heading', { name: 'Registro operazioni' })).toBeVisible()
+  // l'utente disattivato non ha mai fatto login: nessuna operazione sua → azzera e guarda quelle dell'admin
+  await expect(page.locator('.empty')).toBeVisible()
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  const rows = page.locator('.audit-table tbody tr.audit-row')
+  await expect(rows.first()).toContainText('Utente disattivato')
+  await expect(page.locator('.audit-table')).toContainText('Password reimpostata')
+  await expect(page.locator('.audit-table')).toContainText('Utente creato')
+  // filtro per azione via select e dettaglio JSON
+  await page.getByLabel('Azione').selectOption('user.created')
+  await expect(rows).toHaveCount(1)
+  await expect(rows.first()).toContainText('fabio.restivo@fieldview.local')
+  await rows.first().click()
+  await expect(page.locator('.audit-json')).toContainText('"role": "manager"')
+  await page.getByRole('button', { name: 'Storia di questa entità' }).click()
+  await expect(rows).toHaveCount(3)
+  // il manager non entra
+  await page.getByRole('button', { name: 'Esci' }).click()
+  await login(page)
+  await page.goto('/admin/audit')
+  await page.waitForURL('**/projects')
+})

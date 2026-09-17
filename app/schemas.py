@@ -39,6 +39,51 @@ class UserOut(BaseModel):
     notify_push: bool = True
 
 
+class UserUpdate(BaseModel):
+    """PATCH /users/{id} (solo admin): tutti opzionali; `password` reimposta la password."""
+    name: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = Field(default=None, min_length=8)
+
+
+class AuditOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    action: str
+    actor_id: Optional[str] = None
+    actor_email: Optional[str] = None
+    actor_name: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    project_id: Optional[str] = None
+    project_name: Optional[str] = None
+    details: dict
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    created_at: datetime
+
+
+class AuditPage(BaseModel):
+    items: list[AuditOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class AuditActionOut(BaseModel):
+    action: str
+    label: str
+
+
+class UserActivityOut(BaseModel):
+    """Riepilogo per utente nello spazio admin: ultimo accesso e numero di operazioni."""
+    user_id: str
+    last_login: Optional[datetime] = None
+    actions_total: int = 0
+    actions_last_30d: int = 0
+
+
 class PushTokenIn(BaseModel):
     token: str = Field(min_length=10)
     platform: Optional[str] = None

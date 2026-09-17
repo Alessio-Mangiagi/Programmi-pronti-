@@ -11,6 +11,8 @@ import TasksPage from './pages/TasksPage'
 import DashboardPage from './pages/DashboardPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditorPage from './pages/TemplateEditorPage'
+import UsersPage from './pages/admin/UsersPage'
+import AuditPage from './pages/admin/AuditPage'
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth()
@@ -38,6 +40,8 @@ export default function App() {
         <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
+        <Route path="/admin/users" element={<UsersPage />} />
+        <Route path="/admin/audit" element={<AuditPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
