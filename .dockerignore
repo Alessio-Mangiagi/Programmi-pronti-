@@ -8,6 +8,7 @@ __pycache__
 storage
 web/node_modules
 packages/*/node_modules
+mobile
 web/dist
 web/test-results
 web/playwright-report

@@ -78,3 +78,25 @@ jobs:
         with:
           name: playwright-report
           path: web/test-results
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+        working-directory: packages/form-core
+      - run: npm ci
+        working-directory: mobile
+      - run: npm run typecheck
+        working-directory: mobile
+      # DB locale e motore di sync girano in Node su better-sqlite3 (stesse migrazioni dell'app)
+      - run: npm test
+        working-directory: mobile
+      # il bundle Metro verifica che tutti i moduli si risolvano (form-core compreso)
+      - run: npx expo export --platform android --no-bytecode --output-dir /tmp/expo-export
+        working-directory: mobile

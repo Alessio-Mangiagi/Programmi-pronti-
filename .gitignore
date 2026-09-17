@@ -7,7 +7,11 @@ fieldview.db
 storage/
 web/node_modules/
 packages/*/node_modules/
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
 web/dist/
 web/test-results/
 web/.e2e/
 web/playwright-report/
+mobile/.claude/

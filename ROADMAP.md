@@ -142,7 +142,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 
 ## Settimane 4-5 — App mobile offline-first
 
-### Giorno 16 — Scaffold Expo + DB locale
+### Giorno 16 — Scaffold Expo + DB locale ✅ (2026-09-17; DoD "parte su simulatore" NON verificata: nessun simulatore su questa macchina — verificati tsc, vitest sul DB e bundle Metro)
 - `mobile/` con Expo (TS), navigazione, login (JWT in SecureStore).
 - `expo-sqlite` + Drizzle: tabelle `projects, plans, form_templates, pins, form_submissions, tasks, attachments` con colonne extra `dirty: bool`, `local_file_path`.
 - **DoD**: app parte su simulatore iOS e Android, login funziona, DB creato.
