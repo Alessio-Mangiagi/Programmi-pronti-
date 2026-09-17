@@ -85,6 +85,7 @@ Tutti gli endpoint tranne `/auth/login` richiedono `Authorization: Bearer <JWT>`
 |--------|:-----:|:-------:|:-----:|
 | Vedere un progetto | tutti | se membro | se membro |
 | Creare progetti, planimetrie, template; gestire membri | ✓ | ✓ (membro) | – |
+| Modificare, duplicare, archiviare template | ✓ | ✓ | – |
 | Creare utenti | ✓ | – | – |
 | Pin, moduli, task, foto nei progetti di cui si è membri | ✓ | ✓ | ✓ |
 | Portare un task a `verified` | ✓ | ✓ | – |
@@ -174,5 +175,15 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 15: form builder v1 (lista template, editor campi, anteprima live)
+1. Giorno 16: scaffold Expo + DB locale (settimana mobile)
 2. Form builder web sopra i 3 template del seed
+
+## Template dei moduli
+
+`GET /form-templates` restituisce solo i template attivi (`?include_archived=true`
+anche quelli archiviati, per leggere vecchie submission); ogni template porta
+`submissions_count`. `PATCH /form-templates/{id}` (manager): `name`, `category`,
+`archived` sempre; `schema_def` solo se `submissions_count == 0`, altrimenti 409
+(duplicare e modificare la copia: le submission esistenti non vengono ri-validate).
+Un template archiviato non accetta nuove submission (409). Migrazione
+`a16a6f709710` aggiunge `form_templates.archived_at`.
