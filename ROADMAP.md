@@ -163,7 +163,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Schermate progetti e planimetrie; download immagini planimetria in cache (`expo-file-system`) al primo pull; indicatore "disponibile offline".
 - **DoD**: in modalità aereo apro progetto e planimetria già scaricati.
 
-### Giorno 20 — Plan view mobile
+### Giorno 20 — Plan view mobile ✅ (2026-09-17; gesture/pinch verificabili solo su device: tsc + bundle + test query)
 - Viewer con `react-native-gesture-handler` + `reanimated` (pinch/pan), pin overlay in coordinate relative, tap su pin → bottom sheet.
 - Aggiunta pin con long-press.
 - **DoD**: stessa esperienza del web su tablet 10".

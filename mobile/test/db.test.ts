@@ -58,3 +58,31 @@ describe('catalogo', () => {
     expect(listProjects(db)[0]).toMatchObject({ name: 'Rinominato', address: null })
   })
 })
+
+describe('plan view (giorno 20)', () => {
+  it('listPins conta task/moduli e pinLevel segue la priorità del web; pinDetail raccoglie allegati', async () => {
+    const { listPins, pinLevel, pinDetail } = await import('../src/data/catalog')
+    const { createPin, createTask, createSubmission, createAttachment, deletePin } = await import('../src/data/mutations')
+    const db = openNodeDb()
+    const a = createPin(db, 'pl', 0.1, 0.1, 'A', null)
+    const b = createPin(db, 'pl', 0.2, 0.2, 'B', null)
+    const c = createPin(db, 'pl', 0.3, 0.3, 'C', null)
+    const gone = createPin(db, 'pl', 0.4, 0.4, 'gone', null)
+    deletePin(db, gone.id)
+    createTask(db, { pin_id: a.id, title: 't1', description: null, assigned_to: 'u', due_date: null, created_by: null }) // assigned
+    createTask(db, { pin_id: a.id, title: 't2', description: null, assigned_to: null, due_date: null, created_by: null }) // open
+    const sub = createSubmission(db, 'tpl', b.id, { x: 1 }, null)
+    createAttachment(db, { submission_id: sub.id }, 'photo', 'file:///p.jpg')
+    const pins = listPins(db, 'pl')
+    expect(pins.map((p) => p.id).sort()).toEqual([a.id, b.id, c.id].sort())
+    const byId = Object.fromEntries(pins.map((p) => [p.id, p]))
+    expect(byId[a.id]).toMatchObject({ tasks_open: 1, tasks_assigned: 1, submissions_count: 0 })
+    expect(pinLevel(byId[a.id])).toBe('open')
+    expect(pinLevel(byId[b.id])).toBe('submission')
+    expect(pinLevel(byId[c.id])).toBe('empty')
+    const d = pinDetail(db, b.id)!
+    expect(d.submissions).toHaveLength(1)
+    expect(d.attachments).toHaveLength(1)
+    expect(pinDetail(db, 'nope')).toBeNull()
+  })
+})
