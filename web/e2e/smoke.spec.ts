@@ -180,3 +180,54 @@ test('compila "Ispezione sicurezza" con foto e firma dal pannello pin', async ({
   expect(sub.data_json.foto).toEqual([sub.attachments.find((a: { file_type: string }) => a.file_type === 'photo').id])
   expect(sub.data_json.firma_ispettore).toBe(sub.attachments.find((a: { file_type: string }) => a.file_type === 'signature').id)
 })
+
+test('vista task: filtri, cambio stato/assegnatario inline, link alla planimetria', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'Task', exact: true }).click()
+  await page.waitForURL('**/tasks')
+  const rows = page.locator('.tasks-table tbody tr')
+  await expect(rows.first()).toBeVisible()
+  const total = await rows.count()
+  expect(total).toBeGreaterThanOrEqual(3)
+
+  // un task aperto: assegnarlo lo porta ad "assigned" senza toccare lo stato
+  const firstOpen = page.locator('.tasks-table tbody tr', { has: page.locator('.status-select.status-open') }).first()
+  const title = await firstOpen.locator('td strong').first().textContent()
+  const openRow = page.locator('.tasks-table tbody tr', { hasText: title! }) // stabile anche quando cambia stato
+  await openRow.getByLabel(`Assegnatario di ${title}`).selectOption({ label: 'Franco Field' })
+  await expect(openRow.locator('.status-select')).toHaveValue('assigned')
+
+  // poi risolto, con scadenza
+  await openRow.getByLabel(`Stato di ${title}`).selectOption('resolved')
+  await expect(openRow.locator('.status-select')).toHaveValue('resolved')
+  await openRow.getByLabel(`Scadenza di ${title}`).fill('2030-12-31')
+  await page.reload()
+  const sameRow = page.locator('.tasks-table tbody tr', { hasText: title! })
+  await expect(sameRow.locator('.status-select')).toHaveValue('resolved')
+  await expect(sameRow.getByLabel(`Scadenza di ${title}`)).toHaveValue('2030-12-31')
+  await expect(sameRow.getByLabel(`Assegnatario di ${title}`)).toHaveValue(/.+/)
+
+  // filtro stato in URL e "i miei task" (il manager non ha task assegnati)
+  await page.getByRole('button', { name: 'Risolto' }).click()
+  await expect(page).toHaveURL(/status=resolved/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} task`)
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  await page.getByRole('button', { name: 'I miei task' }).click()
+  await expect(page).toHaveURL(/mine=1/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} task`)
+  for (const sel of await page.locator('.tasks-table tbody select[aria-label^="Assegnatario"]').all()) {
+    await expect(sel.locator('option:checked')).toHaveText('Maria Manager')
+  }
+  await page.getByRole('button', { name: 'Tutti i task' }).click()
+
+  // "vedi sulla planimetria": apre la plan view con il pin selezionato e il pannello
+  await sameRow.getByTitle('Vedi sulla planimetria').click()
+  await page.waitForURL(/\/plans\/[0-9a-f-]+/)
+  await expect(page.locator('.pin-panel')).toBeVisible()
+  await expect(page.locator('.pin-panel')).toContainText(title!)
+  await expect(page.locator('.pin-selected')).toHaveCount(1)
+  await expect(page).not.toHaveURL(/pin=/) // parametro consumato
+  const zoom = await page.locator('.plan-zoom').textContent()
+  expect(Number(zoom!.replace('%', ''))).toBeGreaterThanOrEqual(100)
+})

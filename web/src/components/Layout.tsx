@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useParams } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useProject } from '../hooks/useProject'
 
@@ -7,6 +7,7 @@ const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: '
 export default function Layout() {
   const { user, logout } = useAuth()
   const { projectId } = useParams()
+  const mine = new URLSearchParams(useLocation().search).get('mine') === '1'
   const project = useProject(projectId)
 
   return (
@@ -25,6 +26,12 @@ export default function Layout() {
                 {project?.name ?? 'Progetto'}
               </div>
               <NavLink to={`/projects/${projectId}/plans`}>Planimetrie</NavLink>
+              <NavLink to={`/projects/${projectId}/tasks`} end className={({ isActive }) => (isActive && !mine ? 'active' : '')}>
+                Task
+              </NavLink>
+              <NavLink to={`/projects/${projectId}/tasks?mine=1`} className={({ isActive }) => (isActive && mine ? 'active' : '')}>
+                I miei task
+              </NavLink>
             </>
           )}
         </nav>

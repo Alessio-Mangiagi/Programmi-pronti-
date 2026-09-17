@@ -20,7 +20,7 @@ Struttura:
 - `src/auth/` — token in localStorage, `AuthProvider` (`useAuth`), redirect al login su 401
 - `src/components/` — `Layout` (sidebar + outlet), `Toast` (`ToastProvider`/`useToast`, notifiche in basso), `Loading` (spinner), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin), `PlanUploadForm` (nuova planimetria / file mancante), `PinFilters` (barra filtri ↔ query string)
 - `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL), `useLookups` (utenti/template per id)
-- `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`
+- `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`, `TasksPage` (tabella task del progetto)
 - `src/forms/` — `DynamicForm` (un controllo per tipo di campo, errori inline tradotti), `fields/` (`PhotoInput`, `SignatureInput`, `GeolocationInput`), `SubmissionForm` (scelta template → compila → salva; con `submission` modifica via PATCH e cancella gli allegati tolti), `SubmissionDetail` (sola lettura → Modifica / Crea task), `TaskForm`, `nonConformity.ts` (regola "Non conforme" + bozza task), `attachments.ts` (foto/firme locali come File + object URL)
 - `src/components/Modal.tsx` — modale con Esc/click fuori; `body[data-modal-open]` dice alla plan view di ignorare Esc
 
@@ -81,3 +81,12 @@ contiene un valore che matcha `/non\s*conform/i` (`findNonConformity`), si apre 
 (`taskDraftFromSubmission`): assegnatario + "Crea e assegna" = task assegnato in 3 click.
 Nel pannello pin ogni modulo è cliccabile (badge rosso se non conforme) e apre
 `SubmissionDetail`; "+ Nuovo task" crea un task libero sul pin.
+
+Vista task (`/projects/:id/tasks`): carica tutti i task del progetto una volta e
+filtra/ordina client-side; filtri in query string (`status` ripetibile, `plan`,
+`assignee`, `mine=1` = "I miei task", `overdue=1`). Stato, assegnatario e scadenza
+si cambiano inline con `PATCH /tasks/{id}` (aggiornamento ottimistico, rollback +
+toast su errore); il select di stato offre solo le transizioni consentite dal server
+(`verified` solo a manager). "📍 Planimetria · pin" porta a
+`/plans/{planId}?pin={pinId}`: `PlanPage` seleziona il pin, `PlanViewer` lo centra a
+zoom ≥ 100% (`focusPinId`/`onFocused`) e il parametro viene tolto dall'URL.

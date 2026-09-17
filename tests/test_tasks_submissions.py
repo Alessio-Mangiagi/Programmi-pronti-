@@ -146,6 +146,9 @@ def test_list_tasks_filters(client, project, pin, users):
     assert ids(assigned_to=anna) == {b}
     assert ids(plan_id=other_plan["id"]) == {d}
     assert ids(status="assigned", plan_id=project["plan"]["id"]) == {b}
+    by_id = {t["id"]: t for t in client.get(f"/projects/{pid}/tasks").json()}
+    assert (by_id[d]["plan_id"], by_id[d]["plan_name"], by_id[d]["pin_label"]) == (other_plan["id"], "P1", None)
+    assert by_id[a]["plan_name"] == "Piano terra"
     assert client.get(f"/projects/{pid}/tasks", params={"status": "nope"}).status_code == 422
     assert client.get("/projects/nope/tasks").status_code == 404
 

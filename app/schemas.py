@@ -180,6 +180,13 @@ class TaskOut(BaseModel):
     attachments: list[AttachmentOut] = []
 
 
+class TaskListItem(TaskOut):
+    """Task + dove sta: basta alla vista task di progetto per il link "vedi sulla planimetria"."""
+    plan_id: str
+    plan_name: str
+    pin_label: Optional[str] = None
+
+
 class PinCreate(BaseModel):
     plan_id: str
     x: float = Field(ge=0.0, le=1.0)

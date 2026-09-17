@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import ProjectsPage from './pages/ProjectsPage'
 import PlansPage from './pages/PlansPage'
 import PlanPage from './pages/PlanPage'
+import TasksPage from './pages/TasksPage'
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth()
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:projectId/plans" element={<PlansPage />} />
         <Route path="/projects/:projectId/plans/:planId" element={<PlanPage />} />
+        <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

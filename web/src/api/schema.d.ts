@@ -1090,6 +1090,49 @@ export interface components {
             /** Due Date */
             due_date?: string | null;
         };
+        /**
+         * TaskListItem
+         * @description Task + dove sta: basta alla vista task di progetto per il link "vedi sulla planimetria".
+         */
+        TaskListItem: {
+            /** Id */
+            id: string;
+            /** Pin Id */
+            pin_id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Status */
+            status: string;
+            /** Assigned To */
+            assigned_to?: string | null;
+            /** Created By */
+            created_by?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["AttachmentOut"][];
+            /** Plan Id */
+            plan_id: string;
+            /** Plan Name */
+            plan_name: string;
+            /** Pin Label */
+            pin_label?: string | null;
+        };
         /** TaskOut */
         TaskOut: {
             /** Id */
@@ -1981,7 +2024,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskOut"][];
+                    "application/json": components["schemas"]["TaskListItem"][];
                 };
             };
             /** @description Validation Error */

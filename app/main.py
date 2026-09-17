@@ -461,7 +461,7 @@ def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db),
     return _with_attachments(schemas.TaskOut, task)
 
 
-@app.get("/projects/{project_id}/tasks", response_model=list[schemas.TaskOut])
+@app.get("/projects/{project_id}/tasks", response_model=list[schemas.TaskListItem])
 def list_tasks(
     project_id: str,
     status: Optional[str] = None,
@@ -483,7 +483,12 @@ def list_tasks(
     if assigned_to:
         q = q.filter(models.Task.assigned_to == assigned_to)
     q = q.order_by(models.Task.created_at.desc())
-    return [_with_attachments(schemas.TaskOut, t) for t in q.all()]
+    out = []
+    for t in q.all():
+        base = _with_attachments(schemas.TaskOut, t)
+        out.append(schemas.TaskListItem(**base.model_dump(), plan_id=t.pin.plan_id,
+                                        plan_name=t.pin.plan.name, pin_label=t.pin.label))
+    return out
 
 
 @app.get("/tasks/{task_id}", response_model=schemas.TaskOut)

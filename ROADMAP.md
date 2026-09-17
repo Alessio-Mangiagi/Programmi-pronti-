@@ -127,7 +127,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Regola MVP: campo `select` con valore "Non conforme" propone la creazione automatica di un task pre-compilato.
 - **DoD**: da un'ispezione non conforme nasce un task assegnato in 3 click.
 
-### Giorno 14 — Vista task progetto
+### Giorno 14 — Vista task progetto ✅ (2026-09-17, filtri/ordinamento client-side: paginazione server in backlog se un progetto supera le migliaia di task)
 - Tabella task: filtri, ordinamento, cambio stato inline, assegnazione, scadenza; link "vedi sulla planimetria" (centra e apre il pin).
 - Vista "i miei task".
 - **DoD**: un manager smista 10 task senza aprire la planimetria.

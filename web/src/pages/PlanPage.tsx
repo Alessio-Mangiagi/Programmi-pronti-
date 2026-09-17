@@ -43,7 +43,9 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
   const [plan, setPlan] = useState<Plan | null>(null)
   const [allPins, setAllPins] = useState<PinSummary[] | null>(null)
   const [filteredPins, setFilteredPins] = useState<PinSummary[] | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get('pin'))
+  // ?pin=<id> (link "vedi sulla planimetria"): selezionato e centrato una volta, poi tolto dall'URL
+  const [focusPinId, setFocusPinId] = useState<string | null>(() => searchParams.get('pin'))
   const [addMode, setAddMode] = useState(false)
   // Solo per il caricamento della planimetria (404/403): gli errori delle azioni vanno nei toast.
   const [error, setError] = useState<string | null>(null)
@@ -97,6 +99,18 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
   function setFilters(next: PinFilterState) {
     setSearchParams(filtersToSearch(next), { replace: true })
   }
+
+  const onFocused = useCallback(() => {
+    setFocusPinId(null)
+    setSearchParams(
+      (prev) => {
+        const q = new URLSearchParams(prev)
+        q.delete('pin')
+        return q
+      },
+      { replace: true },
+    )
+  }, [setSearchParams])
 
   function switchPlan(id: string) {
     // i filtri restano nella query string: utile per confrontare più piani con lo stesso filtro
@@ -215,6 +229,8 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
               onSelectPin={(p) => setSelectedId(p.id)}
               onAddAt={addPin}
               onMovePin={movePin}
+              focusPinId={focusPinId}
+              onFocused={onFocused}
             />
           ) : (
             !error && <Loading className="plan-viewer-empty" />

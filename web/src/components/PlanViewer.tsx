@@ -15,6 +15,9 @@ type Props = {
   onSelectPin?: (pin: PinSummary) => void
   onAddAt?: (x: number, y: number) => void
   onMovePin?: (pin: PinSummary, x: number, y: number) => void
+  /** Pin da centrare (es. arrivando dalla vista task); onFocused viene chiamato una volta fatto. */
+  focusPinId?: string | null
+  onFocused?: () => void
 }
 
 const MIN_SCALE = 0.05
@@ -36,6 +39,8 @@ export default function PlanViewer({
   onSelectPin,
   onAddAt,
   onMovePin,
+  focusPinId,
+  onFocused,
 }: Props) {
   const { url, loading, failed } = useAuthBlobUrl(plan.file_url)
   const wrapperRef = useRef<ReactZoomPanPinchContentRef>(null)
@@ -43,6 +48,7 @@ export default function PlanViewer({
   const canvasRef = useRef<HTMLDivElement>(null)
   const pressStart = useRef<{ x: number; y: number } | null>(null)
   const [scale, setScale] = useState(1)
+  const focus = useRef<{ x: number; y: number } | null>(null)
   const width = plan.width_px ?? 0
   const height = plan.height_px ?? 0
 
@@ -54,10 +60,29 @@ export default function PlanViewer({
   }, [width, height])
 
   const fit = useCallback(() => {
+    const el = containerRef.current
     const s = Math.max(MIN_SCALE, fitScale())
+    if (focus.current && el) {
+      // pin da centrare: zoom almeno al 100% (o al fit se la planimetria è piccola), pin al centro
+      const z = Math.min(MAX_SCALE, Math.max(s, 1))
+      const x = el.clientWidth / 2 - focus.current.x * width * z
+      const y = el.clientHeight / 2 - focus.current.y * height * z
+      wrapperRef.current?.setTransform(x, y, z, 0)
+      setScale(z)
+      return
+    }
     wrapperRef.current?.centerView(s, 0)
     setScale(s)
-  }, [fitScale])
+  }, [fitScale, width, height])
+
+  // Arrivo con un pin da mostrare: finché non c'è stata un'interazione, ogni fit centra quel pin.
+  useEffect(() => {
+    const p = focusPinId ? pins.find((q) => q.id === focusPinId) : undefined
+    if (!p || !url) return
+    focus.current = { x: p.x, y: p.y }
+    fit()
+    onFocused?.()
+  }, [focusPinId, pins, url, fit, onFocused])
 
   // Al primo render dell'immagine adatta allo schermo; poi a ogni cambio di
   // dimensione del contenitore (finestra, apertura del pannello laterale).
@@ -99,6 +124,8 @@ export default function PlanViewer({
           wheel={{ step: 0.15 }}
           doubleClick={{ disabled: true }}
           panning={{ velocityDisabled: true, excluded: ['pin'] }}
+          onPanningStart={() => (focus.current = null)}
+          onZoomStart={() => (focus.current = null)}
           onTransform={(_, state) => setScale(state.scale)}
         >
           <TransformComponent wrapperClass="plan-viewer-wrapper" contentClass="plan-viewer-content">
