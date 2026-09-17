@@ -183,7 +183,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Lista task del progetto e "i miei"; dettaglio; cambio stato con foto di risoluzione; tutto offline.
 - **DoD**: un operaio chiude un task con foto senza rete; il manager lo vede al ritorno della rete.
 
-### Giorno 24 — Sync automatico e stato
+### Giorno 24 — Sync automatico e stato ✅ (2026-09-17; trigger foreground/NetInfo/15 min/background task — il background vero va provato su device con dev build)
 - Trigger: app in foreground, cambio connettività (`NetInfo`), ogni 15 min con `expo-background-fetch`, pull-to-refresh manuale.
 - Barra di stato sync: ultima sync, elementi in attesa, errori.
 - **DoD**: nessuna azione manuale necessaria per sincronizzare in uso normale.

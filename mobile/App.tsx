@@ -5,6 +5,8 @@ import { ActivityIndicator, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from './src/auth/AuthContext'
 import { DbProvider } from './src/db/DbContext'
+import { SyncProvider } from './src/sync/SyncContext'
+import SyncBar from './src/components/SyncBar'
 import type { RootStackParamList } from './src/navigation'
 import LoginScreen from './src/screens/LoginScreen'
 import PlanScreen from './src/screens/PlanScreen'
@@ -28,7 +30,9 @@ function Routes() {
     )
   }
   return (
-    <Stack.Navigator screenOptions={{ headerTintColor: colors.primary, headerTitleStyle: { color: colors.text } }}>
+    <SyncProvider>
+      {user && <SyncBar />}
+      <Stack.Navigator screenOptions={{ headerTintColor: colors.primary, headerTitleStyle: { color: colors.text } }}>
       {user ? (
         <>
           <Stack.Screen name="Projects" component={ProjectsScreen} options={{ title: 'Progetti' }} />
@@ -43,6 +47,7 @@ function Routes() {
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       )}
     </Stack.Navigator>
+    </SyncProvider>
   )
 }
 

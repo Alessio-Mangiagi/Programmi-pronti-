@@ -86,3 +86,19 @@ describe('plan view (giorno 20)', () => {
     expect(pinDetail(db, 'nope')).toBeNull()
   })
 })
+
+describe('barra di stato (giorno 24)', () => {
+  it('pendingCounts somma dirty, upload in coda, problemi e ultima sync', async () => {
+    const { pendingCounts } = await import('../src/sync/status')
+    const { createPin, createTask, createAttachment } = await import('../src/data/mutations')
+    const db = openNodeDb()
+    expect(pendingCounts(db)).toEqual({ dirty: 0, uploads: 0, issues: 0, lastSyncAt: null })
+    const pin = createPin(db, 'pl', 0.1, 0.1, null, null)
+    createTask(db, { pin_id: pin.id, title: 't', description: null, assigned_to: null, due_date: null, created_by: null })
+    createAttachment(db, { task_id: 'x' }, 'photo', 'file:///a.jpg')
+    db.insert(schema.syncLog).values({ entity: 'tasks', entity_id: 'x', kind: 'rejected', created_at: now }).run()
+    db.insert(schema.syncState).values({ project_id: 'p1', last_server_time: now, last_sync_at: '2026-09-17T12:00:00' }).run()
+    db.insert(schema.syncState).values({ project_id: 'p2', last_server_time: now, last_sync_at: '2026-09-17T13:30:00' }).run()
+    expect(pendingCounts(db)).toEqual({ dirty: 3, uploads: 1, issues: 1, lastSyncAt: '2026-09-17T13:30:00' })
+  })
+})

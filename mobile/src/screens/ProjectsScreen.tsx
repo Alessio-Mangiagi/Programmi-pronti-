@@ -3,11 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
 import { useAuth } from '../auth/AuthContext'
 import { listProjects, refreshProjects } from '../data/catalog'
-import { syncAll } from '../sync'
-import { expoFileStore } from '../sync/expoFileStore'
-import { rnUploadOptions } from '../sync/rnUpload'
-import { API_URL } from '../config'
-import { getToken } from '../auth/token'
+import { useSync } from '../sync/SyncContext'
 import { listSyncIssues } from './SyncIssuesScreen'
 import { useDb } from '../db/DbContext'
 import type { Project } from '../db/schema'
@@ -20,6 +16,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Projects'>
 export default function ProjectsScreen({ navigation }: Props) {
   const db = useDb()
   const { api, user, logout } = useAuth()
+  const { sync } = useSync()
   const [projects, setProjects] = useState<Project[]>(() => listProjects(db))
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,15 +29,15 @@ export default function ProjectsScreen({ navigation }: Props) {
       await refreshProjects(db, api)
       setProjects(listProjects(db))
       // push delle modifiche locali + pull di ogni progetto (planimetrie, pin, moduli, task)
-      const res = await syncAll(db, api, { files: { baseUrl: API_URL, getToken, store: expoFileStore }, uploads: rnUploadOptions })
-      if (res.errors.length) setError(res.errors[0])
+      const res = await sync()
+      if (res?.errors.length) setError(res.errors[0])
       setIssues(listSyncIssues(db).length)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Aggiornamento non riuscito')
     } finally {
       setRefreshing(false)
     }
-  }, [db, api])
+  }, [db, api, sync])
 
   useEffect(() => {
     if (projects.length === 0) refresh()

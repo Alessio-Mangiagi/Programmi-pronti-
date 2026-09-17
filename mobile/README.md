@@ -23,6 +23,8 @@ Struttura:
 - `src/db/types.ts` — `AppDb`: tipo comune ai due driver, usato da sync/ e schermate
 - `src/data/catalog.ts` — query di catalogo (progetti, planimetrie) e `refreshProjects`
 - `src/data/mutations.ts` — scritture locali (`createPin`, `updateTask`, `createSubmission`, …): `updated_at` = adesso, `dirty = true`; `retryRejected`/`discardRejected` per le righe in `sync_log`
+- `src/sync/SyncContext.tsx` — `SyncProvider`/`useSync`: sync all'avvio, al ritorno in foreground (AppState), al ritorno della rete (NetInfo), ogni 15 min in foreground; `status.ts` conta dirty/upload/problemi; `background.ts` registra il task expo-background-task (~15 min, dove il sistema lo consente)
+- `src/components/SyncBar.tsx` — barra sotto l'header: ultima sync, elementi in attesa, foto da caricare, errori, link ai problemi; tap = sincronizza ora
 - `src/sync/uploads.ts` — coda upload (`processUploadQueue`: presign → multipart; backoff 5s·2ⁿ max 1h in `upload_next_at`, max 20 tentativi, 404/409 = rinuncia); `rnUpload.ts` costruisce il multipart RN
 - `src/sync/files.ts` — cache immagini planimetrie (`cachePlanImages`: scarica in `plans/<id>.<ext>` se `local_file_for != updated_at`), `expoFileStore.ts` (expo-file-system `File`/`Directory`); nei test uno store in memoria
 - `src/sync/` — `pull.ts` (incrementale per progetto, upsert con LWW, conflitti in `sync_log`), `push.ts` (righe dirty → `/sync/push`, dirty azzerato solo se `updated_at` invariato, rifiuti in `sync_log`), `index.ts` (`syncAll`: mutex, push poi pull, errori raccolti), `time.ts`
