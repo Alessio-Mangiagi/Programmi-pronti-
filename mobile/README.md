@@ -22,8 +22,24 @@ Struttura:
 - `src/db/migrations.ts` — SQL a mano, versionate con `PRAGMA user_version`; `index.ts` apre il DB con expo-sqlite, `node.ts` con better-sqlite3 (test)
 - `src/db/types.ts` — `AppDb`: tipo comune ai due driver, usato da sync/ e schermate
 - `src/data/catalog.ts` — query di catalogo (progetti, planimetrie) e `refreshProjects`
+- `src/data/mutations.ts` — scritture locali (`createPin`, `updateTask`, `createSubmission`, …): `updated_at` = adesso, `dirty = true`; `retryRejected`/`discardRejected` per le righe in `sync_log`
+- `src/sync/` — `pull.ts` (incrementale per progetto, upsert con LWW, conflitti in `sync_log`), `push.ts` (righe dirty → `/sync/push`, dirty azzerato solo se `updated_at` invariato, rifiuti in `sync_log`), `index.ts` (`syncAll`: mutex, push poi pull, errori raccolti), `time.ts`
 - `src/screens/` — `LoginScreen`, `ProjectsScreen` (lista locale + pull-to-refresh), `PlansScreen`
 - `metro.config.js` — `watchFolders` per `packages/form-core` (dipendenza `file:`)
+
+Sync: `syncAll(db, api)` fa prima il push di tutte le righe `dirty` (un solo batch,
+il server smista per id) e poi `pullProject` per ogni progetto locale con
+`since = sync_state.last_server_time`. Regole:
+- riga remota assente in locale → insert; presente e non dirty → update se la remota
+  è più recente **o pari** (il server valorizza `created_by` senza toccare `updated_at`);
+- riga locale dirty più recente → resta e viene pushata; dirty più vecchia → vince la
+  remota e la versione locale finisce in `sync_log` (`conflict_lost`);
+- rifiuti del push (`rejected`) → `dirty = false` + `sync_log` (`rejected`, motivo):
+  non vengono rispediti da soli; `retryRejected` (dopo la correzione) o `discardRejected`;
+- cancellazioni: `deleted_at` locale + push; al pull la riga resta con `deleted_at`
+  (le query filtrano `deleted_at IS NULL`).
+`test/sync.test.ts` esegue tutto questo contro il backend reale avviato da
+`scripts/e2e_server.py` (porta 8002, cartella `mobile/.e2e/`).
 
 Verifica senza simulatore: `npx expo export --platform android --no-bytecode` produce
 il bundle (Metro risolve tutti i moduli, form-core compreso). L'avvio su simulatore

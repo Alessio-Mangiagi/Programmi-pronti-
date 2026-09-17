@@ -147,7 +147,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - `expo-sqlite` + Drizzle: tabelle `projects, plans, form_templates, pins, form_submissions, tasks, attachments` con colonne extra `dirty: bool`, `local_file_path`.
 - **DoD**: app parte su simulatore iOS e Android, login funziona, DB creato.
 
-### Giorno 17 — Motore di sync
+### Giorno 17 — Motore di sync ✅ (2026-09-17, verificato in Node contro il backend reale; LWW, sync_log e riprova/scarta del giorno 18 già inclusi)
 - `sync/pull.ts`: primo avvio full, poi incrementale con `since = server_time` salvato per progetto; upsert locale; applica `deleted_at`.
 - `sync/push.ts`: raccoglie righe `dirty`, invia `/sync/push`, azzera `dirty` sugli `inserted/updated/skipped`, marca `rejected` con motivo.
 - Ordine: push poi pull. Mutex per evitare sync concorrenti.

@@ -20,14 +20,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8001)
     parser.add_argument("--keep", action="store_true", help="non azzerare DB e storage")
+    parser.add_argument("--dir", default=str(E2E_DIR), help="cartella per DB e storage usa-e-getta")
     args = parser.parse_args()
 
-    if not args.keep and E2E_DIR.exists():
-        shutil.rmtree(E2E_DIR)
-    E2E_DIR.mkdir(parents=True, exist_ok=True)
+    e2e_dir = Path(args.dir)
+    if not args.keep and e2e_dir.exists():
+        shutil.rmtree(e2e_dir)
+    e2e_dir.mkdir(parents=True, exist_ok=True)
     # Prima di importare app.*: database.py legge l'ambiente all'import.
-    os.environ["DATABASE_URL"] = f"sqlite:///{(E2E_DIR / 'e2e.db').as_posix()}"
-    os.environ["STORAGE_DIR"] = str(E2E_DIR / "storage")
+    os.environ["DATABASE_URL"] = f"sqlite:///{(e2e_dir / 'e2e.db').as_posix()}"
+    os.environ["STORAGE_DIR"] = str(e2e_dir / "storage")
     os.environ.setdefault("SECRET_KEY", "e2e-secret-key-not-for-production-0000000000")
 
     from alembic import command
@@ -44,7 +46,7 @@ def main():
     from app.server import app, DIST
 
     if not DIST.is_dir():
-        raise SystemExit(f"manca {DIST}: esegui `npm run build` in web/")
+        print(f"attenzione: manca {DIST} (npm run build in web/): servo solo l'API sotto /api")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
 
 

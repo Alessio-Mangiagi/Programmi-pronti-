@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native'
 import { useAuth } from '../auth/AuthContext'
 import { listProjects, refreshProjects } from '../data/catalog'
+import { syncAll } from '../sync'
 import { useDb } from '../db/DbContext'
 import type { Project } from '../db/schema'
 import type { RootStackParamList } from '../navigation'
@@ -24,6 +25,9 @@ export default function ProjectsScreen({ navigation }: Props) {
     try {
       await refreshProjects(db, api)
       setProjects(listProjects(db))
+      // push delle modifiche locali + pull di ogni progetto (planimetrie, pin, moduli, task)
+      const res = await syncAll(db, api)
+      if (res.errors.length) setError(res.errors[0])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Aggiornamento non riuscito')
     } finally {

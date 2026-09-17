@@ -83,11 +83,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
+      # il test del motore di sync gira contro il backend reale (scripts/e2e_server.py)
+      - run: pip install -r requirements.txt
       - run: npm ci
         working-directory: packages/form-core
       - run: npm ci
@@ -97,6 +103,8 @@ jobs:
       # DB locale e motore di sync girano in Node su better-sqlite3 (stesse migrazioni dell'app)
       - run: npm test
         working-directory: mobile
+        env:
+          PYTHON: python
       # il bundle Metro verifica che tutti i moduli si risolvano (form-core compreso)
       - run: npx expo export --platform android --no-bytecode --output-dir /tmp/expo-export
         working-directory: mobile

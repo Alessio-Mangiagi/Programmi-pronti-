@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
+import { useCallback, useState } from 'react'
 import { FlatList, Text, View } from 'react-native'
 import { listPlans } from '../data/catalog'
 import { useDb } from '../db/DbContext'
@@ -8,10 +9,11 @@ import { styles } from '../ui'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Plans'>
 
-/** Planimetrie del progetto dal DB locale (arrivano con il pull di sync, giorno 17). */
+/** Planimetrie del progetto dal DB locale (riempito dal pull di sync). */
 export default function PlansScreen({ route }: Props) {
   const db = useDb()
-  const [plans] = useState(() => listPlans(db, route.params.projectId))
+  const [plans, setPlans] = useState(() => listPlans(db, route.params.projectId))
+  useFocusEffect(useCallback(() => setPlans(listPlans(db, route.params.projectId)), [db, route.params.projectId]))
 
   return (
     <View style={styles.screen}>
@@ -21,7 +23,7 @@ export default function PlansScreen({ route }: Props) {
         contentContainerStyle={styles.content}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.muted}>Nessuna planimetria scaricata: la sincronizzazione arriva al giorno 17.</Text>
+            <Text style={styles.muted}>Nessuna planimetria: sincronizza dalla lista progetti (trascina verso il basso).</Text>
           </View>
         }
         renderItem={({ item }) => (

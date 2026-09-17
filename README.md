@@ -176,7 +176,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 17: motore di sync mobile (pull incrementale, push delle righe dirty)
+1. Giorno 18: schermata "Elementi non sincronizzati" + scenario stesso task modificato su web e app
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
