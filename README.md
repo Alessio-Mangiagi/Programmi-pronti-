@@ -69,6 +69,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/test_auth.py` — test login, ruoli, visibilità per progetto
 - `tests/test_server.py` — test del mount `/api` e del fallback SPA
 - `web/` — frontend React (vedi `web/README.md`)
+- `mobile/` — app Expo offline-first (vedi `mobile/README.md`)
 - `web/src/forms/` — `DynamicForm` (renderer di tutti i tipi di campo) e `SubmissionForm` (compilazione + upload foto/firma)
 - `packages/form-core/` — tipi schema modulo, `validateSchema`/`validateSubmission`, `defaults`, `zodSchema` (TS, condiviso web/mobile); parità con `app/forms.py` garantita da `fixtures/cases.json`
 - `scripts/gen_form_fixtures.py` — rigenera i casi condivisi dal validatore Python
@@ -175,7 +176,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 16: scaffold Expo + DB locale (settimana mobile)
+1. Giorno 17: motore di sync mobile (pull incrementale, push delle righe dirty)
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
