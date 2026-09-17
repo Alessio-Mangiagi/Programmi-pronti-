@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { Plan } from '../api/types'
+import { isManager, useAuth } from '../auth/AuthContext'
 import AuthImage from '../components/AuthImage'
+import PlanUploadForm from '../components/PlanUploadForm'
 import { useProject } from '../hooks/useProject'
 
 export default function PlansPage() {
   const { projectId = '' } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const project = useProject(projectId)
   const [plans, setPlans] = useState<Plan[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     api.GET('/projects/{project_id}/plans', { params: { path: { project_id: projectId } } }).then(({ data, error }) => {
@@ -27,13 +32,28 @@ export default function PlansPage() {
           </div>
           <h1>Planimetrie</h1>
         </div>
+        {isManager(user) && (
+          <button className="btn btn-primary" onClick={() => setCreating((v) => !v)}>
+            {creating ? 'Annulla' : '+ Nuova planimetria'}
+          </button>
+        )}
       </header>
       <div className="content">
+        {creating && (
+          <PlanUploadForm
+            projectId={projectId}
+            onCancel={() => setCreating(false)}
+            onDone={(plan) => navigate(`/projects/${projectId}/plans/${plan.id}`)}
+          />
+        )}
         {error && <p className="error">{error}</p>}
         {plans === null ? (
           <p className="muted">Caricamento…</p>
         ) : plans.length === 0 ? (
-          <div className="empty">Nessuna planimetria. Il caricamento arriva al giorno 9.</div>
+          <div className="empty">
+            Nessuna planimetria.{' '}
+            {isManager(user) ? 'Caricane una con "+ Nuova planimetria".' : 'Chiedi a un responsabile di caricarne una.'}
+          </div>
         ) : (
           <div className="grid">
             {plans.map((plan) => (

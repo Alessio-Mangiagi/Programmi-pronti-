@@ -536,7 +536,7 @@
     "/plans/{plan_id}/pins": {
       "get": {
         "summary": "List Plan Pins",
-        "description": "Pin (non cancellati) della planimetria con conteggi di submission e task per stato.",
+        "description": "Pin (non cancellati) della planimetria con conteggi di submission e task per stato.\n\nFiltri (in AND tra loro, tutti sui soli record non cancellati):\n- `status` (ripetibile) + `assigned_to`: il pin ha almeno un task che soddisfa\n  ENTRAMBE le condizioni (es. \"task aperti assegnati a Mario\");\n- `template_id`: il pin ha almeno una submission di quel template;\n- `date_from` / `date_to`: il pin, o una sua submission/task, è stato creato\n  nell'intervallo (estremi inclusi; `date_to` con sola data copre tutto il giorno).\nI conteggi restano quelli totali del pin, non filtrati.",
         "operationId": "list_plan_pins_plans__plan_id__pins_get",
         "security": [
           {
@@ -551,6 +551,91 @@
             "schema": {
               "type": "string",
               "title": "Plan Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template Id"
+            }
+          },
+          {
+            "name": "assigned_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned To"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
             }
           }
         ],

@@ -35,7 +35,7 @@ from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -187,14 +187,71 @@ def get_plan(plan_id: str, db: Session = Depends(get_db), user: models.User = De
 
 
 @app.get("/plans/{plan_id}/pins", response_model=list[schemas.PinSummary])
-def list_plan_pins(plan_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
-    """Pin (non cancellati) della planimetria con conteggi di submission e task per stato."""
+def list_plan_pins(
+    plan_id: str,
+    status: Optional[list[str]] = Query(default=None),
+    template_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
+):
+    """
+    Pin (non cancellati) della planimetria con conteggi di submission e task per stato.
+
+    Filtri (in AND tra loro, tutti sui soli record non cancellati):
+    - `status` (ripetibile) + `assigned_to`: il pin ha almeno un task che soddisfa
+      ENTRAMBE le condizioni (es. "task aperti assegnati a Mario");
+    - `template_id`: il pin ha almeno una submission di quel template;
+    - `date_from` / `date_to`: il pin, o una sua submission/task, è stato creato
+      nell'intervallo (estremi inclusi; `date_to` con sola data copre tutto il giorno).
+    I conteggi restano quelli totali del pin, non filtrati.
+    """
     plan = db.get(models.Plan, plan_id)
     if plan is None:
         raise HTTPException(404, "plan not found")
     auth.assert_project_access(db, user, plan.project_id)
 
-    pins = _alive(db.query(models.Pin).filter(models.Pin.plan_id == plan_id), models.Pin).all()
+    q = _alive(db.query(models.Pin).filter(models.Pin.plan_id == plan_id), models.Pin)
+    if status or assigned_to:
+        task_q = db.query(models.Task.id).filter(
+            models.Task.pin_id == models.Pin.id, models.Task.deleted_at.is_(None))
+        if status:
+            task_q = task_q.filter(models.Task.status.in_([_parse_status(v) for v in status]))
+        if assigned_to:
+            task_q = task_q.filter(models.Task.assigned_to == assigned_to)
+        q = q.filter(task_q.exists())
+    if template_id:
+        q = q.filter(db.query(models.FormSubmission.id).filter(
+            models.FormSubmission.pin_id == models.Pin.id,
+            models.FormSubmission.deleted_at.is_(None),
+            models.FormSubmission.template_id == template_id).exists())
+    if date_from or date_to:
+        lo = to_naive_utc(date_from) if date_from else None
+        hi = to_naive_utc(date_to) if date_to else None
+        if hi is not None and hi.time() == datetime.min.time():
+            hi = hi.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        def in_range(col):
+            conds = []
+            if lo is not None:
+                conds.append(col >= lo)
+            if hi is not None:
+                conds.append(col <= hi)
+            return and_(*conds)
+
+        q = q.filter(or_(
+            in_range(models.Pin.created_at),
+            db.query(models.FormSubmission.id).filter(
+                models.FormSubmission.pin_id == models.Pin.id, models.FormSubmission.deleted_at.is_(None),
+                in_range(models.FormSubmission.created_at)).exists(),
+            db.query(models.Task.id).filter(
+                models.Task.pin_id == models.Pin.id, models.Task.deleted_at.is_(None),
+                in_range(models.Task.created_at)).exists(),
+        ))
+
+    pins = q.all()
     if not pins:
         return []
     pin_ids = [p.id for p in pins]

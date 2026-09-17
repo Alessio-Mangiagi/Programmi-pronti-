@@ -193,6 +193,14 @@ export interface paths {
         /**
          * List Plan Pins
          * @description Pin (non cancellati) della planimetria con conteggi di submission e task per stato.
+         *
+         *     Filtri (in AND tra loro, tutti sui soli record non cancellati):
+         *     - `status` (ripetibile) + `assigned_to`: il pin ha almeno un task che soddisfa
+         *       ENTRAMBE le condizioni (es. "task aperti assegnati a Mario");
+         *     - `template_id`: il pin ha almeno una submission di quel template;
+         *     - `date_from` / `date_to`: il pin, o una sua submission/task, è stato creato
+         *       nell'intervallo (estremi inclusi; `date_to` con sola data copre tutto il giorno).
+         *     I conteggi restano quelli totali del pin, non filtrati.
          */
         get: operations["list_plan_pins_plans__plan_id__pins_get"];
         put?: never;
@@ -1571,7 +1579,13 @@ export interface operations {
     };
     list_plan_pins_plans__plan_id__pins_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: string[] | null;
+                template_id?: string | null;
+                assigned_to?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+            };
             header?: never;
             path: {
                 plan_id: string;

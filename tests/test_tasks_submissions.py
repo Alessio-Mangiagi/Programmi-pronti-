@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from app import models
 from tests.conftest import push
 
 
@@ -207,6 +208,53 @@ def test_list_plan_pins_with_counts(client, project, pin, users):
     assert client.get("/plans/nope/pins").status_code == 404
     assert client.get(f"/plans/{plan_id}").json()["name"] == "Piano terra"
     assert client.get(f"/plans/{plan_id}", headers=users["outsider"]["headers"]).status_code == 403
+
+
+def test_list_plan_pins_filters(client, project, users):
+    """Filtri per stato/assegnatario (stesso task), template e intervallo date di creazione."""
+    plan_id = project["plan"]["id"]
+    tpl = project["template"]["id"]
+    tpl2 = client.post("/form-templates", json={
+        "name": "Diario", "schema_def": {"fields": [{"id": "note", "type": "text", "label": "Note"}]}}).json()["id"]
+    anna = users["field"]["id"]
+    p_open, p_anna, p_sub, p_old, p_empty = (str(uuid.uuid4()) for _ in range(5))
+    push(client, pins=[
+        {"id": p_open, "plan_id": plan_id, "x": 0.1, "y": 0.1},
+        {"id": p_anna, "plan_id": plan_id, "x": 0.2, "y": 0.2},
+        {"id": p_sub, "plan_id": plan_id, "x": 0.3, "y": 0.3},
+        {"id": p_old, "plan_id": plan_id, "x": 0.4, "y": 0.4},
+        {"id": p_empty, "plan_id": plan_id, "x": 0.5, "y": 0.5},
+    ])
+    with client.session_factory() as s:  # created_at non è impostabile via API: pin "vecchio" forzato sul DB
+        s.query(models.Pin).filter(models.Pin.id == p_old).update({"created_at": datetime(2020, 1, 1, 10, 0)})
+        s.commit()
+    client.post("/tasks", json={"pin_id": p_open, "title": "aperto"})
+    t = client.post("/tasks", json={"pin_id": p_anna, "title": "di anna", "assigned_to": anna}).json()
+    client.patch(f"/tasks/{t['id']}", json={"status": "resolved"})
+    client.post("/tasks", json={"pin_id": p_anna, "title": "altro aperto"})
+    gone = client.post("/tasks", json={"pin_id": p_empty, "title": "cancellato"}).json()
+    client.delete(f"/tasks/{gone['id']}")
+    client.post("/submissions", json={"template_id": tpl, "pin_id": p_sub, "data_json": {"esito": "Conforme"}})
+    client.post("/submissions", json={"template_id": tpl2, "pin_id": p_old, "data_json": {"note": "x"}})
+
+    ids = lambda **params: {p["id"] for p in client.get(f"/plans/{plan_id}/pins", params=params).json()}
+    assert ids() == {p_open, p_anna, p_sub, p_old, p_empty}
+    assert ids(status="open") == {p_open, p_anna}
+    assert ids(status=["open", "resolved"]) == {p_open, p_anna}
+    assert ids(status="verified") == set()
+    assert ids(assigned_to=anna) == {p_anna}
+    assert ids(status="open", assigned_to=anna) == set()          # stesso task: aperto E di anna
+    assert ids(status="resolved", assigned_to=anna) == {p_anna}
+    assert ids(template_id=tpl) == {p_sub}
+    assert ids(template_id=tpl2) == {p_old}
+    assert ids(template_id=tpl, status="open") == set()
+    # date: il pin vecchio ha una submission creata oggi, quindi rientra nell'intervallo recente
+    assert ids(date_from="2021-01-01") == {p_open, p_anna, p_sub, p_old, p_empty}
+    assert ids(date_to="2020-12-31") == {p_old}
+    assert ids(date_from="2019-12-31", date_to="2020-01-01") == {p_old}   # date_to include tutto il giorno
+    assert ids(date_from="2020-01-02", date_to="2020-01-03") == set()
+    assert client.get(f"/plans/{plan_id}/pins", params={"status": "nope"}).status_code == 422
+    assert client.get(f"/plans/{plan_id}/pins", params={"date_from": "ieri"}).status_code == 422
 
 
 # ---------- CRUD pin da web ----------

@@ -136,8 +136,16 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
   convertito in PNG (prima pagina, lato lungo ≤ 4000 px) e `width_px/height_px`
   vengono calcolati dal server. I file sono serviti da `GET /files/{key}`.
 
+## Filtri pin della plan view
+
+`GET /plans/{id}/pins` accetta filtri in AND, tutti sui soli record non cancellati:
+`status` (ripetibile: `open|assigned|resolved|verified`) e `assigned_to` valgono
+sullo **stesso task** ("task aperti di Mario"); `template_id` richiede almeno una
+submission di quel template; `date_from`/`date_to` (data o datetime ISO, estremi
+inclusi, `date_to` con sola data copre tutto il giorno) guardano la creazione del
+pin o di una sua submission/task. I conteggi nella risposta restano i totali del pin.
+
 ## Prossimi passi consigliati
 
-1. Costruire la plan view web (planimetria + pin cliccabili) che consuma
-   `/projects/{id}/plans` e i pin associati
+1. Giorno 10: smoke test Playwright, FastAPI che serve `web/dist`, toast errori
 2. Form builder web sopra i 3 template del seed

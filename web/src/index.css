@@ -239,3 +239,37 @@ input:focus, select:focus, textarea:focus {
   .plan-split { flex-direction: column; }
   .pin-panel { width: 100%; max-height: 50%; border-left: 0; border-top: 1px solid var(--border); }
 }
+
+/* Upload planimetria */
+.upload-form { max-width: 560px; margin-bottom: 1rem; }
+.upload-preview { display: flex; gap: 0.9rem; align-items: center; margin-bottom: 1rem; }
+.upload-preview img { width: 160px; max-height: 120px; object-fit: contain; border: 1px solid var(--border); border-radius: 6px; background: #eef1f4; }
+.upload-preview-doc {
+  width: 160px; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem;
+  border: 1px dashed var(--border); border-radius: 6px; background: #eef1f4; text-align: center; padding: 0.5rem;
+}
+.upload-preview-ext { font-weight: 800; font-size: 1.3rem; color: var(--primary); letter-spacing: 0.05em; }
+.progress { position: relative; height: 26px; border-radius: 999px; background: #e8edf2; overflow: hidden; margin-bottom: 1rem; }
+.progress-bar { height: 100%; background: var(--primary); transition: width 0.15s; }
+.progress-label { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.8rem; font-weight: 600; color: var(--text); }
+
+/* Filtri pin */
+.filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem 1.25rem;
+  padding: 0.6rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
+.filter-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
+.filters select, .filters input { padding: 0.35rem 0.55rem; font-size: 0.9rem; min-width: 150px; }
+.filters input[type=date] { min-width: 140px; }
+.chips { display: flex; gap: 0.35rem; }
+.chip {
+  padding: 0.3rem 0.7rem; border-radius: 999px; border: 1px solid var(--border);
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+/* spento: neutro; acceso: i colori dello stato (.status-*) + bordo pieno */
+.chip:not(.chip-on) { background: var(--surface); color: var(--muted); }
+.chip:hover { border-color: var(--primary); }
+.chip-on { border-color: currentColor; }
+.filter-summary { flex-direction: row; align-items: center; gap: 0.6rem; margin-left: auto; padding-bottom: 0.2rem; }
+.plan-switch { width: auto; min-width: 220px; font-size: 1.15rem; font-weight: 700; padding: 0.3rem 0.5rem; }

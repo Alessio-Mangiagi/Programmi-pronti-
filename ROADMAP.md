@@ -95,7 +95,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Spostamento pin con drag; cancellazione (soft-delete).
 - **DoD**: creo/sposto/cancello un pin dal browser e lo ritrovo via API.
 
-### Giorno 9 — Upload planimetrie e filtri
+### Giorno 9 — Upload planimetrie e filtri ✅ (2026-09-17, filtri lato server su `GET /plans/{id}/pins`)
 - Form upload planimetria (immagine/PDF), progress, anteprima.
 - Filtri pin: stato task, template modulo, assegnatario, intervallo date.
 - Cambio planimetria senza ricaricare la pagina.

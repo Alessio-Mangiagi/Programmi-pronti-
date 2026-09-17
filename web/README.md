@@ -15,9 +15,9 @@ npm run api:types      # rigenera src/api/schema.d.ts da openapi.json
 (dalla root). Da rifare ogni volta che cambiano gli endpoint, poi `npm run api:types`.
 
 Struttura:
-- `src/api/` — client `openapi-fetch` tipizzato (`client.ts`), alias tipi (`types.ts`)
+- `src/api/` — client `openapi-fetch` tipizzato (`client.ts`), alias tipi (`types.ts`), upload con progresso via XHR (`upload.ts`)
 - `src/auth/` — token in localStorage, `AuthProvider` (`useAuth`), redirect al login su 401
-- `src/components/` — `Layout` (sidebar + outlet), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin)
+- `src/components/` — `Layout` (sidebar + outlet), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin), `PlanUploadForm` (nuova planimetria / file mancante), `PinFilters` (barra filtri ↔ query string)
 - `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL), `useLookups` (utenti/template per id)
 - `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`
 
@@ -29,3 +29,17 @@ Interazioni: click pin → pannello (`GET /pins/{id}`); "+ Aggiungi pin" → cli
 planimetria → `POST /pins`; drag del marker → `PATCH /pins/{id}` (la classe `pin` è
 esclusa dal panning); rinomina dal titolo del pannello; "Cancella pin" → `DELETE`
 (cascata soft su moduli/task/foto). Esc chiude modalità aggiungi o pannello.
+
+Upload planimetria (solo `admin`/`manager`): da "Planimetrie" → "+ Nuova planimetria"
+(nome + PNG/JPG/PDF, max 20 MB, anteprima locale per le immagini, barra di avanzamento)
+→ `POST /plans` + `POST /plans/{id}/file` → si apre subito la plan view. Una planimetria
+senza file mostra lo stesso form al posto del viewer (per `field` solo un avviso).
+
+Filtri pin (barra sotto la topbar): stato task (chip multipli), modulo, assegnatario
+(membri del progetto), intervallo date di creazione. Vivono nella query string
+(`?status=open&status=assigned&template=…&assignee=…&from=…&to=…`), quindi un link
+filtrato si condivide e il filtro sopravvive al cambio planimetria dal selettore in
+topbar (nessun reload: `PlanPage` rimonta `PlanView` con `key={planId}`). La logica è
+lato server (`GET /plans/{id}/pins?…`); la legenda conta i pin mostrati, il riepilogo
+"N di M pin" i totali. Creare un pin con un filtro attivo azzera il filtro (il pin
+nuovo è vuoto e non lo passerebbe).
