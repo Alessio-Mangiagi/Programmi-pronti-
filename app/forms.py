@@ -15,6 +15,7 @@ from datetime import date
 from typing import Any
 
 FIELD_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")  # fromisoformat accetterebbe anche "20260914"
 
 FIELD_TYPES = {
     "text", "textarea", "number", "checkbox", "select", "multiselect",
@@ -238,7 +239,7 @@ def _is_number(v: Any) -> bool:
 
 
 def _is_iso_date(v: Any) -> bool:
-    if not isinstance(v, str):
+    if not isinstance(v, str) or not ISO_DATE_RE.match(v):
         return False
     try:
         date.fromisoformat(v)

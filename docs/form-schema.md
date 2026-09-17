@@ -4,7 +4,10 @@ Un `FormTemplate` ha `name`, `category` e `schema_def`. `schema_def` descrive i 
 del modulo; una `FormSubmission` ha `data_json` con le risposte, chiave = `id` del campo.
 
 Implementazione di riferimento: `app/forms.py` (`validate_schema`, `validate_submission`).
-Il renderer web/mobile (`packages/form-core`) deve applicare le stesse regole.
+Il porting TypeScript è `packages/form-core` (`validateSchema`, `validateSubmission`,
+più `defaults` e `zodSchema`); i due devono restituire gli stessi errori nello stesso
+ordine: `python -m scripts.gen_form_fixtures` scrive i casi con gli errori attesi in
+`packages/form-core/fixtures/cases.json`, verificati sia da pytest sia da vitest.
 Esempio completo: `form_schema_example.json`.
 
 ## Struttura

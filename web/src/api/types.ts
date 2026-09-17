@@ -11,3 +11,6 @@ export type Attachment = components['schemas']['AttachmentOut']
 export type PinDetail = components['schemas']['PinDetail']
 export type PinSummary = components['schemas']['PinSummary']
 export type TaskStatus = 'open' | 'assigned' | 'resolved' | 'verified'
+
+// Schema dei moduli: i tipi vivono in packages/form-core (condivisi con il mobile).
+export type { FormSchema, FormData, FieldError } from '@fieldview/form-core'

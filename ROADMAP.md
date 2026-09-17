@@ -111,7 +111,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 
 ## Settimana 3 — Moduli web
 
-### Giorno 11 — `packages/form-core`
+### Giorno 11 — `packages/form-core` ✅ (2026-09-17, mobile lo importerà al giorno 16; web lo usa dal giorno 12)
 - Tipi TS dello schema modulo (specchio di `docs/form-schema.md`), `validate(schema, data)`, `defaults(schema)`, `zod` schema generato a runtime.
 - Test unitari con gli stessi casi del giorno 1 (schemi condivisi in `packages/form-core/fixtures`).
 - **DoD**: web e mobile importano `@fieldview/form-core`; validazione identica a quella server.

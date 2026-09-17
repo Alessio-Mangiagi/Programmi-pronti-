@@ -1,10 +1,12 @@
 # Immagine unica: build del frontend, poi API Python che serve anche web/dist.
 FROM node:22-alpine AS web
-WORKDIR /web
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
-COPY web/ ./
-RUN npm run build
+WORKDIR /src
+# packages/form-core è una dipendenza `file:` di web: deve esistere prima di npm ci
+COPY packages/form-core packages/form-core
+COPY web/package.json web/package-lock.json web/
+RUN cd web && npm ci
+COPY web web
+RUN cd web && npm run build
 
 FROM python:3.12-slim
 WORKDIR /srv
@@ -15,7 +17,7 @@ COPY app app
 COPY alembic alembic
 COPY alembic.ini .
 COPY scripts scripts
-COPY --from=web /web/dist web/dist
+COPY --from=web /src/web/dist web/dist
 VOLUME /data
 EXPOSE 8000
 CMD ["sh", "scripts/entrypoint.sh"]

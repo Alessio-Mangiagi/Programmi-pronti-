@@ -7,6 +7,7 @@ __pycache__
 .env
 storage
 web/node_modules
+packages/*/node_modules
 web/dist
 web/test-results
 web/playwright-report

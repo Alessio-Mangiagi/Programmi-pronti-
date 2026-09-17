@@ -63,11 +63,14 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/storage.py` — storage file (filesystem `STORAGE_DIR`, default `./storage`), PDF → PNG, sniffing MIME
 - `tests/test_sync.py` — test end-to-end del protocollo di sync
 - `tests/test_forms.py` — test del validatore moduli
+- `tests/test_forms_fixtures.py` — gli stessi casi di `packages/form-core/fixtures/cases.json`
 - `tests/test_tasks_submissions.py` — test endpoint web task/submission/pin
 - `tests/test_files.py` — test upload planimetrie/allegati
 - `tests/test_auth.py` — test login, ruoli, visibilità per progetto
 - `tests/test_server.py` — test del mount `/api` e del fallback SPA
 - `web/` — frontend React (vedi `web/README.md`)
+- `packages/form-core/` — tipi schema modulo, `validateSchema`/`validateSubmission`, `defaults`, `zodSchema` (TS, condiviso web/mobile); parità con `app/forms.py` garantita da `fixtures/cases.json`
+- `scripts/gen_form_fixtures.py` — rigenera i casi condivisi dal validatore Python
 - `scripts/export_openapi.py` — esporta `web/openapi.json` per i tipi TS
 - `ROADMAP.md` — piano giornaliero MVP
 - `form_schema_example.json` — esempio di modulo dinamico (ispezione sicurezza)
@@ -165,5 +168,5 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 11: `packages/form-core` (tipi schema + validazione condivisa web/mobile)
+1. Giorno 12: `DynamicForm` web (renderer di tutti i tipi di campo)
 2. Form builder web sopra i 3 template del seed
