@@ -10,6 +10,7 @@ import { expoFileStore } from './expoFileStore'
 import { syncAll, type SyncResult } from './index'
 import { rnUploadOptions } from './rnUpload'
 import { pendingCounts, type PendingCounts } from './status'
+import { registerPushToken } from '../push'
 
 export type SyncState = {
   syncing: boolean
@@ -67,8 +68,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (user) {
       sync()
       registerBackgroundSync()
+      registerPushToken(api)
     }
-  }, [user, sync])
+  }, [user, sync, api])
 
   // foreground
   useEffect(() => {

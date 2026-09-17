@@ -35,6 +35,7 @@ Struttura:
 - `src/screens/SubmissionScreen.tsx` — scelta template → form → salva in locale (nessuna rete)
 - `src/components/PlanViewer.tsx` — planimetria con pinch/pan/doppio tap (gesture-handler + reanimated), pin in coordinate relative riscalati 1/scale, long-press → coordinate 0-1
 - `src/screens/` — `PlanScreen` (viewer + legenda + bottom sheet del pin: moduli, task, foto, rinomina, cancella; long-press = nuovo pin), `LoginScreen`, `ProjectsScreen` (lista locale + pull-to-refresh + badge ⚠ problemi di sync), `PlansScreen`, `SyncIssuesScreen` (righe rifiutate: riprova/scarta; conflitti persi: presa visione)
+- `src/push.ts` — token Expo Push registrato al login (`POST /auth/me/push-token`) e rimosso al logout (expo-notifications; solo su device fisico)
 - `src/db/wipe.ts` — svuota i dati locali al logout (l'app avvisa se ci sono modifiche in attesa)
 - `eas.json` — profili development/preview (APK, staging)/production; checklist di test su device in `docs/test-sul-campo.md`
 - `metro.config.js` — `watchFolders` per `packages/form-core` (dipendenza `file:`)

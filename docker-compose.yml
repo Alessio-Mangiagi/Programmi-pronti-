@@ -34,6 +34,25 @@ services:
       db:
         condition: service_healthy
 
+  # Worker notifiche: consuma la tabella notifications (email SMTP, push Expo)
+  worker:
+    build: .
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://fieldview:fieldview@db:5432/fieldview
+      WEB_URL: ${WEB_URL:-http://localhost:8000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-fieldview@localhost}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+    volumes:
+      - appdata:/data
+    depends_on:
+      app:
+        condition: service_started
+
 volumes:
   pgdata:
   appdata:

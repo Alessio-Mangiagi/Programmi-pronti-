@@ -39,6 +39,11 @@ class UserOut(BaseModel):
     notify_push: bool = True
 
 
+class PushTokenIn(BaseModel):
+    token: str = Field(min_length=10)
+    platform: Optional[str] = None
+
+
 class PreferencesUpdate(BaseModel):
     notify_email: Optional[bool] = None
     notify_push: Optional[bool] = None

@@ -203,7 +203,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Preferenze utente minime (email sì/no, push sì/no).
 - **DoD**: ogni cambio di stato produce la riga evento giusta (test).
 
-### Giorno 27 — Invio email e push
+### Giorno 27 — Invio email e push ✅ (2026-09-17; SMTP/Expo reali da provare con credenziali: sender testati con finti + payload Expo)
 - Worker (thread in-process in dev, processo separato in prod) che consuma `events` non processati.
 - Email via SMTP (`.env`), template testuali con link diretto al task/pin sul web.
 - Push via Expo Push API; registrazione token dall'app al login.

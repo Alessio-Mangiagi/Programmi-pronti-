@@ -261,3 +261,14 @@ class Notification(Base):
 
     event = relationship("Event", back_populates="notifications")
     user = relationship("User")
+
+
+class PushToken(Base):
+    """Token Expo Push di un device; registrato dall'app al login, rimosso al logout o se Expo lo segnala invalido."""
+    __tablename__ = "push_tokens"
+
+    token = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    platform = Column(String, nullable=True)  # ios | android
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    last_seen_at = Column(DateTime, default=utcnow, nullable=False)

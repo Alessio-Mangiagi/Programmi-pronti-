@@ -29,6 +29,7 @@ Strategia di sync (vedi README):
     - Conflict resolution MVP: "last write wins" basato su updated_at.
 """
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
@@ -48,7 +49,19 @@ from . import events
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
 
-app = FastAPI(title="Field View Starter API")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # NOTIFY_WORKER=thread: worker notifiche in-process (sviluppo). In prod: python -m app.worker
+    stop = None
+    if os.getenv("NOTIFY_WORKER") == "thread":
+        from .worker import start_thread
+        stop = start_thread()
+    yield
+    if stop:
+        stop.set()
+
+
+app = FastAPI(title="Field View Starter API", lifespan=_lifespan)
 
 # In sviluppo il frontend gira su Vite (porta 5173) e chiama l'API su 8000.
 # In produzione FastAPI serve web/dist e CORS non serve (stessa origine).
@@ -84,6 +97,24 @@ def update_preferences(payload: schemas.PreferencesUpdate, db: Session = Depends
     db.commit()
     db.refresh(user)
     return user
+
+
+@app.post("/auth/me/push-token", status_code=204)
+def register_push_token(payload: schemas.PushTokenIn, db: Session = Depends(get_db),
+                        user: models.User = Depends(current_user)):
+    """L'app registra il token Expo Push del device (idempotente; un token cambia utente se serve)."""
+    row = db.get(models.PushToken, payload.token)
+    if row is None:
+        db.add(models.PushToken(token=payload.token, user_id=user.id, platform=payload.platform))
+    else:
+        row.user_id, row.platform, row.last_seen_at = user.id, payload.platform or row.platform, utcnow()
+    db.commit()
+
+
+@app.delete("/auth/me/push-token/{token}", status_code=204)
+def unregister_push_token(token: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    db.query(models.PushToken).filter(models.PushToken.token == token, models.PushToken.user_id == user.id).delete()
+    db.commit()
 
 
 @app.get("/auth/me/notifications", response_model=list[schemas.NotificationOut])

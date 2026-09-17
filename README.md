@@ -52,6 +52,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/schemas.py` — schemi Pydantic per le API, incluso il payload di sync
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
 - `app/auth.py` — JWT, ruoli (`admin`/`manager`/`field`), accesso per progetto
+- `app/notify.py`, `app/worker.py` — template, sender SMTP/Expo/console, `process_pending`, loop del worker
 - `app/events.py` — outbox eventi (`events`) + regole di notifica (`notifications` pending), scritti nella stessa transazione da web e sync push
 - `scripts/seed.py` — dati demo idempotenti
 - `app/main.py` — endpoint FastAPI: CRUD web (`/submissions` + `PATCH`, `/tasks`, `/pins/{id}`, `DELETE /attachments/{id}`) e `/sync/push` / `/sync/pull`
@@ -179,7 +180,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 27: worker notifiche (email SMTP + push Expo)
+1. Giorno 28: API dashboard (`GET /projects/{id}/stats`)
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
@@ -202,4 +203,13 @@ attivo dell'utente (`notify_email`/`notify_push`, `PATCH /auth/me/preferences`):
 assegnatario su `task.assigned`; creatore del task su `resolved`; manager/admin
 membri del progetto su `submission.created` con una scelta tipo "Non conforme".
 L'autore non viene mai notificato. `GET /auth/me/notifications`, `GET /projects/{id}/events`
-(manager). Il worker che invia (email, push) arriva al giorno 27. Migrazione `5d220dd1f4b7`.
+(manager). Migrazione `5d220dd1f4b7`.
+
+Invio (`app/notify.py`, `app/worker.py`): il worker prende le notifiche `pending`,
+compone soggetto/testo in italiano con link diretto alla plan view
+(`WEB_URL/projects/{p}/plans/{plan}?pin={pin}`) e consegna via SMTP (`SMTP_*` in
+`.env`; senza `SMTP_HOST` finisce nel log) o Expo Push API (token registrati dall'app
+con `POST /auth/me/push-token`; `DeviceNotRegistered` rimuove il token). Esiti in
+`notifications.status/error`, `events.processed_at` a fine consegna. Avvio: in
+sviluppo `NOTIFY_WORKER=thread` (thread dentro uvicorn), in produzione il servizio
+`worker` del compose (`python -m app.worker`, `NOTIFY_INTERVAL` secondi).

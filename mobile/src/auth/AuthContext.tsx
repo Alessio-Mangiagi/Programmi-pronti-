@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as SecureStore from 'expo-secure-store'
 import { createApi, type Api } from '../api/client'
 import { API_URL } from '../config'
 import { getToken, setToken } from './token'
+import { unregisterPushToken } from '../push'
 
 export type User = { id: string; email: string; name: string; role: string }
 type LoginResponse = { access_token: string; user: User }
@@ -27,15 +28,18 @@ const USER_KEY = 'fieldview.user'
 export function AuthProvider({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const logoutRef = useRef<() => void>(() => {})
+  const api = useMemo(() => createApi({ baseUrl: API_URL, getToken, onUnauthorized: () => logoutRef.current() }), [])
 
   const logout = useCallback(async () => {
+    await unregisterPushToken(api)
     await setToken(null)
     await SecureStore.deleteItemAsync(USER_KEY)
     onLogout?.()
     setUser(null)
-  }, [onLogout])
+  }, [onLogout, api])
+  logoutRef.current = logout
 
-  const api = useMemo(() => createApi({ baseUrl: API_URL, getToken, onUnauthorized: () => logout() }), [logout])
 
   useEffect(() => {
     ;(async () => {
