@@ -231,3 +231,86 @@ test('vista task: filtri, cambio stato/assegnatario inline, link alla planimetri
   const zoom = await page.locator('.plan-zoom').textContent()
   expect(Number(zoom!.replace('%', ''))).toBeGreaterThanOrEqual(100)
 })
+
+test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: 'Moduli' }).click()
+  await page.waitForURL('**/templates')
+  await expect(page.locator('.table tbody tr')).toHaveCount(3) // i 3 template del seed
+  await page.getByRole('link', { name: '+ Nuovo template' }).click()
+  await page.waitForURL('**/templates/new')
+
+  const name = `Diario giornaliero e2e ${Date.now() % 10000}`
+  await page.getByLabel('Nome').fill(name)
+  await page.getByLabel('Categoria').selectOption('diary')
+
+  const addField = async (type: string, label: string) => {
+    await page.getByLabel('Tipo del nuovo campo').selectOption(type)
+    await page.getByRole('button', { name: '+ Aggiungi campo' }).click()
+    await page.getByLabel('Etichetta').fill(label)
+  }
+  await addField('date', 'Data')
+  await page.getByLabel('Valore iniziale').selectOption('today')
+  await addField('textarea', 'Attività svolte')
+  await page.getByLabel('Obbligatorio').check()
+  await addField('number', 'Operai presenti')
+  await page.getByLabel('Solo numeri interi').check()
+  await addField('select', 'Meteo')
+  await page.getByLabel('Opzioni (una per riga)').fill('Sole\nPioggia\nNuvoloso')
+  await page.getByLabel('Opzioni (una per riga)').blur()
+  await addField('photo', 'Foto del giorno')
+  await page.getByLabel('Più foto').check()
+
+  // id derivati dalle etichette, anteprima live valida
+  await expect(page.locator('.field-list')).toContainText('attivita_svolte')
+  await expect(page.locator('.field-list')).toContainText('operai_presenti')
+  await expect(page.locator('.builder-preview .dyn-field')).toHaveCount(5)
+  await expect(page.locator('.builder-preview').getByLabel(/^Data/)).toHaveValue(/^\d{4}-\d{2}-\d{2}$/)
+
+  // errore di schema segnalato: opzione duplicata, poi corretta
+  await page.locator('.field-row', { hasText: 'Meteo' }).locator('.field-row-main').click()
+  await page.getByLabel('Opzioni (una per riga)').fill('Sole\nSole')
+  await page.getByLabel('Opzioni (una per riga)').blur()
+  await expect(page.locator('.field-props .error')).toContainText('duplicates')
+  await page.getByLabel('Opzioni (una per riga)').fill('Sole\nPioggia\nNuvoloso')
+  await page.getByLabel('Opzioni (una per riga)').blur()
+  await expect(page.locator('.field-props .error')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Salva' }).click()
+  await expect(page.locator('.toast-success')).toContainText('Template creato')
+  await page.waitForURL(/\/templates\/[0-9a-f-]+$/)
+
+  // compilazione su un pin con il nuovo template
+  await page.getByRole('link', { name: 'Progetti' }).click()
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await page.locator('.pin').first().click()
+  await page.getByRole('button', { name: '+ Compila modulo' }).click()
+  const modal = page.getByRole('dialog')
+  await modal.getByLabel('Modulo').selectOption({ label: name })
+  await modal.getByLabel(/Attività svolte/).fill('Getto solaio piano 1')
+  await modal.getByLabel(/Operai presenti/).fill('6')
+  await modal.getByLabel(/^Meteo/).selectOption('Sole')
+  await modal.getByRole('button', { name: 'Salva modulo' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Modulo salvato')
+  await expect(page.locator('.pin-panel .list-item-btn', { hasText: name })).toBeVisible()
+
+  // il template in uso è bloccato nell'editor; archiviato sparisce da "Compila modulo"
+  await page.getByRole('link', { name: 'Moduli' }).click()
+  const row = page.locator('.table tbody tr', { hasText: name })
+  await expect(row.locator('.badge')).toHaveText('In uso')
+  await row.getByRole('link', { name: 'Apri' }).click()
+  await expect(page.locator('.callout-warn')).toContainText('1 compilazioni')
+  await expect(page.getByLabel('Etichetta')).toBeDisabled()
+  await page.getByRole('link', { name: 'Template dei moduli' }).click()
+  await row.getByRole('button', { name: 'Archivia' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('archiviato')
+  await expect(row).toHaveCount(0)
+  await page.getByRole('link', { name: 'Progetti' }).click()
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await page.locator('.pin').first().click()
+  await expect(page.locator('.pin-panel .list-item-btn', { hasText: name })).toBeVisible() // la vecchia compilazione resta leggibile
+  await page.getByRole('button', { name: '+ Compila modulo' }).click()
+  await expect(page.getByRole('dialog').getByLabel('Modulo').locator('option', { hasText: name })).toHaveCount(0)
+})

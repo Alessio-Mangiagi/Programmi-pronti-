@@ -8,6 +8,8 @@ import ProjectsPage from './pages/ProjectsPage'
 import PlansPage from './pages/PlansPage'
 import PlanPage from './pages/PlanPage'
 import TasksPage from './pages/TasksPage'
+import TemplatesPage from './pages/TemplatesPage'
+import TemplateEditorPage from './pages/TemplateEditorPage'
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth()
@@ -32,6 +34,8 @@ export default function App() {
         <Route path="/projects/:projectId/plans" element={<PlansPage />} />
         <Route path="/projects/:projectId/plans/:planId" element={<PlanPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

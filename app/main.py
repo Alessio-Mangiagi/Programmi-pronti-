@@ -287,12 +287,64 @@ def create_form_template(payload: schemas.FormTemplateCreate, db: Session = Depe
     db.add(template)
     db.commit()
     db.refresh(template)
-    return template
+    return _template_out(db, template)
+
+
+def _template_out(db: Session, template: models.FormTemplate) -> schemas.FormTemplateOut:
+    out = schemas.FormTemplateOut.model_validate(template)
+    out.submissions_count = (db.query(func.count(models.FormSubmission.id))
+                             .filter(models.FormSubmission.template_id == template.id,
+                                     models.FormSubmission.deleted_at.is_(None)).scalar())
+    return out
 
 
 @app.get("/form-templates", response_model=list[schemas.FormTemplateOut])
-def list_form_templates(db: Session = Depends(get_db), _: models.User = Depends(current_user)):
-    return db.query(models.FormTemplate).order_by(models.FormTemplate.name).all()
+def list_form_templates(include_archived: bool = False, db: Session = Depends(get_db),
+                        _: models.User = Depends(current_user)):
+    """Template proponibili; con include_archived anche quelli archiviati (per leggere vecchie submission)."""
+    q = db.query(models.FormTemplate)
+    if not include_archived:
+        q = q.filter(models.FormTemplate.archived_at.is_(None))
+    return [_template_out(db, t) for t in q.order_by(models.FormTemplate.name).all()]
+
+
+@app.get("/form-templates/{template_id}", response_model=schemas.FormTemplateOut)
+def get_form_template(template_id: str, db: Session = Depends(get_db), _: models.User = Depends(current_user)):
+    template = db.get(models.FormTemplate, template_id)
+    if template is None:
+        raise HTTPException(404, "template not found")
+    return _template_out(db, template)
+
+
+@app.patch("/form-templates/{template_id}", response_model=schemas.FormTemplateOut)
+def update_form_template(template_id: str, payload: schemas.FormTemplateUpdate, db: Session = Depends(get_db),
+                         _: models.User = Depends(require_role(UserRole.manager))):
+    """
+    Nome/categoria/archiviazione sempre; `schema_def` solo se nessuna submission
+    usa ancora il template (409 altrimenti: duplicare e modificare la copia).
+    """
+    template = db.get(models.FormTemplate, template_id)
+    if template is None:
+        raise HTTPException(404, "template not found")
+    changes = payload.model_dump(exclude_unset=True)
+    if "schema_def" in changes:
+        errors = validate_schema(changes["schema_def"])
+        if errors:
+            raise HTTPException(422, detail=errors)
+        if _template_out(db, template).submissions_count:
+            raise HTTPException(409, "template already used by submissions: duplicate it instead")
+        template.schema_def = changes.pop("schema_def")
+    if "archived" in changes:
+        archived = changes.pop("archived")
+        template.archived_at = utcnow() if archived else None
+    if "name" in changes and not (changes["name"] or "").strip():
+        raise HTTPException(422, "name must not be empty")
+    for k, v in changes.items():
+        setattr(template, k, v)
+    template.updated_at = utcnow()
+    db.commit()
+    db.refresh(template)
+    return _template_out(db, template)
 
 
 # ---------- Pin ----------
@@ -397,6 +449,8 @@ def create_submission(payload: schemas.SubmissionCreate, db: Session = Depends(g
     template = db.get(models.FormTemplate, payload.template_id)
     if template is None:
         raise HTTPException(404, "template not found")
+    if template.archived_at is not None:
+        raise HTTPException(409, "template is archived")
     _get_pin(db, user, payload.pin_id)
     errors = validate_submission(template.schema_def, payload.data_json)
     if errors:

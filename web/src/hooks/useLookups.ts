@@ -18,7 +18,7 @@ export function useLookups(): Lookups {
     api.GET('/users').then(({ data }) => {
       if (data) setUsers(Object.fromEntries(data.map((u) => [u.id, u])))
     })
-    api.GET('/form-templates').then(({ data }) => {
+    api.GET('/form-templates', { params: { query: { include_archived: true } } }).then(({ data }) => {
       if (data) setTemplates(Object.fromEntries(data.map((t) => [t.id, t])))
     })
   }, [])

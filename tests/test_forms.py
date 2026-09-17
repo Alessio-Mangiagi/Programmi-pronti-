@@ -184,3 +184,35 @@ def test_post_form_template_rejects_invalid_schema(client):
     assert r.status_code == 422
     detail = r.json()["detail"]
     assert isinstance(detail, list) and detail[0]["field"] == "fields[0]"
+
+
+# ---------- gestione template (form builder) ----------
+
+def test_template_patch_archive_and_schema_lock(client, project, pin, users):
+    tpl = project["template"]
+    url = f"/form-templates/{tpl['id']}"
+    assert client.get(url).json()["submissions_count"] == 0
+    # rinomina + schema modificabile finché non ci sono submission
+    new_schema = {"fields": [{"id": "esito", "type": "select", "label": "Esito", "required": True,
+                              "options": ["Conforme", "Non conforme"]}]}
+    r = client.patch(url, json={"name": "Ispezione v2", "category": "safety", "schema_def": new_schema})
+    assert r.status_code == 200 and r.json()["name"] == "Ispezione v2" and r.json()["schema_def"] == new_schema
+    assert client.patch(url, json={"schema_def": {"fields": []}}).status_code == 422
+    assert client.patch(url, json={"name": " "}).status_code == 422
+    # field non può gestire template
+    assert client.patch(url, headers=users["field"]["headers"], json={"name": "x"}).status_code == 403
+    # con una submission lo schema si blocca (409), nome no
+    client.post("/submissions", json={"template_id": tpl["id"], "pin_id": pin, "data_json": {"esito": "Conforme"}})
+    assert client.get(url).json()["submissions_count"] == 1
+    assert client.patch(url, json={"schema_def": new_schema}).status_code == 409
+    assert client.patch(url, json={"name": "Ispezione v3"}).status_code == 200
+    # archivia: sparisce dalla lista, resta con include_archived, niente nuove submission
+    r = client.patch(url, json={"archived": True})
+    assert r.status_code == 200 and r.json()["archived_at"]
+    assert tpl["id"] not in {t["id"] for t in client.get("/form-templates").json()}
+    assert tpl["id"] in {t["id"] for t in client.get("/form-templates", params={"include_archived": True}).json()}
+    r = client.post("/submissions", json={"template_id": tpl["id"], "pin_id": pin, "data_json": {"esito": "Conforme"}})
+    assert r.status_code == 409
+    assert client.patch(url, json={"archived": False}).json()["archived_at"] is None
+    assert client.patch("/form-templates/nope", json={"name": "x"}).status_code == 404
+    assert client.get("/form-templates/nope").status_code == 404

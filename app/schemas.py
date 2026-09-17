@@ -80,11 +80,21 @@ class FormTemplateCreate(BaseModel):
     schema_def: dict
 
 
+class FormTemplateUpdate(BaseModel):
+    """PATCH parziale. `schema_def` è modificabile solo finché nessuna submission usa il template."""
+    name: Optional[str] = None
+    category: Optional[str] = None
+    schema_def: Optional[dict] = None
+    archived: Optional[bool] = None
+
+
 class FormTemplateOut(FormTemplateCreate):
     model_config = ConfigDict(from_attributes=True)
     id: str
+    archived_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    submissions_count: int = 0
 
 
 class AttachmentCreate(BaseModel):

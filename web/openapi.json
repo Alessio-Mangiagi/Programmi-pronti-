@@ -668,43 +668,23 @@
       }
     },
     "/form-templates": {
-      "get": {
-        "summary": "List Form Templates",
-        "operationId": "list_form_templates_form_templates_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/FormTemplateOut"
-                  },
-                  "type": "array",
-                  "title": "Response List Form Templates Form Templates Get"
-                }
-              }
-            }
-          }
-        },
+      "post": {
+        "summary": "Create Form Template",
+        "operationId": "create_form_template_form_templates_post",
         "security": [
           {
             "HTTPBearer": []
           }
-        ]
-      },
-      "post": {
-        "summary": "Create Form Template",
-        "operationId": "create_form_template_form_templates_post",
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/FormTemplateCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -727,12 +707,152 @@
               }
             }
           }
-        },
+        }
+      },
+      "get": {
+        "summary": "List Form Templates",
+        "description": "Template proponibili; con include_archived anche quelli archiviati (per leggere vecchie submission).",
+        "operationId": "list_form_templates_form_templates_get",
         "security": [
           {
             "HTTPBearer": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Archived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormTemplateOut"
+                  },
+                  "title": "Response List Form Templates Form Templates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/form-templates/{template_id}": {
+      "get": {
+        "summary": "Get Form Template",
+        "operationId": "get_form_template_form_templates__template_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormTemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update Form Template",
+        "description": "Nome/categoria/archiviazione sempre; `schema_def` solo se nessuna submission\nusa ancora il template (409 altrimenti: duplicare e modificare la copia).",
+        "operationId": "update_form_template_form_templates__template_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormTemplateUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormTemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/pins": {
@@ -2050,6 +2170,18 @@
             "type": "string",
             "title": "Id"
           },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -2059,6 +2191,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "submissions_count": {
+            "type": "integer",
+            "title": "Submissions Count",
+            "default": 0
           }
         },
         "type": "object",
@@ -2070,6 +2207,58 @@
           "updated_at"
         ],
         "title": "FormTemplateOut"
+      },
+      "FormTemplateUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "schema_def": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Def"
+          },
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          }
+        },
+        "type": "object",
+        "title": "FormTemplateUpdate",
+        "description": "PATCH parziale. `schema_def` è modificabile solo finché nessuna submission usa il template."
       },
       "HTTPValidationError": {
         "properties": {

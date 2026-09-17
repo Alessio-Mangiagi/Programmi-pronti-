@@ -167,6 +167,9 @@ class FormTemplate(Base):
     name = Column(String, nullable=False)         # es. "Ispezione sicurezza"
     category = Column(String, nullable=True)       # es. "safety", "quality"
     schema_def = Column(JSONType, nullable=False)     # definizione campi
+    # Archiviato = non proponibile per nuove compilazioni; resta leggibile per
+    # le submission esistenti e viaggia nel sync come gli altri.
+    archived_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/AuthContext'
 import { useProject } from '../hooks/useProject'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
@@ -20,6 +20,7 @@ export default function Layout() {
           <NavLink to="/projects" end>
             Progetti
           </NavLink>
+          {isManager(user) && <NavLink to="/templates">Moduli</NavLink>}
           {projectId && (
             <>
               <div className="nav-section" title={project?.name}>

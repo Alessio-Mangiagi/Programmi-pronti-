@@ -197,7 +197,7 @@ export default function PinPanel({ pinId, lookups, members, onClose, onChanged }
         <Modal title={`Compila modulo — ${pin?.label || 'Pin senza etichetta'}`} onClose={() => setFilling(false)}>
           <SubmissionForm
             pinId={pinId}
-            templates={Object.values(lookups.templates)}
+            templates={Object.values(lookups.templates).filter((t) => !t.archived_at)}
             onCancel={() => setFilling(false)}
             onSaved={async (sub) => {
               setFilling(false)

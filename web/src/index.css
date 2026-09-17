@@ -372,3 +372,23 @@ input:focus, select:focus, textarea:focus {
 .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 420px; }
 .nowrap { white-space: nowrap; }
 .tasks-table td .badge { margin-left: 0.4rem; }
+
+/* Form builder */
+.builder { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 0.9fr) minmax(300px, 1.1fr); gap: 1rem; align-items: start; }
+.builder-wide { grid-column: 1 / -1; margin-bottom: 0; }
+.builder-col h2 { margin-top: 0.25rem; }
+.builder-col h2 + .field, .builder-col h2 + p { margin-top: 0.5rem; }
+.field-list { list-style: none; margin: 0 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.field-row { display: flex; align-items: center; gap: 0.35rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.field-row.is-selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(31, 95, 139, 0.15); }
+.field-row.has-error { border-color: var(--danger); }
+.field-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.45rem 0.6rem; background: none; border: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.field-row-label { font-weight: 600; }
+.field-row-actions { display: flex; gap: 0.2rem; padding-right: 0.35rem; }
+.field-row-actions .btn { padding: 0.2rem 0.45rem; }
+.field-props code { font-size: 0.85em; }
+.builder-preview { background: #fbfcfd; }
+.row-actions .btn { margin-right: 0.3rem; }
+.row-muted { opacity: 0.6; }
+@media (max-width: 1100px) { .builder { grid-template-columns: 1fr 1fr; } .builder-preview { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .builder { grid-template-columns: 1fr; } }

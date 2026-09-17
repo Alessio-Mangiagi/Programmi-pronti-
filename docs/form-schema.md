@@ -20,8 +20,9 @@ Esempio completo: `form_schema_example.json`.
 
 - `fields`: lista non vuota, ordine = ordine di visualizzazione.
 - Il template salvato è immutabile nel senso che le submission esistenti non
-  vengono ri-validate: modificare un template crea rischi di incoerenza, per
-  l'MVP si preferisce duplicare il template.
+  vengono ri-validate: `PATCH /form-templates/{id}` accetta `schema_def` solo
+  finché nessuna submission usa il template (409 altrimenti); dopo, si duplica
+  e si modifica la copia. `archived_at` valorizzato = niente nuove compilazioni.
 
 ## Proprietà comuni a tutti i campi
 

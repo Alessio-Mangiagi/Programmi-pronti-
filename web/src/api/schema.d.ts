@@ -218,7 +218,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Form Templates */
+        /**
+         * List Form Templates
+         * @description Template proponibili; con include_archived anche quelli archiviati (per leggere vecchie submission).
+         */
         get: operations["list_form_templates_form_templates_get"];
         put?: never;
         /** Create Form Template */
@@ -227,6 +230,28 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/form-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Form Template */
+        get: operations["get_form_template_form_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Form Template
+         * @description Nome/categoria/archiviazione sempre; `schema_def` solo se nessuna submission
+         *     usa ancora il template (409 altrimenti: duplicare e modificare la copia).
+         */
+        patch: operations["update_form_template_form_templates__template_id__patch"];
         trace?: never;
     };
     "/pins": {
@@ -656,6 +681,8 @@ export interface components {
             };
             /** Id */
             id: string;
+            /** Archived At */
+            archived_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -666,6 +693,27 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Submissions Count
+             * @default 0
+             */
+            submissions_count: number;
+        };
+        /**
+         * FormTemplateUpdate
+         * @description PATCH parziale. `schema_def` è modificabile solo finché nessuna submission usa il template.
+         */
+        FormTemplateUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Schema Def */
+            schema_def?: {
+                [key: string]: unknown;
+            } | null;
+            /** Archived */
+            archived?: boolean | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1692,7 +1740,9 @@ export interface operations {
     };
     list_form_templates_form_templates_get: {
         parameters: {
-            query?: never;
+            query?: {
+                include_archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1706,6 +1756,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1725,6 +1784,72 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_form_template_form_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_form_template_form_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

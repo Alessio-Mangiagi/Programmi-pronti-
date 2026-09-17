@@ -132,7 +132,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Vista "i miei task".
 - **DoD**: un manager smista 10 task senza aprire la planimetria.
 
-### Giorno 15 — Form builder v1 (senza drag&drop)
+### Giorno 15 — Form builder v1 (senza drag&drop) ✅ (2026-09-17; schema modificabile solo finché il template non ha compilazioni, poi "Duplica e modifica")
 - Pagina template: lista, duplica, archivia.
 - Editor: lista campi con aggiungi/rimuovi/sposta su-giù, proprietà per tipo, anteprima live con `DynamicForm`, validazione schema prima del salvataggio.
 - Drag&drop rimandato al backlog: l'ordine con frecce è sufficiente per l'MVP.
