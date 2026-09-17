@@ -267,3 +267,34 @@ describe('giorno 18: stesso task modificato su web e app offline', () => {
     expect(remote.description).toBeNull()
   })
 })
+
+describe('giorno 19: planimetrie offline', () => {
+  it('syncAll scarica l’immagine della planimetria con il token (bytes reali dal server)', async () => {
+    const db = device()
+    const files = new Map<string, number>()
+    const store = {
+      planPath: (id: string, ext: string) => `mem://plans/${id}.${ext}`,
+      exists: (p: string) => files.has(p),
+      download: async (url: string, path: string, headers: Record<string, string>) => {
+        const r = await fetch(url, { headers })
+        if (!r.ok) throw new Error(String(r.status))
+        files.set(path, (await r.arrayBuffer()).byteLength)
+      },
+      remove: (p: string) => void files.delete(p),
+    }
+    const token = await (async () => {
+      const r = await fetch(`${server.baseUrl}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'field@fieldview.local', password: 'demo1234' }) })
+      return ((await r.json()) as { access_token: string }).access_token
+    })()
+    const res = await syncAll(db, api, { projectIds: [projectId], files: { baseUrl: server.baseUrl, getToken: () => token, store } })
+    expect(res.errors).toEqual([])
+    expect(res.files[projectId]).toEqual({ downloaded: 1, failed: 0, skipped: 0 })
+    const plan = db.select().from(schema.plans).get()!
+    expect(plan.local_file_path).toBe(`mem://plans/${plan.id}.png`)
+    expect(files.get(plan.local_file_path!)).toBeGreaterThan(1000) // il PNG del seed
+    // senza token il server rifiuta: resta "solo online", nessuna eccezione
+    const db2 = device()
+    const res2 = await syncAll(db2, api, { projectIds: [projectId], files: { baseUrl: server.baseUrl, getToken: () => null, store } })
+    expect(res2.files[projectId].failed).toBe(1)
+  })
+})

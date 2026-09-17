@@ -23,6 +23,7 @@ Struttura:
 - `src/db/types.ts` — `AppDb`: tipo comune ai due driver, usato da sync/ e schermate
 - `src/data/catalog.ts` — query di catalogo (progetti, planimetrie) e `refreshProjects`
 - `src/data/mutations.ts` — scritture locali (`createPin`, `updateTask`, `createSubmission`, …): `updated_at` = adesso, `dirty = true`; `retryRejected`/`discardRejected` per le righe in `sync_log`
+- `src/sync/files.ts` — cache immagini planimetrie (`cachePlanImages`: scarica in `plans/<id>.<ext>` se `local_file_for != updated_at`), `expoFileStore.ts` (expo-file-system `File`/`Directory`); nei test uno store in memoria
 - `src/sync/` — `pull.ts` (incrementale per progetto, upsert con LWW, conflitti in `sync_log`), `push.ts` (righe dirty → `/sync/push`, dirty azzerato solo se `updated_at` invariato, rifiuti in `sync_log`), `index.ts` (`syncAll`: mutex, push poi pull, errori raccolti), `time.ts`
 - `src/screens/` — `LoginScreen`, `ProjectsScreen` (lista locale + pull-to-refresh + badge ⚠ problemi di sync), `PlansScreen`, `SyncIssuesScreen` (righe rifiutate: riprova/scarta; conflitti persi: presa visione)
 - `metro.config.js` — `watchFolders` per `packages/form-core` (dipendenza `file:`)
@@ -44,6 +45,12 @@ il server smista per id) e poi `pullProject` per ogni progetto locale con
 regole contro un server finto in memoria (senza Python). Limite noto: LWW è per
 riga, non per campo — se il web cambia la descrizione e l'app (più tardi) il titolo,
 la riga dell'app vince e la descrizione torna a quella che l'app conosceva.
+
+Offline: dopo una sync ogni piano con file ha `local_file_path` ("Disponibile offline"
+nella lista) e la plan view userà quel file; senza rete progetti, planimetrie, pin,
+moduli e task si leggono dal DB locale. La cache si aggiorna solo quando il piano
+cambia sul server (`updated_at`), si riprova alla sync successiva se il download
+fallisce, e viene tolta se il piano perde il file.
 
 Verifica senza simulatore: `npx expo export --platform android --no-bytecode` produce
 il bundle (Metro risolve tutti i moduli, form-core compreso). L'avvio su simulatore

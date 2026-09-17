@@ -159,7 +159,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Test Jest del motore contro un server mock + un test di integrazione contro il backend reale.
 - **DoD**: scenario "stesso task modificato su web e app offline" termina senza duplicati né crash.
 
-### Giorno 19 — Progetti e planimetrie offline
+### Giorno 19 — Progetti e planimetrie offline ✅ (2026-09-17; "modalità aereo" verificata in Node: le schermate leggono solo dal DB e l'immagine è in cache locale)
 - Schermate progetti e planimetrie; download immagini planimetria in cache (`expo-file-system`) al primo pull; indicatore "disponibile offline".
 - **DoD**: in modalità aereo apro progetto e planimetria già scaricati.
 

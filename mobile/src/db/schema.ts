@@ -36,6 +36,8 @@ export const plans = sqliteTable(
     height_px: real('height_px'),
     /** immagine scaricata in cache (expo-file-system), null = solo online */
     local_file_path: text('local_file_path'),
+    /** updated_at del piano quando l'immagine è stata scaricata: se cambia, si riscarica */
+    local_file_for: text('local_file_for'),
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },

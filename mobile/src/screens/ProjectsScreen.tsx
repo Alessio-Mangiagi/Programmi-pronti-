@@ -4,6 +4,9 @@ import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-na
 import { useAuth } from '../auth/AuthContext'
 import { listProjects, refreshProjects } from '../data/catalog'
 import { syncAll } from '../sync'
+import { expoFileStore } from '../sync/expoFileStore'
+import { API_URL } from '../config'
+import { getToken } from '../auth/token'
 import { listSyncIssues } from './SyncIssuesScreen'
 import { useDb } from '../db/DbContext'
 import type { Project } from '../db/schema'
@@ -28,7 +31,7 @@ export default function ProjectsScreen({ navigation }: Props) {
       await refreshProjects(db, api)
       setProjects(listProjects(db))
       // push delle modifiche locali + pull di ogni progetto (planimetrie, pin, moduli, task)
-      const res = await syncAll(db, api)
+      const res = await syncAll(db, api, { files: { baseUrl: API_URL, getToken, store: expoFileStore } })
       if (res.errors.length) setError(res.errors[0])
       setIssues(listSyncIssues(db).length)
     } catch (e) {

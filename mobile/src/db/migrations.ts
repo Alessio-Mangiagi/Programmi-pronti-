@@ -52,6 +52,8 @@ export const MIGRATIONS: string[][] = [
       id INTEGER PRIMARY KEY AUTOINCREMENT, entity TEXT NOT NULL, entity_id TEXT NOT NULL,
       kind TEXT NOT NULL, reason TEXT, payload TEXT, created_at TEXT NOT NULL)`,
   ],
+  // 2: versione della planimetria scaricata (updated_at del piano al momento del download)
+  [`ALTER TABLE plans ADD COLUMN local_file_for TEXT`],
 ]
 
 /** Driver minimo che sia expo-sqlite sia better-sqlite3 sanno offrire. */
