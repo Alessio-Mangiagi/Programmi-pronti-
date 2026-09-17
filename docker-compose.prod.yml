@@ -1,0 +1,83 @@
+# Produzione / staging: docker compose -f docker-compose.prod.yml up -d --build
+# Variabili da .env (vedi .env.example): SECRET_KEY obbligatoria, POSTGRES_PASSWORD, WEB_URL, SMTP_*, STORAGE_S3_*.
+# Il DB non è esposto; l'app ascolta su 127.0.0.1:${APP_PORT:-8000} dietro un reverse proxy (TLS).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fieldview
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?imposta POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: fieldview
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fieldview"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://fieldview:${POSTGRES_PASSWORD}@db:5432/fieldview
+      SECRET_KEY: ${SECRET_KEY:?imposta SECRET_KEY in .env (openssl rand -hex 32)}
+      ACCESS_TOKEN_HOURS: ${ACCESS_TOKEN_HOURS:-12}
+      SEED_DEMO: ${SEED_DEMO:-0}
+      WEB_URL: ${WEB_URL:-http://localhost:8000}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-}
+      STORAGE_S3_PREFIX: ${STORAGE_S3_PREFIX:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    volumes:
+      - appdata:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://fieldview:${POSTGRES_PASSWORD}@db:5432/fieldview
+      WEB_URL: ${WEB_URL:-http://localhost:8000}
+      NOTIFY_INTERVAL: ${NOTIFY_INTERVAL:-10}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-fieldview@localhost}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
+    volumes:
+      - appdata:/data
+    depends_on:
+      app:
+        condition: service_started
+
+  # Backup schedulati: dump Postgres + tar dello storage locale in ./backups (rotazione BACKUP_KEEP giorni).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_CRON: ${BACKUP_CRON:-0 2 * * *}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+    volumes:
+      - appdata:/data:ro
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: ["sh", "-c", "echo \"$$BACKUP_CRON sh /backup.sh >> /backups/backup.log 2>&1\" > /etc/crontabs/root && crond -f -l 8"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  appdata:

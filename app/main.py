@@ -35,7 +35,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
@@ -796,9 +796,12 @@ async def upload_attachment(attachment_id: str, file: UploadFile = File(...), db
 
 @app.get("/files/{key:path}")
 def get_file(key: str, _: models.User = Depends(current_user)):
-    """Serve i file dello storage locale. Con S3 questo endpoint sparisce (URL diretti)."""
+    """Serve i file dello storage (filesystem o S3) con il JWT: gli URL nel DB sono sempre /files/<key>."""
     if not st.storage.exists(key):
         raise HTTPException(404, "file not found")
+    if isinstance(st.storage, st.S3Storage):
+        data = st.storage.read(key)
+        return Response(content=data, media_type=st.sniff_mime(data) or "application/octet-stream")
     return FileResponse(st.storage.path(key))
 
 

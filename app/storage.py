@@ -4,8 +4,10 @@ Storage dei file (planimetrie, foto, firme).
 Interfaccia minima così che in produzione si possa sostituire il filesystem
 con S3-compatible senza toccare gli endpoint:
 
-    save(key, data) -> url      salva i byte e ritorna l'URL pubblico
+    save(key, data) -> url      salva i byte e ritorna l'URL (/files/<key>)
+    exists(key)     -> bool
     path(key)       -> Path     (solo FS) percorso locale per servire il file
+    read(key)       -> bytes    (solo S3) contenuto, servito dall'API
 
 Le chiavi sono relative, es. "plans/<plan_id>.png", "attachments/<id>.jpg".
 Con FileSystemStorage l'URL è "/files/<key>", servito da GET /files/{key}.
@@ -54,7 +56,49 @@ class FileSystemStorage:
             return False
 
 
-storage = FileSystemStorage(Path(os.getenv("STORAGE_DIR", "storage")))
+class S3Storage:
+    """
+    S3-compatible (AWS S3, MinIO, ...). I file restano privati nel bucket e vengono
+    serviti dall'API via GET /files/{key} (auth JWT), come con il filesystem: gli URL
+    salvati nel DB ("/files/<key>") non cambiano tra i due backend. Presigned URL
+    diretti = backlog.
+    """
+    def __init__(self, bucket: str, endpoint_url: str | None = None, region: str | None = None, prefix: str = ""):
+        import boto3  # dipendenza opzionale: serve solo con STORAGE_S3_BUCKET
+        self.bucket = bucket
+        self.prefix = prefix.strip("/")
+        self.client = boto3.client("s3", endpoint_url=endpoint_url or None, region_name=region or None)
+
+    def _k(self, key: str) -> str:
+        if ".." in key.split("/") or key.startswith("/"):
+            raise ValueError("invalid key")
+        return f"{self.prefix}/{key}" if self.prefix else key
+
+    def save(self, key: str, data: bytes) -> str:
+        mime = sniff_mime(data) or "application/octet-stream"
+        self.client.put_object(Bucket=self.bucket, Key=self._k(key), Body=data, ContentType=mime)
+        return f"/files/{key}"
+
+    def exists(self, key: str) -> bool:
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=self._k(key))
+            return True
+        except Exception:
+            return False
+
+    def read(self, key: str) -> bytes:
+        return self.client.get_object(Bucket=self.bucket, Key=self._k(key))["Body"].read()
+
+
+def storage_from_env():
+    """STORAGE_S3_BUCKET attiva S3 (con STORAGE_S3_ENDPOINT per MinIO/altri, STORAGE_S3_REGION, STORAGE_S3_PREFIX)."""
+    bucket = os.getenv("STORAGE_S3_BUCKET")
+    if bucket:
+        return S3Storage(bucket, os.getenv("STORAGE_S3_ENDPOINT"), os.getenv("STORAGE_S3_REGION"), os.getenv("STORAGE_S3_PREFIX", ""))
+    return FileSystemStorage(Path(os.getenv("STORAGE_DIR", "storage")))
+
+
+storage = storage_from_env()
 
 
 # ---------- Ispezione contenuto ----------

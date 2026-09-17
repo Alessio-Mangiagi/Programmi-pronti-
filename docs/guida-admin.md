@@ -1,0 +1,61 @@
+# Field View — guida amministratore
+
+## Ruoli
+| Ruolo | Può |
+|---|---|
+| `admin` | tutto; vede tutti i progetti; crea utenti |
+| `manager` | crea progetti/planimetrie/template, gestisce membri e task, verifica, dashboard |
+| `field` | pin, moduli, task nei progetti di cui è membro |
+
+Utenti: `POST /users` (Swagger `/api/docs`, solo admin) — email, nome, password (≥ 8), ruolo.
+Membri di progetto: `POST /projects/{id}/members` con `user_id`. Preferenze notifica
+per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).
+
+## Setup di un cantiere (web, come manager)
+1. **Progetti → + Nuovo progetto**.
+2. **Planimetrie → + Nuova planimetria**: PNG/JPG/PDF (la prima pagina del PDF viene
+   convertita). Una planimetria senza file si carica dopo dalla sua pagina.
+3. **Moduli** (sidebar): i 3 template demo (ispezione sicurezza, punch list, diario)
+   si duplicano e si adattano; un template già compilato non cambia più schema
+   (duplica e modifica la copia). Un'opzione con "Non conforme" in un campo a scelta
+   fa scattare la proposta di task e la notifica ai manager.
+4. Aggiungere i membri; gli operai fanno login dall'app e sincronizzano.
+
+## Operatività quotidiana (ufficio)
+- **Dashboard**: aperti, scaduti, chiusi negli ultimi 7 giorni, trend; click su un
+  grafico → task filtrati.
+- **Task**: tabella con cambio stato/assegnatario/scadenza inline; "📍" apre la
+  planimetria sul pin. **Verificato** chiude il ciclo (solo manager/admin).
+- **Notifiche**: assegnatario su assegnazione; creatore del task su risoluzione;
+  manager del progetto su non conformità. Registro eventi: `GET /projects/{id}/events`.
+
+## Installazione (staging/produzione)
+```bash
+cp .env.example .env     # SECRET_KEY (openssl rand -hex 32), POSTGRES_PASSWORD, WEB_URL, SMTP_*, STORAGE_S3_* opzionali
+docker compose -f docker-compose.prod.yml up -d --build
+```
+- L'app ascolta su `127.0.0.1:8000` (API `/api`, web alla radice): metterla dietro
+  un reverse proxy con TLS (Caddy/nginx) su `WEB_URL`.
+- Migrazioni automatiche all'avvio (`alembic upgrade head`). `SEED_DEMO=1` solo per demo.
+- Primo admin: con `SEED_DEMO=0` il DB è vuoto → creare l'admin da shell:
+  `docker compose -f docker-compose.prod.yml exec app python -c "from app.database import SessionLocal; from app import models, auth; s=SessionLocal(); s.add(models.User(email='admin@tuodominio.it', name='Admin', role=models.UserRole.admin, password_hash=auth.hash_password('CAMBIAMI'))); s.commit()"`
+- **Worker notifiche**: servizio `worker` (email via `SMTP_*`; senza `SMTP_HOST` finisce nel log; push Expo automatiche).
+- **Storage**: volume `appdata` (`/data/storage`) oppure S3-compatible con `STORAGE_S3_BUCKET`
+  (+ `STORAGE_S3_ENDPOINT` per MinIO). I file sono serviti dall'API con il token, quindi
+  il bucket può restare privato.
+- **Backup**: servizio `backup` — ogni notte (`BACKUP_CRON`) dump Postgres + tar dello
+  storage in `./backups/`, rotazione `BACKUP_KEEP` giorni. Ripristino in `scripts/backup.sh`.
+- **App mobile**: `mobile/eas.json` profilo `preview` con `EXPO_PUBLIC_API_URL` = URL pubblico;
+  `eas build --profile preview --platform android|ios`.
+
+## Aggiornamenti
+```bash
+git pull && docker compose -f docker-compose.prod.yml up -d --build   # migrazioni applicate all'avvio
+```
+Backup prima di ogni aggiornamento con migrazioni (`docker compose ... exec backup sh /backup.sh`).
+
+## Diagnostica
+- `GET /api/docs` — Swagger. Log: `docker compose -f docker-compose.prod.yml logs -f app worker`.
+- Notifiche fallite: tabella `notifications` (`status='failed'`, colonna `error`).
+- Sync rifiutati dall'app: l'utente li vede in "Non sincronizzati" con il motivo
+  (es. template archiviato, campo non valido).

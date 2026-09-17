@@ -219,7 +219,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Click su grafico → vista task filtrata.
 - **DoD**: un manager capisce lo stato del cantiere in 10 secondi.
 
-### Giorno 30 — Rilascio MVP
+### Giorno 30 — Rilascio MVP ⏸ (2026-09-17: compose prod, backup, S3, guide e retrospettiva pronti; staging da alzare su una macchina con Docker e utenti da invitare)
 - Dockerfile prod, `docker-compose.prod.yml` (backend+web, Postgres, worker), backup DB e `storage/` schedulati.
 - Storage S3-compatible attivabile da env.
 - Documentazione: `README` aggiornato, guida utente 1 pagina per cantiere, guida admin.

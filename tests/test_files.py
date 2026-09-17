@@ -204,3 +204,41 @@ def test_attachment_create_with_client_id(client, project, pin):
     assert client.post("/attachments", json={"id": att_id, "submission_id": sub["id"]}).status_code == 409
     r = upload(client, f"/attachments/{att_id}/upload", png_bytes(10, 10), "a.png")
     assert r.status_code == 200 and r.json()["file_url"] == f"/files/attachments/{att_id}.png"
+
+
+def test_s3_storage_with_fake_client(monkeypatch, client, project):
+    """S3Storage: put/head/get sul client boto3 (finto) e file servito dall'API da /files."""
+    from app import storage as stmod
+
+    class FakeS3:
+        def __init__(self):
+            self.objects = {}
+
+        def put_object(self, Bucket, Key, Body, ContentType):
+            self.objects[(Bucket, Key)] = (Body, ContentType)
+
+        def head_object(self, Bucket, Key):
+            if (Bucket, Key) not in self.objects:
+                raise Exception("404")
+
+        def get_object(self, Bucket, Key):
+            import io
+            return {"Body": io.BytesIO(self.objects[(Bucket, Key)][0])}
+
+    s3 = stmod.S3Storage.__new__(stmod.S3Storage)
+    s3.bucket, s3.prefix, s3.client = "fv", "prod", FakeS3()
+    monkeypatch.setattr(stmod, "storage", s3)
+    url = s3.save("plans/x.png", png_bytes(10, 10))
+    assert url == "/files/plans/x.png"
+    assert ("fv", "prod/plans/x.png") in s3.client.objects
+    assert s3.client.objects[("fv", "prod/plans/x.png")][1] == "image/png"
+    assert s3.exists("plans/x.png") and not s3.exists("plans/nope.png")
+    r = client.get("/files/plans/x.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+    assert client.get("/files/plans/nope.png").status_code == 404
+    import pytest
+    with pytest.raises(ValueError):
+        s3.save("../etc/passwd", b"x")
+    # upload planimetria end-to-end su S3
+    r = upload(client, f"/plans/{project['plan']['id']}/file", png_bytes(30, 20), "p.png")
+    assert r.status_code == 200 and ("fv", f"prod/plans/{project['plan']['id']}.png") in s3.client.objects

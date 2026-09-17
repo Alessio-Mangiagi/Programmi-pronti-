@@ -16,3 +16,4 @@ web/.e2e/
 web/playwright-report/
 mobile/.claude/
 mobile/.e2e/
+backups/
