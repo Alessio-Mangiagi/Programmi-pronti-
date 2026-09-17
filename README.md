@@ -69,6 +69,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `tests/test_auth.py` — test login, ruoli, visibilità per progetto
 - `tests/test_server.py` — test del mount `/api` e del fallback SPA
 - `web/` — frontend React (vedi `web/README.md`)
+- `web/src/forms/` — `DynamicForm` (renderer di tutti i tipi di campo) e `SubmissionForm` (compilazione + upload foto/firma)
 - `packages/form-core/` — tipi schema modulo, `validateSchema`/`validateSubmission`, `defaults`, `zodSchema` (TS, condiviso web/mobile); parità con `app/forms.py` garantita da `fixtures/cases.json`
 - `scripts/gen_form_fixtures.py` — rigenera i casi condivisi dal validatore Python
 - `scripts/export_openapi.py` — esporta `web/openapi.json` per i tipi TS
@@ -91,6 +92,10 @@ Tutti gli endpoint tranne `/auth/login` richiedono `Authorization: Bearer <JWT>`
 
 `created_by` / `submitted_by` vengono sempre dal token (anche nel sync push,
 se il device li lascia vuoti). `assigned_to` deve essere un utente esistente.
+
+Allegati da web: `POST /attachments` accetta un `id` UUID generato dal client (409 se
+esiste già), così `data_json` di una submission può referenziare foto e firma prima
+che i byte siano caricati — stesso principio del sync mobile.
 Nel sync push le righe di progetti a cui l'utente non appartiene sono rifiutate
 singolarmente con `reason: "forbidden: ..."`. Ruoli per-progetto: backlog.
 
@@ -168,5 +173,5 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 12: `DynamicForm` web (renderer di tutti i tipi di campo)
+1. Giorno 13: dettaglio submission (sola lettura + foto), modifica, task automatico da "Non conforme"
 2. Form builder web sopra i 3 template del seed
