@@ -179,7 +179,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Stati: `local → uploading → uploaded`; icona sul pin.
 - **DoD**: 20 foto in coda, torna la rete, tutte caricate senza intervento.
 
-### Giorno 23 — Task mobile
+### Giorno 23 — Task mobile ✅ (2026-09-17; DoD verificata in Node contro il backend: chiusura con foto offline → manager la vede)
 - Lista task del progetto e "i miei"; dettaglio; cambio stato con foto di risoluzione; tutto offline.
 - **DoD**: un operaio chiude un task con foto senza rete; il manager lo vede al ritorno della rete.
 

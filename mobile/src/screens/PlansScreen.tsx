@@ -21,6 +21,16 @@ export default function PlansScreen({ route, navigation }: Props) {
         data={plans}
         keyExtractor={(p) => p.id}
         contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+            <TouchableOpacity style={[styles.btnGhost, { flex: 1 }]} onPress={() => navigation.navigate('Tasks', { projectId: route.params.projectId })}>
+              <Text style={styles.btnGhostText}>Task del progetto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.btnGhost, { flex: 1 }]} onPress={() => navigation.navigate('Tasks', { projectId: route.params.projectId, mine: true })}>
+              <Text style={styles.btnGhostText}>I miei task</Text>
+            </TouchableOpacity>
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.muted}>Nessuna planimetria: sincronizza dalla lista progetti (trascina verso il basso).</Text>

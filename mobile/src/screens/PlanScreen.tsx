@@ -93,6 +93,7 @@ export default function PlanScreen({ route, navigation }: Props) {
           onClose={() => setSelectedId(null)}
           onChanged={reload}
           onFill={() => navigation.navigate('Submission', { pinId: selectedId })}
+          onOpenTask={(id) => navigation.navigate('TaskDetail', { taskId: id })}
           canDelete={(p) => !!user && (user.role !== 'field' || p.created_by === user.id)}
         />
       )}
@@ -100,10 +101,10 @@ export default function PlanScreen({ route, navigation }: Props) {
   )
 }
 
-type SheetProps = { pinId: string; onClose: () => void; onChanged: () => void; onFill: () => void; canDelete: (pin: { created_by: string | null }) => boolean }
+type SheetProps = { pinId: string; onClose: () => void; onChanged: () => void; onFill: () => void; onOpenTask: (id: string) => void; canDelete: (pin: { created_by: string | null }) => boolean }
 
 /** Bottom sheet del pin: etichetta, moduli, task, foto; cancellazione. */
-function PinSheet({ pinId, onClose, onChanged, onFill, canDelete }: SheetProps) {
+function PinSheet({ pinId, onClose, onChanged, onFill, onOpenTask, canDelete }: SheetProps) {
   const db = useDb()
   const detail = pinDetail(db, pinId)
   if (!detail) return null
@@ -161,10 +162,10 @@ function PinSheet({ pinId, onClose, onChanged, onFill, canDelete }: SheetProps) 
         <Text style={sheet.h3}>Task ({tasks.length})</Text>
         {tasks.length === 0 && <Text style={styles.muted}>Nessun task.</Text>}
         {tasks.map((t) => (
-          <View key={t.id} style={[sheet.item, styles.row]}>
+          <TouchableOpacity key={t.id} style={[sheet.item, styles.row]} onPress={() => onOpenTask(t.id)}>
             <Text style={[styles.h2, { flex: 1 }]}>{t.title}</Text>
             <Text style={[styles.badge, { backgroundColor: PIN_COLOR[t.status as PinLevel] + '22', color: PIN_COLOR[t.status as PinLevel] }]}>{STATUS_LABEL[t.status] ?? t.status}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
         <Text style={sheet.h3}>
           Foto ({attachments.filter((a) => a.file_type !== 'signature' && a.file_type !== 'doc').length})

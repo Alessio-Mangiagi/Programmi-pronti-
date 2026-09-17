@@ -342,7 +342,7 @@ describe('giorno 22: coda upload foto', () => {
       const bytes = files[uri]
       if (!bytes) throw new Error(`file mancante ${uri}`)
       const form = new FormData()
-      form.append('file', new Blob([bytes], { type: mime }), name)
+      form.append('file', new Blob([new Uint8Array(bytes)], { type: mime }), name)
       return form
     },
   })
@@ -398,5 +398,55 @@ describe('giorno 22: coda upload foto', () => {
     expect(done.file_url).toBeTruthy()
     expect(done.local_file_path).toBeTruthy()
     expect(done.dirty).toBe(false)
+  })
+})
+
+describe('giorno 23: task mobile', () => {
+  it('l’operaio chiude un task con foto senza rete; al ritorno della rete il manager lo vede risolto con la foto', async () => {
+    const { listTasks, getTask, allowedTransitions, resolveTaskWithPhoto, setTaskStatus } = await import('../src/data/tasks')
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+    const fieldApi = await server.login('field@fieldview.local')
+    const me = await fieldApi.get<{ id: string; role: string }>('/auth/me')
+    const db = device()
+    await pullProject(db, fieldApi, projectId)
+
+    const all = listTasks(db, projectId)
+    expect(all.length).toBeGreaterThanOrEqual(3)
+    expect(all[0]).toHaveProperty('plan_name', 'Piano terra')
+    const mine = listTasks(db, projectId, { mine: me.id })
+    expect(mine.length).toBeGreaterThanOrEqual(1)
+    expect(mine.every((t) => t.assigned_to === me.id)).toBe(true)
+
+    // un task aperto non assegnato: prendo in carico, poi risolvo con foto (offline)
+    const open = all.find((t) => t.status === 'open' && !t.assigned_to) ?? all.find((t) => t.status === 'open')!
+    expect(allowedTransitions(getTask(db, open.id)!, me)).toEqual(open.assigned_to ? ['assigned'] : [])
+    setTaskStatus(db, open.id, 'assigned', { assignTo: me.id })
+    expect(allowedTransitions(getTask(db, open.id)!, me)).toEqual(['resolved', 'open']) // field non può verificare
+    resolveTaskWithPhoto(db, open.id, 'file:///att/fix.png')
+    const local = getTask(db, open.id)!
+    expect(local.status).toBe('resolved')
+    expect(local.dirty).toBe(true)
+    expect(listTasks(db, projectId, { status: ['resolved'] }).find((t) => t.id === open.id)).toMatchObject({ photos: 1, pending_uploads: 1 })
+
+    // torna la rete
+    const res = await syncAll(db, fieldApi, {
+      projectIds: [projectId],
+      uploads: { buildForm: async (_uri, name, mime) => { const f = new FormData(); f.append('file', new Blob([new Uint8Array(PNG)], { type: mime }), name); return f } },
+    })
+    expect(res.errors).toEqual([])
+    expect(res.push.rejected).toBe(0)
+    expect(res.uploads).toMatchObject({ uploaded: 1, pending: 0 })
+
+    // il manager (web) vede il task risolto, assegnato all'operaio, con la foto caricata
+    const remote = await api.get<{ status: string; assigned_to: string; attachments: { file_url: string | null; file_type: string }[] }>(`/tasks/${open.id}`)
+    expect(remote.status).toBe('resolved')
+    expect(remote.assigned_to).toBe(me.id)
+    expect(remote.attachments).toHaveLength(1)
+    expect(remote.attachments[0].file_url).toMatch(/^\/files\/attachments\//)
+    // il manager verifica dal web; l'app lo riceve
+    await api.patch(`/tasks/${open.id}`, { status: 'verified' })
+    await pullProject(db, fieldApi, projectId)
+    expect(getTask(db, open.id)!.status).toBe('verified')
+    expect(allowedTransitions(getTask(db, open.id)!, me)).toEqual([])
   })
 })
