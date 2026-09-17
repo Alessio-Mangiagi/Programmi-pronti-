@@ -177,7 +177,7 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 25: giornata di test sul campo (checklist scenari, build EAS) — richiede device
+1. Giorno 26: eventi (outbox) e regole di notifica
 2. Form builder web sopra i 3 template del seed
 
 ## Template dei moduli
