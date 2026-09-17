@@ -347,3 +347,11 @@ input:focus, select:focus, textarea:focus {
 .geo-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
 .geo-coord { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; }
 .geo-coord input { width: 150px; }
+
+/* Dettaglio submission / task */
+.list-item-btn { cursor: pointer; }
+.list-item-btn:hover { border-color: var(--primary); background: #f7f9fb; }
+.callout { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.7rem 0.9rem; border-radius: var(--radius); margin-bottom: 1rem; }
+.callout-warn { background: #fdf3e0; border: 1px solid #f3d9a4; }
+.callout .btn { margin-left: auto; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 1rem; }

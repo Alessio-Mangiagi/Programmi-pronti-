@@ -53,7 +53,7 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/forms.py` — validazione schema moduli e risposte (spec in `docs/form-schema.md`)
 - `app/auth.py` — JWT, ruoli (`admin`/`manager`/`field`), accesso per progetto
 - `scripts/seed.py` — dati demo idempotenti
-- `app/main.py` — endpoint FastAPI: CRUD web (`/submissions`, `/tasks`, `/pins/{id}`) e `/sync/push` / `/sync/pull`
+- `app/main.py` — endpoint FastAPI: CRUD web (`/submissions` + `PATCH`, `/tasks`, `/pins/{id}`, `DELETE /attachments/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da `.env`/ambiente
 - `app/server.py` — entry point di produzione: `/api` + statici di `web/dist` (SPA fallback)
 - `scripts/e2e_server.py` — server per gli smoke test Playwright (SQLite temporaneo + seed + `app.server`)
@@ -89,6 +89,7 @@ Tutti gli endpoint tranne `/auth/login` richiedono `Authorization: Bearer <JWT>`
 | Pin, moduli, task, foto nei progetti di cui si è membri | ✓ | ✓ | ✓ |
 | Portare un task a `verified` | ✓ | ✓ | – |
 | Cancellare un task | ✓ | ✓ | solo i propri |
+| Modificare una submission, cancellare un allegato | ✓ | ✓ | solo i propri |
 
 `created_by` / `submitted_by` vengono sempre dal token (anche nel sync push,
 se il device li lascia vuoti). `assigned_to` deve essere un utente esistente.
@@ -173,5 +174,5 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 
 ## Prossimi passi consigliati
 
-1. Giorno 13: dettaglio submission (sola lettura + foto), modifica, task automatico da "Non conforme"
+1. Giorno 14: vista task di progetto (tabella, filtri, cambio stato inline, "vedi sulla planimetria")
 2. Form builder web sopra i 3 template del seed

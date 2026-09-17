@@ -21,7 +21,7 @@ Struttura:
 - `src/components/` — `Layout` (sidebar + outlet), `Toast` (`ToastProvider`/`useToast`, notifiche in basso), `Loading` (spinner), `AuthImage`, `PlanViewer` (pan/zoom + overlay pin, modalità aggiungi), `PinMarker` (drag), `PinPanel` (dettaglio pin), `PlanUploadForm` (nuova planimetria / file mancante), `PinFilters` (barra filtri ↔ query string)
 - `src/hooks/` — `useProject`, `useAuthBlobUrl` (file da `/files` con bearer → object URL), `useLookups` (utenti/template per id)
 - `src/pages/` — `LoginPage`, `ProjectsPage`, `PlansPage`, `PlanPage`
-- `src/forms/` — `DynamicForm` (un controllo per tipo di campo, errori inline tradotti), `fields/` (`PhotoInput`, `SignatureInput`, `GeolocationInput`), `SubmissionForm` (scelta template → compila → salva), `attachments.ts` (foto/firme locali come File + object URL)
+- `src/forms/` — `DynamicForm` (un controllo per tipo di campo, errori inline tradotti), `fields/` (`PhotoInput`, `SignatureInput`, `GeolocationInput`), `SubmissionForm` (scelta template → compila → salva; con `submission` modifica via PATCH e cancella gli allegati tolti), `SubmissionDetail` (sola lettura → Modifica / Crea task), `TaskForm`, `nonConformity.ts` (regola "Non conforme" + bozza task), `attachments.ts` (foto/firme locali come File + object URL)
 - `src/components/Modal.tsx` — modale con Esc/click fuori; `body[data-modal-open]` dice alla plan view di ignorare Esc
 
 Plan view: l'immagine è resa a dimensione nativa dentro `react-zoom-pan-pinch`;
@@ -74,3 +74,10 @@ none`) esportato in PNG al rilascio di ogni tratto. La geolocalizzazione usa
 `navigator.geolocation` con lat/lng manuali come ripiego. `readOnly` rende gli
 stessi controlli disabilitati con gli allegati remoti (`RemoteAttachment`, via
 `AuthImage`) — è la base del dettaglio submission del giorno 13.
+
+Flusso submission → task (regola MVP): dopo il salvataggio, se un `select`/`multiselect`
+contiene un valore che matcha `/non\s*conform/i` (`findNonConformity`), si apre subito
+`TaskForm` con titolo "<valore> — <modulo> (<pin>)" e descrizione con i campi testuali
+(`taskDraftFromSubmission`): assegnatario + "Crea e assegna" = task assegnato in 3 click.
+Nel pannello pin ogni modulo è cliccabile (badge rosso se non conforme) e apre
+`SubmissionDetail`; "+ Nuovo task" crea un task libero sul pin.

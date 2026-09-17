@@ -418,6 +418,27 @@ def get_submission(submission_id: str, db: Session = Depends(get_db),
     return _with_attachments(schemas.SubmissionOut, sub)
 
 
+@app.patch("/submissions/{submission_id}", response_model=schemas.SubmissionOut)
+def update_submission(submission_id: str, payload: schemas.SubmissionUpdate, db: Session = Depends(get_db),
+                      user: models.User = Depends(current_user)):
+    """Modifica delle risposte (chi l'ha compilata o un manager); stesse regole di validazione della creazione."""
+    sub = db.get(models.FormSubmission, submission_id)
+    if sub is None or sub.deleted_at is not None:
+        raise HTTPException(404, "submission not found")
+    auth.assert_project_access(db, user, auth.project_of_submission(sub))
+    if not auth.is_manager(user) and sub.submitted_by != user.id:
+        raise HTTPException(403, "only the submitter or a manager can edit a submission")
+    template = db.get(models.FormTemplate, sub.template_id)
+    errors = validate_submission(template.schema_def, payload.data_json)
+    if errors:
+        raise HTTPException(422, detail=errors)
+    sub.data_json = payload.data_json
+    sub.updated_at = utcnow()
+    db.commit()
+    db.refresh(sub)
+    return _with_attachments(schemas.SubmissionOut, sub)
+
+
 # ---------- Task (uso da web) ----------
 
 def _parse_status(value: str) -> TaskStatus:
@@ -587,6 +608,17 @@ def create_attachment(payload: schemas.AttachmentCreate, db: Session = Depends(g
     db.commit()
     db.refresh(att)
     return att
+
+
+@app.delete("/attachments/{attachment_id}", status_code=204)
+def delete_attachment(attachment_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Soft-delete di foto/firma (chi ha compilato il modulo o creato il task, oppure un manager)."""
+    att = _get_attachment(db, user, attachment_id)
+    owner = att.submission.submitted_by if att.submission_id else att.task.created_by
+    if not auth.is_manager(user) and owner != user.id:
+        raise HTTPException(403, "only the owner or a manager can delete an attachment")
+    att.deleted_at = att.updated_at = utcnow()
+    db.commit()
 
 
 @app.post("/attachments/presign", response_model=schemas.PresignResponse)

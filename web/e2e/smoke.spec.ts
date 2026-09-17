@@ -127,19 +127,49 @@ test('compila "Ispezione sicurezza" con foto e firma dal pannello pin', async ({
   await page.mouse.up()
   await expect(modal.getByText('Firma acquisita')).toBeVisible()
 
-  await modal.getByRole('button', { name: 'Salva modulo' }).click()
+  const tasksBefore = Number((await panel.getByText(/^Task \(\d+\)$/).textContent())!.match(/\d+/)![0])
+  await modal.getByRole('button', { name: 'Salva modulo' }).click() // click 1
   await expect(page.locator('.toast-success')).toContainText('Modulo salvato')
-  await expect(modal).toBeHidden()
   await expect(panel.getByText(`Moduli (${before + 1})`)).toBeVisible()
+
+  // regola MVP: "Non conforme" propone un task pre-compilato -> assegnato in 3 click
+  const taskModal = page.getByRole('dialog', { name: /Non conformità rilevata/ })
+  await expect(taskModal).toBeVisible()
+  await expect(taskModal.getByLabel('Titolo')).toHaveValue(/Non conforme — Ispezione sicurezza/)
+  await expect(taskModal.getByLabel('Descrizione')).toHaveValue(/Area ispezionata: Vano scala B/)
+  await taskModal.getByLabel('Assegna a').selectOption({ label: 'Franco Field' }) // click 2
+  await taskModal.getByRole('button', { name: 'Crea e assegna' }).click() // click 3
+  await expect(page.locator('.toast-success').last()).toContainText('Task creato e assegnato')
+  await expect(panel.getByText(`Task (${tasksBefore + 1})`)).toBeVisible()
+  await expect(panel.locator('.list li', { hasText: 'Non conforme — Ispezione sicurezza' }).locator('.badge')).toHaveText('Assegnato')
+
+  // dettaglio submission in sola lettura, poi modifica
+  await panel.locator('.list-item-btn', { hasText: 'Ispezione sicurezza' }).last().click()
+  const detail = page.getByRole('dialog', { name: 'Ispezione sicurezza' })
+  await expect(detail.getByLabel(/Area ispezionata/)).toHaveValue('Vano scala B')
+  await expect(detail.getByLabel(/Area ispezionata/)).toBeDisabled()
+  await expect(detail.locator('.callout-warn')).toContainText('Non conforme')
+  await expect(detail.locator('.photo-cell img')).toHaveCount(1)
+  await detail.getByRole('button', { name: 'Modifica' }).click()
+  const edit = page.getByRole('dialog', { name: /Modifica — Ispezione sicurezza/ })
+  await edit.getByLabel(/Area ispezionata/).fill('Vano scala B, piano 2')
+  await edit.getByRole('button', { name: 'Salva modifiche' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Modulo aggiornato')
+  await expect(detail.getByLabel(/Area ispezionata/)).toHaveValue('Vano scala B, piano 2')
+  await detail.locator('.form-actions').getByRole('button', { name: 'Chiudi' }).click()
+  await expect(detail).toBeHidden()
   await expect(panel.locator('.photo-grid img')).toHaveCount(1) // la foto; la firma non è nella griglia foto
 
   // via API: submission con esito e 2 allegati caricati
   const token = await page.evaluate(() => localStorage.getItem('fieldview.token'))
   const selected = await page.locator('.pin-selected').getAttribute('data-pin-id')
   const res = await page.request.get(`/api/pins/${selected}`, { headers: { Authorization: `Bearer ${token}` } })
-  const detail = await res.json()
-  const sub = detail.submissions.find((s: { data_json: { area?: string } }) => s.data_json.area === 'Vano scala B')
+  const pinDetail = await res.json()
+  const sub = pinDetail.submissions.find((s: { data_json: { area?: string } }) => s.data_json.area === 'Vano scala B, piano 2')
   expect(sub).toBeTruthy()
+  const task = pinDetail.tasks.find((t: { title: string }) => t.title.startsWith('Non conforme — Ispezione sicurezza'))
+  expect(task.status).toBe('assigned')
+  expect(task.assigned_to).toBeTruthy()
   expect(sub.data_json.esito).toBe('Non conforme')
   expect(sub.data_json.rischi).toEqual(['Elettrico'])
   expect(sub.data_json.persone_presenti).toBe(3)

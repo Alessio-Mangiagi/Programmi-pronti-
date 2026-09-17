@@ -4,7 +4,7 @@ import { api, errorMessage } from '../api/client'
 import type { FormTemplate, Submission } from '../api/types'
 import { uploadAttachmentFile } from '../api/upload'
 import { useToast } from '../components/Toast'
-import { isLocal, releaseAttachment, type AttachmentMap } from './attachments'
+import { isLocal, releaseAttachment, type AttachmentKind, type AttachmentMap, type RemoteAttachment } from './attachments'
 import DynamicForm, { type AttachmentChange } from './DynamicForm'
 
 type Props = {
@@ -12,8 +12,20 @@ type Props = {
   templates: FormTemplate[]
   /** Template preselezionato (se uno solo, o scelto fuori dal form). */
   templateId?: string
+  /** Se presente si modifica questa submission (template fisso, valori e allegati esistenti). */
+  submission?: Submission
   onSaved: (submission: Submission) => void
   onCancel: () => void
+}
+
+/** Allegati già sul server, indicizzati per id (il tipo viene da file_type). */
+export function remoteAttachments(sub: Submission): AttachmentMap {
+  return Object.fromEntries(
+    sub.attachments.map((a): [string, RemoteAttachment] => [
+      a.id,
+      { id: a.id, kind: a.file_type === 'photo' || a.file_type === 'signature' ? (a.file_type as AttachmentKind) : null, fileUrl: a.file_url ?? null },
+    ]),
+  )
 }
 
 /**
@@ -21,14 +33,15 @@ type Props = {
  * validazione locale (form-core, identica al server) → POST /submissions →
  * upload di foto e firma (POST /attachments con l'id già in data_json + byte).
  */
-export default function SubmissionForm({ pinId, templates, templateId: initialTemplateId, onSaved, onCancel }: Props) {
-  const [templateId, setTemplateId] = useState(initialTemplateId ?? (templates.length === 1 ? templates[0].id : ''))
+export default function SubmissionForm({ pinId, templates, templateId: initialTemplateId, submission, onSaved, onCancel }: Props) {
+  const fixedTemplate = submission?.template_id ?? initialTemplateId
+  const [templateId, setTemplateId] = useState(fixedTemplate ?? (templates.length === 1 ? templates[0].id : ''))
   const template = templates.find((t) => t.id === templateId)
   const [busy, setBusy] = useState(false)
 
   return (
     <div className="submission-form">
-      {!initialTemplateId && templates.length > 1 && (
+      {!fixedTemplate && templates.length > 1 && (
         <div className="field">
           <label htmlFor="sf-template">Modulo</label>
           <select id="sf-template" value={templateId} onChange={(e) => setTemplateId(e.target.value)} disabled={busy}>
@@ -43,7 +56,7 @@ export default function SubmissionForm({ pinId, templates, templateId: initialTe
       )}
       {template ? (
         // key = template: cambiando modulo si riparte dai default, foto e firme comprese
-        <Editor key={template.id} pinId={pinId} template={template} onSaved={onSaved} onCancel={onCancel} onBusy={setBusy} />
+        <Editor key={template.id} pinId={pinId} template={template} submission={submission} onSaved={onSaved} onCancel={onCancel} onBusy={setBusy} />
       ) : (
         <div className="row form-actions">
           <button className="btn btn-primary" type="button" disabled>
@@ -61,16 +74,17 @@ export default function SubmissionForm({ pinId, templates, templateId: initialTe
 type EditorProps = {
   pinId: string
   template: FormTemplate
+  submission?: Submission
   onSaved: (submission: Submission) => void
   onCancel: () => void
   onBusy: (busy: boolean) => void
 }
 
-function Editor({ pinId, template, onSaved, onCancel, onBusy }: EditorProps) {
+function Editor({ pinId, template, submission, onSaved, onCancel, onBusy }: EditorProps) {
   const toast = useToast()
   const schema = template.schema_def as FormSchema
-  const [value, setValue] = useState<FormData>(() => defaults(schema))
-  const [attachments, setAttachments] = useState<AttachmentMap>({})
+  const [value, setValue] = useState<FormData>(() => (submission ? { ...defaults(schema), ...(submission.data_json as FormData) } : defaults(schema)))
+  const [attachments, setAttachments] = useState<AttachmentMap>(() => (submission ? remoteAttachments(submission) : {}))
   const [touched, setTouched] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   // Smontaggio: revoca gli object URL ancora vivi (il ref evita di dipendere dallo stato).
@@ -109,17 +123,26 @@ function Editor({ pinId, template, onSaved, onCancel, onBusy }: EditorProps) {
       return
     }
     setSavingState('Salvataggio…')
-    const { data: sub, error } = await api.POST('/submissions', {
-      body: { template_id: template.id, pin_id: pinId, data_json: value },
-    })
+    const { data: sub, error } = submission
+      ? await api.PATCH('/submissions/{submission_id}', { params: { path: { submission_id: submission.id } }, body: { data_json: value } })
+      : await api.POST('/submissions', { body: { template_id: template.id, pin_id: pinId, data_json: value } })
     if (error || !sub) {
       setSavingState(null)
       return toast.error(errorMessage(error))
     }
 
-    // Allegati referenziati in data_json: record con lo stesso id, poi i byte.
-    const local = Object.values(attachments).filter(isLocal)
+    // In modifica: gli allegati remoti tolti dal form vengono cancellati (soft) sul server.
     let failed = 0
+    if (submission) {
+      const removedRemote = submission.attachments.filter((a) => !(a.id in attachments))
+      for (const a of removedRemote) {
+        const { error: delErr } = await api.DELETE('/attachments/{attachment_id}', { params: { path: { attachment_id: a.id } } })
+        if (delErr) failed++
+      }
+    }
+
+    // Allegati nuovi referenziati in data_json: record con lo stesso id, poi i byte.
+    const local = Object.values(attachments).filter(isLocal)
     for (const [i, a] of local.entries()) {
       setSavingState(`Caricamento ${a.kind === 'signature' ? 'firma' : 'foto'} ${i + 1}/${local.length}…`)
       const { error: attErr } = await api.POST('/attachments', { body: { id: a.id, submission_id: sub.id, file_type: a.kind } })
@@ -135,8 +158,8 @@ function Editor({ pinId, template, onSaved, onCancel, onBusy }: EditorProps) {
     }
     setSavingState(null)
     if (failed) toast.error(`Modulo salvato ma ${failed} allegat${failed === 1 ? 'o non caricato' : 'i non caricati'}`)
-    else toast.success('Modulo salvato')
-    onSaved(sub)
+    else toast.success(submission ? 'Modulo aggiornato' : 'Modulo salvato')
+    onSaved({ ...sub, data_json: value })
   }
 
   return (
@@ -153,7 +176,7 @@ function Editor({ pinId, template, onSaved, onCancel, onBusy }: EditorProps) {
       />
       <div className="row form-actions">
         <button className="btn btn-primary" type="submit" disabled={!!saving}>
-          {saving ?? 'Salva modulo'}
+          {saving ?? (submission ? 'Salva modifiche' : 'Salva modulo')}
         </button>
         <button className="btn" type="button" onClick={onCancel} disabled={!!saving}>
           Annulla

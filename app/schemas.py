@@ -126,6 +126,10 @@ class SubmissionCreate(BaseModel):
     submitted_by: Optional[str] = None
 
 
+class SubmissionUpdate(BaseModel):
+    data_json: dict
+
+
 class SubmissionOut(SubmissionCreate):
     model_config = ConfigDict(from_attributes=True)
     id: str

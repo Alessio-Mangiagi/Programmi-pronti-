@@ -150,6 +150,50 @@ def test_list_tasks_filters(client, project, pin, users):
     assert client.get("/projects/nope/tasks").status_code == 404
 
 
+def test_update_submission_validates_and_checks_owner(client, project, pin, users):
+    tpl = project["template"]["id"]
+    field = users["field"]["headers"]
+    sub = client.post("/submissions", headers=field,
+                      json={"template_id": tpl, "pin_id": pin, "data_json": {"esito": "Conforme"}}).json()
+    url = f"/submissions/{sub['id']}"
+    # chi l'ha compilata modifica
+    r = client.patch(url, headers=field, json={"data_json": {"esito": "Non conforme"}})
+    assert r.status_code == 200 and r.json()["data_json"] == {"esito": "Non conforme"}
+    assert r.json()["updated_at"] > sub["updated_at"]
+    # stessa validazione della creazione
+    r = client.patch(url, headers=field, json={"data_json": {"esito": "Boh"}})
+    assert r.status_code == 422 and r.json()["detail"][0]["field"] == "esito"
+    # manager sì, altro field no, outsider 403 per progetto
+    assert client.patch(url, headers=users["manager"]["headers"], json={"data_json": {"esito": "Conforme"}}).status_code == 200
+    other = client.post("/users", json={"email": "altro@test.local", "password": "password123",
+                                        "name": "Altro", "role": "field"}).json()
+    client.post(f"/projects/{project['project']['id']}/members", json={"user_id": other["id"]})
+    from tests.conftest import login
+    assert client.patch(url, headers=login(client, "altro@test.local"), json={"data_json": {}}).status_code == 403
+    assert client.patch(url, headers=users["outsider"]["headers"], json={"data_json": {}}).status_code == 403
+    assert client.patch("/submissions/nope", json={"data_json": {}}).status_code == 404
+
+
+def test_delete_attachment_soft(client, project, pin, users):
+    tpl = project["template"]["id"]
+    field = users["field"]["headers"]
+    sub = client.post("/submissions", headers=field,
+                      json={"template_id": tpl, "pin_id": pin, "data_json": {"esito": "Conforme"}}).json()
+    att = client.post("/attachments", headers=field, json={"submission_id": sub["id"], "file_type": "photo"}).json()
+    assert client.delete(f"/attachments/{att['id']}", headers=users["manager"]["headers"]).status_code == 204
+    assert client.delete(f"/attachments/{att['id']}").status_code == 404          # già cancellato
+    assert client.get(f"/pins/{pin}").json()["submissions"][0]["attachments"] == []
+    att2 = client.post("/attachments", headers=field, json={"submission_id": sub["id"]}).json()
+    from tests.conftest import login
+    other = client.post("/users", json={"email": "altro@test.local", "password": "password123",
+                                        "name": "Altro", "role": "field"}).json()
+    client.post(f"/projects/{project['project']['id']}/members", json={"user_id": other["id"]})
+    assert client.delete(f"/attachments/{att2['id']}", headers=login(client, "altro@test.local")).status_code == 403
+    assert client.delete(f"/attachments/{att2['id']}", headers=field).status_code == 204
+    pulled = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()
+    assert any(a["id"] == att2["id"] and a["deleted_at"] for a in pulled["attachments"])
+
+
 # ---------- pin detail ----------
 
 def test_pin_detail_nested(client, project, pin):

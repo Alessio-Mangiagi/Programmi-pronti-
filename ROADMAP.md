@@ -121,7 +121,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Errori inline dal validatore, campi required evidenziati.
 - **DoD**: il template "ispezione sicurezza" si compila e salva con foto e firma.
 
-### Giorno 13 — Flusso submission e task
+### Giorno 13 — Flusso submission e task ✅ (2026-09-17)
 - Dal pannello pin: "Compila modulo" → scegli template → `DynamicForm` → `POST /submissions`.
 - Dettaglio submission (sola lettura + foto), modifica.
 - Regola MVP: campo `select` con valore "Non conforme" propone la creazione automatica di un task pre-compilato.

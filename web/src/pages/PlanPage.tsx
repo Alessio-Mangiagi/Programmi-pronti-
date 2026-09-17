@@ -220,7 +220,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
             !error && <Loading className="plan-viewer-empty" />
           )}
           {selectedId && (
-            <PinPanel pinId={selectedId} lookups={lookups} onClose={() => setSelectedId(null)} onChanged={loadPins} />
+            <PinPanel pinId={selectedId} lookups={lookups} members={members} onClose={() => setSelectedId(null)} onChanged={loadPins} />
           )}
         </div>
       </div>

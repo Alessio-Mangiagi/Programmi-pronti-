@@ -997,6 +997,59 @@
             }
           }
         }
+      },
+      "patch": {
+        "summary": "Update Submission",
+        "description": "Modifica delle risposte (chi l'ha compilata o un manager); stesse regole di validazione della creazione.",
+        "operationId": "update_submission_submissions__submission_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/tasks": {
@@ -1368,6 +1421,44 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/attachments/{attachment_id}": {
+      "delete": {
+        "summary": "Delete Attachment",
+        "description": "Soft-delete di foto/firma (chi ha compilato il modulo o creato il task, oppure un manager).",
+        "operationId": "delete_attachment_attachments__attachment_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/attachments/presign": {
@@ -2738,6 +2829,20 @@
           "updated_at"
         ],
         "title": "SubmissionOut"
+      },
+      "SubmissionUpdate": {
+        "properties": {
+          "data_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data_json"
+        ],
+        "title": "SubmissionUpdate"
       },
       "SyncPullResponse": {
         "properties": {

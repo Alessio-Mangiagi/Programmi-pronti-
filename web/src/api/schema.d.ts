@@ -306,7 +306,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Submission
+         * @description Modifica delle risposte (chi l'ha compilata o un manager); stesse regole di validazione della creazione.
+         */
+        patch: operations["update_submission_submissions__submission_id__patch"];
         trace?: never;
     };
     "/tasks": {
@@ -407,6 +411,26 @@ export interface paths {
          */
         post: operations["create_attachment_attachments_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Attachment
+         * @description Soft-delete di foto/firma (chi ha compilato il modulo o creato il task, oppure un manager).
+         */
+        delete: operations["delete_attachment_attachments__attachment_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -946,6 +970,13 @@ export interface components {
              * @default []
              */
             attachments: components["schemas"]["AttachmentOut"][];
+        };
+        /** SubmissionUpdate */
+        SubmissionUpdate: {
+            /** Data Json */
+            data_json: {
+                [key: string]: unknown;
+            };
         };
         /**
          * SyncPullResponse
@@ -1861,6 +1892,41 @@ export interface operations {
             };
         };
     };
+    update_submission_submissions__submission_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmissionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_task_tasks_post: {
         parameters: {
             query?: never;
@@ -2080,6 +2146,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AttachmentOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_attachment_attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

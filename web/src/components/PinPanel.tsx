@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
-import type { Attachment, PinDetail, TaskStatus } from '../api/types'
+import type { Attachment, PinDetail, Submission, TaskStatus, User } from '../api/types'
 import { isManager, useAuth } from '../auth/AuthContext'
 import type { Lookups } from '../hooks/useLookups'
 import AuthImage from './AuthImage'
@@ -8,6 +8,10 @@ import Loading from './Loading'
 import Modal from './Modal'
 import { useToast } from './Toast'
 import SubmissionForm from '../forms/SubmissionForm'
+import SubmissionDetail from '../forms/SubmissionDetail'
+import TaskForm from '../forms/TaskForm'
+import { findNonConformity, taskDraftFromSubmission } from '../forms/nonConformity'
+import type { FormData, FormSchema } from '@fieldview/form-core'
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: 'Aperto',
@@ -19,6 +23,8 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
 type Props = {
   pinId: string
   lookups: Lookups
+  /** Membri del progetto: assegnatari possibili di un task. */
+  members: User[]
   onClose: () => void
   /** Chiamato dopo modifiche che cambiano i marker (label, cancellazione). */
   onChanged: () => void
@@ -29,7 +35,7 @@ function fmtDate(iso: string) {
 }
 
 /** Pannello laterale con tutto ciò che è agganciato a un pin. */
-export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) {
+export default function PinPanel({ pinId, lookups, members, onClose, onChanged }: Props) {
   const { user } = useAuth()
   const toast = useToast()
   const [pin, setPin] = useState<PinDetail | null>(null)
@@ -37,6 +43,10 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
   const [label, setLabel] = useState('')
   const [editingLabel, setEditingLabel] = useState(false)
   const [filling, setFilling] = useState(false)
+  const [openSub, setOpenSub] = useState<Submission | null>(null)
+  // Submission appena salvata con una non conformità: proponi il task pre-compilato
+  const [proposeTaskFor, setProposeTaskFor] = useState<Submission | null>(null)
+  const [newTask, setNewTask] = useState(false)
 
   const load = useCallback(async () => {
     const { data, error } = await api.GET('/pins/{pin_id}', { params: { path: { pin_id: pinId } } })
@@ -119,19 +129,33 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
             </div>
             {pin.submissions.length === 0 && <p className="muted small">Nessun modulo compilato.</p>}
             <ul className="list">
-              {pin.submissions.map((s) => (
-                <li key={s.id}>
-                  <strong>{lookups.templateName(s.template_id)}</strong>
-                  <div className="muted small">
-                    {lookups.userName(s.submitted_by)} · {fmtDate(s.created_at)}
-                  </div>
-                </li>
-              ))}
+              {pin.submissions.map((s) => {
+                const tpl = lookups.templates[s.template_id]
+                const nc = tpl ? findNonConformity(tpl.schema_def as FormSchema, s.data_json as FormData) : null
+                return (
+                  <li key={s.id} className="list-item-btn" onClick={() => setOpenSub(s)} role="button" tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && setOpenSub(s)}>
+                    <div className="row">
+                      <strong>{lookups.templateName(s.template_id)}</strong>
+                      {nc && <span className="badge status-open">{nc.value}</span>}
+                    </div>
+                    <div className="muted small">
+                      {lookups.userName(s.submitted_by)} · {fmtDate(s.created_at)}
+                      {s.attachments.length > 0 && ` · ${s.attachments.length} allegat${s.attachments.length === 1 ? 'o' : 'i'}`}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </section>
 
           <section>
-            <h3>Task ({pin.tasks.length})</h3>
+            <div className="row">
+              <h3>Task ({pin.tasks.length})</h3>
+              <button type="button" className="btn small" onClick={() => setNewTask(true)}>
+                + Nuovo task
+              </button>
+            </div>
             {pin.tasks.length === 0 && <p className="muted small">Nessun task.</p>}
             <ul className="list">
               {pin.tasks.map((t) => (
@@ -175,13 +199,60 @@ export default function PinPanel({ pinId, lookups, onClose, onChanged }: Props) 
             pinId={pinId}
             templates={Object.values(lookups.templates)}
             onCancel={() => setFilling(false)}
-            onSaved={async () => {
+            onSaved={async (sub) => {
               setFilling(false)
+              await load()
+              onChanged()
+              const tpl = lookups.templates[sub.template_id]
+              if (tpl && findNonConformity(tpl.schema_def as FormSchema, sub.data_json as FormData)) setProposeTaskFor(sub)
+            }}
+          />
+        </Modal>
+      )}
+      {proposeTaskFor && lookups.templates[proposeTaskFor.template_id] && (
+        <Modal title="Non conformità rilevata: crea un task?" onClose={() => setProposeTaskFor(null)}>
+          <TaskForm
+            pinId={pinId}
+            members={members}
+            draft={taskDraftFromSubmission(lookups.templates[proposeTaskFor.template_id], proposeTaskFor.data_json as FormData, pin?.label)}
+            onCancel={() => setProposeTaskFor(null)}
+            onSaved={async () => {
+              setProposeTaskFor(null)
               await load()
               onChanged()
             }}
           />
         </Modal>
+      )}
+      {newTask && (
+        <Modal title={`Nuovo task — ${pin?.label || 'Pin senza etichetta'}`} onClose={() => setNewTask(false)}>
+          <TaskForm
+            pinId={pinId}
+            members={members}
+            onCancel={() => setNewTask(false)}
+            onSaved={async () => {
+              setNewTask(false)
+              await load()
+              onChanged()
+            }}
+          />
+        </Modal>
+      )}
+      {openSub && lookups.templates[openSub.template_id] && (
+        <SubmissionDetail
+          submission={openSub}
+          template={lookups.templates[openSub.template_id]}
+          pinId={pinId}
+          pinLabel={pin?.label}
+          lookups={lookups}
+          members={members}
+          canEdit={isManager(user) || openSub.submitted_by === user?.id}
+          onClose={() => setOpenSub(null)}
+          onChanged={async () => {
+            await load()
+            onChanged()
+          }}
+        />
       )}
     </aside>
   )
