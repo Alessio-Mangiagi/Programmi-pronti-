@@ -31,7 +31,8 @@ export function createApi(opts: ApiOptions) {
     } catch (e) {
       throw new ApiError(0, 'Rete non disponibile', e)
     }
-    if (res.status === 401) opts.onUnauthorized?.()
+    // 401 sul login = credenziali errate, non sessione scaduta: lo gestisce la schermata.
+    if (res.status === 401 && !path.endsWith('/auth/login')) opts.onUnauthorized?.()
     if (res.status === 204) return undefined as T
     const text = await res.text()
     let data: unknown = null

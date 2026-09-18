@@ -42,8 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout])
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data, error } = await api.POST('/auth/login', { body: { email, password } })
-    if (error || !data) throw new Error(errorMessage(error, 'Credenziali non valide'))
+    const { data, error, response } = await api.POST('/auth/login', { body: { email, password } })
+    if (response.status === 401) throw new Error('Email o password errati')
+    if (error || !data) throw new Error(errorMessage(error, 'Accesso non riuscito'))
     setToken(data.access_token)
     setUser(data.user)
   }, [])

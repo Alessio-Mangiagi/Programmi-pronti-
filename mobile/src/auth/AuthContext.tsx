@@ -59,7 +59,13 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const res = await api.post<LoginResponse>('/auth/login', { email, password })
+      let res: LoginResponse
+      try {
+        res = await api.post<LoginResponse>('/auth/login', { email, password })
+      } catch (e) {
+        if ((e as { status?: number }).status === 401) throw new Error('Email o password errati')
+        throw e
+      }
       await setToken(res.access_token)
       await cacheUser(res.user)
       setUser(res.user)

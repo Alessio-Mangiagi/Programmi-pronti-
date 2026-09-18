@@ -87,7 +87,7 @@ def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends
         audit.record(db, "auth.login_failed", actor_email=email, request=request,
                      details={"reason": "inactive" if user is not None and not user.is_active else "invalid"})
         db.commit()
-        raise HTTPException(401, "invalid credentials")
+        raise HTTPException(401, "Email o password errati")
     audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request)
     db.commit()
     return schemas.TokenResponse(access_token=auth.create_access_token(user), user=user)
