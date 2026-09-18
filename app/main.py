@@ -50,6 +50,7 @@ from . import events
 from . import audit
 from . import pdf
 from . import stats as st_stats
+from . import wbs_import
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
 
@@ -960,6 +961,119 @@ def create_wbs_node(project_id: str, payload: schemas.WbsNodeCreate, request: Re
     db.commit()
     db.refresh(node)
     return _wbs_out([node], db)[0]
+
+
+WBS_IMPORT_MAX_BYTES = 5 * 1024 * 1024
+
+
+@app.post("/projects/{project_id}/wbs/import", response_model=schemas.WbsImportResult)
+async def import_wbs(project_id: str, request: Request, file: UploadFile = File(...), dry_run: bool = False,
+                     db: Session = Depends(get_db), user: models.User = Depends(require_role(UserRole.manager))):
+    """
+    Importa/aggiorna l'albero da Excel o CSV (formato in app/wbs_import.py). Le voci si
+    riconoscono per codice: stesso codice = aggiornamento, nuovo codice o senza codice =
+    creazione. Con dry_run=true restituisce solo l'anteprima riga per riga, senza scrivere.
+    """
+    auth.assert_project_access(db, user, project_id)
+    data = await file.read(WBS_IMPORT_MAX_BYTES + 1)
+    if len(data) > WBS_IMPORT_MAX_BYTES:
+        raise HTTPException(413, f"file larger than {WBS_IMPORT_MAX_BYTES} bytes")
+    try:
+        parsed = wbs_import.parse(data, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if parsed.errors:
+        raise HTTPException(422, "; ".join(parsed.errors))
+
+    existing = db.query(models.WbsNode).filter(models.WbsNode.project_id == project_id).all()
+    by_code = {n.code: n for n in existing if n.code}
+    file_codes = {r.code for r in parsed.rows if r.code and not r.error}
+
+    # Chiave in memoria di ogni voce (esistente: id; nuova: ("new", riga)) e padre risultante,
+    # per trovare i cicli prima di scrivere (vale anche per l'anteprima).
+    key_of_code = {c: n.id for c, n in by_code.items()}
+    parent_key: dict = {n.id: n.parent_id for n in existing}
+    row_key = {}
+    for r in parsed.rows:
+        if r.error:
+            continue
+        if r.parent_code and r.parent_code not in file_codes and r.parent_code not in by_code:
+            r.error = f"padre '{r.parent_code}' non trovato"
+            continue
+        k = key_of_code.get(r.code) if r.code else None
+        if k is None:
+            k = ("new", r.row)
+            if r.code:
+                key_of_code[r.code] = k
+        row_key[r.row] = k
+    for r in parsed.rows:
+        if r.error:
+            continue
+        parent_key[row_key[r.row]] = key_of_code[r.parent_code] if r.parent_code else None
+    for r in parsed.rows:
+        if r.error:
+            continue
+        k = row_key[r.row]
+        p, hops = parent_key.get(k), 0
+        while p is not None and hops < 10_000:
+            if p == k:
+                r.error = "il padre è una sua sottovoce (ciclo)"
+                break
+            p, hops = parent_key.get(p), hops + 1
+
+    out_rows = [
+        schemas.WbsImportRow(row=r.row, code=r.code, name=r.name, parent_code=r.parent_code,
+                             action="error" if r.error else ("update" if r.code in by_code else "create"), error=r.error)
+        for r in parsed.rows
+    ]
+    result = schemas.WbsImportResult(
+        dry_run=dry_run, rows=out_rows,
+        created=sum(1 for x in out_rows if x.action == "create"),
+        updated=sum(1 for x in out_rows if x.action == "update"),
+        errors=sum(1 for x in out_rows if x.action == "error"),
+    )
+    if dry_run:
+        return result
+
+    # Scrittura: prima le voci (nome), poi i padri, poi le posizioni delle nuove in coda ai fratelli.
+    now = utcnow()
+    node_of_key: dict = {n.id: n for n in existing}
+    new_nodes: list[tuple[models.WbsNode, object]] = []
+    for r in parsed.rows:
+        if r.error:
+            continue
+        k = row_key[r.row]
+        if k in node_of_key:
+            n = node_of_key[k]
+            if n.name != r.name:
+                n.name, n.updated_at = r.name, now
+        else:
+            n = models.WbsNode(project_id=project_id, code=r.code, name=r.name, position=0)
+            db.add(n)
+            node_of_key[k] = n
+            new_nodes.append((n, k))
+    for r in parsed.rows:
+        if r.error:
+            continue
+        n = node_of_key[row_key[r.row]]
+        parent = node_of_key[key_of_code[r.parent_code]] if r.parent_code else None
+        if parent is not None:
+            db.flush()   # id del padre appena creato
+        pid = parent.id if parent is not None else None
+        if n.parent_id != pid:
+            n.parent, n.updated_at = parent, now
+    db.flush()
+    sibling_max: dict = {}
+    for n in existing:
+        sibling_max[n.parent_id] = max(sibling_max.get(n.parent_id, 0), n.position)
+    for n, _ in new_nodes:
+        sibling_max[n.parent_id] = sibling_max.get(n.parent_id, 0) + 1
+        n.position = sibling_max[n.parent_id]
+    audit.record(db, "wbs.imported", user, entity_type="project", entity_id=project_id, project_id=project_id,
+                 request=request, details={"file": file.filename, "created": result.created, "updated": result.updated,
+                                           "errors": result.errors})
+    db.commit()
+    return result
 
 
 @app.get("/wbs/{node_id}", response_model=schemas.WbsNodeDetail)

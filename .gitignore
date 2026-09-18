@@ -13,6 +13,7 @@ mobile/dist/
 web/dist/
 web/test-results/
 web/.e2e/
+web/.demo/
 web/playwright-report/
 mobile/.claude/
 mobile/.e2e/

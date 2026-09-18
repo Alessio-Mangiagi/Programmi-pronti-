@@ -7,6 +7,7 @@ import Icon from '../components/Icon'
 import Loading from '../components/Loading'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
+import WbsImportForm from '../components/WbsImportForm'
 import SubmissionDetail from '../forms/SubmissionDetail'
 import SubmissionForm from '../forms/SubmissionForm'
 import { findNonConformity } from '../forms/nonConformity'
@@ -62,6 +63,7 @@ export default function WbsPage() {
   // Modale per nuova voce (parent = null → radice) e modifica voce
   const [adding, setAdding] = useState<{ parentId: string | null } | null>(null)
   const [editing, setEditing] = useState<WbsNode | null>(null)
+  const [importing, setImporting] = useState(false)
 
   const loadNodes = useCallback(async () => {
     const { data, error } = await api.GET('/projects/{project_id}/wbs', { params: { path: { project_id: projectId } } })
@@ -175,9 +177,14 @@ export default function WbsPage() {
           <h1>WBS</h1>
         </div>
         {canEdit && (
-          <button className="btn btn-primary" onClick={() => setAdding({ parentId: null })}>
-            + Voce principale
-          </button>
+          <div className="topbar-actions">
+            <button className="btn" onClick={() => setImporting(true)}>
+              Importa da Excel/CSV
+            </button>
+            <button className="btn btn-primary" onClick={() => setAdding({ parentId: null })}>
+              + Voce principale
+            </button>
+          </div>
         )}
       </header>
       <div className="wbs-page">
@@ -188,7 +195,7 @@ export default function WbsPage() {
           ) : tree.length === 0 ? (
             <div className="empty small">
               Nessuna voce WBS.{' '}
-              {canEdit ? 'Crea la prima con "+ Voce principale".' : 'Chiedi a un responsabile di impostare la WBS.'}
+              {canEdit ? 'Crea la prima con "+ Voce principale" o importa un file Excel/CSV.' : 'Chiedi a un responsabile di impostare la WBS.'}
             </div>
           ) : (
             <ul className="wbs-root" role="tree">
@@ -232,6 +239,18 @@ export default function WbsPage() {
               if (adding.parentId) setExpanded((prev) => new Set(prev).add(adding.parentId!))
               await loadNodes()
               if (data) select(data.id)
+            }}
+          />
+        </Modal>
+      )}
+      {importing && (
+        <Modal title="Importa WBS da Excel/CSV" onClose={() => setImporting(false)}>
+          <WbsImportForm
+            projectId={projectId}
+            onCancel={() => setImporting(false)}
+            onDone={async () => {
+              setImporting(false)
+              await loadNodes()
             }}
           />
         </Modal>

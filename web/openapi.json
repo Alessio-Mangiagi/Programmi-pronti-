@@ -2096,6 +2096,71 @@
         }
       }
     },
+    "/projects/{project_id}/wbs/import": {
+      "post": {
+        "summary": "Import Wbs",
+        "description": "Importa/aggiorna l'albero da Excel o CSV (formato in app/wbs_import.py). Le voci si\nriconoscono per codice: stesso codice = aggiornamento, nuovo codice o senza codice =\ncreazione. Con dry_run=true restituisce solo l'anteprima riga per riga, senza scrivere.",
+        "operationId": "import_wbs_projects__project_id__wbs_import_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Dry Run"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_wbs_projects__project_id__wbs_import_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WbsImportResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wbs/{node_id}": {
       "get": {
         "summary": "Get Wbs Node",
@@ -3585,6 +3650,20 @@
           "offset"
         ],
         "title": "AuditPage"
+      },
+      "Body_import_wbs_projects__project_id__wbs_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_wbs_projects__project_id__wbs_import_post"
       },
       "Body_upload_attachment_attachments__attachment_id__upload_post": {
         "properties": {
@@ -6113,6 +6192,99 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WbsImportResult": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/WbsImportRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dry_run",
+          "rows",
+          "created",
+          "updated",
+          "errors"
+        ],
+        "title": "WbsImportResult",
+        "description": "Esito (o anteprima, se dry_run) dell'import da Excel/CSV: una riga per riga del file."
+      },
+      "WbsImportRow": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parent_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Code"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "name",
+          "action"
+        ],
+        "title": "WbsImportRow"
       },
       "WbsNodeCreate": {
         "properties": {

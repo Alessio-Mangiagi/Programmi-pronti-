@@ -448,6 +448,24 @@ class WbsNodeOut(BaseModel):
     updated_at: datetime
 
 
+class WbsImportRow(BaseModel):
+    row: int
+    code: Optional[str] = None
+    name: str
+    parent_code: Optional[str] = None
+    action: str            # create | update | error
+    error: Optional[str] = None
+
+
+class WbsImportResult(BaseModel):
+    """Esito (o anteprima, se dry_run) dell'import da Excel/CSV: una riga per riga del file."""
+    dry_run: bool
+    rows: list[WbsImportRow]
+    created: int
+    updated: int
+    errors: int
+
+
 class WbsNodeDetail(WbsNodeOut):
     """Voce con i moduli compilati su di essa: è ciò che apre la vista WBS al click."""
     submissions: list[SubmissionOut] = []

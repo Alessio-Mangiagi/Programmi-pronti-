@@ -1,8 +1,9 @@
 @echo off
 REM Avvia Field View in modalita' test/demo: build del frontend + server con
-REM DB SQLite usa-e-getta e dati demo (scripts/e2e_server.py) su http://localhost:8010
+REM DB SQLite usa-e-getta e dati demo (scripts/e2e_server.py) su http://localhost:8010.
+REM Usa web\.demo (non web\.e2e) cosi' non entra in conflitto con i test Playwright.
 REM Uso: avvia_test.bat [--keep] [--no-build]
-REM   --keep      non azzera DB e storage in web\.e2e
+REM   --keep      non azzera DB e storage in web\.demo
 REM   --no-build  salta "npm run build" (usa web\dist esistente)
 
 setlocal
@@ -40,12 +41,12 @@ if "%BUILD%"=="1" (
     )
 )
 
-echo [2/2] Avvio server su http://localhost:%PORT% (DB e dati demo in web\.e2e)
+echo [2/2] Avvio server su http://localhost:%PORT% (DB e dati demo in web\.demo)
 echo       Login demo: password "demo1234" (utenti admin / manager / field, vedi scripts\seed.py)
 echo       Ctrl+C per fermare.
 REM apre il browser in una finestra separata appena il server risponde
 start "" /min cmd /c ""%~f0" --wait-and-open"
-"%PYTHON%" -m scripts.e2e_server --port %PORT% %KEEP%
+"%PYTHON%" -m scripts.e2e_server --port %PORT% --dir web\.demo %KEEP%
 endlocal
 exit /b
 

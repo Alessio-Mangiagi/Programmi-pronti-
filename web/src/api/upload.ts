@@ -1,5 +1,5 @@
 import { getToken, onUnauthorized } from '../auth/token'
-import type { Attachment, Plan } from './types'
+import type { Attachment, Plan, WbsImportResult } from './types'
 
 export const PLAN_FILE_ACCEPT = 'image/png,image/jpeg,application/pdf,.png,.jpg,.jpeg,.pdf'
 export const PLAN_FILE_MAX_BYTES = 20 * 1024 * 1024
@@ -12,6 +12,13 @@ export function uploadPlanFile(planId: string, file: File, onProgress?: (fractio
 /** Byte di un allegato già creato con POST /attachments. */
 export function uploadAttachmentFile(attachmentId: string, file: File, onProgress?: (fraction: number) => void): Promise<Attachment> {
   return uploadMultipart(`/api/attachments/${encodeURIComponent(attachmentId)}/upload`, file, onProgress)
+}
+
+export const WBS_FILE_ACCEPT = '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv'
+
+/** Albero WBS da Excel/CSV; con dryRun solo l'anteprima riga per riga (niente scritto). */
+export function importWbsFile(projectId: string, file: File, dryRun: boolean): Promise<WbsImportResult> {
+  return uploadMultipart(`/api/projects/${encodeURIComponent(projectId)}/wbs/import?dry_run=${dryRun}`, file)
 }
 
 /**
@@ -53,4 +60,7 @@ const UPLOAD_ERRORS: Record<string, string> = {
   'only JPEG, PNG or PDF allowed': 'Formato non supportato: usa PNG, JPG o PDF',
   'cannot render PDF': 'Il PDF non si riesce a convertire in immagine',
   'cannot read image': "Impossibile leggere l'immagine",
+  'cannot read xlsx': 'File Excel non leggibile',
+  'xls not supported: save as xlsx or csv': 'Formato .xls non supportato: salva come .xlsx o .csv',
+  'empty file': 'Il file è vuoto',
 }

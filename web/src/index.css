@@ -614,3 +614,10 @@ input:focus, select:focus, textarea:focus {
   .wbs-page { flex-direction: column; }
   .wbs-tree { width: 100%; max-height: 40%; border-right: 0; border-bottom: 1px solid var(--border); }
 }
+
+/* Import WBS da file: anteprima riga per riga */
+.wbs-import-preview { max-height: 45vh; overflow-y: auto; margin-bottom: 1rem; }
+.wbs-import .row-error td { background: rgba(192, 57, 43, 0.06); }
+.error-text { color: var(--danger); }
+.badge.import-create { background: var(--cosedil-green); color: var(--text-strong); }
+.badge.import-update { background: var(--row-hover); color: var(--primary); }

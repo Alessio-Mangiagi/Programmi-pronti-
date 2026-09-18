@@ -597,3 +597,32 @@ test('WBS del cantiere: albero, voce selezionata, compilazione modulo sulla voce
   await expect(page.locator('.toast-error').last()).toBeVisible()
   await expect(panel.locator('.wbs-title')).toHaveText('01.02 Solai')
 })
+
+test('WBS: import da CSV con anteprima, aggiornamento per codice e righe in errore', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'WBS' }).click()
+  await page.getByRole('button', { name: 'Importa da Excel/CSV' }).click()
+  const modal = page.getByRole('dialog')
+
+  // "01" esiste già nel seed → aggiornamento; 04 e 04.01 nuove; una riga senza nome
+  const csv = 'codice;nome\n01;Opere strutturali (rev. 2)\n04;Sicurezza\n04.01;Ponteggi\n05;\n'
+  await modal.locator('#wbs-file').setInputFiles({ name: 'wbs.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf-8') })
+  await expect(modal.getByText(/2.*nuove.*1.*da aggiornare.*1.*righe con errori/)).toBeVisible()
+  const rows = modal.locator('tbody tr')
+  await expect(rows).toHaveCount(4)
+  await expect(rows.nth(0)).toContainText('Aggiorna')
+  await expect(rows.nth(2)).toContainText('04')
+  await expect(rows.nth(2)).toContainText('Nuova')
+  await expect(rows.nth(3)).toContainText('nome mancante')
+
+  await modal.getByRole('button', { name: 'Importa 3 voci' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('2 nuove, 1 aggiornate, 1 righe saltate')
+  await expect(modal).toBeHidden()
+  const tree = page.getByRole('tree')
+  await expect(tree.getByRole('treeitem', { name: /Opere strutturali \(rev\. 2\)/ })).toBeVisible()
+  const sicurezza = tree.getByRole('treeitem', { name: /Sicurezza/ })
+  await expect(sicurezza).toBeVisible()
+  await sicurezza.getByRole('button', { name: 'Apri' }).click()
+  await expect(tree.getByRole('treeitem', { name: /Ponteggi/ })).toBeVisible()
+})

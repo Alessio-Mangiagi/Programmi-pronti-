@@ -588,6 +588,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/wbs/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Wbs
+         * @description Importa/aggiorna l'albero da Excel o CSV (formato in app/wbs_import.py). Le voci si
+         *     riconoscono per codice: stesso codice = aggiornamento, nuovo codice o senza codice =
+         *     creazione. Con dry_run=true restituisce solo l'anteprima riga per riga, senza scrivere.
+         */
+        post: operations["import_wbs_projects__project_id__wbs_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wbs/{node_id}": {
         parameters: {
             query?: never;
@@ -1033,6 +1055,11 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** Body_import_wbs_projects__project_id__wbs_import_post */
+        Body_import_wbs_projects__project_id__wbs_import_post: {
+            /** File */
+            file: string;
         };
         /** Body_upload_attachment_attachments__attachment_id__upload_post */
         Body_upload_attachment_attachments__attachment_id__upload_post: {
@@ -2003,6 +2030,37 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WbsImportResult
+         * @description Esito (o anteprima, se dry_run) dell'import da Excel/CSV: una riga per riga del file.
+         */
+        WbsImportResult: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** Rows */
+            rows: components["schemas"]["WbsImportRow"][];
+            /** Created */
+            created: number;
+            /** Updated */
+            updated: number;
+            /** Errors */
+            errors: number;
+        };
+        /** WbsImportRow */
+        WbsImportRow: {
+            /** Row */
+            row: number;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name: string;
+            /** Parent Code */
+            parent_code?: string | null;
+            /** Action */
+            action: string;
+            /** Error */
+            error?: string | null;
         };
         /** WbsNodeCreate */
         WbsNodeCreate: {
@@ -3408,6 +3466,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WbsNodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_wbs_projects__project_id__wbs_import_post: {
+        parameters: {
+            query?: {
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_wbs_projects__project_id__wbs_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WbsImportResult"];
                 };
             };
             /** @description Validation Error */
