@@ -14,6 +14,9 @@ const PATHS = {
   'list-checks': 'M10 6h11 M10 12h11 M10 18h11 M3 6l1.5 1.5L7 5 M3 12l1.5 1.5L7 11 M3 18l1.5 1.5L7 17',
   tag: 'M20 12l-8 8-9-9V4h7l10 8z M7.5 7.5h.01',
   crosshair: 'M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  'chevron-right': 'M9 6l6 6-6 6',
+  'chevron-down': 'M6 9l6 6 6-6',
+  tree: 'M12 3v6 M12 9H6v4 M12 9h6v4 M4 13h4v4H4z M16 13h4v4h-4z M10 3h4v6h-4z',
 } as const
 
 export type IconName = keyof typeof PATHS

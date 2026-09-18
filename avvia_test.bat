@@ -31,7 +31,7 @@ if not exist "%PYTHON%" (
 )
 
 if "%BUILD%"=="1" (
-    echo [1/2] Build frontend (web\dist)...
+    echo [1/2] Build frontend ^(web\dist^)...
     call npm --prefix web run build
     if errorlevel 1 (
         echo [ERRORE] Build fallita.

@@ -907,6 +907,117 @@ def get_pin(pin_id: str, db: Session = Depends(get_db), user: models.User = Depe
     return out
 
 
+# ---------- WBS (albero per cantiere) ----------
+
+def _get_wbs_node(db: Session, user: models.User, node_id: str) -> models.WbsNode:
+    node = db.get(models.WbsNode, node_id)
+    if node is None:
+        raise HTTPException(404, "wbs node not found")
+    auth.assert_project_access(db, user, node.project_id)
+    return node
+
+
+def _wbs_out(nodes: list[models.WbsNode], db: Session) -> list[schemas.WbsNodeOut]:
+    ids = [n.id for n in nodes]
+    counts = dict(
+        db.query(models.FormSubmission.wbs_node_id, func.count())
+        .filter(models.FormSubmission.wbs_node_id.in_(ids), models.FormSubmission.deleted_at.is_(None))
+        .group_by(models.FormSubmission.wbs_node_id).all()
+    ) if ids else {}
+    out = []
+    for n in nodes:
+        o = schemas.WbsNodeOut.model_validate(n)
+        o.submissions_count = counts.get(n.id, 0)
+        out.append(o)
+    return out
+
+
+@app.get("/projects/{project_id}/wbs", response_model=list[schemas.WbsNodeOut])
+def list_wbs(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Tutte le voci WBS del cantiere, piatte e ordinate (position, code): il client ricostruisce l'albero."""
+    auth.assert_project_access(db, user, project_id)
+    nodes = (db.query(models.WbsNode).filter(models.WbsNode.project_id == project_id)
+             .order_by(models.WbsNode.position, models.WbsNode.code, models.WbsNode.name).all())
+    return _wbs_out(nodes, db)
+
+
+@app.post("/projects/{project_id}/wbs", response_model=schemas.WbsNodeOut, status_code=201)
+def create_wbs_node(project_id: str, payload: schemas.WbsNodeCreate, request: Request, db: Session = Depends(get_db),
+                    user: models.User = Depends(require_role(UserRole.manager))):
+    """Nuova voce (radice o figlia di parent_id, che deve stare nello stesso cantiere); va in coda tra i fratelli."""
+    auth.assert_project_access(db, user, project_id)
+    if payload.parent_id is not None:
+        parent = db.get(models.WbsNode, payload.parent_id)
+        if parent is None or parent.project_id != project_id:
+            raise HTTPException(422, "parent_id: wbs node not found in this project")
+    last = (db.query(func.max(models.WbsNode.position))
+            .filter(models.WbsNode.project_id == project_id, models.WbsNode.parent_id == payload.parent_id).scalar())
+    node = models.WbsNode(project_id=project_id, position=(last or 0) + 1, **payload.model_dump())
+    db.add(node)
+    db.flush()
+    audit.record(db, "wbs.created", user, entity_type="wbs_node", entity_id=node.id, project_id=project_id,
+                 request=request, details={"code": node.code, "name": node.name, "parent_id": node.parent_id})
+    db.commit()
+    db.refresh(node)
+    return _wbs_out([node], db)[0]
+
+
+@app.get("/wbs/{node_id}", response_model=schemas.WbsNodeDetail)
+def get_wbs_node(node_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Voce con i moduli compilati su di essa (non cancellati), dal più recente."""
+    node = _get_wbs_node(db, user, node_id)
+    subs = (_alive(db.query(models.FormSubmission).filter_by(wbs_node_id=node_id), models.FormSubmission)
+            .order_by(models.FormSubmission.created_at.desc()).all())
+    out = schemas.WbsNodeDetail.model_validate(node)
+    out.submissions_count = len(subs)
+    out.submissions = [_with_attachments(schemas.SubmissionOut, x) for x in subs]
+    return out
+
+
+@app.patch("/wbs/{node_id}", response_model=schemas.WbsNodeOut)
+def update_wbs_node(node_id: str, payload: schemas.WbsNodeUpdate, request: Request, db: Session = Depends(get_db),
+                    user: models.User = Depends(require_role(UserRole.manager))):
+    """Rinomina, ricodifica, sposta sotto un altro padre (non un proprio discendente) o riordina."""
+    node = _get_wbs_node(db, user, node_id)
+    changes = payload.model_dump(exclude_unset=True)
+    if "parent_id" in changes and changes["parent_id"] != node.parent_id:
+        new_parent = changes["parent_id"]
+        if new_parent is not None:
+            p = db.get(models.WbsNode, new_parent)
+            if p is None or p.project_id != node.project_id:
+                raise HTTPException(422, "parent_id: wbs node not found in this project")
+            while p is not None:
+                if p.id == node.id:
+                    raise HTTPException(422, "parent_id: cannot move a node under itself")
+                p = p.parent
+    for k, v in changes.items():
+        setattr(node, k, v)
+    node.updated_at = utcnow()
+    audit.record(db, "wbs.updated", user, entity_type="wbs_node", entity_id=node.id, project_id=node.project_id,
+                 request=request, details={"fields": sorted(changes.keys()), "code": node.code, "name": node.name})
+    db.commit()
+    db.refresh(node)
+    return _wbs_out([node], db)[0]
+
+
+@app.delete("/wbs/{node_id}", status_code=204)
+def delete_wbs_node(node_id: str, request: Request, db: Session = Depends(get_db),
+                    user: models.User = Depends(require_role(UserRole.manager))):
+    """Elimina una voce senza figli e senza moduli compilati (409 altrimenti)."""
+    node = _get_wbs_node(db, user, node_id)
+    if node.children:
+        raise HTTPException(409, "wbs node has children")
+    if any(s.deleted_at is None for s in node.submissions):
+        raise HTTPException(409, "wbs node has submissions")
+    audit.record(db, "wbs.deleted", user, entity_type="wbs_node", entity_id=node.id, project_id=node.project_id,
+                 request=request, details={"code": node.code, "name": node.name})
+    # le submission soft-deleted restano referenziate: stacchiamole prima
+    for s in node.submissions:
+        s.wbs_node_id = None
+    db.delete(node)
+    db.commit()
+
+
 # ---------- Submissions (uso da web) ----------
 
 @app.post("/submissions", response_model=schemas.SubmissionOut, status_code=201)
@@ -917,17 +1028,19 @@ def create_submission(payload: schemas.SubmissionCreate, request: Request, db: S
         raise HTTPException(404, "template not found")
     if template.archived_at is not None:
         raise HTTPException(409, "template is archived")
-    _get_pin(db, user, payload.pin_id)
+    if payload.pin_id:
+        project_id = auth.project_of_pin(_get_pin(db, user, payload.pin_id))
+    else:
+        project_id = _get_wbs_node(db, user, payload.wbs_node_id).project_id
     errors = validate_submission(template.schema_def, payload.data_json)
     if errors:
         raise HTTPException(422, detail=errors)
     sub = models.FormSubmission(**payload.model_dump(exclude={"submitted_by"}), submitted_by=user.id)
     db.add(sub)
     db.flush()
-    project_id = auth.project_of_pin(sub.pin)
     events.record_submission_created(db, sub, project_id, user.id)
     audit.record(db, "submission.created", user, entity_type="submission", entity_id=sub.id, project_id=project_id,
-                 request=request, details={"template": template.name, "pin_id": sub.pin_id})
+                 request=request, details={"template": template.name, "pin_id": sub.pin_id, "wbs_node_id": sub.wbs_node_id})
     db.commit()
     db.refresh(sub)
     return _with_attachments(schemas.SubmissionOut, sub)
@@ -1338,7 +1451,7 @@ def sync_push(payload: schemas.SyncPushRequest, request: Request, db: Session = 
             return "exactly one of submission_id or task_id is required"
         parent = (db.get(models.FormSubmission, item.submission_id) if item.submission_id
                   else db.get(models.Task, item.task_id))
-        return forbidden(auth.project_of_pin(parent.pin))
+        return forbidden(auth.project_of_submission(parent) if item.submission_id else auth.project_of_task(parent))
 
     # Stato precedente dei task e submission già note: per capire cosa è cambiato davvero.
     task_before = {t.id: {"status": t.status.value, "assigned_to": t.assigned_to}

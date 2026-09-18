@@ -61,7 +61,8 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 - `app/audit.py` — registro operazioni (`audit_log`): catalogo azioni + `record()` chiamato dagli endpoint nella stessa transazione; spazio admin web `/admin/users`, `/admin/audit`
 - `app/events.py` — outbox eventi (`events`) + regole di notifica (`notifications` pending), scritti nella stessa transazione da web e sync push
 - `scripts/seed.py` — dati demo idempotenti
-- `app/main.py` — endpoint FastAPI: CRUD web (`/submissions` + `PATCH`, `/tasks`, `/pins/{id}`, `DELETE /attachments/{id}`) e `/sync/push` / `/sync/pull`
+- `app/models.py: WbsNode` — albero WBS per cantiere (`/projects/{id}/wbs`, `/wbs/{id}`); i moduli si compilano anche su una voce WBS (`FormSubmission.wbs_node_id`, alternativo a `pin_id`); pagina web `/projects/{id}/wbs`. Solo web: le submission su WBS non entrano nel sync dell'app
+- `app/main.py` — endpoint FastAPI: CRUD web (`/submissions` + `PATCH`, `/tasks`, `/pins/{id}`, `/wbs/{id}`, `DELETE /attachments/{id}`) e `/sync/push` / `/sync/pull`
 - `app/database.py` — engine/session; `DATABASE_URL` da `.env`/ambiente
 - `app/server.py` — entry point di produzione: `/api` + statici di `web/dist` (SPA fallback)
 - `scripts/e2e_server.py` — server per gli smoke test Playwright (SQLite temporaneo + seed + `app.server`)

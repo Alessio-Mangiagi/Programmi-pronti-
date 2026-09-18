@@ -7,7 +7,9 @@ Concetti chiave:
 - Pin: un punto sulla planimetria (coordinate x/y relative 0-1, così funzionano
   a qualunque risoluzione l'immagine venga renderizzata)
 - FormTemplate: definizione di un modulo dinamico (lo schema JSON dei campi)
+- WbsNode: una voce dell'albero WBS (Work Breakdown Structure) del cantiere
 - FormSubmission: un'istanza compilata di un FormTemplate, agganciata a un Pin
+  oppure a una voce WBS (esattamente uno dei due)
 - Task: un'azione da seguire (es. "risolvi questo difetto"), con stato e assegnatario
 - Attachment: foto/file collegati a una submission o a un task
 
@@ -163,6 +165,31 @@ class Project(Base):
 
     plans = relationship("Plan", back_populates="project")
     commessa = relationship("Commessa", back_populates="projects")
+    wbs_nodes = relationship("WbsNode", back_populates="project")
+
+
+class WbsNode(Base):
+    """
+    Voce dell'albero WBS di un cantiere (es. "01 Opere strutturali" > "01.02 Solai").
+    Ogni cantiere ha il suo albero; selezionando una voce sul web si compilano
+    i moduli agganciati a quella voce (FormSubmission.wbs_node_id). Solo web,
+    non viaggia nel sync: le submission su WBS sono escluse dal pull dell'app.
+    """
+    __tablename__ = "wbs_nodes"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False, index=True)
+    parent_id = Column(String, ForeignKey("wbs_nodes.id"), nullable=True, index=True)
+    code = Column(String, nullable=True)       # es. "01.02"
+    name = Column(String, nullable=False)
+    position = Column(Integer, default=0, nullable=False)   # ordine tra fratelli
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    project = relationship("Project", back_populates="wbs_nodes")
+    parent = relationship("WbsNode", remote_side=[id], back_populates="children")
+    children = relationship("WbsNode", back_populates="parent", order_by="WbsNode.position")
+    submissions = relationship("FormSubmission", back_populates="wbs_node")
 
 
 class Plan(Base):
@@ -221,15 +248,17 @@ class FormTemplate(Base):
 
 
 class FormSubmission(SyncMixin, Base):
-    """Un'istanza compilata di un FormTemplate, agganciata a un pin."""
+    """Un'istanza compilata di un FormTemplate, agganciata a un pin o a una voce WBS (uno dei due)."""
     __tablename__ = "form_submissions"
 
     template_id = Column(String, ForeignKey("form_templates.id"), nullable=False)
-    pin_id = Column(String, ForeignKey("pins.id"), nullable=False, index=True)
+    pin_id = Column(String, ForeignKey("pins.id"), nullable=True, index=True)
+    wbs_node_id = Column(String, ForeignKey("wbs_nodes.id"), nullable=True, index=True)
     data_json = Column(JSONType, nullable=False)       # risposte, chiave = field id
     submitted_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     pin = relationship("Pin", back_populates="submissions")
+    wbs_node = relationship("WbsNode", back_populates="submissions")
     attachments = relationship("Attachment", back_populates="submission")
 
 

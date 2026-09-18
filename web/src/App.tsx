@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import ProjectsPage from './pages/ProjectsPage'
 import PlansPage from './pages/PlansPage'
 import PlanPage from './pages/PlanPage'
+import WbsPage from './pages/WbsPage'
 import TasksPage from './pages/TasksPage'
 import DashboardPage from './pages/DashboardPage'
 import TemplatesPage from './pages/TemplatesPage'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:projectId/plans" element={<PlansPage />} />
         <Route path="/projects/:projectId/plans/:planId" element={<PlanPage />} />
+        <Route path="/projects/:projectId/wbs" element={<WbsPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
         <Route path="/templates" element={<TemplatesHubPage />} />

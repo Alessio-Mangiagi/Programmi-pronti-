@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
@@ -269,10 +269,18 @@ class PresignResponse(BaseModel):
 
 
 class SubmissionCreate(BaseModel):
+    """Compilazione di un modulo su un pin oppure su una voce WBS: esattamente uno dei due."""
     template_id: str
-    pin_id: str
+    pin_id: Optional[str] = None
+    wbs_node_id: Optional[str] = None
     data_json: dict
     submitted_by: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _one_parent(self):
+        if bool(self.pin_id) == bool(self.wbs_node_id):
+            raise ValueError("exactly one of pin_id or wbs_node_id is required")
+        return self
 
 
 class SubmissionUpdate(BaseModel):
@@ -389,6 +397,60 @@ class PinSummary(PinOut):
     tasks_assigned: int = 0
     tasks_resolved: int = 0
     tasks_verified: int = 0
+
+
+# ---------- WBS ----------
+
+class WbsNodeCreate(BaseModel):
+    name: str = Field(min_length=1)
+    code: Optional[str] = None
+    parent_id: Optional[str] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_name(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def _strip_code(cls, v):
+        return (v.strip() or None) if isinstance(v, str) else v
+
+
+class WbsNodeUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    code: Optional[str] = None
+    parent_id: Optional[str] = None
+    position: Optional[int] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_name(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def _strip_code(cls, v):
+        return (v.strip() or None) if isinstance(v, str) else v
+
+
+class WbsNodeOut(BaseModel):
+    """Voce dell'albero WBS (lista piatta: il client ricostruisce l'albero da parent_id)."""
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    project_id: str
+    parent_id: Optional[str] = None
+    code: Optional[str] = None
+    name: str
+    position: int
+    submissions_count: int = 0   # solo le proprie (non i discendenti)
+    created_at: datetime
+    updated_at: datetime
+
+
+class WbsNodeDetail(WbsNodeOut):
+    """Voce con i moduli compilati su di essa: è ciò che apre la vista WBS al click."""
+    submissions: list[SubmissionOut] = []
 
 
 class PinDetail(PinOut):

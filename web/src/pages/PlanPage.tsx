@@ -3,8 +3,11 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { PinSummary, Plan, User } from '../api/types'
 import { isManager, useAuth } from '../auth/AuthContext'
-import PlanViewer from '../components/PlanViewer'
+import PlanViewer, { type PlanContextMenuInfo } from '../components/PlanViewer'
 import PinPanel from '../components/PinPanel'
+import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
+import Modal from '../components/Modal'
+import TaskForm, { type TaskTarget } from '../forms/TaskForm'
 import PinFilters, {
   EMPTY_FILTERS,
   filtersFromSearch,
@@ -47,6 +50,12 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
   // ?pin=<id> (link "vedi sulla planimetria"): selezionato e centrato una volta, poi tolto dall'URL
   const [focusPinId, setFocusPinId] = useState<string | null>(() => searchParams.get('pin'))
   const [addMode, setAddMode] = useState(false)
+  // Tasto destro sulla planimetria: menù nel punto cliccato (con il pin sotto al cursore, se c'è)
+  const [menu, setMenu] = useState<PlanContextMenuInfo | null>(null)
+  // Modale "nuovo task" aperta dal menù: su un pin esistente o su un nuovo pin nel punto scelto
+  const [taskTarget, setTaskTarget] = useState<TaskTarget | null>(null)
+  // Incrementato dopo un task creato dal menù: rimonta il pannello (stesso pin) così ricarica i dati
+  const [panelVersion, setPanelVersion] = useState(0)
   // Solo per il caricamento della planimetria (404/403): gli errori delle azioni vanno nei toast.
   const [error, setError] = useState<string | null>(null)
 
@@ -126,6 +135,29 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
     else await loadPins()
     if (data) setSelectedId(data.id)
   }
+
+  async function onTaskSaved(task: { pin_id: string }) {
+    setTaskTarget(null)
+    // un pin nuovo con task aperto passa quasi tutti i filtri, ma per sicurezza mostriamolo sempre
+    if (filtering) setFilters(EMPTY_FILTERS)
+    else await loadPins()
+    setSelectedId(task.pin_id)
+    setPanelVersion((v) => v + 1)
+  }
+
+  const closeMenu = useCallback(() => setMenu(null), [])
+
+  const menuItems: ContextMenuItem[] = menu
+    ? menu.pin
+      ? [
+          { label: '+ Nuovo task su questo pin', onClick: () => setTaskTarget({ pinId: menu.pin!.id }) },
+          { label: 'Apri pin', onClick: () => setSelectedId(menu.pin!.id) },
+        ]
+      : [
+          { label: '+ Nuovo task qui', onClick: () => setTaskTarget({ planId, x: menu.x, y: menu.y }) },
+          { label: '+ Aggiungi pin qui', onClick: () => addPin(menu.x, menu.y) },
+        ]
+    : []
 
   async function movePin(pin: PinSummary, x: number, y: number) {
     // aggiornamento ottimistico: il marker resta dove è stato lasciato
@@ -229,6 +261,10 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
               onSelectPin={(p) => setSelectedId(p.id)}
               onAddAt={addPin}
               onMovePin={movePin}
+              onContextMenu={(info) => {
+                setAddMode(false)
+                setMenu(info)
+              }}
               focusPinId={focusPinId}
               onFocused={onFocused}
             />
@@ -236,10 +272,23 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
             !error && <Loading className="plan-viewer-empty" />
           )}
           {selectedId && (
-            <PinPanel pinId={selectedId} lookups={lookups} members={members} onClose={() => setSelectedId(null)} onChanged={loadPins} />
+            <PinPanel key={`${selectedId}:${panelVersion}`} pinId={selectedId} lookups={lookups} members={members} onClose={() => setSelectedId(null)} onChanged={loadPins} />
           )}
         </div>
       </div>
+      {menu && <ContextMenu x={menu.clientX} y={menu.clientY} items={menuItems} onClose={closeMenu} />}
+      {taskTarget && (
+        <Modal
+          title={
+            'pinId' in taskTarget
+              ? `Nuovo task — ${pins.find((p) => p.id === taskTarget.pinId)?.label || 'Pin senza etichetta'}`
+              : 'Nuovo task sulla planimetria'
+          }
+          onClose={() => setTaskTarget(null)}
+        >
+          <TaskForm target={taskTarget} members={members} onCancel={() => setTaskTarget(null)} onSaved={onTaskSaved} />
+        </Modal>
+      )}
     </>
   )
 }

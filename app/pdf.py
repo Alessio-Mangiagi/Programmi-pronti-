@@ -151,18 +151,30 @@ def _value_flowables(f: dict, v: Any, atts: dict[str, models.Attachment]) -> lis
     return [_p(str(v), "value")]
 
 
+def _project_of(sub: models.FormSubmission) -> models.Project:
+    return sub.pin.plan.project if sub.pin_id else sub.wbs_node.project
+
+
 def _header_block(sub: models.FormSubmission, template: models.FormTemplate, db: Session) -> list:
-    pin = sub.pin
-    plan = pin.plan
-    project = plan.project
+    project = _project_of(sub)
     commessa = project.commessa
     author = db.get(models.User, sub.submitted_by) if sub.submitted_by else None
 
+    if sub.pin_id:
+        pin = sub.pin
+        where = [["Planimetria", pin.plan.name], ["Pin", pin.label or f"({pin.x:.2f}, {pin.y:.2f})"]]
+    else:
+        # voce WBS con il percorso dalla radice (es. "01 Strutture › 01.02 Solai")
+        chain = []
+        n = sub.wbs_node
+        while n is not None:
+            chain.append(f"{n.code} {n.name}".strip() if n.code else n.name)
+            n = n.parent
+        where = [["Voce WBS", " › ".join(reversed(chain))]]
     rows = [
         ["Commessa", f"{commessa.code} · {commessa.name}" if commessa else "—"],
         ["Cantiere", project.name],
-        ["Planimetria", plan.name],
-        ["Pin", pin.label or f"({pin.x:.2f}, {pin.y:.2f})"],
+        *where,
         ["Compilato da", f"{author.name} ({author.email})" if author else "—"],
         ["Data", _fmt_dt(sub.created_at) + (f" · modificato {_fmt_dt(sub.updated_at)}" if sub.updated_at != sub.created_at else "")],
     ]
@@ -214,7 +226,7 @@ def build_submission_pdf(db: Session, sub: models.FormSubmission, template: mode
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN, topMargin=MARGIN + 4 * mm,
-                            bottomMargin=MARGIN, title=f"{template.name} — {sub.pin.plan.project.name}",
+                            bottomMargin=MARGIN, title=f"{template.name} — {_project_of(sub).name}",
                             author="Field View")
     story: list = _header_block(sub, template, db)
     for f in template.schema_def["fields"]:

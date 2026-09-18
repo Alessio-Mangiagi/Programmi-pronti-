@@ -7,8 +7,11 @@ import { useToast } from '../components/Toast'
 import { isLocal, releaseAttachment, type AttachmentKind, type AttachmentMap, type RemoteAttachment } from './attachments'
 import DynamicForm, { type AttachmentChange } from './DynamicForm'
 
+/** Dove agganciare la compilazione: un pin della planimetria oppure una voce WBS del cantiere. */
+export type SubmissionTarget = { pinId: string } | { wbsNodeId: string }
+
 type Props = {
-  pinId: string
+  target: SubmissionTarget
   templates: FormTemplate[]
   /** Template preselezionato (se uno solo, o scelto fuori dal form). */
   templateId?: string
@@ -33,7 +36,7 @@ export function remoteAttachments(sub: Submission): AttachmentMap {
  * validazione locale (form-core, identica al server) → POST /submissions →
  * upload di foto e firma (POST /attachments con l'id già in data_json + byte).
  */
-export default function SubmissionForm({ pinId, templates, templateId: initialTemplateId, submission, onSaved, onCancel }: Props) {
+export default function SubmissionForm({ target, templates, templateId: initialTemplateId, submission, onSaved, onCancel }: Props) {
   const fixedTemplate = submission?.template_id ?? initialTemplateId
   const [templateId, setTemplateId] = useState(fixedTemplate ?? (templates.length === 1 ? templates[0].id : ''))
   const template = templates.find((t) => t.id === templateId)
@@ -56,7 +59,7 @@ export default function SubmissionForm({ pinId, templates, templateId: initialTe
       )}
       {template ? (
         // key = template: cambiando modulo si riparte dai default, foto e firme comprese
-        <Editor key={template.id} pinId={pinId} template={template} submission={submission} onSaved={onSaved} onCancel={onCancel} onBusy={setBusy} />
+        <Editor key={template.id} target={target} template={template} submission={submission} onSaved={onSaved} onCancel={onCancel} onBusy={setBusy} />
       ) : (
         <div className="row form-actions">
           <button className="btn btn-primary" type="button" disabled>
@@ -72,7 +75,7 @@ export default function SubmissionForm({ pinId, templates, templateId: initialTe
 }
 
 type EditorProps = {
-  pinId: string
+  target: SubmissionTarget
   template: FormTemplate
   submission?: Submission
   onSaved: (submission: Submission) => void
@@ -80,7 +83,7 @@ type EditorProps = {
   onBusy: (busy: boolean) => void
 }
 
-function Editor({ pinId, template, submission, onSaved, onCancel, onBusy }: EditorProps) {
+function Editor({ target, template, submission, onSaved, onCancel, onBusy }: EditorProps) {
   const toast = useToast()
   const schema = template.schema_def as FormSchema
   const [value, setValue] = useState<FormData>(() => (submission ? { ...defaults(schema), ...(submission.data_json as FormData) } : defaults(schema)))
@@ -125,7 +128,12 @@ function Editor({ pinId, template, submission, onSaved, onCancel, onBusy }: Edit
     setSavingState('Salvataggio…')
     const { data: sub, error } = submission
       ? await api.PATCH('/submissions/{submission_id}', { params: { path: { submission_id: submission.id } }, body: { data_json: value } })
-      : await api.POST('/submissions', { body: { template_id: template.id, pin_id: pinId, data_json: value } })
+      : await api.POST('/submissions', { body: {
+          template_id: template.id,
+          pin_id: 'pinId' in target ? target.pinId : null,
+          wbs_node_id: 'wbsNodeId' in target ? target.wbsNodeId : null,
+          data_json: value,
+        } })
     if (error || !sub) {
       setSavingState(null)
       return toast.error(errorMessage(error))

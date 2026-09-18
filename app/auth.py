@@ -114,7 +114,7 @@ def project_of_pin(pin: models.Pin) -> str:
 
 
 def project_of_submission(sub: models.FormSubmission) -> str:
-    return project_of_pin(sub.pin)
+    return project_of_pin(sub.pin) if sub.pin_id else sub.wbs_node.project_id
 
 
 def project_of_task(task: models.Task) -> str:

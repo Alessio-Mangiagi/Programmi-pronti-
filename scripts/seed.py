@@ -171,6 +171,30 @@ def main():
                                status=models.TaskStatus.assigned if assigned else models.TaskStatus.open))
             print(f"creato pin {label} con submission e task")
 
+        # Albero WBS del cantiere demo: una voce foglia ha già un diario compilato
+        if not db.query(models.WbsNode).filter_by(project_id=project.id).first():
+            wbs = [
+                ("01", "Opere strutturali", [("01.01", "Fondazioni"), ("01.02", "Solai"), ("01.03", "Pilastri e travi")]),
+                ("02", "Opere architettoniche", [("02.01", "Murature"), ("02.02", "Serramenti"), ("02.03", "Finiture")]),
+                ("03", "Impianti", [("03.01", "Elettrico"), ("03.02", "Idraulico"), ("03.03", "Climatizzazione")]),
+            ]
+            for i, (code, name, children) in enumerate(wbs, start=1):
+                root = models.WbsNode(project_id=project.id, code=code, name=name, position=i)
+                db.add(root)
+                db.flush()
+                for j, (ccode, cname) in enumerate(children, start=1):
+                    child = models.WbsNode(project_id=project.id, parent_id=root.id, code=ccode, name=cname, position=j)
+                    db.add(child)
+                    db.flush()
+                    if ccode == "01.02":
+                        db.add(models.FormSubmission(
+                            template_id=templates["Diario giornaliero"].id, wbs_node_id=child.id,
+                            submitted_by=users["field"].id,
+                            data_json={"data": "2026-09-15", "meteo": "Nuvoloso", "operai_presenti": 5,
+                                       "imprese": ["Impresa principale"], "lavorazioni": "Posa rete solaio piano 1",
+                                       "firma": "seed"}))
+            print("creato albero WBS del cantiere demo")
+
         db.commit()
         print(f"\nProgetto: {project.id}\nLogin: <email> / {PASSWORD}  ->  " +
               ", ".join(email for email, _, _, pw in USERS if not pw) +

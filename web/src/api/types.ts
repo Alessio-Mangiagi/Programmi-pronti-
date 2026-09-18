@@ -10,6 +10,8 @@ export type Submission = components['schemas']['SubmissionOut']
 export type Attachment = components['schemas']['AttachmentOut']
 export type PinDetail = components['schemas']['PinDetail']
 export type PinSummary = components['schemas']['PinSummary']
+export type WbsNode = components['schemas']['WbsNodeOut']
+export type WbsNodeDetail = components['schemas']['WbsNodeDetail']
 export type TaskStatus = 'open' | 'assigned' | 'resolved' | 'verified'
 
 // Schema dei moduli: i tipi vivono in packages/form-core (condivisi con il mobile).

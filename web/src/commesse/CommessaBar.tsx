@@ -31,8 +31,8 @@ export default function CommessaBar() {
   const cantieri = selectedId === NO_COMMESSA ? orphans : (selected?.projects ?? [])
   const section = projectId ? (pathname.split(`/projects/${projectId}/`)[1]?.split('/')[0] ?? 'plans') : 'plans'
 
-  // Sezione da mantenere cambiando cantiere: dashboard/task restano, il resto va alle planimetrie
-  const target = (id: string) => `/projects/${id}/${section === 'dashboard' || section === 'tasks' ? section : 'plans'}`
+  // Sezione da mantenere cambiando cantiere: dashboard/task/wbs restano, il resto va alle planimetrie
+  const target = (id: string) => `/projects/${id}/${['dashboard', 'tasks', 'wbs'].includes(section) ? section : 'plans'}`
   const current = cantieri.some((p) => p.id === projectId) ? projectId : ''
 
   function onSelect(id: string) {

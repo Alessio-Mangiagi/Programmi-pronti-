@@ -564,6 +564,58 @@ export interface paths {
         patch: operations["update_pin_pins__pin_id__patch"];
         trace?: never;
     };
+    "/projects/{project_id}/wbs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Wbs
+         * @description Tutte le voci WBS del cantiere, piatte e ordinate (position, code): il client ricostruisce l'albero.
+         */
+        get: operations["list_wbs_projects__project_id__wbs_get"];
+        put?: never;
+        /**
+         * Create Wbs Node
+         * @description Nuova voce (radice o figlia di parent_id, che deve stare nello stesso cantiere); va in coda tra i fratelli.
+         */
+        post: operations["create_wbs_node_projects__project_id__wbs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wbs/{node_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Wbs Node
+         * @description Voce con i moduli compilati su di essa (non cancellati), dal più recente.
+         */
+        get: operations["get_wbs_node_wbs__node_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Wbs Node
+         * @description Elimina una voce senza figli e senza moduli compilati (409 altrimenti).
+         */
+        delete: operations["delete_wbs_node_wbs__node_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Wbs Node
+         * @description Rinomina, ricodifica, sposta sotto un altro padre (non un proprio discendente) o riordina.
+         */
+        patch: operations["update_wbs_node_wbs__node_id__patch"];
+        trace?: never;
+    };
     "/submissions": {
         parameters: {
             query?: never;
@@ -1557,12 +1609,17 @@ export interface components {
             /** Resolved */
             resolved: number;
         };
-        /** SubmissionCreate */
+        /**
+         * SubmissionCreate
+         * @description Compilazione di un modulo su un pin oppure su una voce WBS: esattamente uno dei due.
+         */
         SubmissionCreate: {
             /** Template Id */
             template_id: string;
             /** Pin Id */
-            pin_id: string;
+            pin_id?: string | null;
+            /** Wbs Node Id */
+            wbs_node_id?: string | null;
             /** Data Json */
             data_json: {
                 [key: string]: unknown;
@@ -1575,7 +1632,9 @@ export interface components {
             /** Template Id */
             template_id: string;
             /** Pin Id */
-            pin_id: string;
+            pin_id?: string | null;
+            /** Wbs Node Id */
+            wbs_node_id?: string | null;
             /** Data Json */
             data_json: {
                 [key: string]: unknown;
@@ -1944,6 +2003,97 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WbsNodeCreate */
+        WbsNodeCreate: {
+            /** Name */
+            name: string;
+            /** Code */
+            code?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
+        /**
+         * WbsNodeDetail
+         * @description Voce con i moduli compilati su di essa: è ciò che apre la vista WBS al click.
+         */
+        WbsNodeDetail: {
+            /** Id */
+            id: string;
+            /** Project Id */
+            project_id: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /**
+             * Submissions Count
+             * @default 0
+             */
+            submissions_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Submissions
+             * @default []
+             */
+            submissions: components["schemas"]["SubmissionOut"][];
+        };
+        /**
+         * WbsNodeOut
+         * @description Voce dell'albero WBS (lista piatta: il client ricostruisce l'albero da parent_id).
+         */
+        WbsNodeOut: {
+            /** Id */
+            id: string;
+            /** Project Id */
+            project_id: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /**
+             * Submissions Count
+             * @default 0
+             */
+            submissions_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** WbsNodeUpdate */
+        WbsNodeUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Position */
+            position?: number | null;
         };
     };
     responses: never;
@@ -3192,6 +3342,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_wbs_projects__project_id__wbs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WbsNodeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_wbs_node_projects__project_id__wbs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WbsNodeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WbsNodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_wbs_node_wbs__node_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WbsNodeDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_wbs_node_wbs__node_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_wbs_node_wbs__node_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WbsNodeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WbsNodeOut"];
                 };
             };
             /** @description Validation Error */

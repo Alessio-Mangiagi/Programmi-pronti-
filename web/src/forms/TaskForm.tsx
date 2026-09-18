@@ -5,8 +5,11 @@ import { useToast } from '../components/Toast'
 
 export type TaskDraft = { title: string; description?: string; assigned_to?: string | null; due_date?: string | null }
 
+/** Dove agganciare il task: un pin esistente, oppure un nuovo pin creato al salvataggio nel punto indicato. */
+export type TaskTarget = { pinId: string } | { planId: string; x: number; y: number }
+
 type Props = {
-  pinId: string
+  target: TaskTarget
   members: User[]
   /** Valori iniziali (es. dalla non conformità di un modulo). */
   draft?: Partial<TaskDraft>
@@ -15,7 +18,7 @@ type Props = {
 }
 
 /** Creazione task su un pin: titolo, descrizione, assegnatario (membri del progetto), scadenza. */
-export default function TaskForm({ pinId, members, draft, onSaved, onCancel }: Props) {
+export default function TaskForm({ target, members, draft, onSaved, onCancel }: Props) {
   const toast = useToast()
   const [title, setTitle] = useState(draft?.title ?? '')
   const [description, setDescription] = useState(draft?.description ?? '')
@@ -27,6 +30,18 @@ export default function TaskForm({ pinId, members, draft, onSaved, onCancel }: P
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
+    let pinId: string
+    if ('pinId' in target) {
+      pinId = target.pinId
+    } else {
+      // task "dal nulla" (tasto destro sulla planimetria): prima il pin nel punto scelto
+      const pin = await api.POST('/pins', { body: { plan_id: target.planId, x: target.x, y: target.y, label: null } })
+      if (pin.error || !pin.data) {
+        setSaving(false)
+        return toast.error(errorMessage(pin.error))
+      }
+      pinId = pin.data.id
+    }
     const { data, error } = await api.POST('/tasks', {
       body: {
         pin_id: pinId,

@@ -197,7 +197,7 @@ export default function PinPanel({ pinId, lookups, members, onClose, onChanged }
       {filling && (
         <Modal title={`Compila modulo — ${pin?.label || 'Pin senza etichetta'}`} onClose={() => setFilling(false)}>
           <SubmissionForm
-            pinId={pinId}
+            target={{ pinId }}
             templates={Object.values(lookups.templates).filter((t) => !t.archived_at)}
             onCancel={() => setFilling(false)}
             onSaved={async (sub) => {
@@ -213,7 +213,7 @@ export default function PinPanel({ pinId, lookups, members, onClose, onChanged }
       {proposeTaskFor && lookups.templates[proposeTaskFor.template_id] && (
         <Modal title="Non conformità rilevata: crea un task?" onClose={() => setProposeTaskFor(null)}>
           <TaskForm
-            pinId={pinId}
+            target={{ pinId }}
             members={members}
             draft={taskDraftFromSubmission(lookups.templates[proposeTaskFor.template_id], proposeTaskFor.data_json as FormData, pin?.label)}
             onCancel={() => setProposeTaskFor(null)}
@@ -228,7 +228,7 @@ export default function PinPanel({ pinId, lookups, members, onClose, onChanged }
       {newTask && (
         <Modal title={`Nuovo task — ${pin?.label || 'Pin senza etichetta'}`} onClose={() => setNewTask(false)}>
           <TaskForm
-            pinId={pinId}
+            target={{ pinId }}
             members={members}
             onCancel={() => setNewTask(false)}
             onSaved={async () => {

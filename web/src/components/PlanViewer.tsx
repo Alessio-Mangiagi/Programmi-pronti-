@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchContentRef } from 'react-zoom-pan-pinch'
 import type { PinSummary, Plan } from '../api/types'
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl'
@@ -15,10 +15,14 @@ type Props = {
   onSelectPin?: (pin: PinSummary) => void
   onAddAt?: (x: number, y: number) => void
   onMovePin?: (pin: PinSummary, x: number, y: number) => void
+  /** Tasto destro sulla planimetria: punto (relativo 0-1) e posizione a schermo; `pin` se sopra a un marker. */
+  onContextMenu?: (info: PlanContextMenuInfo) => void
   /** Pin da centrare (es. arrivando dalla vista task); onFocused viene chiamato una volta fatto. */
   focusPinId?: string | null
   onFocused?: () => void
 }
+
+export type PlanContextMenuInfo = { x: number; y: number; clientX: number; clientY: number; pin: PinSummary | null }
 
 const MIN_SCALE = 0.05
 const MAX_SCALE = 10
@@ -39,6 +43,7 @@ export default function PlanViewer({
   onSelectPin,
   onAddAt,
   onMovePin,
+  onContextMenu,
   focusPinId,
   onFocused,
 }: Props) {
@@ -108,6 +113,16 @@ export default function PlanViewer({
     onAddAt?.(x, y)
   }
 
+  // Tasto destro: menù contestuale del chiamante (nuovo task / pin nel punto, o sul pin sotto al cursore)
+  function onCanvasContextMenu(e: MouseEvent<HTMLDivElement>) {
+    if (!onContextMenu || !canvasRef.current) return
+    e.preventDefault()
+    const pinId = (e.target as HTMLElement).closest<HTMLElement>('.pin')?.dataset.pinId
+    const pin = pinId ? (pins.find((p) => p.id === pinId) ?? null) : null
+    const { x, y } = relativePoint(canvasRef.current, e.clientX, e.clientY)
+    onContextMenu({ x, y, clientX: e.clientX, clientY: e.clientY, pin })
+  }
+
   if (!plan.file_url) return <div className="plan-viewer-empty">Planimetria senza file: caricala prima di aggiungere pin.</div>
   if (failed) return <div className="plan-viewer-empty">Impossibile caricare l'immagine della planimetria.</div>
 
@@ -135,6 +150,7 @@ export default function PlanViewer({
               style={{ width, height }}
               onPointerDown={onCanvasPointerDown}
               onPointerUp={onCanvasPointerUp}
+              onContextMenu={onCanvasContextMenu}
             >
               <img src={url} width={width} height={height} alt={plan.name} draggable={false} />
               {pins.map((pin) => (

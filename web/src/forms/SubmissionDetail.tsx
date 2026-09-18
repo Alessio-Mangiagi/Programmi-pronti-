@@ -13,7 +13,8 @@ import TaskForm from './TaskForm'
 type Props = {
   submission: Submission
   template: FormTemplate
-  pinId: string
+  /** Pin del modulo; assente per i moduli compilati su una voce WBS (niente "crea task": i task vivono sui pin). */
+  pinId?: string
   pinLabel?: string | null
   lookups: Lookups
   members: User[]
@@ -61,7 +62,7 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
     return (
       <Modal title={`Modifica — ${template.name}`} onClose={onClose}>
         <SubmissionForm
-          pinId={pinId}
+          target={pinId ? { pinId } : { wbsNodeId: submission.wbs_node_id ?? '' }}
           templates={[template]}
           submission={submission}
           onCancel={() => setMode('view')}
@@ -75,11 +76,11 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
     )
   }
 
-  if (mode === 'task') {
+  if (mode === 'task' && pinId) {
     return (
       <Modal title={nc ? `Task da "${nc.value}"` : 'Nuovo task dal modulo'} onClose={onClose}>
         <TaskForm
-          pinId={pinId}
+          target={{ pinId }}
           members={members}
           draft={taskDraftFromSubmission(template, data, pinLabel)}
           onCancel={() => setMode('view')}
@@ -100,10 +101,12 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
       </p>
       {nc && (
         <div className="callout callout-warn">
-          <strong>{nc.value}</strong> in "{nc.label}": serve un intervento?
-          <button type="button" className="btn small btn-primary" onClick={() => setMode('task')}>
-            Crea task
-          </button>
+          <strong>{nc.value}</strong> in "{nc.label}"{pinId && ': serve un intervento?'}
+          {pinId && (
+            <button type="button" className="btn small btn-primary" onClick={() => setMode('task')}>
+              Crea task
+            </button>
+          )}
         </div>
       )}
       <DynamicForm schema={schema} value={data} attachments={remoteAttachments(submission)} readOnly onChange={() => {}} />
@@ -113,7 +116,7 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
             Modifica
           </button>
         )}
-        {!nc && (
+        {!nc && pinId && (
           <button type="button" className="btn" onClick={() => setMode('task')}>
             Crea task da questo modulo
           </button>
