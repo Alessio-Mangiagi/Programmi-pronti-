@@ -236,7 +236,15 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await login(page)
   await page.getByRole('link', { name: 'Moduli' }).click()
   await page.waitForURL('**/templates')
+  // ingresso: hub con le scelte, non la lista
+  await expect(page.locator('.hub-card')).toHaveCount(4)
+  await expect(page.locator('.hub-card', { hasText: 'Elenco moduli' })).toContainText('3 moduli attivi')
+  await page.getByRole('link', { name: /Elenco moduli/ }).click()
+  await page.waitForURL('**/templates/elenco')
   await expect(page.locator('.table tbody tr')).toHaveCount(3) // i 3 template del seed
+  await page.getByLabel('Categoria').selectOption('quality')
+  await expect(page.locator('.table tbody tr')).toHaveCount(1)
+  await page.getByLabel('Categoria').selectOption('')
   await page.getByRole('link', { name: '+ Nuovo template' }).click()
   await page.waitForURL('**/templates/new')
 
@@ -280,6 +288,15 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await expect(page.locator('.toast-success')).toContainText('Template creato')
   await page.waitForURL(/\/templates\/[0-9a-f-]+$/)
 
+  // scelte multiple: le opzioni del nuovo template si cambiano dalla pagina dedicata; i template del seed (in uso) sono bloccati
+  await page.goto('/templates/scelte')
+  await expect(page.locator('.choices-card')).toHaveCount(4) // i 3 del seed + il nuovo
+  await expect(page.locator('.choices-card', { hasText: 'Punch list' }).locator('textarea').first()).toBeDisabled()
+  const mine = page.locator('.choices-card', { hasText: name })
+  await mine.getByLabel(/^Meteo/).fill('Sole\nPioggia\nNuvoloso\nGrandine')
+  await mine.getByRole('button', { name: 'Salva' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Scelte salvate')
+
   // compilazione su un pin con il nuovo template
   await page.getByRole('link', { name: 'Progetti' }).click()
   await page.getByRole('link', { name: /Cantiere demo/ }).click()
@@ -290,19 +307,20 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await modal.getByLabel('Modulo').selectOption({ label: name })
   await modal.getByLabel(/Attività svolte/).fill('Getto solaio piano 1')
   await modal.getByLabel(/Operai presenti/).fill('6')
+  await expect(modal.getByLabel(/^Meteo/).locator('option', { hasText: 'Grandine' })).toHaveCount(1)
   await modal.getByLabel(/^Meteo/).selectOption('Sole')
   await modal.getByRole('button', { name: 'Salva modulo' }).click()
   await expect(page.locator('.toast-success').last()).toContainText('Modulo salvato')
   await expect(page.locator('.pin-panel .list-item-btn', { hasText: name })).toBeVisible()
 
   // il template in uso è bloccato nell'editor; archiviato sparisce da "Compila modulo"
-  await page.getByRole('link', { name: 'Moduli' }).click()
+  await page.goto('/templates/elenco')
   const row = page.locator('.table tbody tr', { hasText: name })
   await expect(row.locator('.badge')).toHaveText('In uso')
   await row.getByRole('link', { name: 'Apri' }).click()
   await expect(page.locator('.callout-warn')).toContainText('1 compilazioni')
   await expect(page.getByLabel('Etichetta')).toBeDisabled()
-  await page.getByRole('link', { name: 'Template dei moduli' }).click()
+  await page.getByRole('link', { name: 'Elenco moduli' }).click()
   await row.getByRole('button', { name: 'Archivia' }).click()
   await expect(page.locator('.toast-success').last()).toContainText('archiviato')
   await expect(row).toHaveCount(0)
@@ -401,20 +419,23 @@ test('spazio admin: crea utente, reset password, disattiva; registro operazioni 
 test('commessa in alto: selezione, sottomenù cantieri, nuova commessa con parametri, parametro admin', async ({ page }) => {
   await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
   const bar = page.getByTestId('commessa-bar')
-  await expect(bar).toContainText('Scegli una commessa')
+  await expect(bar.locator('#cantiere-sel')).toBeDisabled()
   // gruppi per commessa nella pagina progetti, con i valori dei parametri del seed
   await expect(page.locator('.commessa-group')).toHaveCount(2)
   await expect(page.locator('.commessa-group').first()).toContainText('Edilizia civile, Impianti')
-  // selezione dalla barra → sottomenù con i 2 cantieri della commessa
+  // selezione dalla barra → menù cantieri con i 2 cantieri della commessa
   await bar.locator('#commessa-sel').selectOption({ label: 'C-2026-014 · Riqualificazione scuola Da Vinci' })
-  await expect(bar.locator('.commessa-tab')).toHaveCount(2)
+  const cantiere = bar.locator('#cantiere-sel')
+  await expect(cantiere).toBeEnabled()
+  await expect(cantiere.locator('option:not([value=""])')).toHaveCount(2)
   await expect(bar).toContainText('Comune di Milano')
-  await bar.getByRole('link', { name: 'Palestra e mensa' }).click()
+  await cantiere.selectOption({ label: 'Palestra e mensa' })
   await expect(page).toHaveURL(/\/projects\/[^/]+\/plans/)
-  await expect(bar.locator('.commessa-tab.active')).toContainText('Palestra e mensa')
+  await expect(cantiere.locator('option:checked')).toHaveText('Palestra e mensa')
   // la commessa con un solo cantiere porta dritto alla planimetria... qui zero cantieri → messaggio
   await bar.locator('#commessa-sel').selectOption({ label: 'C-2026-021 · Manutenzione SP 12' })
-  await expect(bar).toContainText('Nessun cantiere')
+  await expect(bar.locator('#cantiere-sel')).toBeDisabled()
+  await expect(bar.locator('#cantiere-sel')).toContainText('Nessun cantiere')
   // filtro per parametro nella pagina progetti
   await page.goto('/projects')
   await page.getByLabel('Tipologia lavori').selectOption('Stradale')
@@ -444,9 +465,9 @@ test('commessa in alto: selezione, sottomenù cantieri, nuova commessa con param
   await expect(page.locator('.toast-success', { hasText: 'C-2026-030' })).toBeVisible()
   await expect(bar.locator('#commessa-sel')).toHaveValue(/.+/)
   await expect(page.locator('.commessa-group.is-selected')).toContainText('Zona: Nord')
-  // nuovo cantiere dentro la commessa → compare nel sottomenù
+  // nuovo cantiere dentro la commessa → compare nel menù cantieri
   await page.locator('.commessa-group.is-selected').getByRole('button', { name: '+ Cantiere' }).click()
   await page.getByRole('dialog').getByLabel('Nome cantiere').fill('Lotto 1')
   await page.getByRole('dialog').getByRole('button', { name: 'Crea cantiere' }).click()
-  await expect(bar.getByRole('link', { name: 'Lotto 1' })).toBeVisible()
+  await expect(bar.locator('#cantiere-sel')).toContainText('Lotto 1')
 })

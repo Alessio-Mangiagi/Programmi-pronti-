@@ -47,7 +47,7 @@ PUNCH_LIST = {
 
 DIARIO = {
     "name": "Diario giornaliero",
-    "category": "daily",
+    "category": "diary",
     "schema_def": {"fields": [
         {"id": "data", "type": "date", "label": "Data", "required": True, "default": "today"},
         {"id": "meteo", "type": "select", "label": "Meteo", "required": True,

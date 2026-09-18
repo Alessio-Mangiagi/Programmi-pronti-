@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import type { FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
@@ -14,6 +14,8 @@ export default function TemplatesPage() {
   const { user } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const [search, setSearch] = useSearchParams()
+  const categoria = search.get('categoria') ?? ''
   const [templates, setTemplates] = useState<FormTemplate[] | null>(null)
   const [showArchived, setShowArchived] = useState(false)
 
@@ -45,16 +47,26 @@ export default function TemplatesPage() {
     load()
   }
 
-  const visible = (templates ?? []).filter((t) => showArchived || !t.archived_at)
+  const visible = (templates ?? []).filter((t) => (showArchived || !t.archived_at) && (!categoria || (t.category ?? 'other') === categoria))
 
   return (
     <>
       <header className="topbar">
         <div>
-          <div className="muted small">Moduli</div>
-          <h1>Template dei moduli</h1>
+          <div className="muted small">
+            <Link to="/templates">Moduli</Link>
+          </div>
+          <h1>Elenco moduli</h1>
         </div>
         <div className="topbar-actions">
+          <select aria-label="Categoria" value={categoria} onChange={(e) => setSearch(e.target.value ? { categoria: e.target.value } : {}, { replace: true })} style={{ width: 'auto' }}>
+            <option value="">Tutte le categorie</option>
+            {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
           <label className="dyn-check">
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
             <span className="small">Mostra archiviati</span>
@@ -68,7 +80,7 @@ export default function TemplatesPage() {
         {templates === null ? (
           <Loading />
         ) : visible.length === 0 ? (
-          <div className="empty">Nessun template. Creane uno con "+ Nuovo template".</div>
+          <div className="empty">{categoria ? `Nessun modulo nella categoria ${CATEGORY_LABEL[categoria] ?? categoria}.` : 'Nessun template. Creane uno con "+ Nuovo template".'}</div>
         ) : (
           <div className="table-wrap">
             <table className="table">

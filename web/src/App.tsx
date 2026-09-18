@@ -10,6 +10,8 @@ import PlanPage from './pages/PlanPage'
 import TasksPage from './pages/TasksPage'
 import DashboardPage from './pages/DashboardPage'
 import TemplatesPage from './pages/TemplatesPage'
+import TemplatesHubPage from './pages/TemplatesHubPage'
+import TemplateChoicesPage from './pages/TemplateChoicesPage'
 import TemplateEditorPage from './pages/TemplateEditorPage'
 import UsersPage from './pages/admin/UsersPage'
 import AuditPage from './pages/admin/AuditPage'
@@ -42,7 +44,9 @@ export default function App() {
         <Route path="/projects/:projectId/plans/:planId" element={<PlanPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
-        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/templates" element={<TemplatesHubPage />} />
+        <Route path="/templates/elenco" element={<TemplatesPage />} />
+        <Route path="/templates/scelte" element={<TemplateChoicesPage />} />
         <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/audit" element={<AuditPage />} />

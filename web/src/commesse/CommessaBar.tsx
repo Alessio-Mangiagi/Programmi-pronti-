@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { isManager, useAuth } from '../auth/AuthContext'
-import Icon from '../components/Icon'
 import { NO_COMMESSA, useCommesse } from './CommesseContext'
 
 /**
- * Barra in alto: selezione della commessa e, come sottomenù, i cantieri
- * associati (tab). Aprendo un cantiere da un link diretto la commessa
- * selezionata si allinea a quella del cantiere.
+ * Barra in alto: due menù affiancati, la commessa e i suoi cantieri.
+ * Aprendo un cantiere da un link diretto la commessa selezionata si
+ * allinea a quella del cantiere.
  */
 export default function CommessaBar() {
   const { user } = useAuth()
@@ -30,15 +29,18 @@ export default function CommessaBar() {
 
   const selected = selectedId === NO_COMMESSA ? null : commesse.find((c) => c.id === selectedId) ?? null
   const cantieri = selectedId === NO_COMMESSA ? orphans : (selected?.projects ?? [])
-  // Sezione corrente del cantiere aperto (plans/tasks/dashboard) da conservare cambiando cantiere
   const section = projectId ? (pathname.split(`/projects/${projectId}/`)[1]?.split('/')[0] ?? 'plans') : 'plans'
+
+  // Sezione da mantenere cambiando cantiere: dashboard/task restano, il resto va alle planimetrie
+  const target = (id: string) => `/projects/${id}/${section === 'dashboard' || section === 'tasks' ? section : 'plans'}`
+  const current = cantieri.some((p) => p.id === projectId) ? projectId : ''
 
   function onSelect(id: string) {
     select(id || null)
     if (!id) return navigate('/projects')
     const list = id === NO_COMMESSA ? orphans : commesse.find((c) => c.id === id)?.projects ?? []
     // con un solo cantiere ci si va diretti, altrimenti alla lista filtrata
-    if (list.length === 1) navigate(`/projects/${list[0].id}/${section === 'dashboard' || section === 'tasks' ? section : 'plans'}`)
+    if (list.length === 1) navigate(target(list[0].id))
     else navigate(`/projects?commessa=${id}`)
   }
 
@@ -59,21 +61,31 @@ export default function CommessaBar() {
         </select>
         {selected?.client && <span className="muted small commessa-client">{selected.client}</span>}
       </div>
-      <nav className="commessa-sub" aria-label="Cantieri della commessa">
-        {selectedId ? (
-          cantieri.length === 0 ? (
-            <span className="muted small">Nessun cantiere {isManager(user) ? '— aggiungilo dalla pagina Progetti' : 'a cui hai accesso'}</span>
-          ) : (
-            cantieri.map((p) => (
-              <NavLink key={p.id} to={`/projects/${p.id}/${section === 'dashboard' || section === 'tasks' ? section : 'plans'}`} className={({ isActive }) => `commessa-tab${isActive || p.id === projectId ? ' active' : ''}`}>
-                <Icon name="map-pin" /> {p.name}
-              </NavLink>
-            ))
-          )
-        ) : (
-          <span className="muted small">Scegli una commessa per vedere i suoi cantieri</span>
-        )}
-      </nav>
+      <div className="commessa-select commessa-cantiere">
+        <label className="filter-label" htmlFor="cantiere-sel">
+          Cantiere
+        </label>
+        <select
+          id="cantiere-sel"
+          value={current ?? ''}
+          onChange={(e) => e.target.value && navigate(target(e.target.value))}
+          disabled={loading || !selectedId || cantieri.length === 0}
+          aria-label="Cantieri della commessa"
+        >
+          <option value="">
+            {!selectedId
+              ? 'Scegli prima una commessa'
+              : cantieri.length === 0
+                ? `Nessun cantiere${isManager(user) ? ' — aggiungilo dalla pagina Progetti' : ''}`
+                : `Scegli un cantiere (${cantieri.length})`}
+          </option>
+          {cantieri.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   )
 }

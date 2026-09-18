@@ -158,7 +158,7 @@ function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved:
       <header className="topbar">
         <div>
           <div className="muted small">
-            <Link to="/templates">Template dei moduli</Link>
+            <Link to="/templates">Moduli</Link> · <Link to="/templates/elenco">Elenco moduli</Link>
           </div>
           <h1>{template ? template.name : 'Nuovo template'}</h1>
         </div>
