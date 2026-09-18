@@ -76,6 +76,21 @@ Formato errori (sia schema che submission):
 `field` è l'`id` del campo, oppure `$` per errori sull'intero documento,
 oppure `fields[i]` quando il campo non ha un `id` valido.
 
+### Note per campo (`_notes`)
+
+Chi compila può aggiungere sotto ogni campo un commento e/o delle foto, fuori
+dallo schema del template. Vivono nella chiave riservata `_notes` di `data_json`:
+
+```json
+{ "esito": "Non conforme",
+  "_notes": { "esito": { "comment": "Quadro aperto", "photos": ["<attachment id>"] } } }
+```
+
+- ogni chiave di `_notes` deve essere l'`id` di un campo dello schema (`_notes.<id>: unknown field`);
+- ammessi solo `comment` (stringa) e `photos` (lista di attachment id, come il tipo `photo`);
+- gli allegati si creano come gli altri (`POST /attachments` con `submission_id`, poi upload);
+- compaiono nel PDF del modulo (`GET /submissions/{id}/pdf`) sotto il campo relativo.
+
 ## Errori API
 
 `POST /form-templates` con schema non valido → `422` con `detail` = lista errori.

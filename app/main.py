@@ -29,6 +29,7 @@ Strategia di sync (vedi README):
     - Conflict resolution MVP: "last write wins" basato su updated_at.
 """
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Optional
@@ -47,6 +48,7 @@ from .database import get_db
 from .forms import validate_schema, validate_submission
 from . import events
 from . import audit
+from . import pdf
 from . import stats as st_stats
 from .models import utcnow, TaskStatus, TASK_TRANSITIONS, UserRole
 from .schemas import to_naive_utc
@@ -939,6 +941,21 @@ def get_submission(submission_id: str, db: Session = Depends(get_db),
         raise HTTPException(404, "submission not found")
     auth.assert_project_access(db, user, auth.project_of_submission(sub))
     return _with_attachments(schemas.SubmissionOut, sub)
+
+
+@app.get("/submissions/{submission_id}/pdf")
+def submission_pdf(submission_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Modulo compilato in PDF (campi, foto, firma, note per campo), scaricabile/stampabile."""
+    sub = db.get(models.FormSubmission, submission_id)
+    if sub is None or sub.deleted_at is not None:
+        raise HTTPException(404, "submission not found")
+    auth.assert_project_access(db, user, auth.project_of_submission(sub))
+    template = db.get(models.FormTemplate, sub.template_id)
+    data = pdf.build_submission_pdf(db, sub, template)
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", template.name).strip("-").lower() or "modulo"
+    filename = f"{slug}-{sub.created_at:%Y%m%d}-{sub.id[:8]}.pdf"
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.patch("/submissions/{submission_id}", response_model=schemas.SubmissionOut)

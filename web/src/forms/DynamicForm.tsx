@@ -1,5 +1,7 @@
-import type { Field, FieldError, FormData, FormSchema, Geolocation } from '@fieldview/form-core'
+import { useState } from 'react'
+import { notesOf, withNote, type Field, type FieldError, type FieldNote, type FormData, type FormSchema, type Geolocation, type PhotoField } from '@fieldview/form-core'
 import type { AttachmentMap, LocalAttachment } from './attachments'
+import Icon from '../components/Icon'
 import GeolocationInput from './fields/GeolocationInput'
 import PhotoInput from './fields/PhotoInput'
 import SignatureInput from './fields/SignatureInput'
@@ -26,6 +28,7 @@ type Props = {
 export default function DynamicForm({ schema, value, errors = [], attachments, readOnly, onChange, onAttachmentsChange, onError }: Props) {
   const errorOf = (id: string) => errors.find((e) => e.field === id)?.message
   const set = (id: string, v: FormData[string]) => onChange({ ...value, [id]: v })
+  const notes = notesOf(value)
 
   return (
     <div className="dyn-form">
@@ -66,9 +69,90 @@ export default function DynamicForm({ schema, value, errors = [], attachments, r
                 {translateMessage(err)}
               </div>
             )}
+            <FieldNoteBlock
+              field={f}
+              note={notes[f.id]}
+              attachments={attachments}
+              readOnly={readOnly}
+              onChange={(n) => onChange(withNote(value, f.id, n))}
+              onAttachmentsChange={onAttachmentsChange}
+              onError={onError}
+            />
           </div>
         )
       })}
+    </div>
+  )
+}
+
+type NoteProps = {
+  field: Field
+  note?: FieldNote
+  attachments: AttachmentMap
+  readOnly?: boolean
+  onChange: (n: FieldNote) => void
+  onAttachmentsChange?: (change: AttachmentChange) => void
+  onError?: (msg: string) => void
+}
+
+/**
+ * Nota sotto il campo (commento libero + foto), aggiunta da chi compila e
+ * salvata in data_json._notes. Chiusa finché non serve, per non appesantire
+ * il modulo; in sola lettura compare solo se c'è qualcosa.
+ */
+function FieldNoteBlock({ field: f, note, attachments, readOnly, onChange, onAttachmentsChange, onError }: NoteProps) {
+  const has = !!(note?.comment || note?.photos?.length)
+  const [open, setOpen] = useState(has)
+  const photoField: PhotoField = { id: `note_${f.id}`, type: 'photo', label: 'Foto della nota', multiple: true }
+  const photos = note?.photos ?? []
+
+  if (readOnly) {
+    if (!has) return null
+    return (
+      <div className="dyn-note dyn-note-view">
+        <div className="dyn-note-title">Nota</div>
+        {note?.comment && <p className="dyn-note-comment">{note.comment}</p>}
+        {photos.length > 0 && <PhotoInput field={photoField} value={photos} attachments={attachments} readOnly onChange={() => {}} />}
+      </div>
+    )
+  }
+
+  if (!open && !has) {
+    return (
+      <button type="button" className="dyn-note-toggle" onClick={() => setOpen(true)}>
+        <Icon name="plus" /> Commento o foto
+      </button>
+    )
+  }
+
+  return (
+    <div className="dyn-note">
+      <div className="dyn-note-title">
+        Nota
+        {!has && (
+          <button type="button" className="btn small" onClick={() => setOpen(false)} aria-label="Chiudi nota">
+            <Icon name="x" />
+          </button>
+        )}
+      </div>
+      <textarea
+        id={`note-${f.id}`}
+        aria-label={`Commento su ${f.label}`}
+        rows={2}
+        placeholder="Commento…"
+        value={note?.comment ?? ''}
+        onChange={(e) => onChange({ ...note, comment: e.target.value })}
+      />
+      <PhotoInput
+        field={photoField}
+        value={photos}
+        attachments={attachments}
+        onError={onError}
+        onChange={(ids, added, removed) => {
+          onChange({ ...note, photos: ids })
+          onAttachmentsChange?.({ added, removed })
+        }}
+      />
     </div>
   )
 }

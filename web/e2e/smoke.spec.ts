@@ -309,9 +309,23 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await modal.getByLabel(/Operai presenti/).fill('6')
   await expect(modal.getByLabel(/^Meteo/).locator('option', { hasText: 'Grandine' })).toHaveCount(1)
   await modal.getByLabel(/^Meteo/).selectOption('Sole')
+  // nota sotto un campo: commento + foto di chi compila
+  await modal.locator('.dyn-field', { hasText: 'Operai presenti' }).getByRole('button', { name: 'Commento o foto' }).click()
+  await modal.getByLabel('Commento su Operai presenti').fill('Due in ferie da domani')
+  await modal.locator('#df-note_operai_presenti').setInputFiles({ name: 'squadra.png', mimeType: 'image/png', buffer: PNG_1PX })
   await modal.getByRole('button', { name: 'Salva modulo' }).click()
   await expect(page.locator('.toast-success').last()).toContainText('Modulo salvato')
   await expect(page.locator('.pin-panel .list-item-btn', { hasText: name })).toBeVisible()
+
+  // in lettura la nota compare sotto il campo; il PDF si scarica con nome parlante
+  await page.locator('.pin-panel .list-item-btn', { hasText: name }).click()
+  const view = page.getByRole('dialog')
+  await expect(view.locator('.dyn-note-view')).toHaveCount(1)
+  await expect(view.locator('.dyn-note-view')).toContainText('Due in ferie da domani')
+  await expect(view.locator('.dyn-note-view img')).toHaveCount(1)
+  const [download] = await Promise.all([page.waitForEvent('download'), view.getByRole('button', { name: 'Scarica PDF' }).click()])
+  expect(download.suggestedFilename()).toMatch(/^diario-giornaliero-e2e-\d+-\d{8}-[0-9a-f]{8}\.pdf$/)
+  await view.getByRole('button', { name: 'Chiudi', exact: true }).last().click()
 
   // il template in uso è bloccato nell'editor; archiviato sparisce da "Compila modulo"
   await page.goto('/templates/elenco')
@@ -364,7 +378,7 @@ test('spazio admin: crea utente, reset password, disattiva; registro operazioni 
   await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
   await page.getByRole('link', { name: 'Utenti' }).click()
   await expect(page.getByRole('heading', { name: 'Utenti' })).toBeVisible()
-  await expect(page.locator('.users-table tbody tr')).toHaveCount(3)
+  await expect(page.locator('.users-table tbody tr')).toHaveCount(4) // i 3 demo + l'admin personale del seed
 
   // crea
   await page.getByRole('button', { name: '+ Nuovo utente' }).click()

@@ -2134,6 +2134,49 @@
         }
       }
     },
+    "/submissions/{submission_id}/pdf": {
+      "get": {
+        "summary": "Submission Pdf",
+        "description": "Modulo compilato in PDF (campi, foto, firma, note per campo), scaricabile/stampabile.",
+        "operationId": "submission_pdf_submissions__submission_id__pdf_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks": {
       "post": {
         "summary": "Create Task",

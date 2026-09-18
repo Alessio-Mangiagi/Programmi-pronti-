@@ -37,6 +37,10 @@ TYPE_PROPS = {
 }
 COMMON_PROPS = {"id", "type", "label", "required", "help"}
 
+# Chiave riservata in data_json: note per campo aggiunte in compilazione
+# ({field_id: {"comment": str, "photos": [attachment id]}}), fuori dallo schema.
+NOTES_KEY = "_notes"
+
 
 def _err(field: str, message: str) -> dict:
     return {"field": field, "message": message}
@@ -152,8 +156,11 @@ def validate_submission(schema: dict, data: Any) -> list[dict]:
     fields = {f["id"]: f for f in schema["fields"]}
 
     for key in data:
-        if key not in fields:
+        if key != NOTES_KEY and key not in fields:
             errors.append(_err(key, "unknown field"))
+
+    if NOTES_KEY in data and data[NOTES_KEY] is not None:
+        errors.extend(_validate_notes(fields, data[NOTES_KEY]))
 
     for fid, f in fields.items():
         value = data.get(fid)
@@ -165,6 +172,29 @@ def validate_submission(schema: dict, data: Any) -> list[dict]:
         if msg:
             errors.append(_err(fid, msg))
 
+    return errors
+
+
+def _validate_notes(fields: dict, notes: Any) -> list[dict]:
+    """Note per campo: commento libero e/o foto (attachment id), solo su campi esistenti."""
+    if not isinstance(notes, dict):
+        return [_err(NOTES_KEY, "must be an object")]
+    errors: list[dict] = []
+    for fid, n in notes.items():
+        where = f"{NOTES_KEY}.{fid}"
+        if fid not in fields:
+            errors.append(_err(where, "unknown field"))
+            continue
+        if not isinstance(n, dict):
+            errors.append(_err(where, "must be an object"))
+            continue
+        if set(n) - {"comment", "photos"}:
+            errors.append(_err(where, "only comment, photos allowed"))
+        if "comment" in n and not isinstance(n["comment"], str):
+            errors.append(_err(where, "'comment' must be a string"))
+        photos = n.get("photos")
+        if "photos" in n and (not isinstance(photos, list) or not all(isinstance(x, str) and x for x in photos)):
+            errors.append(_err(where, "'photos' must be a list of attachment ids"))
     return errors
 
 

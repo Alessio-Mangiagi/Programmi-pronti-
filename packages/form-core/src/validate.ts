@@ -3,7 +3,7 @@
  * Stessi messaggi, stesso ordine degli errori: i casi in fixtures/cases.json
  * girano contro entrambe le implementazioni.
  */
-import { FIELD_TYPES, type FieldError, type FieldType, type FormSchema } from './types'
+import { FIELD_TYPES, NOTES_KEY, type Field, type FieldError, type FieldType, type FormSchema } from './types'
 
 export const FIELD_ID_RE = /^[a-z][a-z0-9_]{0,63}$/
 
@@ -157,7 +157,11 @@ export function validateSubmission(schema: FormSchema, data: unknown): FieldErro
   const fields = new Map(schema.fields.map((f) => [f.id, f]))
 
   for (const key of Object.keys(data)) {
-    if (!fields.has(key)) errors.push(err(key, 'unknown field'))
+    if (key !== NOTES_KEY && !fields.has(key)) errors.push(err(key, 'unknown field'))
+  }
+
+  if (NOTES_KEY in data && data[NOTES_KEY] !== null && data[NOTES_KEY] !== undefined) {
+    errors.push(...validateNotes(fields, data[NOTES_KEY]))
   }
 
   for (const [fid, f] of fields) {
@@ -170,6 +174,29 @@ export function validateSubmission(schema: FormSchema, data: unknown): FieldErro
     if (msg) errors.push(err(fid, msg))
   }
 
+  return errors
+}
+
+/** Note per campo: commento libero e/o foto (attachment id), solo su campi esistenti. */
+function validateNotes(fields: Map<string, Field>, notes: unknown): FieldError[] {
+  if (!isObject(notes)) return [err(NOTES_KEY, 'must be an object')]
+  const errors: FieldError[] = []
+  for (const [fid, n] of Object.entries(notes)) {
+    const where = `${NOTES_KEY}.${fid}`
+    if (!fields.has(fid)) {
+      errors.push(err(where, 'unknown field'))
+      continue
+    }
+    if (!isObject(n)) {
+      errors.push(err(where, 'must be an object'))
+      continue
+    }
+    if (Object.keys(n).some((k) => k !== 'comment' && k !== 'photos')) errors.push(err(where, 'only comment, photos allowed'))
+    if ('comment' in n && !isString(n.comment)) errors.push(err(where, "'comment' must be a string"))
+    if ('photos' in n && (!Array.isArray(n.photos) || !n.photos.every((x) => isString(x) && x))) {
+      errors.push(err(where, "'photos' must be a list of attachment ids"))
+    }
+  }
   return errors
 }
 

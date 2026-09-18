@@ -5,7 +5,7 @@ Dati demo per sviluppo e test manuali. Idempotente: rilanciarlo non duplica null
     python -m scripts.seed
 
 Crea:
-- 3 utenti (admin / manager / field), password "demo1234"
+- 3 utenti demo (admin / manager / field), password "demo1234" + admin personale (vedi USERS)
 - 1 progetto "Cantiere demo" con i 3 utenti membri
 - 1 planimetria "Piano terra" con un PNG generato (griglia 2000x1400)
 - 3 template: ispezione sicurezza, punch list, diario giornaliero
@@ -22,10 +22,12 @@ from app.database import SessionLocal
 from app.forms import validate_schema
 
 PASSWORD = "demo1234"
+# (email, nome, ruolo, password o None = PASSWORD demo)
 USERS = [
-    ("admin@fieldview.local", "Admin", "admin"),
-    ("manager@fieldview.local", "Maria Manager", "manager"),
-    ("field@fieldview.local", "Franco Field", "field"),
+    ("admin@fieldview.local", "Admin", "admin", None),
+    ("manager@fieldview.local", "Maria Manager", "manager", None),
+    ("field@fieldview.local", "Franco Field", "field", None),
+    ("alessiomanghiagi@field.com", "Alessio Mangiagi", "admin", "10101010"),
 ]
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -97,10 +99,10 @@ def main():
     db = SessionLocal()
     try:
         users = {}
-        for email, name, role in USERS:
+        for email, name, role, password in USERS:
             u, created = get_or_create(db, models.User, email=email, defaults={
-                "name": name, "role": models.UserRole(role), "password_hash": auth.hash_password(PASSWORD)})
-            users[role] = u
+                "name": name, "role": models.UserRole(role), "password_hash": auth.hash_password(password or PASSWORD)})
+            users.setdefault(role, u)  # per ruolo resta il primo (demo), usato dai dati d'esempio
             print(("creato " if created else "esiste ") + f"utente {email} ({role})")
 
         # Parametri personalizzati e commesse (giorno 31): il cantiere demo sta nella prima
@@ -171,7 +173,8 @@ def main():
 
         db.commit()
         print(f"\nProgetto: {project.id}\nLogin: <email> / {PASSWORD}  ->  " +
-              ", ".join(email for email, _, _ in USERS))
+              ", ".join(email for email, _, _, pw in USERS if not pw) +
+              "\n" + ", ".join(f"{email} / {pw}" for email, _, _, pw in USERS if pw))
     finally:
         db.close()
 

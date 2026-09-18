@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { FormData, FormSchema } from '@fieldview/form-core'
 import type { FormTemplate, Submission, User } from '../api/types'
 import Modal from '../components/Modal'
+import { useToast } from '../components/Toast'
+import { getToken } from '../auth/token'
 import type { Lookups } from '../hooks/useLookups'
 import DynamicForm from './DynamicForm'
 import { findNonConformity, taskDraftFromSubmission } from './nonConformity'
@@ -29,6 +31,28 @@ function fmtDate(iso: string) {
 export default function SubmissionDetail({ submission: initial, template, pinId, pinLabel, lookups, members, canEdit, onClose, onChanged }: Props) {
   const [submission, setSubmission] = useState(initial)
   const [mode, setMode] = useState<'view' | 'edit' | 'task'>('view')
+  const [downloading, setDownloading] = useState(false)
+  const toast = useToast()
+
+  /** PDF dal server (richiede il bearer: niente <a href> diretto). */
+  async function downloadPdf() {
+    setDownloading(true)
+    try {
+      const r = await fetch(`/api/submissions/${encodeURIComponent(submission.id)}/pdf`, { headers: { Authorization: `Bearer ${getToken() ?? ''}` } })
+      if (!r.ok) throw new Error(`Errore ${r.status}`)
+      const name = r.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'modulo.pdf'
+      const url = URL.createObjectURL(await r.blob())
+      const a = Object.assign(document.createElement('a'), { href: url, download: name })
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'PDF non generato')
+    } finally {
+      setDownloading(false)
+    }
+  }
   const schema = template.schema_def as FormSchema
   const data = submission.data_json as FormData
   const nc = findNonConformity(schema, data)
@@ -94,6 +118,9 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
             Crea task da questo modulo
           </button>
         )}
+        <button type="button" className="btn" onClick={downloadPdf} disabled={downloading}>
+          {downloading ? 'Preparo il PDF…' : 'Scarica PDF'}
+        </button>
         <button type="button" className="btn" onClick={onClose}>
           Chiudi
         </button>
