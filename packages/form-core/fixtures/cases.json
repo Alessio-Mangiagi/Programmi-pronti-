@@ -77,7 +77,64 @@
             "required": true,
             "default": "today"
           }
-        ]
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "ispezione",
+              "title": "Ispezione",
+              "columns": 2,
+              "items": [
+                {
+                  "field": "area",
+                  "span": 2
+                },
+                {
+                  "field": "esito"
+                },
+                {
+                  "field": "data_ispezione"
+                },
+                {
+                  "field": "rischi",
+                  "span": 2
+                },
+                {
+                  "field": "persone_presenti"
+                },
+                {
+                  "field": "dpi_indossati"
+                }
+              ]
+            },
+            {
+              "id": "evidenze",
+              "title": "Evidenze",
+              "columns": 2,
+              "items": [
+                {
+                  "field": "note",
+                  "span": 2
+                },
+                {
+                  "field": "foto"
+                },
+                {
+                  "field": "posizione"
+                }
+              ]
+            },
+            {
+              "id": "chiusura",
+              "title": "Chiusura",
+              "items": [
+                {
+                  "field": "firma_ispettore"
+                }
+              ]
+            }
+          ]
+        }
       },
       "errors": []
     },
@@ -107,7 +164,7 @@
       "errors": [
         {
           "field": "$",
-          "message": "'fields' must be a non-empty list"
+          "message": "'fields' must be a list"
         }
       ]
     },
@@ -116,12 +173,7 @@
       "schema": {
         "fields": []
       },
-      "errors": [
-        {
-          "field": "$",
-          "message": "'fields' must be a non-empty list"
-        }
-      ]
+      "errors": []
     },
     {
       "name": "fields_not_list",
@@ -131,7 +183,7 @@
       "errors": [
         {
           "field": "$",
-          "message": "'fields' must be a non-empty list"
+          "message": "'fields' must be a list"
         }
       ]
     },
@@ -970,6 +1022,916 @@
           "message": "'default' must be a number"
         }
       ]
+    },
+    {
+      "name": "layout_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 2
+                },
+                {
+                  "field": "b"
+                }
+              ],
+              "title": "Dati",
+              "columns": 2
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_ok_slots_only",
+      "schema": {
+        "fields": [],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "slot": "s_1"
+                },
+                {
+                  "slot": "s_2",
+                  "span": 3
+                }
+              ],
+              "title": "Da riempire",
+              "columns": 3
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_ok_field_not_placed",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_null",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": null
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_not_object",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": []
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'layout' must be an object"
+        }
+      ]
+    },
+    {
+      "name": "layout_sections_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {}
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'layout.sections' must be a non-empty list"
+        }
+      ]
+    },
+    {
+      "name": "layout_sections_empty",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": []
+        }
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'layout.sections' must be a non-empty list"
+        }
+      ]
+    },
+    {
+      "name": "layout_extra_key",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": []
+            }
+          ],
+          "foo": 1
+        }
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "only 'sections' allowed in layout"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_not_object",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            "x"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "section must be an object"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_id_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "S1",
+              "items": []
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_id_duplicate",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": []
+            },
+            {
+              "id": "s1",
+              "items": []
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[1]",
+          "message": "duplicate section id"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_title_number",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [],
+              "title": 3
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'title' must be a string"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_columns_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [],
+              "columns": 4
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'columns' must be 1, 2 or 3"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_extra_prop",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [],
+              "foo": 1,
+              "bar": 2
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "properties not allowed in section: ['bar', 'foo']"
+        }
+      ]
+    },
+    {
+      "name": "layout_items_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1"
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'items' must be a list"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_not_object",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                "x"
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "item must be an object"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_neither",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "span": 1
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "item must have either 'field' or 'slot'"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_both",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "slot": "s_1"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "item must have either 'field' or 'slot'"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_extra_prop",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "width": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "properties not allowed in item: ['width']"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_unknown_field",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "zzz"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "unknown field 'zzz'"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_field_number",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": 5
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "unknown field 5"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_field_twice",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a"
+                },
+                {
+                  "field": "a"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[1]",
+          "message": "field 'a' is already placed"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_slot_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "slot": "1x"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'slot' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_slot_duplicate",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "slot": "s_1"
+                },
+                {
+                  "slot": "s_1"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[1]",
+          "message": "duplicate slot id"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_over_columns",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 3
+                }
+              ],
+              "columns": 2
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 2"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_zero",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 0
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 1"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_float",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 1.5
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 1"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_bool",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 1"
+        }
+      ]
+    },
+    {
+      "name": "layout_empty_schema",
+      "schema": {
+        "fields": []
+      },
+      "errors": []
     }
   ],
   "submission_schema": {
@@ -1047,7 +2009,64 @@
         "required": true,
         "default": "today"
       }
-    ]
+    ],
+    "layout": {
+      "sections": [
+        {
+          "id": "ispezione",
+          "title": "Ispezione",
+          "columns": 2,
+          "items": [
+            {
+              "field": "area",
+              "span": 2
+            },
+            {
+              "field": "esito"
+            },
+            {
+              "field": "data_ispezione"
+            },
+            {
+              "field": "rischi",
+              "span": 2
+            },
+            {
+              "field": "persone_presenti"
+            },
+            {
+              "field": "dpi_indossati"
+            }
+          ]
+        },
+        {
+          "id": "evidenze",
+          "title": "Evidenze",
+          "columns": 2,
+          "items": [
+            {
+              "field": "note",
+              "span": 2
+            },
+            {
+              "field": "foto"
+            },
+            {
+              "field": "posizione"
+            }
+          ]
+        },
+        {
+          "id": "chiusura",
+          "title": "Chiusura",
+          "items": [
+            {
+              "field": "firma_ispettore"
+            }
+          ]
+        }
+      ]
+    }
   },
   "submission_cases": [
     {

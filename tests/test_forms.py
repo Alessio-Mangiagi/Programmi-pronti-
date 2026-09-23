@@ -31,10 +31,86 @@ def test_example_schema_is_valid():
     assert validate_schema(SCHEMA) == []
 
 
-@pytest.mark.parametrize("schema", [None, [], {}, {"fields": []}, {"fields": "x"}])
-def test_schema_needs_non_empty_fields(schema):
+@pytest.mark.parametrize("schema", [None, [], {}, {"fields": "x"}])
+def test_schema_needs_fields_list(schema):
     errs = validate_schema(schema)
     assert errs and errs[0]["field"] == "$"
+
+
+def test_schema_without_fields_is_valid():
+    """Modulo appena impostato: solo la struttura, i campi arrivano dopo."""
+    assert validate_schema({"fields": []}) == []
+    assert validate_schema({"fields": [], "layout": {"sections": [
+        {"id": "s1", "title": "Dati generali", "columns": 2, "items": [{"slot": "b1"}, {"slot": "b2"}]},
+    ]}}) == []
+
+
+# ---------- layout ----------
+
+def laid_out(layout):
+    return {"fields": [{"id": "a", "type": "text", "label": "A"},
+                       {"id": "b", "type": "number", "label": "B"}], "layout": layout}
+
+
+def test_layout_valid():
+    assert validate_schema(laid_out({"sections": [
+        {"id": "s1", "title": "Dati", "columns": 2, "items": [{"field": "a", "span": 2}, {"slot": "vuoto"}]},
+        {"id": "s2", "items": [{"field": "b"}]},
+    ]})) == []
+
+
+def test_layout_absent_or_null_is_ok():
+    assert validate_schema(laid_out(None)) == []
+    assert validate_schema({"fields": [{"id": "a", "type": "text", "label": "A"}]}) == []
+
+
+@pytest.mark.parametrize("layout", [[], "x", {}, {"sections": []}, {"sections": [{"id": "s1", "items": []}], "x": 1}])
+def test_layout_shape_errors(layout):
+    errs = validate_schema(laid_out(layout))
+    assert errs and errs[0]["field"] == "$"
+
+
+@pytest.mark.parametrize("section, expected", [
+    ({"id": "S1", "items": []}, "'id' must match"),
+    ({"id": "s1", "items": [], "title": 3}, "'title' must be a string"),
+    ({"id": "s1", "items": [], "columns": 4}, "'columns' must be 1, 2 or 3"),
+    ({"id": "s1", "items": [], "foo": 1}, "properties not allowed in section"),
+    ({"id": "s1"}, "'items' must be a list"),
+])
+def test_layout_section_errors(section, expected):
+    errs = validate_schema(laid_out({"sections": [section]}))
+    assert any(expected in e["message"] and e["field"] == "layout.sections[0]" for e in errs)
+
+
+@pytest.mark.parametrize("item, expected", [
+    ("x", "item must be an object"),
+    ({"span": 1}, "item must have either 'field' or 'slot'"),
+    ({"field": "a", "slot": "s"}, "item must have either 'field' or 'slot'"),
+    ({"field": "a", "width": 1}, "properties not allowed in item"),
+    ({"field": "zzz"}, "unknown field"),
+    ({"slot": "1x"}, "'slot' must match"),
+    ({"field": "a", "span": 2}, "'span' must be an integer between 1 and 1"),
+])
+def test_layout_item_errors(item, expected):
+    errs = validate_schema(laid_out({"sections": [{"id": "s1", "items": [item]}]}))
+    assert any(expected in e["message"] and e["field"] == "layout.sections[0].items[0]" for e in errs)
+
+
+def test_layout_field_placed_once():
+    errs = validate_schema(laid_out({"sections": [{"id": "s1", "items": [{"field": "a"}, {"field": "a"}]}]}))
+    assert messages(errs, "layout.sections[0].items[1]") == ["field 'a' is already placed"]
+
+
+def test_layout_duplicate_section_and_slot_ids():
+    errs = validate_schema(laid_out({"sections": [{"id": "s1", "items": [{"slot": "x"}, {"slot": "x"}]},
+                                                  {"id": "s1", "items": []}]}))
+    assert messages(errs, "layout.sections[0].items[1]") == ["duplicate slot id"]
+    assert messages(errs, "layout.sections[1]") == ["duplicate section id"]
+
+
+def test_layout_field_not_placed_is_allowed():
+    """Campo aggiunto senza toccare la struttura: valido, i renderer lo mettono in fondo."""
+    assert validate_schema(laid_out({"sections": [{"id": "s1", "items": [{"field": "a"}]}]})) == []
 
 
 @pytest.mark.parametrize("bad_id", ["", "Esito", "1a", "a-b", None, "a" * 65])
@@ -197,7 +273,7 @@ def test_template_patch_archive_and_schema_lock(client, project, pin, users):
                               "options": ["Conforme", "Non conforme"]}]}
     r = client.patch(url, json={"name": "Ispezione v2", "category": "safety", "schema_def": new_schema})
     assert r.status_code == 200 and r.json()["name"] == "Ispezione v2" and r.json()["schema_def"] == new_schema
-    assert client.patch(url, json={"schema_def": {"fields": []}}).status_code == 422
+    assert client.patch(url, json={"schema_def": {"fields": "x"}}).status_code == 422
     assert client.patch(url, json={"name": " "}).status_code == 422
     # field non può gestire template
     assert client.patch(url, headers=users["field"]["headers"], json={"name": "x"}).status_code == 403

@@ -47,7 +47,34 @@ export type Field =
   | SignatureField
   | GeolocationField
 
-export type FormSchema = { fields: Field[] }
+/**
+ * Layout: struttura a blocchi del modulo, progettabile prima dei campi.
+ * Opzionale: senza `layout` i campi si mostrano in fila, uno sotto l'altro.
+ * I dati restano governati da `fields`: il layout dice solo dove sta ogni campo.
+ */
+export const LAYOUT_COLUMNS = [1, 2, 3] as const
+export type LayoutColumns = (typeof LAYOUT_COLUMNS)[number]
+
+/** Blocco con dentro un campo. `span` = colonne occupate (default 1). */
+export type LayoutFieldItem = { field: string; span?: number }
+/** Blocco ancora vuoto: tiene il posto finché non ci si mette un campo. */
+export type LayoutSlotItem = { slot: string; span?: number }
+export type LayoutItem = LayoutFieldItem | LayoutSlotItem
+
+export type LayoutSection = {
+  /** ^[a-z][a-z0-9_]{0,63}$, univoco nel modulo */
+  id: string
+  title?: string
+  /** colonne della sezione, default 1 */
+  columns?: LayoutColumns
+  items: LayoutItem[]
+}
+
+export type Layout = { sections: LayoutSection[] }
+
+export const isFieldItem = (i: LayoutItem): i is LayoutFieldItem => 'field' in i
+
+export type FormSchema = { fields: Field[]; layout?: Layout }
 
 export type Geolocation = { lat: number; lng: number; accuracy?: number }
 

@@ -46,6 +46,14 @@ API: `GET/POST/PATCH /commesse`, `PATCH /projects/{id}` (`commessa_id`), `GET/PO
    si duplicano e si adattano; un template già compilato non cambia più schema
    (duplica e modifica la copia). Un'opzione con "Non conforme" in un campo a scelta
    fa scattare la proposta di task e la notifica ai manager.
+   Il builder lavora in due fasi, ripetibili in qualsiasi momento:
+   **1. Struttura** — sezioni con titolo, da 1 a 3 colonne, dentro cui si mettono
+   blocchi anche vuoti (le frecce spostano un blocco anche nella sezione vicina,
+   il selettore `n/colonne` decide quanto è largo); si può salvare un modulo con
+   la sola struttura e riempirlo un altro giorno.
+   **2. Campi** — ogni blocco vuoto si riempie scegliendo il tipo di campo, poi si
+   regolano etichetta, obbligatorietà e opzioni nel pannello Proprietà.
+   Su telefono le colonne si richiudono a una; il PDF resta a un campo per riga.
 4. Aggiungere i membri; gli operai fanno login dall'app e sincronizzano.
 
 ## Operatività quotidiana (ufficio)

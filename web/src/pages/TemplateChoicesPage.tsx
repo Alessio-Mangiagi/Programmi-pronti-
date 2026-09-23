@@ -54,7 +54,8 @@ export default function TemplateChoicesPage() {
 
   /** Schema con le opzioni modificate; un default non più fra le opzioni viene tolto. */
   function patched(t: FormTemplate): FormSchema {
-    const fields = (t.schema_def as FormSchema).fields.map((f) => {
+    const schema = t.schema_def as FormSchema
+    const fields = schema.fields.map((f) => {
       const text = isChoice(f) ? drafts[t.id]?.[f.id] : undefined
       if (!isChoice(f) || text === undefined) return f
       const options = parseOptions(text)
@@ -67,7 +68,8 @@ export default function TemplateChoicesPage() {
       const kept = (def ?? []).filter((v) => options.includes(v))
       return kept.length ? { ...rest, options, default: kept } : { ...rest, options }
     })
-    return { fields }
+    // qui si toccano solo le opzioni: la struttura del modulo resta quella salvata
+    return schema.layout ? { fields, layout: schema.layout } : { fields }
   }
 
   async function save(t: FormTemplate) {

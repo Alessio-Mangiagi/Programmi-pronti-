@@ -252,15 +252,30 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await page.getByLabel('Nome').fill(name)
   await page.getByLabel('Categoria').selectOption('diary')
 
-  const addField = async (type: string, label: string) => {
-    await page.getByLabel('Tipo del nuovo campo').selectOption(type)
-    await page.getByRole('button', { name: '+ Aggiungi campo' }).click()
+  // fase 1: la struttura, prima dei campi — una sezione a due colonne con due blocchi vuoti
+  await page.getByRole('tab', { name: /Struttura/ }).click()
+  await page.getByLabel('Titolo della sezione 1').fill('Dati del giorno')
+  await page.getByLabel('Colonne della sezione 1').selectOption('2')
+  await page.getByRole('button', { name: 'Blocco' }).click()
+  await page.getByRole('button', { name: 'Blocco' }).click()
+  await expect(page.locator('.bblock.is-empty')).toHaveCount(2)
+
+  // fase 2: i campi dentro i blocchi già disegnati
+  await page.getByRole('tab', { name: /Campi/ }).click()
+  const fillBlock = async (type: string, label: string) => {
+    await page.locator('.bblock.is-empty select').first().selectOption(type)
     await page.getByLabel('Etichetta').fill(label)
   }
-  await addField('date', 'Data')
+  const addField = async (type: string, label: string) => {
+    await page.getByLabel('Tipo del nuovo campo').selectOption(type)
+    await page.getByRole('button', { name: '+ Aggiungi campo in fondo' }).click()
+    await page.getByLabel('Etichetta').fill(label)
+  }
+  await fillBlock('date', 'Data')
   await page.getByLabel('Valore iniziale').selectOption('today')
-  await addField('textarea', 'Attività svolte')
+  await fillBlock('textarea', 'Attività svolte')
   await page.getByLabel('Obbligatorio').check()
+  await expect(page.locator('.bblock.is-empty')).toHaveCount(0)
   await addField('number', 'Operai presenti')
   await page.getByLabel('Solo numeri interi').check()
   await addField('select', 'Meteo')
@@ -269,14 +284,15 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await addField('photo', 'Foto del giorno')
   await page.getByLabel('Più foto').check()
 
-  // id derivati dalle etichette, anteprima live valida
-  await expect(page.locator('.field-list')).toContainText('attivita_svolte')
-  await expect(page.locator('.field-list')).toContainText('operai_presenti')
+  // id derivati dalle etichette, anteprima live valida con la sezione disegnata prima
+  await expect(page.locator('.bsections')).toContainText('attivita_svolte')
+  await expect(page.locator('.bsections')).toContainText('operai_presenti')
   await expect(page.locator('.builder-preview .dyn-field')).toHaveCount(5)
+  await expect(page.locator('.builder-preview .dyn-section-title')).toHaveText('Dati del giorno')
   await expect(page.locator('.builder-preview').getByLabel(/^Data/)).toHaveValue(/^\d{4}-\d{2}-\d{2}$/)
 
   // errore di schema segnalato: opzione duplicata, poi corretta
-  await page.locator('.field-row', { hasText: 'Meteo' }).locator('.field-row-main').click()
+  await page.locator('.bblock', { hasText: 'Meteo' }).locator('.bblock-main').click()
   await page.getByLabel('Opzioni (una per riga)').fill('Sole\nSole')
   await page.getByLabel('Opzioni (una per riga)').blur()
   await expect(page.locator('.field-props .error')).toContainText('duplicates')

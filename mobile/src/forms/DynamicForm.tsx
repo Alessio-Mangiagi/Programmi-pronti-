@@ -1,8 +1,8 @@
-import { type Field, type FieldError, type FormData, type FormSchema, type Geolocation } from '@fieldview/form-core'
+import { resolveLayout, type Field, type FieldError, type FormData, type FormSchema, type Geolocation } from '@fieldview/form-core'
 import * as ImagePicker from 'expo-image-picker'
 import * as Location from 'expo-location'
 import { useRef, useState } from 'react'
-import { Alert, Image, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, Image, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useWindowDimensions, View, type DimensionValue } from 'react-native'
 import SignatureScreen, { type SignatureViewRef } from 'react-native-signature-canvas'
 import { newId } from '../data/mutations'
 import { colors, styles } from '../ui'
@@ -48,39 +48,63 @@ export function translate(msg: string): string {
   return msg
 }
 
-/** Renderer mobile del modulo dinamico: un controllo nativo per tipo, errori inline. */
+/**
+ * Renderer mobile del modulo dinamico: un controllo nativo per tipo, errori inline.
+ * Sezioni e colonne vengono da `schema.layout` (resolveLayout); su schermo stretto
+ * le colonne collassano a una, che su telefono è l'unica disposizione leggibile.
+ */
 export default function DynamicForm({ schema, value, errors = [], attachments, remoteUris = {}, readOnly, onChange, onAttachmentsChange }: Props) {
   const errorOf = (id: string) => errors.find((e) => e.field === id)?.message
   const set = (id: string, v: FormData[string]) => onChange({ ...value, [id]: v })
+  const sections = resolveLayout(schema)
+  const wide = useWindowDimensions().width >= 600
 
   return (
     <View style={{ gap: 14 }}>
-      {schema.fields.map((f) => {
-        const err = errorOf(f.id)
+      {sections.map((sec) => {
+        const cols = wide ? sec.columns : 1
         return (
-          <View key={f.id}>
-            <Text style={[styles.label, { color: colors.text, fontWeight: '600' }]}>
-              {f.label}
-              {f.required && <Text style={{ color: colors.danger }}> *</Text>}
-            </Text>
-            <Control
-              field={f}
-              value={value[f.id]}
-              attachments={attachments}
-              remoteUris={remoteUris}
-              readOnly={readOnly}
-              invalid={!!err}
-              onChange={(v) => set(f.id, v)}
-              onAttachmentsChange={onAttachmentsChange}
-            />
-            {f.help && !err && <Text style={styles.muted}>{f.help}</Text>}
-            {err && <Text style={styles.error}>{translate(err)}</Text>}
+          <View key={sec.id} style={{ gap: 14 }}>
+            {sec.title ? <Text style={formStyles.sectionTitle}>{sec.title}</Text> : null}
+            <View style={cols > 1 ? formStyles.grid : { gap: 14 }}>
+              {sec.items.map(({ field: f, span }) => {
+                const err = errorOf(f.id)
+                // percentuale della riga occupata dal campo; gap simulato dal padding delle celle
+                const width = (cols > 1 ? `${(Math.min(span, cols) / cols) * 100}%` : undefined) as DimensionValue | undefined
+                return (
+                  <View key={f.id} style={cols > 1 ? [formStyles.cell, { width }] : undefined}>
+                    <Text style={[styles.label, { color: colors.text, fontWeight: '600' }]}>
+                      {f.label}
+                      {f.required && <Text style={{ color: colors.danger }}> *</Text>}
+                    </Text>
+                    <Control
+                      field={f}
+                      value={value[f.id]}
+                      attachments={attachments}
+                      remoteUris={remoteUris}
+                      readOnly={readOnly}
+                      invalid={!!err}
+                      onChange={(v) => set(f.id, v)}
+                      onAttachmentsChange={onAttachmentsChange}
+                    />
+                    {f.help && !err && <Text style={styles.muted}>{f.help}</Text>}
+                    {err && <Text style={styles.error}>{translate(err)}</Text>}
+                  </View>
+                )
+              })}
+            </View>
           </View>
         )
       })}
     </View>
   )
 }
+
+const formStyles = StyleSheet.create({
+  sectionTitle: { color: colors.text, fontWeight: '700', fontSize: 16, marginBottom: -4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
+  cell: { paddingHorizontal: 6, paddingBottom: 14 },
+})
 
 type ControlProps = {
   field: Field

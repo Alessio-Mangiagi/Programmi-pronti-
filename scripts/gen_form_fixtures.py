@@ -25,6 +25,20 @@ def field(**kw):
     return {"fields": [base]}
 
 
+def laid_out(layout, fields=None):
+    """Schema con due campi (a, b) e il layout passato."""
+    return {"fields": fields if fields is not None else [
+        {"id": "a", "type": "text", "label": "A"},
+        {"id": "b", "type": "number", "label": "B"},
+    ], "layout": layout}
+
+
+def section(**kw):
+    base = {"id": "s1", "items": []}
+    base.update(kw)
+    return {"sections": [base]}
+
+
 SCHEMAS = {
     "example": EXAMPLE,
     "not_object": None,
@@ -77,6 +91,40 @@ SCHEMAS = {
     "signature_extra_prop": field(type="signature", default="x"),
     "geolocation_ok": field(type="geolocation", help="Posizione"),
     "many_errors_same_field": field(type="number", min="a", max="b", integer=1, default="c", label=""),
+    # layout: struttura a blocchi, opzionale e indipendente dai dati
+    "layout_ok": laid_out(section(title="Dati", columns=2,
+                                  items=[{"field": "a", "span": 2}, {"field": "b"}])),
+    "layout_ok_slots_only": laid_out(section(title="Da riempire", columns=3,
+                                             items=[{"slot": "s_1"}, {"slot": "s_2", "span": 3}]),
+                                     fields=[]),
+    "layout_ok_field_not_placed": laid_out(section(items=[{"field": "a"}])),
+    "layout_null": laid_out(None),
+    "layout_not_object": laid_out([]),
+    "layout_sections_missing": laid_out({}),
+    "layout_sections_empty": laid_out({"sections": []}),
+    "layout_extra_key": laid_out({"sections": [{"id": "s1", "items": []}], "foo": 1}),
+    "layout_section_not_object": laid_out({"sections": ["x"]}),
+    "layout_section_id_bad": laid_out(section(id="S1")),
+    "layout_section_id_duplicate": laid_out({"sections": [{"id": "s1", "items": []},
+                                                          {"id": "s1", "items": []}]}),
+    "layout_section_title_number": laid_out(section(title=3)),
+    "layout_section_columns_bad": laid_out(section(columns=4)),
+    "layout_section_extra_prop": laid_out(section(foo=1, bar=2)),
+    "layout_items_missing": laid_out({"sections": [{"id": "s1"}]}),
+    "layout_item_not_object": laid_out(section(items=["x"])),
+    "layout_item_neither": laid_out(section(items=[{"span": 1}])),
+    "layout_item_both": laid_out(section(items=[{"field": "a", "slot": "s_1"}])),
+    "layout_item_extra_prop": laid_out(section(items=[{"field": "a", "width": 2}])),
+    "layout_item_unknown_field": laid_out(section(items=[{"field": "zzz"}])),
+    "layout_item_field_number": laid_out(section(items=[{"field": 5}])),
+    "layout_item_field_twice": laid_out(section(items=[{"field": "a"}, {"field": "a"}])),
+    "layout_item_slot_bad": laid_out(section(items=[{"slot": "1x"}])),
+    "layout_item_slot_duplicate": laid_out(section(items=[{"slot": "s_1"}, {"slot": "s_1"}])),
+    "layout_item_span_over_columns": laid_out(section(columns=2, items=[{"field": "a", "span": 3}])),
+    "layout_item_span_zero": laid_out(section(items=[{"field": "a", "span": 0}])),
+    "layout_item_span_float": laid_out(section(items=[{"field": "a", "span": 1.5}])),
+    "layout_item_span_bool": laid_out(section(items=[{"field": "a", "span": True}])),
+    "layout_empty_schema": {"fields": []},
 }
 
 VALID_DATA = {

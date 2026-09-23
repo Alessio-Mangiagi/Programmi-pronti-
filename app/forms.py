@@ -37,6 +37,11 @@ TYPE_PROPS = {
 }
 COMMON_PROPS = {"id", "type", "label", "required", "help"}
 
+# Layout (opzionale): sezioni a 1-3 colonne con dentro blocchi, ciascuno con un
+# campo ("field") o ancora vuoto ("slot"). Vedi docs/form-schema.md.
+SECTION_PROPS = {"id", "title", "columns", "items"}
+ITEM_PROPS = {"field", "slot", "span"}
+
 # Chiave riservata in data_json: note per campo aggiunte in compilazione
 # ({field_id: {"comment": str, "photos": [attachment id]}}), fuori dallo schema.
 NOTES_KEY = "_notes"
@@ -54,8 +59,9 @@ def validate_schema(schema: Any) -> list[dict]:
         return [_err("$", "schema must be an object")]
 
     fields = schema.get("fields")
-    if not isinstance(fields, list) or not fields:
-        return [_err("$", "'fields' must be a non-empty list")]
+    # lista vuota ammessa: un modulo può nascere come sola struttura (layout) e ricevere i campi dopo
+    if not isinstance(fields, list):
+        return [_err("$", "'fields' must be a list")]
 
     seen: set[str] = set()
     for i, f in enumerate(fields):
@@ -90,6 +96,94 @@ def validate_schema(schema: Any) -> list[dict]:
             errors.append(_err(where, f"properties not allowed for type {ftype}: {sorted(extra)}"))
 
         errors.extend(_validate_type_props(where, ftype, f))
+
+    if schema.get("layout") is not None:
+        errors.extend(_validate_layout(schema["layout"], seen))
+
+    return errors
+
+
+def _validate_layout(layout: Any, field_ids: set[str]) -> list[dict]:
+    """
+    Sezioni del layout: id univoco, 1-3 colonne, blocchi con un campo esistente
+    (una sola volta) o uno slot vuoto. I campi non collocati non sono un errore:
+    i renderer li mostrano in fondo.
+    """
+    if not isinstance(layout, dict):
+        return [_err("$", "'layout' must be an object")]
+    sections = layout.get("sections")
+    if not isinstance(sections, list) or not sections:
+        return [_err("$", "'layout.sections' must be a non-empty list")]
+    if set(layout) - {"sections"}:
+        return [_err("$", "only 'sections' allowed in layout")]
+
+    errors: list[dict] = []
+    seen_sections: set[str] = set()
+    placed: set[str] = set()
+    seen_slots: set[str] = set()
+
+    for i, sec in enumerate(sections):
+        where = f"layout.sections[{i}]"
+        if not isinstance(sec, dict):
+            errors.append(_err(where, "section must be an object"))
+            continue
+
+        sid = sec.get("id")
+        if not isinstance(sid, str) or not FIELD_ID_RE.match(sid):
+            errors.append(_err(where, "'id' must match ^[a-z][a-z0-9_]{0,63}$"))
+        elif sid in seen_sections:
+            errors.append(_err(where, "duplicate section id"))
+        else:
+            seen_sections.add(sid)
+
+        if "title" in sec and not isinstance(sec["title"], str):
+            errors.append(_err(where, "'title' must be a string"))
+        if "columns" in sec and sec["columns"] not in (1, 2, 3):
+            errors.append(_err(where, "'columns' must be 1, 2 or 3"))
+        extra = set(sec) - SECTION_PROPS
+        if extra:
+            errors.append(_err(where, f"properties not allowed in section: {sorted(extra)}"))
+
+        items = sec.get("items")
+        if not isinstance(items, list):
+            errors.append(_err(where, "'items' must be a list"))
+            continue
+        columns = sec["columns"] if sec.get("columns") in (2, 3) else 1
+
+        for j, it in enumerate(items):
+            iw = f"{where}.items[{j}]"
+            if not isinstance(it, dict):
+                errors.append(_err(iw, "item must be an object"))
+                continue
+            has_field, has_slot = "field" in it, "slot" in it
+            if has_field == has_slot:
+                errors.append(_err(iw, "item must have either 'field' or 'slot'"))
+                continue
+            iextra = set(it) - ITEM_PROPS
+            if iextra:
+                errors.append(_err(iw, f"properties not allowed in item: {sorted(iextra)}"))
+
+            if has_field:
+                fid = it["field"]
+                if not isinstance(fid, str) or fid not in field_ids:
+                    errors.append(_err(iw, f"unknown field {fid!r}"))
+                elif fid in placed:
+                    errors.append(_err(iw, f"field {fid!r} is already placed"))
+                else:
+                    placed.add(fid)
+            else:
+                slot = it["slot"]
+                if not isinstance(slot, str) or not FIELD_ID_RE.match(slot):
+                    errors.append(_err(iw, "'slot' must match ^[a-z][a-z0-9_]{0,63}$"))
+                elif slot in seen_slots:
+                    errors.append(_err(iw, "duplicate slot id"))
+                else:
+                    seen_slots.add(slot)
+
+            span = it.get("span")
+            if "span" in it and (not isinstance(span, int) or isinstance(span, bool)
+                                 or span < 1 or span > columns):
+                errors.append(_err(iw, f"'span' must be an integer between 1 and {columns}"))
 
     return errors
 

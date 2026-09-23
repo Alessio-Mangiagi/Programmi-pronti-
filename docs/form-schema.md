@@ -14,15 +14,63 @@ Esempio completo: `form_schema_example.json`.
 
 ```json
 {
-  "fields": [ { "id": "...", "type": "...", "label": "...", ... } ]
+  "fields": [ { "id": "...", "type": "...", "label": "...", ... } ],
+  "layout": { "sections": [ { "id": "...", "title": "...", "columns": 2, "items": [ ... ] } ] }
 }
 ```
 
-- `fields`: lista non vuota, ordine = ordine di visualizzazione.
+- `fields`: lista dei campi, ordine = ordine di visualizzazione quando non c'è
+  un `layout`. Può essere **vuota**: un modulo può nascere come sola struttura
+  (si progettano i blocchi, i campi arrivano dopo).
+- `layout`: facoltativo, descrive solo *dove* stanno i campi (vedi sotto). I dati
+  restano governati da `fields`: `data_json` non cambia se il layout cambia.
 - Il template salvato è immutabile nel senso che le submission esistenti non
   vengono ri-validate: `PATCH /form-templates/{id}` accetta `schema_def` solo
   finché nessuna submission usa il template (409 altrimenti); dopo, si duplica
   e si modifica la copia. `archived_at` valorizzato = niente nuove compilazioni.
+
+## Layout (struttura a blocchi)
+
+Facoltativo. Serve a progettare l'impaginato del modulo prima (o dopo) di
+riempirlo di campi: sezioni con titolo, da 1 a 3 colonne, dentro le quali stanno
+dei blocchi. Un blocco contiene un campo (`field`) oppure è ancora vuoto (`slot`),
+cioè tiene il posto finché non gli si mette dentro qualcosa.
+
+```json
+{
+  "layout": {
+    "sections": [
+      { "id": "dati_generali", "title": "Dati generali", "columns": 2,
+        "items": [ { "field": "area", "span": 2 }, { "field": "esito" }, { "slot": "b3" } ] },
+      { "id": "chiusura", "items": [ { "field": "firma_ispettore" } ] }
+    ]
+  }
+}
+```
+
+| Proprietà | Dove | Note |
+|-----------|------|------|
+| `sections` | `layout` | lista non vuota; unica chiave ammessa in `layout` |
+| `id` | sezione | `^[a-z][a-z0-9_]{0,63}$`, univoco fra le sezioni |
+| `title` | sezione | facoltativo, mostrato sopra la sezione |
+| `columns` | sezione | `1`, `2` o `3` (default `1`) |
+| `items` | sezione | lista (anche vuota) di blocchi |
+| `field` | blocco | `id` di un campo esistente, in **un solo** blocco |
+| `slot` | blocco | id del blocco vuoto, `^[a-z][a-z0-9_]{0,63}$`, univoco |
+| `span` | blocco | intero fra 1 e le `columns` della sezione (default 1) |
+
+Ogni blocco ha `field` **oppure** `slot`, mai entrambi né nessuno dei due.
+
+Regole di disegno, uguali su web, mobile e anteprima del builder
+(`resolveLayout` in `packages/form-core/src/layout.ts`):
+
+- senza `layout`: una sola sezione a una colonna con i campi nell'ordine di `fields`;
+- i blocchi vuoti non si mostrano in compilazione (esistono solo nel builder);
+- un campo che non sta in nessun blocco **non è un errore**: compare in fondo, in
+  una sezione senza titolo, così un campo aggiunto senza toccare la struttura
+  resta comunque compilabile;
+- su mobile, sotto i 600 px di larghezza le colonne collassano a una;
+- il PDF del modulo compilato resta a un campo per riga, nell'ordine di `fields`.
 
 ## Proprietà comuni a tutti i campi
 
@@ -74,7 +122,8 @@ Formato errori (sia schema che submission):
 ```
 
 `field` è l'`id` del campo, oppure `$` per errori sull'intero documento,
-oppure `fields[i]` quando il campo non ha un `id` valido.
+oppure `fields[i]` quando il campo non ha un `id` valido. Gli errori del layout
+usano il percorso: `layout.sections[i]` e `layout.sections[i].items[j]`.
 
 ### Note per campo (`_notes`)
 

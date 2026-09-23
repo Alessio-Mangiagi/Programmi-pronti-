@@ -7,6 +7,9 @@ import { FIELD_TYPES, NOTES_KEY, type Field, type FieldError, type FieldType, ty
 
 export const FIELD_ID_RE = /^[a-z][a-z0-9_]{0,63}$/
 
+const SECTION_PROPS = new Set(['id', 'title', 'columns', 'items'])
+const ITEM_PROPS = new Set(['field', 'slot', 'span'])
+
 const COMMON_PROPS = new Set(['id', 'type', 'label', 'required', 'help'])
 const TYPE_PROPS: Record<FieldType, Set<string>> = {
   text: new Set(['max_length', 'default']),
@@ -55,7 +58,8 @@ export function validateSchema(schema: unknown): FieldError[] {
   if (!isObject(schema)) return [err('$', 'schema must be an object')]
 
   const fields = schema.fields
-  if (!Array.isArray(fields) || fields.length === 0) return [err('$', "'fields' must be a non-empty list")]
+  // lista vuota ammessa: un modulo può nascere come sola struttura (layout) e ricevere i campi dopo
+  if (!Array.isArray(fields)) return [err('$', "'fields' must be a list")]
 
   const seen = new Set<string>()
   fields.forEach((f, i) => {
@@ -94,6 +98,96 @@ export function validateSchema(schema: unknown): FieldError[] {
     }
 
     errors.push(...validateTypeProps(where, t, f))
+  })
+
+  if ('layout' in schema && schema.layout !== null && schema.layout !== undefined) {
+    errors.push(...validateLayout(schema.layout, seen))
+  }
+
+  return errors
+}
+
+/**
+ * Layout: sezioni a 1-3 colonne con dentro blocchi, ciascuno con un campo
+ * (`field`) o ancora vuoto (`slot`). Un campo può stare in un solo blocco;
+ * i campi non collocati si mostrano in fondo (vedi resolveLayout).
+ */
+function validateLayout(layout: unknown, fieldIds: Set<string>): FieldError[] {
+  if (!isObject(layout)) return [err('$', "'layout' must be an object")]
+  const sections = layout.sections
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return [err('$', "'layout.sections' must be a non-empty list")]
+  }
+  if (Object.keys(layout).some((k) => k !== 'sections')) {
+    return [err('$', "only 'sections' allowed in layout")]
+  }
+
+  const errors: FieldError[] = []
+  const seenSections = new Set<string>()
+  const placed = new Set<string>()
+  const seenSlots = new Set<string>()
+
+  sections.forEach((sec, i) => {
+    const where = `layout.sections[${i}]`
+    if (!isObject(sec)) {
+      errors.push(err(where, 'section must be an object'))
+      return
+    }
+
+    const sid = sec.id
+    if (!isString(sid) || !FIELD_ID_RE.test(sid)) errors.push(err(where, "'id' must match ^[a-z][a-z0-9_]{0,63}$"))
+    else if (seenSections.has(sid)) errors.push(err(where, 'duplicate section id'))
+    else seenSections.add(sid)
+
+    if ('title' in sec && !isString(sec.title)) errors.push(err(where, "'title' must be a string"))
+    if ('columns' in sec && sec.columns !== 1 && sec.columns !== 2 && sec.columns !== 3) {
+      errors.push(err(where, "'columns' must be 1, 2 or 3"))
+    }
+    const extra = Object.keys(sec)
+      .filter((k) => !SECTION_PROPS.has(k))
+      .sort()
+    if (extra.length) errors.push(err(where, `properties not allowed in section: [${extra.map((k) => `'${k}'`).join(', ')}]`))
+
+    const items = sec.items
+    if (!Array.isArray(items)) {
+      errors.push(err(where, "'items' must be a list"))
+      return
+    }
+    const columns = sec.columns === 2 || sec.columns === 3 ? sec.columns : 1
+
+    items.forEach((it, j) => {
+      const iw = `${where}.items[${j}]`
+      if (!isObject(it)) {
+        errors.push(err(iw, 'item must be an object'))
+        return
+      }
+      const hasField = 'field' in it
+      const hasSlot = 'slot' in it
+      if (hasField === hasSlot) {
+        errors.push(err(iw, "item must have either 'field' or 'slot'"))
+        return
+      }
+      const iextra = Object.keys(it)
+        .filter((k) => !ITEM_PROPS.has(k))
+        .sort()
+      if (iextra.length) errors.push(err(iw, `properties not allowed in item: [${iextra.map((k) => `'${k}'`).join(', ')}]`))
+
+      if (hasField) {
+        const fid = it.field
+        if (!isString(fid) || !fieldIds.has(fid)) errors.push(err(iw, `unknown field ${repr(fid)}`))
+        else if (placed.has(fid)) errors.push(err(iw, `field ${repr(fid)} is already placed`))
+        else placed.add(fid)
+      } else {
+        const slot = it.slot
+        if (!isString(slot) || !FIELD_ID_RE.test(slot)) errors.push(err(iw, "'slot' must match ^[a-z][a-z0-9_]{0,63}$"))
+        else if (seenSlots.has(slot)) errors.push(err(iw, 'duplicate slot id'))
+        else seenSlots.add(slot)
+      }
+
+      if ('span' in it && (!Number.isInteger(it.span) || (it.span as number) < 1 || (it.span as number) > columns)) {
+        errors.push(err(iw, `'span' must be an integer between 1 and ${columns}`))
+      }
+    })
   })
 
   return errors

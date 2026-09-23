@@ -15,13 +15,23 @@
         "type": "select",
         "label": "Esito",
         "required": true,
-        "options": ["Conforme", "Non conforme", "Da verificare"]
+        "options": [
+          "Conforme",
+          "Non conforme",
+          "Da verificare"
+        ]
       },
       {
         "id": "rischi",
         "type": "multiselect",
         "label": "Rischi rilevati",
-        "options": ["Caduta dall'alto", "Elettrico", "Movimentazione carichi", "Scavi", "Altro"]
+        "options": [
+          "Caduta dall'alto",
+          "Elettrico",
+          "Movimentazione carichi",
+          "Scavi",
+          "Altro"
+        ]
       },
       {
         "id": "persone_presenti",
@@ -66,6 +76,63 @@
         "required": true,
         "default": "today"
       }
-    ]
+    ],
+    "layout": {
+      "sections": [
+        {
+          "id": "ispezione",
+          "title": "Ispezione",
+          "columns": 2,
+          "items": [
+            {
+              "field": "area",
+              "span": 2
+            },
+            {
+              "field": "esito"
+            },
+            {
+              "field": "data_ispezione"
+            },
+            {
+              "field": "rischi",
+              "span": 2
+            },
+            {
+              "field": "persone_presenti"
+            },
+            {
+              "field": "dpi_indossati"
+            }
+          ]
+        },
+        {
+          "id": "evidenze",
+          "title": "Evidenze",
+          "columns": 2,
+          "items": [
+            {
+              "field": "note",
+              "span": 2
+            },
+            {
+              "field": "foto"
+            },
+            {
+              "field": "posizione"
+            }
+          ]
+        },
+        {
+          "id": "chiusura",
+          "title": "Chiusura",
+          "items": [
+            {
+              "field": "firma_ispettore"
+            }
+          ]
+        }
+      ]
+    }
   }
 }

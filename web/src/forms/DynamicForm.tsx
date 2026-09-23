@@ -1,5 +1,16 @@
-import { useState } from 'react'
-import { notesOf, withNote, type Field, type FieldError, type FieldNote, type FormData, type FormSchema, type Geolocation, type PhotoField } from '@fieldview/form-core'
+import { useState, type CSSProperties } from 'react'
+import {
+  notesOf,
+  resolveLayout,
+  withNote,
+  type Field,
+  type FieldError,
+  type FieldNote,
+  type FormData,
+  type FormSchema,
+  type Geolocation,
+  type PhotoField,
+} from '@fieldview/form-core'
 import type { AttachmentMap, LocalAttachment } from './attachments'
 import Icon from '../components/Icon'
 import GeolocationInput from './fields/GeolocationInput'
@@ -23,12 +34,15 @@ type Props = {
 /**
  * Renderer di un modulo dinamico: un controllo per ogni campo dello schema,
  * errori inline dal validatore di form-core, campi required evidenziati.
+ * La disposizione (sezioni e colonne) arriva da `schema.layout` tramite
+ * resolveLayout; senza layout i campi restano in fila come prima.
  * Non valida da solo: il contenitore chiama validateSubmission e passa `errors`.
  */
 export default function DynamicForm({ schema, value, errors = [], attachments, readOnly, onChange, onAttachmentsChange, onError }: Props) {
   const errorOf = (id: string) => errors.find((e) => e.field === id)?.message
   const set = (id: string, v: FormData[string]) => onChange({ ...value, [id]: v })
   const notes = notesOf(value)
+  const sections = resolveLayout(schema)
 
   return (
     <div className="dyn-form">
@@ -40,47 +54,58 @@ export default function DynamicForm({ schema, value, errors = [], attachments, r
             {e.message}
           </p>
         ))}
-      {schema.fields.map((f) => {
-        const err = errorOf(f.id)
-        return (
-          <div key={f.id} className={`field dyn-field dyn-${f.type}${err ? ' has-error' : ''}`}>
-            <label htmlFor={`df-${f.id}`} className="dyn-label">
-              {f.label}
-              {f.required && (
-                <span className="req" aria-hidden="true">
-                  {' '}
-                  *
-                </span>
-              )}
-            </label>
-            <FieldControl
-              field={f}
-              value={value[f.id]}
-              attachments={attachments}
-              readOnly={readOnly}
-              invalid={!!err}
-              onChange={(v) => set(f.id, v)}
-              onAttachmentsChange={onAttachmentsChange}
-              onError={onError}
-            />
-            {f.help && !err && <div className="muted small dyn-help">{f.help}</div>}
-            {err && (
-              <div className="error small dyn-error" role="alert">
-                {translateMessage(err)}
-              </div>
-            )}
-            <FieldNoteBlock
-              field={f}
-              note={notes[f.id]}
-              attachments={attachments}
-              readOnly={readOnly}
-              onChange={(n) => onChange(withNote(value, f.id, n))}
-              onAttachmentsChange={onAttachmentsChange}
-              onError={onError}
-            />
+      {sections.map((sec) => (
+        <section key={sec.id} className="dyn-section">
+          {sec.title && <h3 className="dyn-section-title">{sec.title}</h3>}
+          <div className="dyn-grid" style={{ '--dyn-cols': sec.columns } as CSSProperties}>
+            {sec.items.map(({ field: f, span }) => {
+              const err = errorOf(f.id)
+              return (
+                <div
+                  key={f.id}
+                  className={`field dyn-field dyn-${f.type}${err ? ' has-error' : ''}`}
+                  style={{ '--dyn-span': span } as CSSProperties}
+                >
+                  <label htmlFor={`df-${f.id}`} className="dyn-label">
+                    {f.label}
+                    {f.required && (
+                      <span className="req" aria-hidden="true">
+                        {' '}
+                        *
+                      </span>
+                    )}
+                  </label>
+                  <FieldControl
+                    field={f}
+                    value={value[f.id]}
+                    attachments={attachments}
+                    readOnly={readOnly}
+                    invalid={!!err}
+                    onChange={(v) => set(f.id, v)}
+                    onAttachmentsChange={onAttachmentsChange}
+                    onError={onError}
+                  />
+                  {f.help && !err && <div className="muted small dyn-help">{f.help}</div>}
+                  {err && (
+                    <div className="error small dyn-error" role="alert">
+                      {translateMessage(err)}
+                    </div>
+                  )}
+                  <FieldNoteBlock
+                    field={f}
+                    note={notes[f.id]}
+                    attachments={attachments}
+                    readOnly={readOnly}
+                    onChange={(n) => onChange(withNote(value, f.id, n))}
+                    onAttachmentsChange={onAttachmentsChange}
+                    onError={onError}
+                  />
+                </div>
+              )
+            })}
           </div>
-        )
-      })}
+        </section>
+      ))}
     </div>
   )
 }
