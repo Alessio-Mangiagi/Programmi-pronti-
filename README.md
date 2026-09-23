@@ -99,6 +99,8 @@ Tutti gli endpoint tranne `/auth/login` richiedono `Authorization: Bearer <JWT>`
 | Creare progetti, planimetrie, template; gestire membri | ✓ | ✓ (membro) | – |
 | Modificare, duplicare, archiviare template | ✓ | ✓ | – |
 | Creare utenti | ✓ | – | – |
+| Creare e modificare le etichette d'invito | ✓ | – | – |
+| Invitare qualcuno con un'etichetta | ✓ | ✓ (ruolo ≤ al proprio) | – |
 | Pin, moduli, task, foto nei progetti di cui si è membri | ✓ | ✓ | ✓ |
 | Portare un task a `verified` | ✓ | ✓ | – |
 | Cancellare un task | ✓ | ✓ | solo i propri |
@@ -112,6 +114,28 @@ esiste già), così `data_json` di una submission può referenziare foto e firma
 che i byte siano caricati — stesso principio del sync mobile.
 Nel sync push le righe di progetti a cui l'utente non appartiene sono rifiutate
 singolarmente con `reason: "forbidden: ..."`. Ruoli per-progetto: backlog.
+
+### Inviti con credenziali preimpostate
+
+Un nuovo utente non si crea più a mano campo per campo: si invita con
+un'**etichetta** (`invite_labels`), cioè il profilo di una mansione — ruolo
+globale, cantieri e commesse su cui iscriverlo, preferenze di notifica. Le
+etichette esistono solo nell'area amministratori (`POST/PATCH/DELETE
+/invite-labels`, admin); chi invita le legge e le sceglie, senza poterne
+cambiare i permessi.
+
+- `POST /invites` (admin, manager) → crea l'invito e restituisce `url`, il link
+  col token: **è l'unica volta che esiste in chiaro**, nel database c'è solo lo
+  SHA-256. Se SMTP è configurato parte anche l'email, altrimenti si copia il link.
+- `GET /invites/token/{token}` e `POST /invites/accept` sono **pubblici**: chi
+  accetta sceglie nome e password, l'utente nasce col profilo dell'etichetta
+  (le commesse vengono espanse nei loro cantieri in quel momento) e la risposta
+  è già una sessione valida.
+- `POST /invites/{id}/resend` rigenera il link (quello vecchio smette di valere)
+  e fa ripartire la scadenza; `DELETE /invites/{id}` revoca.
+- Scadenza in `INVITE_DAYS` (default 7), link costruito su `WEB_URL`.
+- Tutto finisce nel registro operazioni: `invite_label.*`, `invite.created`,
+  `invite.resent`, `invite.revoked`, `invite.accepted`, `invite.email_failed`.
 
 ## Strategia di sync per app native (iOS/Android)
 

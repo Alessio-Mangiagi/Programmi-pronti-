@@ -47,6 +47,92 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(default=None, min_length=8)
 
 
+# ---------- Inviti ed etichette (credenziali preimpostate) ----------
+
+class InviteLabelCreate(BaseModel):
+    """Etichetta = profilo preimpostato. Solo admin (vedi app/invites.py)."""
+    name: str
+    description: Optional[str] = None
+    role: str = "field"
+    project_ids: list[str] = Field(default_factory=list)
+    commessa_ids: list[str] = Field(default_factory=list)
+    notify_email: bool = True
+    notify_push: bool = True
+
+
+class InviteLabelUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    role: Optional[str] = None
+    project_ids: Optional[list[str]] = None
+    commessa_ids: Optional[list[str]] = None
+    notify_email: Optional[bool] = None
+    notify_push: Optional[bool] = None
+    position: Optional[int] = None
+    archived: Optional[bool] = None
+
+
+class InviteLabelOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    description: Optional[str] = None
+    role: str
+    project_ids: list[str] = Field(default_factory=list)
+    commessa_ids: list[str] = Field(default_factory=list)
+    notify_email: bool = True
+    notify_push: bool = True
+    position: int = 0
+    archived_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    # calcolati: cantieri effettivi (commesse espanse) e inviti che la usano
+    projects_count: int = 0
+    pending_invites: int = 0
+
+
+class InviteCreate(BaseModel):
+    email: str
+    label_id: str
+    name: Optional[str] = None
+
+
+class InviteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    email: str
+    name: Optional[str] = None
+    label_id: str
+    label_name: str
+    role: str
+    status: str                      # pending | accepted | revoked | expired
+    invited_by_id: Optional[str] = None
+    invited_by_name: Optional[str] = None
+    expires_at: datetime
+    accepted_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    email_sent_at: Optional[datetime] = None
+    created_at: datetime
+    # solo nella risposta di creazione/reinvio: il link esiste in chiaro una volta sola
+    url: Optional[str] = None
+
+
+class InvitePreviewOut(BaseModel):
+    """Vista pubblica del link d'invito (nessun token in uscita)."""
+    email: str
+    name: Optional[str] = None
+    label_name: str
+    role: str
+    projects_count: int
+    expires_at: datetime
+
+
+class InviteAccept(BaseModel):
+    token: str
+    name: str
+    password: str = Field(min_length=8)
+
+
 class AuditOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

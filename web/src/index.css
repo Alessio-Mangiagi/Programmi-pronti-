@@ -436,6 +436,8 @@ input:focus, select:focus, textarea:focus {
 .nowrap { white-space: nowrap; }
 .tasks-table td .badge { margin-left: 0.4rem; }
 
+.invite-summary { list-style: none; margin: 0 0 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+
 /* Form builder */
 .builder { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 0.9fr) minmax(300px, 1.1fr); gap: 1rem; align-items: start; }
 .builder-wide { grid-column: 1 / -1; margin-bottom: 0; }

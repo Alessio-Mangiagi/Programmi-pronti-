@@ -54,7 +54,18 @@ API: `GET/POST/PATCH /commesse`, `PATCH /projects/{id}` (`commessa_id`), `GET/PO
    **2. Campi** — ogni blocco vuoto si riempie scegliendo il tipo di campo, poi si
    regolano etichetta, obbligatorietà e opzioni nel pannello Proprietà.
    Su telefono le colonne si richiudono a una; il PDF resta a un campo per riga.
-4. Aggiungere i membri; gli operai fanno login dall'app e sincronizzano.
+4. **Inviti** (sidebar): invece di creare gli utenti a mano, si manda un invito
+   scegliendo un'**etichetta**, cioè le credenziali preimpostate di una mansione
+   (ruolo, cantieri o commesse su cui viene iscritto, notifiche). Le etichette si
+   creano e si modificano solo in **Amministrazione → Etichette invito**: chi
+   invita le sceglie e basta, i permessi non si improvvisano. Il manager può
+   invitare solo con etichette di ruolo pari o inferiore al suo.
+   Il link d'invito compare una volta sola alla creazione: se c'è SMTP parte
+   anche l'email, altrimenti si copia e si manda a mano. Vale una volta e scade
+   dopo 7 giorni; "Rimanda" ne genera uno nuovo (il vecchio muore), "Revoca" lo
+   spegne subito. Chi accetta sceglie nome e password ed è già dentro col profilo
+   dell'etichetta.
+5. Aggiungere eventuali membri in più; gli operai fanno login dall'app e sincronizzano.
 
 ## Operatività quotidiana (ufficio)
 - **Dashboard**: aperti, scaduti, chiusi negli ultimi 7 giorni, trend; click su un

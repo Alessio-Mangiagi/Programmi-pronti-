@@ -126,6 +126,16 @@ def main():
             get_or_create(db, models.ProjectMember, project_id=project.id, user_id=u.id)
             get_or_create(db, models.ProjectMember, project_id=secondo.id, user_id=u.id)
 
+        # Etichette d'invito: le credenziali preimpostate che l'admin propone a chi invita
+        get_or_create(db, models.InviteLabel, name="Capocantiere", defaults={
+            "description": "Responsabile del cantiere: moduli, task e verifiche",
+            "role": models.UserRole.manager, "project_ids": [], "commessa_ids": [commessa.id],
+            "notify_email": True, "notify_push": True, "position": 1})
+        get_or_create(db, models.InviteLabel, name="Operaio", defaults={
+            "description": "Compila moduli e chiude task sul cantiere demo",
+            "role": models.UserRole.field, "project_ids": [project.id], "commessa_ids": [],
+            "notify_email": False, "notify_push": True, "position": 2})
+
         plan, created = get_or_create(db, models.Plan, project_id=project.id, name="Piano terra")
         if created or not plan.file_url:
             png = plan_png()

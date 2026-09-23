@@ -14,7 +14,10 @@ import TemplatesPage from './pages/TemplatesPage'
 import TemplatesHubPage from './pages/TemplatesHubPage'
 import TemplateChoicesPage from './pages/TemplateChoicesPage'
 import TemplateEditorPage from './pages/TemplateEditorPage'
+import InvitesPage from './pages/InvitesPage'
+import InviteAcceptPage from './pages/InviteAcceptPage'
 import UsersPage from './pages/admin/UsersPage'
+import InviteLabelsPage from './pages/admin/InviteLabelsPage'
 import AuditPage from './pages/admin/AuditPage'
 import ParamsPage from './pages/admin/ParamsPage'
 import { CommesseProvider } from './commesse/CommesseContext'
@@ -30,6 +33,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* pubblica: chi accetta un invito non ha ancora un account */}
+      <Route path="/invito/:token" element={<InviteAcceptPage />} />
       <Route
         element={
           <RequireAuth>
@@ -50,7 +55,9 @@ export default function App() {
         <Route path="/templates/elenco" element={<TemplatesPage />} />
         <Route path="/templates/scelte" element={<TemplateChoicesPage />} />
         <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
+        <Route path="/inviti" element={<InvitesPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
+        <Route path="/admin/etichette" element={<InviteLabelsPage />} />
         <Route path="/admin/audit" element={<AuditPage />} />
         <Route path="/admin/parametri" element={<ParamsPage />} />
       </Route>

@@ -177,6 +177,163 @@ export interface paths {
         patch: operations["update_user_users__user_id__patch"];
         trace?: never;
     };
+    "/invite-labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invite Labels
+         * @description Etichette disponibili: le legge anche il manager (gli servono per invitare), le scrive solo l'admin.
+         */
+        get: operations["list_invite_labels_invite_labels_get"];
+        put?: never;
+        /**
+         * Create Invite Label
+         * @description Solo admin: le credenziali preimpostate si decidono qui e da nessun'altra parte.
+         */
+        post: operations["create_invite_label_invite_labels_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invite-labels/{label_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Invite Label
+         * @description Solo admin. Con inviti collegati si rifiuta (409): prima si revocano, oppure si archivia l'etichetta.
+         */
+        delete: operations["delete_invite_label_invite_labels__label_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Invite Label
+         * @description Solo admin. Gli inviti già accettati non cambiano: l'etichetta vale al momento in cui viene accettata.
+         */
+        patch: operations["update_invite_label_invite_labels__label_id__patch"];
+        trace?: never;
+    };
+    "/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invites
+         * @description Inviti in sospeso (con `include_done` anche accettati/revocati/scaduti). Il manager vede i propri.
+         */
+        get: operations["list_invites_invites_get"];
+        put?: never;
+        /**
+         * Create Invite
+         * @description Invita un'email con un'etichetta: ruolo, cantieri e notifiche arrivano da lì.
+         *     Un manager non può invitare con un'etichetta di livello più alto del suo.
+         *     La risposta contiene `url`, il link col token: è l'unica volta che esiste in
+         *     chiaro (nel database c'è solo l'hash), quindi la UI lo mostra subito.
+         */
+        post: operations["create_invite_invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{invite_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Invite
+         * @description Rigenera il link (quello vecchio smette di valere) e fa ripartire la scadenza.
+         *     Serve anche a recuperare un link perso: in chiaro non era rimasto da nessuna parte.
+         */
+        post: operations["resend_invite_invites__invite_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{invite_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Invite
+         * @description Revoca: il link smette di funzionare subito. Un invito già accettato non si revoca (si disattiva l'utente).
+         */
+        delete: operations["revoke_invite_invites__invite_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/token/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Invite
+         * @description Pubblico: che cosa sto accettando. Stato non valido = 404, senza distinguere i casi.
+         */
+        get: operations["preview_invite_invites_token__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Invite
+         * @description Pubblico: l'invitato sceglie nome e password, l'utente nasce con il profilo
+         *     dell'etichetta (ruolo, cantieri, notifiche) ed è già dentro.
+         */
+        post: operations["accept_invite_invites_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/activity": {
         parameters: {
             query?: never;
@@ -1288,6 +1445,186 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InviteAccept */
+        InviteAccept: {
+            /** Token */
+            token: string;
+            /** Name */
+            name: string;
+            /** Password */
+            password: string;
+        };
+        /** InviteCreate */
+        InviteCreate: {
+            /** Email */
+            email: string;
+            /** Label Id */
+            label_id: string;
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * InviteLabelCreate
+         * @description Etichetta = profilo preimpostato. Solo admin (vedi app/invites.py).
+         */
+        InviteLabelCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Role
+             * @default field
+             */
+            role: string;
+            /** Project Ids */
+            project_ids?: string[];
+            /** Commessa Ids */
+            commessa_ids?: string[];
+            /**
+             * Notify Email
+             * @default true
+             */
+            notify_email: boolean;
+            /**
+             * Notify Push
+             * @default true
+             */
+            notify_push: boolean;
+        };
+        /** InviteLabelOut */
+        InviteLabelOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Role */
+            role: string;
+            /** Project Ids */
+            project_ids?: string[];
+            /** Commessa Ids */
+            commessa_ids?: string[];
+            /**
+             * Notify Email
+             * @default true
+             */
+            notify_email: boolean;
+            /**
+             * Notify Push
+             * @default true
+             */
+            notify_push: boolean;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            /** Archived At */
+            archived_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Projects Count
+             * @default 0
+             */
+            projects_count: number;
+            /**
+             * Pending Invites
+             * @default 0
+             */
+            pending_invites: number;
+        };
+        /** InviteLabelUpdate */
+        InviteLabelUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Role */
+            role?: string | null;
+            /** Project Ids */
+            project_ids?: string[] | null;
+            /** Commessa Ids */
+            commessa_ids?: string[] | null;
+            /** Notify Email */
+            notify_email?: boolean | null;
+            /** Notify Push */
+            notify_push?: boolean | null;
+            /** Position */
+            position?: number | null;
+            /** Archived */
+            archived?: boolean | null;
+        };
+        /** InviteOut */
+        InviteOut: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /** Label Id */
+            label_id: string;
+            /** Label Name */
+            label_name: string;
+            /** Role */
+            role: string;
+            /** Status */
+            status: string;
+            /** Invited By Id */
+            invited_by_id?: string | null;
+            /** Invited By Name */
+            invited_by_name?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Accepted At */
+            accepted_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /** Email Sent At */
+            email_sent_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Url */
+            url?: string | null;
+        };
+        /**
+         * InvitePreviewOut
+         * @description Vista pubblica del link d'invito (nessun token in uscita).
+         */
+        InvitePreviewOut: {
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /** Label Name */
+            label_name: string;
+            /** Role */
+            role: string;
+            /** Projects Count */
+            projects_count: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2458,6 +2795,322 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invite_labels_invite_labels_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteLabelOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invite_label_invite_labels_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteLabelCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteLabelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_invite_label_invite_labels__label_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                label_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_invite_label_invite_labels__label_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                label_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteLabelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteLabelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invites_invites_get: {
+        parameters: {
+            query?: {
+                include_done?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invite_invites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_invite_invites__invite_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invite_invites__invite_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_invite_invites_token__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invite_invites_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
                 };
             };
             /** @description Validation Error */

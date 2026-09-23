@@ -110,6 +110,59 @@ class ProjectMember(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
 
+class InviteLabel(Base):
+    """
+    Etichetta d'invito: le credenziali preimpostate di una mansione
+    (es. "Capocantiere" = ruolo manager + i cantieri della commessa X).
+    Si creano e si modificano SOLO nell'area amministratori; chi invita le
+    sceglie e basta, così il ruolo di un nuovo utente non si improvvisa.
+
+    `project_ids` e `commessa_ids` sono le iscrizioni automatiche applicate
+    quando l'invito viene accettato: le commesse si espandono nei loro cantieri
+    in quel momento (un cantiere aggiunto dopo l'invito entra comunque).
+    """
+    __tablename__ = "invite_labels"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    name = Column(String, nullable=False, unique=True, index=True)
+    description = Column(String, nullable=True)
+    role = Column(Enum(UserRole), default=UserRole.field, nullable=False)
+    project_ids = Column(JSONType, nullable=False, default=list)
+    commessa_ids = Column(JSONType, nullable=False, default=list)
+    notify_email = Column(Boolean, default=True, nullable=False)
+    notify_push = Column(Boolean, default=True, nullable=False)
+    position = Column(Integer, default=0, nullable=False)
+    archived_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class Invite(Base):
+    """
+    Invito a entrare: email + etichetta, un link con token a uso singolo e
+    scadenza. Del token si salva solo l'hash (come per le password): il valore
+    in chiaro esiste una volta sola, nel link consegnato all'invitato.
+    """
+    __tablename__ = "invites"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    email = Column(String, nullable=False, index=True)
+    label_id = Column(String, ForeignKey("invite_labels.id"), nullable=False, index=True)
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=True)            # proposto da chi invita, l'invitato può cambiarlo
+    invited_by_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    accepted_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    email_sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    label = relationship("InviteLabel")
+    invited_by = relationship("User", foreign_keys=[invited_by_id])
+
+
 class SyncMixin:
     """Colonne comuni a tutte le entità che viaggiano nel sync."""
     id = Column(String, primary_key=True, default=gen_uuid)

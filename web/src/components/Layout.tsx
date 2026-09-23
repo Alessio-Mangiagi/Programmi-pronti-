@@ -26,12 +26,14 @@ export default function Layout() {
             Progetti
           </NavLink>
           {isManager(user) && <NavLink to="/templates">Moduli</NavLink>}
+          {isManager(user) && <NavLink to="/inviti">Inviti</NavLink>}
           {user?.role === 'admin' && (
             <>
               <div className="nav-section">Amministrazione</div>
               <NavLink to="/admin/users">Utenti</NavLink>
               <NavLink to="/admin/audit">Registro operazioni</NavLink>
               <NavLink to="/admin/parametri">Parametri commessa</NavLink>
+              <NavLink to="/admin/etichette">Etichette invito</NavLink>
             </>
           )}
           {projectId && (

@@ -8,6 +8,8 @@ type AuthState = {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
+  /** Sessione aperta senza passare dal login (accettazione di un invito). */
+  applySession: (accessToken: string, user: User) => void
   logout: () => void
 }
 
@@ -49,7 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }, [])
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout])
+  const applySession = useCallback((accessToken: string, next: User) => {
+    setToken(accessToken)
+    setUser(next)
+  }, [])
+
+  const value = useMemo(
+    () => ({ user, loading, login, applySession, logout }),
+    [user, loading, login, applySession, logout],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
