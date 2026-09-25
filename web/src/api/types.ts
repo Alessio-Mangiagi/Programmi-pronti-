@@ -16,6 +16,7 @@ export type WbsImportResult = components['schemas']['WbsImportResult']
 export type InviteLabel = components['schemas']['InviteLabelOut']
 export type Invite = components['schemas']['InviteOut']
 export type InvitePreview = components['schemas']['InvitePreviewOut']
+export type SupportMessage = components['schemas']['SupportMessageOut']
 export type TaskStatus = 'open' | 'assigned' | 'resolved' | 'verified'
 
 // Schema dei moduli: i tipi vivono in packages/form-core (condivisi con il mobile).

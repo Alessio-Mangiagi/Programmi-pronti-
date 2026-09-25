@@ -31,6 +31,16 @@ export default function PlansScreen({ route, navigation }: Props) {
             </TouchableOpacity>
           </View>
         }
+        ListFooterComponent={
+          <TouchableOpacity
+            style={[styles.btnGhost, { marginTop: 8 }]}
+            onPress={() =>
+              navigation.navigate('ContactAdmin', { projectId: route.params.projectId, projectName: route.params.projectName, from: 'Planimetrie' })
+            }
+          >
+            <Text style={styles.btnGhostText}>Problemi? Contatta l'amministratore</Text>
+          </TouchableOpacity>
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.muted}>Nessuna planimetria: sincronizza dalla lista progetti (trascina verso il basso).</Text>

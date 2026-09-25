@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -186,11 +186,37 @@ class EventOut(BaseModel):
     type: str
     entity_type: str
     entity_id: str
-    project_id: str
+    project_id: Optional[str] = None
     actor_id: Optional[str] = None
     payload: dict
     created_at: datetime
     processed_at: Optional[datetime] = None
+
+
+class SupportMessageCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    project_id: Optional[str] = None
+    page: Optional[str] = Field(default=None, max_length=500)
+
+
+class SupportMessageUpdate(BaseModel):
+    status: Literal["open", "closed"]
+
+
+class SupportMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    user_id: str
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    project_id: Optional[str] = None
+    project_name: Optional[str] = None
+    message: str
+    page: Optional[str] = None
+    status: str
+    created_at: datetime
+    closed_at: Optional[datetime] = None
+    closed_by_name: Optional[str] = None
 
 
 class NotificationOut(BaseModel):

@@ -11,6 +11,7 @@ Regole:
 - task.status_changed    -> resolved: il creatore del task (se diverso dall'autore)
 - submission.created     -> se contiene una non conformità: i manager/admin
                             membri del progetto (l'autore escluso)
+- support.message        -> tutti gli admin attivi (segnalazione "Contatta l'amministratore")
 """
 import re
 from typing import Iterable, Optional
@@ -37,7 +38,7 @@ def find_non_conformity(schema: dict, data: dict) -> Optional[dict]:
     return None
 
 
-def _event(db: Session, type_: str, entity_type: str, entity_id: str, project_id: str,
+def _event(db: Session, type_: str, entity_type: str, entity_id: str, project_id: Optional[str],
            actor_id: Optional[str], payload: dict) -> models.Event:
     ev = models.Event(type=type_, entity_type=entity_type, entity_id=entity_id,
                       project_id=project_id, actor_id=actor_id, payload=payload)
@@ -115,3 +116,13 @@ def record_submission_created(db: Session, sub: models.FormSubmission, project_i
                  "pin_id": sub.pin_id, "non_conformity": nc})
     if nc:
         _notify(db, ev, project_managers(db, project_id))
+
+
+# ---------- Segnalazioni all'amministratore ----------
+
+def record_support_message(db: Session, msg: models.SupportMessage) -> int:
+    """Evento senza cantiere obbligatorio; notifica ogni admin attivo. Ritorna le consegne create."""
+    ev = _event(db, "support.message", "support_message", msg.id, msg.project_id, msg.user_id,
+                {"message": msg.message[:500], "page": msg.page})
+    admins = db.query(models.User.id).filter(models.User.role == UserRole.admin, models.User.is_active.is_(True)).all()
+    return _notify(db, ev, [a[0] for a in admins])

@@ -31,6 +31,7 @@ ACTIONS = [
     "task.created", "task.updated", "task.deleted",
     "attachment.uploaded", "attachment.deleted",
     "sync.push",
+    "support.message_sent", "support.message_closed", "support.message_reopened",
 ]
 
 # Etichette italiane per la UI (la stessa lista, leggibile)
@@ -55,6 +56,8 @@ ACTION_LABELS = {
     "task.created": "Task creato", "task.updated": "Task modificato", "task.deleted": "Task cancellato",
     "attachment.uploaded": "Foto caricata", "attachment.deleted": "Foto cancellata",
     "sync.push": "Sincronizzazione dal device",
+    "support.message_sent": "Segnalazione all'amministratore", "support.message_closed": "Segnalazione chiusa",
+    "support.message_reopened": "Segnalazione riaperta",
 }
 
 

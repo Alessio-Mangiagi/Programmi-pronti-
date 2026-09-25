@@ -79,6 +79,13 @@ export default function ProjectsScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         ListHeaderComponent={error ? <Text style={styles.error}>{error} — mostro i dati locali.</Text> : null}
+        ListFooterComponent={
+          user?.role !== 'admin' ? (
+            <TouchableOpacity style={[styles.btnGhost, { marginTop: 8 }]} onPress={() => navigation.navigate('ContactAdmin', { from: 'Progetti' })}>
+              <Text style={styles.btnGhostText}>Problemi? Contatta l'amministratore</Text>
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.muted}>{refreshing ? 'Caricamento…' : 'Nessun progetto. Trascina per aggiornare.'}</Text>

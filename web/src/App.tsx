@@ -20,6 +20,7 @@ import UsersPage from './pages/admin/UsersPage'
 import InviteLabelsPage from './pages/admin/InviteLabelsPage'
 import AuditPage from './pages/admin/AuditPage'
 import ParamsPage from './pages/admin/ParamsPage'
+import SupportPage from './pages/admin/SupportPage'
 import { CommesseProvider } from './commesse/CommesseContext'
 
 function RequireAuth({ children }: { children: ReactElement }) {
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/admin/etichette" element={<InviteLabelsPage />} />
         <Route path="/admin/audit" element={<AuditPage />} />
         <Route path="/admin/parametri" element={<ParamsPage />} />
+        <Route path="/admin/segnalazioni" element={<SupportPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

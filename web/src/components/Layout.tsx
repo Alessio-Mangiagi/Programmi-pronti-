@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { isManager, useAuth } from '../auth/AuthContext'
 import { useProject } from '../hooks/useProject'
 import CommessaBar from '../commesse/CommessaBar'
+import ContactAdmin from './ContactAdmin'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 
@@ -31,6 +32,7 @@ export default function Layout() {
             <>
               <div className="nav-section">Amministrazione</div>
               <NavLink to="/admin/users">Utenti</NavLink>
+              <NavLink to="/admin/segnalazioni">Segnalazioni</NavLink>
               <NavLink to="/admin/audit">Registro operazioni</NavLink>
               <NavLink to="/admin/parametri">Parametri commessa</NavLink>
               <NavLink to="/admin/etichette">Etichette invito</NavLink>
@@ -56,6 +58,7 @@ export default function Layout() {
         <div className="sidebar-footer">
           <div>{user?.name}</div>
           <div className="muted small">{ROLE_LABEL[user?.role ?? ''] ?? user?.role}</div>
+          {user?.role !== 'admin' && <ContactAdmin projectId={projectId} projectName={project?.name} />}
           <button className="btn" onClick={logout}>
             Esci
           </button>

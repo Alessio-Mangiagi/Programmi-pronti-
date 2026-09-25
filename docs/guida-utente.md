@@ -36,4 +36,7 @@ che fai viene salvato sul device e inviato appena torna la connessione.
 ## Prima di uscire (Esci)
 Se la barra dice "N in attesa", sincronizza prima: uscendo i dati non inviati vanno persi.
 
-**Problemi?** Screenshot della barra e del messaggio → all'ufficio.
+**Problemi?** Usa **Contatta l'amministratore**: sul web è il pulsante in basso nella barra
+laterale, nell'app è in fondo alle liste Progetti e Planimetrie. Scrivi cosa stavi facendo e
+cosa è successo; il messaggio arriva all'amministratore insieme al cantiere e alla pagina in
+cui ti trovi. Dall'app serve la connessione.

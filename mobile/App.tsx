@@ -18,6 +18,7 @@ import SubmissionScreen from './src/screens/SubmissionScreen'
 import TaskDetailScreen from './src/screens/TaskDetailScreen'
 import TasksScreen from './src/screens/TasksScreen'
 import SyncIssuesScreen from './src/screens/SyncIssuesScreen'
+import ContactAdminScreen from './src/screens/ContactAdminScreen'
 import { colors, styles } from './src/ui'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
@@ -44,6 +45,7 @@ function Routes() {
           <Stack.Screen name="Tasks" component={TasksScreen} options={({ route }) => ({ title: route.params.mine ? 'I miei task' : 'Task' })} />
           <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task' }} />
           <Stack.Screen name="SyncIssues" component={SyncIssuesScreen} options={{ title: 'Non sincronizzati' }} />
+          <Stack.Screen name="ContactAdmin" component={ContactAdminScreen} options={{ title: "Contatta l'amministratore" }} />
         </>
       ) : (
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

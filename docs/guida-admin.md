@@ -18,7 +18,13 @@
   testo; click su una riga → dettaglio JSON e "Storia di questa entità"; **Esporta CSV**
   (prime 500 righe del filtro). Le righe sono scritte nella stessa transazione
   dell'operazione (tabella `audit_log`) e non vengono mai cancellate.
-- API equivalenti: `POST/GET/PATCH /users`, `GET /users/activity`, `GET /audit`, `GET /audit/actions`.
+- **Segnalazioni** (`/admin/segnalazioni`): i messaggi inviati dagli utenti con "Contatta
+  l'amministratore" (web: pulsante nella sidebar; app: in fondo a Progetti e Planimetrie),
+  con mittente, cantiere e pagina da cui scrivono. Ogni admin attivo riceve anche una
+  notifica email/push. **Chiudi** quando è gestita (resta tra le chiuse), **Riapri** se serve.
+  Massimo 10 segnalazioni l'ora per utente.
+- API equivalenti: `POST/GET/PATCH /users`, `GET /users/activity`, `GET /audit`, `GET /audit/actions`,
+  `POST/GET /support/messages`, `PATCH /support/messages/{id}`.
 
 Membri di progetto: `POST /projects/{id}/members` con `user_id`. Preferenze notifica
 per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).

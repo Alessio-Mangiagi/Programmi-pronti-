@@ -17,6 +17,7 @@ const PATHS = {
   'chevron-right': 'M9 6l6 6-6 6',
   'chevron-down': 'M6 9l6 6 6-6',
   tree: 'M12 3v6 M12 9H6v4 M12 9h6v4 M4 13h4v4H4z M16 13h4v4h-4z M10 3h4v6h-4z',
+  message: 'M4 5h16v11H9.5L5 19.5V16H4z M8 9h8 M8 12.5h5',
 } as const
 
 export type IconName = keyof typeof PATHS

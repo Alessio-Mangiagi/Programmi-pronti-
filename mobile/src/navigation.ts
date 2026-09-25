@@ -7,4 +7,5 @@ export type RootStackParamList = {
   Tasks: { projectId: string; mine?: boolean }
   TaskDetail: { taskId: string }
   SyncIssues: undefined
+  ContactAdmin: { projectId?: string; projectName?: string; from?: string } | undefined
 }

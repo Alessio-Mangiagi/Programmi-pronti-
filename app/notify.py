@@ -36,6 +36,7 @@ TYPE_LABEL = {
     "task.status_changed": "Task risolto",
     "submission.created": "Non conformità rilevata",
     "task.created": "Nuovo task",
+    "support.message": "Segnalazione all'amministratore",
 }
 
 
@@ -52,8 +53,15 @@ def render(db: Session, n: models.Notification) -> Message:
     p = ev.payload or {}
     actor = db.get(models.User, ev.actor_id) if ev.actor_id else None
     who = actor.name if actor else "Qualcuno"
-    project = db.get(models.Project, ev.project_id)
+    project = db.get(models.Project, ev.project_id) if ev.project_id else None
     pname = project.name if project else ev.project_id
+    if ev.type == "support.message":
+        where = f" dal cantiere {pname}" if project else ""
+        page = f"\nPagina: {p['page']}" if p.get("page") else ""
+        email = f" ({actor.email})" if actor else ""
+        url = f"{WEB_URL}/admin/segnalazioni"
+        body = f"{who}{email} ha scritto all'amministratore{where}:\n\n{p.get('message', '')}{page}\n\nApri: {url}"
+        return Message(f"Segnalazione da {who}", body, url)
     url = _entity_url(db, ev)
     if ev.type == "task.assigned":
         subject = f"[{pname}] Task assegnato: {p.get('title')}"

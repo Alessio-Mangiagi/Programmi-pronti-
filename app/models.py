@@ -356,7 +356,8 @@ class Event(Base):
     """
     Outbox degli eventi di dominio, scritta nella stessa transazione della
     modifica (anche dal sync push): il worker delle notifiche (giorno 27) la
-    consuma. Tipi: submission.created, task.created, task.status_changed, task.assigned.
+    consuma. Tipi: submission.created, task.created, task.status_changed, task.assigned,
+    support.message.
     """
     __tablename__ = "events"
 
@@ -364,7 +365,7 @@ class Event(Base):
     type = Column(String, nullable=False, index=True)
     entity_type = Column(String, nullable=False)   # submission | task
     entity_id = Column(String, nullable=False, index=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=False, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)  # None: evento di sistema (support.message)
     actor_id = Column(String, ForeignKey("users.id"), nullable=True)
     payload = Column(JSONType, nullable=False, default=dict)
     created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
@@ -394,6 +395,30 @@ class AuditLog(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
 
     actor = relationship("User")
+
+
+class SupportMessage(Base):
+    """
+    Segnalazione di un utente all'amministratore ("Contatta l'amministratore"):
+    testo libero più il contesto (cantiere e pagina da cui scrive). Gli admin
+    ricevono una notifica e la chiudono quando è gestita.
+    """
+    __tablename__ = "support_messages"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
+    message = Column(Text, nullable=False)
+    page = Column(String, nullable=True)            # percorso web o schermata app da cui scrive
+    user_agent = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="open", index=True)   # open | closed
+    closed_at = Column(DateTime, nullable=True)
+    closed_by_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+    closed_by = relationship("User", foreign_keys=[closed_by_id])
+    project = relationship("Project")
 
 
 class Notification(Base):
