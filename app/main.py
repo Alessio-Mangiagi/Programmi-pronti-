@@ -84,9 +84,29 @@ app.add_middleware(
 
 # ---------- Auth e utenti ----------
 
+# Anti brute force: tentativi falliti recenti contati sull'audit log (vale con più
+# worker/processi). Limite per email+IP e, più largo, per sola email (l'IP da
+# X-Forwarded-For è falsificabile). Il blocco scade da solo con la finestra.
+LOGIN_WINDOW = timedelta(minutes=int(os.getenv("LOGIN_LOCKOUT_MINUTES", "15")))
+LOGIN_MAX_FAILS_PER_IP = int(os.getenv("LOGIN_MAX_FAILS_PER_IP", "5"))
+LOGIN_MAX_FAILS_PER_EMAIL = int(os.getenv("LOGIN_MAX_FAILS_PER_EMAIL", "20"))
+
+
+def _login_locked(db: Session, email: str, request: Request) -> bool:
+    ip, _ = audit._client_info(request)
+    recent = db.query(func.count(models.AuditLog.id)).filter(
+        models.AuditLog.action == "auth.login_failed", models.AuditLog.actor_email == email,
+        models.AuditLog.created_at >= utcnow() - LOGIN_WINDOW)
+    if recent.scalar() >= LOGIN_MAX_FAILS_PER_EMAIL:
+        return True
+    return recent.filter(models.AuditLog.ip == ip).scalar() >= LOGIN_MAX_FAILS_PER_IP
+
+
 @app.post("/auth/login", response_model=schemas.TokenResponse)
 def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
     email = payload.email.lower().strip()
+    if _login_locked(db, email, request):
+        raise HTTPException(429, "Troppi tentativi falliti: riprova tra qualche minuto")
     user = db.query(models.User).filter(models.User.email == email).first()
     if user is None or not user.is_active or not auth.verify_password(payload.password, user.password_hash):
         # Traccia anche i tentativi falliti (email tentata, IP): utile per capire abusi e lockout.
@@ -1759,11 +1779,36 @@ async def upload_attachment(attachment_id: str, file: UploadFile = File(...), db
     return att
 
 
+def _file_project_id(db: Session, key: str) -> str | None:
+    """
+    Progetto proprietario del file, ricavato dalla key scritta dal server
+    ("plans/<plan_id>.<ext>", "attachments/<attachment_id>.<ext>"). Non si usa
+    file_url del DB: il client può valorizzarlo (POST /plans, sync push).
+    """
+    folder, _, name = key.partition("/")
+    entity_id = name.rsplit(".", 1)[0]
+    if not entity_id or "/" in name:
+        return None
+    if folder == "plans":
+        plan = db.get(models.Plan, entity_id)
+        return auth.project_of_plan(plan) if plan is not None else None
+    if folder == "attachments":
+        att = db.get(models.Attachment, entity_id)
+        return auth.project_of_attachment(att) if att is not None and att.deleted_at is None else None
+    return None
+
+
 @app.get("/files/{key:path}")
-def get_file(key: str, _: models.User = Depends(current_user)):
-    """Serve i file dello storage (filesystem o S3) con il JWT: gli URL nel DB sono sempre /files/<key>."""
-    if not st.storage.exists(key):
+def get_file(key: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """
+    Serve i file dello storage (filesystem o S3) con il JWT: gli URL nel DB sono sempre /files/<key>.
+    Solo ai membri del progetto a cui appartiene il file; file non referenziati → 404.
+    """
+    project_id = _file_project_id(db, key)
+    if project_id is None or not st.storage.exists(key):
         raise HTTPException(404, "file not found")
+    if not auth.is_member(db, user, project_id):
+        raise HTTPException(404, "file not found")  # 404, non 403: non rivela che il file esiste
     if isinstance(st.storage, st.S3Storage):
         data = st.storage.read(key)
         return Response(content=data, media_type=st.sniff_mime(data) or "application/octet-stream")

@@ -91,7 +91,13 @@ Poi apri `http://localhost:8000/docs` per la documentazione interattiva
 ## Autenticazione e permessi
 
 Tutti gli endpoint tranne `/auth/login` richiedono `Authorization: Bearer <JWT>`
-(`SECRET_KEY` e `ACCESS_TOKEN_HOURS` in `.env`). Ruolo globale per utente:
+(`SECRET_KEY` e `ACCESS_TOKEN_HOURS` in `.env`). Con `APP_ENV=production` (default
+nell'immagine Docker) l'app non parte se `SECRET_KEY` manca, è corta (< 32) o è un
+segnaposto del repo. Login: dopo 5 tentativi falliti per email+IP, o 20 per sola
+email, in 15 minuti → 429 finché la finestra non scade (`LOGIN_MAX_FAILS_PER_IP`,
+`LOGIN_MAX_FAILS_PER_EMAIL`, `LOGIN_LOCKOUT_MINUTES`). `GET /files/{key}` serve il
+file solo ai membri del progetto della planimetria/allegato (ricavati dalla key).
+Ruolo globale per utente:
 
 | Azione | admin | manager | field |
 |--------|:-----:|:-------:|:-----:|

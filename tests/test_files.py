@@ -195,6 +195,26 @@ def test_get_file_not_found_and_traversal(client):
     assert client.get("/files/../requirements.txt").status_code in (404, 422)
 
 
+def test_get_file_only_for_project_members(client, project, pin, users):
+    plan_url = upload(client, f"/plans/{project['plan']['id']}/file", png_bytes(30, 20), "p.png").json()["file_url"]
+    task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
+    att = client.post("/attachments", json={"task_id": task["id"]}).json()
+    att_url = upload(client, f"/attachments/{att['id']}/upload", jpg_bytes(), "a.jpg").json()["file_url"]
+    for url in (plan_url, att_url):
+        assert client.get(url, headers=users["field"]["headers"]).status_code == 200
+        assert client.get(url, headers=users["outsider"]["headers"]).status_code == 404
+    # file_url impostato dal client su un file altrui non dà accesso: conta la key, non il DB
+    other = client.post("/projects", json={"name": "Cantiere dell'outsider"}).json()
+    client.post(f"/projects/{other['id']}/members", json={"user_id": users["outsider"]["id"]})
+    r = client.post("/plans", json={"project_id": other["id"], "name": "esca", "file_url": att_url})
+    assert r.status_code == 201 and r.json()["file_url"] == att_url
+    assert client.get(att_url, headers=users["outsider"]["headers"]).status_code == 404
+    # allegato cancellato: file non più servito
+    push(client, attachments=[{"id": att["id"], "task_id": task["id"],
+                               "deleted_at": datetime.now(timezone.utc).isoformat()}])
+    assert client.get(att_url).status_code == 404
+
+
 def test_attachment_create_with_client_id(client, project, pin):
     sub = client.post("/submissions", json={
         "template_id": project["template"]["id"], "pin_id": pin, "data_json": {"esito": "Conforme"}}).json()
@@ -233,12 +253,14 @@ def test_s3_storage_with_fake_client(monkeypatch, client, project):
     assert ("fv", "prod/plans/x.png") in s3.client.objects
     assert s3.client.objects[("fv", "prod/plans/x.png")][1] == "image/png"
     assert s3.exists("plans/x.png") and not s3.exists("plans/nope.png")
-    r = client.get("/files/plans/x.png")
-    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+    # file senza planimetria/allegato che lo referenzi: non servito
+    assert client.get("/files/plans/x.png").status_code == 404
     assert client.get("/files/plans/nope.png").status_code == 404
     import pytest
     with pytest.raises(ValueError):
         s3.save("../etc/passwd", b"x")
-    # upload planimetria end-to-end su S3
+    # upload planimetria end-to-end su S3, poi servita da /files
     r = upload(client, f"/plans/{project['plan']['id']}/file", png_bytes(30, 20), "p.png")
     assert r.status_code == 200 and ("fv", f"prod/plans/{project['plan']['id']}.png") in s3.client.objects
+    r = client.get(r.json()["file_url"])
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:8] == b"\x89PNG\r\n\x1a\n"

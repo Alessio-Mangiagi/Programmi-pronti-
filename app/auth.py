@@ -23,7 +23,25 @@ from . import models
 from .database import get_db
 from .models import UserRole, utcnow
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-secret-key-change-me-in-production-0000")  # >= 32 byte per HS256
+_DEV_SECRET_KEY = "dev-only-secret-key-change-me-in-production-0000"
+# Valori segnaposto presenti in repo (.env.example, docker-compose.yml): mai validi in produzione.
+_PLACEHOLDER_KEYS = {
+    _DEV_SECRET_KEY,
+    "cambiami-in-produzione-openssl-rand-hex-32",
+    "genera-una-chiave-lunga-almeno-32-byte-es-openssl-rand-hex-32",
+}
+
+
+def _load_secret_key() -> str:
+    """Con APP_ENV=production la chiave JWT deve essere impostata, lunga e non un segnaposto: altrimenti non si parte."""
+    key = os.getenv("SECRET_KEY")
+    if os.getenv("APP_ENV", "dev").lower() == "production":
+        if not key or len(key) < 32 or key in _PLACEHOLDER_KEYS:
+            raise RuntimeError("APP_ENV=production: imposta SECRET_KEY (>= 32 caratteri, es. `openssl rand -hex 32`)")
+    return key or _DEV_SECRET_KEY
+
+
+SECRET_KEY = _load_secret_key()  # >= 32 byte per HS256
 ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "12"))
 ALGORITHM = "HS256"
 

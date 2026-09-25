@@ -10,7 +10,8 @@ RUN cd web && npm run build
 
 FROM python:3.12-slim
 WORKDIR /srv
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 STORAGE_DIR=/data/storage
+# APP_ENV=production: l'app non parte senza una SECRET_KEY vera (vedi app/auth.py)
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 STORAGE_DIR=/data/storage APP_ENV=production
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app app

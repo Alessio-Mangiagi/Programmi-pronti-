@@ -29,6 +29,28 @@ def test_login_wrong_password_or_unknown_user(client):
     assert client.post("/auth/login", json={"email": "nobody@test.local", "password": PASSWORD}).status_code == 401
 
 
+def test_login_lockout_after_repeated_failures(client, monkeypatch):
+    from app import main
+    monkeypatch.setattr(main, "LOGIN_MAX_FAILS_PER_IP", 3)
+    monkeypatch.setattr(main, "LOGIN_MAX_FAILS_PER_EMAIL", 5)
+    bad = {"email": "admin@test.local", "password": "nope"}
+    good = {"email": "admin@test.local", "password": PASSWORD}
+    for _ in range(3):
+        assert client.post("/auth/login", json=bad).status_code == 401
+    # bloccato anche con la password giusta, dallo stesso IP
+    assert client.post("/auth/login", json=good).status_code == 429
+    # altro IP: ancora ammesso finché non si supera il limite per email
+    other_ip = {"X-Forwarded-For": "10.0.0.9"}
+    assert client.post("/auth/login", json=bad, headers=other_ip).status_code == 401
+    assert client.post("/auth/login", json=bad, headers=other_ip).status_code == 401
+    assert client.post("/auth/login", json=good, headers={"X-Forwarded-For": "10.0.0.10"}).status_code == 429
+    # altra email non toccata
+    assert client.post("/auth/login", json={"email": "nobody@test.local", "password": "x"}).status_code == 401
+    # finestra scaduta: di nuovo ammesso
+    monkeypatch.setattr(main, "LOGIN_WINDOW", main.timedelta(seconds=0))
+    assert client.post("/auth/login", json=good).status_code == 200
+
+
 def test_no_token_or_bad_token_is_401(client):
     anon = {"Authorization": ""}
     assert client.get("/projects", headers=anon).status_code == 401
