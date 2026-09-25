@@ -25,7 +25,6 @@ eseguiti in sequenza; vedi `ROADMAP.md` per le DoD giorno per giorno).
 
 ## Debiti tecnici noti
 - LWW a livello di riga (campo perso se due device toccano campi diversi).
-- `fieldview.db` committato con schema vecchio: rimuoverlo dall'indice (`git rm --cached`).
 - Lint web: warning "set-state-in-effect"/"only-export-components" accettati.
 - Vista task e filtri pin client-side: paginazione server oltre le migliaia di righe.
 - I file di S3 passano dall'API (`/files`): presigned URL diretti per alleggerire.

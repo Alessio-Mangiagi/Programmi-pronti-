@@ -30,9 +30,9 @@ def test_login_wrong_password_or_unknown_user(client):
 
 
 def test_login_lockout_after_repeated_failures(client, monkeypatch):
-    from app import main
-    monkeypatch.setattr(main, "LOGIN_MAX_FAILS_PER_IP", 3)
-    monkeypatch.setattr(main, "LOGIN_MAX_FAILS_PER_EMAIL", 5)
+    from app.routers import users as users_router
+    monkeypatch.setattr(users_router, "LOGIN_MAX_FAILS_PER_IP", 3)
+    monkeypatch.setattr(users_router, "LOGIN_MAX_FAILS_PER_EMAIL", 5)
     bad = {"email": "admin@test.local", "password": "nope"}
     good = {"email": "admin@test.local", "password": PASSWORD}
     for _ in range(3):
@@ -47,7 +47,7 @@ def test_login_lockout_after_repeated_failures(client, monkeypatch):
     # altra email non toccata
     assert client.post("/auth/login", json={"email": "nobody@test.local", "password": "x"}).status_code == 401
     # finestra scaduta: di nuovo ammesso
-    monkeypatch.setattr(main, "LOGIN_WINDOW", main.timedelta(seconds=0))
+    monkeypatch.setattr(users_router, "LOGIN_WINDOW", users_router.timedelta(seconds=0))
     assert client.post("/auth/login", json=good).status_code == 200
 
 

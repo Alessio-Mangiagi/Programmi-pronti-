@@ -256,8 +256,8 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await page.getByRole('tab', { name: /Struttura/ }).click()
   await page.getByLabel('Titolo della sezione 1').fill('Dati del giorno')
   await page.getByLabel('Colonne della sezione 1').selectOption('2')
-  await page.getByRole('button', { name: 'Blocco' }).click()
-  await page.getByRole('button', { name: 'Blocco' }).click()
+  await page.getByRole('button', { name: 'Blocco', exact: true }).click()
+  await page.getByRole('button', { name: 'Blocco', exact: true }).click()
   await expect(page.locator('.bblock.is-empty')).toHaveCount(2)
 
   // fase 2: i campi dentro i blocchi già disegnati
