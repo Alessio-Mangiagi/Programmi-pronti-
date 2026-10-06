@@ -208,6 +208,14 @@ test('vista task: filtri, cambio stato/assegnatario inline, link alla planimetri
   await expect(sameRow.getByLabel(`Scadenza di ${title}`)).toHaveValue('2030-12-31')
   await expect(sameRow.getByLabel(`Assegnatario di ${title}`)).toHaveValue(/.+/)
 
+  // ricerca testuale lato server: in query string, la riga cercata resta
+  await page.getByLabel('Cerca').fill(title!)
+  await expect(page).toHaveURL(/q=/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} task`)
+  await expect(rows.first()).toContainText(title!)
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  await expect(page).not.toHaveURL(/q=/)
+
   // filtro stato in URL e "i miei task" (il manager non ha task assegnati)
   await page.getByRole('button', { name: 'Risolto' }).click()
   await expect(page).toHaveURL(/status=resolved/)
