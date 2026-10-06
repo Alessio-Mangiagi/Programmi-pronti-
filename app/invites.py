@@ -124,9 +124,9 @@ def accept(db: Session, inv: models.Invite, *, name: str, password_hash: str) ->
 def email_body(inv: models.Invite, url: str, inviter_name: str) -> tuple[str, str]:
     """Oggetto e testo dell'email d'invito (italiano, link diretto)."""
     label = inv.label.name
-    subject = "Invito a Field View"
+    subject = "Invito a InCampo"
     body = (
-        f"{inviter_name} ti ha invitato su Field View come «{label}».\n\n"
+        f"{inviter_name} ti ha invitato su InCampo come «{label}».\n\n"
         f"Apri questo link e scegli la tua password:\n{url}\n\n"
         f"Il link vale una sola volta e scade il "
         f"{inv.expires_at.strftime('%d/%m/%Y')}.\n"

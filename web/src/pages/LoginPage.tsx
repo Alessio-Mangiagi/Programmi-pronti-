@@ -34,7 +34,7 @@ export default function LoginPage() {
         <div className="brand">
           <span className="brand-mark">FV</span>
           <span>
-            Field View
+            InCampo
             <span className="brand-sub">Cosedil S.p.A.</span>
           </span>
         </div>

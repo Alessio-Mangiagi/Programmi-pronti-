@@ -1,17 +1,19 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "InCampo",
+    "slug": "incampo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cosedil.incampo"
     },
     "android": {
+      "package": "com.cosedil.incampo",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0c4577",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -24,7 +26,30 @@
     "plugins": [
       "expo-sqlite",
       "expo-secure-store",
-      "expo-background-task"
+      "expo-background-task",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "La fotocamera serve per scattare le foto di difetti, verifiche e task chiusi.",
+          "photosPermission": "La galleria serve per allegare ai moduli foto già scattate.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "La posizione viene salvata solo nei campi \"posizione\" dei moduli, quando li compili.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0c4577",
+          "defaultChannel": "default"
+        }
+      ]
     ]
   }
 }

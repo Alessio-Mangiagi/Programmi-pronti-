@@ -72,7 +72,7 @@ export default function InviteAcceptPage() {
         <div className="brand">
           <span className="brand-mark">FV</span>
           <span>
-            Field View
+            InCampo
             <span className="brand-sub">Cosedil S.p.A.</span>
           </span>
         </div>
@@ -118,7 +118,7 @@ export default function InviteAcceptPage() {
         </div>
         {error && <p className="error">{error}</p>}
         <button className="btn btn-primary" type="submit" disabled={busy}>
-          {busy ? 'Attendere…' : 'Entra in Field View'}
+          {busy ? 'Attendere…' : 'Entra in InCampo'}
         </button>
       </form>
     </div>

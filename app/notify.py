@@ -165,7 +165,7 @@ class NoPushSender:
 def senders_from_env() -> tuple[EmailSender, PushSender]:
     host = os.getenv("SMTP_HOST")
     email: EmailSender = (SmtpEmailSender(host, int(os.getenv("SMTP_PORT", "587")), os.getenv("SMTP_USER"),
-                                          os.getenv("SMTP_PASSWORD"), os.getenv("SMTP_FROM", "fieldview@localhost"),
+                                          os.getenv("SMTP_PASSWORD"), os.getenv("SMTP_FROM", "incampo@localhost"),
                                           os.getenv("SMTP_TLS", "1") == "1")
                           if host else ConsoleEmailSender())
     push_url = os.getenv("EXPO_PUSH_URL", "https://exp.host/--/api/v2/push/send")  # "" = disattivato

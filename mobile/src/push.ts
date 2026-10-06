@@ -17,9 +17,10 @@ export async function registerPushToken(api: Api): Promise<string | null> {
     const granted = perm.granted || (await Notifications.requestPermissionsAsync()).granted
     if (!granted) return null
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', { name: 'Field View', importance: Notifications.AndroidImportance.DEFAULT })
+      await Notifications.setNotificationChannelAsync('default', { name: 'InCampo', importance: Notifications.AndroidImportance.DEFAULT })
     }
-    const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId
+    // projectId EAS: lo scrive `eas init` in app.json (extra.eas) o arriva dalla build (easConfig)
+    const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId
     const { data: token } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)
     await api.post('/auth/me/push-token', { token, platform: Platform.OS })
     current = token

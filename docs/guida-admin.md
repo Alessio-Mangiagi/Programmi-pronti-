@@ -108,8 +108,10 @@ docker compose -f docker-compose.prod.yml up -d --build
   non è raggiungibile dai client).
 - **Backup**: servizio `backup` — ogni notte (`BACKUP_CRON`) dump Postgres + tar dello
   storage in `./backups/`, rotazione `BACKUP_KEEP` giorni. Ripristino in `scripts/backup.sh`.
-- **App mobile**: `mobile/eas.json` profilo `preview` con `EXPO_PUBLIC_API_URL` = URL pubblico;
-  `eas build --profile preview --platform android|ios`.
+- **App mobile** ("InCampo", `com.cosedil.incampo`): APK Android a distribuzione
+  interna, niente store. `mobile/eas.json`: profilo `production` → `https://incampo.cosedilspa.com/api`,
+  `preview` → staging. Build: `cd mobile && eas build -p android --profile production`; EAS
+  dà un link di download da girare agli operai. Primo setup e push: vedi `docs/rilascio.md`.
 
 ## Aggiornamenti
 ```bash

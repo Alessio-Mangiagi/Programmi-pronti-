@@ -25,7 +25,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView style={[styles.screen, { justifyContent: 'center', padding: 24, backgroundColor: colors.text }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.card, { gap: 12 }]}>
-        <Text style={styles.title}>Field View</Text>
+        <Text style={styles.title}>InCampo</Text>
         <View>
           <Text style={styles.label}>Email</Text>
           <TextInput style={styles.input} autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} testID="email" />

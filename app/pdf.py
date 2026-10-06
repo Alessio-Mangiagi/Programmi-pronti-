@@ -227,7 +227,7 @@ def build_submission_pdf(db: Session, sub: models.FormSubmission, template: mode
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN, topMargin=MARGIN + 4 * mm,
                             bottomMargin=MARGIN, title=f"{template.name} — {_project_of(sub).name}",
-                            author="Field View")
+                            author="InCampo — Cosedil")
     story: list = _header_block(sub, template, db)
     for f in template.schema_def["fields"]:
         block = _field_block(f, data, notes, atts)

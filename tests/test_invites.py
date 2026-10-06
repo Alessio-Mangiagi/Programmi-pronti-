@@ -232,7 +232,7 @@ def test_email_sent_when_sender_works(client, monkeypatch):
     inv = invite(client, "conmail@test.local")
     assert inv["email_sent_at"] is not None
     to, subject, body = sent[0]
-    assert to == "conmail@test.local" and "Field View" in subject and inv["url"] in body
+    assert to == "conmail@test.local" and "InCampo" in subject and inv["url"] in body
 
 
 def test_invite_survives_email_failure(client, monkeypatch):
