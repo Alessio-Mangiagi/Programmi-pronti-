@@ -17,8 +17,9 @@ router = APIRouter()
 # ---------- Auth e utenti ----------
 
 # Anti brute force: tentativi falliti recenti contati sull'audit log (vale con più
-# worker/processi). Limite per email+IP e, più largo, per sola email (l'IP da
-# X-Forwarded-For è falsificabile). Il blocco scade da solo con la finestra.
+# worker/processi). Limite per email+IP (IP = ultima voce di X-Forwarded-For, quella
+# del nostro proxy) e, più largo, per sola email: chi cambia IP davvero (botnet) resta
+# limitato per account. Il blocco scade da solo con la finestra.
 LOGIN_WINDOW = timedelta(minutes=int(os.getenv("LOGIN_LOCKOUT_MINUTES", "15")))
 LOGIN_MAX_FAILS_PER_IP = int(os.getenv("LOGIN_MAX_FAILS_PER_IP", "5"))
 LOGIN_MAX_FAILS_PER_EMAIL = int(os.getenv("LOGIN_MAX_FAILS_PER_EMAIL", "20"))

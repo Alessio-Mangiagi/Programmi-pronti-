@@ -64,8 +64,11 @@ ACTION_LABELS = {
 def _client_info(request: Optional[Request]) -> tuple[Optional[str], Optional[str]]:
     if request is None:
         return None, None
+    # L'app ascolta solo su 127.0.0.1 dietro il reverse proxy, che AGGIUNGE in coda
+    # a X-Forwarded-For l'IP che vede. Le voci prima le scrive il client (falsificabili:
+    # aggirerebbero il blocco login per IP), quindi conta solo l'ultima.
     fwd = request.headers.get("x-forwarded-for")
-    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else None)
+    ip = fwd.split(",")[-1].strip() if fwd else (request.client.host if request.client else None)
     ua = request.headers.get("user-agent")
     return ip, (ua[:200] if ua else None)
 

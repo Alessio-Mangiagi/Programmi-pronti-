@@ -44,6 +44,11 @@ def test_login_lockout_after_repeated_failures(client, monkeypatch):
     assert client.post("/auth/login", json=bad, headers=other_ip).status_code == 401
     assert client.post("/auth/login", json=bad, headers=other_ip).status_code == 401
     assert client.post("/auth/login", json=good, headers={"X-Forwarded-For": "10.0.0.10"}).status_code == 429
+    # voce iniziale falsificata dal client: conta l'IP aggiunto dal proxy (ultima voce)
+    from app import audit
+    from starlette.requests import Request
+    req = Request({"type": "http", "headers": [(b"x-forwarded-for", b"6.6.6.6, 10.0.0.9")], "client": ("127.0.0.1", 1)})
+    assert audit._client_info(req)[0] == "10.0.0.9"
     # altra email non toccata
     assert client.post("/auth/login", json={"email": "nobody@test.local", "password": "x"}).status_code == 401
     # finestra scaduta: di nuovo ammesso
