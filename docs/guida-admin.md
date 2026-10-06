@@ -93,8 +93,12 @@ docker compose -f docker-compose.prod.yml up -d --build
   `docker compose -f docker-compose.prod.yml exec app python -c "from app.database import SessionLocal; from app import models, auth; s=SessionLocal(); s.add(models.User(email='admin@tuodominio.it', name='Admin', role=models.UserRole.admin, password_hash=auth.hash_password('CAMBIAMI'))); s.commit()"`
 - **Worker notifiche**: servizio `worker` (email via `SMTP_*`; senza `SMTP_HOST` finisce nel log; push Expo automatiche).
 - **Storage**: volume `appdata` (`/data/storage`) oppure S3-compatible con `STORAGE_S3_BUCKET`
-  (+ `STORAGE_S3_ENDPOINT` per MinIO). I file sono serviti dall'API con il token, quindi
-  il bucket può restare privato.
+  (+ `STORAGE_S3_ENDPOINT` per MinIO, `STORAGE_S3_REGION`). Il bucket resta **privato**:
+  l'API controlla i permessi e dà URL firmati a scadenza (`STORAGE_S3_PRESIGN_SECONDS`,
+  default 900 s), quindi download e upload delle foto vanno diretti al bucket.
+  Credenziali IAM minime: `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` sul prefisso.
+  `STORAGE_S3_DIRECT=0` fa passare di nuovo tutti i byte dall'API (utile se il bucket
+  non è raggiungibile dai client).
 - **Backup**: servizio `backup` — ogni notte (`BACKUP_CRON`) dump Postgres + tar dello
   storage in `./backups/`, rotazione `BACKUP_KEEP` giorni. Ripristino in `scripts/backup.sh`.
 - **App mobile**: `mobile/eas.json` profilo `preview` con `EXPO_PUBLIC_API_URL` = URL pubblico;
