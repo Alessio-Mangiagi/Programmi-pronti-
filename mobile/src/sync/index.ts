@@ -46,7 +46,7 @@ async function run(db: AppDb, api: Api, { projectIds, files, uploads }: SyncOpti
       continue
     }
     // immagini delle planimetrie in cache: best effort, dopo il pull (che porta i file_url aggiornati)
-    if (files) filesOut[id] = await cachePlanImages(db, files, id)
+    if (files) filesOut[id] = await cachePlanImages(db, { api, ...files }, id)
   }
   // coda upload dopo il push (i record devono esistere sul server) e dopo il pull
   let uploadsOut: UploadSummary | null = null

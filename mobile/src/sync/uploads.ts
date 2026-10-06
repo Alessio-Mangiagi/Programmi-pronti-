@@ -4,6 +4,8 @@
  * già pushati (dirty = false, quindi il record esiste sul server), non cancellati
  * e con upload_next_at scaduto. Flusso per ciascuno:
  *   POST /attachments/presign -> {upload_url, method}  ->  multipart `file` -> file_url
+ * Con S3 diretto la risposta ha anche `fields` e `complete_url`: il multipart va al
+ * bucket (fields prima del file, senza JWT) e poi POST complete_url -> file_url.
  * Fallimento: upload_attempts + 1 e backoff esponenziale (5s · 2^n, max 1h).
  * Stati per la UI: local (file_url null, in coda) -> uploading -> uploaded (file_url).
  */
@@ -13,16 +15,22 @@ import { schema, type AppDb } from '../db/types'
 import { nowIso, toMs } from './time'
 
 export type UploadOptions = {
-  /** costruisce il multipart con il file locale (RN: {uri,name,type}; Node: Blob) */
-  buildForm: (uri: string, name: string, mime: string) => Promise<FormData>
+  /** costruisce il multipart con il file locale (RN: {uri,name,type}; Node: Blob); `fields` vanno PRIMA del file */
+  buildForm: (uri: string, name: string, mime: string, fields?: Record<string, string>) => Promise<FormData>
+  /** fetch per l'upload diretto al bucket (default: globale) */
+  fetch?: typeof fetch
   maxPerRun?: number
   now?: () => string
 }
 export type UploadSummary = { uploaded: number; failed: number; pending: number }
-type Presign = { attachment_id: string; method: string; upload_url: string; max_bytes: number }
+type Presign = { attachment_id: string; method: string; upload_url: string; max_bytes: number; fields?: Record<string, string>; complete_url?: string | null }
+type Uploaded = { file_url: string | null; updated_at: string }
 
 export const MAX_ATTEMPTS = 20
 export const backoffMs = (attempts: number) => Math.min(60 * 60_000, 5_000 * 2 ** Math.max(0, attempts - 1))
+
+/** URL dell'API (assoluto o con /api davanti) -> path relativo al baseUrl del client. */
+const apiPath = (url: string) => url.replace(/^https?:\/\/[^/]+/, '').replace(/^\/api(?=\/)/, '')
 
 export function pendingUploads(db: AppDb) {
   return db
@@ -44,12 +52,20 @@ export async function processUploadQueue(db: AppDb, api: Api, opts: UploadOption
 
   for (const att of candidates) {
     try {
-      const presign = await api.post<Presign>('/attachments/presign', { attachment_id: att.id })
-      const path = presign.upload_url.replace(/^https?:\/\/[^/]+/, '').replace(/^\/api(?=\/)/, '')
       const ext = att.local_file_path!.split('.').pop()?.toLowerCase() ?? 'jpg'
       const mime = ext === 'png' ? 'image/png' : 'image/jpeg'
-      const form = await opts.buildForm(att.local_file_path!, `${att.id}.${ext}`, mime)
-      const res = await api.upload<{ file_url: string | null; updated_at: string }>(path, form)
+      const presign = await api.post<Presign>('/attachments/presign', { attachment_id: att.id, content_type: mime })
+      let res: Uploaded
+      if (presign.complete_url) {
+        // S3 diretto: i byte vanno al bucket senza passare dall'API, poi l'API verifica e chiude
+        const form = await opts.buildForm(att.local_file_path!, `${att.id}.${ext}`, mime, presign.fields)
+        const r = await (opts.fetch ?? fetch)(presign.upload_url, { method: 'POST', body: form })
+        if (!r.ok) throw new Error(`upload S3 ${r.status}`) // niente status: si riprova (es. firma scaduta)
+        res = await api.post<Uploaded>(apiPath(presign.complete_url))
+      } else {
+        const form = await opts.buildForm(att.local_file_path!, `${att.id}.${ext}`, mime)
+        res = await api.upload<Uploaded>(apiPath(presign.upload_url), form)
+      }
       db.update(schema.attachments)
         .set({ file_url: res.file_url, updated_at: res.updated_at, upload_next_at: null })
         .where(eq(schema.attachments.id, att.id))

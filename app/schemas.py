@@ -367,17 +367,31 @@ class AttachmentOut(AttachmentCreate):
 
 class PresignRequest(BaseModel):
     attachment_id: str
+    # tipo del file che il device sta per caricare (serve a S3 per firmare l'upload)
+    content_type: Optional[str] = None
 
 
 class PresignResponse(BaseModel):
     """
-    Dove e come caricare i byte di un allegato. Oggi punta all'upload diretto
-    sull'API; con S3 diventerà un presigned PUT e `fields`/`headers` cambieranno.
+    Dove e come caricare i byte di un allegato.
+    - filesystem (o S3 senza direct): POST multipart `file` su `upload_url` dell'API, con il JWT;
+    - S3 direct: POST multipart su `upload_url` del bucket, SENZA JWT, con `fields` prima
+      del campo `file`; poi POST `complete_url` (API, con JWT) che verifica il file e
+      valorizza file_url.
     """
     attachment_id: str
     method: str
     upload_url: str
     max_bytes: int
+    fields: dict[str, str] = {}
+    complete_url: Optional[str] = None
+
+
+class FileLink(BaseModel):
+    """URL per leggere un file: firmato e a scadenza (direct, niente JWT) o /files dell'API (con JWT)."""
+    url: str
+    direct: bool
+    expires_in: Optional[int] = None
 
 
 class SubmissionCreate(BaseModel):

@@ -105,18 +105,63 @@ def delete_attachment(attachment_id: str, request: Request, db: Session = Depend
     db.commit()
 
 
+def _direct_s3() -> bool:
+    return isinstance(st.storage, st.S3Storage) and st.storage.direct
+
+
 @router.post("/attachments/presign", response_model=schemas.PresignResponse)
 def presign_attachment(payload: schemas.PresignRequest, db: Session = Depends(get_db),
                        user: models.User = Depends(current_user)):
     """
     L'app chiede dove caricare i byte di un allegato già sincronizzato.
-    Stub per l'MVP: upload diretto sull'API. In prod restituirà un presigned URL S3.
+    Con S3 direct: presigned POST sul bucket (tipo e dimensione imposti da S3),
+    poi /attachments/{id}/complete. Altrimenti upload multipart sull'API.
     """
     att = _get_attachment(db, user, payload.attachment_id)
+    if not _direct_s3():
+        return schemas.PresignResponse(
+            attachment_id=att.id, method="POST",
+            upload_url=f"/attachments/{att.id}/upload", max_bytes=st.MAX_UPLOAD_BYTES,
+        )
+    mime = payload.content_type or "image/jpeg"
+    if mime not in st.ALLOWED_MIME:
+        raise HTTPException(415, "only JPEG, PNG or PDF allowed")
+    post = st.storage.presign_post(f"attachments/{att.id}.{st.ALLOWED_MIME[mime]}", mime, st.MAX_UPLOAD_BYTES)
     return schemas.PresignResponse(
-        attachment_id=att.id, method="POST",
-        upload_url=f"/attachments/{att.id}/upload", max_bytes=st.MAX_UPLOAD_BYTES,
+        attachment_id=att.id, method="POST", upload_url=post["url"], fields=post["fields"],
+        complete_url=f"/attachments/{att.id}/complete", max_bytes=st.MAX_UPLOAD_BYTES,
     )
+
+
+@router.post("/attachments/{attachment_id}/complete", response_model=schemas.AttachmentOut)
+def complete_attachment(attachment_id: str, db: Session = Depends(get_db),
+                        user: models.User = Depends(current_user)):
+    """
+    Chiude un upload diretto su S3: verifica nel bucket che il file esista, che il
+    contenuto (magic bytes, non il Content-Type dichiarato) sia JPEG/PNG/PDF e
+    coerente con l'estensione, poi valorizza file_url. Idempotente.
+    """
+    att = _get_attachment(db, user, attachment_id)
+    if not _direct_s3():
+        raise HTTPException(409, "direct upload not enabled: use upload_url")
+    for mime, ext in st.ALLOWED_MIME.items():
+        key = f"attachments/{att.id}.{ext}"
+        if not st.storage.exists(key):
+            continue
+        if st.storage.size(key) > st.MAX_UPLOAD_BYTES:
+            st.storage.delete(key)
+            raise HTTPException(413, f"file larger than {st.MAX_UPLOAD_BYTES} bytes")
+        if st.sniff_mime(st.storage.read_head(key)) != mime:
+            st.storage.delete(key)
+            raise HTTPException(415, "file content does not match its type")
+        att.file_url = f"/files/{key}"
+        if not att.file_type:
+            att.file_type = "doc" if mime == "application/pdf" else "photo"
+        att.updated_at = utcnow()
+        db.commit()
+        db.refresh(att)
+        return att
+    raise HTTPException(404, "uploaded file not found")
 
 
 @router.post("/attachments/{attachment_id}/upload", response_model=schemas.AttachmentOut)
@@ -154,17 +199,34 @@ def _file_project_id(db: Session, key: str) -> str | None:
     return None
 
 
+def _authorize_file(db: Session, user: models.User, key: str) -> None:
+    project_id = _file_project_id(db, key)
+    if project_id is None or not st.storage.exists(key):
+        raise HTTPException(404, "file not found")
+    if not auth.is_member(db, user, project_id):
+        raise HTTPException(404, "file not found")  # 404, non 403: non rivela che il file esiste
+
+
+@router.get("/file-links/{key:path}", response_model=schemas.FileLink)
+def get_file_link(key: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """
+    Come leggere un file (stessi permessi di GET /files): con S3 direct un URL
+    firmato a scadenza da usare così com'è (anche in <img src>, senza JWT);
+    altrimenti /files/<key> da chiamare con il JWT.
+    """
+    _authorize_file(db, user, key)
+    if _direct_s3():
+        return schemas.FileLink(url=st.storage.presign_get(key), direct=True, expires_in=st.PRESIGN_SECONDS)
+    return schemas.FileLink(url=f"/files/{key}", direct=False)
+
+
 @router.get("/files/{key:path}")
 def get_file(key: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     """
     Serve i file dello storage (filesystem o S3) con il JWT: gli URL nel DB sono sempre /files/<key>.
     Solo ai membri del progetto a cui appartiene il file; file non referenziati → 404.
     """
-    project_id = _file_project_id(db, key)
-    if project_id is None or not st.storage.exists(key):
-        raise HTTPException(404, "file not found")
-    if not auth.is_member(db, user, project_id):
-        raise HTTPException(404, "file not found")  # 404, non 403: non rivela che il file esiste
+    _authorize_file(db, user, key)
     if isinstance(st.storage, st.S3Storage):
         data = st.storage.read(key)
         return Response(content=data, media_type=st.sniff_mime(data) or "application/octet-stream")

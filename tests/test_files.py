@@ -264,3 +264,91 @@ def test_s3_storage_with_fake_client(monkeypatch, client, project):
     assert r.status_code == 200 and ("fv", f"prod/plans/{project['plan']['id']}.png") in s3.client.objects
     r = client.get(r.json()["file_url"])
     assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+class FakeS3Direct:
+    """Client boto3 finto con gli URL firmati: abbastanza per il flusso diretto."""
+    def __init__(self):
+        self.objects = {}
+
+    def put_object(self, Bucket, Key, Body, ContentType):
+        self.objects[(Bucket, Key)] = (Body, ContentType)
+
+    def head_object(self, Bucket, Key):
+        if (Bucket, Key) not in self.objects:
+            raise Exception("404")
+        return {"ContentLength": len(self.objects[(Bucket, Key)][0])}
+
+    def get_object(self, Bucket, Key, Range=None):
+        body = self.objects[(Bucket, Key)][0]
+        if Range:
+            lo, hi = map(int, Range.removeprefix("bytes=").split("-"))
+            body = body[lo:hi + 1]
+        return {"Body": io.BytesIO(body)}
+
+    def delete_object(self, Bucket, Key):
+        self.objects.pop((Bucket, Key), None)
+
+    def generate_presigned_url(self, op, Params, ExpiresIn):
+        return f"https://s3.test/{Params['Bucket']}/{Params['Key']}?X-Amz-Expires={ExpiresIn}&sig=x"
+
+    def generate_presigned_post(self, Bucket, Key, Fields, Conditions, ExpiresIn):
+        self.last_post = {"Key": Key, "Conditions": Conditions}
+        return {"url": f"https://s3.test/{Bucket}", "fields": {**Fields, "key": Key, "policy": "p", "x-amz-signature": "s"}}
+
+
+@pytest.fixture()
+def s3_direct(monkeypatch):
+    s3 = st.S3Storage.__new__(st.S3Storage)
+    s3.bucket, s3.prefix, s3.client, s3.direct = "fv", "prod", FakeS3Direct(), True
+    monkeypatch.setattr(st, "storage", s3)
+    return s3
+
+
+def test_s3_direct_upload_presigned_post_then_complete(client, project, pin, s3_direct):
+    task_id, att_id = str(uuid.uuid4()), str(uuid.uuid4())
+    push(client, tasks=[{"id": task_id, "pin_id": pin, "title": "t"}],
+         attachments=[{"id": att_id, "task_id": task_id, "file_type": "photo"}])
+
+    p = client.post("/attachments/presign", json={"attachment_id": att_id, "content_type": "image/png"}).json()
+    assert p["upload_url"] == "https://s3.test/fv" and p["complete_url"] == f"/attachments/{att_id}/complete"
+    assert p["fields"]["key"] == f"prod/attachments/{att_id}.png" and p["fields"]["Content-Type"] == "image/png"
+    assert ["content-length-range", 1, st.MAX_UPLOAD_BYTES] in s3_direct.client.last_post["Conditions"]
+    assert client.post("/attachments/presign", json={"attachment_id": att_id, "content_type": "image/gif"}).status_code == 415
+
+    # complete prima che il device abbia caricato: niente file
+    assert client.post(f"/attachments/{att_id}/complete").status_code == 404
+    # il device carica sul bucket (simulato), poi chiude
+    s3_direct.client.objects[("fv", f"prod/attachments/{att_id}.png")] = (png_bytes(10, 10), "image/png")
+    r = client.post(f"/attachments/{att_id}/complete")
+    assert r.status_code == 200 and r.json()["file_url"] == f"/files/attachments/{att_id}.png"
+    assert client.post(f"/attachments/{att_id}/complete").status_code == 200  # idempotente
+
+    # lettura: link firmato, l'API non tocca i byte
+    link = client.get(f"/file-links/attachments/{att_id}.png").json()
+    assert link["direct"] is True and link["url"].startswith("https://s3.test/fv/prod/attachments/")
+    assert link["expires_in"] == st.PRESIGN_SECONDS
+
+
+def test_s3_direct_complete_rejects_wrong_content(client, pin, s3_direct, users):
+    task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
+    att = client.post("/attachments", json={"task_id": task["id"]}).json()
+    key = ("fv", f"prod/attachments/{att['id']}.jpg")
+    s3_direct.client.objects[key] = (b"<html>non una foto</html>", "image/jpeg")
+    assert client.post(f"/attachments/{att['id']}/complete").status_code == 415
+    assert key not in s3_direct.client.objects  # rimosso dal bucket
+    s3_direct.client.objects[key] = (jpg_bytes(), "image/jpeg")
+    # solo membri del progetto
+    assert client.post(f"/attachments/{att['id']}/complete", headers=users["outsider"]["headers"]).status_code in (403, 404)
+    assert client.post(f"/attachments/{att['id']}/complete").status_code == 200
+    assert client.get(f"/file-links/attachments/{att['id']}.jpg", headers=users["outsider"]["headers"]).status_code == 404
+
+
+def test_file_links_on_filesystem_point_to_api(client, pin, tmp_storage):
+    task = client.post("/tasks", json={"pin_id": pin, "title": "t"}).json()
+    att = client.post("/attachments", json={"task_id": task["id"]}).json()
+    url = upload(client, f"/attachments/{att['id']}/upload", jpg_bytes(), "a.jpg").json()["file_url"]
+    link = client.get("/file-links/" + url.removeprefix("/files/")).json()
+    assert link == {"url": url, "direct": False, "expires_in": None}
+    assert client.post(f"/attachments/{att['id']}/complete").status_code == 409
+    assert client.get("/file-links/attachments/nope.jpg").status_code == 404

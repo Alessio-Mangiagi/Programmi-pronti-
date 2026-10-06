@@ -2,9 +2,12 @@
  * Cache delle immagini delle planimetrie: al pull, ogni piano con file_url viene
  * scaricato in `<document>/plans/<id>.<ext>` così la plan view funziona offline.
  * Si riscarica solo se il piano è cambiato (plans.updated_at != local_file_for).
+ * Con `api` si chiede prima /file-links: con S3 diretto il download va al bucket
+ * con un URL firmato (senza JWT), altrimenti /files dell'API con il JWT.
  * Lo store è un'interfaccia: expo-file-system nell'app, finto nei test in Node.
  */
 import { eq } from 'drizzle-orm'
+import type { Api } from '../api/client'
 import { schema, type AppDb } from '../db/types'
 
 export type FileStore = {
@@ -15,7 +18,8 @@ export type FileStore = {
   remove: (path: string) => void
 }
 
-export type FilesOptions = { baseUrl: string; getToken: () => Promise<string | null> | string | null; store: FileStore }
+export type FilesOptions = { baseUrl: string; getToken: () => Promise<string | null> | string | null; store: FileStore; api?: Pick<Api, 'get'> }
+type FileLink = { url: string; direct: boolean }
 export type CacheSummary = { downloaded: number; failed: number; skipped: number }
 
 export async function cachePlanImages(db: AppDb, opts: FilesOptions, projectId: string): Promise<CacheSummary> {
@@ -39,7 +43,9 @@ export async function cachePlanImages(db: AppDb, opts: FilesOptions, projectId: 
     const ext = plan.file_url.split('.').pop()?.toLowerCase() || 'png'
     const path = opts.store.planPath(plan.id, ext)
     try {
-      await opts.store.download(`${opts.baseUrl}${plan.file_url}`, path, headers)
+      const link = opts.api ? await opts.api.get<FileLink>(`/file-links/${plan.file_url.replace(/^\/files\//, '')}`) : null
+      if (link?.direct) await opts.store.download(link.url, path, {})
+      else await opts.store.download(`${opts.baseUrl}${plan.file_url}`, path, headers)
       db.update(schema.plans).set({ local_file_path: path, local_file_for: plan.updated_at }).where(eq(schema.plans.id, plan.id)).run()
       out.downloaded++
     } catch {
