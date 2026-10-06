@@ -108,3 +108,42 @@ jobs:
       # il bundle Metro verifica che tutti i moduli si risolvano (form-core compreso)
       - run: npx expo export --platform android --no-bytecode --output-dir /tmp/expo-export
         working-directory: mobile
+
+  # Stack di produzione vero (docker-compose.prod.yml): immagine, migrazioni su
+  # Postgres, healthcheck, frontend servito, primo admin, backup e ripristino.
+  docker:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE: docker compose -f docker-compose.prod.yml
+    steps:
+      - uses: actions/checkout@v4
+      - name: .env di prova (chiavi casuali)
+        run: |
+          echo "SECRET_KEY=$(openssl rand -hex 32)" > .env
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >> .env
+      - name: Avvio db + app (attende i healthcheck)
+        run: $COMPOSE up -d --build --wait --wait-timeout 180 db app
+      - name: Healthcheck e frontend
+        run: |
+          curl -fsS http://127.0.0.1:8000/api/healthz
+          curl -fsS http://127.0.0.1:8000/ | grep -q '<div id="root">'
+          curl -fsS http://127.0.0.1:8000/projects/qualsiasi | grep -q '<div id="root">'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/projects)" = 401
+      - name: Primo admin e login
+        run: |
+          $COMPOSE exec -T -e ADMIN_PASSWORD=password-ci-lunga app python -m scripts.create_admin admin@ci.local "Admin CI"
+          curl -fsS -X POST http://127.0.0.1:8000/api/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"admin@ci.local","password":"password-ci-lunga"}' | grep -q access_token
+      - name: Backup e ripristino su un DB nuovo
+        run: |
+          $COMPOSE run --rm --no-deps --entrypoint sh backup /backup.sh
+          DUMP=$(ls backups/db-*.sql.gz | head -1)
+          $COMPOSE exec -T db psql -q -U fieldview -c "CREATE DATABASE restore_test"
+          gunzip -c "$DUMP" | $COMPOSE exec -T db psql -q -v ON_ERROR_STOP=1 -U fieldview restore_test
+          test "$($COMPOSE exec -T db psql -U fieldview -tA restore_test -c "select count(*) from users where email='admin@ci.local'")" = 1
+      - name: Log dei container
+        if: failure()
+        run: $COMPOSE logs --no-color
+      - name: Spegnimento
+        if: always()
+        run: $COMPOSE down -v

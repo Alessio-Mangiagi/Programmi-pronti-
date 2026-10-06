@@ -21,4 +21,6 @@ COPY scripts scripts
 COPY --from=web /src/web/dist web/dist
 VOLUME /data
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request,os; urllib.request.urlopen(f'http://127.0.0.1:{os.getenv(\"PORT\",\"8000\")}/api/healthz', timeout=4)"
 CMD ["sh", "scripts/entrypoint.sh"]

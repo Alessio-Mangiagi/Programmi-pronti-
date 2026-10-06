@@ -27,6 +27,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?imposta SECRET_KEY in .env (openssl rand -hex 32)}
       ACCESS_TOKEN_HOURS: ${ACCESS_TOKEN_HOURS:-12}
       SEED_DEMO: ${SEED_DEMO:-0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       WEB_URL: ${WEB_URL:-http://localhost:8000}
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
       STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}

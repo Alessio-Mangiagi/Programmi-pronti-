@@ -28,15 +28,19 @@ Strategia di sync (vedi README):
       tra un gruppo e l'altro così le FK verso entità dello stesso batch funzionano.
     - Il pull è incrementale per progetto: il client manda l'ultimo server_time
       ricevuto e riceve solo le modifiche successive, cancellazioni comprese.
-    - Conflict resolution MVP: "last write wins" basato su updated_at.
+    - Conflitti: "last write wins" per campo (changed_fields / field_times), vedi README.
 """
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import routers
+from .database import get_db
 
 
 @asynccontextmanager
@@ -65,3 +69,13 @@ app.add_middleware(
 
 for _router in routers.ALL:
     app.include_router(_router)
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz(db: Session = Depends(get_db)):
+    """Per Docker/monitoraggio (senza login): 200 se l'app risponde e il DB è raggiungibile, 503 altrimenti."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        return JSONResponse({"status": "db unavailable"}, status_code=503)
+    return {"status": "ok"}

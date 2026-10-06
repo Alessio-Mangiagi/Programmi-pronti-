@@ -87,10 +87,17 @@ cp .env.example .env     # SECRET_KEY (openssl rand -hex 32), POSTGRES_PASSWORD,
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 - L'app ascolta su `127.0.0.1:8000` (API `/api`, web alla radice): metterla dietro
-  un reverse proxy con TLS (Caddy/nginx) su `WEB_URL`.
+  un reverse proxy con TLS su `WEB_URL`. Pronto: `deploy/Caddyfile` (certificati
+  automatici, header di sicurezza, upload fino a 25 MB); basta cambiare il dominio.
+  Con nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (l'app usa
+  l'ultima voce come IP del client) e `client_max_body_size 25m;`.
+- Healthcheck: `GET /api/healthz` (senza login) → 200 se app e DB rispondono, 503
+  altrimenti. Lo usano il container (`docker ps` mostra healthy) e il proxy; puntarci
+  anche il monitoraggio esterno (UptimeRobot, Uptime Kuma…).
 - Migrazioni automatiche all'avvio (`alembic upgrade head`). `SEED_DEMO=1` solo per demo.
-- Primo admin: con `SEED_DEMO=0` il DB è vuoto → creare l'admin da shell:
-  `docker compose -f docker-compose.prod.yml exec app python -c "from app.database import SessionLocal; from app import models, auth; s=SessionLocal(); s.add(models.User(email='admin@tuodominio.it', name='Admin', role=models.UserRole.admin, password_hash=auth.hash_password('CAMBIAMI'))); s.commit()"`
+- Primo admin: con `SEED_DEMO=0` il DB è vuoto → crearlo da shell (la password,
+  almeno 12 caratteri, si digita a terminale e non resta nella history):
+  `docker compose -f docker-compose.prod.yml exec app python -m scripts.create_admin admin@tuodominio.it "Nome Cognome"`
 - **Worker notifiche**: servizio `worker` (email via `SMTP_*`; senza `SMTP_HOST` finisce nel log; push Expo automatiche).
 - **Storage**: volume `appdata` (`/data/storage`) oppure S3-compatible con `STORAGE_S3_BUCKET`
   (+ `STORAGE_S3_ENDPOINT` per MinIO, `STORAGE_S3_REGION`). Il bucket resta **privato**:
@@ -109,6 +116,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 git pull && docker compose -f docker-compose.prod.yml up -d --build   # migrazioni applicate all'avvio
 ```
 Backup prima di ogni aggiornamento con migrazioni (`docker compose ... exec backup sh /backup.sh`).
+Il ripristino è provato a ogni push dalla CI (job `docker`): dump → DB nuovo → dati presenti.
+Copiare `./backups/` anche fuori dal server (altro disco, NAS o bucket), altrimenti un
+guasto del server porta via dati e backup insieme.
 
 ## Diagnostica
 - `GET /api/docs` — Swagger. Log: `docker compose -f docker-compose.prod.yml logs -f app worker`.
