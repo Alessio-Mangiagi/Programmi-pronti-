@@ -342,3 +342,40 @@ def test_pin_create_update_delete(client, project, users):
     deleted = {row["id"] for group in ("pins", "tasks", "submissions", "attachments")
                for row in pulled[group] if row["deleted_at"]}
     assert {pin["id"], task["id"], sub["id"], att["id"]} <= deleted
+
+
+def test_tasks_page_server_side(client, project, pin, users):
+    pid = project["project"]["id"]
+    anna = users["field"]["id"]
+    past = "2020-01-01T00:00:00"
+    made = [client.post("/tasks", json={"pin_id": pin, "title": f"Task {i:02d}",
+                                        "description": "crepa nel muro" if i % 5 == 0 else None,
+                                        "assigned_to": anna if i % 2 else None,
+                                        "due_date": past if i % 3 == 0 else None}).json()["id"] for i in range(25)]
+
+    def page(**params):
+        r = client.get(f"/projects/{pid}/tasks/page", params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    first = page(limit=10)
+    assert first["total"] == 25 and len(first["items"]) == 10
+    assert first["counts"] == {"open": 13, "assigned": 12, "resolved": 0, "verified": 0}
+    seen = [t["id"] for o in (0, 10, 20) for t in page(limit=10, offset=o)["items"]]
+    assert sorted(seen) == sorted(made)  # nessuna riga ripetuta o saltata tra le pagine
+
+    assert [t["title"] for t in page(sort="title", desc=False, limit=3)["items"]] == ["Task 00", "Task 01", "Task 02"]
+    assert page(q="CREPA")["total"] == 5
+    assert page(status=["assigned"], assigned_to=anna)["total"] == 12
+    assert page(status=["open", "assigned"])["total"] == 25
+    assert page(overdue=True)["total"] == 9
+    by_due = page(sort="due_date", desc=False, limit=25)["items"]
+    assert all(t["due_date"] for t in by_due[:9]) and not any(t["due_date"] for t in by_due[9:])
+    by_due_desc = page(sort="due_date", limit=25)["items"]
+    assert not any(t["due_date"] for t in by_due_desc[9:])  # senza scadenza in fondo anche al contrario
+    assert page(sort="status", desc=False, limit=1)["items"][0]["status"] == "open"
+    assert page(sort="assigned_to", desc=False, limit=1)["items"][0]["assigned_to"] == anna
+    assert page(sort="plan_name")["total"] == 25
+    assert client.get(f"/projects/{pid}/tasks/page", params={"sort": "drop table"}).status_code == 422
+    assert client.get(f"/projects/{pid}/tasks/page", params={"limit": 1000}).status_code == 422
+    assert client.get("/projects/nope/tasks/page").status_code == 404

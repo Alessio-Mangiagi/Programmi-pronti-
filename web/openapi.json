@@ -2961,6 +2961,7 @@
     "/projects/{project_id}/tasks": {
       "get": {
         "summary": "List Tasks",
+        "description": "Tutti i task del progetto (più recenti prima). Per tabelle grandi: /tasks/page.",
         "operationId": "list_tasks_projects__project_id__tasks_get",
         "security": [
           {
@@ -2984,7 +2985,10 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
@@ -3037,6 +3041,175 @@
                     "$ref": "#/components/schemas/TaskListItem"
                   },
                   "title": "Response List Tasks Projects  Project Id  Tasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/tasks/page": {
+      "get": {
+        "summary": "List Tasks Page",
+        "description": "Vista task paginata lato server: filtri (in AND), ricerca testuale, ordinamento\ne pagina. `total` = righe che rispettano i filtri; `counts` = task per stato\ndell'intero progetto (legenda), indipendenti dai filtri.",
+        "operationId": "list_tasks_page_projects__project_id__tasks_page_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "assigned_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned To"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Overdue"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "cerca in titolo, descrizione, etichetta del pin",
+              "title": "Q"
+            },
+            "description": "cerca in titolo, descrizione, etichetta del pin"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(created_at|title|status|assigned_to|due_date|plan_name)$",
+              "default": "created_at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Desc"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPage"
                 }
               }
             }
@@ -3466,7 +3639,7 @@
     "/attachments/presign": {
       "post": {
         "summary": "Presign Attachment",
-        "description": "L'app chiede dove caricare i byte di un allegato già sincronizzato.\nStub per l'MVP: upload diretto sull'API. In prod restituirà un presigned URL S3.",
+        "description": "L'app chiede dove caricare i byte di un allegato già sincronizzato.\nCon S3 direct: presigned POST sul bucket (tipo e dimensione imposti da S3),\npoi /attachments/{id}/complete. Altrimenti upload multipart sull'API.",
         "operationId": "presign_attachment_attachments_presign_post",
         "requestBody": {
           "content": {
@@ -3507,6 +3680,51 @@
         ]
       }
     },
+    "/attachments/{attachment_id}/complete": {
+      "post": {
+        "summary": "Complete Attachment",
+        "description": "Chiude un upload diretto su S3: verifica nel bucket che il file esista, che il\ncontenuto (magic bytes, non il Content-Type dichiarato) sia JPEG/PNG/PDF e\ncoerente con l'estensione, poi valorizza file_url. Idempotente.",
+        "operationId": "complete_attachment_attachments__attachment_id__complete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/attachments/{attachment_id}/upload": {
       "post": {
         "summary": "Upload Attachment",
@@ -3545,6 +3763,51 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file-links/{key}": {
+      "get": {
+        "summary": "Get File Link",
+        "description": "Come leggere un file (stessi permessi di GET /files): con S3 direct un URL\nfirmato a scadenza da usare così com'è (anche in <img src>, senza JWT);\naltrimenti /files/<key> da chiamare con il JWT.",
+        "operationId": "get_file_link_file_links__key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileLink"
                 }
               }
             }
@@ -4010,6 +4273,20 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "changed_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Fields"
           },
           "submission_id": {
             "anyOf": [
@@ -4662,6 +4939,36 @@
         ],
         "title": "EventOut"
       },
+      "FileLink": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "direct": {
+            "type": "boolean",
+            "title": "Direct"
+          },
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "direct"
+        ],
+        "title": "FileLink",
+        "description": "URL per leggere un file: firmato e a scadenza (direct, niente JWT) o /files dell'API (con JWT)."
+      },
       "FormSubmissionSync": {
         "properties": {
           "id": {
@@ -4684,6 +4991,20 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "changed_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Fields"
           },
           "template_id": {
             "type": "string",
@@ -5752,6 +6073,20 @@
             ],
             "title": "Deleted At"
           },
+          "changed_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Fields"
+          },
           "plan_id": {
             "type": "string",
             "title": "Plan Id"
@@ -5996,6 +6331,17 @@
           "attachment_id": {
             "type": "string",
             "title": "Attachment Id"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
           }
         },
         "type": "object",
@@ -6021,6 +6367,25 @@
           "max_bytes": {
             "type": "integer",
             "title": "Max Bytes"
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Fields",
+            "default": {}
+          },
+          "complete_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complete Url"
           }
         },
         "type": "object",
@@ -6031,7 +6396,7 @@
           "max_bytes"
         ],
         "title": "PresignResponse",
-        "description": "Dove e come caricare i byte di un allegato. Oggi punta all'upload diretto\nsull'API; con S3 diventerà un presigned PUT e `fields`/`headers` cambieranno."
+        "description": "Dove e come caricare i byte di un allegato.\n- filesystem (o S3 senza direct): POST multipart `file` su `upload_url` dell'API, con il JWT;\n- S3 direct: POST multipart su `upload_url` del bucket, SENZA JWT, con `fields` prima\n  del campo `file`; poi POST `complete_url` (API, con JWT) che verifica il file e\n  valorizza file_url."
       },
       "ProjectCreate": {
         "properties": {
@@ -6775,6 +7140,17 @@
             "title": "Skipped Ids",
             "default": []
           },
+          "lost_fields": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Lost Fields",
+            "default": {}
+          },
           "rejected": {
             "items": {
               "$ref": "#/components/schemas/RejectedItem"
@@ -7071,6 +7447,46 @@
         ],
         "title": "TaskOut"
       },
+      "TaskPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "counts"
+        ],
+        "title": "TaskPage",
+        "description": "Una pagina della vista task: righe, totale filtrato, conteggi per stato del progetto."
+      },
       "TaskSync": {
         "properties": {
           "id": {
@@ -7093,6 +7509,20 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "changed_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Fields"
           },
           "pin_id": {
             "type": "string",

@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.orm import Session
+from sqlalchemy import case, func, or_
+from sqlalchemy.orm import Session, aliased, contains_eager, selectinload
 
 from .. import models, schemas, auth, events, audit, stats as st_stats
 from ..auth import current_user
@@ -36,34 +37,109 @@ def create_task(payload: schemas.TaskCreate, request: Request, db: Session = Dep
     return _with_attachments(schemas.TaskOut, task)
 
 
+TASK_SORTS = ("created_at", "title", "status", "assigned_to", "due_date", "plan_name")
+
+
+def _task_query(db: Session, project_id: str):
+    """Task vivi del progetto, con pin e planimetria già in join (servono a filtri, ordinamento e risposta)."""
+    return (db.query(models.Task)
+            .join(models.Pin, models.Task.pin_id == models.Pin.id)
+            .join(models.Plan, models.Pin.plan_id == models.Plan.id)
+            .filter(models.Plan.project_id == project_id)
+            .filter(models.Task.deleted_at.is_(None), models.Pin.deleted_at.is_(None))
+            .options(contains_eager(models.Task.pin).contains_eager(models.Pin.plan),
+                     selectinload(models.Task.attachments)))
+
+
+def _filter_tasks(q, status: Optional[list[str]], plan_id: Optional[str], assigned_to: Optional[str],
+                  overdue: bool, search: Optional[str]):
+    if status:
+        q = q.filter(models.Task.status.in_([_parse_status(v) for v in status]))
+    if plan_id:
+        q = q.filter(models.Pin.plan_id == plan_id)
+    if assigned_to:
+        q = q.filter(models.Task.assigned_to == assigned_to)
+    if overdue:
+        today = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        q = q.filter(models.Task.due_date < today, models.Task.status != TaskStatus.verified)
+    if search and search.strip():
+        like = f"%{search.strip().lower()}%"
+        q = q.filter(or_(func.lower(models.Task.title).like(like),
+                         func.lower(func.coalesce(models.Task.description, "")).like(like),
+                         func.lower(func.coalesce(models.Pin.label, "")).like(like)))
+    return q
+
+
+def _sort_tasks(q, sort: str, desc: bool):
+    if sort == "status":
+        order = [case({s: i for i, s in enumerate(TaskStatus)}, value=models.Task.status)]
+    elif sort == "assigned_to":
+        assignee = aliased(models.User)
+        q = q.outerjoin(assignee, models.Task.assigned_to == assignee.id)
+        order = [assignee.name.is_(None), assignee.name]  # non assegnati in fondo
+    elif sort == "due_date":
+        order = [models.Task.due_date.is_(None), models.Task.due_date]  # senza scadenza in fondo
+    elif sort == "plan_name":
+        order = [models.Plan.name]
+    else:
+        order = [getattr(models.Task, sort)]
+    last = order.pop()
+    # spareggio stabile: la paginazione non deve ripetere né saltare righe
+    return q.order_by(*order, last.desc() if desc else last.asc(), models.Task.created_at.desc(), models.Task.id)
+
+
+def _list_item(t: models.Task) -> schemas.TaskListItem:
+    base = _with_attachments(schemas.TaskOut, t)
+    return schemas.TaskListItem(**base.model_dump(), plan_id=t.pin.plan_id, plan_name=t.pin.plan.name, pin_label=t.pin.label)
+
+
 @router.get("/projects/{project_id}/tasks", response_model=list[schemas.TaskListItem])
 def list_tasks(
     project_id: str,
-    status: Optional[str] = None,
+    status: Optional[list[str]] = Query(default=None),
     plan_id: Optional[str] = None,
     assigned_to: Optional[str] = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(current_user),
 ):
+    """Tutti i task del progetto (più recenti prima). Per tabelle grandi: /tasks/page."""
     auth.assert_project_access(db, user, project_id)
-    q = (db.query(models.Task)
-         .join(models.Pin, models.Task.pin_id == models.Pin.id)
-         .join(models.Plan, models.Pin.plan_id == models.Plan.id)
-         .filter(models.Plan.project_id == project_id)
-         .filter(models.Task.deleted_at.is_(None), models.Pin.deleted_at.is_(None)))
-    if status:
-        q = q.filter(models.Task.status == _parse_status(status))
-    if plan_id:
-        q = q.filter(models.Pin.plan_id == plan_id)
-    if assigned_to:
-        q = q.filter(models.Task.assigned_to == assigned_to)
-    q = q.order_by(models.Task.created_at.desc())
-    out = []
-    for t in q.all():
-        base = _with_attachments(schemas.TaskOut, t)
-        out.append(schemas.TaskListItem(**base.model_dump(), plan_id=t.pin.plan_id,
-                                        plan_name=t.pin.plan.name, pin_label=t.pin.label))
-    return out
+    q = _filter_tasks(_task_query(db, project_id), status, plan_id, assigned_to, False, None)
+    return [_list_item(t) for t in _sort_tasks(q, "created_at", True).all()]
+
+
+@router.get("/projects/{project_id}/tasks/page", response_model=schemas.TaskPage)
+def list_tasks_page(
+    project_id: str,
+    status: Optional[list[str]] = Query(default=None),
+    plan_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    overdue: bool = False,
+    q: Optional[str] = Query(default=None, max_length=200, description="cerca in titolo, descrizione, etichetta del pin"),
+    sort: str = Query(default="created_at", pattern="^(" + "|".join(TASK_SORTS) + ")$"),
+    desc: bool = True,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
+):
+    """
+    Vista task paginata lato server: filtri (in AND), ricerca testuale, ordinamento
+    e pagina. `total` = righe che rispettano i filtri; `counts` = task per stato
+    dell'intero progetto (legenda), indipendenti dai filtri.
+    """
+    auth.assert_project_access(db, user, project_id)
+    filtered = _filter_tasks(_task_query(db, project_id), status, plan_id, assigned_to, overdue, q)
+    total = filtered.order_by(None).with_entities(func.count(models.Task.id)).scalar()
+    rows = _sort_tasks(filtered, sort, desc).limit(limit).offset(offset).all()
+    counts = dict(
+        db.query(models.Task.status, func.count(models.Task.id))
+        .join(models.Pin, models.Task.pin_id == models.Pin.id)
+        .join(models.Plan, models.Pin.plan_id == models.Plan.id)
+        .filter(models.Plan.project_id == project_id, models.Task.deleted_at.is_(None), models.Pin.deleted_at.is_(None))
+        .group_by(models.Task.status).all())
+    return schemas.TaskPage(items=[_list_item(t) for t in rows], total=total, limit=limit, offset=offset,
+                            counts={s.value: counts.get(s, 0) for s in TaskStatus})
 
 
 @router.get("/projects/{project_id}/stats", response_model=schemas.StatsOut)

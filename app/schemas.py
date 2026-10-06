@@ -491,6 +491,15 @@ class TaskListItem(TaskOut):
     pin_label: Optional[str] = None
 
 
+class TaskPage(BaseModel):
+    """Una pagina della vista task: righe, totale filtrato, conteggi per stato del progetto."""
+    items: list[TaskListItem]
+    total: int
+    limit: int
+    offset: int
+    counts: dict[str, int]
+
+
 class PinCreate(BaseModel):
     plan_id: str
     x: float = Field(ge=0.0, le=1.0)

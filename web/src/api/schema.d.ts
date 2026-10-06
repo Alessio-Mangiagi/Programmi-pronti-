@@ -877,8 +877,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Tasks */
+        /**
+         * List Tasks
+         * @description Tutti i task del progetto (più recenti prima). Per tabelle grandi: /tasks/page.
+         */
         get: operations["list_tasks_projects__project_id__tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/tasks/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tasks Page
+         * @description Vista task paginata lato server: filtri (in AND), ricerca testuale, ordinamento
+         *     e pagina. `total` = righe che rispettano i filtri; `counts` = task per stato
+         *     dell'intero progetto (legenda), indipendenti dai filtri.
+         */
+        get: operations["list_tasks_page_projects__project_id__tasks_page_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1008,9 +1033,32 @@ export interface paths {
         /**
          * Presign Attachment
          * @description L'app chiede dove caricare i byte di un allegato già sincronizzato.
-         *     Stub per l'MVP: upload diretto sull'API. In prod restituirà un presigned URL S3.
+         *     Con S3 direct: presigned POST sul bucket (tipo e dimensione imposti da S3),
+         *     poi /attachments/{id}/complete. Altrimenti upload multipart sull'API.
          */
         post: operations["presign_attachment_attachments_presign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/{attachment_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Attachment
+         * @description Chiude un upload diretto su S3: verifica nel bucket che il file esista, che il
+         *     contenuto (magic bytes, non il Content-Type dichiarato) sia JPEG/PNG/PDF e
+         *     coerente con l'estensione, poi valorizza file_url. Idempotente.
+         */
+        post: operations["complete_attachment_attachments__attachment_id__complete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1031,6 +1079,28 @@ export interface paths {
          * @description Carica i byte di un allegato. Idempotente: un retry sovrascrive lo stesso file.
          */
         post: operations["upload_attachment_attachments__attachment_id__upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/file-links/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get File Link
+         * @description Come leggere un file (stessi permessi di GET /files): con S3 direct un URL
+         *     firmato a scadenza da usare così com'è (anche in <img src>, senza JWT);
+         *     altrimenti /files/<key> da chiamare con il JWT.
+         */
+        get: operations["get_file_link_file_links__key__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1197,6 +1267,8 @@ export interface components {
             updated_at: string;
             /** Deleted At */
             deleted_at?: string | null;
+            /** Changed Fields */
+            changed_fields?: string[] | null;
             /** Submission Id */
             submission_id?: string | null;
             /** Task Id */
@@ -1407,6 +1479,18 @@ export interface components {
             /** Processed At */
             processed_at?: string | null;
         };
+        /**
+         * FileLink
+         * @description URL per leggere un file: firmato e a scadenza (direct, niente JWT) o /files dell'API (con JWT).
+         */
+        FileLink: {
+            /** Url */
+            url: string;
+            /** Direct */
+            direct: boolean;
+            /** Expires In */
+            expires_in?: number | null;
+        };
         /** FormSubmissionSync */
         FormSubmissionSync: {
             /** Id */
@@ -1418,6 +1502,8 @@ export interface components {
             updated_at: string;
             /** Deleted At */
             deleted_at?: string | null;
+            /** Changed Fields */
+            changed_fields?: string[] | null;
             /** Template Id */
             template_id: string;
             /** Pin Id */
@@ -1842,6 +1928,8 @@ export interface components {
             updated_at: string;
             /** Deleted At */
             deleted_at?: string | null;
+            /** Changed Fields */
+            changed_fields?: string[] | null;
             /** Plan Id */
             plan_id: string;
             /** X */
@@ -1911,11 +1999,16 @@ export interface components {
         PresignRequest: {
             /** Attachment Id */
             attachment_id: string;
+            /** Content Type */
+            content_type?: string | null;
         };
         /**
          * PresignResponse
-         * @description Dove e come caricare i byte di un allegato. Oggi punta all'upload diretto
-         *     sull'API; con S3 diventerà un presigned PUT e `fields`/`headers` cambieranno.
+         * @description Dove e come caricare i byte di un allegato.
+         *     - filesystem (o S3 senza direct): POST multipart `file` su `upload_url` dell'API, con il JWT;
+         *     - S3 direct: POST multipart su `upload_url` del bucket, SENZA JWT, con `fields` prima
+         *       del campo `file`; poi POST `complete_url` (API, con JWT) che verifica il file e
+         *       valorizza file_url.
          */
         PresignResponse: {
             /** Attachment Id */
@@ -1926,6 +2019,15 @@ export interface components {
             upload_url: string;
             /** Max Bytes */
             max_bytes: number;
+            /**
+             * Fields
+             * @default {}
+             */
+            fields: {
+                [key: string]: string;
+            };
+            /** Complete Url */
+            complete_url?: string | null;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -2221,6 +2323,13 @@ export interface components {
              */
             skipped_ids: string[];
             /**
+             * Lost Fields
+             * @default {}
+             */
+            lost_fields: {
+                [key: string]: string[];
+            };
+            /**
              * Rejected
              * @default []
              */
@@ -2320,6 +2429,24 @@ export interface components {
              */
             attachments: components["schemas"]["AttachmentOut"][];
         };
+        /**
+         * TaskPage
+         * @description Una pagina della vista task: righe, totale filtrato, conteggi per stato del progetto.
+         */
+        TaskPage: {
+            /** Items */
+            items: components["schemas"]["TaskListItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+        };
         /** TaskSync */
         TaskSync: {
             /** Id */
@@ -2331,6 +2458,8 @@ export interface components {
             updated_at: string;
             /** Deleted At */
             deleted_at?: string | null;
+            /** Changed Fields */
+            changed_fields?: string[] | null;
             /** Pin Id */
             pin_id: string;
             /** Title */
@@ -4522,7 +4651,7 @@ export interface operations {
     list_tasks_projects__project_id__tasks_get: {
         parameters: {
             query?: {
-                status?: string | null;
+                status?: string[] | null;
                 plan_id?: string | null;
                 assigned_to?: string | null;
             };
@@ -4541,6 +4670,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_page_projects__project_id__tasks_page_get: {
+        parameters: {
+            query?: {
+                status?: string[] | null;
+                plan_id?: string | null;
+                assigned_to?: string | null;
+                overdue?: boolean;
+                /** @description cerca in titolo, descrizione, etichetta del pin */
+                q?: string | null;
+                sort?: string;
+                desc?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskPage"];
                 };
             };
             /** @description Validation Error */
@@ -4817,6 +4988,37 @@ export interface operations {
             };
         };
     };
+    complete_attachment_attachments__attachment_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_attachment_attachments__attachment_id__upload_post: {
         parameters: {
             query?: never;
@@ -4839,6 +5041,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_link_file_links__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileLink"];
                 };
             };
             /** @description Validation Error */
