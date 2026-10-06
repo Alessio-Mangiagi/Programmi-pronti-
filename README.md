@@ -180,11 +180,18 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
    ISO 8601 con qualsiasi offset (`+02:00`, `Z`): viene normalizzato.
    Usare sempre l'orologio UTC del device per `updated_at`.
 
-6. **Conflitti**: "last write wins" basato su `updated_at`. Volutamente
-   semplice per l'MVP. Se in futuro serve gestire meglio i conflitti (es.
-   due persone modificano lo stesso task offline), aggiungere un campo
-   `version` incrementale e rifiutare push con versione vecchia, mostrando
-   il conflitto all'utente invece di sovrascrivere silenziosamente.
+6. **Conflitti**: "last write wins" **per campo**. Ogni riga pushata porta
+   `changed_fields` (i campi toccati offline); il server confronta ciascun campo
+   con la sua ultima modifica nota (`field_times`, aggiornato anche dalle
+   modifiche da web) e applica solo quelli più recenti. Così web che assegna un
+   task e app che ne cambia il titolo convivono. Esito: `updated` (con
+   `lost_fields` se qualche campo ha perso) o `skipped` se li ha persi tutti; il
+   device registra i campi persi in `sync_log`. Senza `changed_fields` (client
+   vecchi) valgono tutti i campi sincronizzabili.
+
+7. **Cursore del pull**: `since` si confronta con `synced_at`, l'istante in cui
+   il SERVER ha scritto la riga, non con l'`updated_at` del device: una modifica
+   fatta offline giorni prima arriva comunque a chi ha già sincronizzato dopo.
 
 ### Cosa serve lato iOS/Android
 
@@ -197,15 +204,26 @@ due volte (Core Data/SQLite su iOS, Room/SQLite su Android), ma il
   scaricare quelle remote.
 - Upload foto: le foto NON viaggiano nel payload JSON di sync. Flusso:
   1. il device crea l'`Attachment` offline (`file_url: null`) e lo pusha;
-  2. chiama `POST /attachments/presign` → `{upload_url, method}`;
+  2. chiama `POST /attachments/presign` (`content_type` del file) → `{upload_url, method, fields, complete_url}`;
   3. manda i byte (multipart `file`) a `upload_url`, con retry: è idempotente;
   4. il server imposta `file_url`, che arriva agli altri device nel pull.
-  Oggi `upload_url` punta a `POST /attachments/{id}/upload`; con S3 diventerà
-  un presigned URL senza cambiare il flusso lato app.
+  Su filesystem `upload_url` è `POST /attachments/{id}/upload` (con JWT). Con S3
+  diretto è un presigned POST sul bucket: `fields` prima del file, niente JWT
+  (S3 impone tipo e 20 MB), poi `POST complete_url` verifica il contenuto e
+  valorizza `file_url`.
 - Planimetrie: `POST /plans` crea il record, `POST /plans/{id}/file` carica
   PNG/JPG/PDF (max 20 MB, tipo riconosciuto dal contenuto). Un PDF viene
   convertito in PNG (prima pagina, lato lungo ≤ 4000 px) e `width_px/height_px`
-  vengono calcolati dal server. I file sono serviti da `GET /files/{key}`.
+  vengono calcolati dal server. I file sono serviti da `GET /files/{key}`;
+  `GET /file-links/{key}` dice come leggerli (URL S3 firmato a scadenza, o `/files` con JWT).
+
+## Vista task paginata
+
+`GET /projects/{id}/tasks/page`: filtri (`status` ripetibile, `plan_id`,
+`assigned_to`, `overdue`), ricerca `q` (titolo, descrizione, etichetta del pin),
+`sort` (`created_at|title|status|assigned_to|due_date|plan_name`) + `desc`,
+`limit` (≤ 200) e `offset`. Risponde `{items, total, counts}`: `total` = righe
+filtrate, `counts` = task per stato dell'intero progetto (legenda).
 
 ## Filtri pin della plan view
 
@@ -222,8 +240,10 @@ pin o di una sua submission/task. I conteggi nella risposta restano i totali del
 `app` (API + web su `127.0.0.1:8000`, da mettere dietro un reverse proxy TLS),
 `worker` notifiche, `backup` (dump + tar storage notturni in `./backups/`).
 Storage S3-compatible attivabile con `STORAGE_S3_BUCKET` (+ endpoint per MinIO):
-i file restano privati e vengono serviti dall'API via `/files/{key}` con il JWT,
-quindi gli URL nel DB non cambiano tra filesystem e S3. Dettagli in `docs/guida-admin.md`.
+i file restano privati, gli URL nel DB restano `/files/<key>`, l'API decide chi
+può leggere e risponde con URL firmati a scadenza (`STORAGE_S3_PRESIGN_SECONDS`,
+default 900): foto e planimetrie viaggiano tra client e bucket senza passare
+dall'API. `STORAGE_S3_DIRECT=0` torna al proxy via API. Dettagli in `docs/guida-admin.md`.
 
 ## Prossimi passi
 
