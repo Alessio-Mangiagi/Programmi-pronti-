@@ -29,7 +29,8 @@ from sqlalchemy import (
     Column, String, Text, Float, Boolean, ForeignKey, DateTime, Enum, JSON, Index, Integer, MetaData, true
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import event, inspect
+from sqlalchemy.orm import Session, declarative_base, relationship
 
 # Nomi deterministici per indici/vincoli: servono ad Alembic per generare
 # ALTER TABLE (soprattutto in batch mode su SQLite, dove i vincoli anonimi
@@ -164,11 +165,29 @@ class Invite(Base):
 
 
 class SyncMixin:
-    """Colonne comuni a tutte le entità che viaggiano nel sync."""
+    """
+    Colonne comuni a tutte le entità che viaggiano nel sync.
+
+    - `updated_at`: istante della modifica (anche del device, se arriva dal push).
+    - `synced_at`: istante in cui il SERVER ha scritto la riga. È il cursore del
+      pull: un push offline con `updated_at` vecchio arriva comunque agli altri device.
+    - `field_times`: {campo: ISO dell'ultima modifica} per i campi in `SYNC_FIELDS`,
+      così due device che toccano campi diversi della stessa riga non si pestano.
+      Lo valorizza `_track_field_times` a ogni flush (web e sync).
+    """
+    SYNC_FIELDS: tuple[str, ...] = ()
+
     id = Column(String, primary_key=True, default=gen_uuid)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
+    synced_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False, index=True)
+    field_times = Column(JSON, nullable=True)
+
+    def field_time(self, field: str) -> datetime:
+        """Ultima modifica nota del campo; righe senza traccia → updated_at (LWW di riga, prudente)."""
+        iso = (self.field_times or {}).get(field)
+        return datetime.fromisoformat(iso) if iso else self.updated_at
 
 
 class CommessaParam(Base):
@@ -270,6 +289,7 @@ class Pin(SyncMixin, Base):
     o dalla risoluzione con cui il client renderizza l'immagine.
     """
     __tablename__ = "pins"
+    SYNC_FIELDS = ("x", "y", "label", "deleted_at")
 
     plan_id = Column(String, ForeignKey("plans.id"), nullable=False, index=True)
     x = Column(Float, nullable=False)  # 0.0 - 1.0
@@ -303,6 +323,7 @@ class FormTemplate(Base):
 class FormSubmission(SyncMixin, Base):
     """Un'istanza compilata di un FormTemplate, agganciata a un pin o a una voce WBS (uno dei due)."""
     __tablename__ = "form_submissions"
+    SYNC_FIELDS = ("data_json", "submitted_by", "deleted_at")
 
     template_id = Column(String, ForeignKey("form_templates.id"), nullable=False)
     pin_id = Column(String, ForeignKey("pins.id"), nullable=True, index=True)
@@ -317,6 +338,7 @@ class FormSubmission(SyncMixin, Base):
 
 class Task(SyncMixin, Base):
     __tablename__ = "tasks"
+    SYNC_FIELDS = ("title", "description", "status", "assigned_to", "due_date", "deleted_at")
 
     pin_id = Column(String, ForeignKey("pins.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
@@ -334,6 +356,8 @@ class Task(SyncMixin, Base):
 
 class Attachment(SyncMixin, Base):
     __tablename__ = "attachments"
+    # file_url no: lo scrive solo l'upload sul server, mai il push del device
+    SYNC_FIELDS = ("file_type", "deleted_at")
 
     submission_id = Column(String, ForeignKey("form_submissions.id"), nullable=True, index=True)
     task_id = Column(String, ForeignKey("tasks.id"), nullable=True, index=True)
@@ -447,3 +471,27 @@ class PushToken(Base):
     platform = Column(String, nullable=True)  # ios | android
     created_at = Column(DateTime, default=utcnow, nullable=False)
     last_seen_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+@event.listens_for(Session, "before_flush")
+def _track_field_times(session, flush_context, instances):
+    """
+    Tiene `field_times` allineato a ogni scrittura ORM (REST web, sync, seed):
+    insert → tutti i SYNC_FIELDS all'istante della riga; update → solo i campi
+    cambiati. Il push del sync imposta `_sync_ts` = updated_at del device, così
+    i campi che porta hanno l'istante della modifica vera, non quello di arrivo.
+    """
+    for obj in list(session.new) + list(session.dirty):
+        if not isinstance(obj, SyncMixin) or not obj.SYNC_FIELDS:
+            continue
+        state = inspect(obj)
+        if obj in session.new:
+            ts = obj.updated_at or utcnow()
+            changed = obj.SYNC_FIELDS
+        else:
+            changed = [f for f in obj.SYNC_FIELDS if state.attrs[f].history.has_changes()]
+            if not changed:
+                continue
+            ts = obj.__dict__.pop("_sync_ts", None) or (
+                obj.updated_at if state.attrs["updated_at"].history.has_changes() else utcnow())
+        obj.field_times = {**(obj.field_times or {}), **{f: ts.isoformat() for f in changed}}

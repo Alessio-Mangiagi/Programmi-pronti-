@@ -3,16 +3,18 @@
  * Primo avvio senza `since` = tutto. Ogni riga ricevuta viene upsertata; le righe
  * con deleted_at restano nel DB come cancellate (le query le filtrano).
  *
- * Conflitti (LWW, come sul server): se una riga locale è `dirty` e più recente
- * della remota, resta e verrà pushata; se la remota è più recente, vince lei e
- * la versione locale finisce in sync_log (kind = conflict_lost).
+ * Conflitti (LWW per campo, come sul server): su una riga locale `dirty` i campi
+ * NON toccati in locale prendono il valore remoto; quelli toccati (`dirty_fields`)
+ * restano locali se modificati dopo l'ultima modifica remota dello stesso campo
+ * (`field_times` del server) e verranno pushati, altrimenti vince il remoto e il
+ * valore locale finisce in sync_log (kind = conflict_lost).
  */
 import { eq } from 'drizzle-orm'
 import type { Api } from '../api/client'
 import { schema, type AppDb } from '../db/types'
 import { isNewer, nowIso } from './time'
 
-type Row = Record<string, unknown> & { id: string; updated_at: string }
+type Row = Record<string, unknown> & { id: string; updated_at: string; field_times?: Record<string, string> | null }
 
 export type PullResponse = {
   plans: Row[]
@@ -91,7 +93,7 @@ function applySynced(tx: AppDb, name: keyof typeof SYNC_TABLES, rows: Row[], fie
   let lost = 0
   for (const remote of rows) {
     const values = pick(remote, ['id', 'created_at', 'updated_at', 'deleted_at', ...fields])
-    const local = tx.select().from(table).where(eq(table.id, remote.id)).get() as (Row & { dirty: boolean }) | undefined
+    const local = tx.select().from(table).where(eq(table.id, remote.id)).get() as (Row & { dirty: boolean; dirty_fields: string[] | null }) | undefined
     if (!local) {
       tx.insert(table)
         .values({ ...values, dirty: false } as never)
@@ -99,12 +101,28 @@ function applySynced(tx: AppDb, name: keyof typeof SYNC_TABLES, rows: Row[], fie
       continue
     }
     if (local.dirty) {
-      if (!isNewer(remote.updated_at, local.updated_at)) continue // la locale è più recente: resta e verrà pushata
-      // la remota vince: la modifica locale è persa, ma tracciata
-      tx.insert(schema.syncLog)
-        .values({ entity: name, entity_id: remote.id, kind: 'conflict_lost', reason: 'remote newer', payload: stripLocal(local), created_at: nowIso() })
-        .run()
-      lost++
+      const touched = local.dirty_fields ?? [...fields.filter((f) => f !== 'created_by'), 'deleted_at']
+      const remoteTime = (f: string) => remote.field_times?.[f] ?? remote.updated_at
+      // campo per campo: la modifica locale resta se è successiva all'ultima remota dello stesso campo
+      const keep = touched.filter((f) => !isNewer(remoteTime(f), local.updated_at))
+      const lostFields = touched.filter((f) => !keep.includes(f))
+      if (lostFields.length) {
+        tx.insert(schema.syncLog)
+          .values({ entity: name, entity_id: remote.id, kind: 'conflict_lost', reason: `remote newer: ${lostFields.join(', ')}`, payload: stripLocal(local), created_at: nowIso() })
+          .run()
+        lost++
+      }
+      if (keep.length) {
+        // resta dirty con i soli campi locali vincenti; gli altri prendono il valore remoto
+        const { id, updated_at, ...set } = values
+        void updated_at // resta quello locale: è l'istante delle modifiche ancora da pushare
+        for (const f of keep) delete set[f]
+        tx.update(table)
+          .set({ ...set, dirty_fields: keep } as never)
+          .where(eq(table.id, id as string))
+          .run()
+        continue
+      }
     } else if (isNewer(local.updated_at, remote.updated_at)) {
       continue // riga già oltre (non dovrebbe succedere senza dirty): non si torna indietro
     }
@@ -112,7 +130,7 @@ function applySynced(tx: AppDb, name: keyof typeof SYNC_TABLES, rows: Row[], fie
     // (es. created_by) all'insert senza cambiare updated_at
     const { id, ...set } = values
     tx.update(table)
-      .set({ ...set, dirty: false } as never)
+      .set({ ...set, dirty: false, dirty_fields: null } as never)
       .where(eq(table.id, id as string))
       .run()
   }
@@ -127,8 +145,9 @@ function pick(row: Row, keys: string[]): Row {
 
 /** Copia della riga senza le colonne solo locali (per il log). */
 export function stripLocal(row: Record<string, unknown>): Record<string, unknown> {
-  const { dirty, local_file_path, upload_attempts, ...rest } = row
+  const { dirty, dirty_fields, local_file_path, upload_attempts, ...rest } = row
   void dirty
+  void dirty_fields
   void local_file_path
   void upload_attempts
   return rest

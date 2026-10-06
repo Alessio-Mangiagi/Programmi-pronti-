@@ -601,6 +601,9 @@ class SyncBase(BaseModel):
     id: str
     updated_at: datetime
     deleted_at: Optional[datetime] = None
+    # Campi modificati offline dall'ultimo push riuscito: il server confronta solo
+    # questi (LWW per campo). Assente/null = tutti (insert, client vecchi).
+    changed_fields: Optional[list[str]] = None
 
     @field_validator("updated_at", "deleted_at", mode="after")
     @classmethod
@@ -662,6 +665,8 @@ class SyncPushResult(BaseModel):
     updated: int = 0
     skipped: int = 0   # push più vecchio di quanto già sul server (last write wins)
     skipped_ids: list[str] = []  # quali: il device può segnalare all'utente la modifica persa
+    # righe aggiornate solo in parte: {id: [campi]} in cui il server aveva una modifica più recente
+    lost_fields: dict[str, list[str]] = {}
     rejected: list[RejectedItem] = []  # righe rifiutate singolarmente, con motivo
 
 

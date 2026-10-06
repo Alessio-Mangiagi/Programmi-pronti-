@@ -223,8 +223,8 @@ describe('conflitti e cancellazioni', () => {
   })
 })
 
-describe('giorno 18: stesso task modificato su web e app offline', () => {
-  it('termina senza duplicati né crash, con LWW e traccia del perdente', async () => {
+describe('giorno 18: stesso task modificato su web e app offline (merge per campo)', () => {
+  it('campi diversi convivono, stesso campo LWW con traccia del perdente, nessun duplicato', async () => {
     const db = device()
     await pullProject(db, api, projectId)
     const task = db.select().from(schema.tasks).where(and(isNull(schema.tasks.deleted_at), eq(schema.tasks.status, 'open'))).get()!
@@ -232,6 +232,7 @@ describe('giorno 18: stesso task modificato su web e app offline', () => {
 
     // app offline: cambia il titolo; poi il web (più tardi) lo assegna
     updateTask(db, task.id, { title: 'Titolo dal telefono' })
+    expect(db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id)).get()!.dirty_fields).toEqual(['title'])
     await new Promise((r) => setTimeout(r, 20))
     const members = await api.get<{ id: string; email: string }[]>(`/projects/${projectId}/members`)
     const franco = members.find((m) => m.email === 'field@fieldview.local')!
@@ -239,32 +240,73 @@ describe('giorno 18: stesso task modificato su web e app offline', () => {
 
     const res = await syncAll(db, api, [projectId])
     expect(res.errors).toEqual([])
-    // il push locale è più vecchio: il server lo salta (skipped), il pull porta la versione web
-    expect(res.push.groups?.tasks.skipped).toBe(1)
+    // campi diversi: passa il titolo dell'app E resta l'assegnazione del web
+    expect(res.push.groups?.tasks.updated).toBe(1)
     const local = db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id)).get()!
-    expect(local.status).toBe('assigned')
-    expect(local.assigned_to).toBe(franco.id)
-    expect(local.title).toBe(task.title) // la modifica locale è persa...
-    expect(local.dirty).toBe(false)
-    const lost = db.select().from(schema.syncLog).where(eq(schema.syncLog.kind, 'conflict_lost')).all()
-    expect(lost.map((l) => l.entity_id)).toContain(task.id) // ...ma tracciata
-    expect((lost.find((l) => l.entity_id === task.id)!.payload as { title: string }).title).toBe('Titolo dal telefono')
+    expect(local).toMatchObject({ title: 'Titolo dal telefono', status: 'assigned', assigned_to: franco.id, dirty: false, dirty_fields: null })
+    expect(db.select().from(schema.syncLog).all()).toHaveLength(0)
+    const remote1 = await api.get<{ title: string; assigned_to: string }>(`/tasks/${task.id}`)
+    expect(remote1).toMatchObject({ title: 'Titolo dal telefono', assigned_to: franco.id })
 
     // nessun duplicato, né in locale né sul server
     expect(db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id)).all()).toHaveLength(1)
     expect((await api.get<unknown[]>(`/projects/${projectId}/tasks`)).length).toBe(countBefore)
 
-    // caso opposto: l'app modifica DOPO il web -> al sync vince l'app
+    // l'app modifica DOPO il web un altro campo: la descrizione del web non si perde
     await api.patch(`/tasks/${task.id}`, { description: 'dal web' })
     await new Promise((r) => setTimeout(r, 20))
     updateTask(db, task.id, { title: 'Titolo dal telefono 2' })
     const res2 = await syncAll(db, api, [projectId])
     expect(res2.push.groups?.tasks.updated).toBe(1)
-    const remote = await api.get<{ title: string; description: string | null }>(`/tasks/${task.id}`)
-    expect(remote.title).toBe('Titolo dal telefono 2')
-    // LWW è a livello di riga: la riga dell'app (più recente) non conosceva la
-    // descrizione messa dal web e la sovrascrive. Merge per campo = backlog.
-    expect(remote.description).toBeNull()
+    const remote2 = await api.get<{ title: string; description: string | null }>(`/tasks/${task.id}`)
+    expect(remote2).toMatchObject({ title: 'Titolo dal telefono 2', description: 'dal web' })
+
+    // stesso campo: app prima, web dopo -> vince il web, la versione dell'app è tracciata
+    updateTask(db, task.id, { title: 'Titolo perso' })
+    await new Promise((r) => setTimeout(r, 20))
+    await api.patch(`/tasks/${task.id}`, { title: 'Titolo dal web' })
+    const res3 = await syncAll(db, api, [projectId])
+    expect(res3.errors).toEqual([])
+    const local3 = db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id)).get()!
+    expect(local3).toMatchObject({ title: 'Titolo dal web', description: 'dal web', dirty: false })
+    const lost = db.select().from(schema.syncLog).where(eq(schema.syncLog.kind, 'conflict_lost')).all()
+    expect(lost.map((l) => l.entity_id)).toContain(task.id)
+    const entry = lost.find((l) => l.entity_id === task.id)!
+    expect((entry.payload as { title: string }).title).toBe('Titolo perso')
+    expect(entry.reason).toContain('title')
+  })
+
+  it('pull con riga dirty: i campi non toccati in locale prendono il remoto, quelli toccati restano', async () => {
+    const db = device()
+    await pullProject(db, api, projectId)
+    const pin = alivePins(db)[2]
+    updatePin(db, pin.id, { label: 'Solo etichetta in app' })
+    await new Promise((r) => setTimeout(r, 20))
+    await api.patch(`/pins/${pin.id}`, { x: 0.33 })
+    const pull = await pullProject(db, api, projectId)
+    expect(pull.conflicts).toBe(0)
+    const local = db.select().from(schema.pins).where(eq(schema.pins.id, pin.id)).get()!
+    expect(local).toMatchObject({ label: 'Solo etichetta in app', dirty: true, dirty_fields: ['label'] })
+    expect(local.x).toBeCloseTo(0.33)
+    await pushDirty(db, api)
+    const remote = (await serverPins()).find((p) => p.id === pin.id)!
+    expect(remote.label).toBe('Solo etichetta in app')
+    expect(remote.x).toBeCloseTo(0.33)
+  })
+
+  it('push di un device rimasto offline a lungo arriva agli altri device già sincronizzati dopo', async () => {
+    const a = device()
+    const b = device()
+    await pullProject(a, api, projectId)
+    await pullProject(b, api, projectId)
+    // pin creato offline "ieri" (orologio del device), pushato solo dopo l'ultimo pull di b
+    const pin = createPin(a, planId, 0.61, 0.61, 'Offline da ieri', null)
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().replace('Z', '')
+    a.update(schema.pins).set({ created_at: yesterday, updated_at: yesterday }).where(eq(schema.pins.id, pin.id)).run()
+    await pushDirty(a, api)
+    const res = await pullProject(b, api, projectId)
+    expect(res.received.pins).toBeGreaterThanOrEqual(1)
+    expect(alivePins(b).some((p) => p.id === pin.id)).toBe(true)
   })
 })
 

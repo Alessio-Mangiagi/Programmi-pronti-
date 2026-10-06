@@ -59,6 +59,8 @@ export const MIGRATIONS: string[][] = [
       data_json TEXT NOT NULL, attachments_json TEXT NOT NULL, updated_at TEXT NOT NULL)`],
   // 4: coda upload: quando riprovare (backoff esponenziale) senza toccare updated_at (che è del sync)
   [`ALTER TABLE attachments ADD COLUMN upload_next_at TEXT`],
+  // 5: campi toccati in locale, per il merge per campo (LWW di campo, non di riga)
+  ['pins', 'form_submissions', 'tasks', 'attachments'].map((t) => `ALTER TABLE ${t} ADD COLUMN dirty_fields TEXT`),
 ]
 
 /** Driver minimo che sia expo-sqlite sia better-sqlite3 sanno offrire. */

@@ -53,7 +53,7 @@ def test_push_is_idempotent(client, project):
     assert client.post("/sync/push", json=payload).json()["pins"]["inserted"] == 1
     # retry di rete: stesso pacchetto due volte
     second = client.post("/sync/push", json=payload).json()["pins"]
-    assert second == {"inserted": 0, "updated": 0, "skipped": 1, "skipped_ids": [pin_id], "rejected": []}
+    assert second == {"inserted": 0, "updated": 0, "skipped": 1, "skipped_ids": [pin_id], "lost_fields": {}, "rejected": []}
     pull = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()
     assert len(pull["pins"]) == 1
 
@@ -138,3 +138,61 @@ def test_pin_coords_validated(client, project):
         "id": str(uuid.uuid4()), "plan_id": project["plan"]["id"],
         "x": 1.5, "y": 0.1, "updated_at": iso(datetime.now(timezone.utc))}]})
     assert r.status_code == 422
+
+
+def test_field_level_merge_web_and_offline_device(client, project, pin):
+    """Web assegna il task, il device (offline, prima) cambia il titolo: restano entrambi."""
+    users = client.get(f"/projects/{project['project']['id']}/members").json()
+    task = client.post("/tasks", json={"pin_id": pin, "title": "Originale"}).json()
+    offline_edit = datetime.now(timezone.utc)
+    client.patch(f"/tasks/{task['id']}", json={"assigned_to": users[0]["id"], "description": "dal web"})
+
+    base = {"id": task["id"], "pin_id": pin, "status": "open", "assigned_to": None, "description": None}
+    r = client.post("/sync/push", json={"tasks": [{
+        **base, "title": "Dal telefono", "updated_at": iso(offline_edit), "changed_fields": ["title"]}]}).json()
+    assert r["tasks"]["updated"] == 1 and r["tasks"]["lost_fields"] == {}
+    t = client.get(f"/tasks/{task['id']}").json()
+    assert (t["title"], t["status"], t["assigned_to"], t["description"]) == ("Dal telefono", "assigned", users[0]["id"], "dal web")
+
+    # stesso campo toccato prima dal device e poi dal web: vince il web, il device lo sa
+    r = client.post("/sync/push", json={"tasks": [{
+        **base, "title": "x", "description": "vecchia", "updated_at": iso(offline_edit + timedelta(milliseconds=1)),
+        "changed_fields": ["title", "description"]}]}).json()
+    assert r["tasks"]["updated"] == 1 and r["tasks"]["lost_fields"] == {task["id"]: ["description"]}
+    t = client.get(f"/tasks/{task['id']}").json()
+    assert (t["title"], t["description"]) == ("x", "dal web")
+
+    # tutti i campi persi → skipped come prima
+    r = client.post("/sync/push", json={"tasks": [{
+        **base, "title": "y", "description": "z", "updated_at": iso(offline_edit), "changed_fields": ["description"]}]}).json()
+    assert r["tasks"]["skipped_ids"] == [task["id"]]
+
+
+def test_changed_fields_ignores_unknown_and_server_only_fields(client, project, pin):
+    att_id = str(uuid.uuid4())
+    sub_id = str(uuid.uuid4())
+    t0 = datetime.now(timezone.utc)
+    client.post("/sync/push", json={"submissions": [{
+        "id": sub_id, "template_id": project["template"]["id"], "pin_id": pin,
+        "data_json": {"esito": "Conforme"}, "updated_at": iso(t0)}],
+        "attachments": [{"id": att_id, "submission_id": sub_id, "file_type": "photo", "updated_at": iso(t0)}]})
+    # file_url lo scrive solo l'upload: un push non lo tocca nemmeno se dichiarato
+    r = client.post("/sync/push", json={"attachments": [{
+        "id": att_id, "submission_id": sub_id, "file_url": "/files/evil", "file_type": "doc",
+        "updated_at": iso(t0 + timedelta(seconds=1)), "changed_fields": ["file_url", "file_type", "id"]}]}).json()
+    assert r["attachments"]["updated"] == 1
+    pulled = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()["attachments"][0]
+    assert pulled["file_url"] is None and pulled["file_type"] == "doc"
+
+
+def test_pull_cursor_is_server_time_not_device_time(client, project):
+    """Push di un device rimasto offline a lungo (updated_at vecchio) arriva a chi ha già fatto pull dopo."""
+    pid = project["project"]["id"]
+    since = client.get("/sync/pull", params={"project_id": pid}).json()["server_time"]
+    long_ago = datetime.now(timezone.utc) - timedelta(days=2)
+    pin_id = str(uuid.uuid4())
+    client.post("/sync/push", json={"pins": [{
+        "id": pin_id, "plan_id": project["plan"]["id"], "x": 0.2, "y": 0.2, "updated_at": iso(long_ago)}]})
+    pull = client.get("/sync/pull", params={"project_id": pid, "since": since}).json()
+    assert [p["id"] for p in pull["pins"]] == [pin_id]
+    assert set(pull["pins"][0]["field_times"]) == {"x", "y", "label", "deleted_at"}

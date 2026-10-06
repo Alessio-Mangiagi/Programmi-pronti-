@@ -4,8 +4,10 @@
  * dirty azzerato E riga in sync_log (kind = rejected) con il motivo, così la
  * schermata "Elementi non sincronizzati" può far scegliere: elimina o riprova.
  *
- * skipped (il server aveva già una versione più recente) -> dirty azzerato e
- * sync_log (kind = conflict_lost): la versione vincente arriva col pull.
+ * Ogni riga porta `changed_fields` (= dirty_fields): il server fa LWW per campo.
+ * skipped (il server aveva una versione più recente di TUTTI i campi mandati) ->
+ * dirty azzerato e sync_log (kind = conflict_lost): la versione vincente arriva
+ * col pull. lost_fields (persi solo alcuni campi) -> stesso log, con i campi.
  *
  * `dirty` viene azzerato solo se `updated_at` è ancora quello pushato: se
  * l'utente ha modificato la riga durante la chiamata, resta dirty e riparte
@@ -18,7 +20,7 @@ import { stripLocal } from './pull'
 import { nowIso } from './time'
 
 type Rejected = { id: string; reason: string }
-type GroupResult = { inserted: number; updated: number; skipped: number; skipped_ids: string[]; rejected: Rejected[] }
+type GroupResult = { inserted: number; updated: number; skipped: number; skipped_ids: string[]; lost_fields?: Record<string, string[]>; rejected: Rejected[] }
 export type PushResponse = { status: string; pins: GroupResult; submissions: GroupResult; tasks: GroupResult; attachments: GroupResult; server_time: string }
 export type PushSummary = { sent: number; rejected: number; conflicts: number; groups: Omit<PushResponse, 'status' | 'server_time'> | null }
 
@@ -31,12 +33,12 @@ const GROUPS = [
 
 export async function pushDirty(db: AppDb, api: Api): Promise<PushSummary> {
   const payload: Record<string, Record<string, unknown>[]> = {}
-  const sentRows: Record<string, { id: string; updated_at: string }[]> = {}
+  const sentRows: Record<string, { id: string; updated_at: string; fields: string[] | null }[]> = {}
   let sent = 0
   for (const g of GROUPS) {
     const rows = db.select().from(g.table).where(eq(g.table.dirty, true)).all() as Record<string, unknown>[]
-    payload[g.name] = rows.map(stripLocal)
-    sentRows[g.name] = rows.map((r) => ({ id: r.id as string, updated_at: r.updated_at as string }))
+    payload[g.name] = rows.map((r) => ({ ...stripLocal(r), changed_fields: r.dirty_fields ?? undefined }))
+    sentRows[g.name] = rows.map((r) => ({ id: r.id as string, updated_at: r.updated_at as string, fields: (r.dirty_fields as string[] | null) ?? null }))
     sent += rows.length
   }
   if (sent === 0) return { sent: 0, rejected: 0, conflicts: 0, groups: null }
@@ -50,19 +52,22 @@ export async function pushDirty(db: AppDb, api: Api): Promise<PushSummary> {
       const result = res[g.name]
       const rejectedById = new Map(result.rejected.map((r) => [r.id, r.reason]))
       const skipped = new Set(result.skipped_ids ?? [])
-      for (const { id, updated_at } of sentRows[g.name]) {
+      const lostFields = result.lost_fields ?? {}
+      for (const { id, updated_at, fields } of sentRows[g.name]) {
         const reason = rejectedById.get(id)
-        const kind = reason !== undefined ? 'rejected' : skipped.has(id) ? 'conflict_lost' : null
+        const kind = reason !== undefined ? 'rejected' : skipped.has(id) || lostFields[id] ? 'conflict_lost' : null
         if (kind) {
           const row = tx.select().from(g.table).where(eq(g.table.id, id)).get() as Record<string, unknown> | undefined
+          const lostList = lostFields[id] ?? fields
+          const why = reason ?? (lostList ? `server newer: ${lostList.join(', ')}` : 'server newer')
           tx.insert(schema.syncLog)
-            .values({ entity: g.name, entity_id: id, kind, reason: reason ?? 'server newer', payload: row ? stripLocal(row) : null, created_at: nowIso() })
+            .values({ entity: g.name, entity_id: id, kind, reason: why, payload: row ? stripLocal(row) : null, created_at: nowIso() })
             .run()
           if (kind === 'rejected') rejected++
           else conflicts++
         }
         tx.update(g.table)
-          .set({ dirty: false } as never)
+          .set({ dirty: false, dirty_fields: null } as never)
           .where(and(eq(g.table.id, id), eq(g.table.updated_at, updated_at)))
           .run()
       }

@@ -2,6 +2,7 @@
  * Tabelle locali (drizzle + SQLite). Stesse entità del backend (app/models.py)
  * con le colonne extra che servono all'offline-first:
  * - `dirty`: la riga ha modifiche locali non ancora pushate;
+ * - `dirty_fields`: quali campi (merge per campo sul server); null = tutti (riga nuova);
  * - `local_file_path` (attachments): file scattato sul device, in coda di upload;
  * - `sync_state`: ultimo `server_time` ricevuto per progetto (prossimo `since`);
  * - `sync_log`: righe rifiutate dal server o perse nel conflitto LWW.
@@ -15,6 +16,8 @@ const syncCols = {
   updated_at: text('updated_at').notNull(),
   deleted_at: text('deleted_at'),
   dirty: integer('dirty', { mode: 'boolean' }).notNull().default(false),
+  /** campi toccati in locale dall'ultimo push riuscito (il server fa LWW per campo); null = tutta la riga */
+  dirty_fields: text('dirty_fields', { mode: 'json' }).$type<string[]>(),
 }
 
 export const projects = sqliteTable('projects', {

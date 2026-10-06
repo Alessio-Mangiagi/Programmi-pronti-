@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from .. import models, schemas, auth, events, audit, stats as st_stats
 from ..auth import current_user
@@ -17,16 +18,23 @@ router = APIRouter()
 
 # ---------- Sync offline-first (uso da app nativa) ----------
 
-def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
+def _upsert(db: Session, model, items, fk_checks: dict,
             validate=None, defaults: Optional[dict] = None) -> schemas.SyncPushResult:
     """
-    Upsert idempotente per id con "last write wins".
+    Upsert idempotente per id con "last write wins" PER CAMPO.
 
     fk_checks: {campo_fk: Model} — ogni FK viene verificata contro il DB
                (comprese le righe appena flushate nello stesso batch).
-    updatable: campi che un push più recente può sovrascrivere.
     validate:  fn(item) -> motivo di rifiuto (str) o None, eseguita dopo le FK.
     defaults:  valori applicati all'insert quando il campo è nullo (es. created_by).
+
+    Campi aggiornabili = `model.SYNC_FIELDS`. Se il device manda `changed_fields`
+    (i campi toccati offline) si confrontano solo quelli, ciascuno con l'ultima
+    modifica nota sul server (`field_times`): un campo vince se il device l'ha
+    cambiato dopo. Così web che assegna un task e app che ne cambia il titolo
+    convivono. Senza `changed_fields` (client vecchi) valgono tutti i SYNC_FIELDS.
+    Esito per riga: updated se almeno un campo passa (quelli persi in `lost_fields`),
+    skipped se nessuno.
     """
     res = schemas.SyncPushResult()
     for item in items:
@@ -45,19 +53,28 @@ def _upsert(db: Session, model, items, fk_checks: dict, updatable: list[str],
 
         existing = db.get(model, item.id)
         if existing is None:
-            values = item.model_dump()
+            values = item.model_dump(exclude={"changed_fields"})
             for k, v in (defaults or {}).items():
                 values[k] = values.get(k) or v
             db.add(model(**values))
             res.inserted += 1
-        elif item.updated_at > existing.updated_at:
-            for f in updatable:
-                setattr(existing, f, getattr(item, f))
-            existing.updated_at = item.updated_at
-            res.updated += 1
-        else:
+            continue
+
+        fields = [f for f in (item.changed_fields or model.SYNC_FIELDS) if f in model.SYNC_FIELDS]
+        won = [f for f in fields if item.updated_at > existing.field_time(f)]
+        lost = [f for f in fields if f not in won]
+        if not won:
             res.skipped += 1
             res.skipped_ids.append(item.id)
+            continue
+        existing._sync_ts = item.updated_at  # field_times dei campi vinti = istante del device
+        for f in won:
+            setattr(existing, f, getattr(item, f))
+        existing.updated_at = max(existing.updated_at, item.updated_at)
+        flag_modified(existing, "updated_at")  # anche se invariato: niente onupdate=utcnow
+        res.updated += 1
+        if lost:
+            res.lost_fields[item.id] = lost
     db.flush()  # rende visibili gli insert alle fk_checks del gruppo successivo
     return res
 
@@ -114,25 +131,21 @@ def sync_push(payload: schemas.SyncPushRequest, request: Request, db: Session = 
     pins = _upsert(
         db, models.Pin, payload.pins,
         fk_checks={"plan_id": models.Plan},
-        updatable=["x", "y", "label", "deleted_at"],
         validate=check_pin, defaults={"created_by": user.id},
     )
     submissions = _upsert(
         db, models.FormSubmission, payload.submissions,
         fk_checks={"template_id": models.FormTemplate, "pin_id": models.Pin},
-        updatable=["data_json", "submitted_by", "deleted_at"],
         validate=check_submission, defaults={"submitted_by": user.id},
     )
     tasks = _upsert(
         db, models.Task, payload.tasks,
         fk_checks={"pin_id": models.Pin, "assigned_to": models.User, "created_by": models.User},
-        updatable=["title", "description", "status", "assigned_to", "due_date", "deleted_at"],
         validate=check_task, defaults={"created_by": user.id},
     )
     attachments = _upsert(
         db, models.Attachment, payload.attachments,
         fk_checks={"submission_id": models.FormSubmission, "task_id": models.Task},
-        updatable=["file_url", "file_type", "deleted_at"],
         validate=check_attachment,
     )
     # Eventi nella stessa transazione del push (solo righe accettate)
@@ -187,7 +200,9 @@ def sync_pull(
     since = to_naive_utc(since)
 
     def changed(query, model):
-        return query.filter(model.updated_at > since) if since else query
+        # Entità del sync: cursore lato server (synced_at), non l'updated_at del device.
+        col = model.synced_at if issubclass(model, models.SyncMixin) else model.updated_at
+        return query.filter(col > since) if since else query
 
     plans_q = db.query(models.Plan).filter(models.Plan.project_id == project_id)
     plan_ids = [p.id for p in plans_q.all()]
