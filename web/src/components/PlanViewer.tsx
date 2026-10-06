@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent, type Pointer
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchContentRef } from 'react-zoom-pan-pinch'
 import type { PinSummary, Plan } from '../api/types'
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl'
-import PinMarker, { relativePoint } from './PinMarker'
+import PinMarker from './PinMarker'
+import { relativePoint } from './pinLevel'
 
 type Props = {
   plan: Plan

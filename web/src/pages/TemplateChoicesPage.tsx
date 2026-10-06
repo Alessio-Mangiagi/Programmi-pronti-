@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { validateSchema, type Field, type FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
-import { useToast } from '../components/Toast'
-import { CATEGORY_LABEL } from './TemplatesPage'
+import { useToast } from '../components/useToast'
+import { CATEGORY_LABEL } from '../labels'
+import { useLoad } from '../hooks/useLoad'
 
 type ChoiceField = Extract<Field, { type: 'select' | 'multiselect' }>
 const isChoice = (f: Field): f is ChoiceField => f.type === 'select' || f.type === 'multiselect'
@@ -39,9 +40,7 @@ export default function TemplateChoicesPage() {
     setDrafts({})
   }, [toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   if (!isManager(user)) return <Navigate to="/projects" replace />
 

@@ -2,12 +2,13 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { Project } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import CommessaForm from '../commesse/CommessaForm'
-import { NO_COMMESSA, useCommesse, type Commessa } from '../commesse/CommesseContext'
+import { NO_COMMESSA, type Commessa } from '../commesse/CommesseContext'
+import { useCommesse } from '../commesse/useCommesse'
 import Loading from '../components/Loading'
 import Modal from '../components/Modal'
-import { useToast } from '../components/Toast'
+import { useToast } from '../components/useToast'
 
 /**
  * Progetti = cantieri raggruppati per commessa. Filtro per commessa (dalla barra

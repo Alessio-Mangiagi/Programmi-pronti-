@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import Icon from './Icon'
 import Modal from './Modal'
-import { useToast } from './Toast'
+import { useToast } from './useToast'
 
 const MAX_LEN = 4000
 

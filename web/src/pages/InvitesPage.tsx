@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { Invite, InviteLabel } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import Modal from '../components/Modal'
-import { useToast } from '../components/Toast'
-import { ROLE_LABEL } from './admin/UsersPage'
+import { useToast } from '../components/useToast'
+import { ROLE_LABEL } from '../labels'
+import { useLoad } from '../hooks/useLoad'
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'In attesa',
@@ -43,9 +44,7 @@ export default function InvitesPage() {
     setLabels(l.data ?? [])
   }, [toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   if (!isManager(me)) return <Navigate to="/projects" replace />
 

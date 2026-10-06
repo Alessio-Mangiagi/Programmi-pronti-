@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import type { FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
-import { useToast } from '../components/Toast'
-
-export const CATEGORY_LABEL: Record<string, string> = { safety: 'Sicurezza', quality: 'Qualità', diary: 'Diario', other: 'Altro' }
+import { useToast } from '../components/useToast'
+import { CATEGORY_LABEL } from '../labels'
+import { useLoad } from '../hooks/useLoad'
 
 /** Lista dei template (solo manager/admin): modifica, duplica, archivia/ripristina. */
 export default function TemplatesPage() {
@@ -25,9 +25,7 @@ export default function TemplatesPage() {
     setTemplates(data ?? [])
   }, [toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   if (!isManager(user)) return <Navigate to="/projects" replace />
 

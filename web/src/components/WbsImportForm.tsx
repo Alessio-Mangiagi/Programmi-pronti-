@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { WbsImportResult } from '../api/types'
 import { importWbsFile, WBS_FILE_ACCEPT } from '../api/upload'
-import { useToast } from './Toast'
+import { useToast } from './useToast'
 
 type Props = {
   projectId: string

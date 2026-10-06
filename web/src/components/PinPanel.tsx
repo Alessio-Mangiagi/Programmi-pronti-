@@ -1,26 +1,20 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
+import { useLoad } from '../hooks/useLoad'
 import type { Attachment, PinDetail, Submission, TaskStatus, User } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import type { Lookups } from '../hooks/useLookups'
 import AuthImage from './AuthImage'
 import Loading from './Loading'
 import Modal from './Modal'
-import { useToast } from './Toast'
+import { useToast } from './useToast'
 import SubmissionForm from '../forms/SubmissionForm'
 import SubmissionDetail from '../forms/SubmissionDetail'
 import TaskForm from '../forms/TaskForm'
 import { findNonConformity, taskDraftFromSubmission } from '../forms/nonConformity'
 import type { FormData, FormSchema } from '@fieldview/form-core'
 import Icon from './Icon'
-
-export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  open: 'Aperto',
-  assigned: 'Assegnato',
-  resolved: 'Risolto',
-  verified: 'Verificato',
-}
-
+import { TASK_STATUS_LABEL } from '../labels'
 type Props = {
   pinId: string
   lookups: Lookups
@@ -56,11 +50,8 @@ export default function PinPanel({ pinId, lookups, members, onClose, onChanged }
     setLabel(data?.label ?? '')
   }, [pinId])
 
-  useEffect(() => {
-    setPin(null)
-    setEditingLabel(false)
-    load()
-  }, [load])
+  // pin diverso = PinPanel rimontato (key nel genitore): niente stato da azzerare qui
+  useLoad(load)
 
   async function saveLabel(e: FormEvent) {
     e.preventDefault()

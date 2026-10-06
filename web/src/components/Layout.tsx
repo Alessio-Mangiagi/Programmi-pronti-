@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import { useProject } from '../hooks/useProject'
 import CommessaBar from '../commesse/CommessaBar'
 import ContactAdmin from './ContactAdmin'

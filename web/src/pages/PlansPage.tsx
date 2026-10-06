@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { Plan } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import AuthImage from '../components/AuthImage'
 import Loading from '../components/Loading'
 import PlanUploadForm from '../components/PlanUploadForm'
-import { useToast } from '../components/Toast'
+import { useToast } from '../components/useToast'
 import { useProject } from '../hooks/useProject'
 
 export default function PlansPage() {

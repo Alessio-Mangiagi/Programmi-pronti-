@@ -1,16 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import Icon from './Icon'
+import { type ToastApi, ToastContext } from './useToast'
 
 type Kind = 'error' | 'success' | 'info'
 type Toast = { id: number; kind: Kind; text: string }
 
-export type ToastApi = {
-  error: (text: string) => void
-  success: (text: string) => void
-  info: (text: string) => void
-}
-
-const ToastContext = createContext<ToastApi | null>(null)
 const TTL_MS: Record<Kind, number> = { error: 7000, success: 3500, info: 4500 }
 
 /** Notifiche non bloccanti in basso al centro; gli errori restano più a lungo. */
@@ -47,10 +41,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   )
-}
-
-export function useToast(): ToastApi {
-  const ctx = useContext(ToastContext)
-  if (!ctx) throw new Error('useToast fuori da ToastProvider')
-  return ctx
 }

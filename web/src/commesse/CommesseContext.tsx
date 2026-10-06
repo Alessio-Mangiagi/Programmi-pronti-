@@ -1,7 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../api/client'
 import type { components } from '../api/schema'
 import type { Project } from '../api/types'
+import { type State, Ctx } from './useCommesse'
+import { useLoad } from '../hooks/useLoad'
 
 export type Commessa = components['schemas']['CommessaOut']
 export type CommessaParam = components['schemas']['CommessaParamOut']
@@ -9,20 +11,6 @@ export type CommessaParam = components['schemas']['CommessaParamOut']
 /** Chiave della voce fittizia "Senza commessa" (cantieri non ancora associati). */
 export const NO_COMMESSA = '__none__'
 
-type State = {
-  commesse: Commessa[]
-  params: CommessaParam[]
-  /** Cantieri senza commessa (visibili all'utente). */
-  orphans: Project[]
-  loading: boolean
-  /** Commessa selezionata nella barra in alto (id, NO_COMMESSA o null = tutte). */
-  selectedId: string | null
-  select: (id: string | null) => void
-  reload: () => Promise<void>
-  paramName: (id: string) => string
-}
-
-const Ctx = createContext<State | null>(null)
 const LS_KEY = 'fv.commessa'
 
 /**
@@ -55,9 +43,7 @@ export function CommesseProvider({ children }: { children: ReactNode }) {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  useLoad(reload)
 
   const select = useCallback((id: string | null) => {
     setSelectedId(id)
@@ -83,10 +69,4 @@ export function CommesseProvider({ children }: { children: ReactNode }) {
     [commesse, params, orphans, loading, selectedId, select, reload],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-}
-
-export function useCommesse(): State {
-  const v = useContext(Ctx)
-  if (!v) throw new Error('useCommesse fuori da CommesseProvider')
-  return v
 }

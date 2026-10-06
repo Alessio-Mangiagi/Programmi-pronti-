@@ -5,9 +5,10 @@ import { api, errorMessage } from '../api/client'
 import type { components } from '../api/schema'
 import type { Plan, User } from '../api/types'
 import Loading from '../components/Loading'
-import { TASK_STATUS_LABEL } from '../components/PinPanel'
-import { useToast } from '../components/Toast'
+import { TASK_STATUS_LABEL } from '../labels'
+import { useToast } from '../components/useToast'
 import { useProject } from '../hooks/useProject'
+import { useLoad } from '../hooks/useLoad'
 
 type Stats = components['schemas']['StatsOut']
 
@@ -62,9 +63,7 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, sp, toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
   useEffect(() => {
     api.GET('/projects/{project_id}/plans', { params: { path: { project_id: projectId } } }).then(({ data }) => data && setPlans(data))
     api.GET('/projects/{project_id}/members', { params: { path: { project_id: projectId } } }).then(({ data }) => data && setMembers(data))

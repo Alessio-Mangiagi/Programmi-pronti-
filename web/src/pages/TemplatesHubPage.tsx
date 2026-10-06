@@ -3,10 +3,10 @@ import { Link, Navigate } from 'react-router-dom'
 import type { FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import Icon from '../components/Icon'
-import { useToast } from '../components/Toast'
-import { CATEGORY_LABEL } from './TemplatesPage'
+import { useToast } from '../components/useToast'
+import { CATEGORY_LABEL } from '../labels'
 
 /**
  * Ingresso della sezione Moduli: invece della lista, le scelte di lavoro

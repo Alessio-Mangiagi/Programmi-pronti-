@@ -1,12 +1,13 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
-import { useAuth } from '../../auth/AuthContext'
-import { useCommesse, type CommessaParam } from '../../commesse/CommesseContext'
+import { useAuth } from '../../auth/useAuth'
+import { type CommessaParam } from '../../commesse/CommesseContext'
+import { useCommesse } from '../../commesse/useCommesse'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import Modal from '../../components/Modal'
-import { useToast } from '../../components/Toast'
+import { useToast } from '../../components/useToast'
 
 /**
  * Spazio admin → Parametri commessa: campi a scelta multipla personalizzati

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
 import type { InviteLabel, Project } from '../../api/types'
-import { useAuth } from '../../auth/AuthContext'
-import { useCommesse } from '../../commesse/CommesseContext'
+import { useAuth } from '../../auth/useAuth'
+import { useCommesse } from '../../commesse/useCommesse'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
 import Modal from '../../components/Modal'
-import { useToast } from '../../components/Toast'
-import { ROLE_LABEL } from './UsersPage'
+import { useToast } from '../../components/useToast'
+import { ROLE_LABEL } from '../../labels'
+import { useLoad } from '../../hooks/useLoad'
 
 type Role = 'admin' | 'manager' | 'field'
 const ROLES: Role[] = ['field', 'manager', 'admin']
@@ -38,9 +39,7 @@ export default function InviteLabelsPage() {
     setLabels(data ?? [])
   }, [toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   if (me?.role !== 'admin') return <Navigate to="/projects" replace />
 

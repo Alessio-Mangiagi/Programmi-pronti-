@@ -2,26 +2,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { PinSummary, Plan, User } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import PlanViewer, { type PlanContextMenuInfo } from '../components/PlanViewer'
 import PinPanel from '../components/PinPanel'
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu'
 import Modal from '../components/Modal'
 import TaskForm, { type TaskTarget } from '../forms/TaskForm'
-import PinFilters, {
-  EMPTY_FILTERS,
-  filtersFromSearch,
-  filtersToQuery,
-  filtersToSearch,
-  isFiltering,
-  type PinFilterState,
-} from '../components/PinFilters'
+import PinFilters from '../components/PinFilters'
+import { EMPTY_FILTERS, filtersFromSearch, filtersToQuery, filtersToSearch, isFiltering, type PinFilterState } from '../components/pinFilterState'
 import PlanUploadForm from '../components/PlanUploadForm'
 import Loading from '../components/Loading'
-import { useToast } from '../components/Toast'
-import { PIN_LEVEL_LABEL, pinLevel, type PinLevel } from '../components/PinMarker'
+import { useToast } from '../components/useToast'
+import { PIN_LEVEL_LABEL, pinLevel, type PinLevel } from '../components/pinLevel'
 import { useLookups } from '../hooks/useLookups'
 import { useProject } from '../hooks/useProject'
+import { useLoad } from '../hooks/useLoad'
+import { useLatestRequest } from '../hooks/useLatestRequest'
 
 const LEGEND: PinLevel[] = ['open', 'assigned', 'resolved', 'verified', 'submission', 'empty']
 
@@ -70,18 +66,21 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
   }, [projectId])
 
   // Tutti i pin (totale e legenda) + i pin filtrati, se c'è un filtro attivo.
+  const begin = useLatestRequest()
   const loadPins = useCallback(async () => {
+    const isLatest = begin()
     const [all, filtered] = await Promise.all([
       api.GET('/plans/{plan_id}/pins', { params: { path: { plan_id: planId } } }),
       filtering
         ? api.GET('/plans/{plan_id}/pins', { params: { path: { plan_id: planId }, query: filtersToQuery(filters) } })
         : Promise.resolve(null),
     ])
+    if (!isLatest()) return // filtri cambiati nel frattempo
     if (all.error) return toast.error(errorMessage(all.error))
     setAllPins(all.data ?? [])
     if (filtered?.error) return toast.error(errorMessage(filtered.error))
     setFilteredPins(filtered ? (filtered.data ?? []) : null)
-  }, [planId, filters, filtering, toast])
+  }, [planId, filters, filtering, toast, begin])
 
   useEffect(() => {
     api.GET('/plans/{plan_id}', { params: { path: { plan_id: planId } } }).then(({ data, error }) => {
@@ -90,9 +89,7 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
     })
   }, [planId])
 
-  useEffect(() => {
-    loadPins()
-  }, [loadPins])
+  useLoad(loadPins)
 
   // Esc chiude la modalità aggiungi / il pannello
   useEffect(() => {

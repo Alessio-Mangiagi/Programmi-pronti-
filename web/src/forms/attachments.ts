@@ -1,3 +1,4 @@
+import type { Submission } from '../api/types'
 /**
  * Allegati di un modulo in compilazione. In data_json i campi photo/signature
  * contengono solo id (UUID generati qui); i byte restano in memoria come File
@@ -31,3 +32,13 @@ export function releaseAttachment(a: LocalAttachment | RemoteAttachment | undefi
 
 export const PHOTO_ACCEPT = 'image/png,image/jpeg,.png,.jpg,.jpeg'
 export const PHOTO_MAX_BYTES = 20 * 1024 * 1024
+
+/** Allegati già sul server, indicizzati per id (il tipo viene da file_type). */
+export function remoteAttachments(sub: Submission): AttachmentMap {
+  return Object.fromEntries(
+    sub.attachments.map((a): [string, RemoteAttachment] => [
+      a.id,
+      { id: a.id, kind: a.file_type === 'photo' || a.file_type === 'signature' ? (a.file_type as AttachmentKind) : null, fileUrl: a.file_url ?? null },
+    ]),
+  )
+}

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
 import type { SupportMessage } from '../../api/types'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../auth/useAuth'
 import Loading from '../../components/Loading'
-import { useToast } from '../../components/Toast'
+import { useToast } from '../../components/useToast'
+import { useLoad } from '../../hooks/useLoad'
+import { useLatestRequest } from '../../hooks/useLatestRequest'
 
 type Filter = 'open' | 'closed' | 'all'
 const FILTER_LABEL: Record<Filter, string> = { open: 'Da gestire', closed: 'Chiuse', all: 'Tutte' }
@@ -23,17 +25,18 @@ export default function SupportPage() {
   const [filter, setFilter] = useState<Filter>('open')
   const [messages, setMessages] = useState<SupportMessage[] | null>(null)
 
+  const begin = useLatestRequest()
   const load = useCallback(async () => {
+    const isLatest = begin()
     const { data, error } = await api.GET('/support/messages', {
       params: { query: filter === 'all' ? {} : { status: filter } },
     })
+    if (!isLatest()) return
     if (error) return toast.error(errorMessage(error))
     setMessages(data ?? [])
-  }, [filter, toast])
+  }, [filter, toast, begin])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   if (me?.role !== 'admin') return <Navigate to="/projects" replace />
 

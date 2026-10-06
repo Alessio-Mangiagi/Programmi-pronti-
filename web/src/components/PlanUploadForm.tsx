@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { Plan } from '../api/types'
 import { PLAN_FILE_ACCEPT, PLAN_FILE_MAX_BYTES, uploadPlanFile } from '../api/upload'
-
+import { formatBytes } from '../format'
 type Props = {
   projectId: string
   /** Se presente si carica solo il file su questa planimetria (niente campo nome). */
@@ -131,9 +131,4 @@ function extOf(name: string) {
   const i = name.lastIndexOf('.')
   return i >= 0 ? name.slice(i + 1).toUpperCase() : 'FILE'
 }
-
-export function formatBytes(n: number) {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
+

@@ -3,10 +3,9 @@ import { defaults, validateSubmission, type FieldError, type FormData, type Form
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate, Submission } from '../api/types'
 import { uploadAttachmentFile } from '../api/upload'
-import { useToast } from '../components/Toast'
-import { isLocal, releaseAttachment, type AttachmentKind, type AttachmentMap, type RemoteAttachment } from './attachments'
+import { useToast } from '../components/useToast'
+import { isLocal, releaseAttachment, remoteAttachments, type AttachmentMap } from './attachments'
 import DynamicForm, { type AttachmentChange } from './DynamicForm'
-
 /** Dove agganciare la compilazione: un pin della planimetria oppure una voce WBS del cantiere. */
 export type SubmissionTarget = { pinId: string } | { wbsNodeId: string }
 
@@ -19,16 +18,6 @@ type Props = {
   submission?: Submission
   onSaved: (submission: Submission) => void
   onCancel: () => void
-}
-
-/** Allegati già sul server, indicizzati per id (il tipo viene da file_type). */
-export function remoteAttachments(sub: Submission): AttachmentMap {
-  return Object.fromEntries(
-    sub.attachments.map((a): [string, RemoteAttachment] => [
-      a.id,
-      { id: a.id, kind: a.file_type === 'photo' || a.file_type === 'signature' ? (a.file_type as AttachmentKind) : null, fileUrl: a.file_url ?? null },
-    ]),
-  )
 }
 
 /**

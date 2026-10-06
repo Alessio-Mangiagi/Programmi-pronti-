@@ -1,19 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { User } from '../api/types'
 import { getToken, setToken, setUnauthorizedHandler } from './token'
-import { useToast } from '../components/Toast'
-
-type AuthState = {
-  user: User | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  /** Sessione aperta senza passare dal login (accettazione di un invito). */
-  applySession: (accessToken: string, user: User) => void
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthState | null>(null)
+import { useToast } from '../components/useToast'
+import { AuthContext } from './useAuth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -62,11 +52,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth fuori da AuthProvider')
-  return ctx
-}
-
-export const isManager = (u: User | null) => u?.role === 'admin' || u?.role === 'manager'

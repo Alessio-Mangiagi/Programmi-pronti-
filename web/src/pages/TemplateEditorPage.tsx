@@ -17,13 +17,13 @@ import {
 } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
-import { useToast } from '../components/Toast'
+import { useToast } from '../components/useToast'
 import DynamicForm from '../forms/DynamicForm'
-import { CATEGORY_LABEL } from './TemplatesPage'
+import { CATEGORY_LABEL } from '../labels'
 import Icon from '../components/Icon'
-
+import { slugId } from '../forms/slug'
 const TYPE_LABEL: Record<FieldType, string> = {
   text: 'Testo breve',
   textarea: 'Testo lungo',
@@ -35,22 +35,6 @@ const TYPE_LABEL: Record<FieldType, string> = {
   photo: 'Foto',
   signature: 'Firma',
   geolocation: 'Posizione GPS',
-}
-
-/** id campo dall'etichetta: snake_case ASCII, come richiesto dallo schema. */
-export function slugId(label: string, taken: Set<string>): string {
-  let base = label
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '') // toglie gli accenti scomposti da NFD
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/^[^a-z]+/, '')
-    .slice(0, 40)
-  if (!base) base = 'campo'
-  let id = base
-  for (let n = 2; taken.has(id); n++) id = `${base}_${n}`
-  return id
 }
 
 function newField(type: FieldType, taken: Set<string>): Field {
@@ -142,10 +126,13 @@ function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved:
   const fieldErrors = (f: Field) => errors.filter((e) => e.field === f.id || e.field === `fields[${fields.indexOf(f)}]`)
   const layoutErrors = errors.filter((e) => e.field === '$' || e.field.startsWith('layout.'))
 
-  // L'anteprima riparte dai default quando cambia lo schema (solo se valido, altrimenti resta l'ultima buona).
-  useEffect(() => {
-    if (schemaValid) setPreview(defaults(schema))
-  }, [schema, schemaValid])
+  // L'anteprima riparte dai default quando cambia lo schema (solo se valido, altrimenti resta l'ultima buona):
+  // aggiornata durante il render, non in un effetto, così non c'è un render intermedio con i dati vecchi.
+  const [previewOf, setPreviewOf] = useState<FormSchema | null>(null)
+  if (schemaValid && previewOf !== schema) {
+    setPreviewOf(schema)
+    setPreview(defaults(schema))
+  }
 
   const fieldIds = () => new Set(fields.map((f) => f.id))
   const slotIds = () => new Set(sections.flatMap((s) => s.items.map(slotOf).filter((x): x is string => !!x)))

@@ -3,11 +3,13 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
 import type { components } from '../../api/schema'
 import type { Project, User } from '../../api/types'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../auth/useAuth'
 import Loading from '../../components/Loading'
-import { useToast } from '../../components/Toast'
-import { TASK_STATUS_LABEL as _TSL } from '../../components/PinPanel'
-import { ROLE_LABEL } from './UsersPage'
+import { useToast } from '../../components/useToast'
+import { TASK_STATUS_LABEL as _TSL } from '../../labels'
+import { ROLE_LABEL } from '../../labels'
+import { useLoad } from '../../hooks/useLoad'
+import { useLatestRequest } from '../../hooks/useLatestRequest'
 
 type AuditItem = components['schemas']['AuditOut']
 type AuditPage = components['schemas']['AuditPage']
@@ -108,7 +110,8 @@ export default function AuditPage() {
   const toast = useToast()
   const [sp, setSp] = useSearchParams()
   const [page, setPage] = useState<AuditPage | null>(null)
-  const [loading, setLoading] = useState(true)
+  // query dell'ultima risposta arrivata: diversa da quella corrente = caricamento in corso
+  const [loadedQuery, setLoadedQuery] = useState<object | null>(null)
   const [actions, setActions] = useState<ActionDef[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -151,17 +154,19 @@ export default function AuditPage() {
     api.GET('/projects').then(({ data }) => data && setProjects(data))
   }, [])
 
+  const begin = useLatestRequest()
   const load = useCallback(async () => {
-    setLoading(true)
+    const isLatest = begin()
     const { data, error } = await api.GET('/audit', { params: { query } })
-    setLoading(false)
+    if (!isLatest()) return
+    setLoadedQuery(query)
     if (error) return toast.error(errorMessage(error))
     setPage(data ?? null)
-  }, [query, toast])
+  }, [query, toast, begin])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
+
+  const loading = loadedQuery !== query
 
   const label = useCallback((a: string) => actions.find((x) => x.action === a)?.label ?? a, [actions])
 

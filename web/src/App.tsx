@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { useAuth } from './auth/AuthContext'
+import { useAuth } from './auth/useAuth'
 import Layout from './components/Layout'
 import Loading from './components/Loading'
 import LoginPage from './pages/LoginPage'

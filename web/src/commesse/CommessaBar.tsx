@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { isManager, useAuth } from '../auth/AuthContext'
-import { NO_COMMESSA, useCommesse } from './CommesseContext'
+import { isManager, useAuth } from '../auth/useAuth'
+import { NO_COMMESSA } from './CommesseContext'
+import { useCommesse } from './useCommesse'
 
 /**
  * Barra in alto: due menù affiancati, la commessa e i suoi cantieri.

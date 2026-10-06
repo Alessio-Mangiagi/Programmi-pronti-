@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
 import type { Submission, User, WbsNode, WbsNodeDetail } from '../api/types'
-import { isManager, useAuth } from '../auth/AuthContext'
+import { isManager, useAuth } from '../auth/useAuth'
 import Icon from '../components/Icon'
 import Loading from '../components/Loading'
 import Modal from '../components/Modal'
-import { useToast } from '../components/Toast'
+import { useToast } from '../components/useToast'
 import WbsImportForm from '../components/WbsImportForm'
 import SubmissionDetail from '../forms/SubmissionDetail'
 import SubmissionForm from '../forms/SubmissionForm'
@@ -14,6 +14,7 @@ import { findNonConformity } from '../forms/nonConformity'
 import type { FormData, FormSchema } from '@fieldview/form-core'
 import { useLookups } from '../hooks/useLookups'
 import { useProject } from '../hooks/useProject'
+import { useLoad } from '../hooks/useLoad'
 
 type TreeNode = WbsNode & { children: TreeNode[] }
 
@@ -71,19 +72,21 @@ export default function WbsPage() {
     setNodes(data ?? [])
   }, [projectId])
 
+  useLoad(loadNodes)
   useEffect(() => {
-    loadNodes()
     api.GET('/projects/{project_id}/members', { params: { path: { project_id: projectId } } }).then(({ data }) => {
       if (data) setMembers(data)
     })
-  }, [projectId, loadNodes])
+  }, [projectId])
 
   const tree = useMemo(() => buildTree(nodes ?? []), [nodes])
   const byId = useMemo(() => new Map((nodes ?? []).map((n) => [n.id, n])), [nodes])
 
   // La voce selezionata (anche da link) deve essere visibile: espandi i suoi antenati
-  useEffect(() => {
-    if (!selectedId || !byId.size) return
+  // (durante il render, quando cambiano selezione o albero: niente effetto con setState)
+  const [expandedFor, setExpandedFor] = useState<{ id: string; tree: Map<string, WbsNode> } | null>(null)
+  if (selectedId && byId.size && (expandedFor?.id !== selectedId || expandedFor.tree !== byId)) {
+    setExpandedFor({ id: selectedId, tree: byId })
     setExpanded((prev) => {
       const next = new Set(prev)
       let n = byId.get(selectedId)
@@ -93,7 +96,7 @@ export default function WbsPage() {
       }
       return next
     })
-  }, [selectedId, byId])
+  }
 
   function select(id: string | null) {
     setSearchParams(id ? { node: id } : {}, { replace: true })
@@ -363,9 +366,7 @@ function NodePanel({
     setDetail(data ?? null)
   }, [node.id, toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   const templates = Object.values(lookups.templates)
     .filter((t) => !t.archived_at)

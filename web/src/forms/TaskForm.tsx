@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { Task, User } from '../api/types'
-import { useToast } from '../components/Toast'
+import { useToast } from '../components/useToast'
 
 export type TaskDraft = { title: string; description?: string; assigned_to?: string | null; due_date?: string | null }
 

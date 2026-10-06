@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
 import type { components } from '../../api/schema'
 import type { User } from '../../api/types'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../auth/useAuth'
 import Loading from '../../components/Loading'
 import Modal from '../../components/Modal'
-import { useToast } from '../../components/Toast'
+import { useToast } from '../../components/useToast'
+import { ROLE_LABEL } from '../../labels'
+import { useLoad } from '../../hooks/useLoad'
 
 type Activity = components['schemas']['UserActivityOut']
 type Role = 'admin' | 'manager' | 'field'
 
-export const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 const ROLES: Role[] = ['admin', 'manager', 'field']
 
 const fmtDateTime = (iso: string | null | undefined) =>
@@ -44,9 +45,7 @@ export default function UsersPage() {
     if (a.data) setActivity(Object.fromEntries(a.data.map((x) => [x.user_id, x])))
   }, [toast])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoad(load)
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase()
