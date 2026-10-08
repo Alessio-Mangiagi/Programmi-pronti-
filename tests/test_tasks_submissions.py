@@ -379,3 +379,27 @@ def test_tasks_page_server_side(client, project, pin, users):
     assert client.get(f"/projects/{pid}/tasks/page", params={"sort": "drop table"}).status_code == 422
     assert client.get(f"/projects/{pid}/tasks/page", params={"limit": 1000}).status_code == 422
     assert client.get("/projects/nope/tasks/page").status_code == 404
+
+
+def test_project_submissions_list_pins_and_wbs(client, project, pin, users):
+    pid, tpl = project["project"]["id"], project["template"]["id"]
+    node = client.post(f"/projects/{pid}/wbs", json={"code": "01", "name": "Strutture"}).json()
+    a = client.post("/submissions", json={"template_id": tpl, "pin_id": pin, "data_json": {"esito": "Conforme"}}).json()
+    b = client.post("/submissions", json={"template_id": tpl, "wbs_node_id": node["id"],
+                                          "data_json": {"esito": "Non conforme"}}).json()
+    # altro cantiere: non compare
+    other = client.post("/projects", json={"name": "Cantiere B"}).json()
+    n2 = client.post(f"/projects/{other['id']}/wbs", json={"name": "X"}).json()
+    client.post("/submissions", json={"template_id": tpl, "wbs_node_id": n2["id"], "data_json": {}})
+
+    r = client.get(f"/projects/{pid}/submissions")
+    assert r.status_code == 200, r.text
+    rows = {s["id"]: s for s in r.json()}
+    assert set(rows) == {a["id"], b["id"]}
+    assert rows[a["id"]]["plan_name"] == "Piano terra" and rows[a["id"]]["wbs_label"] is None
+    assert rows[b["id"]]["wbs_label"] == "01 Strutture" and rows[b["id"]]["data_json"] == {"esito": "Non conforme"}
+    assert r.json()[0]["id"] == b["id"]   # più recente prima
+
+    # solo i membri del cantiere
+    outsider = client.get(f"/projects/{other['id']}/submissions", headers=users["field"]["headers"])
+    assert outsider.status_code == 403

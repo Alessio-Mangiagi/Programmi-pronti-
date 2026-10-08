@@ -10,7 +10,7 @@ from ..auth import current_user
 from ..database import get_db
 from ..forms import validate_submission
 from ..models import utcnow
-from .common import _with_attachments, _get_pin, _get_wbs_node
+from .common import _alive, _with_attachments, _get_pin, _get_wbs_node
 
 router = APIRouter()
 
@@ -41,6 +41,31 @@ def create_submission(payload: schemas.SubmissionCreate, request: Request, db: S
     db.commit()
     db.refresh(sub)
     return _with_attachments(schemas.SubmissionOut, sub)
+
+
+@router.get("/projects/{project_id}/submissions", response_model=list[schemas.ProjectSubmissionOut])
+def list_project_submissions(project_id: str, db: Session = Depends(get_db),
+                             user: models.User = Depends(current_user)):
+    """Tutti i moduli compilati nel cantiere (su pin e su voci WBS), dal più recente."""
+    auth.assert_project_access(db, user, project_id)
+    on_pins = (_alive(db.query(models.FormSubmission, models.Pin, models.Plan), models.FormSubmission)
+               .join(models.Pin, models.FormSubmission.pin_id == models.Pin.id)
+               .join(models.Plan, models.Pin.plan_id == models.Plan.id)
+               .filter(models.Plan.project_id == project_id, models.Pin.deleted_at.is_(None)).all())
+    on_wbs = (_alive(db.query(models.FormSubmission, models.WbsNode), models.FormSubmission)
+              .join(models.WbsNode, models.FormSubmission.wbs_node_id == models.WbsNode.id)
+              .filter(models.WbsNode.project_id == project_id).all())
+    out = []
+    for sub, pin, plan in on_pins:
+        o = _with_attachments(schemas.ProjectSubmissionOut, sub)
+        o.plan_id, o.plan_name, o.pin_label = plan.id, plan.name, pin.label
+        out.append(o)
+    for sub, node in on_wbs:
+        o = _with_attachments(schemas.ProjectSubmissionOut, sub)
+        o.wbs_label = f"{node.code} {node.name}" if node.code else node.name
+        out.append(o)
+    out.sort(key=lambda o: o.created_at, reverse=True)
+    return out
 
 
 @router.get("/submissions/{submission_id}", response_model=schemas.SubmissionOut)

@@ -2776,6 +2776,28 @@
         ]
       }
     },
+    "/pcq/example.docx": {
+      "get": {
+        "summary": "Example Pcq",
+        "description": "PCQ Word di esempio: mostra il formato che l'import riconosce meglio.",
+        "operationId": "example_pcq_pcq_example_docx_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/projects/{project_id}/pcq/preview": {
       "post": {
         "summary": "Preview Project Pcq",
@@ -2872,6 +2894,55 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/projects/{project_id}/submissions": {
+      "get": {
+        "summary": "List Project Submissions",
+        "description": "Tutti i moduli compilati nel cantiere (su pin e su voci WBS), dal più recente.",
+        "operationId": "list_project_submissions_projects__project_id__submissions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSubmissionOut"
+                  },
+                  "title": "Response List Project Submissions Projects  Project Id  Submissions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/submissions/{submission_id}": {
@@ -6702,6 +6773,128 @@
           "created_at"
         ],
         "title": "ProjectOut"
+      },
+      "ProjectSubmissionOut": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "pin_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Id"
+          },
+          "wbs_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbs Node Id"
+          },
+          "data_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data Json"
+          },
+          "submitted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentOut"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "default": []
+          },
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "pin_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Label"
+          },
+          "wbs_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbs Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "data_json",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProjectSubmissionOut",
+        "description": "Modulo compilato nell'elenco del cantiere, con dove sta (planimetria/pin o voce WBS)."
       },
       "ProjectUpdate": {
         "properties": {

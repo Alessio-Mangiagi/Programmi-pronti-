@@ -816,6 +816,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pcq/example.docx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Example Pcq
+         * @description PCQ Word di esempio: mostra il formato che l'import riconosce meglio.
+         */
+        get: operations["example_pcq_pcq_example_docx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/pcq/preview": {
         parameters: {
             query?: never;
@@ -847,6 +867,26 @@ export interface paths {
         put?: never;
         /** Create Submission */
         post: operations["create_submission_submissions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Submissions
+         * @description Tutti i moduli compilati nel cantiere (su pin e su voci WBS), dal più recente.
+         */
+        get: operations["list_project_submissions_projects__project_id__submissions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2133,6 +2173,49 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * ProjectSubmissionOut
+         * @description Modulo compilato nell'elenco del cantiere, con dove sta (planimetria/pin o voce WBS).
+         */
+        ProjectSubmissionOut: {
+            /** Template Id */
+            template_id: string;
+            /** Pin Id */
+            pin_id?: string | null;
+            /** Wbs Node Id */
+            wbs_node_id?: string | null;
+            /** Data Json */
+            data_json: {
+                [key: string]: unknown;
+            };
+            /** Submitted By */
+            submitted_by?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["AttachmentOut"][];
+            /** Plan Id */
+            plan_id?: string | null;
+            /** Plan Name */
+            plan_name?: string | null;
+            /** Pin Label */
+            pin_label?: string | null;
+            /** Wbs Label */
+            wbs_label?: string | null;
         };
         /** ProjectUpdate */
         ProjectUpdate: {
@@ -4598,6 +4681,26 @@ export interface operations {
             };
         };
     };
+    example_pcq_pcq_example_docx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     preview_project_pcq_projects__project_id__pcq_preview_post: {
         parameters: {
             query?: never;
@@ -4653,6 +4756,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubmissionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_submissions_projects__project_id__submissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectSubmissionOut"][];
                 };
             };
             /** @description Validation Error */

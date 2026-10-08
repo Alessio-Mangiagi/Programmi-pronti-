@@ -421,6 +421,14 @@ class SubmissionOut(SubmissionCreate):
     attachments: list[AttachmentOut] = []
 
 
+class ProjectSubmissionOut(SubmissionOut):
+    """Modulo compilato nell'elenco del cantiere, con dove sta (planimetria/pin o voce WBS)."""
+    plan_id: Optional[str] = None
+    plan_name: Optional[str] = None
+    pin_label: Optional[str] = None
+    wbs_label: Optional[str] = None
+
+
 class TaskCreate(BaseModel):
     pin_id: str
     title: str
