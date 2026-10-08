@@ -176,3 +176,86 @@ def parse(data: bytes, filename: str) -> PcqDocument:
     if name.endswith(".docx") or data[:2] == b"PK":
         return parse_docx(data)
     raise ValueError("only docx or pdf allowed")
+
+
+# ---------- esempio scaricabile ----------
+
+EXAMPLE_TITLE = "PCQ - Nuova scuola primaria via Roma"
+EXAMPLE_PHASES = [
+    ("01 Opere strutturali", "Controlli sulle strutture in c.a.", [
+        ("Fase", "Controllo", "Frequenza", "Criterio di accettazione", "Responsabile", "Documento di registrazione"),
+        ("Scavi", "Quota del fondo scavo", "Ogni plinto", "± 5 cm rispetto al progetto", "Direttore lavori", "Verbale di scavo"),
+        ("Armature", "Diametri e passo delle barre", "Prima di ogni getto", "Conformi agli esecutivi strutturali", "Capocantiere", "Check list armature"),
+        ("Armature", "Copriferro", "Prima di ogni getto", "≥ 3 cm, distanziatori ogni 1 m", "Capocantiere", "Check list armature"),
+        ("Getti", "Classe del calcestruzzo sul DDT", "Ogni autobetoniera", "C25/30 XC2 come da capitolato", "Capocantiere", "DDT firmato"),
+        ("Getti", "Prelievo cubetti", "Ogni 100 m³ o ogni giorno di getto", "Rck ≥ 30 MPa a 28 giorni", "Laboratorio", "Certificato di prova"),
+    ]),
+    ("02 Impianti", "Controlli sugli impianti", [
+        ("Fase", "Controllo", "Frequenza", "Criterio di accettazione", "Responsabile"),
+        ("Impianto elettrico", "Prova di continuità dei conduttori di protezione", "Ogni linea", "Resistenza ≤ 0,5 Ω", "Impresa elettrica"),
+        ("Impianto idrico", "Prova di tenuta a pressione", "Ogni colonna montante", "Nessuna perdita a 1,5 × pressione di esercizio per 2 h", "Impresa idraulica"),
+    ]),
+]
+
+_CT = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+       '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+       '<Default Extension="xml" ContentType="application/xml"/>'
+       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+       '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+       '</Types>')
+_RELS = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+         '</Relationships>')
+_DOC_RELS = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+             '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+             '</Relationships>')
+_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+_STYLES = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles {_NS}>'
+           '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="20"/></w:rPr></w:rPrDefault></w:docDefaults>'
+           '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="120"/></w:pPr></w:style>'
+           '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/>'
+           '<w:pPr><w:spacing w:before="240" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="0C4577"/><w:sz w:val="32"/></w:rPr></w:style>'
+           '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/>'
+           '<w:pPr><w:spacing w:before="240" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:color w:val="0C4577"/><w:sz w:val="26"/></w:rPr></w:style>'
+           '</w:styles>')
+
+
+def _esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _xml_p(text: str, style: Optional[str] = None, bold: bool = False) -> str:
+    ppr = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+    rpr = "<w:rPr><w:b/></w:rPr>" if bold else ""
+    return f'<w:p>{ppr}<w:r>{rpr}<w:t xml:space="preserve">{_esc(text)}</w:t></w:r></w:p>'
+
+
+def _xml_table(rows) -> str:
+    border = "".join(f'<w:{b} w:val="single" w:sz="4" w:color="A0A0A0"/>' for b in ("top", "left", "bottom", "right", "insideH", "insideV"))
+    out = [f'<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>{border}</w:tblBorders></w:tblPr>']
+    for i, row in enumerate(rows):
+        shade = '<w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="E8EEF5"/></w:tcPr>' if i == 0 else ""
+        out.append("<w:tr>" + "".join(f"<w:tc>{shade}{_xml_p(c, bold=i == 0)}</w:tc>" for c in row) + "</w:tr>")
+    out.append("</w:tbl>")
+    return "".join(out)
+
+
+def example_docx() -> bytes:
+    """PCQ di esempio nel formato che l'import riconosce meglio (titoli con stile, una tabella per gruppo di fasi)."""
+    body = [_xml_p(EXAMPLE_TITLE, "Heading1"),
+            _xml_p("Piano di Controllo Qualità redatto ai sensi del capitolato speciale d'appalto. "
+                   "Ogni riga delle tabelle è un controllo da registrare in cantiere.")]
+    for heading, intro, rows in EXAMPLE_PHASES:
+        body += [_xml_p(heading, "Heading2"), _xml_p(intro), _xml_table(rows)]
+    document = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {_NS}><w:body>{"".join(body)}</w:body></w:document>'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", _CT)
+        z.writestr("_rels/.rels", _RELS)
+        z.writestr("word/_rels/document.xml.rels", _DOC_RELS)
+        z.writestr("word/document.xml", document)
+        z.writestr("word/styles.xml", _STYLES)
+    return buf.getvalue()

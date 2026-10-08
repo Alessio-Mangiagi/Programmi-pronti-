@@ -2,6 +2,7 @@
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from .. import models, schemas, auth, pcq_import
@@ -30,6 +31,14 @@ async def preview_pcq(file: UploadFile = File(...), user: models.User = Depends(
     """Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.
     Lo usa l'editor dei moduli per ricreare il PCQ come template."""
     return await _preview(file)
+
+
+@router.get("/pcq/example.docx")
+def example_pcq(user: models.User = Depends(require_role(UserRole.manager))):
+    """PCQ Word di esempio: mostra il formato che l'import riconosce meglio."""
+    return Response(content=pcq_import.example_docx(),
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    headers={"Content-Disposition": 'attachment; filename="PCQ-esempio.docx"'})
 
 
 @router.post("/projects/{project_id}/pcq/preview", response_model=schemas.PcqPreview)

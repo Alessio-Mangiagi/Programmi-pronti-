@@ -25,8 +25,8 @@ def _docx(body: str) -> bytes:
     return buf.getvalue()
 
 
-def _preview(client, pid, content, name, headers=None):
-    return client.post(f"/projects/{pid}/pcq/preview", headers=headers,
+def _preview(client, pid, content, name, headers=None, path=None):
+    return client.post(path or f"/projects/{pid}/pcq/preview", headers=headers,
                        files={"file": (name, content, "application/octet-stream")})
 
 
@@ -82,3 +82,12 @@ def test_pcq_preview_pdf_text_and_errors(client, project):
     assert _preview(client, pid, b"abc", "x.doc").json()["detail"] == "doc not supported: save as docx"
     assert _preview(client, pid, b"abc", "x.txt").json()["detail"] == "only docx or pdf allowed"
     assert _preview(client, pid, b"PK broken", "x.docx").json()["detail"] == "cannot read docx"
+
+
+def test_pcq_example_docx_is_readable(client, users):
+    r = client.get("/pcq/example.docx")
+    assert r.status_code == 200 and r.content[:2] == b"PK"
+    doc = _preview(client, None, r.content, "PCQ-esempio.docx", path="/pcq/preview").json()
+    assert doc["headings"][0].startswith("PCQ") and len(doc["tables"]) == 2
+    assert doc["tables"][0]["rows"][0][:2] == ["Fase", "Controllo"]
+    assert client.get("/pcq/example.docx", headers=users["field"]["headers"]).status_code == 403
