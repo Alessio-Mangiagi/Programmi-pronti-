@@ -152,7 +152,9 @@ def _value_flowables(f: dict, v: Any, atts: dict[str, models.Attachment]) -> lis
 
 
 def _project_of(sub: models.FormSubmission) -> models.Project:
-    return sub.pin.plan.project if sub.pin_id else sub.wbs_node.project
+    if sub.pin_id:
+        return sub.pin.plan.project
+    return sub.wbs_node.project if sub.wbs_node_id else sub.project
 
 
 def _header_block(sub: models.FormSubmission, template: models.FormTemplate, db: Session) -> list:
@@ -163,6 +165,8 @@ def _header_block(sub: models.FormSubmission, template: models.FormTemplate, db:
     if sub.pin_id:
         pin = sub.pin
         where = [["Planimetria", pin.plan.name], ["Pin", pin.label or f"({pin.x:.2f}, {pin.y:.2f})"]]
+    elif not sub.wbs_node_id:
+        where = [["Registrato su", "Cantiere (modulo generale)"]]
     else:
         # voce WBS con il percorso dalla radice (es. "01 Strutture › 01.02 Solai")
         chain = []

@@ -2899,7 +2899,7 @@
     "/projects/{project_id}/submissions": {
       "get": {
         "summary": "List Project Submissions",
-        "description": "Tutti i moduli compilati nel cantiere (su pin e su voci WBS), dal più recente.",
+        "description": "Tutti i moduli compilati nel cantiere (su pin, su voci WBS e generali), dal più recente.",
         "operationId": "list_project_submissions_projects__project_id__submissions_get",
         "security": [
           {
@@ -6802,6 +6802,17 @@
             ],
             "title": "Wbs Node Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "data_json": {
             "additionalProperties": true,
             "type": "object",
@@ -7107,6 +7118,17 @@
             ],
             "title": "Wbs Node Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "data_json": {
             "additionalProperties": true,
             "type": "object",
@@ -7130,7 +7152,7 @@
           "data_json"
         ],
         "title": "SubmissionCreate",
-        "description": "Compilazione di un modulo su un pin oppure su una voce WBS: esattamente uno dei due."
+        "description": "Compilazione di un modulo su un pin, su una voce WBS o sul cantiere intero: esattamente uno dei tre."
       },
       "SubmissionOut": {
         "properties": {
@@ -7159,6 +7181,17 @@
               }
             ],
             "title": "Wbs Node Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
           },
           "data_json": {
             "additionalProperties": true,

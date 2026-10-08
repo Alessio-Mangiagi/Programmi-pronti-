@@ -27,8 +27,13 @@ def create_submission(payload: schemas.SubmissionCreate, request: Request, db: S
         raise HTTPException(409, "template is archived")
     if payload.pin_id:
         project_id = auth.project_of_pin(_get_pin(db, user, payload.pin_id))
-    else:
+    elif payload.wbs_node_id:
         project_id = _get_wbs_node(db, user, payload.wbs_node_id).project_id
+    else:
+        project_id = payload.project_id
+        if db.get(models.Project, project_id) is None:
+            raise HTTPException(404, "project not found")
+        auth.assert_project_access(db, user, project_id)
     errors = validate_submission(template.schema_def, payload.data_json)
     if errors:
         raise HTTPException(422, detail=errors)
@@ -37,7 +42,8 @@ def create_submission(payload: schemas.SubmissionCreate, request: Request, db: S
     db.flush()
     events.record_submission_created(db, sub, project_id, user.id)
     audit.record(db, "submission.created", user, entity_type="submission", entity_id=sub.id, project_id=project_id,
-                 request=request, details={"template": template.name, "pin_id": sub.pin_id, "wbs_node_id": sub.wbs_node_id})
+                 request=request, details={"template": template.name, "pin_id": sub.pin_id, "wbs_node_id": sub.wbs_node_id,
+                                                   "general": bool(sub.project_id)})
     db.commit()
     db.refresh(sub)
     return _with_attachments(schemas.SubmissionOut, sub)
@@ -46,7 +52,7 @@ def create_submission(payload: schemas.SubmissionCreate, request: Request, db: S
 @router.get("/projects/{project_id}/submissions", response_model=list[schemas.ProjectSubmissionOut])
 def list_project_submissions(project_id: str, db: Session = Depends(get_db),
                              user: models.User = Depends(current_user)):
-    """Tutti i moduli compilati nel cantiere (su pin e su voci WBS), dal più recente."""
+    """Tutti i moduli compilati nel cantiere (su pin, su voci WBS e generali), dal più recente."""
     auth.assert_project_access(db, user, project_id)
     on_pins = (_alive(db.query(models.FormSubmission, models.Pin, models.Plan), models.FormSubmission)
                .join(models.Pin, models.FormSubmission.pin_id == models.Pin.id)
@@ -55,7 +61,9 @@ def list_project_submissions(project_id: str, db: Session = Depends(get_db),
     on_wbs = (_alive(db.query(models.FormSubmission, models.WbsNode), models.FormSubmission)
               .join(models.WbsNode, models.FormSubmission.wbs_node_id == models.WbsNode.id)
               .filter(models.WbsNode.project_id == project_id).all())
-    out = []
+    general = _alive(db.query(models.FormSubmission), models.FormSubmission).filter(
+        models.FormSubmission.project_id == project_id).all()
+    out = [_with_attachments(schemas.ProjectSubmissionOut, sub) for sub in general]
     for sub, pin, plan in on_pins:
         o = _with_attachments(schemas.ProjectSubmissionOut, sub)
         o.plan_id, o.plan_name, o.pin_label = plan.id, plan.name, pin.label

@@ -395,17 +395,18 @@ class FileLink(BaseModel):
 
 
 class SubmissionCreate(BaseModel):
-    """Compilazione di un modulo su un pin oppure su una voce WBS: esattamente uno dei due."""
+    """Compilazione di un modulo su un pin, su una voce WBS o sul cantiere intero: esattamente uno dei tre."""
     template_id: str
     pin_id: Optional[str] = None
     wbs_node_id: Optional[str] = None
+    project_id: Optional[str] = None
     data_json: dict
     submitted_by: Optional[str] = None
 
     @model_validator(mode="after")
     def _one_parent(self):
-        if bool(self.pin_id) == bool(self.wbs_node_id):
-            raise ValueError("exactly one of pin_id or wbs_node_id is required")
+        if sum(bool(x) for x in (self.pin_id, self.wbs_node_id, self.project_id)) != 1:
+            raise ValueError("exactly one of pin_id, wbs_node_id or project_id is required")
         return self
 
 

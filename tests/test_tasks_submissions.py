@@ -403,3 +403,32 @@ def test_project_submissions_list_pins_and_wbs(client, project, pin, users):
     # solo i membri del cantiere
     outsider = client.get(f"/projects/{other['id']}/submissions", headers=users["field"]["headers"])
     assert outsider.status_code == 403
+
+
+def test_general_project_submission(client, project, pin, users):
+    """Modulo generale del cantiere: né pin né voce WBS."""
+    pid, tpl = project["project"]["id"], project["template"]["id"]
+    base = {"template_id": tpl, "data_json": {"esito": "Non conforme"}}
+    # esattamente uno fra pin, voce WBS e cantiere
+    assert client.post("/submissions", json={**base, "project_id": pid, "pin_id": pin}).status_code == 422
+    assert client.post("/submissions", json={**base, "project_id": "nope"}).status_code == 404
+    assert client.post("/submissions", headers=users["outsider"]["headers"],
+                       json={**base, "project_id": pid}).status_code == 403
+
+    r = client.post("/submissions", headers=users["field"]["headers"], json={**base, "project_id": pid})
+    assert r.status_code == 201, r.text
+    sub = r.json()
+    assert sub["project_id"] == pid and sub["pin_id"] is None and sub["wbs_node_id"] is None
+
+    listed = {s["id"]: s for s in client.get(f"/projects/{pid}/submissions").json()}
+    assert listed[sub["id"]]["plan_name"] is None and listed[sub["id"]]["wbs_label"] is None
+
+    assert client.get(f"/submissions/{sub['id']}", headers=users["outsider"]["headers"]).status_code == 403
+    r = client.patch(f"/submissions/{sub['id']}", headers=users["field"]["headers"], json={"data_json": {"esito": "Conforme"}})
+    assert r.status_code == 200 and r.json()["data_json"] == {"esito": "Conforme"}
+    r = client.get(f"/submissions/{sub['id']}/pdf")
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+
+    # solo web: non arriva all'app col sync
+    pulled = client.get("/sync/pull", params={"project_id": pid}).json()["submissions"]
+    assert sub["id"] not in {s["id"] for s in pulled}

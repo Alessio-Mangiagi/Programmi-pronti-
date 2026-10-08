@@ -882,7 +882,7 @@ export interface paths {
         };
         /**
          * List Project Submissions
-         * @description Tutti i moduli compilati nel cantiere (su pin e su voci WBS), dal più recente.
+         * @description Tutti i moduli compilati nel cantiere (su pin, su voci WBS e generali), dal più recente.
          */
         get: operations["list_project_submissions_projects__project_id__submissions_get"];
         put?: never;
@@ -2185,6 +2185,8 @@ export interface components {
             pin_id?: string | null;
             /** Wbs Node Id */
             wbs_node_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Data Json */
             data_json: {
                 [key: string]: unknown;
@@ -2285,7 +2287,7 @@ export interface components {
         };
         /**
          * SubmissionCreate
-         * @description Compilazione di un modulo su un pin oppure su una voce WBS: esattamente uno dei due.
+         * @description Compilazione di un modulo su un pin, su una voce WBS o sul cantiere intero: esattamente uno dei tre.
          */
         SubmissionCreate: {
             /** Template Id */
@@ -2294,6 +2296,8 @@ export interface components {
             pin_id?: string | null;
             /** Wbs Node Id */
             wbs_node_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Data Json */
             data_json: {
                 [key: string]: unknown;
@@ -2309,6 +2313,8 @@ export interface components {
             pin_id?: string | null;
             /** Wbs Node Id */
             wbs_node_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Data Json */
             data_json: {
                 [key: string]: unknown;

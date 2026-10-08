@@ -321,18 +321,24 @@ class FormTemplate(Base):
 
 
 class FormSubmission(SyncMixin, Base):
-    """Un'istanza compilata di un FormTemplate, agganciata a un pin o a una voce WBS (uno dei due)."""
+    """
+    Un'istanza compilata di un FormTemplate, agganciata a uno solo fra: un pin, una voce
+    WBS o il cantiere intero (project_id: modulo generale, senza luogo). Le ultime due
+    sono solo web: il sync dell'app porta solo i moduli sui pin.
+    """
     __tablename__ = "form_submissions"
     SYNC_FIELDS = ("data_json", "submitted_by", "deleted_at")
 
     template_id = Column(String, ForeignKey("form_templates.id"), nullable=False)
     pin_id = Column(String, ForeignKey("pins.id"), nullable=True, index=True)
     wbs_node_id = Column(String, ForeignKey("wbs_nodes.id"), nullable=True, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
     data_json = Column(JSONType, nullable=False)       # risposte, chiave = field id
     submitted_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     pin = relationship("Pin", back_populates="submissions")
     wbs_node = relationship("WbsNode", back_populates="submissions")
+    project = relationship("Project")
     attachments = relationship("Attachment", back_populates="submission")
 
 
