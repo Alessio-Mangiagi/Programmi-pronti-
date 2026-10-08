@@ -13,6 +13,7 @@ Crea:
 """
 import io
 import json
+import os
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -95,7 +96,15 @@ def get_or_create(db, model, defaults=None, **lookup):
     return obj, False
 
 
+def refuse_in_production() -> None:
+    """Gli account demo hanno password note: in produzione il seed non deve mai girare per sbaglio."""
+    if os.getenv("APP_ENV", "dev").lower() == "production" and os.getenv("SEED_ALLOW_PRODUCTION") != "1":
+        raise SystemExit("APP_ENV=production: il seed demo crea account con password note e non parte. "
+                         "Per un ambiente demo usa APP_ENV diverso (o SEED_ALLOW_PRODUCTION=1 se sai cosa fai).")
+
+
 def main():
+    refuse_in_production()
     db = SessionLocal()
     try:
         users = {}

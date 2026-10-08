@@ -27,3 +27,18 @@ def test_create_admin_then_login(client, admin_script, monkeypatch):
 def test_create_admin_rejects_short_password(admin_script, monkeypatch):
     monkeypatch.setenv("ADMIN_PASSWORD", "corta")
     assert admin_script.main(["x@azienda.it", "X"]) == 2
+
+
+def test_demo_seed_refuses_production(monkeypatch):
+    """Il seed demo (password note) non parte con APP_ENV=production."""
+    import pytest
+    from scripts import seed
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("SEED_ALLOW_PRODUCTION", raising=False)
+    with pytest.raises(SystemExit):
+        seed.refuse_in_production()
+    monkeypatch.setenv("SEED_ALLOW_PRODUCTION", "1")
+    seed.refuse_in_production()
+    monkeypatch.setenv("APP_ENV", "dev")
+    monkeypatch.delenv("SEED_ALLOW_PRODUCTION")
+    seed.refuse_in_production()
