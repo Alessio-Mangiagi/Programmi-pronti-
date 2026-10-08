@@ -40,10 +40,10 @@ export default function LoginPage() {
         </div>
         <p className="login-tagline">Costruiamo il tuo domani</p>
         <div className="field">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">Email o utente</label>
           <input
             id="email"
-            type="email"
+            type="text"
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
