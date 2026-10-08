@@ -91,3 +91,29 @@ def test_pcq_example_docx_is_readable(client, users):
     assert doc["headings"][0].startswith("PCQ") and len(doc["tables"]) == 2
     assert doc["tables"][0]["rows"][0][:2] == ["Fase", "Controllo"]
     assert client.get("/pcq/example.docx", headers=users["manager"]["headers"]).status_code == 403
+
+
+def test_pcq_modelli_docx_to_schema():
+    from app import pcq_import
+    from app.forms import validate_schema
+    from scripts.pcq_modelli import slug_id, to_schema
+
+    rows = [["Fase", "Controllo", "Riferimenti", "Frequenze"],
+            ["Posizione 1 - Preliminari", "Verifica presa in possesso area", "Verbale", "Inizio attività"],
+            ["", "Verifica P.O.S.", "", ""],
+            ["Posizione 2 - In corso d'opera", "Densità ≥ 95%", "CNR 22-72", ""]]
+    data = pcq_import.build_docx("PCQ99 SK-PROVA - Prova", "Intro", [(None, None, rows)])
+    name, schema, controls = to_schema(pcq_import.parse(data, "x.docx"), "x.docx")
+
+    assert name == "PCQ99 SK-PROVA - Prova" and controls == 3
+    assert validate_schema(schema) == []
+    titles = [s.get("title") for s in schema["layout"]["sections"]]
+    assert titles == ["Posizione 1 - Preliminari", "Posizione 2 - In corso d'opera", "Chiusura"]
+    first = schema["fields"][0]
+    assert first["options"] == ["Conforme", "Non conforme", "Non applicabile"]
+    assert first["help"] == "Riferimenti: Verbale · Frequenze: Inizio attività"
+    assert "help" not in schema["fields"][1]
+    # come slug.ts: accenti tolti, niente cifre in testa, suffisso sui doppioni
+    assert slug_id("Già 1° controllo", set()) == "gia_1_controllo"
+    assert slug_id("3-4-5.A Verifica", set()) == "a_verifica"
+    assert slug_id("Verifica", {"verifica"}) == "verifica_2"

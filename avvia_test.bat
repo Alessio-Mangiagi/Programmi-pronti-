@@ -11,6 +11,8 @@ cd /d "%~dp0"
 
 set PORT=8010
 set PYTHON=.venv\Scripts\python.exe
+REM carica nel demo anche i PCQ di "000_MODELLI APPROVATI\PCQ_word", se presenti
+set SEED_PCQ=1
 set BUILD=1
 set KEEP=
 

@@ -33,6 +33,7 @@ USERS = [
 ]
 
 ROOT = Path(__file__).resolve().parent.parent
+PCQ_WORD = ROOT / "000_MODELLI APPROVATI" / "PCQ_word"  # generati da scripts/pcq_modelli.py
 
 PUNCH_LIST = {
     "name": "Punch list (difetto)",
@@ -216,6 +217,11 @@ def main():
             print("creato albero WBS del cantiere demo")
 
         db.commit()
+        # PCQ approvati (cartella locale, fuori da git): con SEED_PCQ=1 (avvia_test.bat) diventano
+        # moduli anche nel demo; i test e2e restano sui 3 moduli d'esempio
+        if os.getenv("SEED_PCQ") == "1" and PCQ_WORD.is_dir():
+            from scripts import pcq_modelli
+            pcq_modelli.load(PCQ_WORD)
         print(f"\nProgetto: {project.id}\nLogin: <email> / {PASSWORD}  ->  " +
               ", ".join(email for email, _, _, pw in USERS if not pw) +
               "\n" + ", ".join(f"{email} / {pw}" for email, _, _, pw in USERS if pw))

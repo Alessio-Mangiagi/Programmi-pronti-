@@ -243,13 +243,19 @@ def _xml_table(rows) -> str:
     return "".join(out)
 
 
-def example_docx() -> bytes:
-    """PCQ di esempio nel formato che l'import riconosce meglio (titoli con stile, una tabella per gruppo di fasi)."""
-    body = [_xml_p(EXAMPLE_TITLE, "Heading1"),
-            _xml_p("Piano di Controllo Qualità redatto ai sensi del capitolato speciale d'appalto. "
-                   "Ogni riga delle tabelle è un controllo da registrare in cantiere.")]
-    for heading, intro, rows in EXAMPLE_PHASES:
-        body += [_xml_p(heading, "Heading2"), _xml_p(intro), _xml_table(rows)]
+def build_docx(title: str, intro: Optional[str], sections) -> bytes:
+    """PCQ Word nel formato che l'import riconosce meglio: titolo (Titolo 1), paragrafo
+    introduttivo e per ogni sezione (titolo Titolo 2 o None, testo o None, righe) una tabella
+    con la prima riga di intestazione."""
+    body = [_xml_p(title, "Heading1")]
+    if intro:
+        body.append(_xml_p(intro))
+    for heading, text, rows in sections:
+        if heading:
+            body.append(_xml_p(heading, "Heading2"))
+        if text:
+            body.append(_xml_p(text))
+        body.append(_xml_table(rows))
     document = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {_NS}><w:body>{"".join(body)}</w:body></w:document>'
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -259,3 +265,11 @@ def example_docx() -> bytes:
         z.writestr("word/document.xml", document)
         z.writestr("word/styles.xml", _STYLES)
     return buf.getvalue()
+
+
+def example_docx() -> bytes:
+    """PCQ di esempio nel formato che l'import riconosce meglio (titoli con stile, una tabella per gruppo di fasi)."""
+    return build_docx(EXAMPLE_TITLE,
+                      "Piano di Controllo Qualità redatto ai sensi del capitolato speciale d'appalto. "
+                      "Ogni riga delle tabelle è un controllo da registrare in cantiere.",
+                      EXAMPLE_PHASES)
