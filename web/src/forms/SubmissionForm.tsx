@@ -6,8 +6,8 @@ import { uploadAttachmentFile } from '../api/upload'
 import { useToast } from '../components/useToast'
 import { isLocal, releaseAttachment, remoteAttachments, type AttachmentMap } from './attachments'
 import DynamicForm, { type AttachmentChange } from './DynamicForm'
-/** Dove agganciare la compilazione: un pin della planimetria oppure una voce WBS del cantiere. */
-export type SubmissionTarget = { pinId: string } | { wbsNodeId: string }
+/** Dove agganciare la compilazione: un pin della planimetria, una voce WBS o il cantiere intero (modulo generale). */
+export type SubmissionTarget = { pinId: string } | { wbsNodeId: string } | { projectId: string }
 
 type Props = {
   target: SubmissionTarget
@@ -121,6 +121,7 @@ function Editor({ target, template, submission, onSaved, onCancel, onBusy }: Edi
           template_id: template.id,
           pin_id: 'pinId' in target ? target.pinId : null,
           wbs_node_id: 'wbsNodeId' in target ? target.wbsNodeId : null,
+          project_id: 'projectId' in target ? target.projectId : null,
           data_json: value,
         } })
     if (error || !sub) {

@@ -17,7 +17,11 @@ function fmtDate(iso: string) {
   return new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+/** Valore della tendina "Dove" per il modulo generale, non legato a voci WBS. */
+const GENERAL = '__cantiere'
+
 function where(s: ProjectSubmission) {
+  if (s.project_id) return 'Cantiere (generale)'
   if (s.wbs_label) return `WBS · ${s.wbs_label}`
   return `${s.plan_name ?? 'Planimetria'}${s.pin_label ? ` · ${s.pin_label}` : ''}`
 }
@@ -38,8 +42,8 @@ function flattenWbs(nodes: WbsNode[]): { node: WbsNode; depth: number }[] {
 }
 
 /**
- * Tutti i moduli compilati nel cantiere, sulle planimetrie e sulle voci WBS, con filtri;
- * da qui se ne compila uno nuovo scegliendo fra i moduli creati e la voce WBS su cui registrarlo.
+ * Tutti i moduli compilati nel cantiere (planimetrie, voci WBS, generali), con filtri;
+ * da qui se ne compila uno nuovo scegliendo fra i moduli creati, generale del cantiere o su una voce WBS.
  */
 export default function ProjectFormsPage() {
   const { projectId = '' } = useParams()
@@ -106,6 +110,7 @@ export default function ProjectFormsPage() {
       if (tpl && s.template_id !== tpl) return false
       if (place === 'wbs' && !s.wbs_node_id) return false
       if (place === 'pin' && !s.pin_id) return false
+      if (place === 'generale' && !s.project_id) return false
       if (ncOnly && !ncOf(s)) return false
       if (!needle) return true
       return [lookups.templateName(s.template_id), where(s), lookups.userName(s.submitted_by)].some((x) => x.toLowerCase().includes(needle))
@@ -117,8 +122,8 @@ export default function ProjectFormsPage() {
     setNodeId('')
     setFilter('compila', on ? '1' : '')
   }
-  // con una sola voce WBS non c'è niente da scegliere
-  const target = nodeId || (wbsOptions.length === 1 ? wbsOptions[0].node.id : '')
+  // di default il modulo è generale del cantiere; la voce WBS è facoltativa
+  const target = nodeId || GENERAL
 
   return (
     <>
@@ -168,6 +173,7 @@ export default function ProjectFormsPage() {
             <option value="">Ovunque</option>
             <option value="pin">Planimetrie</option>
             <option value="wbs">Voci WBS</option>
+            <option value="generale">Generale del cantiere</option>
           </select>
         </div>
         <div className="filter-group">
@@ -219,7 +225,9 @@ export default function ProjectFormsPage() {
                         )}
                       </td>
                       <td>
-                        {s.wbs_node_id ? (
+                        {s.project_id ? (
+                          <span>{where(s)}</span>
+                        ) : s.wbs_node_id ? (
                           <Link to={`/projects/${projectId}/wbs?node=${s.wbs_node_id}`} onClick={(e) => e.stopPropagation()}>
                             {where(s)}
                           </Link>
@@ -245,11 +253,6 @@ export default function ProjectFormsPage() {
         <Modal title="Compila modulo" onClose={() => setFilling(false)} width={760}>
           {wbs === null ? (
             <Loading />
-          ) : wbsOptions.length === 0 ? (
-            <div className="empty">
-              Per compilare un modulo qui serve almeno una voce WBS: <Link to={`/projects/${projectId}/wbs`}>creala nella WBS</Link>. Sui punti
-              della planimetria si compila dalla planimetria.
-            </div>
           ) : templates.length === 0 ? (
             <div className="empty">
               Non ci sono moduli da compilare. {isManager(user) && <Link to="/templates/new">Creane uno</Link>}
@@ -257,21 +260,26 @@ export default function ProjectFormsPage() {
           ) : (
             <>
               <div className="field">
-                <label htmlFor="pf-node">Dove lo registri (voce WBS)</label>
+                <label htmlFor="pf-node">Dove lo registri</label>
                 <select id="pf-node" value={target} onChange={(e) => setNodeId(e.target.value)}>
-                  <option value="">— Scegli la voce —</option>
-                  {wbsOptions.map(({ node, depth }) => (
-                    <option key={node.id} value={node.id}>
-                      {' '.repeat(depth * 3)}
-                      {node.code ? `${node.code} ${node.name}` : node.name}
-                    </option>
-                  ))}
+                  <option value={GENERAL}>Tutto il cantiere (modulo generale, senza voce WBS)</option>
+                  {wbsOptions.length > 0 && (
+                    <optgroup label="Su una voce WBS">
+                      {wbsOptions.map(({ node, depth }) => (
+                        <option key={node.id} value={node.id}>
+                          {' '.repeat(depth * 3)}
+                          {node.code ? `${node.code} ${node.name}` : node.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                <p className="muted small">Sui punti della planimetria si compila dalla planimetria.</p>
               </div>
               {target ? (
                 <SubmissionForm
                   key={target}
-                  target={{ wbsNodeId: target }}
+                  target={target === GENERAL ? { projectId } : { wbsNodeId: target }}
                   templates={templates}
                   onCancel={() => setFilling(false)}
                   onSaved={async () => {
@@ -280,7 +288,7 @@ export default function ProjectFormsPage() {
                   }}
                 />
               ) : (
-                <p className="muted small">Scegli la voce WBS, poi il modulo da compilare fra quelli creati.</p>
+                <p className="muted small">Scegli dove registrarlo, poi il modulo da compilare fra quelli creati.</p>
               )}
             </>
           )}

@@ -63,7 +63,7 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
     return (
       <Modal title={`Modifica — ${template.name}`} onClose={onClose}>
         <SubmissionForm
-          target={pinId ? { pinId } : { wbsNodeId: submission.wbs_node_id ?? '' }}
+          target={pinId ? { pinId } : submission.wbs_node_id ? { wbsNodeId: submission.wbs_node_id } : { projectId: submission.project_id ?? '' }}
           templates={[template]}
           submission={submission}
           onCancel={() => setMode('view')}
