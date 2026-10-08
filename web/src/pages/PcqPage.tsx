@@ -1,8 +1,9 @@
-import { useRef, useState, type DragEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { PcqPreview } from '../api/types'
-import { PCQ_FILE_ACCEPT, PCQ_FILE_MAX_BYTES, previewPcqFile } from '../api/upload'
+import { PCQ_FILE_ACCEPT, PCQ_FILE_MAX_BYTES, pcqFileError, previewPcqFile } from '../api/upload'
 import { isManager, useAuth } from '../auth/useAuth'
+import FileDropzone from '../components/FileDropzone'
 import Icon from '../components/Icon'
 import { formatBytes } from '../format'
 import { useProject } from '../hooks/useProject'
@@ -16,20 +17,11 @@ type Item = {
   error?: string
 }
 
-const EXTENSIONS = ['.docx', '.pdf']
 const PDF_LINES_SHOWN = 300
 
 function extension(name: string) {
   const i = name.lastIndexOf('.')
   return i >= 0 ? name.slice(i).toLowerCase() : ''
-}
-
-/** Errore lato client (formato/dimensione) prima di mandare il file al server. */
-function precheck(f: File): string | undefined {
-  const ext = extension(f.name)
-  if (ext === '.doc') return 'Formato .doc non supportato: salva come .docx'
-  if (!EXTENSIONS.includes(ext)) return 'Formato non supportato: usa Word (.docx) o PDF'
-  if (f.size > PCQ_FILE_MAX_BYTES) return `File troppo grande (max ${formatBytes(PCQ_FILE_MAX_BYTES)})`
 }
 
 function summary(p: PcqPreview) {
@@ -41,7 +33,7 @@ function summary(p: PcqPreview) {
 /**
  * Caricamento dei PCQ (Piano di Controllo Qualità) da ricreare nel cantiere: si
  * trascinano uno o più Word/PDF, il server li legge uno alla volta e la pagina
- * mostra cosa ha trovato (titoli, tabelle, testo). Per ora solo anteprima.
+ * mostra cosa ha trovato (titoli, tabelle, testo); "Crea modulo" lo apre nell'editor dei moduli.
  */
 export default function PcqPage() {
   const { projectId = '' } = useParams()
@@ -49,10 +41,8 @@ export default function PcqPage() {
   const project = useProject(projectId)
   const [items, setItems] = useState<Item[]>([])
   const [selected, setSelected] = useState<number | null>(null)
-  const [dragging, setDragging] = useState(false)
-  const dragDepth = useRef(0)
+  const navigate = useNavigate()
   const nextId = useRef(1)
-  const inputRef = useRef<HTMLInputElement>(null)
   const queue = useRef<Item[]>([])
   const running = useRef(false)
 
@@ -60,9 +50,9 @@ export default function PcqPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...changes } : it)))
   }
 
-  function add(files: FileList | File[]) {
-    const added: Item[] = Array.from(files).map((file) => {
-      const error = precheck(file)
+  function add(files: File[]) {
+    const added: Item[] = files.map((file) => {
+      const error = pcqFileError(file)
       return { id: nextId.current++, file, status: error ? 'error' : 'queued', progress: 0, error }
     })
     if (!added.length) return
@@ -87,25 +77,6 @@ export default function PcqPage() {
       }
     }
     running.current = false
-  }
-
-  function onDragEnter(e: DragEvent) {
-    e.preventDefault()
-    dragDepth.current += 1
-    setDragging(true)
-  }
-
-  function onDragLeave(e: DragEvent) {
-    e.preventDefault()
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) setDragging(false)
-  }
-
-  function onDrop(e: DragEvent) {
-    e.preventDefault()
-    dragDepth.current = 0
-    setDragging(false)
-    add(e.dataTransfer.files)
   }
 
   function remove(id: number) {
@@ -148,35 +119,16 @@ export default function PcqPage() {
           <>
             <p className="muted small pcq-intro">
               Carica il Piano di Controllo Qualità del cantiere in Word (.docx) o PDF. L'app legge fasi, controlli e tabelle e te li mostra qui
-              sotto. Per ora è solo un'anteprima: la creazione automatica di WBS e moduli si attiva quando la mappatura sarà tarata sul primo PCQ
-              reale.
+              sotto; con "Crea modulo" il PCQ diventa un modulo da compilare (un esito per controllo), da rivedere nell'editor prima di salvarlo.
             </p>
-            <div
-              className={`pcq-drop${dragging ? ' is-dragging' : ''}`}
-              onDragEnter={onDragEnter}
-              onDragOver={(e) => e.preventDefault()}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop}
-            >
-              <Icon name="upload" className="pcq-drop-icon" />
-              <p className="pcq-drop-title">{dragging ? 'Rilascia per caricare' : 'Trascina qui i PCQ da riprodurre'}</p>
-              <p className="muted small">Word (.docx) o PDF, anche più file insieme · max {formatBytes(PCQ_FILE_MAX_BYTES)} ciascuno</p>
-              <button type="button" className="btn btn-primary" onClick={() => inputRef.current?.click()}>
-                Scegli i file
-              </button>
-              <input
-                ref={inputRef}
-                type="file"
-                accept={PCQ_FILE_ACCEPT}
-                multiple
-                hidden
-                data-testid="pcq-input"
-                onChange={(e) => {
-                  if (e.target.files) add(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-            </div>
+            <FileDropzone
+              accept={PCQ_FILE_ACCEPT}
+              multiple
+              title="Trascina qui i PCQ da riprodurre"
+              hint={`Word (.docx) o PDF, anche più file insieme · max ${formatBytes(PCQ_FILE_MAX_BYTES)} ciascuno`}
+              onFiles={add}
+              testId="pcq-input"
+            />
 
             {items.length > 0 && (
               <ul className="pcq-queue">
@@ -204,9 +156,14 @@ export default function PcqPage() {
                     </div>
                     <div className="pcq-item-actions">
                       {it.status === 'done' && (
-                        <button type="button" className="btn small" onClick={() => setSelected(it.id)} disabled={it.id === selected}>
-                          {it.id === selected ? 'Aperto' : 'Anteprima'}
-                        </button>
+                        <>
+                          <button type="button" className="btn small" onClick={() => setSelected(it.id)} disabled={it.id === selected}>
+                            {it.id === selected ? 'Aperto' : 'Anteprima'}
+                          </button>
+                          <button type="button" className="btn small" onClick={() => navigate('/templates/new', { state: { pcq: it.preview } })}>
+                            Crea modulo
+                          </button>
+                        </>
                       )}
                       {it.status !== 'reading' && (
                         <button type="button" className="btn btn-icon" aria-label={`Rimuovi ${it.file.name}`} onClick={() => remove(it.id)}>

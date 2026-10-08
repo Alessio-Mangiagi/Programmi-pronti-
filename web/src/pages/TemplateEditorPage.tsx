@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   FIELD_TYPES,
   LAYOUT_COLUMNS,
@@ -16,14 +16,17 @@ import {
   type LayoutSection,
 } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
-import type { FormTemplate } from '../api/types'
+import type { FormTemplate, PcqPreview } from '../api/types'
 import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
+import PcqImportModal from '../components/PcqImportModal'
 import { useToast } from '../components/useToast'
 import DynamicForm from '../forms/DynamicForm'
 import { CATEGORY_LABEL } from '../labels'
 import Icon from '../components/Icon'
 import { slugId } from '../forms/slug'
+import { pcqToSchema, type PcqConversion } from '../forms/pcqToSchema'
+
 const TYPE_LABEL: Record<FieldType, string> = {
   text: 'Testo breve',
   textarea: 'Testo lungo',
@@ -65,7 +68,11 @@ export default function TemplateEditorPage() {
   const { templateId } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const isNew = !templateId || templateId === 'new'
+  // "Crea modulo" dalla pagina PCQ del cantiere: il PCQ letto arriva nello state della navigazione
+  const pcq = isNew ? (location.state as { pcq?: PcqPreview } | null)?.pcq : undefined
+  const [draft] = useState<PcqConversion | null>(() => (pcq ? pcqToSchema(pcq) : null))
   const [loaded, setLoaded] = useState<FormTemplate | null>(null)
   const [notFound, setNotFound] = useState(false)
 
@@ -80,7 +87,7 @@ export default function TemplateEditorPage() {
   if (!isManager(user)) return <Navigate to="/projects" replace />
   if (notFound) return <div className="content empty">Template non trovato.</div>
   if (!isNew && !loaded) return <Loading className="content" />
-  return <Editor key={loaded?.id ?? 'new'} template={loaded} onSaved={(t) => navigate(`/templates/${t.id}`, { replace: true })} />
+  return <Editor key={loaded?.id ?? 'new'} template={loaded} draft={draft} onSaved={(t) => navigate(`/templates/${t.id}`, { replace: true })} />
 }
 
 type Tab = 'struttura' | 'campi'
@@ -104,12 +111,15 @@ function initialSections(schema: FormSchema | null): LayoutSection[] {
   return sections
 }
 
-function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved: (t: FormTemplate) => void }) {
+type EditorProps = { template: FormTemplate | null; draft?: PcqConversion | null; onSaved: (t: FormTemplate) => void }
+
+function Editor({ template, draft, onSaved }: EditorProps) {
   const toast = useToast()
   const navigate = useNavigate()
-  const saved = (template?.schema_def ?? null) as FormSchema | null
-  const [name, setName] = useState(template?.name ?? '')
-  const [category, setCategory] = useState(template?.category ?? '')
+  const saved = (template?.schema_def ?? draft?.schema ?? null) as FormSchema | null
+  const [name, setName] = useState(template?.name ?? draft?.name ?? '')
+  const [category, setCategory] = useState(template?.category ?? (draft ? 'quality' : ''))
+  const [importing, setImporting] = useState(false)
   const [fields, setFields] = useState<Field[]>(() => saved?.fields ?? [])
   const [sections, setSections] = useState<LayoutSection[]>(() => initialSections(saved))
   const [tab, setTab] = useState<Tab>(() => (saved?.fields.length ? 'campi' : 'struttura'))
@@ -263,6 +273,18 @@ function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved:
     }
   }
 
+  /** PCQ letto e convertito: sostituisce nome (se vuoto), struttura e campi; si rivede e si salva. */
+  const applyPcq = (conv: PcqConversion) => {
+    if (!name.trim()) setName(conv.name)
+    setCategory('quality')
+    setFields(conv.schema.fields)
+    setSections(initialSections(conv.schema))
+    setSelected(conv.schema.fields[0]?.id ?? null)
+    setTab('campi')
+    setImporting(false)
+    toast.success(`PCQ importato: ${conv.controls} controlli. Rivedi e salva.`)
+  }
+
   async function save(e: FormEvent) {
     e.preventDefault()
     setTouched(true)
@@ -305,6 +327,11 @@ function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved:
           <h1>{template ? template.name : 'Nuovo template'}</h1>
         </div>
         <div className="topbar-actions">
+          {!locked && (
+            <button type="button" className="btn" onClick={() => setImporting(true)}>
+              <Icon name="upload" /> Importa da PCQ
+            </button>
+          )}
           {locked && (
             <button type="button" className="btn" onClick={duplicateAndEdit}>
               Duplica e modifica
@@ -315,6 +342,7 @@ function Editor({ template, onSaved }: { template: FormTemplate | null; onSaved:
           </button>
         </div>
       </header>
+      {importing && <PcqImportModal replacing={fields.length > 0} onApply={applyPcq} onClose={() => setImporting(false)} />}
       <form id="template-form" className="content builder" onSubmit={save} noValidate>
         {locked && (
           <div className="callout callout-warn builder-wide">

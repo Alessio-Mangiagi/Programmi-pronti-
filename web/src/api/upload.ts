@@ -24,9 +24,18 @@ export function importWbsFile(projectId: string, file: File, dryRun: boolean): P
 export const PCQ_FILE_ACCEPT = '.docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf'
 export const PCQ_FILE_MAX_BYTES = 20 * 1024 * 1024
 
+/** Errore lato client (formato/dimensione) prima di mandare un PCQ al server. */
+export function pcqFileError(f: File): string | undefined {
+  const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase()
+  if (ext === '.doc') return 'Formato .doc non supportato: salva come .docx'
+  if (ext !== '.docx' && ext !== '.pdf') return 'Formato non supportato: usa Word (.docx) o PDF'
+  if (f.size > PCQ_FILE_MAX_BYTES) return `File troppo grande (max ${Math.round(PCQ_FILE_MAX_BYTES / 1024 / 1024)} MB)`
+}
+
 /** Legge un PCQ Word/PDF e restituisce titoli e tabelle (solo anteprima, niente scritto). */
-export function previewPcqFile(projectId: string, file: File, onProgress?: (fraction: number) => void): Promise<PcqPreview> {
-  return uploadMultipart(`/api/projects/${encodeURIComponent(projectId)}/pcq/preview`, file, onProgress)
+export function previewPcqFile(projectId: string | null, file: File, onProgress?: (fraction: number) => void): Promise<PcqPreview> {
+  const url = projectId ? `/api/projects/${encodeURIComponent(projectId)}/pcq/preview` : '/api/pcq/preview'
+  return uploadMultipart(url, file, onProgress)
 }
 
 /**

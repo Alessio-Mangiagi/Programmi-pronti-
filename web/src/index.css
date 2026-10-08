@@ -689,3 +689,9 @@ input:focus, select:focus, textarea:focus {
 .pcq-table td { white-space: pre-line; vertical-align: top; }
 .pcq-table .table-wrap { max-height: 50vh; overflow-y: auto; }
 .pcq-lines { margin: 0; padding-left: 2.5rem; max-height: 50vh; overflow-y: auto; font-size: 0.9rem; color: var(--text); }
+.pcq-file-line { margin: 0.8rem 0 0; overflow-wrap: anywhere; }
+.pcq-summary { margin-top: 1rem; }
+.pcq-summary-list { list-style: none; margin: 0.5rem 0 0; padding: 0; max-height: 35vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.pcq-summary-list li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0.8rem; }
+.pcq-summary-list li + li { border-top: 1px solid var(--border); }
+.pcq-summary .callout { margin-top: 0.8rem; }
