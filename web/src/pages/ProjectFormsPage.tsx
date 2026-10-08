@@ -11,6 +11,7 @@ import { useLoad } from '../hooks/useLoad'
 import { useLookups } from '../hooks/useLookups'
 import { useProject } from '../hooks/useProject'
 import { compileUrl } from '../routes'
+import { downloadCsv, today } from '../csv'
 
 function fmtDate(iso: string) {
   return new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })
@@ -87,6 +88,26 @@ export default function ProjectFormsPage() {
 
   const ncCount = (subs ?? []).filter((s) => ncOf(s)).length
 
+  /** Righe filtrate in CSV: dati fissi più le risposte del modulo ("Etichetta: valore" separate da " | "). */
+  function exportCsv() {
+    const answer = (s: ProjectSubmission) => {
+      const t = lookups.templates[s.template_id]
+      const data = s.data_json as FormData
+      return ((t?.schema_def as FormSchema | undefined)?.fields ?? [])
+        .filter((f) => f.type !== 'photo' && f.type !== 'signature' && data[f.id] !== undefined && data[f.id] !== null && data[f.id] !== '')
+        .map((f) => {
+          const v = data[f.id]
+          return `${f.label}: ${Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'Sì' : 'No') : typeof v === 'object' ? JSON.stringify(v) : v}`
+        })
+        .join(' | ')
+    }
+    downloadCsv(
+      `moduli-${project?.name ?? 'cantiere'}-${today()}.csv`,
+      ['data', 'modulo', 'dove', 'compilato_da', 'esito', 'allegati', 'risposte'],
+      shown.map((s) => [fmtDate(s.created_at), lookups.templateName(s.template_id), where(s), lookups.userName(s.submitted_by), ncOf(s)?.value ?? '', s.attachments.length, answer(s)]),
+    )
+  }
+
   return (
     <>
       <header className="topbar">
@@ -102,6 +123,9 @@ export default function ProjectFormsPage() {
               Crea un nuovo modulo
             </Link>
           )}
+          <button type="button" className="btn" onClick={exportCsv} disabled={!shown.length}>
+            Esporta CSV
+          </button>
           <Link to={compileUrl(projectId)} className="btn btn-primary">
             + Compila modulo
           </Link>
@@ -216,6 +240,7 @@ export default function ProjectFormsPage() {
           submission={open}
           template={lookups.templates[open.template_id]}
           pinId={open.pin_id ?? undefined}
+          projectId={projectId}
           pinLabel={open.pin_label}
           lookups={lookups}
           members={members}

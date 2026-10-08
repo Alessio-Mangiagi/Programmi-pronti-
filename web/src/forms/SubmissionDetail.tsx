@@ -9,13 +9,15 @@ import DynamicForm from './DynamicForm'
 import { findNonConformity, taskDraftFromSubmission } from './nonConformity'
 import SubmissionForm from './SubmissionForm'
 import { remoteAttachments } from './attachments'
-import TaskForm from './TaskForm'
+import TaskForm, { type TaskTarget } from './TaskForm'
 
 type Props = {
   submission: Submission
   template: FormTemplate
   /** Pin del modulo; assente per i moduli compilati su una voce WBS (niente "crea task": i task vivono sui pin). */
   pinId?: string
+  /** Cantiere del modulo: senza pin il task da una non conformità nasce sul cantiere. */
+  projectId?: string
   pinLabel?: string | null
   lookups: Lookups
   members: User[]
@@ -30,7 +32,7 @@ function fmtDate(iso: string) {
 }
 
 /** Modulo compilato in sola lettura, con modifica e creazione task nella stessa modale. */
-export default function SubmissionDetail({ submission: initial, template, pinId, pinLabel, lookups, members, canEdit, onClose, onChanged }: Props) {
+export default function SubmissionDetail({ submission: initial, template, pinId, projectId, pinLabel, lookups, members, canEdit, onClose, onChanged }: Props) {
   const [submission, setSubmission] = useState(initial)
   const [mode, setMode] = useState<'view' | 'edit' | 'task'>('view')
   const [downloading, setDownloading] = useState(false)
@@ -58,6 +60,12 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
   const schema = template.schema_def as FormSchema
   const data = submission.data_json as FormData
   const nc = findNonConformity(schema, data)
+  // task: sul pin del modulo, altrimenti sul cantiere (moduli su voce WBS o generali)
+  const taskTarget: TaskTarget | null = pinId
+    ? { pinId, submissionId: submission.id }
+    : projectId
+      ? { projectId, submissionId: submission.id }
+      : null
 
   if (mode === 'edit') {
     return (
@@ -77,11 +85,11 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
     )
   }
 
-  if (mode === 'task' && pinId) {
+  if (mode === 'task' && taskTarget) {
     return (
       <Modal title={nc ? `Task da "${nc.value}"` : 'Nuovo task dal modulo'} onClose={onClose}>
         <TaskForm
-          target={{ pinId }}
+          target={taskTarget}
           members={members}
           draft={taskDraftFromSubmission(template, data, pinLabel)}
           onCancel={() => setMode('view')}
@@ -102,8 +110,8 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
       </p>
       {nc && (
         <div className="callout callout-warn">
-          <strong>{nc.value}</strong> in "{nc.label}"{pinId && ': serve un intervento?'}
-          {pinId && (
+          <strong>{nc.value}</strong> in "{nc.label}"{taskTarget && ': serve un intervento?'}
+          {taskTarget && (
             <button type="button" className="btn small btn-primary" onClick={() => setMode('task')}>
               Crea task
             </button>
@@ -117,7 +125,7 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
             Modifica
           </button>
         )}
-        {!nc && pinId && (
+        {!nc && taskTarget && (
           <button type="button" className="btn" onClick={() => setMode('task')}>
             Crea task da questo modulo
           </button>

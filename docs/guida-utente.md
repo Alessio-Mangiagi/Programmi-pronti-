@@ -19,7 +19,8 @@ che fai viene salvato sul device e inviato appena torna la connessione.
 ## Compilare un modulo
 1. Tocca il pin → **+ Compila modulo** → scegli il modulo.
 2. Compila i campi (* = obbligatorio). Foto: **Scatta** o **Galleria**; firma con il dito.
-3. **Salva modulo**. Se chiudi a metà, ritrovi la **bozza** la prossima volta.
+3. **Salva modulo**. Se chiudi a metà, ritrovi la **bozza** la prossima volta (anche sul
+   web, nello stesso browser: lì foto e firma vanno riaggiunte).
 4. Un esito **"Non conforme"** avvisa automaticamente l'ufficio.
 
 ## Task

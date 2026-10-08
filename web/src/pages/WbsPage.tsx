@@ -425,6 +425,7 @@ function NodePanel({
         <SubmissionDetail
           submission={openSub}
           template={lookups.templates[openSub.template_id]}
+          projectId={node.project_id}
           lookups={lookups}
           members={members}
           canEdit={isManager(user) || openSub.submitted_by === user?.id}

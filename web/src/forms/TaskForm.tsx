@@ -5,8 +5,12 @@ import { useToast } from '../components/useToast'
 
 export type TaskDraft = { title: string; description?: string; assigned_to?: string | null; due_date?: string | null }
 
-/** Dove agganciare il task: un pin esistente, oppure un nuovo pin creato al salvataggio nel punto indicato. */
-export type TaskTarget = { pinId: string } | { planId: string; x: number; y: number }
+/**
+ * Dove agganciare il task: un pin esistente, un nuovo pin creato al salvataggio nel punto
+ * indicato, oppure il cantiere (task da un modulo su voce WBS o generale).
+ * `submissionId` = modulo da cui nasce, se c'è.
+ */
+export type TaskTarget = ({ pinId: string } | { planId: string; x: number; y: number } | { projectId: string }) & { submissionId?: string }
 
 type Props = {
   target: TaskTarget
@@ -17,7 +21,7 @@ type Props = {
   onCancel: () => void
 }
 
-/** Creazione task su un pin: titolo, descrizione, assegnatario (membri del progetto), scadenza. */
+/** Creazione task su un pin o sul cantiere: titolo, descrizione, assegnatario (membri del progetto), scadenza. */
 export default function TaskForm({ target, members, draft, onSaved, onCancel }: Props) {
   const toast = useToast()
   const [title, setTitle] = useState(draft?.title ?? '')
@@ -30,10 +34,10 @@ export default function TaskForm({ target, members, draft, onSaved, onCancel }: 
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
-    let pinId: string
+    let pinId: string | null = null
     if ('pinId' in target) {
       pinId = target.pinId
-    } else {
+    } else if ('planId' in target) {
       // task "dal nulla" (tasto destro sulla planimetria): prima il pin nel punto scelto
       const pin = await api.POST('/pins', { body: { plan_id: target.planId, x: target.x, y: target.y, label: null } })
       if (pin.error || !pin.data) {
@@ -45,6 +49,8 @@ export default function TaskForm({ target, members, draft, onSaved, onCancel }: 
     const { data, error } = await api.POST('/tasks', {
       body: {
         pin_id: pinId,
+        project_id: 'projectId' in target ? target.projectId : null,
+        submission_id: target.submissionId ?? null,
         title: title.trim(),
         description: description.trim() || null,
         assigned_to: assignedTo || null,

@@ -133,12 +133,12 @@ function PlanView({ projectId, planId }: { projectId: string; planId: string }) 
     if (data) setSelectedId(data.id)
   }
 
-  async function onTaskSaved(task: { pin_id: string }) {
+  async function onTaskSaved(task: { pin_id?: string | null }) {
     setTaskTarget(null)
     // un pin nuovo con task aperto passa quasi tutti i filtri, ma per sicurezza mostriamolo sempre
     if (filtering) setFilters(EMPTY_FILTERS)
     else await loadPins()
-    setSelectedId(task.pin_id)
+    setSelectedId(task.pin_id ?? null)
     setPanelVersion((v) => v + 1)
   }
 

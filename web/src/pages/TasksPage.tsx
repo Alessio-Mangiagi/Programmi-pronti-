@@ -6,6 +6,7 @@ import type { components } from '../api/schema'
 import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import { TASK_STATUS_LABEL } from '../labels'
+import { downloadCsv, today } from '../csv'
 import { useToast } from '../components/useToast'
 import { useProject } from '../hooks/useProject'
 import Icon from '../components/Icon'
@@ -148,6 +149,39 @@ export default function TasksPage() {
     api.GET('/projects/{project_id}/plans', { params: { path: { project_id: projectId } } }).then(({ data }) => data && setPlans(data))
   }, [projectId])
 
+  const [exporting, setExporting] = useState(false)
+
+  /** Tutti i task del filtro corrente (non solo la pagina), a blocchi da 200, fino a 5000. */
+  async function exportCsv() {
+    setExporting(true)
+    const f = readFilters(new URLSearchParams(query))
+    const rows: TaskItem[] = []
+    for (let offset = 0; offset < 5000; offset += 200) {
+      const { data, error } = await api.GET('/projects/{project_id}/tasks/page', {
+        params: {
+          path: { project_id: projectId },
+          query: { status: f.status, plan_id: f.plan || undefined, assigned_to: (f.mine ? user?.id : f.assignee) || undefined,
+            overdue: f.overdue || undefined, q: f.q || undefined, sort: f.sort, desc: f.desc, limit: 200, offset },
+        },
+      })
+      if (error || !data) {
+        setExporting(false)
+        return toast.error(errorMessage(error))
+      }
+      rows.push(...data.items)
+      if (rows.length >= data.total) break
+    }
+    const name = (id?: string | null) => (id ? (members.find((m) => m.id === id)?.name ?? '') : '')
+    const place = (t: TaskItem) => (t.pin_id ? `${t.plan_name}${t.pin_label ? ` · ${t.pin_label}` : ''}` : t.wbs_label ? `WBS · ${t.wbs_label}` : 'Cantiere (generale)')
+    const day = (iso?: string | null) => (iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleDateString('it-IT') : '')
+    downloadCsv(
+      `task-${today()}.csv`,
+      ['titolo', 'descrizione', 'stato', 'assegnato_a', 'scadenza', 'dove', 'creato_da', 'creato_il', 'risolto_il'],
+      rows.map((t) => [t.title, t.description, TASK_STATUS_LABEL[t.status as TaskStatus], name(t.assigned_to), day(t.due_date), place(t), name(t.created_by), day(t.created_at), day(t.resolved_at)]),
+    )
+    setExporting(false)
+  }
+
   async function patch(task: TaskItem, body: components['schemas']['TaskUpdate']) {
     const prev = page
     const replace = (fn: (t: TaskItem) => TaskItem) => setPage((p) => p && { ...p, items: p.items.map((t) => (t.id === task.id ? fn(t) : t)) })
@@ -200,6 +234,9 @@ export default function TasksPage() {
               </span>
             ))}
           </div>
+          <button type="button" className="btn" onClick={exportCsv} disabled={exporting || !page?.total}>
+            {exporting ? 'Esporto…' : 'Esporta CSV'}
+          </button>
           <button type="button" className={`btn ${filters.mine ? 'btn-primary' : ''}`} onClick={() => patchFilters({ mine: !filters.mine })}>
             {filters.mine ? 'Tutti i task' : 'I miei task'}
           </button>
@@ -344,10 +381,18 @@ export default function TasksPage() {
                         {isOverdue(t) && <span className="badge status-open">scaduto</span>}
                       </td>
                       <td>
-                        <Link to={`/projects/${projectId}/plans/${t.plan_id}?pin=${t.pin_id}`} title="Vedi sulla planimetria">
-                          <Icon name="map-pin" /> {t.plan_name}
-                          {t.pin_label && <span className="muted"> · {t.pin_label}</span>}
-                        </Link>
+                        {t.pin_id ? (
+                          <Link to={`/projects/${projectId}/plans/${t.plan_id}?pin=${t.pin_id}`} title="Vedi sulla planimetria">
+                            <Icon name="map-pin" /> {t.plan_name}
+                            {t.pin_label && <span className="muted"> · {t.pin_label}</span>}
+                          </Link>
+                        ) : t.wbs_node_id ? (
+                          <Link to={`/projects/${projectId}/wbs?node=${t.wbs_node_id}`} title="Vedi la voce WBS">
+                            <Icon name="tree" /> WBS · {t.wbs_label}
+                          </Link>
+                        ) : (
+                          <span className="muted">Cantiere (generale)</span>
+                        )}
                       </td>
                       <td className="muted small nowrap">{new Date(t.created_at + 'Z').toLocaleDateString('it-IT')}</td>
                     </tr>

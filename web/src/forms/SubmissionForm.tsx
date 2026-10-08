@@ -6,6 +6,7 @@ import { uploadAttachmentFile } from '../api/upload'
 import { useToast } from '../components/useToast'
 import { isLocal, releaseAttachment, remoteAttachments, type AttachmentMap } from './attachments'
 import DynamicForm, { type AttachmentChange } from './DynamicForm'
+import { clearDraft, draftKey, isDirty, loadDraft, saveDraft } from './drafts'
 /** Dove agganciare la compilazione: un pin della planimetria, una voce WBS o il cantiere intero (modulo generale). */
 export type SubmissionTarget = { pinId: string } | { wbsNodeId: string } | { projectId: string }
 
@@ -75,7 +76,30 @@ type EditorProps = {
 function Editor({ target, template, submission, onSaved, onCancel, onBusy }: EditorProps) {
   const toast = useToast()
   const schema = template.schema_def as FormSchema
-  const [value, setValue] = useState<FormData>(() => (submission ? { ...defaults(schema), ...(submission.data_json as FormData) } : defaults(schema)))
+  // Bozza solo per le compilazioni nuove (le modifiche partono dal modulo salvato)
+  const key = submission ? null : draftKey(template.id, target)
+  const [restored, setRestored] = useState(() => (key ? loadDraft(key) : null))
+  const [initial] = useState<FormData>(() => (submission ? { ...defaults(schema), ...(submission.data_json as FormData) } : defaults(schema)))
+  const [value, setValue] = useState<FormData>(() => (restored ? { ...initial, ...restored.value } : initial))
+  const [saved, setSaved] = useState(false)
+  const dirty = !saved && isDirty(initial, value)
+
+  // a ogni modifica la bozza va nel browser; chiudendo la scheda con dati non salvati il browser avvisa
+  useEffect(() => {
+    if (key && dirty) saveDraft(key, schema, value)
+  }, [key, dirty, schema, value])
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  function discardDraft() {
+    if (key) clearDraft(key)
+    setRestored(null)
+    setValue(initial)
+  }
   const [attachments, setAttachments] = useState<AttachmentMap>(() => (submission ? remoteAttachments(submission) : {}))
   const [touched, setTouched] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
@@ -155,6 +179,8 @@ function Editor({ target, template, submission, onSaved, onCancel, onBusy }: Edi
       }
     }
     setSavingState(null)
+    if (key) clearDraft(key)
+    setSaved(true)
     if (failed) toast.error(`Modulo salvato ma ${failed} allegat${failed === 1 ? 'o non caricato' : 'i non caricati'}`)
     else toast.success(submission ? 'Modulo aggiornato' : 'Modulo salvato')
     onSaved({ ...sub, data_json: value })
@@ -162,6 +188,17 @@ function Editor({ target, template, submission, onSaved, onCancel, onBusy }: Edi
 
   return (
     <form onSubmit={onSubmit} noValidate>
+      {restored && (
+        <div className="callout draft-callout small">
+          <span>
+            Bozza ripresa da dove l'avevi lasciata ({new Date(restored.savedAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}).
+            Foto e firma vanno riaggiunte.
+          </span>
+          <button type="button" className="btn small" onClick={discardDraft} disabled={!!saving}>
+            Scarta bozza
+          </button>
+        </div>
+      )}
       <DynamicForm
         schema={schema}
         value={value}

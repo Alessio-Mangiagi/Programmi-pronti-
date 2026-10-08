@@ -615,10 +615,10 @@ test('WBS del cantiere: albero, voce selezionata, compilazione modulo sulla voce
   await expect(tree.getByRole('treeitem', { name: /Solai/ }).locator('.wbs-count')).toHaveText('2')
   await expect(strutture.locator('.wbs-count')).toHaveText('2')
 
-  // in lettura: niente "crea task" (i task vivono sui pin), PDF disponibile
+  // in lettura: anche sulle voci WBS si crea un task (sul cantiere), PDF disponibile
   await panel.locator('.list-item-btn', { hasText: 'Punch list' }).click()
   const view = page.getByRole('dialog')
-  await expect(view.getByRole('button', { name: /Crea task/ })).toHaveCount(0)
+  await expect(view.getByRole('button', { name: /Crea task/ })).toHaveCount(1)
   await expect(view.getByRole('button', { name: 'Scarica PDF' })).toBeVisible()
   await view.getByRole('button', { name: 'Chiudi', exact: true }).last().click()
 

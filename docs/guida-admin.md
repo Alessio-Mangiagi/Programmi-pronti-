@@ -79,7 +79,13 @@ API: `GET/POST/PATCH /commesse`, `PATCH /projects/{id}` (`commessa_id`), `GET/PO
 - **Dashboard**: aperti, scaduti, chiusi negli ultimi 7 giorni, trend; click su un
   grafico → task filtrati.
 - **Task**: tabella con cambio stato/assegnatario/scadenza inline; l'icona pin apre la
-  planimetria sul pin. **Verificato** chiude il ciclo (solo manager/admin).
+  planimetria sul pin. **Verificato** chiude il ciclo (solo manager/admin). Un task può
+  stare anche **sul cantiere**: nasce dal "Crea task" di un modulo su voce WBS o generale
+  (colonna Posizione: "WBS · voce" o "Cantiere"); come i moduli generali è solo web.
+  **Esporta CSV** scarica tutti i task del filtro corrente (fino a 5000).
+- **Moduli compilati**: **Esporta CSV** con le righe filtrate e le risposte di ciascun modulo.
+- **Dashboard**: conta anche moduli e task su WBS e generali; con il filtro per planimetria
+  restano solo quelli sulla tavola.
 - **Notifiche**: assegnatario su assegnazione; creatore del task su risoluzione;
   manager del progetto su non conformità. Registro eventi: `GET /projects/{id}/events`.
 
