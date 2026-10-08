@@ -13,6 +13,8 @@ import {
 } from '@fieldview/form-core'
 import type { AttachmentMap, LocalAttachment } from './attachments'
 import Icon from '../components/Icon'
+import FieldShell from './FieldShell'
+import { fieldTips } from './fieldTips'
 import GeolocationInput from './fields/GeolocationInput'
 import PhotoInput from './fields/PhotoInput'
 import SignatureInput from './fields/SignatureInput'
@@ -60,21 +62,21 @@ export default function DynamicForm({ schema, value, errors = [], attachments, r
           <div className="dyn-grid" style={{ '--dyn-cols': sec.columns } as CSSProperties}>
             {sec.items.map(({ field: f, span }) => {
               const err = errorOf(f.id)
-              return (
-                <div
-                  key={f.id}
-                  className={`field dyn-field dyn-${f.type}${err ? ' has-error' : ''}`}
-                  style={{ '--dyn-span': span } as CSSProperties}
-                >
-                  <label htmlFor={`df-${f.id}`} className="dyn-label">
-                    {f.label}
-                    {f.required && (
-                      <span className="req" aria-hidden="true">
-                        {' '}
-                        *
-                      </span>
-                    )}
-                  </label>
+              const cls = `field dyn-field dyn-${f.type}${err ? ' has-error' : ''}`
+              const fieldStyle = { '--dyn-span': span } as CSSProperties
+              const label = (
+                <label htmlFor={`df-${f.id}`} className="dyn-label">
+                  {f.label}
+                  {f.required && (
+                    <span className="req" aria-hidden="true">
+                      {' '}
+                      *
+                    </span>
+                  )}
+                </label>
+              )
+              const content = (
+                <>
                   <FieldControl
                     field={f}
                     value={value[f.id]}
@@ -100,7 +102,18 @@ export default function DynamicForm({ schema, value, errors = [], attachments, r
                     onAttachmentsChange={onAttachmentsChange}
                     onError={onError}
                   />
+                </>
+              )
+              // in sola lettura niente suggerimenti di compilazione
+              return readOnly ? (
+                <div key={f.id} className={cls} style={fieldStyle}>
+                  {label}
+                  {content}
                 </div>
+              ) : (
+                <FieldShell key={f.id} className={cls} style={fieldStyle} tips={fieldTips(f)} label={label}>
+                  {content}
+                </FieldShell>
               )
             })}
           </div>

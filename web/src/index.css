@@ -390,6 +390,7 @@ input:focus, select:focus, textarea:focus {
 .dyn-help { margin-top: 0.3rem; }
 .dyn-check { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.35rem 0; }
 .dyn-check input { width: 20px; height: 20px; margin: 0; }
+.dyn-checkbox .dyn-check { display: flex; width: fit-content; }
 .dyn-multi { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .chip-primary.chip-on { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
 .form-actions { justify-content: flex-start; margin-top: 1.25rem; gap: 0.6rem; }
@@ -737,3 +738,25 @@ input:focus, select:focus, textarea:focus {
 .compile-page { max-width: 860px; display: flex; flex-direction: column; gap: 1rem; }
 .compile-where .field { margin-bottom: 0; }
 .compile-where .muted { margin: 0.35rem 0 0; }
+
+/* Suggerimenti di compilazione in hover (FieldShell) */
+.dyn-label-row { display: flex; align-items: center; gap: 0.4rem; }
+.dyn-label-row .dyn-label { margin-bottom: 0; }
+.dyn-field > .dyn-label-row { margin-bottom: 0.35rem; }
+.dyn-tip-btn {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; flex: none;
+  border: 1px solid var(--border-input); border-radius: 50%; background: var(--surface);
+  font: 700 0.7rem var(--font-ui); color: var(--muted); cursor: help; opacity: 0.55;
+  transition: opacity 0.2s var(--ease-out), color 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+.dyn-field:hover .dyn-tip-btn, .dyn-tip-btn:focus-visible, .dyn-tip-btn[aria-describedby] { opacity: 1; color: var(--primary); border-color: var(--primary); }
+.dyn-tip {
+  position: fixed; z-index: 1000; width: max-content; max-width: 320px; padding: 0.6rem 0.8rem;
+  background: var(--text-strong); color: #fff; border-radius: 6px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  font-family: var(--font-body); font-size: 0.82rem; line-height: 1.4; pointer-events: none;
+  animation: dyn-tip-in 0.15s var(--ease-out);
+}
+.dyn-tip.is-above { transform: translateY(-100%); }
+.dyn-tip-title { font: 700 0.68rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--cosedil-green); margin-bottom: 0.3rem; }
+.dyn-tip ul { margin: 0; padding-left: 1rem; display: flex; flex-direction: column; gap: 0.2rem; }
+@keyframes dyn-tip-in { from { opacity: 0; } to { opacity: 1; } }
