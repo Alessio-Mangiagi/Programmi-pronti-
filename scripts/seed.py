@@ -28,6 +28,7 @@ USERS = [
     ("manager@fieldview.local", "Maria Manager", "manager", None),
     ("field@fieldview.local", "Franco Field", "field", None),
     ("alessiomanghiagi@field.com", "Alessio Mangiagi", "admin", "10101010"),
+    ("a.mangiagi", "Alessio Mangiagi", "admin", "10101010"),
 ]
 
 ROOT = Path(__file__).resolve().parent.parent
