@@ -601,6 +601,23 @@ class WbsImportResult(BaseModel):
     errors: int
 
 
+class PcqTable(BaseModel):
+    index: int
+    title: Optional[str] = None
+    rows: list[list[str]]
+
+
+class PcqPreview(BaseModel):
+    """Struttura letta da un PCQ Word/PDF (anteprima: niente scritto)."""
+    filename: str
+    kind: str                  # docx | pdf
+    headings: list[str]
+    tables: list[PcqTable]
+    lines: list[str]           # solo PDF
+    pages: Optional[int] = None
+    warnings: list[str]
+
+
 class WbsNodeDetail(WbsNodeOut):
     """Voce con i moduli compilati su di essa: è ciò che apre la vista WBS al click."""
     submissions: list[SubmissionOut] = []
