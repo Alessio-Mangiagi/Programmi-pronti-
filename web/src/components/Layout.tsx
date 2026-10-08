@@ -3,13 +3,16 @@ import { isManager, useAuth } from '../auth/useAuth'
 import { useProject } from '../hooks/useProject'
 import CommessaBar from '../commesse/CommessaBar'
 import ContactAdmin from './ContactAdmin'
+import Icon from './Icon'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const { projectId } = useParams()
-  const mine = new URLSearchParams(useLocation().search).get('mine') === '1'
+  const location = useLocation()
+  const mine = new URLSearchParams(location.search).get('mine') === '1'
+  const newTemplate = location.pathname === '/templates/new'
   const project = useProject(projectId)
 
   return (
@@ -26,7 +29,16 @@ export default function Layout() {
           <NavLink to="/projects" end>
             Progetti
           </NavLink>
-          {isManager(user) && <NavLink to="/templates">Moduli</NavLink>}
+          {isManager(user) && (
+            <>
+              <NavLink to="/templates" className={({ isActive }) => (isActive && !newTemplate ? 'active' : '')}>
+                Moduli
+              </NavLink>
+              <NavLink to="/templates/new" className="nav-new">
+                <Icon name="plus" /> Nuovo modulo
+              </NavLink>
+            </>
+          )}
           {isManager(user) && <NavLink to="/inviti">Inviti</NavLink>}
           {user?.role === 'admin' && (
             <>

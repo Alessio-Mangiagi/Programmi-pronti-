@@ -72,7 +72,7 @@ export default function TemplateEditorPage() {
   const isNew = !templateId || templateId === 'new'
   // "Crea modulo" dalla pagina PCQ del cantiere: il PCQ letto arriva nello state della navigazione
   const pcq = isNew ? (location.state as { pcq?: PcqPreview } | null)?.pcq : undefined
-  const [draft] = useState<PcqConversion | null>(() => (pcq ? pcqToSchema(pcq) : null))
+  const draft = useMemo<PcqConversion | null>(() => (pcq ? pcqToSchema(pcq) : null), [pcq])
   const [loaded, setLoaded] = useState<FormTemplate | null>(null)
   const [notFound, setNotFound] = useState(false)
 
@@ -87,7 +87,8 @@ export default function TemplateEditorPage() {
   if (!isManager(user)) return <Navigate to="/projects" replace />
   if (notFound) return <div className="content empty">Template non trovato.</div>
   if (!isNew && !loaded) return <Loading className="content" />
-  return <Editor key={loaded?.id ?? 'new'} template={loaded} draft={draft} onSaved={(t) => navigate(`/templates/${t.id}`, { replace: true })} />
+  // nuovo modulo: ogni navigazione (anche dal menu mentre si è già qui) riparte da un editor vuoto
+  return <Editor key={loaded?.id ?? `new-${location.key}`} template={loaded} draft={draft} onSaved={(t) => navigate(`/templates/${t.id}`, { replace: true })} />
 }
 
 type Tab = 'struttura' | 'campi'
@@ -324,7 +325,7 @@ function Editor({ template, draft, onSaved }: EditorProps) {
           <div className="muted small">
             <Link to="/templates">Moduli</Link> · <Link to="/templates/elenco">Elenco moduli</Link>
           </div>
-          <h1>{template ? template.name : 'Nuovo template'}</h1>
+          <h1>{template ? template.name : 'Nuovo modulo'}</h1>
         </div>
         <div className="topbar-actions">
           {!locked && (

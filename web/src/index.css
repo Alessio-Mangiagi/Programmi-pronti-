@@ -718,3 +718,7 @@ input:focus, select:focus, textarea:focus {
 .pf-count { margin-left: auto; align-self: center; }
 .pf-table .row-link { cursor: pointer; }
 .pf-table .row-link:hover td, .pf-table .row-link:focus-visible td { background: var(--row-hover); }
+
+/* Menu: scorciatoia "Nuovo modulo" sotto Moduli */
+.nav a.nav-new { display: flex; align-items: center; gap: 0.45rem; margin-left: 0.75rem; font-size: 0.92em; }
+.nav a.nav-new .icon { width: 1em; height: 1em; color: var(--cosedil-green); }
