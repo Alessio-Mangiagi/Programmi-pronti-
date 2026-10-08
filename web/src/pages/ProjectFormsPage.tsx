@@ -52,13 +52,14 @@ export default function ProjectFormsPage() {
   const [members, setMembers] = useState<User[]>([])
   const [wbs, setWbs] = useState<WbsNode[] | null>(null)
   const [open, setOpen] = useState<ProjectSubmission | null>(null)
-  const [filling, setFilling] = useState(false)
   const [nodeId, setNodeId] = useState('')
 
   const q = params.get('q') ?? ''
   const tpl = params.get('modulo') ?? ''
   const place = params.get('dove') ?? ''
   const ncOnly = params.get('esito') === 'nc'
+  // la compilazione aperta sta nell'URL: il menu "Compila modulo" ci arriva con ?compila=1
+  const filling = params.get('compila') === '1'
   const setFilter = (k: string, v: string) =>
     setParams(
       (p) => {
@@ -112,10 +113,12 @@ export default function ProjectFormsPage() {
   }, [subs, q, tpl, place, ncOnly, ncOf, lookups])
 
   const ncCount = (subs ?? []).filter((s) => ncOf(s)).length
-  const startFill = () => {
-    setNodeId(wbsOptions.length === 1 ? wbsOptions[0].node.id : '')
-    setFilling(true)
+  const setFilling = (on: boolean) => {
+    setNodeId('')
+    setFilter('compila', on ? '1' : '')
   }
+  // con una sola voce WBS non c'è niente da scegliere
+  const target = nodeId || (wbsOptions.length === 1 ? wbsOptions[0].node.id : '')
 
   return (
     <>
@@ -132,7 +135,7 @@ export default function ProjectFormsPage() {
               Crea un nuovo modulo
             </Link>
           )}
-          <button type="button" className="btn btn-primary" onClick={startFill}>
+          <button type="button" className="btn btn-primary" onClick={() => setFilling(true)}>
             + Compila modulo
           </button>
         </div>
@@ -255,7 +258,7 @@ export default function ProjectFormsPage() {
             <>
               <div className="field">
                 <label htmlFor="pf-node">Dove lo registri (voce WBS)</label>
-                <select id="pf-node" value={nodeId} onChange={(e) => setNodeId(e.target.value)}>
+                <select id="pf-node" value={target} onChange={(e) => setNodeId(e.target.value)}>
                   <option value="">— Scegli la voce —</option>
                   {wbsOptions.map(({ node, depth }) => (
                     <option key={node.id} value={node.id}>
@@ -265,10 +268,10 @@ export default function ProjectFormsPage() {
                   ))}
                 </select>
               </div>
-              {nodeId ? (
+              {target ? (
                 <SubmissionForm
-                  key={nodeId}
-                  target={{ wbsNodeId: nodeId }}
+                  key={target}
+                  target={{ wbsNodeId: target }}
                   templates={templates}
                   onCancel={() => setFilling(false)}
                   onSaved={async () => {

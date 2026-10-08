@@ -4,6 +4,7 @@ import { useProject } from '../hooks/useProject'
 import CommessaBar from '../commesse/CommessaBar'
 import ContactAdmin from './ContactAdmin'
 import Icon from './Icon'
+import { compileUrl } from '../routes'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 
@@ -12,7 +13,7 @@ export default function Layout() {
   const { projectId } = useParams()
   const location = useLocation()
   const mine = new URLSearchParams(location.search).get('mine') === '1'
-  const newTemplate = location.pathname === '/templates/new'
+  const compiling = location.pathname === '/compila' || new URLSearchParams(location.search).get('compila') === '1'
   const project = useProject(projectId)
 
   return (
@@ -29,16 +30,10 @@ export default function Layout() {
           <NavLink to="/projects" end>
             Progetti
           </NavLink>
-          {isManager(user) && (
-            <>
-              <NavLink to="/templates" className={({ isActive }) => (isActive && !newTemplate ? 'active' : '')}>
-                Moduli
-              </NavLink>
-              <NavLink to="/templates/new" className="nav-new">
-                <Icon name="plus" /> Nuovo modulo
-              </NavLink>
-            </>
-          )}
+          <NavLink to={projectId ? compileUrl(projectId) : '/compila'} className={() => `nav-new${compiling ? ' active' : ''}`}>
+            <Icon name="plus" /> Compila modulo
+          </NavLink>
+          {isManager(user) && <NavLink to="/templates">Moduli</NavLink>}
           {isManager(user) && <NavLink to="/inviti">Inviti</NavLink>}
           {user?.role === 'admin' && (
             <>
@@ -58,7 +53,9 @@ export default function Layout() {
               <NavLink to={`/projects/${projectId}/dashboard`}>Dashboard</NavLink>
               <NavLink to={`/projects/${projectId}/plans`}>Planimetrie</NavLink>
               <NavLink to={`/projects/${projectId}/wbs`}>WBS</NavLink>
-              <NavLink to={`/projects/${projectId}/moduli`}>Moduli compilati</NavLink>
+              <NavLink to={`/projects/${projectId}/moduli`} className={({ isActive }) => (isActive && !compiling ? 'active' : '')}>
+                Moduli compilati
+              </NavLink>
               {isManager(user) && <NavLink to={`/projects/${projectId}/pcq`}>PCQ</NavLink>}
               <NavLink to={`/projects/${projectId}/tasks`} end className={({ isActive }) => (isActive && !mine ? 'active' : '')}>
                 Task
