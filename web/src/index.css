@@ -126,9 +126,10 @@ input:focus, select:focus, textarea:focus {
   padding: 0.25rem 1.25rem 1rem; font-family: var(--font-display); font-weight: 500; font-size: 1.05rem; color: #fff; line-height: 1.15;
 }
 .brand-mark {
-  width: 30px; height: 30px; border-radius: 4px; background: #fff; color: var(--primary); flex: none;
-  display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 0.8rem;
+  width: 32px; height: 32px; border-radius: 6px; background: #fff; color: var(--primary); flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
 }
+.brand-mark svg { width: 26px; height: 26px; display: block; }
 .brand-sub { display: block; font-family: var(--font-ui); font-weight: 600; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #9fc0dd; }
 .nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.75rem; }
 .nav a {

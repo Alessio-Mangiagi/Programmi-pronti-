@@ -4,6 +4,7 @@ import { api, errorMessage } from '../api/client'
 import type { InvitePreview } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
+import BrandMark from '../components/BrandMark'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 
@@ -70,7 +71,7 @@ export default function InviteAcceptPage() {
     <div className="login-page">
       <form className="card login-card" onSubmit={onSubmit}>
         <div className="brand">
-          <span className="brand-mark">FV</span>
+          <BrandMark />
           <span>
             InCampo
             <span className="brand-sub">Cosedil S.p.A.</span>

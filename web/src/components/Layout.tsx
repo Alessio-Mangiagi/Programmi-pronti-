@@ -5,6 +5,7 @@ import CommessaBar from '../commesse/CommessaBar'
 import ContactAdmin from './ContactAdmin'
 import Icon from './Icon'
 import { compileUrl } from '../routes'
+import BrandMark from './BrandMark'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 
@@ -20,7 +21,7 @@ export default function Layout() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">FV</span>
+          <BrandMark />
           <span>
             InCampo
             <span className="brand-sub">Cosedil S.p.A.</span>

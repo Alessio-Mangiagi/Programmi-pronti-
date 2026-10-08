@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import BrandMark from '../components/BrandMark'
 
 export default function LoginPage() {
   const { user, login } = useAuth()
@@ -32,7 +33,7 @@ export default function LoginPage() {
     <div className="login-page">
       <form className="card login-card" onSubmit={onSubmit}>
         <div className="brand">
-          <span className="brand-mark">FV</span>
+          <BrandMark />
           <span>
             InCampo
             <span className="brand-sub">Cosedil S.p.A.</span>
