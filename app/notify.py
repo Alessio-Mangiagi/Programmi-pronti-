@@ -87,6 +87,8 @@ def _entity_url(db: Session, ev: models.Event) -> Optional[str]:
     pin = None
     if ev.entity_type == "task":
         t = db.get(models.Task, ev.entity_id)
+        if t is not None and not t.pin_id:
+            return f"{WEB_URL}/projects/{ev.project_id}/tasks"
         pin = t.pin if t else None
     elif ev.entity_type == "submission":
         s = db.get(models.FormSubmission, ev.entity_id)

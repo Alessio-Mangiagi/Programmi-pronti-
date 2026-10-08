@@ -645,7 +645,10 @@ export interface paths {
          */
         get: operations["list_form_templates_form_templates_get"];
         put?: never;
-        /** Create Form Template */
+        /**
+         * Create Form Template
+         * @description Nuovo modulo (anche duplicato o da PCQ): solo l'amministratore. I responsabili li modificano.
+         */
         post: operations["create_form_template_form_templates_post"];
         delete?: never;
         options?: never;
@@ -807,7 +810,7 @@ export interface paths {
         /**
          * Preview Pcq
          * @description Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.
-         *     Lo usa l'editor dei moduli per ricreare il PCQ come template.
+         *     Lo usa l'editor dei moduli per ricreare il PCQ come template: solo admin, come la creazione dei moduli.
          */
         post: operations["preview_pcq_pcq_preview_post"];
         delete?: never;
@@ -2504,10 +2507,17 @@ export interface components {
              */
             rejected: components["schemas"]["RejectedItem"][];
         };
-        /** TaskCreate */
+        /**
+         * TaskCreate
+         * @description Task su un pin oppure sul cantiere (project_id): esattamente uno dei due. submission_id = modulo d'origine.
+         */
         TaskCreate: {
             /** Pin Id */
-            pin_id: string;
+            pin_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Submission Id */
+            submission_id?: string | null;
             /** Title */
             title: string;
             /** Description */
@@ -2519,13 +2529,17 @@ export interface components {
         };
         /**
          * TaskListItem
-         * @description Task + dove sta: basta alla vista task di progetto per il link "vedi sulla planimetria".
+         * @description Task + dove sta: planimetria e pin, oppure (task sul cantiere) la voce WBS del modulo d'origine.
          */
         TaskListItem: {
             /** Id */
             id: string;
             /** Pin Id */
-            pin_id: string;
+            pin_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Submission Id */
+            submission_id?: string | null;
             /** Title */
             title: string;
             /** Description */
@@ -2556,18 +2570,26 @@ export interface components {
              */
             attachments: components["schemas"]["AttachmentOut"][];
             /** Plan Id */
-            plan_id: string;
+            plan_id?: string | null;
             /** Plan Name */
-            plan_name: string;
+            plan_name?: string | null;
             /** Pin Label */
             pin_label?: string | null;
+            /** Wbs Node Id */
+            wbs_node_id?: string | null;
+            /** Wbs Label */
+            wbs_label?: string | null;
         };
         /** TaskOut */
         TaskOut: {
             /** Id */
             id: string;
             /** Pin Id */
-            pin_id: string;
+            pin_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Submission Id */
+            submission_id?: string | null;
             /** Title */
             title: string;
             /** Description */

@@ -138,7 +138,7 @@ def project_of_submission(sub: models.FormSubmission) -> str:
 
 
 def project_of_task(task: models.Task) -> str:
-    return project_of_pin(task.pin)
+    return project_of_pin(task.pin) if task.pin_id else task.project_id
 
 
 def project_of_attachment(att: models.Attachment) -> str:

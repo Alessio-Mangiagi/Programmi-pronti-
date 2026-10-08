@@ -343,10 +343,18 @@ class FormSubmission(SyncMixin, Base):
 
 
 class Task(SyncMixin, Base):
+    """
+    Lavoro da fare, su un pin della planimetria oppure sul cantiere (project_id) quando
+    nasce da un modulo senza luogo sulla tavola (voce WBS o modulo generale): esattamente
+    uno dei due. `submission_id` = modulo da cui è nato, se c'è. I task sul cantiere sono
+    solo web: il sync dell'app porta quelli sui pin.
+    """
     __tablename__ = "tasks"
     SYNC_FIELDS = ("title", "description", "status", "assigned_to", "due_date", "deleted_at")
 
-    pin_id = Column(String, ForeignKey("pins.id"), nullable=False, index=True)
+    pin_id = Column(String, ForeignKey("pins.id"), nullable=True, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
+    submission_id = Column(String, ForeignKey("form_submissions.id"), nullable=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.open, nullable=False)
@@ -357,6 +365,8 @@ class Task(SyncMixin, Base):
     resolved_at = Column(DateTime, nullable=True, index=True)
 
     pin = relationship("Pin", back_populates="tasks")
+    project = relationship("Project")
+    submission = relationship("FormSubmission")
     attachments = relationship("Attachment", back_populates="task")
 
 

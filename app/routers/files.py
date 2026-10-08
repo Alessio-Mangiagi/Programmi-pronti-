@@ -95,13 +95,12 @@ def delete_attachment(attachment_id: str, request: Request, db: Session = Depend
                       user: models.User = Depends(current_user)):
     """Soft-delete di foto/firma (chi ha compilato il modulo o creato il task, oppure un manager)."""
     att = _get_attachment(db, user, attachment_id)
-    parent = att.submission if att.submission_id else att.task
     owner = att.submission.submitted_by if att.submission_id else att.task.created_by
     if not auth.is_manager(user) and owner != user.id:
         raise HTTPException(403, "only the owner or a manager can delete an attachment")
     att.deleted_at = att.updated_at = utcnow()
     audit.record(db, "attachment.deleted", user, entity_type="attachment", entity_id=att.id,
-                 project_id=auth.project_of_pin(parent.pin), request=request, details={"file_type": att.file_type})
+                 project_id=auth.project_of_attachment(att), request=request, details={"file_type": att.file_type})
     db.commit()
 
 

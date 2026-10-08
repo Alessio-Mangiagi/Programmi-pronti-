@@ -431,7 +431,10 @@ class ProjectSubmissionOut(SubmissionOut):
 
 
 class TaskCreate(BaseModel):
-    pin_id: str
+    """Task su un pin oppure sul cantiere (project_id): esattamente uno dei due. submission_id = modulo d'origine."""
+    pin_id: Optional[str] = None
+    project_id: Optional[str] = None
+    submission_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     assigned_to: Optional[str] = None   # se valorizzato il task nasce già "assigned"
@@ -441,6 +444,12 @@ class TaskCreate(BaseModel):
     @classmethod
     def _naive_due(cls, v):
         return to_naive_utc(v)
+
+    @model_validator(mode="after")
+    def _one_place(self):
+        if bool(self.pin_id) == bool(self.project_id):
+            raise ValueError("exactly one of pin_id or project_id is required")
+        return self
 
 
 class TaskUpdate(BaseModel):
@@ -460,7 +469,9 @@ class TaskUpdate(BaseModel):
 class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
-    pin_id: str
+    pin_id: Optional[str] = None
+    project_id: Optional[str] = None
+    submission_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: str
@@ -494,10 +505,12 @@ class StatsOut(BaseModel):
 
 
 class TaskListItem(TaskOut):
-    """Task + dove sta: basta alla vista task di progetto per il link "vedi sulla planimetria"."""
-    plan_id: str
-    plan_name: str
+    """Task + dove sta: planimetria e pin, oppure (task sul cantiere) la voce WBS del modulo d'origine."""
+    plan_id: Optional[str] = None
+    plan_name: Optional[str] = None
     pin_label: Optional[str] = None
+    wbs_node_id: Optional[str] = None
+    wbs_label: Optional[str] = None
 
 
 class TaskPage(BaseModel):

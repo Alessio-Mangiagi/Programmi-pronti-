@@ -2069,6 +2069,7 @@
     "/form-templates": {
       "post": {
         "summary": "Create Form Template",
+        "description": "Nuovo modulo (anche duplicato o da PCQ): solo l'amministratore. I responsabili li modificano.",
         "operationId": "create_form_template_form_templates_post",
         "security": [
           {
@@ -2735,7 +2736,7 @@
     "/pcq/preview": {
       "post": {
         "summary": "Preview Pcq",
-        "description": "Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.\nLo usa l'editor dei moduli per ricreare il PCQ come template.",
+        "description": "Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.\nLo usa l'editor dei moduli per ricreare il PCQ come template: solo admin, come la creazione dei moduli.",
         "operationId": "preview_pcq_pcq_preview_post",
         "requestBody": {
           "content": {
@@ -7616,8 +7617,37 @@
       "TaskCreate": {
         "properties": {
           "pin_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Pin Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "title": {
             "type": "string",
@@ -7660,10 +7690,10 @@
         },
         "type": "object",
         "required": [
-          "pin_id",
           "title"
         ],
-        "title": "TaskCreate"
+        "title": "TaskCreate",
+        "description": "Task su un pin oppure sul cantiere (project_id): esattamente uno dei due. submission_id = modulo d'origine."
       },
       "TaskListItem": {
         "properties": {
@@ -7672,8 +7702,37 @@
             "title": "Id"
           },
           "pin_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Pin Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "title": {
             "type": "string",
@@ -7759,11 +7818,25 @@
             "default": []
           },
           "plan_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Plan Id"
           },
           "plan_name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Plan Name"
           },
           "pin_label": {
@@ -7776,21 +7849,40 @@
               }
             ],
             "title": "Pin Label"
+          },
+          "wbs_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbs Node Id"
+          },
+          "wbs_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbs Label"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "pin_id",
           "title",
           "status",
           "created_at",
-          "updated_at",
-          "plan_id",
-          "plan_name"
+          "updated_at"
         ],
         "title": "TaskListItem",
-        "description": "Task + dove sta: basta alla vista task di progetto per il link \"vedi sulla planimetria\"."
+        "description": "Task + dove sta: planimetria e pin, oppure (task sul cantiere) la voce WBS del modulo d'origine."
       },
       "TaskOut": {
         "properties": {
@@ -7799,8 +7891,37 @@
             "title": "Id"
           },
           "pin_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Pin Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "title": {
             "type": "string",
@@ -7889,7 +8010,6 @@
         "type": "object",
         "required": [
           "id",
-          "pin_id",
           "title",
           "status",
           "created_at",

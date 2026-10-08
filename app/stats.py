@@ -10,7 +10,7 @@ Filtri (tutti opzionali, in AND): intervallo date sulla creazione (`date_from`,
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from . import models
@@ -38,7 +38,15 @@ def project_stats(db: Session, project_id: str, *, date_from: Optional[datetime]
     plan_name = {p.id: p.name for p in plans}
 
     # ---- task ----
+    # Task del progetto: sui pin vivi delle planimetrie (scelte) e, senza filtro per
+    # planimetria, anche quelli sul cantiere (nati da moduli su WBS o generali).
     t = models.Task
+    on_plans = and_(models.Pin.plan_id.in_(plan_ids), models.Pin.deleted_at.is_(None))
+    task_scope = on_plans if plan_id else or_(on_plans, t.project_id == project_id)
+
+    def tasks_q(*cols):
+        return db.query(*cols).select_from(t).outerjoin(models.Pin, t.pin_id == models.Pin.id).filter(task_scope, t.deleted_at.is_(None))
+
     task_filters = []
     if date_from is not None:
         task_filters.append(t.created_at >= date_from)
@@ -48,56 +56,38 @@ def project_stats(db: Session, project_id: str, *, date_from: Optional[datetime]
         task_filters.append(t.assigned_to == assigned_to)
     task_where = and_(*task_filters) if task_filters else True
 
-    by_status = dict(
-        db.query(t.status, func.count())
-        .join(models.Pin, t.pin_id == models.Pin.id)
-        .filter(models.Pin.plan_id.in_(plan_ids), t.deleted_at.is_(None), models.Pin.deleted_at.is_(None), task_where)
-        .group_by(t.status).all()
-    )
+    by_status = dict(tasks_q(t.status, func.count()).filter(task_where).group_by(t.status).all())
     tasks_by_status = {s: int(by_status.get(TaskStatus(s), 0)) for s in STATUSES}
 
     open_by_plan_rows = (
-        db.query(models.Pin.plan_id, func.count())
-        .join(t, t.pin_id == models.Pin.id)
-        .filter(models.Pin.plan_id.in_(plan_ids), t.deleted_at.is_(None), models.Pin.deleted_at.is_(None), task_where,
-                t.status.in_([TaskStatus.open, TaskStatus.assigned]))
+        tasks_q(models.Pin.plan_id, func.count())
+        .filter(on_plans, task_where, t.status.in_([TaskStatus.open, TaskStatus.assigned]))
         .group_by(models.Pin.plan_id).all()
     )
     open_by_plan_map = {pid: int(n) for pid, n in open_by_plan_rows}
     open_by_plan = [{"plan_id": pid, "plan_name": plan_name[pid], "open": open_by_plan_map.get(pid, 0)} for pid in plan_ids]
+    if not plan_id:
+        # task sul cantiere: una barra in più, solo se ce ne sono di aperti
+        open_site = int(tasks_q(func.count(t.id)).filter(t.project_id == project_id, task_where,
+                                                          t.status.in_([TaskStatus.open, TaskStatus.assigned])).scalar() or 0)
+        if open_site:
+            open_by_plan.append({"plan_id": None, "plan_name": "Cantiere (WBS e generali)", "open": open_site})
 
     overdue = int(
-        db.query(func.count(t.id))
-        .join(models.Pin, t.pin_id == models.Pin.id)
-        .filter(models.Pin.plan_id.in_(plan_ids), t.deleted_at.is_(None), models.Pin.deleted_at.is_(None), task_where,
-                t.due_date.isnot(None), t.due_date < now, t.status.notin_([TaskStatus.verified, TaskStatus.resolved]))
+        tasks_q(func.count(t.id))
+        .filter(task_where, t.due_date.isnot(None), t.due_date < now, t.status.notin_([TaskStatus.verified, TaskStatus.resolved]))
         .scalar() or 0
     )
     week_ago = now - timedelta(days=7)
     closed_7d = int(
-        db.query(func.count(t.id))
-        .join(models.Pin, t.pin_id == models.Pin.id)
-        .filter(models.Pin.plan_id.in_(plan_ids), t.deleted_at.is_(None), models.Pin.deleted_at.is_(None), task_where,
-                t.resolved_at.isnot(None), t.resolved_at >= week_ago)
-        .scalar() or 0
+        tasks_q(func.count(t.id)).filter(task_where, t.resolved_at.isnot(None), t.resolved_at >= week_ago).scalar() or 0
     )
 
     # serie giornaliera: creati e risolti negli ultimi `days` giorni (0 dove non c'è nulla)
     start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    created_rows = (
-        db.query(_day(t.created_at), func.count())
-        .join(models.Pin, t.pin_id == models.Pin.id)
-        .filter(models.Pin.plan_id.in_(plan_ids), t.deleted_at.is_(None), models.Pin.deleted_at.is_(None),
-                t.created_at >= start, *([t.assigned_to == assigned_to] if assigned_to else []))
-        .group_by(_day(t.created_at)).all()
-    )
-    resolved_rows = (
-        db.query(_day(t.resolved_at), func.count())
-        .join(models.Pin, t.pin_id == models.Pin.id)
-        .filter(models.Pin.plan_id.in_(plan_ids), t.deleted_at.is_(None), models.Pin.deleted_at.is_(None),
-                t.resolved_at >= start, *([t.assigned_to == assigned_to] if assigned_to else []))
-        .group_by(_day(t.resolved_at)).all()
-    )
+    by_assignee = [t.assigned_to == assigned_to] if assigned_to else []
+    created_rows = tasks_q(_day(t.created_at), func.count()).filter(t.created_at >= start, *by_assignee).group_by(_day(t.created_at)).all()
+    resolved_rows = tasks_q(_day(t.resolved_at), func.count()).filter(t.resolved_at >= start, *by_assignee).group_by(_day(t.resolved_at)).all()
     created_map = {str(d): int(n) for d, n in created_rows}
     resolved_map = {str(d): int(n) for d, n in resolved_rows}
     series = []
@@ -106,6 +96,7 @@ def project_stats(db: Session, project_id: str, *, date_from: Optional[datetime]
         series.append({"date": d, "created": created_map.get(d, 0), "resolved": resolved_map.get(d, 0)})
 
     # ---- submission per template ----
+    # Sui pin delle planimetrie e, senza filtro per planimetria, anche su voci WBS e generali.
     s = models.FormSubmission
     sub_filters = []
     if date_from is not None:
@@ -114,11 +105,15 @@ def project_stats(db: Session, project_id: str, *, date_from: Optional[datetime]
         sub_filters.append(s.created_at <= date_to)
     if template_id:
         sub_filters.append(s.template_id == template_id)
+    sub_on_plans = and_(models.Pin.plan_id.in_(plan_ids), models.Pin.deleted_at.is_(None))
+    sub_scope = sub_on_plans if plan_id else or_(sub_on_plans, models.WbsNode.project_id == project_id, s.project_id == project_id)
     sub_rows = (
         db.query(s.template_id, models.FormTemplate.name, func.count())
-        .join(models.Pin, s.pin_id == models.Pin.id)
+        .select_from(s)
+        .outerjoin(models.Pin, s.pin_id == models.Pin.id)
+        .outerjoin(models.WbsNode, s.wbs_node_id == models.WbsNode.id)
         .join(models.FormTemplate, models.FormTemplate.id == s.template_id)
-        .filter(models.Pin.plan_id.in_(plan_ids), s.deleted_at.is_(None), models.Pin.deleted_at.is_(None), *sub_filters)
+        .filter(sub_scope, s.deleted_at.is_(None), *sub_filters)
         .group_by(s.template_id, models.FormTemplate.name).order_by(func.count().desc()).all()
     )
     submissions_by_template = [{"template_id": tid, "template_name": name, "count": int(n)} for tid, name, n in sub_rows]

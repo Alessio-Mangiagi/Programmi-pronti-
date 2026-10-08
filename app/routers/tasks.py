@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import case, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, aliased, contains_eager, selectinload
 
 from .. import models, schemas, auth, events, audit, stats as st_stats
@@ -22,13 +22,24 @@ router = APIRouter()
 @router.post("/tasks", response_model=schemas.TaskOut, status_code=201)
 def create_task(payload: schemas.TaskCreate, request: Request, db: Session = Depends(get_db),
                 user: models.User = Depends(current_user)):
-    _get_pin(db, user, payload.pin_id)
+    if payload.pin_id:
+        project_id = auth.project_of_pin(_get_pin(db, user, payload.pin_id))
+    else:
+        project_id = payload.project_id
+        if db.get(models.Project, project_id) is None:
+            raise HTTPException(404, "project not found")
+        auth.assert_project_access(db, user, project_id)
+    if payload.submission_id:
+        sub = db.get(models.FormSubmission, payload.submission_id)
+        if sub is None or sub.deleted_at is not None:
+            raise HTTPException(404, "submission not found")
+        if auth.project_of_submission(sub) != project_id:
+            raise HTTPException(422, "submission belongs to another project")
     _get_user_or_422(db, payload.assigned_to, "assigned_to")
     task = models.Task(**payload.model_dump(), created_by=user.id)
     task.status = TaskStatus.assigned if payload.assigned_to else TaskStatus.open
     db.add(task)
     db.flush()
-    project_id = auth.project_of_pin(task.pin)
     events.record_task_created(db, task, project_id, user.id)
     audit.record(db, "task.created", user, entity_type="task", entity_id=task.id, project_id=project_id,
                  request=request, details={"title": task.title, "assigned_to": task.assigned_to})
@@ -40,15 +51,22 @@ def create_task(payload: schemas.TaskCreate, request: Request, db: Session = Dep
 TASK_SORTS = ("created_at", "title", "status", "assigned_to", "due_date", "plan_name")
 
 
+def in_project(project_id: str):
+    """Condizione "task vivo del progetto": sui pin vivi delle sue planimetrie, oppure sul cantiere.
+    Va usata con Pin e Plan in outer join (i task sul cantiere non hanno pin)."""
+    return or_(and_(models.Plan.project_id == project_id, models.Pin.deleted_at.is_(None)),
+               models.Task.project_id == project_id)
+
+
 def _task_query(db: Session, project_id: str):
-    """Task vivi del progetto, con pin e planimetria già in join (servono a filtri, ordinamento e risposta)."""
+    """Task vivi del progetto, con pin e planimetria (se ci sono) già in join: servono a filtri, ordinamento e risposta."""
     return (db.query(models.Task)
-            .join(models.Pin, models.Task.pin_id == models.Pin.id)
-            .join(models.Plan, models.Pin.plan_id == models.Plan.id)
-            .filter(models.Plan.project_id == project_id)
-            .filter(models.Task.deleted_at.is_(None), models.Pin.deleted_at.is_(None))
+            .outerjoin(models.Pin, models.Task.pin_id == models.Pin.id)
+            .outerjoin(models.Plan, models.Pin.plan_id == models.Plan.id)
+            .filter(in_project(project_id), models.Task.deleted_at.is_(None))
             .options(contains_eager(models.Task.pin).contains_eager(models.Pin.plan),
-                     selectinload(models.Task.attachments)))
+                     selectinload(models.Task.attachments),
+                     selectinload(models.Task.submission).selectinload(models.FormSubmission.wbs_node)))
 
 
 def _filter_tasks(q, status: Optional[list[str]], plan_id: Optional[str], assigned_to: Optional[str],
@@ -67,6 +85,7 @@ def _filter_tasks(q, status: Optional[list[str]], plan_id: Optional[str], assign
         q = q.filter(or_(func.lower(models.Task.title).like(like),
                          func.lower(func.coalesce(models.Task.description, "")).like(like),
                          func.lower(func.coalesce(models.Pin.label, "")).like(like)))
+    # plan_id filtra per planimetria: i task sul cantiere (senza pin) restano fuori
     return q
 
 
@@ -90,7 +109,11 @@ def _sort_tasks(q, sort: str, desc: bool):
 
 def _list_item(t: models.Task) -> schemas.TaskListItem:
     base = _with_attachments(schemas.TaskOut, t)
-    return schemas.TaskListItem(**base.model_dump(), plan_id=t.pin.plan_id, plan_name=t.pin.plan.name, pin_label=t.pin.label)
+    if t.pin is not None:
+        return schemas.TaskListItem(**base.model_dump(), plan_id=t.pin.plan_id, plan_name=t.pin.plan.name, pin_label=t.pin.label)
+    node = t.submission.wbs_node if t.submission is not None else None
+    return schemas.TaskListItem(**base.model_dump(), wbs_node_id=node.id if node else None,
+                                wbs_label=(f"{node.code} {node.name}" if node.code else node.name) if node else None)
 
 
 @router.get("/projects/{project_id}/tasks", response_model=list[schemas.TaskListItem])
@@ -134,9 +157,9 @@ def list_tasks_page(
     rows = _sort_tasks(filtered, sort, desc).limit(limit).offset(offset).all()
     counts = dict(
         db.query(models.Task.status, func.count(models.Task.id))
-        .join(models.Pin, models.Task.pin_id == models.Pin.id)
-        .join(models.Plan, models.Pin.plan_id == models.Plan.id)
-        .filter(models.Plan.project_id == project_id, models.Task.deleted_at.is_(None), models.Pin.deleted_at.is_(None))
+        .outerjoin(models.Pin, models.Task.pin_id == models.Pin.id)
+        .outerjoin(models.Plan, models.Pin.plan_id == models.Plan.id)
+        .filter(in_project(project_id), models.Task.deleted_at.is_(None))
         .group_by(models.Task.status).all())
     return schemas.TaskPage(items=[_list_item(t) for t in rows], total=total, limit=limit, offset=offset,
                             counts={s.value: counts.get(s, 0) for s in TaskStatus})

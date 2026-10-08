@@ -432,3 +432,57 @@ def test_general_project_submission(client, project, pin, users):
     # solo web: non arriva all'app col sync
     pulled = client.get("/sync/pull", params={"project_id": pid}).json()["submissions"]
     assert sub["id"] not in {s["id"] for s in pulled}
+
+
+def test_site_task_from_wbs_non_conformity(client, project, pin, users):
+    """Non conformità su una voce WBS: il task sta sul cantiere e punta al modulo d'origine."""
+    pid, tpl = project["project"]["id"], project["template"]["id"]
+    node = client.post(f"/projects/{pid}/wbs", json={"code": "02", "name": "Impianti"}).json()
+    sub = client.post("/submissions", json={"template_id": tpl, "wbs_node_id": node["id"],
+                                            "data_json": {"esito": "Non conforme"}}).json()
+    field = users["field"]
+    # esattamente uno fra pin e cantiere
+    assert client.post("/tasks", json={"title": "x"}).status_code == 422
+    assert client.post("/tasks", json={"title": "x", "pin_id": pin, "project_id": pid}).status_code == 422
+    assert client.post("/tasks", headers=users["outsider"]["headers"], json={"title": "x", "project_id": pid}).status_code == 403
+    other = client.post("/projects", json={"name": "Altro"}).json()
+    assert client.post("/tasks", json={"title": "x", "project_id": other["id"], "submission_id": sub["id"]}).status_code == 422
+
+    r = client.post("/tasks", headers=field["headers"], json={
+        "title": "Rifare prova di tenuta", "project_id": pid, "submission_id": sub["id"], "assigned_to": field["id"]})
+    assert r.status_code == 201, r.text
+    task = r.json()
+    assert task["pin_id"] is None and task["project_id"] == pid and task["status"] == "assigned"
+
+    page = client.get(f"/projects/{pid}/tasks/page").json()
+    row = next(t for t in page["items"] if t["id"] == task["id"])
+    assert row["plan_id"] is None and row["wbs_node_id"] == node["id"] and row["wbs_label"] == "02 Impianti"
+    assert page["counts"]["assigned"] >= 1
+    # filtro per planimetria: i task sul cantiere restano fuori
+    by_plan = client.get(f"/projects/{pid}/tasks/page", params={"plan_id": project["plan"]["id"]}).json()
+    assert task["id"] not in {t["id"] for t in by_plan["items"]}
+
+    # ciclo di vita come gli altri: risolto con foto, verificato dall'ufficio
+    att = client.post("/attachments", headers=field["headers"], json={"task_id": task["id"], "file_type": "photo"}).json()
+    assert client.patch(f"/tasks/{task['id']}", headers=field["headers"], json={"status": "resolved"}).status_code == 200
+    assert client.patch(f"/tasks/{task['id']}", json={"status": "verified"}).status_code == 200
+    assert client.delete(f"/attachments/{att['id']}", headers=field["headers"]).status_code == 204
+
+    # dashboard: contato fra i task e i moduli su WBS fra i moduli
+    stats = client.get(f"/projects/{pid}/stats").json()
+    assert stats["tasks_by_status"]["verified"] == 1
+    assert sum(x["count"] for x in stats["submissions_by_template"]) == 1
+    assert client.get(f"/projects/{pid}/stats", params={"plan_id": project["plan"]["id"]}).json()["tasks_by_status"]["verified"] == 0
+
+    # solo web: non arriva all'app
+    pulled = client.get("/sync/pull", params={"project_id": pid}).json()["tasks"]
+    assert task["id"] not in {t["id"] for t in pulled}
+
+
+def test_delete_photo_of_wbs_submission(client, project):
+    """Prima andava in errore: la foto di un modulo su voce WBS non ha pin."""
+    pid, tpl = project["project"]["id"], project["template"]["id"]
+    node = client.post(f"/projects/{pid}/wbs", json={"name": "Solai"}).json()
+    sub = client.post("/submissions", json={"template_id": tpl, "wbs_node_id": node["id"], "data_json": {}}).json()
+    att = client.post("/attachments", json={"submission_id": sub["id"], "file_type": "photo"}).json()
+    assert client.delete(f"/attachments/{att['id']}").status_code == 204
