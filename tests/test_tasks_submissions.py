@@ -486,3 +486,10 @@ def test_delete_photo_of_wbs_submission(client, project):
     sub = client.post("/submissions", json={"template_id": tpl, "wbs_node_id": node["id"], "data_json": {}}).json()
     att = client.post("/attachments", json={"submission_id": sub["id"], "file_type": "photo"}).json()
     assert client.delete(f"/attachments/{att['id']}").status_code == 204
+
+
+def test_new_submission_not_marked_as_modified(client, project):
+    """Appena creato, un modulo ha created_at == updated_at (prima differivano di microsecondi: "modificato")."""
+    pid, tpl = project["project"]["id"], project["template"]["id"]
+    sub = client.post("/submissions", json={"template_id": tpl, "project_id": pid, "data_json": {}}).json()
+    assert sub["created_at"] == sub["updated_at"]

@@ -498,7 +498,16 @@ def _track_field_times(session, flush_context, instances):
     i campi che porta hanno l'istante della modifica vera, non quello di arrivo.
     """
     for obj in list(session.new) + list(session.dirty):
-        if not isinstance(obj, SyncMixin) or not obj.SYNC_FIELDS:
+        if not isinstance(obj, SyncMixin):
+            continue
+        if obj in session.new:
+            # stesso istante per creazione e ultima modifica: i default calcolati colonna per
+            # colonna differiscono di qualche microsecondo e la riga sembrerebbe "modificata"
+            if obj.created_at is None:
+                obj.created_at = obj.updated_at or utcnow()
+            if obj.updated_at is None:
+                obj.updated_at = obj.created_at
+        if not obj.SYNC_FIELDS:
             continue
         state = inspect(obj)
         if obj in session.new:
