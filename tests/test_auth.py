@@ -153,7 +153,9 @@ def test_plans_and_templates_require_manager(client, project, users):
                        headers=f).status_code == 403
     tpl = {"name": "T", "schema_def": {"fields": [{"id": "a", "type": "text", "label": "A"}]}}
     assert client.post("/form-templates", json=tpl, headers=f).status_code == 403
-    assert client.post("/form-templates", json=tpl, headers=m).status_code == 201
+    # creare moduli è solo dell'amministratore (il client dei test è admin)
+    assert client.post("/form-templates", json=tpl, headers=m).status_code == 403
+    assert client.post("/form-templates", json=tpl).status_code == 201
     assert len(client.get("/form-templates", headers=f).json()) == 2
 
 

@@ -60,7 +60,7 @@ def test_pcq_preview_docx_headings_tables_and_merges(client, project, users):
     # stessa lettura senza cantiere (editor dei moduli)
     r = client.post("/pcq/preview", files={"file": ("pcq.docx", _docx(body), "application/octet-stream")})
     assert r.status_code == 200 and r.json()["tables"] == doc["tables"]
-    r = client.post("/pcq/preview", headers=users["field"]["headers"],
+    r = client.post("/pcq/preview", headers=users["manager"]["headers"],
                     files={"file": ("pcq.docx", _docx(body), "application/octet-stream")})
     assert r.status_code == 403
 
@@ -90,4 +90,4 @@ def test_pcq_example_docx_is_readable(client, users):
     doc = _preview(client, None, r.content, "PCQ-esempio.docx", path="/pcq/preview").json()
     assert doc["headings"][0].startswith("PCQ") and len(doc["tables"]) == 2
     assert doc["tables"][0]["rows"][0][:2] == ["Fase", "Controllo"]
-    assert client.get("/pcq/example.docx", headers=users["field"]["headers"]).status_code == 403
+    assert client.get("/pcq/example.docx", headers=users["manager"]["headers"]).status_code == 403

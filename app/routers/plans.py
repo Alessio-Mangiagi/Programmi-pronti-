@@ -141,7 +141,8 @@ def list_plan_pins(
 
 @router.post("/form-templates", response_model=schemas.FormTemplateOut, status_code=201)
 def create_form_template(payload: schemas.FormTemplateCreate, request: Request, db: Session = Depends(get_db),
-                         user: models.User = Depends(require_role(UserRole.manager))):
+                         user: models.User = Depends(require_role(UserRole.admin))):
+    """Nuovo modulo (anche duplicato o da PCQ): solo l'amministratore. I responsabili li modificano."""
     errors = validate_schema(payload.schema_def)
     if errors:
         raise HTTPException(422, detail=errors)

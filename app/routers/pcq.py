@@ -27,14 +27,14 @@ async def _preview(file: UploadFile) -> schemas.PcqPreview:
 
 
 @router.post("/pcq/preview", response_model=schemas.PcqPreview)
-async def preview_pcq(file: UploadFile = File(...), user: models.User = Depends(require_role(UserRole.manager))):
+async def preview_pcq(file: UploadFile = File(...), user: models.User = Depends(require_role(UserRole.admin))):
     """Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.
-    Lo usa l'editor dei moduli per ricreare il PCQ come template."""
+    Lo usa l'editor dei moduli per ricreare il PCQ come template: solo admin, come la creazione dei moduli."""
     return await _preview(file)
 
 
 @router.get("/pcq/example.docx")
-def example_pcq(user: models.User = Depends(require_role(UserRole.manager))):
+def example_pcq(user: models.User = Depends(require_role(UserRole.admin))):
     """PCQ Word di esempio: mostra il formato che l'import riconosce meglio."""
     return Response(content=pcq_import.example_docx(),
                     media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
