@@ -1,5 +1,5 @@
 import { getToken, onUnauthorized } from '../auth/token'
-import type { Attachment, Plan, WbsImportResult } from './types'
+import type { Attachment, PcqPreview, Plan, WbsImportResult } from './types'
 
 export const PLAN_FILE_ACCEPT = 'image/png,image/jpeg,application/pdf,.png,.jpg,.jpeg,.pdf'
 export const PLAN_FILE_MAX_BYTES = 20 * 1024 * 1024
@@ -19,6 +19,14 @@ export const WBS_FILE_ACCEPT = '.xlsx,.csv,application/vnd.openxmlformats-office
 /** Albero WBS da Excel/CSV; con dryRun solo l'anteprima riga per riga (niente scritto). */
 export function importWbsFile(projectId: string, file: File, dryRun: boolean): Promise<WbsImportResult> {
   return uploadMultipart(`/api/projects/${encodeURIComponent(projectId)}/wbs/import?dry_run=${dryRun}`, file)
+}
+
+export const PCQ_FILE_ACCEPT = '.docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf'
+export const PCQ_FILE_MAX_BYTES = 20 * 1024 * 1024
+
+/** Legge un PCQ Word/PDF e restituisce titoli e tabelle (solo anteprima, niente scritto). */
+export function previewPcqFile(projectId: string, file: File, onProgress?: (fraction: number) => void): Promise<PcqPreview> {
+  return uploadMultipart(`/api/projects/${encodeURIComponent(projectId)}/pcq/preview`, file, onProgress)
 }
 
 /**
@@ -63,4 +71,8 @@ const UPLOAD_ERRORS: Record<string, string> = {
   'cannot read xlsx': 'File Excel non leggibile',
   'xls not supported: save as xlsx or csv': 'Formato .xls non supportato: salva come .xlsx o .csv',
   'empty file': 'Il file è vuoto',
+  'cannot read docx': 'File Word non leggibile',
+  'cannot read pdf': 'PDF non leggibile',
+  'doc not supported: save as docx': 'Formato .doc non supportato: salva come .docx',
+  'only docx or pdf allowed': 'Formato non supportato: usa Word (.docx) o PDF',
 }

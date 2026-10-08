@@ -795,6 +795,26 @@ export interface paths {
         patch: operations["update_wbs_node_wbs__node_id__patch"];
         trace?: never;
     };
+    "/projects/{project_id}/pcq/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Pcq
+         * @description Legge un PCQ (.docx o .pdf) e ne restituisce titoli e tabelle (o testo, per i PDF). Non scrive nulla.
+         */
+        post: operations["preview_pcq_projects__project_id__pcq_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/submissions": {
         parameters: {
             query?: never;
@@ -1335,6 +1355,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_preview_pcq_projects__project_id__pcq_preview_post */
+        Body_preview_pcq_projects__project_id__pcq_preview_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_attachment_attachments__attachment_id__upload_post */
         Body_upload_attachment_attachments__attachment_id__upload_post: {
             /** File */
@@ -1789,6 +1814,35 @@ export interface components {
             /** Sent At */
             sent_at?: string | null;
             event: components["schemas"]["EventOut"];
+        };
+        /**
+         * PcqPreview
+         * @description Struttura letta da un PCQ Word/PDF (anteprima: niente scritto).
+         */
+        PcqPreview: {
+            /** Filename */
+            filename: string;
+            /** Kind */
+            kind: string;
+            /** Headings */
+            headings: string[];
+            /** Tables */
+            tables: components["schemas"]["PcqTable"][];
+            /** Lines */
+            lines: string[];
+            /** Pages */
+            pages?: number | null;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** PcqTable */
+        PcqTable: {
+            /** Index */
+            index: number;
+            /** Title */
+            title?: string | null;
+            /** Rows */
+            rows: string[][];
         };
         /** PinCreate */
         PinCreate: {
@@ -4472,6 +4526,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WbsNodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_pcq_projects__project_id__pcq_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_pcq_projects__project_id__pcq_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PcqPreview"];
                 };
             };
             /** @description Validation Error */

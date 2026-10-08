@@ -2732,6 +2732,61 @@
         }
       }
     },
+    "/projects/{project_id}/pcq/preview": {
+      "post": {
+        "summary": "Preview Pcq",
+        "description": "Legge un PCQ (.docx o .pdf) e ne restituisce titoli e tabelle (o testo, per i PDF). Non scrive nulla.",
+        "operationId": "preview_pcq_projects__project_id__pcq_preview_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_pcq_projects__project_id__pcq_preview_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcqPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/submissions": {
       "post": {
         "summary": "Create Submission",
@@ -4532,6 +4587,20 @@
         ],
         "title": "Body_import_wbs_projects__project_id__wbs_import_post"
       },
+      "Body_preview_pcq_projects__project_id__pcq_preview_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_pcq_projects__project_id__pcq_preview_post"
+      },
       "Body_upload_attachment_attachments__attachment_id__upload_post": {
         "properties": {
           "file": {
@@ -5782,6 +5851,103 @@
           "event"
         ],
         "title": "NotificationOut"
+      },
+      "PcqPreview": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "headings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Headings"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/PcqTable"
+            },
+            "type": "array",
+            "title": "Tables"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "kind",
+          "headings",
+          "tables",
+          "lines",
+          "warnings"
+        ],
+        "title": "PcqPreview",
+        "description": "Struttura letta da un PCQ Word/PDF (anteprima: niente scritto)."
+      },
+      "PcqTable": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "rows"
+        ],
+        "title": "PcqTable"
       },
       "PinCreate": {
         "properties": {

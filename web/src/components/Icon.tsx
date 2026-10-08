@@ -17,6 +17,8 @@ const PATHS = {
   'chevron-right': 'M9 6l6 6-6 6',
   'chevron-down': 'M6 9l6 6 6-6',
   tree: 'M12 3v6 M12 9H6v4 M12 9h6v4 M4 13h4v4H4z M16 13h4v4h-4z M10 3h4v6h-4z',
+  upload: 'M12 16V4 M7 9l5-5 5 5 M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4',
+  file: 'M6 3h8l5 5v13H6z M14 3v5h5',
   message: 'M4 5h16v11H9.5L5 19.5V16H4z M8 9h8 M8 12.5h5',
 } as const
 
