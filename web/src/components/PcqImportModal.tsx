@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { isFieldItem } from '@fieldview/form-core'
 import { PCQ_FILE_ACCEPT, PCQ_FILE_MAX_BYTES, pcqFileError, previewPcqFile } from '../api/upload'
 import { formatBytes } from '../format'
@@ -53,7 +54,7 @@ export default function PcqImportModal({ replacing, onApply, onClose }: Props) {
       <p className="muted small">
         Ogni controllo del PCQ diventa un campo con esito <strong>Conforme / Non conforme / Non applicabile</strong> (un "Non conforme" propone
         un task); frequenza, criterio di accettazione e responsabile finiscono nel testo di aiuto. In fondo: data, note e firma. Poi rivedi tutto
-        nell'editor e salvi.
+        nell'editor e salvi. <Link to="/templates/pcq">Come deve essere fatto il file</Link>
       </p>
       <FileDropzone
         accept={PCQ_FILE_ACCEPT}

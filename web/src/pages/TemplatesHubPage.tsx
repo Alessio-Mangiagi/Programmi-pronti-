@@ -51,6 +51,13 @@ export default function TemplatesHubPage() {
             <h2>Nuovo modulo</h2>
             <p className="muted">Costruisci un modulo da zero: campi, obbligatorietà, anteprima.</p>
           </Link>
+          <Link to="/templates/pcq" className="card card-link hub-card">
+            <span className="hub-icon">
+              <Icon name="file" />
+            </span>
+            <h2>Struttura PCQ</h2>
+            <p className="muted">Come preparare il Word del Piano di Controllo Qualità, con un esempio scaricabile e il modulo che ne esce.</p>
+          </Link>
           <Link to="/templates/scelte" className="card card-link hub-card">
             <span className="hub-icon">
               <Icon name="list-checks" />

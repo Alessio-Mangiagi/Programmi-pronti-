@@ -102,3 +102,10 @@ export function pcqToSchema(p: PcqPreview): PcqConversion {
   const first = p.headings[0]?.trim() || (p.kind === 'pdf' ? p.lines[0] : '') || p.filename.replace(/\.[^.]+$/, '')
   return { name: cut(clean(first)), schema: { fields, layout: { sections } }, controls }
 }
+
+/** Riepilogo di cosa è stato letto: tabelle e righe per il Word, pagine e righe per il PDF. */
+export function pcqSummary(p: PcqPreview) {
+  if (p.kind === 'pdf') return `${p.pages ?? 0} pagin${p.pages === 1 ? 'a' : 'e'} · ${p.lines.length} righe di testo`
+  const rows = p.tables.reduce((n, t) => n + t.rows.length, 0)
+  return `${p.tables.length} tabell${p.tables.length === 1 ? 'a' : 'e'} · ${rows} righe · ${p.headings.length} titoli`
+}

@@ -4,8 +4,10 @@ import type { PcqPreview } from '../api/types'
 import { PCQ_FILE_ACCEPT, PCQ_FILE_MAX_BYTES, pcqFileError, previewPcqFile } from '../api/upload'
 import { isManager, useAuth } from '../auth/useAuth'
 import FileDropzone from '../components/FileDropzone'
+import PcqDocumentView from '../components/PcqDocumentView'
 import Icon from '../components/Icon'
 import { formatBytes } from '../format'
+import { pcqSummary as summary } from '../forms/pcqToSchema'
 import { useProject } from '../hooks/useProject'
 
 type Item = {
@@ -17,17 +19,10 @@ type Item = {
   error?: string
 }
 
-const PDF_LINES_SHOWN = 300
 
 function extension(name: string) {
   const i = name.lastIndexOf('.')
   return i >= 0 ? name.slice(i).toLowerCase() : ''
-}
-
-function summary(p: PcqPreview) {
-  if (p.kind === 'pdf') return `${p.pages ?? 0} pagin${p.pages === 1 ? 'a' : 'e'} · ${p.lines.length} righe di testo`
-  const rows = p.tables.reduce((n, t) => n + t.rows.length, 0)
-  return `${p.tables.length} tabell${p.tables.length === 1 ? 'a' : 'e'} · ${rows} righe · ${p.headings.length} titoli`
 }
 
 /**
@@ -176,87 +171,14 @@ export default function PcqPage() {
               </ul>
             )}
 
-            {current?.preview && <PcqPreviewPanel name={current.file.name} preview={current.preview} />}
+            {current?.preview && (
+              <section className="card pcq-preview">
+                <PcqDocumentView name={current.file.name} preview={current.preview} />
+              </section>
+            )}
           </>
         )}
       </div>
     </>
-  )
-}
-
-function PcqPreviewPanel({ name, preview }: { name: string; preview: PcqPreview }) {
-  const [allLines, setAllLines] = useState(false)
-  const lines = allLines ? preview.lines : preview.lines.slice(0, PDF_LINES_SHOWN)
-  return (
-    <section className="card pcq-preview">
-      <h2>{name}</h2>
-      <p className="muted small">{summary(preview)}</p>
-      {preview.warnings.map((w) => (
-        <p key={w} className="pcq-warning small">
-          {w}
-        </p>
-      ))}
-
-      {preview.headings.length > 0 && (
-        <>
-          <h3>Struttura</h3>
-          <ul className="pcq-headings">
-            {preview.headings.map((h, i) => (
-              <li key={i} style={{ paddingLeft: `${(h.length - h.trimStart().length) * 0.6}rem`, fontWeight: h.startsWith(' ') ? undefined : 600 }}>
-                {h.trim()}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {preview.tables.map((t) => {
-        const [head, ...body] = t.rows
-        return (
-          <div key={t.index} className="pcq-table">
-            <h3>
-              Tabella {t.index}
-              {t.title && <span className="muted"> · {t.title}</span>}
-            </h3>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    {head.map((c, i) => (
-                      <th key={i}>{c}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {body.map((r, i) => (
-                    <tr key={i}>
-                      {r.map((c, j) => (
-                        <td key={j}>{c}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })}
-
-      {preview.kind === 'pdf' && preview.lines.length > 0 && (
-        <>
-          <h3>Testo</h3>
-          <ol className="pcq-lines">
-            {lines.map((l, i) => (
-              <li key={i}>{l}</li>
-            ))}
-          </ol>
-          {preview.lines.length > PDF_LINES_SHOWN && (
-            <button type="button" className="link-btn" onClick={() => setAllLines((v) => !v)}>
-              {allLines ? 'Mostra meno' : `Mostra tutte le ${preview.lines.length} righe`}
-            </button>
-          )}
-        </>
-      )}
-    </section>
   )
 }

@@ -680,8 +680,8 @@ input:focus, select:focus, textarea:focus {
 .pcq-item-actions { display: flex; align-items: center; gap: 0.4rem; flex: none; }
 .pcq-bar { height: 4px; margin-top: 0.4rem; border-radius: 999px; background: var(--bg-alt); overflow: hidden; }
 .pcq-bar > div { height: 100%; background: var(--cosedil-green); transition: width 0.15s; }
-.pcq-preview h2 { margin: 0 0 0.2rem; overflow-wrap: anywhere; }
-.pcq-preview h3 { margin: 1.2rem 0 0.5rem; font-size: 1rem; }
+.pcq-doc h2 { margin: 0 0 0.2rem; overflow-wrap: anywhere; }
+.pcq-doc h3 { margin: 1.2rem 0 0.5rem; font-size: 1rem; }
 .pcq-warning { margin: 0.5rem 0 0; padding: 0.5rem 0.7rem; border-left: 3px solid var(--warn); background: rgba(184, 115, 10, 0.07); }
 .pcq-warning::first-letter { text-transform: uppercase; }
 .pcq-headings { margin: 0; padding: 0; list-style: none; }
@@ -695,3 +695,26 @@ input:focus, select:focus, textarea:focus {
 .pcq-summary-list li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0.8rem; }
 .pcq-summary-list li + li { border-top: 1px solid var(--border); }
 .pcq-summary .callout { margin-top: 0.8rem; }
+
+/* Struttura PCQ: regole, esempio Word e modulo risultante */
+.pcq-structure { display: flex; flex-direction: column; gap: 1.5rem; }
+.pcq-structure .card h2 { margin-top: 0; }
+.pcq-rules { margin: 0 0 1rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.4rem; max-width: 90ch; }
+.pcq-compare { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.pcq-compare-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; margin: 0 0 0.7rem; }
+.pcq-compare-title .step-n {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--primary); color: var(--primary-ink); font: 700 0.8rem var(--font-ui);
+}
+.pcq-paper {
+  background: #fff; border: 1px solid var(--border); border-radius: 2px; padding: 2rem 2.2rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(12, 69, 119, 0.08);
+}
+.pcq-paper .table-wrap { max-height: none; }
+.pcq-form-name { margin: 0 0 0.2rem; }
+@media (max-width: 1100px) { .pcq-compare { grid-template-columns: minmax(0, 1fr); } }
+
+/* Moduli del cantiere */
+.pf-count { margin-left: auto; align-self: center; }
+.pf-table .row-link { cursor: pointer; }
+.pf-table .row-link:hover td, .pf-table .row-link:focus-visible td { background: var(--row-hover); }

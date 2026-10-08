@@ -46,6 +46,7 @@ export default function Layout() {
               <NavLink to={`/projects/${projectId}/dashboard`}>Dashboard</NavLink>
               <NavLink to={`/projects/${projectId}/plans`}>Planimetrie</NavLink>
               <NavLink to={`/projects/${projectId}/wbs`}>WBS</NavLink>
+              <NavLink to={`/projects/${projectId}/moduli`}>Moduli compilati</NavLink>
               {isManager(user) && <NavLink to={`/projects/${projectId}/pcq`}>PCQ</NavLink>}
               <NavLink to={`/projects/${projectId}/tasks`} end className={({ isActive }) => (isActive && !mine ? 'active' : '')}>
                 Task
