@@ -57,6 +57,13 @@ def test_pcq_preview_docx_headings_tables_and_merges(client, project, users):
     # solo manager
     assert _preview(client, pid, _docx(body), "pcq.docx", users["field"]["headers"]).status_code == 403
 
+    # stessa lettura senza cantiere (editor dei moduli)
+    r = client.post("/pcq/preview", files={"file": ("pcq.docx", _docx(body), "application/octet-stream")})
+    assert r.status_code == 200 and r.json()["tables"] == doc["tables"]
+    r = client.post("/pcq/preview", headers=users["field"]["headers"],
+                    files={"file": ("pcq.docx", _docx(body), "application/octet-stream")})
+    assert r.status_code == 403
+
 
 def test_pcq_preview_pdf_text_and_errors(client, project):
     pid = project["project"]["id"]

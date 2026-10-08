@@ -14,11 +14,7 @@ router = APIRouter()
 PCQ_MAX_BYTES = 20 * 1024 * 1024
 
 
-@router.post("/projects/{project_id}/pcq/preview", response_model=schemas.PcqPreview)
-async def preview_pcq(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db),
-                      user: models.User = Depends(require_role(UserRole.manager))):
-    """Legge un PCQ (.docx o .pdf) e ne restituisce titoli e tabelle (o testo, per i PDF). Non scrive nulla."""
-    auth.assert_project_access(db, user, project_id)
+async def _preview(file: UploadFile) -> schemas.PcqPreview:
     data = await file.read(PCQ_MAX_BYTES + 1)
     if len(data) > PCQ_MAX_BYTES:
         raise HTTPException(413, f"file larger than {PCQ_MAX_BYTES} bytes")
@@ -27,3 +23,18 @@ async def preview_pcq(project_id: str, file: UploadFile = File(...), db: Session
     except ValueError as e:
         raise HTTPException(422, str(e))
     return schemas.PcqPreview(filename=file.filename or "", **asdict(doc))
+
+
+@router.post("/pcq/preview", response_model=schemas.PcqPreview)
+async def preview_pcq(file: UploadFile = File(...), user: models.User = Depends(require_role(UserRole.manager))):
+    """Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.
+    Lo usa l'editor dei moduli per ricreare il PCQ come template."""
+    return await _preview(file)
+
+
+@router.post("/projects/{project_id}/pcq/preview", response_model=schemas.PcqPreview)
+async def preview_project_pcq(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db),
+                              user: models.User = Depends(require_role(UserRole.manager))):
+    """Come /pcq/preview, dalla pagina PCQ del cantiere (controlla l'accesso al cantiere)."""
+    auth.assert_project_access(db, user, project_id)
+    return await _preview(file)

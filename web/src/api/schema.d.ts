@@ -795,7 +795,7 @@ export interface paths {
         patch: operations["update_wbs_node_wbs__node_id__patch"];
         trace?: never;
     };
-    "/projects/{project_id}/pcq/preview": {
+    "/pcq/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -806,9 +806,30 @@ export interface paths {
         put?: never;
         /**
          * Preview Pcq
-         * @description Legge un PCQ (.docx o .pdf) e ne restituisce titoli e tabelle (o testo, per i PDF). Non scrive nulla.
+         * @description Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.
+         *     Lo usa l'editor dei moduli per ricreare il PCQ come template.
          */
-        post: operations["preview_pcq_projects__project_id__pcq_preview_post"];
+        post: operations["preview_pcq_pcq_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/pcq/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Project Pcq
+         * @description Come /pcq/preview, dalla pagina PCQ del cantiere (controlla l'accesso al cantiere).
+         */
+        post: operations["preview_project_pcq_projects__project_id__pcq_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1355,8 +1376,13 @@ export interface components {
             /** File */
             file: string;
         };
-        /** Body_preview_pcq_projects__project_id__pcq_preview_post */
-        Body_preview_pcq_projects__project_id__pcq_preview_post: {
+        /** Body_preview_pcq_pcq_preview_post */
+        Body_preview_pcq_pcq_preview_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_preview_project_pcq_projects__project_id__pcq_preview_post */
+        Body_preview_project_pcq_projects__project_id__pcq_preview_post: {
             /** File */
             file: string;
         };
@@ -4539,7 +4565,40 @@ export interface operations {
             };
         };
     };
-    preview_pcq_projects__project_id__pcq_preview_post: {
+    preview_pcq_pcq_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_pcq_pcq_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PcqPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_project_pcq_projects__project_id__pcq_preview_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4550,7 +4609,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_preview_pcq_projects__project_id__pcq_preview_post"];
+                "multipart/form-data": components["schemas"]["Body_preview_project_pcq_projects__project_id__pcq_preview_post"];
             };
         };
         responses: {

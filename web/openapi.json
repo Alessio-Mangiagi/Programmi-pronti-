@@ -2732,11 +2732,55 @@
         }
       }
     },
-    "/projects/{project_id}/pcq/preview": {
+    "/pcq/preview": {
       "post": {
         "summary": "Preview Pcq",
-        "description": "Legge un PCQ (.docx o .pdf) e ne restituisce titoli e tabelle (o testo, per i PDF). Non scrive nulla.",
-        "operationId": "preview_pcq_projects__project_id__pcq_preview_post",
+        "description": "Legge un PCQ (.docx o .pdf): titoli e tabelle (o testo, per i PDF). Non scrive nulla.\nLo usa l'editor dei moduli per ricreare il PCQ come template.",
+        "operationId": "preview_pcq_pcq_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_pcq_pcq_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcqPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/projects/{project_id}/pcq/preview": {
+      "post": {
+        "summary": "Preview Project Pcq",
+        "description": "Come /pcq/preview, dalla pagina PCQ del cantiere (controlla l'accesso al cantiere).",
+        "operationId": "preview_project_pcq_projects__project_id__pcq_preview_post",
         "security": [
           {
             "HTTPBearer": []
@@ -2758,7 +2802,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_preview_pcq_projects__project_id__pcq_preview_post"
+                "$ref": "#/components/schemas/Body_preview_project_pcq_projects__project_id__pcq_preview_post"
               }
             }
           }
@@ -4587,7 +4631,7 @@
         ],
         "title": "Body_import_wbs_projects__project_id__wbs_import_post"
       },
-      "Body_preview_pcq_projects__project_id__pcq_preview_post": {
+      "Body_preview_pcq_pcq_preview_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -4599,7 +4643,21 @@
         "required": [
           "file"
         ],
-        "title": "Body_preview_pcq_projects__project_id__pcq_preview_post"
+        "title": "Body_preview_pcq_pcq_preview_post"
+      },
+      "Body_preview_project_pcq_projects__project_id__pcq_preview_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_project_pcq_projects__project_id__pcq_preview_post"
       },
       "Body_upload_attachment_attachments__attachment_id__upload_post": {
         "properties": {
