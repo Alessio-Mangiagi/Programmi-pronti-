@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import type { FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import { useToast } from '../components/useToast'
 import { CATEGORY_LABEL } from '../labels'
@@ -69,16 +69,18 @@ export default function TemplatesPage() {
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
             <span className="small">Mostra archiviati</span>
           </label>
-          <Link to="/templates/new" className="btn btn-primary">
-            + Nuovo template
-          </Link>
+          {canCreateTemplates(user) && (
+            <Link to="/templates/new" className="btn btn-primary">
+              + Nuovo template
+            </Link>
+          )}
         </div>
       </header>
       <div className="content">
         {templates === null ? (
           <Loading />
         ) : visible.length === 0 ? (
-          <div className="empty">{categoria ? `Nessun modulo nella categoria ${CATEGORY_LABEL[categoria] ?? categoria}.` : 'Nessun template. Creane uno con "+ Nuovo template".'}</div>
+          <div className="empty">{categoria ? `Nessun modulo nella categoria ${CATEGORY_LABEL[categoria] ?? categoria}.` : canCreateTemplates(user) ? 'Nessun template. Creane uno con "+ Nuovo template".' : 'Nessun template.'}</div>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -118,9 +120,11 @@ export default function TemplatesPage() {
                       <Link className="btn small" to={`/templates/${t.id}`}>
                         {t.submissions_count ? 'Apri' : 'Modifica'}
                       </Link>
-                      <button type="button" className="btn small" onClick={() => duplicate(t)}>
-                        Duplica
-                      </button>
+                      {canCreateTemplates(user) && (
+                        <button type="button" className="btn small" onClick={() => duplicate(t)}>
+                          Duplica
+                        </button>
+                      )}
                       {t.archived_at ? (
                         <button type="button" className="btn small" onClick={() => setArchived(t, false)}>
                           Ripristina

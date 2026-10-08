@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 // Utenti del seed demo (scripts/seed.py).
 const MANAGER = { email: 'manager@fieldview.local', password: 'demo1234' }
+const ADMIN = { email: 'admin@fieldview.local', password: 'demo1234' }
 
 async function login(page: Page, user = MANAGER) {
   await page.goto('/login')
@@ -240,8 +241,23 @@ test('vista task: filtri, cambio stato/assegnatario inline, link alla planimetri
   expect(Number(zoom!.replace('%', ''))).toBeGreaterThanOrEqual(100)
 })
 
-test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ page }) => {
+test('il responsabile non crea moduli: niente "Nuovo modulo", "Duplica" né editor vuoto', async ({ page }) => {
   await login(page)
+  await page.getByRole('link', { name: 'Moduli', exact: true }).click()
+  await page.waitForURL('**/templates')
+  await expect(page.locator('.hub-card')).toHaveCount(3)
+  await expect(page.locator('.hub-card', { hasText: 'Nuovo modulo' })).toHaveCount(0)
+  await page.getByRole('link', { name: /Elenco moduli/ }).click()
+  await expect(page.locator('.table tbody tr')).toHaveCount(3)
+  await expect(page.getByRole('link', { name: '+ Nuovo template' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Duplica' })).toHaveCount(0)
+  await page.goto('/templates/new')
+  await page.waitForURL('**/templates/elenco')
+})
+
+test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ page }) => {
+  // creare moduli è solo dell'amministratore
+  await login(page, ADMIN)
   await page.getByRole('link', { name: 'Moduli' }).click()
   await page.waitForURL('**/templates')
   // ingresso: hub con le scelte, non la lista

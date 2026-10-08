@@ -17,7 +17,7 @@ import {
 } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate, PcqPreview } from '../api/types'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import PcqImportModal from '../components/PcqImportModal'
 import { useToast } from '../components/useToast'
@@ -85,6 +85,8 @@ export default function TemplateEditorPage() {
   }, [isNew, templateId])
 
   if (!isManager(user)) return <Navigate to="/projects" replace />
+  // i moduli nuovi li crea solo l'amministratore; i responsabili modificano quelli esistenti
+  if (isNew && !canCreateTemplates(user)) return <Navigate to="/templates/elenco" replace />
   if (notFound) return <div className="content empty">Template non trovato.</div>
   if (!isNew && !loaded) return <Loading className="content" />
   // nuovo modulo: ogni navigazione (anche dal menu mentre si è già qui) riparte da un editor vuoto
@@ -115,6 +117,7 @@ function initialSections(schema: FormSchema | null): LayoutSection[] {
 type EditorProps = { template: FormTemplate | null; draft?: PcqConversion | null; onSaved: (t: FormTemplate) => void }
 
 function Editor({ template, draft, onSaved }: EditorProps) {
+  const { user } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const saved = (template?.schema_def ?? draft?.schema ?? null) as FormSchema | null
@@ -328,12 +331,12 @@ function Editor({ template, draft, onSaved }: EditorProps) {
           <h1>{template ? template.name : 'Nuovo modulo'}</h1>
         </div>
         <div className="topbar-actions">
-          {!locked && (
+          {!locked && canCreateTemplates(user) && (
             <button type="button" className="btn" onClick={() => setImporting(true)}>
               <Icon name="upload" /> Importa da PCQ
             </button>
           )}
-          {locked && (
+          {locked && canCreateTemplates(user) && (
             <button type="button" className="btn" onClick={duplicateAndEdit}>
               Duplica e modifica
             </button>

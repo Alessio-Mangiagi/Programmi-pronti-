@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { FormData, FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { ProjectSubmission, User } from '../api/types'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import SubmissionDetail from '../forms/SubmissionDetail'
 import { findNonConformity } from '../forms/nonConformity'
@@ -97,7 +97,7 @@ export default function ProjectFormsPage() {
           <h1>Moduli del cantiere</h1>
         </div>
         <div className="topbar-actions">
-          {isManager(user) && (
+          {canCreateTemplates(user) && (
             <Link to="/templates/new" className="btn">
               Crea un nuovo modulo
             </Link>

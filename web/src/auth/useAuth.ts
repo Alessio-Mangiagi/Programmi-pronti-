@@ -19,3 +19,5 @@ export function useAuth(): AuthState {
 }
 
 export const isManager = (u: User | null) => u?.role === 'admin' || u?.role === 'manager'
+/** Solo l'amministratore crea moduli nuovi (anche duplicando o da PCQ). */
+export const canCreateTemplates = (u: User | null) => u?.role === 'admin'

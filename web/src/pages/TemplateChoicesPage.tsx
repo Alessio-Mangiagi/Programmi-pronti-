@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { validateSchema, type Field, type FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import { useToast } from '../components/useToast'
 import { CATEGORY_LABEL } from '../labels'
@@ -131,9 +131,11 @@ export default function TemplateChoicesPage() {
                         <span className="badge status-verified" title="Ha compilazioni: le opzioni non si possono più cambiare">
                           In uso
                         </span>
-                        <button type="button" className="btn small" onClick={() => duplicate(t)}>
-                          Duplica e modifica
-                        </button>
+                        {canCreateTemplates(user) && (
+                          <button type="button" className="btn small" onClick={() => duplicate(t)}>
+                            Duplica e modifica
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <button type="button" className="btn btn-primary small" onClick={() => save(t)} disabled={!dirty(t) || saving === t.id}>

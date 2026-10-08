@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { WbsNode } from '../api/types'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import SubmissionForm from '../forms/SubmissionForm'
 import { useLookups } from '../hooks/useLookups'
@@ -75,7 +75,7 @@ export default function CompileFormPage() {
           {loading ? (
             <Loading />
           ) : templates.length === 0 ? (
-            <div className="empty">Non ci sono moduli da compilare. {isManager(user) && <Link to="/templates/new">Creane uno</Link>}</div>
+            <div className="empty">Non ci sono moduli da compilare. {canCreateTemplates(user) ? <Link to="/templates/new">Creane uno</Link> : "Chiedi all'amministratore di crearne uno."}</div>
           ) : (
             <>
               <section className="card compile-where">

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { PcqPreview } from '../api/types'
 import { PCQ_FILE_ACCEPT, PCQ_FILE_MAX_BYTES, pcqFileError, previewPcqFile } from '../api/upload'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
 import FileDropzone from '../components/FileDropzone'
 import PcqDocumentView from '../components/PcqDocumentView'
 import Icon from '../components/Icon'
@@ -114,7 +114,10 @@ export default function PcqPage() {
           <>
             <p className="muted small pcq-intro">
               Carica il Piano di Controllo Qualità del cantiere in Word (.docx) o PDF. L'app legge fasi, controlli e tabelle e te li mostra qui
-              sotto; con "Crea modulo" il PCQ diventa un modulo da compilare (un esito per controllo), da rivedere nell'editor prima di salvarlo.
+              sotto
+              {canCreateTemplates(user)
+                ? `; con "Crea modulo" il PCQ diventa un modulo da compilare (un esito per controllo), da rivedere nell'editor prima di salvarlo.`
+                : ". Per trasformarlo in un modulo da compilare rivolgiti all'amministratore."}
             </p>
             <FileDropzone
               accept={PCQ_FILE_ACCEPT}
@@ -155,9 +158,11 @@ export default function PcqPage() {
                           <button type="button" className="btn small" onClick={() => setSelected(it.id)} disabled={it.id === selected}>
                             {it.id === selected ? 'Aperto' : 'Anteprima'}
                           </button>
-                          <button type="button" className="btn small" onClick={() => navigate('/templates/new', { state: { pcq: it.preview } })}>
-                            Crea modulo
-                          </button>
+                          {canCreateTemplates(user) && (
+                            <button type="button" className="btn small" onClick={() => navigate('/templates/new', { state: { pcq: it.preview } })}>
+                              Crea modulo
+                            </button>
+                          )}
                         </>
                       )}
                       {it.status !== 'reading' && (

@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { defaults, type FormData } from '@fieldview/form-core'
 import type { PcqPreview } from '../api/types'
 import { getToken } from '../auth/token'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, useAuth } from '../auth/useAuth'
 import { previewPcqFile } from '../api/upload'
 import Icon from '../components/Icon'
 import Loading from '../components/Loading'
@@ -70,7 +70,7 @@ export default function PcqStructurePage() {
     }
   }, [])
 
-  if (!isManager(user)) return <Navigate to="/projects" replace />
+  if (!canCreateTemplates(user)) return <Navigate to="/templates" replace />
 
   function download() {
     if (!file) return

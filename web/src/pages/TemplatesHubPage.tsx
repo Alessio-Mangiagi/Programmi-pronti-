@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import type { FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
-import { isManager, useAuth } from '../auth/useAuth'
+import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
 import Icon from '../components/Icon'
 import { useToast } from '../components/useToast'
 import { CATEGORY_LABEL } from '../labels'
@@ -44,20 +44,24 @@ export default function TemplatesHubPage() {
       </header>
       <div className="content">
         <div className="hub-grid">
-          <Link to="/templates/new" className="card card-link hub-card hub-card-primary">
-            <span className="hub-icon">
-              <Icon name="plus" />
-            </span>
-            <h2>Nuovo modulo</h2>
-            <p className="muted">Costruisci un modulo da zero: campi, obbligatorietà, anteprima.</p>
-          </Link>
-          <Link to="/templates/pcq" className="card card-link hub-card">
-            <span className="hub-icon">
-              <Icon name="file" />
-            </span>
-            <h2>Struttura PCQ</h2>
-            <p className="muted">Come preparare il Word del Piano di Controllo Qualità, con un esempio scaricabile e il modulo che ne esce.</p>
-          </Link>
+          {canCreateTemplates(user) && (
+            <>
+              <Link to="/templates/new" className="card card-link hub-card hub-card-primary">
+                <span className="hub-icon">
+                  <Icon name="plus" />
+                </span>
+                <h2>Nuovo modulo</h2>
+                <p className="muted">Costruisci un modulo da zero: campi, obbligatorietà, anteprima.</p>
+              </Link>
+              <Link to="/templates/pcq" className="card card-link hub-card">
+                <span className="hub-icon">
+                  <Icon name="file" />
+                </span>
+                <h2>Struttura PCQ</h2>
+                <p className="muted">Come preparare il Word del Piano di Controllo Qualità, con un esempio scaricabile e il modulo che ne esce.</p>
+              </Link>
+            </>
+          )}
           <Link to="/templates/scelte" className="card card-link hub-card">
             <span className="hub-icon">
               <Icon name="list-checks" />

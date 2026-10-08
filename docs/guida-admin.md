@@ -50,7 +50,9 @@ API: `GET/POST/PATCH /commesse`, `PATCH /projects/{id}` (`commessa_id`), `GET/PO
    convertita). Una planimetria senza file si carica dopo dalla sua pagina.
 3. **Moduli** (sidebar): i 3 template demo (ispezione sicurezza, punch list, diario)
    si duplicano e si adattano; un template già compilato non cambia più schema
-   (duplica e modifica la copia). Un'opzione con "Non conforme" in un campo a scelta
+   (duplica e modifica la copia). **Creare** moduli (nuovo, duplica, importa da PCQ,
+   Struttura PCQ) è solo dell'**amministratore**; i manager modificano e archiviano
+   quelli esistenti e tutti li compilano. Un'opzione con "Non conforme" in un campo a scelta
    fa scattare la proposta di task e la notifica ai manager.
    Il builder lavora in due fasi, ripetibili in qualsiasi momento:
    **1. Struttura** — sezioni con titolo, da 1 a 3 colonne, dentro cui si mettono
