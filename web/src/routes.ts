@@ -1,2 +1,3 @@
-/** Compilazione di un modulo nel cantiere: apre la modale nei Moduli compilati. */
-export const compileUrl = (projectId: string) => `/projects/${projectId}/moduli?compila=1`
+/** Pagina di compilazione di un modulo nel cantiere. */
+export const compileUrl = (projectId: string, wbsNodeId?: string) =>
+  `/projects/${projectId}/moduli/compila${wbsNodeId ? `?voce=${encodeURIComponent(wbsNodeId)}` : ''}`

@@ -245,7 +245,7 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await page.getByRole('link', { name: 'Moduli' }).click()
   await page.waitForURL('**/templates')
   // ingresso: hub con le scelte, non la lista
-  await expect(page.locator('.hub-card')).toHaveCount(4)
+  await expect(page.locator('.hub-card')).toHaveCount(5)
   await expect(page.locator('.hub-card', { hasText: 'Elenco moduli' })).toContainText('3 moduli attivi')
   await page.getByRole('link', { name: /Elenco moduli/ }).click()
   await page.waitForURL('**/templates/elenco')
@@ -581,9 +581,11 @@ test('WBS del cantiere: albero, voce selezionata, compilazione modulo sulla voce
   await expect(panel.locator('.wbs-path')).toContainText('01 Opere strutturali › 01.02 Solai')
   await expect(panel.getByRole('heading', { name: 'Moduli (1)' })).toBeVisible()
 
-  // compila un modulo sulla voce
-  await panel.getByRole('button', { name: '+ Compila modulo' }).click()
-  const modal = page.getByRole('dialog')
+  // compila un modulo sulla voce: pagina di compilazione con la voce già scelta, poi si torna alla voce
+  await panel.getByRole('link', { name: '+ Compila modulo' }).click()
+  await page.waitForURL('**/moduli/compila?voce=*')
+  await expect(page.getByLabel('Dove lo registri').locator('option:checked')).toContainText('01.02 Solai')
+  const modal = page.locator('.compile-page')
   await modal.getByLabel('Modulo').selectOption({ label: 'Punch list (difetto)' })
   await modal.getByLabel(/Descrizione del difetto/).fill('Fessura sul solaio')
   await modal.getByLabel(/^Categoria/).selectOption({ index: 1 })
@@ -592,6 +594,7 @@ test('WBS del cantiere: albero, voce selezionata, compilazione modulo sulla voce
   await expect(modal.locator('.photo-cell img')).toBeVisible()
   await modal.getByRole('button', { name: 'Salva modulo' }).click()
   await expect(page.locator('.toast-success').last()).toContainText('Modulo salvato')
+  await page.waitForURL('**/wbs?node=*')
   await expect(panel.getByRole('heading', { name: 'Moduli (2)' })).toBeVisible()
   await expect(tree.getByRole('treeitem', { name: /Solai/ }).locator('.wbs-count')).toHaveText('2')
   await expect(strutture.locator('.wbs-count')).toHaveText('2')

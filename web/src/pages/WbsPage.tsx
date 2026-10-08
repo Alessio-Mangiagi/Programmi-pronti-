@@ -9,11 +9,11 @@ import Modal from '../components/Modal'
 import { useToast } from '../components/useToast'
 import WbsImportForm from '../components/WbsImportForm'
 import SubmissionDetail from '../forms/SubmissionDetail'
-import SubmissionForm from '../forms/SubmissionForm'
 import { findNonConformity } from '../forms/nonConformity'
 import type { FormData, FormSchema } from '@fieldview/form-core'
 import { useLookups } from '../hooks/useLookups'
 import { useProject } from '../hooks/useProject'
+import { compileUrl } from '../routes'
 import { useLoad } from '../hooks/useLoad'
 
 type TreeNode = WbsNode & { children: TreeNode[] }
@@ -357,7 +357,6 @@ function NodePanel({
   const { user } = useAuth()
   const toast = useToast()
   const [detail, setDetail] = useState<WbsNodeDetail | null>(null)
-  const [filling, setFilling] = useState(false)
   const [openSub, setOpenSub] = useState<Submission | null>(null)
 
   const load = useCallback(async () => {
@@ -367,10 +366,6 @@ function NodePanel({
   }, [node.id, toast])
 
   useLoad(load)
-
-  const templates = Object.values(lookups.templates)
-    .filter((t) => !t.archived_at)
-    .sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="wbs-node">
@@ -395,9 +390,9 @@ function NodePanel({
       <section>
         <div className="row">
           <h3>Moduli ({detail ? detail.submissions.length : '…'})</h3>
-          <button type="button" className="btn small btn-primary" onClick={() => setFilling(true)}>
+          <Link to={compileUrl(node.project_id, node.id)} className="btn small btn-primary">
             + Compila modulo
-          </button>
+          </Link>
         </div>
         {!detail ? (
           <Loading />
@@ -426,20 +421,6 @@ function NodePanel({
         )}
       </section>
 
-      {filling && (
-        <Modal title={`Compila modulo — ${label(node)}`} onClose={() => setFilling(false)}>
-          <SubmissionForm
-            target={{ wbsNodeId: node.id }}
-            templates={templates}
-            onCancel={() => setFilling(false)}
-            onSaved={async () => {
-              setFilling(false)
-              await load()
-              onChanged()
-            }}
-          />
-        </Modal>
-      )}
       {openSub && lookups.templates[openSub.template_id] && (
         <SubmissionDetail
           submission={openSub}

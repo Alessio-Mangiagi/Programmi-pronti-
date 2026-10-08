@@ -2,23 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { FormData, FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
-import type { ProjectSubmission, User, WbsNode } from '../api/types'
+import type { ProjectSubmission, User } from '../api/types'
 import { isManager, useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
-import Modal from '../components/Modal'
 import SubmissionDetail from '../forms/SubmissionDetail'
-import SubmissionForm from '../forms/SubmissionForm'
 import { findNonConformity } from '../forms/nonConformity'
 import { useLoad } from '../hooks/useLoad'
 import { useLookups } from '../hooks/useLookups'
 import { useProject } from '../hooks/useProject'
+import { compileUrl } from '../routes'
 
 function fmtDate(iso: string) {
   return new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })
 }
-
-/** Valore della tendina "Dove" per il modulo generale, non legato a voci WBS. */
-const GENERAL = '__cantiere'
 
 function where(s: ProjectSubmission) {
   if (s.project_id) return 'Cantiere (generale)'
@@ -26,24 +22,9 @@ function where(s: ProjectSubmission) {
   return `${s.plan_name ?? 'Planimetria'}${s.pin_label ? ` · ${s.pin_label}` : ''}`
 }
 
-/** Voci WBS in ordine d'albero con la profondità, per la tendina "Dove". */
-function flattenWbs(nodes: WbsNode[]): { node: WbsNode; depth: number }[] {
-  const children = new Map<string | null, WbsNode[]>()
-  for (const n of nodes) children.set(n.parent_id ?? null, [...(children.get(n.parent_id ?? null) ?? []), n])
-  const out: { node: WbsNode; depth: number }[] = []
-  const walk = (parent: string | null, depth: number) => {
-    for (const n of (children.get(parent) ?? []).sort((a, b) => a.position - b.position)) {
-      out.push({ node: n, depth })
-      walk(n.id, depth + 1)
-    }
-  }
-  walk(null, 0)
-  return out
-}
-
 /**
  * Tutti i moduli compilati nel cantiere (planimetrie, voci WBS, generali), con filtri;
- * da qui se ne compila uno nuovo scegliendo fra i moduli creati, generale del cantiere o su una voce WBS.
+ * "+ Compila modulo" porta alla pagina di compilazione (CompileFormPage).
  */
 export default function ProjectFormsPage() {
   const { projectId = '' } = useParams()
@@ -54,16 +35,12 @@ export default function ProjectFormsPage() {
   const [subs, setSubs] = useState<ProjectSubmission[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [members, setMembers] = useState<User[]>([])
-  const [wbs, setWbs] = useState<WbsNode[] | null>(null)
   const [open, setOpen] = useState<ProjectSubmission | null>(null)
-  const [nodeId, setNodeId] = useState('')
 
   const q = params.get('q') ?? ''
   const tpl = params.get('modulo') ?? ''
   const place = params.get('dove') ?? ''
   const ncOnly = params.get('esito') === 'nc'
-  // la compilazione aperta sta nell'URL: il menu "Compila modulo" ci arriva con ?compila=1
-  const filling = params.get('compila') === '1'
   const setFilter = (k: string, v: string) =>
     setParams(
       (p) => {
@@ -83,17 +60,8 @@ export default function ProjectFormsPage() {
   useLoad(load)
   useEffect(() => {
     api.GET('/projects/{project_id}/members', { params: { path: { project_id: projectId } } }).then(({ data }) => data && setMembers(data))
-    api.GET('/projects/{project_id}/wbs', { params: { path: { project_id: projectId } } }).then(({ data }) => setWbs(data ?? []))
   }, [projectId])
 
-  const templates = useMemo(
-    () =>
-      Object.values(lookups.templates)
-        .filter((t) => !t.archived_at)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [lookups.templates],
-  )
-  const wbsOptions = useMemo(() => flattenWbs(wbs ?? []), [wbs])
   const ncOf = useCallback(
     (s: ProjectSubmission) => {
       const t = lookups.templates[s.template_id]
@@ -118,12 +86,6 @@ export default function ProjectFormsPage() {
   }, [subs, q, tpl, place, ncOnly, ncOf, lookups])
 
   const ncCount = (subs ?? []).filter((s) => ncOf(s)).length
-  const setFilling = (on: boolean) => {
-    setNodeId('')
-    setFilter('compila', on ? '1' : '')
-  }
-  // di default il modulo è generale del cantiere; la voce WBS è facoltativa
-  const target = nodeId || GENERAL
 
   return (
     <>
@@ -140,9 +102,9 @@ export default function ProjectFormsPage() {
               Crea un nuovo modulo
             </Link>
           )}
-          <button type="button" className="btn btn-primary" onClick={() => setFilling(true)}>
+          <Link to={compileUrl(projectId)} className="btn btn-primary">
             + Compila modulo
-          </button>
+          </Link>
         </div>
       </header>
       <div className="filters" role="group" aria-label="Filtri moduli">
@@ -248,52 +210,6 @@ export default function ProjectFormsPage() {
           </div>
         )}
       </div>
-
-      {filling && (
-        <Modal title="Compila modulo" onClose={() => setFilling(false)} width={760}>
-          {wbs === null ? (
-            <Loading />
-          ) : templates.length === 0 ? (
-            <div className="empty">
-              Non ci sono moduli da compilare. {isManager(user) && <Link to="/templates/new">Creane uno</Link>}
-            </div>
-          ) : (
-            <>
-              <div className="field">
-                <label htmlFor="pf-node">Dove lo registri</label>
-                <select id="pf-node" value={target} onChange={(e) => setNodeId(e.target.value)}>
-                  <option value={GENERAL}>Tutto il cantiere (modulo generale, senza voce WBS)</option>
-                  {wbsOptions.length > 0 && (
-                    <optgroup label="Su una voce WBS">
-                      {wbsOptions.map(({ node, depth }) => (
-                        <option key={node.id} value={node.id}>
-                          {' '.repeat(depth * 3)}
-                          {node.code ? `${node.code} ${node.name}` : node.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                <p className="muted small">Sui punti della planimetria si compila dalla planimetria.</p>
-              </div>
-              {target ? (
-                <SubmissionForm
-                  key={target}
-                  target={target === GENERAL ? { projectId } : { wbsNodeId: target }}
-                  templates={templates}
-                  onCancel={() => setFilling(false)}
-                  onSaved={async () => {
-                    setFilling(false)
-                    await load()
-                  }}
-                />
-              ) : (
-                <p className="muted small">Scegli dove registrarlo, poi il modulo da compilare fra quelli creati.</p>
-              )}
-            </>
-          )}
-        </Modal>
-      )}
 
       {open && lookups.templates[open.template_id] && (
         <SubmissionDetail

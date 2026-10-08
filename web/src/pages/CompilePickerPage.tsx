@@ -7,7 +7,7 @@ import { compileUrl } from '../routes'
 
 /**
  * "Compila modulo" dal menu senza un cantiere aperto: si sceglie prima il cantiere
- * (con uno solo si va dritti), poi la compilazione si apre nei Moduli compilati.
+ * (con uno solo si va dritti), poi si apre la pagina di compilazione.
  */
 export default function CompilePickerPage() {
   const [projects, setProjects] = useState<Project[] | null>(null)

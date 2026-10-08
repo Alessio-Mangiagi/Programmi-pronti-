@@ -12,6 +12,7 @@ import PcqPage from './pages/PcqPage'
 import PcqStructurePage from './pages/PcqStructurePage'
 import ProjectFormsPage from './pages/ProjectFormsPage'
 import CompilePickerPage from './pages/CompilePickerPage'
+import CompileFormPage from './pages/CompileFormPage'
 import TasksPage from './pages/TasksPage'
 import DashboardPage from './pages/DashboardPage'
 import TemplatesPage from './pages/TemplatesPage'
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/projects/:projectId/wbs" element={<WbsPage />} />
         <Route path="/projects/:projectId/pcq" element={<PcqPage />} />
         <Route path="/projects/:projectId/moduli" element={<ProjectFormsPage />} />
+        <Route path="/projects/:projectId/moduli/compila" element={<CompileFormPage />} />
         <Route path="/compila" element={<CompilePickerPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />

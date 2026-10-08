@@ -13,7 +13,7 @@ export default function Layout() {
   const { projectId } = useParams()
   const location = useLocation()
   const mine = new URLSearchParams(location.search).get('mine') === '1'
-  const compiling = location.pathname === '/compila' || new URLSearchParams(location.search).get('compila') === '1'
+  const compiling = location.pathname === '/compila' || location.pathname.endsWith('/moduli/compila')
   const project = useProject(projectId)
 
   return (
