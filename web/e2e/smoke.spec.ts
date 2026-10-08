@@ -245,8 +245,8 @@ test('il responsabile non crea moduli: niente "Nuovo modulo", "Duplica" né edit
   await login(page)
   await page.getByRole('link', { name: 'Moduli', exact: true }).click()
   await page.waitForURL('**/templates')
-  await expect(page.locator('.hub-card')).toHaveCount(3)
-  await expect(page.locator('.hub-card', { hasText: 'Nuovo modulo' })).toHaveCount(0)
+  await expect(page.locator('.hub-row-link')).toHaveCount(2)
+  await expect(page.locator('.hub-row-link', { hasText: 'Nuovo modulo' })).toHaveCount(0)
   await page.getByRole('link', { name: /Elenco moduli/ }).click()
   await expect(page.locator('.table tbody tr')).toHaveCount(3)
   await expect(page.getByRole('link', { name: '+ Nuovo template' })).toHaveCount(0)
@@ -261,8 +261,8 @@ test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ 
   await page.getByRole('link', { name: 'Moduli' }).click()
   await page.waitForURL('**/templates')
   // ingresso: hub con le scelte, non la lista
-  await expect(page.locator('.hub-card')).toHaveCount(5)
-  await expect(page.locator('.hub-card', { hasText: 'Elenco moduli' })).toContainText('3 moduli attivi')
+  await expect(page.locator('.hub-row-link')).toHaveCount(4)
+  await expect(page.locator('.hub-row-link', { hasText: 'Elenco moduli' })).toContainText('3 attivi')
   await page.getByRole('link', { name: /Elenco moduli/ }).click()
   await page.waitForURL('**/templates/elenco')
   await expect(page.locator('.table tbody tr')).toHaveCount(3) // i 3 template del seed

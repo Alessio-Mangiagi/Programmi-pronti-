@@ -4,13 +4,13 @@ import type { FormSchema } from '@fieldview/form-core'
 import { api, errorMessage } from '../api/client'
 import type { FormTemplate } from '../api/types'
 import { canCreateTemplates, isManager, useAuth } from '../auth/useAuth'
-import Icon from '../components/Icon'
+import Icon, { type IconName } from '../components/Icon'
 import { useToast } from '../components/useToast'
 import { CATEGORY_LABEL } from '../labels'
 
 /**
- * Ingresso della sezione Moduli: invece della lista, le scelte di lavoro
- * (nuovo modulo, scelte multiple, categorie, elenco) con i contatori.
+ * Ingresso della sezione Moduli: le scelte di lavoro in una lista a righe
+ * (nuovo modulo, elenco, scelte multiple, struttura PCQ, categorie) con i contatori.
  */
 export default function TemplatesHubPage() {
   const { user } = useAuth()
@@ -43,58 +43,62 @@ export default function TemplatesHubPage() {
         </div>
       </header>
       <div className="content">
-        <div className="hub-grid">
+        <nav className="hub-list" aria-label="Sezioni dei moduli">
           {canCreateTemplates(user) && (
-            <>
-              <Link to="/templates/new" className="card card-link hub-card hub-card-primary">
-                <span className="hub-icon">
-                  <Icon name="plus" />
-                </span>
-                <h2>Nuovo modulo</h2>
-                <p className="muted">Costruisci un modulo da zero: campi, obbligatorietà, anteprima.</p>
-              </Link>
-              <Link to="/templates/pcq" className="card card-link hub-card">
-                <span className="hub-icon">
-                  <Icon name="file" />
-                </span>
-                <h2>Struttura PCQ</h2>
-                <p className="muted">Come preparare il Word del Piano di Controllo Qualità, con un esempio scaricabile e il modulo che ne esce.</p>
-              </Link>
-            </>
+            <HubRow to="/templates/new" icon="plus" title="Nuovo modulo" text="Costruisci un modulo da zero: campi, obbligatorietà, anteprima." primary />
           )}
-          <Link to="/templates/scelte" className="card card-link hub-card">
-            <span className="hub-icon">
-              <Icon name="list-checks" />
-            </span>
-            <h2>Scelte multiple</h2>
-            <p className="muted">Modifica le opzioni dei campi a scelta singola o multipla dei moduli esistenti.</p>
-            {templates && <span className="hub-count">{n(choiceFields, 'campo a scelta', 'campi a scelta')}</span>}
-          </Link>
-          <div className="card hub-card">
+          <HubRow
+            to="/templates/elenco"
+            icon="list"
+            title="Elenco moduli"
+            text="Tutti i moduli: modifica, duplica, archivia."
+            count={templates ? n(active.length, 'attivo', 'attivi') : undefined}
+          />
+          <HubRow
+            to="/templates/scelte"
+            icon="list-checks"
+            title="Scelte multiple"
+            text="Le opzioni dei campi a scelta singola o multipla, senza aprire il builder."
+            count={templates ? n(choiceFields, 'campo', 'campi') : undefined}
+          />
+          {canCreateTemplates(user) && (
+            <HubRow to="/templates/pcq" icon="file" title="Struttura PCQ" text="Come preparare il Word del PCQ: esempio scaricabile e modulo che ne esce." />
+          )}
+          <div className="hub-row hub-row-static">
             <span className="hub-icon">
               <Icon name="tag" />
             </span>
-            <h2>Categorie</h2>
-            <p className="muted">Apri i moduli per tipo di lavoro.</p>
-            <ul className="hub-links">
-              {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
-                <li key={k}>
-                  <Link to={`/templates/elenco?categoria=${k}`}>{v}</Link>
-                  {templates && <span className="muted small"> · {byCategory(k)}</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <Link to="/templates/elenco" className="card card-link hub-card">
-            <span className="hub-icon">
-              <Icon name="list" />
+            <span className="hub-row-main">
+              <span className="hub-row-title">Categorie</span>
+              <span className="hub-chips">
+                {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+                  <Link key={k} to={`/templates/elenco?categoria=${k}`} className="hub-chip">
+                    {v}
+                    {templates && <span className="hub-chip-n">{byCategory(k)}</span>}
+                  </Link>
+                ))}
+              </span>
             </span>
-            <h2>Elenco moduli</h2>
-            <p className="muted">Tutti i moduli: modifica, duplica, archivia.</p>
-            {templates && <span className="hub-count">{n(active.length, 'modulo attivo', 'moduli attivi')}</span>}
-          </Link>
-        </div>
+          </div>
+        </nav>
       </div>
     </>
+  )
+}
+
+/** Riga della lista: icona, titolo con descrizione, contatore e freccia; tutta la riga è il link. */
+function HubRow({ to, icon, title, text, count, primary }: { to: string; icon: IconName; title: string; text: string; count?: string; primary?: boolean }) {
+  return (
+    <Link to={to} className={`hub-row hub-row-link${primary ? ' is-primary' : ''}`}>
+      <span className="hub-icon">
+        <Icon name={icon} />
+      </span>
+      <span className="hub-row-main">
+        <span className="hub-row-title">{title}</span>
+        <span className="muted small">{text}</span>
+      </span>
+      {count && <span className="hub-row-count">{count}</span>}
+      <Icon name="chevron-right" className="hub-row-arrow" />
+    </Link>
   )
 }
