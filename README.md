@@ -14,6 +14,7 @@ Ogni cartella ha il nome dell'app, e sul server lo stesso nome diventa il suo in
 | `ocr-documenti/` | OCR Documenti — testo da scansioni, estrazione contratti | 5179 | Node.js + OCR |
 | `scadenzario/` | Scadenzario — scadenze e adempimenti | 5180 | Python |
 | `verifica-requisiti/` | Verifica Requisiti — ricerca e checklist sui documenti (riservata) | 5185 | Node.js + OCR |
+| `incampo/` | InCampo — gestione cantiere: planimetrie, moduli, task; web e app mobile | 5190 | Python + React |
 | `ponte-trimble/` | Ponte Trimble — PCQ, computi e SAL da PDF a Trimble (solo admin) | 3011 | Node.js |
 | `auguri/` | Auguri — compleanni su WhatsApp (solo admin) | 3000 | Node.js |
 
@@ -53,6 +54,7 @@ reverse proxy, ogni app ha un indirizzo col proprio nome:
 | `https://ocr-documenti.<dominio>` | OCR Documenti |
 | `https://scadenzario.<dominio>` | Scadenzario |
 | `https://verifica-requisiti.<dominio>` | Verifica Requisiti |
+| `https://incampo.<dominio>` | InCampo |
 | `https://ponte-trimble.<dominio>` | Ponte Trimble |
 
 Si attiva con una sola variabile, letta dal portale e dal Caddyfile:
@@ -93,6 +95,9 @@ verifica il cookie di sessione contro `<portale>/api/verify`. Conseguenze pratic
 - **Portale spento = app chiuse** (503). È il default; su un PC singolo, dove l'app deve
   restare usabile da sola, si imposta `COSEDIL_SSO_FAIL=open`.
 - **In sviluppo** si toglie di mezzo il gate con `COSEDIL_SSO=off`.
+- **InCampo** ha anche un suo login: il gate controlla solo le pagine web, le API restano
+  al JWT di InCampo perché l'app mobile il cookie del portale non ce l'ha. Dopo il
+  portale si entra con l'account InCampo (`incampo/README-SUITE.md`).
 - **Auguri** è riservata agli admin del portale, e lo impone l'app stessa: il
   flag `adminOnly` nel registro del portale nasconde solo la card.
 
@@ -115,6 +120,7 @@ Ogni app si controlla da sola, e la CI le controlla tutte.
 | `.github/workflows/ci-analista-dati.yml` | `analista-dati` (type-check, test, build, audit) |
 | `.github/workflows/ci-suite.yml` | portale, ocr, verifica-requisiti, auto-scan, Auguri |
 | `.github/workflows/ci-python.yml` | `confronta file` e `scadenzario` |
+| `.github/workflows/ci-incampo.yml` | `incampo` (pytest SQLite e Postgres, web e2e, mobile, Docker) |
 
 In locale, dentro la cartella dell'app: `npm test` (Node) o `python -m pytest tests/ -q`
 (Python). Le app Node con TypeScript hanno anche `npm run type-check` (o `typecheck`):

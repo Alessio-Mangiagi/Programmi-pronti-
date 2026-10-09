@@ -168,6 +168,23 @@ const APPS = [
     dettaglio: 'Carichi i documenti (anche scansionati: il testo lo tira fuori l\'OCR) e poi ci cerchi dentro parole e frasi, oppure gli fai passare una checklist di requisiti — "il DURC è scaduto?", "c\'è la partita IVA?", "compare la dicitura X?". Per ogni requisito dà un esito (ok, ko, dubbio, non applicabile) con il punto del testo che lo dimostra, e produce il report Excel.',
   },
   {
+    id: 'incampo',
+    nome: 'InCampo',
+    sottotitolo: 'Gestione cantiere',
+    desc: 'Planimetrie con pin, moduli di controllo, task e non conformità dei cantieri, da web e da app mobile anche offline.',
+    porta: 5190,
+    dir: 'incampo',
+    launch: 'avvia.vbs',
+    tipo: 'Python',
+    // Le pagine passano dal login del portale (gate SSO); le API restano al login
+    // di InCampo (JWT), perché l'app mobile il cookie del portale non ce l'ha.
+    kw: ['incampo', 'in campo', 'field view', 'cantiere', 'cantieri', 'planimetria', 'planimetrie',
+      'pin', 'modulo', 'moduli', 'modulo di controllo', 'ispezione', 'sopralluogo', 'task',
+      'non conformita', 'non conforme', 'commessa', 'commesse', 'wbs', 'piano controllo qualita',
+      'app mobile', 'telefono', 'tablet', 'offline', 'firma', 'direzione lavori'],
+    dettaglio: 'Gestisce il lavoro in cantiere: carichi le planimetrie, ci metti i pin, compili moduli di controllo (anche i PCQ) e apri task e non conformità assegnandoli alle persone. Ha un\'app per telefono e tablet che funziona anche senza rete e si sincronizza quando torna la connessione. Dentro InCampo si entra con il proprio account InCampo.',
+  },
+  {
     id: 'trimble',
     nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',
