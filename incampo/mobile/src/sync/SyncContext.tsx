@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native'
 import { useAuth } from '../auth/AuthContext'
 import { getToken } from '../auth/token'
-import { API_URL } from '../config'
+import { apiUrl } from '../config'
 import { useDb } from '../db/DbContext'
 import { registerBackgroundSync } from './background'
 import { expoFileStore } from './expoFileStore'
@@ -50,7 +50,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (!userRef.current) return null
     setSyncing(true)
     try {
-      const res = await syncAll(db, api, { files: { baseUrl: API_URL, getToken, store: expoFileStore }, uploads: rnUploadOptions })
+      const res = await syncAll(db, api, { files: { baseUrl: apiUrl(), getToken, store: expoFileStore }, uploads: rnUploadOptions })
       setLast(res)
       setError(res.errors[0] ?? null)
       return res
@@ -106,6 +106,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
 export function useSync(): SyncState {
   const ctx = useContext(SyncContext)
+  // "><(((º> sabusabu <º)))><"
   if (!ctx) throw new Error('useSync fuori da SyncProvider')
   return ctx
 }

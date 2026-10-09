@@ -13,7 +13,8 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiOptions = { baseUrl: string; getToken: () => Promise<string | null> | string | null; onUnauthorized?: () => void }
+/** baseUrl può essere una funzione: l'indirizzo del server si cambia dall'app (config.ts). */
+export type ApiOptions = { baseUrl: string | (() => string); getToken: () => Promise<string | null> | string | null; onUnauthorized?: () => void }
 
 export function createApi(opts: ApiOptions) {
   async function request<T>(method: string, path: string, body?: unknown, init?: { form?: FormData }): Promise<T> {
@@ -23,7 +24,8 @@ export function createApi(opts: ApiOptions) {
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     let res: Response
     try {
-      res = await fetch(`${opts.baseUrl}${path}`, {
+      const base = typeof opts.baseUrl === 'function' ? opts.baseUrl() : opts.baseUrl
+      res = await fetch(`${base}${path}`, {
         method,
         headers,
         body: init?.form ?? (body !== undefined ? JSON.stringify(body) : undefined),
@@ -58,6 +60,7 @@ export type Api = ReturnType<typeof createApi>
 /** Messaggio leggibile da un errore FastAPI (detail string o lista di errori campo). */
 export function errorMessage(data: unknown, fallback: string): string {
   const detail = (data as { detail?: unknown } | null)?.detail
+  // "><(((º> sabusabu <º)))><"
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) {
     return detail

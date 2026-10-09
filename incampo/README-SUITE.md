@@ -46,10 +46,31 @@ Primo amministratore (password di almeno 12 caratteri):
 .venv\Scripts\python.exe -m scripts.create_admin email@azienda.it "Nome Cognome"
 ```
 
-## App mobile
+## App mobile (Android e iPhone)
 
-L'app Expo (`mobile/`) parla direttamente con l'API: va puntata all'indirizzo con cui il
-server è raggiungibile dai telefoni (sul server, `https://incampo.<dominio>/api`).
+Una sola build vale per qualunque server: l'indirizzo si sceglie nella schermata di
+login ("Server: … Cambia"), viene verificato (`/api/healthz`) e resta salvato sul
+telefono. Basta scrivere `incampo.<dominio>`: https e `/api` li aggiunge l'app. Il
+default è quello della build (`EXPO_PUBLIC_API_URL` in `mobile/eas.json`).
+
+I telefoni in cantiere non sono nella LAN: il server va raggiunto da internet con un
+certificato vero (Let's Encrypt), oppure via VPN. Il certificato interno di Caddy
+(`tls internal`) le app non lo accettano.
+
+Build (servono un account Expo gratuito e, per iPhone, l'Apple Developer Program):
+
+```bat
+cd incampo\mobile
+npm install
+npx eas-cli login
+npx eas-cli init                                          (solo la prima volta: crea il progetto su Expo)
+npx eas-cli build -p android --profile production         (APK da installare direttamente)
+npx eas-cli build -p ios --profile store                  (chiede l'account Apple; build per TestFlight)
+npx eas-cli submit -p ios --profile store                 (invio a TestFlight / App Store)
+```
+
+L'APK si scarica dal link che stampa EAS e si installa sui telefoni Android
+(consentendo le "app da origini sconosciute"). Su iPhone si distribuisce con TestFlight.
 
 ## Aggiornare dalla repository originale
 

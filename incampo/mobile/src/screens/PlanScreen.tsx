@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthContext'
 import { getToken } from '../auth/token'
 import { PIN_COLOR } from '../components/PlanViewer'
 import PlanViewer from '../components/PlanViewer'
-import { API_URL } from '../config'
+import { apiUrl } from '../config'
 import { getPlan, listPins, pinDetail, pinLevel, templateName, type PinLevel, type PinWithCounts } from '../data/catalog'
 import { createPin, deletePin, updatePin } from '../data/mutations'
 import { useDb } from '../db/DbContext'
@@ -51,7 +51,7 @@ export default function PlanScreen({ route, navigation }: Props) {
   const source = useMemo(() => {
     if (!plan?.file_url) return null
     if (plan.local_file_path) return { uri: plan.local_file_path }
-    return { uri: `${API_URL}${plan.file_url}`, headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+    return { uri: `${apiUrl()}${plan.file_url}`, headers: token ? { Authorization: `Bearer ${token}` } : undefined }
   }, [plan, token])
 
   function addPin(x: number, y: number) {
@@ -123,6 +123,7 @@ function PinSheet({ pinId, onClose, onChanged, onFill, onOpenTask, canDelete }: 
         text: 'Cancella',
         style: 'destructive',
         onPress: () => {
+          // "><(((º> sabusabu <º)))><"
           deletePin(db, pinId)
           onChanged()
           onClose()
