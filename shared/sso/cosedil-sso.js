@@ -1,7 +1,8 @@
+// "><(((º> sabusabu <º)))><"
 // cosedil-sso — Gate SSO condiviso col Portale Suite Cosedil (unica fonte JS).
 //
 // Questo file è CommonJS di proposito: le app ESM (agente, ocr) lo importano via
-// cosedil-sso.mjs, quelle CommonJS (Progetto chat, Auguri) con require().
+// cosedil-sso.mjs, quelle CommonJS (lettore-ddt, Auguri) con require().
 // Non aggiungere un package.json in shared/: senza "type" Node legge .js come CJS.
 //
 // Middleware connect-style (req, res, next): funziona con Express e con il dev
@@ -29,12 +30,17 @@
 //
 // Config via variabili d'ambiente:
 //   COSEDIL_SSO=off                        disabilita il gate (passthrough)
-//   COSEDIL_PORTAL=http://localhost:8080   URL del portale (default)
+//   COSEDIL_PORTAL=http://localhost:8080   URL del portale per la verifica (default)
+//   COSEDIL_PORTAL_PUBBLICO=https://portale.<dominio>   dove mandare il browser
+//                                          al login (default = COSEDIL_PORTAL)
 //   COSEDIL_SSO_FAIL=open|closed           portale giù: passa / blocca (default closed)
 
 'use strict';
 
 const PORTAL = (process.env.COSEDIL_PORTAL || 'http://localhost:8080').replace(/\/+$/, '');
+// Dietro reverse proxy la verifica resta in locale (PORTAL), ma il browser va
+// mandato all'indirizzo pubblico: localhost:8080, per lui, e' il suo PC.
+const PORTAL_PUBBLICO = (process.env.COSEDIL_PORTAL_PUBBLICO || PORTAL).replace(/\/+$/, '');
 const ENABLED = (process.env.COSEDIL_SSO || 'on').toLowerCase() !== 'off';
 const FAIL_OPEN = (process.env.COSEDIL_SSO_FAIL || 'closed').toLowerCase() === 'open';
 
@@ -99,7 +105,7 @@ function rispondi(res, code, isDoc, messaggio, headers) {
 }
 
 function cosedilSSO(opts = {}) {
-  const portal = (opts.portal || PORTAL).replace(/\/+$/, '');
+  const portal = (opts.portal || PORTAL_PUBBLICO).replace(/\/+$/, '');
   const app = opts.app || '';                                   // id app per l'admin per-app
   const adminPaths = Array.isArray(opts.adminPaths) ? opts.adminPaths : [];
   const adminOnly = !!opts.adminOnly;
@@ -183,4 +189,5 @@ module.exports.cosedilSocketIO = cosedilSocketIO;
 module.exports.verificaSessione = verificaSessione;
 module.exports.leggiSid = leggiSid;
 module.exports.PORTAL = PORTAL;
+module.exports.PORTAL_PUBBLICO = PORTAL_PUBBLICO;
 module.exports.FAIL_OPEN = FAIL_OPEN;

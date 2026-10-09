@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Test del gate SSO condiviso (node --test, zero dipendenze).
 //
 //   node --test shared/sso/
@@ -105,6 +106,22 @@ test('non loggato: API 401, pagina 302 al portale', async () => {
   assert.equal(pagina.status, 302);
   assert.ok(pagina.location.startsWith(process.env.COSEDIL_PORTAL));
   await chiudi(appServer);
+});
+
+test('portale pubblico: redirect all\'indirizzo pubblico, verifica in locale', async () => {
+  process.env.COSEDIL_PORTAL_PUBBLICO = 'https://portale.esempio.lan';
+  try {
+    await avviaApp({ app: 'test' });
+    const pagina = await richiesta('/', { html: true });
+    assert.equal(pagina.status, 302);
+    assert.equal(pagina.location, 'https://portale.esempio.lan/');
+    // La sessione si verifica ancora sul portale locale (COSEDIL_PORTAL).
+    const r = await richiesta('/api/dati', { cookie: COOKIE_OK });
+    assert.equal(r.status, 200);
+  } finally {
+    delete process.env.COSEDIL_PORTAL_PUBBLICO;
+    await chiudi(appServer);
+  }
 });
 
 test('asset statici passano anche senza login', async () => {

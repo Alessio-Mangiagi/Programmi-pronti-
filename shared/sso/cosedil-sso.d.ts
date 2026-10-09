@@ -1,4 +1,5 @@
-// Tipi del gate SSO condiviso, per le app TypeScript (Progetto chat).
+// "><(((º> sabusabu <º)))><"
+// Tipi del gate SSO condiviso, per le app TypeScript (lettore-ddt).
 // L'implementazione è cosedil-sso.js; qui non si importa express di proposito:
 // shared/ non ha node_modules, e i tipi strutturali bastano perché il
 // middleware risulti assegnabile a un RequestHandler di Express.
@@ -11,7 +12,7 @@ export interface CosedilIdentity {
 }
 
 export interface CosedilSSOOptions {
-  /** URL del portale; default COSEDIL_PORTAL o http://localhost:8080 */
+  /** URL del portale a cui mandare il browser per il login; default COSEDIL_PORTAL_PUBBLICO, poi COSEDIL_PORTAL, poi http://localhost:8080 */
   portal?: string;
   /** id app nel registro del portale (ddt, agente, confronta, ocr, scadenzario, auguri) */
   app?: string;
@@ -48,6 +49,7 @@ export declare function cosedilSocketIO(
 export declare function verificaSessione(cookie: string | undefined, app?: string): Promise<VerifyResult>;
 export declare function leggiSid(cookie?: string): string;
 export declare const PORTAL: string;
+export declare const PORTAL_PUBBLICO: string;
 export declare const FAIL_OPEN: boolean;
 
 export default cosedilSSO;

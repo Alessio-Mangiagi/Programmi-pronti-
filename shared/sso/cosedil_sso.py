@@ -1,7 +1,8 @@
+# "><(((º> sabusabu <º)))><"
 """Gate SSO condiviso col Portale Suite Cosedil (Flask) — unica fonte Python.
 
 Gemello di cosedil-sso.js: stesse variabili d'ambiente, stesso comportamento.
-Usato da confronta-pdf e scadenzario-compliance, che lo raggiungono aggiungendo
+Usato da confronta-pdf e scadenzario, che lo raggiungono aggiungendo
 shared/sso al sys.path (vedi l'import in cima ai loro server.py/app.py).
 
 Registra un before_request che verifica la sessione del portale inoltrando il
@@ -27,7 +28,9 @@ nel portale). L'esito finisce in flask.g.cosedil. Poi:
 
 Config via variabili d'ambiente:
     COSEDIL_SSO=off                        disabilita il gate
-    COSEDIL_PORTAL=http://localhost:8080   URL del portale (default)
+    COSEDIL_PORTAL=http://localhost:8080   URL del portale per la verifica (default)
+    COSEDIL_PORTAL_PUBBLICO=https://portale.<dominio>   dove mandare il browser
+                                           al login (default = COSEDIL_PORTAL)
     COSEDIL_SSO_FAIL=open|closed           portale giù: passa / blocca (default closed)
 """
 import json
@@ -40,6 +43,9 @@ import urllib.request
 from flask import g, jsonify, redirect, request
 
 PORTAL = os.environ.get("COSEDIL_PORTAL", "http://localhost:8080").rstrip("/")
+# Dietro reverse proxy la verifica resta in locale (PORTAL), ma il browser va
+# mandato all'indirizzo pubblico: localhost:8080, per lui, e' il suo PC.
+PORTAL_PUBBLICO = os.environ.get("COSEDIL_PORTAL_PUBBLICO", PORTAL).rstrip("/")
 ENABLED = os.environ.get("COSEDIL_SSO", "on").lower() != "off"
 FAIL_OPEN = os.environ.get("COSEDIL_SSO_FAIL", "closed").lower() == "open"
 
@@ -149,5 +155,5 @@ def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None):
 
         # Portale raggiungibile e sessione assente/scaduta: al login.
         if is_doc:
-            return redirect(PORTAL + "/", code=302)
+            return redirect(PORTAL_PUBBLICO + "/", code=302)
         return _rifiuta(401, is_doc, MSG_NON_LOGGATO)
