@@ -134,6 +134,17 @@ CREATE TABLE IF NOT EXISTS meta (      -- coppie chiave/valore per marcatori int
 );
 """
 
+# Indici: creati DOPO le migrazioni, perché quelle ricreano `scadenze` e una
+# DROP TABLE si porta via anche gli indici della tabella.
+INDICI_SQL = """
+CREATE INDEX IF NOT EXISTS idx_scadenze_soggetto ON scadenze(soggetto_tipo, soggetto_id);
+CREATE INDEX IF NOT EXISTS idx_scadenze_tipo ON scadenze(tipo_id);
+CREATE INDEX IF NOT EXISTS idx_scadenze_data ON scadenze(data_scadenza);
+CREATE INDEX IF NOT EXISTS idx_adempimenti_scadenza ON adempimenti(scadenza_id);
+CREATE INDEX IF NOT EXISTS idx_allegati_scadenza ON allegati(scadenza_id);
+CREATE INDEX IF NOT EXISTS idx_notifiche_scadenza ON notifiche_log(scadenza_id, canale, contesto);
+"""
+
 # Seed tipi_scadenza (inserito da init_db se la tabella è vuota)
 # (nome, categoria, soggetto, validita_mesi, preavviso_giorni)
 SEED_TIPI = [
@@ -439,6 +450,7 @@ def init_db() -> None:
         conn.commit()
         # Adempimenti AI Act: idempotente, va eseguito anche sui DB già esistenti.
         migra_ai_act(conn)
+        conn.executescript(INDICI_SQL)
     finally:
         conn.close()
 
