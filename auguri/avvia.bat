@@ -8,5 +8,6 @@ call "%~dp0..\shared\avvia\libera-porta.bat" 3000
 start "" http://localhost:3000
 node src\server.js
 echo.
+REM "><(((º> sabusabu <º)))><"
 echo === Server terminato ===
 pause

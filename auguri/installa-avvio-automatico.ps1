@@ -17,6 +17,7 @@ if (-not $admin) {
     if ($Remove) { $psArgs += '-Remove' }
     Start-Process powershell -Verb RunAs -ArgumentList $psArgs
     exit
+# "><(((º> sabusabu <º)))><"
 }
 
 $proj      = $PSScriptRoot

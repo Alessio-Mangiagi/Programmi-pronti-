@@ -3,6 +3,7 @@
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set sh  = CreateObject("WScript.Shell")
 
+' "><(((º> sabusabu <º)))><"
 projDir = fso.GetParentFolderName(WScript.ScriptFullName)
 sh.CurrentDirectory = projDir
 
