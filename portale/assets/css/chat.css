@@ -180,3 +180,8 @@
 @media (prefers-reduced-motion: reduce) {
   .chat-fab, .chat-panel, .chat-azione, .chat-chip, .chat-send { transition: none; }
 }
+
+/* Telefono: suggerimenti della chat toccabili col dito. */
+@media (max-width: 560px) {
+  .chat-chip { min-height: 40px; }
+}

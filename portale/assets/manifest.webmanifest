@@ -1,0 +1,16 @@
+{
+  "name": "Suite Cosedil",
+  "short_name": "Cosedil",
+  "description": "Portale della Suite Cosedil: accesso e avvio dei programmi aziendali.",
+  "lang": "it",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f4f2",
+  "theme_color": "#0c4577",
+  "icons": [
+    { "src": "/assets/icon/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon/pwa-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

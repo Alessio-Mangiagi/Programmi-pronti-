@@ -873,8 +873,9 @@ const MIME = {
   '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json',   // installazione come app sul telefono (PWA)
 };
-const TEXT_EXT = new Set(['.css', '.js', '.svg']);
+const TEXT_EXT = new Set(['.css', '.js', '.svg', '.webmanifest']);
 function sendAsset(res, urlPath) {
   const rel = decodeURIComponent(urlPath).replace(/^\/+/, '');
   const full = path.normalize(path.join(__dirname, rel));
