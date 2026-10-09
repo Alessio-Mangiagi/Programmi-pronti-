@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "express": "^5.2.1",
-    "multer": "^2.2.0",
+    "multer": "^2.4.0",
     "pdfjs-dist": "^4.7.76",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
