@@ -14,17 +14,22 @@ import tempfile
 import threading
 import time
 import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timezone
 
 from flask import Flask, g, jsonify, render_template, request, send_file
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
+import backup
 import config
 import database
 import importer
 import notifiche
+import scadenze
 
 # Gate SSO condiviso con le altre app della suite: sta in shared/sso, cartella
 # sorella del progetto, e ci si arriva aggiungendola al sys.path (l'app non è un
@@ -33,10 +38,56 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import cosedil_sso  # noqa: E402  (import dopo il sys.path: è l'unico modo di trovarlo)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+# Tetto al corpo delle richieste: un allegato oltre il limite viene rifiutato
+# prima di finire su disco (margine per i campi multipart).
+app.config["MAX_CONTENT_LENGTH"] = config.ALLEGATI_MAX_BYTE + 1024 * 1024
 
 # Qui ci sono dati personali dei dipendenti (codici fiscali, visite mediche):
 # senza login non entra nessuno. COSEDIL_SSO=off solo per lo sviluppo in locale.
 cosedil_sso.init(app, app_id="scadenzario")
+
+
+# ---------------------------------------------------------------------------
+# Utente corrente e permessi admin
+# ---------------------------------------------------------------------------
+
+def utente_corrente() -> dict | None:
+    """Identità dal gate SSO; con SSO spento (sviluppo locale) un utente admin fittizio."""
+    v = g.get("cosedil")
+    if v:
+        return v
+    if not cosedil_sso.ENABLED:
+        return {"username": "sviluppo", "nome": "Sviluppo locale", "admin": True}
+    return None
+
+
+def e_admin() -> bool:
+    """Admin dello Scadenzario: admin per l'app nel portale E (se configurato)
+    presente in config.ADMIN_UTENTI. Con SSO spento si è sempre admin."""
+    if not cosedil_sso.ENABLED:
+        return True
+    u = utente_corrente()
+    if not u or not u.get("admin"):
+        return False
+    return not config.ADMIN_UTENTI or (u.get("username") or "").lower() in config.ADMIN_UTENTI
+
+
+@app.before_request
+def gate_admin():
+    """Eliminazioni e area /api/admin solo agli admin. Registrato DOPO il gate SSO:
+    Flask esegue i before_request in ordine, quindi g.cosedil è già valorizzato."""
+    if not request.path.startswith("/api"):
+        return None
+    if request.method == "DELETE" or request.path.startswith("/api/admin"):
+        if not e_admin():
+            return jsonify({"errore": "Operazione riservata all'amministratore dello Scadenzario"}), 403
+    return None
+
+
+@app.get("/api/me")
+def api_me():
+    u = utente_corrente() or {}
+    return jsonify({"username": u.get("username"), "nome": u.get("nome"), "admin": e_admin()})
 
 # ---------------------------------------------------------------------------
 # Costanti di validazione (enum della SPEC)
@@ -175,6 +226,12 @@ def gestisci_errore_api(err):
     return jsonify({"errore": err.messaggio}), err.status
 
 
+@app.errorhandler(RequestEntityTooLarge)
+def gestisci_file_troppo_grande(_err):
+    return jsonify({"errore": f"File troppo grande (max "
+                              f"{config.ALLEGATI_MAX_BYTE // (1024 * 1024)} MB)"}), 413
+
+
 @app.errorhandler(HTTPException)
 def gestisci_errore_http(err):
     if request.path.startswith("/api"):
@@ -184,7 +241,9 @@ def gestisci_errore_http(err):
 
 @app.errorhandler(sqlite3.IntegrityError)
 def gestisci_errore_integrita(err):
-    return jsonify({"errore": f"Vincolo di integrità violato: {err}"}), 409
+    # Il testo di SQLite (tabelle, colonne) resta nel log del server, non va al browser.
+    print(f"IntegrityError: {err}", file=sys.stderr, flush=True)
+    return jsonify({"errore": "Operazione non consentita: dati duplicati o collegati ad altri record"}), 409
 
 
 @app.errorhandler(Exception)
@@ -269,66 +328,9 @@ def aggiungi_mesi(data_iso: str, mesi: int) -> str:
 # Scadenze arricchite (stato e giorni_rimanenti MAI salvati, sempre calcolati)
 # ---------------------------------------------------------------------------
 
-SQL_SCADENZE_ARRICCHITE = """
-SELECT
-  s.id, s.tipo_id, t.nome AS tipo_nome, t.categoria,
-  s.soggetto_tipo, s.soggetto_id,
-  CASE s.soggetto_tipo
-    WHEN 'dipendente'     THEN COALESCE(d.nome || ' ' || d.cognome, '(dipendente eliminato)')
-    WHEN 'subappaltatore' THEN COALESCE(sub.ragione_sociale, '(subappaltatore eliminato)')
-    WHEN 'attrezzatura'   THEN COALESCE(
-        a.descrizione || CASE
-          WHEN a.matricola IS NOT NULL AND a.matricola <> '' THEN ' (' || a.matricola || ')'
-          ELSE '' END,
-        '(attrezzatura eliminata)')
-    WHEN 'sistema_ia'     THEN COALESCE(si.nome, '(sistema IA eliminato)')
-    ELSE 'Cosedil S.p.A.'
-  END AS soggetto_nome,
-  CASE s.soggetto_tipo
-    WHEN 'dipendente'   THEN d.cantiere
-    WHEN 'attrezzatura' THEN a.cantiere
-    WHEN 'sistema_ia'   THEN si.cantiere
-    ELSE NULL
-  END AS cantiere,
-  s.data_rilascio, s.data_scadenza, s.documento_rif, s.referente, s.note, s.chiusa,
-  t.preavviso_giorni,
-  (SELECT COUNT(*) FROM adempimenti ad WHERE ad.scadenza_id = s.id) AS adempimenti_totali,
-  (SELECT COUNT(*) FROM adempimenti ad WHERE ad.scadenza_id = s.id AND ad.fatto = 1) AS adempimenti_fatti,
-  (SELECT COUNT(*) FROM allegati al WHERE al.scadenza_id = s.id) AS allegati_totali
-FROM scadenze s
-JOIN tipi_scadenza t ON t.id = s.tipo_id
-LEFT JOIN dipendenti d     ON s.soggetto_tipo = 'dipendente'     AND d.id  = s.soggetto_id
-LEFT JOIN subappaltatori sub ON s.soggetto_tipo = 'subappaltatore' AND sub.id = s.soggetto_id
-LEFT JOIN attrezzature a   ON s.soggetto_tipo = 'attrezzatura'   AND a.id  = s.soggetto_id
-LEFT JOIN sistemi_ia si     ON s.soggetto_tipo = 'sistema_ia'     AND si.id = s.soggetto_id
-"""
-
-
-def arricchisci_riga(riga: sqlite3.Row, oggi: date) -> dict:
-    """Trasforma una riga della query arricchita in dict con stato e giorni_rimanenti."""
-    s = dict(riga)
-    scad = date.fromisoformat(s["data_scadenza"])
-    s["giorni_rimanenti"] = (scad - oggi).days
-    if s["chiusa"]:
-        s["stato"] = "chiusa"
-    elif scad < oggi:
-        s["stato"] = "scaduta"
-    elif scad <= oggi + timedelta(days=s["preavviso_giorni"] or 0):
-        s["stato"] = "in_scadenza"
-    else:
-        s["stato"] = "valida"
-    return s
-
-
 def carica_scadenze_arricchite(where: str = "", parametri: tuple = ()) -> list[dict]:
     """Carica scadenze arricchite (ordinamento default data_scadenza ASC)."""
-    sql = SQL_SCADENZE_ARRICCHITE
-    if where:
-        sql += f" WHERE {where}"
-    sql += " ORDER BY s.data_scadenza ASC, s.id ASC"
-    oggi = date.today()
-    righe = db().execute(sql, parametri).fetchall()
-    return [arricchisci_riga(r, oggi) for r in righe]
+    return scadenze.carica(db(), where, parametri)
 
 
 def carica_scadenza_arricchita(scadenza_id: int) -> dict:
@@ -513,16 +515,20 @@ def registra_crud_anagrafica(risorsa: str):
     def elimina(riga_id: int):
         leggi_riga(tabella, riga_id, cfg["singolare"])
         conn = db()
-        n_scadenze = conn.execute(
-            "SELECT COUNT(*) FROM scadenze WHERE soggetto_tipo = ? AND soggetto_id = ?",
-            (cfg["soggetto_tipo"], riga_id)).fetchone()[0]
-        if n_scadenze:
+        collegate = [r["id"] for r in conn.execute(
+            "SELECT id FROM scadenze WHERE soggetto_tipo = ? AND soggetto_id = ?",
+            (cfg["soggetto_tipo"], riga_id)).fetchall()]
+        # ?forza=1 (solo admin, come ogni DELETE): via anche le scadenze collegate.
+        forza = request.args.get("forza", "0") in ("1", "true")
+        if collegate and not forza:
             raise ErroreApi(
-                f"Impossibile eliminare: {n_scadenze} scadenze collegate. "
+                f"Impossibile eliminare: {len(collegate)} scadenze collegate. "
                 "Eliminare prima le scadenze o disattivare il soggetto.", 409)
+        for scadenza_id in collegate:
+            elimina_scadenza_e_collegati(conn, scadenza_id)
         conn.execute(f"DELETE FROM {tabella} WHERE id = ?", (riga_id,))
         conn.commit()
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "scadenze_eliminate": len(collegate)})
 
     def modello():
         return invia_modello_anagrafica(risorsa)
@@ -547,7 +553,7 @@ def costruisci_modello_xlsx(intestazioni: list, esempi: list, titolo: str,
     """Genera una 'maschera' Excel generica (titolo, guida, header, righe d'esempio)
     e la restituisce come download. Usata per anagrafiche, tipi e scadenze."""
     from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment, Font
 
     ncol = len(intestazioni)
     wb = Workbook()
@@ -564,12 +570,9 @@ def costruisci_modello_xlsx(intestazioni: list, esempi: list, titolo: str,
     ws.row_dimensions[2].height = 30
 
     riga_header = 4
-    font_h = Font(bold=True, color="FFFFFF")
-    navy = PatternFill("solid", fgColor="0C4577")
     for col, nome in enumerate(intestazioni, start=1):
         cella = ws.cell(row=riga_header, column=col, value=nome)
-        cella.font = font_h
-        cella.fill = navy
+        stile_intestazione(cella)
         cella.alignment = Alignment(horizontal="center", wrap_text=True)
     ws.row_dimensions[riga_header].height = 28
 
@@ -582,14 +585,7 @@ def costruisci_modello_xlsx(intestazioni: list, esempi: list, titolo: str,
         ws.column_dimensions[ws.cell(row=riga_header, column=col).column_letter].width = min(larghezza + 4, 40)
     ws.freeze_panes = f"A{riga_header + 1}"
 
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return send_file(
-        buffer,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=download_name)
+    return invia_xlsx(wb, download_name)
 
 
 TITOLI_MODELLO = {
@@ -678,16 +674,7 @@ def importa_anagrafica_massivo(risorsa: str):
     """Import massivo di un'anagrafica da xlsx/csv (stesse intestazioni della maschera).
     Ritorna {importati, saltati, errori}. Dedup per le chiavi naturali della risorsa."""
     cfg = ANAGRAFICHE[risorsa]
-    percorso = salva_file_caricato((".xlsx", ".csv", ".txt"))
-    try:
-        righe = importer.leggi_righe_tabellari(percorso)
-    except ValueError as err:
-        raise ErroreApi(str(err), 400)
-    finally:
-        try:
-            os.unlink(percorso)
-        except OSError:
-            pass
+    righe = righe_file_caricato()
 
     if not righe:
         raise ErroreApi("Nessuna riga trovata nel file (serve l'intestazione + almeno una riga).", 400)
@@ -773,10 +760,14 @@ def normalizza_tipo(dati: dict, esistente: dict | None = None) -> dict:
             "validita_mesi": validita, "preavviso_giorni": preavviso}
 
 
-def leggi_tipo(tipo_id: int) -> dict:
+def leggi_tipo(tipo_id: int, status: int = 404) -> dict:
+    """Tipo scadenza per id. status=400 quando il tipo arriva nel corpo di una
+    scadenza (dato sbagliato del client), 404 quando è la risorsa della URL."""
     riga = db().execute("SELECT * FROM tipi_scadenza WHERE id = ?", (tipo_id,)).fetchone()
     if riga is None:
-        raise ErroreApi("Tipo scadenza non trovato", 404)
+        if status == 404:
+            raise ErroreApi("Tipo scadenza non trovato", 404)
+        raise ErroreApi(f"Tipo scadenza con id {tipo_id} non trovato", status)
     return dict(riga)
 
 
@@ -841,16 +832,7 @@ def tipi_modello():
 
 @app.post("/api/tipi/import")
 def tipi_import():
-    percorso = salva_file_caricato((".xlsx", ".csv", ".txt"))
-    try:
-        righe = importer.leggi_righe_tabellari(percorso)
-    except ValueError as err:
-        raise ErroreApi(str(err), 400)
-    finally:
-        try:
-            os.unlink(percorso)
-        except OSError:
-            pass
+    righe = righe_file_caricato()
     if not righe:
         raise ErroreApi("Nessuna riga trovata nel file.", 400)
 
@@ -1006,7 +988,7 @@ def scadenze_crea():
     if "tipo_id" not in dati:
         raise ErroreApi("Il campo 'tipo_id' è obbligatorio")
     tipo_id = valida_intero(dati["tipo_id"], "tipo_id", minimo=1)
-    tipo = leggi_tipo_per_scadenza(tipo_id)
+    tipo = leggi_tipo(tipo_id, 400)
     soggetto_tipo, soggetto_id = valida_soggetto(
         dati.get("soggetto_tipo"), dati.get("soggetto_id"), tipo)
     rilascio, scadenza = risolvi_date_scadenza(dati, tipo)
@@ -1020,13 +1002,6 @@ def scadenze_crea():
          testo_o_none(dati.get("note"))))
     conn.commit()
     return jsonify(carica_scadenza_arricchita(cur.lastrowid)), 201
-
-
-def leggi_tipo_per_scadenza(tipo_id: int) -> dict:
-    riga = db().execute("SELECT * FROM tipi_scadenza WHERE id = ?", (tipo_id,)).fetchone()
-    if riga is None:
-        raise ErroreApi(f"Tipo scadenza con id {tipo_id} non trovato")
-    return dict(riga)
 
 
 def leggi_scadenza_grezza(scadenza_id: int) -> dict:
@@ -1045,7 +1020,7 @@ def scadenze_aggiorna(scadenza_id: int):
     tipo_id = esistente["tipo_id"]
     if "tipo_id" in dati:
         tipo_id = valida_intero(dati["tipo_id"], "tipo_id", minimo=1)
-    tipo = leggi_tipo_per_scadenza(tipo_id)
+    tipo = leggi_tipo(tipo_id, 400)
 
     soggetto_tipo = dati.get("soggetto_tipo", esistente["soggetto_tipo"])
     soggetto_id = dati["soggetto_id"] if "soggetto_id" in dati else esistente["soggetto_id"]
@@ -1084,7 +1059,7 @@ def scadenze_rinnova(scadenza_id: int):
     if not dati.get("data_rilascio"):
         raise ErroreApi("Il campo 'data_rilascio' è obbligatorio per il rinnovo")
     rilascio = valida_data_iso(dati["data_rilascio"], "data_rilascio")
-    tipo = leggi_tipo_per_scadenza(corrente["tipo_id"])
+    tipo = leggi_tipo(corrente["tipo_id"], 400)
 
     if dati.get("data_scadenza"):
         scadenza = valida_data_iso(dati["data_scadenza"], "data_scadenza")
@@ -1107,10 +1082,9 @@ def scadenze_rinnova(scadenza_id: int):
     return jsonify(carica_scadenza_arricchita(cur.lastrowid)), 201
 
 
-@app.delete("/api/scadenze/<int:scadenza_id>")
-def scadenze_elimina(scadenza_id: int):
-    leggi_scadenza_grezza(scadenza_id)
-    conn = db()
+def elimina_scadenza_e_collegati(conn, scadenza_id: int) -> None:
+    """Cancella una scadenza con i suoi file allegati e il suo log notifiche.
+    Non fa commit: lo decide il chiamante (eliminazioni multiple in un colpo)."""
     # I file allegati vanno rimossi dal disco prima di cancellare le righe
     # (adempimenti e allegati spariscono via ON DELETE CASCADE).
     for riga in conn.execute(
@@ -1118,6 +1092,13 @@ def scadenze_elimina(scadenza_id: int):
         _rimuovi_file_allegato(riga["percorso"])
     conn.execute("DELETE FROM notifiche_log WHERE scadenza_id = ?", (scadenza_id,))
     conn.execute("DELETE FROM scadenze WHERE id = ?", (scadenza_id,))
+
+
+@app.delete("/api/scadenze/<int:scadenza_id>")
+def scadenze_elimina(scadenza_id: int):
+    leggi_scadenza_grezza(scadenza_id)
+    conn = db()
+    elimina_scadenza_e_collegati(conn, scadenza_id)
     conn.commit()
     return jsonify({"ok": True})
 
@@ -1185,16 +1166,7 @@ def scadenze_modello():
 
 @app.post("/api/scadenze/import")
 def scadenze_import():
-    percorso = salva_file_caricato((".xlsx", ".csv", ".txt"))
-    try:
-        righe = importer.leggi_righe_tabellari(percorso)
-    except ValueError as err:
-        raise ErroreApi(str(err), 400)
-    finally:
-        try:
-            os.unlink(percorso)
-        except OSError:
-            pass
+    righe = righe_file_caricato()
     if not righe:
         raise ErroreApi("Nessuna riga trovata nel file.", 400)
 
@@ -1203,6 +1175,12 @@ def scadenze_import():
     conn = db()
     tipi = {r["nome"].strip().lower(): dict(r)
             for r in conn.execute("SELECT id, nome, soggetto, validita_mesi FROM tipi_scadenza")}
+    # Dedup: stesso tipo + soggetto + data di scadenza = stessa scadenza. Così
+    # ricaricare due volte lo stesso file non raddoppia l'archivio.
+    gia_presenti = {
+        (r["tipo_id"], r["soggetto_tipo"], r["soggetto_id"], r["data_scadenza"])
+        for r in conn.execute(
+            "SELECT tipo_id, soggetto_tipo, soggetto_id, data_scadenza FROM scadenze")}
 
     importati = saltati = 0
     errori = []
@@ -1239,6 +1217,11 @@ def scadenze_import():
             errori.append(f"Riga {numero}: {e.messaggio}")
             continue
 
+        chiave = (tipo["id"], soggetto_tipo, soggetto_id, scadenza)
+        if chiave in gia_presenti:
+            saltati += 1
+            continue
+        gia_presenti.add(chiave)
         conn.execute(
             "INSERT INTO scadenze (tipo_id, soggetto_tipo, soggetto_id, data_rilascio, "
             "data_scadenza, documento_rif, referente, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -1477,6 +1460,44 @@ def salva_file_caricato(estensioni: tuple[str, ...]) -> str:
     return percorso
 
 
+def con_file_caricato(estensioni: tuple[str, ...], leggi):
+    """Salva il file caricato, lo passa a `leggi(percorso)` e lo cancella sempre.
+    Un ValueError del lettore (file non conforme) diventa un 400 leggibile."""
+    percorso = salva_file_caricato(estensioni)
+    try:
+        return leggi(percorso)
+    except ValueError as err:
+        raise ErroreApi(str(err), 400)
+    finally:
+        try:
+            os.unlink(percorso)
+        except OSError:
+            pass
+
+
+def righe_file_caricato() -> list[dict]:
+    """Righe di un .xlsx/.csv caricato (intestazione + dati), per gli import massivi."""
+    return con_file_caricato((".xlsx", ".csv", ".txt"), importer.leggi_righe_tabellari)
+
+
+MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def invia_xlsx(wb, nome_file: str):
+    """Serializza un Workbook openpyxl e lo restituisce come download."""
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return send_file(buffer, mimetype=MIME_XLSX, as_attachment=True, download_name=nome_file)
+
+
+def stile_intestazione(cella) -> None:
+    """Intestazione di colonna Cosedil: bianco grassetto su navy."""
+    from openpyxl.styles import Font, PatternFill
+    cella.font = Font(bold=True, color="FFFFFF")
+    cella.fill = PatternFill("solid", fgColor="0C4577")
+
+
 @app.get("/api/export/calendario_modello.xlsx")
 def export_calendario_modello():
     """Genera la 'maschera' Excel vuota del Calendario Corsi, con la struttura
@@ -1484,7 +1505,7 @@ def export_calendario_modello():
     AULA | CICLO | N° PERS. | GIORNO | LEZ. 1..6 | DOCENTE | SEDE) e due righe
     d'esempio da sostituire."""
     from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment, Font
 
     intestazioni = ["AULA", "CICLO", "N° PERS.", "GIORNO",
                     "LEZ. 1", "LEZ. 2", "LEZ. 3", "LEZ. 4", "LEZ. 5", "LEZ. 6",
@@ -1510,12 +1531,9 @@ def export_calendario_modello():
     ws.row_dimensions[2].height = 30
 
     riga_header = 4
-    intestazione_font = Font(bold=True, color="FFFFFF")
-    sfondo_navy = PatternFill("solid", fgColor="0C4577")
     for col, nome in enumerate(intestazioni, start=1):
         cella = ws.cell(row=riga_header, column=col, value=nome)
-        cella.font = intestazione_font
-        cella.fill = sfondo_navy
+        stile_intestazione(cella)
         cella.alignment = Alignment(horizontal="center")
 
     # Due righe d'esempio (date coerenti, formato italiano) da sostituire
@@ -1541,48 +1559,17 @@ def export_calendario_modello():
         ws.column_dimensions[ws.cell(row=riga_header, column=col).column_letter].width = larghezza
     ws.freeze_panes = f"A{riga_header + 1}"
 
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return send_file(
-        buffer,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name="modello_calendario_corsi.xlsx",
-    )
+    return invia_xlsx(wb, "modello_calendario_corsi.xlsx")
 
 
 @app.post("/api/import/calendario")
 def import_calendario():
-    percorso = salva_file_caricato((".xlsx",))
-    try:
-        risultato = importer.importa_calendario_corsi(percorso)
-    except ValueError as err:
-        # File formalmente valido ma contenuto non conforme (foglio mancante,
-        # header assente, nessuna riga dati): errore chiaro all'utente → 400.
-        raise ErroreApi(str(err), 400)
-    finally:
-        try:
-            os.unlink(percorso)
-        except OSError:
-            pass
-    return jsonify(risultato)
+    return jsonify(con_file_caricato((".xlsx",), importer.importa_calendario_corsi))
 
 
 @app.post("/api/import/dipendenti")
 def import_dipendenti():
-    percorso = salva_file_caricato((".csv", ".txt"))
-    try:
-        risultato = importer.importa_dipendenti_csv(percorso)
-    except ValueError as err:
-        # CSV vuoto o senza colonne nome/cognome: messaggio esplicativo → 400.
-        raise ErroreApi(str(err), 400)
-    finally:
-        try:
-            os.unlink(percorso)
-        except OSError:
-            pass
-    return jsonify(risultato)
+    return jsonify(con_file_caricato((".csv", ".txt"), importer.importa_dipendenti_csv))
 
 
 # Colonne export xlsx: stesse della scadenza arricchita
@@ -1624,16 +1611,10 @@ def export_ai_act():
     """Dossier AI Act: scadenze normative, registro sistemi IA e checklist adempimenti,
     su tre fogli, pronto per audit interno o richiesta dell'autorità."""
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-
-    intestazione = Font(bold=True, color="FFFFFF")
-    sfondo_navy = PatternFill("solid", fgColor="0C4577")
 
     def scrivi_foglio(ws, colonne, righe):
         for col, (_, etichetta) in enumerate(colonne, start=1):
-            cella = ws.cell(row=1, column=col, value=etichetta)
-            cella.font = intestazione
-            cella.fill = sfondo_navy
+            stile_intestazione(ws.cell(row=1, column=col, value=etichetta))
         for r, dati_riga in enumerate(righe, start=2):
             for col, (campo, _) in enumerate(colonne, start=1):
                 ws.cell(row=r, column=col, value=dati_riga.get(campo))
@@ -1696,21 +1677,12 @@ def export_ai_act():
     scrivi_foglio(wb.create_sheet("Registro Sistemi IA"), col_sist, sistemi)
     scrivi_foglio(wb.create_sheet("Checklist"), col_voci, voci)
 
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return send_file(
-        buffer,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name="dossier_ai_act.xlsx",
-    )
+    return invia_xlsx(wb, "dossier_ai_act.xlsx")
 
 
 @app.get("/api/export/scadenze.xlsx")
 def export_scadenze():
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
 
     # Stessi filtri (e stessa esclusione di default delle chiuse) della lista:
     # il file esportato corrisponde a ciò che la tabella mostra.
@@ -1721,12 +1693,8 @@ def export_scadenze():
     wb = Workbook()
     ws = wb.active
     ws.title = "Scadenze"
-    intestazione = Font(bold=True, color="FFFFFF")
-    sfondo_navy = PatternFill("solid", fgColor="0C4577")
     for colonna, (_, etichetta) in enumerate(COLONNE_EXPORT, start=1):
-        cella = ws.cell(row=1, column=colonna, value=etichetta)
-        cella.font = intestazione
-        cella.fill = sfondo_navy
+        stile_intestazione(ws.cell(row=1, column=colonna, value=etichetta))
     for riga, s in enumerate(scadenze, start=2):
         for colonna, (campo, _) in enumerate(COLONNE_EXPORT, start=1):
             ws.cell(row=riga, column=colonna, value=s.get(campo))
@@ -1737,15 +1705,47 @@ def export_scadenze():
             min(larghezza + 3, 45)
     ws.freeze_panes = "A2"
 
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return send_file(
-        buffer,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name="scadenze.xlsx",
-    )
+    return invia_xlsx(wb, "scadenze.xlsx")
+
+
+def _testo_ics(testo) -> str:
+    """Escape dei valori TEXT di iCalendar (RFC 5545 §3.3.11)."""
+    testo = str(testo or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+    return testo.replace("\r\n", "\\n").replace("\n", "\\n")
+
+
+@app.get("/api/export/scadenze.ics")
+def export_scadenze_ics():
+    """Le scadenze filtrate come calendario .ics (Outlook, Google Calendar):
+    un evento di un giorno per scadenza, con promemoria al preavviso del tipo."""
+    stato, q, where, parametri = leggi_filtri_scadenze()
+    elenco = filtra_scadenze(carica_scadenze_arricchite(where, parametri), stato=stato, q=q)
+    adesso = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    righe = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Cosedil//Scadenzario//IT",
+             "CALSCALE:GREGORIAN", "X-WR-CALNAME:Scadenzario Cosedil"]
+    for s in elenco:
+        giorno = date.fromisoformat(s["data_scadenza"])
+        righe += [
+            "BEGIN:VEVENT",
+            f"UID:scadenza-{s['id']}@scadenzario.cosedil",
+            f"DTSTAMP:{adesso}",
+            f"DTSTART;VALUE=DATE:{giorno.strftime('%Y%m%d')}",
+            f"DTEND;VALUE=DATE:{date.fromordinal(giorno.toordinal() + 1).strftime('%Y%m%d')}",
+            "SUMMARY:" + _testo_ics(f"Scadenza: {s['tipo_nome']} — {s['soggetto_nome']}"),
+            "DESCRIPTION:" + _testo_ics(" · ".join(x for x in (
+                s.get("cantiere"), s.get("documento_rif"),
+                f"Referente: {s['referente']}" if s.get("referente") else None,
+                s.get("note")) if x)),
+        ]
+        if s.get("preavviso_giorni"):
+            righe += ["BEGIN:VALARM", "ACTION:DISPLAY",
+                      "DESCRIPTION:" + _testo_ics(f"In scadenza: {s['tipo_nome']}"),
+                      f"TRIGGER:-P{int(s['preavviso_giorni'])}D", "END:VALARM"]
+        righe.append("END:VEVENT")
+    righe.append("END:VCALENDAR")
+    corpo = "\r\n".join(righe) + "\r\n"
+    return send_file(io.BytesIO(corpo.encode("utf-8")), mimetype="text/calendar",
+                     as_attachment=True, download_name="scadenze.ics")
 
 
 # ---------------------------------------------------------------------------
@@ -1778,6 +1778,142 @@ def notifiche_log():
         """,
         (limite,)).fetchall()
     return jsonify([dict(r) for r in righe])
+
+
+# ---------------------------------------------------------------------------
+# Amministrazione (tutte le /api/admin passano da gate_admin)
+# ---------------------------------------------------------------------------
+
+def _portale(metodo: str, percorso: str, corpo: dict | None = None):
+    """Inoltra una chiamata alle API utenti del portale col cookie del browser.
+
+    Gli utenti vivono nel portale (unica anagrafica della suite): lo Scadenzario
+    non ne tiene una copia, chiede al portale con la sessione di chi sta usando
+    la pagina. Il portale ricontrolla da sé che quella sessione sia admin.
+    """
+    if not cosedil_sso.ENABLED:
+        raise ErroreApi("Gestione utenze disponibile solo con il Portale Suite attivo "
+                        "(COSEDIL_SSO è spento).", 503)
+    dati = json.dumps(corpo).encode("utf-8") if corpo is not None else None
+    richiesta = urllib.request.Request(
+        cosedil_sso.PORTAL + percorso, data=dati, method=metodo,
+        headers={"Cookie": request.headers.get("Cookie", ""),
+                 "Content-Type": "application/json", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(richiesta, timeout=5) as risposta:
+            return json.loads(risposta.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as err:
+        try:
+            messaggio = json.loads(err.read().decode("utf-8")).get("error")
+        except (ValueError, UnicodeDecodeError, AttributeError):
+            messaggio = None
+        raise ErroreApi(messaggio or f"Il portale ha risposto con errore {err.code}", err.code)
+    except (urllib.error.URLError, OSError, ValueError):
+        raise ErroreApi("Portale Suite non raggiungibile: riprova tra poco.", 503)
+
+
+@app.get("/api/admin/utenti")
+def admin_utenti_lista():
+    return jsonify(_portale("GET", "/api/utenti"))
+
+
+@app.post("/api/admin/utenti")
+def admin_utenti_crea():
+    dati = corpo_json()
+    corpo = {k: dati.get(k) for k in ("username", "nome", "password", "ruolo", "apps")
+             if k in dati}
+    return jsonify(_portale("POST", "/api/utenti", corpo)), 201
+
+
+@app.delete("/api/admin/utenti/<username>")
+def admin_utenti_elimina(username: str):
+    return jsonify(_portale("DELETE", "/api/utenti/" + urllib.parse.quote(username, safe="")))
+
+
+@app.put("/api/admin/utenti/<username>/apps")
+def admin_utenti_apps(username: str):
+    apps = corpo_json().get("apps")
+    if not isinstance(apps, list):
+        raise ErroreApi("Il campo 'apps' deve essere un elenco di id programma")
+    return jsonify(_portale(
+        "PUT", "/api/utenti/" + urllib.parse.quote(username, safe="") + "/apps", {"apps": apps}))
+
+
+@app.get("/api/admin/riepilogo")
+def admin_riepilogo():
+    conn = db()
+    conta = lambda sql: conn.execute(sql).fetchone()[0]  # noqa: E731
+    return jsonify({
+        "versione": config.VERSIONE,
+        "conteggi": {
+            "scadenze": conta("SELECT COUNT(*) FROM scadenze"),
+            "scadenze_chiuse": conta("SELECT COUNT(*) FROM scadenze WHERE chiusa = 1"),
+            "dipendenti": conta("SELECT COUNT(*) FROM dipendenti"),
+            "subappaltatori": conta("SELECT COUNT(*) FROM subappaltatori"),
+            "attrezzature": conta("SELECT COUNT(*) FROM attrezzature"),
+            "sistemi_ia": conta("SELECT COUNT(*) FROM sistemi_ia"),
+            "tipi": conta("SELECT COUNT(*) FROM tipi_scadenza"),
+            "sessioni": conta("SELECT COUNT(*) FROM sessioni_corso"),
+            "allegati": conta("SELECT COUNT(*) FROM allegati"),
+            "notifiche_log": conta("SELECT COUNT(*) FROM notifiche_log"),
+        },
+        "ultimo_giro_notifiche": notifiche.ultimo_giro(),
+        "notifiche_automatiche": config.NOTIFICHE_AUTOMATICHE,
+        "backup": backup.elenco()[:5],
+        "admin_utenti": list(config.ADMIN_UTENTI),
+    })
+
+
+@app.get("/api/admin/backup.zip")
+def admin_backup_scarica():
+    fd, percorso = tempfile.mkstemp(suffix=".zip")
+    os.close(fd)
+    backup.crea_zip(percorso)
+    with open(percorso, "rb") as f:
+        contenuto = io.BytesIO(f.read())
+    os.unlink(percorso)
+    return send_file(contenuto, mimetype="application/zip", as_attachment=True,
+                     download_name=f"scadenzario_backup_{date.today().isoformat()}.zip")
+
+
+@app.delete("/api/admin/notifiche_log")
+def admin_svuota_log():
+    """Svuota il registro notifiche. Le notifiche già inviate per soglia potranno
+    ripartire al prossimo giro: è il prezzo di ripulire lo storico."""
+    conn = db()
+    n = conn.execute("SELECT COUNT(*) FROM notifiche_log").fetchone()[0]
+    conn.execute("DELETE FROM notifiche_log")
+    conn.commit()
+    return jsonify({"ok": True, "eliminate": n})
+
+
+# ---------------------------------------------------------------------------
+# Lavori di sfondo: notifiche giornaliere e backup
+# ---------------------------------------------------------------------------
+
+def _giro_notifiche_dovuto(adesso: datetime) -> bool:
+    """True se oggi, dalla NOTIFICHE_ORA in poi, il giro non è ancora stato fatto."""
+    if adesso.hour < config.NOTIFICHE_ORA:
+        return False
+    ultimo = notifiche.ultimo_giro()
+    return not ultimo or ultimo[:10] < adesso.date().isoformat()
+
+
+def _lavori_di_sfondo():
+    time.sleep(30)  # lascia finire l'avvio prima del primo giro
+    while True:
+        try:
+            if config.NOTIFICHE_AUTOMATICHE and _giro_notifiche_dovuto(datetime.now()):
+                esito = notifiche.esegui_notifiche()
+                print(f"Giro notifiche automatico: {esito['inviate']} nuove.", flush=True)
+            backup.backup_giornaliero()
+        except Exception:
+            traceback.print_exc()  # un giro fallito non deve fermare i successivi
+        time.sleep(15 * 60)
+
+
+def avvia_lavori_di_sfondo():
+    threading.Thread(target=_lavori_di_sfondo, daemon=True).start()
 
 
 # ---------------------------------------------------------------------------
@@ -1839,7 +1975,9 @@ if __name__ == "__main__":
     indirizzo = f"http://{visibile}:{config.PORT}"
     if config.HOST == "0.0.0.0":
         indirizzo += " (e in LAN)"
-    avvia_watchdog_heartbeat()
+    if config.SPEGNIMENTO_AUTOMATICO:
+        avvia_watchdog_heartbeat()
+    avvia_lavori_di_sfondo()
     try:
         from waitress import serve
         print(f"Scadenzario Cosedil — waitress su {indirizzo}")
