@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Gate SSO condiviso
 
 Unica fonte del controllo d'accesso delle app della suite. Prima ne esistevano quattro
@@ -7,10 +8,10 @@ comportamento e le stesse variabili d'ambiente.
 
 | File | Chi lo usa |
 |---|---|
-| `cosedil-sso.js` | il codice vero (CommonJS): Auguri (`require`), DDT Suite (import TS) |
+| `cosedil-sso.js` | il codice vero (CommonJS): Auguri (`require`), Lettore DDT (import TS) |
 | `cosedil-sso.mjs` | facciata ESM per Agente e OCR (`vite.config.ts`) |
 | `cosedil-sso.d.ts` | tipi per le app TypeScript |
-| `cosedil_sso.py` | Confronta PDF, Scadenzario (Flask) |
+| `cosedil_sso.py` | Confronto Documenti, Scadenzario (Flask) |
 
 **Non aggiungere un `package.json` in `shared/`**: senza campo `type` Node legge `.js`
 come CommonJS, ed è quello che serve perché lo stesso file valga per le app CJS e per
@@ -77,8 +78,8 @@ admin **per quell'app**, in base al ruolo utente o all'IP di provenienza
 
 ## Attenzione a
 
-- **Confronta PDF** viene impacchettato con PyInstaller: `ConfrontaPDF.spec` ha
+- **Confronto Documenti** viene impacchettato con PyInstaller: `ConfrontaPDF.spec` ha
   `pathex=['../shared/sso']`, senza cui l'exe non risolve `import cosedil_sso`.
-- **DDT Suite** compila in `dist/`: `src/` e `dist/` stanno entrambi un livello sotto la
+- **Lettore DDT** compila in `dist/`: `src/` e `dist/` stanno entrambi un livello sotto la
   radice dell'app, quindi `../../shared/sso/cosedil-sso` risolve identico prima e dopo il
   build.

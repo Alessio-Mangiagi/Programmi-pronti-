@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """Test del gate SSO Python (gemello di cosedil-sso.test.js).
 
 Eseguibile direttamente, senza pytest:
@@ -101,6 +102,18 @@ controlla("non loggato: API 401", r.status_code == 401)
 r = get(c, "/", headers=HTML)
 controlla("non loggato: pagina 302 al portale",
           r.status_code == 302 and r.headers["Location"].startswith(os.environ["COSEDIL_PORTAL"]))
+
+# Dietro reverse proxy: verifica in locale, ma il browser va al portale pubblico.
+import importlib  # noqa: E402
+os.environ["COSEDIL_PORTAL_PUBBLICO"] = "https://portale.esempio.lan"
+importlib.reload(cosedil_sso)
+r = get(crea_app(app_id="test"), "/", headers=HTML)
+controlla("portale pubblico: redirect all'indirizzo pubblico",
+          r.status_code == 302 and r.headers["Location"] == "https://portale.esempio.lan/")
+r = get(crea_app(app_id="test"), "/api/dati", COOKIE_OK)
+controlla("portale pubblico: la verifica resta su COSEDIL_PORTAL", r.status_code == 200)
+del os.environ["COSEDIL_PORTAL_PUBBLICO"]
+importlib.reload(cosedil_sso)
 
 r = get(c, "/static/stile.css", headers={})   # né HTML né /api: 404 di Flask, non 401 del gate
 controlla("asset statici non gattati", r.status_code == 404)
