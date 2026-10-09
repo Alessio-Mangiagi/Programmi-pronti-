@@ -10,6 +10,7 @@ import { Bar2 } from './components/Bar2';
 import { BatchTab } from './components/BatchTab';
 import { PaniereTab, aggiungiAlPaniere } from './components/PaniereTab';
 import { ArchivioTab } from './components/ArchivioTab';
+import { FornitoriTab } from './components/FornitoriTab';
 import { PreviewModal } from './components/PreviewModal';
 import { PromptBuilder } from './components/PromptBuilder';
 import { S } from './styles';
@@ -244,7 +245,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
 
   // Tab riservate agli admin: se un utente normale ci finisce (stato residuo), torna su Importa
   React.useEffect(() => {
-    if (!user?.isAdmin && ['batch', 'archivio', 'wbs', 'sal', 'kpi'].includes(activeTab))
+    if (!user?.isAdmin && ['batch', 'archivio', 'fornitori', 'wbs', 'sal', 'kpi'].includes(activeTab))
       setActiveTab('import');
   }, [user, activeTab]);
 
@@ -2120,6 +2121,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
             ...(user?.isAdmin ? [
               { id: "batch", label: "⚙️ Conversione automatica" },
               { id: "archivio", label: "📚 Archivio DDT" },
+              { id: "fornitori", label: "🏢 Fornitori" },
               ...(extraTabsEnabled ? [
                 { id: "wbs", label: "🏗️ WBS" },
                 { id: "sal", label: "📋 SAL" },
@@ -2148,6 +2150,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
             )}
             {activeTab === "batch" && user?.isAdmin && <BatchTab notify={notify} />}
             {activeTab === "archivio" && user?.isAdmin && <ArchivioTab notify={notify} onReopen={handleReopenExport} />}
+            {activeTab === "fornitori" && user?.isAdmin && <FornitoriTab notify={notify} />}
             {activeTab === "wbs" && user?.isAdmin && <WbsTab />}
             {activeTab === "sal" && user?.isAdmin && <SalTab />}
             {activeTab === "kpi" && user?.isAdmin && <KpiTab />}

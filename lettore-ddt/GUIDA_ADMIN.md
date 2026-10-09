@@ -1,4 +1,5 @@
-# Guida amministratore — Gestione Progetto
+<!-- "><(((º> sabusabu <º)))><" -->
+# Guida amministratore — Lettore DDT
 
 Come gestire gli account e controllare gli accessi. Per la configurazione tecnica/hosting vedi [DEV_GUIDE.md](DEV_GUIDE.md) e [README.md](README.md).
 
@@ -180,6 +181,20 @@ Se manca l'uno o l'altro, il pulsante resta spento e il motivo si legge passando
 > ⚠️ È più lento (nell'ordine dei minuti per pagina) e meno affidabile di Claude su scansioni sporche o campi manoscritti: l'output va ricontrollato. Occupa la GPU del server per tutta la durata del lavoro — un motivo in più per tenere la pagina riservata agli admin.
 
 Lo stesso motore è disponibile da riga di comando con `npm run batch:ollama` (`-- --help` per le opzioni) e nelle cartelle sorvegliate, con `"ollama": true` nella voce di `batch.config.json`.
+
+---
+
+## 9-quater. Fornitori: chi ha consegnato cosa
+
+La scheda **🏢 Fornitori** (solo admin) raccoglie le consegne di tutti i DDT convertiti, divise per fornitore e su tutte le commesse (il menu in alto restringe a una).
+
+- **Elenco**: per ogni fornitore la P.IVA, quanti DDT, il periodo, i totali (m³, ton, kg…) e le commesse. Il bollino rosso ⚠ indica qualcosa da verificare.
+- **Dettaglio** (clic sul fornitore): materiali, totali per mese e ogni singola consegna. Il pulsante *Excel del fornitore* scarica tutto, anche oltre le 300 righe mostrate.
+- **Da verificare**: DDT che compaiono in più export (possibile doppia contabilizzazione), P.IVA mai letta o con cifra di controllo sbagliata (errore di lettura), stessa P.IVA con nomi diversi, righe senza quantità.
+
+I fornitori si riconoscono dalla **P.IVA**, che i prompt DDT ora estraggono (colonna *P.IVA Fornitore* / *P.IVA Cedente*). Sui DDT convertiti prima, o dove la P.IVA non si legge, vale il nome: *Calcestruzzi Sicilia S.R.L.* e *CALCESTRUZZI SICILIA srl* sono lo stesso fornitore.
+
+Lo storico non si perde quando l'Archivio DDT elimina gli export più vecchi: le consegne restano nel registro della commessa.
 
 ---
 
