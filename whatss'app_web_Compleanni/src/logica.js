@@ -1,4 +1,4 @@
-
+// "><(((º> sabusabu <º)))><"
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const os = require('os');
@@ -59,6 +59,19 @@ function salvaConfig(patch = {}) {
 caricaConfig();
 
 // ---------- Lettura dati Excel ----------
+// ExcelJS non restituisce sempre un valore semplice: le celle con formula danno
+// { formula, result }, il testo formattato { richText: [...] }, i link
+// { text, hyperlink }. Senza questa normalizzazione una data calcolata da
+// formula non era mai "compleanno oggi" e il nome diventava "[object Object]".
+function valoreCella(v) {
+    if (v === null || v === undefined || v instanceof Date) return v;
+    if (typeof v !== 'object') return v;
+    if ('result' in v) return valoreCella(v.result);
+    if (Array.isArray(v.richText)) return v.richText.map((t) => t.text || '').join('');
+    if ('text' in v) return valoreCella(v.text);
+    return null;
+}
+
 async function leggiDati() {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(CONFIG.EXCEL_FILE);
@@ -69,9 +82,9 @@ async function leggiDati() {
     const persone = [];
     fComp.eachRow((row, n) => {
         if (n === 1) return;
-        const nome = row.getCell(1).value;
-        const cognome = row.getCell(2).value;
-        const dataNascita = row.getCell(3).value;
+        const nome = valoreCella(row.getCell(1).value);
+        const cognome = valoreCella(row.getCell(2).value);
+        const dataNascita = valoreCella(row.getCell(3).value);
         if (nome && dataNascita) {
             persone.push({
                 nome: String(nome).trim(),
@@ -93,40 +106,55 @@ function leggiPoolFrasi(wb, nomeFoglio) {
     const frasi = [];
     foglio.eachRow((row, n) => {
         if (n === 1) return;
-        const frase = row.getCell(2).value;
+        const frase = valoreCella(row.getCell(2).value);
         if (frase) frasi.push(String(frase).trim());
     });
     return frasi;
 }
 
 // ---------- Logica compleanno (UTC per evitare slittamento fuso orario) ----------
-function eCompleannoOggi(dataValue) {
-    const oggi = new Date();
-    let bday;
-
+// Giorno e mese (0-11) di nascita, o null se il valore non e' una data.
+// Le stringhe si leggono a mano e non con new Date(): quello "aggiusta" le date
+// impossibili (31/04 diventava 1 maggio) invece di scartarle.
+function giornoMeseNascita(dataValue) {
     if (dataValue instanceof Date) {
-        return dataValue.getUTCDate() === oggi.getDate() &&
-               dataValue.getUTCMonth() === oggi.getMonth();
-    } else if (typeof dataValue === 'string') {
-        const slash = dataValue.split('/');
-        const dash = dataValue.split('-');
-        if (slash.length === 3) {
-            bday = new Date(slash[2], slash[1] - 1, slash[0]);
-        } else if (dash.length === 3) {
-            bday = new Date(dash[0], dash[1] - 1, dash[2].slice(0, 2));
-        } else {
-            return false;
-        }
-    } else if (typeof dataValue === 'number') {
-        bday = new Date((dataValue - 25569) * 86400 * 1000);
-        return bday.getUTCDate() === oggi.getDate() &&
-               bday.getUTCMonth() === oggi.getMonth();
-    } else {
-        return false;
+        if (isNaN(dataValue.getTime())) return null;
+        return { g: dataValue.getUTCDate(), m: dataValue.getUTCMonth() };
     }
+    if (typeof dataValue === 'number') {
+        const d = new Date((dataValue - 25569) * 86400 * 1000);   // seriale Excel
+        if (isNaN(d.getTime())) return null;
+        return { g: d.getUTCDate(), m: d.getUTCMonth() };
+    }
+    if (typeof dataValue !== 'string') return null;
+    const slash = dataValue.split('/');
+    const dash = dataValue.split('-');
+    let g, m;
+    if (slash.length === 3) {               // GG/MM/AAAA
+        g = parseInt(slash[0], 10); m = parseInt(slash[1], 10) - 1;
+    } else if (dash.length === 3) {         // AAAA-MM-GG[Thh:mm...]
+        g = parseInt(dash[2].slice(0, 2), 10); m = parseInt(dash[1], 10) - 1;
+    } else {
+        return null;
+    }
+    const giorniMese = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (!(m >= 0 && m <= 11) || !(g >= 1 && g <= giorniMese[m])) return null;
+    return { g, m };
+}
 
-    if (isNaN(bday.getTime())) return false;
-    return bday.getDate() === oggi.getDate() && bday.getMonth() === oggi.getMonth();
+function bisestile(anno) {
+    return (anno % 4 === 0 && anno % 100 !== 0) || anno % 400 === 0;
+}
+
+// `oggi` si passa solo nei test.
+function eCompleannoOggi(dataValue, oggi = new Date()) {
+    const n = giornoMeseNascita(dataValue);
+    if (!n) return false;
+    if (n.g === oggi.getDate() && n.m === oggi.getMonth()) return true;
+    // Nati il 29 febbraio: negli anni non bisestili si festeggiano il 28,
+    // altrimenti gli auguri non partirebbero per tre anni su quattro.
+    return n.m === 1 && n.g === 29 && oggi.getMonth() === 1 && oggi.getDate() === 28
+        && !bisestile(oggi.getFullYear());
 }
 
 // ---------- Formattazione data per UI ----------
@@ -161,7 +189,10 @@ function unisciNomi(persone) {
 
 function costruisciMessaggio(persone, frase) {
     if (frase.includes('{nome}')) {
-        return frase.replace(/\{nome\}/g, unisciNomi(persone));
+        // Funzione e non stringa: in una stringa di sostituzione "$&" e "$1"
+        // verrebbero interpretati, un nome o una frase con "$" uscirebbe storpiato.
+        const nomi = unisciNomi(persone);
+        return frase.replace(/\{nome\}/g, () => nomi);
     }
     return `🎉 ${unisciNomi(persone)}!\n\n${frase}`;
 }
@@ -177,5 +208,6 @@ module.exports = {
     fraseCasuale,
     nomeCompleto,
     unisciNomi,
-    costruisciMessaggio
+    costruisciMessaggio,
+    valoreCella
 };
