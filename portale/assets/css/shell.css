@@ -74,6 +74,16 @@ header {
 }
 .btn-logout:hover { border-color: var(--cosedil-blue); color: var(--cosedil-blue); }
 
+/* Telefono: l'header va a capo invece di uscire dallo schermo; del chip utente
+   resta l'avatar, e i comandi diventano alti 44px (un dito). */
+@media (max-width: 560px) {
+  .header-inner { flex-wrap: wrap; gap: 0.6rem 1rem; }
+  .header-actions { flex-wrap: wrap; gap: 0.6rem 1rem; margin-left: auto; }
+  .user-chip > span:not(.avatar) { display: none; }
+  .admin-link, .link-back { min-height: 44px; }
+  .btn-logout { min-height: 44px; padding: 0 1rem; }
+}
+
 /* ---- Toast ---- */
 .toast {
   position: fixed;

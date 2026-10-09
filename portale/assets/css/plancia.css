@@ -145,4 +145,27 @@ button { font: inherit; }
   .urow { grid-template-columns: 34px minmax(0, 1fr) auto; }
   .urow .u-role, .urow .u-app { display: none; }
 }
+/* Telefono: una app per riga (i nomi interi, non "SCADENZ…") e tutto quello che
+   si tocca alto almeno 44px, la misura minima per un dito. */
+@media (max-width: 560px) {
+  .brand { padding: 14px 16px 12px; }
+  .brand-word { font-size: 34px; }
+  .apps { grid-template-columns: 1fr; }
+  .card { min-height: 52px; padding: 0 16px; grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .card .n { font-size: 14px; }
+  .card .stop { width: 40px; height: 40px; }
+  .card .stop::after { width: 10px; height: 10px; }
+  .legend { padding: 12px 16px; }
+  .side-links { padding: 0 16px 14px; gap: 22px; }
+  .side-links a { display: inline-flex; align-items: flex-end; min-height: 44px; padding-bottom: 4px; }
+  .main { padding: 14px 16px 96px; }   /* in fondo spazio per la bolla della chat */
+  .topbar { justify-content: space-between; gap: 6px 14px; }
+  .topbar a, .topbar button { min-height: 44px; display: inline-flex; align-items: center; }
+  .topbar button { padding: 0 16px; }
+  .head h1 { font-size: clamp(34px, 11vw, 48px); }
+  .head p { text-align: left; }
+  .kpi b { font-size: 42px; }
+  .res button { min-height: 44px; }
+  .urow { min-height: 52px; }
+}
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

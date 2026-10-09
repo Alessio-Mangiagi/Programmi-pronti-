@@ -97,3 +97,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .fld-apps { grid-column: 1 / -1; }
 .user-form .fld[hidden] { display: none; }   /* [hidden] non basta: .fld impone display:flex */
 .fld-apps .accessi { padding-top: 0.15rem; }
+
+/* Telefono: checkbox, "Elimina" e link-pulsante abbastanza grandi per un dito. */
+@media (max-width: 560px) {
+  .chk { min-height: 40px; padding-right: 0.4rem; }
+  .chk input { width: 20px; height: 20px; }
+  .btn-ghost, .btn-link { min-height: 40px; padding-inline: 0.6rem; }
+}
