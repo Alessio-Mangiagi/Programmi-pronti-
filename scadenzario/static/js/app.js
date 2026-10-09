@@ -73,6 +73,11 @@ const STATI = {
 
 const CANALI = { in_app: 'In-app', email: 'Email', whatsapp: 'WhatsApp' };
 
+// Allegati ammessi e dimensione massima — allineati a config.ALLEGATI_* lato server
+const ESTENSIONI_ALLEGATI = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg',
+  '.jpeg', '.txt', '.csv', '.eml', '.msg', '.p7m', '.zip'];
+const MAX_BYTE_ALLEGATO = 20 * 1024 * 1024;
+
 /* ============================================================
    Icone SVG inline (stile Lucide, stroke 1.75)
    ============================================================ */
@@ -827,6 +832,11 @@ async function modaleScadenza(scadenza, ricarica) {
     '</div>' +
     '<div class="campo"><label class="etichetta" for="sc-note">Note</label>' +
       '<textarea id="sc-note">' + esc(scadenza && scadenza.note || '') + '</textarea></div>' +
+    '<div class="campo"><label class="etichetta" for="sc-allegati">' + (scadenza ? 'Aggiungi allegati' : 'Allegati') + '</label>' +
+      '<input type="file" id="sc-allegati" multiple accept="' + ESTENSIONI_ALLEGATI.join(',') + '">' +
+      '<span class="suggerimento-campo">Attestati, certificati, verbali… Più file insieme, max 20 MB ciascuno' +
+        (scadenza ? '. Quelli già caricati si gestiscono da “Checklist e allegati”.' : '.') + '</span>' +
+      '<ul class="lista-allegati" id="sc-allegati-elenco"></ul></div>' +
     (scadenza
       ? '<label class="campo-check"><input type="checkbox" id="sc-chiusa"' + (scadenza.chiusa ? ' checked' : '') + '> Chiusa (rinnovata/archiviata, esclusa dagli avvisi)</label>'
       : '');
@@ -887,6 +897,16 @@ async function modaleScadenza(scadenza, ricarica) {
       });
       inRilascio.addEventListener('change', autocompilaScadenza);
 
+      // Anteprima dei file scelti (nome + dimensione, in rosso se oltre il limite)
+      const inAllegati = overlay.querySelector('#sc-allegati');
+      const elencoAllegati = overlay.querySelector('#sc-allegati-elenco');
+      inAllegati.addEventListener('change', () => {
+        elencoAllegati.innerHTML = Array.from(inAllegati.files).map((f) =>
+          '<li>' + icona('graffetta', 15) + '<span>' + esc(f.name) + '</span>' +
+          '<span class="voce-data ' + (f.size > MAX_BYTE_ALLEGATO ? 'giorni-negativi' : 'muted') + '">' +
+          esc(fmtBytes(f.size)) + (f.size > MAX_BYTE_ALLEGATO ? ' · troppo grande' : '') + '</span></li>').join('');
+      });
+
       aggiornaSoggetti(scadenza ? scadenza.soggetto_id : null);
     },
     onConferma: async (overlay, mostraErrore) => {
@@ -915,15 +935,38 @@ async function modaleScadenza(scadenza, ricarica) {
         note: overlay.querySelector('#sc-note').value.trim() || null,
       };
 
+      const files = Array.from(overlay.querySelector('#sc-allegati').files);
+      const troppoGrandi = files.filter((f) => f.size > MAX_BYTE_ALLEGATO);
+      if (troppoGrandi.length) {
+        mostraErrore('File oltre 20 MB: ' + troppoGrandi.map((f) => f.name).join(', ') + '. Toglili dalla selezione.');
+        return false;
+      }
+
+      let salvata;
       if (scadenza) {
         body.chiusa = overlay.querySelector('#sc-chiusa').checked ? 1 : 0;
         // "><(((º> sabusabu <º)))><"
-        await api('/scadenze/' + scadenza.id, { method: 'PUT', body });
-        notifica('Scadenza aggiornata.');
+        salvata = await api('/scadenze/' + scadenza.id, { method: 'PUT', body });
       } else {
-        await api('/scadenze', { method: 'POST', body });
-        notifica('Scadenza registrata.');
+        salvata = await api('/scadenze', { method: 'POST', body });
       }
+
+      // Allegati dopo il salvataggio: servono l'id della scadenza. Un file
+      // rifiutato non annulla la scadenza, ma viene segnalato per nome.
+      const nonCaricati = [];
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append('file', f);
+        try {
+          await api('/scadenze/' + salvata.id + '/allegati', { method: 'POST', body: fd });
+        } catch (e) {
+          nonCaricati.push(f.name + ': ' + e.message);
+        }
+      }
+      const caricati = files.length - nonCaricati.length;
+      notifica((scadenza ? 'Scadenza aggiornata' : 'Scadenza registrata') +
+        (caricati ? ' con ' + caricati + (caricati === 1 ? ' allegato' : ' allegati') : '') + '.');
+      if (nonCaricati.length) mostraErroriImport(nonCaricati, 'Allegati non caricati', 'La scadenza è salvata, ma questi file non sono stati caricati:');
       ricarica();
       return true;
     },
