@@ -1,0 +1,9 @@
+{
+  "hints": {
+    "axe/forms": "off",
+    "axe/aria": "off",
+    "axe/text-alternatives": "off",
+    "button-type": "off",
+    "no-inline-styles": "off"
+  }
+}

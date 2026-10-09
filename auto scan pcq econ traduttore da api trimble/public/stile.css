@@ -1,0 +1,311 @@
+/* Palette Cosedil: blu #0c4577, verde #65bc7b. Font di sistema: l'app gira in
+   LAN, niente CDN esterni. */
+:root {
+  --blu: #0c4577;
+  --blu-scuro: #08324f;
+  --blu-tenue: #eaf1f7;
+  --verde: #65bc7b;
+  --verde-scuro: #3f9758;
+  --verde-tenue: #eaf7ee;
+  --rosso: #c0392b;
+  --rosso-tenue: #fdecea;
+  --ambra: #b7791f;
+  --ambra-tenue: #fdf3e0;
+  --testo: #1c2733;
+  --grigio: #667281;
+  --bordo: #e2e7ec;
+  --sfondo: #f4f6f8;
+  --ombra: 0 1px 2px rgba(12, 69, 119, .06), 0 6px 18px rgba(12, 69, 119, .06);
+  --raggio: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.55 Ubuntu, "Segoe UI", system-ui, sans-serif;
+  color: var(--testo);
+  background: var(--sfondo);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── intestazione ─────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 24px;
+  background: linear-gradient(120deg, var(--blu) 0%, var(--blu-scuro) 100%);
+  color: #fff;
+}
+
+.marchio { display: flex; align-items: center; gap: 12px; }
+.marchio h1 { font-size: 17px; margin: 0; font-weight: 500; letter-spacing: .01em; }
+.sottotitolo { margin: 1px 0 0; font-size: 12.5px; opacity: .78; }
+
+.pittogramma {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .12);
+}
+.pittogramma svg { width: 20px; height: 20px; }
+
+/* ── impaginato ───────────────────────────────────────────────────────── */
+main { max-width: 1180px; margin: 22px auto 40px; padding: 0 16px; display: grid; gap: 18px; }
+
+.riquadro {
+  background: #fff;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 18px 20px 20px;
+}
+
+.riquadro-testa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.riquadro-testa h2 {
+  font-size: 13px;
+  margin: 0;
+  color: var(--blu);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.scelte { display: flex; gap: 12px; flex-wrap: wrap; }
+label { font-size: 12.5px; color: var(--grigio); display: inline-flex; align-items: center; gap: 6px; }
+
+select, input[type=file] {
+  font: inherit;
+  font-size: 14px;
+  color: var(--testo);
+  padding: 6px 9px;
+  border: 1px solid var(--bordo);
+  border-radius: 7px;
+  background: #fff;
+}
+select:focus-visible, button:focus-visible, .zona:focus-visible {
+  outline: 2px solid var(--blu);
+  outline-offset: 2px;
+}
+
+/* ── zona di trascinamento ────────────────────────────────────────────── */
+.zona {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 30px 20px;
+  border: 2px dashed #c6d2dd;
+  border-radius: var(--raggio);
+  background: #fbfcfd;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.zona:hover { border-color: var(--blu); background: var(--blu-tenue); }
+.zona.sopra {
+  border-color: var(--verde-scuro);
+  background: var(--verde-tenue);
+  transform: scale(1.006);
+}
+.zona-icona { width: 30px; height: 30px; color: var(--blu); opacity: .85; }
+.zona-titolo { margin: 8px 0 0; font-size: 15px; font-weight: 500; }
+.zona-nota { margin: 2px 0 0; font-size: 13px; color: var(--grigio); }
+.finto-link { color: var(--blu); text-decoration: underline; }
+
+/* ── coda di invio ────────────────────────────────────────────────────── */
+.coda { margin-top: 14px; border-top: 1px solid var(--bordo); padding-top: 12px; }
+.coda-testa { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.coda-testa strong { font-size: 13px; color: var(--grigio); font-weight: 500; }
+
+.lista-coda { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lista-coda li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordo);
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+.lista-coda .nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-coda .peso { color: var(--grigio); font-size: 12px; }
+.lista-coda .esito { font-size: 12.5px; color: var(--grigio); white-space: nowrap; }
+.lista-coda .esito.ok { color: var(--verde-scuro); }
+.lista-coda .esito.ko { color: var(--rosso); }
+
+.barra { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--bordo); overflow: hidden; }
+.barra i { display: block; height: 100%; width: 0; background: var(--blu); transition: width .18s linear; }
+.barra.finita i { background: var(--verde); }
+.barra.fallita i { background: var(--rosso); width: 100% !important; }
+
+/* ── bottoni ──────────────────────────────────────────────────────────── */
+button {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--blu);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s;
+}
+button:hover:not([disabled]) { background: var(--blu-scuro); }
+button.secondario { background: var(--verde-scuro); }
+button.secondario:hover:not([disabled]) { background: #35814a; }
+button.piatto { background: transparent; color: var(--grigio); padding: 4px 8px; }
+button.piatto:hover:not([disabled]) { background: var(--bordo); color: var(--testo); }
+button[disabled] { background: var(--bordo); color: var(--grigio); cursor: not-allowed; }
+
+/* ── tabella dei lavori ───────────────────────────────────────────────── */
+.tabella-scorrevole { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 720px; }
+th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--bordo); vertical-align: top; }
+th {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  color: var(--grigio);
+  letter-spacing: .06em;
+  font-weight: 600;
+  border-bottom-color: #d6dde4;
+}
+tbody tr:hover { background: #fafbfc; }
+.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.vuoto { color: var(--grigio); text-align: center; padding: 26px 10px; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 11px;
+  font-size: 12px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.badge-ok { background: var(--verde-tenue); color: var(--verde-scuro); }
+.badge-corso { background: var(--blu-tenue); color: var(--blu); }
+.badge-errore { background: var(--rosso-tenue); color: var(--rosso); }
+.badge-neutro { background: #eceff2; color: var(--grigio); }
+header .badge { background: rgba(255, 255, 255, .14); color: #fff; }
+header .badge-ok { background: var(--verde); color: #06331a; }
+header .badge-errore { background: var(--rosso); color: #fff; }
+
+.avvisi { margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--ambra); }
+.avvisi li { padding: 2px 0 2px 14px; position: relative; }
+.avvisi li::before { content: "!"; position: absolute; left: 3px; font-weight: 700; }
+details.avvisi-molti summary { cursor: pointer; color: var(--ambra); font-size: 12.5px; }
+.errore-riga { display: block; margin-top: 4px; font-size: 12.5px; color: var(--rosso); }
+
+.messaggio { min-height: 20px; margin: 12px 0 0; font-size: 13px; color: var(--grigio); }
+.messaggio.errore { color: var(--rosso); }
+.sottile { font-weight: 400; color: var(--grigio); text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.azioni { display: flex; gap: 8px; }
+.riga-file { display: block; font-size: 12px; color: var(--grigio); margin-top: 2px; }
+
+@media (max-width: 640px) {
+  header { padding: 12px 16px; }
+  .riquadro { padding: 16px 14px; }
+  .zona { padding: 22px 14px; }
+}
+
+/* ── filtri della tabella ─────────────────────────────────────────────── */
+.filtri { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.filtri input[type=search] {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordo);
+  border-radius: 7px;
+  min-width: 190px;
+}
+.spunta { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; }
+#riepilogo { margin: 0 0 10px; }
+
+/* ── stato: nome cliccabile, avanzamento dei tre passi ────────────────── */
+.nome-file {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--blu);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nome-file:hover { color: var(--blu-scuro); }
+
+.passi { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: 2px; }
+.passi i { width: 14px; height: 4px; border-radius: 2px; background: var(--bordo); }
+.passi i.ok { background: var(--verde); }
+.passi i.corso { background: var(--blu); animation: pulsa 1.1s ease-in-out infinite; }
+.passi i.ko { background: var(--rosso); }
+@keyframes pulsa { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .passi i.corso { animation: none; } }
+
+.badge-ambra { background: var(--ambra-tenue); color: var(--ambra); }
+button.pericolo { color: var(--rosso); }
+button.pericolo:hover:not([disabled]) { background: var(--rosso-tenue); color: var(--rosso); }
+.azioni { flex-wrap: wrap; }
+
+/* ── pannello di anteprima ────────────────────────────────────────────── */
+/* Serve esplicitamente: una regola d'autore con display (flex, qui sotto) vince
+   sull'[hidden] del browser, e il pannello resterebbe sempre a schermo. */
+[hidden] { display: none !important; }
+
+.velo {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 40, 68, .35);
+  z-index: 10;
+}
+.pannello {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(760px, 94vw);
+  background: #fff;
+  border-left: 1px solid var(--bordo);
+  box-shadow: -12px 0 40px rgba(12, 69, 119, .12);
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+}
+.pannello-testa {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--bordo);
+}
+.pannello-testa h2 { margin: 0; font-size: 15px; color: var(--blu); word-break: break-all; }
+.pannello-testa p { margin: 2px 0 0; }
+.pannello-corpo { padding: 16px 18px 26px; overflow: auto; }
+
+.testata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 18px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: var(--blu-tenue);
+  border-radius: 8px;
+}
+.testata dt { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--grigio); }
+.testata dd { margin: 1px 0 0; font-size: 13.5px; }
+
+table.anteprima { min-width: 640px; font-size: 13px; }
+table.anteprima td { max-width: 340px; }

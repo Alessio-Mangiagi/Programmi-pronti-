@@ -1,0 +1,207 @@
+/* Portale (home): hero, griglia app, card, badge di stato, footer.
+   Richiede tokens.css + shell.css. */
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(101,188,123,0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(101,188,123,0); }
+  100% { box-shadow: 0 0 0 0 rgba(101,188,123,0); }
+}
+
+/* ---- Hero ---- */
+.hero {
+  max-width: 1400px;
+  margin-inline: auto;
+  padding: clamp(2rem, 5vw, 3.5rem) clamp(1rem, 4vw, 3rem) 0.5rem;
+}
+.hero-eyebrow {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cosedil-blue);
+  margin: 0 0 0.5rem;
+}
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  letter-spacing: -0.01em;
+  color: var(--cosedil-text-strong);
+  margin: 0 0 0.6rem;
+}
+.hero p {
+  max-width: 60ch;
+  color: var(--cosedil-gray);
+  margin: 0;
+}
+
+/* ---- Griglia app ---- */
+main {
+  max-width: 1400px;
+  margin-inline: auto;
+  padding: 1.75rem clamp(1rem, 4vw, 3rem) 3rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+@media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--cosedil-surface);
+  border: 1px solid var(--cosedil-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.card-icon {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  background: var(--cosedil-bg-alt);
+  color: var(--cosedil-blue);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.card-icon svg { width: 24px; height: 24px; }
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.status .dot { width: 7px; height: 7px; border-radius: 50%; }
+.status.online { background: rgba(101,188,123,0.14); color: var(--cosedil-green-text); }
+.status.online .dot { background: var(--cosedil-green); }
+.status.offline { background: var(--cosedil-bg-alt); color: var(--cosedil-gray); }
+.status.offline .dot { background: #b7bbc0; }
+.status.checking { background: var(--cosedil-bg-alt); color: var(--cosedil-gray); }
+.status.checking .dot { background: var(--cosedil-blue-light); animation: pulse 1.5s infinite; }
+
+.card h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.2rem;
+  color: var(--cosedil-text-strong);
+  margin: 0 0 0.15rem;
+}
+.card-sub {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cosedil-blue);
+  margin: 0 0 0.7rem;
+}
+.card p.desc {
+  font-size: 0.92rem;
+  color: var(--cosedil-gray);
+  margin: 0 0 1.1rem;
+  flex-grow: 1;
+}
+.actions { display: flex; gap: 0.6rem; }
+.btn {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-btn);
+  padding: 0.7rem 1.1rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.15s var(--ease-out), background 0.2s var(--ease-out), color 0.2s var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  flex: 1;
+}
+.btn svg { width: 16px; height: 16px; }
+.btn-primary {
+  background: var(--cosedil-blue);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--cosedil-blue-hover); transform: translateY(-1px); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary.disabled {
+  background: var(--cosedil-bg-alt);
+  color: #a7abb1;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.btn-outline {
+  background: transparent;
+  color: var(--cosedil-blue);
+  border-color: var(--cosedil-blue);
+}
+.btn-outline:hover { background: var(--cosedil-blue); color: #fff; }
+.btn-outline:active { transform: scale(0.98); }
+.btn.busy { opacity: 0.7; pointer-events: none; }
+/* "Ferma": solo agli admin e solo su app accese. Quadrato e defilato — è
+   l'azione che rovina la giornata a chi sta usando l'app, non la si preme per
+   sbaglio al posto di "Apri". */
+.btn-stop {
+  flex: 0 0 auto;
+  padding: 0.7rem;
+  background: transparent;
+  color: #a7abb1;
+  border-color: var(--cosedil-border);
+}
+.btn-stop:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
+.btn-stop:active { transform: scale(0.98); }
+.btn-stop.hidden { display: none; }
+
+footer {
+  border-top: 1px solid var(--cosedil-border);
+  background: var(--cosedil-surface);
+}
+.footer-inner {
+  max-width: 1400px;
+  margin-inline: auto;
+  padding: 1.25rem clamp(1rem, 4vw, 3rem);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--cosedil-gray);
+}
+footer .tag { color: var(--cosedil-blue); font-weight: 600; }
+.footer-links { display: flex; gap: 0.6rem; }
+.footer-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-ui); font-weight: 600; font-size: 0.78rem;
+  color: var(--cosedil-blue); text-decoration: none;
+  border: 1px solid var(--cosedil-border); border-radius: var(--radius-btn);
+  padding: 0.35rem 0.7rem; transition: all 0.2s var(--ease-out);
+}
+.footer-btn:hover { border-color: var(--cosedil-blue); background: var(--cosedil-blue); color: #fff; }
+.footer-btn svg { width: 15px; height: 15px; }

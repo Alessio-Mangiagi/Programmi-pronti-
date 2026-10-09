@@ -1,0 +1,14 @@
+# Dati locali: utenti, log accessi, chiave sessioni, log server. Mai versionare.
+data/
+
+# Certificati TLS locali (chiave privata!). Mai versionare.
+certs/
+
+# Dipendenze (il progetto è zero-dip, ma per sicurezza).
+node_modules/
+
+# File temporanei delle scritture atomiche.
+*.tmp
+
+# Log.
+*.log

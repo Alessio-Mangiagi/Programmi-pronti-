@@ -1,0 +1,19 @@
+// Typecheck del BACKEND. tsconfig.json copre solo src/ (il frontend): senza
+// questo file il codice del server non veniva mai controllato da tsc, perché in
+// esecuzione lo interpreta tsx, che i tipi li ignora.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["server.ts", "server/**/*.ts", "scripts/**/*.ts"]
+}

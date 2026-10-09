@@ -1,0 +1,76 @@
+============================================================
+  WhatsApp Auguri - Guida installazione e primo avvio
+============================================================
+
+COSA FA
+  Invia automaticamente gli auguri di compleanno a un gruppo
+  WhatsApp, leggendo nomi e date da un file Excel.
+
+
+------------------------------------------------------------
+REQUISITI (una volta sola)
+------------------------------------------------------------
+  1. Installa Node.js (versione LTS) da:  https://nodejs.org
+     (Avanti / Next fino a Fine, lascia tutte le opzioni di default.)
+
+
+------------------------------------------------------------
+INSTALLAZIONE
+------------------------------------------------------------
+  2. Doppio clic su:  installa-dipendenze.bat
+     Attendi il messaggio "[OK] Installazione completata".
+
+
+------------------------------------------------------------
+PRIMO AVVIO
+------------------------------------------------------------
+  3. Doppio clic su:  avvia.bat
+     Si apre il browser su  http://localhost:3000
+
+  4. SCANSIONA IL QR CODE
+     Sul telefono: WhatsApp -> Impostazioni -> Dispositivi
+     collegati -> Collega un dispositivo -> inquadra il QR.
+
+  5. SCEGLI IL FILE EXCEL
+     Nella sezione "Configurazione" premi  [Sfoglia],
+     naviga e seleziona il tuo file .xlsx degli auguri.
+
+  6. Imposta il "Gruppo destinazione" (nome esatto del gruppo
+     WhatsApp) e l'orario di invio automatico.
+
+  7. Premi  [Salva configurazione].
+     Da ora il programma invia gli auguri da solo ogni giorno
+     all'orario impostato.
+
+
+------------------------------------------------------------
+FORMATO DEL FILE EXCEL
+------------------------------------------------------------
+  Il file deve avere 3 fogli:
+   - "Compleanni"         -> col A: Nome, col B: Cognome, col C: Data nascita
+   - "Frasi di auguri"    -> col B: frase (per 1 festeggiato)
+   - "Auguri di gruppo"   -> col B: frase (per piu' festeggiati)
+  Nelle frasi puoi usare {nome} dove inserire il nome.
+
+
+------------------------------------------------------------
+AVVIO AUTOMATICO OGNI GIORNO ALLE 09:30 (consigliato)
+------------------------------------------------------------
+  - Attiva:    doppio clic su  installa-avvio-automatico.bat
+  - Disattiva: doppio clic su  disinstalla-avvio-automatico.bat
+  (Windows chiede la conferma amministratore: premi "Si".)
+
+  Crea un'Attivita' pianificata di Windows: ogni giorno alle 09:30
+  il programma parte da solo, in background e senza finestre, e invia
+  gli auguri. Se il PC era spento alle 09:30, parte appena viene acceso.
+  L'orario di invio (09:30) si cambia dalla sezione "Configurazione".
+
+
+------------------------------------------------------------
+NOTE
+------------------------------------------------------------
+  - Il telefono deve restare collegato a internet ogni tanto,
+    altrimenti la sessione WhatsApp scade e va riscansionato il QR.
+  - La configurazione viene salvata nel file  config.json
+    (creato automaticamente al primo salvataggio).
+  - I log delle attivita' finiscono nella cartella  log\

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+
+.env
+*.log
+.session.key
+sessions/
+port.js
+.istanza.lock
+*.tmp
+
+# Dati reali (documenti scansionati, testo OCR, verifiche): mai nel repo
+data/

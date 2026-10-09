@@ -1,0 +1,115 @@
+# CI delle app Node rimaste scoperte.
+#
+# Prima qui giravano solo "Progetto chat" (ci.yml) e "agente" (ci-agente.yml):
+# sei app su otto non le controllava nessuno, portale compreso — che e' quello
+# che autentica tutte le altre.
+#
+# Matrice invece di sei file quasi identici: i passi sono gli stessi e i comandi
+# li dichiara ogni riga. Le due app grandi restano nei loro workflow perche' li'
+# i passi divergono davvero (lint, coverage, e2e, matrice di versioni Node).
+name: CI — suite
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'portale/**'
+      - 'ocr-webapp-paddleocr/**'
+      - 'verifica-requisiti/**'
+      - 'auto scan pcq econ traduttore da api trimble/**'
+      - "whatss'app_web_Compleanni/**"
+      - 'shared/**'
+      - '.github/workflows/ci-suite.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'portale/**'
+      - 'ocr-webapp-paddleocr/**'
+      - 'verifica-requisiti/**'
+      - 'auto scan pcq econ traduttore da api trimble/**'
+      - "whatss'app_web_Compleanni/**"
+      - 'shared/**'
+      - '.github/workflows/ci-suite.yml'
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    # Una app che si rompe non nasconde l'esito delle altre.
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Il portale non ha dipendenze (solo moduli core): niente npm ci.
+          - nome: portale
+            cartella: portale
+            node: 20.x
+            installa: 'no'
+            comandi: npm test
+          - nome: ocr
+            cartella: ocr-webapp-paddleocr
+            node: 20.x
+            installa: 'si'
+            comandi: npm run lint && npm test && npm run build
+          - nome: verifica-requisiti
+            cartella: verifica-requisiti
+            node: 20.x
+            installa: 'si'
+            comandi: npm run type-check && npm test && npm run build
+          - nome: auto-scan-trimble
+            cartella: auto scan pcq econ traduttore da api trimble
+            node: 20.x
+            installa: 'si'
+            comandi: npm test
+          # Auguri WhatsApp non ha test: si controlla almeno che il codice sia
+          # sintatticamente valido e che le dipendenze si installino.
+          - nome: auguri-whatsapp
+            cartella: whatss'app_web_Compleanni
+            node: 20.x
+            installa: 'si'
+            comandi: node --check src/server.js
+
+    name: ${{ matrix.nome }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.cartella }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        if: matrix.installa == 'si'
+        run: npm ci
+
+      - name: Verifica
+        run: ${{ matrix.comandi }}
+
+  audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cartella:
+          - ocr-webapp-paddleocr
+          - verifica-requisiti
+          - auto scan pcq econ traduttore da api trimble
+    name: audit (${{ matrix.cartella }})
+    defaults:
+      run:
+        working-directory: ${{ matrix.cartella }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - run: npm ci
+      # Solo le dipendenze di produzione, e solo high: sono quelle che finiscono
+      # sui PC dell'ufficio. Auguri WhatsApp resta fuori: le sue segnalazioni
+      # vengono tutte da puppeteer e si aggiornano a mano, app ferma.
+      - run: npm audit --omit=dev --audit-level=high

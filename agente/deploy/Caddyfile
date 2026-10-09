@@ -1,0 +1,26 @@
+# Caddy davanti all'agente — reverse proxy con HTTPS interno per la LAN.
+# Caddy genera una CA interna: i browser mostreranno un avviso finché non
+# installi il certificato radice di Caddy sui PC client (una volta sola).
+#
+# Avvio:  caddy run --config Caddyfile
+# Doc CA interna:  https://caddyserver.com/docs/automatic-https#local-https
+#
+# Sostituisci l'hostname con quello che vuoi usare in azienda (deve risolvere
+# verso il server, es. via DNS interno o file hosts dei client).
+
+agente.interno.lan {
+    tls internal
+    encode gzip
+    reverse_proxy 127.0.0.1:3001
+}
+
+# Alternativa senza nome DNS: servi in HTTPS sull'IP del server.
+# https://192.168.1.50 {
+#     tls internal
+#     reverse_proxy 127.0.0.1:3001
+# }
+
+# NB: quando usi Caddy in HTTPS, imposta nel .env dell'agente:
+#   COOKIE_SECURE=1
+#   BIND_HOST=127.0.0.1        (il backend ascolta solo in locale; espone Caddy)
+#   ALLOWED_ORIGINS=https://agente.interno.lan

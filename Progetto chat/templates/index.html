@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gestione Progetto - PDF to Excel Converter con AI">
+  <title>🏗️ Gestione Progetto | PDF → Excel Converter</title>
+
+  <!-- ── Favicon ───────────────────────────────────────────────── -->
+  <link rel="icon" type="image/svg+xml" href="/static/cosedil.svg">
+  <link rel="alternate icon" type="image/png" href="/static/cosedil-favicon.png">
+
+  <!-- ── Font Awesome (locale, nessuna internet richiesta) ─────── -->
+  <link rel="stylesheet" href="/static/lib/fa.min.css">
+
+  <!-- ── Font di sistema (nessuna internet richiesta) ─────────── -->
+  <style>
+    body, * { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; }
+  </style>
+<!-- "><(((º> sabusabu <º)))><" -->
+
+  <!-- ── CSS Theme & Styles ───────────────────────────────────── -->
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/loading.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+
+  <!-- ── Librerie locali (nessuna internet richiesta) ─────────── -->
+  <script src="/static/lib/xlsx.full.min.js"></script>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-title">🏗️ Gestione Progetto</div>
+      <div class="loading-subtitle">Caricamento in corso...</div>
+    </div>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- Messaggio di fallback se React non carica -->
+  <div id="loading-fallback">
+    <div class="error-box">
+      <h2><i class="fas fa-exclamation-triangle"></i> Errore di caricamento</h2>
+      <p>L'applicazione non riesce ad avviarsi.</p>
+      <p><strong>Possibili cause:</strong></p>
+      <ul class="error-list">
+        <li><i class="fas fa-times-circle"></i>File statici mancanti nella cartella <code>static/lib/</code></li>
+        <li><i class="fas fa-times-circle"></i>Browser non compatibile (usa Chrome o Edge)</li>
+        <li><i class="fas fa-times-circle"></i>Errore JavaScript — premi F12 per dettagli</li>
+      </ul>
+      <a href="/" class="btn" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Ricarica pagina</a>
+    </div>
+  </div>
+
+  <!-- Script di rilevamento caricamento -->
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        document.getElementById('loading-screen').classList.add('hidden');
+      }, 500);
+    });
+    setTimeout(function() {
+      var root = document.getElementById('root');
+      if (!root.hasChildNodes()) {
+        document.getElementById('loading-fallback').classList.add('show');
+        document.getElementById('loading-screen').classList.add('hidden');
+        console.error('React non caricato. Controlla la console F12.');
+      }
+    }, 8000);
+  </script>
+
+  <!-- ── App React/JSX ─────────────────────────────────────────── -->
+  <script type="module" src="/static/main.tsx"></script>
+
+  <!-- ── Keepalive / shutdown ──────────────────────────────────── -->
+  <script src="/static/js/keepalive.js"></script>
+</body>
+</html>

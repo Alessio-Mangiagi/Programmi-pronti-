@@ -1,0 +1,78 @@
+# Aggiornamenti automatici delle dipendenze, una voce per app.
+#
+# Serviva: le due vulnerabilita' che hanno motivato questo file (pdf.js
+# CVE-2024-4367 e xlsx 0.18.5) erano note da mesi e nessuno le aveva viste,
+# perche' `npm audit` lo lanciava a mano solo chi ci lavorava sopra.
+#
+# Cadenza settimanale e non giornaliera: la suite ha otto app, il rumore
+# quotidiano si smette di leggere dopo due settimane. Le patch di sicurezza
+# arrivano comunque subito, fuori cadenza.
+version: 2
+updates:
+  # --- app Node -------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: "/portale"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: npm
+    directory: "/Progetto chat"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      # Tipi, linter e strumenti di build: un solo PR, si guarda una volta.
+      sviluppo:
+        dependency-type: development
+
+  - package-ecosystem: npm
+    directory: "/agente"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      sviluppo:
+        dependency-type: development
+
+  - package-ecosystem: npm
+    directory: "/ocr-webapp-paddleocr"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      sviluppo:
+        dependency-type: development
+
+  - package-ecosystem: npm
+    directory: "/verifica-requisiti"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      sviluppo:
+        dependency-type: development
+
+  - package-ecosystem: npm
+    directory: "/auto scan pcq econ traduttore da api trimble"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+
+  # Auguri WhatsApp resta sempre in esecuzione (vedi README): gli aggiornamenti
+  # vanno applicati a mano, in una finestra decisa, non mentre la sessione di
+  # WhatsApp Web e' aperta. Dependabot apre comunque il PR, che aspetta.
+  - package-ecosystem: npm
+    directory: "/whatss'app_web_Compleanni"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+
+  # --- app Python -----------------------------------------------------------
+  - package-ecosystem: pip
+    directory: "/confronta file - migliorato"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+
+  - package-ecosystem: pip
+    directory: "/scadenzario-compliance"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+
+  # --- GitHub Actions -------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: monthly }

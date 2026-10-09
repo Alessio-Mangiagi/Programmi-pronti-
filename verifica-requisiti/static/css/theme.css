@@ -1,0 +1,28 @@
+/* ============================================================
+   theme.css — Variabili Strutturali
+   Radius sobri stile cosedilspa.com, ombre diffuse tinte blu.
+   I valori cromatici sono in colors.css.
+   ============================================================ */
+
+@import url('colors.css');
+/* "><(((º> sabusabu <º)))><" */
+
+:root {
+  /* ── Bordi — corporate (bottoni 4px, card 8px) ── */
+  --border-radius-sm: 3px;
+  --border-radius-md: 4px;
+  --border-radius-lg: 8px;
+  --border-radius-xl: 10px;
+
+  /* ── Ombre (diffuse, tinte blu Cosedil) ── */
+  --shadow-sm:    0 2px 12px var(--shadow-light);
+  --shadow-md:    0 8px 24px var(--shadow-medium);
+  --shadow-lg:    0 16px 40px var(--shadow-heavy);
+  --shadow-focus: 0 0 0 2px var(--focus-shadow);
+
+  /* ── Transizioni ── */
+  --transition-fast:   0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow:   0.40s ease;
+  --transition-bounce: 0.50s cubic-bezier(0.16, 1, 0.3, 1);
+}

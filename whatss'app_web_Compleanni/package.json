@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-auguri",
+  "version": "2.0.0",
+  "description": "Invia auguri di compleanno automatici su WhatsApp con interfaccia web",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^4.22.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3",
+    "whatsapp-web.js": "^1.23.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

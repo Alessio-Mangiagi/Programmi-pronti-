@@ -1,0 +1,95 @@
+/* Shell applicativa condivisa: portale (index) + amministrazione (admin).
+   Header, brand, azioni utente e toast. Richiede tokens.css. */
+
+html, body { margin: 0; padding: 0; }
+body {
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  color: var(--cosedil-text);
+  background: var(--cosedil-bg);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Header ---- */
+header {
+  background: var(--cosedil-surface);
+  border-bottom: 1px solid var(--cosedil-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.header-inner {
+  max-width: 1400px;
+  margin-inline: auto;
+  padding: 0.9rem clamp(1rem, 4vw, 3rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.brand { display: flex; align-items: center; gap: 0.75rem; }
+.brand-mark {
+  width: 40px; height: 40px;
+  background: var(--cosedil-blue);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.brand-mark svg { width: 24px; height: 24px; }
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--cosedil-text-strong);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.brand-sub {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cosedil-blue);
+}
+.header-actions { display: flex; align-items: center; gap: 0.9rem; }
+
+/* Link di navigazione header (portale -> admin e admin -> portale). */
+.admin-link, .link-back {
+  font-family: var(--font-ui); font-weight: 600; font-size: 0.82rem;
+  color: var(--cosedil-blue); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+.admin-link:hover, .link-back:hover { color: var(--cosedil-blue-hover); }
+.admin-link svg, .link-back svg { width: 16px; height: 16px; }
+
+.user-chip { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-ui); font-size: 0.82rem; color: var(--cosedil-gray); }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--cosedil-blue); color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-weight: 500; font-size: 0.8rem; }
+.btn-logout {
+  font-family: var(--font-ui); font-weight: 600; font-size: 0.78rem; color: var(--cosedil-gray);
+  background: none; border: 1px solid var(--cosedil-border); border-radius: var(--radius-btn);
+  padding: 0.35rem 0.7rem; cursor: pointer; transition: all 0.2s var(--ease-out);
+}
+.btn-logout:hover { border-color: var(--cosedil-blue); color: var(--cosedil-blue); }
+
+/* ---- Toast ---- */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--cosedil-text-strong);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-btn);
+  box-shadow: var(--shadow-card-hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+  z-index: 50;
+  max-width: 90vw;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

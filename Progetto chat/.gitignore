@@ -1,0 +1,52 @@
+node_modules/
+
+# Build: si rigenera con "npm run build" (tsc + vite). Versionarlo significa
+# rivedere 117 file a ogni compilazione e, prima o poi, spedire un dist/ vecchio
+# che non corrisponde più a src/.
+dist/
+coverage/
+
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+app.log
+*.log
+installer-build/
+installer-output/
+installer-pkg/build/
+installer-pkg/output/
+
+# Archivio utenti cifrato e chiave — mai versionare
+users.json
+users.enc
+.users.key
+.session.key
+sessions/
+port.js
+
+# Artefatti runtime rigenerati dall'app
+data.json.bak
+*.tmp
+# Lock di istanza singola (contiene il PID del processo in esecuzione)
+.istanza.lock
+
+# Tool batch API: config (può contenere apiKey) e cartelle di lavoro
+batch.config.json
+batch-input/
+batch-output/
+# Chiave API cifrata salvata dal pannello admin
+.apikey.enc
+
+# Backup giornalieri automatici (dati reali: mai nel repo)
+backup/
+activity_log.json
+coverage/
+
+# Dati delle commesse (produzione e test): mai versionare,
+# un pull sul server non deve sovrascrivere i dati reali
+data.json
+data/
+
+# Artefatti smoke test e2e
+e2e/ultimo-giro/

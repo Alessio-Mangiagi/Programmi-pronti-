@@ -1,0 +1,577 @@
+/* ============================================================
+   shell.css — Scheletro dell'interfaccia.
+
+   Porta in CSS gli stessi valori che in "Progetto chat" vivono in
+   static/js/styles.ts (lì sono oggetti di stile React). Qui non c'è React,
+   quindi diventano classi: stessi colori, stessi spazi, stessi bordi, così le
+   due app si somigliano davvero invece di somigliarsi "quasi".
+   ============================================================ */
+
+/* ── Guscio ─────────────────────────────────────────────────────────────── */
+.app {
+  font-family: var(--font-body);
+  background: var(--background-gradient);
+  min-height: 100dvh;
+  color: #333333;
+}
+
+/* ── Header (blu Cosedil, filo verde sotto) ─────────────────────────────── */
+.header {
+  background: #0c4577;
+  color: #ffffff;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #65bc7b;
+}
+
+.header-titolo {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+
+.header-sinistra,
+.header-destra {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-destra { gap: 8px; }
+
+.header-info {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.btn-menu {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-header {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Tab ─────────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 32px;
+  box-shadow: 0 2px 12px rgba(12, 69, 119, 0.04);
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 13px 22px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #8a8d92;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  background: transparent;
+  letter-spacing: 0.05em;
+  transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab:hover { color: #0c4577; }
+
+.tab.attiva {
+  color: #0c4577;
+  border-bottom-color: #0c4577;
+}
+
+/* ── Contenuto e card ───────────────────────────────────────────────────── */
+.content {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pannello { display: none; }
+.pannello.attivo { display: block; }
+
+.card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 28px;
+  box-shadow: 0 2px 12px rgba(12, 69, 119, 0.06);
+  margin-bottom: 20px;
+  border: 1px solid #e5e7eb;
+  transition: box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-titolo {
+  font-size: 16px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  margin-bottom: 20px;
+  color: #212326;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nota {
+  color: var(--text-light);
+  font-size: 13px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.due-colonne {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .due-colonne { grid-template-columns: 1fr; }
+  .content { padding: 20px 16px; }
+  .header, .tabs { padding-left: 16px; padding-right: 16px; }
+}
+
+/* ── Bottoni ─────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: #0c4577;
+  box-shadow: inset 0 0 0 1px #0c4577;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primario { background: #0c4577; color: #ffffff; box-shadow: none; }
+.btn-successo { background: #3f8f55; color: #ffffff; box-shadow: none; }
+.btn-pericolo { background: #c0392b; color: #ffffff; box-shadow: none; }
+
+/* Azioni dentro le tabelle: stesso stile, corpo ridotto. */
+.btn-piccolo {
+  padding: 5px 10px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.riga-bottoni {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── Campi ───────────────────────────────────────────────────────────────── */
+.campo,
+input[type="text"].campo,
+input[type="search"].campo,
+input[type="file"].campo,
+select.campo,
+textarea.campo {
+  padding: 9px 12px;
+  border-radius: 4px;
+  border: 1px solid #d2d2d2;
+  font-size: 14px;
+  font-family: var(--font-body);
+  outline: none;
+  background: #ffffff;
+  color: #333333;
+  transition: border-color 0.15s ease;
+}
+
+textarea.campo {
+  width: 100%;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.campo-largo { min-width: 260px; flex: 1; }
+
+label.etichetta {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ── Tabelle ─────────────────────────────────────────────────────────────── */
+.tabella {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.tabella th {
+  background: #f2f3f5;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  color: #434549;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.tabella td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f2f3f5;
+  color: #333333;
+  vertical-align: top;
+}
+
+.tabella td.numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, ui-monospace, monospace;
+  font-size: 12px;
+  color: #212326;
+}
+
+.tabella-vuota {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+/* ── Badge (stessi valori di S.badge in Progetto chat) ───────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(33, 35, 38, 0.05);
+  color: #434549;
+}
+
+.badge-verde { background: rgba(101, 188, 123, 0.14); color: #3f8f55; }
+.badge-rosso { background: rgba(192, 57, 43, 0.10); color: #c0392b; }
+.badge-blu   { background: rgba(12, 69, 119, 0.08); color: #0c4577; }
+.badge-giallo { background: rgba(217, 119, 6, 0.12); color: #d97706; }
+
+/* ── Notifica (toast in alto a destra) ───────────────────────────────────── */
+.notifica {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  padding: 14px 20px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #c9e7d2;
+  border-left: 3px solid #65bc7b;
+  color: #3f8f55;
+  box-shadow: 0 8px 24px rgba(12, 69, 119, 0.12);
+  z-index: 1000;
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 380px;
+  animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notifica-errore { border-color: #eec8c3; border-left-color: #c0392b; color: #c0392b; }
+.notifica-info   { border-color: #c3d7e8; border-left-color: #0c4577; color: #0c4577; }
+
+/* ── Riscontri (le citazioni dal testo del documento) ────────────────────── */
+.riscontro {
+  background: var(--surface-light);
+  border-left: 3px solid #0c4577;
+  border-radius: 0 4px 4px 0;
+  padding: 10px 14px;
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.riscontro .dove {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+
+.esito-riga {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.esito-riga strong { font-family: var(--font-ui); font-size: 13px; }
+
+/* ── Elenco laterale (checklist) ─────────────────────────────────────────── */
+.elenco { list-style: none; }
+
+.elenco li {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.elenco li:hover { background: var(--hover-background); }
+
+.elenco li.attivo {
+  background: #eef4fa;
+  border-left: 3px solid #0c4577;
+  color: #0c4577;
+  font-weight: 600;
+}
+
+.elenco .conteggio {
+  display: block;
+  font-weight: 400;
+  color: var(--text-light);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ── Sidebar (stessa della suite: si apre col tasto Menu) ────────────────── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 35, 38, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 256px;
+  height: 100dvh;
+  background: #ffffff;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e5e7eb;
+  border-left: 3px solid #0c4577;
+}
+
+.sidebar.aperta {
+  transform: translateX(0);
+  box-shadow: 4px 0 32px rgba(12, 69, 119, 0.14);
+}
+
+.sidebar-header {
+  padding: 18px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0c4577;
+  color: #ffffff;
+  font-family: var(--font-display);
+}
+
+.sidebar-chiudi {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-contenuto { flex: 1; overflow-y: auto; padding: 10px 0; }
+
+.voce-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid #f2f3f5;
+  color: #434549;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.voce-menu:hover { background: var(--hover-background); }
+
+.voce-menu.attiva {
+  background: #eef4fa;
+  border-left: 3px solid #0c4577;
+  color: #0c4577;
+  font-weight: 600;
+}
+
+.voce-menu .icona { font-size: 15px; width: 18px; color: #8a8d92; }
+.voce-menu.attiva .icona { color: #0c4577; }
+
+/* ── Scheda "Analisi Claude" ─────────────────────────────────────────────────
+   Stessi ingredienti della scheda Importa di "Progetto chat": card con filo
+   blu a sinistra, bottoni prompt su due righe, zona di trascinamento, box
+   istruzioni. */
+
+.card-claude { border-left: 4px solid #0c4577; }
+
+.bottoni-prompt {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.btn-prompt {
+  background: #0c4577;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 12px 22px;
+  min-width: 160px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-prompt .riga1 { font-size: 18px; }
+.btn-prompt .riga2 { font-size: 13px; opacity: 0.92; }
+.btn-prompt:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.log-claude {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.log-claude .separatore { color: var(--text-light); }
+
+.zona-trascina {
+  border: 2px dashed #e5e7eb;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  text-align: center;
+  background: var(--surface-light);
+  font-size: 13px;
+  color: var(--text-light);
+  transition: all 0.15s ease;
+}
+
+.zona-trascina.sopra {
+  border-color: #0c4577;
+  background: #eef4fa;
+  color: #0c4577;
+}
+
+.istruzioni {
+  background: var(--surface-alt);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #0c4577;
+}
+
+.istruzioni ol { margin: 8px 0 0 18px; line-height: 2; }
+
+kbd {
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: Consolas, ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.riga-campi {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.riga-campi > div { display: flex; flex-direction: column; }

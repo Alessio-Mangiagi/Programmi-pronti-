@@ -1,0 +1,20 @@
+# Rete di sicurezza a livello suite: ogni app ha il proprio .gitignore
+# per i suoi segreti e artefatti; qui solo i pattern universali.
+
+# Dipendenze
+node_modules/
+
+# Ambienti Python
+.venv/
+.venv-gpu/
+venv/
+__pycache__/
+*.py[cod]
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Temporanei
+*.tmp

@@ -1,0 +1,24 @@
+// Backend e strumenti: il frontend ha il suo tsconfig.json (lib DOM, JSX).
+// Senza questo file server.ts e tools/ non li controllava nessuno: in esecuzione
+// li interpreta tsx, che i tipi li ignora.
+// Di src/lib entrano SOLO i moduli condivisi col server (importati da server/*):
+// il resto è codice browser (DOM, IndexedDB, pdf.js) e lo controlla tsconfig.json.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "strict": true
+  },
+  "include": [
+    "server.ts", "server/**/*.ts", "tools/**/*.ts",
+    "src/lib/confronto.ts", "src/lib/testo-nativo.ts", "src/lib/markdown.ts", "src/lib/elenchi.ts"
+  ]
+}

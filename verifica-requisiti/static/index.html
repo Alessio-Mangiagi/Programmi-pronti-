@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Verifica Requisiti - ricerca e controllo su documenti scansionati" />
+  <title>📋 Verifica Requisiti | Ricerca e controllo documenti</title>
+
+  <link rel="icon" type="image/x-icon" href="./favicon.ico" />
+
+  <link rel="stylesheet" href="./lib/fa.min.css?v=0.1.0" />
+  <link rel="stylesheet" href="./css/colors.css?v=0.1.0" />
+  <link rel="stylesheet" href="./css/theme.css?v=0.1.0" />
+  <link rel="stylesheet" href="./css/loading.css?v=0.1.0" />
+  <link rel="stylesheet" href="./css/app.css?v=0.1.0" />
+  <link rel="stylesheet" href="./css/shell.css?v=0.1.0" />
+</head>
+<body>
+  <div id="loading-screen">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-title">📋 Verifica Requisiti</div>
+      <div class="loading-subtitle">Caricamento in corso...</div>
+    </div>
+  </div>
+
+  <div id="root" class="app">
+    <!-- Sidebar ------------------------------------------------------------ -->
+    <div class="sidebar-overlay" id="sidebar-overlay" hidden></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span>Verifica Requisiti</span>
+        <button type="button" class="sidebar-chiudi" id="sidebar-chiudi" title="Chiudi il menu">✕</button>
+      </div>
+      <nav class="sidebar-contenuto" id="sidebar-voci">
+        <button type="button" class="voce-menu attiva" data-scheda="claude">
+          <i class="fas fa-robot icona"></i> Analisi Claude
+        </button>
+        <button type="button" class="voce-menu" data-scheda="documenti">
+          <i class="fas fa-file-arrow-up icona"></i> Documenti
+        </button>
+        <button type="button" class="voce-menu" data-scheda="ricerca">
+          <i class="fas fa-magnifying-glass icona"></i> Ricerca
+        </button>
+        <button type="button" class="voce-menu" data-scheda="checklist">
+          <i class="fas fa-list-check icona"></i> Checklist
+        </button>
+        <button type="button" class="voce-menu" data-scheda="verifiche">
+          <i class="fas fa-clipboard-check icona"></i> Verifiche
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Header ------------------------------------------------------------- -->
+    <div class="header">
+      <div class="header-sinistra">
+        <button type="button" class="btn-menu" id="apri-menu" title="Apri il menu di navigazione">☰ Menu</button>
+        <div class="header-titolo">📋 Verifica Requisiti</div>
+      </div>
+      <div class="header-destra">
+        <span class="header-info" id="header-info">…</span>
+        <button type="button" class="btn-header" id="btn-ricostruisci" title="Ricostruisce l'indice di ricerca">
+          <i class="fas fa-rotate"></i> Indice
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab ---------------------------------------------------------------- -->
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab attiva" data-scheda="claude">🤖 Analisi Claude</button>
+      <button type="button" class="tab" data-scheda="documenti">📥 Documenti</button>
+      <button type="button" class="tab" data-scheda="ricerca">🔍 Ricerca</button>
+      <button type="button" class="tab" data-scheda="checklist">📋 Checklist</button>
+      <button type="button" class="tab" data-scheda="verifiche">✅ Verifiche</button>
+    </div>
+
+    <main class="content">
+      <!-- Documenti -------------------------------------------------------- -->
+      <section class="pannello" id="pannello-documenti">
+        <div class="card card-hover">
+          <div class="card-titolo">Carica scansioni</div>
+          <p class="nota">
+            PDF o immagini (png, jpg, tiff), max 50&nbsp;MB per file. I PDF con testo si leggono
+            direttamente; le scansioni passano dall'OCR e diventano <strong>pronto</strong> a
+            lavorazione finita.
+          </p>
+          <form id="form-upload" class="riga-bottoni">
+            <input type="file" id="file" class="campo" multiple
+                   accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" />
+            <input type="text" id="etichette" class="campo campo-largo"
+                   placeholder="Etichette separate da virgola (commessa, fornitore…)" />
+            <button type="submit" class="btn btn-primario">
+              <i class="fas fa-upload"></i> Carica
+            </button>
+          </form>
+          <div id="esito-upload"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-titolo">
+            <span>Archivio</span>
+            <button type="button" class="btn btn-piccolo" id="aggiorna-documenti">
+              <i class="fas fa-rotate"></i> Aggiorna
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="tabella" id="tabella-documenti">
+              <thead>
+                <tr>
+                  <th></th><th>Documento</th><th>Stato</th><th>Pagine</th>
+                  <th>Origine</th><th>Etichette</th><th>Caricato</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analisi Claude --------------------------------------------------- -->
+      <section class="pannello attivo" id="pannello-claude">
+        <div class="card card-claude">
+          <div class="card-titolo">🤖 Confronto requisiti con Claude</div>
+          <p class="nota">
+            Scegli il tipo di confronto: il prompt viene copiato e Claude.ai si apre. Lì allega il
+            documento e incolla il prompt — la risposta JSON la riporti qui sotto e diventa una
+            verifica nello storico.
+          </p>
+
+          <div class="bottoni-prompt" id="bottoni-prompt">
+            <span class="nota" style="margin:0;">Carico i prompt dal server…</span>
+          </div>
+
+          <div class="log-claude" id="log-claude" hidden></div>
+
+          <div class="zona-trascina" id="zona-trascina">
+            📎 Trascina qui uno o più file per archiviarli (poi allegali in chat)
+          </div>
+
+          <div class="istruzioni">
+            <strong>Come fare:</strong>
+            <ol>
+              <li>Clicca il tipo di confronto → il prompt viene copiato e Claude.ai si apre automaticamente</li>
+              <li>In Claude.ai: allega il documento e incolla il prompt (<kbd>Ctrl+V</kbd>)</li>
+              <li>Copia la risposta JSON e incollala nel campo qui sotto</li>
+              <li>Clicca <strong>Importa esito</strong> → diventa una verifica, una checklist o un file Excel, secondo il bottone usato</li>
+            </ol>
+          </div>
+
+          <label class="etichetta" for="risposta-claude">Incolla qui la risposta JSON di Claude</label>
+          <textarea id="risposta-claude" class="campo" rows="10" spellcheck="false"
+                    placeholder='{"documento":"...","risultati":[ ... ]}'></textarea>
+
+          <div class="riga-campi" style="margin-top: 12px;">
+            <div>
+              <label class="etichetta" for="claude-checklist">Checklist usata</label>
+              <select id="claude-checklist" class="campo"></select>
+            </div>
+            <div>
+              <label class="etichetta" for="claude-documento">Documento in archivio (facoltativo)</label>
+              <select id="claude-documento" class="campo"></select>
+            </div>
+          </div>
+
+          <div class="riga-bottoni">
+            <button type="button" class="btn" id="incolla-appunti">
+              <i class="fas fa-clipboard"></i> Incolla da appunti
+            </button>
+            <button type="button" class="btn btn-primario" id="importa-esito">
+              <i class="fas fa-file-import"></i> Importa esito
+            </button>
+            <button type="button" class="btn" id="svuota-risposta">
+              <i class="fas fa-eraser"></i> Svuota
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ricerca ---------------------------------------------------------- -->
+      <section class="pannello" id="pannello-ricerca">
+        <div class="card card-hover">
+          <div class="card-titolo">Cerca nei documenti</div>
+          <p class="nota">
+            Più parole = devono esserci tutte. Le virgolette tengono insieme una frase:
+            <code>durc "regolarita contributiva"</code>
+          </p>
+          <form id="form-ricerca" class="riga-bottoni">
+            <input type="search" id="q" class="campo campo-largo" placeholder="Cosa cerchi?" autocomplete="off" />
+            <input type="text" id="filtro-etichetta" class="campo" placeholder="Solo etichetta…" />
+            <button type="submit" class="btn btn-primario">
+              <i class="fas fa-magnifying-glass"></i> Cerca
+            </button>
+          </form>
+        </div>
+        <div id="esito-ricerca"></div>
+      </section>
+
+      <!-- Checklist -------------------------------------------------------- -->
+      <section class="pannello" id="pannello-checklist">
+        <div class="card">
+          <div class="card-titolo">
+            <span>Checklist di requisiti</span>
+            <button type="button" class="btn btn-piccolo" id="nuova-checklist">
+              <i class="fas fa-plus"></i> Nuova
+            </button>
+          </div>
+          <div class="due-colonne">
+            <ul class="elenco" id="elenco-checklist"></ul>
+            <div>
+              <p class="nota">
+                La checklist si modifica come JSON: è la forma più diretta finché l'editor a campi
+                non c'è. Tipi di regola: <code>presenza</code>, <code>assenza</code>,
+                <code>regex</code>, <code>scadenza</code>, <code>numero</code>, <code>manuale</code>.
+              </p>
+              <label class="etichetta" for="editor-checklist">Definizione</label>
+              <textarea id="editor-checklist" class="campo" spellcheck="false" rows="20"></textarea>
+              <div class="riga-bottoni" style="margin-top: 14px;">
+                <button type="button" class="btn btn-primario" id="salva-checklist">
+                  <i class="fas fa-floppy-disk"></i> Salva
+                </button>
+                <button type="button" class="btn btn-pericolo" id="elimina-checklist">
+                  <i class="fas fa-trash"></i> Elimina
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Verifiche -------------------------------------------------------- -->
+      <section class="pannello" id="pannello-verifiche">
+        <div class="card card-hover">
+          <div class="card-titolo">Esegui una verifica</div>
+          <p class="nota">
+            Seleziona i documenti nella scheda <strong>Documenti</strong>, scegli la checklist e avvia.
+          </p>
+          <form id="form-verifica" class="riga-bottoni">
+            <select id="set-verifica" class="campo"></select>
+            <button type="submit" class="btn btn-primario">
+              <i class="fas fa-clipboard-check"></i> Verifica i selezionati
+            </button>
+            <span class="nota" id="conteggio-selezione" style="margin: 0;"></span>
+          </form>
+          <div id="esito-verifica"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-titolo">
+            <span>Storico</span>
+            <button type="button" class="btn btn-piccolo" id="aggiorna-verifiche">
+              <i class="fas fa-rotate"></i> Aggiorna
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="tabella" id="tabella-verifiche">
+              <thead>
+                <tr>
+                  <th>Documento</th><th>Checklist</th><th>Esito</th><th>OK</th><th>KO</th>
+                  <th>Da controllare</th><th>Quando</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="dettaglio-verifica"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/loading.js?v=0.1.0"></script>
+  <script src="./js/api.js?v=0.1.0"></script>
+  <script src="./js/app.js?v=0.1.0"></script>
+</body>
+</html>

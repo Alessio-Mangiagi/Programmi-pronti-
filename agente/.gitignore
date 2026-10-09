@@ -1,0 +1,19 @@
+node_modules
+dist
+.env
+*.log
+secret.enc
+test.db
+.venv
+__pycache__
+
+# DB applicativo (utenti, connessioni cifrate, job, run) + report generati
+app.db
+app.db-shm
+app.db-wal
+reports/
+# Set di documenti acquisiti (SQLite per set) — mai versionare i dati aziendali
+docsets/
+
+# Backup locali (contengono .env con MASTER_PASSWORD): mai versionarli
+backup/
