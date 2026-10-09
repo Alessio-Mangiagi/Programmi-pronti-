@@ -61,13 +61,14 @@ jobs:
             node: 20.x
             installa: 'si'
             comandi: npm test
-          # Auguri WhatsApp non ha test: si controlla almeno che il codice sia
-          # sintatticamente valido e che le dipendenze si installino.
+          # Auguri WhatsApp: server.js pilota Chromium e non si avvia in CI, quindi
+          # si controlla la sintassi; la logica pura (date, celle, messaggi) ha i
+          # suoi test in test/logica.test.js.
           - nome: auguri-whatsapp
             cartella: whatss'app_web_Compleanni
             node: 20.x
             installa: 'si'
-            comandi: node --check src/server.js
+            comandi: node --check src/server.js && npm test
 
     name: ${{ matrix.nome }}
     defaults:
