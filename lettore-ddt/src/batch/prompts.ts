@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // prompts.ts — Prompt preimpostati per l'analisi dei PDF: FONTE UNICA.
 // Li usano la conversione batch (engine), la CLI e la pagina Importa, che li
 // riceve via GET /prompts (la vecchia copia in static/js/prompts.ts è stata
@@ -23,11 +24,11 @@ export const PROMPTS: BatchPrompt[] = [
     label: 'DDT Calcestruzzo',
     description: 'Estrae DDT calcestruzzo in 4 fogli (F1–F4)',
     text: `Estrai DDT calcestruzzo dal PDF.
-Indizi: n°DDT, targa, m³, classe cls (C25/30), orari carico/arrivo/scarico, fornitore.
+Indizi: n°DDT, targa, m³, classe cls (C25/30), orari carico/arrivo/scarico, fornitore e sua P.IVA (11 cifre, in intestazione).
 Regole: JSON valido, mai vuoto; ogni DDT→≥1 riga F1+F2; estrai TUTTI (anche registri multi-bolla); illeggibile→"(illeggibile)", assente→"mancante"; F2 somma m³ per cls; F3 dosatura (sabbia/cemento/acqua/additivi); F4 anomalie/duplicati/fuori range; "fileName"=nome esatto PDF (più file: uniti con " + ").
 Rispondi SOLO con questo JSON, nient'altro:
 {"summary":"DDT calcestruzzo — [Fornitore] — [Data] — [N DDT] — Tot [m³] m³","fileName":"[nome esatto del PDF allegato]","sheets":[
-{"name":"F1-Dettaglio DDT","description":"una riga per DDT","headers":["Fornitore","N°DDT","Data","OraCarico","Targa","WBS","ParteOpera","ClRes","ClCons","ClCem","Cloruri","A/C","m³","Note","OraArrivo","IniScarico","FinScarico"],"rows":[]},
+{"name":"F1-Dettaglio DDT","description":"una riga per DDT","headers":["Fornitore","P.IVA Fornitore","N°DDT","Data","OraCarico","Targa","WBS","ParteOpera","ClRes","ClCons","ClCem","Cloruri","A/C","m³","Note","OraArrivo","IniScarico","FinScarico"],"rows":[]},
 {"name":"F2-Riepilogo Cls","description":"aggregato per tipo cls","headers":["Fornitore","N°DDT","Data","TipoCls","Totale m³","WBS"],"rows":[]},
 {"name":"F3-Composizione","description":"dosatura per DDT","headers":["N°DDT","Fornitore","Componente","UM","SetTeo","SetCorr","SetDos","Diff","Err%"],"rows":[]},
 {"name":"F4-Anomalie","description":"anomalie (vuoto se nessuna)","headers":["N°","DDT","Campo","Segnalazione"],"rows":[]}
@@ -38,11 +39,11 @@ Rispondi SOLO con questo JSON, nient'altro:
     label: 'DDT Scansione Pulita',
     description: 'Scarta le pagine non pertinenti e estrae i DDT nella stessa struttura (F1–F4)',
     text: `Estrai DDT inerti (misto granulometrico/inerti da cava) dal PDF.
-Indizi: n°DDT, targa, vettore/trasportatore, u.m. (ton/m³), quantità, descrizione materiale, orari carico/scarico, destinazione/WBS, fornitore.
+Indizi: n°DDT, targa, vettore/trasportatore, u.m. (ton/m³), quantità, descrizione materiale, orari carico/scarico, destinazione/WBS, fornitore e sua P.IVA (11 cifre, in intestazione).
 Regole: JSON valido, mai vuoto; ogni DDT→1 riga in F1; estrai TUTTI i DDT (anche registri multi-bolla); illeggibile→"(illeggibile)", assente→"mancante"; F2 somma Quantità per u.m./tipo materiale/destinazione; F3 anomalie (targhe duplicate stesso orario, quantità fuori range, DDT mancanti in sequenza numerica, orari incoerenti); "fileName"=nome esatto PDF (più file: uniti con " + ").
 Rispondi SOLO con questo JSON, nient'altro:
 {"summary":"DDT inerti — [Fornitore] — [Data/periodo] — [N DDT] — Tot [Quantità] [u.m.]","fileName":"[nome esatto del PDF allegato]","sheets":[
-{"name":"DDT Inerti","description":"una riga per DDT","headers":["Fornitore","Data","N°DDT","Descrizione","OraCarico","OraScarico","Vettore","Targa","u.m.","Quantità","Destinazione/WBS"],"rows":[]},
+{"name":"DDT Inerti","description":"una riga per DDT","headers":["Fornitore","P.IVA Fornitore","Data","N°DDT","Descrizione","OraCarico","OraScarico","Vettore","Targa","u.m.","Quantità","Destinazione/WBS"],"rows":[]},
 {"name":"F2-Riepilogo","description":"aggregato per materiale/destinazione","headers":["Fornitore","Data","Descrizione","u.m.","Totale Quantità","Destinazione/WBS"],"rows":[]},
 {"name":"F3-Anomalie","description":"anomalie (vuoto se nessuna)","headers":["N°","DDT","Campo","Segnalazione"],"rows":[]}
 ]}`,
@@ -59,7 +60,7 @@ Modulo DDT standard (D.P.R. 472/696-1996): Cedente alto-sx (ditta/indirizzo/P.IV
 Regole: JSON valido, mai vuoto; ogni DDT→≥1 riga F1+F2; illeggibile→"(illeggibile)", assente→"mancante"; F2 somma Mc per materiale; F3 anomalie/duplicati/fuori range + pagine scartate(motivo); "fileName"=nome esatto PDF (più file: uniti con " + ").
 Rispondi SOLO con questo JSON, nient'altro:
 {"summary":"DDT materiali inerti — [Cedente] — [Data] — [N DDT] — Tot [Mc] Mc — [N pagine scartate] pagine scartate","fileName":"[nome esatto del PDF allegato]","sheets":[
-{"name":"F1-Dettaglio DDT","description":"una riga per DDT","headers":["Cedente","N°DDT","Data","Cessionario","Luogo Destinazione","Causale","A Mezzo","Targa","Tipo Materiale","Quantità Mc","Peso Kg","N. Colli","Ora Ritiro","Note"],"rows":[]},
+{"name":"F1-Dettaglio DDT","description":"una riga per DDT","headers":["Cedente","P.IVA Cedente","N°DDT","Data","Cessionario","Luogo Destinazione","Causale","A Mezzo","Targa","Tipo Materiale","Quantità Mc","Peso Kg","N. Colli","Ora Ritiro","Note"],"rows":[]},
 {"name":"F2-Riepilogo Materiali","description":"aggregato per tipo materiale","headers":["Cedente","N°DDT","Data","Tipo Materiale","Totale Mc"],"rows":[]},
 {"name":"F3-Anomalie","description":"anomalie e pagine scartate (vuoto se nessuna)","headers":["N°","DDT","Campo","Segnalazione"],"rows":[]}
 ]}`,
