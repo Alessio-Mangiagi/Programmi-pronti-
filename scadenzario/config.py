@@ -45,12 +45,34 @@ EMAIL_DA = os.environ.get("EMAIL_DA", SMTP_USER)
 # Destinatari fissi delle notifiche (compliance/DPO), separati da virgola
 EMAIL_A = tuple(x.strip() for x in os.environ.get("EMAIL_A", "").split(",") if x.strip())
 
+# Amministratori dello Scadenzario: solo questi username del portale (oltre a
+# essere admin per l'app nel portale) vedono la pagina Amministrazione e possono
+# eliminare dati o gestire le utenze. Separati da virgola; vuoto = basta essere
+# admin del portale per l'app.
+ADMIN_UTENTI = tuple(
+    x.strip().lower()
+    for x in os.environ.get("SCADENZARIO_ADMIN", "a.mangiagi").split(",") if x.strip())
+
 # Spegnimento automatico: il server esce quando la SPA smette di inviare
 # heartbeat (ultima scheda chiusa). Il timeout deve restare ampiamente sopra
 # l'intervallo di invio del client, altrimenti un refresh di pagina spegne
 # il server proprio mentre l'utente lo sta ricaricando.
+# Solo in locale: in LAN (HOST non loopback) la chiusura della scheda di un
+# utente non deve spegnere l'app agli altri. SPEGNIMENTO_AUTOMATICO=0/1 forza.
+_spegnimento = os.environ.get("SPEGNIMENTO_AUTOMATICO", "").strip()
+SPEGNIMENTO_AUTOMATICO = (_spegnimento in ("1", "true", "True") if _spegnimento
+                          else HOST in ("127.0.0.1", "localhost"))
 HEARTBEAT_TIMEOUT_SECONDI = 15
 HEARTBEAT_CONTROLLO_SECONDI = 5
 
+# Giro notifiche automatico: una volta al giorno, dalla NOTIFICHE_ORA in poi,
+# mentre il server è acceso. NOTIFICHE_AUTOMATICHE=0 lo disattiva.
+NOTIFICHE_AUTOMATICHE = os.environ.get("NOTIFICHE_AUTOMATICHE", "1") in ("1", "true", "True")
+NOTIFICHE_ORA = int(os.environ.get("NOTIFICHE_ORA", "7"))
+
+# Backup automatico (DB + allegati) una volta al giorno all'avvio, in .gitignore
+BACKUP_DIR = os.path.join(BASE_DIR, "backup")
+BACKUP_DA_TENERE = int(os.environ.get("BACKUP_DA_TENERE", "14"))
+
 # Versione applicazione (esposta da /api/health)
-VERSIONE = "1.3.0"
+VERSIONE = "1.4.0"
