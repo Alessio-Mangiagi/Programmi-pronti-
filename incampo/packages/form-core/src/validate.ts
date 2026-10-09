@@ -1,0 +1,334 @@
+/**
+ * Validazione di schema e risposte: porting 1:1 di app/forms.py.
+ * Stessi messaggi, stesso ordine degli errori: i casi in fixtures/cases.json
+ * girano contro entrambe le implementazioni.
+ */
+import { FIELD_TYPES, NOTES_KEY, type Field, type FieldError, type FieldType, type FormSchema } from './types'
+
+export const FIELD_ID_RE = /^[a-z][a-z0-9_]{0,63}$/
+
+const SECTION_PROPS = new Set(['id', 'title', 'columns', 'items'])
+const ITEM_PROPS = new Set(['field', 'slot', 'span'])
+
+const COMMON_PROPS = new Set(['id', 'type', 'label', 'required', 'help'])
+const TYPE_PROPS: Record<FieldType, Set<string>> = {
+  text: new Set(['max_length', 'default']),
+  textarea: new Set(['max_length', 'default']),
+  number: new Set(['min', 'max', 'integer', 'default']),
+  checkbox: new Set(['default']),
+  select: new Set(['options', 'default']),
+  multiselect: new Set(['options', 'default']),
+  date: new Set(['default']),
+  photo: new Set(['multiple']),
+  signature: new Set(),
+  geolocation: new Set(),
+}
+
+type Dict = Record<string, unknown>
+const err = (field: string, message: string): FieldError => ({ field, message })
+const isObject = (v: unknown): v is Dict => typeof v === 'object' && v !== null && !Array.isArray(v)
+const isString = (v: unknown): v is string => typeof v === 'string'
+const isBool = (v: unknown): v is boolean => typeof v === 'boolean'
+export const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+/** `YYYY-MM-DD` con data di calendario valida. */
+export function isIsoDate(v: unknown): v is string {
+  if (!isString(v) || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
+  const [y, m, d] = v.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
+/** Vuoto = null/undefined, stringa vuota, lista vuota (chiave assente inclusa). */
+export const isEmpty = (v: unknown): boolean =>
+  v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)
+
+/** repr() di Python per i messaggi "unknown type" (stringhe tra apici, None). */
+function repr(v: unknown): string {
+  if (v === undefined || v === null) return 'None'
+  if (isString(v)) return `'${v}'`
+  if (isBool(v)) return v ? 'True' : 'False'
+  return JSON.stringify(v)
+}
+
+// ---------- Schema ----------
+
+export function validateSchema(schema: unknown): FieldError[] {
+  const errors: FieldError[] = []
+  if (!isObject(schema)) return [err('$', 'schema must be an object')]
+
+  const fields = schema.fields
+  // lista vuota ammessa: un modulo può nascere come sola struttura (layout) e ricevere i campi dopo
+  if (!Array.isArray(fields)) return [err('$', "'fields' must be a list")]
+
+  const seen = new Set<string>()
+  fields.forEach((f, i) => {
+    let where = `fields[${i}]`
+    if (!isObject(f)) {
+      errors.push(err(where, 'field must be an object'))
+      return
+    }
+
+    const fid = f.id
+    if (!isString(fid) || !FIELD_ID_RE.test(fid)) {
+      errors.push(err(where, "'id' must match ^[a-z][a-z0-9_]{0,63}$"))
+    } else if (seen.has(fid)) {
+      errors.push(err(fid, 'duplicate field id'))
+    } else {
+      seen.add(fid)
+    }
+    if (isString(fid)) where = fid
+
+    const ftype = f.type
+    if (!isString(ftype) || !(FIELD_TYPES as readonly string[]).includes(ftype)) {
+      errors.push(err(where, `unknown type ${repr(ftype)}`))
+      return
+    }
+    const t = ftype as FieldType
+
+    if (!isString(f.label) || !f.label.trim()) errors.push(err(where, "'label' is required"))
+    if ('required' in f && !isBool(f.required)) errors.push(err(where, "'required' must be a boolean"))
+    if ('help' in f && !isString(f.help)) errors.push(err(where, "'help' must be a string"))
+
+    const extra = Object.keys(f)
+      .filter((k) => !COMMON_PROPS.has(k) && !TYPE_PROPS[t].has(k))
+      .sort()
+    if (extra.length) {
+      errors.push(err(where, `properties not allowed for type ${t}: [${extra.map((k) => `'${k}'`).join(', ')}]`))
+    }
+
+    errors.push(...validateTypeProps(where, t, f))
+  })
+
+  if ('layout' in schema && schema.layout !== null && schema.layout !== undefined) {
+    errors.push(...validateLayout(schema.layout, seen))
+  }
+
+  return errors
+}
+
+/**
+ * Layout: sezioni a 1-3 colonne con dentro blocchi, ciascuno con un campo
+ * (`field`) o ancora vuoto (`slot`). Un campo può stare in un solo blocco;
+ * i campi non collocati si mostrano in fondo (vedi resolveLayout).
+ */
+function validateLayout(layout: unknown, fieldIds: Set<string>): FieldError[] {
+  if (!isObject(layout)) return [err('$', "'layout' must be an object")]
+  const sections = layout.sections
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return [err('$', "'layout.sections' must be a non-empty list")]
+  }
+  if (Object.keys(layout).some((k) => k !== 'sections')) {
+    return [err('$', "only 'sections' allowed in layout")]
+  }
+
+  const errors: FieldError[] = []
+  const seenSections = new Set<string>()
+  const placed = new Set<string>()
+  const seenSlots = new Set<string>()
+
+  sections.forEach((sec, i) => {
+    const where = `layout.sections[${i}]`
+    if (!isObject(sec)) {
+      errors.push(err(where, 'section must be an object'))
+      return
+    }
+
+    const sid = sec.id
+    if (!isString(sid) || !FIELD_ID_RE.test(sid)) errors.push(err(where, "'id' must match ^[a-z][a-z0-9_]{0,63}$"))
+    else if (seenSections.has(sid)) errors.push(err(where, 'duplicate section id'))
+    else seenSections.add(sid)
+
+    if ('title' in sec && !isString(sec.title)) errors.push(err(where, "'title' must be a string"))
+    if ('columns' in sec && sec.columns !== 1 && sec.columns !== 2 && sec.columns !== 3) {
+      errors.push(err(where, "'columns' must be 1, 2 or 3"))
+    }
+    const extra = Object.keys(sec)
+      .filter((k) => !SECTION_PROPS.has(k))
+      .sort()
+    if (extra.length) errors.push(err(where, `properties not allowed in section: [${extra.map((k) => `'${k}'`).join(', ')}]`))
+
+    const items = sec.items
+    if (!Array.isArray(items)) {
+      errors.push(err(where, "'items' must be a list"))
+      return
+    }
+    const columns = sec.columns === 2 || sec.columns === 3 ? sec.columns : 1
+
+    items.forEach((it, j) => {
+      const iw = `${where}.items[${j}]`
+      if (!isObject(it)) {
+        errors.push(err(iw, 'item must be an object'))
+        return
+      }
+      const hasField = 'field' in it
+      const hasSlot = 'slot' in it
+      if (hasField === hasSlot) {
+        errors.push(err(iw, "item must have either 'field' or 'slot'"))
+        return
+      }
+      const iextra = Object.keys(it)
+        .filter((k) => !ITEM_PROPS.has(k))
+        .sort()
+      if (iextra.length) errors.push(err(iw, `properties not allowed in item: [${iextra.map((k) => `'${k}'`).join(', ')}]`))
+
+      if (hasField) {
+        const fid = it.field
+        if (!isString(fid) || !fieldIds.has(fid)) errors.push(err(iw, `unknown field ${repr(fid)}`))
+        else if (placed.has(fid)) errors.push(err(iw, `field ${repr(fid)} is already placed`))
+        else placed.add(fid)
+      } else {
+        const slot = it.slot
+        if (!isString(slot) || !FIELD_ID_RE.test(slot)) errors.push(err(iw, "'slot' must match ^[a-z][a-z0-9_]{0,63}$"))
+        else if (seenSlots.has(slot)) errors.push(err(iw, 'duplicate slot id'))
+        else seenSlots.add(slot)
+      }
+
+      if ('span' in it && (!Number.isInteger(it.span) || (it.span as number) < 1 || (it.span as number) > columns)) {
+        errors.push(err(iw, `'span' must be an integer between 1 and ${columns}`))
+      }
+    })
+  })
+
+  return errors
+}
+
+function validateTypeProps(where: string, t: FieldType, f: Dict): FieldError[] {
+  const errors: FieldError[] = []
+
+  if (t === 'select' || t === 'multiselect') {
+    const opts = f.options
+    if (!Array.isArray(opts) || opts.length === 0 || !opts.every((o) => isString(o) && o.trim())) {
+      errors.push(err(where, "'options' must be a non-empty list of strings"))
+    } else if (new Set(opts).size !== opts.length) {
+      errors.push(err(where, "'options' contains duplicates"))
+    } else if ('default' in f) {
+      const d = f.default
+      if (t === 'select' && !opts.includes(d)) errors.push(err(where, "'default' must be one of options"))
+      if (t === 'multiselect' && (!Array.isArray(d) || !d.every((x) => opts.includes(x)))) {
+        errors.push(err(where, "'default' must be a subset of options"))
+      }
+    }
+  }
+
+  if (t === 'text' || t === 'textarea') {
+    if ('max_length' in f && (!Number.isInteger(f.max_length) || (f.max_length as number) < 1)) {
+      errors.push(err(where, "'max_length' must be a positive integer"))
+    }
+    if ('default' in f && !isString(f.default)) errors.push(err(where, "'default' must be a string"))
+  }
+
+  if (t === 'number') {
+    for (const k of ['min', 'max'] as const) {
+      if (k in f && !isNumber(f[k])) errors.push(err(where, `'${k}' must be a number`))
+    }
+    if (isNumber(f.min) && isNumber(f.max) && f.min > f.max) errors.push(err(where, "'min' must be <= 'max'"))
+    if ('integer' in f && !isBool(f.integer)) errors.push(err(where, "'integer' must be a boolean"))
+    if ('default' in f && !isNumber(f.default)) errors.push(err(where, "'default' must be a number"))
+  }
+
+  if (t === 'checkbox' && 'default' in f && !isBool(f.default)) errors.push(err(where, "'default' must be a boolean"))
+
+  if (t === 'date' && 'default' in f && f.default !== 'today' && !isIsoDate(f.default)) {
+    errors.push(err(where, "'default' must be 'today' or YYYY-MM-DD"))
+  }
+
+  if (t === 'photo' && 'multiple' in f && !isBool(f.multiple)) errors.push(err(where, "'multiple' must be a boolean"))
+
+  return errors
+}
+
+// ---------- Submission ----------
+
+/**
+ * Assume `schema` già valido. Chiavi sconosciute = errore, così un client con
+ * un template vecchio non salva dati silenziosamente persi.
+ */
+export function validateSubmission(schema: FormSchema, data: unknown): FieldError[] {
+  if (!isObject(data)) return [err('$', 'data must be an object')]
+
+  const errors: FieldError[] = []
+  const fields = new Map(schema.fields.map((f) => [f.id, f]))
+
+  for (const key of Object.keys(data)) {
+    if (key !== NOTES_KEY && !fields.has(key)) errors.push(err(key, 'unknown field'))
+  }
+
+  if (NOTES_KEY in data && data[NOTES_KEY] !== null && data[NOTES_KEY] !== undefined) {
+    errors.push(...validateNotes(fields, data[NOTES_KEY]))
+  }
+
+  for (const [fid, f] of fields) {
+    const value = data[fid]
+    if (isEmpty(value)) {
+      if (f.required) errors.push(err(fid, 'required'))
+      continue
+    }
+    const msg = checkValue(f as unknown as Dict, value)
+    if (msg) errors.push(err(fid, msg))
+  }
+
+  return errors
+}
+
+/** Note per campo: commento libero e/o foto (attachment id), solo su campi esistenti. */
+function validateNotes(fields: Map<string, Field>, notes: unknown): FieldError[] {
+  if (!isObject(notes)) return [err(NOTES_KEY, 'must be an object')]
+  const errors: FieldError[] = []
+  for (const [fid, n] of Object.entries(notes)) {
+    const where = `${NOTES_KEY}.${fid}`
+    if (!fields.has(fid)) {
+      errors.push(err(where, 'unknown field'))
+      continue
+    }
+    if (!isObject(n)) {
+      errors.push(err(where, 'must be an object'))
+      continue
+    }
+    if (Object.keys(n).some((k) => k !== 'comment' && k !== 'photos')) errors.push(err(where, 'only comment, photos allowed'))
+    if ('comment' in n && !isString(n.comment)) errors.push(err(where, "'comment' must be a string"))
+    if ('photos' in n && (!Array.isArray(n.photos) || !n.photos.every((x) => isString(x) && x))) {
+      errors.push(err(where, "'photos' must be a list of attachment ids"))
+    }
+  }
+  return errors
+}
+
+/** Messaggio di errore per un valore non vuoto, oppure null se valido. */
+export function checkValue(f: Dict, v: unknown): string | null {
+  const t = f.type as FieldType
+
+  if (t === 'text' || t === 'textarea') {
+    if (!isString(v)) return 'must be a string'
+    if ('max_length' in f && v.length > (f.max_length as number)) return `longer than ${f.max_length} characters`
+  } else if (t === 'number') {
+    if (!isNumber(v)) return 'must be a number'
+    if (f.integer && !Number.isInteger(v)) return 'must be an integer'
+    if ('min' in f && v < (f.min as number)) return `must be >= ${f.min}`
+    if ('max' in f && v > (f.max as number)) return `must be <= ${f.max}`
+  } else if (t === 'checkbox') {
+    if (!isBool(v)) return 'must be a boolean'
+  } else if (t === 'select') {
+    if (!(f.options as string[]).includes(v as string)) return 'not one of options'
+  } else if (t === 'multiselect') {
+    if (!Array.isArray(v) || !v.every(isString)) return 'must be a list of strings'
+    const opts = new Set(f.options as string[])
+    if (!v.every((x) => opts.has(x))) return 'contains values not in options'
+    if (new Set(v).size !== v.length) return 'contains duplicates'
+  } else if (t === 'date') {
+    if (!isIsoDate(v)) return 'must be a date YYYY-MM-DD'
+  } else if (t === 'photo') {
+    // Lista di attachment id (UUID generati dal client); l'esistenza è verificata dal sync.
+    if (!Array.isArray(v) || !v.every((x) => isString(x) && x)) return 'must be a list of attachment ids'
+    if (!f.multiple && v.length > 1) return 'only one photo allowed'
+  } else if (t === 'signature') {
+    if (!isString(v) || !v) return 'must be an attachment id'
+  } else if (t === 'geolocation') {
+    if (!isObject(v) || !isNumber(v.lat) || !isNumber(v.lng)) return 'must be an object with numeric lat and lng'
+    if (!(v.lat >= -90 && v.lat <= 90 && v.lng >= -180 && v.lng <= 180)) return 'lat/lng out of range'
+    if ('accuracy' in v && !isNumber(v.accuracy)) return "'accuracy' must be a number"
+    if (Object.keys(v).some((k) => !['lat', 'lng', 'accuracy'].includes(k))) return 'only lat, lng, accuracy allowed'
+  }
+
+  return null
+}

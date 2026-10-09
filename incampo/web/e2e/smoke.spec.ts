@@ -1,0 +1,700 @@
+import { expect, test, type Page } from '@playwright/test'
+
+// Utenti del seed demo (scripts/seed.py).
+const MANAGER = { email: 'manager@fieldview.local', password: 'demo1234' }
+const ADMIN = { email: 'admin@fieldview.local', password: 'demo1234' }
+
+async function login(page: Page, user = MANAGER) {
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(user.email)
+  await page.getByLabel('Password').fill(user.password)
+  await page.getByRole('button', { name: /accedi|entra|login/i }).click()
+  await page.waitForURL('**/projects')
+}
+
+test('login → planimetria → nuovo pin → pannello → rinomina', async ({ page }) => {
+  await login(page)
+
+  // progetto e planimetria demo
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.waitForURL('**/plans')
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await page.waitForURL(/\/plans\/[0-9a-f-]+$/)
+  await expect(page.locator('.plan-canvas img')).toBeVisible()
+  const before = await page.locator('.pin').count()
+  expect(before).toBeGreaterThan(0) // il seed mette 3 pin
+
+  // aggiungi pin con un click sulla planimetria
+  await page.getByRole('button', { name: '+ Aggiungi pin' }).click()
+  const box = await page.locator('.plan-canvas').boundingBox()
+  if (!box) throw new Error('canvas non visibile')
+  await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.4)
+
+  // il pannello si apre sul pin nuovo e la mappa mostra un marker in più
+  const panel = page.locator('.pin-panel')
+  await expect(panel).toBeVisible()
+  await expect(panel.getByText('Pin senza etichetta')).toBeVisible()
+  await expect(page.locator('.pin')).toHaveCount(before + 1)
+
+  // rinomina dal titolo del pannello
+  await panel.locator('.pin-title').click()
+  await panel.getByPlaceholder('Etichetta').fill('Smoke test')
+  await panel.getByRole('button', { name: 'Salva' }).click()
+  await expect(panel.locator('h2')).toContainText('Smoke test')
+  await expect(page.locator('.pin[aria-label="Smoke test"]')).toBeVisible()
+
+  // il pin esiste anche via API (stessa origine, /api)
+  const token = await page.evaluate(() => localStorage.getItem('fieldview.token'))
+  const planId = page.url().split('/').pop()
+  const res = await page.request.get(`/api/plans/${planId}/pins`, { headers: { Authorization: `Bearer ${token}` } })
+  expect(res.ok()).toBeTruthy()
+  expect((await res.json()).some((p: { label: string | null }) => p.label === 'Smoke test')).toBeTruthy()
+
+  // pulizia: cancella il pin creato
+  page.once('dialog', (d) => d.accept())
+  await panel.getByRole('button', { name: 'Cancella pin' }).click()
+  await expect(panel).toBeHidden()
+  await expect(page.locator('.pin')).toHaveCount(before)
+  await expect(page.locator('.toast-success')).toContainText('Pin cancellato')
+})
+
+test('credenziali sbagliate mostrano errore, route protetta rimanda al login', async ({ page }) => {
+  await page.goto('/projects')
+  await page.waitForURL('**/login')
+  await page.getByLabel('Email').fill(MANAGER.email)
+  await page.getByLabel('Password').fill('sbagliata')
+  await page.getByRole('button', { name: /accedi|entra|login/i }).click()
+  await expect(page.locator('.error')).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test('filtri pin in query string e cambio planimetria senza reload', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await expect(page.locator('.plan-canvas img')).toBeVisible()
+  const total = await page.locator('.pin').count()
+
+  await page.getByRole('button', { name: 'Aperti' }).click()
+  await expect(page).toHaveURL(/status=open/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} pin`)
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  await expect(page).not.toHaveURL(/status=/)
+  await expect(page.locator('.pin')).toHaveCount(total)
+})
+
+// PNG 1×1 valido (il server riconosce il tipo dai byte)
+const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+test('compila "Ispezione sicurezza" con foto e firma dal pannello pin', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await expect(page.locator('.plan-canvas img')).toBeVisible()
+  await page.locator('.pin').first().click()
+  const panel = page.locator('.pin-panel')
+  await expect(panel).toBeVisible()
+  const before = Number((await panel.getByText(/^Moduli \(\d+\)$/).textContent())!.match(/\d+/)![0])
+
+  await panel.getByRole('button', { name: '+ Compila modulo' }).click()
+  const modal = page.getByRole('dialog')
+  await modal.getByLabel('Modulo').selectOption({ label: 'Ispezione sicurezza' })
+
+  // salvataggio a vuoto: errori inline, niente chiamata
+  await modal.getByRole('button', { name: 'Salva modulo' }).click()
+  await expect(modal.locator('.dyn-error').first()).toContainText('Campo obbligatorio')
+  await expect(modal.locator('.form-actions .error')).toContainText(/campi da correggere/)
+
+  await modal.getByLabel(/Area ispezionata/).fill('Vano scala B')
+  await modal.getByLabel(/^Esito/).selectOption('Non conforme')
+  await modal.getByText('Elettrico', { exact: true }).click() // multiselect a chip
+  await modal.getByLabel(/Persone presenti/).fill('3')
+  await modal.getByLabel('Lat').fill('45.46')
+  await modal.getByLabel('Lng').fill('9.19')
+  await modal.locator('#df-foto').setInputFiles({ name: 'quadro.png', mimeType: 'image/png', buffer: PNG_1PX })
+  await expect(modal.locator('.photo-cell img')).toBeVisible()
+
+  // firma: un tratto sul canvas
+  const canvas = modal.locator('.signature-canvas')
+  await canvas.scrollIntoViewIfNeeded()
+  const box = (await canvas.boundingBox())!
+  await page.mouse.move(box.x + 20, box.y + 80)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 200, box.y + 40, { steps: 8 })
+  await page.mouse.move(box.x + 400, box.y + 120, { steps: 8 })
+  await page.mouse.up()
+  await expect(modal.getByText('Firma acquisita')).toBeVisible()
+
+  const tasksBefore = Number((await panel.getByText(/^Task \(\d+\)$/).textContent())!.match(/\d+/)![0])
+  await modal.getByRole('button', { name: 'Salva modulo' }).click() // click 1
+  await expect(page.locator('.toast-success')).toContainText('Modulo salvato')
+  await expect(panel.getByText(`Moduli (${before + 1})`)).toBeVisible()
+
+  // regola MVP: "Non conforme" propone un task pre-compilato -> assegnato in 3 click
+  const taskModal = page.getByRole('dialog', { name: /Non conformità rilevata/ })
+  await expect(taskModal).toBeVisible()
+  await expect(taskModal.getByLabel('Titolo')).toHaveValue(/Non conforme — Ispezione sicurezza/)
+  await expect(taskModal.getByLabel('Descrizione')).toHaveValue(/Area ispezionata: Vano scala B/)
+  await taskModal.getByLabel('Assegna a').selectOption({ label: 'Franco Field' }) // click 2
+  await taskModal.getByRole('button', { name: 'Crea e assegna' }).click() // click 3
+  await expect(page.locator('.toast-success').last()).toContainText('Task creato e assegnato')
+  await expect(panel.getByText(`Task (${tasksBefore + 1})`)).toBeVisible()
+  await expect(panel.locator('.list li', { hasText: 'Non conforme — Ispezione sicurezza' }).locator('.badge')).toHaveText('Assegnato')
+
+  // dettaglio submission in sola lettura, poi modifica
+  await panel.locator('.list-item-btn', { hasText: 'Ispezione sicurezza' }).last().click()
+  const detail = page.getByRole('dialog', { name: 'Ispezione sicurezza' })
+  await expect(detail.getByLabel(/Area ispezionata/)).toHaveValue('Vano scala B')
+  await expect(detail.getByLabel(/Area ispezionata/)).toBeDisabled()
+  await expect(detail.locator('.callout-warn')).toContainText('Non conforme')
+  await expect(detail.locator('.photo-cell img')).toHaveCount(1)
+  await detail.getByRole('button', { name: 'Modifica' }).click()
+  const edit = page.getByRole('dialog', { name: /Modifica — Ispezione sicurezza/ })
+  await edit.getByLabel(/Area ispezionata/).fill('Vano scala B, piano 2')
+  await edit.getByRole('button', { name: 'Salva modifiche' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Modulo aggiornato')
+  await expect(detail.getByLabel(/Area ispezionata/)).toHaveValue('Vano scala B, piano 2')
+  await detail.locator('.form-actions').getByRole('button', { name: 'Chiudi' }).click()
+  await expect(detail).toBeHidden()
+  await expect(panel.locator('.photo-grid img')).toHaveCount(1) // la foto; la firma non è nella griglia foto
+
+  // via API: submission con esito e 2 allegati caricati
+  const token = await page.evaluate(() => localStorage.getItem('fieldview.token'))
+  const selected = await page.locator('.pin-selected').getAttribute('data-pin-id')
+  const res = await page.request.get(`/api/pins/${selected}`, { headers: { Authorization: `Bearer ${token}` } })
+  const pinDetail = await res.json()
+  const sub = pinDetail.submissions.find((s: { data_json: { area?: string } }) => s.data_json.area === 'Vano scala B, piano 2')
+  expect(sub).toBeTruthy()
+  const task = pinDetail.tasks.find((t: { title: string }) => t.title.startsWith('Non conforme — Ispezione sicurezza'))
+  expect(task.status).toBe('assigned')
+  expect(task.assigned_to).toBeTruthy()
+  expect(sub.data_json.esito).toBe('Non conforme')
+  expect(sub.data_json.rischi).toEqual(['Elettrico'])
+  expect(sub.data_json.persone_presenti).toBe(3)
+  expect(sub.data_json.posizione).toEqual({ lat: 45.46, lng: 9.19 })
+  expect(sub.attachments).toHaveLength(2)
+  expect(sub.attachments.every((a: { file_url: string | null }) => a.file_url)).toBeTruthy()
+  expect(sub.attachments.map((a: { file_type: string }) => a.file_type).sort()).toEqual(['photo', 'signature'])
+  expect(sub.data_json.foto).toEqual([sub.attachments.find((a: { file_type: string }) => a.file_type === 'photo').id])
+  expect(sub.data_json.firma_ispettore).toBe(sub.attachments.find((a: { file_type: string }) => a.file_type === 'signature').id)
+})
+
+test('vista task: filtri, cambio stato/assegnatario inline, link alla planimetria', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'Task', exact: true }).click()
+  await page.waitForURL('**/tasks')
+  const rows = page.locator('.tasks-table tbody tr')
+  await expect(rows.first()).toBeVisible()
+  const total = await rows.count()
+  expect(total).toBeGreaterThanOrEqual(3)
+
+  // un task aperto: assegnarlo lo porta ad "assigned" senza toccare lo stato
+  const firstOpen = page.locator('.tasks-table tbody tr', { has: page.locator('.status-select.status-open') }).first()
+  const title = await firstOpen.locator('td strong').first().textContent()
+  const openRow = page.locator('.tasks-table tbody tr', { hasText: title! }) // stabile anche quando cambia stato
+  await openRow.getByLabel(`Assegnatario di ${title}`).selectOption({ label: 'Franco Field' })
+  await expect(openRow.locator('.status-select')).toHaveValue('assigned')
+
+  // poi risolto, con scadenza
+  await openRow.getByLabel(`Stato di ${title}`).selectOption('resolved')
+  await expect(openRow.locator('.status-select')).toHaveValue('resolved')
+  await openRow.getByLabel(`Scadenza di ${title}`).fill('2030-12-31')
+  await page.reload()
+  const sameRow = page.locator('.tasks-table tbody tr', { hasText: title! })
+  await expect(sameRow.locator('.status-select')).toHaveValue('resolved')
+  await expect(sameRow.getByLabel(`Scadenza di ${title}`)).toHaveValue('2030-12-31')
+  await expect(sameRow.getByLabel(`Assegnatario di ${title}`)).toHaveValue(/.+/)
+
+  // ricerca testuale lato server: in query string, la riga cercata resta
+  await page.getByLabel('Cerca').fill(title!)
+  await expect(page).toHaveURL(/q=/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} task`)
+  await expect(rows.first()).toContainText(title!)
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  await expect(page).not.toHaveURL(/q=/)
+
+  // filtro stato in URL e "i miei task" (il manager non ha task assegnati)
+  await page.getByRole('button', { name: 'Risolto' }).click()
+  await expect(page).toHaveURL(/status=resolved/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} task`)
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  await page.getByRole('button', { name: 'I miei task' }).click()
+  await expect(page).toHaveURL(/mine=1/)
+  await expect(page.locator('.filter-summary')).toContainText(`di ${total} task`)
+  for (const sel of await page.locator('.tasks-table tbody select[aria-label^="Assegnatario"]').all()) {
+    await expect(sel.locator('option:checked')).toHaveText('Maria Manager')
+  }
+  await page.getByRole('button', { name: 'Tutti i task' }).click()
+
+  // "vedi sulla planimetria": apre la plan view con il pin selezionato e il pannello
+  await sameRow.getByTitle('Vedi sulla planimetria').click()
+  await page.waitForURL(/\/plans\/[0-9a-f-]+/)
+  await expect(page.locator('.pin-panel')).toBeVisible()
+  await expect(page.locator('.pin-panel')).toContainText(title!)
+  await expect(page.locator('.pin-selected')).toHaveCount(1)
+  await expect(page).not.toHaveURL(/pin=/) // parametro consumato
+  const zoom = await page.locator('.plan-zoom').textContent()
+  expect(Number(zoom!.replace('%', ''))).toBeGreaterThanOrEqual(100)
+})
+
+test('il responsabile non crea moduli: niente "Nuovo modulo", "Duplica" né editor vuoto', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: 'Moduli', exact: true }).click()
+  await page.waitForURL('**/templates')
+  await expect(page.locator('.hub-row-link')).toHaveCount(2)
+  await expect(page.locator('.hub-row-link', { hasText: 'Nuovo modulo' })).toHaveCount(0)
+  await page.getByRole('link', { name: /Elenco moduli/ }).click()
+  await expect(page.locator('.table tbody tr')).toHaveCount(3)
+  await expect(page.getByRole('link', { name: '+ Nuovo template' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Duplica' })).toHaveCount(0)
+  await page.goto('/templates/new')
+  await page.waitForURL('**/templates/elenco')
+})
+
+test('form builder: creo "Diario giornaliero" e lo compilo su un pin', async ({ page }) => {
+  // creare moduli è solo dell'amministratore
+  await login(page, ADMIN)
+  await page.getByRole('link', { name: 'Moduli' }).click()
+  await page.waitForURL('**/templates')
+  // ingresso: hub con le scelte, non la lista
+  await expect(page.locator('.hub-row-link')).toHaveCount(4)
+  await expect(page.locator('.hub-row-link', { hasText: 'Elenco moduli' })).toContainText('3 attivi')
+  await page.getByRole('link', { name: /Elenco moduli/ }).click()
+  await page.waitForURL('**/templates/elenco')
+  await expect(page.locator('.table tbody tr')).toHaveCount(3) // i 3 template del seed
+  await page.getByLabel('Categoria').selectOption('quality')
+  await expect(page.locator('.table tbody tr')).toHaveCount(1)
+  await page.getByLabel('Categoria').selectOption('')
+  await page.getByRole('link', { name: '+ Nuovo template' }).click()
+  await page.waitForURL('**/templates/new')
+
+  const name = `Diario giornaliero e2e ${Date.now() % 10000}`
+  await page.getByLabel('Nome').fill(name)
+  await page.getByLabel('Categoria').selectOption('diary')
+
+  // fase 1: la struttura, prima dei campi — una sezione a due colonne con due blocchi vuoti
+  await page.getByRole('tab', { name: /Struttura/ }).click()
+  await page.getByLabel('Titolo della sezione 1').fill('Dati del giorno')
+  await page.getByLabel('Colonne della sezione 1').selectOption('2')
+  await page.getByRole('button', { name: 'Blocco', exact: true }).click()
+  await page.getByRole('button', { name: 'Blocco', exact: true }).click()
+  await expect(page.locator('.bblock.is-empty')).toHaveCount(2)
+
+  // fase 2: i campi dentro i blocchi già disegnati
+  await page.getByRole('tab', { name: /Campi/ }).click()
+  const fillBlock = async (type: string, label: string) => {
+    await page.locator('.bblock.is-empty select').first().selectOption(type)
+    await page.getByLabel('Etichetta').fill(label)
+  }
+  const addField = async (type: string, label: string) => {
+    await page.getByLabel('Tipo del nuovo campo').selectOption(type)
+    await page.getByRole('button', { name: '+ Aggiungi campo in fondo' }).click()
+    await page.getByLabel('Etichetta').fill(label)
+  }
+  await fillBlock('date', 'Data')
+  await page.getByLabel('Valore iniziale').selectOption('today')
+  await fillBlock('textarea', 'Attività svolte')
+  await page.getByLabel('Obbligatorio').check()
+  await expect(page.locator('.bblock.is-empty')).toHaveCount(0)
+  await addField('number', 'Operai presenti')
+  await page.getByLabel('Solo numeri interi').check()
+  await addField('select', 'Meteo')
+  await page.getByLabel('Opzioni (una per riga)').fill('Sole\nPioggia\nNuvoloso')
+  await page.getByLabel('Opzioni (una per riga)').blur()
+  await addField('photo', 'Foto del giorno')
+  await page.getByLabel('Più foto').check()
+
+  // id derivati dalle etichette, anteprima live valida con la sezione disegnata prima
+  await expect(page.locator('.bsections')).toContainText('attivita_svolte')
+  await expect(page.locator('.bsections')).toContainText('operai_presenti')
+  await expect(page.locator('.builder-preview .dyn-field')).toHaveCount(5)
+  await expect(page.locator('.builder-preview .dyn-section-title')).toHaveText('Dati del giorno')
+  await expect(page.locator('.builder-preview').getByLabel(/^Data/)).toHaveValue(/^\d{4}-\d{2}-\d{2}$/)
+
+  // errore di schema segnalato: opzione duplicata, poi corretta
+  await page.locator('.bblock', { hasText: 'Meteo' }).locator('.bblock-main').click()
+  await page.getByLabel('Opzioni (una per riga)').fill('Sole\nSole')
+  await page.getByLabel('Opzioni (una per riga)').blur()
+  await expect(page.locator('.field-props .error')).toContainText('duplicates')
+  await page.getByLabel('Opzioni (una per riga)').fill('Sole\nPioggia\nNuvoloso')
+  await page.getByLabel('Opzioni (una per riga)').blur()
+  await expect(page.locator('.field-props .error')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Salva' }).click()
+  await expect(page.locator('.toast-success')).toContainText('Template creato')
+  await page.waitForURL(/\/templates\/[0-9a-f-]+$/)
+
+  // scelte multiple: le opzioni del nuovo template si cambiano dalla pagina dedicata; i template del seed (in uso) sono bloccati
+  await page.goto('/templates/scelte')
+  await expect(page.locator('.choices-card')).toHaveCount(4) // i 3 del seed + il nuovo
+  await expect(page.locator('.choices-card', { hasText: 'Punch list' }).locator('textarea').first()).toBeDisabled()
+  const mine = page.locator('.choices-card', { hasText: name })
+  await mine.getByLabel(/^Meteo/).fill('Sole\nPioggia\nNuvoloso\nGrandine')
+  await mine.getByRole('button', { name: 'Salva' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Scelte salvate')
+
+  // compilazione su un pin con il nuovo template
+  await page.getByRole('link', { name: 'Progetti' }).click()
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await page.locator('.pin').first().click()
+  await page.getByRole('button', { name: '+ Compila modulo' }).click()
+  const modal = page.getByRole('dialog')
+  await modal.getByLabel('Modulo').selectOption({ label: name })
+  await modal.getByLabel(/Attività svolte/).fill('Getto solaio piano 1')
+  await modal.getByLabel(/Operai presenti/).fill('6')
+  await expect(modal.getByLabel(/^Meteo/).locator('option', { hasText: 'Grandine' })).toHaveCount(1)
+  await modal.getByLabel(/^Meteo/).selectOption('Sole')
+  // nota sotto un campo: commento + foto di chi compila
+  await modal.locator('.dyn-field', { hasText: 'Operai presenti' }).getByRole('button', { name: 'Commento o foto' }).click()
+  await modal.getByLabel('Commento su Operai presenti').fill('Due in ferie da domani')
+  await modal.locator('#df-note_operai_presenti').setInputFiles({ name: 'squadra.png', mimeType: 'image/png', buffer: PNG_1PX })
+  await modal.getByRole('button', { name: 'Salva modulo' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Modulo salvato')
+  await expect(page.locator('.pin-panel .list-item-btn', { hasText: name })).toBeVisible()
+
+  // in lettura la nota compare sotto il campo; il PDF si scarica con nome parlante
+  await page.locator('.pin-panel .list-item-btn', { hasText: name }).click()
+  const view = page.getByRole('dialog')
+  await expect(view.locator('.dyn-note-view')).toHaveCount(1)
+  await expect(view.locator('.dyn-note-view')).toContainText('Due in ferie da domani')
+  await expect(view.locator('.dyn-note-view img')).toHaveCount(1)
+  const [download] = await Promise.all([page.waitForEvent('download'), view.getByRole('button', { name: 'Scarica PDF' }).click()])
+  expect(download.suggestedFilename()).toMatch(/^diario-giornaliero-e2e-\d+-\d{8}-[0-9a-f]{8}\.pdf$/)
+  await view.getByRole('button', { name: 'Chiudi', exact: true }).last().click()
+
+  // il template in uso è bloccato nell'editor; archiviato sparisce da "Compila modulo"
+  await page.goto('/templates/elenco')
+  const row = page.locator('.table tbody tr', { hasText: name })
+  await expect(row.locator('.badge')).toHaveText('In uso')
+  await row.getByRole('link', { name: 'Apri' }).click()
+  await expect(page.locator('.callout-warn')).toContainText('1 compilazioni')
+  await expect(page.getByLabel('Etichetta')).toBeDisabled()
+  await page.getByRole('link', { name: 'Elenco moduli' }).click()
+  await row.getByRole('button', { name: 'Archivia' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('archiviato')
+  await expect(row).toHaveCount(0)
+  await page.getByRole('link', { name: 'Progetti' }).click()
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await page.locator('.pin').first().click()
+  await expect(page.locator('.pin-panel .list-item-btn', { hasText: name })).toBeVisible() // la vecchia compilazione resta leggibile
+  await page.getByRole('button', { name: '+ Compila modulo' }).click()
+  await expect(page.getByRole('dialog').getByLabel('Modulo').locator('option', { hasText: name })).toHaveCount(0)
+})
+
+test('dashboard: card e grafici, click porta alla vista task filtrata', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'Dashboard' }).click()
+  await page.waitForURL('**/dashboard')
+  await expect(page.locator('.stat-tile')).toHaveCount(3)
+  await expect(page.locator('.stat-tile').first()).toContainText('Task aperti')
+  const openTile = Number((await page.locator('.stat-tile .stat-value').first().textContent())!.trim())
+  expect(openTile).toBeGreaterThan(0)
+  await expect(page.locator('.chart-card')).toHaveCount(4)
+  await expect(page.locator('.chart-card').nth(0).locator('.recharts-bar-rectangle')).toHaveCount(4)
+  await expect(page.locator('.chart-card').nth(1).locator('.recharts-line')).toHaveCount(2)
+  // filtro planimetria in URL e vista tabellare
+  await page.getByLabel('Planimetria').selectOption({ index: 1 })
+  await expect(page).toHaveURL(/plan=/)
+  await page.getByRole('button', { name: 'Tabella' }).click()
+  await expect(page.locator('.table')).toContainText('Task aperto')
+  await page.getByRole('button', { name: 'Grafici' }).click()
+  // click sulla card "Task aperti" -> vista task con status open+assigned e stessa planimetria
+  await page.locator('.stat-tile').first().click()
+  await page.waitForURL(/\/tasks\?/)
+  expect(page.url()).toMatch(/status=open/)
+  expect(page.url()).toMatch(/status=assigned/)
+  expect(page.url()).toMatch(/plan=/)
+  await expect(page.locator('.filter-summary')).toContainText(/di \d+ task/)
+})
+
+test('spazio admin: crea utente, reset password, disattiva; registro operazioni con filtri e dettaglio', async ({ page }) => {
+  await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
+  await page.getByRole('link', { name: 'Utenti' }).click()
+  await expect(page.getByRole('heading', { name: 'Utenti' })).toBeVisible()
+  await expect(page.locator('.users-table tbody tr')).toHaveCount(4) // i 3 demo + l'admin personale del seed
+
+  // crea
+  await page.getByRole('button', { name: '+ Nuovo utente' }).click()
+  const modal = page.getByRole('dialog')
+  await modal.getByLabel('Nome e cognome').fill('Geom. Fabio Restivo')
+  await modal.getByLabel('Email (login)').fill('fabio.restivo@fieldview.local')
+  await modal.getByLabel('Ruolo').selectOption('manager')
+  await modal.getByLabel(/Password iniziale/).fill('cantiere2026')
+  await modal.getByRole('button', { name: 'Crea utente' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'creato' })).toBeVisible()
+  const row = page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' })
+  await expect(row).toContainText('Ufficio')
+
+  // reset password + disattiva (conferma nativa)
+  await row.getByRole('button', { name: 'Password' }).click()
+  await page.getByRole('dialog').getByLabel(/Nuova password/).fill('nuova12345')
+  await page.getByRole('dialog').getByRole('button', { name: 'Reimposta' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'reimpostata' })).toBeVisible()
+  page.once('dialog', (d) => d.accept())
+  await row.getByRole('button', { name: 'Disattiva' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'disattivato' })).toBeVisible()
+  await expect(page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' })).toHaveCount(0) // nascosto di default
+  await page.getByLabel('Mostra disattivati').check()
+  await expect(page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' })).toContainText('Disattivato')
+
+  // registro: storia dell'utente appena gestito
+  await page.locator('.users-table tbody tr', { hasText: 'Fabio Restivo' }).getByRole('link', { name: 'Attività' }).click()
+  await expect(page).toHaveURL(/\/admin\/audit\?actor=/)
+  await expect(page.getByRole('heading', { name: 'Registro operazioni' })).toBeVisible()
+  // l'utente disattivato non ha mai fatto login: nessuna operazione sua → azzera e guarda quelle dell'admin
+  await expect(page.locator('.empty')).toBeVisible()
+  await page.getByRole('button', { name: 'Azzera' }).click()
+  const rows = page.locator('.audit-table tbody tr.audit-row')
+  await expect(rows.first()).toContainText('Utente disattivato')
+  await expect(page.locator('.audit-table')).toContainText('Password reimpostata')
+  await expect(page.locator('.audit-table')).toContainText('Utente creato')
+  // filtro per azione via select e dettaglio JSON
+  await page.getByLabel('Azione').selectOption('user.created')
+  await expect(rows).toHaveCount(1)
+  await expect(rows.first()).toContainText('fabio.restivo@fieldview.local')
+  await rows.first().click()
+  await expect(page.locator('.audit-json')).toContainText('"role": "manager"')
+  await page.getByRole('button', { name: 'Storia di questa entità' }).click()
+  await expect(rows).toHaveCount(3)
+  // il manager non entra
+  await page.getByRole('button', { name: 'Esci' }).click()
+  await login(page)
+  await page.goto('/admin/audit')
+  await page.waitForURL('**/projects')
+})
+
+test('commessa in alto: selezione, sottomenù cantieri, nuova commessa con parametri, parametro admin', async ({ page }) => {
+  await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
+  const bar = page.getByTestId('commessa-bar')
+  await expect(bar.locator('#cantiere-sel')).toBeDisabled()
+  // gruppi per commessa nella pagina progetti, con i valori dei parametri del seed
+  await expect(page.locator('.commessa-group')).toHaveCount(2)
+  await expect(page.locator('.commessa-group').first()).toContainText('Edilizia civile, Impianti')
+  // selezione dalla barra → menù cantieri con i 2 cantieri della commessa
+  await bar.locator('#commessa-sel').selectOption({ label: 'C-2026-014 · Riqualificazione scuola Da Vinci' })
+  const cantiere = bar.locator('#cantiere-sel')
+  await expect(cantiere).toBeEnabled()
+  await expect(cantiere.locator('option:not([value=""])')).toHaveCount(2)
+  await expect(bar).toContainText('Comune di Milano')
+  await cantiere.selectOption({ label: 'Palestra e mensa' })
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/plans/)
+  await expect(cantiere.locator('option:checked')).toHaveText('Palestra e mensa')
+  // la commessa con un solo cantiere porta dritto alla planimetria... qui zero cantieri → messaggio
+  await bar.locator('#commessa-sel').selectOption({ label: 'C-2026-021 · Manutenzione SP 12' })
+  await expect(bar.locator('#cantiere-sel')).toBeDisabled()
+  await expect(bar.locator('#cantiere-sel')).toContainText('Nessun cantiere')
+  // filtro per parametro nella pagina progetti
+  await page.goto('/projects')
+  await page.getByLabel('Tipologia lavori').selectOption('Stradale')
+  await expect(page.locator('.commessa-group')).toHaveCount(1)
+  await expect(page.locator('.commessa-group')).toContainText('Manutenzione SP 12')
+  await page.getByRole('button', { name: 'Azzera' }).click()
+
+  // nuovo parametro (admin) e nuova commessa che lo usa
+  await page.goto('/admin/parametri')
+  await page.getByRole('button', { name: '+ Nuovo parametro' }).click()
+  const m = page.getByRole('dialog')
+  await m.getByLabel('Nome').fill('Zona')
+  await m.locator('#prm-opt').fill('Nord')
+  await m.locator('#prm-opt').press('Enter')
+  await m.locator('#prm-opt').fill('Sud')
+  await m.getByRole('button', { name: 'Aggiungi' }).click()
+  await m.getByRole('button', { name: 'Crea parametro' }).click()
+  await expect(page.locator('.params-table')).toContainText('Zona')
+  await page.goto('/projects')
+  await page.getByRole('button', { name: '+ Nuova commessa' }).click()
+  const cm = page.getByRole('dialog')
+  await cm.getByLabel('Codice commessa').fill('C-2026-030')
+  await cm.getByLabel('Oggetto').fill('Nuovo asilo')
+  await cm.getByRole('group', { name: 'Zona' }).getByRole('button', { name: 'Nord' }).click()
+  await cm.getByRole('group', { name: 'Tipologia lavori' }).getByRole('button', { name: 'Restauro' }).click()
+  await cm.getByRole('button', { name: 'Crea commessa' }).click()
+  await expect(page.locator('.toast-success', { hasText: 'C-2026-030' })).toBeVisible()
+  await expect(bar.locator('#commessa-sel')).toHaveValue(/.+/)
+  await expect(page.locator('.commessa-group.is-selected')).toContainText('Zona: Nord')
+  // nuovo cantiere dentro la commessa → compare nel menù cantieri
+  await page.locator('.commessa-group.is-selected').getByRole('button', { name: '+ Cantiere' }).click()
+  await page.getByRole('dialog').getByLabel('Nome cantiere').fill('Lotto 1')
+  await page.getByRole('dialog').getByRole('button', { name: 'Crea cantiere' }).click()
+  await expect(bar.locator('#cantiere-sel')).toContainText('Lotto 1')
+})
+
+test('tasto destro sulla planimetria: nuovo task nel punto (pin creato) e su un pin esistente', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: /Piano terra/ }).click()
+  await expect(page.locator('.plan-canvas img')).toBeVisible()
+  const before = await page.locator('.pin').count()
+
+  // punto vuoto → "Nuovo task qui": il pin nasce insieme al task
+  const box = await page.locator('.plan-canvas').boundingBox()
+  if (!box) throw new Error('canvas non visibile')
+  await page.mouse.click(box.x + box.width * 0.85, box.y + box.height * 0.85, { button: 'right' })
+  const menu = page.locator('.context-menu')
+  await expect(menu).toBeVisible()
+  await menu.getByRole('menuitem', { name: '+ Nuovo task qui' }).click()
+  await expect(menu).toBeHidden()
+  const modal = page.locator('.modal')
+  await expect(modal.locator('h2')).toContainText('Nuovo task sulla planimetria')
+  await modal.getByLabel('Titolo').fill('Task da tasto destro')
+  await modal.getByRole('button', { name: 'Crea task' }).click()
+  await expect(modal).toBeHidden()
+  await expect(page.locator('.pin')).toHaveCount(before + 1)
+  const panel = page.locator('.pin-panel')
+  await expect(panel).toBeVisible()
+  await expect(panel.getByText('Task da tasto destro')).toBeVisible()
+
+  // sul pin appena creato → "Nuovo task su questo pin"
+  await page.locator('.pin.pin-selected').click({ button: 'right' })
+  await menu.getByRole('menuitem', { name: '+ Nuovo task su questo pin' }).click()
+  await expect(modal.locator('h2')).toContainText('Nuovo task — Pin senza etichetta')
+  await modal.getByLabel('Titolo').fill('Secondo task')
+  await modal.getByRole('button', { name: 'Crea task' }).click()
+  await expect(modal).toBeHidden()
+  await expect(panel.getByText('Secondo task')).toBeVisible()
+  await expect(panel.getByRole('heading', { name: 'Task (2)' })).toBeVisible()
+  await expect(page.locator('.pin')).toHaveCount(before + 1)
+
+  // Esc chiude il menù senza fare nulla
+  const box2 = await page.locator('.plan-canvas').boundingBox()
+  if (!box2) throw new Error('canvas non visibile')
+  await page.mouse.click(box2.x + box2.width * 0.15, box2.y + box2.height * 0.15, { button: 'right' })
+  await expect(menu).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+
+  // pulizia
+  page.once('dialog', (d) => d.accept())
+  await panel.getByRole('button', { name: 'Cancella pin' }).click()
+  await expect(page.locator('.pin')).toHaveCount(before)
+})
+
+test('WBS del cantiere: albero, voce selezionata, compilazione modulo sulla voce, gestione voci', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'WBS' }).click()
+  await page.waitForURL('**/wbs')
+
+  // albero del seed: 3 radici chiuse, il conteggio sale dai figli
+  const tree = page.getByRole('tree')
+  await expect(tree.getByRole('treeitem')).toHaveCount(3)
+  const strutture = tree.getByRole('treeitem', { name: /Opere strutturali/ })
+  await expect(strutture.locator('.wbs-count')).toHaveText('1')
+  await strutture.getByRole('button', { name: 'Apri' }).click()
+  await expect(tree.getByRole('treeitem')).toHaveCount(6)
+
+  // selezione → URL ?node= e pannello con il diario del seed
+  await tree.getByRole('treeitem', { name: /Solai/ }).click()
+  await expect(page).toHaveURL(/\?node=[0-9a-f-]+$/)
+  const panel = page.locator('.wbs-detail')
+  await expect(panel.locator('.wbs-path')).toContainText('01 Opere strutturali › 01.02 Solai')
+  await expect(panel.getByRole('heading', { name: 'Moduli (1)' })).toBeVisible()
+
+  // compila un modulo sulla voce: pagina di compilazione con la voce già scelta, poi si torna alla voce
+  await panel.getByRole('link', { name: '+ Compila modulo' }).click()
+  await page.waitForURL('**/moduli/compila?voce=*')
+  await expect(page.getByLabel('Dove lo registri').locator('option:checked')).toContainText('01.02 Solai')
+  const modal = page.locator('.compile-page')
+  await modal.getByLabel('Modulo').selectOption({ label: 'Punch list (difetto)' })
+  await modal.getByLabel(/Descrizione del difetto/).fill('Fessura sul solaio')
+  await modal.getByLabel(/^Categoria/).selectOption({ index: 1 })
+  await modal.getByLabel(/^Gravità/).selectOption({ index: 1 })
+  await modal.locator('#df-foto').setInputFiles({ name: 'fessura.png', mimeType: 'image/png', buffer: PNG_1PX })
+  await expect(modal.locator('.photo-cell img')).toBeVisible()
+  await modal.getByRole('button', { name: 'Salva modulo' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Modulo salvato')
+  await page.waitForURL('**/wbs?node=*')
+  await expect(panel.getByRole('heading', { name: 'Moduli (2)' })).toBeVisible()
+  await expect(tree.getByRole('treeitem', { name: /Solai/ }).locator('.wbs-count')).toHaveText('2')
+  await expect(strutture.locator('.wbs-count')).toHaveText('2')
+
+  // in lettura: anche sulle voci WBS si crea un task (sul cantiere), PDF disponibile
+  await panel.locator('.list-item-btn', { hasText: 'Punch list' }).click()
+  const view = page.getByRole('dialog')
+  await expect(view.getByRole('button', { name: /Crea task/ })).toHaveCount(1)
+  await expect(view.getByRole('button', { name: 'Scarica PDF' })).toBeVisible()
+  await view.getByRole('button', { name: 'Chiudi', exact: true }).last().click()
+
+  // manager: sottovoce, rinomina, elimina (la voce con moduli non si elimina)
+  await panel.getByRole('button', { name: '+ Sottovoce' }).click()
+  await page.getByRole('dialog').getByLabel('Codice').fill('01.02.01')
+  await page.getByRole('dialog').getByLabel('Nome').fill('Solaio piano 1')
+  await page.getByRole('dialog').getByRole('button', { name: 'Salva' }).click()
+  await expect(panel.locator('.wbs-path')).toContainText('01.02 Solai › 01.02.01 Solaio piano 1')
+  await panel.getByRole('button', { name: 'Modifica' }).click()
+  await page.getByRole('dialog').getByLabel('Nome').fill('Solaio piano primo')
+  await page.getByRole('dialog').getByRole('button', { name: 'Salva' }).click()
+  await expect(panel.locator('.wbs-title')).toHaveText('01.02.01 Solaio piano primo')
+  page.on('dialog', (d) => d.accept())
+  await panel.getByRole('button', { name: 'Elimina' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('Voce eliminata')
+  await expect(panel.locator('.wbs-title')).toHaveText('01.02 Solai')
+  await panel.getByRole('button', { name: 'Elimina' }).click()
+  await expect(page.locator('.toast-error').last()).toBeVisible()
+  await expect(panel.locator('.wbs-title')).toHaveText('01.02 Solai')
+})
+
+test('WBS: import da CSV con anteprima, aggiornamento per codice e righe in errore', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'WBS' }).click()
+  await page.getByRole('button', { name: 'Importa da Excel/CSV' }).click()
+  const modal = page.getByRole('dialog')
+
+  // "01" esiste già nel seed → aggiornamento; 04 e 04.01 nuove; una riga senza nome
+  const csv = 'codice;nome\n01;Opere strutturali (rev. 2)\n04;Sicurezza\n04.01;Ponteggi\n05;\n'
+  await modal.locator('#wbs-file').setInputFiles({ name: 'wbs.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf-8') })
+  await expect(modal.getByText(/2.*nuove.*1.*da aggiornare.*1.*righe con errori/)).toBeVisible()
+  const rows = modal.locator('tbody tr')
+  await expect(rows).toHaveCount(4)
+  await expect(rows.nth(0)).toContainText('Aggiorna')
+  await expect(rows.nth(2)).toContainText('04')
+  await expect(rows.nth(2)).toContainText('Nuova')
+  await expect(rows.nth(3)).toContainText('nome mancante')
+
+  await modal.getByRole('button', { name: 'Importa 3 voci' }).click()
+  await expect(page.locator('.toast-success').last()).toContainText('2 nuove, 1 aggiornate, 1 righe saltate')
+  await expect(modal).toBeHidden()
+  const tree = page.getByRole('tree')
+  await expect(tree.getByRole('treeitem', { name: /Opere strutturali \(rev\. 2\)/ })).toBeVisible()
+  const sicurezza = tree.getByRole('treeitem', { name: /Sicurezza/ })
+  await expect(sicurezza).toBeVisible()
+  await sicurezza.getByRole('button', { name: 'Apri' }).click()
+  await expect(tree.getByRole('treeitem', { name: /Ponteggi/ })).toBeVisible()
+})
+
+test("contatta l'amministratore: il manager scrive dal cantiere, l'admin legge e chiude", async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.waitForURL('**/plans')
+  await page.getByRole('button', { name: "Contatta l'amministratore" }).click()
+  const dialog = page.getByRole('dialog', { name: "Contatta l'amministratore" })
+  await expect(dialog.getByRole('button', { name: 'Invia' })).toBeDisabled()
+  await dialog.getByLabel('Messaggio').fill('E2E: non vedo la planimetria del primo piano')
+  await expect(dialog.getByLabel(/Riguarda il cantiere Cantiere demo/)).toBeChecked()
+  await dialog.getByRole('button', { name: 'Invia' }).click()
+  await expect(page.locator('.toast-success')).toContainText("Messaggio inviato all'amministratore")
+  await expect(dialog).toBeHidden()
+
+  // l'admin non ha il pulsante (scriverebbe a sé stesso) e vede la segnalazione
+  await page.getByRole('button', { name: 'Esci' }).click()
+  await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
+  await expect(page.getByRole('button', { name: "Contatta l'amministratore" })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Segnalazioni' }).click()
+  const row = page.getByRole('row', { name: /E2E: non vedo la planimetria/ })
+  await expect(row).toContainText('Cantiere demo')
+  await expect(row).toContainText('manager@fieldview.local')
+  await expect(row).toContainText('Pagina: /projects/')
+  await row.getByRole('button', { name: 'Chiudi' }).click()
+  await expect(page.locator('.toast-success')).toContainText('Segnalazione chiusa')
+  await expect(page.getByRole('row', { name: /E2E: non vedo la planimetria/ })).toHaveCount(0)
+  await page.getByLabel('Mostra').selectOption('closed')
+  await expect(page.getByRole('row', { name: /E2E: non vedo la planimetria/ })).toContainText('chiusa')
+})

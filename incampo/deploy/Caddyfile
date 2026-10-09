@@ -1,0 +1,38 @@
+# Reverse proxy TLS davanti a InCampo (Caddy 2: certificati Let's Encrypt automatici).
+# Installazione sul server (Debian/Ubuntu): apt install caddy, poi copiare questo file in
+# /etc/caddy/Caddyfile, sostituire il dominio e: systemctl reload caddy
+#
+# Il DNS del dominio deve puntare al server e le porte 80/443 devono essere aperte
+# (la 80 serve a Let's Encrypt e al redirect verso https). L'app resta su 127.0.0.1:8000.
+
+incampo.cosedilspa.com {
+	encode zstd gzip
+
+	# planimetrie PDF e foto fino a 20 MB (+ margine per il multipart)
+	request_body {
+		max_size 25MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+		-Server
+	}
+
+	# Caddy scarta gli X-Forwarded-For mandati dal client e mette l'IP vero: l'app
+	# usa l'ultima voce per il blocco dei login e il registro operazioni.
+	reverse_proxy 127.0.0.1:8000 {
+		health_uri /api/healthz
+		health_interval 30s
+	}
+
+	log {
+		output file /var/log/caddy/fieldview.log {
+			roll_size 50MiB
+			roll_keep 10
+		}
+	}
+}
