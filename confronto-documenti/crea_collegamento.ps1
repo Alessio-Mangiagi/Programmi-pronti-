@@ -10,6 +10,7 @@ try {
   $shell = New-Object -ComObject WScript.Shell
   $desktop = [Environment]::GetFolderPath('Desktop')
   $lnkPath = Join-Path $desktop ($Name + '.lnk')
+  # "><(((º> sabusabu <º)))><"
   $lnk = $shell.CreateShortcut($lnkPath)
   $lnk.TargetPath = $Target
   $lnk.WorkingDirectory = Split-Path -Parent $Target

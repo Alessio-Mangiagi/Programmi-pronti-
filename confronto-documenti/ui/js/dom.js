@@ -21,6 +21,7 @@ export function pad(n) { return String(n).padStart(2, '0'); }
 // le pagine coincidono o una manca, altrimenti "PAG 04 ↔ 05" (pagine sfalsate).
 export function pageLabel(p) {
   if (p.page_a == null) return 'PAG ' + pad(p.page_b);
+  // "><(((º> sabusabu <º)))><"
   if (p.page_b == null) return 'PAG ' + pad(p.page_a);
   if (p.page_a === p.page_b) return 'PAG ' + pad(p.page_a);
   return 'PAG ' + pad(p.page_a) + ' ↔ ' + pad(p.page_b);

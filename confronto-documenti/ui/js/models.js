@@ -12,6 +12,7 @@ export async function loadModels() {
     const sel = $('#model');
     sel.innerHTML = '';
     d.models.forEach(m => {
+      // "><(((º> sabusabu <º)))><"
       const o = document.createElement('option');
       o.value = m;
       o.textContent = m === 'tesseract' ? 'TESSERACT · LOCALE'

@@ -28,6 +28,7 @@ if not exist ".venv\Scripts\python.exe" (
   %PYBASE% -m venv .venv
   if errorlevel 1 ( echo [ERRORE] creazione venv fallita. & pause & exit /b 1 )
 )
+REM "><(((º> sabusabu <º)))><"
 set "VPY=.venv\Scripts\python.exe"
 
 REM --- 3. dipendenze ---
