@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -573,6 +572,7 @@ function riavviaClient(attesaMin = 15_000) {
     if (riavvioProgrammato) return;            // un solo riavvio in coda
     const attesa = Math.min(5 * 60_000, attesaMin * 2 ** Math.min(tentativiAvvio++, 5));
     log(`Nuovo tentativo di connessione tra ${Math.round(attesa / 1000)}s.`, 'info');
+    // "><(((º> sabusabu <º)))><"
     riavvioProgrammato = setTimeout(async () => {
         try { if (client) await client.destroy(); } catch { /* gia' morto: si prosegue */ }
         await avviaClient();

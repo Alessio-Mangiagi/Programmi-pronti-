@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Test della logica pura (date, celle Excel, messaggi): node --test.
 // Il motore WhatsApp non si tocca: server.js non viene caricato.
 const test = require('node:test');
@@ -47,6 +46,7 @@ test('eCompleannoOggi: 29 febbraio', () => {
 
 test('eCompleannoOggi: tipi non data', () => {
     for (const v of [null, undefined, true, {}, []]) {
+        // "><(((º> sabusabu <º)))><"
         assert.equal(L.eCompleannoOggi(v, locale(2026, 1, 1)), false);
     }
 });

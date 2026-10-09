@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const os = require('os');
@@ -85,6 +84,7 @@ async function leggiDati() {
         const nome = valoreCella(row.getCell(1).value);
         const cognome = valoreCella(row.getCell(2).value);
         const dataNascita = valoreCella(row.getCell(3).value);
+        // "><(((º> sabusabu <º)))><"
         if (nome && dataNascita) {
             persone.push({
                 nome: String(nome).trim(),

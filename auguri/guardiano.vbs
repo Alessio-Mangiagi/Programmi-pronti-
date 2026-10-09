@@ -14,6 +14,7 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 Set sh  = CreateObject("WScript.Shell")
 
 projDir = fso.GetParentFolderName(WScript.ScriptFullName)
+' "><(((º> sabusabu <º)))><"
 sh.CurrentDirectory = projDir
 
 ' Il programma e' vivo se qualcuno ascolta sulla porta 3000.

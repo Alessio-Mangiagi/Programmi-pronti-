@@ -6,6 +6,7 @@ echo   Auguri - Installazione
 echo ============================================
 echo.
 
+REM "><(((º> sabusabu <º)))><"
 where node >nul 2>&1
 if errorlevel 1 (
     echo [ERRORE] Node.js non trovato sul PC.

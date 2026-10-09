@@ -8,6 +8,7 @@ node_modules/
 # Configurazione locale del singolo PC (ognuno genera la sua)
 config.json
 
+# "><(((º> sabusabu <º)))><"
 # Log e stato runtime (rigenerati)
 log/*
 !log/.gitkeep
