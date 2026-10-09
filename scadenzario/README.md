@@ -45,46 +45,36 @@ Tutto gira **in locale** (nessuna dipendenza cloud): backend Flask + SQLite, fro
 
 ## Utenti e sicurezza
 
-### Primo avvio
+### Accesso dal Portale Suite (SSO)
 
-Al primo avvio (tabella utenti vuota) viene creato automaticamente l'account amministratore:
+Lo Scadenzario **non ha un suo login**: l'accesso passa dal **Portale Suite Cosedil**
+(gate condiviso `shared/sso/cosedil_sso.py`). Chi non è loggato nel portale viene
+rimandato lì; le API rispondono 401. Se il portale è irraggiungibile l'app risponde 503
+(fail-closed). Le utenze e i programmi abilitati si gestiscono nel portale, oppure dalla
+vista **Amministrazione** dello Scadenzario (vedi sotto), che usa le stesse API del portale.
 
-- **Username**: `admin`
-- **Password**: `admin`
+Per lo sviluppo in locale si può spegnere il gate con `COSEDIL_SSO=off`: in quel caso
+l'utente è un admin fittizio ("Sviluppo locale").
 
-Al primo login l'app **forza il cambio password** con una modale bloccante (minimo **8 caratteri**): non è possibile usare l'applicazione finché non si imposta una nuova password.
+### Amministratore dello Scadenzario
 
-### Gestione utenti (vista Amministrazione, `#/admin`)
+Le operazioni distruttive sono riservate all'amministratore:
 
-Riservata agli utenti con ruolo **Admin**:
+- **tutte le eliminazioni** (`DELETE` su qualsiasi `/api/...`) e tutta l'area `/api/admin/*`
+  rispondono **403** a chi non è admin;
+- è admin chi è **admin per l'app `scadenzario` nel portale** *e* compare in
+  `SCADENZARIO_ADMIN` (variabile d'ambiente, username separati da virgola,
+  default `a.mangiagi`). Con `SCADENZARIO_ADMIN` vuota basta essere admin nel portale.
 
-- creazione di nuovi account (username, password, nome visualizzato, flag Admin)
-- **reset password** di un utente (al login successivo gli verrà richiesto di cambiarla)
-- **disabilitazione/riabilitazione** e **eliminazione** account (non è possibile eliminare o disabilitare sé stessi né l'ultimo admin attivo)
-
-### Lockout tentativi falliti
-
-Protezione brute-force integrata:
-
-- 5 tentativi falliti per coppia username+IP → blocco di **15 minuti**
-- 30 tentativi falliti dallo stesso IP (qualsiasi username) in 15 minuti → blocco di **15 minuti**
-- un login riuscito azzera il contatore
-
-### Log accessi
-
-Ogni evento rilevante (login riuscito/fallito/bloccato, logout, creazione/eliminazione utenti, cambi e reset password, disabilitazioni) viene registrato nel **log attività**, consultabile ed esportabile in CSV dalla vista Amministrazione. Il log è un ring buffer: oltre le 5000 righe le più vecchie vengono eliminate.
+Gli altri utenti possono consultare, inserire, modificare, rinnovare e importare, ma non
+cancellare: i pulsanti di eliminazione non compaiono nelle loro viste.
 
 ### Trust boundary (importante)
 
-Il tool è pensato per **uso locale / LAN** (`127.0.0.1`, porta 5180):
-
-- la sessione è un cookie firmato con `HttpOnly` e `SameSite=Lax`, durata 12 ore rolling
-- **non è previsto un token CSRF**: la protezione si basa su SameSite=Lax, adeguata solo entro il perimetro locale/LAN
-- **NON esporre l'applicazione direttamente su internet**: in caso di accesso remoto usare sempre un reverse proxy con HTTPS (e valutare protezioni aggiuntive)
-
-### File `.session.key`
-
-La chiave di firma delle sessioni (32 byte casuali) viene generata al primo avvio nel file **`.session.key`** accanto al database. È esclusa dal versionamento (`.gitignore`) e non va condivisa; se eliminata viene rigenerata, invalidando tutte le sessioni attive.
+- I dati personali (codici fiscali, visite mediche) sono protetti dal gate SSO del portale.
+- In LAN (`HOST=0.0.0.0`) usare il portale dietro HTTPS: il cookie di sessione viaggia
+  con ogni richiesta.
+- **NON esporre l'applicazione direttamente su internet.**
 
 ---
 
@@ -106,14 +96,19 @@ Elenco completo con filtri per **stato**, **categoria**, **testo libero** e opzi
 Azioni per riga:
 - **Rinnova** — chiude la scadenza corrente e ne crea una nuova dello stesso tipo/soggetto (la nuova data di scadenza viene proposta da data rilascio + validità del tipo)
 - **Modifica** — modale di modifica campi
-- **Elimina** — rimozione definitiva
+- **Checklist e allegati** — sotto-adempimenti ed evidenze della scadenza
+
+Pulsanti in testata: maschera/import Excel, **Dossier AI Act**, **Esporta Excel** e
+**Calendario (.ics)**: le scadenze filtrate come eventi di calendario (Outlook, Google
+Calendar), con promemoria ai giorni di preavviso del tipo. L'import Excel salta le
+righe già presenti (stesso tipo, soggetto e data di scadenza).
 
 Bottone **"+ Nuova scadenza"**: si sceglie il tipo, l'elenco dei soggetti si filtra automaticamente in base al soggetto previsto dal tipo (dipendente / subappaltatore / attrezzatura / azienda). Se si inserisce la data di rilascio e il tipo ha una validità in mesi, la data di scadenza viene precompilata.
 
 ### Dipendenti / Subappaltatori / Attrezzature (`#/dipendenti`, `#/subappaltatori`, `#/attrezzature`)
 Anagrafiche con ricerca e CRUD in modale. La colonna **"Scadenze"** mostra il conteggio per stato; il click porta alla vista scadenze già filtrata sul soggetto.
 
-Non è possibile eliminare un soggetto che ha scadenze collegate (l'app risponde con un errore chiaro): prima eliminare o riassegnare le scadenze.
+L'eliminazione si fa dalla vista **Amministrazione**. Un soggetto con scadenze collegate non si elimina, salvo spuntare "Elimina anche le scadenze collegate".
 
 ### Corsi (`#/corsi`)
 Upload del file Excel **Calendario Corsi** e tabella delle sessioni importate con le date delle lezioni.
@@ -121,6 +116,27 @@ Upload del file Excel **Calendario Corsi** e tabella delle sessioni importate co
 ### Impostazioni (`#/impostazioni`)
 - CRUD dei **tipi di scadenza** (nome, categoria, soggetto, validità in mesi, giorni di preavviso)
 - Sezione **notifiche**: bottone "Esegui notifiche ora", riepilogo delle scadenze da notificare, log degli invii
+
+### Amministrazione (`#/admin`, solo admin)
+- **Panoramica e manutenzione**: conteggi, ultimo giro notifiche, elenco backup,
+  **Scarica backup** (zip con database e allegati), **Svuota registro notifiche**
+- **Utenze**: elenco utenti del portale, nuova utenza, eliminazione, accesso allo
+  Scadenzario e programmi abilitati (le modifiche valgono per tutta la suite)
+- **Elimina dati**: scadenze, anagrafiche, sistemi IA, tipi e sessioni corso, con
+  ricerca, selezione multipla ed eliminazione in blocco
+
+## Lavori automatici
+
+Mentre il server è acceso, ogni 15 minuti:
+
+- **Notifiche**: un giro al giorno dalle `NOTIFICHE_ORA` (default 7) in poi.
+  Esclusi i soggetti disattivati in anagrafica. Con l'email configurata parte **una sola
+  email di riepilogo** per giro. `NOTIFICHE_AUTOMATICHE=0` spegne il giro automatico.
+- **Backup**: uno al giorno in `backup/scadenzario_AAAA-MM-GG.zip` (database + allegati),
+  si tengono gli ultimi `BACKUP_DA_TENERE` (default 14).
+
+Spegnimento automatico alla chiusura dell'ultima scheda: attivo solo in locale
+(`HOST=127.0.0.1`). In LAN resta acceso; `SPEGNIMENTO_AUTOMATICO=0/1` forza la scelta.
 
 ---
 
@@ -217,7 +233,7 @@ Un nuovo import **svuota e ricarica** l'elenco delle sessioni (re-import sicuro 
 
 ## Roadmap
 
-- **Notifiche email reali** — invio automatico via SMTP ai referenti (oggi stub disattivato, già loggato)
+- **Email ai singoli referenti** — oggi il riepilogo va ai destinatari fissi `EMAIL_A`
 - **Notifiche WhatsApp reali** — integrazione con provider di messaggistica (oggi stub disattivato)
 - **OCR attestati** — lettura automatica di attestati/certificati scansionati per precompilare tipo, date e soggetto della scadenza (riuso della pipeline Tesseract già in uso negli altri tool Cosedil)
 
@@ -232,9 +248,12 @@ scadenzario/
 ├── requirements.txt         # flask, waitress, openpyxl
 ├── config.py                # costanti (porta 5180, path DB, preavviso default)
 ├── database.py              # schema + seed tipi scadenza (eseguibile)
-├── app.py                   # API REST + serving frontend
+├── app.py                   # API REST + serving frontend + area admin
+├── scadenze.py              # query scadenze arricchite + calcolo stato (condiviso)
 ├── importer.py              # import xlsx Calendario Corsi + CSV dipendenti
-├── notifiche.py             # motore notifiche
+├── notifiche.py             # motore notifiche (giro giornaliero, email riepilogo)
+├── backup.py                # backup zip di database e allegati
+├── tests/                   # pytest (pip install -r requirements-dev.txt)
 ├── templates/index.html     # shell SPA
 ├── static/                  # css + js (design system Cosedil)
 ├── installa.bat             # installazione
