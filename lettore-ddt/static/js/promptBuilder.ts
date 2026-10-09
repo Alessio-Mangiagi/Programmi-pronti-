@@ -59,6 +59,7 @@ export const SEMPLICI_DEFAULT: ParametriSemplici = {
   documento: 'DDT inerti',
   campi: [
     'Fornitore',
+    'P.IVA Fornitore',
     'Data',
     'N°DDT',
     'Descrizione materiale',
@@ -85,7 +86,7 @@ export const PARAMETRI_DEFAULT: ParametriPrompt = {
     'descrizione materiale',
     'orari carico/scarico',
     'destinazione/WBS',
-    'fornitore',
+    'fornitore e sua P.IVA',
   ],
   note: '',
   pulisciPagine: false,
@@ -98,6 +99,7 @@ export const PARAMETRI_DEFAULT: ParametriPrompt = {
     descrizione: 'una riga per DDT',
     colonne: [
       'Fornitore',
+      'P.IVA Fornitore',
       'Data',
       'N°DDT',
       'Descrizione',
