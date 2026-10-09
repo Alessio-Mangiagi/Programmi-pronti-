@@ -1,7 +1,8 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Scadenzario Cantiere — SPEC v1
 
 Webapp locale Cosedil per tracciare e notificare scadenze normative: formazione sicurezza (D.Lgs 81/08), visite mediche, patentini/abilitazioni, DURC subappaltatori, verifiche attrezzature, polizze/certificazioni aziendali.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Questo file è il **contratto vincolante** tra backend, frontend e moduli: nomi di campi, endpoint e firme NON vanno cambiati senza aggiornare la SPEC.
 

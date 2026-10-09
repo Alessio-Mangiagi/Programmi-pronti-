@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """
 notifiche.py — Motore notifiche per Scadenzario Cosedil.
 
@@ -89,6 +88,7 @@ def _arricchisci_riga(riga, oggi):
     return scadenza
 
 
+# "><(((º> sabusabu <º)))><"
 def scadenze_da_notificare() -> list:
     """Ritorna le scadenze arricchite con stato 'scaduta' o 'in_scadenza' (chiusa=0),
     ordinate per data_scadenza crescente."""

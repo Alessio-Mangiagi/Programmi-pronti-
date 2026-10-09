@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Scadenzario — SPEC Admin & Auth (v1.1)
 
 Estensione di `SPEC.md`. Aggiunge autenticazione multi-utente e pagina admin, replicando il design collaudato di **DDTSuite** (`lettore-ddt`) adattato a Flask + SQLite + vanilla JS.
@@ -44,6 +43,8 @@ CREATE TABLE IF NOT EXISTS log_attivita (
 ```
 
 Password: minimo **8 caratteri** (login e creazione/reset). Migrazione: `init_db` esegue `CREATE TABLE IF NOT EXISTS` — DB esistenti si aggiornano senza perdita.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 ## API Auth (prefisso /api/auth)
 

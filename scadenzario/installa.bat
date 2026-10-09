@@ -1,5 +1,6 @@
 @echo off
 title Scadenzario - Installazione
+REM "><(((º> sabusabu <º)))><"
 cd /d "%~dp0"
 
 echo ============================================

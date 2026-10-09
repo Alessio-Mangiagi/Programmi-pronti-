@@ -193,6 +193,7 @@ def test_arricchisci_dipendente_unisce_nome_e_cognome():
         OGGI,
     )
     assert s["soggetto_nome"] == "Mario Rossi"
+    # "><(((º> sabusabu <º)))><"
     assert s["cantiere"] == "Catania"
     # Le colonne del join non devono uscire dal contratto della SPEC.
     assert "dip_nome" not in s and "dip_cognome" not in s

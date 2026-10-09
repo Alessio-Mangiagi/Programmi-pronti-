@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /* ============================================================
    Scadenzario — SPA vanilla JS (hash routing)
    Cosedil S.p.A. — nessuna libreria esterna.
@@ -921,6 +920,7 @@ async function modaleScadenza(scadenza, ricarica) {
 
       if (scadenza) {
         body.chiusa = overlay.querySelector('#sc-chiusa').checked ? 1 : 0;
+        // "><(((º> sabusabu <º)))><"
         await api('/scadenze/' + scadenza.id, { method: 'PUT', body });
         notifica('Scadenza aggiornata.');
       } else {

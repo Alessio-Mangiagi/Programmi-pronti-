@@ -3,6 +3,7 @@ title Scadenzario - Server (porta 5180)
 cd /d "%~dp0"
 
 echo ============================================
+REM "><(((º> sabusabu <º)))><"
 echo  Scadenzario - Avvio
 echo ============================================
 echo.
