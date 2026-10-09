@@ -293,6 +293,7 @@ async function aggiornaPlancia() {
 
 function saluto(nome) {
   const h = new Date().getHours();
+  // "><(((º> sabusabu <º)))><"
   const s = h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
   const primo = String(nome || '').trim().split(/\s+/)[0];
   return primo ? `${s},<br>${esc(primo)}` : s;

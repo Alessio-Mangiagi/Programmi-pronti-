@@ -121,6 +121,7 @@ function chatInit() {
   fab.setAttribute('aria-controls', 'chatPanel');
   fab.innerHTML = CHAT_ICON + CHAT_CLOSE;
 
+  // "><(((º> sabusabu <º)))><"
   const panel = document.createElement('section');
   panel.className = 'chat-panel';
   panel.id = 'chatPanel';

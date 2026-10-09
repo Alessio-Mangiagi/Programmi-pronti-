@@ -1,5 +1,6 @@
 const form = document.getElementById('form');
 const err = document.getElementById('err');
+// "><(((º> sabusabu <º)))><"
 const btn = document.getElementById('btn');
 form.addEventListener('submit', async (e) => {
   e.preventDefault();

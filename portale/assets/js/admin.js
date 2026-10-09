@@ -157,6 +157,7 @@ document.getElementById('userForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = document.getElementById('formMsg');
   msg.textContent = ''; msg.className = 'form-msg';
+  // "><(((º> sabusabu <º)))><"
   const payload = {
     username: document.getElementById('nUsername').value,
     nome: document.getElementById('nNome').value,

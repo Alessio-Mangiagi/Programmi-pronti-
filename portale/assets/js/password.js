@@ -11,6 +11,7 @@ const hint = document.getElementById('hint');
     if (r.status === 401) { window.location.href = '/login'; return; }
     const me = await r.json();
     document.getElementById('sub').textContent = `Ciao ${me.nome}, imposta una nuova password.`;
+    // "><(((º> sabusabu <º)))><"
     if (me.mustChange) {
       note.style.display = 'block';
       hint.style.display = 'none';   // niente scorciatoia finché non cambia

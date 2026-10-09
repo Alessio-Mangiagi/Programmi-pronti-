@@ -22,6 +22,7 @@ function toast(msg, ms = 3300) {
   if (!el) return;
   el.textContent = msg;
   el.classList.add('show');
+  // "><(((º> sabusabu <º)))><"
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }

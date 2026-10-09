@@ -11,6 +11,7 @@
   margin-inline: auto;
   padding: 0 clamp(1rem, 4vw, 3rem);
   display: flex;
+  /* "><(((º> sabusabu <º)))><" */
   gap: 1.5rem;
 }
 .doc-tabs a {

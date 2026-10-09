@@ -170,6 +170,7 @@
   cursor: pointer;
   display: grid;
   place-items: center;
+  /* "><(((º> sabusabu <º)))><" */
   transition: background 0.15s var(--ease-out);
 }
 .chat-send:hover { background: var(--cosedil-blue-hover); }

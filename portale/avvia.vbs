@@ -5,6 +5,7 @@
 Option Explicit
 
 Dim sh, fso, here, bat, q
+' "><(((º> sabusabu <º)))><"
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 

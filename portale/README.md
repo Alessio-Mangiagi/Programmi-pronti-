@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Portale Suite Cosedil
 
 Portale locale che riunisce in un unico accesso le applicazioni della suite Cosedil: **login** utenti, **avvio** e **apertura** dei programmi, **registro degli accessi** e area di **amministrazione**. Scritto in Node.js **senza dipendenze esterne** (solo moduli core).
@@ -130,6 +129,8 @@ Oppure con la variabile `WARM_APPS`. Attenzione al consumo di RAM/VRAM: attivarl
 Quando avvia un'app, il portale non le passa il proprio `PATH` così com'è: lo **rilegge dal registro** (chiave macchina + chiave utente) e ci accoda quello del processo. Su Windows un processo eredita l'ambiente di chi lo ha creato, e il portale su un server resta acceso per giorni o settimane: senza questa rilettura, un programma installato nel frattempo — Tesseract, poppler, Node aggiornato — resterebbe invisibile alle app fino al riavvio della macchina, con errori del tipo *"pdftoppm non trovato"* pur avendolo appena installato.
 
 La funzione è `pathDalRegistro()` in `server.js`; fuori da Windows restituisce il `PATH` così com'è.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 ## Struttura
 

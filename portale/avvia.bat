@@ -16,6 +16,7 @@ echo  Chiudi questa finestra (o esegui ferma.vbs) per fermare il portale.
 echo.
 
 if not exist "%~dp0data" mkdir "%~dp0data"
+REM "><(((º> sabusabu <º)))><"
 rem Rimuove un eventuale flag di stop rimasto da una chiusura precedente.
 del "%~dp0data\stop.flag" >nul 2>&1
 
