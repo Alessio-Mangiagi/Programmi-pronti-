@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# "><(((º> sabusabu <º)))><"
 """
 Installer interattivo della suite Cosedil.
 
@@ -80,10 +81,14 @@ def output_di(cmd: str, cwd: Path | None = None) -> str:
 def versione_node() -> str:
     return output_di("node --version")           # es. "v24.15.0", "" se assente
 
-def node_ok() -> bool:
+# Minimo comune: "engines" di tutte le app è >=20. L'agente chiede di più (24,
+# per node:sqlite senza flag) e lo dichiara da sé in richiedi_node().
+NODE_MIN = 20
+
+def node_ok(minimo: int = NODE_MIN) -> bool:
     v = versione_node()
     try:
-        return int(v.lstrip("v").split(".")[0]) >= 18
+        return int(v.lstrip("v").split(".")[0]) >= minimo
     except (ValueError, IndexError):
         return False
 
@@ -111,6 +116,15 @@ def gpu_nvidia() -> bool:
 # ---------------------------------------------------------------------------
 
 def npm_install(d: Path, fallback_legacy: bool = True) -> None:
+    # Con il lock si usa npm ci: installa esattamente le versioni collaudate in
+    # CI e non riscrive package-lock.json (npm install lo aggiornava in silenzio,
+    # e ogni PC dell'ufficio finiva con un albero diverso).
+    if (d / "package-lock.json").exists():
+        try:
+            run("npm ci --no-audit --no-fund", cwd=d)
+            return
+        except RuntimeError:
+            say("    npm ci fallito (lock non allineato a package.json?), ripiego su npm install")
     try:
         run("npm install --no-audit --no-fund", cwd=d)
     except RuntimeError:
@@ -132,9 +146,9 @@ def crea_venv(d: Path, req: str = "requirements.txt", nome: str = ".venv") -> Pa
         run(f'"{vpy}" -m pip install -r {req}', cwd=d)
     return vpy
 
-def richiedi_node(app: str) -> None:
-    if not node_ok():
-        raise RuntimeError(f"{app} richiede Node.js >= 18 ({versione_node() or 'assente'}). "
+def richiedi_node(app: str, minimo: int = NODE_MIN) -> None:
+    if not node_ok(minimo):
+        raise RuntimeError(f"{app} richiede Node.js >= {minimo} ({versione_node() or 'assente'}). "
                            "Installa da https://nodejs.org e rilancia.")
 
 # ---------------------------------------------------------------------------
@@ -161,7 +175,7 @@ def installa_ddt(d: Path) -> str:
     return "dipendenze + build (dist/server.js). Porta 5050"
 
 def installa_agente(d: Path) -> str:
-    richiedi_node("L'agente")
+    richiedi_node("L'agente", 24)                       # engines >=24: node:sqlite
     npm_install(d)
     envf = d / ".env"
     if not envf.exists() and (d / ".env.example").exists() and not DRY:
@@ -227,6 +241,15 @@ def installa_auguri(d: Path) -> str:
         run('powershell -NoProfile -ExecutionPolicy Bypass -File "installa-avvio-automatico.ps1"', cwd=d)
     return "dipendenze installate (Chromium incluso). Porta 3000; primo avvio: scansione QR WhatsApp"
 
+def installa_trimble(d: Path) -> str:
+    richiedi_node("Il traduttore Trimble")
+    npm_install(d)
+    envf = d / ".env"
+    if not envf.exists() and (d / ".env.example").exists() and not DRY:
+        shutil.copyfile(d / ".env.example", envf)       # come avvia.bat
+        say("    creato .env da .env.example: le credenziali Trimble vanno compilate a mano")
+    return "dipendenze installate. Porta 3011; credenziali Trimble nel .env"
+
 def installa_credenziali(d: Path) -> str:
     bat = ROOT / "installa-credenziali.bat"
     if not bat.exists():
@@ -244,6 +267,7 @@ APPS = [
     ("scadenzario", "Scadenzario Compliance (porta 5180)",          "scadenzario-compliance",     installa_scadenzario),
     ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)", "verifica-requisiti",  installa_verifica),
     ("auguri",      "Auguri WhatsApp (porta 3000)",                 "whatss'app_web_Compleanni",  installa_auguri),
+    ("trimble",     "Traduttore PCQ/economie per Trimble (porta 3011)", "auto scan pcq econ traduttore da api trimble", installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)", ".",                   installa_credenziali),
 ]
 
@@ -253,7 +277,7 @@ APPS = [
 
 def stampa_prerequisiti() -> None:
     v = versione_node()
-    say(f"  Node.js:   {v + (' OK' if node_ok() else ' TROPPO VECCHIO (serve >=18)') if v else 'ASSENTE (serve per portale/ddt/agente/ocr/requisiti/auguri)'}")
+    say(f"  Node.js:   {v + (' OK' if node_ok() else f' TROPPO VECCHIO (serve >={NODE_MIN}, agente >=24)') if v else 'ASSENTE (serve per portale/ddt/agente/ocr/requisiti/auguri/trimble)'}")
     py = python_sistema()
     say(f"  Python:    {output_di(py + ' --version') + ' OK' if py else 'ASSENTE 3.10+ (serve per confronta/scadenzario/ocr)'}")
     say(f"  Ollama:    {'OK' if ha('ollama') else 'assente (serve a ocr; usato da agente)'}")
