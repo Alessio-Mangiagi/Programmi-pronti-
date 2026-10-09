@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -782,14 +783,25 @@ io.on('connection', (socket) => {
     logBuffer.forEach(r => socket.emit('log', r));
 
     socket.on('invia', async () => {
-        const res = await inviaAuguri();
-        if (res.ok) {
-            // Segna la giornata anche per l'invio a mano: altrimenti il
-            // ricontrollo periodico ripartirebbe e li manderebbe una seconda volta.
-            segnaInviatoOggi();
-            annullaRitenti();
+        // Stesso lucchetto dell'invio automatico: un clic mentre quello e' in
+        // corso mandava il messaggio due volte nel gruppo.
+        if (invioInCorso) {
+            socket.emit('risultatoInvio', { ok: false, msg: 'Invio gia\' in corso, riprova tra poco' });
+            return;
         }
-        socket.emit('risultatoInvio', res);
+        invioInCorso = true;
+        try {
+            const res = await inviaAuguri();
+            if (res.ok) {
+                // Segna la giornata anche per l'invio a mano: altrimenti il
+                // ricontrollo periodico ripartirebbe e li manderebbe una seconda volta.
+                segnaInviatoOggi();
+                annullaRitenti();
+            }
+            socket.emit('risultatoInvio', res);
+        } finally {
+            invioInCorso = false;
+        }
     });
 
     socket.on('ricarica', async () => {
