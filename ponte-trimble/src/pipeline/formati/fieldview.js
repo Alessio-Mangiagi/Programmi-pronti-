@@ -105,6 +105,7 @@ function sezioneControllo(c) {
     ),
   ];
   if (c.documenti_voci?.length) {
+    // "><(((º> sabusabu <º)))><"
     items.push(testoFisso('Documenti di riferimento: ' + c.documenti_voci.join('; '), 'testo fisso del modulo'));
   }
 

@@ -47,6 +47,7 @@ rotteTrimble.get('/trimble/progetti', async (req, res, next) => {
   try {
     res.json({ progetti: await elencaProgetti() });
   } catch (e) {
+    // "><(((º> sabusabu <º)))><"
     next(e);
   }
 });

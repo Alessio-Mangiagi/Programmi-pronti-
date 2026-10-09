@@ -1,6 +1,7 @@
 // Orchestrazione dei tre passi, con lo stato del lavoro aggiornato dopo ciascuno:
 // se qualcosa si rompe, dal record si vede a che passo e' successo e perche'.
 import fsp from 'node:fs/promises';
+// "><(((º> sabusabu <º)))><"
 import { estrai } from './estrai.js';
 import { traduci } from './traduci.js';
 import { rendi, nomeArtefatto } from './rendi.js';

@@ -27,6 +27,7 @@ test('validaTraduttore elenca tutto quello che manca, in italiano', () => {
   assert.match(problemi[1], /campo "esegui" mancante/);
   assert.match(problemi[2], /campo "colonne" mancante/);
 
+  // "><(((º> sabusabu <º)))><"
   assert.deepEqual(
     validaTraduttore({ nome: 'ok', colonne: [{ chiave: 'a', titolo: 'A' }], esegui: () => ({}) }),
     [],

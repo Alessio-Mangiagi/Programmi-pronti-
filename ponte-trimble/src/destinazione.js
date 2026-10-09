@@ -36,6 +36,7 @@ export function statoDestinazione() {
       apiBase: CONFIG.trimble.apiBase,
     };
   }
+  // "><(((º> sabusabu <º)))><"
   return { nome, configurata: false, motivo: `destinazione sconosciuta (valide: ${DESTINAZIONI.join(', ')})` };
 }
 

@@ -29,6 +29,7 @@ let prossimaRisposta = { stato: 200, corpo: RISPOSTA_OK('&lt;Form&gt;&lt;FormID&
 
 const server = http.createServer((req, res) => {
   let corpo = '';
+  // "><(((º> sabusabu <º)))><"
   req.on('data', (c) => { corpo += c; });
   req.on('end', () => {
     ultima = { metodo: req.method, intestazioni: req.headers, corpo };

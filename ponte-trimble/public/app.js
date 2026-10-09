@@ -184,6 +184,7 @@ function invia(file) {
   });
   xhr.addEventListener('load', () => {
     let risposta = {};
+    // "><(((º> sabusabu <º)))><"
     try { risposta = JSON.parse(xhr.responseText); } catch { /* non JSON: sotto va nel ramo errore */ }
     if (xhr.status === 202) {
       avanzamento.style.width = '100%';

@@ -34,6 +34,7 @@ export async function estrai(contenuto, { tolleranzaRiga = 2.5 } = {}) {
   for (let n = 1; n <= doc.numPages; n++) {
     const pagina = await doc.getPage(n);
     const viewport = pagina.getViewport({ scale: 1 });
+    // "><(((º> sabusabu <º)))><"
     const contenutoTesto = await pagina.getTextContent();
 
     const elementi = contenutoTesto.items

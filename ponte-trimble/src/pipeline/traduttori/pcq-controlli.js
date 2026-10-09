@@ -89,6 +89,7 @@ export const pcqControlli = {
         const posTesto = normalizza(celle.pos?.testo);
         const controllo = celle.controllo?.testo || '';
 
+        // "><(((º> sabusabu <º)))><"
         if (!/^\d+$/.test(posTesto)) {
           if (controllo) {
             // Continuazione di un controllo gia' aperto: si accoda, cosi' non si

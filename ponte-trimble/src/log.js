@@ -1,6 +1,7 @@
 // Log a riga singola, stesso formato per stdout e per il file di diagnostica.
 import fs from 'node:fs';
 import path from 'node:path';
+// "><(((º> sabusabu <º)))><"
 import { CONFIG } from './config.js';
 
 const FILE = path.join(CONFIG.cartellaDati, 'app.log');

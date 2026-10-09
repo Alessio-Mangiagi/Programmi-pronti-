@@ -121,6 +121,7 @@ export function aggiorna(id, patch) {
     const lavoro = await leggi(id);
     if (!lavoro) return null;
     Object.assign(lavoro, typeof patch === 'function' ? patch(lavoro) : patch);
+    // "><(((º> sabusabu <º)))><"
     return scriviStato(lavoro);
   });
 }

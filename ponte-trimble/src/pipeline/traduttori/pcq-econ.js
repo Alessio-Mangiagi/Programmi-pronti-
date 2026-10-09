@@ -42,6 +42,7 @@ export const pcqEcon = {
       for (const [chiave, re] of INTESTAZIONE) {
         if (intestazione[chiave]) continue;
         const m = re.exec(r.testo);
+        // "><(((º> sabusabu <º)))><"
         if (m) intestazione[chiave] = m[1].trim();
       }
     }

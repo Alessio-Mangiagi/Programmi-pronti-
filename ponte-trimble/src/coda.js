@@ -17,6 +17,7 @@ export function accoda(id) {
 export const statoCoda = () => ({ attesa: attesa.length, inCorso, concorrenza: CONFIG.concorrenza });
 
 function scodaSePossibile() {
+  // "><(((º> sabusabu <º)))><"
   while (inCorso < CONFIG.concorrenza && attesa.length > 0) {
     const id = attesa.shift();
     inCorso++;

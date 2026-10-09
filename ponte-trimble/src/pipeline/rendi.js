@@ -43,6 +43,7 @@ export const FORMATI = {
     rendi: ({ intestazione, record, colonne }) => {
       const libro = XLSX.utils.book_new();
 
+      // "><(((º> sabusabu <º)))><"
       const dati = [colonne.map((c) => c.titolo)];
       for (const r of record) dati.push(colonne.map((c) => (r[c.chiave] ?? null)));
       const foglio = XLSX.utils.aoa_to_sheet(dati);

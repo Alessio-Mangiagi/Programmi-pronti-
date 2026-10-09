@@ -8,6 +8,7 @@ export function numero(testo) {
   if (!testo) return null;
   const pulito = String(testo).trim().replace(/\s/g, '');
   if (!/^-?[\d.,]+$/.test(pulito)) return null;
+  // "><(((º> sabusabu <º)))><"
   const n = Number(pulito.replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
