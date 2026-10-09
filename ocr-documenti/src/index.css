@@ -353,3 +353,21 @@ select:focus-visible,
 .docx-preview h1 { font-size: 1.4em; margin: 16px 0 8px; border-bottom: 2px solid #0c4577; padding-bottom: 6px; color: #0c4577; font-family: "Ubuntu", Arial, sans-serif; font-weight: 500; }
 .docx-preview h2 { font-size: 1.15em; margin: 14px 0 6px; color: #0c4577; font-family: "Ubuntu", Arial, sans-serif; font-weight: 500; }
 .docx-preview ul, .docx-preview ol { padding-left: 20px; margin: 6px 0; }
+
+/* ── Telefono ──
+   Su desktop è un'app a tutto schermo: area centrale + pannello del risultato
+   (560px) + barra delle impostazioni (500px) affiancati, e la pagina non scorre.
+   Sul telefono i tre blocchi si impilano e scorre la pagina. Gli stili sono
+   inline in App.tsx: per sovrascriverli serve !important (classi ocr-*). */
+@media (max-width: 760px) {
+  html, body, #root { height: auto; overflow: auto; }
+  .ocr-app { height: auto !important; min-height: 100dvh; }
+  .ocr-header { flex-wrap: wrap !important; padding: 10px 14px !important; gap: 8px 12px !important; }
+  .ocr-header-info { display: none !important; }
+  .ocr-header-azioni { margin-left: 0 !important; flex-wrap: wrap; }
+  .ocr-header-azioni > * { min-height: 34px; }
+  .ocr-corpo { flex-direction: column !important; overflow: visible !important; }
+  .ocr-pannello { order: -2; width: auto !important; border-left: 0 !important; border-bottom: 1px solid var(--c-border); min-height: 70vh; }
+  .ocr-impostazioni { order: -1; width: auto !important; border-left: 0 !important; border-bottom: 1px solid var(--c-border); overflow: visible !important; padding: 16px 14px 18px !important; }
+  .ocr-centro { overflow: visible !important; padding: 14px !important; }
+}

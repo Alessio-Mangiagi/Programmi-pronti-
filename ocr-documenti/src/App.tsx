@@ -2049,10 +2049,10 @@ export default function App() {
     : (viewDoc ? 'doc' : 'raw')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text, fontFamily: FONT, fontSize: 14 }}>
+    <div className="ocr-app" style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text, fontFamily: FONT, fontSize: 14 }}>
 
       {/* ── Header ── */}
-      <header style={{ padding: '10px 20px', background: C.accent, borderBottom: `2px solid ${C.blue}`, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }}>
+      <header className="ocr-header" style={{ padding: '10px 20px', background: C.accent, borderBottom: `2px solid ${C.blue}`, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 17, color: '#ffffff', fontFamily: FONT_HEAD }}>
           <IconMark size={19} />
           <span style={{ fontWeight: 700, letterSpacing: '0.02em' }}>COSEDIL</span>
@@ -2067,10 +2067,10 @@ export default function App() {
             CLAUDE
           </button>
         </div>
-        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: '0.04em', borderLeft: '1px solid rgba(255,255,255,0.25)', paddingLeft: 14 }}>
+        <span className="ocr-header-info" style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: '0.04em', borderLeft: '1px solid rgba(255,255,255,0.25)', paddingLeft: 14 }}>
           {pagina === 'claude' ? 'Estrazione con Claude · claude.ai' : 'PaddleOCR + assist Ollama · locale'}
         </span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', fontSize: 11.5 }}>
+        <div className="ocr-header-azioni" style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', fontSize: 11.5 }}>
           <button
             onClick={() => setDocModal('readme')}
             title="Note tecniche (README)"
@@ -2220,13 +2220,14 @@ export default function App() {
           Tutta l'area accetta il trascinamento; in elaborazione no, perché aggiungere
           un file cambia il file attivo sotto una scansione in corso. */}
       <div
+        className="ocr-corpo"
         style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
         onDrop={e => { if (loading) { e.preventDefault(); setIsDragging(false) } else handleDrop(e) }}
         onDragOver={e => { e.preventDefault(); if (!loading) setIsDragging(true) }}
         onDragLeave={() => setIsDragging(false)}
       >
         {!pannelloLargo && (
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 12, overflow: 'auto', outline: isDragging ? `2px dashed ${C.blue}` : 'none', outlineOffset: -6 }}>
+          <div className="ocr-centro" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 12, overflow: 'auto', outline: isDragging ? `2px dashed ${C.blue}` : 'none', outlineOffset: -6 }}>
             {sessionePrecedente && queue.length === 0 && (() => {
               const n = sessionePrecedente.voci.length
               const fatti = sessionePrecedente.voci.filter(v => v.result).length
@@ -2498,7 +2499,7 @@ export default function App() {
 
         {/* ── Pannello del risultato: il file selezionato ── */}
         {activeIdx >= 0 && file && (
-          <div style={{ width: pannelloLargo ? '100%' : 560, flexShrink: 0, background: C.panel, borderLeft: pannelloLargo ? 'none' : `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          <div className="ocr-pannello" style={{ width: pannelloLargo ? '100%' : 560, flexShrink: 0, background: C.panel, borderLeft: pannelloLargo ? 'none' : `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
             <div style={{ height: 40, padding: '0 10px 0 14px', background: C.header, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               {pannelloLargo && (
                 <button onClick={() => setPannelloLargo(false)} title="Torna alla coda" style={{ ...bottone('silenzioso', C.accent), width: 'auto', padding: '3px 8px' }}>
@@ -3267,7 +3268,7 @@ export default function App() {
             Le impostazioni valgono per tutta la coda (o per i file spuntati). Sparisce
             col pannello a tutta larghezza, che serve alla tabella di modifica. */}
         {!pannelloLargo && (
-          <aside aria-label="Impostazioni di estrazione" style={{ width: 500, flexShrink: 0, background: C.panel, borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 24, padding: '20px 20px 22px', overflow: 'auto' }}>
+          <aside className="ocr-impostazioni" aria-label="Impostazioni di estrazione" style={{ width: 500, flexShrink: 0, background: C.panel, borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 24, padding: '20px 20px 22px', overflow: 'auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ ...etichettaSezione, fontSize: 12 }}>Documenti</span>
               <button
