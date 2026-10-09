@@ -1049,3 +1049,19 @@ input[type="checkbox"] {
   .testata-utente { margin-left: 8px; padding-left: 8px; font-size: 12px; }
   .adm-numeri { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Selettore allegati nella modale scadenza */
+.campo input[type="file"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed var(--cosedil-border);
+  border-radius: 6px;
+  background: var(--cosedil-header);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.campo input[type="file"]:focus-visible { outline: 2px solid var(--cosedil-blue); outline-offset: -1px; }
+#sc-allegati-elenco { margin: 8px 0 0; }
+#sc-allegati-elenco:empty { display: none; }
+#sc-allegati-elenco li > span:first-of-type { flex: 1; word-break: break-all; }
