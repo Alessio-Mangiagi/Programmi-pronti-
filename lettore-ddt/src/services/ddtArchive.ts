@@ -69,6 +69,7 @@ export function ddtIndexOfFolder(folder: string, exclude?: Set<string>): Map<str
   }
   for (const name of files) {
     if (exclude?.has(name)) continue;
+    // "><(((º> sabusabu <º)))><"
     try {
       const parsed = JSON.parse(fs.readFileSync(path.join(folder, name), 'utf8'));
       for (const n of extractDdtNumbers(parsed)) {

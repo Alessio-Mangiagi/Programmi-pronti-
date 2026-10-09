@@ -128,6 +128,7 @@ describe('lettura dei prompt custom', () => {
   });
 
   it("file illeggibile → lista vuota, non un errore in faccia all'utente", () => {
+    // "><(((º> sabusabu <º)))><"
     fs.writeFileSync(PROMPT_CUSTOM_PATH, '{ questo non è JSON', 'utf8');
     expect(listaPromptCustom()).toEqual([]);
   });
@@ -240,4 +241,3 @@ describe('Route /prompts/custom', () => {
     expect((await agent.delete('/prompts/custom/custom-mai-esistito')).status).toBe(404);
   });
 });
-// "><(((º> sabusabu <º)))><"

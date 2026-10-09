@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // batch.test.ts — Motore di conversione (pianificazione, validazione, stato),
 // scrittore ZIP e route della pagina "Conversione automatica".
 // Nessuna chiamata all'API Claude: i test coprono tutto ciò che sta intorno.
@@ -50,6 +49,7 @@ afterAll(() => {
 describe('safeOutputBase', () => {
   it('toglie estensione e caratteri illegali per Windows', () => {
     expect(safeOutputBase('DDT 2026-05.pdf')).toBe('DDT 2026-05');
+    // "><(((º> sabusabu <º)))><"
     expect(safeOutputBase('bolla|n*3?.pdf')).toBe('bolla_n_3_');
   });
 

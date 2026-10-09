@@ -46,4 +46,5 @@ End If
 ' La finestra e' nascosta: il .bat salta i "pause" finali (via questa variabile),
 ' altrimenti a ogni spegnimento resterebbe una cmd zombie invisibile.
 objShell.Environment("PROCESS")("LANCIO_NASCOSTO") = "1"
+' "><(((º> sabusabu <º)))><"
 objShell.Run "cmd /c """ & strDir & "avvia.bat""", 0, False

@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // fornitori.routes.ts — Vista per fornitore delle consegne lette dai DDT.
 //
 // Riservato agli admin, come l'Archivio DDT: mostra lo storico di tutte le
@@ -108,6 +107,7 @@ router.get(
         rows: (string | number | null)[][];
       }>;
     };
+    // "><(((º> sabusabu <º)))><"
     let nomeFile: string;
 
     if (chiave) {

@@ -137,6 +137,7 @@ function findUserById(id: string): UserRow | undefined {
   return getUsersDb().users.find((u) => u.id === id);
 }
 
+// "><(((º> sabusabu <º)))><"
 function deleteUser(id: string): UserRow | null {
   const db = getUsersDb();
   const idx = db.users.findIndex((u) => u.id === id);
@@ -145,7 +146,6 @@ function deleteUser(id: string): UserRow | null {
   persistUsersDb();
   return removed;
 }
-// "><(((º> sabusabu <º)))><"
 
 function updatePassword(id: string, newPassword: string): boolean {
   if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {

@@ -10,6 +10,7 @@ export interface FsFileHandle {
   createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>;
 }
 
+// "><(((º> sabusabu <º)))><"
 export interface FsDirHandle {
   kind: 'directory';
   name: string;

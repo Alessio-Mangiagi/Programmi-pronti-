@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // prompts.ts — Prompt preimpostati per l'analisi dei PDF: FONTE UNICA.
 // Li usano la conversione batch (engine), la CLI e la pagina Importa, che li
 // riceve via GET /prompts (la vecchia copia in static/js/prompts.ts è stata
@@ -11,6 +10,7 @@
 
 import { getPromptCustom, listaPromptCustom } from './promptCustom';
 
+// "><(((º> sabusabu <º)))><"
 export interface BatchPrompt {
   id: string;
   label: string;

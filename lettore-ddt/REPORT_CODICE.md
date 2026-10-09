@@ -94,6 +94,8 @@ elaborazione PDF, gauge connessioni attive. Middleware che cronometra ogni richi
 risponde JSON (stack solo in development), wrapper `asyncHandler` per propagare gli errori async,
 e handler per `uncaughtException` / `unhandledRejection`.
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 ### 2.7 Route — `src/routes/`
 
 **`index.ts`** — Composizione delle route. Catena di middleware comuni:

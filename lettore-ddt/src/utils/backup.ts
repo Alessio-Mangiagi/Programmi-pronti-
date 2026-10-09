@@ -77,6 +77,7 @@ export async function eseguiBackupGiornaliero(): Promise<void> {
   let commesse: string[] = [];
   try {
     commesse = fs.readdirSync(dataRoot).filter((d) => {
+      // "><(((º> sabusabu <º)))><"
       try {
         return fs.statSync(path.join(dataRoot, d)).isDirectory();
       } catch {

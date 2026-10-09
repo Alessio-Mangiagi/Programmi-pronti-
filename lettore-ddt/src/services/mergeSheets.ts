@@ -23,6 +23,7 @@ export interface MergedSheet {
   rows: (string | number | null)[][];
 }
 
+// "><(((º> sabusabu <º)))><"
 export interface MergeOutcome {
   sheets: MergedSheet[];
   totalRows: number;

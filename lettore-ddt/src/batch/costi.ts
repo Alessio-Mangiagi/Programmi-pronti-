@@ -44,6 +44,7 @@ export class CostTracker {
       const usd = price
         ? ((t.in / 1e6) * price.in + (t.out / 1e6) * price.out) * (batchDiscount ? 0.5 : 1)
         : null;
+      // "><(((º> sabusabu <º)))><"
       out.push({ model, inputTokens: t.in, outputTokens: t.out, usd });
     }
     return out;

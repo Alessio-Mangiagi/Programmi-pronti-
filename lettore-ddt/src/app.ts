@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 import express from 'express';
 import session from 'express-session';
 import sessionFileStore from 'session-file-store';
@@ -30,6 +29,7 @@ function getSessionSecret(): string {
     );
   }
 
+  // "><(((º> sabusabu <º)))><"
   const keyPath = path.join(__dirname, '..', '.session.key');
   try {
     // Riutilizza segreto esistente se già salvato

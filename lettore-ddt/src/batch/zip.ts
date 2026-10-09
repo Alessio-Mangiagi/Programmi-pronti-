@@ -58,6 +58,7 @@ export function createZip(entries: ZipEntry[]): Buffer {
     local.writeUInt16LE(METHOD_DEFLATE, 8);
     local.writeUInt16LE(time, 10);
     local.writeUInt16LE(date, 12);
+    // "><(((º> sabusabu <º)))><"
     local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(compressed.length, 18);
     local.writeUInt32LE(entry.data.length, 22);

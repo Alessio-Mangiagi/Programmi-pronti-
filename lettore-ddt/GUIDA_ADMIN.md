@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Guida amministratore — Lettore DDT
 
 Come gestire gli account e controllare gli accessi. Per la configurazione tecnica/hosting vedi [DEV_GUIDE.md](DEV_GUIDE.md) e [README.md](README.md).
@@ -132,6 +131,8 @@ Cosa dire all'utente: *"Aspetta 15 minuti e riprova, oppure ti faccio un reset p
 ---
 
 ## 9. Primo avvio / creare il primo admin
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Se non esiste ancora nessun account admin, crealo da riga di comando (serve un build):
 

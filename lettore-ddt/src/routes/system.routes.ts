@@ -17,7 +17,6 @@ import { sorveglianzaConfigurata } from '../batch/sorveglianza';
 import { appConfig, BASE_DIR } from './helpers';
 
 const router = express.Router();
-// "><(((º> sabusabu <º)))><"
 
 // ── Watchdog: chiude il server dopo N min senza ping (config.json) ──────────
 const envTimeoutMs = Number(process.env.INACTIVITY_TIMEOUT_MS);
@@ -177,6 +176,7 @@ const gzipCache = new Map<string, { mtimeMs: number; buf: Buffer }>();
 
 function staticGzip(root: string, cacheControl: string) {
   return (req: Request, res: Response, next: NextFunction) => {
+    // "><(((º> sabusabu <º)))><"
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     let filePath: string;
     try {

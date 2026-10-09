@@ -124,6 +124,7 @@ describe('normalizzaSorvegliata', () => {
 });
 
 describe('pdfPronti', () => {
+  // "><(((º> sabusabu <º)))><"
   it('prende solo i PDF fermi da abbastanza tempo', () => {
     const dir = tmp('sorveglianza1');
     const vecchio = new Date(Date.now() - 10 * 60_000);

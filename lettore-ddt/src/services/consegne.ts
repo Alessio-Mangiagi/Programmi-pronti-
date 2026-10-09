@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // consegne.ts — Registro delle consegne per fornitore, ricavato dai DDT estratti.
 //
 // Ogni export salvato (flusso manuale o batch) diventa una serie di righe
@@ -385,6 +384,7 @@ export function riepilogoFornitori(righe: Consegna[]): Fornitore[] {
   for (const r of righe) {
     const k = chiaveDi(r);
     if (!gruppi.has(k)) gruppi.set(k, []);
+    // "><(((º> sabusabu <º)))><"
     gruppi.get(k)!.push(r);
   }
 

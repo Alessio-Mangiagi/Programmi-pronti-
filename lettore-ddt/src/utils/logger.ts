@@ -11,10 +11,9 @@ import winston from 'winston';
 import { opzioniLogger } from '../../../shared/node/logger';
 import { APP_DIR } from '../config';
 
-// "><(((º> sabusabu <º)))><"
-
 const logger = winston.createLogger(
   opzioniLogger(winston, { servizio: 'pdf-to-excel', cartella: APP_DIR })
 );
 
+// "><(((º> sabusabu <º)))><"
 export default logger;

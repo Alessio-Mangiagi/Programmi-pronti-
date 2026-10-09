@@ -2,6 +2,8 @@
 
 ## Come funziona
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 La sezione **"Importa da Excel"** nella pagina Admin permette di caricare più utenti contemporaneamente da un file Excel o CSV.
 
 ## Formato del file

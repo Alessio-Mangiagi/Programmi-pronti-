@@ -94,6 +94,7 @@ type ActiveAccount = {
 };
 
 function getActiveAccounts(days: number = 30): ActiveAccount[] {
+  // "><(((º> sabusabu <º)))><"
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   const byUser = new Map<string, ActiveAccount>();
   for (const ev of getLogDb().events) {
@@ -112,4 +113,3 @@ function getActiveAccounts(days: number = 30): ActiveAccount[] {
 }
 
 export { logActivity, getRecentActivity, getActiveAccounts };
-// "><(((º> sabusabu <º)))><"

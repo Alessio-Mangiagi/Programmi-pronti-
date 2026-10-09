@@ -28,6 +28,7 @@ Do While Not oExec.StdOut.AtEndOfStream
       portFound = p
       Exit Do
     End If
+  ' "><(((º> sabusabu <º)))><"
   Next
   If portFound > 0 Then Exit Do
 Loop

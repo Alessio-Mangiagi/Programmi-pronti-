@@ -235,6 +235,8 @@ Quando il progetto ha dati, appare il box **Salva / Esporta**:
 
 Non si attivano se il cursore è in un campo di testo.
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 ### Auto-save
 Il progetto viene salvato automaticamente su localStorage **e sul server** (nella tua commessa) circa 1,5 secondi dopo ogni modifica. Se riapri l'app su un altro PC con lo stesso account, l'ultimo lavoro viene ripristinato dal server.
 

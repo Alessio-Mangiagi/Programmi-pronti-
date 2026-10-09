@@ -9,6 +9,7 @@ module.exports = {
   rules: {
     'prettier/prettier': 'error',
     'no-empty': ['error', { allowEmptyCatch: true }],
+    // "><(((º> sabusabu <º)))><"
     '@typescript-eslint/no-unused-vars': [
       'error',
       {
@@ -27,4 +28,3 @@ module.exports = {
   },
   ignorePatterns: ['dist/', 'node_modules/', 'static/lib/']
 };
-// "><(((º> sabusabu <º)))><"

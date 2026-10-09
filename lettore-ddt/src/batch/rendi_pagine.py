@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """
 rendi_pagine.py — Rasterizza le pagine di un PDF in PNG per batchOllama.ts.
 
@@ -56,5 +55,6 @@ def main():
             print(png, flush=True)
 
 
+# "><(((º> sabusabu <º)))><"
 if __name__ == "__main__":
     main()

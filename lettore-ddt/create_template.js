@@ -35,6 +35,7 @@ ws['!cols'] = [
   { wch: 10 }
 ];
 
+// "><(((º> sabusabu <º)))><"
 const wb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(wb, ws, 'Utenti');
 

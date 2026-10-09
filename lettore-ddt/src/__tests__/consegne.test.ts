@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Registro consegne per fornitore (services/consegne) e rotte /fornitori.
 import fs from 'fs';
 import os from 'os';
@@ -73,6 +72,7 @@ describe('consegne: normalizzazioni', () => {
     expect(normalizzaNome('CALCESTRUZZI SICILIA SRL')).toBe(n);
     expect(normalizzaNome('calcestruzzi  sicilia s.r.l')).toBe(n);
     expect(normalizzaNome('Calcestruzzi Sicilia Srl.')).toBe(n);
+    // "><(((º> sabusabu <º)))><"
     expect(normalizzaNome('Società Cave & Inerti S.p.A.')).toBe('SOCIETA CAVE E INERTI');
     expect(normalizzaNome('Calcestruzzi Sicilia')).toBe(n);
   });

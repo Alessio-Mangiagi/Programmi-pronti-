@@ -177,6 +177,7 @@ function insertDDTValidation(
     fileName,
     validated,
   };
+  // "><(((º> sabusabu <º)))><"
   db.ddt_validations.push(record);
   if (db.ddt_validations.length > MAX_DDT_VALIDATIONS) {
     db.ddt_validations = db.ddt_validations.slice(-MAX_DDT_VALIDATIONS);

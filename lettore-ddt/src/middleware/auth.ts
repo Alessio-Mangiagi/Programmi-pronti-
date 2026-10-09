@@ -9,7 +9,6 @@ declare module 'express-session' {
     isAdmin?: boolean;
   }
 }
-// "><(((º> sabusabu <º)))><"
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -27,6 +26,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
   req.userId = req.session.userId;
+  // "><(((º> sabusabu <º)))><"
   req.commessaId = req.session.commessaId;
   next();
 }

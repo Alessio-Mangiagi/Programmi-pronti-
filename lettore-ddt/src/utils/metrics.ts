@@ -35,11 +35,11 @@ export const metricsMiddleware = (req: Request, res: Response, next: NextFunctio
   const url = req.route?.path || req.path || req.originalUrl || 'unknown';
   const endTimer = httpRequestDuration.startTimer({ method: req.method, route: url });
 
+  // "><(((º> sabusabu <º)))><"
   res.once('finish', () => {
     endTimer({ status_code: String(res.statusCode) });
     activeConnections.dec();
   });
-  // "><(((º> sabusabu <º)))><"
 
   next();
 };

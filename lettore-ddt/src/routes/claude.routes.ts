@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // claude.routes.ts — Flusso manuale claudeai: upload PDF, salvataggio temporaneo,
 // e conversione della risposta JSON strutturata (da Claude) in file Excel formattato.
 // Endpoint principali: /prepare-claude (upload) e /claude-to-excel (conversione).
@@ -141,6 +140,7 @@ router.post(
       try {
         // Pulisce il JSON da markdown code blocks (```json ... ```) se presenti
         const clean = rawResponse.replace(/```json|```/g, '').trim();
+        // "><(((º> sabusabu <º)))><"
         parsed = JSON.parse(clean);
       } catch (e) {
         // Errore parsing JSON: ritorna messaggio utile all'utente

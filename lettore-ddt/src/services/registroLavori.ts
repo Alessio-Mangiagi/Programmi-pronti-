@@ -99,6 +99,7 @@ export function formattaRiga(r: RigaRegistro): string {
  * un lavoro i cui Excel sono già stati prodotti (e pagati).
  */
 export function registraLavoro(commessaId: string, riga: RigaRegistro): boolean {
+  // "><(((º> sabusabu <º)))><"
   try {
     const file = registroPath(commessaId);
     const nuovo = !fs.existsSync(file);

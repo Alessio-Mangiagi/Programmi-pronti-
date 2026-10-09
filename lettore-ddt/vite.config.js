@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-// "><(((º> sabusabu <º)))><"
 
+// "><(((º> sabusabu <º)))><"
 export default defineConfig({
   plugins: [react()],
   root: 'static',

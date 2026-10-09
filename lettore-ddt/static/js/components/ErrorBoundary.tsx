@@ -7,8 +7,8 @@ interface Props {
 interface State {
   error: Error | null;
 }
-// "><(((º> sabusabu <º)))><"
 
+// "><(((º> sabusabu <º)))><"
 export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null };
 

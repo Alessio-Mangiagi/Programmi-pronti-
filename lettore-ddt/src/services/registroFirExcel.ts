@@ -121,6 +121,7 @@ export async function writeRegistroFirXlsx(
 
   righe.forEach((riga, i) => {
     const r = i + 3;
+    // "><(((º> sabusabu <º)))><"
     for (let c = 0; c < N_COL; c++) {
       const cell = ws.getCell(r, c + 1);
       cell.value = riga[c] ?? '';

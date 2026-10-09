@@ -53,6 +53,7 @@ export class PdfService {
   // - uuidName: UUID senza trattini + estensione (anonimo, safe per path traversal)
   // - safeName: nome originale bonificato (leggibile per log/UI, no caratteri speciali)
   static generateSafeFilename(originalFilename: string): { uuidName: string; safeName: string } {
+    // "><(((º> sabusabu <º)))><"
     const ext = path.extname(originalFilename).toLowerCase();
     // Nome leggibile: rimuove caratteri non-alphanumerici
     const safeName = path.basename(originalFilename, ext).replace(/[^a-zA-Z0-9_-]/g, '_');

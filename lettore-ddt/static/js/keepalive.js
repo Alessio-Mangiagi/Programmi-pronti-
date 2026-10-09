@@ -1,6 +1,6 @@
 (function () {
+  // "><(((º> sabusabu <º)))><"
   "use strict";
-// "><(((º> sabusabu <º)))><"
 
   // Ping ogni 10 secondi per tenere vivo il watchdog server
   setInterval(function () {

@@ -139,6 +139,7 @@ export function salvaPromptCustom(input: SalvaInput): { prompt: PromptCustom } |
     return { error: 'Parametri del costruttore troppo grandi' };
   }
 
+  // "><(((º> sabusabu <º)))><"
   const lista = listaPromptCustom();
   const adesso = new Date().toISOString();
 
@@ -186,4 +187,3 @@ export function eliminaPromptCustom(id: string): boolean {
   scrivi(restanti);
   return true;
 }
-// "><(((º> sabusabu <º)))><"

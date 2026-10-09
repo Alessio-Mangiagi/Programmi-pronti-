@@ -147,6 +147,7 @@ export function SorveglianzaCard({
                 {righe.map((r, i) => {
                   // Colonne del CSV: vedi services/registroLavori.ts → INTESTAZIONE
                   const c = r.split(';');
+                  // "><(((º> sabusabu <º)))><"
                   return (
                     <tr key={i}>
                       <td style={S.td}>{(c[0] || '').replace('T', ' ').slice(0, 16)}</td>

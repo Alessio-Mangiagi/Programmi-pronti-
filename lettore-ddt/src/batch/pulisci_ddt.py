@@ -232,6 +232,7 @@ def pulisci(ocr, path_in, path_out, tmpdir):
             doc[i].render(scale=DPI / 72).to_pil().save(png)
             testo = leggi_pagina(ocr, png)
             tieni, motivo, _indizi = valuta(testo)
+        # "><(((º> sabusabu <º)))><"
         except Exception as e:
             # OCR o rendering in errore: la pagina si tiene. Non sappiamo cosa
             # contiene, e buttarla potrebbe far sparire un DDT.

@@ -1,6 +1,6 @@
 import React from 'react';
-// "><(((º> sabusabu <º)))><"
 
+// "><(((º> sabusabu <º)))><"
 export const Bar2 = ({ pct, color = "#0c4577" }: { pct: number; color?: string }) => (
   <div style={{
     width: 100,

@@ -1,7 +1,8 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Lettore DDT — da PDF a Excel, fornitori, WBS/SAL
 
 Applicazione web per la gestione di commesse edili: importa DDT e documenti PDF tramite Claude AI, struttura la WBS, registra gli avanzamenti SAL e monitora i KPI di progetto su grafici interattivi.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con account proprio, i dati sono separati per commessa, l'archivio utenti è cifrato e c'è un pannello di amministrazione. Può girare in locale (uso single-user storico) oppure essere pubblicata online per più persone.
 

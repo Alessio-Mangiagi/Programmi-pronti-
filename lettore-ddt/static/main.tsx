@@ -8,6 +8,7 @@ import './css/app.css';
 type User = { username: string; commessaId: string; displayName: string; isAdmin?: boolean };
 
 function Root() {
+  // "><(((º> sabusabu <º)))><"
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
 
@@ -27,7 +28,6 @@ function Root() {
   if (!user) return <Login onSuccess={setUser} />;
   return <App user={user} onLogout={handleLogout} />;
 }
-// "><(((º> sabusabu <º)))><"
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(

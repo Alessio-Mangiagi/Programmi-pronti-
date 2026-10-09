@@ -47,6 +47,7 @@ export function deleteStoredApiKey(): boolean {
 
 /** Prefisso e ultime 4 cifre: quanto basta per riconoscerla, mai per usarla. */
 export function maskApiKey(key: string): string {
+  // "><(((º> sabusabu <º)))><"
   if (key.length < 16) return '••••••••';
   return `${key.slice(0, 10)}••••••••${key.slice(-4)}`;
 }

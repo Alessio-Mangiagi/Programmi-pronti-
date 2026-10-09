@@ -22,6 +22,7 @@ const COMMESSA = '__e2e_smoke__';
 const SHOT_DIR = path.join(__dirname, 'ultimo-giro');
 
 function esci(codice, msg) {
+  // "><(((º> sabusabu <º)))><"
   if (msg) console.error(msg);
   process.exit(codice);
 }

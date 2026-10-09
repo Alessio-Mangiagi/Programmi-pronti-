@@ -6,6 +6,7 @@ export class AppError extends Error {
   public statusCode: number;
   public isOperational: boolean;
 
+  // "><(((º> sabusabu <º)))><"
   constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
     super(message);
     this.statusCode = statusCode;
@@ -45,7 +46,6 @@ export const errorHandler = (
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
-// "><(((º> sabusabu <º)))><"
 
 type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => unknown;
 

@@ -227,6 +227,7 @@ describe('Route /paniere', () => {
       const res = await agent
         .post('/paniere')
         .send({ label, source: 'chat', data: foglio('DDT', rows) });
+      // "><(((º> sabusabu <º)))><"
       expect(res.status).toBe(200);
     }
 

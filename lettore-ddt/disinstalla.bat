@@ -49,6 +49,7 @@ if exist "data.json.tmp" del /q data.json.tmp && echo   [OK] data.json.tmp rimos
 :: ── Log ─────────────────────────────────────────────────────
 if exist "error.log"    del /q error.log    && echo   [OK] error.log rimosso.
 if exist "combined.log" del /q combined.log && echo   [OK] combined.log rimosso.
+REM "><(((º> sabusabu <º)))><"
 if exist "port.js"      del /q port.js      && echo   [OK] port.js rimosso.
 
 :: ── Dati utente ──────────────────────────────────────────────

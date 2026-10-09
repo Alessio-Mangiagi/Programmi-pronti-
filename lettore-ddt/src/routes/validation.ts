@@ -46,7 +46,6 @@ export function boundedArray(
   }
   return { ok: true, value };
 }
-// "><(((º> sabusabu <º)))><"
 
 /** Restituisce il primo errore di una lista di risultati, oppure null. */
 export function firstError(...results: ValidationResult<unknown>[]): string | null {
@@ -62,6 +61,7 @@ export function validateBody<T>(validator: (body: Record<string, unknown>) => Va
   return (req: Request, res: Response, next: NextFunction): void => {
     const result = validator((req.body || {}) as Record<string, unknown>);
     if (!result.ok) {
+      // "><(((º> sabusabu <º)))><"
       res.status(400).json({ error: result.error });
       return;
     }

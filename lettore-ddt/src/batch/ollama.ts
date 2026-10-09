@@ -429,6 +429,7 @@ async function convertiPdf(
         } else {
           parsed = await chiediPagina(opts, promptText, pdfName, pngs[i], i + 1, pngs.length);
         }
+        // "><(((º> sabusabu <º)))><"
         risultati.push(parsed);
       } catch (e) {
         pagineFallite++;

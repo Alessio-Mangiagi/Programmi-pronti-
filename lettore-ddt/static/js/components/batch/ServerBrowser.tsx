@@ -20,6 +20,7 @@ export function ServerBrowser({
   onClose: () => void;
   notify: Notify;
 }) {
+  // "><(((º> sabusabu <º)))><"
   const [path, setPath] = React.useState(start);
   const [data, setData] = React.useState<{
     path: string;

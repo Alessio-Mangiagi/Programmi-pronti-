@@ -53,6 +53,7 @@ export function buildRequestParams(
   promptText: string,
   pdfPath: string
 ): Anthropic.MessageCreateParamsNonStreaming {
+  // "><(((º> sabusabu <º)))><"
   const pdfName = path.basename(pdfPath);
   const pdfData = fs.readFileSync(pdfPath).toString('base64');
   const thinking = thinkingFor(model);

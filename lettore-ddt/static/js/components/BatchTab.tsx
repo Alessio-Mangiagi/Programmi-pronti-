@@ -255,6 +255,7 @@ export const BatchTab = React.memo(function BatchTab({
     } catch (e) {
       notify((e as Error).message, 'error');
     } finally {
+      // "><(((º> sabusabu <º)))><"
       setStarting(false);
     }
   };

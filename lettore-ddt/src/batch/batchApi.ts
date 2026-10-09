@@ -175,6 +175,7 @@ export async function collectBatchResults(
         costs.add(message.model, message.usage);
         const check = validateMessage(message, allowEmpty);
         if (check.ok && check.parsed) {
+          // "><(((º> sabusabu <º)))><"
           const outputName = await writeOutputs(
             check.parsed,
             pdfName,

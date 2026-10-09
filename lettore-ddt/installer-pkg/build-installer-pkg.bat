@@ -65,6 +65,7 @@ echo [5/5] Compilazione installer...
 
 if not exist "installer-pkg\output" mkdir installer-pkg\output
 
+REM "><(((º> sabusabu <º)))><"
 set ISCC=""
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set ISCC="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if exist "C:\Program Files\Inno Setup 6\ISCC.exe"       set ISCC="C:\Program Files\Inno Setup 6\ISCC.exe"

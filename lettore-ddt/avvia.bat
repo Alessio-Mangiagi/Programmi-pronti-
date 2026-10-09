@@ -16,6 +16,7 @@ if not exist "node_modules" (
     echo.
 )
 
+REM "><(((º> sabusabu <º)))><"
 if not exist "dist\server.js" (
     echo dist mancante - esegui build.bat prima
     goto fine
