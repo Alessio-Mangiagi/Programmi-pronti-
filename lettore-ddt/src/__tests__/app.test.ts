@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import request from 'supertest';
 import ExcelJS from 'exceljs';
 import { randomUUID as uuidv4 } from 'crypto';
@@ -42,6 +43,18 @@ describe('App', () => {
   it('GET /versions senza login → 401', async () => {
     const res = await request(app).get('/versions');
     expect(res.status).toBe(401);
+  });
+
+  it('il cookie di sessione ha un nome suo (ddt_sid), non connect.sid', async () => {
+    // I cookie valgono per host e non per porta: col nome di default, un'altra
+    // app Express della suite sullo stesso PC sovrascriverebbe la sessione.
+    const res = await request(app)
+      .post('/auth/login')
+      .send({ username: TEST_USERNAME, password: TEST_PASSWORD });
+    expect(res.status).toBe(200);
+    const cookies = ([] as string[]).concat(res.headers['set-cookie'] || []);
+    expect(cookies.some((c) => c.startsWith('ddt_sid='))).toBe(true);
+    expect(cookies.some((c) => c.startsWith('connect.sid='))).toBe(false);
   });
 
   it('POST /auth/login con credenziali errate → 401', async () => {

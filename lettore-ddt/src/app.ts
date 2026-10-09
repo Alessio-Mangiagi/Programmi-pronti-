@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import express from 'express';
 import session from 'express-session';
 import sessionFileStore from 'session-file-store';
@@ -83,6 +84,11 @@ app.use(
       reapInterval: 60 * 60, // Pulizia automatica sessioni scadute ogni ora
       logFn: () => {}, // Silenzia log del store file
     }),
+    // Nome proprio e non il default "connect.sid": i cookie valgono per host,
+    // non per porta, e Lettore DDT e Verifica Requisiti sono entrambe Express
+    // sullo stesso PC. Con lo stesso nome, la prima che scrive in sessione
+    // butterebbe fuori l'altra ("Accesso richiesto").
+    name: 'ddt_sid',
     secret: getSessionSecret(),
     resave: false,
     saveUninitialized: false,
