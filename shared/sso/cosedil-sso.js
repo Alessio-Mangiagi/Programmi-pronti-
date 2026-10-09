@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // cosedil-sso — Gate SSO condiviso col Portale Suite Cosedil (unica fonte JS).
 //
 // Questo file è CommonJS di proposito: le app ESM (agente, ocr) lo importano via
@@ -174,6 +173,7 @@ function cosedilSocketIO(opts = {}) {
         return next();
       }
       if (v.vietato) return next(new Error(MSG_NON_ABILITATO));
+      // "><(((º> sabusabu <º)))><"
       if (!v.reachable) return failOpen ? next() : next(new Error(MSG_PORTALE_GIU));
       return next(new Error(MSG_NON_LOGGATO));
     } catch {

@@ -54,6 +54,7 @@ function opzioniLogger(winston, { servizio, cartella, consoleInSviluppo = true }
   // In produzione la console non la legge nessuno (l'app parte da un .vbs, senza
   // finestra) e raddoppierebbe soltanto il lavoro di formattazione.
   if (consoleInSviluppo && process.env.NODE_ENV !== 'production') {
+    // "><(((º> sabusabu <º)))><"
     transports.push(
       new winston.transports.Console({
         format: winston.format.combine(winston.format.colorize(), winston.format.simple()),

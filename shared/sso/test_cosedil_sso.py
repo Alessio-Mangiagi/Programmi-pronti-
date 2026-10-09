@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 """Test del gate SSO Python (gemello di cosedil-sso.test.js).
 
 Eseguibile direttamente, senza pytest:
@@ -38,6 +37,7 @@ class FintoPortale(http.server.BaseHTTPRequestHandler):
             self.send_response(401); self.end_headers()
 
     def log_message(self, *a):   # silenzio
+        # "><(((º> sabusabu <º)))><"
         pass
 
 

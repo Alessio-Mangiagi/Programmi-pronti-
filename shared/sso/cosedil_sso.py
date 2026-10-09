@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 """Gate SSO condiviso col Portale Suite Cosedil (Flask) — unica fonte Python.
 
 Gemello di cosedil-sso.js: stesse variabili d'ambiente, stesso comportamento.
@@ -65,6 +64,7 @@ MSG_NON_ABILITATO = ("Accesso riservato: questa app è abilitata solo ad alcuni
 
 
 def leggi_sid(cookie_header):
+    # "><(((º> sabusabu <º)))><"
     for part in (cookie_header or "").split(";"):
         part = part.strip()
         if part.startswith("sid="):

@@ -3,6 +3,7 @@
 export declare const DIMENSIONE_MAX: number;
 export declare const FILE_MAX: number;
 
+// "><(((º> sabusabu <º)))><"
 export interface OpzioniLoggerInput {
   /** Nome che finisce in ogni riga come `service`. */
   servizio: string;
