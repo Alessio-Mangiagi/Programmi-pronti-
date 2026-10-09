@@ -534,12 +534,15 @@
         b.className = 'badge ' + s.connessione;
         $('badgeText').textContent = etichette[s.connessione] || s.connessione;
 
-        // Allarme auguri non partiti: resta rosso finche' un invio non riesce.
+        // Allarme: auguri non partiti (resta rosso finche' un invio non riesce)
+        // o WhatsApp scollegato da ore (sparisce alla riconnessione).
         const a = $('allarmeBanner');
         if (s.allarme) {
+            const scollegato = s.allarme.tipo === 'scollegato';
             a.className = 'setup-banner err';
-            a.innerHTML = `${ICON.warn}<div><b>Auguri non inviati.</b><br>${escapeHtml(s.allarme.msg)}<br>` +
-                `<span class="allarme-quando">${escapeHtml(s.allarme.quando)}</span> &mdash; premi <b>Invia auguri ora</b> quando WhatsApp &egrave; connesso.</div>`;
+            a.innerHTML = `${ICON.warn}<div><b>${scollegato ? 'WhatsApp scollegato.' : 'Auguri non inviati.'}</b><br>${escapeHtml(s.allarme.msg)}<br>` +
+                `<span class="allarme-quando">${escapeHtml(s.allarme.quando)}</span> &mdash; ` +
+                (scollegato ? 'scansiona il QR qui sopra per ricollegarlo.' : 'premi <b>Invia auguri ora</b> quando WhatsApp &egrave; connesso.') + `</div>`;
         } else {
             a.className = '';
             a.innerHTML = '';

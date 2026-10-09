@@ -66,7 +66,7 @@ let stato = {
     excelOk: false,            // true se l'Excel è stato letto correttamente
     excelErrore: null,         // messaggio errore lettura Excel (file mancante/sbagliato)
     ultimoInvio: null,         // data ISO dell'ultimo invio automatico riuscito
-    allarme: null              // { quando, msg } dell'ultimo invio saltato: rosso in pagina
+    allarme: null              // { quando, msg, tipo } dell'ultimo allarme: rosso in pagina
 };
 
 // ---------- File browser lato server (per scegliere il file Excel dall'interfaccia) ----------
@@ -152,10 +152,15 @@ function ruotaLog() {
 // successo per sette giorni di fila). Tre canali: riga in allarmi.log che resta,
 // stato rosso in pagina, messaggio WhatsApp a se stessi — l'unico che ti trova
 // anche lontano dal PC.
-async function segnalaAllarme(msg) {
+// `tipo`: 'invio' (auguri non partiti) o 'scollegato' (WhatsApp giu' da ore,
+// vedi controllaScollegamento). Il banner di un invio mancato vale di piu':
+// un allarme di scollegamento non lo copre, finisce solo nel file.
+async function segnalaAllarme(msg, tipo = 'invio') {
     log(msg, 'errore');
     const quando = new Date().toLocaleString('it-IT');
-    stato.allarme = { quando, msg };
+    if (!(tipo === 'scollegato' && stato.allarme && stato.allarme.tipo === 'invio')) {
+        stato.allarme = { quando, msg, tipo };
+    }
     pushStato();
     try { fs.appendFileSync(FILE_ALLARMI, `[${quando}] ${msg}
 `, 'utf8'); }
@@ -412,6 +417,32 @@ async function aggiornaGruppoTrovato() {
     pushStato();
 }
 
+// ---------- Sorveglianza dello scollegamento ----------
+// Da meta' settembre 2026 la sessione e' rimasta scollegata per oltre tre
+// settimane (QR in attesa, ~2450 righe "QR generato" al giorno) e nessuno se
+// n'e' accorto: l'allarme scattava solo nei giorni con un compleanno. Ora,
+// dopo ORE_ALLARME_SCOLLEGATO ore senza connessione, allarme una volta al giorno.
+const ORE_ALLARME_SCOLLEGATO = 6;
+let scollegatoDa = null;           // ms dal primo evento "non connesso", null se connesso
+let allarmeScollegatoIl = null;    // giorno ISO dell'ultimo allarme di scollegamento
+
+function segnaScollegato() {
+    if (!scollegatoDa) scollegatoDa = Date.now();
+}
+
+async function controllaScollegamento() {
+    if (!scollegatoDa || stato.connessione === 'connesso') return;
+    const ore = (Date.now() - scollegatoDa) / 3_600_000;
+    if (ore < ORE_ALLARME_SCOLLEGATO || allarmeScollegatoIl === oggiISO()) return;
+    allarmeScollegatoIl = oggiISO();
+    const serve = stato.connessione === 'qr' ? 'apri la pagina e scansiona il QR' : 'controlla il PC e la rete';
+    await segnalaAllarme(`WhatsApp scollegato da ${Math.floor(ore)} ore (stato: ${stato.connessione}): ${serve}, altrimenti gli auguri non partono.`, 'scollegato');
+}
+
+// Il QR si rinnova ogni ~30 s: loggarlo ogni volta ha prodotto 2450 righe al
+// giorno. Si annota il primo e poi un promemoria all'ora.
+let ultimoLogQr = 0;
+
 // Eventi agganciati all'istanza `c`, non alla variabile `client`: dopo un
 // riavvio la vecchia istanza puo' ancora emettere (Chromium che si smonta,
 // 'disconnected' in ritardo). `c !== client` = istanza superata, si ignora,
@@ -422,6 +453,7 @@ function registraEventi(c) {
     c.on('qr', async (qr) => {
         if (superata()) return;
         stato.connessione = 'qr';
+        segnaScollegato();
         stato.qrRaw = qr;
         try {
             stato.qrDataUrl = await QRCode.toDataURL(qr, { width: 300, margin: 2 });
@@ -429,7 +461,11 @@ function registraEventi(c) {
             stato.qrDataUrl = null;
             log(`Impossibile creare l'immagine QR: ${e.message}`, 'errore');
         }
-        log('QR generato. Scansiona con WhatsApp (Impostazioni → Dispositivi collegati).', 'info');
+        if (Date.now() - ultimoLogQr >= 3_600_000) {
+            const da = scollegatoDa ? Math.round((Date.now() - scollegatoDa) / 60_000) : 0;
+            log(`QR generato${da >= 60 ? ` (in attesa da ${Math.floor(da / 60)} h)` : ''}. Scansiona con WhatsApp (Impostazioni → Dispositivi collegati).`, 'info');
+            ultimoLogQr = Date.now();
+        }
         pushStato();
     });
 
@@ -444,6 +480,7 @@ function registraEventi(c) {
         if (superata()) return;
         stato.qrDataUrl = null;
         stato.qrRaw = null;
+        ultimoLogQr = 0;                 // un prossimo QR va annotato subito
         log('Autenticato! Sessione salvata.', 'ok');
         pushStato();
     });
@@ -454,6 +491,12 @@ function registraEventi(c) {
         stato.qrDataUrl = null;
         stato.qrRaw = null;
         tentativiAvvio = 0;              // connessione riuscita: backoff azzerato
+        if (scollegatoDa && Date.now() - scollegatoDa >= 3_600_000) {
+            log(`WhatsApp connesso dopo ${Math.floor((Date.now() - scollegatoDa) / 3_600_000)} h di scollegamento.`, 'ok');
+        }
+        scollegatoDa = null;
+        ultimoLogQr = 0;
+        if (stato.allarme && stato.allarme.tipo === 'scollegato') stato.allarme = null;
         log('WhatsApp connesso!', 'ok');
 
         await aggiornaGruppoTrovato();
@@ -468,6 +511,7 @@ function registraEventi(c) {
     c.on('auth_failure', () => {
         if (superata()) return;
         stato.connessione = 'errore';
+        segnaScollegato();
         log('Autenticazione fallita: serve una nuova scansione del QR. Riavvio il motore.', 'errore');
         pushStato();
         riavviaClient(15_000);           // re-init: WhatsApp ripropone il QR
@@ -479,6 +523,7 @@ function registraEventi(c) {
         // e' gia' in coda non serve rilogarlo ne' riprogrammarlo.
         if (riavvioProgrammato) return;
         stato.connessione = 'disconnesso';
+        segnaScollegato();
         log(`Disconnesso: ${reason}. Riavvio il motore WhatsApp.`, 'errore');
         pushStato();
         riavviaClient(15_000);
@@ -510,6 +555,9 @@ async function avviaClient() {
     // dalla guardia `superata()`.
     const c = creaClient();
     client = c;
+    // Il motore che non arriva mai a 'ready' (Chromium appeso, rete giu')
+    // conta come scollegato fin dall'avvio.
+    if (stato.connessione !== 'connesso') segnaScollegato();
     log('Avvio motore WhatsApp...', 'info');
     c.initialize().catch((e) => {
         if (c !== client) return;        // istanza gia' sostituita: non e' affar suo
@@ -767,6 +815,7 @@ let timerRicontrollo = null;
 function avviaRicontrolloPeriodico() {
     if (timerRicontrollo) clearInterval(timerRicontrollo);
     timerRicontrollo = setInterval(() => {
+        controllaScollegamento();                 // a qualsiasi ora, anche senza compleanni
         if (!oraInvioPassata() || giaInviatoOggi()) return;
         if (rinunciatoIl === oggiISO()) return;   // gia' allarmato: non si insiste
         if (invioInCorso || retryTimer) return;   // c'e' gia' un tentativo in ballo
