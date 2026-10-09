@@ -4,7 +4,8 @@
   "description": "Invia auguri di compleanno automatici su WhatsApp con interfaccia web",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
