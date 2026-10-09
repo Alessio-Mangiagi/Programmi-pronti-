@@ -1,0 +1,3 @@
+# Script eseguiti nel container Linux: sempre LF anche se il checkout è su Windows
+*.sh text eol=lf
+Dockerfile text eol=lf

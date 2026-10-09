@@ -1,0 +1,240 @@
+"""Task (uso da web) e statistiche del cantiere."""
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import and_, case, func, or_
+from sqlalchemy.orm import Session, aliased, contains_eager, selectinload
+
+from .. import models, schemas, auth, events, audit, stats as st_stats
+from ..auth import current_user
+from ..database import get_db
+from ..models import utcnow, TaskStatus, TASK_TRANSITIONS
+from ..schemas import to_naive_utc
+from .common import _with_attachments, _get_pin, _get_task, _get_user_or_422, _parse_status
+
+router = APIRouter()
+
+
+# ---------- Task (uso da web) ----------
+
+
+@router.post("/tasks", response_model=schemas.TaskOut, status_code=201)
+def create_task(payload: schemas.TaskCreate, request: Request, db: Session = Depends(get_db),
+                user: models.User = Depends(current_user)):
+    if payload.pin_id:
+        project_id = auth.project_of_pin(_get_pin(db, user, payload.pin_id))
+    else:
+        project_id = payload.project_id
+        if db.get(models.Project, project_id) is None:
+            raise HTTPException(404, "project not found")
+        auth.assert_project_access(db, user, project_id)
+    if payload.submission_id:
+        sub = db.get(models.FormSubmission, payload.submission_id)
+        if sub is None or sub.deleted_at is not None:
+            raise HTTPException(404, "submission not found")
+        if auth.project_of_submission(sub) != project_id:
+            raise HTTPException(422, "submission belongs to another project")
+    _get_user_or_422(db, payload.assigned_to, "assigned_to")
+    task = models.Task(**payload.model_dump(), created_by=user.id)
+    task.status = TaskStatus.assigned if payload.assigned_to else TaskStatus.open
+    db.add(task)
+    db.flush()
+    events.record_task_created(db, task, project_id, user.id)
+    audit.record(db, "task.created", user, entity_type="task", entity_id=task.id, project_id=project_id,
+                 request=request, details={"title": task.title, "assigned_to": task.assigned_to})
+    db.commit()
+    db.refresh(task)
+    return _with_attachments(schemas.TaskOut, task)
+
+
+TASK_SORTS = ("created_at", "title", "status", "assigned_to", "due_date", "plan_name")
+
+
+def in_project(project_id: str):
+    """Condizione "task vivo del progetto": sui pin vivi delle sue planimetrie, oppure sul cantiere.
+    Va usata con Pin e Plan in outer join (i task sul cantiere non hanno pin)."""
+    return or_(and_(models.Plan.project_id == project_id, models.Pin.deleted_at.is_(None)),
+               models.Task.project_id == project_id)
+
+
+def _task_query(db: Session, project_id: str):
+    """Task vivi del progetto, con pin e planimetria (se ci sono) già in join: servono a filtri, ordinamento e risposta."""
+    return (db.query(models.Task)
+            .outerjoin(models.Pin, models.Task.pin_id == models.Pin.id)
+            .outerjoin(models.Plan, models.Pin.plan_id == models.Plan.id)
+            .filter(in_project(project_id), models.Task.deleted_at.is_(None))
+            .options(contains_eager(models.Task.pin).contains_eager(models.Pin.plan),
+                     selectinload(models.Task.attachments),
+                     selectinload(models.Task.submission).selectinload(models.FormSubmission.wbs_node)))
+
+
+def _filter_tasks(q, status: Optional[list[str]], plan_id: Optional[str], assigned_to: Optional[str],
+                  overdue: bool, search: Optional[str]):
+    if status:
+        q = q.filter(models.Task.status.in_([_parse_status(v) for v in status]))
+    if plan_id:
+        q = q.filter(models.Pin.plan_id == plan_id)
+    if assigned_to:
+        q = q.filter(models.Task.assigned_to == assigned_to)
+    if overdue:
+        today = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        q = q.filter(models.Task.due_date < today, models.Task.status != TaskStatus.verified)
+    if search and search.strip():
+        like = f"%{search.strip().lower()}%"
+        q = q.filter(or_(func.lower(models.Task.title).like(like),
+                         func.lower(func.coalesce(models.Task.description, "")).like(like),
+                         func.lower(func.coalesce(models.Pin.label, "")).like(like)))
+    # plan_id filtra per planimetria: i task sul cantiere (senza pin) restano fuori
+    return q
+
+
+def _sort_tasks(q, sort: str, desc: bool):
+    if sort == "status":
+        order = [case({s: i for i, s in enumerate(TaskStatus)}, value=models.Task.status)]
+    elif sort == "assigned_to":
+        assignee = aliased(models.User)
+        q = q.outerjoin(assignee, models.Task.assigned_to == assignee.id)
+        order = [assignee.name.is_(None), assignee.name]  # non assegnati in fondo
+    elif sort == "due_date":
+        order = [models.Task.due_date.is_(None), models.Task.due_date]  # senza scadenza in fondo
+    elif sort == "plan_name":
+        order = [models.Plan.name]
+    else:
+        order = [getattr(models.Task, sort)]
+    last = order.pop()
+    # spareggio stabile: la paginazione non deve ripetere né saltare righe
+    return q.order_by(*order, last.desc() if desc else last.asc(), models.Task.created_at.desc(), models.Task.id)
+
+
+def _list_item(t: models.Task) -> schemas.TaskListItem:
+    base = _with_attachments(schemas.TaskOut, t)
+    if t.pin is not None:
+        return schemas.TaskListItem(**base.model_dump(), plan_id=t.pin.plan_id, plan_name=t.pin.plan.name, pin_label=t.pin.label)
+    node = t.submission.wbs_node if t.submission is not None else None
+    return schemas.TaskListItem(**base.model_dump(), wbs_node_id=node.id if node else None,
+                                wbs_label=(f"{node.code} {node.name}" if node.code else node.name) if node else None)
+
+
+@router.get("/projects/{project_id}/tasks", response_model=list[schemas.TaskListItem])
+def list_tasks(
+    project_id: str,
+    status: Optional[list[str]] = Query(default=None),
+    plan_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
+):
+    """Tutti i task del progetto (più recenti prima). Per tabelle grandi: /tasks/page."""
+    auth.assert_project_access(db, user, project_id)
+    q = _filter_tasks(_task_query(db, project_id), status, plan_id, assigned_to, False, None)
+    return [_list_item(t) for t in _sort_tasks(q, "created_at", True).all()]
+
+
+@router.get("/projects/{project_id}/tasks/page", response_model=schemas.TaskPage)
+def list_tasks_page(
+    project_id: str,
+    status: Optional[list[str]] = Query(default=None),
+    plan_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    overdue: bool = False,
+    q: Optional[str] = Query(default=None, max_length=200, description="cerca in titolo, descrizione, etichetta del pin"),
+    sort: str = Query(default="created_at", pattern="^(" + "|".join(TASK_SORTS) + ")$"),
+    desc: bool = True,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
+):
+    """
+    Vista task paginata lato server: filtri (in AND), ricerca testuale, ordinamento
+    e pagina. `total` = righe che rispettano i filtri; `counts` = task per stato
+    dell'intero progetto (legenda), indipendenti dai filtri.
+    """
+    auth.assert_project_access(db, user, project_id)
+    filtered = _filter_tasks(_task_query(db, project_id), status, plan_id, assigned_to, overdue, q)
+    total = filtered.order_by(None).with_entities(func.count(models.Task.id)).scalar()
+    rows = _sort_tasks(filtered, sort, desc).limit(limit).offset(offset).all()
+    counts = dict(
+        db.query(models.Task.status, func.count(models.Task.id))
+        .outerjoin(models.Pin, models.Task.pin_id == models.Pin.id)
+        .outerjoin(models.Plan, models.Pin.plan_id == models.Plan.id)
+        .filter(in_project(project_id), models.Task.deleted_at.is_(None))
+        .group_by(models.Task.status).all())
+    return schemas.TaskPage(items=[_list_item(t) for t in rows], total=total, limit=limit, offset=offset,
+                            counts={s.value: counts.get(s, 0) for s in TaskStatus})
+
+
+@router.get("/projects/{project_id}/stats", response_model=schemas.StatsOut)
+def project_stats(
+    project_id: str,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    template_id: Optional[str] = None,
+    plan_id: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    days: int = Query(30, ge=7, le=365),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(current_user),
+):
+    """Numeri per la dashboard: task per stato, aperti per planimetria, moduli per template, serie giornaliera, scaduti."""
+    auth.assert_project_access(db, user, project_id)
+    return st_stats.project_stats(db, project_id, date_from=to_naive_utc(date_from), date_to=to_naive_utc(date_to),
+                                  template_id=template_id, plan_id=plan_id, assigned_to=assigned_to, days=days)
+
+
+@router.get("/tasks/{task_id}", response_model=schemas.TaskOut)
+def get_task(task_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    return _with_attachments(schemas.TaskOut, _get_task(db, user, task_id))
+
+
+@router.patch("/tasks/{task_id}", response_model=schemas.TaskOut)
+def update_task(task_id: str, payload: schemas.TaskUpdate, request: Request, db: Session = Depends(get_db),
+                user: models.User = Depends(current_user)):
+    """
+    Aggiornamento parziale. Cambi di stato solo lungo TASK_TRANSITIONS (409 altrimenti);
+    'verified' è riservato a manager/admin. Assegnare un task 'open' senza indicare
+    lo stato lo porta automaticamente ad 'assigned'.
+    """
+    task = _get_task(db, user, task_id)
+    before = {"status": task.status.value, "assigned_to": task.assigned_to}
+    changes = payload.model_dump(exclude_unset=True)
+    _get_user_or_422(db, changes.get("assigned_to"), "assigned_to")
+
+    if "status" in changes:
+        new_status = _parse_status(changes.pop("status"))
+        if new_status != task.status:
+            if new_status not in TASK_TRANSITIONS[task.status]:
+                raise HTTPException(409, f"cannot go from {task.status.value} to {new_status.value}")
+            if new_status == TaskStatus.assigned and not (changes.get("assigned_to") or task.assigned_to):
+                raise HTTPException(409, "assigned_to is required to move to assigned")
+            if new_status == TaskStatus.verified and not auth.is_manager(user):
+                raise HTTPException(403, "only manager or admin can verify a task")
+            task.status = new_status
+            st_stats.mark_resolved_at(task, before["status"])
+    elif changes.get("assigned_to") and task.status == TaskStatus.open:
+        task.status = TaskStatus.assigned
+
+    for k, v in changes.items():
+        setattr(task, k, v)
+    task.updated_at = utcnow()
+    events.record_task_changes(db, task, auth.project_of_task(task), user.id, before)
+    audit.record(db, "task.updated", user, entity_type="task", entity_id=task.id, project_id=auth.project_of_task(task),
+                 request=request, details={"title": task.title, "fields": sorted(payload.model_dump(exclude_unset=True).keys()),
+                                           "status": {"from": before["status"], "to": task.status.value}
+                                           if before["status"] != task.status.value else None})
+    db.commit()
+    db.refresh(task)
+    return _with_attachments(schemas.TaskOut, task)
+
+
+@router.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: str, request: Request, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    """Soft-delete (manager/admin o creatore): viaggia nel sync come ogni altra modifica."""
+    task = _get_task(db, user, task_id)
+    if not auth.is_manager(user) and task.created_by != user.id:
+        raise HTTPException(403, "only the creator or a manager can delete a task")
+    task.deleted_at = task.updated_at = utcnow()
+    audit.record(db, "task.deleted", user, entity_type="task", entity_id=task.id, project_id=auth.project_of_task(task),
+                 request=request, details={"title": task.title})
+    db.commit()

@@ -1,0 +1,26 @@
+{
+  "name": "@fieldview/form-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tipi, validazione e default dei moduli dinamici Field View (condivisi da web e mobile)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "fixtures"],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9",
+    "vitest": "^3.2.0",
+    "zod": "^4.0.0"
+  }
+}

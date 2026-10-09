@@ -1,0 +1,3467 @@
+{
+  "schema_cases": [
+    {
+      "name": "example",
+      "schema": {
+        "fields": [
+          {
+            "id": "area",
+            "type": "text",
+            "label": "Area ispezionata",
+            "required": true,
+            "max_length": 120
+          },
+          {
+            "id": "esito",
+            "type": "select",
+            "label": "Esito",
+            "required": true,
+            "options": [
+              "Conforme",
+              "Non conforme",
+              "Da verificare"
+            ]
+          },
+          {
+            "id": "rischi",
+            "type": "multiselect",
+            "label": "Rischi rilevati",
+            "options": [
+              "Caduta dall'alto",
+              "Elettrico",
+              "Movimentazione carichi",
+              "Scavi",
+              "Altro"
+            ]
+          },
+          {
+            "id": "persone_presenti",
+            "type": "number",
+            "label": "Persone presenti nell'area",
+            "integer": true,
+            "min": 0
+          },
+          {
+            "id": "dpi_indossati",
+            "type": "checkbox",
+            "label": "DPI indossati correttamente",
+            "default": false
+          },
+          {
+            "id": "note",
+            "type": "textarea",
+            "label": "Note",
+            "help": "Descrivere la non conformità e l'azione correttiva proposta"
+          },
+          {
+            "id": "foto",
+            "type": "photo",
+            "label": "Foto evidenza",
+            "multiple": true
+          },
+          {
+            "id": "posizione",
+            "type": "geolocation",
+            "label": "Posizione GPS"
+          },
+          {
+            "id": "firma_ispettore",
+            "type": "signature",
+            "label": "Firma ispettore",
+            "required": true
+          },
+          {
+            "id": "data_ispezione",
+            "type": "date",
+            "label": "Data ispezione",
+            "required": true,
+            "default": "today"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "ispezione",
+              "title": "Ispezione",
+              "columns": 2,
+              "items": [
+                {
+                  "field": "area",
+                  "span": 2
+                },
+                {
+                  "field": "esito"
+                },
+                {
+                  "field": "data_ispezione"
+                },
+                {
+                  "field": "rischi",
+                  "span": 2
+                },
+                {
+                  "field": "persone_presenti"
+                },
+                {
+                  "field": "dpi_indossati"
+                }
+              ]
+            },
+            {
+              "id": "evidenze",
+              "title": "Evidenze",
+              "columns": 2,
+              "items": [
+                {
+                  "field": "note",
+                  "span": 2
+                },
+                {
+                  "field": "foto"
+                },
+                {
+                  "field": "posizione"
+                }
+              ]
+            },
+            {
+              "id": "chiusura",
+              "title": "Chiusura",
+              "items": [
+                {
+                  "field": "firma_ispettore"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "not_object",
+      "schema": null,
+      "errors": [
+        {
+          "field": "$",
+          "message": "schema must be an object"
+        }
+      ]
+    },
+    {
+      "name": "list",
+      "schema": [],
+      "errors": [
+        {
+          "field": "$",
+          "message": "schema must be an object"
+        }
+      ]
+    },
+    {
+      "name": "empty_object",
+      "schema": {},
+      "errors": [
+        {
+          "field": "$",
+          "message": "'fields' must be a list"
+        }
+      ]
+    },
+    {
+      "name": "empty_fields",
+      "schema": {
+        "fields": []
+      },
+      "errors": []
+    },
+    {
+      "name": "fields_not_list",
+      "schema": {
+        "fields": "x"
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'fields' must be a list"
+        }
+      ]
+    },
+    {
+      "name": "field_not_object",
+      "schema": {
+        "fields": [
+          "x"
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "field must be an object"
+        }
+      ]
+    },
+    {
+      "name": "id_empty",
+      "schema": {
+        "fields": [
+          {
+            "id": "",
+            "type": "text",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "id_uppercase",
+      "schema": {
+        "fields": [
+          {
+            "id": "Esito",
+            "type": "text",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "id_starts_digit",
+      "schema": {
+        "fields": [
+          {
+            "id": "1a",
+            "type": "text",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "id_dash",
+      "schema": {
+        "fields": [
+          {
+            "id": "a-b",
+            "type": "text",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "id_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": null,
+            "type": "text",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "id_too_long",
+      "schema": {
+        "fields": [
+          {
+            "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "text",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "fields[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "id_duplicate",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "a",
+            "type": "number",
+            "label": "A2"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "a",
+          "message": "duplicate field id"
+        }
+      ]
+    },
+    {
+      "name": "type_unknown",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "radio",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "unknown type 'radio'"
+        }
+      ]
+    },
+    {
+      "name": "type_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": null,
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "unknown type None"
+        }
+      ]
+    },
+    {
+      "name": "type_number_value",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": 5,
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "unknown type 5"
+        }
+      ]
+    },
+    {
+      "name": "label_blank",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text",
+            "label": "  "
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'label' is required"
+        }
+      ]
+    },
+    {
+      "name": "label_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'label' is required"
+        }
+      ]
+    },
+    {
+      "name": "required_not_bool",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text",
+            "label": "F",
+            "required": "yes"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'required' must be a boolean"
+        }
+      ]
+    },
+    {
+      "name": "help_not_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text",
+            "label": "F",
+            "help": 3
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'help' must be a string"
+        }
+      ]
+    },
+    {
+      "name": "props_not_allowed",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "checkbox",
+            "label": "F",
+            "options": [
+              "a"
+            ],
+            "foo": 1
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "properties not allowed for type checkbox: ['foo', 'options']"
+        }
+      ]
+    },
+    {
+      "name": "select_options_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'options' must be a non-empty list of strings"
+        }
+      ]
+    },
+    {
+      "name": "select_options_empty",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F",
+            "options": []
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'options' must be a non-empty list of strings"
+        }
+      ]
+    },
+    {
+      "name": "select_options_blank",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F",
+            "options": [
+              "a",
+              ""
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'options' must be a non-empty list of strings"
+        }
+      ]
+    },
+    {
+      "name": "select_options_dup",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F",
+            "options": [
+              "a",
+              "a"
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'options' contains duplicates"
+        }
+      ]
+    },
+    {
+      "name": "select_options_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F",
+            "options": "a"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'options' must be a non-empty list of strings"
+        }
+      ]
+    },
+    {
+      "name": "select_default_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F",
+            "options": [
+              "a",
+              "b"
+            ],
+            "default": "a"
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "select_default_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "select",
+            "label": "F",
+            "options": [
+              "a",
+              "b"
+            ],
+            "default": "z"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be one of options"
+        }
+      ]
+    },
+    {
+      "name": "multiselect_default_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "multiselect",
+            "label": "F",
+            "options": [
+              "a",
+              "b"
+            ],
+            "default": [
+              "a",
+              "z"
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be a subset of options"
+        }
+      ]
+    },
+    {
+      "name": "multiselect_default_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "multiselect",
+            "label": "F",
+            "options": [
+              "a",
+              "b"
+            ],
+            "default": [
+              "b"
+            ]
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "number_min_gt_max",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "F",
+            "min": 5,
+            "max": 1
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'min' must be <= 'max'"
+        }
+      ]
+    },
+    {
+      "name": "number_min_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "F",
+            "min": "1"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'min' must be a number"
+        }
+      ]
+    },
+    {
+      "name": "number_integer_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "F",
+            "integer": "yes"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'integer' must be a boolean"
+        }
+      ]
+    },
+    {
+      "name": "number_default_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "F",
+            "default": "3"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be a number"
+        }
+      ]
+    },
+    {
+      "name": "number_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "F",
+            "min": 0,
+            "max": 10,
+            "integer": true,
+            "default": 3
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "number_float_bounds",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "F",
+            "min": 0.5,
+            "max": 1.5
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "date_today",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "date",
+            "label": "F",
+            "default": "today"
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "date_iso",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "date",
+            "label": "F",
+            "default": "2026-01-31"
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "date_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "date",
+            "label": "F",
+            "default": "31/01/2026"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be 'today' or YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "name": "date_invalid_calendar",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "date",
+            "label": "F",
+            "default": "2026-02-30"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be 'today' or YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "name": "text_max_length_zero",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text",
+            "label": "F",
+            "max_length": 0
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'max_length' must be a positive integer"
+        }
+      ]
+    },
+    {
+      "name": "text_max_length_float",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text",
+            "label": "F",
+            "max_length": 2.5
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'max_length' must be a positive integer"
+        }
+      ]
+    },
+    {
+      "name": "text_default_number",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "text",
+            "label": "F",
+            "default": 1
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be a string"
+        }
+      ]
+    },
+    {
+      "name": "checkbox_default_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "checkbox",
+            "label": "F",
+            "default": "no"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'default' must be a boolean"
+        }
+      ]
+    },
+    {
+      "name": "photo_multiple_string",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "photo",
+            "label": "F",
+            "multiple": "si"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'multiple' must be a boolean"
+        }
+      ]
+    },
+    {
+      "name": "photo_multiple_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "photo",
+            "label": "F",
+            "multiple": true
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "signature_extra_prop",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "signature",
+            "label": "F",
+            "default": "x"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "properties not allowed for type signature: ['default']"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "geolocation",
+            "label": "F",
+            "help": "Posizione"
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "many_errors_same_field",
+      "schema": {
+        "fields": [
+          {
+            "id": "f",
+            "type": "number",
+            "label": "",
+            "min": "a",
+            "max": "b",
+            "integer": 1,
+            "default": "c"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "field": "f",
+          "message": "'label' is required"
+        },
+        {
+          "field": "f",
+          "message": "'min' must be a number"
+        },
+        {
+          "field": "f",
+          "message": "'max' must be a number"
+        },
+        {
+          "field": "f",
+          "message": "'integer' must be a boolean"
+        },
+        {
+          "field": "f",
+          "message": "'default' must be a number"
+        }
+      ]
+    },
+    {
+      "name": "layout_ok",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 2
+                },
+                {
+                  "field": "b"
+                }
+              ],
+              "title": "Dati",
+              "columns": 2
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_ok_slots_only",
+      "schema": {
+        "fields": [],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "slot": "s_1"
+                },
+                {
+                  "slot": "s_2",
+                  "span": 3
+                }
+              ],
+              "title": "Da riempire",
+              "columns": 3
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_ok_field_not_placed",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_null",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": null
+      },
+      "errors": []
+    },
+    {
+      "name": "layout_not_object",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": []
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'layout' must be an object"
+        }
+      ]
+    },
+    {
+      "name": "layout_sections_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {}
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'layout.sections' must be a non-empty list"
+        }
+      ]
+    },
+    {
+      "name": "layout_sections_empty",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": []
+        }
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "'layout.sections' must be a non-empty list"
+        }
+      ]
+    },
+    {
+      "name": "layout_extra_key",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": []
+            }
+          ],
+          "foo": 1
+        }
+      },
+      "errors": [
+        {
+          "field": "$",
+          "message": "only 'sections' allowed in layout"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_not_object",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            "x"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "section must be an object"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_id_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "S1",
+              "items": []
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'id' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_id_duplicate",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": []
+            },
+            {
+              "id": "s1",
+              "items": []
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[1]",
+          "message": "duplicate section id"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_title_number",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [],
+              "title": 3
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'title' must be a string"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_columns_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [],
+              "columns": 4
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'columns' must be 1, 2 or 3"
+        }
+      ]
+    },
+    {
+      "name": "layout_section_extra_prop",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [],
+              "foo": 1,
+              "bar": 2
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "properties not allowed in section: ['bar', 'foo']"
+        }
+      ]
+    },
+    {
+      "name": "layout_items_missing",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1"
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0]",
+          "message": "'items' must be a list"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_not_object",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                "x"
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "item must be an object"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_neither",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "span": 1
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "item must have either 'field' or 'slot'"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_both",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "slot": "s_1"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "item must have either 'field' or 'slot'"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_extra_prop",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "width": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "properties not allowed in item: ['width']"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_unknown_field",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "zzz"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "unknown field 'zzz'"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_field_number",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": 5
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "unknown field 5"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_field_twice",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a"
+                },
+                {
+                  "field": "a"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[1]",
+          "message": "field 'a' is already placed"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_slot_bad",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "slot": "1x"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'slot' must match ^[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_slot_duplicate",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "slot": "s_1"
+                },
+                {
+                  "slot": "s_1"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[1]",
+          "message": "duplicate slot id"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_over_columns",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 3
+                }
+              ],
+              "columns": 2
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 2"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_zero",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 0
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 1"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_float",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": 1.5
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 1"
+        }
+      ]
+    },
+    {
+      "name": "layout_item_span_bool",
+      "schema": {
+        "fields": [
+          {
+            "id": "a",
+            "type": "text",
+            "label": "A"
+          },
+          {
+            "id": "b",
+            "type": "number",
+            "label": "B"
+          }
+        ],
+        "layout": {
+          "sections": [
+            {
+              "id": "s1",
+              "items": [
+                {
+                  "field": "a",
+                  "span": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "field": "layout.sections[0].items[0]",
+          "message": "'span' must be an integer between 1 and 1"
+        }
+      ]
+    },
+    {
+      "name": "layout_empty_schema",
+      "schema": {
+        "fields": []
+      },
+      "errors": []
+    }
+  ],
+  "submission_schema": {
+    "fields": [
+      {
+        "id": "area",
+        "type": "text",
+        "label": "Area ispezionata",
+        "required": true,
+        "max_length": 120
+      },
+      {
+        "id": "esito",
+        "type": "select",
+        "label": "Esito",
+        "required": true,
+        "options": [
+          "Conforme",
+          "Non conforme",
+          "Da verificare"
+        ]
+      },
+      {
+        "id": "rischi",
+        "type": "multiselect",
+        "label": "Rischi rilevati",
+        "options": [
+          "Caduta dall'alto",
+          "Elettrico",
+          "Movimentazione carichi",
+          "Scavi",
+          "Altro"
+        ]
+      },
+      {
+        "id": "persone_presenti",
+        "type": "number",
+        "label": "Persone presenti nell'area",
+        "integer": true,
+        "min": 0
+      },
+      {
+        "id": "dpi_indossati",
+        "type": "checkbox",
+        "label": "DPI indossati correttamente",
+        "default": false
+      },
+      {
+        "id": "note",
+        "type": "textarea",
+        "label": "Note",
+        "help": "Descrivere la non conformità e l'azione correttiva proposta"
+      },
+      {
+        "id": "foto",
+        "type": "photo",
+        "label": "Foto evidenza",
+        "multiple": true
+      },
+      {
+        "id": "posizione",
+        "type": "geolocation",
+        "label": "Posizione GPS"
+      },
+      {
+        "id": "firma_ispettore",
+        "type": "signature",
+        "label": "Firma ispettore",
+        "required": true
+      },
+      {
+        "id": "data_ispezione",
+        "type": "date",
+        "label": "Data ispezione",
+        "required": true,
+        "default": "today"
+      }
+    ],
+    "layout": {
+      "sections": [
+        {
+          "id": "ispezione",
+          "title": "Ispezione",
+          "columns": 2,
+          "items": [
+            {
+              "field": "area",
+              "span": 2
+            },
+            {
+              "field": "esito"
+            },
+            {
+              "field": "data_ispezione"
+            },
+            {
+              "field": "rischi",
+              "span": 2
+            },
+            {
+              "field": "persone_presenti"
+            },
+            {
+              "field": "dpi_indossati"
+            }
+          ]
+        },
+        {
+          "id": "evidenze",
+          "title": "Evidenze",
+          "columns": 2,
+          "items": [
+            {
+              "field": "note",
+              "span": 2
+            },
+            {
+              "field": "foto"
+            },
+            {
+              "field": "posizione"
+            }
+          ]
+        },
+        {
+          "id": "chiusura",
+          "title": "Chiusura",
+          "items": [
+            {
+              "field": "firma_ispettore"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "submission_cases": [
+    {
+      "name": "valid",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": []
+    },
+    {
+      "name": "not_object",
+      "data": [
+        1
+      ],
+      "errors": [
+        {
+          "field": "$",
+          "message": "data must be an object"
+        }
+      ]
+    },
+    {
+      "name": "null",
+      "data": null,
+      "errors": [
+        {
+          "field": "$",
+          "message": "data must be an object"
+        }
+      ]
+    },
+    {
+      "name": "optional_omitted_or_empty",
+      "data": {
+        "area": "x",
+        "esito": "Conforme",
+        "firma_ispettore": "s",
+        "data_ispezione": "2026-09-14",
+        "note": "",
+        "rischi": [],
+        "foto": null
+      },
+      "errors": []
+    },
+    {
+      "name": "required_missing",
+      "data": {
+        "note": "solo note"
+      },
+      "errors": [
+        {
+          "field": "area",
+          "message": "required"
+        },
+        {
+          "field": "esito",
+          "message": "required"
+        },
+        {
+          "field": "firma_ispettore",
+          "message": "required"
+        },
+        {
+          "field": "data_ispezione",
+          "message": "required"
+        }
+      ]
+    },
+    {
+      "name": "required_empty_string",
+      "data": {
+        "area": "",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "area",
+          "message": "required"
+        }
+      ]
+    },
+    {
+      "name": "required_null",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": null,
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "esito",
+          "message": "required"
+        }
+      ]
+    },
+    {
+      "name": "unknown_field",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "extra": 1,
+        "altro": "x"
+      },
+      "errors": [
+        {
+          "field": "extra",
+          "message": "unknown field"
+        },
+        {
+          "field": "altro",
+          "message": "unknown field"
+        }
+      ]
+    },
+    {
+      "name": "text_not_string",
+      "data": {
+        "area": 5,
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "area",
+          "message": "must be a string"
+        }
+      ]
+    },
+    {
+      "name": "text_too_long",
+      "data": {
+        "area": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "area",
+          "message": "longer than 120 characters"
+        }
+      ]
+    },
+    {
+      "name": "text_exact_max",
+      "data": {
+        "area": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": []
+    },
+    {
+      "name": "number_string",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": "3",
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "persone_presenti",
+          "message": "must be a number"
+        }
+      ]
+    },
+    {
+      "name": "number_bool",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": true,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "persone_presenti",
+          "message": "must be a number"
+        }
+      ]
+    },
+    {
+      "name": "number_float_for_integer",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 2.5,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "persone_presenti",
+          "message": "must be an integer"
+        }
+      ]
+    },
+    {
+      "name": "number_below_min",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": -1,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "persone_presenti",
+          "message": "must be >= 0"
+        }
+      ]
+    },
+    {
+      "name": "number_zero_ok",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 0,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": []
+    },
+    {
+      "name": "checkbox_string",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": "si",
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "dpi_indossati",
+          "message": "must be a boolean"
+        }
+      ]
+    },
+    {
+      "name": "select_not_option",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Boh",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "esito",
+          "message": "not one of options"
+        }
+      ]
+    },
+    {
+      "name": "select_number",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": 1,
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "esito",
+          "message": "not one of options"
+        }
+      ]
+    },
+    {
+      "name": "multiselect_string",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": "Elettrico",
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "rischi",
+          "message": "must be a list of strings"
+        }
+      ]
+    },
+    {
+      "name": "multiselect_not_option",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Nucleare"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "rischi",
+          "message": "contains values not in options"
+        }
+      ]
+    },
+    {
+      "name": "multiselect_duplicates",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Elettrico"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "rischi",
+          "message": "contains duplicates"
+        }
+      ]
+    },
+    {
+      "name": "multiselect_non_strings",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          1
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "rischi",
+          "message": "must be a list of strings"
+        }
+      ]
+    },
+    {
+      "name": "date_bad_format",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "14/09/2026"
+      },
+      "errors": [
+        {
+          "field": "data_ispezione",
+          "message": "must be a date YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "name": "date_invalid_calendar",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-02-30"
+      },
+      "errors": [
+        {
+          "field": "data_ispezione",
+          "message": "must be a date YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "name": "date_compact_format",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "20260914"
+      },
+      "errors": [
+        {
+          "field": "data_ispezione",
+          "message": "must be a date YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "name": "photo_string",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": "11111111-1111-4111-8111-111111111111",
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "foto",
+          "message": "must be a list of attachment ids"
+        }
+      ]
+    },
+    {
+      "name": "photo_two_when_single",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "a",
+          "b"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": []
+    },
+    {
+      "name": "photo_empty_id",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          ""
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "foto",
+          "message": "must be a list of attachment ids"
+        }
+      ]
+    },
+    {
+      "name": "signature_empty",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "firma_ispettore",
+          "message": "required"
+        }
+      ]
+    },
+    {
+      "name": "signature_number",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": 7,
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "firma_ispettore",
+          "message": "must be an attachment id"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_missing_lng",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.0
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "posizione",
+          "message": "must be an object with numeric lat and lng"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_out_of_range",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 91,
+          "lng": 0
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "posizione",
+          "message": "lat/lng out of range"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_accuracy_string",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 1,
+          "lng": 2,
+          "accuracy": "8"
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "posizione",
+          "message": "'accuracy' must be a number"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_extra_key",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 1,
+          "lng": 2,
+          "alt": 100
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "posizione",
+          "message": "only lat, lng, accuracy allowed"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_list",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": [
+          45.0,
+          9.0
+        ],
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": [
+        {
+          "field": "posizione",
+          "message": "must be an object with numeric lat and lng"
+        }
+      ]
+    },
+    {
+      "name": "notes_ok",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "area": {
+            "comment": "vano stretto",
+            "photos": [
+              "33333333-3333-4333-8333-333333333333"
+            ]
+          },
+          "esito": {
+            "comment": "da rivedere"
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "notes_empty",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {}
+      },
+      "errors": []
+    },
+    {
+      "name": "notes_null",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": null
+      },
+      "errors": []
+    },
+    {
+      "name": "notes_not_object",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": [
+          "x"
+        ]
+      },
+      "errors": [
+        {
+          "field": "_notes",
+          "message": "must be an object"
+        }
+      ]
+    },
+    {
+      "name": "notes_unknown_field",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "nope": {
+            "comment": "x"
+          }
+        }
+      },
+      "errors": [
+        {
+          "field": "_notes.nope",
+          "message": "unknown field"
+        }
+      ]
+    },
+    {
+      "name": "notes_entry_not_object",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "area": "testo"
+        }
+      },
+      "errors": [
+        {
+          "field": "_notes.area",
+          "message": "must be an object"
+        }
+      ]
+    },
+    {
+      "name": "notes_extra_key",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "area": {
+            "comment": "x",
+            "foo": 1
+          }
+        }
+      },
+      "errors": [
+        {
+          "field": "_notes.area",
+          "message": "only comment, photos allowed"
+        }
+      ]
+    },
+    {
+      "name": "notes_comment_number",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "area": {
+            "comment": 5
+          }
+        }
+      },
+      "errors": [
+        {
+          "field": "_notes.area",
+          "message": "'comment' must be a string"
+        }
+      ]
+    },
+    {
+      "name": "notes_photos_string",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "area": {
+            "photos": "id"
+          }
+        }
+      },
+      "errors": [
+        {
+          "field": "_notes.area",
+          "message": "'photos' must be a list of attachment ids"
+        }
+      ]
+    },
+    {
+      "name": "notes_photos_empty_id",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": 45.46,
+          "lng": 9.19,
+          "accuracy": 8.5
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14",
+        "_notes": {
+          "area": {
+            "photos": [
+              ""
+            ]
+          }
+        }
+      },
+      "errors": [
+        {
+          "field": "_notes.area",
+          "message": "'photos' must be a list of attachment ids"
+        }
+      ]
+    },
+    {
+      "name": "geolocation_edges_ok",
+      "data": {
+        "area": "Piano 2, vano scala",
+        "esito": "Non conforme",
+        "rischi": [
+          "Elettrico",
+          "Altro"
+        ],
+        "persone_presenti": 3,
+        "dpi_indossati": true,
+        "note": "Quadro aperto",
+        "foto": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "posizione": {
+          "lat": -90,
+          "lng": 180
+        },
+        "firma_ispettore": "22222222-2222-4222-8222-222222222222",
+        "data_ispezione": "2026-09-14"
+      },
+      "errors": []
+    },
+    {
+      "name": "many_errors_ordered",
+      "data": {
+        "zzz": 1,
+        "area": 5,
+        "esito": "Boh",
+        "rischi": "x",
+        "persone_presenti": "n",
+        "firma_ispettore": "",
+        "data_ispezione": "x"
+      },
+      "errors": [
+        {
+          "field": "zzz",
+          "message": "unknown field"
+        },
+        {
+          "field": "area",
+          "message": "must be a string"
+        },
+        {
+          "field": "esito",
+          "message": "not one of options"
+        },
+        {
+          "field": "rischi",
+          "message": "must be a list of strings"
+        },
+        {
+          "field": "persone_presenti",
+          "message": "must be a number"
+        },
+        {
+          "field": "firma_ispettore",
+          "message": "required"
+        },
+        {
+          "field": "data_ispezione",
+          "message": "must be a date YYYY-MM-DD"
+        }
+      ]
+    }
+  ]
+}
