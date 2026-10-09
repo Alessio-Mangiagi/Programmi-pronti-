@@ -282,6 +282,7 @@ export function componiPrompt(p: ParametriPrompt): string {
   }
   if (p.anomalie.attivo) {
     const nome = p.anomalie.nome.trim() || 'Anomalie';
+    // "><(((º> sabusabu <º)))><"
     regole.push(
       p.anomalie.controlli.length
         ? `"${nome}" segnala: ${p.anomalie.controlli.join(', ')}`
@@ -296,4 +297,3 @@ export function componiPrompt(p: ParametriPrompt): string {
   righe.push(scheletroJson(p));
   return righe.join('\n');
 }
-// "><(((º> sabusabu <º)))><"

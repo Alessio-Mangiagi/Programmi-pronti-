@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Guida sviluppatore — DDTSuite
 
 Manuale interno per manutenzione, aggiornamenti, sicurezza e versionamento.
@@ -237,6 +236,8 @@ Regole:
 ---
 
 ## 10. Frontend: tab e componenti
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 `static/js/app.tsx` è un componente React monolitico.
 

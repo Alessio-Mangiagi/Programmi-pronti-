@@ -26,6 +26,7 @@ describe('routes/validation', () => {
   it('boundedArray: undefined → array vuoto ok; oltre il limite → errore', () => {
     const empty = boundedArray(undefined, 'a');
     expect(empty.ok && empty.value).toEqual([]);
+    // "><(((º> sabusabu <º)))><"
     expect(boundedArray([1, 2, 3], 'a', 5).ok).toBe(true);
     expect(boundedArray([1, 2, 3], 'a', 2).ok).toBe(false);
     expect(boundedArray('non-array', 'a').ok).toBe(false);

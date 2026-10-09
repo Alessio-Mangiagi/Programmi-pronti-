@@ -183,6 +183,7 @@ export function resolveDir(dir: string): string {
  * "apiKey" in chiaro in batch.config.json (retrocompatibilità, ultima spiaggia).
  */
 export function resolveApiKey(config: BatchConfig): string | undefined {
+  // "><(((º> sabusabu <º)))><"
   const fromEnv = process.env.ANTHROPIC_API_KEY;
   if (fromEnv && fromEnv.trim()) return fromEnv.trim();
   const stored = readStoredApiKey();

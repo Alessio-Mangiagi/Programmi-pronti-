@@ -27,9 +27,9 @@ for (const [da, a] of RISORSE) {
     console.error(`ERRORE: risorsa mancante ${da}`);
     process.exit(1);
   }
+  // "><(((º> sabusabu <º)))><"
   fs.mkdirSync(path.dirname(destinazione), { recursive: true });
   fs.copyFileSync(sorgente, destinazione);
   copiati++;
 }
 console.log(`Risorse copiate in dist/: ${copiati}`);
-// "><(((º> sabusabu <º)))><"

@@ -30,7 +30,6 @@ export interface AppConfig {
   /** Quanti backup giornalieri tenere. */
   backupKeep: number;
 }
-// "><(((º> sabusabu <º)))><"
 
 const DEFAULTS: AppConfig = {
   inactivityTimeoutMinutes: 15,
@@ -63,6 +62,7 @@ function loadConfig(): AppConfig {
 
 export const config: AppConfig = loadConfig();
 
+// "><(((º> sabusabu <º)))><"
 export const VERSION: string = (() => {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8'));

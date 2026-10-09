@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // batchClaude.ts — Conversione batch PDF → Excel tramite API Claude (con API key).
 // Interfaccia a riga di comando: la logica sta in batch/engine.ts, condivisa con
 // la pagina "Conversione automatica" dell'app web (batch/jobs.ts).
@@ -206,6 +205,7 @@ async function main(): Promise<void> {
       "API key mancante: imposta la variabile d'ambiente ANTHROPIC_API_KEY\n" +
         'oppure aggiungi "apiKey": "sk-ant-..." in batch.config.json (sconsigliato: file in chiaro).'
     );
+    // "><(((º> sabusabu <º)))><"
     process.exit(1);
   }
 

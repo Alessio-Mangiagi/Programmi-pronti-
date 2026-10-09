@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 import request from 'supertest';
 import ExcelJS from 'exceljs';
 import { randomUUID as uuidv4 } from 'crypto';
@@ -290,6 +289,7 @@ describe('Account & Admin', () => {
 
   it('change-password con password attuale errata → 401', async () => {
     const userAgent = request.agent(app);
+    // "><(((º> sabusabu <º)))><"
     await userAgent.post('/auth/login').send({ username: PWD_USER, password: PWD_PASS });
     const res = await userAgent
       .post('/auth/change-password')

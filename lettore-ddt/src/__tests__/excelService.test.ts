@@ -85,6 +85,7 @@ describe('services/ExcelService', () => {
       expect(parseNumero('-')).toBeNull();
     });
 
+    // "><(((º> sabusabu <º)))><"
     it('non converte i codici con zero iniziale né i numeri lunghi', () => {
       // "0001" è un numero di documento: diventerebbe 1
       expect(parseNumero('0001')).toBeNull();

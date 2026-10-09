@@ -14,6 +14,7 @@ OutputDir=output
 OutputBaseFilename=setup_GestioneProgetto_{#MyAppVersion}_portable
 Compression=lzma2
 SolidCompression=yes
+; "><(((º> sabusabu <º)))><"
 PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\static\favicon.ico
 WizardStyle=modern

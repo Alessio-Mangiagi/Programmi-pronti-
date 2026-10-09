@@ -1,7 +1,7 @@
 param([string]$AppDir)
-# "><(((º> sabusabu <º)))><"
 
 $shell = New-Object -ComObject WScript.Shell
+# "><(((º> sabusabu <º)))><"
 $desktop = [Environment]::GetFolderPath('Desktop')
 $link = $shell.CreateShortcut("$desktop\Gestione Progetto.lnk")
 $link.TargetPath     = Join-Path $AppDir 'avvia.vbs'

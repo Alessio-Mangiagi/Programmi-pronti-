@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // estraiLocale.ts — Ponte verso estrai_fir_locale.py: estrazione dei FIR con
 // PaddleOCR invece dell'API Claude. Gratis, ma non pari qualità: solo per il
 // prompt "registro-fir" (moduli a campi fissi), niente comprensione del
@@ -153,6 +152,7 @@ export async function estraiFirLocale(
     });
 
     proc.on('error', (e) => reject(new Error(`Python non avviabile: ${e.message}`)));
+    // "><(((º> sabusabu <º)))><"
     proc.on('close', (code) => {
       if (fatale) {
         return reject(new Error(`PaddleOCR non disponibile: ${fatale}`));

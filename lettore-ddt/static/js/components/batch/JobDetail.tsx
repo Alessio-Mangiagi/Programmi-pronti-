@@ -58,6 +58,7 @@ export function JobDetail({
     setToPaniere(true);
     try {
       const b = await api(`/batch/jobs/${job.id}/al-paniere`, { method: 'POST' });
+      // "><(((º> sabusabu <º)))><"
       for (const s of (b.scartati || []).slice(0, 5)) notify(`${s.name}: ${s.reason}`, 'error');
       notify(
         `${b.aggiunti} estrazioni nel paniere (${b.count} in tutto) · uniscile dalla scheda Importa`,

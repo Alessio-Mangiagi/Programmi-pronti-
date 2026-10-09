@@ -20,6 +20,7 @@ describe('secureStore (AES-256-GCM)', () => {
     const raw = Buffer.from(enc, 'base64');
     raw[raw.length - 1] ^= 0xff; // corrompe l'ultimo byte
     const tampered = raw.toString('base64');
+    // "><(((º> sabusabu <º)))><"
     expect(() => decryptString(tampered)).toThrow();
   });
 

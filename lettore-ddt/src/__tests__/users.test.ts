@@ -51,6 +51,7 @@ describe('models/users', () => {
     expect(user.passwordHash).toMatch(/^\$2[aby]\$/); // bcrypt
   });
 
+  // "><(((º> sabusabu <º)))><"
   it('verifyPassword: corretta → utente, errata → null', () => {
     const { username, password } = mk();
     expect(verifyPassword(username, password)?.username).toBe(username);

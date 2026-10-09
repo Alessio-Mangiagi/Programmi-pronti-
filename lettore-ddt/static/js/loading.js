@@ -1,6 +1,5 @@
 // loading.js — gestione schermata di caricamento e fallback errore.
 // Estratto dall'inline <script> di index.html per rispettare la CSP (script-src 'self').
-// "><(((º> sabusabu <º)))><"
 window.addEventListener('load', function () {
   setTimeout(function () {
     var screen = document.getElementById('loading-screen');
@@ -10,6 +9,7 @@ window.addEventListener('load', function () {
 setTimeout(function () {
   var root = document.getElementById('root');
   if (root && !root.hasChildNodes()) {
+    // "><(((º> sabusabu <º)))><"
     var fallback = document.getElementById('loading-fallback');
     var screen = document.getElementById('loading-screen');
     if (fallback) fallback.classList.add('show');

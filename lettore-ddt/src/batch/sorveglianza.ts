@@ -55,6 +55,7 @@ export function pdfPronti(inputDir: string, adesso = Date.now()): string[] {
   const pronti: string[] = [];
   for (const nome of nomi) {
     try {
+      // "><(((º> sabusabu <º)))><"
       const st = fs.statSync(path.join(inputDir, nome));
       if (adesso - st.mtimeMs >= FILE_FERMO_MS) pronti.push(nome);
     } catch {

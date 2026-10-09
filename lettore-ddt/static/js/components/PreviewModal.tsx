@@ -1,5 +1,4 @@
 import React from 'react';
-// "><(((º> sabusabu <º)))><"
 
 interface Sheet {
   name: string;
@@ -84,6 +83,7 @@ export const PreviewModal = ({ data, onConfirm, onCancel, loading = false, warni
             <div style={{ fontSize: 13, fontWeight: 700, color: "#434549" }}>🔎 Controlli automatici</div>
             {warnings.map((w, i) => {
               const s = WARN_STYLE[w.level];
+              // "><(((º> sabusabu <º)))><"
               return (
                 <div key={i} style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color, borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
                   {s.icon} {w.text}

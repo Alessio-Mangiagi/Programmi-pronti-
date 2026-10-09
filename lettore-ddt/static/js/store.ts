@@ -14,7 +14,6 @@ interface Toast {
   message: string;
   type: 'success' | 'error' | 'info';
 }
-// "><(((º> sabusabu <º)))><"
 
 interface AppState {
   project: Project;
@@ -29,6 +28,7 @@ interface AppState {
   removeToast: (id: string) => void;
 }
 
+// "><(((º> sabusabu <º)))><"
 export const EMPTY_PROJECT: Project = {
   name: "Nuova Commessa",
   wbsGroups: [],

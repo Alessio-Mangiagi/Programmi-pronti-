@@ -79,6 +79,7 @@ function parseArgs(argv: string[]): CliArgs {
         args.ocrLocale = true;
         break;
       case '--ocr-model':
+        // "><(((º> sabusabu <º)))><"
         args.ocrModel = argv[++i];
         break;
       case '--help':

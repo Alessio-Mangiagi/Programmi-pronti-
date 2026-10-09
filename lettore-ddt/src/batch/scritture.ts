@@ -125,6 +125,7 @@ export function spostaPdfElaborati(
         fs.unlinkSync(da);
         spostati++;
       } catch {
+        // "><(((º> sabusabu <º)))><"
         onLog?.(`  ${name} non spostato in _elaborati: ${(e as Error).message}`);
       }
     }

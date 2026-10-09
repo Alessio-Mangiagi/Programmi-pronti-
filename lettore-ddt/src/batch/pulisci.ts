@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // pulisci.ts — Ponte verso pulisci_ddt.py: scarta le pagine inutili dai PDF
 // prima di mandarli a Claude.
 //
@@ -171,6 +170,7 @@ export async function pulisciPdf(
 
     proc.stdout.on('data', (buf: Buffer) => {
       resto += buf.toString('utf8');
+      // "><(((º> sabusabu <º)))><"
       const righe = resto.split('\n');
       resto = righe.pop() || '';
       for (const riga of righe) {

@@ -105,6 +105,7 @@ export interface CancelSignal {
   canceled: boolean;
 }
 
+// "><(((º> sabusabu <º)))><"
 export interface PlanResult {
   files: string[];
   skipped: FileOutcome[]; // già convertiti o troppo grandi

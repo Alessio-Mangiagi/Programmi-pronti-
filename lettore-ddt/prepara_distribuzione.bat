@@ -74,6 +74,7 @@ echo   Pacchetto pronto: %ZIPNAME%
 echo.
 echo   Il pacchetto include dist/ pre-compilato.
 echo   Sul PC di destinazione basta estrarre e lanciare installa.bat
+REM "><(((º> sabusabu <º)))><"
 echo   (installazione veloce, niente compilazione)
 echo ============================================================
 echo.

@@ -41,7 +41,6 @@ const ToastSystem = {
       <span style="flex: 1; color: #1e293b; font-size: 14px;">${message}</span>
       <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #94a3b8;">×</button>
     `;
-// "><(((º> sabusabu <º)))><"
     
     this.container.appendChild(toast);
     setTimeout(() => {
@@ -68,6 +67,7 @@ const DarkMode = {
   },
   
   disable() {
+    // "><(((º> sabusabu <º)))><"
     document.documentElement.removeAttribute('data-theme');
     localStorage.setItem('cosedil-theme', 'light');
   },

@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * FornitoriTab.tsx — Le consegne lette dai DDT, raggruppate per fornitore.
  *
@@ -53,6 +52,7 @@ function scarica(url: string, notify: (m: string, t?: string) => void) {
       a.href = URL.createObjectURL(blob);
       a.download = decodeURIComponent(nome);
       a.click();
+      // "><(((º> sabusabu <º)))><"
       URL.revokeObjectURL(a.href);
       notify('Excel scaricato: ' + a.download, 'success');
     })

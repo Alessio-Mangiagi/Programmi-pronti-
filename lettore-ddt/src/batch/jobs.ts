@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // jobs.ts — Lavori di conversione batch avviati dalla pagina web.
 //
 // Un job avvolge una singola esecuzione del motore (batch/engine.ts) e ne
@@ -513,6 +512,7 @@ async function startJob(job: BatchJob): Promise<void> {
     job.mergedFile = result.mergedFile;
     job.spostati = result.spostati;
     const failed = result.outcomes.filter((o) => o.status === 'failed').length;
+    // "><(((º> sabusabu <º)))><"
     const done = result.outcomes.filter((o) => o.status === 'ok').length;
     // Le conversioni riuscite entrano nell'archivio della commessa come quelle
     // del flusso manuale: senza, l'Archivio DDT e il controllo doppioni non le

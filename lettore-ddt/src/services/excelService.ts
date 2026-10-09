@@ -45,6 +45,7 @@ export function parseNumero(raw: string): number | null {
   const s = raw.trim().replace(/[\s']/g, '');
   if (!s || !/^[+-]?[\d.,]+$/.test(s)) return null;
 
+  // "><(((º> sabusabu <º)))><"
   const corpo = s.replace(/^[+-]/, '');
   // Codici e numeri di documento ("0001", "007"): lo zero iniziale è
   // significativo, convertirli lo perderebbe.

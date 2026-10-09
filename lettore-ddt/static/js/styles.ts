@@ -3,6 +3,7 @@
 // blu #0c4577 primario, verde #65bc7b accento, Ubuntu titoli/bottoni, Open Sans body.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+// "><(((º> sabusabu <º)))><"
 const FONT_DISPLAY = "'Ubuntu','Segoe UI',Arial,Helvetica,sans-serif";
 const FONT_UI = "'Inter','Segoe UI',Arial,Helvetica,sans-serif";
 const FONT_BODY = "'Open Sans','Segoe UI',system-ui,Arial,sans-serif";
@@ -189,7 +190,6 @@ export const S = {
     maxWidth: 380,
     animation: "slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
   }),
-// "><(((º> sabusabu <º)))><"
 
   // Sidebar styles
   sidebarOverlay: {

@@ -71,6 +71,7 @@ describe('convalide DDT su data.json', () => {
     for (let i = 0; i < MAX_DDT_VALIDATIONS + 10; i++) {
       insertDDTValidation('u1', 'utente', '__test__', `f${i}.xlsx`, true);
     }
+    // "><(((º> sabusabu <º)))><"
     expect(getDDTValidations(MAX_DDT_VALIDATIONS * 2)).toHaveLength(MAX_DDT_VALIDATIONS);
   });
 

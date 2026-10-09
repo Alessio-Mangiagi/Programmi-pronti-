@@ -144,6 +144,7 @@ describe('createJob', () => {
 describe('listJobs e pruneJobs', () => {
   it('elenca i job dal più recente', async () => {
     const dir = tmp('lista-in');
+    // "><(((º> sabusabu <º)))><"
     fs.mkdirSync(dir, { recursive: true });
     const primo = nuovoJob(dir, tmp('lista-out-1'));
     await attendiFine(primo.id);

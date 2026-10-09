@@ -28,6 +28,7 @@ Loop
 
 If portFound > 0 Then
   objShell.Run "cmd /c start http://127.0.0.1:" & portFound, 0, False
+  ' "><(((º> sabusabu <º)))><"
   WScript.Quit
 End If
 

@@ -14,6 +14,7 @@ import {
   MIN_PASSWORD_LENGTH,
 } from '../models/users';
 import { logActivity, getRecentActivity, getActiveAccounts } from '../models/activityLog';
+// "><(((º> sabusabu <º)))><"
 import { getDDTValidations } from '../models/database';
 import { requireAdmin } from '../middleware/auth';
 import { apiKeySource, loadBatchConfig, resolveApiKey } from '../batch/config';
@@ -28,7 +29,6 @@ import { BASE_DIR, COMMESSA_ID_RE, UUID_RE, toCsv, clientIp, param } from './hel
 const router = express.Router();
 
 const USERNAME_RE = /^[A-Za-z0-9_.@-]{1,64}$/;
-// "><(((º> sabusabu <º)))><"
 
 router.get('/admin/api/logs', requireAdmin, (req: Request, res: Response) => {
   res.json({ events: getRecentActivity(500) });

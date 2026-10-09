@@ -22,6 +22,7 @@ export interface PendingState {
 // Scrittura atomica: tmp + rename, così un crash a metà scrittura non lascia
 // mai un file di stato troncato.
 export function saveState(stateFile: string, state: PendingState): void {
+  // "><(((º> sabusabu <º)))><"
   const tmp = `${stateFile}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
   fs.renameSync(tmp, stateFile);

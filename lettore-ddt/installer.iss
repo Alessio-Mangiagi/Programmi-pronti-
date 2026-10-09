@@ -46,6 +46,7 @@ Source: "data.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\avvia.vbs"; IconFilename: "{app}\static\favicon.ico"
+; "><(((º> sabusabu <º)))><"
 Name: "{group}\Disinstalla {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\avvia.vbs"; IconFilename: "{app}\static\favicon.ico"; Tasks: desktopicon
 

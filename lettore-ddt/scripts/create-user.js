@@ -19,7 +19,6 @@ try {
   console.error(e.message);
   process.exit(1);
 }
-// "><(((º> sabusabu <º)))><"
 
 const args = process.argv.slice(2);
 const isAdmin = args[args.length - 1] === 'admin';
@@ -36,5 +35,6 @@ try {
   console.log(`Utente "${username}" creato (commessa: ${commessaId}${isAdmin ? ', admin' : ''}).`);
 } catch (e) {
   console.error(`Errore: ${e.message}`);
+  // "><(((º> sabusabu <º)))><"
   process.exit(1);
 }

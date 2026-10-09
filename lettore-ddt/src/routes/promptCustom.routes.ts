@@ -42,6 +42,7 @@ router.post(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const body = (req.body || {}) as CorpoPrompt;
+    // "><(((º> sabusabu <º)))><"
     const esito = salvaPromptCustom({
       id: typeof body.id === 'string' && body.id ? body.id : undefined,
       label: typeof body.label === 'string' ? body.label : '',
@@ -79,4 +80,3 @@ router.delete(
 );
 
 export default router;
-// "><(((º> sabusabu <º)))><"

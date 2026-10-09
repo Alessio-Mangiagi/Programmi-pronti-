@@ -9,13 +9,13 @@ export const Login = ({ onSuccess }: LoginProps) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-// "><(((º> sabusabu <º)))><"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
+      // "><(((º> sabusabu <º)))><"
       const res = await fetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -41,6 +41,7 @@ from datetime import datetime
 # ── Bootstrap OCR (stessa tecnica di pulisci_ddt.py: rete aziendale con
 # ispezione SSL, bypass ristretto ai soli host dei modelli PaddleOCR) ────────
 
+# "><(((º> sabusabu <º)))><"
 os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 os.environ.setdefault("PADDLE_PDX_MODEL_SOURCE", "BOS")
 

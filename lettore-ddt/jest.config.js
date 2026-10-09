@@ -8,6 +8,7 @@ module.exports = {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  // "><(((º> sabusabu <º)))><"
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     'static/js/**/*.{js,jsx}',
@@ -33,4 +34,3 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   forceExit: true,
 };
-// "><(((º> sabusabu <º)))><"

@@ -1,5 +1,7 @@
 # Guida rapida — Gestione Progetto
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Benvenuto! Questa guida ti accompagna nelle operazioni di tutti i giorni. Per i dettagli di ogni funzione vedi il [Manuale completo](MANUALE.md).
 
 ---

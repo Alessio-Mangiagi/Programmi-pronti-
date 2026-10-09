@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// "><(((º> sabusabu <º)))><"
 // Entry point del server Express.js. Gestisce l'avvio del server su una porta disponibile
 // tra PORT_START e PORT_END, la persistenza della porta in port.js per accesso client,
 // e il graceful shutdown su SIGINT/SIGTERM.
@@ -8,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import net from 'net';
 import { execFile } from 'child_process';
+// "><(((º> sabusabu <º)))><"
 import app from './app';
 import logger from './utils/logger';
 import { resumeInterruptedJobs } from './batch/jobs';

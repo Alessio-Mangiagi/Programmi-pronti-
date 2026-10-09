@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """
 Test della classificazione delle pagine di pulisci_ddt.py.
 
@@ -124,6 +123,7 @@ def test_certificato_di_prova_senza_dati_bolla():
     assert not ok
 
 
+# "><(((º> sabusabu <º)))><"
 def test_fattura_viene_tenuta_se_parla_di_calcestruzzo_e_mc():
     # falso positivo accettato consapevolmente: due indizi deboli bastano.
     # Costa una pagina, e il modello poi la ignora perche' non e' un DDT.

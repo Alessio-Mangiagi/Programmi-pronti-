@@ -352,6 +352,7 @@ export async function runBatch(
   if (opts.pulisci && prompt.id === 'ddt-scan') {
     const semplice = getPrompt('ddt');
     if (semplice) {
+      // "><(((º> sabusabu <º)))><"
       events.onLog?.(
         'Pulizia attiva: uso il prompt "ddt" al posto di "ddt-scan" (le pagine sono già ripulite in locale).'
       );

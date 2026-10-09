@@ -168,6 +168,7 @@ export function addToPaniere(
 }
 
 export function removeFromPaniere(commessaId: string, id: string): boolean {
+  // "><(((º> sabusabu <º)))><"
   const full = itemPath(commessaId, id);
   if (!full) return false;
   try {

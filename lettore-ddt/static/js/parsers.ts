@@ -1,7 +1,6 @@
 import { EMPTY_PROJECT } from './store';
 
 declare const XLSX: any;
-// "><(((º> sabusabu <º)))><"
 
 export function parseOutputCD(sheet: any) {
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
@@ -24,6 +23,7 @@ export function parseOutputCD(sheet: any) {
     if (col1 === "WBS (cod)" || (col1 === "" && col2 === "" && col3 === "")) continue;
 
     const numVal = parseFloat(col1);
+    // "><(((º> sabusabu <º)))><"
     if (!isNaN(numVal) && numVal === Math.floor(numVal) && col2 && !col2.match(/^\d{3}\s/)) {
       currentGroupNum = Math.floor(numVal);
       currentGroupName = col2;

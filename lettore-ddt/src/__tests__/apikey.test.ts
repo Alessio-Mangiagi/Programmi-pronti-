@@ -141,6 +141,7 @@ describe('Route /admin/api/apikey', () => {
   it('senza login → 401', async () => {
     expect((await request(app).get('/admin/api/apikey')).status).toBe(401);
     expect((await request(app).post('/admin/api/apikey').send({ apiKey: KEY })).status).toBe(401);
+    // "><(((º> sabusabu <º)))><"
     expect((await request(app).delete('/admin/api/apikey')).status).toBe(401);
   });
 

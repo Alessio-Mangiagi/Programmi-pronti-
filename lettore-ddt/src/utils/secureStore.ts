@@ -25,6 +25,7 @@ function getKey(): Buffer {
     cachedKey = crypto.createHash('sha256').update(envKey, 'utf8').digest();
     return cachedKey;
   }
+  // "><(((º> sabusabu <º)))><"
   if (fs.existsSync(KEY_PATH)) {
     cachedKey = Buffer.from(fs.readFileSync(KEY_PATH, 'utf8').trim(), 'hex');
     return cachedKey;
@@ -44,7 +45,6 @@ export function encryptString(plain: string): string {
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, enc]).toString('base64');
 }
-// "><(((º> sabusabu <º)))><"
 
 export function decryptString(payload: string): string {
   const key = getKey();

@@ -1,8 +1,8 @@
 import 'jest-extended';
+// "><(((º> sabusabu <º)))><"
 import os from 'os';
 import path from 'path';
 import logger from '../utils/logger';
-// "><(((º> sabusabu <º)))><"
 
 // La chiave API cifrata (.apikey.enc) va in un file temporaneo per worker:
 // le suite girano in parallelo e sul file reale nella root si pesterebbero

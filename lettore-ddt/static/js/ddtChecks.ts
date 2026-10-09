@@ -1,6 +1,5 @@
 // ddtChecks.ts — controlli di coerenza automatici sull'estrazione DDT
 // prima del download Excel: confronta F1, F2 e summary tra loro.
-// "><(((º> sabusabu <º)))><"
 
 export interface DdtCheck {
   level: 'ok' | 'warn' | 'error';
@@ -48,6 +47,7 @@ export function computeDdtChecks(parsed: any): DdtCheck[] {
   // 2) Somma m³ F1 vs summary ("Tot 118 m³") vs totale F2
   const m3Col = num('m³');
   const sumF1 = dataRows.reduce((acc: number, r: any[]) => {
+    // "><(((º> sabusabu <º)))><"
     const v = parseItNum(r?.[m3Col]);
     return acc + (isNaN(v) ? 0 : v);
   }, 0);

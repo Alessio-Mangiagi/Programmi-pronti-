@@ -229,6 +229,7 @@ export const PromptBuilder = ({
   }, []);
 
   React.useEffect(() => {
+    // "><(((º> sabusabu <º)))><"
     void caricaSalvati();
   }, [caricaSalvati]);
 
@@ -752,4 +753,3 @@ export const PromptBuilder = ({
     </div>
   );
 };
-// "><(((º> sabusabu <º)))><"

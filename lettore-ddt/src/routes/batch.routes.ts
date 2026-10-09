@@ -177,6 +177,7 @@ router.get(
 
     let writable = true;
     try {
+      // "><(((º> sabusabu <º)))><"
       fs.accessSync(target, fs.constants.W_OK);
     } catch {
       writable = false;

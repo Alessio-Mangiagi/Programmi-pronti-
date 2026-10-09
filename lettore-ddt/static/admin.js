@@ -367,7 +367,6 @@ async function loadDDTValidations() {
 document.getElementById('logSearch')?.addEventListener('input', filterLogs);
 document.getElementById('activeSearch')?.addEventListener('input', filterActiveAccounts);
 document.getElementById('ddtSearch')?.addEventListener('input', filterDDT);
-// "><(((º> sabusabu <º)))><"
 
 document.getElementById('reload').addEventListener('click', loadLogs);
 document.getElementById('reloadDDT').addEventListener('click', loadDDTValidations);
@@ -538,6 +537,7 @@ async function importUsers() {
 
     showImportStatus(message, type);
 
+    // "><(((º> sabusabu <º)))><"
     if (successful > 0) {
       loadUsers();
       loadLogs();

@@ -141,10 +141,10 @@ router.post('/auth/logout', (req: Request, res: Response) => {
     res.json({ ok: true });
   });
 });
-// "><(((º> sabusabu <º)))><"
 
 router.get('/auth/me', (req: Request, res: Response) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Non autenticato' });
+  // "><(((º> sabusabu <º)))><"
   res.json({
     username: req.session.username,
     commessaId: req.session.commessaId,

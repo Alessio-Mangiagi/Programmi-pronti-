@@ -34,6 +34,7 @@ h4, h5, h6, th, label {
 #root {
   min-height: 100vh;
   animation: fadeIn 0.35s ease;
+/* "><(((º> sabusabu <º)))><" */
 }
 
 @keyframes fadeIn {
@@ -70,7 +71,6 @@ h4, h5, h6, th, label {
   white-space: nowrap;
   border: 0;
 }
-/* "><(((º> sabusabu <º)))><" */
 
 /* ── Input / Select ── */
 input[type="number"]::-webkit-inner-spin-button,
