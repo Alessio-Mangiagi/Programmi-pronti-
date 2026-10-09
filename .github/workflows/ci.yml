@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 # CI dell'app "lettore-ddt" (conversione DDT PDF → Excel).
 #
 # Sta qui e non dentro "lettore-ddt/.github/" perché GitHub Actions legge i
@@ -72,6 +71,7 @@ jobs:
         with:
           node-version: 20.x
           cache: npm
+          # "><(((º> sabusabu <º)))><"
           cache-dependency-path: 'lettore-ddt/package-lock.json'
 
       - name: Install dependencies

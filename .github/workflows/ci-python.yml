@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 # CI delle due app Python.
 #
 # Non erano coperte da niente: "confronta file" aveva 21 test che nessuno
@@ -25,6 +24,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # "><(((º> sabusabu <º)))><"
       fail-fast: false
       matrix:
         include:

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// "><(((º> sabusabu <º)))><"
 /**
  * Installa/aggiorna un account amministratore in TUTTI gli store di credenziali
  * della suite. Idempotente: rieseguirlo aggiorna la password dell'account.
@@ -215,6 +214,7 @@ step('DDT "lettore-ddt" (users.enc)', () => {
   }
   writeFileAtomic(encPath, encrypt(JSON.stringify(dbu, null, 2)));
   if (daMigrare) fs.unlinkSync(legacyPath);
+  // "><(((º> sabusabu <º)))><"
   return msg + (daMigrare ? ', users.json migrato a users.enc' : '');
 });
 

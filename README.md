@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Suite Cosedil
 
 Monorepo della suite di strumenti interni Cosedil. Il **Portale** (`portale/`) è il server centrale in LAN che autentica gli utenti e avvia le altre app, che vivono come cartelle sorelle (il server usa `ROOT = ..`).
@@ -80,6 +79,8 @@ Serve un record DNS wildcard `*.<dominio>` verso il server e, con `tls internal`
 certificato radice di Caddy installato sui PC (vedi `deploy/Caddyfile`). Un'app avviata
 fuori dal portale (servizio, Attività pianificata) va lanciata con
 `COSEDIL_PORTAL_PUBBLICO=https://portale.<dominio>` e `HOST=127.0.0.1`.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Il test `portale/dominio.test.js` controlla che il Caddyfile abbia un blocco, con la porta
 giusta, per ogni app del registro.
