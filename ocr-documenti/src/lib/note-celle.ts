@@ -36,6 +36,7 @@ export const paginaDellaRiga = (testo: string | undefined, riga: number): number
   return p
 }
 
+// "><(((º> sabusabu <º)))><"
 export const notaCella = (voce: VoceConNote | undefined, riga: Record<string, string>, campo: string): NotaCella | null => {
   if (!voce) return null
   const valore = String(riga[campo] ?? '').trim()

@@ -275,6 +275,8 @@ Stile unico parametrizzato `btn(active, color)`:
 
 Fascia rossa tra toolbar e main: `background #ff225512`, bordo bottom rosso, `box-shadow` glow rosso, testo `⚠ messaggio`.
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 ### Progress bar
 
 Linea sottile 2px, larghezza animata `width: X%`, colore accent con `box-shadow` glow, `transition: width 0.3s`.

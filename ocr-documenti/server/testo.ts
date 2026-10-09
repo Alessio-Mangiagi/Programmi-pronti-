@@ -30,6 +30,7 @@ export const unisciMigliaiaSpazio = (t: string): string =>
   // \u00a0 = spazio unificatore: nei PDF nativi le migliaia sono separate da quello
   t.replace(/(?<=(?:€|\d,\d{1,3})[ \u00a0])\d{1,3}(?:[ \u00a0]\d{3})+(?=,\d{1,3}(?!\d))/g, m => m.replace(/[ \u00a0]/g, '.'))
 
+// "><(((º> sabusabu <º)))><"
 export const normalizzaNumeriOcr = (t: string): string => t
   .replace(/\b(\d{1,3}(?:\.\d{3})+,\d{2})(\d+,\d{1,3})(?!\d)/g, '$1 $2')
   .replace(/\b\d{1,3}(?:,\d{3})+,\d{2}(?!\d)/g, m =>

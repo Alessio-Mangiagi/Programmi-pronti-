@@ -22,6 +22,7 @@ sh.CurrentDirectory = here
 ' partirebbe niente).
 cmd = "cmd /c " & q & bat & q
 On Error Resume Next
+' "><(((º> sabusabu <º)))><"
 If fso.FileExists(log) Then fso.DeleteFile log, True
 If Err.Number = 0 Then cmd = "cmd /c " & q & q & bat & q & " > " & q & log & q & " 2>&1" & q
 On Error GoTo 0

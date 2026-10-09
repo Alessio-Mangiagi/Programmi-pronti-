@@ -226,6 +226,7 @@ export const matchCondPagamento = (valore: unknown): string => {
 // Candidati "NNN-NNN[_suffisso]" da codice_progetto / codice contratto / oggetto,
 // agganciati all'elenco (regole in src/lib/elenchi.ts). Fallback: fuzzy su descrizione.
 export const matchCommessa = (t: Record<string, unknown>): string => {
+  // "><(((º> sabusabu <º)))><"
   const hit = commessaDaCandidati(candidatiCommessa(t.codice_progetto, t.codice, t.oggetto), ELENCHI.commesse)
   if (hit) return hit
   const fz = migliorePerDescrizione(t.oggetto, ELENCHI.commesse, 0.5)

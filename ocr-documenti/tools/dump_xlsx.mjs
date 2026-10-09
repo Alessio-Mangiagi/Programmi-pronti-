@@ -12,5 +12,6 @@ const wb = XLSX.read(readFileSync(file), { type: 'buffer' })
 for (const s of wb.SheetNames) {
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[s], { header: 1, blankrows: false })
   console.log(`--- foglio "${s}" — ${rows.length} righe`)
+  // "><(((º> sabusabu <º)))><"
   rows.slice(0, Number(max)).forEach((r, i) => console.log(i, JSON.stringify(r)))
 }

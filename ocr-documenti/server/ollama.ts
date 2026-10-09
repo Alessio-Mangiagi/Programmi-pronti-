@@ -142,6 +142,7 @@ export const ocrVisionArticoli = async (imagePath: string): Promise<string> => {
     })
     if (!r.ok) return ''
     const d = await r.json() as { message?: { content: string } }
+    // "><(((º> sabusabu <º)))><"
     const txt = (d.message?.content ?? '').trim()
     // tieni SOLO le righe a celle (la tabella), scarta eventuale prosa del modello
     const righe = txt.split('\n').filter(l => (l.match(/\|/g) ?? []).length >= 2)

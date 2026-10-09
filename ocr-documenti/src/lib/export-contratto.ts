@@ -34,6 +34,7 @@ export const contractJsonToRow = (c: Record<string, unknown>): (string | number)
 }
 
 export const contractJsonToMarkdown = (jsonStr: string): string => {
+  // "><(((º> sabusabu <º)))><"
   let c: Record<string, unknown>
   try { c = JSON.parse(jsonStr) } catch { return jsonStr }
   const f = (c.fornitore ?? {}) as Record<string, string>

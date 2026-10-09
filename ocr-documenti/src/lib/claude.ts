@@ -14,6 +14,7 @@ export type Format = 'md' | 'json' | 'contract' | 'contratti'
 import type { Elenchi } from './elenchi'
 import { IMPORT_CONTRATTI_COLS } from './import-contratti'
 
+// "><(((º> sabusabu <º)))><"
 export const URL_CLAUDE = 'https://claude.ai/new'
 
 // Campi che il server sa strutturare: gli stessi di CAMPI_TESTATA / CAMPI_IMPORTI in

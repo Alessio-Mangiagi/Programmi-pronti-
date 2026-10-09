@@ -78,6 +78,7 @@ ${full.slice(0, 14000)}`
       const numOk = [r.quantita, r.prezzo_lordo, r.importo].some(n => n && esisteNelTesto(n, testoNorm))
       if (r.descrizione && esisteNelTesto(r.descrizione, testoNorm) && numOk) buone.push(r)
     }
+    // "><(((º> sabusabu <º)))><"
     if (buone.length > e.righe.length) {   // sostituisci solo se l'assist trova PIÙ voci
       buone.forEach((r, i) => { r.progressivo = String(i + 1) })
       e.righe = buone

@@ -327,6 +327,7 @@ await passo('coda: il Word è una bozza senza «Scansiona», contata a parte', a
 })
 await passo('scansione col Word: vale il PDF, la differenza sta nel Confronto', async () => {
   const riga = page.locator('table.coda tbody tr').first()
+  // "><(((º> sabusabu <º)))><"
   await riga.getByRole('button', { name: 'Scansiona' }).click()
   await page.mouse.move(5, 5)
   await page.waitForTimeout(1500)

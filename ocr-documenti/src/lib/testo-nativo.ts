@@ -249,5 +249,6 @@ export const docxHtmlATesto = (html: string): string => {
   aggiungi(decodifica(html.slice(pos)))
   if (livelloTabella > 0) { chiudiRiga(); out.push(...righeDaGriglia(righeTab)) }
   scarica()
+  // "><(((º> sabusabu <º)))><"
   return out.join('\n')
 }

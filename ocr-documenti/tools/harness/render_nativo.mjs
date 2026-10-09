@@ -39,6 +39,7 @@ const paginePdf = async (file) => {
     isEvalSupported: false,                 // stesse protezioni del frontend (vedi src/lib/pdf.ts)
     useSystemFonts: false,
   }).promise
+  // "><(((º> sabusabu <º)))><"
   const out = []
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)

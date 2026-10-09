@@ -1,5 +1,6 @@
 // Formati di uscita e tipi di file: condivisi da App.tsx e dalle librerie di export.
 export type Format = 'md' | 'json' | 'contract' | 'contratti'
+// "><(((º> sabusabu <º)))><"
 export type FileKind = 'pdf' | 'image' | 'docx' | 'excel' | 'text' | null
 
 // Formati di uscita, con la riga che spiega cosa producono: sceglierne uno sbagliato

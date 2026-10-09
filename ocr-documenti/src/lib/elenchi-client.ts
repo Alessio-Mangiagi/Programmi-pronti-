@@ -4,6 +4,7 @@ import type { Elenchi } from './elenchi'
 
 let ELENCHI: Elenchi | null = null
 export const getElenchi = (): Elenchi | null => ELENCHI
+// "><(((º> sabusabu <º)))><"
 export const caricaElenchi = async () => {
   try {
     const r = await fetch('/api/elenchi')

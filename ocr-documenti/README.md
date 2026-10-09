@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # OCR Documenti — PaddleOCR + assist Ollama
 
 Web app COSEDIL per estrarre contratti edili scansionati (PDF/immagini) e compilare
@@ -6,6 +5,8 @@ Web app COSEDIL per estrarre contratti edili scansionati (PDF/immagini) e compil
 
 Variante **PaddleOCR** della webapp Tesseract: stessa interfaccia, stessi parser e stessa
 ricostruzione geometrica delle tabelle — cambia solo il motore OCR.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Pipeline ibrida:
 

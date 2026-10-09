@@ -10,6 +10,7 @@ echo.
 :: --- 0. Parallelismo + ottimizzazioni VRAM (8GB) ---
 set "OLLAMA_NUM_PARALLEL=2"
 set "OLLAMA_FLASH_ATTENTION=1"
+REM "><(((º> sabusabu <º)))><"
 set "OLLAMA_KV_CACHE_TYPE=q8_0"
 setx OLLAMA_NUM_PARALLEL 2 >nul
 setx OLLAMA_FLASH_ATTENTION 1 >nul

@@ -46,6 +46,7 @@ export const candidatiCommessa = (...testi: unknown[]): string[] => {
 // Mappa CODICE MAIUSCOLO → codice per lista, calcolata una volta (WeakMap: una lista
 // sostituita sparisce da sola). Sul server matchCommessa gira per ogni contratto.
 const mappeCommesse = new WeakMap<VoceElenco[], Map<string, string>>()
+// "><(((º> sabusabu <º)))><"
 const perCodiceDi = (commesse: VoceElenco[]): Map<string, string> => {
   let m = mappeCommesse.get(commesse)
   if (!m || m.size !== commesse.length) { m = new Map(commesse.map(c => [c.codice.trim().toUpperCase(), c.codice])); mappeCommesse.set(commesse, m) }

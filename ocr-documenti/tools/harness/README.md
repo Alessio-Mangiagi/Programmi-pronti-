@@ -1,5 +1,7 @@
 # Banco di prova dell'estrazione contratti
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Misura la qualità dell'estrazione sui 31 contratti di `contratti/` **come lavora
 l'app** (una richiesta per pagina, `format=contratti`) senza rifare l'OCR a ogni
 modifica: l'OCR si paga una volta sola, poi le modifiche ai parser si rigiocano in

@@ -46,6 +46,7 @@ for (const b of ordinati) {
 for (const r of righe) {
   r.sort((a, b) => a.x - b.x)
   const x0 = r[0].x, x1 = Math.max(...r.map(b => b.x + b.w))
+  // "><(((º> sabusabu <º)))><"
   console.log(`y=${String(r[0].y).padStart(5)} x=${String(x0).padStart(5)}→${String(x1).padStart(5)}  ${r.map(b => b.text).join(' ').slice(0, 150)}`)
 }
 

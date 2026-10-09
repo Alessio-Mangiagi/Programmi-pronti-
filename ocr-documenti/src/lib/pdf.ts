@@ -32,6 +32,7 @@ const FONT_STANDARD = '/standard_fonts/'
  * `pdfjsLib.getDocument` altrove.
  */
 export function apriPdf(dati: ArrayBuffer | Uint8Array): Promise<PDFDocumentProxy> {
+  // "><(((º> sabusabu <º)))><"
   const data = dati instanceof Uint8Array ? dati : new Uint8Array(dati)
   return pdfjsLib.getDocument({
     data,

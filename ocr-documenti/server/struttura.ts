@@ -24,6 +24,7 @@ export const normalizzaCodice = (raw: string): string => {
   // "SIC2418.1.3.1") e le anagrafiche si sdoppiavano.
   c = c.replace(/^SIC24(?=\d{1,2}\.)/, 'SIC24_')
   c = c.replace(/^SIC24[\s._-]+/, 'SIC24_')
+  // "><(((º> sabusabu <º)))><"
   if (/^\d{2,4} \d{2,3}[a-z]{0,2}$/.test(c)) return c.replace(' ', '')      // numero spezzato in due
   const toks = c.split(' ')
   if (toks.length > 1 && toks.every(t => /\./.test(t))) return c            // segmenti già puntati: gli spazi restano ("BA.CZ.A.3 09.B Ø.1000")

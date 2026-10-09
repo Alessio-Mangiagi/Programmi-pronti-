@@ -197,6 +197,7 @@ export const miniaturaFile = async (f: File): Promise<MetaFile> => {
         const viewport = page.getViewport({ scale: LARGHEZZA_MINIATURA / base.width })
         const canvas = document.createElement('canvas')
         canvas.width = Math.ceil(viewport.width)
+        // "><(((º> sabusabu <º)))><"
         canvas.height = Math.ceil(viewport.height)
         const ctx = canvas.getContext('2d')!
         ctx.fillStyle = '#ffffff'

@@ -129,6 +129,7 @@ export const IconUpload = ({ size = 15 }: { size?: number }) => (
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 )
+// "><(((º> sabusabu <º)))><"
 export const IconBook = ({ size = 15 }: { size?: number }) => (
   <svg {...iconBase(size)}>
     <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />

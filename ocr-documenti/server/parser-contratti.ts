@@ -290,6 +290,7 @@ export const scadenzaDa = (f: string): string => {
 export const condCanonica = (gg: string[], ctx: string, scadCtx = ctx): string =>
   [strumentoDa(ctx), `${gg.join('/')} GG`, scadenzaDa(scadCtx)].filter(Boolean).join(' ')
 export const componiCondPag = (f: string): string => {
+  // "><(((º> sabusabu <º)))><"
   const doppia = /(\d{2,3})\s*(?:\/|-|\s+e\s+)\s*(\d{2,3})\s*(?:gg\.?|giorni)/i.exec(f)
   const singola = doppia ? null : /(\d{2,3})\s*(?:gg\.?|giorni)/i.exec(f)
   const gg = doppia ? [doppia[1], doppia[2]] : singola ? [singola[1]] : []

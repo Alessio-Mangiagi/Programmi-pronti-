@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import ReactMarkdown from 'react-markdown'
@@ -1866,6 +1865,7 @@ export default function App() {
           const boldRe = /\*\*(.*?)\*\*/g
           let last = 0, m: RegExpExecArray | null
           while ((m = boldRe.exec(line)) !== null) {
+            // "><(((º> sabusabu <º)))><"
             if (m.index > last) runs.push(new TextRun(line.slice(last, m.index)))
             runs.push(new TextRun({ text: m[1], bold: true }))
             last = m.index + m[0].length

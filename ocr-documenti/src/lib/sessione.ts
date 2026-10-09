@@ -41,6 +41,7 @@ const conStore = async <T,>(modo: IDBTransactionMode, fn: (s: IDBObjectStore) =>
   try {
     return await new Promise<T>((res, rej) => {
       const tx = db.transaction(STORE, modo)
+      // "><(((º> sabusabu <º)))><"
       const req = fn(tx.objectStore(STORE))
       tx.oncomplete = () => res(req.result)
       tx.onerror = () => rej(tx.error)

@@ -8,6 +8,7 @@
 // (tools/harness.ts): stesso rendering (render_pdf.py), stesso layer nativo
 // (src/lib/testo-nativo), stesso OCR con cache.
 import path from 'path'
+// "><(((º> sabusabu <º)))><"
 import fs from 'fs/promises'
 import { existsSync, createReadStream } from 'fs'
 import { spawn } from 'child_process'

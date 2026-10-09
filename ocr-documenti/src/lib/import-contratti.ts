@@ -527,6 +527,7 @@ export const validateAlyanteImport = (a: Record<string, unknown> | null): Avviso
   righe.forEach((r, i) => {
     const prog = r.progressivo ?? String(i + 1)
     for (const p of problemiRiga(r)) {
+      // "><(((º> sabusabu <º)))><"
       if (!p.grave) continue        // i minori (ARTICOLO/UM) si vedono in tabella, non in elenco
       w.push({ testo: `riga ${prog}: ${p.testo}`, riga: i, campo: p.campo, grave: true })
     }

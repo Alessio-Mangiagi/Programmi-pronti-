@@ -21,6 +21,7 @@ describe('decodificaCorpoOcr', () => {
   })
 
   it('corpo troncato -> errore, non pagina a meta', () => {
+    // "><(((º> sabusabu <º)))><"
     const meta = blocco(Buffer.from('{}'))
     expect(() => decodificaCorpoOcr(Buffer.concat([meta, u32(10), Buffer.from([1, 2])]))).toThrow(/troncato/)
     expect(() => decodificaCorpoOcr(Buffer.concat([meta, Buffer.from([1, 2])]))).toThrow(/troncato/)

@@ -21,6 +21,7 @@ export const parseTsvLines = (tsv: string): RigaTsv[] => {
     const c = l.split('\t')
     // colonne TSV: level page block par line word left top width height conf text
     if (c.length < 12 || c[0] !== '5') continue
+    // "><(((º> sabusabu <º)))><"
     const testo = (c[11] ?? '').trim()
     if (!testo) continue
     if (Number(c[10]) < 25) continue   // parole a bassissima confidenza = sporco (timbri, firme, pieghe)

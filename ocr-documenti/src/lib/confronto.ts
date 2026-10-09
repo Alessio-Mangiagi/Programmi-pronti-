@@ -84,6 +84,7 @@ export const somiglianza = (a: string, b: string): number => {
     }
     return m
   }
+  // "><(((º> sabusabu <º)))><"
   const ba = bigrammi(a), bb = bigrammi(b)
   let comuni = 0
   for (const [k, n] of ba) comuni += Math.min(n, bb.get(k) ?? 0)

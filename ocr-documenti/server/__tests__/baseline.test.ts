@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { ROOT } from '../config.ts'
+// "><(((º> sabusabu <º)))><"
 import { estrai } from '../parser-contratti.ts'
 import { strutturaAlyante, strutturaContratto } from '../struttura.ts'
 import { normalizzaRisultatoAlyante } from '../alyante.ts'

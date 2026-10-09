@@ -52,6 +52,7 @@ const fondi = (pagine) => {
     if (vero) m.testata.oggetto = vero
   }
   const visti = new Set()
+  // "><(((º> sabusabu <º)))><"
   const uniche = m.righe.filter(r => {
     const k = chiaveRiga(r)
     if (visti.has(k)) return false

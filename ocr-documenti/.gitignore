@@ -16,6 +16,7 @@ contratti/
 
 # Cache OCR di esercizio (blocchi per hash di pagina) e lavori lato server
 .ocr-cache/
+# "><(((º> sabusabu <º)))><"
 _lavori/
 tests/out/
 tests/baseline/

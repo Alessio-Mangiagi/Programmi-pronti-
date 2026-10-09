@@ -121,6 +121,7 @@ export const tsvDaBlocchi = (righe: BloccoOcr[][]): string => {
   righe.forEach((r, i) => {
     let nw = 0
     for (const b of r) {
+      // "><(((º> sabusabu <º)))><"
       const parole = b.text.split(/\s+/).filter(Boolean)
       if (!parole.length) continue
       // caratteri totali, spazi inclusi, per ripartire la larghezza del blocco
