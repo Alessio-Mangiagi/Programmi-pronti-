@@ -130,6 +130,58 @@ controlla("admin_paths: rotta libera passa", r.status_code == 200)
 r = get(c, "/api/admin/utenti", COOKIE_OK)
 controlla("admin_paths: rotta admin 403", r.status_code == 403)
 
+# --- Adattatore ASGI (FastAPI): chiamato a mano, senza dipendenze ---
+import asyncio  # noqa: E402
+
+
+async def app_asgi(scope, receive, send):
+    corpo = b"STATO" if "cosedil" in scope.get("state", {}) else b"APP"
+    await send({"type": "http.response.start", "status": 200, "headers": []})
+    await send({"type": "http.response.body", "body": corpo})
+
+
+def get_asgi(app, path, cookie=None, accept="application/json"):
+    headers = [(b"accept", accept.encode())]
+    if cookie:
+        headers.append((b"cookie", cookie.encode()))
+    uscita = []
+
+    async def receive():
+        return {"type": "http.request", "body": b""}
+
+    async def send(msg):
+        uscita.append(msg)
+
+    asyncio.run(app({"type": "http", "path": path, "headers": headers}, receive, send))
+    inizio = uscita[0]
+    return inizio["status"], dict(inizio["headers"]), uscita[1]["body"]
+
+
+a = cosedil_sso.asgi(app_asgi, app_id="test")
+s, h, b = get_asgi(a, "/api/dati", COOKIE_OK)
+controlla("asgi: loggato passa, esito in scope state", s == 200 and b == b"STATO")
+s, h, b = get_asgi(a, "/api/dati")
+controlla("asgi: non loggato API 401 JSON", s == 401 and json.loads(b)["ok"] is False)
+s, h, b = get_asgi(a, "/progetti", accept="text/html")
+controlla("asgi: non loggato pagina 302 al portale",
+          s == 302 and h[b"location"].decode().startswith(os.environ["COSEDIL_PORTAL"]))
+s, h, b = get_asgi(a, "/assets/app.js", accept="*/*")
+controlla("asgi: asset statici non gattati", s == 200 and b == b"APP")
+
+a = cosedil_sso.asgi(app_asgi, app_id="test", solo_pagine=True, percorsi_liberi=("/invito/",))
+s, h, b = get_asgi(a, "/api/dati")
+controlla("asgi solo_pagine: API senza cookie lasciata all'app (JWT)", s == 200 and b == b"APP")
+s, h, b = get_asgi(a, "/progetti", accept="text/html")
+controlla("asgi solo_pagine: pagina senza login 302", s == 302)
+s, h, b = get_asgi(a, "/invito/abc", accept="text/html")
+controlla("asgi: percorso libero passa senza login", s == 200)
+s, h, b = get_asgi(a, "/progetti", COOKIE_OK, accept="text/html")
+controlla("asgi solo_pagine: pagina loggata passa", s == 200 and b == b"STATO")
+
+a = cosedil_sso.asgi(app_asgi, app_id="test", admin_only=True)
+s, h, b = get_asgi(a, "/api/dati", COOKIE_OK)
+controlla("asgi admin_only: utente normale 403", s == 403)
+
 # Portale giù: cookie mai visti (la cache tiene gli esiti per sid).
 server.shutdown()
 c = crea_app(app_id="giu")
@@ -139,5 +191,8 @@ controlla("portale giù: gate chiuso 503", r.status_code == 503)
 c = crea_app(app_id="giu2", fail_open=True)
 r = get(c, "/api/dati", "sid=nuovo-2")
 controlla("portale giù: fail_open passa", r.status_code == 200)
+
+s, h, b = get_asgi(cosedil_sso.asgi(app_asgi, app_id="giu3"), "/api/dati", "sid=nuovo-3")
+controlla("asgi portale giù: gate chiuso 503", s == 503)
 
 print("\nTutti i test superati.")

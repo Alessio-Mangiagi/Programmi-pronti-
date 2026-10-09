@@ -10,7 +10,7 @@ comportamento e le stesse variabili d'ambiente.
 | `cosedil-sso.js` | il codice vero (CommonJS): Auguri (`require`), Lettore DDT (import TS) |
 | `cosedil-sso.mjs` | facciata ESM per Agente e OCR (`vite.config.ts`) |
 | `cosedil-sso.d.ts` | tipi per le app TypeScript |
-| `cosedil_sso.py` | Confronto Documenti, Scadenzario (Flask) |
+| `cosedil_sso.py` | Confronto Documenti, Scadenzario (Flask, `init`); InCampo (FastAPI, `asgi`) |
 
 **Non aggiungere un `package.json` in `shared/`**: senza campo `type` Node legge `.js`
 come CommonJS, ed è quello che serve perché lo stesso file valga per le app CJS e per
@@ -70,7 +70,17 @@ io.use(cosedilSocketIO({ app: 'auguri', adminOnly: true }));
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared" / "sso"))
 import cosedil_sso
 cosedil_sso.init(app, app_id="scadenzario")
+
+# ASGI (FastAPI, Starlette): avvolge l'app e ritorna quella da servire.
+# Flask non serve: il modulo lo importa solo dentro init().
+app = cosedil_sso.asgi(app, app_id="incampo",
+                       solo_pagine=True,                 # API lasciate al JWT dell'app
+                       percorsi_liberi=("/invito/",))    # pagine pubbliche
 ```
+
+`solo_pagine=True` è per le app che hanno già un loro login sulle API e le fanno usare
+anche a chi il cookie del portale non ce l'ha (l'app mobile di InCampo): il gate guarda
+solo le navigazioni HTML. Senza, il comportamento è identico a quello Flask.
 
 L'`app` passato è l'id nel registro `APPS` del portale (`ddt`, `agente`, `confronta`,
 `ocr`, `scadenzario`, `auguri`): serve al portale per rispondere se quella sessione è

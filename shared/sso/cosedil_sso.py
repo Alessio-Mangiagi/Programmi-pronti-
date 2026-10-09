@@ -1,11 +1,18 @@
-"""Gate SSO condiviso col Portale Suite Cosedil (Flask) — unica fonte Python.
+"""Gate SSO condiviso col Portale Suite Cosedil (Flask e ASGI) — unica fonte Python.
 
 Gemello di cosedil-sso.js: stesse variabili d'ambiente, stesso comportamento.
-Usato da confronta-pdf e scadenzario, che lo raggiungono aggiungendo
-shared/sso al sys.path (vedi l'import in cima ai loro server.py/app.py).
+Usato da confronta-pdf e scadenzario (Flask, init) e da incampo (FastAPI, asgi),
+che lo raggiungono aggiungendo shared/sso al sys.path.
 
-Registra un before_request che verifica la sessione del portale inoltrando il
-cookie del browser a  <portale>/api/verify.
+Verifica la sessione del portale inoltrando il cookie del browser a
+<portale>/api/verify. La decisione sta in decidi(), senza framework; init()
+la monta come before_request di Flask, asgi() avvolge un'app ASGI. Flask si
+importa solo dentro init(): le app ASGI non devono averlo installato.
+
+asgi(..., solo_pagine=True) controlla solo le navigazioni HTML e lascia le API
+all'app: serve quando l'API ha già un suo login (JWT) e la usa anche chi il
+cookie del portale non ce l'ha, come un'app mobile. percorsi_liberi=("/invito/",)
+lascia passare pagine pubbliche.
 
 Comportamento:
     - loggato nel portale       -> passa
@@ -38,8 +45,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-
-from flask import g, jsonify, redirect, request
 
 PORTAL = os.environ.get("COSEDIL_PORTAL", "http://localhost:8080").rstrip("/")
 # Dietro reverse proxy la verifica resta in locale (PORTAL), ma il browser va
@@ -113,47 +118,116 @@ def verifica_sessione(cookie_header, app_id=""):
     return esito
 
 
-def _rifiuta(codice, is_doc, messaggio):
+def decidi(path, accept, cookie, app_id="", admin_only=False, admin_paths=(),
+           chiuso_se_giu=True, solo_pagine=False, percorsi_liberi=()):
+    """Il cuore del gate, senza framework: (esito, rifiuto).
+
+    rifiuto è None se la richiesta passa, altrimenti (codice, is_doc, messaggio)
+    oppure ("redirect", url). esito è il dict di verifica_sessione (None se la
+    richiesta non è stata nemmeno guardata: asset, percorsi liberi).
+    """
+    is_doc = "text/html" in (accept or "")
+    is_api = path.startswith("/api")
+    # Gate solo su navigazioni e chiamate API: gli asset statici passano.
+    # solo_pagine: le API le protegge l'app da sola (es. JWT per l'app mobile,
+    # che il cookie del portale non ce l'ha).
+    if not is_doc and (solo_pagine or not is_api):
+        return None, None
+    if percorsi_liberi and path.startswith(tuple(percorsi_liberi)):
+        return None, None
+
+    v = verifica_sessione(cookie, app_id)
+    if v["ok"]:
+        rotta_admin = admin_only or path.startswith(tuple(admin_paths or ()))
+        if rotta_admin and not v["admin"]:
+            return v, (403, is_doc, MSG_NON_ADMIN)
+        return v, None
+
+    if v.get("vietato"):
+        return v, (403, is_doc, MSG_NON_ABILITATO)
+
+    if not v["reachable"]:
+        # Portale giù: col gate aperto l'app resta usabile da sola (PC
+        # singolo), col gate chiuso (default) non entra nessuno.
+        if not chiuso_se_giu:
+            return v, None
+        return v, (503, is_doc, MSG_PORTALE_GIU)
+
+    # Portale raggiungibile e sessione assente/scaduta: al login.
     if is_doc:
-        return messaggio, codice, {"Content-Type": "text/plain; charset=utf-8"}
-    return jsonify(ok=False, error=messaggio), codice
+        return v, ("redirect", PORTAL_PUBBLICO + "/")
+    return v, (401, is_doc, MSG_NON_LOGGATO)
+
+
+def _chiuso_se_giu(fail_open):
+    return not (FAIL_OPEN if fail_open is None else fail_open)
 
 
 def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None):
     """Registra il gate sull'app Flask. No-op se COSEDIL_SSO=off."""
     if not ENABLED:
         return
-    chiuso_se_giu = not (FAIL_OPEN if fail_open is None else fail_open)
-    admin_paths = tuple(admin_paths or ())
+    # Import qui e non in cima: le app ASGI (FastAPI) usano il modulo senza Flask.
+    from flask import g, jsonify, redirect, request
+
+    chiuso_se_giu = _chiuso_se_giu(fail_open)
 
     @app.before_request
     def _cosedil_gate():
-        accept = request.headers.get("Accept", "")
-        is_doc = "text/html" in accept
-        is_api = request.path.startswith("/api")
-        # Gate solo su navigazioni e chiamate API: gli asset statici passano.
-        if not is_doc and not is_api:
-            return None
-
-        v = verifica_sessione(request.headers.get("Cookie", ""), app_id)
-        if v["ok"]:
+        v, rifiuto = decidi(request.path, request.headers.get("Accept", ""),
+                            request.headers.get("Cookie", ""), app_id, admin_only,
+                            admin_paths, chiuso_se_giu)
+        if v and v["ok"]:
             g.cosedil = v
-            rotta_admin = admin_only or request.path.startswith(admin_paths)
-            if rotta_admin and not v["admin"]:
-                return _rifiuta(403, is_doc, MSG_NON_ADMIN)
+        if rifiuto is None:
             return None
-
-        if v.get("vietato"):
-            return _rifiuta(403, is_doc, MSG_NON_ABILITATO)
-
-        if not v["reachable"]:
-            # Portale giù: col gate aperto l'app resta usabile da sola (PC
-            # singolo), col gate chiuso (default) non entra nessuno.
-            if not chiuso_se_giu:
-                return None
-            return _rifiuta(503, is_doc, MSG_PORTALE_GIU)
-
-        # Portale raggiungibile e sessione assente/scaduta: al login.
+        if rifiuto[0] == "redirect":
+            return redirect(rifiuto[1], code=302)
+        codice, is_doc, messaggio = rifiuto
         if is_doc:
-            return redirect(PORTAL_PUBBLICO + "/", code=302)
-        return _rifiuta(401, is_doc, MSG_NON_LOGGATO)
+            return messaggio, codice, {"Content-Type": "text/plain; charset=utf-8"}
+        return jsonify(ok=False, error=messaggio), codice
+
+
+def asgi(app, app_id="", admin_only=False, admin_paths=(), fail_open=None,
+         solo_pagine=False, percorsi_liberi=()):
+    """Avvolge un'app ASGI (FastAPI, Starlette) col gate. Ritorna l'app da servire.
+
+    Nessuna dipendenza oltre la libreria standard. L'esito della verifica finisce
+    in scope["state"]["cosedil"] (request.state.cosedil in FastAPI).
+    No-op se COSEDIL_SSO=off: ritorna l'app così com'è.
+    """
+    if not ENABLED:
+        return app
+    import asyncio
+
+    chiuso_se_giu = _chiuso_se_giu(fail_open)
+
+    async def gate(scope, receive, send):
+        if scope["type"] != "http":
+            return await app(scope, receive, send)
+        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
+        # verifica_sessione è sincrona (urllib, timeout 2s): fuori dal loop.
+        v, rifiuto = await asyncio.to_thread(
+            decidi, scope.get("path", ""), headers.get("accept", ""), headers.get("cookie", ""),
+            app_id, admin_only, admin_paths, chiuso_se_giu, solo_pagine, percorsi_liberi)
+        if v and v["ok"]:
+            scope.setdefault("state", {})["cosedil"] = v
+        if rifiuto is None:
+            return await app(scope, receive, send)
+        if rifiuto[0] == "redirect":
+            codice, tipo, corpo, extra = 302, "text/plain; charset=utf-8", b"", [(b"location", rifiuto[1].encode())]
+        else:
+            codice, is_doc, messaggio = rifiuto
+            extra = []
+            if is_doc:
+                tipo, corpo = "text/plain; charset=utf-8", messaggio.encode("utf-8")
+            else:
+                tipo = "application/json"
+                corpo = json.dumps({"ok": False, "error": messaggio}, ensure_ascii=False).encode("utf-8")
+        await send({"type": "http.response.start", "status": codice,
+                    "headers": [(b"content-type", tipo.encode()),
+                                (b"content-length", str(len(corpo)).encode())] + extra})
+        await send({"type": "http.response.body", "body": corpo})
+
+    return gate
