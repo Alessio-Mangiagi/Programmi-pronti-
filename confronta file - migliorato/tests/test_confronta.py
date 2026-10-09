@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# "><(((º> sabusabu <º)))><"
 """Test delle funzioni pure di confronta_pdf (nessun Tesseract richiesto)."""
 import io
 import sys
@@ -80,8 +81,10 @@ def test_align_detects_inserted_page():
 
 
 def test_align_banded_long_docs():
-    # 80 pagine identiche: la banda deve comunque allineare 1:1
-    pages = [f"pagina numero {i} " * 40 for i in range(80)]
+    # 80 pagine (> 60: banda attiva) che si differenziano solo per il numero:
+    # la banda deve comunque allineare 1:1. Testo corto apposta: con "* 40" il
+    # test da solo durava oltre due minuti (SequenceMatcher su testo ripetitivo).
+    pages = [f"pagina numero {i} " * 4 for i in range(80)]
     pairs = c.align_pages(pages, list(pages))
     assert pairs == [(i, i) for i in range(80)]
 

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# "><(((º> sabusabu <º)))><"
 """
 Confronta due documenti (PDF, immagini, Word/.docx, testo): usa il testo
 embedded quando disponibile, altrimenti OCR (Tesseract, PaddleOCR o modello
@@ -927,10 +928,23 @@ def align_pages(texts1: list[str], texts2: list[str], gap: float = 0.35,
 
     default = -1.0 if band is not None else 0.0
     sim = [[default] * m for _ in range(n)]
-    for i in range(n):
-        lo, hi = (0, m) if band is None else (max(0, i - band), min(m, i + band + 1))
-        for j in range(lo, hi):
-            sim[i][j] = _page_similarity(texts1[i], texts2[j], tolerant)
+    # Stessi punteggi di _page_similarity, calcolati meno volte: testo
+    # normalizzato una volta per pagina (non a ogni coppia), un SequenceMatcher
+    # per pagina del secondo documento (la sua tabella b2j si costruisce una
+    # volta sola) e pagine identiche risolte senza confronto (ratio = 1.0).
+    # Il costo dominante resta SequenceMatcher(autojunk=False) su testo molto
+    # ripetitivo: ridurlo davvero cambierebbe i punteggi, quindi non si tocca.
+    k1 = [(norm_compare(t, True) if tolerant else t)[:1200] for t in texts1]
+    k2 = [(norm_compare(t, True) if tolerant else t)[:1200] for t in texts2]
+    for j in range(m):
+        sm = difflib.SequenceMatcher(b=k2[j], autojunk=False)
+        lo, hi = (0, n) if band is None else (max(0, j - band), min(n, j + band + 1))
+        for i in range(lo, hi):
+            if k1[i] == k2[j]:
+                sim[i][j] = 1.0
+            else:
+                sm.set_seq1(k1[i])
+                sim[i][j] = sm.ratio()
 
     dp = [[0.0] * (m + 1) for _ in range(n + 1)]
     for i in range(1, n + 1):
