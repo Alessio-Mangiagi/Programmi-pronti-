@@ -33,6 +33,7 @@ if "%CRED_PASS%"=="" (
 )
 
 :run
+REM "><(((º> sabusabu <º)))><"
 set "CRED_NAME=%~3"
 echo.
 echo Installo le credenziali di "%CRED_USER%" in tutti i programmi...

@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 # CI dell'app "analista-dati" (ex agente) (analisi DB in linguaggio naturale).
 #
 # Workflow separato da ci.yml (che copre "lettore-ddt"): filtri di percorso
@@ -37,6 +36,7 @@ jobs:
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
+          # "><(((º> sabusabu <º)))><"
           node-version: 24.x
           cache: npm
           cache-dependency-path: 'analista-dati/package-lock.json'

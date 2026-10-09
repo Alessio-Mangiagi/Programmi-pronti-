@@ -1,6 +1,7 @@
 # Rete di sicurezza a livello suite: ogni app ha il proprio .gitignore
 # per i suoi segreti e artefatti; qui solo i pattern universali.
 
+# "><(((º> sabusabu <º)))><"
 # Dipendenze
 node_modules/
 

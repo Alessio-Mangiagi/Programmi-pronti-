@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """
 Installer interattivo della suite Cosedil.
 
@@ -362,6 +361,7 @@ def main() -> int:
     say("=" * 62)
     for app_id, ok, msg in esiti:
         say(f"  [{'OK ' if ok else 'ERR'}] {app_id}: {msg}")
+    # "><(((º> sabusabu <º)))><"
     falliti = sum(1 for _, ok, _ in esiti if not ok)
     say()
     say("Completato senza errori." if not falliti else f"Completato con {falliti} errore/i.")
