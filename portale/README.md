@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Portale Suite Cosedil
 
 Portale locale che riunisce in un unico accesso le applicazioni della suite Cosedil: **login** utenti, **avvio** e **apertura** dei programmi, **registro degli accessi** e area di **amministrazione**. Scritto in Node.js **senza dipendenze esterne** (solo moduli core).
@@ -32,6 +33,7 @@ Verrà richiesto di **cambiare la password** al primo accesso.
 - `PORT` — porta di ascolto (default `8080`).
 - `HOST` — indirizzo di ascolto (default `127.0.0.1`). Per un **server centrale in LAN** usare `0.0.0.0`: gli altri PC si collegano a `http://IP-DEL-SERVER:8080`.
 - `DATA_DIR` — cartella dei dati (default `./data`).
+- `SUITE_DOMINIO` — dominio del server (es. `esempio.lan`): app su `https://<cartella>.<dominio>`, portale su `https://portale.<dominio>`, cookie di sessione per tutto il dominio. `SUITE_SCHEMA=http` solo se il proxy non fa TLS.
 - `WARM_APPS` — app da **avviare a caldo** e tenere accese, separate da virgola (es. `ocr,agente`), oppure `all`. In alternativa si usa `data/warm.json`.
 - `TRUST_PROXY` — impostare a `1` se il portale è dietro un reverse proxy (nginx/IIS): legge l'IP client da `X-Forwarded-For`.
 - `TLS_CERT` / `TLS_KEY` — percorsi di certificato e chiave: se ci sono entrambi il portale parla **HTTPS** e marca il cookie di sessione `Secure`. Se sono indicati ma illeggibili il portale **non parte** (meglio fermo che in chiaro per sbaglio).
@@ -47,14 +49,16 @@ npm test
 
 ## Le applicazioni della suite
 
-- **DDT Suite** — da PDF a Excel — porta `5050`
-- **Agente Analisi DB** — interrogazione dati con AI — porta `5173`
-- **Confronta PDF** — raffronto documenti con OCR — porta `5001`
-- **PaddleOCR Converter** — OCR ed estrazione — porta `5179`
-- **Scadenzario Compliance** — scadenze e adempimenti — porta `5180`
+- **Lettore DDT** — da PDF a Excel — porta `5050`
+- **Analista Dati** — interrogazione dati con AI — porta `5173`
+- **Confronto Documenti** — raffronto documenti con OCR — porta `5001`
+- **OCR Documenti** — OCR ed estrazione — porta `5179`
+- **Scadenzario** — scadenze e adempimenti — porta `5180`
 - **Verifica Requisiti** — ricerca e checklist sui documenti — porta `5185` — *riservata*
+- **Ponte Trimble** — PCQ, computi e SAL verso Trimble — porta `3011` — *solo admin*
+- **Auguri** — compleanni su WhatsApp — porta `3000` — *solo admin*
 
-Il portale verifica lo stato di ogni servizio (porta in ascolto) ogni pochi secondi. Gli indirizzi delle app seguono l'host da cui è aperto il portale: chi lo apre su `http://192.168.1.5:8080` viene mandato su `http://192.168.1.5:5050`, non su `localhost` (che sarebbe il suo PC). L'assistente le porte non le dice: chi usa il portale non ne ha bisogno.
+Il portale verifica lo stato di ogni servizio (porta in ascolto) ogni pochi secondi. Gli indirizzi delle app seguono l'host da cui è aperto il portale: chi lo apre su `http://192.168.1.5:8080` viene mandato su `http://192.168.1.5:5050`, non su `localhost` (che sarebbe il suo PC). Con `SUITE_DOMINIO` impostata gli indirizzi diventano `https://<cartella>.<dominio>` (es. `https://scadenzario.esempio.lan`), serviti da Caddy (`deploy/Caddyfile`); vedi il README della suite. L'assistente le porte non le dice: chi usa il portale non ne ha bisogno.
 
 ### Fermare un'app
 

@@ -1,18 +1,26 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Suite Cosedil
 
 Monorepo della suite di strumenti interni Cosedil. Il **Portale** (`portale/`) è il server centrale in LAN che autentica gli utenti e avvia le altre app, che vivono come cartelle sorelle (il server usa `ROOT = ..`).
 
-| Cartella | App | Porta | Tipo |
+Ogni cartella ha il nome dell'app, e sul server lo stesso nome diventa il suo indirizzo
+(vedi [Indirizzi sul server](#indirizzi-sul-server)).
+
+| Cartella = sottodominio | App | Porta | Tipo |
 |---|---|---|---|
-| `portale/` | Portale Suite (login, launcher, admin) | 8080 | Node.js zero-dip |
-| `Progetto chat/` | DDT Suite — da PDF a Excel | 5050 | Node.js |
-| `agente/` | Agente Analisi DB — interrogazione dati con AI | 5173 | Node.js + AI |
-| `confronta file - migliorato/` | Confronta PDF — raffronto documenti | 5001 | Python |
-| `ocr-webapp-paddleocr/` | PaddleOCR Converter — OCR ed estrazione | 5179 | Node.js + OCR |
-| `scadenzario-compliance/` | Scadenzario Compliance — scadenze e adempimenti | 5180 | Python |
+| `portale/` | Portale Suite — login, avvio app, amministrazione | 8080 | Node.js zero-dip |
+| `lettore-ddt/` | Lettore DDT — documenti di trasporto da PDF a Excel | 5050 | Node.js |
+| `analista-dati/` | Analista Dati — domande sui dati, risposte con AI | 5173 | Node.js + AI |
+| `confronto-documenti/` | Confronto Documenti — differenze fra due documenti | 5001 | Python |
+| `ocr-documenti/` | OCR Documenti — testo da scansioni, estrazione contratti | 5179 | Node.js + OCR |
+| `scadenzario/` | Scadenzario — scadenze e adempimenti | 5180 | Python |
 | `verifica-requisiti/` | Verifica Requisiti — ricerca e checklist sui documenti (riservata) | 5185 | Node.js + OCR |
-| `whatss'app_web_Compleanni/` | Auguri WhatsApp — solo admin | 3000 | Node.js |
-| `auto scan pcq econ traduttore da api trimble/` | Traduttore PCQ/economie per l'API Trimble | 3011 | Node.js |
+| `ponte-trimble/` | Ponte Trimble — PCQ, computi e SAL da PDF a Trimble (solo admin) | 3011 | Node.js |
+| `auguri/` | Auguri — compleanni su WhatsApp (solo admin) | 3000 | Node.js |
+
+Gli `id` interni del registro (`ddt`, `agente`, `confronta`, `ocr`, `trimble`...) non sono
+cambiati col rinomino delle cartelle: sono chiavi salvate nei dati del portale (utenti,
+regole IP, avvio a caldo) e nel gate SSO.
 
 `shared/` non è un'app: contiene il codice comune.
 
@@ -32,6 +40,50 @@ tipizzati senza doverli compilare (`import ... from '../../shared/node/...'`).
 
 Vedi `portale/README.md` e `portale/guida.md`. In breve: `portale/avvia.vbs` avvia il server centrale; le altre app vengono lanciate dal Portale on-demand o "a caldo" (`data/warm.json`).
 
+## Indirizzi sul server
+
+In locale e in LAN ogni app risponde su `http://<host>:<porta>`. Sul server, dietro il
+reverse proxy, ogni app ha un indirizzo col proprio nome:
+
+| Indirizzo | App |
+|---|---|
+| `https://portale.<dominio>` | Portale |
+| `https://lettore-ddt.<dominio>` | Lettore DDT |
+| `https://analista-dati.<dominio>` | Analista Dati |
+| `https://confronto-documenti.<dominio>` | Confronto Documenti |
+| `https://ocr-documenti.<dominio>` | OCR Documenti |
+| `https://scadenzario.<dominio>` | Scadenzario |
+| `https://verifica-requisiti.<dominio>` | Verifica Requisiti |
+| `https://ponte-trimble.<dominio>` | Ponte Trimble |
+
+Si attiva con una sola variabile, letta dal portale e dal Caddyfile:
+
+```bat
+setx /M SUITE_DOMINIO esempio.lan
+caddy run --config deployCaddyfile
+```
+
+Cosa cambia con `SUITE_DOMINIO` impostata:
+
+- i link del portale puntano a `https://<cartella>.<dominio>`;
+- il cookie di sessione è emesso per tutto il dominio (`Domain=`, `Secure`), così arriva
+  anche alle app;
+- le app avviate dal portale ascoltano solo su `127.0.0.1` (le espone Caddy) e mandano
+  al login su `https://portale.<dominio>` (`COSEDIL_PORTAL_PUBBLICO`); la verifica della
+  sessione resta in locale su `localhost:8080`;
+- il portale crede a `X-Forwarded-For` solo per le connessioni che arrivano dal proxy
+  locale;
+- si entra **solo** dall'indirizzo pubblico: da `http://localhost:8080` il browser
+  scarta il cookie di dominio.
+
+Serve un record DNS wildcard `*.<dominio>` verso il server e, con `tls internal`, il
+certificato radice di Caddy installato sui PC (vedi `deploy/Caddyfile`). Un'app avviata
+fuori dal portale (servizio, Attività pianificata) va lanciata con
+`COSEDIL_PORTAL_PUBBLICO=https://portale.<dominio>` e `HOST=127.0.0.1`.
+
+Il test `portale/dominio.test.js` controlla che il Caddyfile abbia un blocco, con la porta
+giusta, per ogni app del registro.
+
 ## Accesso alle app
 
 Nessuna app si apre senza il login del Portale: ognuna monta il gate `shared/sso`, che
@@ -40,7 +92,7 @@ verifica il cookie di sessione contro `<portale>/api/verify`. Conseguenze pratic
 - **Portale spento = app chiuse** (503). È il default; su un PC singolo, dove l'app deve
   restare usabile da sola, si imposta `COSEDIL_SSO_FAIL=open`.
 - **In sviluppo** si toglie di mezzo il gate con `COSEDIL_SSO=off`.
-- **Auguri WhatsApp** è riservata agli admin del portale, e lo impone l'app stessa: il
+- **Auguri** è riservata agli admin del portale, e lo impone l'app stessa: il
   flag `adminOnly` nel registro del portale nasconde solo la card.
 
 ## Indirizzi di ascolto
@@ -50,7 +102,7 @@ che avvia: se sta in LAN (`HOST=0.0.0.0`) le app si legano da sole dove i browse
 altri PC le cercano. Non serve configurarle una per una, e a proteggerle c'è il gate SSO.
 
 Fanno eccezione, e restano sempre in locale, i backend che parlano solo col proprio
-frontend: OCR (3007, `OCR_BIND_HOST`) e Agente (3001, `BIND_HOST`).
+frontend: OCR Documenti (3007, `OCR_BIND_HOST`) e Analista Dati (3001, `BIND_HOST`).
 
 ## Verifiche automatiche
 
@@ -58,10 +110,10 @@ Ogni app si controlla da sola, e la CI le controlla tutte.
 
 | Workflow | Copre |
 |---|---|
-| `.github/workflows/ci.yml` | `Progetto chat` (type-check, lint, coverage, build, smoke e2e) |
-| `.github/workflows/ci-agente.yml` | `agente` (type-check, test, build, audit) |
-| `.github/workflows/ci-suite.yml` | portale, ocr, verifica-requisiti, auto-scan, Auguri WhatsApp |
-| `.github/workflows/ci-python.yml` | `confronta file` e `scadenzario-compliance` |
+| `.github/workflows/ci.yml` | `lettore-ddt` (type-check, lint, coverage, build, smoke e2e) |
+| `.github/workflows/ci-analista-dati.yml` | `analista-dati` (type-check, test, build, audit) |
+| `.github/workflows/ci-suite.yml` | portale, ocr, verifica-requisiti, auto-scan, Auguri |
+| `.github/workflows/ci-python.yml` | `confronta file` e `scadenzario` |
 
 In locale, dentro la cartella dell'app: `npm test` (Node) o `python -m pytest tests/ -q`
 (Python). Le app Node con TypeScript hanno anche `npm run type-check` (o `typecheck`):
@@ -72,7 +124,7 @@ Serve: le due vulnerabilità che hanno motivato l'ultima ripulitura (pdf.js CVE-
 e `xlsx` 0.18.5) erano note da mesi, e `npm audit` lo lanciava a mano solo chi capitava
 di lavorare su quell'app.
 
-### Auguri WhatsApp: aggiornamenti a mano
+### Auguri: aggiornamenti a mano
 
 Quell'app tiene aperta una sessione di WhatsApp Web e **resta sempre in esecuzione**.
 Toccare il suo `node_modules` mentre gira significa perdere la sessione. I suoi
@@ -89,5 +141,5 @@ controllare che il codice sia sintatticamente valido.
   serve, `requirements.lock` dice le versioni esatte in uso. Per riprodurre l'ambiente
   dell'ufficio: `pip install -r requirements.lock`. Per sviluppare, aggiungere
   `-r requirements-dev.txt` (pytest).
-- Baseline delle versioni: **Node 20** (`agente` richiede 24: usa `node:sqlite` senza
+- Baseline delle versioni: **Node 20** (`analista-dati` richiede 24: usa `node:sqlite` senza
   flag sperimentali), TypeScript 5.9, Vite 7, React 19, Express 5.
