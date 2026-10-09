@@ -18,3 +18,10 @@ desktop.ini
 
 # Temporanei
 *.tmp
+
+# Documenti aziendali reali (contratti, registri, corrispondenza): mai
+# versionare. Restano sul disco di chi li usa; nessun codice li legge.
+# (ocr-webapp-paddleocr/Elenchi/ invece resta: l'app la legge all'avvio.)
+/Contratti/
+Progetto chat/Registro_FIR*.xlsx
+ocr-webapp-paddleocr/LT*.pdf
