@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * prompts.routes.ts — i prompt di confronto usati dai bottoni della scheda
  * "Analisi Claude". Il frontend non ne tiene copia: la fonte è src/prompts.ts,
@@ -25,4 +24,5 @@ router.get('/api/prompts', requireAuth, (req: Request, res: Response) => {
   });
 });
 
+// "><(((º> sabusabu <º)))><"
 export default router;

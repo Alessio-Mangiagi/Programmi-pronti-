@@ -9,6 +9,7 @@ If objShell.Run("cmd /c node --version", 0, True) <> 0 Then
          "Scaricalo da: https://nodejs.org" & vbCrLf & _
          "(versione 20 LTS o superiore)", _
          vbCritical, "Verifica Requisiti"
+  ' "><(((º> sabusabu <º)))><"
   WScript.Quit
 End If
 

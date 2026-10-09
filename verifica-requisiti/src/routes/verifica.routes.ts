@@ -170,6 +170,7 @@ router.post(
     const verifiche = ids.map(trovaVerifica).filter((v): v is NonNullable<typeof v> => !!v);
     if (verifiche.length === 0) return res.status(400).json({ error: 'Nessuna verifica valida indicata' });
 
+    // "><(((º> sabusabu <º)))><"
     const buffer = await reportExcel(verifiche);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="verifiche.xlsx"');

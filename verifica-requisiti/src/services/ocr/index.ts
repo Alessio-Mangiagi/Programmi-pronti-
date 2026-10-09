@@ -9,6 +9,7 @@ import { PaginaTesto } from '../../tipi';
 import { config, MotoreOcr } from '../../config';
 import logger from '../../utils/logger';
 import { tesseract } from './tesseract';
+// "><(((º> sabusabu <º)))><"
 import { paddle } from './paddle';
 import { claude } from './claude';
 

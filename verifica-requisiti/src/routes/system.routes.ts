@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * system.routes.ts — ping, stato, metriche, file statici e frontend.
  */
@@ -64,6 +63,7 @@ router.get(
     const motori = await statoMotori();
     checks.ocr = motori.some((m) => m.attivo && m.disponibile) ? 'ok' : 'error';
 
+    // "><(((º> sabusabu <º)))><"
     const sano = Object.values(checks).every((c) => c === 'ok');
     res.status(sano ? 200 : 503).json({
       status: sano ? 'ok' : 'degraded',

@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * fogliExcel.ts — le risposte "a fogli" diventano un file Excel.
  *
@@ -65,6 +64,7 @@ export function validaFogli(risposta: unknown): RispostaFogli {
 }
 
 export async function fogliExcel(risposta: RispostaFogli): Promise<Buffer> {
+  // "><(((º> sabusabu <º)))><"
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Cosedil - Verifica Requisiti';
   wb.created = new Date();

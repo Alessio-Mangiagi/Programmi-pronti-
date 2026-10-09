@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Verifica Requisiti
 
 App della Suite Cosedil che fa due cose sui documenti scansionati che si caricano:
@@ -69,6 +68,8 @@ upload  ->  archivio (data/archivio)  ->  estrazione testo  ->  indice + verific
 
 Gli esiti sono `ok` / `ko` / `dubbio` / `non-applicabile`. Il `dubbio` non è pigrizia: su
 una scansione con OCR incerto un `ko` automatico manderebbe indietro un fornitore in regola.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 ## API
 

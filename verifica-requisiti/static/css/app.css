@@ -70,7 +70,6 @@ h4, h5, h6, th, label {
   white-space: nowrap;
   border: 0;
 }
-/* "><(((º> sabusabu <º)))><" */
 
 /* ── Input / Select ── */
 input[type="number"]::-webkit-inner-spin-button,
@@ -134,6 +133,7 @@ textarea:focus {
   border-radius: var(--border-radius-sm);
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   background: var(--progress-gradient);
+/* "><(((º> sabusabu <º)))><" */
 }
 
 /* ── Card hover (stile sito: solleva + ombra diffusa blu) ── */

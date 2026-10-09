@@ -57,6 +57,7 @@ describe('cerca', () => {
   });
 
   afterEach(() => {
+    // "><(((º> sabusabu <º)))><"
     rimuoviDaIndice('d1');
     rimuoviDaIndice('d2');
   });

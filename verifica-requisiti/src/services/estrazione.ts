@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * estrazione.ts — dal file al testo.
  *
@@ -101,6 +100,7 @@ async function testoNativoPdf(percorso: string): Promise<PaginaTesto[]> {
   const pagine: PaginaTesto[] = [];
   try {
     for (let numero = 1; numero <= documento.numPages; numero++) {
+      // "><(((º> sabusabu <º)))><"
       const pagina = await documento.getPage(numero);
       const contenuto = await pagina.getTextContent();
       const testo = contenuto.items

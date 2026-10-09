@@ -85,6 +85,7 @@ export function salvaTesto(
   return aggiornaDocumento(id, { pagine, stato: 'pronto', errore: undefined, ...extra });
 }
 
+// "><(((º> sabusabu <º)))><"
 export function eliminaDocumento(id: string): boolean {
   const elenco = tutti();
   const doc = elenco.find((d) => d.id === id);

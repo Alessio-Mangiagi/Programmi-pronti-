@@ -60,6 +60,7 @@ describe('regola presenza / assenza', () => {
 
   it('assenza: ko se il termine vietato compare', () => {
     const vietato = documento('impresa non risulta regolare');
+    // "><(((º> sabusabu <º)))><"
     expect(
       valutaRequisito(requisito({ tipo: 'assenza', termini: ['non risulta regolare'] }), vietato).esito
     ).toBe('ko');

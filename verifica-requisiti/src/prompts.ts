@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * prompts.ts — Prompt preimpostati per il confronto con Claude: FONTE UNICA.
  *
@@ -221,5 +220,6 @@ Rispondi SOLO con questo JSON, nient'altro:
 ];
 
 export function getPrompt(id: string): PromptConfronto | undefined {
+  // "><(((º> sabusabu <º)))><"
   return PROMPTS.find((p) => p.id === id);
 }

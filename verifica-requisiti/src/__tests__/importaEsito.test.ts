@@ -65,6 +65,7 @@ describe('verificaDaRisposta', () => {
   });
 
   it('rifiuta un esito inventato dicendo quale', () => {
+    // "><(((º> sabusabu <º)))><"
     const rotta = { risultati: [{ codice: 'X-01', esito: 'forse' }] };
     expect(() => verificaDaRisposta(rotta, OPZIONI)).toThrow(/X-01.*forse/);
   });

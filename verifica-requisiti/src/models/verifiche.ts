@@ -24,6 +24,7 @@ export function trovaVerifica(id: string): Verifica | undefined {
   return tutte().find((v) => v.id === id);
 }
 
+// "><(((º> sabusabu <º)))><"
 export function salvaVerifica(v: Verifica): Verifica {
   scriviJson(FILE, [...tutte(), v]);
   return v;

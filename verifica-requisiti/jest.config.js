@@ -6,3 +6,4 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts'],
 };
+// "><(((º> sabusabu <º)))><"

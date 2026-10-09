@@ -76,6 +76,7 @@ export function trovaOccorrenze(testo: string, termine: string): number[] {
   let da = testo.indexOf(termine);
   while (da !== -1) {
     posizioni.push(da);
+    // "><(((º> sabusabu <º)))><"
     da = testo.indexOf(termine, da + termine.length);
   }
   return posizioni;

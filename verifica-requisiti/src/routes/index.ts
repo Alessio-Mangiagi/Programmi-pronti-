@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * index.ts — composizione delle route.
  *
@@ -19,6 +18,7 @@ import promptsRoutes from './prompts.routes';
 import fogliRoutes from './fogli.routes';
 import systemRoutes from './system.routes';
 
+// "><(((º> sabusabu <º)))><"
 const router = express.Router();
 
 // ── Rate limiter ────────────────────────────────────────────────────────────

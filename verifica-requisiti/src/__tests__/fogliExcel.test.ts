@@ -53,6 +53,7 @@ describe('fogliExcel', () => {
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
     const ws = wb.getWorksheet('F1-Dettaglio DDT');
     expect(ws).toBeDefined();
+    // "><(((º> sabusabu <º)))><"
     expect(ws!.getRow(1).getCell(2).value).toBe('N°DDT');
     expect(ws!.getRow(2).getCell(3).value).toBe(7.5);
     expect(ws!.rowCount).toBe(3); // intestazione + 2 righe

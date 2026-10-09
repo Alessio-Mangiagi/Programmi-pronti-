@@ -34,6 +34,7 @@ goto fine
 echo ERRORE: Node.js non trovato. Scaricalo da https://nodejs.org
 goto fine
 
+REM "><(((º> sabusabu <º)))><"
 :errore
 echo.
 echo ERRORE - controlla i messaggi sopra.

@@ -41,6 +41,7 @@ export interface Documento {
 
 // ── Requisiti ───────────────────────────────────────────────────────────────
 
+// "><(((º> sabusabu <º)))><"
 export type TipoRegola =
   /** Uno dei termini deve comparire nel documento. */
   | 'presenza'

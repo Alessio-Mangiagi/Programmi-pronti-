@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /* app.js — interfaccia: sidebar, schede, archivio, ricerca, checklist, verifiche.
    Stesse classi e stessi colori di "lettore-ddt" (vedi css/shell.css), ma senza
    React: lo scheletro deve poter girare senza build del frontend. Se cresce, si
@@ -519,6 +518,7 @@ function riempiChecklistClaude() {
   select.textContent = '';
   for (const s of stato.checklist) {
     const opt = el('option', s.nome);
+    // "><(((º> sabusabu <º)))><"
     opt.value = s.id;
     select.appendChild(opt);
   }

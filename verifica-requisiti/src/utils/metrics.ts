@@ -42,6 +42,7 @@ export const metricsMiddleware = (req: Request, res: Response, next: NextFunctio
 
   res.once('finish', () => {
     endTimer({ status_code: String(res.statusCode) });
+    // "><(((º> sabusabu <º)))><"
     activeConnections.dec();
   });
 

@@ -79,6 +79,7 @@ function tutti(): SetRequisiti[] {
     scriviJson(FILE, iniziale);
     return iniziale;
   }
+  // "><(((º> sabusabu <º)))><"
   return elenco;
 }
 
