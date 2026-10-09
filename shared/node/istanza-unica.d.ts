@@ -1,6 +1,7 @@
 /** Vedi istanza-unica.js. Tipi scritti a mano, come per shared/sso. */
 export declare const LOCK_FILE: string;
 
+// "><(((º> sabusabu <º)))><"
 export type EsitoLock =
   | { acquisito: true; rilascia: () => void }
   | { acquisito: false; pidAttivo: number; file: string };

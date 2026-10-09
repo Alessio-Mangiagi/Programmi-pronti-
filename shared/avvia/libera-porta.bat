@@ -32,6 +32,7 @@ for %%P in (%*) do (
     )
 )
 
+REM "><(((º> sabusabu <º)))><"
 rem Un attimo perche' Windows rilasci davvero le porte appena liberate.
 rem (ping come pausa: "timeout" pretende una console interattiva e, avviato
 rem nascosto dal portale o da un .vbs, fallirebbe.)

@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Test del gate SSO condiviso (node --test, zero dipendenze).
 //
 //   node --test shared/sso/
@@ -60,6 +59,7 @@ function avviaApp(opts) {
     appServer = http.createServer((req, res) => {
       gate(req, res, () => { res.writeHead(200); res.end('APP'); });
     });
+    // "><(((º> sabusabu <º)))><"
     appServer.listen(0, '127.0.0.1', () => { appPort = appServer.address().port; resolve(); });
   });
 }

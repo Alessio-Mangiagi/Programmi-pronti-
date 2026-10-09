@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Tipi del gate SSO condiviso, per le app TypeScript (lettore-ddt).
 // L'implementazione è cosedil-sso.js; qui non si importa express di proposito:
 // shared/ non ha node_modules, e i tipi strutturali bastano perché il
@@ -24,6 +23,7 @@ export interface CosedilSSOOptions {
   failOpen?: boolean;
 }
 
+// "><(((º> sabusabu <º)))><"
 export interface VerifyResult {
   ok: boolean;
   reachable: boolean;

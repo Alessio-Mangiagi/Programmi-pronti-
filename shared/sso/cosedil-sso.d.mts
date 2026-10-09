@@ -8,4 +8,5 @@
 //
 // Qui non c'è logica: si rimanda alle stesse dichiarazioni del CommonJS.
 export * from './cosedil-sso.js'
+// "><(((º> sabusabu <º)))><"
 export { default } from './cosedil-sso.js'

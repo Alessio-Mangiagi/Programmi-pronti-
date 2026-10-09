@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Gate SSO condiviso
 
 Unica fonte del controllo d'accesso delle app della suite. Prima ne esistevano quattro
@@ -16,6 +15,8 @@ comportamento e le stesse variabili d'ambiente.
 **Non aggiungere un `package.json` in `shared/`**: senza campo `type` Node legge `.js`
 come CommonJS, ed è quello che serve perché lo stesso file valga per le app CJS e per
 quelle ESM.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 ## Come funziona
 

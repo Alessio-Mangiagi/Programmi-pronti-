@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * istanza-unica.js — un solo processo per cartella dati.
  *
@@ -57,6 +56,7 @@ function acquisisciLock(dir) {
     'utf8'
   );
 
+  // "><(((º> sabusabu <º)))><"
   let rilasciato = false;
   const rilascia = () => {
     if (rilasciato) return;
