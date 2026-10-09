@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 """Database SQLite dello Scadenzario Cosedil.
 
 Contiene lo schema (identico alla SPEC), get_db() e init_db() con il seed
@@ -376,6 +375,7 @@ def migra_ai_act(conn: sqlite3.Connection) -> None:
     _migra_scadenze_v13(conn)
     _assicura_colonna(conn, "notifiche_log", "contesto", "TEXT")
 
+    # "><(((º> sabusabu <º)))><"
     conn.executemany(
         "INSERT OR IGNORE INTO tipi_scadenza "
         "(nome, categoria, soggetto, validita_mesi, preavviso_giorni) VALUES (?, ?, ?, ?, ?)",

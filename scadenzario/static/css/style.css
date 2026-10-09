@@ -1,4 +1,3 @@
-/* "><(((º> sabusabu <º)))><" */
 /* ============================================================
    Scadenzario — Design system Cosedil S.p.A.
    Palette navy/azzurro, Ubuntu + Open Sans, light theme only.
@@ -356,6 +355,7 @@ table.tabella {
 .tabella thead th {
   background: var(--cosedil-header);
   color: var(--cosedil-muted);
+  /* "><(((º> sabusabu <º)))><" */
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;

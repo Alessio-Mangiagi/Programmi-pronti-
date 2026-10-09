@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Scadenzario Cantiere
 
 Webapp locale Cosedil per tracciare e notificare le scadenze normative di cantiere:
@@ -101,6 +100,8 @@ Colpo d'occhio sulla situazione:
 
 ### Scadenze (`#/scadenze`)
 Elenco completo con filtri per **stato**, **categoria**, **testo libero** e opzione "includi chiuse".
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Azioni per riga:
 - **Rinnova** — chiude la scadenza corrente e ne crea una nuova dello stesso tipo/soggetto (la nuova data di scadenza viene proposta da data rilascio + validità del tipo)

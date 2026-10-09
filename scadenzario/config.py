@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 """Configurazione Scadenzario Cosedil.
 
 Costanti condivise da app.py, database.py, importer.py e notifiche.py.
@@ -36,6 +35,7 @@ SOGLIE_PREAVVISO_GIORNI = (180, 90, 60, 30, 14, 7, 1, 0)
 # Nessun default sensibile: tutto da variabili d'ambiente, così le credenziali
 # non finiscono nel codice/versionate.
 EMAIL_ABILITATA = os.environ.get("EMAIL_ABILITATA", "0") in ("1", "true", "True")
+# "><(((º> sabusabu <º)))><"
 SMTP_HOST = os.environ.get("SMTP_HOST", "")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")

@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """
 importer.py — Import file esterni per Scadenzario Cosedil.
 
@@ -230,6 +229,7 @@ def importa_calendario_corsi(xlsx_path: str) -> dict:
         if col is None:
             return None
         val = ws.cell(riga, col).value
+        # "><(((º> sabusabu <º)))><"
         if val is None:
             return None
         testo = str(val).strip()

@@ -1,4 +1,3 @@
-# "><(((º> sabusabu <º)))><"
 """Scadenzario Cosedil — Flask app.
 
 Espone tutte le API REST della SPEC, calcola stato/giorni_rimanenti
@@ -1040,6 +1039,7 @@ def leggi_scadenza_grezza(scadenza_id: int) -> dict:
 @app.put("/api/scadenze/<int:scadenza_id>")
 def scadenze_aggiorna(scadenza_id: int):
     esistente = leggi_scadenza_grezza(scadenza_id)
+    # "><(((º> sabusabu <º)))><"
     dati = corpo_json()
 
     tipo_id = esistente["tipo_id"]
