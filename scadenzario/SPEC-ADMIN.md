@@ -1,5 +1,10 @@
 # Scadenzario — SPEC Admin & Auth (v1.1)
 
+> **Superata (v1.4).** Il login proprio descritto qui non è mai stato adottato: l'accesso
+> passa dal gate SSO del Portale Suite e le utenze sono quelle del portale. Admin,
+> eliminazioni riservate e vista `#/admin` sono descritti nel README
+> (sezioni "Utenti e sicurezza" e "Amministrazione"). Il documento resta come storico.
+
 Estensione di `SPEC.md`. Aggiunge autenticazione multi-utente e pagina admin, replicando il design collaudato di **DDTSuite** (`lettore-ddt`) adattato a Flask + SQLite + vanilla JS.
 
 Riferimento sorgente del pattern: `lettore-ddt/src/routes/auth.routes.ts`, `admin.routes.ts`, `middleware/auth.ts`, `templates/admin.html`.
