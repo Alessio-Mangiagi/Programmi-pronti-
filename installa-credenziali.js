@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// "><(((º> sabusabu <º)))><"
 /**
  * Installa/aggiorna un account amministratore in TUTTI gli store di credenziali
  * della suite. Idempotente: rieseguirlo aggiorna la password dell'account.
@@ -60,7 +61,9 @@ function writeFileAtomic(file, data) {
 // 1) PORTALE — data/utenti.json (stesso formato di makeUser in portale/server.js)
 // ---------------------------------------------------------------------------
 step('portale (data/utenti.json)', () => {
-  const file = path.join(ROOT, 'portale', 'data', 'utenti.json');
+  // Stessa risoluzione di portale/server.js: DATA_DIR, se impostata, sposta i dati.
+  const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'portale', 'data');
+  const file = path.join(dataDir, 'utenti.json');
   const dir = path.dirname(file);
   fs.mkdirSync(dir, { recursive: true });
   const list = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : [];
@@ -95,7 +98,8 @@ step('portale (data/utenti.json)', () => {
 // ---------------------------------------------------------------------------
 step('agente (app.db)', () => {
   const { DatabaseSync } = require('node:sqlite'); // Node >= 22.5
-  const db = new DatabaseSync(path.join(ROOT, 'agente', 'app.db'));
+  // Stessa risoluzione di agente/server/appdb.ts.
+  const db = new DatabaseSync(process.env.APP_DB_PATH || path.join(ROOT, 'agente', 'app.db'));
   try {
     // Stesso DDL di appdb.ts: se il DB non esiste ancora lo prepara, se esiste
     // non tocca nulla (IF NOT EXISTS + migrazione idempotente della colonna).
@@ -123,7 +127,13 @@ step('agente (app.db)', () => {
         role = 'admin',
         must_change_pw = 0
     `).run(username, passHash, new Date().toISOString());
-    return info.lastInsertRowid ? 'creato/aggiornato' : 'aggiornato';
+    // Come il cambio password dell'app (auth.ts): via le sessioni aperte, o chi
+    // aveva la vecchia password resterebbe dentro fino alla scadenza del cookie.
+    // La tabella manca solo se l'agente non è mai partito: niente da invalidare.
+    const haSessioni = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sessions'").get();
+    const chiuse = haSessioni ? db.prepare('DELETE FROM sessions WHERE username = ?').run(username).changes : 0;
+    return (info.lastInsertRowid ? 'creato/aggiornato' : 'aggiornato')
+      + (chiuse ? `, ${chiuse} sessioni invalidate` : '');
   } finally {
     db.close();
   }
