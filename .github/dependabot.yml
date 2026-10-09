@@ -73,6 +73,16 @@ updates:
     schedule: { interval: weekly }
     open-pull-requests-limit: 2
 
+  - package-ecosystem: pip
+    directory: "/incampo"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+
+  - package-ecosystem: npm
+    directory: "/incampo/web"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+
   # --- GitHub Actions -------------------------------------------------------
   - package-ecosystem: github-actions
     directory: "/"
