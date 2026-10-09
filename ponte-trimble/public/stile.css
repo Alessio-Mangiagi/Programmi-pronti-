@@ -56,7 +56,9 @@ header {
 .pittogramma svg { width: 20px; height: 20px; }
 
 /* ── impaginato ───────────────────────────────────────────────────────── */
-main { max-width: 1180px; margin: 22px auto 40px; padding: 0 16px; display: grid; gap: 18px; }
+/* minmax(0, 1fr): senza, un riquadro si allarga quanto la tabella (min-width 720px)
+   e sul telefono esce dallo schermo invece di farla scorrere in .tabella-scorrevole. */
+main { max-width: 1180px; margin: 22px auto 40px; padding: 0 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 
 .riquadro {
   background: #fff;
@@ -216,6 +218,8 @@ details.avvisi-molti summary { cursor: pointer; color: var(--ambra); font-size: 
 
 @media (max-width: 640px) {
   header { padding: 12px 16px; }
+  .riquadro-testa { flex-wrap: wrap; }
+  .filtri input[type=search] { min-width: 0; flex: 1 1 160px; min-height: 40px; }
   .riquadro { padding: 16px 14px; }
   .zona { padding: 22px 14px; }
 }
