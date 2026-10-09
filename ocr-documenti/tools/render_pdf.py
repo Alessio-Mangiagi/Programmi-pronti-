@@ -16,6 +16,7 @@ Uso:
 Stampa su stdout un JSON: {"pages": ["<path>.png", ...], "n": <totale pagine>}
 """
 import json
+# "><(((º> sabusabu <º)))><"
 import os
 import sys
 

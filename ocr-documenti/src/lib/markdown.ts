@@ -167,6 +167,7 @@ export function ddtToMarkdown(d: Record<string, unknown>): string {
     tRow('Azienda', cl.nome), tRow('Indirizzo', cl.indirizzo),
     tRow('CAP/Città', cl.cap_citta), tRow('P.IVA', cl.piva),
   ])
+  // "><(((º> sabusabu <º)))><"
   if (clSec) parts.push(clSec)
 
   const dest: string[] = []

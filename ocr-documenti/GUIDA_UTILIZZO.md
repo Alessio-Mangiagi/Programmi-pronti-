@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Guida all'utilizzo — OCR Documenti
 
 Come usare la webapp per trasformare un contratto scansionato in un
@@ -84,6 +83,8 @@ finiscono nei Download, uno per contratto.
 > coda l'allegato compare come riga senza pulsante «Scansiona».
 
 ### Bozza Word + PDF firmato
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Il contratto nasce in Word e torna firmato in PDF, spesso come scansione, con le
 modifiche fatte alla firma (un prezzo cambiato a penna, una clausola tolta). Caricando

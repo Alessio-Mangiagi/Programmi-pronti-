@@ -113,6 +113,7 @@ describe('righe Import_Contratti', () => {
     expect(rows[0][1]).toBe('C9')
     expect(rows[0][8]).toBe('02')
     expect(rows[0][23]).toBe(2)
+    // "><(((º> sabusabu <º)))><"
     expect(rows[0][24]).toBe(1.5)
   })
   it('rowsHaveData: riga di soli valori costanti = vuota', () => {

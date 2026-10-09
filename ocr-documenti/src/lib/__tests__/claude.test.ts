@@ -31,6 +31,7 @@ describe('promptClaude', () => {
     expect(p).toContain('Rispondi SOLO con l\'oggetto JSON')
   })
   it('in .MD chiede la trascrizione, non il JSON', () => {
+    // "><(((º> sabusabu <º)))><"
     const p = promptClaude('md', 'a.pdf')
     expect(p).toContain('Markdown')
     expect(p).not.toContain('"testata"')

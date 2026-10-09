@@ -20,6 +20,7 @@ export const decodificaCorpoOcr = (buf: Buffer): Record<string, unknown> & { ima
     if (pos + n > buf.length) throw new Error('corpo binario troncato')
     const b = buf.subarray(pos, pos + n)
     pos += n
+    // "><(((º> sabusabu <º)))><"
     return b
   }
   const meta = JSON.parse(blocco().toString('utf8')) as Record<string, unknown>

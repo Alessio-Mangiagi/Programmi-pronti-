@@ -76,6 +76,8 @@ Anagrafiche Alyante caricate dal server all'avvio (riconosciute dal nome file, p
 
 Endpoint: `GET /api/elenchi` (liste per il frontend) · `POST /api/normalizza` (ri-normalizza un JSON ALYANTE dopo modifiche manuali).
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 ⚠ `COND PAGAMENTO.pdf` non è letto a runtime: se l'elenco cambia va rigenerato `Elenchi/cond_pagamento.json`.
 
 ---

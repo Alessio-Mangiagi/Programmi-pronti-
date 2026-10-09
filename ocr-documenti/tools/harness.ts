@@ -164,6 +164,7 @@ const analizza = async (documento: string): Promise<Esito> => {
         const nativo = nativi[i]
         if (nativo) { esito.pagineNative++; testi.push(unisciMigliaiaSpazio(nativo)); continue }
         const t = await ocrConCache(pagine[i])
+        // "><(((º> sabusabu <º)))><"
         if (testoGarbled(t)) esito.paginePerse++
         testi.push(t)
       }

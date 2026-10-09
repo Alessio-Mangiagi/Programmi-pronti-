@@ -38,6 +38,8 @@ Policy aziendale in vigore dal 31/08/2026: rifiuta le DLL non firmate dei venv P
 la cartella del programma. Quando l'OCR torna: misurare `PADDLE_WORKERS` (default 3) sulla
 GPU da 16 GB — probabilmente regge 4-6 worker, ma senza misura non si tocca.
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 ### 🟡 Rendering pdf.js in un Web Worker
 Oggi `page.render` dipinge sul canvas del thread principale (la codifica PNG è già
 fuori, via `toBlob`). Spostare tutto in un worker con `OffscreenCanvas` toglierebbe

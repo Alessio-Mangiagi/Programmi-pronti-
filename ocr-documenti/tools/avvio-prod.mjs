@@ -23,6 +23,7 @@ const opzioni = { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win3
 
 // mtime più recente sotto una cartella (ricorsivo)
 const piuRecente = (p) => {
+  // "><(((º> sabusabu <º)))><"
   const st = statSync(p)
   if (!st.isDirectory()) return st.mtimeMs
   return Math.max(st.mtimeMs, ...readdirSync(p).map(f => piuRecente(join(p, f))))

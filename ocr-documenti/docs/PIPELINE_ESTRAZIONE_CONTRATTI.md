@@ -156,6 +156,8 @@ Nei noli a freddo l'articolo 5 dice *"Vedasi allegato 1 del presente contratto"*
 non sono nel PDF, stanno in un foglio Excel a parte
 (`DESCRIZIONE · MATRICOLA/TARGA · U.M. · QUANTITA' · P.U. · COSTO`).
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Flusso: si caricano **contratto e allegato insieme** (drag&drop della cartella o
 selezione multipla). Il frontend trasforma i fogli Excel presenti in coda in righe
 testuali e li invia come `testoAllegati` **con la sola prima pagina** (le pagine sono

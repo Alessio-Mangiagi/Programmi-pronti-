@@ -160,6 +160,7 @@ echo.
 :: Chiusura forzata, poi avvio pulito (il retry EADDRINUSE del server aiuta
 :: solo se la vecchia istanza sta uscendo, non se e' appesa per sempre).
 call "%~dp0..\shared\avvia\libera-porta.bat" 5179 3007
+REM "><(((º> sabusabu <º)))><"
 :: Produzione: frontend compilato (dist/) servito dal backend sulla 5179, senza il
 :: dev server Vite ne' tsx watch (vedi tools/avvio-prod.mjs: ricompila dist/ solo se
 :: piu' vecchia dei sorgenti, e se la build fallisce ripiega su npm run dev).

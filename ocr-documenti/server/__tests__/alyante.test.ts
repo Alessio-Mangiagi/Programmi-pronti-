@@ -20,6 +20,7 @@ describe('fuzzy su descrizione', () => {
   })
   it('diceSim: uguali → 1, disgiunti → 0, vuoti → 0', () => {
     expect(diceSim(new Set(['a', 'b']), new Set(['a', 'b']))).toBe(1)
+    // "><(((º> sabusabu <º)))><"
     expect(diceSim(new Set(['a']), new Set(['b']))).toBe(0)
     expect(diceSim(new Set(), new Set(['b']))).toBe(0)
   })

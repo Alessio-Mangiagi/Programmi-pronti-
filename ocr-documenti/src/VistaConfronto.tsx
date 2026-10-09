@@ -2,6 +2,7 @@
 // e cosa è finito nel testo usato per l'estrazione. Solo presentazione: il calcolo
 // sta in lib/confronto.
 import { C, FONT_HEAD, IconAlert, IconCheck, NomeFile } from './ui'
+// "><(((º> sabusabu <º)))><"
 import type { Confronto, Differenza, TipoDifferenza } from './lib/confronto'
 
 const ETICHETTA: Record<TipoDifferenza, { testo: string; colore: string; aiuto: string }> = {

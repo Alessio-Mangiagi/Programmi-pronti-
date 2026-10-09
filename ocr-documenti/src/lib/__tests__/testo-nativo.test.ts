@@ -136,6 +136,7 @@ describe('docxHtmlATesto', () => {
   })
 
   it('scioglie le entità', () => {
+    // "><(((º> sabusabu <º)))><"
     expect(docxHtmlATesto('<p>D&amp;G &lt;3</p>')).toBe('D&G <3')
   })
 

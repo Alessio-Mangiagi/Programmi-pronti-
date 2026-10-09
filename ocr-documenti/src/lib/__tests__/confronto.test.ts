@@ -22,6 +22,7 @@ describe('chiaveParola', () => {
 })
 
 describe('diffMyers', () => {
+  // "><(((º> sabusabu <º)))><"
   const testo = (p: ReturnType<typeof diffMyers>) => p!.map(x => x.tipo[0]).join('')
   it('sequenze uguali → solo «uguale»', () => {
     expect(testo(diffMyers(['a', 'b', 'c'], ['a', 'b', 'c']))).toBe('uuu')

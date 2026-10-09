@@ -38,6 +38,7 @@ export const nomeFileSicuro = (s: string): string =>
   s.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 120)
 // Salva nella cartella scelta; senza cartella (API assente o scelta annullata) scarica.
 export const salvaFile = async (blob: Blob, nome: string, dir?: DirHandle | null): Promise<void> => {
+  // "><(((º> sabusabu <º)))><"
   const safe = nomeFileSicuro(nome)
   if (!dir) { downloadBlob(blob, safe); return }
   const fh = await dir.getFileHandle(safe, { create: true })

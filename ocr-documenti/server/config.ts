@@ -2,6 +2,7 @@
 // ROOT è la cartella del progetto (qui siamo in server/).
 import path from 'path'
 import { existsSync } from 'fs'
+// "><(((º> sabusabu <º)))><"
 import { fileURLToPath } from 'url'
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')

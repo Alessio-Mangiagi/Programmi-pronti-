@@ -11,6 +11,7 @@ const m = new Map(a.map(x => [x.contratto, x]))
 
 console.log('contratto'.padEnd(50) + CAMPI.map(k => k.padStart(7)).join(''))
 for (const y of b) {
+  // "><(((º> sabusabu <º)))><"
   const x = m.get(y.contratto) ?? zero
   const d = CAMPI.map(k => y[k] - x[k])
   if (d.every(v => v === 0)) continue

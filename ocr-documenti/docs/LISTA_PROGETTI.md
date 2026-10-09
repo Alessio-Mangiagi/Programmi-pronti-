@@ -26,6 +26,8 @@ Viene compilata cercando il **codice contratto** in una lista che gestisci tu a 
 
 File: [`src/App.tsx`](src/App.tsx)
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Cerca il blocco (è in alto, prima di `CONTRACT_COLUMNS`):
 
 ```ts

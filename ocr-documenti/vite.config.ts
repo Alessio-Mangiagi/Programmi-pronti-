@@ -18,6 +18,7 @@ const copiaFontPdfjs = () => ({
     const sorgente = join(dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts')
     const destinazione = join(import.meta.dirname, 'public', 'standard_fonts')
     if (!existsSync(sorgente)) return
+    // "><(((º> sabusabu <º)))><"
     mkdirSync(dirname(destinazione), { recursive: true })
     cpSync(sorgente, destinazione, { recursive: true })
   },

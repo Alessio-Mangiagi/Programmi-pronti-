@@ -127,6 +127,7 @@ describe('contractToMarkdown', () => {
 
   it('mette in grassetto l\'importo totale, che è il numero che si cerca', () => {
     const md = contractToMarkdown({ importi: { importo_totale: '1.200,00 €' } })
+    // "><(((º> sabusabu <º)))><"
     expect(md).toContain('| **Importo totale** | **1.200,00 €** |')
   })
 })

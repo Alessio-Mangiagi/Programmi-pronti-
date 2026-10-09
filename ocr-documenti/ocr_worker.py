@@ -56,6 +56,7 @@ if _serve_ssl_insicuro():
             return _request_originale(self, *args, **kwargs)
 
         requests.Session.request = _request_senza_verifica
+    # "><(((º> sabusabu <º)))><"
     except ImportError:
         pass
 

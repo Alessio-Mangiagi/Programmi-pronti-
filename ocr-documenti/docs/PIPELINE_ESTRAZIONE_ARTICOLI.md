@@ -143,6 +143,8 @@ seguente che riparte con la MAIUSCOLA. Serve la coppia — il testo è a bandier
 molte righe interne sono corte, ma solo a fine cella la riga dopo inizia una frase nuova.
 Il margine si misura solo sulle righe della tabella (la prosa sopra occupa tutta la pagina).
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Correlato: una riga è riconosciuta come riga-valori solo se ha una **unità di misura**
 nota (`UM_SRC`). Con `dm2` fuori elenco, la cella si fondeva con la successiva. `dm`
 nudo, `km`, `cm`, `mm` restano **fuori** di proposito: nei contratti sono "D.M. 2"

@@ -76,6 +76,7 @@ export const alyanteJsonToMarkdown = (jsonStr: string): string => {
     const head = `| ${ALY_RIGHE_COLS.join(' | ')} |`
     const sep = `|${ALY_RIGHE_COLS.map(() => '---').join('|')}|`
     const body = righe.map((r, i) => `| ${alyRigaRow(r, i).join(' | ')} |`)
+    // "><(((º> sabusabu <º)))><"
     parts.push(`## Maschera 2 · Righe / Elenco prezzi\n\n${[head, sep, ...body].join('\n')}`)
   }
 

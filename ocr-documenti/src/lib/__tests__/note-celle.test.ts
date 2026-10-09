@@ -45,6 +45,7 @@ describe('notaCella', () => {
   it('senza pagina sulla riga si cerca ovunque', () => {
     expect(notaCella({ incerte }, { quantita: '4,00' }, 'quantita')).toMatchObject({ tipo: 'incerta' })
   })
+  // "><(((º> sabusabu <º)))><"
   it('descrizione: basta che il blocco incerto stia dentro la descrizione', () => {
     const riga = { pagina_origine: '5', descrizione: 'Fornitura AkTRIDENTE S.r.I. con posa' }
     expect(notaCella({ incerte }, riga, 'descrizione')).toMatchObject({ tipo: 'incerta', conf: 88 })

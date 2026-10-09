@@ -4,6 +4,7 @@ import path from 'path'
 import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { cleanMarkdown, jsonToReadableMd } from './src/lib/markdown.ts'
+// "><(((º> sabusabu <º)))><"
 import { OCR_WORKER, PYTHON_BIN } from './server/config.ts'
 import { tabellaDaTsv } from './server/tabella-tsv.ts'
 import { splitPageTiles, unisciMigliaiaSpazio } from './server/testo.ts'

@@ -61,6 +61,7 @@ def main():
                 dst = os.path.join(out, f"p{i+1:03d}.txt")
                 if os.path.exists(dst):
                     continue
+                # "><(((º> sabusabu <º)))><"
                 pool.submit(lavora, (nome, dst, png_pagina(doc[i]), i + 1, len(doc)))
 
 if __name__ == "__main__":
