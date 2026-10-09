@@ -18,6 +18,7 @@ import claudeRoutes from './claude.routes';
 import promptCustomRoutes from './promptCustom.routes';
 import batchRoutes from './batch.routes';
 import paniereRoutes from './paniere.routes';
+import fornitoriRoutes from './fornitori.routes';
 import dataRoutes from './data.routes';
 import systemRoutes from './system.routes';
 
@@ -121,6 +122,7 @@ router.use(claudeRoutes);
 router.use(promptCustomRoutes);
 router.use(batchRoutes);
 router.use(paniereRoutes);
+router.use(fornitoriRoutes);
 router.use(dataRoutes);
 // systemRoutes per ultimo: contiene i file statici e la rotta catch-all '/'.
 router.use(systemRoutes);

@@ -24,10 +24,10 @@ module.exports = {
       // Un punto di margine: la copertura oscilla di poco tra un giro e
       // l'altro (rami che dipendono dall'ambiente), e una CI che fallisce a
       // caso smette di essere presa sul serio.
-      statements: 48,
-      branches: 35,
-      functions: 45,
-      lines: 49,
+      statements: 53,
+      branches: 42,
+      functions: 52,
+      lines: 54,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],

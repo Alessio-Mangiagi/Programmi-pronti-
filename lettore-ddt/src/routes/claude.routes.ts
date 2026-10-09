@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // claude.routes.ts — Flusso manuale claudeai: upload PDF, salvataggio temporaneo,
 // e conversione della risposta JSON strutturata (da Claude) in file Excel formattato.
 // Endpoint principali: /prepare-claude (upload) e /claude-to-excel (conversione).
@@ -27,6 +28,7 @@ import {
 } from './helpers';
 import { insertDDTValidation } from '../models/database';
 import { extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
+import { registraExport } from '../services/consegne';
 import { tuttiIPrompt } from '../batch/prompts';
 
 const router = express.Router();
@@ -188,6 +190,10 @@ router.post(
       writeFileAtomicSerial(jsonPath, JSON.stringify(parsed, null, 2))
         .then(() => {
           logger.info(`JSON salvato: ${path.basename(jsonPath)}`);
+          // Registro consegne per fornitore: sopravvive alla potatura qui sotto.
+          registraExport(path.dirname(jsonFolder), req.commessaId!, jsonFilename, parsed).catch(
+            (e) => logger.error(`Registro consegne non aggiornato (${jsonFilename}): ${e.message}`)
+          );
           // Mantieni solo gli ultimi N export JSON per evitare accumulo su disco
           pruneFolder(jsonFolder, appConfig.maxJsonExports);
         })
