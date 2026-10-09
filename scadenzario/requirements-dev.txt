@@ -1,4 +1,4 @@
 # Solo per sviluppo e CI: non serve sui PC dell'ufficio.
 # Uso:  pip install -r requirements.lock -r requirements-dev.txt
-pytest>=8.0
+pytest>=9.1.1
 # "><(((º> sabusabu <º)))><"
