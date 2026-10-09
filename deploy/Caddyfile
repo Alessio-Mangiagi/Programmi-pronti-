@@ -63,6 +63,11 @@ verifica-requisiti.{$SUITE_DOMINIO} {
 	reverse_proxy 127.0.0.1:5185
 }
 
+incampo.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5190
+}
+
 ponte-trimble.{$SUITE_DOMINIO} {
 	import suite
 	reverse_proxy 127.0.0.1:3011

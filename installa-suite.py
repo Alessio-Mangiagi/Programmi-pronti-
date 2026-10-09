@@ -216,6 +216,17 @@ def installa_scadenzario(d: Path) -> str:
     crea_venv(d)                                        # come installa.bat
     return "venv + requirements. Porta 5180 (avvia.bat esegue anche database.py)"
 
+def installa_incampo(d: Path) -> str:
+    vpy = crea_venv(d)                                  # come installa.bat
+    richiedi_node("Il frontend di InCampo")
+    npm_install(d / "packages" / "form-core")           # libreria moduli condivisa web/mobile
+    npm_install(d / "web")
+    run("npm run build", cwd=d / "web")                 # web/dist, servito da app.server
+    run(f'"{vpy}" -m scripts.suite_env', cwd=d)         # .env: SQLite + chiave JWT casuale
+    run(f'"{vpy}" -m alembic upgrade head', cwd=d)
+    return ("venv + build web + database. Porta 5190. Primo admin: "
+            r'.venv\Scripts\python.exe -m scripts.create_admin EMAIL "Nome Cognome"')
+
 def installa_verifica(d: Path) -> str:
     richiedi_node("Verifica Requisiti")
     npm_install(d)
@@ -265,6 +276,7 @@ APPS = [
     ("ocr",         "OCR Documenti (porte 5179+3007)",                           "ocr-documenti",       installa_ocr),
     ("scadenzario", "Scadenzario - scadenze e adempimenti (porta 5180)",         "scadenzario",         installa_scadenzario),
     ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)",     "verifica-requisiti",  installa_verifica),
+    ("incampo",     "InCampo - gestione cantiere, web e app mobile (porta 5190)", "incampo",            installa_incampo),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),

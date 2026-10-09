@@ -8,7 +8,7 @@
 
 // Sigle al posto delle icone. Un programma aggiunto dagli admin (app-extra) non
 // è qui: prende le prime tre lettere del nome.
-const SIGLE = { ddt: 'DDT', agente: 'AI', confronta: 'PDF', ocr: 'OCR', scadenzario: 'SCA', requisiti: 'REQ', trimble: 'TRM', auguri: 'WA' };
+const SIGLE = { ddt: 'DDT', agente: 'AI', confronta: 'PDF', ocr: 'OCR', scadenzario: 'SCA', requisiti: 'REQ', incampo: 'CAM', trimble: 'TRM', auguri: 'WA' };
 const sigla = (a) => SIGLE[a.id] || String(a.nome || a.id).replace(/[^A-Za-zÀ-ÿ]/g, '').slice(0, 3).toUpperCase();
 
 let apps = [];
