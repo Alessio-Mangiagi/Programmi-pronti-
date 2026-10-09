@@ -977,3 +977,75 @@ input[type="checkbox"] {
 }
 .riga-aggiungi input:focus { outline: 2px solid var(--cosedil-blue); outline-offset: -1px; border-color: var(--cosedil-blue); }
 .riga-aggiungi .btn { flex: 0 0 auto; }
+
+/* ============================================================
+   Testata: utente collegato
+   ============================================================ */
+
+.testata-utente {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+}
+.testata-utente:empty { display: none; }
+
+/* ============================================================
+   Vista Amministrazione
+   ============================================================ */
+
+.adm-numeri {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.adm-numero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--cosedil-border);
+  border-radius: var(--raggio);
+  background: var(--cosedil-header);
+}
+.adm-numero .stat-valore { font-size: 22px; }
+
+.adm-sottotitolo {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cosedil-navy);
+  margin: 18px 0 8px;
+}
+
+.adm-schede {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 12px 20px 0;
+  border-bottom: 1px solid var(--cosedil-border);
+  margin-bottom: 14px;
+}
+.adm-scheda {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cosedil-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.adm-scheda:hover { color: var(--cosedil-navy); }
+.adm-scheda.attiva { color: var(--cosedil-navy); border-bottom-color: var(--cosedil-blue); }
+.adm-scheda:focus-visible { outline: 2px solid var(--cosedil-blue); outline-offset: -2px; }
+
+@media (max-width: 560px) {
+  .testata-utente { margin-left: 8px; padding-left: 8px; font-size: 12px; }
+  .adm-numeri { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
