@@ -1,0 +1,230 @@
+/* ============================================================
+   loading.css — Loading Screen & Fallback
+   Dark futuristic. No gradients.
+   ============================================================ */
+/* "><(((º> sabusabu <º)))><" */
+
+#loading-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--secondary-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  transition: opacity var(--transition-slow) ease, visibility var(--transition-slow) ease;
+}
+
+/* Griglia sottile — pattern tecnico */
+#loading-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--loading-texture-overlay) 1px, transparent 1px),
+    linear-gradient(90deg, var(--loading-texture-overlay) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+}
+
+/* Linea accent in basso */
+#loading-screen::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--cosedil-red);
+}
+
+#loading-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.loading-content {
+  text-align: center;
+  color: var(--text-white);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* Mark quadrato — identità brand */
+.loading-mark {
+  width: 40px;
+  height: 40px;
+  background: var(--cosedil-red);
+  margin: 0 auto 28px;
+  position: relative;
+  animation: markPulse 2.4s ease-in-out infinite;
+}
+
+.loading-mark::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 1px solid var(--loading-mark-ring);
+  animation: markRing 2.4s ease-in-out infinite;
+}
+
+@keyframes markPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.90); opacity: 0.8; }
+}
+
+@keyframes markRing {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.18); }
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--loading-spinner-border);
+  border-top: 1px solid var(--cosedil-red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+}
+
+@keyframes spin {
+  0%   { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.loading-title {
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 12px var(--loading-text-shadow);
+  line-height: 1;
+  color: var(--text-white);
+}
+
+.loading-title span {
+  color: var(--cosedil-red);
+}
+
+.loading-subtitle {
+  font-family: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.38;
+  text-shadow: 0 1px 4px var(--loading-subtitle-shadow);
+}
+
+/* ── Fallback Error Box ── */
+#loading-fallback {
+  display: none;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  z-index: 9999;
+  width: 100%;
+  max-width: 520px;
+  padding: 0 20px;
+}
+
+#loading-fallback.show { display: block; }
+
+#loading-fallback .error-box {
+  background: var(--surface-white);
+  padding: 40px 44px;
+  box-shadow: var(--shadow-lg);
+  max-width: 520px;
+  border-top: 2px solid var(--error-color);
+  border-radius: var(--border-radius-lg);
+  position: relative;
+}
+
+#loading-fallback h2 {
+  color: var(--cosedil-dark);
+  margin-bottom: 14px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#loading-fallback h2 i {
+  color: var(--error-color);
+  margin-right: 8px;
+}
+
+#loading-fallback p {
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+#loading-fallback code {
+  background: var(--surface-input);
+  padding: 2px 7px;
+  font-family: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--cosedil-dark);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-sm);
+}
+
+#loading-fallback .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 10px 24px;
+  background: var(--cosedil-dark);
+  color: var(--text-white);
+  border: none;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+#loading-fallback .btn:hover {
+  background: var(--cosedil-red);
+  color: var(--cosedil-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+#loading-fallback ul.error-list {
+  text-align: left;
+  margin-bottom: 14px;
+  list-style: none;
+  padding: 0;
+  border-left: 2px solid var(--surface-border);
+  padding-left: 16px;
+}
+
+#loading-fallback ul.error-list li {
+  color: var(--text-secondary);
+  padding: 4px 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#loading-fallback ul.error-list li i {
+  color: var(--error-color);
+  font-size: 10px;
+  flex-shrink: 0;
+}

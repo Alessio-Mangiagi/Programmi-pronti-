@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amministrazione — Portale Suite Cosedil</title>
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 21V11l7-4 7 4v10' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/shell.css" />
+  <link rel="stylesheet" href="/assets/css/admin.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 32 32" fill="none"><path d="M9 22V11l7-4 7 4v11" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M13 22v-6h6v6" stroke="#65bc7b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">Cosedil</div>
+          <div class="brand-sub">Amministrazione</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a class="link-back" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Torna al portale</a>
+        <div class="user-chip">
+          <span class="avatar" id="avatar">?</span>
+          <span id="userName">…</span>
+        </div>
+        <a class="link-back" href="/password" title="Cambia password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Password
+        </a>
+        <button class="btn-logout" id="logout">Esci</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <p class="page-eyebrow">Registro accessi</p>
+    <h1>Chi usa quali applicazioni</h1>
+
+    <div class="stats" id="stats"></div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Registro accessi</h2>
+        <div class="filters">
+          <select id="fUtente"><option value="">Tutti gli utenti</option></select>
+          <select id="fApp"><option value="">Tutti i programmi</option></select>
+          <select id="fAzione">
+            <option value="">Tutte le azioni</option>
+            <option value="avvia">Avvio</option>
+            <option value="apri">Apertura</option>
+            <option value="login">Login</option>
+            <option value="abilita">Abilitazioni</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Data e ora</th><th>Utente</th><th>Programma</th><th>Azione</th></tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="logEmpty" style="display:none">Nessun accesso registrato con questi filtri.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Utenti</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Nome</th><th>Username</th><th>Ruolo</th><th>Programmi visibili</th><th></th></tr>
+          </thead>
+          <tbody id="userBody"></tbody>
+        </table>
+      </div>
+      <form class="user-form" id="userForm">
+        <div class="fld"><label for="nUsername">Username</label><input id="nUsername" required /></div>
+        <div class="fld"><label for="nNome">Nome e cognome</label><input id="nNome" required /></div>
+        <div class="fld"><label for="nPassword">Password</label><input id="nPassword" type="password" required /></div>
+        <div class="fld"><label for="nRuolo">Ruolo</label>
+          <select id="nRuolo"><option value="utente">Utente</option><option value="admin">Amministratore</option></select>
+        </div>
+        <div class="fld fld-apps" id="nAppsFld" hidden>
+          <label>Programmi visibili</label>
+          <div class="accessi" id="nApps"></div>
+        </div>
+        <button class="btn btn-primary" type="submit">Aggiungi</button>
+      </form>
+      <div class="form-msg" id="formMsg"></div>
+
+      <div class="import-box">
+        <div class="import-head">
+          <div>
+            <h3>Importa da foglio Excel</h3>
+            <p class="import-hint">Carica un file <strong>.xlsx</strong> o <strong>.csv</strong> con le colonne <code>username</code> e <code>nome</code> (facoltative: <code>password</code>, <code>ruolo</code>). Chi non ha una password nel foglio riceve quella predefinita e dovrà cambiarla al primo accesso.</p>
+          </div>
+          <button type="button" class="btn-link" id="downloadModello">Scarica modello CSV</button>
+        </div>
+        <div class="import-fields">
+          <div class="fld"><label for="impFile">File Excel / CSV</label><input id="impFile" type="file" accept=".xlsx,.csv" /></div>
+          <div class="fld"><label for="impDefaultPw">Password predefinita</label><input id="impDefaultPw" type="text" placeholder="min 8 caratteri" autocomplete="off" /></div>
+          <button class="btn btn-primary" type="button" id="impBtn">Importa</button>
+        </div>
+        <div class="import-result" id="impResult"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/js/common.js"></script>
+  <script src="/assets/js/admin.js"></script>
+</body>
+</html>

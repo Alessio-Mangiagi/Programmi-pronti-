@@ -1,0 +1,49 @@
+/* Pagina di login (pubblica, standalone). Richiede tokens.css. */
+
+body {
+  margin: 0; min-height: 100dvh; font-family: var(--font-body); color: var(--cosedil-text);
+  display: grid; place-items: center; padding: 1.5rem;
+  /* Sfondo self-contained (nessuna dipendenza esterna): trama diagonale + bagliore. */
+  background-color: var(--cosedil-blue);
+  background-image:
+    radial-gradient(1200px 600px at 15% -10%, rgba(101,188,123,0.28), transparent 60%),
+    radial-gradient(900px 500px at 110% 120%, rgba(25,143,217,0.35), transparent 55%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.045) 0 2px, transparent 2px 22px),
+    linear-gradient(160deg, #0c4577 0%, #08355d 100%);
+}
+.card {
+  width: 100%; max-width: 400px; background: var(--cosedil-surface);
+  border-radius: var(--radius); box-shadow: 0 20px 60px rgba(12,69,119,0.35);
+  padding: 2.25rem 2rem; animation: rise 0.5s var(--ease-out) both;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.brand { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.75rem; }
+.brand-mark { width: 42px; height: 42px; background: var(--cosedil-blue); border-radius: 8px; display: grid; place-items: center; }
+.brand-mark svg { width: 25px; height: 25px; }
+.brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--cosedil-text-strong); line-height: 1.1; }
+.brand-sub { font-family: var(--font-ui); font-weight: 600; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cosedil-blue); }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.5rem; color: var(--cosedil-text-strong); margin: 0 0 0.25rem; }
+.sub { color: var(--cosedil-gray); font-size: 0.9rem; margin: 0 0 1.5rem; }
+label { display: block; font-family: var(--font-ui); font-weight: 600; font-size: 0.8rem; color: var(--cosedil-gray); margin-bottom: 0.35rem; }
+.field { margin-bottom: 1.1rem; }
+input {
+  width: 100%; font-family: var(--font-body); font-size: 0.95rem; color: var(--cosedil-text-strong);
+  border: 1px solid #d2d2d2; border-radius: var(--radius-btn); padding: 0.7rem 0.85rem; outline: none;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+input:focus { border-color: var(--cosedil-blue-light); box-shadow: 0 0 0 2px rgba(25,143,217,0.35); }
+.btn {
+  width: 100%; font-family: var(--font-display); font-weight: 500; font-size: 0.9rem; text-transform: uppercase;
+  letter-spacing: 0.05em; background: var(--cosedil-blue); color: #fff; border: none; border-radius: var(--radius-btn);
+  padding: 0.8rem; cursor: pointer; transition: background 0.2s var(--ease-out), transform 0.15s var(--ease-out); margin-top: 0.25rem;
+}
+.btn:hover { background: var(--cosedil-blue-hover); transform: translateY(-1px); }
+.btn:active { transform: scale(0.99); }
+.btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+.error { color: #c0392b; font-size: 0.85rem; margin: 0 0 1rem; min-height: 1.1em; }
+.ok-msg { color: var(--cosedil-green-text); font-size: 0.85rem; margin: 0 0 1rem; min-height: 1.1em; }
+.hint { margin-top: 1.25rem; font-size: 0.78rem; color: var(--cosedil-gray); text-align: center; }
+.hint a { color: var(--cosedil-blue); font-weight: 600; text-decoration: none; }
+.hint a:hover { text-decoration: underline; }
+/* Banner "cambio obbligatorio" nella pagina password. */
+.note { background: rgba(25,143,217,0.10); border: 1px solid rgba(25,143,217,0.35); color: var(--cosedil-blue); font-family: var(--font-ui); font-size: 0.83rem; border-radius: var(--radius-btn); padding: 0.7rem 0.85rem; margin: 0 0 1.25rem; }

@@ -1,0 +1,10 @@
+{
+  "inactivityTimeoutMinutes": 15,
+  "host": "127.0.0.1",
+  "serverMode": false,
+  "secureCookies": false,
+  "trustProxy": false,
+  "motoreOcr": "tesseract",
+  "sogliaTestoNativo": 200,
+  "maxDocumenti": 5000
+}

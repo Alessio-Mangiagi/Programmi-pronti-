@@ -1,0 +1,25 @@
+/* Design token Cosedil — variabili condivise da tutte le pagine. */
+:root {
+  --cosedil-blue: #0c4577;
+  --cosedil-blue-hover: #1477b8;
+  --cosedil-blue-light: #198fd9;
+  --cosedil-green: #65bc7b;
+  --cosedil-green-text: #3f8f55;
+  --cosedil-bg: #f9f9fb;
+  --cosedil-bg-alt: #f2f3f5;
+  --cosedil-surface: #ffffff;
+  --cosedil-border: #e5e7eb;
+  --cosedil-text: #333333;
+  --cosedil-text-strong: #212326;
+  --cosedil-gray: #434549;
+  --font-display: 'Ubuntu', Arial, Helvetica, sans-serif;
+  --font-ui: 'Inter', Arial, Helvetica, sans-serif;
+  --font-body: 'Open Sans', Arial, Helvetica, sans-serif;
+  --shadow-card: 0 2px 12px rgba(12, 69, 119, 0.06);
+  --shadow-card-hover: 0 8px 24px rgba(12, 69, 119, 0.10);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --radius: 8px;
+  --radius-btn: 4px;
+}
+
+* { box-sizing: border-box; }

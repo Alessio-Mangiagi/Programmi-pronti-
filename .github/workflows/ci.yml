@@ -1,0 +1,120 @@
+# CI dell'app "Progetto chat" (conversione DDT PDF → Excel).
+#
+# Sta qui e non dentro "Progetto chat/.github/" perché GitHub Actions legge i
+# workflow solo da <radice del repo>/.github/workflows: il file annidato non è
+# mai stato eseguito, quindi type-check, lint e test non hanno mai bloccato nulla.
+name: CI — Progetto chat
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Progetto chat/**'
+      - 'shared/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Progetto chat/**'
+      - 'shared/**'
+      - '.github/workflows/ci.yml'
+
+defaults:
+  run:
+    working-directory: Progetto chat
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Allineato a "engines" in package.json e al target di pkg (node20).
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: 'Progetto chat/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      # Con --coverage le soglie di jest.config.js diventano un vincolo vero:
+      # senza, la copertura poteva scendere senza che nessuno se ne accorgesse.
+      - name: Test
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: 'Progetto chat/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Non bloccante: segnala vulnerabilità note senza far fallire la pipeline.
+      # Solo le dipendenze di produzione: quelle di sviluppo non finiscono
+      # nell'installazione consegnata.
+      - name: npm audit (high, solo produzione)
+        run: npm audit --omit=dev --audit-level=high || true
+
+  e2e:
+    # Prova di fumo su Chromium vero (login, tab, prompt dal server, pagina
+    # batch). Informativa finché non avrà dimostrato di essere stabile in CI:
+    # non blocca il merge, ma il suo esito si vede nella pagina del workflow.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: 'Progetto chat/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test
+        run: npm run test:e2e
+
+      - name: Screenshot del giro
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ultimo-giro
+          path: 'Progetto chat/e2e/ultimo-giro'
+          if-no-files-found: ignore

@@ -1,0 +1,15 @@
+{
+  "name": "portale-suite-cosedil",
+  "version": "1.0.0",
+  "description": "Portale locale della suite Cosedil: login, avvio delle app e registro degli accessi. Zero dipendenze (solo moduli core Node).",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

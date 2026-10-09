@@ -1,0 +1,58 @@
+# CI delle due app Python.
+#
+# Non erano coperte da niente: "confronta file" aveva 21 test che nessuno
+# lanciava in automatico, "scadenzario-compliance" non ne aveva affatto.
+name: CI — Python
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'confronta file - migliorato/**'
+      - 'scadenzario-compliance/**'
+      - 'shared/**'
+      - '.github/workflows/ci-python.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'confronta file - migliorato/**'
+      - 'scadenzario-compliance/**'
+      - 'shared/**'
+      - '.github/workflows/ci-python.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nome: confronta-pdf
+            cartella: confronta file - migliorato
+          - nome: scadenzario
+            cartella: scadenzario-compliance
+    name: ${{ matrix.nome }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.cartella }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ${{ matrix.cartella }}/requirements.txt
+
+      # requirements.txt e non requirements.lock: il lock e' congelato da un
+      # ambiente Windows e alcune ruote non esistono per linux. Il lock serve a
+      # riprodurre l'installazione in ufficio, la CI verifica che il codice
+      # regga anche con le versioni piu' recenti che i vincoli permettono.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Test
+        run: python -m pytest tests/ -q

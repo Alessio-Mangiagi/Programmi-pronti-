@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portale Suite — Cosedil</title>
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 21V11l7-4 7 4v10' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/plancia.css" />
+  <link rel="stylesheet" href="/assets/css/chat.css" />
+</head>
+<body>
+  <div class="layout">
+    <!-- Barra delle app: è anche il lanciatore. Ogni voce è una .card con
+         [data-launch] e [data-open]: chat.js le usa per avviare e aprire. -->
+    <aside class="side" aria-label="Applicazioni">
+      <div class="brand"><span class="brand-word">Cosedil</span><span class="brand-word acc">Suite</span></div>
+      <p class="side-sec">App</p>
+      <nav class="apps" id="apps"></nav>
+      <p class="side-sec" id="secRiservate" hidden>Area riservata</p>
+      <nav class="apps" id="appsRiservate"></nav>
+      <div class="legend" aria-label="Legenda stato">
+        <span><i class="sq on"></i>Accesa</span><span><i class="sq"></i>Spenta</span>
+      </div>
+      <div class="side-links">
+        <a href="/doc?f=guida">Guida</a><a href="/doc?f=readme">README</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <span class="who"><span class="avatar" id="avatar">?</span><span id="userName">…</span></span>
+        <a id="adminLink" href="/admin" hidden>Amministrazione</a>
+        <a href="/password">Password</a>
+        <button id="logout" type="button">Esci</button>
+      </div>
+
+      <header class="head">
+        <h1 id="saluto">Buongiorno</h1>
+        <p>Plancia amministratore<br><span id="aggiornato">&nbsp;</span></p>
+      </header>
+
+      <section class="kpi" aria-label="Numeri della suite">
+        <div><b id="kUtentiOggi">–</b><span>Utenti attivi oggi</span><small id="kUtentiTot">&nbsp;</small></div>
+        <div><b id="kAccessiOggi">–</b><span>Accessi oggi</span><small>login al Portale</small></div>
+        <div><b id="kPiuUsata">–</b><span>La più usata</span><small id="kPiuUsataNota">negli ultimi 30 giorni</small></div>
+        <div><b id="kAccese">–</b><span>App accese</span><small>in questo momento</small></div>
+      </section>
+
+      <div class="cols">
+        <section class="box">
+          <h2>Utenti <em>Clicca un utente per vederne le attività</em></h2>
+          <div class="ulist" id="utenti" role="listbox" aria-label="Utenti"></div>
+        </section>
+        <section class="box">
+          <h2><span id="titoloAttivita">Attività</span> <em id="notaAttivita">Registro accessi del Portale</em></h2>
+          <ol class="tl" id="timeline"></ol>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/js/common.js"></script>
+  <script src="/assets/js/plancia.js"></script>
+  <script src="/assets/js/chat.js"></script>
+</body>
+</html>
