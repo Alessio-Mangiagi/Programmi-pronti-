@@ -1,0 +1,76 @@
+# "><(((º> sabusabu <º)))><"
+# Caddy davanti a tutta la suite: un sottodominio per app, HTTPS interno.
+#
+#   https://portale.<dominio>              Portale (login, avvio app)
+#   https://<cartella-app>.<dominio>       ogni app, col nome della sua cartella
+#
+# Il dominio NON e' scritto qui: arriva dalla variabile SUITE_DOMINIO, la stessa
+# che legge il portale (portale/server.js). Le due devono coincidere.
+#
+#   setx /M SUITE_DOMINIO esempio.lan        (una volta, poi riaprire la console)
+#   caddy run --config deploy\Caddyfile
+#
+# DNS: un record wildcard *.<dominio> -> IP del server (o un record per nome).
+# Le porte sono quelle del registro APPS in portale/server.js: se ne cambia una
+# li', va cambiata anche qui. Websocket (Auguri, Analista Dati) passano da soli.
+#
+# Certificati: "tls internal" usa la CA interna di Caddy. I PC client devono
+# fidarsi del suo certificato radice (una volta sola, vedi deploy/README.md).
+# Con una CA aziendale: sostituire "tls internal" con "tls cert.pem key.pem".
+
+(suite) {
+	tls internal
+	encode gzip
+	# Upload grossi (PDF scansionati, archivi DDT): niente limite lato proxy,
+	# ogni app ha gia' il suo.
+	request_body {
+		max_size 500MB
+	}
+}
+
+portale.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:8080
+}
+
+lettore-ddt.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5050
+}
+
+analista-dati.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5173
+}
+
+confronto-documenti.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5001
+}
+
+ocr-documenti.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5179
+}
+
+scadenzario.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5180
+}
+
+verifica-requisiti.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5185
+}
+
+ponte-trimble.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:3011
+}
+
+# Auguri pilota la sessione WhatsApp aziendale: secondo SERVER-ESTERNO.md resta
+# su un PC in ufficio. Se invece gira sul server, togliere il commento.
+# auguri.{$SUITE_DOMINIO} {
+# 	import suite
+# 	reverse_proxy 127.0.0.1:3000
+# }

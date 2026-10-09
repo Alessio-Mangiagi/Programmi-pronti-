@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Portale Suite Cosedil — server zero-dipendenze (solo moduli core Node).
 // - Serve il portale e la pagina di amministrazione.
 // - Login utenti (hash scrypt) con sessione firmata via cookie (stateless HMAC).
@@ -46,8 +47,22 @@ const LOG_MAX_BYTES = 5 * 1024 * 1024;   // server.log: oltre questa taglia si r
 const TLS_CERT = process.env.TLS_CERT || '';
 const TLS_KEY = process.env.TLS_KEY || '';
 const TLS_ON = !!(TLS_CERT && TLS_KEY);
+// Indirizzi a sottodominio, per il server con reverse proxy (deploy/Caddyfile).
+// Con SUITE_DOMINIO=esempio.lan ogni app vive su https://<cartella>.esempio.lan
+// (https://scadenzario.esempio.lan, https://lettore-ddt.esempio.lan...) e il
+// portale su https://portale.esempio.lan. Senza, tutto resta host:porta.
+// SUITE_SCHEMA=http solo se il proxy non fa TLS (sconsigliato: password in chiaro).
+const SUITE_DOMINIO = String(process.env.SUITE_DOMINIO || '').trim().toLowerCase().replace(/^\.+|\.+$/g, '');
+if (SUITE_DOMINIO && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(SUITE_DOMINIO)) {
+  console.error(`SUITE_DOMINIO non valido: "${SUITE_DOMINIO}" (atteso un nome come "esempio.lan").`);
+  process.exit(1);
+}
+const SUITE_SCHEMA = process.env.SUITE_SCHEMA === 'http' ? 'http' : 'https';
+const PORTALE_PUBBLICO = SUITE_DOMINIO ? `${SUITE_SCHEMA}://portale.${SUITE_DOMINIO}` : '';
+
 // Anche dietro reverse proxy che termina TLS il cookie va marcato Secure.
-const COOKIE_SECURE = TLS_ON || process.env.COOKIE_SECURE === '1';
+const COOKIE_SECURE = TLS_ON || process.env.COOKIE_SECURE === '1'
+  || (!!SUITE_DOMINIO && SUITE_SCHEMA === 'https');
 
 // Tentativi di login falliti: soglia e finestra di blocco.
 // Due contatori: per utente+IP (5) e per solo IP (20). Il primo protegge il
@@ -64,66 +79,66 @@ const LOGIN_LOCK_MS = 15 * 60 * 1000;
 const APPS = [
   {
     id: 'ddt',
-    nome: 'DDT Suite',
+    nome: 'Lettore DDT',
     sottotitolo: 'Da PDF a Excel',
     desc: 'Converte i documenti di trasporto (DDT) da PDF a Excel. Gestione utenti, template e storico versioni.',
     porta: 5050,
-    dir: 'Progetto chat',
+    dir: 'lettore-ddt',
     launch: 'avvia.vbs',
     tipo: 'Node.js',
-    kw: ['ddt', 'documento di trasporto', 'documenti di trasporto', 'bolla', 'bolle',
+    kw: ['lettore ddt', 'lettore', 'ddt suite', 'ddt', 'documento di trasporto', 'documenti di trasporto', 'bolla', 'bolle',
       'excel', 'xlsx', 'foglio di calcolo', 'template', 'fornitore', 'fornitori', 'trasporto'],
     dettaglio: 'Prende i documenti di trasporto in PDF e li trasforma in fogli Excel. Gestisce gli utenti, i template di estrazione per ogni fornitore e lo storico delle versioni.',
   },
   {
     id: 'agente',
-    nome: 'Agente Analisi DB',
-    sottotitolo: 'Interrogazione dati con AI',
+    nome: 'Analista Dati',
+    sottotitolo: 'Domande sui dati, risposte con AI',
     desc: 'Agente AI che interroga i database aziendali in linguaggio naturale e produce report e grafici.',
     porta: 5173,
-    dir: 'agente',
+    dir: 'analista-dati',
     launch: 'avvia.vbs',
     tipo: 'Node.js + AI',
-    kw: ['agente', 'database', 'db', 'sql', 'query', 'interrogare', 'interroga', 'dati',
+    kw: ['analista dati', 'analista', 'agente', 'database', 'db', 'sql', 'query', 'interrogare', 'interroga', 'dati',
       'report', 'grafico', 'grafici', 'analisi', 'statistiche', 'ai',
       'intelligenza artificiale', 'linguaggio naturale', 'domanda sui dati'],
     dettaglio: 'Gli fai una domanda in italiano e lui la traduce in query sui database aziendali, poi ti risponde con tabelle, report e grafici. Non serve sapere SQL.',
   },
   {
     id: 'confronta',
-    nome: 'Confronta PDF',
+    nome: 'Confronto Documenti',
     sottotitolo: 'Raffronto documenti',
     desc: 'Confronta due documenti PDF evidenziando le differenze, con OCR e report scaricabile in Word o PDF.',
     porta: 5001,
-    dir: 'confronta file - migliorato',
-    launch: 'Avvia Confronta PDF.vbs',
+    dir: 'confronto-documenti',
+    launch: 'avvia.vbs',
     tipo: 'Python',
-    kw: ['confronta', 'confronto', 'confrontare', 'raffronto', 'differenza', 'differenze',
+    kw: ['confronto documenti', 'confronta pdf', 'confronta', 'confronto', 'confrontare', 'raffronto', 'differenza', 'differenze',
       'due pdf', 'due documenti', 'versione', 'versioni', 'revisione', 'revisioni',
       'cambiato', 'modifiche', 'word', 'diff'],
     dettaglio: 'Mette due PDF uno contro l\'altro ed evidenzia le differenze. Legge anche i documenti scansionati (usa l\'OCR) e produce un report scaricabile in Word o PDF.',
   },
   {
     id: 'ocr',
-    nome: 'PaddleOCR Converter',
+    nome: 'OCR Documenti',
     sottotitolo: 'OCR ed estrazione',
     desc: 'Riconoscimento testo da immagini e scansioni (PaddleOCR) con estrazione di articoli e prestazioni.',
     porta: 5179,
-    dir: 'ocr-webapp-paddleocr',
+    dir: 'ocr-documenti',
     launch: 'avvia.vbs',
     tipo: 'Node.js + OCR',
-    kw: ['ocr', 'paddle', 'paddleocr', 'scansione', 'scansioni', 'scansionato', 'scannerizzato',
+    kw: ['ocr documenti', 'ocr', 'paddle', 'paddleocr', 'scansione', 'scansioni', 'scansionato', 'scannerizzato',
       'immagine', 'immagini', 'foto', 'riconoscimento testo', 'riconoscere', 'estrazione',
       'estrarre', 'articoli', 'prestazioni', 'testo da immagine'],
     dettaglio: 'Riconosce il testo dentro immagini e scansioni, anche storte o di bassa qualità, e ne estrae articoli e prestazioni. È l\'app da usare quando un PDF è una fotografia e non testo selezionabile.',
   },
   {
     id: 'scadenzario',
-    nome: 'Scadenzario Compliance',
+    nome: 'Scadenzario',
     sottotitolo: 'Scadenze e adempimenti',
     desc: 'Tiene sotto controllo scadenze e adempimenti aziendali, con preavvisi automatici e importazione da Excel.',
     porta: 5180,
-    dir: 'scadenzario-compliance',
+    dir: 'scadenzario',
     launch: 'avvia.vbs',
     tipo: 'Python',
     kw: ['scadenzario', 'scadenza', 'scadenze', 'scaduto', 'scadute', 'adempimento',
@@ -154,26 +169,26 @@ const APPS = [
   },
   {
     id: 'trimble',
-    nome: 'Traduttore PDF Trimble',
+    nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',
     desc: 'Converte PCQ, computi economici e SAL da PDF a file strutturati e li carica su Trimble via API. Riservato agli amministratori.',
     porta: 3011,
-    dir: 'auto scan pcq econ traduttore da api trimble',
+    dir: 'ponte-trimble',
     launch: 'avvia.vbs',
     tipo: 'Node.js',
     adminOnly: true,   // parla col tenant Trimble aziendale: visibile e avviabile solo agli admin
-    kw: ['trimble', 'pcq', 'piano controllo qualita', 'piano di controllo qualità', 'economico',
+    kw: ['ponte trimble', 'ponte', 'traduttore', 'trimble', 'pcq', 'piano controllo qualita', 'piano di controllo qualità', 'economico',
       'economici', 'computo', 'sal', 'stato avanzamento', 'stato avanzamento lavori',
       'caricare su trimble', 'upload', 'connect', 'xlsx', 'csv', 'api'],
     dettaglio: 'Prende un PDF (piani di controllo qualità, computi economici, SAL), ne estrae le voci riga per riga e produce un file xlsx, csv o json che carica su Trimble via API. Segnala gli scostamenti di quadratura prima del caricamento. Riservata agli amministratori del portale.',
   },
   {
     id: 'auguri',
-    nome: 'Auguri WhatsApp',
-    sottotitolo: 'Compleanni automatici',
+    nome: 'Auguri',
+    sottotitolo: 'Compleanni su WhatsApp',
     desc: 'Invia in automatico gli auguri di compleanno su WhatsApp. Riservato agli amministratori.',
     porta: 3000,
-    dir: "whatss'app_web_Compleanni",
+    dir: 'auguri',
     launch: 'avvia-silenzioso.vbs',
     tipo: 'Node.js',
     adminOnly: true,   // visibile e avviabile solo agli admin del portale
@@ -549,7 +564,10 @@ function signSession(payload) {
   const mac = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
   return `${body}.${mac}`;
 }
-const COOKIE_FLAGS = `HttpOnly; Path=/; SameSite=Lax${COOKIE_SECURE ? '; Secure' : ''}`;
+// Con i sottodomini il cookie va emesso per tutto il dominio: e' il browser a
+// mandarlo a https://scadenzario.<dominio>, e il gate SSO dell'app lo gira al
+// portale per la verifica. Senza Domain resterebbe confinato a portale.<dominio>.
+const COOKIE_FLAGS = `HttpOnly; Path=/; SameSite=Lax${SUITE_DOMINIO ? `; Domain=${SUITE_DOMINIO}` : ''}${COOKIE_SECURE ? '; Secure' : ''}`;
 function makeSessionCookie(user, adm) {
   const payload = {
     u: user.username, n: user.nome, r: user.ruolo,
@@ -646,7 +664,13 @@ function loadIpAdmin() {
 // socket (l'header sarebbe falsificabile). Normalizza IPv4-mapped IPv6 e ::1.
 function clientIp(req) {
   let ip = '';
-  if (process.env.TRUST_PROXY === '1') {
+  // Con SUITE_DOMINIO davanti c'e' il reverse proxy sulla stessa macchina: tutto
+  // arriva da 127.0.0.1, e senza l'header ogni utente sembrerebbe "locale"
+  // (regole IP -> admin, blocco dei login). Ci si fida dell'header solo se la
+  // connessione viene davvero dal loopback: da un altro PC non si falsifica.
+  const remoto = String((req.socket && req.socket.remoteAddress) || '');
+  const daLoopback = /^(127\.|::1$|::ffff:127\.)/.test(remoto);
+  if (process.env.TRUST_PROXY === '1' || (SUITE_DOMINIO && daLoopback)) {
     ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   }
   if (!ip) ip = (req.socket && req.socket.remoteAddress) || '';
@@ -670,8 +694,19 @@ function portalHostname(req) {
 // http: le app della suite servono HTTP in chiaro sulla loro porta, anche se il
 // portale sta dietro TLS (il link è una navigazione, non un sotto-risorsa: il
 // browser non lo blocca).
+// Con SUITE_DOMINIO: https://<sottodominio>.<dominio>, servito dal reverse proxy.
 function appUrl(req, app) {
+  const sub = sottodominio(app);
+  if (SUITE_DOMINIO && sub) return `${SUITE_SCHEMA}://${sub}.${SUITE_DOMINIO}`;
   return `http://${portalHostname(req)}:${app.porta}`;
+}
+
+// Sottodominio di un'app = nome della sua cartella (lettore-ddt, scadenzario...):
+// un solo nome da ricordare, sul disco e nella barra degli indirizzi. null se la
+// cartella non e' un'etichetta DNS valida.
+function sottodominio(app) {
+  const s = String(app.dir || '').toLowerCase();
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(s) ? s : null;
 }
 
 // Origin ammessi in CORS su /api/verify: SOLO le app della suite. Le app girano
@@ -687,6 +722,14 @@ function isSuiteOrigin(origin, req) {
   let u;
   try { u = new URL(origin); } catch { return false; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  // Sottodomini: solo portale.<dominio> e <app>.<dominio> del registro, sullo
+  // schema configurato. Non "qualunque *.<dominio>": un altro servizio sotto lo
+  // stesso dominio non deve poter leggere chi e' loggato.
+  if (SUITE_DOMINIO && u.protocol === `${SUITE_SCHEMA}:` && !u.port) {
+    const h = u.hostname.toLowerCase();
+    if (h === `portale.${SUITE_DOMINIO}`) return true;
+    if (APPS.some((a) => sottodominio(a) && h === `${sottodominio(a)}.${SUITE_DOMINIO}`)) return true;
+  }
   const porta = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
   if (!SUITE_PORTS.has(porta)) return false;
   if (LOOPBACK_HOST.test(u.hostname)) return true;
@@ -1106,7 +1149,16 @@ function launchApp(app) {
   // resta il gate SSO (shared/sso), non l'indirizzo di ascolto.
   // PATH riletto dal registro: vedi pathDalRegistro(). Windows distingue Path e
   // PATH solo nella forma, non nella sostanza: Node normalizza su PATH.
+  //
+  // Con SUITE_DOMINIO le app stanno dietro il reverse proxy: ascoltano solo in
+  // locale (le espone il proxy, non la LAN) e il gate SSO, quando serve il
+  // login, rimanda al portale pubblico invece che a localhost:8080. La verifica
+  // della sessione resta in locale (COSEDIL_PORTAL), veloce e senza TLS.
   const env = { ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro() };
+  if (SUITE_DOMINIO) {
+    env.HOST = '127.0.0.1';
+    env.COSEDIL_PORTAL_PUBBLICO = PORTALE_PUBBLICO;
+  }
   const child = isVbs
     ? spawn('wscript.exe', [launcher], { cwd: appDir, detached: true, stdio: 'ignore', windowsHide: true, env })
     : spawn('cmd.exe', ['/c', 'start', '', '/D', appDir, app.launch], { detached: true, stdio: 'ignore', windowsHide: true, env });
@@ -1638,6 +1690,12 @@ if (require.main === module) {
     console.log('  Portale Suite Cosedil attivo');
     console.log('  ' + addr + (HOST !== '127.0.0.1' ? '  (host ' + HOST + ')' : ''));
     if (TLS_ON) console.log('  [TLS] HTTPS attivo, cookie di sessione marcato Secure.');
+    if (SUITE_DOMINIO) {
+      // Il cookie e' emesso per il dominio: da http://localhost il browser lo
+      // scarta e il login non regge. Si entra solo dall'indirizzo pubblico.
+      console.log('  [DOMINIO] ' + PORTALE_PUBBLICO + '  (app su https://<cartella>.' + SUITE_DOMINIO + ')');
+      console.log('            Accesso solo da questo indirizzo, dietro il reverse proxy.');
+    }
     // In ascolto oltre il loopback e senza TLS: le password degli utenti
     // attraversano la rete in chiaro, e con loro il cookie di sessione. Chi ha
     // scelto questa configurazione deve almeno saperlo.
@@ -1655,7 +1713,7 @@ if (require.main === module) {
     console.log('============================================');
     // Apre il browser solo se in ascolto in locale.
     if (HOST === '127.0.0.1' || HOST === 'localhost') {
-      spawn('cmd.exe', ['/c', 'start', '', addr], { detached: true, stdio: 'ignore' }).unref();
+      spawn('cmd.exe', ['/c', 'start', '', PORTALE_PUBBLICO || addr], { detached: true, stdio: 'ignore' }).unref();
     }
     // Avvio a caldo delle app configurate + keep-alive (le rimette su se cadono).
     if (getWarmList().length) {
@@ -1678,5 +1736,5 @@ module.exports = {
   rispondiAssistente,                              // assistente
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
   riepilogoAttivita, riepilogoUtenti,              // plancia degli admin
-  APPS,
+  APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };
