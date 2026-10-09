@@ -662,6 +662,7 @@ let retryTimer = null;
 let rinunciatoIl = null;
 const MAX_RITENTI_CONNESSIONE = 60;   // 60 x 2 min = 2 ore per collegarsi
 const MAX_RITENTI_INVIO = 24;         // 24 x 5 min = 2 ore di invii ritentati
+const MAX_RITENTI_EXCEL = 24;         // 24 x 5 min = 2 ore per tornare a leggere l'Excel
 
 function annullaRitenti() {
     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
@@ -681,13 +682,30 @@ function programmaRitento(giorno, conteggio, attesa, silenzioso) {
 
 // `silenzioso`: giro di controllo di routine (il ricontrollo periodico). Tace la
 // rilettura dell'Excel e il "niente da fare", non i tentativi di invio.
-async function eseguiInvioAutomatico(conteggio = { conn: 0, invio: 0 }, silenzioso = false) {
+async function eseguiInvioAutomatico(conteggio = { conn: 0, invio: 0, excel: 0 }, silenzioso = false) {
     if (invioInCorso) return;
     invioInCorso = true;
     const giorno = oggiISO();
-    const primoGiro = conteggio.conn === 0 && conteggio.invio === 0;
+    const primoGiro = conteggio.conn === 0 && conteggio.invio === 0 && !conteggio.excel;
     try {
         await ricaricaDati(silenzioso);
+        // Excel illeggibile (file spostato, cartella di rete giu', foglio
+        // rinominato): festeggiati resta vuoto e prima finiva come "nessun
+        // compleanno oggi", cioe' auguri saltati senza che nessuno lo sapesse.
+        if (!stato.excelOk) {
+            const n = conteggio.excel || 0;
+            if (n >= MAX_RITENTI_EXCEL) {
+                rinunciatoIl = giorno;
+                annullaRitenti();
+                await segnalaAllarme(`AUGURI FORSE NON INVIATI (${giorno}): Excel illeggibile da 2 ore (${stato.excelErrore}).`);
+                return;
+            }
+            if (n % 6 === 0) {
+                log(`Invio automatico: Excel non leggibile, ritento tra 5 minuti (${n + 1}/${MAX_RITENTI_EXCEL}).`, 'errore');
+            }
+            programmaRitento(giorno, { ...conteggio, excel: n + 1 }, 5 * 60 * 1000, silenzioso);
+            return;
+        }
         if (stato.festeggiati.length === 0) {
             if (primoGiro && !silenzioso) log('Invio automatico: nessun compleanno oggi.', 'info');
             annullaRitenti();
