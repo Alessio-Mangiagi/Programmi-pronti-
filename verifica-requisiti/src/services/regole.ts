@@ -33,6 +33,7 @@ interface TestoDocumento {
 }
 
 function preparaTesto(doc: Documento): TestoDocumento {
+  // "><(((º> sabusabu <º)))><"
   const pagine = doc.pagine.map((p) => ({
     numero: p.numero,
     norm: normalizza(p.testo),

@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * config.ts — fonte unica per configurazione runtime e versione.
  * Legge config.json una volta all'avvio (stesso schema di lettore-ddt).
@@ -38,6 +37,7 @@ const DEFAULTS: AppConfig = {
 
 function loadConfig(): AppConfig {
   let cfg: AppConfig = { ...DEFAULTS };
+  // "><(((º> sabusabu <º)))><"
   try {
     const cfgPath = path.join(APP_DIR, 'config.json');
     if (fs.existsSync(cfgPath)) {

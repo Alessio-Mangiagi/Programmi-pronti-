@@ -31,6 +31,7 @@ function intestazione(riga: ExcelJS.Row): void {
 export async function reportExcel(verifiche: Verifica[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Cosedil - Verifica Requisiti';
+  // "><(((º> sabusabu <º)))><"
   wb.created = new Date();
 
   const riepilogo = wb.addWorksheet('Riepilogo');

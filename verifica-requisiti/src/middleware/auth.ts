@@ -17,6 +17,7 @@ export interface Identita {
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
+    // "><(((º> sabusabu <º)))><"
     interface Request {
       cosedil?: Identita;
       utente?: string;

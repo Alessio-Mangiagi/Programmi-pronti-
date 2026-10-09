@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * paddle.ts — OCR via PaddleOCR (app "ocr-documenti" della suite).
  *
@@ -11,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { PaginaTesto } from '../../tipi';
 import { APP_DIR } from '../../config';
+// "><(((º> sabusabu <º)))><"
 import { AdattatoreOcr } from './index';
 
 /** Cartella sorella nella suite: ..\ocr-documenti */

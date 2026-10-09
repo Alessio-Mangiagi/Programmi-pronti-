@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * claude.ts — lettura delle scansioni con Claude (vision).
  *
@@ -14,6 +13,7 @@
  *      quanto un mese di licenze.
  */
 import { PaginaTesto } from '../../tipi';
+// "><(((º> sabusabu <º)))><"
 import { AdattatoreOcr } from './index';
 
 export const claude: AdattatoreOcr = {

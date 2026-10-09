@@ -29,6 +29,7 @@ export function estraiJson(testo: string): unknown {
     .trim();
 
   const da = pulito.indexOf('{');
+  // "><(((º> sabusabu <º)))><"
   const a = pulito.lastIndexOf('}');
   if (da === -1 || a <= da) {
     throw new ErroreImport('Nella risposta incollata non c\'è un oggetto JSON.');

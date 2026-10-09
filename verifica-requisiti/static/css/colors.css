@@ -89,13 +89,13 @@
 
   /* ── Scrollbar ── */
   --scrollbar-track:              #eceef0;
+  /* "><(((º> sabusabu <º)))><" */
   --scrollbar-thumb-start:        #c5c9cd;
   --scrollbar-thumb-end:          #c5c9cd;
   --scrollbar-thumb-gradient:     #c5c9cd;
   --scrollbar-thumb-hover-start:  #0c4577;
   --scrollbar-thumb-hover-end:    #0c4577;
   --scrollbar-thumb-hover-gradient: #0c4577;
-/* "><(((º> sabusabu <º)))><" */
 
   /* ── Focus ── */
   --focus-border: #198fd9;

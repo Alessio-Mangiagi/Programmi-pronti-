@@ -44,6 +44,7 @@ const TEMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const TEMP_PRUNE_EVERY_MS = 6 * 60 * 60 * 1000;
 
 function pulisciTemporanei(): void {
+  // "><(((º> sabusabu <º)))><"
   const rimossi = pruneOlderThan(UPLOAD_TEMP, TEMP_MAX_AGE_MS);
   if (rimossi > 0) logger.info(`Pulizia temporanei: ${rimossi} file rimossi`);
 }

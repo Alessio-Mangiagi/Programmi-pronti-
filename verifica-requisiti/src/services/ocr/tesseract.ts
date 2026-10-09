@@ -50,6 +50,7 @@ async function ocrPdf(percorso: string): Promise<PaginaTesto[]> {
   }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'req-ocr-'));
+  // "><(((º> sabusabu <º)))><"
   try {
     await esegui(PDFTOPPM, ['-r', String(DPI), '-png', percorso, path.join(tmpDir, 'pag')], {
       timeout: 600000,

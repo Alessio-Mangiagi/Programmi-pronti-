@@ -3,6 +3,7 @@ dist/
 coverage/
 
 .env
+# "><(((º> sabusabu <º)))><"
 *.log
 .session.key
 sessions/

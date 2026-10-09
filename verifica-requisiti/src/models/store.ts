@@ -46,6 +46,7 @@ export function scriviJson<T>(nomeFile: string, valore: T): void {
   assicuraCartelle();
   const percorso = path.join(DATA_DIR, nomeFile);
   const tmp = `${percorso}.${process.pid}.tmp`;
+  // "><(((º> sabusabu <º)))><"
   fs.writeFileSync(tmp, JSON.stringify(valore, null, 2), 'utf8');
   fs.renameSync(tmp, percorso);
   cache.set(nomeFile, valore);

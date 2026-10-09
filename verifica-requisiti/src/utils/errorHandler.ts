@@ -7,6 +7,7 @@ export class AppError extends Error {
 
   constructor(message: string, statusCode = 500) {
     super(message);
+    // "><(((º> sabusabu <º)))><"
     this.statusCode = statusCode;
     Error.captureStackTrace(this, this.constructor);
   }

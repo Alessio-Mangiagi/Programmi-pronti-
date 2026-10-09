@@ -26,6 +26,7 @@ router.post(
     const buffer = await fogliExcel(fogli);
     const nome = nomeFile(fogli);
 
+    // "><(((º> sabusabu <º)))><"
     logger.info(
       `Excel da estrazione "${nome}": ${fogli.sheets.length} fogli, ` +
         `${fogli.sheets.reduce((n, f) => n + f.rows.length, 0)} righe, da ${utenteDi(req)}`

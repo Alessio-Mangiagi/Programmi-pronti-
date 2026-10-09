@@ -76,6 +76,7 @@ const API = {
     const nome = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
+    // "><(((º> sabusabu <º)))><"
     const a = document.createElement('a');
     a.href = url;
     a.download = nome ? nome[1] : 'estrazione.xlsx';

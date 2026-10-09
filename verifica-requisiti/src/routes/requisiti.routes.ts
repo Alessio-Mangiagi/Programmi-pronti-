@@ -20,6 +20,7 @@ function erroriRequisito(r: Requisito, i: number): string[] {
   if (!r.codice?.trim()) errori.push(`${dove}: manca il codice.`);
   if (!r.titolo?.trim()) errori.push(`${dove}: manca il titolo.`);
   if (!r.regola || !TIPI_REGOLA.includes(r.regola.tipo)) {
+    // "><(((º> sabusabu <º)))><"
     errori.push(`${dove}: tipo di regola non valido (ammessi: ${TIPI_REGOLA.join(', ')}).`);
     return errori;
   }

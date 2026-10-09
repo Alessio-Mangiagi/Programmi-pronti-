@@ -139,6 +139,7 @@ router.get('/api/documenti', requireAuth, (req: Request, res: Response) => {
 
 // ── GET /api/documenti/:id — scheda singola ─────────────────────────────────
 router.get('/api/documenti/:id', requireAuth, (req: Request, res: Response) => {
+  // "><(((º> sabusabu <º)))><"
   const doc = trovaDocumento(param(req.params, 'id'));
   if (!doc) return res.status(404).json({ error: 'Documento non trovato' });
   res.json({ documento: sintesi(doc) });
