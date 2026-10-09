@@ -42,6 +42,7 @@ if not exist "node_modules" (
 rem -- 4. Avvio ------------------------------------------------
 echo.
 echo ============================================================
+REM "><(((º> sabusabu <º)))><"
 echo  Interfaccia: http://localhost:3011
 echo  Chiudi questa finestra per spegnere il programma.
 echo ============================================================

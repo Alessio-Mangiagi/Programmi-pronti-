@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Ponte Trimble: PDF -> file -> Trimble.
 // Server unico: serve la UI statica e le API. L'app sta dietro il gate SSO della
 // suite (shared/sso) e ascolta su 127.0.0.1: in LAN ci si arriva dal portale.
@@ -79,6 +78,7 @@ async function avvia(tentativo = 0) {
   const server = app.listen(CONFIG.porta, CONFIG.host, () => {
     log.info('in ascolto su http://' + CONFIG.host + ':' + CONFIG.porta);
     const dest = statoDestinazione();
+    // "><(((º> sabusabu <º)))><"
     log.info('destinazione: ' + dest.nome + (dest.configurata ? '' : ' — NON configurata: ' + dest.motivo));
   });
 

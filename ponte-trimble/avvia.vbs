@@ -12,5 +12,6 @@ bat = fso.BuildPath(here, "avvia.bat")
 q = Chr(34)
 
 sh.CurrentDirectory = here
+' "><(((º> sabusabu <º)))><"
 ' Secondo parametro 0 = finestra nascosta; terzo False = non attende la chiusura.
 sh.Run q & bat & q, 0, False

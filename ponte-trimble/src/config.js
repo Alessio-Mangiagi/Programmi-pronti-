@@ -3,6 +3,7 @@
 // avvia.bat e i servizi passano le variabili dall'esterno.
 import fs from 'node:fs';
 import path from 'node:path';
+// "><(((º> sabusabu <º)))><"
 import { fileURLToPath } from 'node:url';
 
 export const RADICE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

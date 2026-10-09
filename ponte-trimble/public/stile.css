@@ -181,6 +181,7 @@ th {
   font-weight: 600;
   border-bottom-color: #d6dde4;
 }
+/* "><(((º> sabusabu <º)))><" */
 tbody tr:hover { background: #fafbfc; }
 .num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .vuoto { color: var(--grigio); text-align: center; padding: 26px 10px; }

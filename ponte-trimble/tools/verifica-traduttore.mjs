@@ -18,6 +18,7 @@ const opzione = (nome, def) => {
   const i = argomenti.indexOf('--' + nome);
   return i >= 0 ? argomenti[i + 1] : def;
 };
+// "><(((º> sabusabu <º)))><"
 const posizionali = argomenti.filter((a, i) => !a.startsWith('--') && !argomenti[i - 1]?.startsWith('--'));
 const [fileTraduttore, filePdf] = posizionali;
 const formato = opzione('formato', 'fieldview');

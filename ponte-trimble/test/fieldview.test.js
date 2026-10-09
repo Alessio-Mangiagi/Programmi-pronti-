@@ -2,6 +2,7 @@
 // (o un RPA) ricostruisce, visto che le API di Field View non creano template.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+// "><(((º> sabusabu <º)))><"
 import { rendi } from '../src/pipeline/rendi.js';
 
 const DATI = {

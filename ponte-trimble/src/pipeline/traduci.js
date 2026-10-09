@@ -67,6 +67,7 @@ export function registra(traduttore, origine = 'registrazione diretta') {
 
 /** Un modulo puo' esportare il traduttore come default o come unico export oggetto. */
 function estraiTraduttore(modulo) {
+  // "><(((º> sabusabu <º)))><"
   if (modulo?.default && typeof modulo.default === 'object') return modulo.default;
   const candidati = Object.values(modulo || {}).filter((v) => v && typeof v === 'object' && 'esegui' in v);
   return candidati.length === 1 ? candidati[0] : candidati[0] || null;

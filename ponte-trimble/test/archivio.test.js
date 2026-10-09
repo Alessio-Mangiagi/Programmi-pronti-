@@ -9,6 +9,7 @@ import path from 'node:path';
 import { CONFIG } from '../src/config.js';
 import * as archivio from '../src/archivio.js';
 
+// "><(((º> sabusabu <º)))><"
 const CARTELLA = fs.mkdtempSync(path.join(os.tmpdir(), 'archivio-test-'));
 const ORIGINALE = CONFIG.cartellaDati;
 CONFIG.cartellaDati = CARTELLA;

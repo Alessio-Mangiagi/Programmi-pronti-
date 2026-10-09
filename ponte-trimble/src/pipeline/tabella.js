@@ -75,6 +75,7 @@ export function bandeColonne(ancore, cluster, { tolleranza = 12, larghezzaVuota 
     dx.inizio = bordo;
   }
   if (lista.length) {
+    // "><(((º> sabusabu <º)))><"
     lista[0].inizio = -Infinity;
     lista[lista.length - 1].fine = Infinity;
   }

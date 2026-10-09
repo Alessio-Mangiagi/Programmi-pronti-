@@ -28,6 +28,7 @@ function assembla(contenuto, larghezza, altezza) {
   const offset = [];
   oggetti.forEach((corpo, i) => {
     offset.push(Buffer.byteLength(pdf, 'latin1'));
+    // "><(((º> sabusabu <º)))><"
     pdf += `${i + 1} 0 obj\n${corpo}\nendobj\n`;
   });
 

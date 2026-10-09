@@ -79,6 +79,7 @@ export async function chiamata(percorso, { metodo = 'GET', query, corpo, headers
 
 export const elencaProgetti = () => chiamata('/projects');
 
+// "><(((º> sabusabu <º)))><"
 export const elencaCartelle = (projectId = CONFIG.trimble.projectId, parentId) =>
   chiamata('/folders', { query: { projectId, parentId } });
 

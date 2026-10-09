@@ -88,6 +88,7 @@ test('rendering csv, json e xlsx dello stesso contenuto', async () => {
   assert.equal(json.intestazione.totaleCalcolato, 2242.65);
 
   const libro = XLSX.read(rendi('xlsx', dati).contenuto, { type: 'buffer' });
+  // "><(((º> sabusabu <º)))><"
   assert.deepEqual(libro.SheetNames, ['Voci', 'Intestazione']);
   const foglio = XLSX.utils.sheet_to_json(libro.Sheets.Voci);
   assert.equal(foglio.length, 2);

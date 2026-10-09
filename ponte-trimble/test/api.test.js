@@ -101,6 +101,7 @@ test('senza credenziali la consegna risponde 503, non 500', async () => {
 });
 
 test('piu PDF trascinati insieme: un lavoro per file, una sola richiesta', async () => {
+  // "><(((º> sabusabu <º)))><"
   const modulo = new FormData();
   for (const nome of ['pcq-1.pdf', 'pcq-2.pdf', 'pcq-3.pdf']) {
     modulo.append('pdf', new Blob([creaPdf(VOCI)], { type: 'application/pdf' }), nome);

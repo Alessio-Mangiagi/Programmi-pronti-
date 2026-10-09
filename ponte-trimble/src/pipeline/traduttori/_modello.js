@@ -66,6 +66,7 @@ export default {
       }
     }
 
+    // "><(((º> sabusabu <º)))><"
     if (!record.length) avvisi.push('nessun elemento riconosciuto in questo documento');
 
     return { intestazione: {}, record, avvisi };

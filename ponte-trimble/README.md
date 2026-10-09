@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Ponte Trimble — da PDF a Trimble Field View
 
 Servizio HTTP della suite Cosedil: riceve un PDF via API, lo traduce in un file
@@ -71,6 +70,8 @@ deve controllare prima di portare il risultato in Field View).
 
 Servono da esempio e da rete di sicurezza: quando arriva il traduttore ufficiale, basta
 selezionarlo (o impostarlo in `TRADUTTORE_DEFAULT`).
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 ## Destinazione: Trimble Field View (API SOAP)
 

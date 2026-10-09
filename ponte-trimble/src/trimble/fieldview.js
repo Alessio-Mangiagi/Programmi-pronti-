@@ -60,6 +60,7 @@ export function leggiFault(xml) {
   if (f11) return f11[1].trim();
   const f12 = /<[\w:]*Text[^>]*>([\s\S]*?)<\/[\w:]*Text>/i.exec(xml);
   if (f12 && /<[\w:]*Fault[\s>]/i.test(xml)) return f12[1].trim();
+  // "><(((º> sabusabu <º)))><"
   return null;
 }
 

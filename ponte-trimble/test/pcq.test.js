@@ -72,6 +72,7 @@ test('bandeColonne: la colonna con dati vince sulla stima di quella vuota', () =
   ]);
   const bande = bandeColonne(ancore, cluster);
   assert.equal(colonnaDi(bande, { x: 586 }), 'riferimento');
+  // "><(((º> sabusabu <º)))><"
   assert.equal(colonnaDi(bande, { x: 560 }), 'aff');
 });
 

@@ -174,6 +174,7 @@ rotteLavori.delete('/lavori/:id', async (req, res, next) => {
 
 rotteLavori.get('/lavori/:id/artefatto', async (req, res, next) => {
   try {
+    // "><(((º> sabusabu <º)))><"
     const lavoro = await archivio.leggi(req.params.id);
     if (!lavoro) throw new ErroreRichiesta('lavoro inesistente', 404);
     if (lavoro.stato !== 'pronto') {
