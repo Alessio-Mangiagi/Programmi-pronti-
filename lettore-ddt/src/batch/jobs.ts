@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // jobs.ts — Lavori di conversione batch avviati dalla pagina web.
 //
 // Un job avvolge una singola esecuzione del motore (batch/engine.ts) e ne
@@ -25,6 +26,7 @@ import {
   writeFileAtomicSerial,
 } from '../routes/helpers';
 import { ddtIndexOfFolder, extractDdtNumbers } from '../services/ddtArchive';
+import { registraExport } from '../services/consegne';
 import { addToPaniere } from '../services/paniere';
 import { registraLavoro } from '../services/registroLavori';
 import { BatchConfig, loadBatchConfig, resolveApiKey } from './config';
@@ -597,6 +599,11 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
     // è accettabile, l'esito lo riporta il log dell'app.
     writeFileAtomicSerial(path.join(folder, jsonName), JSON.stringify(parsed, null, 2)).catch((e) =>
       logger.error(`Archiviazione ${jsonName} fallita: ${e.message}`)
+    );
+    // Registro consegne per fornitore (vedi services/consegne): indipendente
+    // dalla potatura di json_exports qui sotto.
+    registraExport(path.dirname(folder), job.commessaId, jsonName, parsed).catch((e) =>
+      logger.error(`Registro consegne non aggiornato (${jsonName}): ${e.message}`)
     );
     archiviati++;
   }

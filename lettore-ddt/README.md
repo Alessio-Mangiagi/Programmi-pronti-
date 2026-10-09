@@ -1,5 +1,5 @@
 <!-- "><(((º> sabusabu <º)))><" -->
-# DDTSuite — PDF to Excel + WBS/SAL
+# Lettore DDT — da PDF a Excel, fornitori, WBS/SAL
 
 Applicazione web per la gestione di commesse edili: importa DDT e documenti PDF tramite Claude AI, struttura la WBS, registra gli avanzamenti SAL e monitora i KPI di progetto su grafici interattivi.
 
@@ -173,6 +173,17 @@ lettore-ddt/
 | GET / POST / DELETE | `/project/autosave` | Autosave progetto (per commessa) |
 | POST | `/stats` | Statistiche budget/avanzamento |
 | GET | `/docs/readme` · `/docs/manual` | Contenuto README / MANUALE |
+
+### Fornitori (solo admin)
+Consegne lette dai DDT e raggruppate per fornitore (P.IVA, altrimenti nome normalizzato), su tutte le commesse. `?commessa=<id>` restringe a una.
+
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| GET | `/fornitori` | Elenco: DDT, periodo, totali per u.m., commesse, anomalie |
+| GET | `/fornitori/dettaglio?chiave=` | Consegne del fornitore, materiali, totali per mese |
+| GET | `/fornitori/excel[?chiave=]` | Lo stesso in Excel (elenco o singolo fornitore) |
+
+Il registro sta in `data/<commessa>/consegne.json`: si aggiorna a ogni export salvato (manuale e batch), si ricostruisce dagli export al primo accesso e **non** segue la potatura di `json_exports` (`maxJsonExports`), quindi lo storico resta intero.
 
 ---
 
