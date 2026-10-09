@@ -84,6 +84,24 @@ test('costruisciMessaggio: "$" nei nomi non viene interpretato', () => {
     assert.equal(L.costruisciMessaggio(p, 'Ciao {nome}'), 'Ciao A$&B $1');
 });
 
+test('prossimiCompleanni: ordine, oggi escluso, finestra, cambio anno', () => {
+    const persone = [
+        { nome: 'Oggi', cognome: '', dataNascita: utc(1990, 12, 30) },
+        { nome: 'Tra3', cognome: '', dataNascita: utc(1985, 1, 2) },
+        { nome: 'Domani', cognome: 'X', dataNascita: '31/12/1970' },
+        { nome: 'Lontano', cognome: '', dataNascita: utc(1980, 2, 1) },
+    ];
+    const r = L.prossimiCompleanni(persone, 14, locale(2026, 12, 30));
+    assert.deepEqual(r.map((p) => [p.nome, p.tra]), [['Domani X', 1], ['Tra3', 3]]);
+    assert.equal(r[1].data, '02/01/1985');
+    assert.deepEqual(L.prossimiCompleanni(persone, 0, locale(2026, 12, 30)), []);
+});
+
+test('prossimiCompleanni: 29 febbraio nella finestra di un anno non bisestile', () => {
+    const r = L.prossimiCompleanni([{ nome: 'Bis', cognome: '', dataNascita: utc(1984, 2, 29) }], 7, locale(2027, 2, 25));
+    assert.deepEqual(r.map((p) => p.tra), [3]);   // festeggiato il 28
+});
+
 test('fraseCasuale: pool vuoto -> frase di riserva', () => {
     assert.match(L.fraseCasuale([]), /auguri/i);
     assert.equal(L.fraseCasuale(['unica']), 'unica');

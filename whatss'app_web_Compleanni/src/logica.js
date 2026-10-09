@@ -157,6 +157,21 @@ function eCompleannoOggi(dataValue, oggi = new Date()) {
         && !bisestile(oggi.getFullYear());
 }
 
+// Compleanni dei prossimi `giorni` giorni (oggi escluso), in ordine di data.
+// Passa da eCompleannoOggi giorno per giorno: stesse regole, 29 febbraio compreso.
+function prossimiCompleanni(persone, giorni = 14, oggi = new Date()) {
+    const out = [];
+    for (let tra = 1; tra <= giorni; tra++) {
+        const giorno = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate() + tra, 12);
+        for (const p of persone) {
+            if (eCompleannoOggi(p.dataNascita, giorno)) {
+                out.push({ nome: nomeCompleto(p), data: formattaData(p.dataNascita), tra });
+            }
+        }
+    }
+    return out;
+}
+
 // ---------- Formattazione data per UI ----------
 function formattaData(dataValue) {
     let d;
@@ -209,5 +224,6 @@ module.exports = {
     nomeCompleto,
     unisciNomi,
     costruisciMessaggio,
-    valoreCella
+    valoreCella,
+    prossimiCompleanni
 };

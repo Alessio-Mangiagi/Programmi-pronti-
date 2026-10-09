@@ -35,6 +35,8 @@ const FILE_ALLARMI = path.join(LOG_DIR, 'allarmi.log');
 // Giorni di log giornalieri da conservare. Senza rotazione la cartella cresce
 // per sempre: ad agosto 2026 un singolo giorno ha superato 1 MB.
 const GIORNI_LOG = 30;
+// Quanti giorni avanti mostrare in pagina ("Prossimi compleanni").
+const GIORNI_PROSSIMI = 14;
 
 const app = express();
 const server = http.createServer(app);
@@ -58,6 +60,7 @@ let stato = {
     caricamento: 0,
     dati: null,                // { persone, frasiSingole, frasiGruppo }
     festeggiati: [],
+    prossimi: [],              // [{ nome, data, tra }] compleanni dei prossimi GIORNI_PROSSIMI giorni
     anteprima: null,
     gruppoTrovato: null,
     excelOk: false,            // true se l'Excel è stato letto correttamente
@@ -183,6 +186,7 @@ async function ricaricaDati(silenzioso = false) {
         stato.festeggiati = stato.dati.persone
             .filter(p => L.eCompleannoOggi(p.dataNascita))
             .map(p => ({ nome: L.nomeCompleto(p), data: L.formattaData(p.dataNascita) }));
+        stato.prossimi = L.prossimiCompleanni(stato.dati.persone, GIORNI_PROSSIMI);
 
         // costruisci anteprima messaggio
         const festObj = stato.dati.persone.filter(p => L.eCompleannoOggi(p.dataNascita));
@@ -206,6 +210,7 @@ async function ricaricaDati(silenzioso = false) {
         stato.excelErrore = err.message;
         stato.dati = null;
         stato.festeggiati = [];
+        stato.prossimi = [];
         stato.anteprima = null;
         log(`Errore lettura Excel: ${err.message}`, 'errore');
         pushStato();
