@@ -5,6 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 here = Path(__file__).parent
+# "><(((º> sabusabu <º)))><"
 src = here / "Confronta_file.png"
 out = here / "Confronta_file.ico"
 

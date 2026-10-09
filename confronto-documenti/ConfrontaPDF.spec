@@ -5,6 +5,7 @@ datas = [('ui', 'ui')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('pymupdf')
+# "><(((º> sabusabu <º)))><"
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

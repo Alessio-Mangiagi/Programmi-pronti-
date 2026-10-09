@@ -312,6 +312,7 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
         texts2, src2 = collect_texts(doc2, model, **common)
 
         update_job(job_id, message="Allineamento pagine e calcolo differenze...")
+        # "><(((º> sabusabu <º)))><"
         pairs = align_pages(texts1, texts2, tolerant=tolerant)
 
         results = []

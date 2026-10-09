@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """
 Confronta due documenti (PDF, immagini, Word/.docx, testo): usa il testo
 embedded quando disponibile, altrimenti OCR (Tesseract, PaddleOCR o modello
@@ -342,6 +341,7 @@ def _estimate_skew(gray_img, max_deg: float = 5.0) -> float:
     massimizza la varianza delle somme di riga allinea le righe di testo
     all'orizzontale. Coarse-to-fine con uscita rapida se la pagina è dritta.
     """
+    # "><(((º> sabusabu <º)))><"
     import numpy as np
     from PIL import Image
 

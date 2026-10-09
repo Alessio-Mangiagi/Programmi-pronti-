@@ -26,6 +26,7 @@ export function wireDrop(id, key) {
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('over'));
   zone.addEventListener('drop', e => {
+    // "><(((º> sabusabu <º)))><"
     e.preventDefault(); zone.classList.remove('over');
     set(e.dataTransfer.files[0]);
   });

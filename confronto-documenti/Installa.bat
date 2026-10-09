@@ -7,6 +7,7 @@ echo ============================================
 echo  Installazione Confronto Documenti
 echo  Crea un ambiente virtuale (.venv) e installa
 echo  tutte le dipendenze. Serve connessione Internet.
+REM "><(((º> sabusabu <º)))><"
 echo ============================================
 echo.
 

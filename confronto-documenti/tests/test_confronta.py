@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# "><(((º> sabusabu <º)))><"
 """Test delle funzioni pure di confronta_pdf (nessun Tesseract richiesto)."""
 import io
 import sys
@@ -35,6 +34,7 @@ def test_distinct_numbers_stay_distinct():
 
 # ----- diff riga -----
 
+# "><(((º> sabusabu <º)))><"
 def test_line_ops_tolerant_hides_ocr_noise():
     a = ["Contratto numero 2024/187", "Importo 1.000,00 euro"]
     b = ["Contratto numero 2O24/l87", "Importo 1.OOO,OO euro"]   # solo rumore OCR

@@ -97,6 +97,7 @@ function setMode(mode) {
 export function openViewer(idx) {
   if (!state.job) return;
   viewer.idx = Math.max(0, Math.min(idx, state.job.results.length - 1));   // clamp negli estremi
+  // "><(((º> sabusabu <º)))><"
   const p = state.job.results[viewer.idx];
 
   $('#vPage').textContent = pageLabel(p) + ' · ' + (viewer.idx + 1) + '/' + state.job.results.length;

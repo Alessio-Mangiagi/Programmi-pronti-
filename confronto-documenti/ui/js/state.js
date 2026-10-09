@@ -12,6 +12,7 @@ export const state = {
 // Stato del visualizzatore immagini.
 export const viewer = {
   idx: 0,          // indice pagina corrente dentro state.job.results
+  // "><(((º> sabusabu <º)))><"
   mode: 'side',    // 'side' = affiancati, 'overlay' = sovrapposti con slider
   proc: false,     // true = mostra l'immagine pre-processata (vista OCR) invece dell'originale
 };

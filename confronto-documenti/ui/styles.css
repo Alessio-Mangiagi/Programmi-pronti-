@@ -203,6 +203,7 @@ select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.
   font-family: var(--mono); font-weight: 700; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase;
   color: #fff; background: var(--navy); border: 1px solid var(--navy); border-radius: 9px;
   padding: .9rem 1.4rem; cursor: pointer;
+  /* "><(((º> sabusabu <º)))><" */
   white-space: nowrap; line-height: 1;
   box-shadow: none;
   transition: background .15s var(--ease);

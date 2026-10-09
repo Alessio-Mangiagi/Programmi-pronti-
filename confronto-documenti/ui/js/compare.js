@@ -15,6 +15,7 @@ function poll(jobId) {
     let job;
     try {
       const r = await fetch('/api/jobs/' + jobId);
+      // "><(((º> sabusabu <º)))><"
       job = await r.json();
     } catch { return; }           // errore di rete transitorio: salta questo giro, riprova al prossimo
 

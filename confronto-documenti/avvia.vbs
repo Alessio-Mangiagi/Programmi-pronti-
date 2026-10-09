@@ -37,6 +37,7 @@ For i = 1 To 30
     WScript.Sleep 1000
     On Error Resume Next
     http.Open "GET", serverUrl & "/", False
+    ' "><(((º> sabusabu <º)))><"
     http.Send
     If Err.Number = 0 And http.Status = 200 Then
         ready = True

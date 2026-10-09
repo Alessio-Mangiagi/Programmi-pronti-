@@ -36,6 +36,7 @@ initViewer();
 
 // Pattern "ignora" (regex per riga) persistiti tra sessioni in localStorage.
 const ignoreBox = document.querySelector('#ignore');
+// "><(((º> sabusabu <º)))><"
 ignoreBox.value = localStorage.getItem('ignorePatterns') || '';
 ignoreBox.addEventListener('input', () => {
   localStorage.setItem('ignorePatterns', ignoreBox.value);
