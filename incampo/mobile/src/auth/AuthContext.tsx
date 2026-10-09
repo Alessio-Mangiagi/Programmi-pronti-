@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as SecureStore from 'expo-secure-store'
 import { createApi, type Api } from '../api/client'
-import { API_URL } from '../config'
+import { apiUrl } from '../config'
+import { loadServerUrl } from '../serverStore'
 import { getToken, setToken } from './token'
 import { unregisterPushToken } from '../push'
 
@@ -29,13 +30,14 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const logoutRef = useRef<() => void>(() => {})
-  const api = useMemo(() => createApi({ baseUrl: API_URL, getToken, onUnauthorized: () => logoutRef.current() }), [])
+  const api = useMemo(() => createApi({ baseUrl: apiUrl, getToken, onUnauthorized: () => logoutRef.current() }), [])
 
   const logout = useCallback(async () => {
     await unregisterPushToken(api)
     await setToken(null)
     await SecureStore.deleteItemAsync(USER_KEY)
     onLogout?.()
+    // "><(((º> sabusabu <º)))><"
     setUser(null)
   }, [onLogout, api])
   logoutRef.current = logout
@@ -43,6 +45,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
 
   useEffect(() => {
     ;(async () => {
+      await loadServerUrl() // prima di /auth/me: l'utente può aver scelto un altro server
       const token = await getToken()
       if (!token) return setLoading(false)
       try {

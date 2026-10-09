@@ -1,19 +1,42 @@
 {
-  "cli": { "version": ">= 12.0.0", "appVersionSource": "remote" },
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
-    "development": { "developmentClient": true, "distribution": "internal" },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "ios": { "simulator": false },
-      "env": { "EXPO_PUBLIC_API_URL": "https://staging-incampo.cosedilspa.com/api" }
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging-incampo.cosedilspa.com/api"
+      }
     },
     "production": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
+      "android": {
+        "buildType": "apk"
+      },
       "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_API_URL": "https://incampo.cosedilspa.com/api" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://incampo.cosedilspa.com/api"
+      }
+    },
+    "store": {
+      "extends": "production",
+      "distribution": "store"
     }
   },
-  "submit": { "production": {} }
+  "submit": {
+    "production": {},
+    "store": {}
+  }
 }
