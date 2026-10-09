@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * estrazione.ts — dal file al testo.
  *
@@ -169,7 +170,7 @@ export async function elaboraDocumento(id: string): Promise<Documento | undefine
 
 /**
  * Documenti rimasti a metà per un riavvio. L'estrazione non costa nulla per
- * pagina (a differenza dei batch a pagamento di "Progetto chat"), quindi si
+ * pagina (a differenza dei batch a pagamento di "lettore-ddt"), quindi si
  * rifà tutta invece di provare a recuperare il lavoro parziale.
  */
 export async function riprendiEstrazioniInterrotte(): Promise<void> {

@@ -1,22 +1,23 @@
+# "><(((º> sabusabu <º)))><"
 # CI delle due app Python.
 #
 # Non erano coperte da niente: "confronta file" aveva 21 test che nessuno
-# lanciava in automatico, "scadenzario-compliance" non ne aveva affatto.
+# lanciava in automatico, "scadenzario" non ne aveva affatto.
 name: CI — Python
 
 on:
   push:
     branches: [main]
     paths:
-      - 'confronta file - migliorato/**'
-      - 'scadenzario-compliance/**'
+      - 'confronto-documenti/**'
+      - 'scadenzario/**'
       - 'shared/**'
       - '.github/workflows/ci-python.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'confronta file - migliorato/**'
-      - 'scadenzario-compliance/**'
+      - 'confronto-documenti/**'
+      - 'scadenzario/**'
       - 'shared/**'
       - '.github/workflows/ci-python.yml'
 
@@ -28,9 +29,9 @@ jobs:
       matrix:
         include:
           - nome: confronta-pdf
-            cartella: confronta file - migliorato
+            cartella: confronto-documenti
           - nome: scadenzario
-            cartella: scadenzario-compliance
+            cartella: scadenzario
     name: ${{ matrix.nome }}
     defaults:
       run:

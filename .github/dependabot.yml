@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 # Aggiornamenti automatici delle dipendenze, una voce per app.
 #
 # Serviva: le due vulnerabilita' che hanno motivato questo file (pdf.js
@@ -16,7 +17,7 @@ updates:
     open-pull-requests-limit: 3
 
   - package-ecosystem: npm
-    directory: "/Progetto chat"
+    directory: "/lettore-ddt"
     schedule: { interval: weekly }
     open-pull-requests-limit: 3
     groups:
@@ -25,7 +26,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/agente"
+    directory: "/analista-dati"
     schedule: { interval: weekly }
     open-pull-requests-limit: 3
     groups:
@@ -33,7 +34,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/ocr-webapp-paddleocr"
+    directory: "/ocr-documenti"
     schedule: { interval: weekly }
     open-pull-requests-limit: 3
     groups:
@@ -49,26 +50,26 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/auto scan pcq econ traduttore da api trimble"
+    directory: "/ponte-trimble"
     schedule: { interval: weekly }
     open-pull-requests-limit: 3
 
-  # Auguri WhatsApp resta sempre in esecuzione (vedi README): gli aggiornamenti
+  # Auguri resta sempre in esecuzione (vedi README): gli aggiornamenti
   # vanno applicati a mano, in una finestra decisa, non mentre la sessione di
   # WhatsApp Web e' aperta. Dependabot apre comunque il PR, che aspetta.
   - package-ecosystem: npm
-    directory: "/whatss'app_web_Compleanni"
+    directory: "/auguri"
     schedule: { interval: weekly }
     open-pull-requests-limit: 2
 
   # --- app Python -----------------------------------------------------------
   - package-ecosystem: pip
-    directory: "/confronta file - migliorato"
+    directory: "/confronto-documenti"
     schedule: { interval: weekly }
     open-pull-requests-limit: 2
 
   - package-ecosystem: pip
-    directory: "/scadenzario-compliance"
+    directory: "/scadenzario"
     schedule: { interval: weekly }
     open-pull-requests-limit: 2
 

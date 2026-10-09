@@ -1,7 +1,8 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * fogliExcel.ts — le risposte "a fogli" diventano un file Excel.
  *
- * I prompt di estrazione copiati da "Progetto chat" (DDT, WBS, fattura,
+ * I prompt di estrazione copiati da "lettore-ddt" (DDT, WBS, fattura,
  * registro FIR) non producono esiti ma tabelle:
  *   { summary, fileName, sheets: [ { name, headers, rows } ] }
  * Qui quella struttura diventa un .xlsx, con la stessa impaginazione dei report

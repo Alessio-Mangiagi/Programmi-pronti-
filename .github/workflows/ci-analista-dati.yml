@@ -1,29 +1,30 @@
-# CI dell'app "agente" (analisi DB in linguaggio naturale).
+# "><(((º> sabusabu <º)))><"
+# CI dell'app "analista-dati" (ex agente) (analisi DB in linguaggio naturale).
 #
-# Workflow separato da ci.yml (che copre "Progetto chat"): filtri di percorso
+# Workflow separato da ci.yml (che copre "lettore-ddt"): filtri di percorso
 # diversi, comandi diversi, e un fallimento dell'uno non deve bloccare l'altro.
 #
 # Node 24: il backend usa node:sqlite (DatabaseSync) senza flag sperimentali —
 # su Node 22 servirebbe --experimental-sqlite. Vedi "engines" in package.json.
-name: CI — agente
+name: CI — analista-dati
 
 on:
   push:
     branches: [main]
     paths:
-      - 'agente/**'
+      - 'analista-dati/**'
       - 'shared/**'
-      - '.github/workflows/ci-agente.yml'
+      - '.github/workflows/ci-analista-dati.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'agente/**'
+      - 'analista-dati/**'
       - 'shared/**'
-      - '.github/workflows/ci-agente.yml'
+      - '.github/workflows/ci-analista-dati.yml'
 
 defaults:
   run:
-    working-directory: agente
+    working-directory: analista-dati
 
 jobs:
   build:
@@ -38,7 +39,7 @@ jobs:
         with:
           node-version: 24.x
           cache: npm
-          cache-dependency-path: 'agente/package-lock.json'
+          cache-dependency-path: 'analista-dati/package-lock.json'
 
       # xlsx arriva dal CDN ufficiale SheetJS (su npm la 0.18.5 e' ferma a due
       # advisory high senza fix): npm ci deve poter raggiungere cdn.sheetjs.com.
@@ -68,7 +69,7 @@ jobs:
         with:
           node-version: 24.x
           cache: npm
-          cache-dependency-path: 'agente/package-lock.json'
+          cache-dependency-path: 'analista-dati/package-lock.json'
 
       - name: Install dependencies
         run: npm ci

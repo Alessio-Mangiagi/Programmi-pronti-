@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<!--
+  index.html — unica pagina dell'app "Confronto Documenti" (SPA senza framework).
+  Struttura: nav, hero, sezione CARICA (upload + controlli), ELABORAZIONE
+  (barra), REPORT (risultati), COME FUNZIONA (guida), footer e il #viewer
+  (dialog a schermo intero per il confronto visuale).
+  Tutta la logica è in js/app.js (module), caricato in fondo al <body>.
+  Il markup è statico: i moduli JS lo popolano/mostrano agganciandosi agli id.
+-->
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confronto Documenti — Cosedil</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body id="top">
+<div class="mesh"></div>
+
+<header class="nav">
+  <a class="brand" href="#top">
+    <img class="logo" src="favicon.ico" alt="Cosedil" width="34" height="34">
+    <span class="brand-text">COSEDIL<span class="brand-sub">Confronto Documenti</span></span>
+  </a>
+  <nav class="nav-links">
+    <a href="#come">Come funziona</a>
+    <a href="#requisiti">Requisiti</a>
+  </nav>
+  <a href="#carica" class="nav-cta">Avvia confronto</a>
+</header>
+
+<main>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="hero-inner reveal">
+      <span class="eyebrow">OCR Diff Engine · Elaborazione 100% locale</span>
+      <h1>Confronta due PDF. <em>Trova ogni differenza.</em></h1>
+      <p class="lead">
+        Carica due documenti — PDF, immagini, Word o testo: il testo viene
+        estratto (dalle scansioni via OCR, con pulizia e raddrizzamento
+        automatici) ed evidenziato in ogni differenza.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ CARICA ============ -->
+  <section id="carica" class="block">
+    <div class="section-title reveal">
+      <span class="kicker">Passo 1</span>
+      <h2>Carica i documenti</h2>
+      <p>Trascina o seleziona i due PDF da mettere a confronto.</p>
+    </div>
+
+    <div class="deck">
+      <div class="drop reveal" id="dropA" style="transition-delay:.05s">
+        <div class="shell"><div class="core">
+          <div class="tag">Documento A</div>
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          </div>
+          <div class="fname">Trascina il primo documento</div>
+          <div class="fmeta">PDF · immagine · Word · testo</div>
+        </div></div>
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.docx,.txt,.md,.csv">
+      </div>
+
+      <div class="drop reveal" id="dropB" style="transition-delay:.12s">
+        <div class="shell"><div class="core">
+          <div class="tag">Documento B</div>
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          </div>
+          <div class="fname">Trascina il secondo documento</div>
+          <div class="fmeta">PDF · immagine · Word · testo</div>
+        </div></div>
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.docx,.txt,.md,.csv">
+      </div>
+    </div>
+
+    <div class="controls reveal" style="transition-delay:.18s">
+      <div class="opts">
+        <div class="field">
+          <label for="model">Motore OCR</label>
+          <!-- Opzioni popolate da models.js via /api/models; questa è il fallback -->
+          <select id="model"><option value="tesseract">TESSERACT · LOCALE</option></select>
+        </div>
+        <div class="field">
+          <label for="dpi">Risoluzione</label>
+          <select id="dpi">
+            <option value="150">150 DPI · Veloce</option>
+            <option value="200" selected>200 DPI · Bilanciato</option>
+            <option value="300">300 DPI · Preciso</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="lang">Lingua OCR</label>
+          <select id="lang">
+            <option value="ita+eng" selected>Italiano + Inglese</option>
+            <option value="ita">Italiano</option>
+            <option value="eng">Inglese</option>
+            <option value="ita+eng+fra+deu">IT · EN · FR · DE</option>
+          </select>
+        </div>
+        <div class="field toggles">
+          <label class="chk"><input type="checkbox" id="tolerant"> Confronto tollerante <span class="chk-hint">(ignora rumore OCR)</span></label>
+          <label class="chk"><input type="checkbox" id="preprocess" checked> Migliora scansioni <span class="chk-hint">(deskew · pulizia)</span></label>
+        </div>
+      </div>
+      <button class="cta" id="go" disabled>
+        Avvia confronto
+        <span class="orb">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </button>
+    </div>
+
+    <details class="adv reveal" style="transition-delay:.24s">
+      <summary>Opzioni avanzate · righe da ignorare</summary>
+      <textarea id="ignore" placeholder="Una regex per riga, es.:&#10;Pagina \d+ di \d+&#10;\d{2}/\d{2}/\d{4}&#10;Rev\. \d+"></textarea>
+      <div class="hint">Le righe che corrispondono a uno di questi pattern (regex, una per riga)
+      vengono escluse dal confronto — utile per numeri di pagina, date, timbri di revisione.</div>
+    </details>
+  </section>
+
+  <!-- ============ ELABORAZIONE ============ -->
+  <section id="progress" class="block">
+    <div class="shell"><div class="core">
+      <div class="prog-head">
+        <div class="prog-msg" id="progMsg">In coda...</div>
+        <div class="prog-count" id="progCount"></div>
+      </div>
+      <div class="bar pulse"><i id="progBar"></i></div>
+      <div style="margin-top:1.3rem">
+        <button class="ghost-btn danger" id="cancelBtn">✕ Annulla confronto</button>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ============ REPORT ============ -->
+  <section id="results" class="block">
+    <div class="section-title">
+      <span class="kicker">Risultato</span>
+      <h2>Report differenze</h2>
+      <p>Righe rimosse in rosso, aggiunte in verde. Apri l'anteprima per il confronto visuale.</p>
+    </div>
+    <div class="summary-row">
+      <div class="summary" id="summary"></div>
+      <a class="ghost-btn" id="dlDocx" download>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Report Word
+      </a>
+      <a class="ghost-btn" id="dlPdf" download>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Report PDF
+      </a>
+    </div>
+    <div id="pages"></div>
+  </section>
+
+  <!-- ============ COME FUNZIONA ============ -->
+  <section id="come" class="block">
+    <div class="section-title reveal">
+      <span class="kicker">Guida</span>
+      <h2>Come <em>funziona</em></h2>
+      <p>Tre passaggi, elaborazione interamente in locale.</p>
+    </div>
+    <div class="readme-grid">
+      <div class="shell reveal" style="transition-delay:.05s"><div class="core">
+        <h3>Utilizzo</h3>
+        <ol>
+          <li>Trascina (o clicca per scegliere) i <strong>due documenti</strong> — PDF, immagini (JPG/PNG/TIFF), Word (.docx) o testo</li>
+          <li>Scegli <strong>risoluzione</strong> e <strong>lingua OCR</strong>: le pagine con testo selezionabile sono lette all'istante, le scansioni passano per <strong>Tesseract</strong> con pulizia automatica</li>
+          <li>Attiva il <strong>confronto tollerante</strong> per ignorare il rumore OCR (0/O, l/1, punteggiatura) ed evitare differenze finte</li>
+          <li>Premi <strong>Avvia confronto</strong> — annullabile in ogni momento</li>
+          <li>Leggi il report: righe <code>−</code>/<code>+</code>, parole cambiate evidenziate, <strong>Anteprima</strong> per il confronto visuale (affiancato o sovrapposto con cursore)</li>
+          <li><strong>Scarica report</strong> per un HTML stampabile da allegare</li>
+        </ol>
+      </div></div>
+
+      <div class="shell reveal" id="requisiti" style="transition-delay:.12s"><div class="core">
+        <h3>Requisiti</h3>
+        <ul>
+          <li><strong>Tesseract OCR</strong> installato, con la cartella <code>tessdata</code> e le lingue <code>ita+eng</code></li>
+          <li>Python con <code>pymupdf</code>, <code>flask</code>, <code>pillow</code>, <code>numpy</code>, <code>pytesseract</code></li>
+          <li><strong>Nessun Ollama, nessun servizio esterno, nessuna connessione</strong></li>
+          <li>Il pallino in alto indica se Tesseract è pronto</li>
+        </ul>
+      </div></div>
+
+      <div class="shell reveal" style="transition-delay:.19s"><div class="core">
+        <h3>Motore OCR</h3>
+        <ul>
+          <li><code>tesseract</code> — OCR locale velocissimo (~1s/pagina), ideale per testo stampato pulito</li>
+          <li><code>paddle</code> — PaddleOCR (PP-OCRv5, GPU): più preciso su <strong>scansioni molto sporche</strong> o sbiadite; più lento all'avvio. Appare solo se installato</li>
+          <li>Pagine con <strong>testo embedded</strong>: lette direttamente, OCR saltato (istantaneo)</li>
+          <li>DPI più alti = scansione più precisa ma più lenta (300 per documenti fitti)</li>
+          <li>I risultati OCR vanno in <strong>cache su disco</strong>: i riconfronti sono immediati</li>
+        </ul>
+      </div></div>
+
+      <div class="shell reveal" style="transition-delay:.26s"><div class="core">
+        <h3>Privacy e note</h3>
+        <ul>
+          <li>Elaborazione <strong>100% locale e offline</strong>: nessun documento lascia questa macchina</li>
+          <li>I file caricati vengono <strong>eliminati</strong> a fine confronto</li>
+          <li>L'OCR può variare leggermente tra esecuzioni: piccole differenze di spaziatura sono normalizzate</li>
+          <li>Avvio rapido: <code>avvia.vbs</code> (nascosto) o <code>Avvia con console.bat</code> (con log)</li>
+        </ul>
+      </div></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-brand">
+    <img class="logo" src="favicon.ico" alt="Cosedil" width="30" height="30">
+    <span>COSEDIL S.p.A.</span>
+  </div>
+  <div class="foot-meta">
+    <span>Elaborazione 100% locale</span><span class="sep">·</span>
+    <span>Tesseract + PyMuPDF</span><span class="sep">·</span>
+    <span>© Confronto Documenti</span>
+  </div>
+</footer>
+
+<!-- ============ VIEWER (confronto visuale) ============
+     Dialog a schermo intero, nascosto finché viewer.js non aggiunge .open.
+     Due layout mutuamente esclusivi: .viewer-panes (A|B affiancati) e
+     .viewer-overlay (onion skin con slider). Gestito da viewer.js. -->
+<div id="viewer" role="dialog" aria-modal="true">
+  <div class="viewer-bar">
+    <div class="viewer-title">
+      Confronto visuale <span class="page-num" id="vPage"></span>
+    </div>
+    <div class="viewer-nav">
+      <button class="v-btn" id="vZoomOut" title="Riduci">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      </button>
+      <button class="ghost-btn" id="vZoomReset" title="Zoom 100%">100%</button>
+      <button class="v-btn" id="vZoomIn" title="Ingrandisci">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="ghost-btn" id="vMode">Sovrapponi</button>
+      <button class="ghost-btn" id="vProc" title="Mostra la pagina pulita come la vede l'OCR">Vista OCR</button>
+      <button class="v-btn" id="vPrev" title="Pagina precedente">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="v-btn" id="vNext" title="Pagina successiva">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <button class="v-btn" id="vClose" title="Chiudi (Esc)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="viewer-panes">
+    <div class="pane">
+      <div class="pane-label">Doc A · <b id="vNameA"></b></div>
+      <div class="shell"><div class="core" id="vPaneA"></div></div>
+    </div>
+    <div class="pane">
+      <div class="pane-label">Doc B · <b id="vNameB"></b></div>
+      <div class="shell"><div class="core" id="vPaneB"></div></div>
+    </div>
+  </div>
+  <div class="viewer-overlay" id="vOverlayWrap">
+    <div class="ov-slider-row">
+      <span class="lab">A</span>
+      <input type="range" id="ovSlider" min="0" max="100" value="50">
+      <span class="lab">B</span>
+    </div>
+    <div class="shell"><div class="core" id="vOverlay"></div></div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

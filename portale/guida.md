@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Guida al Portale Suite Cosedil
 
 Benvenuto. Questa guida spiega, passo passo, come usare il portale per accedere e avviare i programmi della suite. Non serve alcuna competenza tecnica.
@@ -42,7 +43,7 @@ Se un programma è già **Attivo**, premi **Apri** per aprirlo subito in una nuo
 
 ## 6. Chiedere all'assistente
 
-Non sai quale programma ti serve? In basso a destra c'è una **bolla azzurra**: premila e chiedi in italiano, per esempio *"quale app per i PDF scansionati?"* oppure *"cosa fa l'agente?"*.
+Non sai quale programma ti serve? In basso a destra c'è una **bolla azzurra**: premila e chiedi in italiano, per esempio *"quale app per i PDF scansionati?"* oppure *"cosa fa l'analista dati?"*.
 
 L'assistente ti risponde e ti mette lì i pulsanti **Avvia** e **Apri** dell'app giusta. Sa parlare **solo delle app della suite e di cosa fanno**: su altri argomenti ti dirà che non sa rispondere. Non serve internet.
 

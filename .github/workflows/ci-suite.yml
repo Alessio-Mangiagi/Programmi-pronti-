@@ -1,6 +1,7 @@
+# "><(((º> sabusabu <º)))><"
 # CI delle app Node rimaste scoperte.
 #
-# Prima qui giravano solo "Progetto chat" (ci.yml) e "agente" (ci-agente.yml):
+# Prima qui giravano solo "lettore-ddt" (ci.yml) e "analista-dati" (ci-analista-dati.yml):
 # sei app su otto non le controllava nessuno, portale compreso — che e' quello
 # che autentica tutte le altre.
 #
@@ -14,20 +15,20 @@ on:
     branches: [main]
     paths:
       - 'portale/**'
-      - 'ocr-webapp-paddleocr/**'
+      - 'ocr-documenti/**'
       - 'verifica-requisiti/**'
-      - 'auto scan pcq econ traduttore da api trimble/**'
-      - "whatss'app_web_Compleanni/**"
+      - 'ponte-trimble/**'
+      - "auguri/**"
       - 'shared/**'
       - '.github/workflows/ci-suite.yml'
   pull_request:
     branches: [main]
     paths:
       - 'portale/**'
-      - 'ocr-webapp-paddleocr/**'
+      - 'ocr-documenti/**'
       - 'verifica-requisiti/**'
-      - 'auto scan pcq econ traduttore da api trimble/**'
-      - "whatss'app_web_Compleanni/**"
+      - 'ponte-trimble/**'
+      - "auguri/**"
       - 'shared/**'
       - '.github/workflows/ci-suite.yml'
 
@@ -47,7 +48,7 @@ jobs:
             installa: 'no'
             comandi: npm test
           - nome: ocr
-            cartella: ocr-webapp-paddleocr
+            cartella: ocr-documenti
             node: 20.x
             installa: 'si'
             comandi: npm run lint && npm test && npm run build
@@ -57,15 +58,15 @@ jobs:
             installa: 'si'
             comandi: npm run type-check && npm test && npm run build
           - nome: auto-scan-trimble
-            cartella: auto scan pcq econ traduttore da api trimble
+            cartella: ponte-trimble
             node: 20.x
             installa: 'si'
             comandi: npm test
-          # Auguri WhatsApp: server.js pilota Chromium e non si avvia in CI, quindi
+          # Auguri: server.js pilota Chromium e non si avvia in CI, quindi
           # si controlla la sintassi; la logica pura (date, celle, messaggi) ha i
           # suoi test in test/logica.test.js.
           - nome: auguri-whatsapp
-            cartella: whatss'app_web_Compleanni
+            cartella: auguri
             node: 20.x
             installa: 'si'
             comandi: node --check src/server.js && npm test
@@ -97,9 +98,9 @@ jobs:
       fail-fast: false
       matrix:
         cartella:
-          - ocr-webapp-paddleocr
+          - ocr-documenti
           - verifica-requisiti
-          - auto scan pcq econ traduttore da api trimble
+          - ponte-trimble
     name: audit (${{ matrix.cartella }})
     defaults:
       run:
@@ -111,6 +112,6 @@ jobs:
           node-version: 20.x
       - run: npm ci
       # Solo le dipendenze di produzione, e solo high: sono quelle che finiscono
-      # sui PC dell'ufficio. Auguri WhatsApp resta fuori: le sue segnalazioni
+      # sui PC dell'ufficio. Auguri resta fuori: le sue segnalazioni
       # vengono tutte da puppeteer e si aggiornano a mano, app ferma.
       - run: npm audit --omit=dev --audit-level=high

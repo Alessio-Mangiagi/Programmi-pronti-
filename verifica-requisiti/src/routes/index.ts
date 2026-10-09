@@ -1,8 +1,9 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * index.ts — composizione delle route.
  *
  * Catena comune (rate limit, log, CORS, header di sicurezza) e poi i moduli per
- * dominio. Stessa impalcatura di "Progetto chat", così chi conosce quella app
+ * dominio. Stessa impalcatura di "lettore-ddt", così chi conosce quella app
  * ritrova le stesse cose negli stessi posti.
  */
 import express from 'express';

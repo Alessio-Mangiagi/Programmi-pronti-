@@ -1,0 +1,53 @@
+{
+  "name": "analista-dati",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others \"tsx watch server.ts\" \"vite --port 5173\"",
+    "build": "vite build",
+    "start": "tsx server.ts",
+    "preview": "vite preview",
+    "set-key": "tsx scripts/set-key.ts",
+    "demo": "tsx scripts/demo.ts",
+    "eval": "tsx scripts/eval-sql.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
+    "backup": "tsx scripts/backup.ts",
+    "test:features": "tsx scripts/test-new-features.ts",
+    "test:scheduler": "tsx scripts/test-scheduler.ts",
+    "test:chat": "tsx scripts/test-chat.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "ioredis": "^5.4.2",
+    "mongodb": "^6.12.0",
+    "mssql": "^11.0.1",
+    "mysql2": "^3.12.0",
+    "pg": "^8.13.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^2.15.0",
+    "tsx": "^4.15.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.6",
+    "@types/mssql": "^9.1.7",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^5.2.0",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^2.1.8"
+  }
+}

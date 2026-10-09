@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * istanza-unica.js — un solo processo per cartella dati.
  *
@@ -12,7 +13,7 @@
  * Un PID riciclato dal sistema operativo può in teoria dare un falso positivo:
  * in quel caso basta cancellare il file indicato nel messaggio di errore.
  *
- * Stava in due copie, in "Progetto chat" e in "verifica-requisiti", identiche a
+ * Stava in due copie, in "lettore-ddt" e in "verifica-requisiti", identiche a
  * meno del commento iniziale: una correzione qui andava applicata due volte e
  * la seconda volta se ne perdeva memoria. Vive qui come CommonJS con un .d.ts
  * accanto, come già shared/sso: le due app compilano in CommonJS e nessuna

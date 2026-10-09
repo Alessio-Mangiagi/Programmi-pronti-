@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.cosedilspa.com)",
+      "Bash(python -c \"from PIL import Image; im=Image.open\\('favicon.ico'\\); im=im.convert\\('RGBA'\\); im.save\\('/c/Users/aless/AppData/Local/Temp/claude/c--Users-aless-Desktop-sicurezza-COSEDIL-confronta-file/803bf541-6b14-4c77-8fa1-beba25635f02/scratchpad/fav.png'\\); print\\(im.size\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import PIL; print\\('PIL', PIL.__version__\\)\")",
+      "Bash(python -c \"import numpy; print\\('numpy', numpy.__version__\\)\")",
+      "Bash(\"C:\\\\Program Files\\\\Tesseract-OCR\\\\tesseract.exe\" --version)",
+      "Bash(python -c \"import pytesseract; print\\('pytesseract OK', pytesseract.__version__\\)\")",
+      "Bash(python -c \"import confronta_pdf as c; print\\('import module OK, PIPELINE_VERSION', c.PIPELINE_VERSION\\)\")",
+      "Bash(python test_preproc.py)",
+      "Bash(python debug_stages.py)",
+      "Bash(python test_matrix.py)",
+      "Bash(python -m py_compile confronta_pdf.py server.py)",
+      "Bash(python -c \"import confronta_pdf as c; print\\('helpers:', hasattr\\(c,'preprocess_for_ocr'\\), hasattr\\(c,'_otsu_threshold'\\), hasattr\\(c,'_estimate_skew'\\)\\)\")"
+    ]
+  }
+}

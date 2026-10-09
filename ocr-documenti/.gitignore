@@ -1,0 +1,36 @@
+node_modules/
+dist/
+uploads/
+*.local
+.venv/
+__pycache__/
+.venv-gpu/
+
+# Documenti aziendali di test/archivio: mai versionare
+_archivio/
+contratti/
+
+# Banco di prova offline: pagine renderizzate, cache OCR e output estratti
+# (tests/baseline = copia di tests/out tenuta a mano per i confronti prima/dopo)
+.harness-cache/
+
+# Cache OCR di esercizio (blocchi per hash di pagina) e lavori lato server
+.ocr-cache/
+_lavori/
+tests/out/
+tests/baseline/
+
+# Banco di prova estrazione: testo dei contratti in cache, mai versionare
+# (rigenerabili: cache/ con render_ocr.py, cache-nativo/ con render_nativo.mjs)
+tools/harness/cache/
+tools/harness/cache-nativo/
+tools/harness/blocchi/
+tools/harness/*.json
+
+# Script usa-e-getta creati durante il lavoro (pilotaggio browser, diagnostica)
+_*.mjs
+_*.mts
+
+# Font di pdf.js copiati in automatico da vite.config.ts (plugin pdfjs-standard-fonts)
+public/standard_fonts/
+avvio.log

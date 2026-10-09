@@ -1,7 +1,8 @@
+/* "><(((º> sabusabu <º)))><" */
 /* ============================================================
    shell.css — Scheletro dell'interfaccia.
 
-   Porta in CSS gli stessi valori che in "Progetto chat" vivono in
+   Porta in CSS gli stessi valori che in "lettore-ddt" vivono in
    static/js/styles.ts (lì sono oggetti di stile React). Qui non c'è React,
    quindi diventano classi: stessi colori, stessi spazi, stessi bordi, così le
    due app si somigliano davvero invece di somigliarsi "quasi".
@@ -287,7 +288,7 @@ label.etichetta {
   font-size: 13px;
 }
 
-/* ── Badge (stessi valori di S.badge in Progetto chat) ───────────────────── */
+/* ── Badge (stessi valori di S.badge in lettore-ddt) ───────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -476,7 +477,7 @@ label.etichetta {
 .voce-menu.attiva .icona { color: #0c4577; }
 
 /* ── Scheda "Analisi Claude" ─────────────────────────────────────────────────
-   Stessi ingredienti della scheda Importa di "Progetto chat": card con filo
+   Stessi ingredienti della scheda Importa di "lettore-ddt": card con filo
    blu a sinistra, bottoni prompt su due righe, zona di trascinamento, box
    istruzioni. */
 

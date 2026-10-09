@@ -1,0 +1,354 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; overflow: hidden; }
+
+/* ── Tema corporate Cosedil (cosedilspa.com) ──
+   Unica fonte dei colori: l'oggetto `C` di App.tsx legge queste variabili, così una
+   modifica di palette si fa qui e non in 400 stili inline.
+   blu istituzionale #0c4577 · azzurro #198fd9 · verde #65bc7b
+   heading Ubuntu · testo Open Sans */
+:root {
+  --c-bg: #f2f3f5;
+  --c-panel: #ffffff;
+  --c-header: #f9f9fb;
+  --c-border: #dfe4ea;
+  --c-text: #212326;
+  --c-muted: #66707a;
+  --c-accent: #0c4577;   /* blu istituzionale */
+  --c-blue: #198fd9;     /* azzurro: selezione, focus */
+  --c-green: #1e8e3e;    /* azione che produce il deliverable */
+  --c-red: #c5221f;      /* errore, distruttivo */
+  --c-yellow: #a16207;   /* attenzione, da rivedere */
+  --c-brand-green: #65bc7b;  /* verde Cosedil, accenti */
+
+  /* superfici degli stati (avvisi, righe da rivedere) */
+  --c-warn-bg: #fff8e1;
+  --c-warn-border: #e6c26e;
+  --c-err-bg: #fdecea;
+
+  --c-font: "Open Sans", "Segoe UI", Arial, Helvetica, sans-serif;
+  --c-font-head: "Ubuntu", Arial, Helvetica, sans-serif;
+}
+
+/* ── Interazioni globali: hover/active/focus uniformi su tutti i controlli ── */
+button { font-family: inherit; }
+button:disabled { cursor: not-allowed; }
+button:not(:disabled) { cursor: pointer; }
+button:not(:disabled):hover { filter: brightness(0.95); }
+button:not(:disabled):active { filter: brightness(0.9); }
+/* Focus SEMPRE visibile: il programma si usa molto da tastiera e con gli stili
+   inline il ring di default spariva sotto i background pieni dei bottoni. */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+.dropzone:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Drop zone */
+.dropzone { transition: border-color 0.15s, background 0.15s, color 0.15s; }
+.dropzone:hover {
+  border-color: #198fd9 !important;
+  background: rgba(25, 143, 217, 0.05) !important;
+}
+
+/* Spinner corporate (anello navy) */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid #dfe4ea;
+  border-top-color: #0c4577;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+.spinner-sm {
+  display: inline-block;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: currentColor;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -1px;
+  margin-right: 6px;
+}
+
+/* Input dell'editor Import P6: focus ring azzurro, cella tabella evidenziata */
+.edit-input { transition: border-color 0.15s, box-shadow 0.15s; }
+.edit-input:focus {
+  outline: none;
+  border-color: #198fd9 !important;
+  box-shadow: 0 0 0 3px rgba(25, 143, 217, 0.15);
+}
+.edit-cell { transition: background 0.15s, box-shadow 0.15s; border-radius: 2px; }
+.edit-cell:focus {
+  outline: none;
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 2px rgba(25, 143, 217, 0.55);
+}
+
+/* Cella descrizione: stretta a riposo, si apre quando la si sta scrivendo — le
+   descrizioni arrivano a 240 caratteri e in 200px non si leggevano. */
+.edit-cell-descr { resize: none; overflow: hidden; line-height: 1.35; }
+.edit-cell-descr:focus { background: #ffffff !important; box-shadow: inset 0 0 0 2px rgba(25, 143, 217, 0.55); }
+
+/* Riga con un problema rilevato: barra a sinistra, non solo colore di sfondo
+   (il colore da solo non basta a chi non lo distingue). */
+.riga-problema > td:first-child { box-shadow: inset 3px 0 0 var(--c-yellow); }
+.riga-problema { background: var(--c-warn-bg) !important; }
+.riga-evidenziata { animation: lampeggia 1.2s ease-out 1; }
+@keyframes lampeggia {
+  0%, 55% { background: rgba(25, 143, 217, 0.22) !important; }
+  100% { background: transparent; }
+}
+
+/* Segmented control del formato di uscita.
+   Griglia 2×2 e non una riga sola: nella sidebar da 196 px quattro segmenti
+   affiancati mandavano "IMPORT P6" a capo e tagliavano ".JSON". */
+.segmented {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--c-border); border-radius: 6px; overflow: hidden;
+  background: var(--c-bg);
+}
+.segmented > button {
+  padding: 7px 4px; background: transparent;
+  border: none; border-top: 1px solid var(--c-border); border-left: 1px solid var(--c-border);
+  color: var(--c-muted); font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background 0.15s, color 0.15s;
+}
+.segmented > button:nth-child(-n+2) { border-top: none; }
+.segmented > button:nth-child(odd) { border-left: none; }
+.segmented > button[aria-pressed="true"] { background: var(--c-accent); color: #ffffff; }
+/* Nella barra comandi i quattro formati stanno su una riga sola: c'è spazio, e la
+   griglia 2×2 nascondeva che sono alternative tra loro. */
+/* Nella barra di destra (500 px) i segmenti sono grandi il doppio. */
+.segmented.grande > button { padding: 13px 8px; font-size: 13px; }
+.segmented.riga { display: inline-flex; }
+.segmented.riga > button { border-top: none; border-left: 1px solid var(--c-border); padding: 9px 14px; font-size: 11.5px; }
+.segmented.riga > button:first-child { border-left: none; }
+.segmented.riga > button:disabled { opacity: 0.6; }
+/* Selettore di pagina (OCR / Claude) nell'intestazione blu: la variante chiara,
+   perché il segmento attivo color accent sparirebbe sullo sfondo dello stesso colore. */
+.segmented.pagine { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.10); }
+.segmented.pagine > button { color: rgba(255,255,255,0.85); border-left-color: rgba(255,255,255,0.25); padding: 6px 14px; font-size: 11px; cursor: pointer; }
+.segmented.pagine > button[aria-pressed="true"] { background: #ffffff; color: var(--c-accent); }
+
+/* ── Coda di lavoro: una riga per documento ── */
+/* Colonne fisse: è il nome del documento a stringersi (con l'estensione sempre
+   visibile, vedi NomeFile), non l'esito o i bottoni. */
+.coda { border-collapse: collapse; width: 100%; font-size: 13px; background: var(--c-panel); table-layout: fixed; }
+.coda th {
+  background: var(--c-bg); color: var(--c-muted);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  text-align: left; padding: 7px 10px; border: 1px solid var(--c-border);
+}
+.coda td { padding: 6px 10px; border: 1px solid var(--c-border); vertical-align: middle; }
+.coda tbody tr { cursor: pointer; }
+.coda tbody tr.attiva td { background: #eef4fa; }
+.coda tbody tr:not(.attiva):hover td { background: var(--c-header); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+
+/* Schede del pannello risultato */
+.schede {
+  display: flex; align-items: center; gap: 2px; padding: 0 14px;
+  border-bottom: 1px solid var(--c-border); background: var(--c-header); flex-shrink: 0;
+}
+.schede > button {
+  padding: 9px 12px; background: transparent; border: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  color: var(--c-muted); font-size: 12px; font-weight: 600; font-family: inherit;
+}
+.schede > button[aria-selected="true"] { color: var(--c-accent); border-bottom-color: var(--c-accent); }
+.schede > button:disabled { opacity: 0.4; }
+.schede > button[aria-selected="true"]:disabled { opacity: 1; }   /* «Modifica» aperta: attiva, non spenta */
+
+/* Anteprima al passaggio del mouse sulla coda: prima pagina del documento.
+   pointer-events: none → il mouse resta sulla riga, il riquadro non lampeggia. */
+.anteprima-hover {
+  position: fixed; z-index: 500; width: 360px;
+  background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(12, 69, 119, 0.18);
+  padding: 8px; pointer-events: none;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.anteprima-hover img {
+  width: 100%; max-height: 400px; object-fit: contain; object-position: top;
+  border: 1px solid var(--c-border); background: #ffffff;
+}
+
+/* Proposta di ripresa della sessione salvata (IndexedDB), sopra la zona vuota */
+.ripresa-sessione {
+  display: flex; align-items: center; gap: 12px;
+  width: min(720px, 100%); margin: 0 auto; padding: 12px 16px;
+  background: var(--c-panel); border: 1px solid var(--c-border); border-left: 4px solid var(--c-accent);
+  border-radius: 8px; box-shadow: 0 2px 12px rgba(12, 69, 119, 0.06);
+  font-size: 13px; color: var(--c-text);
+}
+
+/* Menu ⋮ di una riga della coda: a posizione fissa, sopra l'anteprima in hover */
+.menu-riga {
+  position: fixed; z-index: 600; min-width: 230px;
+  background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(12, 69, 119, 0.18);
+  padding: 4px; display: flex; flex-direction: column;
+}
+.menu-riga > button {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 8px 10px; border: none; border-radius: 5px; background: transparent;
+  font: inherit; font-size: 12.5px; font-weight: 500; color: var(--c-text); cursor: pointer;
+}
+.menu-riga > button:hover, .menu-riga > button:focus-visible { background: #eef4fa; outline: none; }
+.menu-riga > button.pericolo { color: var(--c-red); }
+.menu-riga > button:disabled { opacity: 0.45; cursor: default; background: transparent; }
+
+/* Gruppo azioni secondarie richiudibile */
+/* Gruppi richiudibili: stessa resa, classi distinte perche' vivono in tre punti
+   diversi (azioni della sidebar, formati di servizio, export secondari). */
+.altre-azioni > summary,
+.gruppo-pieghevole > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--c-accent); padding: 6px 2px; border-top: 1px solid var(--c-border);
+  display: flex; align-items: center; gap: 6px;
+}
+.altre-azioni > summary::-webkit-details-marker,
+.gruppo-pieghevole > summary::-webkit-details-marker { display: none; }
+.altre-azioni > summary::before,
+.gruppo-pieghevole > summary::before { content: '▸'; font-size: 11px; transition: transform 0.15s; }
+.altre-azioni[open] > summary::before,
+.gruppo-pieghevole[open] > summary::before { transform: rotate(90deg); }
+.altre-azioni > div { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+
+/* Avviso pre-import cliccabile */
+.avviso-riga {
+  display: block; width: 100%; text-align: left; background: transparent; border: none;
+  color: inherit; font: inherit; padding: 2px 4px; border-radius: 3px;
+}
+.avviso-riga:not(:disabled):hover { background: rgba(161, 98, 7, 0.14); text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner, .spinner-sm { animation-duration: 1.6s; }
+  .riga-evidenziata { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f2f3f5; }
+::-webkit-scrollbar-thumb { background: #c5cdd6; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9aa7b4; }
+
+/* ── Markdown ── */
+.markdown-body {
+  color: #212326;
+  line-height: 1.7;
+  font-size: 14px;
+  font-family: "Open Sans", "Segoe UI", Arial, Helvetica, sans-serif;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  margin: 20px 0 8px;
+  color: #0c4577;
+  font-weight: 500;
+  font-family: "Ubuntu", Arial, Helvetica, sans-serif;
+  letter-spacing: -0.01em;
+}
+.markdown-body h1 { font-size: 1.4em; border-bottom: 2px solid #0c4577; padding-bottom: 8px; }
+.markdown-body h2 { font-size: 1.15em; border-bottom: 1px solid #dfe4ea; padding-bottom: 6px; }
+.markdown-body p { margin: 8px 0; }
+.markdown-body ul, .markdown-body ol { padding-left: 22px; margin: 8px 0; }
+.markdown-body li { margin: 4px 0; }
+.markdown-body li::marker { color: #198fd9; }
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+  font-size: 13px;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid #dfe4ea;
+  padding: 7px 12px;
+  text-align: left;
+}
+.markdown-body th {
+  background: #f2f5f8;
+  font-weight: 600;
+  color: #0c4577;
+  letter-spacing: 0.02em;
+  font-size: 12px;
+}
+.markdown-body tr:nth-child(even) { background: #f9f9fb; }
+.markdown-body tr:hover { background: rgba(12, 69, 119, 0.05); }
+
+.markdown-body pre {
+  background: #f6f8fa;
+  border: 1px solid #dfe4ea;
+  border-left: 3px solid #0c4577;
+  border-radius: 4px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.markdown-body code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 85%;
+  background: rgba(12, 69, 119, 0.08);
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: #0c4577;
+}
+.markdown-body pre code { background: transparent; padding: 0; font-size: 13px; color: #212326; }
+.markdown-body blockquote {
+  border-left: 3px solid #198fd9;
+  padding-left: 16px;
+  color: #66707a;
+  margin: 12px 0;
+}
+.markdown-body strong { color: #0c4577; }
+.markdown-body em { color: #198fd9; }
+.markdown-body a { color: #198fd9; text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body hr { border: none; border-top: 1px solid #dfe4ea; margin: 24px 0; }
+
+/* ── Range inputs ── */
+.range-input {
+  width: 44px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  border: 1px solid #cfd8e0;
+  background: #ffffff;
+  color: #212326;
+  font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -moz-appearance: textfield;
+}
+.range-input:focus {
+  border-color: #198fd9;
+  box-shadow: 0 0 0 3px rgba(25, 143, 217, 0.18);
+}
+.range-input:disabled { opacity: 0.4; cursor: not-allowed; }
+.range-input::-webkit-inner-spin-button,
+.range-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ── DOCX preview ── */
+.docx-preview { color: #212326; font-family: "Open Sans", "Segoe UI", Arial, sans-serif; font-size: 14px; }
+.docx-preview p { margin: 6px 0; }
+.docx-preview table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+.docx-preview td, .docx-preview th { border: 1px solid #dfe4ea; padding: 6px 10px; }
+.docx-preview th { background: #f2f5f8; font-weight: 600; color: #0c4577; letter-spacing: 0.02em; }
+.docx-preview h1 { font-size: 1.4em; margin: 16px 0 8px; border-bottom: 2px solid #0c4577; padding-bottom: 6px; color: #0c4577; font-family: "Ubuntu", Arial, sans-serif; font-weight: 500; }
+.docx-preview h2 { font-size: 1.15em; margin: 14px 0 6px; color: #0c4577; font-family: "Ubuntu", Arial, sans-serif; font-weight: 500; }
+.docx-preview ul, .docx-preview ol { padding-left: 20px; margin: 6px 0; }

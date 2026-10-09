@@ -1,0 +1,16 @@
+# Dipendenze
+node_modules/
+
+# Sessione/cache WhatsApp (per-PC, non portabili)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Configurazione locale del singolo PC (ognuno genera la sua)
+config.json
+
+# Log e stato runtime (rigenerati)
+log/*
+!log/.gitkeep
+
+# Pacchetto distribuibile (copia dei sorgenti, rigenerabile)
+pacchetto-installazione/

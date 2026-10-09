@@ -1,8 +1,9 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * prompts.routes.ts — i prompt di confronto usati dai bottoni della scheda
  * "Analisi Claude". Il frontend non ne tiene copia: la fonte è src/prompts.ts,
  * altrimenti le due copie divergono in silenzio (è già successo in
- * "Progetto chat", da cui questa impostazione arriva).
+ * "lettore-ddt", da cui questa impostazione arriva).
  */
 import express, { Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';

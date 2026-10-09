@@ -1,0 +1,41 @@
+# Build PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Cache OCR
+.ocr_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.egg
+
+# Venv
+venv/
+env/
+.env/
+.venv/
+
+# Tessdata (file grandi binari, installa separatamente)
+tessdata/
+
+# PDF temporanei/test
+*.pdf
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user

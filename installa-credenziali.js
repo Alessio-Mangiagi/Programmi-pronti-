@@ -10,8 +10,8 @@
  *
  * Store toccati (gli unici con utenti propri):
  *   1. portale/data/utenti.json      — scrypt, salt separato (fonte SSO)
- *   2. agente/app.db                 — SQLite, hash "scrypt$salt$hash"
- *   3. Progetto chat/users.enc       — AES-256-GCM, dentro bcrypt (DDT)
+ *   2. analista-dati/app.db          — SQLite, hash "scrypt$salt$hash"
+ *   3. lettore-ddt/users.enc       — AES-256-GCM, dentro bcrypt (DDT)
  *
  * Le altre app (confronta, ocr, scadenzario, requisiti, trimble, auguri) non hanno
  * utenti locali: usano il gate SSO condiviso, e un utente con ruolo "admin" nel
@@ -94,12 +94,12 @@ step('portale (data/utenti.json)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2) AGENTE — app.db, tabella users (schema e hash di agente/server/auth.ts)
+// 2) AGENTE — app.db, tabella users (schema e hash di analista-dati/server/auth.ts)
 // ---------------------------------------------------------------------------
 step('agente (app.db)', () => {
   const { DatabaseSync } = require('node:sqlite'); // Node >= 22.5
-  // Stessa risoluzione di agente/server/appdb.ts.
-  const db = new DatabaseSync(process.env.APP_DB_PATH || path.join(ROOT, 'agente', 'app.db'));
+  // Stessa risoluzione di analista-dati/server/appdb.ts.
+  const db = new DatabaseSync(process.env.APP_DB_PATH || path.join(ROOT, 'analista-dati', 'app.db'));
   try {
     // Stesso DDL di appdb.ts: se il DB non esiste ancora lo prepara, se esiste
     // non tocca nulla (IF NOT EXISTS + migrazione idempotente della colonna).
@@ -140,10 +140,10 @@ step('agente (app.db)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3) DDT (Progetto chat) — users.enc: AES-256-GCM (secureStore.ts) + bcrypt
+// 3) DDT (lettore-ddt) — users.enc: AES-256-GCM (secureStore.ts) + bcrypt
 // ---------------------------------------------------------------------------
-step('DDT "Progetto chat" (users.enc)', () => {
-  const dir = path.join(ROOT, 'Progetto chat');
+step('DDT "lettore-ddt" (users.enc)', () => {
+  const dir = path.join(ROOT, 'lettore-ddt');
 
   // bcryptjs: pure-JS, presa dal node_modules dell'app; se manca la installa da sola.
   let bcrypt;
