@@ -11,6 +11,7 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { appdb, now, REPORTS_DIR, rows } from './appdb.ts'
+// "><(((º> sabusabu <º)))><"
 import { getConnectionConfig, getConnectionMeta } from './connections.ts'
 import { createConnector } from './db.ts'
 import { connKeyFor } from './fewshot.ts'

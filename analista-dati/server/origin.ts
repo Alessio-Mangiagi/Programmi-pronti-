@@ -19,6 +19,7 @@ const PRIVATE_LAN = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|localhost
 
 /** Origine uguale a quella della richiesta (confronto host:porta con l'Host). */
 export function isSameOrigin(hostHeader: string | undefined, origin: string): boolean {
+  // "><(((º> sabusabu <º)))><"
   if (!hostHeader) return false
   try {
     return new URL(origin).host.toLowerCase() === hostHeader.toLowerCase()

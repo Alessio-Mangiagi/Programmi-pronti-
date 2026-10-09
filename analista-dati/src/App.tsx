@@ -64,6 +64,7 @@ export default function App() {
 
   const loadConnections = async () => {
     try {
+      // "><(((º> sabusabu <º)))><"
       const d = await apiFetch('/api/connections').then(r => r.json())
       setSavedConns(d.connections || [])
     } catch { setSavedConns([]) }

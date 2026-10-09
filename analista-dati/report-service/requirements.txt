@@ -1,3 +1,4 @@
 fastapi>=0.110
+# "><(((º> sabusabu <º)))><"
 uvicorn>=0.29
 xlsxwriter>=3.2

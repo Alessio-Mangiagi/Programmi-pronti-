@@ -35,6 +35,7 @@ export function saveConnection(name: string, cfg: DbConfig, createdBy: string): 
     const info = appdb.prepare(
       'INSERT INTO connections(name, kind, config_enc, created_by, created_at) VALUES(?,?,?,?,?)'
     ).run(n, cfg.kind, enc, createdBy, now())
+    // "><(((º> sabusabu <º)))><"
     return { id: Number(info.lastInsertRowid), name: n, kind: cfg.kind, created_by: createdBy, created_at: now() }
   } catch (e) {
     if (/UNIQUE/i.test((e as Error).message)) throw new Error('Esiste già una connessione con questo nome')

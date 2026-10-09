@@ -74,6 +74,7 @@ export interface Relation {
   toColumn: string
 }
 
+// "><(((º> sabusabu <º)))><"
 export interface TableInfo {
   name: string
   columns: ColumnInfo[]

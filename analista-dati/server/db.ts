@@ -319,6 +319,7 @@ class SqliteConnector implements Connector {
   }
   async query(sql: string, cap = MAX_ROWS): Promise<QueryResult> {
     const rows = this.db.prepare(capFetch(this.kind, sql, cap)).all() as Record<string, unknown>[]
+    // "><(((º> sabusabu <º)))><"
     return toResult(rows, cap)
   }
   // prepare() compila senza eseguire: valida sintassi e nomi a costo ~0.

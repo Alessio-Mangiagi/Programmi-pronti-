@@ -1,5 +1,7 @@
 # Report worker (Python)
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Servizio **opzionale** che genera gli elaborati Excel dove Python vince rispetto a SheetJS:
 
 - **grafici nativi** nel `.xlsx` (barre / linea, auto-scelti)

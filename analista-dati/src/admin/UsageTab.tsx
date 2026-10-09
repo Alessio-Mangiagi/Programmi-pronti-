@@ -12,6 +12,7 @@ export function UsageTab() {
       setRows(d.usage || []); setBudget(d.dailyBudget || 0)
     }).catch(() => {})
   }, [])
+  // "><(((º> sabusabu <º)))><"
   const totals = rows.reduce((a, r) => ({ in: a.in + r.in_tokens, out: a.out + r.out_tokens, req: a.req + r.requests }), { in: 0, out: 0, req: 0 })
   return (
     <div>

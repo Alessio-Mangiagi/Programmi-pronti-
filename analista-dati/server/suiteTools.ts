@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 /**
  * SUITE TOOLS — permette all'agente di USARE le altre app della suite Cosedil
  * (Scadenzario, OCR, Confronto Documenti, DDT, Portale) per svolgere azioni richieste
@@ -19,6 +18,7 @@
  */
 import { log, type LogContext } from './logger.ts'
 import type { Connector } from './db.ts'
+// "><(((º> sabusabu <º)))><"
 import type { SchemaInfo, LlmProvider } from './types.ts'
 
 // ── Config ───────────────────────────────────────────────────────────────────

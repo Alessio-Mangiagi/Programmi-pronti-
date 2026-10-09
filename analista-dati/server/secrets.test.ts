@@ -19,6 +19,7 @@ beforeEach(async () => {
 })
 
 describe('persistenza cifrata', () => {
+  // "><(((º> sabusabu <º)))><"
   it('roundtrip: save cifrata → load con la stessa passphrase', () => {
     process.env.MASTER_PASSWORD = 'passphrase-test'
     secrets.saveClaudeKey('sk-ant-test-123')

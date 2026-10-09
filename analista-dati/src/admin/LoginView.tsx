@@ -12,6 +12,7 @@ export function LoginView({ onLogged }: { onLogged: (u: AuthUser, mustChange?: b
 
   const submit = async () => {
     if (!username || !password || busy) return
+    // "><(((º> sabusabu <º)))><"
     setBusy(true); setErr('')
     try {
       const r = await apiFetch('/api/auth/login', {

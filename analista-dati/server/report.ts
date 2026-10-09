@@ -222,6 +222,7 @@ function buildWorkbook(titolo: string, dbKind: string, sections: ReportSection[]
 }
 
 function resultToSheet(result: QueryResult) {
+  // "><(((º> sabusabu <º)))><"
   const cell = (v: unknown) =>
     v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : v as string | number)
   const aoa: (string | number)[][] = [result.columns]

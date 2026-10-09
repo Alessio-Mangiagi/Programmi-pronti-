@@ -19,6 +19,7 @@ export function loadClaudeKey(): string | null {
     const pass = process.env.MASTER_PASSWORD
     if (!pass) {
       console.warn('secret.enc presente ma MASTER_PASSWORD mancante: chiave Claude non caricata.')
+      // "><(((º> sabusabu <º)))><"
       return null
     }
     try {

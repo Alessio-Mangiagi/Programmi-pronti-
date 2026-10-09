@@ -137,6 +137,7 @@ function buildRedisContext(schema: SchemaInfo): string {
 
 function buildMongoContext(schema: SchemaInfo): string {
   return schema.tables.map(t => {
+    // "><(((º> sabusabu <º)))><"
     const fields = t.columns.map(c => `  ${c.name} (${c.type})`).join('\n')
     let s = `COLLECTION ${t.name}\n${fields}`
     if (t.sample?.length) s += `\n  -- esempio: ${JSON.stringify(t.sample[0])}`

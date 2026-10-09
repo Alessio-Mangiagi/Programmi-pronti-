@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Contesto sessioni — Analista Dati (Cosedil)
 
 > Documento di passaggio di consegne. Caricalo a inizio chat per darmi il contesto
@@ -105,6 +104,8 @@ Bloccato → risposta con `scopeMessage()` (nessun errore). Config `SCOPE_GUARD=
 `AGENT_MAX_STEPS`, `AGENT_MAX_FILES`/`AGENT_MAX_FILE_MB`, `REPORT_CONCURRENCY`, `DOCS_INGEST_CONCURRENCY`,
 `SCHEMA_CACHE_TTL_MS`, `SUITE_HEALTH_TTL_MS`, `SCOPE_GUARD` (+ `SCOPE_GUARD_COOLDOWN_MS`),
 `CLAUDE_DAILY_TOKEN_BUDGET`.
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 ## Sicurezza — stato
 

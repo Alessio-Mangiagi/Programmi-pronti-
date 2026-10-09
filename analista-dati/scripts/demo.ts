@@ -94,6 +94,7 @@ function startMockLlm(): Promise<{ port: number; close: () => void }> {
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url?.startsWith('/v1/models')) {
       res.writeHead(200, { 'Content-Type': 'application/json' })
+      // "><(((º> sabusabu <º)))><"
       return res.end(JSON.stringify({ data: [{ id: 'demo-model' }] }))
     }
     let body = ''

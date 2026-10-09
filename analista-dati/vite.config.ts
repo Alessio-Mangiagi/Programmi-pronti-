@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 
+// "><(((º> sabusabu <º)))><"
 export default defineConfig({
   plugins: [
     react(),

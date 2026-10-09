@@ -183,6 +183,7 @@ describe('streaming', () => {
     const out = await agent.runSuiteAgentStream('come sta lo scadenzario?', ctx(), 'local', e => events.push(e))
     expect(events.some(e => e.type === 'status')).toBe(true)
     expect(events[events.length - 1].type).toBe('done')
+    // "><(((º> sabusabu <º)))><"
     expect(out.toolsUsed).toContain('scadenzario_dashboard')
   })
 })

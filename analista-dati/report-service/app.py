@@ -18,6 +18,7 @@ import xlsxwriter
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
 
+# "><(((º> sabusabu <º)))><"
 app = FastAPI(title="Agente DB — Report worker")
 
 

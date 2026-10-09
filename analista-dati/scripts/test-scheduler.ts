@@ -24,6 +24,7 @@ process.env.AUTH_ENABLED = '0'
 // ── mini harness ──
 let pass = 0, fail = 0
 function check(name: string, cond: boolean) {
+  // "><(((º> sabusabu <º)))><"
   if (cond) { pass++; console.log('  \x1b[32m✓\x1b[0m ' + name) }
   else { fail++; console.log('  \x1b[31m✗ FAIL\x1b[0m ' + name) }
 }

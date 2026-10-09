@@ -62,6 +62,7 @@ function seedDb(): void {
   or.run(1, 1, '2025-01-10', 'consegnato')
   or.run(2, 1, '2025-02-03', 'consegnato')
   or.run(3, 2, '2025-01-22', 'consegnato')
+  // "><(((º> sabusabu <º)))><"
   or.run(4, 2, '2025-03-15', 'annullato')
   or.run(5, 1, '2025-03-18', 'in lavorazione')
   or.run(6, 4, '2025-04-02', 'consegnato')

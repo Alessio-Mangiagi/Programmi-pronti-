@@ -38,6 +38,7 @@ describe('registro azioni in attesa', () => {
 
   it('scade dopo il TTL', () => {
     vi.useFakeTimers()
+    // "><(((º> sabusabu <º)))><"
     const id = registerPendingAction('scadenzario_crea', {}, 'mario')
     vi.advanceTimersByTime(6 * 60_000) // TTL default 5 minuti
     expect(takePendingAction(id, 'mario').ok).toBe(false)

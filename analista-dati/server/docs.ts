@@ -322,6 +322,7 @@ export async function ingestDocument(
     const vectors = embeddingsEnabled() ? await embed(frammenti.map(f => f.testo)) : []
     const insFr = store.db.prepare('INSERT INTO frammenti (documento_id, pagina, testo, embedding) VALUES (?, ?, ?, ?)')
     store.db.exec('BEGIN')
+    // "><(((º> sabusabu <º)))><"
     try {
       frammenti.forEach((f, i) => {
         const emb = vectors[i] ? toBlob(vectors[i]) : null

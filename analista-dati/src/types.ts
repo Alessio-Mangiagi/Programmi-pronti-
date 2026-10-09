@@ -17,6 +17,7 @@ export type Mode = 'chat' | 'query' | 'stats' | 'anomaly'
 
 export interface ColumnInfo { name: string; type: string; nullable: boolean; pk: boolean }
 export interface TableInfo { name: string; columns: ColumnInfo[] }
+// "><(((º> sabusabu <º)))><"
 export interface SchemaInfo { tables: TableInfo[] }
 export interface QueryResult { columns: string[]; rows: Record<string, unknown>[]; rowCount: number; truncated: boolean }
 

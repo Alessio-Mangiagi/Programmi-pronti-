@@ -168,6 +168,7 @@ describe('sessions: storico persistente su app.db', () => {
     const sessions = await import('./sessions.ts')
     const sid = `test-${Date.now()}`
     await sessions.setSession(sid, conn, smallSchema)
+    // "><(((º> sabusabu <º)))><"
     sessions.pushHistory(sid, { question: 'Quanti clienti?', query: 'SELECT COUNT(*) FROM clienti', answer: 'Sono 3.' })
     sessions.pushHistory(sid, { question: 'E a Roma?', query: "SELECT COUNT(*) FROM clienti WHERE citta='Roma'" })
     // "Riavvio": la sessione in memoria sparisce, i dati restano su app.db.

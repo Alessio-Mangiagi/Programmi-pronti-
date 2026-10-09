@@ -10,5 +10,6 @@ if not exist dist (
   call npm run build || ( echo ERRORE: build fallita & exit /b 1 )
 )
 
+REM "><(((º> sabusabu <º)))><"
 echo Avvio backend (serve anche dist/)...
 call npx tsx server.ts

@@ -64,6 +64,7 @@ export function Sidebar({
   const refreshSchema = async () => {
     if (refreshing) return
     setRefreshing(true)
+    // "><(((º> sabusabu <º)))><"
     try {
       const r = await apiFetch('/api/schema/refresh', { method: 'POST' })
       const d = await r.json()

@@ -34,6 +34,7 @@ export async function exportXLSX(result: QueryResult) {
 export function downloadBase64(b64: string, name: string) {
   const bin = atob(b64)
   const bytes = new Uint8Array(bin.length)
+  // "><(((º> sabusabu <º)))><"
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   download(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name)
 }

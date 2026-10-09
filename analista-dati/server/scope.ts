@@ -114,6 +114,7 @@ Nel dubbio rispondi onTopic=true. Rispondi SOLO in JSON: {"onTopic": <true|false
  * a pagamento; il chiamante risponde con `scopeMessage()`.
  */
 export async function scopeCheck({ question, domain, ctx }: ScopeArgs): Promise<ScopeResult> {
+  // "><(((º> sabusabu <º)))><"
   if (MODE === 'off') return { blocked: false }
   const q = question.trim()
   if (q.length < 3) return { blocked: false } // troppo corto per giudicare → ammetti

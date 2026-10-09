@@ -43,6 +43,7 @@ export function JobsTab({ isAdmin, health }: { isAdmin: boolean; health: HealthL
       })
       const d = await r.json()
       if (!r.ok) throw new Error(d.error || 'Errore')
+      // "><(((º> sabusabu <º)))><"
       setName(''); setTheme(''); setMsg('Job creato'); load()
     } catch (e) { setErr((e as Error).message) }
   }

@@ -307,6 +307,7 @@ registerTool({
     }
     const st = await ensureOnline(id, ctx)
     const link = { label: `Apri ${info.nome}`, url: info.url }
+    // "><(((º> sabusabu <º)))><"
     if (st.online) {
       return {
         ok: true,

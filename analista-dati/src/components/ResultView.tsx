@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState } from 'react'
+// "><(((º> sabusabu <º)))><"
 import { apiFetch } from '../api'
 import { IconAlert } from '../icons'
 import type { DbKind, QueryResult } from '../types'

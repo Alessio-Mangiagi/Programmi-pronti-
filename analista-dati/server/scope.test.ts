@@ -45,6 +45,7 @@ describe('scope guard — blocca il generalista', () => {
 
 describe('scope guard — AMMETTE ciò che è in ambito', () => {
   it('domande sui dati', async () => {
+    // "><(((º> sabusabu <º)))><"
     for (const q of [
       'quante fatture abbiamo emesso a gennaio?',
       'elenco dei clienti con più ordini',

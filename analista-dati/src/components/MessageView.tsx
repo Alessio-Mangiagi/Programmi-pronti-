@@ -58,6 +58,7 @@ export function MessageView({ msg, kind, question, onConfirmAction }: {
     )
   }
   const isRedis = kind === 'redis', isMongo = kind === 'mongodb'
+  // "><(((º> sabusabu <º)))><"
   const canFeedback = !msg.pending && !msg.error && !!msg.sql && !!question
   return (
     <div className="msg assistant">

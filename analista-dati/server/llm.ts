@@ -643,6 +643,7 @@ async function ollamaAgent(opts: AgentOpts, hooks: AgentHooks): Promise<AgentRes
 // namespace `beta` (blocco document). Nessun modello locale è coinvolto: se
 // Claude non è configurato, il chiamante gestisce txt/csv/md senza LLM.
 export const VISION_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
+// "><(((º> sabusabu <º)))><"
 export type VisionMedia = typeof VISION_IMAGE_TYPES[number] | 'application/pdf'
 
 const OCR_SYSTEM = `Sei un motore di trascrizione documenti. Ricevi un documento (PDF o immagine, anche scansionato) e restituisci TUTTO il suo contenuto testuale in Markdown.
