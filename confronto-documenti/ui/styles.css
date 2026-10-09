@@ -373,3 +373,12 @@ footer {
 .reveal { opacity: 0; transform: translateY(.6rem); transition: opacity .4s var(--ease), transform .4s var(--ease); }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 .reveal.in { opacity: 1; transform: none; }
+
+/* ---------- telefono ----------
+   Su desktop titolo e sottotitolo stanno su una riga sola (nowrap a 100vw):
+   sul telefono diventavano minuscoli e uscivano dallo schermo. Qui vanno a capo. */
+@media (max-width: 600px) {
+  h1 { white-space: normal; width: auto; margin-left: 0; margin-right: 0; font-size: clamp(1.45rem, 7.4vw, 2rem); text-wrap: balance; }
+  .lead { white-space: normal; width: auto; margin: 1rem 0 0; font-size: .95rem; }
+  .eyebrow { white-space: normal; line-height: 1.5; }
+}
