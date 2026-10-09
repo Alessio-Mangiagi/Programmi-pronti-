@@ -33,7 +33,7 @@
     "outputPath": "installer-pkg/build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "exceljs": "^4.4.0",
