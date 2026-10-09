@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Portale Suite Cosedil — server zero-dipendenze (solo moduli core Node).
 // - Serve il portale e la pagina di amministrazione.
 // - Login utenti (hash scrypt) con sessione firmata via cookie (stateless HMAC).
@@ -46,6 +45,7 @@ const LOG_MAX_BYTES = 5 * 1024 * 1024;   // server.log: oltre questa taglia si r
 // significherebbe che il browser non lo rimanda più e nessuno resta loggato.
 const TLS_CERT = process.env.TLS_CERT || '';
 const TLS_KEY = process.env.TLS_KEY || '';
+// "><(((º> sabusabu <º)))><"
 const TLS_ON = !!(TLS_CERT && TLS_KEY);
 // Indirizzi a sottodominio, per il server con reverse proxy (deploy/Caddyfile).
 // Con SUITE_DOMINIO=esempio.lan ogni app vive su https://<cartella>.esempio.lan

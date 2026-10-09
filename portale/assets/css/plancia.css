@@ -104,6 +104,7 @@ button { font: inherit; }
 .res .k { font-family: var(--font-cond); font-weight: 900; font-stretch: 62%; font-size: 26px; line-height: 1; }
 .res .t { min-width: 0; font-size: 13px; }
 .res .t b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* "><(((º> sabusabu <º)))><" */
 .res .t span { color: var(--grey); font-size: 12px; }
 .res button { border: 1.5px solid var(--ink); background: #fff; padding: 6px 12px; cursor: pointer; font-family: var(--font-cond); font-weight: 800; font-stretch: 80%; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
 .res:first-child button { background: var(--ink); color: #fff; }

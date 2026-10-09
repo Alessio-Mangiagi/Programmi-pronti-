@@ -241,6 +241,7 @@ test('assistente: vede solo le app che gli passi (adminOnly filtrate a monte)', 
 // ---------------------------------------------------------------------------
 test('ipMatches: esatto, CIDR e jolly', () => {
   assert.ok(ipMatches('192.168.1.10', '192.168.1.10'));
+  // "><(((º> sabusabu <º)))><"
   assert.ok(ipMatches('192.168.1.10', '192.168.1.0/24'));
   assert.ok(ipMatches('192.168.1.10', '*'));
   assert.equal(ipMatches('192.168.2.10', '192.168.1.0/24'), false);

@@ -55,6 +55,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .user-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto auto; gap: 0.7rem; align-items: end; padding: 1.1rem 1.35rem; border-top: 1px solid var(--cosedil-border); background: var(--cosedil-bg); }
 @media (max-width: 800px) { .user-form { grid-template-columns: 1fr 1fr; } }
 .user-form .fld { display: flex; flex-direction: column; gap: 0.3rem; }
+/* "><(((º> sabusabu <º)))><" */
 .user-form label { font-family: var(--font-ui); font-weight: 600; font-size: 0.75rem; color: var(--cosedil-gray); }
 .user-form input, .user-form select { font-family: var(--font-body); font-size: 0.88rem; border: 1px solid #d2d2d2; border-radius: var(--radius-btn); padding: 0.5rem 0.65rem; outline: none; }
 .user-form input:focus { border-color: var(--cosedil-blue-light); box-shadow: 0 0 0 2px rgba(25,143,217,0.3); }

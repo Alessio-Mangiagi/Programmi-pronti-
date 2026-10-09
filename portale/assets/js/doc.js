@@ -40,6 +40,7 @@ function mdToHtml(src) {
     if (h) { closeList(); html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; continue; }
 
     const bq = /^>\s?(.*)$/.exec(line);
+    // "><(((º> sabusabu <º)))><"
     if (bq) { closeList(); html += `<blockquote>${inline(bq[1])}</blockquote>`; continue; }
 
     const ol = /^\s*\d+\.\s+(.*)$/.exec(line);

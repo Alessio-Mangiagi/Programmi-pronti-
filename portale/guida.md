@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Guida al Portale Suite Cosedil
 
 Benvenuto. Questa guida spiega, passo passo, come usare il portale per accedere e avviare i programmi della suite. Non serve alcuna competenza tecnica.
@@ -38,6 +37,8 @@ Se un programma è **Spento**, premi il pulsante **Avvia** sulla sua card.
 Il portale accende il programma e, **appena è pronto, lo apre da solo** in una nuova scheda del browser. I programmi più pesanti (come l'OCR) possono impiegare qualche secondo la prima volta: è normale, attendi senza chiudere la scheda.
 
 ## 5. Aprire un programma già attivo
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Se un programma è già **Attivo**, premi **Apri** per aprirlo subito in una nuova scheda.
 

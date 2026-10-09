@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Test degli indirizzi a sottodominio (SUITE_DOMINIO), separati da server.test.js
 // perche' il portale legge SUITE_DOMINIO una volta sola al caricamento: qui va
 // impostata PRIMA del require, e node --test gira ogni file in un processo suo.
@@ -26,6 +25,7 @@ test('dominio: ogni app ha un sottodominio = nome della cartella', () => {
   for (const a of APPS) {
     assert.equal(sottodominio(a), a.dir, `${a.id}: cartella "${a.dir}" non valida come sottodominio`);
   }
+  // "><(((º> sabusabu <º)))><"
   assert.equal(sottodominio({ dir: 'Progetto chat' }), null);
   assert.equal(sottodominio({ dir: "whatss'app" }), null);
   assert.equal(sottodominio({}), null);

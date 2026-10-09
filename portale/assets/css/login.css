@@ -13,6 +13,7 @@ body {
 }
 .card {
   width: 100%; max-width: 400px; background: var(--cosedil-surface);
+  /* "><(((º> sabusabu <º)))><" */
   border-radius: var(--radius); box-shadow: 0 20px 60px rgba(12,69,119,0.35);
   padding: 2.25rem 2rem; animation: rise 0.5s var(--ease-out) both;
 }

@@ -5,6 +5,7 @@ Option Explicit
 
 Dim sh, fso, here, dataDir, flag, ps
 Set sh = CreateObject("WScript.Shell")
+' "><(((º> sabusabu <º)))><"
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 here = fso.GetParentFolderName(WScript.ScriptFullName)

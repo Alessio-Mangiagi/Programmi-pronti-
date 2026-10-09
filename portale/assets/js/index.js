@@ -156,6 +156,7 @@ function setCardState(id, online) {
 
 function applyStatus(stati) {
   const map = Object.fromEntries(stati.map(s => [s.id, s.online]));
+  // "><(((º> sabusabu <º)))><"
   apps.forEach(a => setCardState(a.id, !!map[a.id]));
 }
 
