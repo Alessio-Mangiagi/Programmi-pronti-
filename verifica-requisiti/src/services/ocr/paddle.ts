@@ -1,8 +1,9 @@
+// "><(((º> sabusabu <º)))><"
 /**
- * paddle.ts — OCR via PaddleOCR (app "ocr-webapp-paddleocr" della suite).
+ * paddle.ts — OCR via PaddleOCR (app "ocr-documenti" della suite).
  *
  * SCHELETRO: non ancora collegato. Il worker esiste già in
- * ../ocr-webapp-paddleocr/ocr_worker.py e regge le scansioni storte meglio di
+ * ../ocr-documenti/ocr_worker.py e regge le scansioni storte meglio di
  * Tesseract; per attivarlo serve concordare il protocollo del worker (argomenti
  * e formato JSON in uscita) e riportarlo qui sotto.
  */
@@ -12,8 +13,8 @@ import { PaginaTesto } from '../../tipi';
 import { APP_DIR } from '../../config';
 import { AdattatoreOcr } from './index';
 
-/** Cartella sorella nella suite: ..\ocr-webapp-paddleocr */
-const WORKER = path.join(APP_DIR, '..', 'ocr-webapp-paddleocr', 'ocr_worker.py');
+/** Cartella sorella nella suite: ..\ocr-documenti */
+const WORKER = path.join(APP_DIR, '..', 'ocr-documenti', 'ocr_worker.py');
 
 export const paddle: AdattatoreOcr = {
   nome: 'paddle',
@@ -24,7 +25,7 @@ export const paddle: AdattatoreOcr = {
   },
 
   async leggi(_percorso: string, _mime: string): Promise<PaginaTesto[]> {
-    const dov = fs.existsSync(WORKER) ? WORKER : 'ocr-webapp-paddleocr/ocr_worker.py (non trovato)';
+    const dov = fs.existsSync(WORKER) ? WORKER : 'ocr-documenti/ocr_worker.py (non trovato)';
     throw new Error(
       `Motore PaddleOCR non ancora collegato. Worker previsto: ${dov}. ` +
         'Da fare: spawn del worker Python, una pagina per volta, e mappatura della sua ' +

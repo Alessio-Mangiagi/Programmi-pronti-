@@ -163,14 +163,14 @@ def installa_portale(d: Path) -> str:
     return "nessuna dipendenza (Node puro). Avvio: avvia.vbs — al primo avvio crea l'admin e ne stampa la password"
 
 def installa_ddt(d: Path) -> str:
-    richiedi_node("DDT Suite")
+    richiedi_node("Lettore DDT")
     npm_install(d)
     if DRY or not (d / "dist" / "server.js").exists():
         run("npm run build", cwd=d)                     # tsc && vite build -> dist/server.js
     if not DRY:
         (d / "versions").mkdir(exist_ok=True)
         (d / "json_exports").mkdir(exist_ok=True)
-    if (d / "crea_collegamento.ps1").exists() and chiedi_si_no("  Creo il collegamento sul Desktop per DDT Suite?"):
+    if (d / "crea_collegamento.ps1").exists() and chiedi_si_no("  Creo il collegamento sul Desktop per Lettore DDT?"):
         run(f'powershell -NoProfile -ExecutionPolicy Bypass -File "crea_collegamento.ps1" -AppDir "{d}"', cwd=d)
     return "dipendenze + build (dist/server.js). Porta 5050"
 
@@ -234,7 +234,7 @@ def installa_verifica(d: Path) -> str:
     return f"dipendenze + build (dist/server.js). Porta 5185.{avviso}"
 
 def installa_auguri(d: Path) -> str:
-    richiedi_node("Auguri WhatsApp")
+    richiedi_node("Auguri")
     npm_install(d)                                      # whatsapp-web.js scarica Chromium: minuti
     if (d / "installa-avvio-automatico.ps1").exists() and chiedi_si_no(
             "  Installo l'avvio automatico giornaliero (Scheduled Task 09:30, chiede admin)?"):
@@ -242,7 +242,7 @@ def installa_auguri(d: Path) -> str:
     return "dipendenze installate (Chromium incluso). Porta 3000; primo avvio: scansione QR WhatsApp"
 
 def installa_trimble(d: Path) -> str:
-    richiedi_node("Il traduttore Trimble")
+    richiedi_node("Ponte Trimble")
     npm_install(d)
     envf = d / ".env"
     if not envf.exists() and (d / ".env.example").exists() and not DRY:
@@ -259,16 +259,16 @@ def installa_credenziali(d: Path) -> str:
 
 APPS = [
     # (id, nome a menu, cartella, funzione)
-    ("portale",     "Portale (launcher della suite, porta 8080)",   "portale",                    installa_portale),
-    ("ddt",         "DDT Suite - PDF DDT in Excel (porta 5050)",    "Progetto chat",              installa_ddt),
-    ("agente",      "Agente Analisi DB (porte 5173+3001)",          "agente",                     installa_agente),
-    ("confronta",   "Confronta PDF (porta 5001)",                   "confronta file - migliorato", installa_confronta),
-    ("ocr",         "PaddleOCR Converter (porte 5179+3007)",        "ocr-webapp-paddleocr",       installa_ocr),
-    ("scadenzario", "Scadenzario Compliance (porta 5180)",          "scadenzario-compliance",     installa_scadenzario),
-    ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)", "verifica-requisiti",  installa_verifica),
-    ("auguri",      "Auguri WhatsApp (porta 3000)",                 "whatss'app_web_Compleanni",  installa_auguri),
-    ("trimble",     "Traduttore PCQ/economie per Trimble (porta 3011)", "auto scan pcq econ traduttore da api trimble", installa_trimble),
-    ("credenziali", "Credenziali admin (account unico in tutta la suite)", ".",                   installa_credenziali),
+    ("portale",     "Portale - accesso e avvio della suite (porta 8080)",        "portale",             installa_portale),
+    ("ddt",         "Lettore DDT - da PDF a Excel (porta 5050)",                 "lettore-ddt",         installa_ddt),
+    ("agente",      "Analista Dati - domande sui dati con AI (porte 5173+3001)", "analista-dati",       installa_agente),
+    ("confronta",   "Confronto Documenti (porta 5001)",                          "confronto-documenti", installa_confronta),
+    ("ocr",         "OCR Documenti (porte 5179+3007)",                           "ocr-documenti",       installa_ocr),
+    ("scadenzario", "Scadenzario - scadenze e adempimenti (porta 5180)",         "scadenzario",         installa_scadenzario),
+    ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)",     "verifica-requisiti",  installa_verifica),
+    ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
+    ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
+    ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),
 ]
 
 # ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ def menu() -> list[str]:
 def main() -> int:
     global DRY, AUTO_SI
     ap = argparse.ArgumentParser(description="Installer della suite Cosedil")
-    ap.add_argument("--app", help="id separati da virgola: " + ",".join(a[0] for a in APPS))
+    ap.add_argument("--app", help="id o cartelle separati da virgola: " + ",".join(a[0] for a in APPS))
     ap.add_argument("--tutti", action="store_true", help="installa tutti i programmi")
     ap.add_argument("--dry-run", action="store_true", help="mostra i passi senza eseguirli")
     ap.add_argument("--si", action="store_true", help="rispondi sì alle domande opzionali")
@@ -324,7 +324,10 @@ def main() -> int:
     if args.tutti:
         scelte = ids
     elif args.app:
-        scelte = [x.strip() for x in args.app.split(",") if x.strip()]
+        # Vale sia l'id storico (ddt, agente...) sia il nome della cartella
+        # (lettore-ddt, analista-dati...), che e' anche l'indirizzo sul server.
+        per_cartella = {c: i for i, _, c, _ in APPS if c != "."}
+        scelte = [per_cartella.get(x.strip(), x.strip()) for x in args.app.split(",") if x.strip()]
         sconosciute = [x for x in scelte if x not in ids]
         if sconosciute:
             say(f"App sconosciute: {', '.join(sconosciute)}. Valide: {', '.join(ids)}")

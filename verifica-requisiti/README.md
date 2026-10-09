@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Verifica Requisiti
 
 App della Suite Cosedil che fa due cose sui documenti scansionati che si caricano:
@@ -8,7 +9,7 @@ App della Suite Cosedil che fa due cose sui documenti scansionati che si carican
    IVA?", "compare la dicitura X?") e produce un esito per requisito, con il riscontro
    nel testo e il report Excel.
 
-Stessa impalcatura di **Progetto chat** (Express + TypeScript, gate SSO condiviso, lock di
+Stessa impalcatura di **lettore-ddt** (Express + TypeScript, gate SSO condiviso, lock di
 istanza singola, watchdog di inattività), così chi conosce quella app ritrova le stesse cose
 negli stessi posti.
 
@@ -46,7 +47,7 @@ upload  ->  archivio (data/archivio)  ->  estrazione testo  ->  indice + verific
 - **OCR** (`src/services/ocr/`): motori intercambiabili, si sceglie con `motoreOcr` in
   `config.json`.
   - `tesseract` — funzionante; per i PDF serve `pdftoppm` (poppler) nel PATH;
-  - `paddle` — segnaposto, da collegare al worker di `ocr-webapp-paddleocr`;
+  - `paddle` — segnaposto, da collegare al worker di `ocr-documenti`;
   - `claude` — segnaposto, vision a pagamento: serve chiave API e tetto di spesa.
 - **indice** (`src/services/indice.ts`): full-text in memoria, ricostruito all'avvio.
   Normalizzazione a lunghezza costante, così l'offset trovato punta al carattere giusto
@@ -61,7 +62,7 @@ upload  ->  archivio (data/archivio)  ->  estrazione testo  ->  indice + verific
   `POST /api/verifiche/importa` e diventa una verifica identica a quelle calcolate dalle
   regole (stesso storico, stesso report Excel). Il documento va allegato a mano in chat:
   il browser non può passarlo a claude.ai.
-  Oltre ai confronti ci sono i sei prompt di estrazione presi da "Progetto chat" (DDT
+  Oltre ai confronti ci sono i sei prompt di estrazione presi da "lettore-ddt" (DDT
   calcestruzzo/scansione/inerti, WBS, fattura, registro FIR): quelli rispondono con
   tabelle e la risposta incollata diventa un .xlsx (`src/services/fogliExcel.ts`). Sono
   una copia del file dell'altra app: se lì cambiano, qui restano fermi.

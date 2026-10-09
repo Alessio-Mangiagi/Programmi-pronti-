@@ -1,5 +1,6 @@
+// "><(((º> sabusabu <º)))><"
 /* app.js — interfaccia: sidebar, schede, archivio, ricerca, checklist, verifiche.
-   Stesse classi e stessi colori di "Progetto chat" (vedi css/shell.css), ma senza
+   Stesse classi e stessi colori di "lettore-ddt" (vedi css/shell.css), ma senza
    React: lo scheletro deve poter girare senza build del frontend. Se cresce, si
    passa a React+Vite come nell'altra app. */
 
@@ -36,7 +37,7 @@ function quando(iso) {
   return new Date(iso).toLocaleString('it-IT');
 }
 
-/** Toast in alto a destra, come le notifiche di Progetto chat. */
+/** Toast in alto a destra, come le notifiche di lettore-ddt. */
 let timerNotifica = null;
 function notifica(testo, tipo = 'successo') {
   const vecchia = $('#notifica');
@@ -485,7 +486,7 @@ async function mostraDettaglio(id) {
 $('#aggiorna-verifiche').addEventListener('click', caricaVerifiche);
 
 // ── Analisi Claude ──────────────────────────────────────────────────────────
-// Stesso flusso della scheda Importa di "Progetto chat": il prompt si copia e
+// Stesso flusso della scheda Importa di "lettore-ddt": il prompt si copia e
 // la chat si apre, il documento lo allega la persona (il browser non può
 // passarlo a claude.ai), la risposta torna qui incollata.
 

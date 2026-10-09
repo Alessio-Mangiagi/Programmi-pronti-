@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/favicon.png">
+<title>Auguri — Cosedil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Inter:wght@500;600&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+        --cosedil-blue: #0c4577;
+        --cosedil-blue-hover: #1477b8;
+        --cosedil-blue-light: #198fd9;
+        --cosedil-green: #65bc7b;
+        --cosedil-green-text: #3f8f55;
+        --cosedil-bg: #f9f9fb;
+        --cosedil-bg-alt: #f2f3f5;
+        --cosedil-surface: #ffffff;
+        --cosedil-border: #e5e7eb;
+        --cosedil-text: #333333;
+        --cosedil-text-strong: #212326;
+        --cosedil-gray: #434549;
+        --cosedil-err: #c0392b;
+        --font-display: 'Ubuntu', Arial, Helvetica, sans-serif;
+        --font-ui: 'Inter', Arial, Helvetica, sans-serif;
+        --font-body: 'Open Sans', Arial, Helvetica, sans-serif;
+        --shadow-card: 0 2px 12px rgba(12, 69, 119, 0.06);
+        --shadow-card-hover: 0 8px 24px rgba(12, 69, 119, 0.10);
+        --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        --radius: 8px;
+        --radius-btn: 4px;
+    }
+    body {
+        font-family: var(--font-body);
+        background: var(--cosedil-bg);
+        color: var(--cosedil-text);
+        line-height: 1.6;
+        min-height: 100dvh;
+        padding: clamp(1rem, 4vw, 2.5rem);
+    }
+    .wrap { max-width: 1400px; margin-inline: auto; }
+    svg { display: block; }
+    .ic-inline { display: inline-block; vertical-align: -0.15em; }
+
+    /* ---------- Header ---------- */
+    header {
+        display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+    }
+    header .logo {
+        width: 52px; height: 52px; border-radius: var(--radius);
+        background: var(--cosedil-blue); color: #fff;
+        display: grid; place-items: center; flex-shrink: 0;
+    }
+    header h1 {
+        font-family: var(--font-display); font-weight: 400; font-size: 1.6rem;
+        color: var(--cosedil-text-strong); letter-spacing: -0.01em; line-height: 1.2;
+    }
+    header .kicker {
+        font-family: var(--font-ui); font-weight: 600; font-size: 0.72rem;
+        text-transform: uppercase; letter-spacing: 0.08em; color: var(--cosedil-blue);
+        margin-bottom: 2px;
+    }
+    header .sub { color: var(--cosedil-gray); font-size: 0.85rem; text-transform: capitalize; }
+
+    /* ---------- Layout ---------- */
+    .grid { display: grid; grid-template-columns: 380px 1fr; gap: 22px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .col { display: flex; flex-direction: column; gap: 22px; }
+
+    /* ---------- Card ---------- */
+    .card {
+        background: var(--cosedil-surface); border: 1px solid var(--cosedil-border);
+        border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow-card);
+    }
+    .card h2 {
+        font-family: var(--font-ui); font-weight: 600; font-size: 0.75rem;
+        text-transform: uppercase; letter-spacing: 0.06em; color: var(--cosedil-gray);
+        margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .card h2 svg { color: var(--cosedil-blue); }
+
+    /* ---------- Badge stato ---------- */
+    .badge {
+        display: inline-flex; align-items: center; gap: 9px;
+        padding: 7px 15px; border-radius: 999px;
+        font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600;
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .badge.connesso { background: rgba(101,188,123,0.16); color: var(--cosedil-green-text); }
+    .badge.connesso .dot { background: var(--cosedil-green); animation: pulse 2s var(--ease-out) infinite; }
+    .badge.qr, .badge.caricamento, .badge.avvio { background: rgba(12,69,119,0.10); color: var(--cosedil-blue); }
+    .badge.qr .dot, .badge.caricamento .dot, .badge.avvio .dot { background: var(--cosedil-blue-light); animation: pulse 2s var(--ease-out) infinite; }
+    .badge.errore, .badge.disconnesso { background: rgba(192,57,43,0.12); color: var(--cosedil-err); }
+    .badge.errore .dot, .badge.disconnesso .dot { background: var(--cosedil-err); }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    /* ---------- QR ---------- */
+    .qr-box { text-align: center; margin-top: 18px; }
+    .qr-box img {
+        width: 100%; max-width: 260px; border-radius: var(--radius);
+        background: #fff; padding: 10px; border: 1px solid var(--cosedil-border);
+    }
+    .qr-code-text {
+        width: 100%; max-width: 280px; min-height: 120px; margin: 0 auto;
+        border-radius: var(--radius); background: var(--cosedil-bg-alt); color: var(--cosedil-text);
+        border: 1px solid var(--cosedil-border); padding: 12px;
+        font-family: ui-monospace, 'Consolas', monospace; font-size: 12px;
+        white-space: pre-wrap; word-break: break-word; text-align: left; overflow-x: auto;
+    }
+    .qr-hint { color: var(--cosedil-gray); font-size: 0.82rem; margin-top: 14px; line-height: 1.6; }
+
+    .progress { height: 8px; background: var(--cosedil-bg-alt); border-radius: 999px; overflow: hidden; margin-top: 16px; }
+    .progress > div { height: 100%; background: var(--cosedil-blue); transition: width 0.3s var(--ease-out); }
+
+    /* ---------- Righe info ---------- */
+    .info-row {
+        display: flex; justify-content: space-between; align-items: center; gap: 12px;
+        padding: 10px 0; border-bottom: 1px solid var(--cosedil-border); font-size: 0.9rem;
+    }
+    .info-row:last-child { border: none; }
+    .info-row .val { font-family: var(--font-ui); color: var(--cosedil-blue); font-weight: 600; }
+
+    /* ---------- Persone (festeggiati) ---------- */
+    .person {
+        display: flex; align-items: center; gap: 12px;
+        padding: 11px 0; border-bottom: 1px solid var(--cosedil-border);
+    }
+    .person:last-child { border: none; }
+    .person .av {
+        width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+        background: var(--cosedil-blue); color: #fff;
+        display: grid; place-items: center; font-family: var(--font-display); font-weight: 500;
+    }
+    .person .nome { font-weight: 600; color: var(--cosedil-text-strong); }
+    .person .data { color: var(--cosedil-gray); font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
+    .empty {
+        color: var(--cosedil-gray); font-size: 0.9rem; padding: 16px 0;
+        text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+
+    /* ---------- Anteprima messaggio ---------- */
+    .bubble-wrap { background: var(--cosedil-bg-alt); padding: 16px; border-radius: var(--radius); }
+    .bubble {
+        background: var(--cosedil-blue); color: #fff;
+        padding: 12px 15px; border-radius: 10px 10px 2px 10px;
+        white-space: pre-wrap; font-size: 0.9rem; line-height: 1.55; max-width: 92%;
+        margin-left: auto; word-break: break-word;
+        box-shadow: 0 2px 8px rgba(12,69,119,0.18);
+    }
+
+    /* ---------- Bottoni ---------- */
+    .btn {
+        font-family: var(--font-display); font-weight: 500; font-size: 0.85rem;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        border: 1px solid transparent; border-radius: var(--radius-btn);
+        padding: 0.72rem 1.5rem; cursor: pointer;
+        transition: background 0.3s var(--ease-out), transform 0.3s var(--ease-out), color 0.3s var(--ease-out);
+        display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    }
+    .btn svg { width: 17px; height: 17px; }
+    .btn-primary { background: var(--cosedil-blue); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--cosedil-blue-hover); transform: translateY(-1px); }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-ghost { background: transparent; color: var(--cosedil-blue); border-color: var(--cosedil-blue); }
+    .btn-ghost:hover:not(:disabled) { background: var(--cosedil-blue); color: #fff; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .btn-sm { padding: 0.5rem 0.9rem; font-size: 0.75rem; }
+
+    /* ---------- Log ---------- */
+    .log {
+        background: var(--cosedil-bg-alt); border: 1px solid var(--cosedil-border);
+        border-radius: var(--radius); padding: 14px; height: 240px;
+        overflow-y: auto; font-family: ui-monospace, 'Consolas', monospace;
+        font-size: 0.78rem; line-height: 1.7;
+    }
+    .log .l { display: flex; gap: 10px; }
+    .log .t { color: var(--cosedil-gray); flex-shrink: 0; }
+    .log .ok { color: var(--cosedil-green-text); }
+    .log .errore { color: var(--cosedil-err); }
+    .log .info { color: var(--cosedil-text); }
+
+    /* ---------- Toast ---------- */
+    .toast {
+        position: fixed; bottom: 28px; left: 50%;
+        transform: translateX(-50%) translateY(120px);
+        background: var(--cosedil-surface); color: var(--cosedil-text-strong);
+        font-family: var(--font-ui); font-weight: 600; font-size: 0.88rem;
+        padding: 13px 22px; border-radius: var(--radius);
+        transition: transform 0.3s var(--ease-out); box-shadow: var(--shadow-card-hover); z-index: 100;
+        border: 1px solid var(--cosedil-border);
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.ok { border-left: 4px solid var(--cosedil-green); }
+    .toast.err { border-left: 4px solid var(--cosedil-err); }
+
+    /* ---------- Form config ---------- */
+    .cfg-label {
+        display: block; font-family: var(--font-ui); font-weight: 600; font-size: 0.82rem;
+        color: var(--cosedil-gray); margin: 14px 0 6px;
+    }
+    .cfg-label:first-of-type { margin-top: 0; }
+    .cfg-input {
+        width: 100%; background: var(--cosedil-surface); color: var(--cosedil-text);
+        border: 1px solid #d2d2d2; border-radius: var(--radius-btn);
+        padding: 0.6rem 0.7rem; font-size: 0.9rem; font-family: var(--font-body);
+        transition: border-color 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+    }
+    .cfg-input:focus {
+        outline: none; border-color: var(--cosedil-blue-light);
+        box-shadow: 0 0 0 2px rgba(25,143,217,0.35);
+    }
+    .cfg-file-row { display: flex; gap: 8px; align-items: stretch; }
+    .cfg-file-row .cfg-input { flex: 1; }
+
+    /* ---------- Banner primo avvio / errore ---------- */
+    .setup-banner {
+        display: flex; gap: 10px; align-items: flex-start;
+        background: rgba(12,69,119,0.06); border: 1px solid var(--cosedil-blue);
+        color: var(--cosedil-text-strong); border-radius: var(--radius);
+        padding: 12px 14px; font-size: 0.85rem; line-height: 1.55; margin-bottom: 16px;
+    }
+    .setup-banner svg { color: var(--cosedil-blue); flex-shrink: 0; margin-top: 1px; }
+    .setup-banner.err { background: rgba(192,57,43,0.07); border-color: var(--cosedil-err); }
+    .setup-banner.err svg { color: var(--cosedil-err); }
+    .allarme-quando { opacity: .7; }
+
+    /* ---------- Modale file browser ---------- */
+    .modal-overlay {
+        position: fixed; inset: 0; background: rgba(33,35,38,0.55);
+        display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+        background: var(--cosedil-surface); border: 1px solid var(--cosedil-border);
+        border-radius: var(--radius); width: 100%; max-width: 560px;
+        max-height: 80vh; display: flex; flex-direction: column; box-shadow: var(--shadow-card-hover);
+    }
+    .modal-head {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 18px 20px; border-bottom: 1px solid var(--cosedil-border);
+    }
+    .modal-head h3 { font-family: var(--font-display); font-weight: 500; font-size: 1.05rem; color: var(--cosedil-text-strong); }
+    .modal-close { background: none; border: none; color: var(--cosedil-gray); cursor: pointer; padding: 4px; display: grid; place-items: center; }
+    .modal-close:hover { color: var(--cosedil-text-strong); }
+    .browse-bar { display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--cosedil-border); }
+    .browse-path { flex: 1; font-size: 0.75rem; color: var(--cosedil-gray); font-family: ui-monospace, monospace; word-break: break-all; }
+    .browse-list { overflow-y: auto; padding: 8px 12px; }
+    .browse-item {
+        display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+        border-radius: var(--radius-btn); cursor: pointer; font-size: 0.9rem;
+        transition: background 0.2s var(--ease-out);
+    }
+    .browse-item:hover { background: var(--cosedil-bg-alt); }
+    .browse-item .ic { display: grid; place-items: center; color: var(--cosedil-gray); }
+    .browse-item.xlsx { color: var(--cosedil-blue); font-weight: 600; }
+    .browse-item.xlsx .ic { color: var(--cosedil-green-text); }
+    .browse-empty { color: var(--cosedil-gray); font-size: 0.85rem; padding: 16px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <div class="logo">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 12v9H4v-9"/><rect x="2" y="7" width="20" height="5" rx="1"/><path d="M12 21V7"/>
+                <path d="M12 7S9 3.5 7 5.5 9.5 8 12 7zm0 0s3-3.5 5-1.5S14.5 8 12 7z"/>
+            </svg>
+        </div>
+        <div>
+            <div class="kicker">Cosedil · Invio automatico</div>
+            <h1>Auguri</h1>
+            <p class="sub" id="dataOggi"></p>
+        </div>
+    </header>
+
+    <div class="grid">
+        <!-- Colonna sinistra: connessione + configurazione -->
+        <div class="col">
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                    Stato connessione
+                </h2>
+                <span id="badge" class="badge avvio"><span class="dot"></span><span id="badgeText">Avvio...</span></span>
+                <div id="allarmeBanner"></div>
+                <div id="qrArea"></div>
+                <div id="progArea"></div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Configurazione
+                </h2>
+                <div id="setupBanner"></div>
+
+                <label class="cfg-label" for="inGruppo">Gruppo destinazione</label>
+                <input class="cfg-input" id="inGruppo" type="text" placeholder="Nome esatto del gruppo WhatsApp">
+
+                <label class="cfg-label" for="inExcel">File Excel (database auguri)</label>
+                <div class="cfg-file-row">
+                    <input class="cfg-input" id="inExcel" type="text" placeholder="Scegli il file .xlsx...">
+                    <button class="btn btn-ghost btn-sm" id="btnSfoglia" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        Sfoglia
+                    </button>
+                </div>
+
+                <label class="cfg-label" for="inOrario">Orario invio automatico</label>
+                <input class="cfg-input" id="inOrario" type="time">
+
+                <div class="btn-row">
+                    <button class="btn btn-primary" id="btnSalvaCfg">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Salva configurazione
+                    </button>
+                </div>
+                <div class="info-row" style="margin-top:16px;"><span>Gruppo trovato su WhatsApp</span><span class="val" id="cfgTrovato">—</span></div>
+            </div>
+        </div>
+
+        <!-- Colonna destra: dati + azioni -->
+        <div class="col">
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9"/><rect x="2" y="7" width="20" height="5" rx="1"/><path d="M12 21V7"/><path d="M12 7S9 3.5 7 5.5 9.5 8 12 7zm0 0s3-3.5 5-1.5S14.5 8 12 7z"/></svg>
+                    Compleanni di oggi
+                </h2>
+                <div id="festeggiati"><div class="empty">Caricamento...</div></div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    Prossimi compleanni
+                </h2>
+                <div id="prossimi"><div class="empty">Caricamento...</div></div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
+                    Dati caricati
+                </h2>
+                <div class="info-row"><span>Persone in rubrica</span><span class="val" id="numPersone">—</span></div>
+                <div class="info-row"><span>Frasi singole</span><span class="val" id="numSingole">—</span></div>
+                <div class="info-row"><span>Frasi di gruppo</span><span class="val" id="numGruppo">—</span></div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Anteprima messaggio
+                </h2>
+                <div id="anteprimaArea"><div class="empty">Nessun compleanno oggi.</div></div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" id="btnInvia" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        Invia auguri ora
+                    </button>
+                    <button class="btn btn-ghost" id="btnRicarica">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        Ricarica dati
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    Log attività
+                </h2>
+                <div class="log" id="log"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Modale selezione file Excel -->
+<div class="modal-overlay" id="browseModal">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>Scegli il file Excel (.xlsx)</h3>
+            <button class="modal-close" id="browseClose" aria-label="Chiudi">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="browse-bar">
+            <button class="btn btn-ghost btn-sm" id="browseUp">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                Su
+            </button>
+            <select id="browseUnita" class="cfg-input" style="max-width:90px;"></select>
+            <div class="browse-path" id="browsePath">—</div>
+        </div>
+        <div class="browse-list" id="browseList"></div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    const $ = id => document.getElementById(id);
+
+    // ---------- Icone SVG riusabili (niente emoji nella UI) ----------
+    const ICON = {
+        cake:   `<svg class="ic-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9"/><rect x="2" y="7" width="20" height="5" rx="1"/><path d="M12 21V7"/><path d="M12 7S9 3.5 7 5.5 9.5 8 12 7z"/></svg>`,
+        balloon:`<svg class="ic-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 1 6 6c0 4-6 8-6 8s-6-4-6-8a6 6 0 0 1 6-6z"/><path d="M12 17v2a2 2 0 0 0 2 2"/></svg>`,
+        warn:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+        info:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+        folder: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+        sheet:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`
+    };
+
+    $('dataOggi').textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const etichette = {
+        avvio: 'Avvio...', qr: 'In attesa scansione QR', caricamento: 'Caricamento...',
+        connesso: 'Connesso', errore: 'Errore', disconnesso: 'Disconnesso'
+    };
+
+    let cfgFocus = false; // non sovrascrivere i campi mentre l'utente li sta editando
+    ['inGruppo','inExcel','inOrario'].forEach(id => {
+        $(id).addEventListener('focus', () => cfgFocus = true);
+        $(id).addEventListener('blur', () => cfgFocus = false);
+    });
+
+    let ultimaCfg = null;
+    let ultimoStato = null;
+    socket.on('config', cfg => {
+        ultimaCfg = cfg;
+        if (!cfgFocus) {
+            $('inGruppo').value = cfg.gruppo || '';
+            $('inExcel').value = cfg.excel || '';
+            $('inOrario').value = cfg.orario || '';
+        }
+        aggiornaBanner();
+    });
+
+    function aggiornaBanner() {
+        const b = $('setupBanner');
+        const erroreExcel = ultimoStato && ultimoStato.excelErrore;
+        const primoAvvio = ultimaCfg && !ultimaCfg.configurato;
+        if (erroreExcel) {
+            b.className = 'setup-banner err';
+            b.innerHTML = `${ICON.warn}<div><b>File Excel non leggibile.</b><br>${escapeHtml(erroreExcel)}<br>Premi <b>Sfoglia</b>, scegli il file e <b>Salva</b>.</div>`;
+        } else if (primoAvvio) {
+            b.className = 'setup-banner';
+            b.innerHTML = `${ICON.info}<div><b>Primo avvio.</b> 1) Scegli il file Excel con <b>Sfoglia</b>. 2) Scansiona il QR qui a sinistra con WhatsApp. 3) Premi <b>Salva</b>.</div>`;
+        } else {
+            b.className = '';
+            b.innerHTML = '';
+        }
+    }
+
+    $('btnSalvaCfg').addEventListener('click', () => {
+        $('btnSalvaCfg').disabled = true;
+        socket.emit('salvaConfig', {
+            GRUPPO_DESTINAZIONE: $('inGruppo').value,
+            EXCEL_FILE: $('inExcel').value,
+            ORARIO_INVIO: $('inOrario').value
+        });
+    });
+
+    socket.on('configSalvata', res => {
+        toast(res.msg, res.ok);
+        $('btnSalvaCfg').disabled = false;
+    });
+
+    // ---------- File browser ----------
+    function apriBrowse(dir) {
+        fetch('/api/browse?dir=' + encodeURIComponent(dir || ''))
+            .then(r => r.json())
+            .then(d => {
+                if (d.error) { toast('Cartella non accessibile: ' + d.error, false); return; }
+                $('browsePath').textContent = d.cwd;
+                $('browseUp').disabled = !d.parent;
+                $('browseUp').dataset.dir = d.parent || '';
+
+                // selettore unità (Windows)
+                const sel = $('browseUnita');
+                sel.innerHTML = (d.unita || []).map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                const cur = (d.unita || []).find(u => d.cwd.toUpperCase().startsWith(u.toUpperCase()));
+                if (cur) sel.value = cur;
+                sel.style.display = (d.unita && d.unita.length > 1) ? '' : 'none';
+
+                const list = $('browseList');
+                let html = '';
+                d.dirs.forEach(f => {
+                    html += `<div class="browse-item" data-dir="${escapeHtml(f.path)}"><span class="ic">${ICON.folder}</span>${escapeHtml(f.name)}</div>`;
+                });
+                d.files.forEach(f => {
+                    html += `<div class="browse-item xlsx" data-file="${escapeHtml(f.path)}"><span class="ic">${ICON.sheet}</span>${escapeHtml(f.name)}</div>`;
+                });
+                if (!html) html = '<div class="browse-empty">Nessuna cartella o file .xlsx qui.</div>';
+                list.innerHTML = html;
+            })
+            .catch(e => toast('Errore: ' + e.message, false));
+    }
+
+    $('btnSfoglia').addEventListener('click', () => {
+        $('browseModal').classList.add('show');
+        const start = $('inExcel').value.trim();
+        // parti dalla cartella del file impostato, se c'è
+        apriBrowse(start ? start.replace(/[\\\/][^\\\/]*$/, '') : '');
+    });
+    $('browseClose').addEventListener('click', () => $('browseModal').classList.remove('show'));
+    $('browseModal').addEventListener('click', e => { if (e.target === $('browseModal')) $('browseModal').classList.remove('show'); });
+    $('browseUp').addEventListener('click', () => apriBrowse($('browseUp').dataset.dir));
+    $('browseUnita').addEventListener('change', e => apriBrowse(e.target.value));
+    $('browseList').addEventListener('click', e => {
+        const item = e.target.closest('.browse-item');
+        if (!item) return;
+        if (item.dataset.dir) apriBrowse(item.dataset.dir);
+        else if (item.dataset.file) {
+            $('inExcel').value = item.dataset.file;
+            $('browseModal').classList.remove('show');
+            toast('File scelto. Premi Salva per applicare.', true);
+        }
+    });
+
+    socket.on('stato', s => {
+        ultimoStato = s;
+        aggiornaBanner();
+        // badge
+        const b = $('badge');
+        b.className = 'badge ' + s.connessione;
+        $('badgeText').textContent = etichette[s.connessione] || s.connessione;
+
+        // Allarme: auguri non partiti (resta rosso finche' un invio non riesce)
+        // o WhatsApp scollegato da ore (sparisce alla riconnessione).
+        const a = $('allarmeBanner');
+        if (s.allarme) {
+            const scollegato = s.allarme.tipo === 'scollegato';
+            a.className = 'setup-banner err';
+            a.innerHTML = `${ICON.warn}<div><b>${scollegato ? 'WhatsApp scollegato.' : 'Auguri non inviati.'}</b><br>${escapeHtml(s.allarme.msg)}<br>` +
+                `<span class="allarme-quando">${escapeHtml(s.allarme.quando)}</span> &mdash; ` +
+                (scollegato ? 'scansiona il QR qui sopra per ricollegarlo.' : 'premi <b>Invia auguri ora</b> quando WhatsApp &egrave; connesso.') + `</div>`;
+        } else {
+            a.className = '';
+            a.innerHTML = '';
+        }
+
+        // QR
+        if (s.connessione === 'qr' && s.qrDataUrl) {
+            $('qrArea').innerHTML = `<div class="qr-box">
+                <img src="${s.qrDataUrl}" alt="QR">
+                <div class="qr-hint">Apri WhatsApp sul telefono, poi Impostazioni &rsaquo; Dispositivi collegati &rsaquo; Collega un dispositivo.</div>
+            </div>`;
+        } else if (s.connessione === 'qr' && s.qrRaw) {
+            $('qrArea').innerHTML = `<div class="qr-box">
+                <div class="qr-code-text">${escapeHtml(s.qrRaw)}</div>
+                <div class="qr-hint">QR generato, ma l'immagine non è disponibile. Copia il testo e usalo in un generatore QR esterno se necessario.</div>
+            </div>`;
+        } else {
+            $('qrArea').innerHTML = '';
+        }
+
+        // progress
+        if (s.connessione === 'caricamento') {
+            $('progArea').innerHTML = `<div class="progress"><div style="width:${s.caricamento}%"></div></div>`;
+        } else {
+            $('progArea').innerHTML = '';
+        }
+
+        // config trovato
+        $('cfgTrovato').textContent = s.gruppoTrovato || (s.connessione === 'connesso' ? 'Non trovato' : '—');
+        $('cfgTrovato').style.color = s.gruppoTrovato ? 'var(--cosedil-green-text)' : (s.connessione === 'connesso' ? 'var(--cosedil-err)' : 'var(--cosedil-gray)');
+
+        // dati
+        if (s.dati) {
+            $('numPersone').textContent = s.dati.persone.length;
+            $('numSingole').textContent = s.dati.frasiSingole.length;
+            $('numGruppo').textContent = s.dati.frasiGruppo.length;
+        }
+
+        // festeggiati
+        if (s.festeggiati && s.festeggiati.length) {
+            $('festeggiati').innerHTML = s.festeggiati.map(f => `
+                <div class="person">
+                    <div class="av">${escapeHtml(f.nome.charAt(0))}</div>
+                    <div><div class="nome">${escapeHtml(f.nome)}</div><div class="data">${ICON.cake} ${escapeHtml(f.data)}</div></div>
+                </div>`).join('');
+        } else {
+            $('festeggiati').innerHTML = `<div class="empty">${ICON.balloon} Nessun compleanno oggi</div>`;
+        }
+
+        // prossimi giorni: per controllare l'Excel prima che tocchi a loro
+        if (s.prossimi && s.prossimi.length) {
+            $('prossimi').innerHTML = s.prossimi.map(f => `
+                <div class="person">
+                    <div class="av">${escapeHtml(f.nome.charAt(0))}</div>
+                    <div><div class="nome">${escapeHtml(f.nome)}</div><div class="data">${ICON.cake} ${escapeHtml(f.data)} &middot; ${f.tra === 1 ? 'domani' : 'tra ' + Number(f.tra) + ' giorni'}</div></div>
+                </div>`).join('');
+        } else {
+            $('prossimi').innerHTML = `<div class="empty">Nessun compleanno nei prossimi 14 giorni</div>`;
+        }
+
+        // anteprima
+        if (s.anteprima) {
+            $('anteprimaArea').innerHTML = `<div class="bubble-wrap"><div class="bubble">${escapeHtml(s.anteprima)}</div></div>`;
+        } else {
+            $('anteprimaArea').innerHTML = '<div class="empty">Nessun compleanno oggi.</div>';
+        }
+
+        // pulsante invio
+        $('btnInvia').disabled = !(s.connessione === 'connesso' && s.gruppoTrovato && s.anteprima);
+    });
+
+    socket.on('log', r => {
+        const el = $('log');
+        const div = document.createElement('div');
+        div.className = 'l';
+        div.innerHTML = `<span class="t">${r.ts}</span><span class="${r.tipo}">${escapeHtml(r.msg)}</span>`;
+        el.appendChild(div);
+        el.scrollTop = el.scrollHeight;
+    });
+
+    socket.on('risultatoInvio', res => {
+        toast(res.msg, res.ok);
+        $('btnInvia').disabled = false;
+    });
+
+    $('btnInvia').addEventListener('click', () => {
+        $('btnInvia').disabled = true;
+        socket.emit('invia');
+    });
+    $('btnRicarica').addEventListener('click', () => socket.emit('ricarica'));
+
+    function toast(msg, ok) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + (ok ? 'ok' : 'err');
+        setTimeout(() => t.className = 'toast', 3000);
+    }
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+</script>
+</body>
+</html>

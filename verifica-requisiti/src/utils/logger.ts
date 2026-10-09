@@ -1,6 +1,7 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * Logger dell'app. La configurazione (rotazione, formato, dimensioni) sta in
- * shared/node/logger.js, condivisa con "Progetto chat": qui restano solo il
+ * shared/node/logger.js, condivisa con "lettore-ddt": qui restano solo il
  * nome del servizio e la cartella dove scrivere.
  */
 import winston from 'winston';

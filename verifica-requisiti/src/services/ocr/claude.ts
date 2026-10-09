@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * claude.ts — lettura delle scansioni con Claude (vision).
  *
@@ -6,7 +7,7 @@
  * pagina: va acceso di proposito, non come predefinito.
  *
  * Da fare quando serve:
- *   1. dipendenza @anthropic-ai/sdk (come in "Progetto chat");
+ *   1. dipendenza @anthropic-ai/sdk (come in "lettore-ddt");
  *   2. chiave API dal keystore cifrato, mai da config.json in chiaro;
  *   3. una immagine per pagina in base64 + prompt di sola trascrizione;
  *   4. tetto di spesa e conteggio pagine, altrimenti un batch grosso costa

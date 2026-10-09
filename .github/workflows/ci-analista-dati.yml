@@ -1,0 +1,81 @@
+# "><(((º> sabusabu <º)))><"
+# CI dell'app "analista-dati" (ex agente) (analisi DB in linguaggio naturale).
+#
+# Workflow separato da ci.yml (che copre "lettore-ddt"): filtri di percorso
+# diversi, comandi diversi, e un fallimento dell'uno non deve bloccare l'altro.
+#
+# Node 24: il backend usa node:sqlite (DatabaseSync) senza flag sperimentali —
+# su Node 22 servirebbe --experimental-sqlite. Vedi "engines" in package.json.
+name: CI — analista-dati
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'analista-dati/**'
+      - 'shared/**'
+      - '.github/workflows/ci-analista-dati.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'analista-dati/**'
+      - 'shared/**'
+      - '.github/workflows/ci-analista-dati.yml'
+
+defaults:
+  run:
+    working-directory: analista-dati
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: 'analista-dati/package-lock.json'
+
+      # xlsx arriva dal CDN ufficiale SheetJS (su npm la 0.18.5 e' ferma a due
+      # advisory high senza fix): npm ci deve poter raggiungere cdn.sheetjs.com.
+      - name: Install dependencies
+        run: npm ci
+
+      # Copre frontend (tsconfig.json) E backend (tsconfig.server.json): senza il
+      # secondo, il codice del server non verrebbe controllato da nessuno, perche'
+      # in esecuzione lo interpreta tsx, che i tipi li ignora.
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: 'analista-dati/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Solo le dipendenze di produzione: quelle di sviluppo non finiscono sul
+      # server. Bloccante su high: le vulnerabilita' di cio' che gira in
+      # produzione non devono passare in silenzio.
+      - name: npm audit (high, solo produzione)
+        run: npm audit --omit=dev --audit-level=high

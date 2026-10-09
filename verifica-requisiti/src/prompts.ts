@@ -1,7 +1,8 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * prompts.ts — Prompt preimpostati per il confronto con Claude: FONTE UNICA.
  *
- * Stessa idea di `src/batch/prompts.ts` in "Progetto chat": i prompt stanno qui,
+ * Stessa idea di `src/batch/prompts.ts` in "lettore-ddt": i prompt stanno qui,
  * il frontend li riceve da GET /api/prompts e ne fa un bottone ciascuno. Per
  * aggiungere o cambiare un confronto si tocca SOLO questo file.
  *
@@ -122,7 +123,7 @@ Rispondi SOLO con questo JSON, nient'altro:
 {"nome":"[nome della checklist]","descrizione":"[una riga: da quale documento arriva]","requisiti":[{"codice":"ABC-01","titolo":"[cosa si controlla]","descrizione":"[opzionale]","obbligatorio":true,"regola":{"tipo":"presenza","termini":["..."]}}]}`,
   },
 
-  // ── Estrazione documenti — prompt copiati da "Progetto chat"
+  // ── Estrazione documenti — prompt copiati da "lettore-ddt"
   //    (src/batch/prompts.ts). Sono una COPIA, non un riferimento: se lì
   //    cambiano, qui restano fermi. Producono tabelle, non esiti: la
   //    risposta incollata diventa un file Excel.

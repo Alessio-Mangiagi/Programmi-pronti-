@@ -1,6 +1,7 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * config.ts — fonte unica per configurazione runtime e versione.
- * Legge config.json una volta all'avvio (stesso schema di Progetto chat).
+ * Legge config.json una volta all'avvio (stesso schema di lettore-ddt).
  */
 import fs from 'fs';
 import path from 'path';

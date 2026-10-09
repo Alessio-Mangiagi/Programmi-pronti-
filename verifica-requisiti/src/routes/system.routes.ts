@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 /**
  * system.routes.ts — ping, stato, metriche, file statici e frontend.
  */
@@ -119,7 +120,7 @@ const impostaNoCache = (res: Response): void => {
 router.use('/css', express.static(path.join(STATIC_DIR, 'css'), { ...SENZA_CACHE, setHeaders: impostaNoCache }));
 router.use('/js', express.static(path.join(STATIC_DIR, 'js'), { ...SENZA_CACHE, setHeaders: impostaNoCache }));
 // Font Awesome cerca i font su /static/lib/webfonts (percorsi assoluti dentro
-// fa.min.css, come in "Progetto chat"): senza questo mount le icone restano
+// fa.min.css, come in "lettore-ddt"): senza questo mount le icone restano
 // quadratini vuoti.
 router.use('/static', express.static(STATIC_DIR, { maxAge: '7d' }));
 router.use(express.static(STATIC_DIR, { index: false, maxAge: '7d' }));
