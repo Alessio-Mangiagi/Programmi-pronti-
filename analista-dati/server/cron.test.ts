@@ -75,6 +75,7 @@ describe('catch-up: lastCronMatchWithin', () => {
     expect(lastCronMatchWithin(c, at('2026-07-01T09:00:00'), 30)).toBeNull()
   })
 
+  // "><(((º> sabusabu <º)))><"
   it('include il minuto corrente se combacia', () => {
     const c = parseCron('0 8 * * *')
     const due = lastCronMatchWithin(c, at('2026-07-01T08:00:30'), 60)

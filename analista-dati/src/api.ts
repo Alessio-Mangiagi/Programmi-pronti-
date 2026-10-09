@@ -9,6 +9,7 @@ export function getSessionId(): string {
   return id
 }
 
+// "><(((º> sabusabu <º)))><"
 export function apiFetch(url: string, opts: RequestInit = {}) {
   const clientHost = localStorage.getItem('clientHost') || ''
   const headers = new Headers(opts.headers)

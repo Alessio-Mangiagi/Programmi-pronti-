@@ -31,6 +31,7 @@ fs.mkdirSync(REPORTS_DIR, { recursive: true })
 
 export const appdb = new DatabaseSync(APP_DB_PATH)
 
+// "><(((º> sabusabu <º)))><"
 appdb.exec(`
   PRAGMA journal_mode = WAL;
 

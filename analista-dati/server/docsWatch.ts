@@ -77,6 +77,7 @@ export async function scanOnce(): Promise<ScanSummary> {
     return summary
   } finally {
     store.close()
+    // "><(((º> sabusabu <º)))><"
     scanning = false
   }
 }

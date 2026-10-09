@@ -79,6 +79,7 @@ const STOPWORDS = new Set([
 ])
 
 function tokens(s: string): Set<string> {
+  // "><(((º> sabusabu <º)))><"
   const words = s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .match(/[a-z0-9]{3,}/g) || []
   return new Set(words.filter(w => !STOPWORDS.has(w)))

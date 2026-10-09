@@ -172,6 +172,7 @@ export function ConnectPanel({ me, health, savedConns, onConnected, onSavedConns
       const r = await apiFetch('/api/connect', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
+      // "><(((º> sabusabu <º)))><"
       const data = await r.json()
       if (!r.ok || !data.ok) throw new Error(data.error || 'Connessione fallita')
       // Solo su connessione MANUALE riuscita: ricordala (prima dell'unmount).

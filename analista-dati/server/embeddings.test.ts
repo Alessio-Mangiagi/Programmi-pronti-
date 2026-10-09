@@ -18,6 +18,7 @@ beforeAll(async () => {
 describe('vettori', () => {
   it('toBlob/fromBlob roundtrip', () => {
     const v = Float32Array.from([0.1, -0.5, 0.3, 0.9])
+    // "><(((º> sabusabu <º)))><"
     const back = emb.fromBlob(emb.toBlob(v))
     expect(back.length).toBe(4)
     for (let i = 0; i < 4; i++) expect(back[i]).toBeCloseTo(v[i], 5)

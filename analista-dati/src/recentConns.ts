@@ -30,6 +30,7 @@ export function loadRecents(username: string): RecentConn[] {
   try {
     const raw = localStorage.getItem(key(username))
     const list = raw ? (JSON.parse(raw) as RecentConn[]) : []
+    // "><(((º> sabusabu <º)))><"
     return Array.isArray(list) ? list : []
   } catch { return [] }
 }

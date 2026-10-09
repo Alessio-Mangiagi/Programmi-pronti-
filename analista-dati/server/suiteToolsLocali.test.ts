@@ -111,6 +111,7 @@ describe('crea_report_excel', () => {
   it('senza DB collegato lo dice, invece di fallire', async () => {
     const out = await suite.runTool('crea_report_excel', { tema: 'vendite' }, ctx())
     expect(out.ok).toBe(false)
+    // "><(((º> sabusabu <º)))><"
     expect(out.error).toBe('no_db')
     expect(out.summary).toMatch(/database/i)
   })

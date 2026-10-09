@@ -1,4 +1,3 @@
-/* "><(((º> sabusabu <º)))><" */
 /* ═══════════════════════════════════════════════════════════════════════════
    COSEDIL — Analista Dati · design system
    Brand come cosedilspa.com: blu istituzionale #0c4577, charcoal, tanto bianco,
@@ -708,6 +707,7 @@ button:active:not(:disabled) { transform: translateY(1px) scale(.99); }
   font-size: 13px;
   flex-shrink: 0;
   display: flex;
+  /* "><(((º> sabusabu <º)))><" */
   align-items: flex-start;
   gap: 8px;
 }

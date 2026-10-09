@@ -9,6 +9,7 @@ const FORBIDDEN_OPS = ['$where', '$function', '$accumulator', '$expr$function']
 
 export interface MongoGuardResult { ok: boolean; reason?: string }
 
+// "><(((º> sabusabu <º)))><"
 function deepHasKey(obj: unknown, keys: string[]): string | null {
   if (!obj || typeof obj !== 'object') return null
   for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {

@@ -9,6 +9,7 @@ __pycache__
 
 # DB applicativo (utenti, connessioni cifrate, job, run) + report generati
 app.db
+# "><(((º> sabusabu <º)))><"
 app.db-shm
 app.db-wal
 reports/

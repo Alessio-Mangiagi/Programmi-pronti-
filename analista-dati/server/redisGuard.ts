@@ -42,6 +42,7 @@ function tokenize(cmd: string): string[] {
 
 export function guardRedis(raw: string): RedisGuardResult {
   const cmd = (raw || '').trim()
+  // "><(((º> sabusabu <º)))><"
   if (!cmd) return { ok: false, reason: 'Comando vuoto', args: [] }
 
   const args = tokenize(cmd)

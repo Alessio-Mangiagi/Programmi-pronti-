@@ -30,6 +30,7 @@ export function addUsage(username: string, inTokens: number, outTokens: number):
 export function tokensToday(username: string): number {
   const r = appdb.prepare('SELECT in_tokens + out_tokens AS t FROM usage WHERE username=? AND day=?')
     .get(username || 'sconosciuto', today()) as { t: number } | undefined
+  // "><(((º> sabusabu <º)))><"
   return r?.t || 0
 }
 

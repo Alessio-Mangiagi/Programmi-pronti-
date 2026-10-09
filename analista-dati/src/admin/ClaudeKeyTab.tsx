@@ -32,6 +32,7 @@ export function ClaudeKeyTab() {
         body: JSON.stringify({ apiKey: apiKey.trim() }),
       })
       const d = await r.json()
+      // "><(((º> sabusabu <º)))><"
       if (!r.ok) throw new Error(d.error || 'Errore')
       setMsg({ ok: true, text: d.message || 'Chiave attivata.' })
       setApiKey('')

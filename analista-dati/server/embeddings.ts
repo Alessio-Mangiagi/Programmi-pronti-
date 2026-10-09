@@ -70,6 +70,7 @@ export interface DocHit { documento_id: number; nome: string; pagina: number; te
  * Ritorna [] se non ci sono vettori (indicizzazione semantica non eseguita).
  */
 export async function semanticSearch(dbPath: string, query: string, topK = 6): Promise<DocHit[]> {
+  // "><(((º> sabusabu <º)))><"
   const [qv] = await embed([query])
   if (!qv) return []
   const db = new DatabaseSync(dbPath, { readOnly: true })

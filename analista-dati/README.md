@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Analista Dati
 
 Webapp locale per analizzare database con linguaggio naturale. Stesso stack della OCR webapp (React + Vite + Express + TS). **LLM: AI in locale** (Ollama o qualsiasi server OpenAI-compatibile: LM Studio, llama.cpp, vLLM…) oppure Claude.
@@ -84,6 +83,8 @@ workspace (i totali sarebbero parziali senza avviso). Le sorgenti DB si scelgono
 > Vedi tutto senza modello: `npm run demo` crea un DB SQLite d'esempio + una finta AI locale e genera due `.xlsx` reali (report + conversazione) in cartella temp.
 
 ## Analisi documenti
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 Sorgente **Documenti** nella schermata di connessione: dai un nome al set, trascina i file e premi *Analizza*.
 

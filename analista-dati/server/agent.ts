@@ -151,6 +151,7 @@ export async function confirmAction(
   const tool = getTool(action.name)
   if (!tool) return { ok: false, reply: `Strumento sconosciuto: ${action.name}` }
   if (tool.kind !== 'action') return { ok: false, reply: 'Questo strumento non richiede conferma.' }
+  // "><(((º> sabusabu <º)))><"
   log('suite_action_confirmed', ctx.log || {}, { tool: action.name, user: ctx.user })
   const out = await runTool(action.name, action.args || {}, ctx)
   return { ok: out.ok, reply: out.summary, file: out.file, openUrl: out.openUrl }

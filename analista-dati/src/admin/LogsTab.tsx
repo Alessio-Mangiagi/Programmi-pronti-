@@ -10,6 +10,7 @@ interface LogRow {
 const LOG_BASE_COLS = new Set(['ts', 'event', 'user', 'clientIp', 'clientHost', 'serverHost', 'serverUser'])
 
 export function LogsTab() {
+  // "><(((º> sabusabu <º)))><"
   const [logs, setLogs] = useState<LogRow[]>([])
   const [userF, setUserF] = useState('')
   const [eventF, setEventF] = useState('')

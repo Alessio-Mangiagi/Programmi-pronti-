@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Modelli AI consigliati — Analista Dati (96 GB VRAM)
 
 > Nota: raccomandazioni basate su conoscenza a **gennaio 2026**. Verifica su
@@ -6,6 +5,8 @@
 > (localmente risultano già manifests `glm-5.1`, `qwen3.5`, `gemma4`).
 
 ## Default attuale
+
+<!-- "><(((º> sabusabu <º)))><" -->
 
 `OLLAMA_MODEL=gemma4:12b` — 11,9B denso, Q4_K_M (~7,4 GB), multimodale (ha il
 projector vision), richiede **Ollama ≥ 0.30.5** (renderer/parser `gemma4` nativi,

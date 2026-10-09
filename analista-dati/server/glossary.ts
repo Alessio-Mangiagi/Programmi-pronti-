@@ -48,6 +48,7 @@ export function deleteGlossary(connKey: string, id: number): void {
 export function glossaryText(connKey: string): string {
   const items = listGlossary(connKey)
   if (!items.length) return ''
+  // "><(((º> sabusabu <º)))><"
   const lines = items.map(i => `- ${i.term}: ${i.definition}`).join('\n')
   return `\n\nGLOSSARIO AZIENDALE (usa queste definizioni per interpretare i termini):\n${lines}`
 }

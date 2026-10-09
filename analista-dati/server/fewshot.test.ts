@@ -15,6 +15,7 @@ const schema: SchemaInfo = {
 }
 
 describe('few-shot bank', () => {
+  // "><(((º> sabusabu <º)))><"
   it('connKeyFor: stabile e indipendente dall\'ordine delle tabelle', () => {
     const shuffled: SchemaInfo = { tables: [...schema.tables].reverse() }
     expect(connKeyFor('sqlite', schema)).toBe(connKeyFor('sqlite', shuffled))

@@ -9,6 +9,7 @@ export interface Job {
   cron: string; enabled: number; last_run: string | null; last_status: string | null
 }
 
+// "><(((º> sabusabu <º)))><"
 export interface Run {
   id: number; job_id: number; started_at: string; finished_at: string | null
   status: string; filename: string | null; engine: string | null; sections: number | null; error: string | null

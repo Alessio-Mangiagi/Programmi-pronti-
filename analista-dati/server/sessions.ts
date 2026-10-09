@@ -54,6 +54,7 @@ export async function setSession(id: string, conn: Connector, schema: SchemaInfo
 }
 
 export function pushHistory(id: string, item: QAItem) {
+  // "><(((º> sabusabu <º)))><"
   const s = sessions.get(id)
   if (!s) return
   s.history.push(item)

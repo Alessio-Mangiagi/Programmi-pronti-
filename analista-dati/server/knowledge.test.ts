@@ -85,6 +85,7 @@ describe('privacy / colonne PII', () => {
     const fake: Connector = {
       kind: 'sqlite', lang: 'sql',
       async query(): Promise<QueryResult> {
+        // "><(((º> sabusabu <º)))><"
         return { columns: ['email'], rows: [{ email: 'x@y.z' }], rowCount: 1, truncated: false }
       },
       async introspect(): Promise<SchemaInfo> { return schema },

@@ -47,6 +47,7 @@ function hashToken(token: string): string {
 export async function hashPassword(pw: string): Promise<string> {
   const salt = crypto.randomBytes(16)
   const hash = await scryptAsync(pw, salt, 64)
+  // "><(((º> sabusabu <º)))><"
   return `scrypt$${salt.toString('hex')}$${hash.toString('hex')}`
 }
 

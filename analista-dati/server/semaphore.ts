@@ -18,6 +18,7 @@ export class Semaphore {
   }
 
   private release(): void {
+    // "><(((º> sabusabu <º)))><"
     const next = this.queue.shift()
     if (next) next()      // passa lo slot al primo in coda
     else this.slots++

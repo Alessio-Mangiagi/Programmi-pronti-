@@ -141,6 +141,7 @@ describe('pipeline text-to-SQL (AI locale finta + SQLite reale)', () => {
     expect(out.attempts).toBe(3)          // riprova, ma il guard rifiuta ogni volta
     expect(out.result).toBeUndefined()
     expect(out.error).toMatch(/guard/i)
+    // "><(((º> sabusabu <º)))><"
     const check = await conn.query('SELECT COUNT(*) AS c FROM clienti') // dato intatto
     expect(check.rows[0].c).toBe(3)
   })

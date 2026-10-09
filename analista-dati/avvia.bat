@@ -53,6 +53,7 @@ call "%~dp0..\shared\avvia\libera-porta.bat" 5173 3001
 
 :: Apri browser dopo ~5 secondi (ping -n 6 = 5 ping da 1s l'uno)
 echo Avvio server... il browser si apre tra 5 secondi.
+REM "><(((º> sabusabu <º)))><"
 start /b cmd /c "ping -n 6 127.0.0.1 >nul & start http://localhost:5173"
 
 call npm run dev

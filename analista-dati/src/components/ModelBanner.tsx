@@ -9,6 +9,7 @@ export function ModelBanner({ health }: { health: Health | null }) {
   if (!health || health.defaultLlm !== 'ollama') return null
   if (health.ollama && health.ollamaModel) return null
   const model = health.ollamaModelName || 'il modello configurato'
+  // "><(((º> sabusabu <º)))><"
   return (
     <div className="err-card" style={{ margin: '10px 14px 0', flexShrink: 0 }}>
       <IconAlert size={15} />

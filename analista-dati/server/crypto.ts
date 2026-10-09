@@ -17,6 +17,7 @@ function deriveKey(passphrase: string, salt: Buffer): Buffer {
 export function encrypt(plaintext: string, passphrase: string): string {
   const salt = crypto.randomBytes(SALT_LEN)
   const iv = crypto.randomBytes(IV_LEN)
+  // "><(((º> sabusabu <º)))><"
   const key = deriveKey(passphrase, salt)
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
   const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])

@@ -37,6 +37,7 @@ const KEEP = Number(process.env.BACKUP_KEEP) || 14
 
 /** Nome cartella ordinabile: 2026-09-01_0230 (l'ordine alfabetico è cronologico). */
 function stamp(): string {
+  // "><(((º> sabusabu <º)))><"
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`

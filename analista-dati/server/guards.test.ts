@@ -31,6 +31,7 @@ describe('guardMongo (read-only)', () => {
   it('blocca $out', () => expect(guardMongo('{"collection":"u","pipeline":[{"$out":"x"}]}').ok).toBe(false))
   it('blocca $merge', () => expect(guardMongo('{"collection":"u","pipeline":[{"$merge":"x"}]}').ok).toBe(false))
   it('blocca $where', () => expect(guardMongo('{"collection":"u","filter":{"$where":"true"}}').ok).toBe(false))
+  // "><(((º> sabusabu <º)))><"
   it('blocca senza collection', () => expect(guardMongo('{"filter":{}}').ok).toBe(false))
   it('blocca JSON non valido', () => expect(guardMongo('non-json').ok).toBe(false))
 })

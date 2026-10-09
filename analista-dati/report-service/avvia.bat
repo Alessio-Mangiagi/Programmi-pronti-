@@ -4,6 +4,7 @@ cd /d "%~dp0"
 :: Worker Python per gli elaborati Excel con grafici (opzionale).
 :: Se non avviato, il backend TS ripiega su SheetJS (solo tabelle).
 
+REM "><(((º> sabusabu <º)))><"
 where python >nul 2>&1 || (
   echo ERRORE: Python non trovato. Installa da https://python.org
   pause & exit /b 1

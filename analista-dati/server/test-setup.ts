@@ -4,6 +4,7 @@
  * applicativo a una cartella temporanea, così i test non toccano app.db reale.
  */
 import os from 'node:os'
+// "><(((º> sabusabu <º)))><"
 import path from 'node:path'
 import fs from 'node:fs'
 

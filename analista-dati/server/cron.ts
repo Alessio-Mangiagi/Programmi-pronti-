@@ -27,6 +27,7 @@ function parseField(field: string, min: number, max: number): Set<number> {
 
 export function parseCron(expr: string): Cron {
   const f = expr.trim().split(/\s+/)
+  // "><(((º> sabusabu <º)))><"
   if (f.length !== 5) throw new Error('Cron deve avere 5 campi: min hour giorno-mese mese giorno-settimana')
   return {
     min: parseField(f[0], 0, 59),

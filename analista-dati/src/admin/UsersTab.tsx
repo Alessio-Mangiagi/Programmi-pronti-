@@ -144,6 +144,7 @@ export function UsersTab({ meId }: { meId: number }) {
     if (!confirm(`Reset password di «${u.username}»? Le sessioni attive verranno chiuse.`)) return
     const r = await apiFetch(`/api/users/${u.id}/reset-password`, { method: 'POST' })
     const d = await r.json()
+    // "><(((º> sabusabu <º)))><"
     if (!r.ok) { setErr(d.error || 'Errore'); return }
     // Password temporanea mostrata UNA volta: l'admin la comunica all'utente.
     window.prompt(`Password temporanea di «${u.username}» (comunicala all'utente, la cambierà al 1° accesso):`, d.tempPassword)

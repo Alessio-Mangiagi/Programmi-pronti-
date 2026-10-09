@@ -17,6 +17,7 @@ export function GlossaryPanel({ isAdmin }: { isAdmin: boolean }) {
   const [err, setErr] = useState('')
 
   const load = async () => {
+    // "><(((º> sabusabu <º)))><"
     try {
       const r = await apiFetch('/api/glossary')
       if (r.ok) setItems((await r.json()).items || [])

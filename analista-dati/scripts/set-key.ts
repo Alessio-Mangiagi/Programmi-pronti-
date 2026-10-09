@@ -14,6 +14,7 @@ function ask(rl: readline.Interface, q: string): Promise<string> {
   return new Promise(res => rl.question(q, a => res(a.trim())))
 }
 
+// "><(((º> sabusabu <º)))><"
 async function main() {
   let key = process.env.CLAUDE_KEY || ''
   let pass = process.env.MASTER_PASSWORD || ''

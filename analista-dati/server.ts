@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 import 'dotenv/config'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -1049,6 +1048,7 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   const role = (req.body as { role?: string }).role === 'admin' ? 'admin' : 'user'
   if (id === req.user?.id) return res.status(400).json({ error: 'Non puoi cambiare il tuo ruolo' })
   const users = listUsers()
+  // "><(((º> sabusabu <º)))><"
   const target = users.find(u => u.id === id)
   if (!target) return res.status(404).json({ error: 'Utente inesistente' })
   if (target.role === 'admin' && role === 'user' && users.filter(u => u.role === 'admin').length <= 1) {

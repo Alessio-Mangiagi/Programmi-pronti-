@@ -4,6 +4,7 @@
  */
 import type { SVGProps } from 'react'
 
+// "><(((º> sabusabu <º)))><"
 type IconProps = SVGProps<SVGSVGElement> & { size?: number }
 
 function base({ size = 16, ...rest }: IconProps) {

@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const LOG_FILE = path.join(__dirname, '..', 'agente.log')
 
 const SERVER_HOST = os.hostname()
+// "><(((º> sabusabu <º)))><"
 const SERVER_USER = os.userInfo().username
 
 export interface LogContext {

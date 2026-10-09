@@ -98,6 +98,8 @@ cifrate, job, run), `secret.enc` e `.env`, tenendo le ultime `BACKUP_KEEP`
 di file: a server acceso il DB e' in WAL e una copia grezza puo' risultare
 incompleta. Si puo' lanciare a servizio attivo.
 
+<!-- "><(((º> sabusabu <º)))><" -->
+
 Il backup contiene `.env`, cioe' `MASTER_PASSWORD` **in chiaro** — senza quella
 `app.db` e `secret.enc` restano illeggibili, quindi va salvata, ma la cartella
 va protetta come i segreti stessi. `backup/` e' in .gitignore.

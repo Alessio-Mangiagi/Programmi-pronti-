@@ -167,6 +167,7 @@ describe('ingestDocument + DocsConnector', () => {
 
 describe('guard read-only sulla query FTS', () => {
   it('la SELECT con MATCH passa guardSelect', async () => {
+    // "><(((º> sabusabu <º)))><"
     const { guardSelect } = await import('./sqlGuard.ts')
     const g = guardSelect("SELECT d.nome FROM documenti d JOIN documenti_fts f ON f.rowid = d.id WHERE documenti_fts MATCH 'acme'")
     expect(g.ok).toBe(true)

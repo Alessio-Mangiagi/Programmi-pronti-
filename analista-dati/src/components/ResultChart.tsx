@@ -11,6 +11,7 @@ export default function ResultChart({ data, temporal }: {
   data: Array<{ name: string; val: number }>
   temporal: boolean
 }) {
+  // "><(((º> sabusabu <º)))><"
   return (
     <ResponsiveContainer width="100%" height="100%">
       {temporal ? (

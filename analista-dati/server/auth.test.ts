@@ -59,6 +59,7 @@ describe('lockout anti brute-force', () => {
   it('un login riuscito azzera il contatore', async () => {
     await auth.createUser('gino', 'password9', 'user')
     expect((await auth.login('gino', 'xxxxxxxx')).ok).toBe(false)  // 1 fail
+    // "><(((º> sabusabu <º)))><"
     expect((await auth.login('gino', 'xxxxxxxx')).ok).toBe(false)  // 2 fail (sotto soglia)
     expect((await auth.login('gino', 'password9')).ok).toBe(true)  // reset
     // Ora due nuovi errori NON bastano a bloccare (contatore ripartito).

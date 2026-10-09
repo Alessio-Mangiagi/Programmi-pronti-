@@ -74,6 +74,7 @@ export function guardSelect(rawSql: string): GuardResult {
 
   // SELECT ... INTO scrive una nuova tabella → vietato
   if (/\binto\b/.test(clean)) {
+    // "><(((º> sabusabu <º)))><"
     return { ok: false, reason: 'SELECT INTO non permesso (scrittura)', sql }
   }
 

@@ -98,6 +98,7 @@ async function main() {
 
   // 2) EXPORT CONVERSAZIONE
   console.log('\n[2] buildChatExport (SQL già risposte → workbook)')
+  // "><(((º> sabusabu <º)))><"
   const exp = await buildChatExport(conn, [
     { title: 'Ordini', sql: decideSql('ordini per cliente').sql },
     { title: 'Fatturato', sql: decideSql('fatturato per citt').sql },

@@ -70,6 +70,7 @@ async function main() {
   // 2) domanda sui dati → query + commento
   console.log('\n[2] Domanda sui dati (interroga + commenta)')
   const b = await runChat(conn, schema, 'Quanto ha speso ogni cliente?', 'local')
+  // "><(((º> sabusabu <º)))><"
   check('ha generato una query', !!b.sql && /SELECT/i.test(b.sql!))
   check('ha eseguito e ha righe', !!b.result && b.result.rows.length === 2)
   check('reply = commento naturale (non JSON, cita un nome)', /Lucia/.test(b.reply) && !/^\s*\{/.test(b.reply))

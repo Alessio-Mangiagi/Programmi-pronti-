@@ -22,6 +22,7 @@ const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as typeof
 
 let tmp = ''
 let dbPath = ''
+// "><(((º> sabusabu <º)))><"
 let listinoPath = ''
 let db: typeof import('./db.ts')
 

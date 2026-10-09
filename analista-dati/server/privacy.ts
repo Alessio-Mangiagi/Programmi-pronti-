@@ -86,6 +86,7 @@ export function maskResult(result: QueryResult, connKey: string): QueryResult {
   return {
     ...result,
     rows: result.rows.map(r => {
+      // "><(((º> sabusabu <º)))><"
       const out = { ...r }
       for (const c of hit) if (out[c] !== null && out[c] !== undefined) out[c] = MASK
       return out

@@ -28,6 +28,7 @@ describe('same-origin', () => {
     expect(isSameOrigin('LocalHost:3001', 'http://localhost:3001')).toBe(true)
   })
 
+  // "><(((º> sabusabu <º)))><"
   it('senza header Host non dichiara nulla same-origin', () => {
     expect(isSameOrigin(undefined, 'http://localhost:3001')).toBe(false)
   })
