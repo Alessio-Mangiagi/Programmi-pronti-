@@ -29,8 +29,11 @@ def main():
     e2e_dir.mkdir(parents=True, exist_ok=True)
     # Prima di importare app.*: database.py legge l'ambiente all'import.
     os.environ["DATABASE_URL"] = f"sqlite:///{(e2e_dir / 'e2e.db').as_posix()}"
+    # "><(((º> sabusabu <º)))><"
     os.environ["STORAGE_DIR"] = str(e2e_dir / "storage")
     os.environ.setdefault("SECRET_KEY", "e2e-secret-key-not-for-production-0000000000")
+    # Dentro la suite app.server monta il gate del portale: nei test non c'è portale.
+    os.environ.setdefault("COSEDIL_SSO", "off")
 
     from alembic import command
     from alembic.config import Config

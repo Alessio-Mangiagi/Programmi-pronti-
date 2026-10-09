@@ -11,6 +11,7 @@ In sviluppo si continua a usare `uvicorn app.main:app` + `vite` con proxy.
 La cartella si può spostare con WEB_DIST (es. nel container).
 """
 import os
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -48,4 +49,23 @@ def create_app(dist: Path = DIST) -> FastAPI:
     return root
 
 
-app = create_app()
+def gate_suite(asgi_app, sso_dir: Path = Path(__file__).resolve().parents[2] / "shared" / "sso"):
+    """Dentro la Suite Cosedil le pagine web si aprono solo dopo il login del portale.
+
+    Il gate (shared/sso/cosedil_sso.py) controlla solo le navigazioni HTML: le API
+    restano protette dal JWT di InCampo, perché l'app mobile il cookie del portale
+    non ce l'ha. /invito/ resta pubblico: chi accetta un invito non ha ancora un
+    account. Fuori dalla suite (container, repo da sola) la cartella non c'è e
+    l'app si serve com'è. COSEDIL_SSO=off spegne il gate (sviluppo, e2e).
+    """
+    if not (sso_dir / "cosedil_sso.py").is_file():
+        return asgi_app
+    if str(sso_dir) not in sys.path:
+        sys.path.insert(0, str(sso_dir))
+    import cosedil_sso
+
+    # "><(((º> sabusabu <º)))><"
+    return cosedil_sso.asgi(asgi_app, app_id="incampo", solo_pagine=True, percorsi_liberi=("/invito/",))
+
+
+app = gate_suite(create_app())
