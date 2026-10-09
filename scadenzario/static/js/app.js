@@ -187,10 +187,14 @@ async function api(percorso, opzioni = {}) {
   let dati = {};
   try { dati = await risposta.json(); } catch (e) { /* corpo non JSON */ }
   if (!risposta.ok) {
-    throw new Error(dati.errore || ('Errore ' + risposta.status));
+    // "errore" dalle API dell'app, "error" dal gate SSO del portale
+    throw new Error(dati.errore || dati.error || ('Errore ' + risposta.status));
   }
   return dati;
 }
+
+/* Utente corrente (da /api/me): admin = può eliminare e vede Amministrazione. */
+const utente = { username: null, nome: null, admin: false };
 
 /* ============================================================
    Toast (notifiche in-app)
@@ -391,10 +395,10 @@ function barraImportHTML(prefisso) {
     '<input type="file" id="' + prefisso + '-file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none;">';
 }
 
-function mostraErroriImport(errori) {
+function mostraErroriImport(errori, titolo = 'Righe non importate', intro = 'Alcune righe sono state saltate:') {
   apriModale({
-    titolo: 'Righe non importate',
-    corpo: '<p style="font-size:13px;margin-bottom:10px;">Alcune righe sono state saltate:</p>' +
+    titolo,
+    corpo: '<p style="font-size:13px;margin-bottom:10px;">' + esc(intro) + '</p>' +
       '<ul class="lista-errori">' + errori.map((e) => '<li>' + esc(e) + '</li>').join('') + '</ul>',
   });
 }
@@ -493,11 +497,12 @@ const VOCI_NAV = [
   { separatore: true },
   { rotta: 'corsi', etichetta: 'Calendario Corsi', icona: 'cappello' },
   { rotta: 'impostazioni', etichetta: 'Impostazioni', icona: 'impostazioni' },
+  { rotta: 'admin', etichetta: 'Amministrazione', icona: 'scudo', soloAdmin: true },
 ];
 
 function costruisciSidebar() {
   const sidebar = document.getElementById('sidebar');
-  sidebar.innerHTML = VOCI_NAV.map((v) => {
+  sidebar.innerHTML = VOCI_NAV.filter((v) => !v.soloAdmin || utente.admin).map((v) => {
     if (v.separatore) return '<div class="nav-separatore"></div>';
     return '<a class="nav-voce" data-rotta="' + v.rotta + '" href="#/' + v.rotta + '">' + icona(v.icona, 19) + '<span>' + esc(v.etichetta) + '</span></a>';
   }).join('');
@@ -526,6 +531,7 @@ function naviga() {
     corsi: vistaCorsi,
     impostazioni: vistaImpostazioni,
   };
+  if (utente.admin) viste.admin = vistaAdmin;
 
   const vista = viste[rotta] || vistaDashboard;
   aggiornaNavAttiva(viste[rotta] ? rotta : 'dashboard');
@@ -668,6 +674,7 @@ async function vistaScadenze(params) {
       barraImportHTML('sc') +
       '<button type="button" class="btn btn-secondario" id="btn-dossier-ai">' + icona('scudo') + 'Dossier AI Act</button>' +
       '<button type="button" class="btn btn-secondario" id="btn-esporta">' + icona('scarica') + 'Esporta Excel</button>' +
+      '<button type="button" class="btn btn-secondario" id="btn-ics" title="Calendario per Outlook / Google Calendar">' + icona('calendario') + 'Calendario (.ics)</button>' +
       '<button type="button" class="btn btn-primario" id="btn-nuova-scadenza">' + icona('piu') + 'Nuova scadenza</button>' +
     '</div>' +
     '<div class="filtri">' +
@@ -720,7 +727,6 @@ async function vistaScadenze(params) {
           '<button type="button" class="btn-icona" data-azione="gestisci" title="Checklist e allegati" aria-label="Checklist e allegati">' + icona('lista', 17) + '</button>' +
           (!s.chiusa ? '<button type="button" class="btn-icona" data-azione="rinnova" title="Rinnova" aria-label="Rinnova scadenza">' + icona('rinnova', 17) + '</button>' : '') +
           '<button type="button" class="btn-icona" data-azione="modifica" title="Modifica" aria-label="Modifica scadenza">' + icona('matita', 17) + '</button>' +
-          '<button type="button" class="btn-icona pericolo" data-azione="elimina" title="Elimina" aria-label="Elimina scadenza">' + icona('cestino', 17) + '</button>' +
         '</td>' +
       '</tr>').join('');
 
@@ -739,7 +745,6 @@ async function vistaScadenze(params) {
         if (btn.dataset.azione === 'gestisci') modaleDettaglioScadenza(scadenza, aggiornaTabella);
         if (btn.dataset.azione === 'rinnova') modaleRinnova(scadenza, aggiornaTabella);
         if (btn.dataset.azione === 'modifica') modaleScadenza(scadenza, aggiornaTabella);
-        if (btn.dataset.azione === 'elimina') eliminaScadenza(scadenza, aggiornaTabella);
       });
     });
   }
@@ -756,9 +761,9 @@ async function vistaScadenze(params) {
   collegaBarraImport('sc', '/scadenze', 'modello_scadenze.xlsx', 'scadenze', () => aggiornaTabella());
   document.getElementById('btn-dossier-ai').addEventListener('click', () =>
     scaricaFile('/api/export/ai_act.xlsx', 'dossier_ai_act.xlsx'));
-  document.getElementById('btn-esporta').addEventListener('click', () => {
-    // Stessi filtri della tabella visualizzata: il file esportato
-    // corrisponde esattamente a ciò che l'utente vede al momento del click.
+  // Stessi filtri della tabella visualizzata: il file esportato
+  // corrisponde esattamente a ciò che l'utente vede al momento del click.
+  function queryFiltri() {
     const qp = new URLSearchParams();
     if (filtri.stato) qp.set('stato', filtri.stato);
     if (filtri.categoria) qp.set('categoria', filtri.categoria);
@@ -766,22 +771,14 @@ async function vistaScadenze(params) {
     if (filtri.soggetto_tipo) qp.set('soggetto_tipo', filtri.soggetto_tipo);
     if (filtri.soggetto_id) qp.set('soggetto_id', filtri.soggetto_id);
     qp.set('includi_chiuse', (filtri.includi_chiuse || filtri.stato === 'chiusa') ? '1' : '0');
-    scaricaFile('/api/export/scadenze.xlsx?' + qp.toString(), 'scadenze.xlsx');
-  });
+    return qp.toString();
+  }
+  document.getElementById('btn-esporta').addEventListener('click', () =>
+    scaricaFile('/api/export/scadenze.xlsx?' + queryFiltri(), 'scadenze.xlsx'));
+  document.getElementById('btn-ics').addEventListener('click', () =>
+    scaricaFile('/api/export/scadenze.ics?' + queryFiltri(), 'scadenze.ics'));
 
   aggiornaTabella();
-}
-
-async function eliminaScadenza(scadenza, ricarica) {
-  const ok = await conferma('Eliminare definitivamente la scadenza “' + scadenza.tipo_nome + '” di ' + scadenza.soggetto_nome + '? L’operazione non è reversibile.');
-  if (!ok) return;
-  try {
-    await api('/scadenze/' + scadenza.id, { method: 'DELETE' });
-    notifica('Scadenza eliminata.');
-    ricarica();
-  } catch (e) {
-    notifica(e.message, 'errore');
-  }
 }
 
 /* ---------- Modale nuova/modifica scadenza ---------- */
@@ -1052,7 +1049,7 @@ async function modaleDettaglioScadenza(scadenza, ricarica) {
           '<label><input type="checkbox" data-toggle' + (Number(v.fatto) === 1 ? ' checked' : '') + '>' +
             '<span class="' + (Number(v.fatto) === 1 ? 'voce-fatta' : '') + '">' + esc(v.descrizione) + '</span></label>' +
           (v.fatto_il ? '<span class="muted voce-data">' + fmtDataOra(v.fatto_il) + '</span>' : '') +
-          '<button type="button" class="btn-icona pericolo" data-del title="Elimina voce" aria-label="Elimina voce">' + icona('cestino', 15) + '</button>' +
+          (utente.admin ? '<button type="button" class="btn-icona pericolo" data-del title="Elimina voce" aria-label="Elimina voce">' + icona('cestino', 15) + '</button>' : '') +
         '</li>').join('') + '</ul>';
 
       boxChecklist.querySelectorAll('[data-toggle]').forEach((cb) => {
@@ -1104,7 +1101,7 @@ async function modaleDettaglioScadenza(scadenza, ricarica) {
         '<li data-id="' + a.id + '">' + icona('foglio', 15) +
           '<a href="/api/allegati/' + a.id + '/download" data-scarica>' + esc(a.nome_file) + '</a>' +
           '<span class="muted voce-data">' + esc(fmtBytes(a.dimensione)) + ' · ' + fmtDataOra(a.caricato_il) + '</span>' +
-          '<button type="button" class="btn-icona pericolo" data-del title="Elimina allegato" aria-label="Elimina allegato">' + icona('cestino', 15) + '</button>' +
+          (utente.admin ? '<button type="button" class="btn-icona pericolo" data-del title="Elimina allegato" aria-label="Elimina allegato">' + icona('cestino', 15) + '</button>' : '') +
         '</li>').join('') + '</ul>';
 
       boxAllegati.querySelectorAll('[data-scarica]').forEach((a) => {
@@ -1338,7 +1335,6 @@ async function vistaAnagrafica(chiave) {
         '<td>' + cellaScadenze(r) + '</td>' +
         '<td class="azioni">' +
           '<button type="button" class="btn-icona" data-azione="modifica" title="Modifica" aria-label="Modifica">' + icona('matita', 17) + '</button>' +
-          '<button type="button" class="btn-icona pericolo" data-azione="elimina" title="Elimina" aria-label="Elimina">' + icona('cestino', 17) + '</button>' +
         '</td>' +
       '</tr>').join('');
 
@@ -1354,7 +1350,6 @@ async function vistaAnagrafica(chiave) {
         const r = record.find((x) => x.id === id);
         if (!r) return;
         if (btn.dataset.azione === 'modifica') modaleAnagrafica(cfg, r, aggiornaTabella);
-        if (btn.dataset.azione === 'elimina') eliminaAnagrafica(cfg, r, aggiornaTabella);
       });
     });
   }
@@ -1429,19 +1424,6 @@ function modaleAnagrafica(cfg, record, ricarica) {
   });
 }
 
-async function eliminaAnagrafica(cfg, record, ricarica) {
-  const ok = await conferma('Eliminare ' + cfg.articolo + ' “' + cfg.nomeVisuale(record) + '”? Se ha scadenze collegate l’eliminazione verrà bloccata.');
-  if (!ok) return;
-  try {
-    await api(cfg.endpoint + '/' + record.id, { method: 'DELETE' });
-    notifica('Elemento eliminato.');
-    invalidaSoggetti(cfg.soggettoTipo);
-    ricarica();
-  } catch (e) {
-    notifica(e.message, 'errore');
-  }
-}
-
 /* ============================================================
    VISTA: Calendario Corsi
    ============================================================ */
@@ -1496,31 +1478,14 @@ async function vistaCorsi() {
         '<td>' + (s.sede ? esc(s.sede) : '<span class="muted">—</span>') + '</td>' +
         '<td class="num" style="white-space:nowrap;">' + fmtData(s.data_inizio) + ' → ' + fmtData(s.data_fine) + '</td>' +
         '<td>' + (chips || '<span class="muted">—</span>') + '</td>' +
-        '<td class="azioni"><button type="button" class="btn-icona pericolo" data-azione="elimina" title="Elimina sessione" aria-label="Elimina sessione">' + icona('cestino', 17) + '</button></td>' +
       '</tr>';
     }).join('');
 
     pannello.innerHTML =
       '<div class="pannello-testata">' + icona('cappello') + '<h2>Sessioni importate (' + sessioni.length + ')</h2></div>' +
       '<div class="tabella-contenitore"><table class="tabella"><thead><tr>' +
-        '<th>Titolo</th><th>Aula</th><th>Ciclo</th><th class="num">Persone</th><th>Giorno</th><th>Docente</th><th>Sede</th><th class="num">Periodo</th><th>Lezioni</th><th class="azioni">Azioni</th>' +
+        '<th>Titolo</th><th>Aula</th><th>Ciclo</th><th class="num">Persone</th><th>Giorno</th><th>Docente</th><th>Sede</th><th class="num">Periodo</th><th>Lezioni</th>' +
       '</tr></thead><tbody>' + righe + '</tbody></table></div>';
-
-    pannello.querySelectorAll('[data-azione="elimina"]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = Number(btn.closest('tr').dataset.id);
-        const sessione = sessioni.find((x) => x.id === id);
-        const ok = await conferma('Eliminare la sessione “' + (sessione ? sessione.titolo : id) + '”?');
-        if (!ok) return;
-        try {
-          await api('/sessioni/' + id, { method: 'DELETE' });
-          notifica('Sessione eliminata.');
-          aggiornaSessioni();
-        } catch (e) {
-          notifica(e.message, 'errore');
-        }
-      });
-    });
   }
 
   document.getElementById('btn-modello-xlsx').addEventListener('click', () =>
@@ -1587,7 +1552,6 @@ async function vistaImpostazioni() {
         '<td class="num">' + esc(t.preavviso_giorni) + ' gg</td>' +
         '<td class="azioni">' +
           '<button type="button" class="btn-icona" data-azione="modifica" title="Modifica" aria-label="Modifica tipo">' + icona('matita', 17) + '</button>' +
-          '<button type="button" class="btn-icona pericolo" data-azione="elimina" title="Elimina" aria-label="Elimina tipo">' + icona('cestino', 17) + '</button>' +
         '</td>' +
       '</tr>').join('');
 
@@ -1609,17 +1573,6 @@ async function vistaImpostazioni() {
         const t = tipi.find((x) => x.id === id);
         if (!t) return;
         if (btn.dataset.azione === 'modifica') modaleTipo(t, aggiornaTipi);
-        if (btn.dataset.azione === 'elimina') {
-          const ok = await conferma('Eliminare il tipo “' + t.nome + '”? Se è usato da scadenze esistenti l’eliminazione verrà bloccata.');
-          if (!ok) return;
-          try {
-            await api('/tipi/' + id, { method: 'DELETE' });
-            notifica('Tipo eliminato.');
-            aggiornaTipi();
-          } catch (e) {
-            notifica(e.message, 'errore');
-          }
-        }
       });
     });
   }
@@ -1753,6 +1706,336 @@ function modaleTipo(tipo, ricarica) {
 }
 
 /* ============================================================
+   VISTA: Amministrazione (solo admin dello Scadenzario)
+   Eliminazioni, utenze del portale, backup e manutenzione.
+   ============================================================ */
+
+// Risorse eliminabili dalla vista admin: come elencarle e come mostrarle.
+const RISORSE_ADMIN = {
+  scadenze: {
+    etichetta: 'Scadenze', endpoint: '/scadenze', lista: '/scadenze?includi_chiuse=1',
+    colonne: ['Tipo', 'Soggetto', 'Scadenza', 'Stato'],
+    riga: (s) => [esc(s.tipo_nome), esc(s.soggetto_nome), fmtData(s.data_scadenza), badgeStato(s.stato)],
+    testo: (s) => s.tipo_nome + ' ' + s.soggetto_nome + ' ' + (s.cantiere || ''),
+  },
+  dipendenti: {
+    etichetta: 'Dipendenti', endpoint: '/dipendenti', lista: '/dipendenti', forza: true,
+    colonne: ['Nominativo', 'Codice fiscale', 'Cantiere', 'Stato'],
+    riga: (r) => [esc(r.nome + ' ' + r.cognome), esc(r.codice_fiscale || '—'), esc(r.cantiere || '—'), badgeAttivo(r.attivo)],
+    testo: (r) => r.nome + ' ' + r.cognome + ' ' + (r.codice_fiscale || '') + ' ' + (r.cantiere || ''),
+  },
+  subappaltatori: {
+    etichetta: 'Subappaltatori', endpoint: '/subappaltatori', lista: '/subappaltatori', forza: true,
+    colonne: ['Ragione sociale', 'Partita IVA', 'Stato'],
+    riga: (r) => [esc(r.ragione_sociale), esc(r.partita_iva || '—'), badgeAttivo(r.attivo)],
+    testo: (r) => r.ragione_sociale + ' ' + (r.partita_iva || ''),
+  },
+  attrezzature: {
+    etichetta: 'Attrezzature', endpoint: '/attrezzature', lista: '/attrezzature', forza: true,
+    colonne: ['Descrizione', 'Matricola', 'Stato'],
+    riga: (r) => [esc(r.descrizione), esc(r.matricola || '—'), badgeAttivo(r.attivo)],
+    testo: (r) => r.descrizione + ' ' + (r.matricola || ''),
+  },
+  sistemi_ia: {
+    etichetta: 'Sistemi IA', endpoint: '/sistemi_ia', lista: '/sistemi_ia', forza: true,
+    colonne: ['Sistema', 'Fornitore', 'Stato'],
+    riga: (r) => [esc(r.nome), esc(r.fornitore || '—'), badgeAttivo(r.attivo)],
+    testo: (r) => r.nome + ' ' + (r.fornitore || ''),
+  },
+  tipi: {
+    etichetta: 'Tipi di scadenza', endpoint: '/tipi', lista: '/tipi',
+    colonne: ['Nome', 'Categoria', 'Soggetto'],
+    riga: (t) => [esc(t.nome), esc(CATEGORIE[t.categoria] || t.categoria), esc(SOGGETTI[t.soggetto] || t.soggetto)],
+    testo: (t) => t.nome,
+  },
+  sessioni: {
+    etichetta: 'Sessioni corso', endpoint: '/sessioni', lista: '/sessioni',
+    colonne: ['Titolo', 'Docente', 'Periodo'],
+    riga: (s) => [esc(s.titolo), esc(s.docente || '—'), fmtData(s.data_inizio) + ' → ' + fmtData(s.data_fine)],
+    testo: (s) => s.titolo + ' ' + (s.docente || ''),
+  },
+};
+
+async function vistaAdmin(params) {
+  if (!utente.admin) { location.hash = '#/dashboard'; return; }
+  const risorsaIniziale = RISORSE_ADMIN[params.get('dati')] ? params.get('dati') : 'scadenze';
+
+  contenuto.innerHTML =
+    '<div class="vista-testata"><h2 class="vista-titolo">Amministrazione</h2></div>' +
+    '<p class="vista-sottotitolo">Area riservata a ' + esc(utente.nome || utente.username || 'amministratore') +
+      ': eliminazioni, utenze del portale, backup e manutenzione.</p>' +
+    '<div class="pannello" id="adm-riepilogo">' + htmlCaricamento() + '</div>' +
+    '<div class="pannello" id="adm-utenze">' + htmlCaricamento() + '</div>' +
+    '<div class="pannello" id="adm-dati">' + htmlCaricamento() + '</div>';
+
+  caricaRiepilogoAdmin();
+  caricaUtenzeAdmin();
+  caricaDatiAdmin(risorsaIniziale);
+}
+
+/* ---------- Panoramica + manutenzione ---------- */
+
+async function caricaRiepilogoAdmin() {
+  const box = document.getElementById('adm-riepilogo');
+  let r;
+  try { r = await api('/admin/riepilogo'); }
+  catch (e) { box.innerHTML = '<div class="pannello-corpo">' + htmlErrore(e.message) + '</div>'; return; }
+  const c = r.conteggi || {};
+  const voce = (etichetta, valore) =>
+    '<div class="adm-numero"><span class="stat-valore">' + esc(valore) + '</span><span class="stat-etichetta">' + esc(etichetta) + '</span></div>';
+  const backupRighe = (r.backup || []).map((b) =>
+    '<li>' + icona('archivio', 15) + '<span>' + esc(b.nome) + '</span><span class="muted voce-data">' + esc(fmtBytes(b.dimensione)) + '</span></li>').join('');
+
+  box.innerHTML =
+    '<div class="pannello-testata">' + icona('grafico') + '<h2>Panoramica e manutenzione</h2>' +
+      '<button type="button" class="btn btn-secondario" id="adm-backup">' + icona('scarica', 16) + 'Scarica backup</button>' +
+      '<button type="button" class="btn btn-pericolo" id="adm-svuota-log">' + icona('cestino', 16) + 'Svuota registro notifiche</button></div>' +
+    '<div class="pannello-corpo">' +
+      '<div class="adm-numeri">' +
+        voce('Scadenze', c.scadenze || 0) + voce('di cui chiuse', c.scadenze_chiuse || 0) +
+        voce('Dipendenti', c.dipendenti || 0) + voce('Subappaltatori', c.subappaltatori || 0) +
+        voce('Attrezzature', c.attrezzature || 0) + voce('Sistemi IA', c.sistemi_ia || 0) +
+        voce('Allegati', c.allegati || 0) + voce('Righe log notifiche', c.notifiche_log || 0) +
+      '</div>' +
+      '<p class="suggerimento-campo" style="margin-top:14px;">' +
+        'Versione ' + esc(r.versione) + ' · notifiche automatiche ' + (r.notifiche_automatiche ? 'attive' : 'spente') +
+        ' · ultimo giro: ' + (r.ultimo_giro_notifiche ? fmtDataOra(r.ultimo_giro_notifiche) : 'mai') +
+        (r.admin_utenti && r.admin_utenti.length ? ' · admin: ' + esc(r.admin_utenti.join(', ')) : '') + '</p>' +
+      '<h3 class="adm-sottotitolo">Backup automatici (cartella backup/)</h3>' +
+      (backupRighe ? '<ul class="lista-allegati">' + backupRighe + '</ul>'
+        : '<p class="muted">Nessun backup ancora: il primo viene creato poco dopo l’avvio del server.</p>') +
+    '</div>';
+
+  document.getElementById('adm-backup').addEventListener('click', () =>
+    scaricaFile('/api/admin/backup.zip', 'scadenzario_backup.zip'));
+  document.getElementById('adm-svuota-log').addEventListener('click', async () => {
+    const ok = await conferma('Svuotare tutto il registro notifiche? Gli avvisi già inviati per soglia potranno ripartire al prossimo giro.', 'Svuota');
+    if (!ok) return;
+    try {
+      const esito = await api('/admin/notifiche_log', { method: 'DELETE' });
+      notifica('Registro svuotato: ' + esito.eliminate + ' righe eliminate.');
+      caricaRiepilogoAdmin();
+    } catch (e) { notifica(e.message, 'errore'); }
+  });
+}
+
+/* ---------- Utenze del portale ---------- */
+
+async function caricaUtenzeAdmin() {
+  const box = document.getElementById('adm-utenze');
+  box.innerHTML = htmlCaricamento();
+  let dati;
+  try { dati = await api('/admin/utenti'); }
+  catch (e) {
+    box.innerHTML = '<div class="pannello-testata">' + icona('utenti') + '<h2>Utenze</h2></div>' +
+      '<div class="pannello-corpo">' + htmlErrore(e.message) + '</div>';
+    return;
+  }
+  const utenti = dati.utenti || [];
+  const assegnabili = dati.assegnabili || [];
+
+  const righe = utenti.map((u) => {
+    const apps = Array.isArray(u.apps) ? u.apps : [];
+    const haScadenzario = u.ruolo === 'admin' || apps.includes('scadenzario');
+    const se = u.username === utente.username;
+    return '<tr data-username="' + esc(u.username) + '">' +
+      '<td class="principale">' + esc(u.username) + (se ? ' <span class="muted">(tu)</span>' : '') + '</td>' +
+      '<td>' + esc(u.nome || '—') + '</td>' +
+      '<td>' + (u.ruolo === 'admin'
+        ? '<span class="badge badge-neutro"><span class="punto"></span>Admin</span>'
+        : '<span class="badge badge-chiusa"><span class="punto"></span>Utente</span>') + '</td>' +
+      '<td><label class="filtro-check"><input type="checkbox" data-accesso' + (haScadenzario ? ' checked' : '') +
+        (u.ruolo === 'admin' ? ' disabled title="Gli admin del portale entrano ovunque"' : '') + '> Scadenzario</label></td>' +
+      '<td class="num">' + fmtData(u.creato) + '</td>' +
+      '<td class="azioni">' +
+        '<button type="button" class="btn-icona" data-programmi title="Programmi abilitati" aria-label="Programmi abilitati">' + icona('lista', 17) + '</button>' +
+        (se ? '' : '<button type="button" class="btn-icona pericolo" data-elimina title="Elimina utenza" aria-label="Elimina utenza">' + icona('cestino', 17) + '</button>') +
+      '</td></tr>';
+  }).join('');
+
+  box.innerHTML =
+    '<div class="pannello-testata">' + icona('utenti') + '<h2>Utenze (' + utenti.length + ')</h2>' +
+      '<button type="button" class="btn btn-primario" id="adm-nuovo-utente">' + icona('piu', 16) + 'Nuova utenza</button></div>' +
+    '<p class="suggerimento-campo" style="padding:0 20px;">Le utenze sono quelle del Portale Suite: le modifiche valgono per tutti i programmi.</p>' +
+    (utenti.length
+      ? '<div class="tabella-contenitore"><table class="tabella"><thead><tr>' +
+        '<th>Username</th><th>Nome</th><th>Ruolo</th><th>Accesso</th><th class="num">Creato</th><th class="azioni">Azioni</th>' +
+        '</tr></thead><tbody>' + righe + '</tbody></table></div>'
+      : htmlVuoto('utenti', 'Nessuna utenza', 'Crea la prima utenza con il pulsante in alto.'));
+
+  const trova = (el) => utenti.find((u) => u.username === el.closest('tr').dataset.username);
+
+  async function salvaApps(u, apps) {
+    await api('/admin/utenti/' + encodeURIComponent(u.username) + '/apps', { method: 'PUT', body: { apps } });
+    notifica('Programmi di ' + u.username + ' aggiornati.');
+    caricaUtenzeAdmin();
+  }
+
+  box.querySelectorAll('[data-accesso]').forEach((cb) => cb.addEventListener('change', async () => {
+    const u = trova(cb);
+    const apps = new Set(Array.isArray(u.apps) ? u.apps : []);
+    if (cb.checked) apps.add('scadenzario'); else apps.delete('scadenzario');
+    try { await salvaApps(u, [...apps]); }
+    catch (e) { notifica(e.message, 'errore'); cb.checked = !cb.checked; }
+  }));
+
+  box.querySelectorAll('[data-programmi]').forEach((btn) => btn.addEventListener('click', () => {
+    const u = trova(btn);
+    const attive = new Set(Array.isArray(u.apps) ? u.apps : []);
+    apriModale({
+      titolo: 'Programmi di ' + u.username,
+      corpo: (u.ruolo === 'admin' ? '<p class="suggerimento-campo" style="margin-bottom:10px;">Admin del portale: entra comunque in tutti i programmi.</p>' : '') +
+        assegnabili.map((a) =>
+          '<label class="campo-check"><input type="checkbox" value="' + esc(a.id) + '"' + (attive.has(a.id) ? ' checked' : '') + '> ' +
+          esc(a.nome) + (a.riservata ? ' <span class="muted">(riservata)</span>' : '') + '</label>').join(''),
+      labelConferma: 'Salva',
+      onConferma: async (overlay) => {
+        const scelte = [...overlay.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value);
+        await salvaApps(u, scelte);
+        return true;
+      },
+    });
+  }));
+
+  box.querySelectorAll('[data-elimina]').forEach((btn) => btn.addEventListener('click', async () => {
+    const u = trova(btn);
+    const ok = await conferma('Eliminare l’utenza “' + u.username + '”? Non potrà più accedere a nessun programma della suite.');
+    if (!ok) return;
+    try {
+      await api('/admin/utenti/' + encodeURIComponent(u.username), { method: 'DELETE' });
+      notifica('Utenza eliminata.');
+      caricaUtenzeAdmin();
+    } catch (e) { notifica(e.message, 'errore'); }
+  }));
+
+  document.getElementById('adm-nuovo-utente').addEventListener('click', () => {
+    apriModale({
+      titolo: 'Nuova utenza',
+      corpo:
+        '<div class="riga-campi">' +
+          '<div class="campo"><label class="etichetta" for="nu-username">Username *</label><input type="text" id="nu-username" autocomplete="off" placeholder="es. m.rossi"></div>' +
+          '<div class="campo"><label class="etichetta" for="nu-nome">Nome e cognome *</label><input type="text" id="nu-nome"></div>' +
+        '</div>' +
+        '<div class="riga-campi">' +
+          '<div class="campo"><label class="etichetta" for="nu-password">Password provvisoria *</label><input type="password" id="nu-password" autocomplete="new-password">' +
+            '<span class="suggerimento-campo">Al primo accesso l’utente dovrà cambiarla.</span></div>' +
+          '<div class="campo"><label class="etichetta" for="nu-ruolo">Ruolo</label><select id="nu-ruolo"><option value="utente">Utente</option><option value="admin">Admin del portale</option></select></div>' +
+        '</div>' +
+        '<label class="campo-check"><input type="checkbox" id="nu-scadenzario" checked> Abilita allo Scadenzario</label>',
+      labelConferma: 'Crea utenza',
+      onConferma: async (overlay, mostraErrore) => {
+        const body = {
+          username: overlay.querySelector('#nu-username').value.trim().toLowerCase(),
+          nome: overlay.querySelector('#nu-nome').value.trim(),
+          password: overlay.querySelector('#nu-password').value,
+          ruolo: overlay.querySelector('#nu-ruolo').value,
+        };
+        if (!body.username || !body.nome || !body.password) { mostraErrore('Username, nome e password sono obbligatori.'); return false; }
+        if (overlay.querySelector('#nu-scadenzario').checked) {
+          // Programmi predefiniti (non riservati) + Scadenzario
+          const apps = new Set(assegnabili.filter((a) => !a.riservata).map((a) => a.id));
+          apps.add('scadenzario');
+          body.apps = [...apps];
+        }
+        await api('/admin/utenti', { method: 'POST', body });
+        notifica('Utenza ' + body.username + ' creata.');
+        caricaUtenzeAdmin();
+        return true;
+      },
+    });
+  });
+}
+
+/* ---------- Eliminazione dati ---------- */
+
+async function caricaDatiAdmin(chiave) {
+  const box = document.getElementById('adm-dati');
+  const cfg = RISORSE_ADMIN[chiave];
+  const schede = Object.keys(RISORSE_ADMIN).map((k) =>
+    '<button type="button" class="adm-scheda' + (k === chiave ? ' attiva' : '') + '" data-scheda="' + k + '">' + esc(RISORSE_ADMIN[k].etichetta) + '</button>').join('');
+
+  box.innerHTML =
+    '<div class="pannello-testata">' + icona('cestino') + '<h2>Elimina dati</h2></div>' +
+    '<div class="adm-schede" role="tablist">' + schede + '</div>' +
+    '<div class="filtri" style="padding:0 20px;">' +
+      '<div class="filtro-campo crescita"><label for="adm-cerca">Cerca</label><input type="search" id="adm-cerca" placeholder="Filtra l’elenco…"></div>' +
+      (cfg.forza ? '<label class="filtro-check"><input type="checkbox" id="adm-forza"> Elimina anche le scadenze collegate</label>' : '') +
+      '<button type="button" class="btn btn-pericolo" id="adm-elimina-sel" disabled>' + icona('cestino', 16) + 'Elimina selezionati</button>' +
+    '</div>' +
+    '<div id="adm-elenco">' + htmlCaricamento() + '</div>';
+
+  box.querySelectorAll('[data-scheda]').forEach((b) => b.addEventListener('click', () => caricaDatiAdmin(b.dataset.scheda)));
+
+  let elementi;
+  try { elementi = await api(cfg.lista); }
+  catch (e) { document.getElementById('adm-elenco').innerHTML = '<div class="pannello-corpo">' + htmlErrore(e.message) + '</div>'; return; }
+
+  const selezionati = new Set();
+  const btnElimina = document.getElementById('adm-elimina-sel');
+  const aggiornaBottone = () => {
+    btnElimina.disabled = !selezionati.size;
+    btnElimina.lastChild.textContent = selezionati.size ? 'Elimina selezionati (' + selezionati.size + ')' : 'Elimina selezionati';
+  };
+
+  function disegna(filtro) {
+    const testo = (filtro || '').toLowerCase();
+    const visibili = elementi.filter((x) => !testo || cfg.testo(x).toLowerCase().includes(testo));
+    const elenco = document.getElementById('adm-elenco');
+    if (!visibili.length) { elenco.innerHTML = htmlVuoto('inbox', 'Niente da mostrare', 'Nessun elemento corrisponde.'); return; }
+    elenco.innerHTML = '<div class="tabella-contenitore"><table class="tabella"><thead><tr>' +
+      '<th style="width:36px;"><input type="checkbox" id="adm-tutti" aria-label="Seleziona tutti"></th>' +
+      cfg.colonne.map((c) => '<th>' + esc(c) + '</th>').join('') + '<th class="azioni">Elimina</th>' +
+      '</tr></thead><tbody>' + visibili.map((x) =>
+        '<tr data-id="' + x.id + '"><td><input type="checkbox" data-sel' + (selezionati.has(x.id) ? ' checked' : '') + ' aria-label="Seleziona"></td>' +
+        cfg.riga(x).map((v) => '<td>' + v + '</td>').join('') +
+        '<td class="azioni"><button type="button" class="btn-icona pericolo" data-uno title="Elimina" aria-label="Elimina">' + icona('cestino', 17) + '</button></td></tr>').join('') +
+      '</tbody></table></div>';
+
+    elenco.querySelectorAll('[data-sel]').forEach((cb) => cb.addEventListener('change', () => {
+      const id = Number(cb.closest('tr').dataset.id);
+      if (cb.checked) selezionati.add(id); else selezionati.delete(id);
+      aggiornaBottone();
+    }));
+    document.getElementById('adm-tutti').addEventListener('change', (e) => {
+      visibili.forEach((x) => { if (e.target.checked) selezionati.add(x.id); else selezionati.delete(x.id); });
+      disegna(filtro);
+      aggiornaBottone();
+    });
+    elenco.querySelectorAll('[data-uno]').forEach((btn) => btn.addEventListener('click', () =>
+      eliminaElementi([Number(btn.closest('tr').dataset.id)])));
+  }
+
+  async function eliminaElementi(ids) {
+    const forza = cfg.forza && document.getElementById('adm-forza').checked;
+    const ok = await conferma('Eliminare definitivamente ' + ids.length + ' ' + (ids.length === 1 ? 'elemento' : 'elementi') +
+      ' da «' + cfg.etichetta + '»' + (forza ? ' insieme alle scadenze collegate' : '') + '? L’operazione non è reversibile.');
+    if (!ok) return;
+    let eliminati = 0;
+    const errori = [];
+    for (const id of ids) {
+      try {
+        await api(cfg.endpoint + '/' + id + (forza ? '?forza=1' : ''), { method: 'DELETE' });
+        eliminati++;
+      } catch (e) {
+        const x = elementi.find((el) => el.id === id);
+        errori.push((x ? cfg.testo(x).trim() : 'ID ' + id) + ': ' + e.message);
+      }
+    }
+    if (eliminati) notifica(eliminati + ' eliminati.');
+    if (errori.length) mostraErroriImport(errori, 'Elementi non eliminati', 'Alcuni elementi non sono stati eliminati:');
+    // Le cache delle select vanno ricaricate: qualcosa può essere sparito.
+    cache.tipi = null;
+    cache.soggetti = {};
+    caricaDatiAdmin(chiave);
+    caricaRiepilogoAdmin();
+  }
+
+  btnElimina.addEventListener('click', () => eliminaElementi([...selezionati]));
+  document.getElementById('adm-cerca').addEventListener('input', debounce((e) => disegna(e.target.value.trim()), 200));
+  disegna('');
+}
+
+/* ============================================================
    Avvio applicazione
    ============================================================ */
 
@@ -1768,8 +2051,16 @@ function avviaHeartbeat() {
   setInterval(invia, 5000);
 }
 
-function avvia() {
+async function avvia() {
   avviaHeartbeat();
+  try {
+    Object.assign(utente, await api('/me'));
+  } catch (e) { /* senza /me si resta utente semplice: niente area admin */ }
+  const elUtente = document.getElementById('testata-utente');
+  if (elUtente && (utente.nome || utente.username)) {
+    elUtente.textContent = utente.nome || utente.username;
+    if (utente.admin) elUtente.title = 'Amministratore dello Scadenzario';
+  }
   costruisciSidebar();
 
   // Data odierna nella testata
