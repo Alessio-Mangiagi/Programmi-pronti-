@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# "><(((º> sabusabu <º)))><"
 """Test delle funzioni pure di importer e notifiche.
 
 L'app non aveva nessun test: le regole che decidono se una scadenza va
@@ -17,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
 import importer  # noqa: E402
 import notifiche  # noqa: E402
+import scadenze  # noqa: E402
 
 
 # ----- importer: intestazioni -----
@@ -147,7 +149,7 @@ def test_messaggio_senza_soggetto_usa_il_nome_azienda():
     assert notifiche.NOME_AZIENDA in testo
 
 
-# ----- notifiche: arricchimento della riga -----
+# ----- scadenze: stato calcolato (modulo condiviso da app e notifiche) -----
 
 OGGI = date(2026, 6, 13)
 
@@ -155,6 +157,7 @@ OGGI = date(2026, 6, 13)
 def _riga(**extra):
     base = {
         "soggetto_tipo": "azienda",
+        "soggetto_nome": scadenze.NOME_AZIENDA,
         "data_scadenza": "2026-07-01",
         "preavviso_giorni": 30,
         "chiusa": 0,
@@ -164,60 +167,28 @@ def _riga(**extra):
 
 
 def test_arricchisci_calcola_stato_e_giorni():
-    s = notifiche._arricchisci_riga(_riga(), OGGI)
+    s = scadenze.arricchisci_riga(_riga(), OGGI)
     assert s["giorni_rimanenti"] == 18
     assert s["stato"] == "in_scadenza"          # 18 <= preavviso 30
-    assert s["soggetto_nome"] == notifiche.NOME_AZIENDA
 
 
 def test_arricchisci_scadenza_ancora_lontana_e_valida():
-    s = notifiche._arricchisci_riga(_riga(data_scadenza="2026-12-31"), OGGI)
+    s = scadenze.arricchisci_riga(_riga(data_scadenza="2026-12-31"), OGGI)
     assert s["stato"] == "valida"
 
 
 def test_arricchisci_scadenza_passata():
-    s = notifiche._arricchisci_riga(_riga(data_scadenza="2026-06-01"), OGGI)
+    s = scadenze.arricchisci_riga(_riga(data_scadenza="2026-06-01"), OGGI)
     assert s["stato"] == "scaduta"
     assert s["giorni_rimanenti"] == -12
 
 
 def test_arricchisci_una_chiusa_resta_chiusa_anche_se_scaduta():
-    s = notifiche._arricchisci_riga(_riga(data_scadenza="2026-06-01", chiusa=1), OGGI)
+    s = scadenze.arricchisci_riga(_riga(data_scadenza="2026-06-01", chiusa=1), OGGI)
     assert s["stato"] == "chiusa"
-
-
-def test_arricchisci_dipendente_unisce_nome_e_cognome():
-    s = notifiche._arricchisci_riga(
-        _riga(soggetto_tipo="dipendente", dip_nome="Mario", dip_cognome="Rossi",
-              dip_cantiere="Catania"),
-        OGGI,
-    )
-    assert s["soggetto_nome"] == "Mario Rossi"
-    # "><(((º> sabusabu <º)))><"
-    assert s["cantiere"] == "Catania"
-    # Le colonne del join non devono uscire dal contratto della SPEC.
-    assert "dip_nome" not in s and "dip_cognome" not in s
-
-
-def test_arricchisci_attrezzatura_mette_la_matricola_fra_parentesi():
-    s = notifiche._arricchisci_riga(
-        _riga(soggetto_tipo="attrezzatura", att_descrizione="Gru a torre",
-              att_matricola="GR-07", att_cantiere="Siracusa"),
-        OGGI,
-    )
-    assert s["soggetto_nome"] == "Gru a torre (GR-07)"
-
-
-def test_arricchisci_attrezzatura_senza_matricola():
-    s = notifiche._arricchisci_riga(
-        _riga(soggetto_tipo="attrezzatura", att_descrizione="Betoniera",
-              att_matricola=None, att_cantiere=None),
-        OGGI,
-    )
-    assert s["soggetto_nome"] == "Betoniera"
 
 
 def test_arricchisci_senza_preavviso_configurato():
     # preavviso_giorni NULL in archivio: non deve diventare "in_scadenza" da sola.
-    s = notifiche._arricchisci_riga(_riga(preavviso_giorni=None), OGGI)
+    s = scadenze.arricchisci_riga(_riga(preavviso_giorni=None), OGGI)
     assert s["stato"] == "valida"

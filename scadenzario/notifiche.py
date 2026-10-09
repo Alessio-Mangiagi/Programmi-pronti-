@@ -5,15 +5,14 @@ notifiche.py — Motore notifiche per Scadenzario Cosedil.
 Funzioni (firme vincolate dalla SPEC):
   - scadenze_da_notificare() : scadenze arricchite con stato 'scaduta' o 'in_scadenza', non chiuse
   - esegui_notifiche()       : canale in_app → scrive su notifiche_log con esito 'ok';
-                               email e whatsapp → stub disattivati, loggano esito 'disabilitato'
+                               email → un riepilogo per giro (se configurata); whatsapp → stub 'disabilitato'
   - formatta_messaggio(scadenza) : testo notifica, es.
         "⚠ Visita medica idoneità di Mario Rossi scade il 01/07/2026 (18 giorni)"
 
 Canali:
   - in_app   : sempre attivo (il log è mostrato nella vista Impostazioni della SPA).
-  - email    : STUB disattivato. Per attivarlo: configurare un server SMTP aziendale
-               (smtplib stdlib), aggiungere le costanti SMTP_HOST/SMTP_PORT/SMTP_USER/
-               SMTP_PASSWORD in config.py e sostituire il corpo di _invia_email().
+  - email    : attiva se configurata da variabili d'ambiente (vedi config.py):
+               una sola email di riepilogo per ogni giro di notifiche.
   - whatsapp : STUB disattivato. Per attivarlo si riusa il bot Node whatsapp-web.js già
                esistente nel progetto "auguri": quel bot espone l'invio
                messaggi via WhatsApp Web; basta avviarlo e fare una POST HTTP locale al suo
@@ -21,111 +20,36 @@ Canali:
                i messaggi in un file/coda condivisa che il bot legge.
 """
 
-import sqlite3
-from datetime import date, datetime
+from datetime import datetime
 
 import config
 import database
+import scadenze
 
 # Nome soggetto per le scadenze aziendali (soggetto_tipo='azienda', soggetto_id NULL)
-NOME_AZIENDA = "Cosedil S.p.A."
+NOME_AZIENDA = scadenze.NOME_AZIENDA
 
 
 # ---------------------------------------------------------------------------
-# Lettura scadenze arricchite
+# Lettura scadenze da notificare
 # ---------------------------------------------------------------------------
-
-def _arricchisci_riga(riga, oggi):
-    """Trasforma una riga SQL (scadenze + join) nel dict 'scadenza arricchita' della SPEC."""
-    scadenza = dict(riga)
-
-    # soggetto_nome e cantiere in base al tipo di soggetto
-    tipo_soggetto = scadenza["soggetto_tipo"]
-    if tipo_soggetto == "dipendente":
-        nome = scadenza.pop("dip_nome", None)
-        cognome = scadenza.pop("dip_cognome", None)
-        scadenza["soggetto_nome"] = f"{nome} {cognome}".strip() if (nome or cognome) else None
-        scadenza["cantiere"] = scadenza.pop("dip_cantiere", None)
-    elif tipo_soggetto == "subappaltatore":
-        scadenza["soggetto_nome"] = scadenza.pop("sub_ragione_sociale", None)
-        scadenza["cantiere"] = None
-    elif tipo_soggetto == "attrezzatura":
-        descrizione = scadenza.pop("att_descrizione", None)
-        matricola = scadenza.pop("att_matricola", None)
-        if descrizione and matricola:
-            scadenza["soggetto_nome"] = f"{descrizione} ({matricola})"
-        else:
-            scadenza["soggetto_nome"] = descrizione
-        scadenza["cantiere"] = scadenza.pop("att_cantiere", None)
-    elif tipo_soggetto == "sistema_ia":
-        scadenza["soggetto_nome"] = scadenza.pop("si_nome", None)
-        scadenza["cantiere"] = scadenza.pop("si_cantiere", None)
-    else:  # azienda
-        scadenza["soggetto_nome"] = NOME_AZIENDA
-        scadenza["cantiere"] = None
-
-    # Campi di join residui non previsti dal contratto
-    for chiave in ("dip_nome", "dip_cognome", "dip_cantiere", "sub_ragione_sociale",
-                   "att_descrizione", "att_matricola", "att_cantiere",
-                   "si_nome", "si_cantiere"):
-        scadenza.pop(chiave, None)
-
-    # Stato calcolato server-side (mai salvato) — regole SPEC
-    data_scadenza = datetime.strptime(scadenza["data_scadenza"], "%Y-%m-%d").date()
-    giorni_rimanenti = (data_scadenza - oggi).days
-    preavviso = scadenza.get("preavviso_giorni") or 0
-    if scadenza["chiusa"]:
-        stato = "chiusa"
-    elif data_scadenza < oggi:
-        stato = "scaduta"
-    elif giorni_rimanenti <= preavviso:
-        stato = "in_scadenza"
-    else:
-        stato = "valida"
-
-    scadenza["stato"] = stato
-    scadenza["giorni_rimanenti"] = giorni_rimanenti
-    return scadenza
-
 
 # "><(((º> sabusabu <º)))><"
+def _da_notificare(conn, oggi=None) -> list:
+    """Scadenze aperte, scadute o in scadenza, di soggetti ancora attivi."""
+    return [s for s in scadenze.carica(conn, "s.chiusa = 0", oggi=oggi)
+            if s["stato"] in ("scaduta", "in_scadenza")
+            and s.get("soggetto_attivo") != 0]
+
+
 def scadenze_da_notificare() -> list:
     """Ritorna le scadenze arricchite con stato 'scaduta' o 'in_scadenza' (chiusa=0),
-    ordinate per data_scadenza crescente."""
-    con = database.get_db()
-    con.row_factory = sqlite3.Row  # garantisce righe accessibili per nome colonna
-    cur = con.cursor()
-    righe = cur.execute(
-        """SELECT s.id, s.tipo_id, t.nome AS tipo_nome, t.categoria,
-                  s.soggetto_tipo, s.soggetto_id,
-                  s.data_rilascio, s.data_scadenza, s.documento_rif, s.referente, s.note, s.chiusa,
-                  t.preavviso_giorni,
-                  d.nome AS dip_nome, d.cognome AS dip_cognome, d.cantiere AS dip_cantiere,
-                  sub.ragione_sociale AS sub_ragione_sociale,
-                  a.descrizione AS att_descrizione, a.matricola AS att_matricola,
-                  a.cantiere AS att_cantiere,
-                  si.nome AS si_nome, si.cantiere AS si_cantiere
-           FROM scadenze s
-           JOIN tipi_scadenza t ON t.id = s.tipo_id
-           LEFT JOIN dipendenti d
-                  ON s.soggetto_tipo = 'dipendente' AND d.id = s.soggetto_id
-           LEFT JOIN subappaltatori sub
-                  ON s.soggetto_tipo = 'subappaltatore' AND sub.id = s.soggetto_id
-           LEFT JOIN attrezzature a
-                  ON s.soggetto_tipo = 'attrezzatura' AND a.id = s.soggetto_id
-           LEFT JOIN sistemi_ia si
-                  ON s.soggetto_tipo = 'sistema_ia' AND si.id = s.soggetto_id
-           WHERE s.chiusa = 0
-           ORDER BY s.data_scadenza ASC"""
-    ).fetchall()
-
-    oggi = date.today()
-    risultato = []
-    for riga in righe:
-        scadenza = _arricchisci_riga(riga, oggi)
-        if scadenza["stato"] in ("scaduta", "in_scadenza"):
-            risultato.append(scadenza)
-    return risultato
+    ordinate per data_scadenza crescente. Esclusi i soggetti disattivati in anagrafica."""
+    conn = database.get_db()
+    try:
+        return _da_notificare(conn)
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -155,32 +79,33 @@ def formatta_messaggio(scadenza: dict) -> str:
 # Canali di invio
 # ---------------------------------------------------------------------------
 
-def _invia_email(scadenza, messaggio):
-    """Invia la notifica via email (SMTP stdlib) se il canale è configurato.
+def _invia_email_riepilogo(nuove):
+    """Invia UNA email con tutte le notifiche nuove del giro (SMTP stdlib).
 
     Attivazione (nessuna credenziale nel codice): impostare le variabili
     d'ambiente EMAIL_ABILITATA=1, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD,
     EMAIL_DA, EMAIL_A (destinatari separati da virgola). Vedi config.py.
 
-    Ritorna ('ok', testo) se inviata, ('errore', dettaglio) se l'invio fallisce,
-    ('disabilitato', testo) se il canale non è configurato.
+    nuove = lista di (scadenza, messaggio). Ritorna ('ok'|'errore'|'disabilitato', dettaglio).
     """
     if not config.EMAIL_ABILITATA or not config.SMTP_HOST or not config.EMAIL_A:
-        return ("disabilitato", messaggio)
+        return ("disabilitato", "")
     try:
         import smtplib
         from email.message import EmailMessage
 
         msg = EmailMessage()
-        soggetto = scadenza.get("soggetto_nome") or NOME_AZIENDA
-        tipo_nome = scadenza.get("tipo_nome") or "Scadenza"
-        msg["Subject"] = f"[Scadenzario Cosedil] {tipo_nome} — {soggetto}"
+        msg["Subject"] = (f"[Scadenzario Cosedil] {len(nuove)} "
+                          f"{'scadenza' if len(nuove) == 1 else 'scadenze'} da verificare")
         msg["From"] = config.EMAIL_DA or config.SMTP_USER
         msg["To"] = ", ".join(config.EMAIL_A)
-        corpo = messaggio
-        if scadenza.get("referente"):
-            corpo += f"\nReferente: {scadenza['referente']}"
-        msg.set_content(corpo)
+        righe = []
+        for scadenza, messaggio in nuove:
+            riga = "- " + messaggio
+            if scadenza.get("referente"):
+                riga += f" (referente: {scadenza['referente']})"
+            righe.append(riga)
+        msg.set_content("Riepilogo scadenze dallo Scadenzario Cosedil:\n\n" + "\n".join(righe))
 
         with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=15) as server:
             if config.SMTP_STARTTLS:
@@ -188,9 +113,9 @@ def _invia_email(scadenza, messaggio):
             if config.SMTP_USER:
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
             server.send_message(msg)
-        return ("ok", messaggio)
+        return ("ok", "")
     except Exception as exc:  # rete/SMTP/auth: non deve mai far crashare il giro
-        return ("errore", f"{messaggio} [invio email fallito: {exc}]")
+        return ("errore", f"[invio email fallito: {exc}]")
 
 
 def _invia_whatsapp(scadenza, messaggio):
@@ -239,59 +164,71 @@ def esegui_notifiche() -> dict:
       - una sola volta per ciascuna soglia attraversata (180/90/60/30/14/7/1/0 gg),
         così l'utente riceve avvisi ripetuti man mano che la scadenza si avvicina;
       - una volta al giorno finché la scadenza resta scaduta.
-    Il canale 'email' è reale se configurato (vedi _invia_email), altrimenti logga
-    'disabilitato'; 'whatsapp' resta uno stub disattivato.
+    Le notifiche nuove del giro partono in UNA sola email di riepilogo (se il
+    canale è configurato, vedi _invia_email_riepilogo); 'whatsapp' resta uno stub.
 
     Ritorna: {"inviate": N, "log": [ {scadenza_id, canale, messaggio, esito, contesto}, ... ]}
     """
-    con = database.get_db()
-    cur = con.cursor()
-    da_notificare = scadenze_da_notificare()
-    log = []
-    inviate = 0
+    conn = database.get_db()
+    try:
+        log = []
+        nuove = []   # (scadenza, messaggio, contesto)
 
-    for scadenza in da_notificare:
-        contesto, per_giorno = _banda_preavviso(scadenza)
-        if contesto is None:
-            continue
+        for scadenza in _da_notificare(conn):
+            contesto, per_giorno = _banda_preavviso(scadenza)
+            if contesto is None:
+                continue
 
-        # Dedup: per le soglie una volta sola (per scadenza+banda); per lo stato
-        # 'scaduta' una volta al giorno.
-        if per_giorno:
-            gia_notificata = cur.execute(
-                """SELECT 1 FROM notifiche_log
-                   WHERE scadenza_id = ? AND canale = 'in_app' AND contesto = ?
-                     AND date(inviata_il) = date('now','localtime') LIMIT 1""",
-                (scadenza["id"], contesto)).fetchone()
-        else:
-            gia_notificata = cur.execute(
-                """SELECT 1 FROM notifiche_log
-                   WHERE scadenza_id = ? AND canale = 'in_app' AND contesto = ? LIMIT 1""",
-                (scadenza["id"], contesto)).fetchone()
-        if gia_notificata:
-            continue
+            # Dedup: per le soglie una volta sola (per scadenza+banda); per lo stato
+            # 'scaduta' una volta al giorno.
+            sql_dedup = ("SELECT 1 FROM notifiche_log WHERE scadenza_id = ? "
+                         "AND canale = 'in_app' AND contesto = ?")
+            if per_giorno:
+                sql_dedup += " AND date(inviata_il) = date('now','localtime')"
+            if conn.execute(sql_dedup + " LIMIT 1", (scadenza["id"], contesto)).fetchone():
+                continue
 
-        messaggio = formatta_messaggio(scadenza)
-        cur.execute(
-            """INSERT INTO notifiche_log (scadenza_id, canale, messaggio, esito, contesto)
-               VALUES (?, 'in_app', ?, 'ok', ?)""",
-            (scadenza["id"], messaggio, contesto))
-        inviate += 1
-        log.append({"scadenza_id": scadenza["id"], "canale": "in_app",
-                    "messaggio": messaggio, "esito": "ok", "contesto": contesto})
-
-        # Canale email (reale se configurato) e whatsapp (stub disattivato)
-        for canale, invia in (("email", _invia_email), ("whatsapp", _invia_whatsapp)):
-            esito, testo = invia(scadenza, messaggio)
-            cur.execute(
+            messaggio = formatta_messaggio(scadenza)
+            conn.execute(
                 """INSERT INTO notifiche_log (scadenza_id, canale, messaggio, esito, contesto)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (scadenza["id"], canale, testo, esito, contesto))
-            log.append({"scadenza_id": scadenza["id"], "canale": canale,
-                        "messaggio": testo, "esito": esito, "contesto": contesto})
+                   VALUES (?, 'in_app', ?, 'ok', ?)""",
+                (scadenza["id"], messaggio, contesto))
+            log.append({"scadenza_id": scadenza["id"], "canale": "in_app",
+                        "messaggio": messaggio, "esito": "ok", "contesto": contesto})
+            nuove.append((scadenza, messaggio, contesto))
 
-    con.commit()
-    return {"inviate": inviate, "log": log}
+        if nuove:
+            esito_email, dettaglio = _invia_email_riepilogo([(s, m) for s, m, _ in nuove])
+            for scadenza, messaggio, contesto in nuove:
+                esito_wa, testo_wa = _invia_whatsapp(scadenza, messaggio)
+                for canale, esito, testo in (
+                        ("email", esito_email, (messaggio + " " + dettaglio).strip()),
+                        ("whatsapp", esito_wa, testo_wa)):
+                    conn.execute(
+                        """INSERT INTO notifiche_log (scadenza_id, canale, messaggio, esito, contesto)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (scadenza["id"], canale, testo, esito, contesto))
+                    log.append({"scadenza_id": scadenza["id"], "canale": canale,
+                                "messaggio": testo, "esito": esito, "contesto": contesto})
+
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (chiave, valore) "
+            "VALUES ('ultimo_giro_notifiche', datetime('now','localtime'))")
+        conn.commit()
+        return {"inviate": len(nuove), "log": log}
+    finally:
+        conn.close()
+
+
+def ultimo_giro():
+    """Timestamp dell'ultimo giro di notifiche (stringa) o None."""
+    conn = database.get_db()
+    try:
+        riga = conn.execute(
+            "SELECT valore FROM meta WHERE chiave = 'ultimo_giro_notifiche'").fetchone()
+        return riga[0] if riga else None
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
