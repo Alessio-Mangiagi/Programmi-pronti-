@@ -228,7 +228,7 @@ test('assistente: non dice mai la porta', () => {
 
 test('assistente: alla domanda sulla porta risponde comunque qualcosa di utile', () => {
   const { risposta, apps } = rispondiAssistente('che porta usa il ddt?', APPS);
-  assert.match(risposta, /Avvia|Apri/);
+  assert.match(risposta, /scheda .* apre/);
   assert.deepEqual(apps, ['ddt']);
 });
 
@@ -549,6 +549,33 @@ test('assistente: gli esempi che propone trovano davvero un\'app', () => {
   for (const q of ['cosa fa l\'OCR?', 'quale app per i PDF scansionati?', 'come si avvia il DDT?', 'quali app ci sono?']) {
     assert.ok(rispondiAssistente(q, visibili).apps.length > 0, q);
   }
+});
+
+test('assistente: credenziali e password rimandano all\'amministratore', () => {
+  for (const q of ['ho dimenticato la password', 'il mio account è bloccato', 'mi servono le credenziali per il ddt', 'non riesco ad accedere']) {
+    const r = rispondiAssistente(q, APPS, { emailAdmin: 'admin@cosedil.it' });
+    assert.deepEqual(r.contatto, { email: 'admin@cosedil.it' }, q);
+    assert.match(r.risposta, /admin@cosedil\.it/);
+    assert.match(r.risposta, /Cambia password/);
+  }
+});
+
+test('assistente: senza indirizzo configurato non ne inventa uno', () => {
+  const r = rispondiAssistente('ho dimenticato la password', APPS);
+  assert.deepEqual(r.contatto, { email: '' });
+  assert.match(r.risposta, /rivolgiti a un amministratore/);
+  assert.doesNotMatch(r.risposta, /@/);
+});
+
+test('assistente: domande fuori tema o lunghe vanno a una persona, quelle sulle app no', () => {
+  const o = { emailAdmin: 'admin@cosedil.it' };
+  assert.ok(rispondiAssistente('come faccio il bilancio consolidato?', APPS, o).contatto);
+  const lunga = 'devo preparare un report che incroci le bolle del mese con le scadenze dei fornitori e poi '
+    + 'confrontare il risultato con la versione di settembre per capire quali fornitori hanno cambiato condizioni';
+  const r = rispondiAssistente(lunga, APPS, o);
+  assert.ok(r.contatto);
+  assert.ok(r.apps.includes('ddt'));
+  assert.equal(rispondiAssistente('cosa fa l\'OCR?', APPS, o).contatto, undefined);
 });
 
 test('APPS: ogni app ha attività e guida per la home utenti', () => {

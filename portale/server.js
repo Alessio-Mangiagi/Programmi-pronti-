@@ -31,6 +31,20 @@ const LOG_FILE = path.join(DATA_DIR, 'server.log');         // errori runtime
 const IP_ADMIN_FILE = path.join(DATA_DIR, 'ip-admin.json'); // regole IP -> admin per-app
 const WARM_FILE = path.join(DATA_DIR, 'warm.json');        // app da avviare "a caldo"
 const APP_EXTRA_FILE = path.join(DATA_DIR, 'app-extra.json'); // programmi aggiunti dagli admin
+const CONTATTI_FILE = path.join(DATA_DIR, 'contatti.json');  // { "emailAdmin": "..." }
+
+// Casella dell'amministratore a cui l'assistente e la pagina di login mandano
+// chi ha bisogno di una persona. Variabile ADMIN_EMAIL, altrimenti
+// data/contatti.json; riletta a ogni richiesta, così si cambia senza riavvio.
+// Un valore che non sembra un indirizzo vale come assente.
+function emailAdmin() {
+  let v = process.env.ADMIN_EMAIL || '';
+  if (!v) {
+    try { v = String(JSON.parse(fs.readFileSync(CONTATTI_FILE, 'utf8')).emailAdmin || ''); } catch { v = ''; }
+  }
+  v = v.trim();
+  return /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(v) ? v : '';
+}
 
 // Eventi massimi conservati. Alzato quando le app hanno iniziato a scrivere nel
 // registro le loro azioni (es. ogni DDT convertito), non solo aperture e login.
@@ -297,12 +311,50 @@ function eInsulto(qn) { return INSULTI.test(qn); }
 const RISPOSTA_INSULTO = 'Sono un assistente automatico e ti aiuto volentieri, ma ti chiedo di scrivere con rispetto. '
   + 'Riprova a farmi la domanda con calma, per esempio «quale app per le bolle?».';
 
-function rispondiAssistente(domanda, apps) {
+// Dove mandare chi ha bisogno di una persona: credenziali, password dimenticata,
+// domande che l'assistente non sa o che sono troppo articolate. Senza indirizzo
+// configurato si dice di rivolgersi a un amministratore, senza inventarne uno.
+function rimandoAdmin(email) {
+  return email ? `scrivi all'amministratore del portale: ${email}` : 'rivolgiti a un amministratore del portale';
+}
+const DOMANDA_ACCOUNT = /(^|\s)(password|passwd|credenzial\w*|account|username|nome utente|login|bloccat\w*|dimenticat\w*|accedere|accesso negato|non (riesco|posso) (a )?(entrare|accedere)|nuovo utente|abilitazion\w*|permess\w*)($|\s)/;
+// Oltre questa lunghezza la domanda è un ragionamento, non una richiesta su
+// un'app: meglio una persona che una risposta a parole chiave.
+const PAROLE_DOMANDA_COMPLESSA = 25;
+
+// opts.emailAdmin: indirizzo dell'amministratore (vedi emailAdmin()).
+// La risposta porta `contatto: { email }` quando rimanda a una persona: la
+// pagina ci aggancia il pulsante "Scrivi all'amministratore".
+function rispondiAssistente(domanda, apps, opts = {}) {
   const qn = normalizza(domanda);
+  const email = opts.emailAdmin || '';
   if (!qn) return { risposta: 'Scrivi una domanda sulle app della suite. ' + CHAT_ESEMPI, apps: [] };
   if (eInsulto(qn)) return { risposta: RISPOSTA_INSULTO, apps: [], insulto: true };
 
   const parole = qn.split(' ');
+
+  // Credenziali e password: il cambio lo fa l'utente da sé, il resto un admin.
+  if (DOMANDA_ACCOUNT.test(qn)) {
+    return {
+      risposta: 'Per cambiare la tua password usa «Cambia password». '
+        + `Se l'hai dimenticata, se l'account è bloccato o ti servono credenziali o permessi nuovi, ${rimandoAdmin(email)}.`,
+      apps: [],
+      contatto: { email },
+    };
+  }
+
+  // Domanda lunga e articolata: la si gira a una persona, citando le app che
+  // c'entrano se ce ne sono.
+  if (parole.length > PAROLE_DOMANDA_COMPLESSA) {
+    const app = appPertinenti(qn, apps).slice(0, 2).map((t) => t.app);
+    return {
+      risposta: 'È una domanda articolata e rischierei di risponderti male: '
+        + `${rimandoAdmin(email)}, spiegando cosa ti serve.`
+        + (app.length ? `\nIntanto, le app che potrebbero servirti: ${app.map((a) => a.nome).join(', ')}.` : ''),
+      apps: app.map((a) => a.id),
+      contatto: { email },
+    };
+  }
 
   // Saluto secco (non "ciao, cosa fa il ddt?": quello prosegue).
   if (parole.length <= 3 && /(^|\s)(ciao|salve|buongiorno|buonasera|hey|ehi)($|\s)/.test(qn)) {
@@ -331,7 +383,7 @@ function rispondiAssistente(domanda, apps) {
     const a = trovate.length ? trovate[0].app : null;
     const dove = a ? `di ${a.nome}` : 'dell\'app';
     return {
-      risposta: `Gli indirizzi delle app non servono: usa i pulsanti "Avvia" e "Apri" sulla card ${dove} e il portale la apre da solo.`,
+      risposta: `Gli indirizzi delle app non servono: clicca sulla scheda ${dove} e il portale la apre da sé (se è spenta prima la avvia).`,
       apps: a ? [a.id] : [],
     };
   }
@@ -339,9 +391,9 @@ function rispondiAssistente(domanda, apps) {
   // Come si avvia / si apre.
   if (/(^|\s)(avvi|avvio|avviare|aprire|apro|accendere|accendo|lanciare|start)/.test(qn)) {
     const a = trovate.length ? trovate[0].app : null;
-    const dove = a ? `sulla card di ${a.nome}` : 'sulla card dell\'app';
+    const dove = a ? `sulla scheda di ${a.nome}` : 'sulla scheda dell\'app';
     return {
-      risposta: `Premi "Avvia" ${dove}: il portale accende il programma e lo apre da solo appena è pronto. Se è già acceso (pallino verde "Attivo") usa direttamente "Apri". Le app più pesanti, come l'OCR, ci mettono qualche secondo la prima volta.`,
+      risposta: `Clicca ${dove}: se il programma è spento il portale lo accende e lo apre da solo appena è pronto. Le app più pesanti, come Scansioni, ci mettono qualche secondo la prima volta.`,
       apps: a ? [a.id] : [],
     };
   }
@@ -360,10 +412,12 @@ function rispondiAssistente(domanda, apps) {
     return { risposta, apps: [prima.app.id] };
   }
 
-  // Fuori tema: non lo so e lo dico.
+  // Fuori tema: non lo so, lo dico, e indico una persona a cui chiedere.
   return {
-    risposta: `Su questo non so rispondere: conosco solo le app della suite e cosa fanno.\n${CHAT_ESEMPI}`,
+    risposta: `Su questo non so rispondere: conosco solo le app della suite e cosa fanno.\n${CHAT_ESEMPI}\n`
+      + `Per domande più complesse ${rimandoAdmin(email)}.`,
     apps: [],
+    contatto: { email },
   };
 }
 
@@ -1496,6 +1550,12 @@ async function handle(req, res) {
   }
 
   // ---- Pagina di login (pubblica) ----
+  // Contatto dell'amministratore, PRIMA del login: serve proprio a chi non
+  // riesce a entrare ("Password dimenticata?"). Espone solo l'indirizzo.
+  if (p === '/api/contatti') {
+    return sendJson(res, 200, { emailAdmin: emailAdmin() });
+  }
+
   if (p === '/login' || p === '/login.html') {
     return sendFile(res, path.join(PAGES_DIR, 'login.html'), 'text/html');
   }
@@ -1677,7 +1737,7 @@ async function handle(req, res) {
   if (p === '/api/chat' && req.method === 'POST') {
     const { domanda } = await readJsonBody(req);
     const q = String(domanda || '').slice(0, 500);   // domande lunghe: tagliate
-    return sendJson(res, 200, rispondiAssistente(q, APPS.filter(canSeeApp)));
+    return sendJson(res, 200, rispondiAssistente(q, APPS.filter(canSeeApp), { emailAdmin: emailAdmin() }));
   }
 
   // ---- Stato app ----
