@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Test del portale. Zero dipendenze: node --test (Node >= 18).
 //   npm test
 //

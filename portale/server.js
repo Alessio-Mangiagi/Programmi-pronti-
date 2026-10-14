@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Portale Suite Cosedil — server zero-dipendenze (solo moduli core Node).
 // - Serve il portale e la pagina di amministrazione.
 // - Login utenti (hash scrypt) con sessione firmata via cookie (stateless HMAC).
@@ -395,7 +394,7 @@ function rispondiAssistente(domanda, apps, opts = {}) {
     const a = trovate.length ? trovate[0].app : null;
     const dove = a ? `sulla scheda di ${a.nome}` : 'sulla scheda dell\'app';
     return {
-      risposta: `Clicca ${dove}: se il programma è spento il portale lo accende e lo apre da solo appena è pronto. Le app più pesanti, come Scansioni, ci mettono qualche secondo la prima volta.`,
+      risposta: `Clicca ${dove}: se il programma è spento il portale lo accende e lo apre da solo appena è pronto. Le app più pesanti, come OCR Documenti, ci mettono qualche secondo la prima volta.`,
       apps: a ? [a.id] : [],
     };
   }

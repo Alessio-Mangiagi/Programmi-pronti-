@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // cosedil-sso — Gate SSO condiviso col Portale Suite Cosedil (unica fonte JS).
 //
 // Questo file è CommonJS di proposito: le app ESM (agente, ocr) lo importano via

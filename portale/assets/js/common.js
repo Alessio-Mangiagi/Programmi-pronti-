@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Helper condivisi tra le pagine del portale. Caricato PRIMA di index.js/admin.js.
 
 // Escape HTML: previene XSS quando si inseriscono dati in innerHTML.

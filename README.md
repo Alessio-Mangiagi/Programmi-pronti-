@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Suite Cosedil
 
 Monorepo della suite di strumenti interni Cosedil. Il **Portale** (`portale/`) è il server centrale in LAN che autentica gli utenti e avvia le altre app, che vivono come cartelle sorelle (il server usa `ROOT = ..`).
