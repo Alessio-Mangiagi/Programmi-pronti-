@@ -208,6 +208,86 @@ function durata(min) {
 // Nome breve dell'app per le frasi ("in DDT dalle 10:03").
 const nomeApp = (id) => { const a = appById(id); return a ? sigla(a) : id; };
 
+// ---------------------------------------------------------------- calendario
+// Mese a griglia (lunedì per primo). Ogni giorno ha un livello di attività
+// (utenti distinti quel giorno, relativo al giorno più attivo del mese) e il
+// dettaglio nel tooltip. Clic su un giorno = filtra le attività dell'utente
+// selezionato su quel giorno; secondo clic o "Tutti i giorni" toglie il filtro.
+
+let giorni = {};             // 'YYYY-MM-DD' -> { accessi, aperture, azioni, utenti } (da /api/plancia)
+let meseVisto = null;        // Date al primo del mese mostrato
+let giornoSel = null;        // 'YYYY-MM-DD' filtrato, o null
+
+// '2026-10-13' -> "lunedì 13 ottobre" (da mezzogiorno: niente scivoloni di fuso).
+const giornoTesto = (k) => new Date(k + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+const chiaveGiorno = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+function renderCalendario() {
+  const oggi = new Date();
+  if (!meseVisto) meseVisto = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
+  const anno = meseVisto.getFullYear();
+  const mese = meseVisto.getMonth();
+  document.getElementById('calTitolo').textContent = meseVisto.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  const stessoMese = anno === oggi.getFullYear() && mese === oggi.getMonth();
+  document.getElementById('calOggi').hidden = stessoMese && !giornoSel;
+  // Mese futuro: non c'è niente da vedere.
+  document.getElementById('calNext').disabled = stessoMese || meseVisto > oggi;
+
+  const nGiorni = new Date(anno, mese + 1, 0).getDate();
+  const vuoti = (new Date(anno, mese, 1).getDay() + 6) % 7;   // lunedì = 0
+  let max = 0;
+  for (let g = 1; g <= nGiorni; g++) {
+    const c = giorni[chiaveGiorno(new Date(anno, mese, g))];
+    if (c && c.utenti > max) max = c.utenti;
+  }
+
+  const celle = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((n, i) => `<span class="cal-h${i > 4 ? ' we' : ''}">${n}</span>`);
+  for (let i = 0; i < vuoti; i++) celle.push('<span class="cal-v" aria-hidden="true"></span>');
+  const chiaveOggi = chiaveGiorno(oggi);
+  for (let g = 1; g <= nGiorni; g++) {
+    const d = new Date(anno, mese, g);
+    const k = chiaveGiorno(d);
+    const c = giorni[k];
+    const futuro = d > oggi && k !== chiaveOggi;
+    // 3 livelli: un giorno "pieno" è vicino al massimo del mese, non a un numero fisso.
+    const lv = c && c.utenti ? Math.min(3, Math.max(1, Math.ceil((c.utenti / max) * 3))) : 0;
+    const etichetta = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+    const det = c
+      ? `${c.utenti} ${c.utenti === 1 ? 'utente' : 'utenti'} · ${c.accessi} accessi · ${c.aperture} aperture · ${c.azioni} azioni`
+      : 'nessuna attività';
+    const cls = ['cal-d', lv ? 'lv' + lv : '', k === chiaveOggi ? 'oggi' : '', k === giornoSel ? 'sel' : '', d.getDay() % 6 === 0 ? 'we' : ''].filter(Boolean).join(' ');
+    celle.push(`<button type="button" class="${cls}" data-giorno="${k}" ${futuro ? 'disabled' : ''}
+      title="${esc(etichetta + ': ' + det)}" aria-label="${esc(etichetta + ', ' + det)}" aria-pressed="${k === giornoSel}">
+      <b>${g}</b>${c && c.utenti ? `<small>${c.utenti}</small>` : ''}</button>`);
+  }
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = celle.join('');
+  grid.querySelectorAll('[data-giorno]').forEach((b) => b.addEventListener('click', () => {
+    giornoSel = giornoSel === b.dataset.giorno ? null : b.dataset.giorno;
+    renderCalendario();
+    caricaAttivita();
+  }));
+}
+
+function spostaMese(delta) {
+  meseVisto = new Date(meseVisto.getFullYear(), meseVisto.getMonth() + delta, 1);
+  renderCalendario();
+}
+document.getElementById('calPrev').addEventListener('click', () => spostaMese(-1));
+document.getElementById('calNext').addEventListener('click', () => spostaMese(1));
+document.getElementById('calOggi').addEventListener('click', () => {
+  const oggi = new Date();
+  meseVisto = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
+  giornoSel = null;
+  renderCalendario();
+  caricaAttivita();
+});
+document.getElementById('togliFiltro').addEventListener('click', () => {
+  giornoSel = null;
+  renderCalendario();
+  caricaAttivita();
+});
+
 let me = null;               // utente collegato (da /api/me)
 let utenti = [];             // righe di /api/plancia
 let selezionato = null;      // username di cui si mostrano le attività
@@ -255,7 +335,9 @@ function testoRiga(e, app) {
 function renderTimeline(attivita, nome, inUso) {
   const el = document.getElementById('timeline');
   // In cima, le app aperte adesso: sessione ancora viva, chiusura non ancora nota.
-  const vive = (inUso || []).map((x) => {
+  // Con un giorno passato filtrato, "Adesso" non c'entra.
+  const conVive = !giornoSel || giornoSel === chiaveGiorno(new Date());
+  const vive = (conVive ? inUso || [] : []).map((x) => {
     const app = appById(x.appId);
     return `<li class="live">
       <time datetime="${esc(x.dal)}">${esc(ora2(new Date(x.dal)))}</time>
@@ -264,12 +346,14 @@ function renderTimeline(attivita, nome, inUso) {
       <span class="az">In uso ora</span></li>`;
   });
   if (!attivita.length && !vive.length) {
-    el.innerHTML = `<li class="empty">${esc(nome)} non ha ancora attività registrate nel Portale.</li>`;
+    el.innerHTML = giornoSel
+      ? `<li class="empty">${esc(nome)} non ha attività registrate ${esc(giornoTesto(giornoSel))}.</li>`
+      : `<li class="empty">${esc(nome)} non ha ancora attività registrate nel Portale.</li>`;
     return;
   }
   let ultimoGiorno = '';
   const righe = vive.length ? ['<li class="day">Adesso</li>', ...vive] : [];
-  for (const e of attivita.slice(0, 40)) {
+  for (const e of giornoSel ? attivita : attivita.slice(0, 40)) {
     const d = new Date(e.ts);
     const g = giornoEtichetta(d);
     if (g !== ultimoGiorno) { righe.push(`<li class="day">${esc(g)}</li>`); ultimoGiorno = g; }
@@ -290,16 +374,19 @@ async function caricaAttivita() {
   const u = utenti.find((x) => x.username === selezionato);
   const nome = u ? u.nome : selezionato;
   document.getElementById('titoloAttivita').textContent = 'Attività di ' + nome;
+  document.getElementById('togliFiltro').hidden = !giornoSel;
   let r;
   try {
-    const res = await fetch('/api/attivita?utente=' + encodeURIComponent(selezionato));
+    const q = '?utente=' + encodeURIComponent(selezionato) + (giornoSel ? '&giorno=' + giornoSel : '');
+    const res = await fetch('/api/attivita' + q);
     if (!res.ok) throw new Error();
     r = await res.json();
   } catch { document.getElementById('timeline').innerHTML = '<li class="empty">Attività non disponibili. Riprova tra poco.</li>'; return; }
   const n = r.numeri || {};
   const piu = n.piuUsata && appById(n.piuUsata.appId);
-  document.getElementById('notaAttivita').textContent =
-    `${n.aperture7 ?? 0} app aperte in 7 gg` + (piu ? ` · più usata: ${sigla(piu)}` : '');
+  document.getElementById('notaAttivita').textContent = giornoSel
+    ? 'Solo ' + giornoTesto(giornoSel)
+    : `${n.aperture7 ?? 0} app aperte in 7 gg` + (piu ? ` · più usata: ${sigla(piu)}` : '');
   renderTimeline(r.attivita || [], nome, r.inUso);
 }
 
@@ -324,18 +411,22 @@ async function aggiornaPlancia() {
     ? `${piu.nome} · ${n.piuUsata.volte} ${n.piuUsata.volte === 1 ? 'volta' : 'volte'} in 30 gg`
     : 'negli ultimi 30 giorni';
   document.getElementById('aggiornato').textContent = 'Aggiornato alle ' + ora2(new Date());
+  giorni = r.giorni || {};
+  renderOggi();
+  renderCalendario();
   renderUtenti();
   caricaAttivita();
 }
 
 // ---------------------------------------------------------------- avvio
 
-function saluto(nome) {
-  const h = new Date().getHours();
-  // "><(((º> sabusabu <º)))><"
-  const s = h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
-  const primo = String(nome || '').trim().split(/\s+/)[0];
-  return primo ? `${s},<br>${esc(primo)}` : s;
+// Testata: la data di oggi in grande. Si riscrive a ogni aggiornamento, così
+// una plancia lasciata aperta passa da sola al giorno dopo.
+function renderOggi() {
+  const d = new Date();
+  document.getElementById('oggiNum').textContent = String(d.getDate());
+  document.getElementById('oggiGiorno').textContent = d.toLocaleDateString('it-IT', { weekday: 'long' });
+  document.getElementById('oggiMese').textContent = d.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 }
 
 async function loadMe() {
@@ -346,7 +437,6 @@ async function loadMe() {
   if (me.mustChange) { window.location.href = '/password'; return false; }
   document.getElementById('userName').textContent = me.nome;
   document.getElementById('avatar').textContent = iniz(me.nome);
-  document.getElementById('saluto').innerHTML = saluto(me.nome);
   // admin del portale: ruolo "vero" oppure elevazione dall'IP (adminPortale).
   isAdmin = !!(me.adminPortale || me.ruolo === 'admin');
   document.getElementById('adminLink').hidden = !isAdmin;
@@ -363,6 +453,8 @@ async function init() {
   if (!ok) return;
   apps = (await (await fetch('/api/apps')).json()).apps;
   renderApps();
+  renderOggi();
+  renderCalendario();   // subito, vuoto: i livelli arrivano con /api/plancia
   aggiornaPlancia();
   pollStatus();
   setInterval(pollStatus, 4000);

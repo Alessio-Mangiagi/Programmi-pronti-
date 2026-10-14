@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="manifest" href="/assets/manifest.webmanifest" />
   <meta name="theme-color" content="#0c4577" />
   <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png" />
@@ -41,10 +42,26 @@
         <button id="logout" type="button">Esci</button>
       </div>
 
+      <!-- Testata: la data di oggi e il calendario del mese con l'attività
+           della suite giorno per giorno. Un clic su un giorno filtra le
+           attività dell'utente selezionato su quel giorno. -->
       <header class="head">
-        <!-- "><(((º> sabusabu <º)))><" -->
-        <h1 id="saluto">Buongiorno</h1>
-        <p>Plancia amministratore<br><span id="aggiornato">&nbsp;</span></p>
+        <h1 class="sr-only">Plancia amministratore</h1>
+        <div class="data-oggi">
+          <b id="oggiNum">–</b>
+          <span class="oggi-txt"><strong id="oggiGiorno">&nbsp;</strong><em id="oggiMese">&nbsp;</em></span>
+          <p>Plancia amministratore<br><span id="aggiornato">&nbsp;</span></p>
+        </div>
+        <section class="cal" aria-label="Calendario attività">
+          <div class="cal-bar">
+            <button type="button" id="calPrev" aria-label="Mese precedente">&lsaquo;</button>
+            <h2 id="calTitolo" aria-live="polite">&nbsp;</h2>
+            <button type="button" id="calNext" aria-label="Mese successivo">&rsaquo;</button>
+            <button type="button" id="calOggi" class="cal-oggi">Oggi</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <p class="cal-leg"><span><i class="lv1"></i>Poca attività</span><span><i class="lv3"></i>Molta</span><span><i class="sel"></i>Giorno filtrato</span></p>
+        </section>
       </header>
 
       <section class="kpi" aria-label="Numeri della suite">
@@ -60,7 +77,8 @@
           <div class="ulist" id="utenti" role="listbox" aria-label="Utenti"></div>
         </section>
         <section class="box">
-          <h2><span id="titoloAttivita">Attività</span> <em id="notaAttivita">Registro accessi del Portale</em></h2>
+          <h2><span id="titoloAttivita">Attività</span> <em id="notaAttivita">Registro accessi del Portale</em>
+            <button type="button" class="filtro" id="togliFiltro" hidden>Tutti i giorni &times;</button></h2>
           <ol class="tl" id="timeline"></ol>
         </section>
       </div>
