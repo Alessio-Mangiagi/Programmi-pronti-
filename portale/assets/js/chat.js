@@ -117,6 +117,19 @@ async function chatChiedi(domanda) {
     const data = await r.json();
     chatMostraMsg(data.risposta, 'bot');
     chatMostraAzioni(data.apps);
+    // Rimando a una persona: mail all'amministratore con la domanda già scritta.
+    const mail = data.contatto && typeof mailAdmin === 'function' ? mailAdmin(data.contatto.email, q) : '';
+    if (mail) {
+      const box = document.createElement('div');
+      box.className = 'chat-azioni';
+      const a = document.createElement('a');
+      a.className = 'chat-azione';
+      a.href = mail;
+      a.textContent = 'Scrivi all’amministratore';
+      box.appendChild(a);
+      chatLog.appendChild(box);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
   } catch {
     chatMostraMsg('Non riesco a rispondere: il portale non risponde. Riprova tra poco.', 'bot');
   } finally {

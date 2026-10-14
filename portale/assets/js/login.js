@@ -1,3 +1,16 @@
+// "><(((º> sabusabu <º)))><"
+// Password dimenticata: se l'indirizzo dell'amministratore è configurato, la
+// frase diventa un link che apre la posta. /api/contatti risponde anche senza login.
+fetch('/api/contatti').then((r) => r.json()).then(({ emailAdmin }) => {
+  if (!emailAdmin) return;
+  const p = document.getElementById('dimenticata');
+  const a = document.createElement('a');
+  a.href = `mailto:${emailAdmin}?subject=${encodeURIComponent('Portale Suite Cosedil — credenziali')}`;
+  a.textContent = 'Scrivi all’amministratore';
+  p.textContent = 'Password dimenticata o account bloccato? ';
+  p.appendChild(a);
+}).catch(() => { /* resta la frase generica */ });
+
 const form = document.getElementById('form');
 const err = document.getElementById('err');
 // "><(((º> sabusabu <º)))><"
