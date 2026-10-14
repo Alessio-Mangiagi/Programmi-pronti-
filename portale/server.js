@@ -1908,9 +1908,12 @@ async function handle(req, res) {
   }
 
   // ---- Portale (home) ----
-  // Gli admin vedono la plancia (utenti e attività), gli altri la griglia delle app.
+  // Gli admin vedono la plancia (utenti e attività), gli altri la home delle app.
+  // ?vista=utente: l'admin vede la home come la vedono gli utenti (link
+  // "Vista utente" nella plancia), per controllarla senza un secondo account.
   if (p === '/' || p === '/index.html') {
-    return sendFile(res, path.join(PAGES_DIR, isAdmin ? 'plancia.html' : 'index.html'), 'text/html');
+    const vistaUtente = url.searchParams.get('vista') === 'utente';
+    return sendFile(res, path.join(PAGES_DIR, isAdmin && !vistaUtente ? 'plancia.html' : 'index.html'), 'text/html');
   }
 
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

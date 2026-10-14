@@ -213,6 +213,17 @@ async function init() {
   if (!(await loadMe())) return;
   const data = await (await fetch('/api/apps')).json();
   apps = data.apps || [];
+  // Admin in "vista utente" (/?vista=utente dalla plancia): via le app solo
+  // admin, così vede la home come un utente, e un link per tornare indietro.
+  if (new URLSearchParams(location.search).get('vista') === 'utente') {
+    apps = apps.filter((a) => !a.adminOnly);
+    const torna = document.createElement('a');
+    torna.className = 'ghost';
+    torna.href = '/';
+    torna.textContent = 'Torna alla plancia';
+    torna.dataset.tip = 'Stai vedendo la home come un utente: torna alla plancia admin';
+    document.querySelector('.utente').prepend(torna);
+  }
   render();
 }
 
