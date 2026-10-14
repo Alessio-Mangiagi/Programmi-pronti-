@@ -31,6 +31,7 @@ const {
   rowsToUsers, csvToRows,
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,
+  ipInterno, validaRichiesta, passwordTemporanea,
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,
 } = require('./server.js');
 
@@ -576,6 +577,30 @@ test('assistente: domande fuori tema o lunghe vanno a una persona, quelle sulle 
   assert.ok(r.contatto);
   assert.ok(r.apps.includes('ddt'));
   assert.equal(rispondiAssistente('cosa fa l\'OCR?', APPS, o).contatto, undefined);
+});
+
+test('ipInterno: reti private e loopback interne, il resto esterno', () => {
+  for (const ip of ['10.1.2.3', '172.16.0.9', '172.31.255.1', '192.168.1.50', '127.0.0.1', '::1', 'fd12:3456::1', 'fe80::1', '169.254.3.4']) {
+    assert.equal(ipInterno(ip), true, ip);
+  }
+  for (const ip of ['8.8.8.8', '172.32.0.1', '93.184.216.34', '2001:4860::8888', '', null]) {
+    assert.equal(ipInterno(ip), false, String(ip));
+  }
+});
+
+test('validaRichiesta: nome, cognome ed email obbligatori; campi ripuliti', () => {
+  assert.equal(validaRichiesta({ nome: 'Mario', email: 'm@x.it' }).ok, false);
+  assert.equal(validaRichiesta({ nome: 'Mario', cognome: 'Rossi', email: 'non-una-mail' }).ok, false);
+  assert.equal(validaRichiesta({ nome: 'Mario', cognome: 'Rossi', email: 'm@x.it', sito: 'spam' }).ok, false);
+  const v = validaRichiesta({ nome: ' Mario ', cognome: 'Rossi', email: 'mario.rossi@cosedil.it', username: ' MRossi ', messaggio: 'riga1' + String.fromCharCode(10) + 'riga2' });
+  assert.equal(v.ok, true);
+  assert.deepEqual(v.dati, { nome: 'Mario', cognome: 'Rossi', email: 'mario.rossi@cosedil.it', username: 'mrossi', messaggio: 'riga1 riga2' });
+});
+
+test('passwordTemporanea: 12 caratteri leggibili a gruppi, ogni volta diversa', () => {
+  const a = passwordTemporanea();
+  assert.match(a, /^[a-km-zA-HJ-NP-Z2-9]{4}-[a-km-zA-HJ-NP-Z2-9]{4}-[a-km-zA-HJ-NP-Z2-9]{4}$/);
+  assert.notEqual(a, passwordTemporanea());
 });
 
 test('APPS: ogni app ha attività e guida per la home utenti', () => {
