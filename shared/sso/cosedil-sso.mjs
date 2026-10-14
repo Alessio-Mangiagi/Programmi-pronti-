@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Facciata ESM del gate SSO: la logica sta tutta in cosedil-sso.js (CommonJS),
 // qui c'è solo il ponte per le app ESM (agente, ocr) e per i vite.config.
 //
@@ -16,5 +17,9 @@ export const leggiSid = mod.leggiSid;
 export const PORTAL = mod.PORTAL;
 export const PORTAL_PUBBLICO = mod.PORTAL_PUBBLICO;
 export const FAIL_OPEN = mod.FAIL_OPEN;
+export const cosedilAttivita = mod.cosedilAttivita;
+export const segnalaPresenza = mod.segnalaPresenza;
+export const registraEvento = mod.registraEvento;
+export const EVENTI = mod.EVENTI;
 
 export default mod;
