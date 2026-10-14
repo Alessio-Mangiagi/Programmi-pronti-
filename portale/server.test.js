@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Test del portale. Zero dipendenze: node --test (Node >= 18).
 //   npm test
 //
@@ -30,6 +31,7 @@ const {
   rowsToUsers, csvToRows,
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
   riepilogoAttivita, riepilogoUtenti,
+  segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,
 } = require('./server.js');
 
 const reqCon = (host, headers = {}) => ({ headers: Object.assign({ host }, headers), socket: {} });
@@ -433,4 +435,66 @@ test('riepilogoUtenti: numeri di tutta la suite', () => {
   assert.equal(n.utentiTotali, 3);
   assert.equal(n.accessiOggi, 1);
   assert.deepEqual(n.piuUsata, { appId: 'scadenzario', volte: 2 });
+});
+
+// ---- Presenza nelle app e azioni fatte dentro ----
+
+const T0 = Date.parse('2026-10-14T10:00:00.000Z');
+const DDT = { username: 'mrossi', nome: 'Mario Rossi', appId: 'ddt', appNome: 'DDT Suite' };
+
+test('segnaPresenza: il primo segnale apre la sessione, i successivi la allungano', () => {
+  let { presenze, chiuse } = segnaPresenza({}, DDT, T0);
+  assert.equal(chiuse.length, 0);
+  assert.equal(presenze['mrossi|ddt'].inizio, '2026-10-14T10:00:00.000Z');
+  ({ presenze, chiuse } = segnaPresenza(presenze, DDT, T0 + 60_000));
+  assert.equal(chiuse.length, 0);
+  assert.equal(presenze['mrossi|ddt'].inizio, '2026-10-14T10:00:00.000Z');
+  assert.equal(presenze['mrossi|ddt'].ultimo, '2026-10-14T10:01:00.000Z');
+});
+
+test('segnaPresenza: dopo una pausa lunga chiude la vecchia sessione e ne apre una nuova', () => {
+  let presenze = {};
+  for (let m = 0; m <= 20; m++) ({ presenze } = segnaPresenza(presenze, DDT, T0 + m * 60_000));   // 10:00 → 10:20
+  const dopo = T0 + 20 * 60_000 + PRESENZA_TIMEOUT_MS + 1;
+  const r = segnaPresenza(presenze, DDT, dopo);
+  assert.equal(r.chiuse.length, 1);
+  assert.equal(r.chiuse[0].azione, 'chiudi');
+  assert.equal(r.chiuse[0].ts, '2026-10-14T10:20:00.000Z');      // ora dell'ultimo segnale
+  assert.equal(r.chiuse[0].durataMin, 20);
+  assert.equal(r.presenze['mrossi|ddt'].inizio, new Date(dopo).toISOString());
+});
+
+test('chiudiPresenzeScadute: chiude solo chi tace da più del timeout', () => {
+  let { presenze } = segnaPresenza({}, DDT, T0);
+  ({ presenze } = segnaPresenza(presenze, { ...DDT, appId: 'ocr', appNome: 'OCR' }, T0 + 5 * 60_000));
+  const r = chiudiPresenzeScadute(presenze, T0 + 5 * 60_000 + 1000);
+  assert.deepEqual(r.chiuse.map((c) => c.appId), ['ddt']);
+  assert.deepEqual(Object.keys(r.presenze), ['mrossi|ocr']);
+});
+
+test('inUso: solo sessioni vive, filtrabili per utente', () => {
+  let { presenze } = segnaPresenza({}, DDT, T0);
+  ({ presenze } = segnaPresenza(presenze, { ...DDT, username: 'gverdi', nome: 'Giulia Verdi' }, T0));
+  assert.equal(inUso(presenze, null, T0 + 1000).length, 2);
+  assert.deepEqual(inUso(presenze, 'gverdi', T0 + 1000).map((x) => x.appId), ['ddt']);
+  assert.equal(inUso(presenze, null, T0 + PRESENZA_TIMEOUT_MS + 1).length, 0);
+});
+
+test('pulisciTestoEvento: niente a capo né caratteri di controllo, lunghezza tagliata', () => {
+  assert.equal(pulisciTestoEvento(['riga1', 'riga2' + String.fromCharCode(9, 7) + 'x'].join(String.fromCharCode(10)), 100), 'riga1 riga2 x');
+  assert.equal(pulisciTestoEvento('a'.repeat(300), 200).length, 200);
+  assert.equal(pulisciTestoEvento(null, 10), '');
+});
+
+test('riepilogoAttivita: chiusura con durata ed evento con dettaglio arrivano alla plancia', () => {
+  const reg = [
+    { ts: '2026-10-14T10:20:00.000Z', username: 'mrossi', appId: 'ddt', azione: 'chiudi', inizio: '2026-10-14T10:00:00.000Z', durataMin: 20 },
+    { ts: '2026-10-14T10:05:00.000Z', username: 'mrossi', appId: 'ddt', azione: 'evento', evento: 'DDT convertito in Excel', dettaglio: 'bolla.pdf' },
+    { ts: '2026-10-14T10:25:00.000Z', username: 'mrossi', appId: null, azione: 'logout' },
+  ];
+  const r = riepilogoAttivita(reg, 'mrossi', () => true, T0 + 30 * 60_000);
+  assert.deepEqual(r.attivita.map((e) => e.azione), ['logout', 'chiudi', 'evento']);
+  assert.equal(r.attivita[1].durataMin, 20);
+  assert.equal(r.attivita[2].dettaglio, 'bolla.pdf');
+  assert.equal(r.attivita[0].dettaglio, undefined);
 });
