@@ -872,6 +872,75 @@ function noteLoginFail(key, now = Date.now(), maxFail = LOGIN_MAX_FAIL) {
 function clearLoginFails(key) {
   loginFails.delete(key);
 }
+// Sblocco di un account da parte di un admin: via i blocchi di quell'utente da
+// QUALUNQUE PC (le chiavi sono "utente|ip").
+function sbloccaUtente(username) {
+  const pre = String(username || '').toLowerCase().trim() + '|';
+  for (const k of [...loginFails.keys()]) if (k.startsWith(pre)) loginFails.delete(k);
+}
+
+// ---------------------------------------------------------------------------
+// Richieste di aiuto dal login: password dimenticata o account bloccato.
+// Chi non riesce a entrare lascia nome, cognome, email e (se lo ricorda)
+// username; nella plancia degli admin compare un avviso con l'IP di provenienza,
+// marcato interno/esterno, e da lì l'admin reimposta la password.
+// ---------------------------------------------------------------------------
+const RICHIESTE_FILE = path.join(DATA_DIR, 'richieste.json');
+const RICHIESTE_MAX_IP_ORA = 5;          // per IP: oltre, 429 (niente spam di avvisi)
+const RICHIESTE_CAP = 500;               // richieste conservate
+const richiesteIp = new Map();           // ip -> [ms, ...] dell'ultima ora
+
+// IP della rete aziendale o esterno? Pura (testata). Privati IPv4 (10/8,
+// 172.16/12, 192.168/16), loopback, link-local e IPv6 locali (fc00::/7, fe80::/10).
+function ipInterno(ip) {
+  const s = String(ip || '').toLowerCase();
+  if (!s) return false;
+  if (s === '::1' || s === 'localhost') return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(s) || /^fe[89ab][0-9a-f]:/.test(s)) return true;
+  const n = ipv4ToInt(s);
+  if (n == null) return false;
+  const in4 = (base, bits) => ipMatches(s, base + '/' + bits);
+  return in4('10.0.0.0', 8) || in4('172.16.0.0', 12) || in4('192.168.0.0', 16)
+    || in4('127.0.0.0', 8) || in4('169.254.0.0', 16);
+}
+
+// Controlla e ripulisce i campi del modulo. Pura (testata).
+function validaRichiesta(b) {
+  const t = (v, max) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, max);
+  const d = {
+    nome: t(b && b.nome, 60), cognome: t(b && b.cognome, 60),
+    email: t(b && b.email, 120), username: t(b && b.username, 60).toLowerCase(),
+    messaggio: t(b && b.messaggio, 500),
+  };
+  if (b && b.sito) return { ok: false, errore: 'Richiesta non valida' };   // campo esca per i bot
+  if (!d.nome || !d.cognome) return { ok: false, errore: 'Scrivi nome e cognome' };
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(d.email)) return { ok: false, errore: 'Scrivi un indirizzo email valido: serve per ricontattarti' };
+  return { ok: true, dati: d };
+}
+
+function loadRichieste() {
+  try { const j = JSON.parse(fs.readFileSync(RICHIESTE_FILE, 'utf8')); return Array.isArray(j) ? j : []; } catch { return []; }
+}
+function saveRichieste(list) {
+  writeFileAtomic(RICHIESTE_FILE, JSON.stringify(list.slice(-RICHIESTE_CAP), null, 2));
+}
+function richiestaTroppoFrequente(ip, now = Date.now()) {
+  const recenti = (richiesteIp.get(ip) || []).filter((t) => now - t < 60 * 60 * 1000);
+  if (recenti.length >= RICHIESTE_MAX_IP_ORA) { richiesteIp.set(ip, recenti); return true; }
+  recenti.push(now);
+  richiesteIp.set(ip, recenti);
+  if (richiesteIp.size > 2000) richiesteIp.clear();
+  return false;
+}
+
+// Password temporanea leggibile al telefono: niente 0/O, 1/l/I.
+function passwordTemporanea() {
+  const alfabeto = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const b = crypto.randomBytes(12);
+  let s = '';
+  for (let i = 0; i < 12; i++) s += alfabeto[b[i] % alfabeto.length];
+  return s.slice(0, 4) + '-' + s.slice(4, 8) + '-' + s.slice(8);
+}
 // La mappa non deve crescere all'infinito: via le voci ferme da un pezzo e non
 // più in blocco.
 function pruneLoginFails(now = Date.now()) {
@@ -1556,6 +1625,31 @@ async function handle(req, res) {
     return sendJson(res, 200, { emailAdmin: emailAdmin() });
   }
 
+  // Richiesta di aiuto dal login (password dimenticata / account bloccato).
+  // Senza sessione di proposito: chi è bloccato non può entrare. Non dice mai
+  // se l'username esiste (lo vede solo l'admin), così il modulo non serve a
+  // scoprire gli account.
+  if (p === '/api/richiesta-password' && req.method === 'POST') {
+    const ip = clientIp(req);
+    if (richiestaTroppoFrequente(ip)) {
+      return sendJson(res, 429, { ok: false, error: 'Hai già mandato diverse richieste: l’amministratore le ha ricevute. Riprova più tardi.' });
+    }
+    const v = validaRichiesta(await readJsonBody(req));
+    if (!v.ok) return sendJson(res, 400, { ok: false, error: v.errore });
+    const utente = v.dati.username ? loadUtenti().find((u) => u.username === v.dati.username) : null;
+    const r = {
+      id: crypto.randomBytes(6).toString('hex'), ts: new Date().toISOString(),
+      ...v.dati, account: !!utente, ip, interno: ipInterno(ip), stato: 'aperta',
+    };
+    const list = loadRichieste();
+    list.push(r);
+    saveRichieste(list);
+    if (utente) {
+      logAccesso({ ts: r.ts, username: utente.username, nome: utente.nome, appId: null, appNome: null, azione: 'richiesta-aiuto', ip });
+    }
+    return sendJson(res, 200, { ok: true });
+  }
+
   if (p === '/login' || p === '/login.html') {
     return sendFile(res, path.join(PAGES_DIR, 'login.html'), 'text/html');
   }
@@ -1568,6 +1662,16 @@ async function handle(req, res) {
     // Chiave del contatore per solo IP: '*' non può collidere con uno username
     // vero (il login li normalizza e '*' non è un nome valido).
     const keyIp = loginKey('*', ip);
+
+    // Sblocco fatto da un admin (reset password) DOPO l'ultimo errore: il blocco
+    // non vale più. Serve perché i blocchi stanno nella RAM di ogni processo:
+    // l'admin che sblocca dalla plancia (8090) non tocca la memoria del portale
+    // utenti (8080), mentre utenti.json sì.
+    const uSblocco = loadUtenti().find((u) => u.username === String(username || '').toLowerCase().trim());
+    if (uSblocco && uSblocco.sbloccatoIl) {
+      const t = Date.parse(uSblocco.sbloccatoIl);
+      for (const k of [key, keyIp]) { const e = loginFails.get(k); if (e && e.ts < t) clearLoginFails(k); }
+    }
 
     const bloccoMs = Math.max(loginBlockedMs(key), loginBlockedMs(keyIp));
     if (bloccoMs > 0) {
@@ -1847,6 +1951,47 @@ async function handle(req, res) {
     r.numeri.inUsoOra = new Set(ora.map((x) => x.username)).size;
     return sendJson(res, 200, r);
   }
+  // ---- Richieste di aiuto dal login: elenco, gestita, reimposta password ----
+  if (p === '/api/richieste') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const aperte = loadRichieste().filter((r) => r.stato === 'aperta').reverse();   // più recenti prima
+    return sendJson(res, 200, { richieste: aperte });
+  }
+  const mRich = /^\/api\/richieste\/([0-9a-f]{12})\/(gestita|reimposta)$/.exec(p);
+  if (mRich && req.method === 'POST') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const list = loadRichieste();
+    const r = list.find((x) => x.id === mRich[1]);
+    if (!r) return sendJson(res, 404, { ok: false, error: 'Richiesta non trovata' });
+    let password = null;
+    if (mRich[2] === 'reimposta') {
+      const utenti = loadUtenti();
+      const u = utenti.find((x) => x.username === r.username);
+      if (!u) return sendJson(res, 404, { ok: false, error: 'Nessun account con questo username: crealo da Amministrazione' });
+      // Password temporanea mostrata UNA volta all'admin, che la comunica a voce
+      // o per mail; al primo accesso l'utente deve cambiarla. sv++ chiude le
+      // sessioni ancora aperte, sbloccaUtente toglie il blocco per tentativi.
+      password = passwordTemporanea();
+      u.salt = crypto.randomBytes(16).toString('hex');
+      u.hash = hashPw(password, u.salt);
+      u.mustChange = true;
+      u.sv = (u.sv || 1) + 1;
+      u.sbloccatoIl = new Date().toISOString();   // vale anche per l'altro portale (vedi /api/login)
+      saveUtenti(utenti);
+      sbloccaUtente(u.username);
+    }
+    r.stato = 'gestita';
+    r.gestitaDa = session.username;
+    r.gestitaIl = new Date().toISOString();
+    r.esito = mRich[2] === 'reimposta' ? 'password reimpostata' : 'gestita';
+    saveRichieste(list);
+    logAccesso({
+      ts: r.gestitaIl, username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: mRich[2] === 'reimposta' ? 'reset-password' : 'richiesta-gestita', per: r.username || null,
+    });
+    return sendJson(res, 200, { ok: true, password });
+  }
+
   if (p === '/api/attivita') {
     if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
     const chi = String(new URL(req.url, 'http://x').searchParams.get('utente') || session.username).toLowerCase();
@@ -2044,6 +2189,7 @@ module.exports = {
   rispondiAssistente,                              // assistente
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,   // plancia degli admin
+  ipInterno, validaRichiesta, passwordTemporanea,  // richieste di aiuto dal login
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,   // presenza/azioni nelle app
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };
