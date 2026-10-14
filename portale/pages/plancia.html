@@ -65,6 +65,13 @@
         </section>
       </header>
 
+      <!-- Richieste di aiuto dal login (password dimenticata / account bloccato):
+           compare solo quando ce n'è almeno una aperta. -->
+      <section class="avvisi" id="avvisi" hidden aria-labelledby="avvisiT">
+        <h2 id="avvisiT">Richieste di aiuto <em id="avvisiN"></em></h2>
+        <ol class="avvisi-lista" id="avvisiLista"></ol>
+      </section>
+
       <section class="kpi" aria-label="Numeri della suite">
         <div><b id="kUtentiOggi">–</b><span>Utenti attivi oggi</span><small id="kUtentiTot">&nbsp;</small></div>
         <div><b id="kAccessiOggi">–</b><span>Accessi oggi</span><small>login al Portale</small></div>
