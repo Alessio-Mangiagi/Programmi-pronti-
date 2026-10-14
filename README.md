@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Suite Cosedil
 
 Monorepo della suite di strumenti interni Cosedil. Il **Portale** (`portale/`) è il server centrale in LAN che autentica gli utenti e avvia le altre app, che vivono come cartelle sorelle (il server usa `ROOT = ..`).
@@ -109,6 +110,11 @@ altri PC le cercano. Non serve configurarle una per una, e a proteggerle c'è il
 
 Fanno eccezione, e restano sempre in locale, i backend che parlano solo col proprio
 frontend: OCR Documenti (3007, `OCR_BIND_HOST`) e Analista Dati (3001, `BIND_HOST`).
+
+**Firewall del server.** `firewall-suite.ps1` apre le porte della suite solo verso la rete
+interna (default la sottorete del server, profili Dominio e Privato) e si può rieseguire:
+`-Rete 192.168.1.0/24` per una sottorete precisa, `-ReteAdmin <IP>` per la plancia admin
+(8090) solo da certi PC, `-Rimuovi` per richiudere. Va lanciato una volta sul server.
 
 ## Verifiche automatiche
 
