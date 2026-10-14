@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="manifest" href="/assets/manifest.webmanifest" />
   <meta name="theme-color" content="#0c4577" />
   <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png" />
@@ -12,72 +13,72 @@
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 21V11l7-4 7 4v10' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/assets/css/tokens.css" />
-  <link rel="stylesheet" href="/assets/css/shell.css" />
   <link rel="stylesheet" href="/assets/css/index.css" />
   <link rel="stylesheet" href="/assets/css/chat.css" />
 </head>
 <body>
-  <header>
-    <div class="header-inner">
-      <div class="brand">
-        <div class="brand-mark">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 22V11l7-4 7 4v11" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-            <path d="M13 22v-6h6v6" stroke="#65bc7b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <div>
-          <div class="brand-name">Cosedil</div>
-          <div class="brand-sub">Portale Suite</div>
-        </div>
-      </div>
-      <!-- "><(((º> sabusabu <º)))><" -->
-      <div class="header-actions">
-        <a class="admin-link" id="adminLink" href="/admin" style="display:none">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 7.3 8 9 4.6-1.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
-          Amministrazione
-        </a>
-        <div class="user-chip">
-          <span class="avatar" id="avatar">?</span>
-          <span id="userName">…</span>
-        </div>
-        <a class="admin-link" href="/password" title="Cambia password">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Password
-        </a>
-        <button class="btn-logout" id="logout">Esci</button>
-      </div>
+  <!-- Home degli UTENTI: solo le app e come usarle. Niente accessi, orari o
+       storico d'uso: quelli stanno nella plancia degli admin. -->
+  <header class="top">
+    <div class="top-in">
+      <span class="brand">
+        <span class="mark">
+          <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M9 22V11l7-4 7 4v11" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M13 22v-6h6v6" stroke="#65bc7b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        </span>
+        <span><b>Cosedil</b><small>Suite</small></span>
+      </span>
+      <span class="utente">
+        <span class="av" id="avatar" aria-hidden="true">?</span>
+        <span id="userName">…</span>
+        <a class="ghost" href="/password" data-tip="Cambia la password con cui entri nel portale">Password</a>
+        <button class="ghost" type="button" id="logout" data-tip="Esci dal portale su questo computer">Esci</button>
+      </span>
     </div>
   </header>
 
-  <section class="hero">
-    <p class="hero-eyebrow">Suite Applicativa Interna</p>
-    <h1>Le tue applicazioni, un unico accesso</h1>
-    <p>Avvia gli strumenti della suite Cosedil e aprili nel browser. Lo stato di ogni servizio è verificato automaticamente ogni pochi secondi.</p>
-  </section>
+  <div class="lay">
+    <aside class="pan">
+      <h1>La suite Cosedil</h1>
+      <p>Gli strumenti di lavoro in un unico posto. Accedi una volta, li apri tutti.</p>
+      <nav class="linee" aria-label="Aiuto">
+        <a href="/doc?f=guida" data-tip="Come si usa il portale, passo per passo">Guida all’uso <span aria-hidden="true">→</span></a>
+        <a href="#" id="apriAssistente" data-tip="Apre la chat: chiedi quale app usare per il tuo lavoro">Chiedi all’assistente <span aria-hidden="true">→</span></a>
+        <a href="/password" data-tip="Cambia la password con cui entri nel portale">Cambia password <span aria-hidden="true">→</span></a>
+      </nav>
+    </aside>
 
-  <main>
-    <div class="grid" id="grid"><!-- card generate via JS --></div>
-  </main>
+    <main class="corpo">
+      <h2>Cosa devi fare oggi?</h2>
+      <p class="sub">Scegli l’attività: ti portiamo nello strumento giusto.<span class="solo-mouse"> Passa sopra una scheda per sapere cosa ti serve.</span></p>
 
-  <footer>
-    <div class="footer-inner">
-      <span>Cosedil S.p.A. — <span class="tag">Costruiamo il tuo domani</span></span>
-      <div class="footer-links">
-        <a class="footer-btn" href="/doc?f=guida">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
-          Guida
-        </a>
-        <a class="footer-btn" href="/doc?f=readme">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/></svg>
-          README
-        </a>
+      <form class="cerca" id="cerca" role="search">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label for="q" class="sr-only">Cerca un’attività o chiedi all’assistente</label>
+        <input id="q" type="search" autocomplete="off" maxlength="500"
+               placeholder="Es. «bolla», «scadenza», oppure scrivi una domanda e premi Invio"
+               aria-describedby="avvisoAi" />
+        <button class="invia" type="submit">Chiedi</button>
+      </form>
+      <!-- Compare quando l'utente entra nella ricerca: dall'altra parte c'è un
+           assistente automatico, non una persona. -->
+      <p class="avviso-ai" id="avvisoAi" hidden>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h0M15 12h0M9 16h6"/></svg>
+        <span><b>Stai scrivendo a un assistente automatico</b>, un programma di intelligenza artificiale, non a una persona.
+        Scrivi con rispetto, senza insulti: ti risponde meglio e più in fretta.</span>
+      </p>
+      <div class="risposta" id="risposta" hidden aria-live="polite"></div>
+
+      <div class="task" id="task"><!-- schede generate da index.js --></div>
+      <p class="vuoto" id="vuoto" hidden>Nessuna attività corrisponde. Premi <b>Invio</b> per chiederlo all’assistente.</p>
+
+      <div class="aiuto">
+        <span><b>Non trovi quello che cerchi?</b><br><span>Chiedi all’assistente in basso a destra o apri la guida.</span></span>
+        <a class="ghost" href="/doc?f=guida">Apri la guida</a>
       </div>
-      <span>Portale locale · <code>localhost:8080</code></span>
-    </div>
-  </footer>
+    </main>
+  </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status"></div>
 
   <script src="/assets/js/common.js"></script>
   <script src="/assets/js/index.js"></script>
