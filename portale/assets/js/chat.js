@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Assistente della suite: widget in basso a destra.
 // Caricato DOPO index.js, di cui riusa la variabile globale `apps` e le card
 // già in pagina. Le risposte arrivano da POST /api/chat: qui non c'è nessuna
