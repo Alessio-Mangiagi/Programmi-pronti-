@@ -82,11 +82,13 @@ const COOKIE_SECURE = TLS_ON || process.env.COOKIE_SECURE === '1'
   || (!!SUITE_DOMINIO && SUITE_SCHEMA === 'https');
 
 // Tentativi di login falliti: soglia e finestra di blocco.
-// Due contatori: per utente+IP (5) e per solo IP (20). Il primo protegge il
-// singolo account; il secondo ferma chi dallo stesso PC prova 5 tentativi su
-// OGNI username — senza, il limite per-account non limitava niente.
-const LOGIN_MAX_FAIL = 5;
-const LOGIN_MAX_FAIL_IP = 20;
+// Due contatori: per utente+IP (15) e per solo IP (50). Il primo protegge il
+// singolo account; il secondo ferma chi dallo stesso PC prova qualche tentativo
+// su OGNI username — senza, il limite per-account non limitava niente.
+// 15 e non 5: con 5 si bloccava chi aveva solo il blocco maiuscole inserito.
+// Quello per IP resta ben sopra, così non scatta prima di quello per account.
+const LOGIN_MAX_FAIL = 15;
+const LOGIN_MAX_FAIL_IP = 50;
 const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
 // Registro delle app della suite.
@@ -2183,7 +2185,7 @@ module.exports = {
   ipMatches, admForIp, isAdminForApp, clientIp,   // admin per-IP / per-app (testabili)
   getWarmList,                                     // pre-warm (testabile)
   portalHostname, appUrl, isSuiteOrigin,           // URL/CORS in LAN
-  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails,   // freno al brute force
+  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
   parseNetstatPid,                                 // spegnimento app
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente
