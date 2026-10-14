@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="manifest" href="/assets/manifest.webmanifest" />
   <meta name="theme-color" content="#0c4577" />
   <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png" />
@@ -18,7 +19,6 @@
   <form class="card" id="form" autocomplete="on">
     <div class="brand">
       <div class="brand-mark">
-        <!-- "><(((º> sabusabu <º)))><" -->
         <svg viewBox="0 0 32 32" fill="none"><path d="M9 22V11l7-4 7 4v11" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M13 22v-6h6v6" stroke="#65bc7b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
       </div>
       <div>
@@ -38,9 +38,34 @@
       <input id="password" name="password" type="password" autocomplete="current-password" required />
     </div>
     <button class="btn" id="btn" type="submit">Entra</button>
-    <p class="hint" id="dimenticata">Password dimenticata o account bloccato? Rivolgiti a un amministratore del portale.</p>
+    <p class="hint"><button type="button" class="link" id="apriAiuto">Password dimenticata o account bloccato?</button></p>
     <p class="hint">Cosedil S.p.A. — Costruiamo il tuo domani</p>
   </form>
+
+  <!-- Richiesta all'amministratore: funziona anche ad account bloccato, perché
+       non serve essere entrati. L'admin la vede come avviso nella plancia. -->
+  <form class="card" id="aiuto" hidden autocomplete="on">
+    <h1>Chiedi aiuto</h1>
+    <p class="sub">Lascia i tuoi dati: l’amministratore ti ricontatta e ti reimposta la password.</p>
+    <p class="error" id="aiutoErr" role="alert"></p>
+    <div class="riga2">
+      <div class="field"><label for="aNome">Nome</label><input id="aNome" autocomplete="given-name" required maxlength="60" /></div>
+      <div class="field"><label for="aCognome">Cognome</label><input id="aCognome" autocomplete="family-name" required maxlength="60" /></div>
+    </div>
+    <div class="field"><label for="aEmail">Email per ricontattarti</label><input id="aEmail" type="email" autocomplete="email" required maxlength="120" /></div>
+    <div class="field"><label for="aUser">Username <span class="opz">(se lo ricordi)</span></label><input id="aUser" autocomplete="username" maxlength="60" /></div>
+    <div class="field"><label for="aMsg">Messaggio <span class="opz">(facoltativo)</span></label><textarea id="aMsg" rows="3" maxlength="500" placeholder="Es. «account bloccato dopo troppi tentativi»"></textarea></div>
+    <!-- campo esca: invisibile alle persone, i bot lo riempiono -->
+    <div class="esca" aria-hidden="true"><label for="aSito">Sito</label><input id="aSito" tabindex="-1" autocomplete="off" /></div>
+    <button class="btn" id="aiutoBtn" type="submit">Invia la richiesta</button>
+    <p class="hint"><button type="button" class="link" id="tornaLogin">← Torna all’accesso</button></p>
+  </form>
+
+  <section class="card" id="aiutoOk" hidden aria-live="polite">
+    <h1>Richiesta inviata</h1>
+    <p class="sub" id="aiutoOkTesto">L’amministratore ha ricevuto la tua richiesta e ti ricontatterà.</p>
+    <p class="hint"><button type="button" class="link" id="tornaLogin2">← Torna all’accesso</button></p>
+  </section>
 
   <script src="/assets/js/login.js"></script>
 </body>
