@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Portale Suite Cosedil — server zero-dipendenze (solo moduli core Node).
 // - Serve il portale e la pagina di amministrazione.
 // - Login utenti (hash scrypt) con sessione firmata via cookie (stateless HMAC).
@@ -31,7 +32,9 @@ const IP_ADMIN_FILE = path.join(DATA_DIR, 'ip-admin.json'); // regole IP -> admi
 const WARM_FILE = path.join(DATA_DIR, 'warm.json');        // app da avviare "a caldo"
 const APP_EXTRA_FILE = path.join(DATA_DIR, 'app-extra.json'); // programmi aggiunti dagli admin
 
-const ACCESSI_CAP = 5000;   // eventi massimi conservati
+// Eventi massimi conservati. Alzato quando le app hanno iniziato a scrivere nel
+// registro le loro azioni (es. ogni DDT convertito), non solo aperture e login.
+const ACCESSI_CAP = 20000;
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const MIN_PW_LEN = 8;
 // Username dell'admin creato al primo avvio (la password è casuale, vedi ensureData).
@@ -489,7 +492,14 @@ function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
   const meseCorrente = new Date(ora).toISOString().slice(0, 7);
 
   return {
-    attivita: mie.slice(0, 40).map((e) => ({ ts: e.ts, azione: e.azione, appId: e.appId || null })),
+    // Campi extra solo dove ci sono: "chiudi" porta inizio e durata, "evento"
+    // il nome dell'azione fatta nell'app e il suo dettaglio.
+    attivita: mie.slice(0, 80).map((e) => {
+      const r = { ts: e.ts, azione: e.azione, appId: e.appId || null };
+      if (e.azione === 'chiudi') { r.inizio = e.inizio || null; r.durataMin = Number(e.durataMin) || 0; }
+      if (e.azione === 'evento') { r.evento = e.evento || ''; r.dettaglio = e.dettaglio || ''; }
+      return r;
+    }),
     riprendi,
     numeri: {
       aperture7: mie.filter(dopo(7)).filter(usoApp).length,
@@ -537,6 +547,103 @@ function riepilogoUtenti(accessi, utenti, ora = Date.now()) {
       piuUsata: piuUsataId ? { appId: piuUsataId, volte: piuUsataVolte } : null,
     },
   };
+}
+
+// ---- Presenza nelle app: quando un utente le chiude ----
+// Il portale non vede le schede delle app (stanno su altre porte). Le app però
+// gli segnalano, dal loro backend, che l'utente le sta usando (vedi
+// shared/sso, segnalaPresenza): al massimo una volta al minuto per utente e app.
+// Una sessione d'uso resta "aperta" finché arrivano segnali; dopo
+// PRESENZA_TIMEOUT_MS di silenzio è chiusa, e nel registro finisce una riga
+// "chiudi" con l'ora dell'ultimo segnale e la durata. La chiusura è quindi
+// precisa al minuto, non al secondo: il browser non avvisa in modo affidabile
+// quando una scheda viene chiusa.
+//
+// Lo stato vive in data/presenze.json e non in memoria: il portale degli utenti
+// e la plancia admin possono girare insieme sulla stessa cartella dati, e
+// qualunque dei due riceva i segnali, l'altro deve vedere chi è dentro adesso.
+const PRESENZE_FILE = path.join(DATA_DIR, 'presenze.json');
+const PRESENZA_TIMEOUT_MS = 3 * 60 * 1000;
+
+function loadPresenze() {
+  try {
+    const j = JSON.parse(fs.readFileSync(PRESENZE_FILE, 'utf8'));
+    return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+  } catch { return {}; }
+}
+function savePresenze(presenze) {
+  try { fs.writeFileSync(PRESENZE_FILE, JSON.stringify(presenze, null, 2)); }
+  catch (e) { logError('salva presenze', e); }
+}
+
+// Riga di registro per una sessione d'uso conclusa. Funzione pura (testata).
+function rigaChiusura(p) {
+  const durataMin = Math.max(0, Math.round((Date.parse(p.ultimo) - Date.parse(p.inizio)) / 60000));
+  return {
+    ts: p.ultimo, username: p.username, nome: p.nome,
+    appId: p.appId, appNome: p.appNome, azione: 'chiudi', inizio: p.inizio, durataMin,
+  };
+}
+
+// Toglie le sessioni scadute. Funzione pura (testata): ritorna le presenze
+// rimaste e le righe "chiudi" da scrivere.
+function chiudiPresenzeScadute(presenze, ora = Date.now()) {
+  const restano = {};
+  const chiuse = [];
+  for (const [k, p] of Object.entries(presenze)) {
+    if (!p || !p.ultimo || ora - Date.parse(p.ultimo) > PRESENZA_TIMEOUT_MS) {
+      if (p && p.ultimo && p.inizio) chiuse.push(rigaChiusura(p));
+    } else restano[k] = p;
+  }
+  return { presenze: restano, chiuse };
+}
+
+// Un segnale "sto usando l'app". Funzione pura (testata). Se la sessione
+// precedente era già scaduta (segnali ripresi dopo una pausa lunga) la chiude e
+// ne apre una nuova: due usi separati restano due righe nel registro.
+function segnaPresenza(presenze, chi, ora = Date.now()) {
+  const k = chi.username + '|' + chi.appId;
+  const adesso = new Date(ora).toISOString();
+  const prima = presenze[k];
+  const chiuse = [];
+  const out = { ...presenze };
+  if (prima && prima.ultimo && ora - Date.parse(prima.ultimo) <= PRESENZA_TIMEOUT_MS) {
+    out[k] = { ...prima, ultimo: adesso };
+  } else {
+    if (prima && prima.ultimo && prima.inizio) chiuse.push(rigaChiusura(prima));
+    out[k] = { username: chi.username, nome: chi.nome, appId: chi.appId, appNome: chi.appNome, inizio: adesso, ultimo: adesso };
+  }
+  return { presenze: out, chiuse };
+}
+
+// App in uso adesso per un utente (o per tutti, senza username). Pura (testata).
+function inUso(presenze, username, ora = Date.now()) {
+  return Object.values(presenze)
+    .filter((p) => p && (!username || p.username === username) && ora - Date.parse(p.ultimo) <= PRESENZA_TIMEOUT_MS)
+    .map((p) => ({ username: p.username, appId: p.appId, dal: p.inizio, ultimo: p.ultimo }))
+    .sort((a, b) => (a.dal < b.dal ? -1 : 1));
+}
+
+// Rilegge il file subito prima di scrivere: con due portali sulla stessa
+// cartella la finestra in cui uno può pestare l'altro resta minima.
+function registraPresenza(chi) {
+  const { presenze, chiuse } = segnaPresenza(loadPresenze(), chi);
+  savePresenze(presenze);
+  chiuse.forEach(logAccesso);
+}
+function sweepPresenze() {
+  const prima = loadPresenze();
+  const { presenze, chiuse } = chiudiPresenzeScadute(prima);
+  if (!chiuse.length) return;
+  savePresenze(presenze);
+  chiuse.forEach(logAccesso);
+}
+
+// Azione fatta DENTRO un'app (es. "DDT convertito in Excel"), segnalata dal suo
+// backend. Nome e dettaglio arrivano da un'altra app: si tagliano e si tolgono
+// i caratteri di controllo, il registro resta una riga per evento.
+function pulisciTestoEvento(s, max) {
+  return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, max);
 }
 
 function trimAccessi() {
@@ -1172,7 +1279,14 @@ function launchApp(app) {
   // locale (le espone il proxy, non la LAN) e il gate SSO, quando serve il
   // login, rimanda al portale pubblico invece che a localhost:8080. La verifica
   // della sessione resta in locale (COSEDIL_PORTAL), veloce e senza TLS.
-  const env = { ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro() };
+  //
+  // COSEDIL_EVENTI: dove l'app manda presenza e azioni (shared/sso). Il portale
+  // che la avvia si propone lui, se nessuno l'ha già fissato a mano: così anche
+  // un portale su un'altra porta (es. la plancia admin) riceve i segnali.
+  const env = {
+    ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro(),
+    COSEDIL_EVENTI: process.env.COSEDIL_EVENTI || ('http://127.0.0.1:' + PORT),
+  };
   if (SUITE_DOMINIO) {
     env.HOST = '127.0.0.1';
     env.COSEDIL_PORTAL_PUBBLICO = PORTALE_PUBBLICO;
@@ -1368,6 +1482,14 @@ async function handle(req, res) {
 
   // ---- Logout ----
   if (p === '/api/logout' && req.method === 'POST') {
+    // Uscita volontaria nel registro, così la plancia sa quando ha smesso.
+    const chiEsce = getSession(req);
+    if (chiEsce) {
+      logAccesso({
+        ts: new Date().toISOString(), username: chiEsce.username, nome: chiEsce.nome,
+        appId: null, appNome: null, azione: 'logout', ip: clientIp(req),
+      });
+    }
     return sendJson(res, 200, { ok: true }, { 'Set-Cookie': CLEAR_COOKIE });
   }
 
@@ -1555,6 +1677,33 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true });
   }
 
+  // ---- Segnali dalle app: presenza ("la sto usando") e azioni fatte dentro ----
+  // Li manda il BACKEND dell'app (shared/sso), inoltrando il cookie del browser:
+  // è la sessione del portale a dire chi è l'utente, non il corpo della richiesta.
+  // L'header X-Cosedil-App obbliga a un preflight CORS che il portale qui non
+  // concede: una pagina di un altro sito non può scrivere nel registro a nome
+  // di chi la apre.
+  if ((p === '/api/presenza' || p === '/api/evento') && req.method === 'POST') {
+    if (!req.headers['x-cosedil-app']) return sendJson(res, 400, { ok: false, error: 'Header X-Cosedil-App mancante' });
+    const body = await readJsonBody(req);
+    const app = APPS.find((a) => a.id === (body && body.appId));
+    if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false });
+    const chi = { username: session.username, nome: session.nome, appId: app.id, appNome: app.nome };
+    if (p === '/api/presenza') {
+      registraPresenza(chi);
+      return sendJson(res, 200, { ok: true });
+    }
+    const evento = pulisciTestoEvento(body.azione, 80);
+    if (!evento) return sendJson(res, 400, { ok: false, error: 'Azione mancante' });
+    // Un'azione dimostra anche che l'app è in uso: allunga la presenza.
+    registraPresenza(chi);
+    logAccesso({
+      ts: new Date().toISOString(), ...chi, azione: 'evento',
+      evento, dettaglio: pulisciTestoEvento(body.dettaglio, 200),
+    });
+    return sendJson(res, 200, { ok: true });
+  }
+
   // ================= area amministrazione =================
   const isAdmin = adminPortale;
 
@@ -1566,14 +1715,24 @@ async function handle(req, res) {
   // ---- Plancia degli admin: elenco utenti + attività di un utente ----
   if (p === '/api/plancia') {
     if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
-    return sendJson(res, 200, riepilogoUtenti(loadAccessi(), loadUtenti()));
+    // Chiude prima le sessioni d'uso scadute: la plancia non deve dare per
+    // "dentro" chi ha chiuso l'app da un pezzo solo perché lo sweep non è passato.
+    sweepPresenze();
+    const r = riepilogoUtenti(loadAccessi(), loadUtenti());
+    const ora = inUso(loadPresenze());
+    for (const u of r.utenti) u.inUso = ora.filter((x) => x.username === u.username);
+    r.numeri.inUsoOra = new Set(ora.map((x) => x.username)).size;
+    return sendJson(res, 200, r);
   }
   if (p === '/api/attivita') {
     if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
     const chi = String(new URL(req.url, 'http://x').searchParams.get('utente') || session.username).toLowerCase();
     if (!loadUtenti().some((u) => u.username === chi)) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
     // L'admin vede già l'intero registro (/api/accessi): qui nessun filtro per app.
-    return sendJson(res, 200, riepilogoAttivita(loadAccessi(), chi, () => true));
+    sweepPresenze();
+    const r = riepilogoAttivita(loadAccessi(), chi, () => true);
+    r.inUso = inUso(loadPresenze(), chi);
+    return sendJson(res, 200, r);
   }
 
   if (p === '/api/accessi') {
@@ -1702,6 +1861,8 @@ process.on('unhandledRejection', (e) => logError('unhandledRejection', e));
 if (require.main === module) {
   ensureData();
   trimAccessi();   // limita la crescita del log a ogni avvio
+  // Sessioni d'uso delle app rimaste senza segnali: chiuse e registrate.
+  setInterval(sweepPresenze, 60_000).unref();
   server.listen(PORT, HOST, () => {
     const addr = (TLS_ON ? 'https' : 'http') + '://localhost:' + PORT;
     console.log('============================================');
@@ -1754,5 +1915,6 @@ module.exports = {
   rispondiAssistente,                              // assistente
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
   riepilogoAttivita, riepilogoUtenti,              // plancia degli admin
+  segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,   // presenza/azioni nelle app
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };
