@@ -44,6 +44,7 @@ Verrà richiesto di **cambiare la password** al primo accesso.
 - `TRUST_PROXY` — impostare a `1` se il portale è dietro un reverse proxy (nginx/IIS): legge l'IP client da `X-Forwarded-For`.
 - `TLS_CERT` / `TLS_KEY` — percorsi di certificato e chiave: se ci sono entrambi il portale parla **HTTPS** e marca il cookie di sessione `Secure`. Se sono indicati ma illeggibili il portale **non parte** (meglio fermo che in chiaro per sbaglio).
 - `COOKIE_SECURE=1` — cookie `Secure` anche senza TLS_CERT, per quando è il reverse proxy a fare l'HTTPS.
+- `ADMIN_EMAIL` — casella dell'amministratore (in alternativa `data/contatti.json` con `{"emailAdmin": "..."}`, riletto senza riavvio). L'assistente ci manda chi ha problemi di credenziali o password dimenticata e chi fa domande che non sa o troppo articolate; compare anche nel login ("Password dimenticata?") e nella home. Senza indirizzo si dice di rivolgersi a un amministratore.
 
 ## Test
 
