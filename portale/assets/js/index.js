@@ -1,173 +1,197 @@
-// Icone per app (SVG stroke 1.5, stile Phosphor/Radix, niente emoji).
+// "><(((º> sabusabu <º)))><"
+// Home degli utenti: una scheda per attività ("Trasformare una bolla in
+// Excel"), con suggerimento al passaggio del mouse; la ricerca filtra le schede
+// e, con Invio, gira la domanda all'assistente della suite.
+// Niente stato acceso/spento né storico: un clic apre l'app, e se è spenta
+// la avvia prima. Testi delle schede (fai, guida) dal server: /api/apps.
+
+// Icone per app (SVG stroke, niente emoji).
 const ICONS = {
-  ddt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/></svg>',
-  agente: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6"/></svg>',
-  confronta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M7 7H4l3-4 3 4H7v6a2 2 0 0 0 2 2h1"/><path d="M17 17h3l-3 4-3-4h3v-6a2 2 0 0 0-2-2h-1"/></svg>',
-  ocr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V6a2 2 0 0 1 2-2h2M17 4h2a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2M7 20H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10M9 9h6M9 15h4"/></svg>',
-  scadenzario: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13v3l2 1.5"/></svg>',
-  requisiti: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/><path d="m8 11 2.2 2.2L14.5 9"/></svg>',
-  incampo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v13l6-2 6 2 6-2V5l-6 2-6-2-3 1"/><path d="M15 7v5"/><path d="M9 5v13"/><path d="M15 21v-2"/></svg>',
-  trimble: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/></svg>',
-  auguri: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/></svg>'
+  ddt: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/>',
+  agente: '<path d="M4 19V5M4 19h16"/><path d="M8 15v-4M12 15V8M16 15v-6"/>',
+  confronta: '<path d="M5 4h6v16H5zM13 4h6v16h-6z"/>',
+  ocr: '<path d="M3 8V6a2 2 0 0 1 2-2h2M17 4h2a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2M7 20H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10M9 9h6M9 15h4"/>',
+  scadenzario: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="m9 15 2 2 4-4"/>',
+  requisiti: '<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/><path d="m8 11 2.2 2.2L14.5 9"/>',
+  trimble: '<path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/>',
+  incampo: '<path d="M3 7v13l6-2 6 2 6-2V5l-6 2-6-2-3 1"/><path d="M15 7v5"/><path d="M9 5v13"/><path d="M15 21v-2"/>',
+  auguri: '<path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/>',
 };
-const OPEN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
-const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 14 8-14 8V4Z"/></svg>';
-const STOP_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+const icona = (id) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[id] || ICONS.ddt}</svg>`;
+const FRECCIA = '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
-let apps = [];
-let isAdmin = false;   // solo gli admin del portale possono fermare le app
-const grid = document.getElementById('grid');
+let apps = [];        // globale: lo riusa anche chat.js
+const elTask = document.getElementById('task');
+const elQ = document.getElementById('q');
+const elAvviso = document.getElementById('avvisoAi');
+const elRisposta = document.getElementById('risposta');
+const elVuoto = document.getElementById('vuoto');
 
-function statusHtml(state) {
-  if (state === 'online') return '<span class="status online"><span class="dot"></span>Attivo</span>';
-  if (state === 'offline') return '<span class="status offline"><span class="dot"></span>Spento</span>';
-  return '<span class="status checking"><span class="dot"></span>Verifica…</span>';
-}
+// Per il filtro: minuscolo e senza accenti ("attività" trova "attivita").
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 function render() {
-  grid.innerHTML = apps.map(a => `
-    <article class="card" data-id="${esc(a.id)}">
-      <div class="card-top">
-        <div class="card-icon">${ICONS[a.id] || ''}</div>
-        <span data-status>${statusHtml('checking')}</span>
-      </div>
-      <h2>${esc(a.nome)}</h2>
-      <p class="card-sub">${esc(a.sottotitolo)}</p>
-      <p class="desc">${esc(a.desc)}</p>
-      <div class="actions">
-        <button class="btn btn-outline" data-launch="${esc(a.id)}">${PLAY_ICON} Avvia</button>
-        <a class="btn btn-primary disabled" data-open="${esc(a.id)}" href="${esc(a.url)}" target="_blank" rel="noopener">${OPEN_ICON} Apri</a>
-        ${isAdmin ? `<button class="btn btn-stop hidden" data-stop="${esc(a.id)}" title="Ferma ${esc(a.nome)}" aria-label="Ferma ${esc(a.nome)}">${STOP_ICON}</button>` : ''}
-      </div>
-    </article>
-  `).join('');
-
-  grid.querySelectorAll('[data-launch]').forEach(btn => {
-    btn.addEventListener('click', () => launch(btn.dataset.launch, btn));
-  });
-  grid.querySelectorAll('[data-stop]').forEach(btn => {
-    btn.addEventListener('click', () => stop(btn.dataset.stop, btn));
-  });
-  grid.querySelectorAll('[data-open]').forEach(a => {
-    a.addEventListener('click', (e) => {
-      if (a.classList.contains('disabled')) { e.preventDefault(); return; }
-      // Registra l'apertura (non blocca l'apertura in nuova scheda).
-      fetch('/api/log-access', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appId: a.dataset.open }),
-      }).catch(() => {});
-    });
-  });
+  elTask.innerHTML = apps.map((a) => `
+    <button type="button" class="t" data-id="${esc(a.id)}" aria-describedby="tip-${esc(a.id)}">
+      <span class="ic">${icona(a.id)}</span>
+      <span><b>${esc(a.fai || a.nome)}</b><small>con <i>${esc(a.nome)}</i> · ${esc(a.sottotitolo)}</small></span>
+      <span class="fr">${FRECCIA}</span>
+      <span class="tip" role="tooltip" id="tip-${esc(a.id)}">${esc(a.guida || a.desc)}<em>Clic per aprire ${esc(a.nome)}. Se è spenta parte da sola in qualche secondo.</em></span>
+    </button>`).join('');
+  elTask.querySelectorAll('.t').forEach((b) => b.addEventListener('click', () => apriApp(b.dataset.id)));
 }
 
-// Attende che l'app risponda sulla sua porta: poll rapido (0,7s) fino al pronto
-// o al timeout. Aggiorna la card appena è online.
-function waitReady(id, { timeoutMs = 120000, intervalMs = 700 } = {}) {
+// ---------------------------------------------------------------- apertura
+
+function registraApertura(id) {
+  fetch('/api/log-access', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ appId: id }),
+  }).catch(() => {});
+}
+
+async function eAccesa(id) {
+  try { return !!(await (await fetch('/api/status/' + encodeURIComponent(id))).json()).online; } catch { return false; }
+}
+
+// Attende che l'app risponda sulla sua porta, fino al timeout.
+function attendiPronta(id, timeoutMs = 120000, ogniMs = 700) {
   const t0 = Date.now();
   return new Promise((resolve) => {
-    const tick = async () => {
-      let online = false;
-      try { online = !!(await (await fetch('/api/status/' + encodeURIComponent(id))).json()).online; } catch {}
-      if (online) {
-        setCardState(id, true);
-        return resolve(true);
-      }
+    const giro = async () => {
+      if (await eAccesa(id)) return resolve(true);
       if (Date.now() - t0 > timeoutMs) return resolve(false);
-      setTimeout(tick, intervalMs);
+      setTimeout(giro, ogniMs);
     };
-    tick();
+    giro();
   });
 }
 
-async function launch(id, btn) {
-  const app = apps.find(a => a.id === id);
-  // Apre subito una scheda "vuota" sul click (gesto utente): la navigheremo
-  // quando l'app è pronta, aggirando il blocco dei popup differiti dei browser.
+// Un solo gesto per l'utente: "apri". Se l'app è spenta la si avvia e la
+// scheda si apre da sola quando è pronta. La finestra si apre SUBITO sul clic
+// (gesto utente), altrimenti il browser bloccherebbe il popup arrivato dopo.
+let inApertura = null;
+async function apriApp(id) {
+  const app = apps.find((a) => a.id === id);
+  if (!app || inApertura === id) return;
   let win = null;
-  try { win = window.open('', '_blank'); } catch {}
-  if (win) { try { win.document.write(`<title>Avvio…</title><body style="font:16px/1.5 system-ui;padding:2rem;color:#334">Avvio di <b>${esc(app.nome)}</b> in corso… la pagina si aprirà da sola appena è pronta.</body>`); } catch {} }
+  try { win = window.open('', '_blank'); } catch { /* popup bloccato: si ripiega sotto */ }
+  const scheda = elTask.querySelector(`.t[data-id="${id}"]`);
 
-  btn.classList.add('busy');
-  btn.disabled = true;
-  btn.innerHTML = PLAY_ICON + ' Avvio…';
-  const resetBtn = () => { btn.classList.remove('busy'); btn.disabled = false; btn.innerHTML = PLAY_ICON + ' Avvia'; };
+  if (await eAccesa(id)) {
+    if (win && !win.closed) win.location = app.url; else window.open(app.url, '_blank', 'noopener');
+    registraApertura(id);
+    return;
+  }
 
+  inApertura = id;
+  if (scheda) scheda.classList.add('busy');
+  if (win) { try { win.document.write(`<title>Avvio…</title><body style="font:16px/1.5 system-ui;padding:2rem;color:#334">Sto aprendo <b>${esc(app.nome)}</b>… la pagina si apre da sola appena è pronta.</body>`); } catch { /* scheda già navigata */ } }
+  toast(`${app.nome} si sta avviando: si apre da sola appena è pronta.`);
   try {
-    const r = await fetch('/api/launch/' + id, { method: 'POST' });
+    const r = await fetch('/api/launch/' + encodeURIComponent(id), { method: 'POST' });
     const data = await r.json();
-    if (!data.ok) { if (win) win.close(); toast('Errore: ' + (data.error || 'avvio non riuscito')); return; }
-
-    toast(app.nome + ' in avvio — si aprirà da sola appena pronta.');
-    const ready = await waitReady(id);
-    if (ready) {
+    if (!data.ok) { if (win) win.close(); toast('Non riesco ad aprire ' + app.nome + ': ' + (data.error || 'riprova tra poco')); return; }
+    if (await attendiPronta(id)) {
       if (win && !win.closed) win.location = app.url; else window.open(app.url, '_blank', 'noopener');
-      // Registra l'apertura (come il pulsante "Apri").
-      fetch('/api/log-access', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appId: id }),
-      }).catch(() => {});
-      toast(app.nome + ' pronto.');
+      registraApertura(id);
     } else {
       if (win && !win.closed) win.close();
-      toast(app.nome + ' ci mette più del solito. Riprova tra poco con "Apri".');
-    }
-  } catch (e) {
-    if (win) win.close();
-    toast('Errore di rete durante l\'avvio.');
-  } finally {
-    resetBtn();
-  }
-}
-
-// Ferma un'app (solo admin). L'app è condivisa: se qualcun altro la sta usando
-// la sua sessione muore, quindi si chiede conferma.
-async function stop(id, btn) {
-  const app = apps.find(a => a.id === id);
-  if (!confirm(`Fermare ${app.nome}?\n\nChi lo sta usando in questo momento perde il lavoro non salvato.`)) return;
-
-  btn.disabled = true;
-  btn.classList.add('busy');
-  try {
-    const r = await fetch('/api/stop/' + encodeURIComponent(id), { method: 'POST' });
-    const data = await r.json();
-    if (data.ok) {
-      toast(app.nome + ' fermato.');
-      setCardState(id, false);
-    } else {
-      toast('Errore: ' + (data.error || 'chiusura non riuscita'));
+      toast(app.nome + ' ci mette più del solito. Riprova tra un minuto.');
     }
   } catch {
-    toast('Errore di rete durante la chiusura.');
+    if (win) win.close();
+    toast('Il portale non risponde. Riprova tra poco.');
   } finally {
-    btn.disabled = false;
-    btn.classList.remove('busy');
+    inApertura = null;
+    if (scheda) scheda.classList.remove('busy');
+  }
+}
+window.apriApp = apriApp;   // usata anche dai pulsanti dell'assistente (chat.js)
+
+// ---------------------------------------------------------------- ricerca / assistente
+
+function filtra() {
+  const q = norm(elQ.value).trim();
+  let visibili = 0;
+  for (const b of elTask.querySelectorAll('.t')) {
+    const a = apps.find((x) => x.id === b.dataset.id);
+    const ok = !q || norm([a.fai, a.nome, a.sottotitolo, a.desc, a.guida].join(' ')).includes(q);
+    b.hidden = !ok;
+    if (ok) visibili++;
+  }
+  elVuoto.hidden = visibili > 0;
+}
+
+function mostraRisposta(testo, ids) {
+  elRisposta.replaceChildren();
+  const chi = document.createElement('span');
+  chi.className = 'chi';
+  chi.textContent = 'Assistente automatico';
+  const p = document.createElement('p');
+  p.className = 'testo';
+  p.style.margin = '0';
+  p.textContent = testo;          // textContent: niente HTML dalle risposte
+  elRisposta.append(chi, p);
+  const valide = (ids || []).filter((id) => apps.some((a) => a.id === id));
+  if (valide.length) {
+    const box = document.createElement('div');
+    box.className = 'azioni';
+    for (const id of valide) {
+      const a = apps.find((x) => x.id === id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'apri';
+      b.textContent = 'Apri ' + a.nome;
+      b.addEventListener('click', () => apriApp(id));
+      box.appendChild(b);
+    }
+    elRisposta.appendChild(box);
+  }
+  elRisposta.hidden = false;
+  elVuoto.hidden = true;          // c'è già la risposta: "nessuna attività" sarebbe rumore
+}
+
+let inAttesa = false;
+async function chiedi(domanda) {
+  const q = domanda.trim();
+  if (!q || inAttesa) return;
+  inAttesa = true;
+  mostraRisposta('Ci penso…', []);
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domanda: q }),
+    });
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    const data = await r.json();
+    mostraRisposta(data.risposta, data.apps);
+  } catch {
+    mostraRisposta('Non riesco a rispondere: il portale non risponde. Riprova tra poco.', []);
+  } finally {
+    inAttesa = false;
   }
 }
 
-// Stato di una card: pallino, "Apri" attivo, "Ferma" visibile solo se accesa.
-function setCardState(id, online) {
-  const card = grid.querySelector(`.card[data-id="${id}"]`);
-  if (!card) return;
-  card.querySelector('[data-status]').innerHTML = statusHtml(online ? 'online' : 'offline');
-  const openBtn = card.querySelector('[data-open]');
-  if (openBtn) openBtn.classList.toggle('disabled', !online);
-  const stopBtn = card.querySelector('[data-stop]');
-  if (stopBtn) stopBtn.classList.toggle('hidden', !online);
-}
+// Entrando nella ricerca compare il promemoria: dall'altra parte c'è un
+// assistente automatico, e va trattato con rispetto. Resta finché si scrive.
+elQ.addEventListener('focus', () => { elAvviso.hidden = false; });
+elQ.addEventListener('blur', () => { if (!elQ.value.trim()) elAvviso.hidden = true; });
+elQ.addEventListener('input', () => {
+  filtra();
+  if (!elQ.value.trim()) elRisposta.hidden = true;
+});
+document.getElementById('cerca').addEventListener('submit', (e) => {
+  e.preventDefault();
+  chiedi(elQ.value);
+});
 
-function applyStatus(stati) {
-  const map = Object.fromEntries(stati.map(s => [s.id, s.online]));
-  // "><(((º> sabusabu <º)))><"
-  apps.forEach(a => setCardState(a.id, !!map[a.id]));
-}
+document.getElementById('apriAssistente').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (typeof chatApri === 'function') chatApri(true);
+});
 
-async function pollStatus() {
-  try {
-    const r = await fetch('/api/status');
-    const data = await r.json();
-    applyStatus(data.apps);
-  } catch (e) { /* silenzioso: il portale resta usabile */ }
-}
+// ---------------------------------------------------------------- avvio
 
 async function loadMe() {
   const r = await fetch('/api/me');
@@ -177,9 +201,6 @@ async function loadMe() {
   if (me.mustChange) { window.location.href = '/password'; return false; }
   document.getElementById('userName').textContent = me.nome;
   document.getElementById('avatar').textContent = iniz(me.nome);
-  // admin del portale: ruolo "vero" oppure elevazione dall'IP (adminPortale).
-  isAdmin = !!(me.adminPortale || me.ruolo === 'admin');
-  if (isAdmin) document.getElementById('adminLink').style.display = 'inline-flex';
   return true;
 }
 
@@ -189,14 +210,10 @@ document.getElementById('logout').addEventListener('click', async () => {
 });
 
 async function init() {
-  const ok = await loadMe();
-  if (!ok) return;
-  const r = await fetch('/api/apps');
-  const data = await r.json();
-  apps = data.apps;
+  if (!(await loadMe())) return;
+  const data = await (await fetch('/api/apps')).json();
+  apps = data.apps || [];
   render();
-  pollStatus();
-  setInterval(pollStatus, 4000);
 }
 
 init();
