@@ -123,7 +123,7 @@ function filtra() {
   elVuoto.hidden = visibili > 0;
 }
 
-function mostraRisposta(testo, ids) {
+function mostraRisposta(testo, ids, contatto, domanda) {
   elRisposta.replaceChildren();
   const chi = document.createElement('span');
   chi.className = 'chi';
@@ -134,7 +134,10 @@ function mostraRisposta(testo, ids) {
   p.textContent = testo;          // textContent: niente HTML dalle risposte
   elRisposta.append(chi, p);
   const valide = (ids || []).filter((id) => apps.some((a) => a.id === id));
-  if (valide.length) {
+  // La risposta rimanda a una persona (credenziali, domanda complessa): pulsante
+  // che apre la mail all'amministratore con la domanda già scritta.
+  const mail = contatto ? mailAdmin(contatto.email, domanda) : '';
+  if (valide.length || mail) {
     const box = document.createElement('div');
     box.className = 'azioni';
     for (const id of valide) {
@@ -145,6 +148,14 @@ function mostraRisposta(testo, ids) {
       b.textContent = 'Apri ' + a.nome;
       b.addEventListener('click', () => apriApp(id));
       box.appendChild(b);
+    }
+    if (mail) {
+      const m = document.createElement('a');
+      m.className = 'ghost';
+      m.href = mail;
+      m.textContent = 'Scrivi all’amministratore';
+      m.dataset.tip = 'Apre la tua posta con la domanda già scritta: ' + contatto.email;
+      box.appendChild(m);
     }
     elRisposta.appendChild(box);
   }
@@ -165,7 +176,7 @@ async function chiedi(domanda) {
     });
     if (r.status === 401) { window.location.href = '/login'; return; }
     const data = await r.json();
-    mostraRisposta(data.risposta, data.apps);
+    mostraRisposta(data.risposta, data.apps, data.contatto, q);
   } catch {
     mostraRisposta('Non riesco a rispondere: il portale non risponde. Riprova tra poco.', []);
   } finally {
@@ -209,8 +220,24 @@ document.getElementById('logout').addEventListener('click', async () => {
   window.location.href = '/login';
 });
 
+// Casella dell'amministratore: link nel pannello e nel riquadro di aiuto.
+// Se non è configurata i link restano nascosti (l'assistente dice comunque
+// di rivolgersi a un amministratore).
+async function caricaContatti() {
+  let email = '';
+  try { email = (await (await fetch('/api/contatti')).json()).emailAdmin || ''; } catch { /* resta vuota */ }
+  if (!email) return;
+  for (const id of ['mailAdmin', 'mailAdmin2']) {
+    const a = document.getElementById(id);
+    a.href = mailAdmin(email);
+    a.hidden = false;
+  }
+  document.getElementById('aiutoTesto').textContent = 'Chiedi all’assistente, apri la guida o scrivi all’amministratore: ' + email + '.';
+}
+
 async function init() {
   if (!(await loadMe())) return;
+  caricaContatti();
   const data = await (await fetch('/api/apps')).json();
   apps = data.apps || [];
   // Admin in "vista utente" (/?vista=utente dalla plancia): via le app solo

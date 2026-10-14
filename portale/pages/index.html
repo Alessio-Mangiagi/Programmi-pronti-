@@ -44,6 +44,7 @@
         <a href="/doc?f=guida" data-tip="Come si usa il portale, passo per passo">Guida all’uso <span aria-hidden="true">→</span></a>
         <a href="#" id="apriAssistente" data-tip="Apre la chat: chiedi quale app usare per il tuo lavoro">Chiedi all’assistente <span aria-hidden="true">→</span></a>
         <a href="/password" data-tip="Cambia la password con cui entri nel portale">Cambia password <span aria-hidden="true">→</span></a>
+        <a href="#" id="mailAdmin" hidden data-tip="Credenziali, password dimenticata o domande complesse: scrivi a una persona">Scrivi all’amministratore <span aria-hidden="true">→</span></a>
       </nav>
     </aside>
 
@@ -72,8 +73,11 @@
       <p class="vuoto" id="vuoto" hidden>Nessuna attività corrisponde. Premi <b>Invio</b> per chiederlo all’assistente.</p>
 
       <div class="aiuto">
-        <span><b>Non trovi quello che cerchi?</b><br><span>Chiedi all’assistente in basso a destra o apri la guida.</span></span>
-        <a class="ghost" href="/doc?f=guida">Apri la guida</a>
+        <span><b>Non trovi quello che cerchi?</b><br><span id="aiutoTesto">Chiedi all’assistente in basso a destra o apri la guida.</span></span>
+        <span class="aiuto-azioni">
+          <a class="ghost" href="/doc?f=guida">Apri la guida</a>
+          <a class="ghost" href="#" id="mailAdmin2" hidden>Scrivi all’amministratore</a>
+        </span>
       </div>
     </main>
   </div>
