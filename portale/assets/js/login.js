@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 // Login + richiesta di aiuto (password dimenticata / account bloccato).
 // La richiesta non richiede di essere entrati: arriva come avviso nella
 // plancia degli admin, con nome, cognome, email e IP di provenienza.

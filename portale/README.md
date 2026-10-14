@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Portale Suite Cosedil
 
 Portale locale che riunisce in un unico accesso le applicazioni della suite Cosedil: **login** utenti, **avvio** e **apertura** dei programmi, **registro degli accessi** e area di **amministrazione**. Scritto in Node.js **senza dipendenze esterne** (solo moduli core).

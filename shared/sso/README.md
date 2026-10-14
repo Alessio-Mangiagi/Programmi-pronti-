@@ -1,4 +1,3 @@
-<!-- "><(((º> sabusabu <º)))><" -->
 # Gate SSO condiviso
 
 Unica fonte del controllo d'accesso delle app della suite. Prima ne esistevano quattro

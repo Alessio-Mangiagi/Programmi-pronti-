@@ -1,4 +1,3 @@
-// "><(((º> sabusabu <º)))><"
 import express from 'express';
 import session from 'express-session';
 import sessionFileStore from 'session-file-store';
