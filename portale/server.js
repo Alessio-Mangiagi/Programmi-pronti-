@@ -464,7 +464,10 @@ function logAccesso(entry) {
 // solo le proprie righe, e solo per le app che può ancora vedere — un'app tolta
 // a un utente sparisce anche dal suo storico, come sparisce dalla home.
 const GIORNO_MS = 24 * 60 * 60 * 1000;
-function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
+// `giorno` (YYYY-MM-DD locale, facoltativo) restringe SOLO l'elenco attività
+// a quel giorno — il clic sul calendario — mentre numeri e "riprendi" restano
+// quelli dell'utente.
+function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now(), giorno = null) {
   const mie = accessi
     .filter((e) => e && e.username === username && e.ts)
     .filter((e) => !e.appId || puoVedere(e.appId))
@@ -494,7 +497,7 @@ function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
   return {
     // Campi extra solo dove ci sono: "chiudi" porta inizio e durata, "evento"
     // il nome dell'azione fatta nell'app e il suo dettaglio.
-    attivita: mie.slice(0, 80).map((e) => {
+    attivita: (giorno ? mie.filter((e) => giornoLocale(e.ts) === giorno) : mie).slice(0, giorno ? 300 : 80).map((e) => {
       const r = { ts: e.ts, azione: e.azione, appId: e.appId || null };
       if (e.azione === 'chiudi') { r.inizio = e.inizio || null; r.durataMin = Number(e.durataMin) || 0; }
       if (e.azione === 'evento') { r.evento = e.evento || ''; r.dettaglio = e.dettaglio || ''; }
@@ -513,6 +516,31 @@ function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
 // Elenco utenti per la plancia degli admin. Funzione pura (testata).
 // Una riga per utente registrato — anche chi non è mai entrato, così l'admin
 // vede gli account inutilizzati — ordinata dall'attività più recente.
+// Attività giorno per giorno, per il calendario della plancia. Funzione pura
+// (testata). Chiave = data LOCALE (YYYY-MM-DD), non UTC: un accesso alle 00:30
+// italiane appartiene a quel giorno, non al precedente.
+function giornoLocale(ts) {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function calendarioAttivita(accessi) {
+  const giorni = {};
+  const utenti = {};
+  for (const e of accessi) {
+    if (!e || !e.ts || !e.username) continue;
+    const g = giornoLocale(e.ts);
+    if (!g) continue;
+    const c = giorni[g] || (giorni[g] = { accessi: 0, aperture: 0, azioni: 0, utenti: 0 });
+    if (e.azione === 'login') c.accessi++;
+    else if (e.appId && (e.azione === 'apri' || e.azione === 'avvia')) c.aperture++;
+    else if (e.azione === 'evento') c.azioni++;
+    (utenti[g] || (utenti[g] = new Set())).add(e.username);
+  }
+  for (const g of Object.keys(giorni)) giorni[g].utenti = utenti[g].size;
+  return giorni;
+}
+
 function riepilogoUtenti(accessi, utenti, ora = Date.now()) {
   const oggi = new Date(ora).toISOString().slice(0, 10);
   const dopo30 = (e) => ora - Date.parse(e.ts) <= 30 * GIORNO_MS;
@@ -1718,7 +1746,9 @@ async function handle(req, res) {
     // Chiude prima le sessioni d'uso scadute: la plancia non deve dare per
     // "dentro" chi ha chiuso l'app da un pezzo solo perché lo sweep non è passato.
     sweepPresenze();
-    const r = riepilogoUtenti(loadAccessi(), loadUtenti());
+    const registro = loadAccessi();
+    const r = riepilogoUtenti(registro, loadUtenti());
+    r.giorni = calendarioAttivita(registro);
     const ora = inUso(loadPresenze());
     for (const u of r.utenti) u.inUso = ora.filter((x) => x.username === u.username);
     r.numeri.inUsoOra = new Set(ora.map((x) => x.username)).size;
@@ -1730,7 +1760,10 @@ async function handle(req, res) {
     if (!loadUtenti().some((u) => u.username === chi)) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
     // L'admin vede già l'intero registro (/api/accessi): qui nessun filtro per app.
     sweepPresenze();
-    const r = riepilogoAttivita(loadAccessi(), chi, () => true);
+    const g = String(new URL(req.url, 'http://x').searchParams.get('giorno') || '');
+    const giorno = /^\d{4}-\d{2}-\d{2}$/.test(g) ? g : null;
+    const r = riepilogoAttivita(loadAccessi(), chi, () => true, Date.now(), giorno);
+    r.giorno = giorno;
     r.inUso = inUso(loadPresenze(), chi);
     return sendJson(res, 200, r);
   }
@@ -1914,7 +1947,7 @@ module.exports = {
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
-  riepilogoAttivita, riepilogoUtenti,              // plancia degli admin
+  riepilogoAttivita, riepilogoUtenti, calendarioAttivita,   // plancia degli admin
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,   // presenza/azioni nelle app
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };

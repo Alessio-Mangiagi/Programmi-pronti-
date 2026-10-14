@@ -30,7 +30,7 @@ const {
   rispondiAssistente, APPS,
   rowsToUsers, csvToRows,
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
-  riepilogoAttivita, riepilogoUtenti,
+  riepilogoAttivita, riepilogoUtenti, calendarioAttivita,
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,
 } = require('./server.js');
 
@@ -497,4 +497,34 @@ test('riepilogoAttivita: chiusura con durata ed evento con dettaglio arrivano al
   assert.equal(r.attivita[1].durataMin, 20);
   assert.equal(r.attivita[2].dettaglio, 'bolla.pdf');
   assert.equal(r.attivita[0].dettaglio, undefined);
+});
+
+test('calendarioAttivita: per giorno locale, accessi/aperture/azioni e utenti distinti', () => {
+  const locale = (y, m, d, h) => new Date(y, m - 1, d, h, 30).toISOString();
+  const g = calendarioAttivita([
+    { ts: locale(2026, 10, 14, 0), username: 'mrossi', azione: 'login' },          // 00:30 locali: è il 14
+    { ts: locale(2026, 10, 14, 9), username: 'gverdi', azione: 'login' },
+    { ts: locale(2026, 10, 14, 9), username: 'gverdi', appId: 'ddt', azione: 'apri' },
+    { ts: locale(2026, 10, 14, 10), username: 'gverdi', appId: 'ddt', azione: 'evento' },
+    { ts: locale(2026, 10, 13, 18), username: 'mrossi', appId: 'ddt', azione: 'avvia' },
+    { ts: 'non-una-data', username: 'x', azione: 'login' },
+    { ts: locale(2026, 10, 12, 8) },                                                   // riga senza utente
+  ]);
+  assert.deepEqual(g['2026-10-14'], { accessi: 2, aperture: 1, azioni: 1, utenti: 2 });
+  assert.deepEqual(g['2026-10-13'], { accessi: 0, aperture: 1, azioni: 0, utenti: 1 });
+  assert.deepEqual(Object.keys(g).sort(), ['2026-10-13', '2026-10-14']);
+});
+
+test('riepilogoAttivita: il filtro per giorno restringe solo l\'elenco', () => {
+  const locale = (d, h) => new Date(2026, 9, d, h).toISOString();
+  const reg = [
+    { ts: locale(14, 9), username: 'mrossi', azione: 'login' },
+    { ts: locale(13, 9), username: 'mrossi', azione: 'login' },
+    { ts: locale(13, 10), username: 'mrossi', appId: 'ddt', azione: 'apri' },
+  ];
+  const ora = new Date(2026, 9, 14, 12).getTime();
+  const r = riepilogoAttivita(reg, 'mrossi', () => true, ora, '2026-10-13');
+  assert.equal(r.attivita.length, 2);
+  assert.equal(r.numeri.aperture7, 1);
+  assert.equal(riepilogoAttivita(reg, 'mrossi', () => true, ora).attivita.length, 3);
 });
