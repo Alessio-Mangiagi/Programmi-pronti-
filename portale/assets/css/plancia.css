@@ -18,7 +18,8 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(
 button { font: inherit; }
 :focus-visible { outline: 2px solid var(--cosedil-blue); outline-offset: 2px; }
 
-.layout { display: grid; grid-template-columns: 264px minmax(0, 1fr); min-height: 100%; }
+.layout { display: grid; grid-template-columns: clamp(220px, 16vw, 300px) minmax(0, 1fr); min-height: 100%; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------------- barra delle app ---------------- */
 .side { background: #fff; border-right: 2px solid var(--ink); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
@@ -62,7 +63,9 @@ button { font: inherit; }
 .side-links a:hover { color: var(--cosedil-blue); border-color: var(--cosedil-blue); }
 
 /* ---------------- area principale ---------------- */
-.main { padding: 18px clamp(16px, 3vw, 36px) 40px; display: flex; flex-direction: column; gap: 18px; min-width: 0; max-width: 1240px; }
+/* Fluida: riempie qualsiasi monitor. Il tetto è alto (ultrawide) solo per non
+   ridurre le righe a strisce illeggibili oltre i 2400px. */
+.main { padding: 18px clamp(16px, 2.6vw, 48px) 40px; display: flex; flex-direction: column; gap: clamp(14px, 1.4vw, 24px); min-width: 0; width: 100%; max-width: 2400px; }
 .topbar { display: flex; justify-content: flex-end; align-items: center; gap: 18px; font-family: var(--font-cond); font-weight: 700; font-stretch: 85%; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; flex-wrap: wrap; }
 .topbar a { color: var(--ink); text-decoration: none; }
 .topbar a:hover { color: var(--cosedil-blue); }
@@ -72,13 +75,59 @@ button { font: inherit; }
 .who { display: inline-flex; align-items: center; gap: 8px; }
 .avatar { width: 26px; height: 26px; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 11px; letter-spacing: .02em; }
 
-.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; border-bottom: 4px solid var(--ink); padding-bottom: 12px; }
-.head h1 { margin: 0; font-family: var(--font-cond); font-weight: 900; font-stretch: 68%; font-size: clamp(40px, 6vw, 72px); line-height: .86; text-transform: uppercase; letter-spacing: -.01em; text-wrap: balance; }
-.head p { margin: 0; font-family: var(--font-cond); font-weight: 600; font-stretch: 88%; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); text-align: right; }
+.head { display: grid; grid-template-columns: minmax(200px, auto) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 44px); align-items: stretch; border-bottom: 4px solid var(--ink); padding-bottom: 14px; }
+
+/* data di oggi */
+.data-oggi { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: 'num txt' 'num meta'; column-gap: 14px; align-items: end; }
+.data-oggi > b { grid-area: num; font-family: var(--font-cond); font-weight: 900; font-stretch: 62%; font-size: clamp(72px, 8.5vw, 150px); line-height: .8; color: var(--cosedil-blue); font-variant-numeric: tabular-nums; align-self: end; }
+.oggi-txt { grid-area: txt; display: flex; flex-direction: column; align-self: end; padding-bottom: 4px; }
+.oggi-txt strong { font-family: var(--font-cond); font-weight: 900; font-stretch: 68%; font-size: clamp(26px, 2.6vw, 46px); line-height: .9; text-transform: uppercase; }
+.oggi-txt em { font-style: normal; font-family: var(--font-cond); font-weight: 700; font-stretch: 80%; font-size: clamp(14px, 1.2vw, 20px); text-transform: uppercase; letter-spacing: .04em; }
+.data-oggi p { grid-area: meta; margin: 8px 0 0; font-family: var(--font-cond); font-weight: 600; font-stretch: 88%; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); align-self: end; }
+
+/* calendario del mese */
+.cal { border: 2px solid var(--ink); background: #fff; display: flex; flex-direction: column; min-width: 0; }
+.cal-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 2px solid var(--ink); }
+.cal-bar h2 { margin: 0 6px; flex: 1; font-family: var(--font-cond); font-weight: 800; font-stretch: 80%; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; }
+.cal-bar button { border: 1.5px solid var(--ink); background: #fff; min-width: 30px; height: 28px; cursor: pointer; font-family: var(--font-cond); font-weight: 800; font-size: 16px; line-height: 1; }
+.cal-bar button:hover:not(:disabled) { background: var(--ink); color: #fff; }
+.cal-bar button:disabled { border-color: var(--soft); color: var(--soft); cursor: default; }
+.cal-bar .cal-oggi { font-size: 11px; font-stretch: 85%; letter-spacing: .08em; text-transform: uppercase; padding: 0 10px; }
+.cal-bar .cal-oggi[hidden] { display: none; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1; }
+.cal-h { padding: 5px 6px 3px; font-family: var(--font-cond); font-weight: 700; font-stretch: 85%; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--grey); border-bottom: 1px solid var(--soft); }
+.cal-h.we { color: #a3a8ae; }
+.cal-d, .cal-v { min-height: clamp(30px, 4.4vh, 58px); border-right: 1px solid var(--soft); border-bottom: 1px solid var(--soft); }
+.cal-grid > :nth-child(7n) { border-right: 0; }
+.cal-d { position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 2px; padding: 4px 6px; background: #fff; border-top: 0; border-left: 0; cursor: pointer; text-align: left; color: var(--ink); font-family: var(--font-ui); }
+.cal-d b { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cal-d small { align-self: flex-end; font-family: var(--font-cond); font-weight: 800; font-stretch: 80%; font-size: 11px; font-variant-numeric: tabular-nums; }
+.cal-d.we b { color: var(--grey); }
+.cal-d:hover:not(:disabled) { box-shadow: inset 0 0 0 2px var(--ink); }
+.cal-d:disabled { cursor: default; color: var(--soft); background: #fff; }
+.cal-d:disabled b { color: var(--soft); }
+/* livelli di attività: tinte del blu Cosedil, il pieno solo per i giorni al massimo */
+.cal-d.lv1 { background: #e3eaf1; }
+.cal-d.lv2 { background: #a8bfd4; }
+.cal-d.lv3 { background: var(--cosedil-blue); color: #fff; }
+.cal-d.lv3 b { color: #fff; }
+.cal-d.oggi { box-shadow: inset 0 0 0 2px var(--cosedil-blue); }
+.cal-d.oggi b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.cal-d.lv3.oggi { box-shadow: inset 0 0 0 2px var(--ink); }
+.cal-d.sel, .cal-d.sel.lv3 { background: var(--ink); color: #fff; box-shadow: none; }
+.cal-d.sel b { color: #fff; }
+.cal-leg { margin: 0; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 6px 14px; border-top: 2px solid var(--ink); font-family: var(--font-cond); font-weight: 600; font-stretch: 90%; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); }
+.cal-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.cal-leg i { width: 10px; height: 10px; display: inline-block; border: 1px solid var(--soft); }
+.cal-leg i.lv1 { background: #e3eaf1; } .cal-leg i.lv3 { background: var(--cosedil-blue); border-color: var(--cosedil-blue); } .cal-leg i.sel { background: var(--ink); border-color: var(--ink); }
+
+.box h2 .filtro { border: 1.5px solid var(--ink); background: var(--ink); color: #fff; padding: 2px 8px; cursor: pointer; font-family: var(--font-cond); font-weight: 800; font-stretch: 85%; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+.box h2 .filtro:hover { background: var(--cosedil-blue); border-color: var(--cosedil-blue); }
+.box h2 .filtro[hidden] { display: none; }
 
 .kpi { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 2px solid var(--ink); border-left: 2px solid var(--ink); background: #fff; }
 .kpi > div { border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink); padding: 12px 14px 11px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.kpi b { font-family: var(--font-cond); font-weight: 900; font-stretch: 62%; font-size: 54px; line-height: .85; font-variant-numeric: tabular-nums; }
+.kpi b { font-family: var(--font-cond); font-weight: 900; font-stretch: 62%; font-size: clamp(40px, 3.6vw, 72px); line-height: .85; font-variant-numeric: tabular-nums; }
 .kpi > div:first-child b { color: var(--cosedil-blue); }
 .kpi span { font-family: var(--font-cond); font-weight: 700; font-stretch: 85%; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .kpi small { font-size: 11.5px; color: var(--grey); }
@@ -142,6 +191,15 @@ button { font: inherit; }
 .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; font-size: .85rem; padding: .75rem 1.25rem; opacity: 0; pointer-events: none; transition: opacity .3s var(--ease-out), transform .3s var(--ease-out); z-index: 50; max-width: 90vw; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* monitor grandi: più respiro alla cronologia, testo un filo più grande */
+@media (min-width: 1700px) {
+  .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .tl li, .urow { font-size: 14px; padding-top: 11px; padding-bottom: 11px; }
+  .u-name b { font-size: 14.5px; }
+}
+@media (min-width: 2300px) { body { font-size: 15px; } .cal-d b { font-size: 14px; } }
+/* testata su due righe quando il calendario accanto alla data non ci sta */
+@media (max-width: 1100px) { .head { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } .cols > .box:last-child { order: -1; } .kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) {
   .layout { grid-template-columns: 1fr; }
@@ -152,6 +210,11 @@ button { font: inherit; }
   .tl .az { display: none; }
   .urow { grid-template-columns: 34px minmax(0, 1fr) auto; }
   .urow .u-role, .urow .u-app { display: none; }
+  .kpi b { font-size: 38px; }
+  .data-oggi > b { font-size: 64px; }
+  .cal-d { padding: 3px 4px; }
+  .cal-d small { display: none; }     /* il livello di colore basta, il numero sta nel tooltip */
+  .cal-h { padding: 4px 3px 2px; letter-spacing: .04em; }
 }
 /* Telefono: una app per riga (i nomi interi, non "SCADENZ…") e tutto quello che
    si tocca alto almeno 44px, la misura minima per un dito. */
@@ -176,4 +239,5 @@ button { font: inherit; }
   .res button { min-height: 44px; }
   .urow { min-height: 52px; }
 }
+@media (max-width: 420px) { .kpi { grid-template-columns: 1fr; } .cal-bar .cal-oggi { padding: 0 6px; } }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
