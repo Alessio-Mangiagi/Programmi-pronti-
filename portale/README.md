@@ -158,7 +158,7 @@ La funzione è `pathDalRegistro()` in `server.js`; fuori da Windows restituisce 
 
 - Le password sono salvate con hash **scrypt** + salt; nessuna password in chiaro.
 - Le sessioni sono cookie **HttpOnly** firmati **HMAC-SHA256** (nessuno stato in RAM).
-- Dopo **5 tentativi di login falliti** quella coppia utente+PC resta bloccata **15 minuti**. Il conteggio sta in RAM: si azzera al riavvio del portale.
+- Dopo **15 tentativi di login falliti** quella coppia utente+PC resta bloccata **15 minuti** (dallo stesso PC, 50 tentativi in tutto su username diversi). Chi resta bloccato chiede aiuto dal login ("Password dimenticata o account bloccato?") e l'admin lo sblocca dalla plancia reimpostando la password. Il conteggio sta in RAM: si azzera al riavvio del portale.
 - **Su HTTP le password viaggiano in chiaro sulla LAN.** Chi vuole cifrarle imposta `TLS_CERT`/`TLS_KEY` (basta un certificato interno) oppure mette davanti un reverse proxy HTTPS con `COOKIE_SECURE=1`. Le app della suite restano su HTTP: il link dal portale è una normale navigazione e il browser non la blocca.
 - `GET /api/verify` risponde in CORS solo alle app sullo **stesso host del portale** (o su IP privati di LAN), mai a un sito su internet.
 - L'IP **non è una password**: chi usa una postazione "fidata" ne eredita i privilegi. Usare IP fissi/prenotazione DHCP per le postazioni admin, e mantenere comunque il login.

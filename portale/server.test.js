@@ -25,7 +25,7 @@ test.after(() => fs.rmSync(DATA_TMP, { recursive: true, force: true }));
 const {
   ipMatches, isAdminForApp, clientIp,
   portalHostname, appUrl, isSuiteOrigin,
-  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails,
+  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,
   parseNetstatPid,
   rispondiAssistente, APPS,
   rowsToUsers, csvToRows,
@@ -111,13 +111,14 @@ test('isSuiteOrigin: un dominio che contiene un IP privato non passa', () => {
 // ---------------------------------------------------------------------------
 // Freno ai tentativi di login.
 // ---------------------------------------------------------------------------
-test('login: blocca dopo 5 tentativi falliti', () => {
+test('login: blocca dopo LOGIN_MAX_FAIL (15) tentativi falliti', () => {
   const k = loginKey('mario', '192.168.1.9');
   clearLoginFails(k);
-  for (let i = 0; i < 4; i++) noteLoginFail(k);
-  assert.equal(loginBlockedMs(k), 0, 'al quarto tentativo deve ancora poter provare');
+  assert.equal(LOGIN_MAX_FAIL, 15);
+  for (let i = 0; i < LOGIN_MAX_FAIL - 1; i++) noteLoginFail(k);
+  assert.equal(loginBlockedMs(k), 0, 'al penultimo tentativo deve ancora poter provare');
   noteLoginFail(k);
-  assert.ok(loginBlockedMs(k) > 0, 'al quinto scatta il blocco');
+  assert.ok(loginBlockedMs(k) > 0, 'all’ultimo scatta il blocco');
   clearLoginFails(k);
 });
 
@@ -125,7 +126,7 @@ test('login: il blocco scade', () => {
   const k = loginKey('mario', '192.168.1.9');
   clearLoginFails(k);
   const t0 = 1_000_000;
-  for (let i = 0; i < 5; i++) noteLoginFail(k, t0);
+  for (let i = 0; i < LOGIN_MAX_FAIL; i++) noteLoginFail(k, t0);
   assert.ok(loginBlockedMs(k, t0 + 60_000) > 0, 'dopo un minuto ancora bloccato');
   assert.equal(loginBlockedMs(k, t0 + 16 * 60_000), 0, 'dopo un quarto d\'ora si riprova');
   clearLoginFails(k);
@@ -141,15 +142,16 @@ test('login: il successo azzera i tentativi', () => {
   clearLoginFails(k);
 });
 
-test('login: contatore per solo IP con soglia propria (20)', () => {
+test('login: contatore per solo IP con soglia propria, sopra quella per account', () => {
   // Stesso IP, username sempre diversi: il contatore per utente+IP non scatta
   // mai, quello per IP sì. È il freno alla scansione di account.
   const kIp = loginKey('*', '192.168.1.77');
   clearLoginFails(kIp);
-  for (let i = 0; i < 19; i++) noteLoginFail(kIp, Date.now(), 20);
-  assert.equal(loginBlockedMs(kIp), 0, 'al diciannovesimo può ancora provare');
-  noteLoginFail(kIp, Date.now(), 20);
-  assert.ok(loginBlockedMs(kIp) > 0, 'al ventesimo scatta il blocco IP');
+  assert.ok(LOGIN_MAX_FAIL_IP > LOGIN_MAX_FAIL, 'il blocco del PC non deve scattare prima di quello dell’account');
+  for (let i = 0; i < LOGIN_MAX_FAIL_IP - 1; i++) noteLoginFail(kIp, Date.now(), LOGIN_MAX_FAIL_IP);
+  assert.equal(loginBlockedMs(kIp), 0, 'al penultimo può ancora provare');
+  noteLoginFail(kIp, Date.now(), LOGIN_MAX_FAIL_IP);
+  assert.ok(loginBlockedMs(kIp) > 0, 'all’ultimo scatta il blocco IP');
   clearLoginFails(kIp);
 });
 
@@ -157,7 +159,7 @@ test('login: il blocco è per utente+IP, non per utente', () => {
   const k1 = loginKey('mario', '192.168.1.9');
   const k2 = loginKey('mario', '192.168.1.10');
   clearLoginFails(k1); clearLoginFails(k2);
-  for (let i = 0; i < 5; i++) noteLoginFail(k1);
+  for (let i = 0; i < LOGIN_MAX_FAIL; i++) noteLoginFail(k1);
   assert.ok(loginBlockedMs(k1) > 0);
   assert.equal(loginBlockedMs(k2), 0, 'un altro PC non deve restare fuori');
   clearLoginFails(k1); clearLoginFails(k2);
