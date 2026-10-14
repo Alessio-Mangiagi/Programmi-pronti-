@@ -79,11 +79,17 @@ const LOGIN_LOCK_MS = 15 * 60 * 1000;
 // Campi extra usati SOLO dall'assistente (vedi "Assistente della suite"):
 //   kw        — parole e frasi con cui la gente nomina l'app (anche a sproposito).
 //   dettaglio — risposta lunga a "cosa fa X?"; il campo desc resta quello della card.
+// fai   — l'attività come la direbbe chi lavora ("Trasformare una bolla in Excel"):
+//         è il titolo della scheda nella home degli utenti.
+// guida — due righe su cosa serve e cosa succede dentro l'app: il suggerimento
+//         che compare passando sopra la scheda.
 const APPS = [
   {
     id: 'ddt',
     nome: 'Lettore DDT',
     sottotitolo: 'Da PDF a Excel',
+    fai: 'Trasformare una bolla in Excel',
+    guida: 'Tieni a portata di mano il PDF della bolla: lo carichi, controlli i dati estratti e scarichi il foglio Excel pronto.',
     desc: 'Converte i documenti di trasporto (DDT) da PDF a Excel. Gestione utenti, template e storico versioni.',
     porta: 5050,
     dir: 'lettore-ddt',
@@ -97,6 +103,8 @@ const APPS = [
     id: 'agente',
     nome: 'Analista Dati',
     sottotitolo: 'Domande sui dati, risposte con AI',
+    fai: 'Fare una domanda sui dati aziendali',
+    guida: 'Scrivi la domanda come la faresti a un collega, per esempio «fatturato per cantiere nel 2025». Ricevi tabelle e grafici, senza conoscere SQL.',
     desc: 'Agente AI che interroga i database aziendali in linguaggio naturale e produce report e grafici.',
     porta: 5173,
     dir: 'analista-dati',
@@ -111,6 +119,8 @@ const APPS = [
     id: 'confronta',
     nome: 'Confronto Documenti',
     sottotitolo: 'Raffronto documenti',
+    fai: 'Trovare le differenze tra due PDF',
+    guida: 'Servono due versioni dello stesso documento: le carichi una accanto all’altra e scarichi il report delle differenze in Word o PDF.',
     desc: 'Confronta due documenti PDF evidenziando le differenze, con OCR e report scaricabile in Word o PDF.',
     porta: 5001,
     dir: 'confronto-documenti',
@@ -125,12 +135,15 @@ const APPS = [
     id: 'ocr',
     nome: 'OCR Documenti',
     sottotitolo: 'OCR ed estrazione',
+    fai: 'Leggere un documento scansionato',
+    guida: 'Usala quando il PDF è una foto e il testo non si seleziona: carichi la scansione e copi o esporti il testo riconosciuto.',
     desc: 'Riconoscimento testo da immagini e scansioni (PaddleOCR) con estrazione di articoli e prestazioni.',
     porta: 5179,
     dir: 'ocr-documenti',
     launch: 'avvia.vbs',
     tipo: 'Node.js + OCR',
-    kw: ['ocr documenti', 'ocr', 'paddle', 'paddleocr', 'scansione', 'scansioni', 'scansionato', 'scannerizzato',
+    kw: ['ocr documenti', 'ocr', 'paddle', 'paddleocr', 'scansione', 'scansioni', 'scansionato', 'scansionata', 'scansionati', 'scansionate',
+      'pdf scansionato', 'pdf scansionati', 'scannerizzato',
       'immagine', 'immagini', 'foto', 'riconoscimento testo', 'riconoscere', 'estrazione',
       'estrarre', 'articoli', 'prestazioni', 'testo da immagine'],
     dettaglio: 'Riconosce il testo dentro immagini e scansioni, anche storte o di bassa qualità, e ne estrae articoli e prestazioni. È l\'app da usare quando un PDF è una fotografia e non testo selezionabile.',
@@ -139,6 +152,8 @@ const APPS = [
     id: 'scadenzario',
     nome: 'Scadenzario',
     sottotitolo: 'Scadenze e adempimenti',
+    fai: 'Controllare scadenze e adempimenti',
+    guida: 'Trovi l’elenco delle scadenze con quelle vicine in evidenza. Puoi aggiungerne di nuove o importarle da un file Excel.',
     desc: 'Tiene sotto controllo scadenze e adempimenti aziendali, con preavvisi automatici e importazione da Excel.',
     porta: 5180,
     dir: 'scadenzario',
@@ -154,6 +169,8 @@ const APPS = [
     id: 'requisiti',
     nome: 'Verifica Requisiti',
     sottotitolo: 'Ricerca e checklist sui documenti',
+    fai: 'Verificare i requisiti di un documento',
+    guida: 'Carichi DURC, visure o certificati e fai passare la checklist: per ogni requisito vedi l’esito e il punto del testo che lo dimostra.',
     desc: 'Cerca parole e frasi dentro i documenti scansionati (con OCR) e applica una checklist di requisiti, con report Excel.',
     porta: 5185,
     dir: 'verifica-requisiti',
@@ -174,6 +191,8 @@ const APPS = [
     id: 'incampo',
     nome: 'InCampo',
     sottotitolo: 'Gestione cantiere',
+    fai: 'Seguire il lavoro in cantiere',
+    guida: 'Planimetrie con i pin, moduli di controllo, task e non conformità. Dentro si entra con il proprio account InCampo; c’è anche l’app per telefono, che funziona senza rete.',
     desc: 'Planimetrie con pin, moduli di controllo, task e non conformità dei cantieri, da web e da app mobile anche offline.',
     porta: 5190,
     dir: 'incampo',
@@ -191,6 +210,8 @@ const APPS = [
     id: 'trimble',
     nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',
+    fai: 'Caricare un PDF su Trimble',
+    guida: 'Per PCQ, computi e SAL: estrae le voci riga per riga, segnala gli scostamenti e carica il file su Trimble Connect.',
     desc: 'Converte PCQ, computi economici e SAL da PDF a file strutturati e li carica su Trimble via API. Riservato agli amministratori.',
     porta: 3011,
     dir: 'ponte-trimble',
@@ -206,6 +227,8 @@ const APPS = [
     id: 'auguri',
     nome: 'Auguri',
     sottotitolo: 'Compleanni su WhatsApp',
+    fai: 'Gestire gli auguri di compleanno',
+    guida: 'Controlli l’elenco dei compleanni e i messaggi WhatsApp che partono in automatico.',
     desc: 'Invia in automatico gli auguri di compleanno su WhatsApp. Riservato agli amministratori.',
     porta: 3000,
     dir: 'auguri',
@@ -266,9 +289,18 @@ const CHAT_ESEMPI = 'Prova con: "cosa fa l\'OCR?", "quale app per i PDF scansion
 
 // Ritorna { risposta, apps: [id] }: gli id servono al widget per mostrare i
 // pulsanti Avvia/Apri della card corrispondente.
+// Insulti all'assistente: non si risponde nel merito, si chiede di riformulare
+// con calma. Elenco volutamente corto e su parole intere (testo già normalizzato:
+// minuscolo, senza accenti): "scemo" non deve scattare su "scemato".
+const INSULTI = /(^|\s)(stupid[oaie]|idiot[aie]|cretin[oaie]|scem[oaie]|imbecill[ei]|deficient[ei]|coglion[ei]|stronz[oaie]|vaffanculo|fanculo|merda|schifo|inutile|incapace|ritardat[oaie])($|\s)/;
+function eInsulto(qn) { return INSULTI.test(qn); }
+const RISPOSTA_INSULTO = 'Sono un assistente automatico e ti aiuto volentieri, ma ti chiedo di scrivere con rispetto. '
+  + 'Riprova a farmi la domanda con calma, per esempio «quale app per le bolle?».';
+
 function rispondiAssistente(domanda, apps) {
   const qn = normalizza(domanda);
   if (!qn) return { risposta: 'Scrivi una domanda sulle app della suite. ' + CHAT_ESEMPI, apps: [] };
+  if (eInsulto(qn)) return { risposta: RISPOSTA_INSULTO, apps: [], insulto: true };
 
   const parole = qn.split(' ');
 
@@ -1632,6 +1664,7 @@ async function handle(req, res) {
     return sendJson(res, 200, {
       apps: APPS.filter(canSeeApp).map((a) => ({
         id: a.id, nome: a.nome, sottotitolo: a.sottotitolo, desc: a.desc,
+        fai: a.fai, guida: a.guida,   // home utenti: l'attività e il suggerimento al passaggio del mouse
         porta: a.porta, tipo: a.tipo, url: appUrl(req, a),
         adminOnly: !!a.adminOnly,   // la home le raggruppa in "Area riservata"
       })),

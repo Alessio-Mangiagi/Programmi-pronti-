@@ -528,3 +528,32 @@ test('riepilogoAttivita: il filtro per giorno restringe solo l\'elenco', () => {
   assert.equal(r.numeri.aperture7, 1);
   assert.equal(riepilogoAttivita(reg, 'mrossi', () => true, ora).attivita.length, 3);
 });
+
+test('assistente: agli insulti chiede rispetto e non suggerisce app', () => {
+  for (const q of ['sei uno STUPIDO', 'che app inutile', 'Vaffanculo', 'idiota, dov’è il ddt?']) {
+    const r = rispondiAssistente(q, APPS);
+    assert.equal(r.insulto, true, q);
+    assert.deepEqual(r.apps, []);
+    assert.match(r.risposta, /rispetto/);
+  }
+});
+
+test('assistente: parole che contengono un insulto non scattano', () => {
+  for (const q of ['quale app per le bolle?', 'come si scematizza un pdf', 'documenti stupidamente lunghi']) {
+    assert.notEqual(rispondiAssistente(q, APPS).insulto, true, q);
+  }
+});
+
+test('assistente: gli esempi che propone trovano davvero un\'app', () => {
+  const visibili = APPS.filter((a) => !a.adminOnly && !a.riservata);
+  for (const q of ['cosa fa l\'OCR?', 'quale app per i PDF scansionati?', 'come si avvia il DDT?', 'quali app ci sono?']) {
+    assert.ok(rispondiAssistente(q, visibili).apps.length > 0, q);
+  }
+});
+
+test('APPS: ogni app ha attività e guida per la home utenti', () => {
+  for (const a of APPS) {
+    assert.ok(a.fai && a.fai.length < 60, a.id + ' fai');
+    assert.ok(a.guida && a.guida.length > 40, a.id + ' guida');
+  }
+});
