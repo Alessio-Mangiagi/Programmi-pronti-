@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))><" -->
 # Portale Suite Cosedil
 
 Portale locale che riunisce in un unico accesso le applicazioni della suite Cosedil: **login** utenti, **avvio** e **apertura** dei programmi, **registro degli accessi** e area di **amministrazione**. Scritto in Node.js **senza dipendenze esterne** (solo moduli core).
@@ -17,6 +18,12 @@ Portale locale che riunisce in un unico accesso le applicazioni della suite Cose
 - Da riga di comando: `node server.js` (oppure `npm start`).
 
 All'avvio in locale il browser si apre da solo su `http://localhost:8080`.
+
+### Plancia admin (porta 8090)
+
+- **Avvia**: `avvia-admin.vbs` (invisibile) o `avvia-admin.bat` (con log). **Ferma**: `ferma-admin.vbs`.
+- Stesso `server.js` su `http://localhost:8090`: gli admin vedono la plancia (utenti e attività), gli altri la griglia delle app.
+- Per condividere utenti, sessioni e registro accessi col portale degli utenti (8080), impostare una volta `setx PORTALE_DATA_DIR "<cartella data del portale 8080>"`. Senza, usa `./data`.
 
 ### Primo accesso
 
