@@ -52,4 +52,34 @@ export declare const PORTAL: string;
 export declare const PORTAL_PUBBLICO: string;
 export declare const FAIL_OPEN: boolean;
 
+/** Azione registrata nel portale quando la rotta va a buon fine (status < 400). */
+export interface CosedilEventoRotta {
+  /** default 'POST' */
+  metodo?: string;
+  /** percorso esatto (senza query) o RegExp */
+  percorso: string | RegExp;
+  /** testo mostrato nella plancia, es. "DDT convertito in Excel" */
+  azione: string;
+  /** dettaglio opzionale (es. nome file), letto a risposta finita */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dettaglio?: (req: any) => string | undefined | null;
+}
+
+export interface CosedilAttivitaOptions {
+  app: string;
+  eventi?: CosedilEventoRotta[];
+}
+
+type ReqAttivita = Req & { method?: string; path?: string };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ResAttivita = Res & { on?(ev: 'finish', cb: () => void): any };
+
+export declare function cosedilAttivita(
+  opts: CosedilAttivitaOptions
+): (req: ReqAttivita, res: ResAttivita, next: Next) => void;
+export declare function segnalaPresenza(cookie: string | undefined, app: string, ora?: number): boolean;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export declare function registraEvento(req: any, app: string, azione: string, dettaglio?: string): Promise<boolean>;
+export declare const EVENTI: string;
+
 export default cosedilSSO;
