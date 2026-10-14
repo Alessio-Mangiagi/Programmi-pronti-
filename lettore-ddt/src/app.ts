@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import express from 'express';
 import session from 'express-session';
 import sessionFileStore from 'session-file-store';
@@ -9,7 +10,7 @@ import routes from './routes';
 // del progetto). I tipi arrivano da shared/sso/cosedil-sso.d.ts; a runtime sia
 // src/ sia dist/ stanno un livello sotto la radice dell'app, quindi lo stesso
 // path relativo risolve in sviluppo e in build.
-import cosedilSSO from '../../shared/sso/cosedil-sso';
+import cosedilSSO, { cosedilAttivita } from '../../shared/sso/cosedil-sso';
 import { errorHandler } from './utils/errorHandler';
 import { metricsMiddleware } from './utils/metrics';
 import logger from './utils/logger';
@@ -59,6 +60,64 @@ const app = express();
 // chiuso (COSEDIL_SSO_FAIL=open per il vecchio comportamento; COSEDIL_SSO=off
 // per disattivare). Deve stare prima di tutto il resto.
 app.use(cosedilSSO({ app: 'ddt' }));
+
+// Attività per la plancia admin del portale: presenza (il keepalive della
+// pagina pinga ogni 10s, quindi il portale sa quando l'utente chiude DDT) e le
+// azioni che contano, scritte nel registro solo se vanno a buon fine.
+// Il dettaglio è un nome file o di versione, mai il contenuto del DDT.
+const testo = (v: unknown): string => (typeof v === 'string' ? v : '');
+app.use(
+  cosedilAttivita({
+    app: 'ddt',
+    eventi: [
+      {
+        percorso: '/auth/login',
+        azione: 'Accesso a DDT',
+        dettaglio: (req) => testo(req.body?.username),
+      },
+      { percorso: '/auth/logout', azione: 'Uscita da DDT' },
+      {
+        percorso: '/claude-to-excel',
+        azione: 'DDT convertito in Excel',
+        dettaglio: (req) => testo(req.body?.pdfFileName),
+      },
+      {
+        percorso: '/log-excel-validation',
+        azione: 'Excel verificato',
+        dettaglio: (req) =>
+          testo(req.body?.fileName) +
+          (req.body?.validated === true ? ' · convalidato' : ' · respinto'),
+      },
+      {
+        percorso: '/batch/jobs',
+        azione: 'Conversione batch avviata',
+        dettaglio: (req) => testo(req.body?.inputDir),
+      },
+      { percorso: /^\/batch\/jobs\/[^/]+\/cancel$/, azione: 'Conversione batch annullata' },
+      { percorso: /^\/batch\/jobs\/[^/]+\/al-paniere$/, azione: 'Risultati batch nel paniere' },
+      {
+        percorso: '/paniere',
+        azione: 'Estrazione aggiunta al paniere',
+        dettaglio: (req) => testo(req.body?.label),
+      },
+      { percorso: '/paniere/da-archivio', azione: "Estrazioni dall'archivio al paniere" },
+      { metodo: 'DELETE', percorso: '/paniere', azione: 'Paniere svuotato' },
+      {
+        percorso: '/paniere/unisci',
+        azione: 'Paniere unito in un Excel',
+        dettaglio: (req) => testo(req.body?.nome),
+      },
+      {
+        percorso: '/versions',
+        azione: 'Versione salvata',
+        dettaglio: (req) => testo(req.body?.name),
+      },
+      { metodo: 'DELETE', percorso: /^\/versions\/[^/]+$/, azione: 'Versione eliminata' },
+      { percorso: '/export/csv', azione: 'Esportazione CSV' },
+      { percorso: '/export/json', azione: 'Esportazione JSON' },
+    ],
+  })
+);
 
 // Dietro reverse proxy/HTTPS (Nginx, Caddy, Render, ecc.) per cookie secure e req.ip corretti.
 if (appCfg.trustProxy) app.set('trust proxy', 1);
