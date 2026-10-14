@@ -196,7 +196,82 @@ function quando(ts) {
 const AZIONI = {
   login: 'Accesso', logout: 'Uscita', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
   chiudi: 'Chiusura', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
+  'richiesta-aiuto': 'Richiesta aiuto', 'reset-password': 'Reset password', 'richiesta-gestita': 'Richiesta gestita',
 };
+
+// ---------------------------------------------------------------- richieste di aiuto
+// Dal login (password dimenticata / account bloccato). Ogni avviso dice chi è,
+// come ricontattarlo e da dove scrive (IP interno o esterno alla rete aziendale).
+
+async function caricaRichieste() {
+  let r;
+  try {
+    const res = await fetch('/api/richieste');
+    if (!res.ok) return;
+    r = await res.json();
+  } catch { return; }
+  const lista = r.richieste || [];
+  const box = document.getElementById('avvisi');
+  box.hidden = !lista.length;
+  if (!lista.length) return;
+  document.getElementById('avvisiN').textContent = lista.length === 1 ? '1 da gestire' : lista.length + ' da gestire';
+  const el = document.getElementById('avvisiLista');
+  // Una password temporanea appena generata non va cancellata dal giro di aggiornamento.
+  if (el.querySelector('.pwd-temp')) return;
+  el.innerHTML = lista.map((q) => {
+    const account = q.username
+      ? (q.account ? `account <b>${esc(q.username)}</b>` : `username «${esc(q.username)}» <span class="tag no">non esiste</span>`)
+      : '<span class="tag no">username non indicato</span>';
+    return `<li class="avviso" data-id="${esc(q.id)}">
+      <div class="chi">
+        <b>${esc(q.nome)} ${esc(q.cognome)}</b> chiede di reimpostare la password
+        <p><a href="mailto:${esc(q.email)}">${esc(q.email)}</a> · ${account} · IP ${esc(q.ip)}
+          <span class="tag ${q.interno ? 'interno' : 'esterno'}">${q.interno ? 'Interno' : 'Esterno'}</span> · ${esc(quando(q.ts))}</p>
+        ${q.messaggio ? `<p class="msg">${esc(q.messaggio)}</p>` : ''}
+      </div>
+      <div class="az">
+        ${q.account ? `<button type="button" class="primario" data-reimposta="${esc(q.id)}">Reimposta password</button>` : ''}
+        <button type="button" data-gestita="${esc(q.id)}">Segna gestita</button>
+      </div>
+    </li>`;
+  }).join('');
+  el.querySelectorAll('[data-reimposta]').forEach((b) => b.addEventListener('click', () => gestisciRichiesta(b.dataset.reimposta, 'reimposta', b)));
+  el.querySelectorAll('[data-gestita]').forEach((b) => b.addEventListener('click', () => gestisciRichiesta(b.dataset.gestita, 'gestita', b)));
+}
+
+async function gestisciRichiesta(id, azione, btn) {
+  const li = btn.closest('.avviso');
+  const nome = li.querySelector('.chi b').textContent;
+  if (azione === 'reimposta' && !confirm(`Reimpostare la password di ${nome}?\n\nLa password attuale smette di funzionare e le sue sessioni aperte si chiudono. Riceverai una password temporanea da comunicargli.`)) return;
+  li.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  try {
+    const res = await fetch(`/api/richieste/${encodeURIComponent(id)}/${azione}`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) { toast(data.error || 'Operazione non riuscita'); li.querySelectorAll('button').forEach((b) => { b.disabled = false; }); return; }
+    if (data.password) {
+      // Mostrata una sola volta: il server non la conserva in chiaro.
+      const email = li.querySelector('.chi a').textContent;
+      li.querySelector('.az').remove();
+      const box = document.createElement('div');
+      box.className = 'pwd-temp';
+      box.innerHTML = `Password temporanea: <code>${esc(data.password)}</code>
+        <button type="button" class="copia">Copia</button>
+        <a href="mailto:${esc(email)}?subject=${encodeURIComponent('Portale Suite Cosedil — nuova password')}&body=${encodeURIComponent('Ciao,\n\nti ho reimpostato la password del portale.\nPassword temporanea: ' + data.password + '\n\nAl primo accesso ti verrà chiesto di sceglierne una nuova.\n')}">Mandala per email</a>
+        <button type="button" class="fatto">Fatto</button>`;
+      li.appendChild(box);
+      box.querySelector('.copia').addEventListener('click', () => { navigator.clipboard.writeText(data.password).then(() => toast('Password copiata.'), () => toast('Copia non riuscita: selezionala a mano.')); });
+      box.querySelector('.fatto').addEventListener('click', () => { li.remove(); caricaRichieste(); });
+      toast('Password reimpostata e account sbloccato.');
+    } else {
+      li.remove();
+      toast('Richiesta segnata come gestita.');
+      caricaRichieste();
+    }
+  } catch {
+    toast('Il portale non risponde. Riprova.');
+    li.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  }
+}
 
 function durata(min) {
   const m = Math.max(0, Math.round(Number(min) || 0));
@@ -456,6 +531,8 @@ async function init() {
   renderOggi();
   renderCalendario();   // subito, vuoto: i livelli arrivano con /api/plancia
   aggiornaPlancia();
+  caricaRichieste();
+  setInterval(caricaRichieste, 20000);   // una richiesta di aiuto non aspetta il minuto
   pollStatus();
   setInterval(pollStatus, 4000);
   setInterval(aggiornaPlancia, 60000);
