@@ -1,3 +1,4 @@
+/* "><(((º> sabusabu <º)))><" */
 /* Home del portale: "plancia personale".
    Barra delle app a sinistra, attività dell'utente al centro.
    Bianco e nero con un solo accento (il blu Cosedil): lo stato delle app si
@@ -98,6 +99,12 @@ button { font: inherit; }
 .tl .t b { font-weight: 600; }
 .tl .az { font-family: var(--font-cond); font-weight: 700; font-stretch: 85%; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); white-space: nowrap; }
 .tl li.warn .az { color: var(--ink); background: repeating-linear-gradient(-45deg, var(--soft) 0 3px, transparent 3px 6px); padding: 2px 5px; }
+.tl .t small { color: var(--grey); font-size: 12px; margin-left: 4px; }
+/* App aperta adesso: unico punto della timeline con l'accento blu. */
+.tl li.live .az { color: #fff; background: var(--cosedil-blue); padding: 2px 5px; }
+.tl li.live time { color: var(--ink); font-weight: 600; }
+/* Azione fatta dentro un'app: rientra sotto le aperture, si legge come dettaglio. */
+.tl li.ev .k { color: var(--grey); }
 
 .res { display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 12px; border-top: 1px solid var(--soft); }
 .res:first-child { border-top: 0; }
@@ -120,6 +127,7 @@ button { font: inherit; }
 .urow[aria-selected="true"] .u-av { background: #fff; color: var(--ink); }
 .u-av { width: 34px; height: 34px; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 600; position: relative; }
 .u-av.oggi::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 10px; height: 10px; background: var(--cosedil-blue); border: 2px solid #fff; }
+.u-av.live::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 10px; height: 10px; background: var(--cosedil-blue); border: 2px solid #fff; border-radius: 50%; }
 .u-name { min-width: 0; }
 .u-name b { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .u-meta { font-size: 11.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }

@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Plancia degli amministratori: barra delle app (lanciatore) + utenti e attività.
 // Gli utenti normali ricevono index.html, la griglia di sempre.
 //
@@ -193,9 +194,19 @@ function quando(ts) {
 // Le azioni come nomi, non come participi: "Scadenzario · Apertura" vale per
 // qualunque app, senza accordare maschile e femminile.
 const AZIONI = {
-  login: 'Accesso', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
-  'login-bloccato': 'Accesso bloccato',
+  login: 'Accesso', logout: 'Uscita', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
+  chiudi: 'Chiusura', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
 };
+
+function durata(min) {
+  const m = Math.max(0, Math.round(Number(min) || 0));
+  if (m < 1) return 'meno di 1 min';
+  if (m < 60) return m + ' min';
+  return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+}
+
+// Nome breve dell'app per le frasi ("in DDT dalle 10:03").
+const nomeApp = (id) => { const a = appById(id); return a ? sigla(a) : id; };
 
 let me = null;               // utente collegato (da /api/me)
 let utenti = [];             // righe di /api/plancia
@@ -206,9 +217,13 @@ function renderUtenti() {
   if (!utenti.length) { el.innerHTML = '<p class="empty">Nessun utente registrato.</p>'; return; }
   el.innerHTML = utenti.map((u) => {
     const app = u.ultimaApp && appById(u.ultimaApp.appId);
-    const meta = u.ultimoAccesso ? 'Ultimo accesso ' + quando(u.ultimoAccesso) : 'Mai entrato';
+    const ora = u.inUso || [];
+    // Chi ha un'app aperta adesso lo si dice prima di tutto: è la domanda della plancia.
+    const meta = ora.length
+      ? 'Ora in ' + ora.map((x) => nomeApp(x.appId)).join(', ')
+      : u.ultimoAccesso ? 'Ultimo accesso ' + quando(u.ultimoAccesso) : 'Mai entrato';
     return `<button type="button" class="urow" role="option" data-utente="${esc(u.username)}" aria-selected="${u.username === selezionato}">
-      <span class="u-av${u.attivoOggi ? ' oggi' : ''}" title="${u.attivoOggi ? 'Attivo oggi' : ''}">${esc(iniz(u.nome))}</span>
+      <span class="u-av${ora.length ? ' live' : u.attivoOggi ? ' oggi' : ''}" title="${ora.length ? 'In uso adesso' : u.attivoOggi ? 'Attivo oggi' : ''}">${esc(iniz(u.nome))}</span>
       <span class="u-name"><b>${esc(u.nome)}</b><span class="u-meta">${esc(u.username)} · ${esc(meta)}</span></span>
       <span class="u-role">${u.ruolo === 'admin' ? 'Admin' : 'Utente'}</span>
       <span class="u-num"><b>${u.accessi30}</b><small>accessi 30 gg</small></span>
@@ -222,22 +237,46 @@ function renderUtenti() {
   }));
 }
 
-function renderTimeline(attivita, nome) {
+// Testo della riga: cosa è successo, con i dettagli che l'azione porta con sé.
+function testoRiga(e, app) {
+  const nomeB = app ? `<b>${esc(app.nome)}</b>` : e.appId ? `<b>${esc(e.appId)}</b>` : '';
+  if (e.azione === 'chiudi') {
+    const dal = e.inizio ? ora2(new Date(e.inizio)) + '–' + ora2(new Date(e.ts)) : '';
+    return `${nomeB} <small>usata ${esc(dal)} · ${esc(durata(e.durataMin))}</small>`;
+  }
+  if (e.azione === 'evento') {
+    return `${nomeB} · ${esc(e.evento || 'Azione')}` + (e.dettaglio ? ` <small>${esc(e.dettaglio)}</small>` : '');
+  }
+  if (e.azione === 'login') return 'Accesso al Portale';
+  if (e.azione === 'logout') return 'Uscita dal Portale';
+  return nomeB || esc(AZIONI[e.azione] || e.azione);
+}
+
+function renderTimeline(attivita, nome, inUso) {
   const el = document.getElementById('timeline');
-  if (!attivita.length) {
+  // In cima, le app aperte adesso: sessione ancora viva, chiusura non ancora nota.
+  const vive = (inUso || []).map((x) => {
+    const app = appById(x.appId);
+    return `<li class="live">
+      <time datetime="${esc(x.dal)}">${esc(ora2(new Date(x.dal)))}</time>
+      <span class="k">${app ? esc(sigla(app)) : '—'}</span>
+      <span class="t"><b>${esc(app ? app.nome : x.appId)}</b> <small>aperta da ${esc(durata((Date.now() - Date.parse(x.dal)) / 60000))}</small></span>
+      <span class="az">In uso ora</span></li>`;
+  });
+  if (!attivita.length && !vive.length) {
     el.innerHTML = `<li class="empty">${esc(nome)} non ha ancora attività registrate nel Portale.</li>`;
     return;
   }
   let ultimoGiorno = '';
-  const righe = [];
-  for (const e of attivita.slice(0, 16)) {
+  const righe = vive.length ? ['<li class="day">Adesso</li>', ...vive] : [];
+  for (const e of attivita.slice(0, 40)) {
     const d = new Date(e.ts);
     const g = giornoEtichetta(d);
     if (g !== ultimoGiorno) { righe.push(`<li class="day">${esc(g)}</li>`); ultimoGiorno = g; }
     const app = e.appId ? appById(e.appId) : null;
     // App non più nell'elenco (rimossa o non visibile): si mostra l'id, non si perde la riga.
-    const testo = app ? `<b>${esc(app.nome)}</b>` : e.appId ? `<b>${esc(e.appId)}</b>` : (e.azione === 'login' ? 'Accesso al Portale' : esc(AZIONI[e.azione] || e.azione));
-    righe.push(`<li class="${e.azione === 'login-bloccato' ? 'warn' : ''}">
+    const testo = testoRiga(e, app);
+    righe.push(`<li class="${e.azione === 'login-bloccato' ? 'warn' : e.azione === 'evento' ? 'ev' : ''}">
       <time datetime="${esc(e.ts)}">${esc(ora2(d))}</time>
       <span class="k">${app ? esc(sigla(app)) : '—'}</span>
       <span class="t">${testo}</span>
@@ -261,7 +300,7 @@ async function caricaAttivita() {
   const piu = n.piuUsata && appById(n.piuUsata.appId);
   document.getElementById('notaAttivita').textContent =
     `${n.aperture7 ?? 0} app aperte in 7 gg` + (piu ? ` · più usata: ${sigla(piu)}` : '');
-  renderTimeline(r.attivita || [], nome);
+  renderTimeline(r.attivita || [], nome, r.inUso);
 }
 
 async function aggiornaPlancia() {
