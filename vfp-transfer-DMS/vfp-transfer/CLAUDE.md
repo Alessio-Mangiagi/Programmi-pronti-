@@ -46,6 +46,13 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Smistamento AI (solo admin): `ai_smistamento.py` chiama la Messages API di Anthropic (URL fisso, tool use
   forzato `assegna_cartelle`) con i soli nomi dei file e l'albero delle cartelle VFP (`VfpClient.list_child_folders`);
   le risposte fuori dall'albero diventano "Da smistare". Endpoint `/api/ai/analyze|status|start` in `vfp_gui.py`.
+- Estrazione dal DMS di origine: `estrai_dms.py` (CLI separata). `LetturaSicura` ammette solo GET e `POST /login`
+  (`ScritturaBloccata`), niente redirect, freno richieste/s (raddoppiato su 429), retry su 429/5xx/rete, `DmsSovraccarico`
+  dopo N errori di fila, finestra `--orario`. Adattatore `SorgenteSeedDms` (login/logout/cartella/figli/versioni/scarica):
+  un altro DMS = un'altra classe con gli stessi metodi. Output: `file/<doc>/v<n>/<nome>`, `stato_estrazione.json`
+  (SHA-256, ripresa), `report_estrazione.csv`, `manifest.csv` (valori con `csv_cell`; `items_from_manifest` applica `csv_plain`).
+  DMS di prova: SeedDMS 6 portabile fuori dal repo (`..\..\seeddms-prova`, porta 8780), dati finti con
+  `strumenti_prova/popola_seeddms.py` (solo localhost).
 - Sempre attivo: `installa_avvio_automatico.ps1` crea un'operazione pianificata (pythonw `--service`,
   all'accesso + controllo ogni 5 minuti con IgnoreNew, riavvio su errore). Log in `logs/vfp_servizio.log`.
 - Documentazione API: Swagger https://api-uk.vfp.viewpoint.com/swagger/ui/index
@@ -65,6 +72,7 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Da verificare alla prima prova reale: formato delle risposte delle liste (gestito in `_items`),
   dettagli dello scambio token, disponibilita' dello scope `offline_access`.
 - Credenziali API (client_id) da richiedere a Trimble/Viewpoint (support@4projects.com).
-- Possibile sviluppo: leggere direttamente dal DMS di origine (es. SharePoint) invece che da un export.
+- DMS di origine reale ancora da definire: `estrai_dms.py` provato solo contro SeedDMS di prova (hash identici
+  all'archivio). Per il DMS vero serve il suo adattatore.
 
 Commenti e messaggi del programma sono in italiano.
