@@ -60,8 +60,14 @@ L'interfaccia chiede **nome utente e password**. Due ruoli:
 
 | Ruolo | Cosa vede e fa |
 |---|---|
-| **Amministratore** | Tutto: impostazioni, trasferimenti, posta, storico, download dei report, gestione utenti |
-| **Utente** | Solo la Panoramica e la richiesta del report: indica l'indirizzo email e il report Excel arriva lì e, in copia, all'amministratore (non viene scaricato) |
+| **Amministratore** | Tutto, in entrambe le aree (Documenti e Posta): impostazioni, trasferimenti, posta, storico, download dei report, gestione utenti |
+| **Utente** | Solo la Panoramica **della sua area** e la richiesta del report: indica l'indirizzo email e il report Excel arriva lì e, in copia, all'amministratore (non viene scaricato) |
+
+**Aree.** Il programma ha due aree: **Documenti** (trasferimento, smistamento, storico, moduli) e **Posta** (flusso
+posta, caselle email). L'amministratore passa dall'una all'altra con il selettore in alto a sinistra. Ogni utente
+normale ha **una sola area**, scelta dall'amministratore (*Impostazioni > Utenti*, colonna *Area*): vede solo quella,
+senza selettore, e il programma gli rifiuta i dati dell'altra area anche se li chiede direttamente. Anche il report
+che riceve via email contiene solo la sua area. Gli utenti creati prima delle aree hanno l'area Documenti.
 
 - Gli utenti stanno nella cassaforte cifrata, con la password ridotta a impronta irreversibile (PBKDF2).
   Creare, eliminare un utente o cambiarne password o ruolo richiede il codice inviato all'amministratore.
@@ -69,6 +75,7 @@ L'interfaccia chiede **nome utente e password**. Due ruoli:
   ```
   python auth.py aggiungi nome.cognome --ruolo admin
   ```
+  Un utente normale con la sua area: `python auth.py aggiungi nome.cognome --area posta` (oppure `documenti`).
   Altri comandi: `python auth.py password NOME`, `python auth.py elimina NOME`, `python auth.py elenco`.
   Gli altri utenti si creano anche dall'interfaccia (*Impostazioni > Utenti*).
 - Dopo 5 password sbagliate l'utente viene bloccato per 15 minuti. La sessione scade dopo un'ora di inattività
@@ -282,6 +289,43 @@ Le cartelle vuote non compaiono nel manifest (in VFP si creano solo le cartelle 
 Per provare senza toccare il DMS vero: SeedDMS portabile su questo PC (`avvia_seeddms.bat`, http://127.0.0.1:8780,
 utente `admin`). `python strumenti_prova\popola_seeddms.py` lo riempie con due commesse finte (cartelle, revisioni,
 nomi con caratteri speciali, un file da 12 MB); scrive nel DMS e per questo funziona solo verso 127.0.0.1.
+
+## Moduli autocompilati (in costruzione)
+
+Da un documento che non è una lettera (DDT, verbale, certificato, fattura...) il programma compila una maschera, la
+fa rivedere all'utente e salva il **PDF del modulo compilato**. Per ora c'è la logica, con una prova da riga di comando;
+la pagina arriverà insieme ai moduli veri.
+```
+python moduli.py --modulo esempio_ddt --file D:\documenti\ddt.pdf          (solo lettura sul PC)
+python moduli.py --modulo esempio_ddt --file D:\documenti\ddt.pdf --ai     (completa con Claude i campi mancanti)
+```
+- **Prima senza AI**: il testo del documento (PDF con testo, Word .docx, .txt) viene letto sul PC e i campi si trovano
+  con le regole del modulo (etichette come "DDT n.", "Data documento", oppure un'espressione regolare).
+- **Poi, solo se serve, Claude**: per i soli campi mancanti (o per scansioni e foto, che sul PC non si leggono).
+  Il documento viene inviato ad Anthropic **solo** se `MODULI_AI` lo permette: `no` = mai, `conferma` (predefinito)
+  = solo quando l'utente lo chiede, `auto` = subito. Cambiarlo richiede il codice inviato all'amministratore.
+- **Controlli su ogni valore**, letto sul PC o da Claude: date vere, importi, partite IVA con cifra di controllo,
+  scelte tra le opzioni del modulo. Un valore che non torna viene scartato e il campo resta da compilare.
+- **Revisione e conferma**: l'utente corregge e conferma; servono tutti i campi obbligatori. Per ogni campo resta
+  scritto da dove viene (documento, AI, manuale). Archivio in `moduli_compilati/` con la copia del documento.
+- **Origini dei documenti**: file caricato, allegati della posta, una cartella (anche un'estrazione dal DMS), il DMS
+  direttamente via API (`DMS_URL`, `DMS_USER`, `DMS_PASSWORD`, in sola lettura). CPM e Alyante sono previsti: per
+  collegarli servono la documentazione e le credenziali delle loro API.
+
+**Dati del fornitore.** I campi con ambito `fornitore` (ragione sociale, IBAN del conto dedicato, persone delegate...)
+valgono solo per quel fornitore, riconosciuto dalla partita IVA: alla prima conferma vanno nella sua **anagrafica**
+(`moduli_compilati/fornitori/`) e dal documento successivo si compilano da soli. Un dato registrato non viene mai
+sostituito da quello letto in un documento: se è diverso (per esempio un IBAN cambiato, tipico delle truffe) resta
+quello registrato con un avviso, e per cambiarlo alla conferma serve una scelta esplicita; resta lo storico di chi
+l'ha cambiato e quando. I campi `fisso` (per esempio il committente) sono uguali per tutti.
+
+**Sezioni con testo fisso.** Una sezione (per esempio *Art. 1 - Obblighi di tracciabilità finanziaria*) ha lo stesso
+testo per tutti i fornitori, con i dati del singolo fornitore al posto di `{iban_dedicato}`, `{delegati}`, `{cig}`...
+Vedi `moduli/esempio_tracciabilita.json` (testo indicativo, da sostituire con quello dei vostri contratti).
+
+Un modulo è un file `moduli/<id>.json` (vedi `moduli/esempio_ddt.json`): nome, campi (tipo, obbligatorio, etichette da
+cercare, regex facoltativa) e, se c'è, il PDF compilabile da riempire (`pdf` + `pdf_campo` per ogni campo). Senza PDF
+compilabile il programma genera una scheda PDF con tutti i campi.
 
 ## Avvio in VS Code
 
