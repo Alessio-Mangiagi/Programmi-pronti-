@@ -47,7 +47,12 @@ class ApiTest(unittest.TestCase):
             mock.patch.object(api_posta, "PATHS", {"mail_log": log, "report": report}),
             mock.patch.object(env_config, "load_settings", lambda *a, **k: dict(cls.settings)),
             mock.patch.object(protocollo, "OVERRIDES_PATH", d / "manuali.json"),
-            mock.patch.object(auth, "session", lambda token: {"user": "prova", "role": "admin"} if token == "ok" else None),
+            mock.patch.object(auth, "session", lambda token: {
+                "ok": {"user": "prova", "role": "admin", "area": "documenti"},
+                "doc": {"user": "ufficio", "role": "utente", "area": "documenti"},
+                "posta": {"user": "segreteria", "role": "utente", "area": "posta"},
+            }.get(token)),
+            mock.patch.object(auth, "get_user", lambda name: {"email": ""}),
             mock.patch.object(vfp_gui.attivita, "record", lambda *a, **k: None),
         ]
         for p in cls.patches:
@@ -79,6 +84,49 @@ class ApiTest(unittest.TestCase):
     def test_senza_sessione(self):
         code, _, _ = self.call("/api/mail/log", cookie="no")
         self.assertEqual(code, 401)
+
+    def test_aree_degli_utenti(self):
+        # l'amministratore vede entrambe le aree
+        self.assertEqual(self.call("/api/report")[0], 200)
+        self.assertEqual(self.call("/api/mail")[0], 200)
+        # l'utente dell'area documenti non riceve i dati della posta, e viceversa
+        self.assertEqual(self.call("/api/report", cookie="doc")[0], 200)
+        self.assertEqual(self.call("/api/mail", cookie="doc")[0], 403)
+        self.assertEqual(self.call("/api/mail", cookie="posta")[0], 200)
+        self.assertEqual(self.call("/api/report", cookie="posta")[0], 403)
+        # nessuno dei due accede alle funzioni dell'amministratore
+        for cookie in ("doc", "posta"):
+            self.assertEqual(self.call("/api/mail/log", cookie=cookie)[0], 403)
+        _, body, _ = self.call("/api/session", cookie="posta")
+        info = json.loads(body)
+        self.assertEqual((info["role"], info["area"]), ("utente", "posta"))
+        self.assertEqual(set(info["areas"]), {"documenti", "posta"})
+
+    def test_report_per_area(self):
+        import report_excel
+        p = api_posta.PATHS
+        tutto = report_excel.build_report(p["mail_log"], p["report"], self.settings["MAIL_ARCHIVE_DIR"])
+        solo_doc = report_excel.build_report(p["mail_log"], p["report"], self.settings["MAIL_ARCHIVE_DIR"], area="documenti")
+        solo_posta = report_excel.build_report(p["mail_log"], p["report"], self.settings["MAIL_ARCHIVE_DIR"], area="posta")
+        import io
+        import zipfile
+
+        def testo(xlsx):
+            with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+                return " ".join(z.read(n).decode("utf-8", "replace") for n in z.namelist() if n.endswith(".xml"))
+        self.assertIn("ente@pec.it", testo(tutto))
+        self.assertIn("DOC-1", testo(tutto))
+        self.assertNotIn("ente@pec.it", testo(solo_doc))
+        self.assertIn("DOC-1", testo(solo_doc))
+        self.assertIn("ente@pec.it", testo(solo_posta))
+        self.assertNotIn("DOC-1", testo(solo_posta))
+
+    def test_area_utente_valida(self):
+        self.assertEqual(auth.area_di({"area": "posta"}), "posta")
+        self.assertEqual(auth.area_di({}), "documenti")  # utenti creati prima delle aree
+        self.assertEqual(auth.area_di({"area": "tutte"}), "documenti")
+        with self.assertRaises(ValueError):
+            auth._check_area("amministrazione")
 
     def test_host_estraneo(self):
         code, _, _ = self.call("/api/salute", headers={"Host": "attaccante.example"})

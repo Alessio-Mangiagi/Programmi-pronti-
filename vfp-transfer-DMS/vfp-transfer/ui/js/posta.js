@@ -40,6 +40,7 @@ function fmtWhen(ts) {
 }
 
 async function loadMail() {
+  if (!canSeeArea('posta')) return;  // utente dell'area documenti: niente dati della posta
   let m;
   try { m = await api('/api/mail'); } catch { return; }
   state.mail = m;

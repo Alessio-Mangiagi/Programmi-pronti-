@@ -583,11 +583,11 @@ _SEND_LOCK = threading.Lock()
 def api_session_info(sess):
     user = auth.get_user(sess["user"]) or {}
     return {"user": sess["user"], "role": sess["role"], "role_label": auth.ROLES.get(sess["role"], ""),
-            "email": user.get("email", "")}
+            "email": user.get("email", ""), "area": sess.get("area", auth.AREA_PREDEFINITA), "areas": auth.AREE}
 
 
 def api_users():
-    return {"users": auth.list_users(), "roles": auth.ROLES, "min_password": auth.MIN_PASSWORD}
+    return {"users": auth.list_users(), "roles": auth.ROLES, "areas": auth.AREE, "min_password": auth.MIN_PASSWORD}
 
 
 def api_users_save(body, sess, token=""):
@@ -597,11 +597,13 @@ def api_users_save(body, sess, token=""):
     if not what:
         raise ValueError("Operazione non valida")
     auth.require_approval(token, sess["user"], what,
-                          {k: body.get(k) for k in ("action", "name", "role", "email", "password")}, body.get("otp"))
+                          {k: body.get(k) for k in ("action", "name", "role", "email", "password", "area")}, body.get("otp"))
     if action == "add":
-        auth.add_user(name, str(body.get("password") or ""), body.get("role"), str(body.get("email") or ""))
-        log.warning("Utente %s creato da %s (ruolo %s)", name, sess["user"], body.get("role"))
-        attivita.record(sess["user"], "modifica", "Utente creato", f"{name} ({auth.ROLES.get(body.get('role'), '')})", role="admin")
+        area = body.get("area") or auth.AREA_PREDEFINITA
+        auth.add_user(name, str(body.get("password") or ""), body.get("role"), str(body.get("email") or ""), area)
+        log.warning("Utente %s creato da %s (ruolo %s, area %s)", name, sess["user"], body.get("role"), area)
+        attivita.record(sess["user"], "modifica", "Utente creato",
+                        f"{name} ({auth.ROLES.get(body.get('role'), '')}, area {auth.AREE.get(area, area)})", role="admin")
     elif action == "password":
         auth.set_password(name, str(body.get("password") or ""))
         log.warning("Password dell'utente %s cambiata da %s", name, sess["user"])
@@ -609,10 +611,14 @@ def api_users_save(body, sess, token=""):
     elif action == "update":
         if name == sess["user"] and body.get("role") not in (None, "admin"):
             raise ValueError("Non puoi togliere a te stesso il ruolo di amministratore")
-        auth.update_user(name, role=body.get("role"), email=body.get("email"))
+        auth.update_user(name, role=body.get("role"), email=body.get("email"), area=body.get("area"))
         log.warning("Utente %s modificato da %s", name, sess["user"])
-        attivita.record(sess["user"], "modifica", "Utente modificato",
-                        f"{name}: ruolo {auth.ROLES.get(body.get('role'), '-')}" if body.get("role") else name, role="admin")
+        dettaglio = name
+        if body.get("role"):
+            dettaglio = f"{name}: ruolo {auth.ROLES.get(body.get('role'), '-')}"
+        elif body.get("area"):
+            dettaglio = f"{name}: area {auth.AREE.get(body.get('area'), '-')}"
+        attivita.record(sess["user"], "modifica", "Utente modificato", dettaglio, role="admin")
     elif action == "delete":
         if name == sess["user"]:
             raise ValueError("Non puoi eliminare il tuo stesso utente")
@@ -644,8 +650,9 @@ def api_report_send(body, sess):
     if days != "0":
         from datetime import date, timedelta
         dal = date.today() - timedelta(days=int(days) - 1)
+    area = None if sess["role"] == "admin" else sess.get("area")  # l'utente riceve solo la sua area
     data = report_excel.build_report(MAIL_LOG_PATH, REPORT_PATH, env_config.resolve_path(settings["MAIL_ARCHIVE_DIR"]),
-                                     dal, None, None)
+                                     dal, None, None, area=area)
     period = {"0": "tutto il periodo", "1": "oggi", "7": "ultimi 7 giorni", "30": "ultimi 30 giorni"}[days]
     name = f"report_vfp_{time.strftime('%Y%m%d_%H%M')}.xlsx"
     body_text = (f"In allegato il report delle email ricevute e dei documenti trasferiti in Viewpoint ({period}).\n\n"
@@ -764,6 +771,11 @@ class Handler(BaseHTTPRequestHandler):
         if sess is None:
             self._send(401, {"error": "Sessione scaduta o assente: accedere di nuovo", "login": True})
             return False
+        if role.startswith("area:") and sess["role"] != "admin" and sess.get("area") != role[5:]:
+            log.warning("Accesso negato a %s per l'utente %s (area %s)", urlparse(self.path).path, sess["user"], sess.get("area"))
+            attivita.record(sess["user"], "sicurezza", "Area non assegnata", urlparse(self.path).path, "negato", sess["role"])
+            self._send(403, {"error": "Funzione di un'area non assegnata a questo utente"})
+            return False
         if role == "admin" and sess["role"] != "admin":
             log.warning("Accesso negato a %s per l'utente %s", urlparse(self.path).path, sess["user"])
             attivita.record(sess["user"], "sicurezza", "Funzione riservata negata", urlparse(self.path).path,
@@ -787,8 +799,8 @@ class Handler(BaseHTTPRequestHandler):
         sess = self._session()
         routes = {
             "/api/session": ("utente", lambda: api_session_info(sess)),
-            "/api/report": ("utente", lambda: api_report()),
-            "/api/mail": ("utente", lambda: api_posta.mail_status()),
+            "/api/report": ("area:documenti", lambda: api_report()),  # utente: solo chi ha l'area documenti
+            "/api/mail": ("area:posta", lambda: api_posta.mail_status()),  # utente: solo chi ha l'area posta
             "/api/config": ("admin", lambda: api_get_config()),
             "/api/browse": ("admin", lambda: api_browse(q)),
             "/api/status": ("admin", lambda: api_status(q)),

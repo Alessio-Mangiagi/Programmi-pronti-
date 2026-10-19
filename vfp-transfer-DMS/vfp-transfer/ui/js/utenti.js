@@ -7,6 +7,7 @@
 async function loadSession() {
   state.me = await api('/api/session');
   document.body.classList.toggle('role-user', !isAdmin());
+  if (!isAdmin()) setArea(state.me.area, { go: false });  // l'utente normale vede solo la sua area
   $('#meName').textContent = state.me.user;
   $('#meRole').textContent = state.me.role_label;
   let saved = '';
@@ -198,9 +199,14 @@ function renderUsers(d) {
   $('#usersBody').innerHTML = d.users.map((u) => {
     const me = u.name === state.me.user;
     const roles = Object.entries(d.roles).map(([k, l]) => `<option value="${esc(k)}" ${k === u.role ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const areas = Object.entries(d.areas).map(([k, l]) => `<option value="${esc(k)}" ${k === u.area ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    // l'amministratore vede tutte le aree: l'area conta solo per gli utenti normali
+    const area = u.role === 'admin' ? '<span class="muted small">Tutte</span>'
+      : `<select data-act="area" aria-label="Area di ${esc(u.name)}">${areas}</select>`;
     return `<tr data-user="${esc(u.name)}">
       <td><strong>${esc(u.name)}</strong>${me ? '<span class="badge b-info me-tag">tu</span>' : ''}</td>
       <td><select data-act="role" aria-label="Ruolo di ${esc(u.name)}" ${me ? 'disabled' : ''}>${roles}</select></td>
+      <td>${area}</td>
       <td class="small">${esc(u.email || '—')}</td>
       <td class="nowrap mono small">${u.last_login ? fmtWhen(u.last_login) : 'mai'}</td>
       <td class="num"><span class="user-actions">
@@ -224,10 +230,14 @@ async function userAction(body, okMsg) {
 }
 
 $('#usersBody').addEventListener('change', (e) => {
-  const sel = e.target.closest('[data-act=role]');
+  const sel = e.target.closest('[data-act=role], [data-act=area]');
   if (!sel) return;
   const name = sel.closest('tr').dataset.user;
-  userAction({ action: 'update', name, role: sel.value }, `Ruolo di ${name} aggiornato.`);
+  if (sel.dataset.act === 'area') {
+    userAction({ action: 'update', name, area: sel.value }, `${name} ora vede l'area ${sel.selectedOptions[0].textContent}.`);
+  } else {
+    userAction({ action: 'update', name, role: sel.value }, `Ruolo di ${name} aggiornato.`);
+  }
 });
 
 $('#usersBody').addEventListener('click', async (e) => {
@@ -248,9 +258,13 @@ $('#usersBody').addEventListener('click', async (e) => {
   }
 });
 
+const syncAreaField = () => { $('#uaAreaField').hidden = $('#uaRole').value === 'admin'; };
+$('#uaRole').addEventListener('change', syncAreaField);
+syncAreaField();
+
 $('#userAdd').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const body = { action: 'add', name: $('#uaName').value.trim(), role: $('#uaRole').value, email: $('#uaEmail').value.trim(), password: $('#uaPass').value };
+  const body = { action: 'add', name: $('#uaName').value.trim(), role: $('#uaRole').value, area: $('#uaArea').value, email: $('#uaEmail').value.trim(), password: $('#uaPass').value };
   if (await userAction(body, `Utente ${body.name} creato.`)) {
     ['#uaName', '#uaEmail', '#uaPass'].forEach((s) => { $(s).value = ''; });
   }

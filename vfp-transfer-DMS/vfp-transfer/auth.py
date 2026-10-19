@@ -39,6 +39,9 @@ import mail_send
 
 USERS_PATH = env_config.BASE_DIR / "utenti.json"
 ROLES = {"admin": "Amministratore", "utente": "Utente"}
+# area di lavoro di un utente normale (l'amministratore le vede tutte)
+AREE = {"documenti": "Documenti", "posta": "Posta"}
+AREA_PREDEFINITA = "documenti"
 PBKDF2_ITERATIONS = 600_000
 MIN_PASSWORD = 8
 SESSION_IDLE = 60 * 60  # un'ora senza richieste
@@ -220,8 +223,20 @@ def _log_line(text):
 
 def list_users():
     return [{"name": n, "role": u["role"], "role_label": ROLES[u["role"]], "email": u.get("email", ""),
+             "area": area_di(u), "area_label": AREE[area_di(u)],
              "created": u.get("created", ""), "last_login": u.get("last_login", "")}
             for n, u in sorted(load_users().items())]
+
+
+def area_di(user):
+    """Area di un utente normale; un valore mancante o sconosciuto vale l'area predefinita."""
+    a = (user or {}).get("area")
+    return a if a in AREE else AREA_PREDEFINITA
+
+
+def _check_area(area):
+    if area not in AREE:
+        raise ValueError("Area non valida: " + " oppure ".join(AREE))
 
 
 def _check_email(email):
@@ -229,19 +244,20 @@ def _check_email(email):
         raise ValueError("Indirizzo email non valido")
 
 
-def add_user(name, password, role, email=""):
+def add_user(name, password, role, email="", area=AREA_PREDEFINITA):
     name, email = name.strip(), (email or "").strip()
     if not _NAME_RE.match(name):
         raise ValueError("Nome utente: 2-64 caratteri tra lettere, numeri e . _ @ -")
     if role not in ROLES:
         raise ValueError("Ruolo non valido")
+    _check_area(area)
     _check_email(email)
     check_new_password(password, name)
     with _lock:
         users = load_users()
         if name.lower() in {n.lower() for n in users}:
             raise ValueError(f"L'utente {name} esiste gia'")
-        users[name] = {"role": role, "hash": hash_password(password), "email": email,
+        users[name] = {"role": role, "hash": hash_password(password), "email": email, "area": area,
                        "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
         _save_users(users)
 
@@ -257,7 +273,7 @@ def set_password(name, password):
     drop_sessions(name)  # chi era collegato con la vecchia password deve rientrare
 
 
-def update_user(name, role=None, email=None):
+def update_user(name, role=None, email=None, area=None):
     with _lock:
         users = load_users()
         if name not in users:
@@ -271,6 +287,9 @@ def update_user(name, role=None, email=None):
         if email is not None:
             _check_email(email.strip())
             users[name]["email"] = email.strip()
+        if area is not None:
+            _check_area(area)
+            users[name]["area"] = area
         _save_users(users)
     if role is not None:
         drop_sessions(name)
@@ -353,6 +372,7 @@ def session(token):
         logout(token)
         return None
     s["role"] = user["role"]
+    s["area"] = area_di(user)  # riletta a ogni richiesta: un cambio d'area vale subito
     return s
 
 
@@ -416,6 +436,8 @@ def main():
     p.add_argument("nome")
     p.add_argument("--ruolo", choices=sorted(ROLES), default="utente")
     p.add_argument("--email", default="")
+    p.add_argument("--area", choices=sorted(AREE), default=AREA_PREDEFINITA,
+                   help="area dell'utente normale (l'amministratore le vede tutte)")
     sub.add_parser("password", help="cambia la password").add_argument("nome")
     sub.add_parser("elimina", help="elimina un utente").add_argument("nome")
     sub.add_parser("elenco", help="elenca gli utenti")
@@ -427,8 +449,9 @@ def main():
         if args.cmd != "elenco":
             cli_approval(f"{args.cmd} utente {args.nome} (da terminale)", args.emergenza)
         if args.cmd == "aggiungi":
-            add_user(args.nome, _ask_password(args.nome), args.ruolo, args.email)
-            print(f"Utente {args.nome} creato ({ROLES[args.ruolo]}).")
+            add_user(args.nome, _ask_password(args.nome), args.ruolo, args.email, args.area)
+            print(f"Utente {args.nome} creato ({ROLES[args.ruolo]}" +
+                  (f", area {AREE[args.area]})." if args.ruolo != "admin" else ")."))
         elif args.cmd == "password":
             if not get_user(args.nome):
                 raise ValueError("Utente non trovato")
@@ -439,7 +462,8 @@ def main():
             print(f"Utente {args.nome} eliminato.")
         else:
             for u in list_users():
-                print(f"{u['name']:<24} {u['role_label']:<16} {u['email']}")
+                area = "tutte" if u["role"] == "admin" else u["area_label"]
+                print(f"{u['name']:<24} {u['role_label']:<16} {area:<10} {u['email']}")
     except ValueError as e:
         sys.exit(str(e))
     print("Se il programma e' gia' aperto, le modifiche valgono subito (la cassaforte viene riletta).")

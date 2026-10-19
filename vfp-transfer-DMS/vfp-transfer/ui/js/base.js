@@ -46,6 +46,8 @@ const state = {
   searchTimer: null,
 };
 const isAdmin = () => state.me && state.me.role === 'admin';
+// l'amministratore vede tutte le aree, l'utente normale solo quella assegnata
+const canSeeArea = (area) => isAdmin() || (!!state.me && state.me.area === area);
 
 // ------------------------------------------------------------------ utilita'
 
@@ -140,10 +142,41 @@ const BADGES = {
 };
 const badge = (s) => { const [c, l] = BADGES[s] || ['b-mute', s]; return `<span class="badge ${c}">${esc(l)}</span>`; };
 
+// ------------------------------------------------------------------ aree: documenti e posta
+
+// stesso programma, due aree: ogni voce del menu e ogni scheda della panoramica ha data-area
+// (documenti, posta, comune); quelle dell'altra area le nasconde il CSS (body[data-area])
+const AREAS = { documenti: 'Documenti', posta: 'Posta' };
+
+function setArea(area, { go = true } = {}) {
+  if (state.me && !isAdmin()) area = state.me.area;  // l'utente normale non cambia area
+  if (!AREAS[area]) area = 'documenti';
+  document.body.dataset.area = area;
+  $$('.area-btn').forEach((b) => {
+    const on = b.dataset.area === area;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-pressed', on);
+  });
+  const label = $('#ovArea');
+  if (label) label.textContent = AREAS[area];
+  try { localStorage.setItem('vfp.area', area); } catch { /* storage non disponibile */ }
+  // la pagina aperta e' dell'altra area: si torna alla panoramica della nuova
+  const current = $('.tab.is-active');
+  if (go && current && AREAS[current.dataset.area] && current.dataset.area !== area) showView('panoramica');
+}
+
+$$('.area-btn').forEach((b) => b.addEventListener('click', () => setArea(b.dataset.area)));
+try { setArea(localStorage.getItem('vfp.area') || 'documenti', { go: false }); } catch { setArea('documenti', { go: false }); }
+
 // ------------------------------------------------------------------ navigazione
 
 function showView(name) {
   if (!isAdmin()) name = 'panoramica';  // l'utente vede solo la prima pagina
+  // un collegamento verso una pagina dell'altra area (es. "Vai al flusso posta") cambia area da solo
+  const target = $(`.tab[data-view="${name}"]`);
+  if (target && AREAS[target.dataset.area] && target.dataset.area !== document.body.dataset.area) {
+    setArea(target.dataset.area, { go: false });
+  }
   $$('.tab').forEach((t) => {
     const on = t.dataset.view === name;
     t.classList.toggle('is-active', on);
