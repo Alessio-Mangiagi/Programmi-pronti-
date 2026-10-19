@@ -452,6 +452,8 @@ def items_from_manifest(manifest_path, base_dir, default_revision):
         if "file" not in (reader.fieldnames or []):
             raise ValueError(f"il manifest deve avere la colonna 'file' (trovate: {reader.fieldnames})")
         for row in reader:
+            # manifest scritti da estrai_dms.py: valori protetti con csv_cell
+            row = {k: csv_plain(v) for k, v in row.items() if k}
             if not (row.get("file") or "").strip():
                 continue
             file = Path(row["file"].strip())
