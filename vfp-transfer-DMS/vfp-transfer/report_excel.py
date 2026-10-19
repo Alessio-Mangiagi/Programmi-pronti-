@@ -167,11 +167,18 @@ def _read_report(path):
         return [{k: vt.csv_plain(v) for k, v in r.items()} for r in csv.DictReader(f, delimiter=";")]
 
 
-def build_report(mail_log_path, report_path, archive_dir, dal=None, al=None, casella=None):
-    """dal/al: date (estremi inclusi) o None; casella: etichetta della casella o None per tutte."""
+def build_report(mail_log_path, report_path, archive_dir, dal=None, al=None, casella=None, area=None):
+    """
+    dal/al: date (estremi inclusi) o None; casella: etichetta della casella o None per tutte.
+    area: None = tutto (amministratore), "documenti" = senza email, "posta" = senza trasferimenti.
+    """
     emails = [e for e in vfp_mail.group_mail_log(vfp_mail.read_mail_log(mail_log_path))
               if _in_period(e.get("data"), dal, al) and (not casella or e.get("casella") == casella)]
     transfers = [t for t in _read_report(report_path) if _in_period(t.get("data"), dal, al)]
+    if area == "documenti":
+        emails = []
+    elif area == "posta":
+        transfers = []
     archive = str(Path(archive_dir).resolve()).lower()
 
     # ---- Riepilogo

@@ -55,6 +55,8 @@ function renderSideMail() {
   const errors = mailGroups(m.history).filter((g) => isProblem(g.latest.outcome)).length;
   $('#flCount').hidden = !errors;
   $('#flCount').textContent = errors;
+  $('#areaMailCount').hidden = !errors;  // si vede anche stando nell'area documenti
+  $('#areaMailCount').textContent = errors;
 }
 
 // ------------------------------------------------------------------ panoramica
@@ -62,7 +64,10 @@ function renderSideMail() {
 async function loadOverview() {
   let report = { rows: [] };
   try {
-    [report] = await Promise.all([api('/api/report'), state.mail ? Promise.resolve() : loadMail()]);
+    [report] = await Promise.all([
+      canSeeArea('documenti') ? api('/api/report') : Promise.resolve({ rows: [] }),
+      state.mail ? Promise.resolve() : loadMail(),
+    ]);
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -90,6 +95,16 @@ function renderOverview() {
   const sub = $('#ovDocsSub');
   sub.textContent = rows.length ? `${diff >= 0 ? '+' : ''}${fmtNum(diff)} rispetto a ieri` : 'Nessun trasferimento registrato';
   sub.classList.toggle('up', diff > 0);
+
+  // area documenti: errori di oggi e ultimo caricamento (righe del report, le piu' recenti per prime)
+  const trErr = rows.filter((r) => r.esito === 'errore' && (r.data || '').startsWith(today));
+  $('#ovTrErr').textContent = fmtNum(trErr.length);
+  $('#ovTrErrSub').textContent = trErr.length ? (trErr[0].nome || splitPath(trErr[0].file || '')[1]) : 'Nessun errore oggi ✓';
+  $('#ovTrErrSub').classList.toggle('up', !trErr.length);
+  $('#ovTrErrCard').classList.toggle('has-items', trErr.length > 0);
+  const lastOk = loaded[0];
+  $('#ovLast').textContent = lastOk ? fmtAgo(lastOk.data) : '—';
+  $('#ovLastSub').textContent = lastOk ? (lastOk.nome || splitPath(lastOk.file || '')[1]) : 'Ancora nessun documento caricato';
 
   // grafico ultimi 7 giorni
   const days = [];
@@ -122,19 +137,12 @@ function renderOverview() {
     : 'Email in attesa, in caricamento e trasferite.';
   updateOverviewCountdown();
 
-  // attivita' recente: file del report + email elaborate, dalla piu' recente
-  const feed = [
-    ...rows.slice(0, 30).filter((r) => r.esito !== 'saltato').map((r) => ({
-      t: r.data, k: r.esito === 'caricato' ? 'ok' : 'err', icon: r.esito === 'caricato' ? 'check' : 'alert',
-      text: `${r.nome || splitPath(r.file || '')[1]} ${r.esito === 'caricato' ? 'caricato' : 'non caricato'}`,
-      sub: r.esito === 'caricato' ? (r.cartella || '') : r.messaggio,
-    })),
-    ...(m.history || []).slice(0, 20).map((x) => ({
-      t: x.time, k: x.outcome === 'trasferita' ? 'info' : x.outcome === 'errore' ? 'err' : 'warn', icon: 'mail',
-      text: subjText(x.subject), who: x.sender,
-      sub: { trasferita: 'trasferita', riprovo: 'nuovo tentativo', errore: 'da verificare', bloccata: 'bloccata per sicurezza' }[x.outcome] || x.outcome,
-    })),
-  ].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 7);
+  // attivita' recente (area documenti): file caricati o non caricati; le email stanno nell'area posta
+  const feed = rows.slice(0, 30).filter((r) => r.esito !== 'saltato').map((r) => ({
+    t: r.data, k: r.esito === 'caricato' ? 'ok' : 'err', icon: r.esito === 'caricato' ? 'check' : 'alert',
+    text: `${r.nome || splitPath(r.file || '')[1]} ${r.esito === 'caricato' ? 'caricato' : 'non caricato'}`,
+    sub: r.esito === 'caricato' ? (r.cartella || '') : r.messaggio,
+  })).sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 7);
   $('#ovFeed').innerHTML = feed.map((f) => `<li><span class="fi ${f.k}">${icon(f.icon)}</span>
       <span class="ft">${f.who ? `<strong>${esc(f.who)}</strong> ` : ''}${esc(f.text)}${f.sub ? `<small>${esc(f.sub)}</small>` : ''}</span><time title="${esc(fmtFull(f.t))}">${fmtAgo(f.t)}</time></li>`).join('');
   $('#ovFeedEmpty').hidden = feed.length > 0;

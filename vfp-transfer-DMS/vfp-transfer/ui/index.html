@@ -71,15 +71,20 @@
   <button class="side-search" id="btnSearch" type="button" data-admin title="Cerca in email, protocolli e documenti (Ctrl+K)">
     <svg class="ic"><use href="#i-search"/></svg><span>Cerca…</span><kbd>Ctrl K</kbd>
   </button>
+  <div class="area-switch" role="group" aria-label="Area di lavoro" data-admin>
+    <button class="area-btn is-active" type="button" data-area="documenti" aria-pressed="true"><svg class="ic"><use href="#i-folder"/></svg>Documenti</button>
+    <button class="area-btn" type="button" data-area="posta" aria-pressed="false"><svg class="ic"><use href="#i-mail"/></svg>Posta<span class="nav-count" id="areaMailCount" hidden>0</span></button>
+  </div>
   <nav class="nav" role="tablist" aria-label="Sezioni">
-    <button class="tab is-active" role="tab" data-view="panoramica" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Panoramica</button>
-    <button class="tab" role="tab" data-admin data-view="trasferimento" aria-selected="false"><svg class="ic"><use href="#i-swap"/></svg>Trasferimento</button>
-    <button class="tab" role="tab" data-admin data-view="smistamento" aria-selected="false"><svg class="ic"><use href="#i-spark"/></svg>Smistamento AI</button>
-    <button class="tab" role="tab" data-admin data-view="flusso" aria-selected="false"><svg class="ic"><use href="#i-board"/></svg>Flusso posta<span class="nav-count" id="flCount" hidden>0</span></button>
-    <button class="tab" role="tab" data-admin data-view="posta" aria-selected="false"><svg class="ic"><use href="#i-mail"/></svg>Caselle email<span class="tab-dot" id="mailDot" hidden></span></button>
-    <button class="tab" role="tab" data-admin data-view="storico" aria-selected="false"><svg class="ic"><use href="#i-history"/></svg>Storico</button>
-    <button class="tab" role="tab" data-admin data-view="attivita" aria-selected="false"><svg class="ic"><use href="#i-activity"/></svg>Attività utenti<span class="nav-count" id="actAlert" hidden>!</span></button>
-    <button class="tab" role="tab" data-admin data-view="impostazioni" aria-selected="false"><svg class="ic"><use href="#i-gear"/></svg>Impostazioni<span class="tab-badge" id="settingsBadge" hidden>!</span></button>
+    <button class="tab is-active" role="tab" data-area="comune" data-view="panoramica" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Panoramica</button>
+    <button class="tab" role="tab" data-admin data-area="documenti" data-view="trasferimento" aria-selected="false"><svg class="ic"><use href="#i-swap"/></svg>Trasferimento</button>
+    <button class="tab" role="tab" data-admin data-area="documenti" data-view="smistamento" aria-selected="false"><svg class="ic"><use href="#i-spark"/></svg>Smistamento AI</button>
+    <button class="tab" role="tab" data-admin data-area="documenti" data-view="storico" aria-selected="false"><svg class="ic"><use href="#i-history"/></svg>Storico</button>
+    <button class="tab" role="tab" data-admin data-area="posta" data-view="flusso" aria-selected="false"><svg class="ic"><use href="#i-board"/></svg>Flusso posta<span class="nav-count" id="flCount" hidden>0</span></button>
+    <button class="tab" role="tab" data-admin data-area="posta" data-view="posta" aria-selected="false"><svg class="ic"><use href="#i-mail"/></svg>Caselle email<span class="tab-dot" id="mailDot" hidden></span></button>
+    <p class="nav-sep" data-admin>Generale</p>
+    <button class="tab" role="tab" data-admin data-area="comune" data-view="attivita" aria-selected="false"><svg class="ic"><use href="#i-activity"/></svg>Attività utenti<span class="nav-count" id="actAlert" hidden>!</span></button>
+    <button class="tab" role="tab" data-admin data-area="comune" data-view="impostazioni" aria-selected="false"><svg class="ic"><use href="#i-gear"/></svg>Impostazioni<span class="tab-badge" id="settingsBadge" hidden>!</span></button>
   </nav>
   <div class="side-foot">
     <div class="side-user">
@@ -110,12 +115,12 @@
   <section class="view is-active" id="view-panoramica" role="tabpanel">
     <div class="page-head page-head-row">
       <div>
-        <p class="eyebrow">Panoramica</p>
+        <p class="eyebrow">Panoramica · <span id="ovArea">Documenti</span></p>
         <h1 class="ov-date" id="ovDate"></h1>
       </div>
       <div class="head-actions" data-admin>
-        <button class="btn btn-secondary" id="ovCheck" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Controlla posta</button>
-        <button class="btn btn-primary" type="button" data-goto="trasferimento"><svg class="ic"><use href="#i-upload"/></svg>Nuovo trasferimento</button>
+        <button class="btn btn-secondary" id="ovCheck" type="button" data-area="posta"><svg class="ic"><use href="#i-refresh"/></svg>Controlla posta</button>
+        <button class="btn btn-primary" type="button" data-area="documenti" data-goto="trasferimento"><svg class="ic"><use href="#i-upload"/></svg>Nuovo trasferimento</button>
       </div>
     </div>
 
@@ -126,10 +131,12 @@
     </div>
 
     <section class="kpis">
-      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-upload"/></svg><span class="kpi-lbl">Documenti caricati oggi</span><span class="kpi-val mono" id="ovDocs">0</span><span class="kpi-sub" id="ovDocsSub"></span></article>
-      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-mail"/></svg><span class="kpi-lbl">Email trasferite oggi</span><span class="kpi-val mono" id="ovMails">0</span><span class="kpi-sub" id="ovMailsSub"></span></article>
-      <article class="card kpi kpi-err" id="ovErrCard"><svg class="ic kpi-ic"><use href="#i-alert"/></svg><span class="kpi-lbl">Email da verificare</span><span class="kpi-val mono" id="ovErr">0</span><span class="kpi-sub" id="ovErrSub"></span></article>
-      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-clock"/></svg><span class="kpi-lbl">Prossimo controllo posta</span><span class="kpi-val mono" id="ovNext">—</span><span class="kpi-sub" id="ovNextSub"></span></article>
+      <article class="card kpi" data-area="documenti"><svg class="ic kpi-ic"><use href="#i-upload"/></svg><span class="kpi-lbl">Documenti caricati oggi</span><span class="kpi-val mono" id="ovDocs">0</span><span class="kpi-sub" id="ovDocsSub"></span></article>
+      <article class="card kpi kpi-err" id="ovTrErrCard" data-area="documenti"><svg class="ic kpi-ic"><use href="#i-alert"/></svg><span class="kpi-lbl">Errori di caricamento oggi</span><span class="kpi-val mono" id="ovTrErr">0</span><span class="kpi-sub" id="ovTrErrSub"></span></article>
+      <article class="card kpi" data-area="documenti"><svg class="ic kpi-ic"><use href="#i-clock"/></svg><span class="kpi-lbl">Ultimo caricamento</span><span class="kpi-val mono" id="ovLast">—</span><span class="kpi-sub" id="ovLastSub"></span></article>
+      <article class="card kpi" data-area="posta"><svg class="ic kpi-ic"><use href="#i-mail"/></svg><span class="kpi-lbl">Email trasferite oggi</span><span class="kpi-val mono" id="ovMails">0</span><span class="kpi-sub" id="ovMailsSub"></span></article>
+      <article class="card kpi kpi-err" id="ovErrCard" data-area="posta"><svg class="ic kpi-ic"><use href="#i-alert"/></svg><span class="kpi-lbl">Email da verificare</span><span class="kpi-val mono" id="ovErr">0</span><span class="kpi-sub" id="ovErrSub"></span></article>
+      <article class="card kpi" data-area="posta"><svg class="ic kpi-ic"><use href="#i-clock"/></svg><span class="kpi-lbl">Prossimo controllo posta</span><span class="kpi-val mono" id="ovNext">—</span><span class="kpi-sub" id="ovNextSub"></span></article>
     </section>
 
     <article class="card send-card" id="sendCard">
@@ -159,7 +166,7 @@
       <p class="send-result" id="sendResult" role="status" hidden></p>
     </article>
 
-    <div class="ov-grid">
+    <div class="ov-grid" data-area="documenti">
       <article class="card">
         <div class="card-head"><h2>Documenti caricati, ultimi 7 giorni</h2><span class="muted small" id="ovWeekTotal"></span></div>
         <div class="bars" id="ovBars"></div>
@@ -171,7 +178,7 @@
       </article>
     </div>
 
-    <article class="card prot-card" id="ovProt" data-admin hidden>
+    <article class="card prot-card" id="ovProt" data-admin data-area="posta" hidden>
       <div class="card-head">
         <div>
           <h2 class="card-title" style="margin-bottom:.3rem"><svg class="ic"><use href="#i-hash"/></svg>Protocolli PEC</h2>
@@ -187,12 +194,12 @@
     </article>
 
     <div class="quick" data-admin>
-      <a href="#" class="card qa" data-goto="trasferimento"><span class="qi"><svg class="ic"><use href="#i-folder"/></svg></span><span><strong>Carica una cartella</strong><small>Export dal vecchio archivio, con anteprima e prova.</small></span></a>
-      <a href="#" class="card qa" data-goto="flusso"><span class="qi"><svg class="ic"><use href="#i-board"/></svg></span><span><strong>Flusso posta</strong><small id="ovQuickMail">Email in arrivo, in caricamento e da verificare.</small></span></a>
+      <a href="#" class="card qa" data-area="documenti" data-goto="trasferimento"><span class="qi"><svg class="ic"><use href="#i-folder"/></svg></span><span><strong>Carica una cartella</strong><small>Export dal vecchio archivio, con anteprima e prova.</small></span></a>
+      <a href="#" class="card qa" data-area="posta" data-goto="flusso"><span class="qi"><svg class="ic"><use href="#i-board"/></svg></span><span><strong>Flusso posta</strong><small id="ovQuickMail">Email in arrivo, in caricamento e da verificare.</small></span></a>
       <a href="/api/report.xlsx" class="card qa" download><span class="qi"><svg class="ic"><use href="#i-download"/></svg></span><span><strong>Scarica il report</strong><small>Email e trasferimenti in Excel per l'ufficio tecnico.</small></span></a>
     </div>
 
-    <article class="card table-card">
+    <article class="card table-card" data-area="posta">
       <div class="card-head"><h2>Ultime email</h2><a href="#" class="small" data-admin data-goto="flusso">Vai al flusso posta</a></div>
       <div class="table-wrap-flat">
         <table class="data"><thead><tr><th>Elaborata</th><th>Esito</th><th>Mittente</th><th>Oggetto</th><th class="num">Allegati</th><th>Casella</th></tr></thead><tbody id="ovMailBody"></tbody></table>
@@ -1027,18 +1034,19 @@
       <article class="card set-row set-row-full" id="cardUsers">
         <header class="set-label">
           <h2 class="card-title"><svg class="ic"><use href="#i-users"/></svg>Utenti</h2>
-          <p class="set-desc">Gli <strong>amministratori</strong> vedono e usano tutto. Gli <strong>utenti</strong> vedono solo la Panoramica e possono farsi inviare il report via email.</p>
+          <p class="set-desc">Gli <strong>amministratori</strong> vedono e usano tutto. Gli <strong>utenti</strong> vedono solo la Panoramica della <strong>loro area</strong> (Documenti o Posta) e possono farsi inviare il report via email, solo con i dati di quell'area.</p>
         </header>
         <div class="set-body">
           <div class="table-wrap">
             <table class="data">
-              <thead><tr><th>Nome utente</th><th>Ruolo</th><th>Email</th><th>Ultimo accesso</th><th class="num">Azioni</th></tr></thead>
+              <thead><tr><th>Nome utente</th><th>Ruolo</th><th>Area</th><th>Email</th><th>Ultimo accesso</th><th class="num">Azioni</th></tr></thead>
               <tbody id="usersBody"></tbody>
             </table>
           </div>
           <form class="user-add" id="userAdd" novalidate>
             <div class="field"><label for="uaName">Nuovo utente</label><input id="uaName" type="text" autocomplete="off" spellcheck="false" placeholder="nome.cognome"></div>
             <div class="field"><label for="uaRole">Ruolo</label><select id="uaRole"><option value="utente">Utente</option><option value="admin">Amministratore</option></select></div>
+            <div class="field" id="uaAreaField"><label for="uaArea">Area</label><select id="uaArea"><option value="documenti">Documenti</option><option value="posta">Posta</option></select></div>
             <div class="field"><label for="uaEmail">Email <span class="muted">(facoltativa)</span></label><input id="uaEmail" type="email" autocomplete="off" spellcheck="false"></div>
             <div class="field"><label for="uaPass">Password iniziale</label><input id="uaPass" type="password" autocomplete="new-password"></div>
             <button class="btn btn-primary" type="submit"><svg class="ic"><use href="#i-check"/></svg>Aggiungi</button>
