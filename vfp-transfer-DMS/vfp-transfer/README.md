@@ -252,6 +252,37 @@ python vfp_transfer.py --source "D:\export_dms" --manifest manifest.csv
 **Prova senza scrivere nulla in VFP:** aggiungere `--dry-run`. Le impostazioni vengono lette da `.env`
 (un file diverso con `--env percorso\.env`). Solo posta, senza interfaccia: `python vfp_mail.py`.
 
+## Estrazione dal DMS di origine via API (sola lettura)
+
+`estrai_dms.py` scarica documenti e revisioni dal DMS di origine in una cartella locale con `manifest.csv`, da
+caricare poi con la modalità manifest. Il DMS viene letto **una sola volta per file**: se il caricamento su VFP va
+rifatto, si riparte dalla copia locale. Per ora c'è l'adattatore per **SeedDMS** (`SorgenteSeedDms`).
+```
+python estrai_dms.py --url https://dms/restapi/index.php --user lettore --cartella 12 --dry-run
+python estrai_dms.py --url https://dms/restapi/index.php --user lettore --cartella 12 --dest D:\estrazione
+python vfp_transfer.py --source D:\estrazione --manifest D:\estrazione\manifest.csv --dry-run
+```
+La password si chiede a video (oppure variabile `SEEDDMS_PASSWORD`). `--cartella` è l'ID della cartella da estrarre
+(per esempio una commessa); le sue sottocartelle diventano le cartelle in VFP.
+
+Protezioni per il DMS:
+- **solo lettura**: il programma blocca da sé ogni chiamata che non sia una lettura (l'unica eccezione è il login);
+  conviene comunque un utente tecnico con i soli permessi di lettura;
+- **carico basso**: una richiesta alla volta, al massimo `--richieste-al-secondo` (predefinito 2), dimezzate da sole
+  se il DMS chiede di rallentare (429); nuovi tentativi con attesa crescente su errori temporanei;
+- **stop automatico** dopo `--max-errori` errori di fila (predefinito 10): rilanciando riprende da dove si era fermato;
+- **finestra oraria**: `--orario 20:00-07:00` lavora solo di notte, fuori aspetta;
+- **integrità**: download in `.part`, controllo della dimensione dichiarata dal DMS, SHA-256 in `stato_estrazione.json`.
+  Rilanciando si scaricano solo le versioni mancanti o nuove. Esito di ogni file in `report_estrazione.csv`.
+
+Le cartelle vuote non compaiono nel manifest (in VFP si creano solo le cartelle che contengono documenti).
+
+### DMS di prova
+
+Per provare senza toccare il DMS vero: SeedDMS portabile su questo PC (`avvia_seeddms.bat`, http://127.0.0.1:8780,
+utente `admin`). `python strumenti_prova\popola_seeddms.py` lo riempie con due commesse finte (cartelle, revisioni,
+nomi con caratteri speciali, un file da 12 MB); scrive nel DMS e per questo funziona solo verso 127.0.0.1.
+
 ## Avvio in VS Code
 
 1. Installare Python da https://www.python.org/downloads/ (spuntare "Add python.exe to PATH").
