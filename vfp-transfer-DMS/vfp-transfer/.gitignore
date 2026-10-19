@@ -24,3 +24,7 @@ registro_attivita.jsonl
 protocolli_manuali.json
 protocolli_manuali.tmp
 registro_posta.tmp
+
+# moduli autocompilati: archivio e file caricati (dati dei documenti)
+moduli_compilati/
+moduli_in_arrivo/

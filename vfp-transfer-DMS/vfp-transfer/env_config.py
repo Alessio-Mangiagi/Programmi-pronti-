@@ -85,6 +85,15 @@ DEFAULTS = {
     # ---- smistamento con Claude (Anthropic)
     "ANTHROPIC_API_KEY": "",
     "CLAUDE_MODEL": "claude-opus-5-5",
+    # ---- moduli autocompilati: no = mai Claude, conferma = Claude solo su richiesta, auto = se i campi mancano
+    "MODULI_AI": "conferma",
+    "MODULI_DIR": "moduli",
+    "MODULI_ARCHIVIO": "moduli_compilati",
+    # ---- DMS di origine (sola lettura, vedi estrai_dms.py)
+    "DMS_TIPO": "seeddms",
+    "DMS_URL": "",
+    "DMS_USER": "",
+    "DMS_PASSWORD": "",
     # ---- Microsoft 365 (Graph)
     "GRAPH_TENANT_ID": "",
     "GRAPH_CLIENT_ID": "",
@@ -106,7 +115,7 @@ DEFAULTS = {
 }
 
 SECRET_KEYS = {"VFP_CLIENT_SECRET", "GRAPH_CLIENT_SECRET", "IMAP_PASSWORD", "PEC_PASSWORD", "SMTP_PASSWORD",
-               "ANTHROPIC_API_KEY"}
+               "ANTHROPIC_API_KEY", "DMS_PASSWORD"}
 # una password resta valida solo per il server a cui era destinata: se cambia uno di questi campi va reinserita,
 # altrimenti chi modifica l'indirizzo del server si farebbe mandare la password vera
 SECRET_BINDINGS = {
@@ -116,9 +125,10 @@ SECRET_BINDINGS = {
     "PEC_PASSWORD": ("PEC_HOST", "PEC_PORT", "PEC_USER"),
     "SMTP_PASSWORD": ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_SECURITY"),
     "ANTHROPIC_API_KEY": (),  # indirizzo di Anthropic fisso nel codice: la chiave non puo' essere dirottata
+    "DMS_PASSWORD": ("DMS_URL", "DMS_USER", "DMS_TIPO"),
 }
 # credenziali e identificativi delle API: stanno nella cassaforte cifrata, mai nel .env in chiaro
-VAULT_KEYS = SECRET_KEYS | {"VFP_CLIENT_ID", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "IMAP_USER", "PEC_USER", "SMTP_USER"}
+VAULT_KEYS = SECRET_KEYS | {"VFP_CLIENT_ID", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "IMAP_USER", "PEC_USER", "SMTP_USER", "DMS_USER"}
 # impostazioni che si possono cambiare solo con il codice inviato via email all'amministratore
 OTP_KEYS = VAULT_KEYS | {
     "ADMIN_EMAIL", "REPORT_SEND_METHOD", "REPORT_FROM", "REPORT_EMAIL_DOMAINS", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURITY",
@@ -126,6 +136,7 @@ OTP_KEYS = VAULT_KEYS | {
     "GRAPH_MAILBOX", "IMAP_HOST", "IMAP_PORT", "PEC_HOST", "PEC_PORT",
     "MAIL_ALLOWED_SENDERS", "MAIL_REQUIRE_AUTH", "MAIL_ANTIVIRUS", "MAIL_ALLOWED_EXT", "MAIL_MAX_MB", "CLAUDE_MODEL",
     "VFP_DOC_URL", "GUI_BIND", "GUI_HOSTNAME", "GUI_TLS_CERT", "GUI_TLS_KEY",
+    "MODULI_AI", "DMS_URL", "DMS_TIPO",  # MODULI_AI decide se il contenuto dei documenti puo' andare ad Anthropic
 }
 # campi che, se cambiano, rendono inutilizzabile l'accesso Viewpoint salvato (il token va rifatto)
 TOKEN_BINDINGS = ("VFP_AUTH_URL", "VFP_TOKEN_URL", "VFP_BASE_URL", "VFP_CLIENT_ID", "VFP_REDIRECT_URI")
@@ -181,6 +192,17 @@ def validate_settings(values, current):
             raise ValueError(f"{k}: indirizzo email non valido")
     if values.get("CLAUDE_MODEL") and not re.fullmatch(r"[a-z0-9][a-z0-9.\-]{2,63}", values["CLAUDE_MODEL"]):
         raise ValueError("CLAUDE_MODEL: nome del modello non valido")
+    if values.get("MODULI_AI", "conferma") not in ("no", "conferma", "auto"):
+        raise ValueError("MODULI_AI: no, conferma oppure auto")
+    if values.get("DMS_TIPO", "seeddms") not in ("seeddms",):
+        raise ValueError("DMS_TIPO: per ora solo seeddms")
+    if values.get("DMS_URL"):
+        u = urlparse(values["DMS_URL"])
+        if u.username or u.password or not (u.scheme == "https" or (u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost", "::1"))):
+            raise ValueError("DMS_URL: serve https (http solo per un DMS di prova su questo PC)")
+    for k in ("MODULI_DIR", "MODULI_ARCHIVIO"):
+        if k in values and (not re.fullmatch(r"[A-Za-z0-9 _.\-]{1,80}", values[k]) or values[k].startswith("..")):
+            raise ValueError(f"{k}: solo il nome di una cartella dentro quella del programma")
     for k in ("MAIL_DONE_FOLDER", "MAIL_ERROR_FOLDER", "MAIL_QUARANTINE_FOLDER"):
         if k in values and not values[k].strip():
             raise ValueError(f"{k}: indicare il nome della cartella")

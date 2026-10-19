@@ -301,7 +301,8 @@ class Estrazione:
         s = self.stato["scaricati"].get(voce.chiave)
         return bool(s) and (self.dest / s["file"]).is_file() and (self.dest / s["file"]).stat().st_size == s["byte"]
 
-    def _scarica(self, voce):
+    def scarica(self, voce):
+        """Scarica una versione con i controlli di integrita'; restituisce (percorso relativo, byte, sha256)."""
         rel = Path("file") / str(voce.doc_id) / f"v{voce.versione}" / nome_sicuro(voce.nome_file, nome_sicuro(voce.nome))
         finale = self.dest / rel
         finale.parent.mkdir(parents=True, exist_ok=True)
@@ -346,7 +347,7 @@ class Estrazione:
                         conti["presente"] += 1
                         continue
                     try:
-                        rel, n, sha = self._scarica(voce)
+                        rel, n, sha = self.scarica(voce)
                     except (DmsSovraccarico, ScritturaBloccata, KeyboardInterrupt):
                         raise
                     except Exception as e:  # un file rotto non ferma gli altri

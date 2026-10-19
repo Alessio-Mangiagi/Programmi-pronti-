@@ -1,0 +1,30 @@
+{
+  "_firma": "><(((º> sabusabu <º)))><",
+  "_nota": "Modulo di ESEMPIO per provare la logica: va sostituito con i moduli veri. Le etichette in 'cerca' vanno dalla piu' specifica alla piu' generica.",
+  "id": "esempio_ddt",
+  "nome": "Ricevimento merce da DDT (esempio)",
+  "descrizione": "Dati principali di un documento di trasporto arrivato in cantiere.",
+  "pdf": null,
+  "campi": [
+    {"id": "numero", "etichetta": "Numero DDT", "tipo": "codice", "obbligatorio": true,
+     "cerca": ["Numero DDT", "DDT n", "Documento di trasporto n", "Numero documento", "N. documento"],
+     "aiuto": "numero del documento di trasporto"},
+    {"id": "data", "etichetta": "Data DDT", "tipo": "data", "obbligatorio": true,
+     "cerca": ["Data DDT", "Data documento", "Data del documento", "Data"]},
+    {"id": "fornitore", "etichetta": "Fornitore", "tipo": "testo", "obbligatorio": true,
+     "cerca": ["Fornitore", "Mittente", "Cedente"], "aiuto": "ragione sociale di chi spedisce la merce"},
+    {"id": "piva_fornitore", "etichetta": "Partita IVA fornitore", "tipo": "piva",
+     "cerca": ["Partita IVA", "P. IVA", "P.IVA", "Cod. Fisc./P. IVA"]},
+    {"id": "commessa", "etichetta": "Commessa", "tipo": "codice",
+     "cerca": ["Commessa", "Cod. commessa", "Rif. commessa"],
+     "regex": "\\b(C-\\d{4}-\\d{3})\\b", "aiuto": "codice commessa Cosedil, es. C-2024-015"},
+    {"id": "cantiere", "etichetta": "Cantiere / destinazione", "tipo": "testo",
+     "cerca": ["Luogo di destinazione", "Destinazione", "Cantiere"]},
+    {"id": "causale", "etichetta": "Causale del trasporto", "tipo": "scelta",
+     "opzioni": ["Vendita", "Conto visione", "Reso", "Conto lavorazione", "Comodato"],
+     "cerca": ["Causale del trasporto", "Causale"]},
+    {"id": "colli", "etichetta": "Numero colli", "tipo": "numero", "cerca": ["Numero colli", "N. colli", "Colli"]},
+    {"id": "importo", "etichetta": "Totale documento", "tipo": "importo", "cerca": ["Totale documento", "Totale"]},
+    {"id": "note", "etichetta": "Note", "tipo": "testo_lungo", "cerca": ["Annotazioni", "Note"]}
+  ]
+}
