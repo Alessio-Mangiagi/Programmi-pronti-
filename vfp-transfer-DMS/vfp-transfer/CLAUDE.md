@@ -12,6 +12,13 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   `GUI_BIND`/`GUI_HOSTNAME`/`GUI_TLS_*`, vedi `_network_setup`) + `ui/` (HTML/CSS senza build, design system
   Cosedil; JS in `ui/js/*.js`, script classici caricati in ordine da `index.html` che condividono le variabili
   globali: una funzione chiamata al caricamento deve stare in un file precedente, es. `bindChips` in `base.js`).
+  Due aree nello stesso programma: Documenti e Posta (`setArea` in `base.js`, `body[data-area]`). Voci di menu e
+  schede della panoramica hanno `data-area` documenti/posta/comune e il CSS nasconde quelle dell'altra area;
+  `showView` verso una pagina dell'altra area cambia area da solo. Nuove pagine: mettere sempre `data-area`.
+  Area per utente: `auth.AREE`, campo `area` dell'utente (`area_di`, predefinita documenti), riletta in `session()`.
+  L'admin vede tutto; l'utente solo la sua area (`setArea` forzata, selettore `data-admin`). Sul server i ruoli di
+  rotta `area:documenti` / `area:posta` in `_allowed` (`/api/report`, `/api/mail`); `report_excel.build_report(area=)`
+  toglie l'altra area dal report inviato da un utente. In UI `canSeeArea()` evita chiamate che darebbero 403.
   API di posta, protocolli e ricerca in `api_posta.py` (`WATCHER` e `PATHS` impostati da `vfp_gui`).
   `/api/salute` senza sessione solo da 127.0.0.1; `_watchdog` esce con codice 3 se il ciclo posta si blocca.
 - Posta automatica: `vfp_mail.py` (Microsoft Graph con client credentials, IMAP, PEC con postacert.eml).
@@ -43,9 +50,24 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Impostazioni da interfaccia validate da `env_config.validate_settings` (niente a capo, URL VFP solo https su
   domini Viewpoint/Trimble); una password mascherata non resta valida se cambia il suo server (`SECRET_BINDINGS`).
   I CSV passano da `vt.csv_cell`/`vt.csv_plain` (anti formule Excel).
-- Smistamento AI (solo admin): `ai_smistamento.py` chiama la Messages API di Anthropic (URL fisso, tool use
-  forzato `assegna_cartelle`) con i soli nomi dei file e l'albero delle cartelle VFP (`VfpClient.list_child_folders`);
-  le risposte fuori dall'albero diventano "Da smistare". Endpoint `/api/ai/analyze|status|start` in `vfp_gui.py`.
+- Smistamento AI (solo admin): `ai_smistamento.py` chiede a Claude (via `claude_json.chiedi_json`) i soli nomi dei file
+  e l'albero delle cartelle VFP (`VfpClient.list_child_folders`); le risposte fuori dall'albero diventano "Da smistare".
+  Endpoint `/api/ai/analyze|status|start` in `vfp_gui.py`.
+- Claude: `claude_json.py` (URL fisso, uscita JSON con `output_config.format`, `fallbacks: "default"` sui modelli che
+  lo accettano, errori su refusal/max_tokens). MAI `tool_choice` forzato: su claude-opus-5-5 da' 400.
+- Moduli autocompilati: `moduli.py` (solo logica + CLI, pagina e API ancora da fare). Definizioni in `moduli/*.json`
+  (`valida_modulo`, tipi in `TIPI`), lettura locale (`testo_documento`: pypdf, DOCX via zipfile, TXT) + regole
+  (`compila_locale`: regex del campo, etichette `cerca`), poi Claude solo sui campi mancanti secondo `MODULI_AI`
+  (no/conferma/auto, in `OTP_KEYS` perche' decide se il contenuto esce verso Anthropic). Ogni valore passa da
+  `normalizza` (date ISO, importi Decimal, P.IVA con cifra di controllo). Archivio `moduli_compilati/<id>/`
+  (record.json, copia del documento, modulo.pdf); PDF = PDF compilabile del modulo (`pdf` + `pdf_campo`, pypdf)
+  oppure `scheda_pdf` generata senza librerie. Origini: `SORGENTI` (caricamento, posta, cartella, dms; cpm e
+  alyante `da_collegare`). DMS via `DMS_URL/USER/PASSWORD` e `estrai_dms` (sola lettura).
+  Campi con `ambito` documento/fornitore/fisso; `chiave_fornitore` (P.IVA) -> `Anagrafica` in
+  `moduli_compilati/fornitori/<chiave>.json`: `_applica_anagrafica` compila i campi del fornitore e NON sovrascrive mai
+  il registrato con il letto (avviso "ATTENZIONE", difesa dalle truffe sul cambio IBAN); `Archivio.salva(conferma=True)`
+  registra, e cambiare un dato registrato richiede `aggiorna_anagrafica=True` (storico). `sezioni` con testo fisso e
+  segnaposto `{id_campo}` (`testo_sezione`, `blocchi_scheda`), es. Art. 1 tracciabilita' (L. 136/2010).
 - Estrazione dal DMS di origine: `estrai_dms.py` (CLI separata). `LetturaSicura` ammette solo GET e `POST /login`
   (`ScritturaBloccata`), niente redirect, freno richieste/s (raddoppiato su 429), retry su 429/5xx/rete, `DmsSovraccarico`
   dopo N errori di fila, finestra `--orario`. Adattatore `SorgenteSeedDms` (login/logout/cartella/figli/versioni/scarica):
@@ -71,6 +93,8 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Logica, GUI e posta provate solo con client VFP e caselle finti (mai contro VFP/Microsoft 365 reali).
 - Da verificare alla prima prova reale: formato delle risposte delle liste (gestito in `_items`),
   dettagli dello scambio token, disponibilita' dello scope `offline_access`.
+- Moduli: in attesa delle maschere vere dall'utente; da fare pagina "Moduli" + API in `vfp_gui.py`.
+  CPM e Alyante: servono documentazione e credenziali delle loro API.
 - Credenziali API (client_id) da richiedere a Trimble/Viewpoint (support@4projects.com).
 - DMS di origine reale ancora da definire: `estrai_dms.py` provato solo contro SeedDMS di prova (hash identici
   all'archivio). Per il DMS vero serve il suo adattatore.
