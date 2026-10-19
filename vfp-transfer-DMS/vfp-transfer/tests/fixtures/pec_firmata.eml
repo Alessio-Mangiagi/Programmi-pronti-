@@ -1,0 +1,83 @@
+Return-Path: <posta-certificata@pec-prova.it>
+From: "Per conto di: tecnico@comune-prova.it" <posta-certificata@pec-prova.it>
+Reply-To: tecnico@comune-prova.it
+To: cosedil@pec-prova.it
+Subject: POSTA CERTIFICATA: 001 - Trasmissione verbale di consegna lavori
+Date: Tue, 13 Oct 2026 09:58:30 +0200
+Message-ID: <opec-prova.20261013095830.00001.01.1.1@pec-prova.it>
+X-Trasporto: posta-certificata
+MIME-Version: 1.0
+Content-Type: multipart/signed; protocol="application/pkcs7-signature"; micalg=sha-256; boundary="FIRMA"
+
+--FIRMA
+Content-Type: multipart/mixed; boundary="BUSTA"
+
+--BUSTA
+Content-Type: text/plain; charset=utf-8
+
+Messaggio di posta certificata.
+--BUSTA
+Content-Type: application/xml; name="daticert.xml"
+Content-Disposition: inline; filename="daticert.xml"
+
+<?xml version="1.0" encoding="UTF-8"?>
+<postacert tipo="posta-certificata" errore="nessuno">
+<intestazione><mittente>tecnico@comune-prova.it</mittente><destinatari tipo="certificato">cosedil@pec-prova.it</destinatari>
+<risposte>tecnico@comune-prova.it</risposte><oggetto>001 - Trasmissione verbale di consegna lavori</oggetto></intestazione>
+<dati><gestore-emittente>GESTORE PEC DI PROVA</gestore-emittente><data zona="+0200"><giorno>13/10/2026</giorno><ora>09:58:30</ora></data>
+<identificativo>opec-prova.20261013095830.00001.01.1.1@pec-prova.it</identificativo><msgid>&lt;originale-001@comune-prova.it&gt;</msgid></dati>
+</postacert>
+
+--BUSTA
+Content-Type: message/rfc822; name="postacert.eml"
+Content-Disposition: attachment; filename="postacert.eml"
+
+From: Ufficio Tecnico <tecnico@comune-prova.it>
+To: cosedil@pec-prova.it
+Subject: 001 - Trasmissione verbale di consegna lavori
+Message-ID: <originale-001@comune-prova.it>
+Date: Tue, 13 Oct 2026 09:58:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="IN"
+
+--IN
+Content-Type: text/plain; charset=utf-8
+
+In allegato il verbale.
+--IN
+Content-Type: application/pdf; name="verbale.pdf"
+Content-Disposition: attachment; filename="verbale.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJcOkw7zDtsOfCjEgMCBvYmoKPDw+PgplbmRvYmoKdHJhaWxlcgo8PD4+CiUlRU9GCg==
+--IN--
+
+--BUSTA--
+
+--FIRMA
+Content-Type: application/pkcs7-signature; name="smime.p7s"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="smime.p7s"
+
+MIIEUAYJKoZIhvcNAQcCoIIEQTCCBD0CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCAsUw
+ggLBMIIBqaADAgECAgkA5kvc+0LCf0QwDQYJKoZIhvcNAQELBQAwHzEdMBsGA1UEAxMUR2VzdG9y
+ZSBQRUMgZGkgUHJvdmEwIBcNMjYxMDEyMTYyNzU2WhgPMjA1NjEwMTMxNjI3NTZaMB8xHTAbBgNV
+BAMTFEdlc3RvcmUgUEVDIGRpIFByb3ZhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA
+46oqIjLsDpgCxmCLygeE1PkNizZWu6/L143qDLYv4yrqIedsOFAhVb2j6BS3eE6M2NJJyo1P6ocb
+mUgwRWxkXFW7NogDQ+KiI/yzL35QSAqo8m9e96DUDS2DBp7ARVYNOZiBi9X5tak/XHrGxR64CCdG
+GiZKEkSk4hSdMJsXU5HtJ6zcYc9o6F39Gq71IegcF4zTgyuzIQ0C4yVkeO9VupjqHFgXqrkOAAV1
+1eNaTzmQD9c8EVjMLKlm1E8t9FU0qlIMLdw+DW2BeT0oJVXjyTEiT5y2YmVo/r7k3/7ArXiaUImm
++54pjD7aoIBx4UFB95MFN/+AaG7vfvhgl3+1EQIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCAo0kk
+PFCQ/S4RToE30atJCdxOvdfXOsTbg0iY/Aax+WQFVzlifl7nl98iMlz38Pol5SZxjQ3JpW15IL/y
+ZZ+WXG5NBXCcS8pKIpyM1sfDbHur9ygyxTVB33Ca/wpyghascIUrhwTGIH0uL4JknQC5ItbvRvDH
+mH1NneweZqgfFL//f8ZzO1mfXEZ+aYX8qJBB+aVe3Sa6P+6KLp9P5UaYwIYM/i1SchB797BqUotC
+znhoafZbsgtfVSxEGcVVdOb1BWiAv5YJuk6SQq+O3gbHG5xTVlVzWEc6ui3qUJ6PxTzxTrRfzOQP
+g/73d3K97wkJM0WuXTyj835DpVx9/St1MYIBUzCCAU8CAQEwLDAfMR0wGwYDVQQDExRHZXN0b3Jl
+IFBFQyBkaSBQcm92YQIJAOZL3PtCwn9EMAkGBSsOAwIaBQAwDQYJKoZIhvcNAQEBBQAEggEAc8y5
+FLoiF7hd2wMvtvjfIEhAeCCq8wzCkikUJSZj8XN0jeLyv8f42pSpcqEg4wFcmjiuXbPvNBOAlQo7
+gFaKPWZvRsPe20Z0rT0dWI5T9cfc3NBzjCppYm7lAuzIK2rmspfslFdt601cRCqKGyz/20MY9EAn
+Vc99Rbnf3qhArq/8otjVIxeCBg4yt8+aqTpDI6YS+EmWkrLqEIwNtC7O7qsxkUwvnet2+jUvOcD3
+kZkfxG6qp12aKrw9vBZ/cNW0pF83cwKOJBAGSFyts2XbJL15OEPJ5K4neogjxycNdu/IzFZ6fpqY
+PbtR/ot3DG6eNkTmUSy1aBrX/H/r2ngCfQ==
+
+--FIRMA--

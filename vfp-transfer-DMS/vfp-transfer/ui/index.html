@@ -1,0 +1,1210 @@
+<!doctype html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trasferimento VFP · Cosedil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Inter:wght@500;600&family=Open+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 20l7-9 7 9' stroke='%2365bc7b' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- Icone (stile lineare, stroke 1.5) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.38a1.5 1.5 0 0 1 1.06.44L11.5 8h8A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9.5 3.5h5M10 3.5v6L4.8 18a1.5 1.5 0 0 0 1.3 2.3h11.8a1.5 1.5 0 0 0 1.3-2.3L14 9.5v-6"/><path d="M7.2 14.5h9.6"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2v.1"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-2.6-1.5L14 2.5h-4l-.5 2.6A7.5 7.5 0 0 0 6.9 6.6l-2.3-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 2.6 1.5l.5 2.6h4l.5-2.6a7.5 7.5 0 0 0 2.6-1.5l2.3 1 2-3.4z"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3.5 4v4h4M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8.5-8.5M16.5 6.5l2 2M14.5 8.5l1.5 1.5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12A7.5 7.5 0 1 1 17 6.4"/><path d="M19.5 4v4h-4"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="1.5"/><path d="m7 9.5 3 2.5-3 2.5M12.5 15h4.5"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5v4M15 3.5v4M6.5 7.5h11v3a5.5 5.5 0 0 1-11 0zM12 16v4.5"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="5" height="15" rx="1"/><rect x="9.5" y="4.5" width="5" height="10" rx="1"/><rect x="15.5" y="4.5" width="5" height="12.5" rx="1"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4L15 6.9"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.1"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 10.1 20.5 12l-6.6 1.9L12 20.5l-1.9-6.6L3.5 12l6.6-1.9z"/><path d="M18.5 3.5v3M17 5h3"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M20.5 3.5 10 14M20.5 3.5 14 20.5l-4-6.5-6.5-4z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 5 6v5.5c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5a6 6 0 0 1 12 0M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.2a6 6 0 0 1 3.5 5.3"/></symbol>
+    <symbol id="i-hash" viewBox="0 0 24 24"><path d="M9.5 4 8 20M16 4l-1.5 16M4.5 9h15M4 15h15"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.6-3.6a4 4 0 0 0-5.7-5.7L12 6.3M14 10a4 4 0 0 0-5.7 0l-3.6 3.6a4 4 0 0 0 5.7 5.7l1.6-1.6"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.4-7.5-10A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7.5 3c0 5.6-7.5 10-7.5 10z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14.5 4.5h-8a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5h8M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/></symbol>
+  </defs>
+</svg>
+
+<div class="shell">
+<aside class="side">
+  <div class="side-brand">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 21l8-10 8 10" /></svg></span>
+    <div><span class="brand-name">COSEDIL</span><small>Documenti &rarr; Viewpoint</small></div>
+  </div>
+  <button class="side-search" id="btnSearch" type="button" data-admin title="Cerca in email, protocolli e documenti (Ctrl+K)">
+    <svg class="ic"><use href="#i-search"/></svg><span>Cerca…</span><kbd>Ctrl K</kbd>
+  </button>
+  <nav class="nav" role="tablist" aria-label="Sezioni">
+    <button class="tab is-active" role="tab" data-view="panoramica" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Panoramica</button>
+    <button class="tab" role="tab" data-admin data-view="trasferimento" aria-selected="false"><svg class="ic"><use href="#i-swap"/></svg>Trasferimento</button>
+    <button class="tab" role="tab" data-admin data-view="smistamento" aria-selected="false"><svg class="ic"><use href="#i-spark"/></svg>Smistamento AI</button>
+    <button class="tab" role="tab" data-admin data-view="flusso" aria-selected="false"><svg class="ic"><use href="#i-board"/></svg>Flusso posta<span class="nav-count" id="flCount" hidden>0</span></button>
+    <button class="tab" role="tab" data-admin data-view="posta" aria-selected="false"><svg class="ic"><use href="#i-mail"/></svg>Caselle email<span class="tab-dot" id="mailDot" hidden></span></button>
+    <button class="tab" role="tab" data-admin data-view="storico" aria-selected="false"><svg class="ic"><use href="#i-history"/></svg>Storico</button>
+    <button class="tab" role="tab" data-admin data-view="attivita" aria-selected="false"><svg class="ic"><use href="#i-activity"/></svg>Attività utenti<span class="nav-count" id="actAlert" hidden>!</span></button>
+    <button class="tab" role="tab" data-admin data-view="impostazioni" aria-selected="false"><svg class="ic"><use href="#i-gear"/></svg>Impostazioni<span class="tab-badge" id="settingsBadge" hidden>!</span></button>
+  </nav>
+  <div class="side-foot">
+    <div class="side-user">
+      <svg class="ic"><use href="#i-user"/></svg>
+      <span class="side-user-txt"><strong id="meName">—</strong><small id="meRole"></small></span>
+      <button class="side-logout theme-btn" id="btnTheme" type="button" title="Tema chiaro" aria-label="Tema chiaro"><svg class="ic ico-sun"><use href="#i-sun"/></svg><svg class="ic ico-moon"><use href="#i-moon"/></svg></button>
+      <button class="side-logout" id="btnSignOut" type="button" title="Esci dal programma" aria-label="Esci"><svg class="ic"><use href="#i-logout"/></svg></button>
+    </div>
+    <button class="auth-pill" id="authPill" type="button" data-admin data-goto="impostazioni" title="Stato accesso Viewpoint">
+      <span class="dot"></span><span class="auth-label">Verifica accesso…</span>
+    </button>
+    <button class="auth-pill" id="sideMail" type="button" data-admin data-goto="posta" title="Stato posta automatica">
+      <span class="dot"></span><span class="side-mail-label">Posta…</span>
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="undo-dock" data-admin>
+    <div class="undo-bar" role="toolbar" aria-label="Annulla, ripeti e scorciatoie">
+      <button class="undo-btn" id="btnUndo" type="button" aria-label="Annulla"><svg class="ic"><use href="#i-undo"/></svg><span class="undo-n" id="undoCount"></span></button>
+      <button class="undo-btn" id="btnRedo" type="button" aria-label="Ripeti"><svg class="ic"><use href="#i-redo"/></svg></button>
+      <button class="undo-btn undo-help" id="btnHelp" type="button" aria-label="Scorciatoie da tastiera" title="Scorciatoie da tastiera (?)">?</button>
+    </div>
+  </div>
+
+  <!-- ======================================================= PANORAMICA -->
+  <section class="view is-active" id="view-panoramica" role="tabpanel">
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Panoramica</p>
+        <h1 class="ov-date" id="ovDate"></h1>
+      </div>
+      <div class="head-actions" data-admin>
+        <button class="btn btn-secondary" id="ovCheck" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Controlla posta</button>
+        <button class="btn btn-primary" type="button" data-goto="trasferimento"><svg class="ic"><use href="#i-upload"/></svg>Nuovo trasferimento</button>
+      </div>
+    </div>
+
+    <div class="banner banner-warn" id="ovLoginBanner" data-admin hidden>
+      <svg class="ic"><use href="#i-key"/></svg>
+      <div class="banner-grow"><strong id="ovLoginTitle">Non collegato a Viewpoint.</strong> <span id="ovLoginText"></span></div>
+      <button class="btn btn-primary btn-sm" type="button" id="ovLoginBtn"><svg class="ic"><use href="#i-key"/></svg>Accedi a Viewpoint</button>
+    </div>
+
+    <section class="kpis">
+      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-upload"/></svg><span class="kpi-lbl">Documenti caricati oggi</span><span class="kpi-val mono" id="ovDocs">0</span><span class="kpi-sub" id="ovDocsSub"></span></article>
+      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-mail"/></svg><span class="kpi-lbl">Email trasferite oggi</span><span class="kpi-val mono" id="ovMails">0</span><span class="kpi-sub" id="ovMailsSub"></span></article>
+      <article class="card kpi kpi-err" id="ovErrCard"><svg class="ic kpi-ic"><use href="#i-alert"/></svg><span class="kpi-lbl">Email da verificare</span><span class="kpi-val mono" id="ovErr">0</span><span class="kpi-sub" id="ovErrSub"></span></article>
+      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-clock"/></svg><span class="kpi-lbl">Prossimo controllo posta</span><span class="kpi-val mono" id="ovNext">—</span><span class="kpi-sub" id="ovNextSub"></span></article>
+    </section>
+
+    <article class="card send-card" id="sendCard">
+      <div class="send-intro">
+        <span class="qi"><svg class="ic"><use href="#i-send"/></svg></span>
+        <div>
+          <h2>Invia il report via email</h2>
+          <p class="muted small">Il report Excel con le email ricevute e i documenti trasferiti arriva all'indirizzo che scrivi qui e, in copia, all'amministratore. Non viene scaricato su questo PC.</p>
+        </div>
+      </div>
+      <form class="send-form" id="sendForm" novalidate>
+        <div class="field">
+          <label for="sendTo">Dove vuoi ricevere il report?</label>
+          <input id="sendTo" type="email" placeholder="nome.cognome@cosedilspa.com" autocomplete="email" spellcheck="false" required>
+        </div>
+        <div class="field">
+          <span class="label">Periodo</span>
+          <div class="seg-filter" id="sendPeriod" role="group" aria-label="Periodo del report">
+            <button class="chip" type="button" data-f="1">Oggi</button>
+            <button class="chip is-active" type="button" data-f="7">7 giorni</button>
+            <button class="chip" type="button" data-f="30">30 giorni</button>
+            <button class="chip" type="button" data-f="0">Tutto</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit" id="sendBtn"><svg class="ic"><use href="#i-send"/></svg>Invia report</button>
+      </form>
+      <p class="send-result" id="sendResult" role="status" hidden></p>
+    </article>
+
+    <div class="ov-grid">
+      <article class="card">
+        <div class="card-head"><h2>Documenti caricati, ultimi 7 giorni</h2><span class="muted small" id="ovWeekTotal"></span></div>
+        <div class="bars" id="ovBars"></div>
+      </article>
+      <article class="card">
+        <div class="card-head"><h2>Attività recente</h2><a href="#" class="small" data-admin data-goto="storico">Storico completo</a></div>
+        <ul class="feed" id="ovFeed"></ul>
+        <div class="empty small" id="ovFeedEmpty" hidden><p>Nessuna attività registrata.</p><a href="#" class="link-sm" data-admin data-goto="trasferimento"><svg class="ic"><use href="#i-upload"/></svg>Avvia il primo trasferimento</a></div>
+      </article>
+    </div>
+
+    <article class="card prot-card" id="ovProt" data-admin hidden>
+      <div class="card-head">
+        <div>
+          <h2 class="card-title" style="margin-bottom:.3rem"><svg class="ic"><use href="#i-hash"/></svg>Protocolli PEC</h2>
+          <p class="muted small" style="margin:0" id="ovProtSub">Numerazione annuale: si controlla che non manchino numeri e che non ci siano doppi.</p>
+        </div>
+        <div class="card-actions">
+          <div class="seg-filter" id="ovProtYear" role="group" aria-label="Anno"></div>
+          <a class="btn btn-secondary btn-sm" id="ovProtXlsx" href="/api/protocolli.xlsx" download><svg class="ic"><use href="#i-download"/></svg>Registro Excel</a>
+        </div>
+      </div>
+      <div class="prot-stats stats stats-4" id="ovProtStats"></div>
+      <div id="ovProtIssues"></div>
+    </article>
+
+    <div class="quick" data-admin>
+      <a href="#" class="card qa" data-goto="trasferimento"><span class="qi"><svg class="ic"><use href="#i-folder"/></svg></span><span><strong>Carica una cartella</strong><small>Export dal vecchio archivio, con anteprima e prova.</small></span></a>
+      <a href="#" class="card qa" data-goto="flusso"><span class="qi"><svg class="ic"><use href="#i-board"/></svg></span><span><strong>Flusso posta</strong><small id="ovQuickMail">Email in arrivo, in caricamento e da verificare.</small></span></a>
+      <a href="/api/report.xlsx" class="card qa" download><span class="qi"><svg class="ic"><use href="#i-download"/></svg></span><span><strong>Scarica il report</strong><small>Email e trasferimenti in Excel per l'ufficio tecnico.</small></span></a>
+    </div>
+
+    <article class="card table-card">
+      <div class="card-head"><h2>Ultime email</h2><a href="#" class="small" data-admin data-goto="flusso">Vai al flusso posta</a></div>
+      <div class="table-wrap-flat">
+        <table class="data"><thead><tr><th>Elaborata</th><th>Esito</th><th>Mittente</th><th>Oggetto</th><th class="num">Allegati</th><th>Casella</th></tr></thead><tbody id="ovMailBody"></tbody></table>
+        <div class="empty small" id="ovMailEmpty" hidden><p>Nessuna email elaborata finora.</p><a href="#" class="link-sm" data-admin data-goto="impostazioni" data-anchor="cardMail"><svg class="ic"><use href="#i-mail"/></svg>Configura la posta automatica</a></div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ======================================================= FLUSSO POSTA -->
+  <section class="view" id="view-flusso" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Posta in arrivo &rarr; Viewpoint</p>
+        <h1>Flusso documenti</h1>
+        <p class="live-pill" id="flLive"><i></i><span>Verifica…</span></p>
+      </div>
+      <div class="head-actions fl-actions">
+        <div class="seg-filter" id="flFilter" role="group" aria-label="Filtra per casella">
+          <button class="chip is-active" data-f="all">Tutte le caselle</button>
+          <button class="chip" data-f="graph">Microsoft 365</button>
+          <button class="chip" data-f="imap">IMAP</button>
+          <button class="chip" data-f="pec">PEC</button>
+        </div>
+        <button class="btn btn-primary btn-sm" id="flCheck" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
+      </div>
+    </div>
+    <div class="board" id="flBoard"></div>
+  </section>
+
+
+  <!-- ======================================================= SMISTAMENTO AI -->
+  <section class="view" id="view-smistamento" role="tabpanel" hidden>
+    <div class="page-head">
+      <p class="eyebrow">Claude &middot; solo amministratori</p>
+      <h1>Smistamento automatico</h1>
+      <p class="lead">Claude legge il nome di ogni file del vecchio archivio e propone in quale cartella di Viewpoint archiviarlo, scegliendo solo tra le cartelle che esistono già. Controlla le proposte, correggi dove serve e poi avvia il caricamento.</p>
+    </div>
+    <div class="banner banner-warn">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <div>Ad Anthropic (Claude) vengono inviati <strong>solo i nomi dei file, i percorsi e i nomi delle cartelle VFP</strong>, mai il contenuto dei documenti. Serve la chiave API in <a href="#" data-goto="impostazioni" data-anchor="cardAi">Impostazioni</a>.</div>
+    </div>
+
+    <article class="card">
+      <div class="field">
+        <label for="aiSrc">Cartella del DMS o dell'export da smistare</label>
+        <div class="input-group">
+          <input id="aiSrc" type="text" placeholder="Es. \\server\archivio\commessa C26-014" autocomplete="off" spellcheck="false">
+          <button class="btn btn-secondary" type="button" data-browse="ai"><svg class="ic"><use href="#i-folder"/></svg>Sfoglia</button>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="aiAnalyze" type="button"><svg class="ic"><use href="#i-spark"/></svg>Proponi le cartelle</button>
+      </div>
+      <div class="ai-progress" id="aiProgress" hidden>
+        <div class="progress-meta"><span id="aiPhase">Avvio…</span><span class="mono" id="aiCount"></span></div>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span id="aiBar"></span></div>
+      </div>
+      <div class="error-box" id="aiError" hidden></div>
+    </article>
+
+    <article class="card" id="aiResults" hidden>
+      <div class="card-head">
+        <div><h2>Proposte di Claude</h2><p class="muted small" id="aiSummary"></p></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="aiDry" type="button"><svg class="ic"><use href="#i-flask"/></svg>Esegui prova</button>
+          <button class="btn btn-primary" id="aiGo" type="button"><svg class="ic"><use href="#i-upload"/></svg>Trasferisci selezionati</button>
+        </div>
+      </div>
+      <div class="stats stats-4">
+        <div class="stat"><span class="stat-label">File</span><span class="stat-value mono" id="aiTot">0</span></div>
+        <div class="stat stat-ok"><span class="stat-label">Proposte sicure</span><span class="stat-value mono" id="aiSure">0</span></div>
+        <div class="stat"><span class="stat-label">Da controllare</span><span class="stat-value mono" id="aiCheck">0</span></div>
+        <div class="stat stat-err"><span class="stat-label">Da smistare</span><span class="stat-value mono" id="aiNone">0</span></div>
+      </div>
+      <div class="table-tools">
+        <div class="seg-filter" id="aiFilter" role="group" aria-label="Filtra proposte">
+          <button class="chip is-active" data-f="all">Tutte</button>
+          <button class="chip" data-f="check">Da controllare</button>
+          <button class="chip" data-f="none">Da smistare</button>
+        </div>
+        <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="aiSearch" placeholder="Cerca file o cartella"></label>
+      </div>
+      <datalist id="aiFolderList"></datalist>
+      <div class="table-wrap table-scroll table-tall">
+        <table class="data">
+          <thead><tr><th><input type="checkbox" id="aiAll" aria-label="Seleziona tutti" checked></th><th>File</th><th>Cartella in Viewpoint</th><th>Sicurezza</th><th>Motivo</th></tr></thead>
+          <tbody id="aiBody"></tbody>
+        </table>
+        <div class="empty small" id="aiNoMatch" hidden>Nessun file corrisponde al filtro.</div>
+      </div>
+      <p class="hint">La cartella si può correggere scrivendone una esistente (l'elenco si apre digitando). I file in "Da smistare" finiscono in quella cartella di Viewpoint, da sistemare a mano.</p>
+    </article>
+  </section>
+
+  <!-- ======================================================= TRASFERIMENTO -->
+  <section class="view" id="view-trasferimento" role="tabpanel" hidden>
+    <div class="page-head">
+      <p class="eyebrow">Procedura guidata</p>
+      <h1>Carica i documenti in Viewpoint</h1>
+      <p class="lead">Scegli la cartella esportata dal vecchio archivio, controlla l'anteprima, fai una prova e poi avvia il trasferimento. Puoi interrompere e riprendere in qualsiasi momento: i file già caricati non vengono ricaricati.</p>
+    </div>
+
+    <div class="banner banner-warn" id="configBanner" hidden>
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <div><strong>Impostazioni incomplete.</strong> <span id="configBannerText"></span> La prova funziona comunque; per il trasferimento reale completa le <a href="#" data-goto="impostazioni">impostazioni</a>.</div>
+    </div>
+
+    <div class="layout">
+      <div class="col-main">
+
+        <!-- Avanzamento (visibile durante e dopo un lavoro) -->
+        <article class="card progress-card" id="progressCard" hidden>
+          <header class="card-head">
+            <div>
+              <p class="eyebrow" id="progEyebrow">Trasferimento in corso</p>
+              <h2 id="progTitle">Caricamento in Viewpoint</h2>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-danger-outline" id="btnStop" type="button"><svg class="ic"><use href="#i-stop"/></svg>Interrompi</button>
+              <button class="btn btn-ghost" id="btnCloseProgress" type="button" hidden><svg class="ic"><use href="#i-x"/></svg>Chiudi</button>
+            </div>
+          </header>
+          <div class="progress-wrap">
+            <div class="progress-meta">
+              <span class="mono" id="progCount">0 / 0</span>
+              <span id="progPct" class="mono">0%</span>
+            </div>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progBar"><span></span></div>
+            <p class="progress-current" id="progCurrent">&nbsp;</p>
+          </div>
+          <div class="fatal" id="progFatal" hidden></div>
+          <div class="stats stats-4">
+            <div class="stat stat-ok"><span class="stat-label">Caricati</span><span class="stat-value mono" id="cntCaricato">0</span></div>
+            <div class="stat stat-test"><span class="stat-label">Pronti (prova)</span><span class="stat-value mono" id="cntProva">0</span></div>
+            <div class="stat"><span class="stat-label">Saltati</span><span class="stat-value mono" id="cntSaltato">0</span></div>
+            <div class="stat stat-err"><span class="stat-label">Errori</span><span class="stat-value mono" id="cntErrore">0</span></div>
+          </div>
+          <div class="seg-filter" id="evFilter" role="group" aria-label="Filtra esiti">
+            <button class="chip is-active" data-f="all">Tutti</button>
+            <button class="chip" data-f="errore">Errori</button>
+            <button class="chip" data-f="caricato">Caricati</button>
+            <button class="chip" data-f="saltato">Saltati</button>
+          </div>
+          <div class="table-wrap table-scroll">
+            <table class="data">
+              <thead><tr><th>Esito</th><th>File</th><th>Destinazione</th><th>Rev.</th><th>Dettaglio</th></tr></thead>
+              <tbody id="evBody"></tbody>
+            </table>
+            <div class="empty small" id="evEmpty">In attesa del primo file…</div>
+          </div>
+          <details class="console">
+            <summary><svg class="ic"><use href="#i-terminal"/></svg>Registro tecnico <span class="muted" id="logCount"></span></summary>
+            <pre id="logBox" class="mono"></pre>
+          </details>
+        </article>
+
+        <!-- Step 1 -->
+        <article class="card step" id="step1">
+          <header class="card-head">
+            <div class="step-title">
+              <span class="step-num">1</span>
+              <div>
+                <h2>Origine dei documenti</h2>
+                <p class="muted">Da dove prendere i file da caricare.</p>
+              </div>
+            </div>
+          </header>
+
+          <div class="mode-switch" role="radiogroup" aria-label="Modalità">
+            <label class="mode-opt">
+              <input type="radio" name="mode" value="folder" checked>
+              <span class="mode-box">
+                <svg class="ic ic-lg"><use href="#i-folder"/></svg>
+                <span><strong>Solo cartella</strong><small>Le sottocartelle diventano cartelle in VFP, ogni file un documento.</small></span>
+              </span>
+            </label>
+            <label class="mode-opt">
+              <input type="radio" name="mode" value="manifest">
+              <span class="mode-box">
+                <svg class="ic ic-lg"><use href="#i-table"/></svg>
+                <span><strong>Cartella + elenco CSV</strong><small>Un file CSV indica cartella, nome, revisione e descrizione di ogni file.</small></span>
+              </span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="srcPath">Cartella esportata dal vecchio archivio</label>
+            <div class="input-group">
+              <input id="srcPath" type="text" placeholder="Es. D:\export_dms" autocomplete="off" spellcheck="false">
+              <button class="btn btn-secondary" type="button" data-browse="source"><svg class="ic"><use href="#i-folder"/></svg>Sfoglia</button>
+            </div>
+          </div>
+
+          <div class="field" id="manifestField" hidden>
+            <label for="manPath">File CSV con l'elenco dei documenti</label>
+            <div class="input-group">
+              <input id="manPath" type="text" placeholder="Es. D:\export_dms\manifest.csv" autocomplete="off" spellcheck="false">
+              <button class="btn btn-secondary" type="button" data-browse="manifest"><svg class="ic"><use href="#i-file"/></svg>Sfoglia</button>
+            </div>
+            <p class="hint">Colonne: <code>file;folder;name;revision;description</code>. Righe con stessa cartella e nome diventano le revisioni dello stesso documento, nell'ordine in cui compaiono.</p>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" id="btnAnalyze" type="button"><svg class="ic"><use href="#i-search"/></svg>Analizza file</button>
+          </div>
+        </article>
+
+        <!-- Step 2 -->
+        <article class="card step" id="step2">
+          <header class="card-head">
+            <div class="step-title">
+              <span class="step-num">2</span>
+              <div>
+                <h2>Anteprima</h2>
+                <p class="muted">Controlla cosa verrà caricato prima di procedere.</p>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btnRefreshPreview" type="button" hidden><svg class="ic"><use href="#i-refresh"/></svg>Aggiorna</button>
+          </header>
+
+          <div class="empty" id="previewEmpty">
+            <svg class="ic ic-xl"><use href="#i-folder"/></svg>
+            <p>Scegli la cartella di origine e premi <strong>Analizza file</strong>.</p>
+          </div>
+
+          <div id="previewSkeleton" hidden>
+            <div class="stats stats-5">
+              <div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div>
+            </div>
+            <div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>
+          </div>
+
+          <div class="error-box" id="previewError" hidden></div>
+
+          <div id="previewBody" hidden>
+            <div class="stats stats-5">
+              <div class="stat"><span class="stat-label">File trovati</span><span class="stat-value mono" id="pvTotal">0</span></div>
+              <div class="stat stat-ok"><span class="stat-label">Da caricare</span><span class="stat-value mono" id="pvReady">0</span></div>
+              <div class="stat"><span class="stat-label">Già trasferiti</span><span class="stat-value mono" id="pvDone">0</span></div>
+              <div class="stat stat-err"><span class="stat-label">Da verificare</span><span class="stat-value mono" id="pvIssues">0</span></div>
+              <div class="stat"><span class="stat-label">Dimensione</span><span class="stat-value mono" id="pvSize">0</span></div>
+            </div>
+            <div class="table-tools">
+              <div class="seg-filter" id="pvFilter" role="group" aria-label="Filtra anteprima">
+                <button class="chip is-active" data-f="all">Tutti</button>
+                <button class="chip" data-f="pronto">Da caricare</button>
+                <button class="chip" data-f="issues">Da verificare</button>
+                <button class="chip" data-f="trasferito">Già trasferiti</button>
+              </div>
+              <label class="search">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input type="search" id="pvSearch" placeholder="Cerca file o cartella">
+              </label>
+            </div>
+            <div class="table-wrap table-scroll">
+              <table class="data">
+                <thead><tr><th>Stato</th><th>File di origine</th><th>Cartella in VFP</th><th>Nome documento</th><th>Rev.</th><th class="num">Dimensione</th></tr></thead>
+                <tbody id="pvBody"></tbody>
+              </table>
+              <div class="empty small" id="pvNoMatch" hidden>Nessun file corrisponde al filtro.</div>
+            </div>
+            <p class="hint" id="pvTruncated" hidden></p>
+          </div>
+        </article>
+      </div>
+
+      <!-- Colonna laterale: destinazione e avvio -->
+      <aside class="col-side">
+        <article class="card side-card">
+          <div class="step-title">
+            <span class="step-num">3</span>
+            <div>
+              <h2>Avvio</h2>
+              <p class="muted">Prima una prova, poi il caricamento.</p>
+            </div>
+          </div>
+
+          <dl class="summary">
+            <div><dt>Destinazione</dt><dd id="sumTarget">—</dd></div>
+            <div><dt>ID</dt><dd class="mono small-id" id="sumTargetId">—</dd></div>
+            <div><dt>Documento già esistente</dt><dd id="sumIfExists">—</dd></div>
+            <div><dt>File da caricare</dt><dd class="mono" id="sumReady">—</dd></div>
+          </dl>
+
+          <div class="side-actions">
+            <button class="btn btn-secondary btn-block" id="btnDryRun" type="button" disabled>
+              <svg class="ic"><use href="#i-flask"/></svg>Esegui prova
+            </button>
+            <button class="btn btn-primary btn-block" id="btnStart" type="button" disabled>
+              <svg class="ic"><use href="#i-upload"/></svg>Avvia trasferimento
+            </button>
+          </div>
+          <p class="hint" id="sideHint">Analizza prima i file per abilitare i pulsanti.</p>
+          <a href="#" class="link-sm" data-goto="impostazioni"><svg class="ic"><use href="#i-gear"/></svg>Modifica destinazione</a>
+        </article>
+
+        <article class="card side-card tips">
+          <h3><svg class="ic"><use href="#i-info"/></svg>Da sapere</h3>
+          <ul>
+            <li>La <strong>prova</strong> non scrive nulla in Viewpoint: serve a controllare cartelle e nomi.</li>
+            <li>Al primo trasferimento si apre il browser per l'<strong>accesso Viewpoint</strong>.</li>
+            <li>Dopo il caricamento, VFP elabora i file per qualche minuto: risultano "Pending" con dimensione 0.</li>
+            <li>File oltre 100 MB vengono caricati a parti e non sono controllati dall'antivirus VFP.</li>
+          </ul>
+        </article>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ======================================================= POSTA -->
+  <section class="view" id="view-posta" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Posta automatica</p>
+        <h1>Caselle email</h1>
+        <p class="lead">Il programma controlla di continuo le caselle email e carica in Viewpoint gli allegati ricevuti. Le email trasferite vengono spostate nella cartella "<span id="mpDoneFolder">Trasferite a VFP</span>".</p>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="#" data-goto="impostazioni" data-anchor="cardMail"><svg class="ic"><use href="#i-gear"/></svg>Impostazioni posta</a>
+        <button class="btn btn-primary" id="btnMailCheck" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
+      </div>
+    </div>
+
+    <div class="banner banner-warn" id="mailLoginBanner" hidden>
+      <svg class="ic"><use href="#i-key"/></svg>
+      <div><strong>Accesso a Viewpoint necessario.</strong> Le email restano in attesa finché qualcuno non rifà l'accesso.
+        <button class="btn btn-sm btn-primary banner-btn" type="button" id="btnMailLogin">Accedi a Viewpoint</button></div>
+    </div>
+    <div class="banner banner-warn" id="mailProblems" hidden>
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <div><strong>Configurazione da completare.</strong> <span id="mailProblemsText"></span></div>
+    </div>
+
+    <article class="card mail-status">
+      <div class="mail-state">
+        <span class="state-dot" id="mpDot"></span>
+        <div>
+          <strong id="mpState">Verifica…</strong>
+          <span class="muted" id="mpNext"></span>
+        </div>
+      </div>
+      <div class="stats stats-3">
+        <div class="stat stat-ok"><span class="stat-label">Trasferite</span><span class="stat-value mono" id="mpOk">0</span></div>
+        <div class="stat"><span class="stat-label">In nuovo tentativo</span><span class="stat-value mono" id="mpRetry">0</span></div>
+        <div class="stat stat-err"><span class="stat-label">In errore</span><span class="stat-value mono" id="mpErr">0</span></div>
+      </div>
+    </article>
+
+    <div class="source-grid" id="mpSources"></div>
+
+    <article class="card">
+      <header class="card-head">
+        <h2>Ultime email elaborate</h2>
+        <div class="seg-filter" id="mpFilter" role="group" aria-label="Filtra email">
+          <button class="chip is-active" data-f="all">Tutte</button>
+          <button class="chip" data-f="trasferita">Trasferite</button>
+          <button class="chip" data-f="riprovo">In nuovo tentativo</button>
+          <button class="chip" data-f="errore">Errori</button>
+        </div>
+      </header>
+      <div class="table-wrap table-scroll table-tall">
+        <table class="data">
+          <thead><tr><th>Elaborata</th><th>Esito</th><th>Mittente e oggetto</th><th>Allegati</th><th>Casella</th><th>Dettaglio</th></tr></thead>
+          <tbody id="mpBody"></tbody>
+        </table>
+        <div class="empty" id="mpEmpty">
+          <svg class="ic ic-xl"><use href="#i-mail"/></svg>
+          <p>Nessuna email elaborata finora.</p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ======================================================= STORICO -->
+  <section class="view" id="view-storico" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Report</p>
+        <h1>Storico trasferimenti</h1>
+        <p class="lead">Esito di ogni file trasferito, dal più recente. Viene salvato in <code>report_trasferimento.csv</code>.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="btnReloadReport" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Aggiorna</button>
+        <a class="btn btn-secondary" href="/api/report.csv" download><svg class="ic"><use href="#i-download"/></svg>Scarica CSV</a>
+        <a class="btn btn-primary" href="/api/report.xlsx" download><svg class="ic"><use href="#i-download"/></svg>Scarica Excel</a>
+      </div>
+    </div>
+
+    <article class="card">
+      <div class="stats stats-4">
+        <div class="stat"><span class="stat-label">Righe totali</span><span class="stat-value mono" id="rpTotal">0</span></div>
+        <div class="stat stat-ok"><span class="stat-label">Caricati</span><span class="stat-value mono" id="rpOk">0</span></div>
+        <div class="stat"><span class="stat-label">Saltati</span><span class="stat-value mono" id="rpSkip">0</span></div>
+        <div class="stat stat-err"><span class="stat-label">Errori</span><span class="stat-value mono" id="rpErr">0</span></div>
+      </div>
+      <div class="table-tools">
+        <div class="seg-filter" id="rpFilter" role="group" aria-label="Filtra report">
+          <button class="chip is-active" data-f="all">Tutti</button>
+          <button class="chip" data-f="caricato">Caricati</button>
+          <button class="chip" data-f="saltato">Saltati</button>
+          <button class="chip" data-f="errore">Errori</button>
+        </div>
+        <label class="search">
+          <svg class="ic"><use href="#i-search"/></svg>
+          <input type="search" id="rpSearch" placeholder="Cerca file, cartella o messaggio">
+        </label>
+      </div>
+      <div class="table-wrap table-scroll table-tall">
+        <table class="data">
+          <thead><tr><th>Data</th><th>Esito</th><th>File</th><th>Cartella</th><th>Nome</th><th>Rev.</th><th>Dettaglio</th><th>Viewpoint</th></tr></thead>
+          <tbody id="rpBody"></tbody>
+        </table>
+        <div class="empty" id="rpEmpty" hidden>
+          <svg class="ic ic-xl"><use href="#i-history"/></svg>
+          <p>Nessun trasferimento registrato.</p>
+          <a href="#" class="btn btn-primary btn-sm" id="rpEmptyGo" data-goto="trasferimento"><svg class="ic"><use href="#i-upload"/></svg>Nuovo trasferimento</a>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ======================================================= ATTIVITA' UTENTI -->
+  <section class="view" id="view-attivita" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Solo amministratori</p>
+        <h1>Attività utenti</h1>
+        <p class="lead">Chi è collegato, chi ha fatto cosa e quando: accessi, modifiche, trasferimenti, report e tentativi non consentiti. Password, codici e valori delle impostazioni non vengono mai registrati.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="actReload" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Aggiorna</button>
+        <a class="btn btn-primary" id="actXlsx" href="/api/activity.xlsx" download><svg class="ic"><use href="#i-download"/></svg>Scarica Excel</a>
+      </div>
+    </div>
+
+    <div class="banner banner-err" id="actIntegrity" hidden>
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <div><strong>Registro modificato dall'esterno.</strong> <span id="actIntegrityText"></span></div>
+    </div>
+
+    <section class="kpis">
+      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-users"/></svg><span class="kpi-lbl">Collegati ora</span><span class="kpi-val mono" id="actOnline">0</span><span class="kpi-sub" id="actOnlineSub"></span></article>
+      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-key"/></svg><span class="kpi-lbl">Accessi oggi</span><span class="kpi-val mono" id="actLogins">0</span><span class="kpi-sub">accessi riusciti</span></article>
+      <article class="card kpi kpi-err" id="actFailCard"><svg class="ic kpi-ic"><use href="#i-alert"/></svg><span class="kpi-lbl">Tentativi respinti, 24 ore</span><span class="kpi-val mono" id="actFailed">0</span><span class="kpi-sub" id="actFailedSub"></span></article>
+      <article class="card kpi"><svg class="ic kpi-ic"><use href="#i-gear"/></svg><span class="kpi-lbl">Modifiche oggi</span><span class="kpi-val mono" id="actChanges">0</span><span class="kpi-sub">impostazioni e utenti</span></article>
+    </section>
+
+    <div class="ov-grid act-grid">
+      <article class="card table-card">
+        <div class="card-head"><h2>Sessioni attive</h2><span class="muted small" id="actSessCount"></span></div>
+        <div class="table-wrap-flat">
+          <table class="data"><thead><tr><th>Utente</th><th>Collegato da</th><th>Ultima richiesta</th><th class="num"></th></tr></thead><tbody id="actSessions"></tbody></table>
+          <div class="empty small" id="actSessEmpty" hidden>Nessuna sessione attiva.</div>
+        </div>
+      </article>
+      <article class="card table-card">
+        <div class="card-head"><h2>Utenti</h2><a href="#" class="small" data-goto="impostazioni" data-anchor="cardUsers">Gestisci utenti</a></div>
+        <div class="table-wrap-flat">
+          <table class="data"><thead><tr><th>Utente</th><th>Ruolo</th><th>Ultimo accesso</th><th>Ultima attività</th></tr></thead><tbody id="actUsers"></tbody></table>
+        </div>
+      </article>
+    </div>
+
+    <article class="card act-log">
+      <div class="card-head"><h2>Registro</h2><span class="muted small" id="actCount"></span></div>
+      <div class="table-tools">
+        <div class="seg-filter" id="actCat" role="group" aria-label="Categoria">
+          <button class="chip is-active" data-f="">Tutto</button>
+          <button class="chip" data-f="accesso">Accessi</button>
+          <button class="chip" data-f="modifica">Modifiche</button>
+          <button class="chip" data-f="trasferimento">Trasferimenti</button>
+          <button class="chip" data-f="report">Report</button>
+          <button class="chip" data-f="sicurezza">Sicurezza</button>
+        </div>
+        <div class="seg-filter" id="actDays" role="group" aria-label="Periodo">
+          <button class="chip" data-f="1">Oggi</button>
+          <button class="chip is-active" data-f="7">7 giorni</button>
+          <button class="chip" data-f="30">30 giorni</button>
+          <button class="chip" data-f="0">Tutto</button>
+        </div>
+      </div>
+      <div class="table-tools">
+        <select id="actUser" aria-label="Utente"><option value="">Tutti gli utenti</option></select>
+        <select id="actOutcome" aria-label="Esito"><option value="">Tutti gli esiti</option><option value="ok">Riuscite</option><option value="fallito">Non riuscite</option><option value="negato">Negate</option></select>
+        <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="actSearch" placeholder="Cerca azione o dettaglio"></label>
+      </div>
+      <div class="table-wrap table-scroll table-tall">
+        <table class="data">
+          <thead><tr><th>Quando</th><th>Utente</th><th>Categoria</th><th>Azione</th><th>Dettaglio</th><th>Esito</th></tr></thead>
+          <tbody id="actBody"></tbody>
+        </table>
+        <div class="empty small" id="actEmpty" hidden>Nessuna attività con questi filtri.</div>
+      </div>
+      <p class="hint">Il registro è in <code>registro_attivita.jsonl</code>: ogni riga contiene l'impronta della precedente, quindi una riga modificata o tolta viene segnalata qui sopra. Informare il personale che l'uso del programma viene registrato.</p>
+    </article>
+  </section>
+
+  <!-- ======================================================= IMPOSTAZIONI -->
+  <section class="view" id="view-impostazioni" role="tabpanel" hidden>
+    <div class="page-head">
+      <p class="eyebrow">Configurazione</p>
+      <h1>Impostazioni</h1>
+      <p class="lead">Di solito si compilano una volta sola, con l'aiuto dell'ufficio IT. Vengono salvate nel file <code>.env</code> su questo PC, insieme alle credenziali: non condividerlo.</p>
+    </div>
+    <nav class="set-index" id="setIndex" aria-label="Settori delle impostazioni"></nav>
+    <div class="banner banner-err" id="secBanner" hidden>
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <div><strong>Sicurezza da completare:</strong><ul class="banner-list" id="secBannerList"></ul></div>
+    </div>
+    <div class="banner banner-warn" id="fromOsBanner" hidden>
+      <svg class="ic"><use href="#i-info"/></svg>
+      <div>Alcuni valori sono impostati come variabili d'ambiente di Windows e hanno la precedenza sul file: <span class="mono" id="fromOsList"></span></div>
+    </div>
+
+    <div class="settings-list">
+      <h2 class="set-sector">Viewpoint<small>accesso, destinazione e regole di caricamento</small></h2>
+
+      <article class="card set-row">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-user"/></svg>Accesso Viewpoint</h2>
+        </header>
+        <div class="set-body">
+          <div class="auth-box" id="authBox">
+            <span class="auth-state" id="authState">—</span>
+            <p class="muted" id="authDetail"></p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btnLogin" type="button"><svg class="ic"><use href="#i-key"/></svg>Accedi a Viewpoint</button>
+            <button class="btn btn-ghost" id="btnLogout" type="button"><svg class="ic"><use href="#i-x"/></svg>Esci</button>
+          </div>
+          <p class="hint">L'accesso si apre in una nuova scheda del browser. Viene rinnovato in automatico: va rifatto solo se Viewpoint lo revoca o scade.</p>
+        </div>
+      </article>
+
+      <article class="card set-row">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-target"/></svg>Destinazione in VFP</h2>
+        </header>
+        <div class="set-body">
+          <div class="field">
+            <span class="label">Tipo</span>
+            <div class="radio-cards">
+              <label><input type="radio" name="targetType" data-env="VFP_TARGET_TYPE" value="project"><span><strong>Progetto</strong><small>Le cartelle vengono create nella radice del progetto.</small></span></label>
+              <label><input type="radio" name="targetType" data-env="VFP_TARGET_TYPE" value="folder"><span><strong>Cartella</strong><small>Tutto finisce dentro una Document Folder esistente.</small></span></label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="cfgTargetId">ID (GUID) del progetto o della cartella</label>
+            <input id="cfgTargetId" data-env="VFP_TARGET_ID" type="text" class="mono" placeholder="00000000-0000-0000-0000-000000000000" spellcheck="false">
+            <p class="field-error" id="errTargetId" hidden>Formato atteso: 8-4-4-4-12 caratteri esadecimali.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card set-row">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-file"/></svg>Documenti</h2>
+        </header>
+        <div class="set-body">
+          <div class="field">
+            <label for="cfgRevision">Revisione predefinita</label>
+            <input id="cfgRevision" data-env="VFP_DEFAULT_REVISION" type="text" placeholder="1">
+            <p class="hint">Usata per gli allegati email, in modalità solo cartella e quando il CSV non indica la revisione.</p>
+          </div>
+          <div class="field">
+            <span class="label">Se il documento esiste già in VFP</span>
+            <div class="radio-cards">
+              <label><input type="radio" name="ifExists" data-env="VFP_IF_EXISTS" value="new_revision"><span><strong>Aggiungi revisione</strong><small>Carica il file come nuova revisione.</small></span></label>
+              <label><input type="radio" name="ifExists" data-env="VFP_IF_EXISTS" value="skip"><span><strong>Salta</strong><small>Lascia il documento com'è.</small></span></label>
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" data-env="VFP_NOTIFY_EMAIL">
+            <span class="toggle-ui"></span>
+            <span>Notifica via email i destinatari dei documenti</span>
+          </label>
+          <div class="field">
+            <label for="cfgDocUrl">Indirizzo web di un documento in Viewpoint</label>
+            <input id="cfgDocUrl" data-env="VFP_DOC_URL" type="url" class="mono" spellcheck="false" placeholder="https://…viewpoint.com/…/{id}">
+            <p class="hint">Facoltativo. Apri un documento in Viewpoint dal browser, copia l'indirizzo e sostituisci l'ID del documento con <code>{id}</code>: nello Storico e nel Flusso posta compare il link diretto.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card set-row">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-key"/></svg>Credenziali API Viewpoint</h2>
+        </header>
+        <div class="set-body">
+          <div class="field">
+            <label for="cfgClientId">Client ID</label>
+            <input id="cfgClientId" data-env="VFP_CLIENT_ID" type="text" class="mono" spellcheck="false" placeholder="Fornito da Trimble/Viewpoint">
+          </div>
+          <div class="field">
+            <label for="cfgSecret">Client secret <span class="muted">(se previsto)</span></label>
+            <input id="cfgSecret" data-env="VFP_CLIENT_SECRET" type="password" class="mono" autocomplete="new-password">
+          </div>
+          <details class="advanced">
+            <summary><svg class="ic"><use href="#i-chevron"/></svg>Impostazioni avanzate</summary>
+            <div class="field"><label for="cfgBaseUrl">URL API</label><input id="cfgBaseUrl" data-env="VFP_BASE_URL" type="url" class="mono"></div>
+            <div class="field"><label for="cfgAuthUrl">URL autorizzazione</label><input id="cfgAuthUrl" data-env="VFP_AUTH_URL" type="url" class="mono"></div>
+            <div class="field"><label for="cfgTokenUrl">URL token</label><input id="cfgTokenUrl" data-env="VFP_TOKEN_URL" type="url" class="mono"></div>
+            <div class="field"><label for="cfgRedirect">Redirect URI</label><input id="cfgRedirect" data-env="VFP_REDIRECT_URI" type="url" class="mono"></div>
+            <div class="field"><label for="cfgScope">Scope</label><input id="cfgScope" data-env="VFP_SCOPE" type="text" class="mono">
+              <p class="hint">Lasciare <code>offline_access</code>: serve al rinnovo automatico, indispensabile per la posta.</p></div>
+            <div class="field">
+              <label for="cfgDefaults">Campi extra del documento (JSON)</label>
+              <textarea id="cfgDefaults" data-env="VFP_DOCUMENT_DEFAULTS" class="mono" rows="3" spellcheck="false" placeholder="{}"></textarea>
+              <p class="field-error" id="errDefaults" hidden>JSON non valido: deve essere un oggetto, es. {"OwnerId": "…"}</p>
+            </div>
+            <div class="field"><label for="cfgPort">Porta interfaccia</label><input id="cfgPort" data-env="GUI_PORT" type="text" inputmode="numeric" class="mono">
+              <p class="hint">Vale dal prossimo riavvio del programma.</p></div>
+          </details>
+        </div>
+      </article>
+
+      <h2 class="set-sector">Posta<small>caselle, caricamento automatico e controlli di sicurezza</small></h2>
+
+      <article class="card set-row">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-plug"/></svg>Caselle email</h2>
+          <p class="set-desc">Attiva una o più caselle. Dopo aver salvato, usa <strong>Prova connessione</strong>. Meglio una casella dedicata (es. documenti@…): vengono elaborate tutte le email con allegati.</p>
+        </header>
+        <div class="set-body">
+
+          <div class="mailbox">
+            <div class="mailbox-head">
+              <label class="toggle"><input type="checkbox" data-source="graph"><span class="toggle-ui"></span><span><strong>Microsoft 365 / Outlook</strong></span></label>
+              <button class="btn btn-ghost btn-sm" type="button" data-test="graph"><svg class="ic"><use href="#i-plug"/></svg>Prova connessione</button>
+            </div>
+            <p class="hint">Serve un'app registrata in Azure (Entra ID) con permesso applicativo <code>Mail.ReadWrite</code> (più <code>Mail.Send</code> per inviare i report) e consenso dell'amministratore. Importante: limitare l'app alla sola casella con una <em>Application Access Policy</em> di Exchange Online, altrimenti può leggere tutte le caselle dell'azienda.</p>
+            <div class="field-grid">
+              <div class="field"><label>Tenant ID</label><input data-env="GRAPH_TENANT_ID" type="text" class="mono" spellcheck="false"></div>
+              <div class="field"><label>Casella</label><input data-env="GRAPH_MAILBOX" type="text" placeholder="documenti@azienda.it" spellcheck="false"></div>
+              <div class="field"><label>Client ID</label><input data-env="GRAPH_CLIENT_ID" type="text" class="mono" spellcheck="false"></div>
+              <div class="field"><label>Client secret</label><input data-env="GRAPH_CLIENT_SECRET" type="password" class="mono" autocomplete="new-password"></div>
+              <div class="field"><label>Cartella da leggere</label><input data-env="GRAPH_FOLDER" type="text" class="mono" placeholder="inbox"></div>
+            </div>
+            <p class="test-result" data-result="graph" hidden></p>
+          </div>
+
+          <div class="mailbox">
+            <div class="mailbox-head">
+              <label class="toggle"><input type="checkbox" data-source="imap"><span class="toggle-ui"></span><span><strong>IMAP</strong> <span class="muted">(Aruba, Gmail con password per app, altri)</span></span></label>
+              <button class="btn btn-ghost btn-sm" type="button" data-test="imap"><svg class="ic"><use href="#i-plug"/></svg>Prova connessione</button>
+            </div>
+            <div class="field-grid">
+              <div class="field"><label>Server</label><input data-env="IMAP_HOST" type="text" class="mono" placeholder="imaps.aruba.it" spellcheck="false"></div>
+              <div class="field"><label>Porta</label><input data-env="IMAP_PORT" type="text" inputmode="numeric" class="mono"></div>
+              <div class="field"><label>Utente</label><input data-env="IMAP_USER" type="text" spellcheck="false" autocomplete="off"></div>
+              <div class="field"><label>Password</label><input data-env="IMAP_PASSWORD" type="password" autocomplete="new-password"></div>
+              <div class="field"><label>Cartella da leggere</label><input data-env="IMAP_FOLDER" type="text" class="mono" placeholder="INBOX"></div>
+            </div>
+            <p class="test-result" data-result="imap" hidden></p>
+          </div>
+
+          <div class="mailbox">
+            <div class="mailbox-head">
+              <label class="toggle"><input type="checkbox" data-source="pec"><span class="toggle-ui"></span><span><strong>PEC</strong> <span class="muted">(gli allegati vengono presi dalla busta postacert.eml)</span></span></label>
+              <button class="btn btn-ghost btn-sm" type="button" data-test="pec"><svg class="ic"><use href="#i-plug"/></svg>Prova connessione</button>
+            </div>
+            <div class="field-grid">
+              <div class="field"><label>Server</label><input data-env="PEC_HOST" type="text" class="mono" placeholder="imaps.pec.aruba.it" spellcheck="false"></div>
+              <div class="field"><label>Porta</label><input data-env="PEC_PORT" type="text" inputmode="numeric" class="mono"></div>
+              <div class="field"><label>Utente</label><input data-env="PEC_USER" type="text" spellcheck="false" autocomplete="off"></div>
+              <div class="field"><label>Password</label><input data-env="PEC_PASSWORD" type="password" autocomplete="new-password"></div>
+              <div class="field"><label>Cartella da leggere</label><input data-env="PEC_FOLDER" type="text" class="mono" placeholder="INBOX"></div>
+            </div>
+            <p class="test-result" data-result="pec" hidden></p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card set-row" id="cardMail">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-mail"/></svg>Posta in arrivo</h2>
+        </header>
+        <div class="set-body">
+          <label class="toggle toggle-strong">
+            <input type="checkbox" data-env="MAIL_ENABLED">
+            <span class="toggle-ui"></span>
+            <span>Carica in automatico gli allegati delle email</span>
+          </label>
+          <div class="field-grid">
+            <div class="field"><label for="mlFolder">Cartella VFP per gli allegati</label><input id="mlFolder" data-env="MAIL_VFP_FOLDER" type="text" placeholder="Posta in arrivo">
+              <p class="hint">Sotto la destinazione; sottocartelle con "/".</p></div>
+            <div class="field"><label for="mlPoll">Controlla ogni (secondi)</label><input id="mlPoll" data-env="MAIL_POLL_SECONDS" type="text" inputmode="numeric" class="mono"></div>
+            <div class="field"><label for="mlDone">Sposta le email trasferite in</label><input id="mlDone" data-env="MAIL_DONE_FOLDER" type="text"></div>
+            <div class="field"><label for="mlErr">Sposta le email in errore in</label><input id="mlErr" data-env="MAIL_ERROR_FOLDER" type="text"></div>
+            <div class="field"><label for="mlAttempts">Tentativi prima dell'errore</label><input id="mlAttempts" data-env="MAIL_MAX_ATTEMPTS" type="text" inputmode="numeric" class="mono"></div>
+          </div>
+          <label class="toggle"><input type="checkbox" data-env="MAIL_SKIP_INLINE"><span class="toggle-ui"></span><span>Ignora le immagini nel testo (loghi, firme)</span></label>
+          <label class="toggle"><input type="checkbox" data-env="MAIL_DATE_PREFIX"><span class="toggle-ui"></span><span>Aggiungi data e ora di arrivo al nome del documento</span></label>
+        </div>
+      </article>
+
+      <article class="card set-row" id="cardMailSec">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-shield"/></svg>Sicurezza della posta</h2>
+          <p class="set-desc">Le email che non superano questi controlli non vengono caricate: finiscono nella cartella di quarantena della casella, da controllare a mano.</p>
+        </header>
+        <div class="set-body">
+          <div class="field">
+            <label for="secSenders">Mittenti autorizzati</label>
+            <textarea id="secSenders" data-env="MAIL_ALLOWED_SENDERS" data-list rows="3" class="mono" spellcheck="false" placeholder="@fornitore.it, progettista@studio.it"></textarea>
+            <p class="hint">Indirizzi completi o domini (<code>@dominio.it</code>), separati da virgola. Vuoto = chiunque: sconsigliato.</p>
+          </div>
+          <div class="field">
+            <label for="secExt">Estensioni ammesse</label>
+            <input id="secExt" data-env="MAIL_ALLOWED_EXT" type="text" class="mono" spellcheck="false" placeholder="elenco predefinito">
+            <p class="hint">Vuoto = elenco predefinito (pdf, dwg, documenti Office senza macro, immagini, zip…). Eseguibili, script, pagine web e file con macro sono sempre bloccati.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field"><label for="secMax">Dimensione massima email (MB)</label><input id="secMax" data-env="MAIL_MAX_MB" type="text" inputmode="numeric" class="mono"></div>
+            <div class="field"><label for="secQuar">Cartella di quarantena</label><input id="secQuar" data-env="MAIL_QUARANTINE_FOLDER" type="text"></div>
+          </div>
+          <label class="toggle"><input type="checkbox" data-env="MAIL_ANTIVIRUS"><span class="toggle-ui"></span><span>Controlla gli allegati con l'antivirus (Windows Defender) prima del caricamento</span></label>
+          <label class="toggle"><input type="checkbox" data-env="MAIL_REQUIRE_AUTH"><span class="toggle-ui"></span><span>Blocca i mittenti falsificati (controllo SPF/DKIM/DMARC del server di posta)</span></label>
+        </div>
+      </article>
+
+      <article class="card set-row" id="cardProt">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-hash"/></svg>Protocollo PEC</h2>
+          <p class="set-desc">Il numero di protocollo si legge dall'oggetto delle PEC. Le regole predefinite riconoscono "Prot. n. …", la numerazione annuale da 001 e i formati più comuni degli enti.</p>
+        </header>
+        <div class="set-body">
+          <div class="field">
+            <label for="protRule">Regola personalizzata <span class="muted">(facoltativa)</span></label>
+            <input id="protRule" data-env="PEC_PROTOCOL_REGEX" type="text" class="mono" spellcheck="false" placeholder="es. ^(?:POSTA CERTIFICATA:\s*)?(\d{3,})">
+            <p class="hint">Espressione regolare: il numero è il gruppo <code>(?P&lt;n&gt;…)</code>, altrimenti il primo gruppo tra parentesi. Viene provata prima delle regole predefinite. Vuota = solo regole predefinite.</p>
+          </div>
+          <div class="field">
+            <label for="protSubject">Prova su un oggetto</label>
+            <div class="input-group">
+              <input id="protSubject" type="text" spellcheck="false" placeholder="POSTA CERTIFICATA: 001 - Trasmissione verbale">
+              <button class="btn btn-ghost btn-sm" type="button" id="protTest"><svg class="ic"><use href="#i-flask"/></svg>Prova</button>
+            </div>
+            <p class="hint">La prova usa la regola scritta qui sopra anche se non è ancora salvata.</p>
+          </div>
+          <div class="prot-test" id="protTestOut" hidden></div>
+        </div>
+      </article>
+
+      <article class="card" id="cardMailLog">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title" style="margin-bottom:.35rem"><svg class="ic"><use href="#i-mail"/></svg>Caselle collegate e posta ricevuta</h2>
+            <p class="muted small" style="margin:0">Cosa è arrivato, da chi e com'è andato il caricamento in Viewpoint. Clicca una casella per vedere solo la sua posta.</p>
+          </div>
+          <a class="btn btn-primary" id="btnXlsx" href="/api/report.xlsx" download><svg class="ic"><use href="#i-download"/></svg>Scarica report Excel</a>
+        </div>
+        <div class="mbox-list" id="mlSources"></div>
+        <div class="table-tools">
+          <div class="seg-filter" id="mlPeriod" role="group" aria-label="Periodo">
+            <button class="chip" data-f="1">Oggi</button>
+            <button class="chip is-active" data-f="7">7 giorni</button>
+            <button class="chip" data-f="30">30 giorni</button>
+            <button class="chip" data-f="0">Tutto</button>
+          </div>
+          <label class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <input type="search" id="mlSearch" placeholder="Cerca mittente, oggetto, protocollo o allegato">
+          </label>
+        </div>
+        <p class="muted small ml-count" id="mlCount"></p>
+        <div class="table-wrap table-scroll">
+          <table class="data">
+            <thead><tr><th>Ricevuta</th><th>Casella</th><th>Mittente</th><th>Oggetto</th><th>Allegati</th><th>Esito</th><th class="num">Tentativi</th></tr></thead>
+            <tbody id="mlBody"></tbody>
+          </table>
+          <div class="empty small" id="mlEmpty" hidden>Nessuna email nel periodo scelto.</div>
+        </div>
+      </article>
+
+      <h2 class="set-sector">Report e smistamento<small>invio del report via email e smistamento con Claude</small></h2>
+
+      <article class="card set-row" id="cardSend">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-send"/></svg>Invio del report via email</h2>
+          <p class="set-desc">Gli utenti non scaricano il report: lo ricevono via email, sempre in copia all'amministratore.</p>
+        </header>
+        <div class="set-body">
+          <div class="field-grid">
+            <div class="field"><label for="sdAdmin">Email dell'amministratore</label><input id="sdAdmin" data-env="ADMIN_EMAIL" type="email" spellcheck="false" placeholder="it@cosedilspa.com"></div>
+            <div class="field"><label for="sdFrom">Mittente</label><input id="sdFrom" data-env="REPORT_FROM" type="email" spellcheck="false" placeholder="documenti@cosedilspa.com"></div>
+          </div>
+          <div class="field">
+            <label for="sdDomains">Domini ammessi per i destinatari</label>
+            <input id="sdDomains" data-env="REPORT_EMAIL_DOMAINS" type="text" class="mono" spellcheck="false" placeholder="cosedilspa.com">
+            <p class="hint">Vuoto = qualsiasi indirizzo. Consigliato il solo dominio aziendale: il report contiene dati interni.</p>
+          </div>
+          <div class="field">
+            <span class="label">Invia con</span>
+            <div class="radio-cards">
+              <label><input type="radio" name="sendMethod" data-env="REPORT_SEND_METHOD" value="smtp"><span><strong>Server SMTP</strong><small>Con TLS e certificato verificato.</small></span></label>
+              <label><input type="radio" name="sendMethod" data-env="REPORT_SEND_METHOD" value="graph"><span><strong>Microsoft 365</strong><small>App Azure della posta, con permesso Mail.Send.</small></span></label>
+            </div>
+          </div>
+          <div class="field-grid" id="smtpFields">
+            <div class="field"><label>Server SMTP</label><input data-env="SMTP_HOST" type="text" class="mono" spellcheck="false" placeholder="smtps.aruba.it"></div>
+            <div class="field"><label>Porta</label><input data-env="SMTP_PORT" type="text" inputmode="numeric" class="mono"></div>
+            <div class="field"><label>Utente</label><input data-env="SMTP_USER" type="text" spellcheck="false" autocomplete="off"></div>
+            <div class="field"><label>Password</label><input data-env="SMTP_PASSWORD" type="password" autocomplete="new-password"></div>
+            <div class="field"><span class="label">Cifratura</span>
+              <div class="radio-inline">
+                <label><input type="radio" name="smtpSec" data-env="SMTP_SECURITY" value="starttls"> STARTTLS (587)</label>
+                <label><input type="radio" name="smtpSec" data-env="SMTP_SECURITY" value="ssl"> SSL (465)</label>
+              </div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-ghost btn-sm" type="button" id="btnSendTest"><svg class="ic"><use href="#i-send"/></svg>Invia email di prova</button>
+          </div>
+          <p class="test-result" id="sendTestResult" hidden></p>
+        </div>
+      </article>
+
+      <article class="card set-row" id="cardAi">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-spark"/></svg>Smistamento con Claude</h2>
+          <p class="set-desc">Chiave API di Anthropic (console.anthropic.com), meglio se di un progetto dedicato con limite di spesa. Vengono inviati solo nomi di file e cartelle.</p>
+        </header>
+        <div class="set-body">
+          <div class="field"><label for="aiKey">Chiave API</label><input id="aiKey" data-env="ANTHROPIC_API_KEY" type="password" class="mono" autocomplete="new-password" placeholder="sk-ant-…"></div>
+          <div class="field"><label for="aiModel">Modello</label><input id="aiModel" data-env="CLAUDE_MODEL" type="text" class="mono" spellcheck="false"></div>
+        </div>
+      </article>
+
+      <h2 class="set-sector">Utenti e manutenzione<small>chi accede al programma e ripresa dei trasferimenti</small></h2>
+
+      <article class="card set-row set-row-full" id="cardUsers">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-users"/></svg>Utenti</h2>
+          <p class="set-desc">Gli <strong>amministratori</strong> vedono e usano tutto. Gli <strong>utenti</strong> vedono solo la Panoramica e possono farsi inviare il report via email.</p>
+        </header>
+        <div class="set-body">
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Nome utente</th><th>Ruolo</th><th>Email</th><th>Ultimo accesso</th><th class="num">Azioni</th></tr></thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </div>
+          <form class="user-add" id="userAdd" novalidate>
+            <div class="field"><label for="uaName">Nuovo utente</label><input id="uaName" type="text" autocomplete="off" spellcheck="false" placeholder="nome.cognome"></div>
+            <div class="field"><label for="uaRole">Ruolo</label><select id="uaRole"><option value="utente">Utente</option><option value="admin">Amministratore</option></select></div>
+            <div class="field"><label for="uaEmail">Email <span class="muted">(facoltativa)</span></label><input id="uaEmail" type="email" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label for="uaPass">Password iniziale</label><input id="uaPass" type="password" autocomplete="new-password"></div>
+            <button class="btn btn-primary" type="submit"><svg class="ic"><use href="#i-check"/></svg>Aggiungi</button>
+          </form>
+          <p class="hint" id="usersHint"></p>
+        </div>
+      </article>
+
+      <article class="card set-row" id="cardHealth">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-pulse"/></svg>Stato del programma</h2>
+          <p class="set-desc">Lo stesso controllo è disponibile per altri programmi all'indirizzo <code>/api/salute</code> (solo da questo PC): risponde 200 se tutto gira, 503 se c'è un problema. Se il controllo della posta si blocca, il programma si riavvia da solo.</p>
+        </header>
+        <div class="set-body">
+          <div class="health" id="healthBox"><span class="muted small">Verifica…</span></div>
+          <div class="btn-row"><button class="btn btn-ghost btn-sm" type="button" id="btnHealth"><svg class="ic"><use href="#i-refresh"/></svg>Aggiorna</button></div>
+        </div>
+      </article>
+
+      <article class="card set-row" id="cardNet">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-plug"/></svg>Accesso dalla rete</h2>
+          <p class="set-desc">Di serie l'interfaccia si apre solo da questo PC. Per aprirla dagli altri PC dell'ufficio serve HTTPS: un certificato emesso per il nome del server (chiedilo all'IT). Vale dal prossimo riavvio del programma.</p>
+        </header>
+        <div class="set-body">
+          <div class="field-grid">
+            <div class="field"><label for="netBind">Indirizzo di ascolto</label><input id="netBind" data-env="GUI_BIND" type="text" class="mono" spellcheck="false" placeholder="127.0.0.1">
+              <p class="hint"><code>127.0.0.1</code> = solo questo PC; <code>0.0.0.0</code> = tutta la rete.</p></div>
+            <div class="field"><label for="netHost">Nome del server</label><input id="netHost" data-env="GUI_HOSTNAME" type="text" class="mono" spellcheck="false" placeholder="vfp.cosedil.local"></div>
+            <div class="field"><label for="netCert">Certificato HTTPS (.pem)</label><input id="netCert" data-env="GUI_TLS_CERT" type="text" class="mono" spellcheck="false" placeholder="certificati\vfp.pem"></div>
+            <div class="field"><label for="netKey">Chiave del certificato (.pem)</label><input id="netKey" data-env="GUI_TLS_KEY" type="text" class="mono" spellcheck="false" placeholder="certificati\vfp.key"></div>
+          </div>
+          <p class="hint">Sul firewall di Windows va aperta solo la porta dell'interfaccia (di serie 8770) e solo verso la rete dell'ufficio. Gli accessi restano protetti da utente, password e blocco dopo 5 errori.</p>
+        </div>
+      </article>
+
+      <article class="card set-row">
+        <header class="set-label">
+          <h2 class="card-title"><svg class="ic"><use href="#i-history"/></svg>Ripresa trasferimenti</h2>
+        </header>
+        <div class="set-body">
+          <p>File registrati come già caricati: <strong class="mono" id="stDone">0</strong><br>
+             In attesa di completare l'upload: <strong class="mono" id="stPending">0</strong></p>
+          <p class="hint">Azzerare la ripresa solo se si vuole ricaricare tutto da capo (ad esempio su un altro progetto). Viene conservata una copia di sicurezza.</p>
+          <button class="btn btn-danger-outline" id="btnResetState" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Azzera ripresa</button>
+        </div>
+      </article>
+    </div>
+
+    <div class="save-bar">
+      <span class="muted" id="saveStatus">Nessuna modifica</span>
+      <button class="btn btn-primary" id="btnSaveCfg" type="button"><svg class="ic"><use href="#i-check"/></svg>Salva impostazioni</button>
+    </div>
+  </section>
+</main>
+</div>
+
+<!-- Dettaglio email (flusso posta) -->
+<div class="drawer-wrap" id="flDrawer" hidden>
+  <div class="drawer-bg" data-close-drawer></div>
+  <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="flDSubj">
+    <header class="drawer-head">
+      <div><p class="eyebrow" id="flDBox"></p><h2 id="flDSubj"></h2></div>
+      <button class="icon-btn" type="button" data-close-drawer aria-label="Chiudi"><svg class="ic"><use href="#i-x"/></svg></button>
+    </header>
+    <div class="drawer-body" id="flDBody"></div>
+    <footer class="drawer-foot">
+      <a href="#" class="btn btn-secondary btn-sm" data-goto="storico" data-close-drawer><svg class="ic"><use href="#i-history"/></svg>Storico</a>
+      <button class="btn btn-secondary btn-sm" type="button" id="flDRetry" hidden><svg class="ic"><use href="#i-refresh"/></svg>Riprova adesso</button>
+      <button class="btn btn-primary btn-sm" type="button" id="flDCheck"><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
+    </footer>
+  </aside>
+</div>
+
+<!-- Selettore cartelle/file -->
+<div class="modal" id="browseModal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="browseTitle">
+    <header class="modal-head">
+      <h2 id="browseTitle">Seleziona cartella</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Chiudi"><svg class="ic"><use href="#i-x"/></svg></button>
+    </header>
+    <div class="browse-path">
+      <button class="icon-btn" type="button" id="browseUp" title="Cartella superiore"><svg class="ic"><use href="#i-up"/></svg></button>
+      <input type="text" id="browsePath" class="mono" spellcheck="false" placeholder="Unità disponibili">
+    </div>
+    <ul class="browse-list" id="browseList"></ul>
+    <footer class="modal-foot">
+      <span class="muted small" id="browseHint"></span>
+      <div class="btn-row">
+        <button class="btn btn-ghost" type="button" data-close>Annulla</button>
+        <button class="btn btn-primary" type="button" id="browseSelect">Usa questa cartella</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Ricerca unica -->
+<div class="modal modal-top" id="searchModal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel modal-search" role="dialog" aria-modal="true" aria-label="Cerca">
+    <label class="search search-big">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <input type="search" id="searchInput" placeholder="Mittente, oggetto, protocollo, nome file, ID documento…" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="search-results" id="searchResults"><p class="muted small search-hint">Scrivi almeno 2 caratteri. Cerca in tutte le email ricevute e in tutti i documenti trasferiti.</p></div>
+  </div>
+</div>
+
+<!-- Scorciatoie da tastiera -->
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel modal-sm" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <header class="modal-head">
+      <h2 id="helpTitle">Scorciatoie da tastiera</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Chiudi"><svg class="ic"><use href="#i-x"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <dl class="keys">
+        <div><dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Cerca in email, protocolli e documenti</dd></div>
+        <div><dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>Annulla l'ultima modifica ai campi</dd></div>
+        <div><dt><kbd>Ctrl</kbd> <kbd>Y</kbd></dt><dd>Ripeti la modifica annullata</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>Chiude finestre e dettagli</dd></div>
+        <div><dt><kbd>Invio</kbd></dt><dd>Nella cartella di origine: analizza i file</dd></div>
+        <div><dt><kbd>?</kbd></dt><dd>Mostra questo elenco</dd></div>
+      </dl>
+      <p class="muted small">Dentro un campo di testo Ctrl+Z annulla le lettere scritte, come in ogni programma.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Conferma -->
+<div class="modal" id="confirmModal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <header class="modal-head">
+      <h2 id="confirmTitle">Conferma</h2>
+    </header>
+    <div class="modal-body" id="confirmBody"></div>
+    <footer class="modal-foot">
+      <span></span>
+      <div class="btn-row">
+        <button class="btn btn-ghost" type="button" data-close>Annulla</button>
+        <button class="btn btn-primary" type="button" id="confirmOk">Conferma</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="js/base.js"></script>
+<script src="js/annulla.js"></script>
+<script src="js/impostazioni.js"></script>
+<script src="js/posta.js"></script>
+<script src="js/viewpoint.js"></script>
+<script src="js/dialoghi.js"></script>
+<script src="js/trasferimento.js"></script>
+<script src="js/storico.js"></script>
+<script src="js/panoramica.js"></script>
+<script src="js/flusso.js"></script>
+<script src="js/registro-posta.js"></script>
+<script src="js/utenti.js"></script>
+<script src="js/smistamento.js"></script>
+<script src="js/protocolli.js"></script>
+<script src="js/ricerca.js"></script>
+<script src="js/avvio.js"></script>
+</body>
+</html>

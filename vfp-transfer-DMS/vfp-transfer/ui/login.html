@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accesso · Trasferimento VFP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Inter:wght@500;600&family=Open+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 20l7-9 7 9' stroke='%2365bc7b' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body class="login-page">
+<main class="login-wrap">
+  <div class="login-brand">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 21l8-10 8 10" /></svg></span>
+    <div><span class="brand-name">COSEDIL</span><small>Documenti &rarr; Viewpoint</small></div>
+  </div>
+  <form class="card login-card" id="loginForm" novalidate>
+    <h1>Accedi</h1>
+    <p class="muted small">Usa le credenziali ricevute dall'amministratore.</p>
+    <div class="field">
+      <label for="user">Nome utente</label>
+      <input id="user" name="username" type="text" autocomplete="username" spellcheck="false" autocapitalize="off" required autofocus>
+    </div>
+    <div class="field">
+      <label for="pass">Password</label>
+      <input id="pass" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <p class="field-error" id="loginError" role="alert" hidden></p>
+    <button class="btn btn-primary btn-block" id="loginBtn" type="submit">Accedi</button>
+  </form>
+  <p class="muted small login-note">Programma interno: l'accesso viene registrato. Dopo 5 tentativi sbagliati l'utente viene bloccato per 15 minuti.</p>
+</main>
+<script src="login.js"></script>
+</body>
+</html>
