@@ -1,0 +1,34 @@
+{
+  "_firma": "><(((º> sabusabu <º)))><",
+  "_nota": "Modulo di ESEMPIO. Il testo dell'Art. 1 e' indicativo: sostituirlo con quello dei vostri contratti. I campi con ambito 'fornitore' si ricordano per ogni fornitore (riconosciuto dalla partita IVA) e si autocompilano ai documenti successivi.",
+  "id": "esempio_tracciabilita",
+  "nome": "Dichiarazione di tracciabilita' dei flussi finanziari (esempio)",
+  "chiave_fornitore": "piva",
+  "nome_fornitore": "ragione_sociale",
+  "pdf": null,
+  "sezioni": [
+    {"id": "fornitore", "titolo": "Dati del fornitore", "campi": ["ragione_sociale", "piva", "sede"]},
+    {"id": "art1", "titolo": "Art. 1 - Obblighi di tracciabilita' finanziaria",
+     "testo": "Tra {committente} e il fornitore {ragione_sociale} (P.IVA {piva}), il fornitore assume gli obblighi di tracciabilita' dei flussi finanziari di cui all'art. 3 della Legge 13 agosto 2010 n. 136. Il conto corrente dedicato e' IBAN {iban_dedicato} presso {banca}; le persone delegate ad operare sul conto sono: {delegati}. I pagamenti relativi al contratto {riferimento_contratto} riporteranno il CIG {cig} e, ove previsto, il CUP {cup}."}
+  ],
+  "campi": [
+    {"id": "committente", "etichetta": "Committente", "tipo": "testo", "ambito": "fisso", "valore": "Cosedil S.p.A."},
+    {"id": "ragione_sociale", "etichetta": "Ragione sociale", "tipo": "testo", "ambito": "fornitore", "obbligatorio": true,
+     "cerca": ["Ragione sociale", "Denominazione", "Ditta"]},
+    {"id": "piva", "etichetta": "Partita IVA", "tipo": "piva", "ambito": "fornitore", "obbligatorio": true,
+     "cerca": ["Partita IVA", "P. IVA", "P.IVA", "Cod. Fisc./P. IVA"]},
+    {"id": "sede", "etichetta": "Sede legale", "tipo": "testo", "ambito": "fornitore", "cerca": ["Sede legale", "Sede"]},
+    {"id": "iban_dedicato", "etichetta": "IBAN conto dedicato", "tipo": "iban", "ambito": "fornitore", "obbligatorio": true,
+     "cerca": ["IBAN conto dedicato", "Conto corrente dedicato", "Codice IBAN", "IBAN"]},
+    {"id": "banca", "etichetta": "Banca", "tipo": "testo", "ambito": "fornitore",
+     "cerca": ["Istituto di credito", "Istituto bancario", "Banca"]},
+    {"id": "delegati", "etichetta": "Persone delegate ad operare sul conto", "tipo": "testo_lungo", "ambito": "fornitore",
+     "cerca": ["Persone delegate", "Soggetti delegati", "Delegati ad operare"],
+     "aiuto": "nome, cognome e codice fiscale di ogni persona delegata"},
+    {"id": "riferimento_contratto", "etichetta": "Contratto / ordine", "tipo": "codice", "obbligatorio": true,
+     "cerca": ["Contratto n", "Ordine n", "Rif. contratto", "Rif. ordine"]},
+    {"id": "cig", "etichetta": "CIG", "tipo": "codice", "regex": "\\bCIG\\s*[:.]?\\s*([0-9A-Z]{10})\\b"},
+    {"id": "cup", "etichetta": "CUP", "tipo": "codice", "regex": "\\bCUP\\s*[:.]?\\s*([0-9A-Z]{15})\\b"},
+    {"id": "data", "etichetta": "Data", "tipo": "data", "cerca": ["Data documento", "Data"]}
+  ]
+}
