@@ -1,0 +1,26 @@
+# "><(((º> sabusabu <º)))><"
+# ambiente Python
+.venv/
+__pycache__/
+
+# dati riservati e file generati dal trasferimento
+.env
+config.json
+.vfp_token.json
+stato_trasferimento.json
+report_trasferimento.csv
+stato_trasferimento_*.bak.json
+stato_posta.json
+stato_posta.tmp
+posta_in_arrivo/
+logs/
+registro_posta.csv
+utenti.json
+utenti.tmp
+.vfp_istanza
+cassaforte.dat
+cassaforte.tmp
+registro_attivita.jsonl
+protocolli_manuali.json
+protocolli_manuali.tmp
+registro_posta.tmp
