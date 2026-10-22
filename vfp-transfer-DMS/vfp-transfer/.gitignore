@@ -24,3 +24,5 @@ registro_attivita.jsonl
 protocolli_manuali.json
 protocolli_manuali.tmp
 registro_posta.tmp
+stato_sql.json
+specchio_sql/
