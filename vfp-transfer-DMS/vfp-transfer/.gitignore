@@ -28,3 +28,7 @@ registro_posta.tmp
 # moduli autocompilati: archivio e file caricati (dati dei documenti)
 moduli_compilati/
 moduli_in_arrivo/
+
+# archivio SQL
+stato_sql.json
+specchio_sql/

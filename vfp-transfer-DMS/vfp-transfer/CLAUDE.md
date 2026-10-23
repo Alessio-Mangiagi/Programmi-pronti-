@@ -75,6 +75,10 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   (SHA-256, ripresa), `report_estrazione.csv`, `manifest.csv` (valori con `csv_cell`; `items_from_manifest` applica `csv_plain`).
   DMS di prova: SeedDMS 6 portabile fuori dal repo (`..\..\seeddms-prova`, porta 8780), dati finti con
   `strumenti_prova/popola_seeddms.py` (solo localhost).
+- Archivio SQL (sola lettura): `sorgente_sql.py` legge una vista SQL Server (colonne canoniche nel docstring) con ODBC
+  via ctypes (`OdbcConnection`, niente pyodbc: Python 3.15 non ha la wheel), solo SELECT costruite da `build_query`,
+  connessione read-only. File in `specchio_sql/<id>/<rev>/`, data dell'ultimo giro in `stato_sql.json`. Per ora solo
+  CLI (`prova`, `trasferisci`): da agganciare alla GUI/servizio con `TRANSFER_LOCK`. Impostazioni `SQL_*` in `env_config`.
 - Sempre attivo: `installa_avvio_automatico.ps1` crea un'operazione pianificata (pythonw `--service`,
   all'accesso + controllo ogni 5 minuti con IgnoreNew, riavvio su errore). Log in `logs/vfp_servizio.log`.
 - Documentazione API: Swagger https://api-uk.vfp.viewpoint.com/swagger/ui/index
@@ -98,5 +102,8 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Credenziali API (client_id) da richiedere a Trimble/Viewpoint (support@4projects.com).
 - DMS di origine reale ancora da definire: `estrai_dms.py` provato solo contro SeedDMS di prova (hash identici
   all'archivio). Per il DMS vero serve il suo adattatore.
+- `sorgente_sql.py` provato solo con dati finti e con il driver testo di Windows: in attesa dall'IT di driver ODBC 18,
+  server/database, utente di sola lettura e vista. Il driver ODBC 18 richiede l'amministratore (winget annullato, 1602).
+  Sul PC c'e' anche TeamSystem Knos (KnosClient + KnosAPI COM 32 bit) come possibile sorgente alternativa.
 
 Commenti e messaggi del programma sono in italiano.
