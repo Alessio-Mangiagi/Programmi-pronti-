@@ -474,14 +474,15 @@ test('potaAvvisi: tiene tutti gli aperti e gli ultimi 300 visti', () => {
   assert.ok(!p.some((a) => a.id === 'v0'));
 });
 
-test("vistaAvvisi: aperti più recenti prima, nome leggibile dell'app", () => {
+test("vistaAvvisi: aperti per gravità e poi più recenti, nome leggibile dell'app", () => {
   const v = vistaAvvisi([
-    { id: 'a', app: 'ddt', data: '2026-10-01', ultimo: '2026-10-01', visto_il: '' },
-    { id: 'b', app: 'vfp', data: '2026-10-02', ultimo: '2026-10-02', visto_il: '' },
+    { id: 'a', app: 'ddt', livello: 'attenzione', data: '2026-10-01', ultimo: '2026-10-01', visto_il: '' },
+    { id: 'b', app: 'vfp', livello: 'attenzione', data: '2026-10-02', ultimo: '2026-10-02', visto_il: '' },
+    { id: 'e', app: 'ocr', livello: 'errore', data: '2026-09-01', ultimo: '2026-09-01', visto_il: '' },
     { id: 'c', app: 'ddt', data: '2026-09-01', visto_il: '2026-10-03' },
   ], (id) => ({ ddt: 'Lettore DDT' }[id] || id));
-  assert.deepEqual(v.aperti.map((a) => a.id), ['b', 'a']);
-  assert.equal(v.aperti[1].appNome, 'Lettore DDT');
+  assert.deepEqual(v.aperti.map((a) => a.id), ['e', 'b', 'a']);
+  assert.equal(v.aperti[2].appNome, 'Lettore DDT');
   assert.deepEqual(v.visti.map((a) => a.id), ['c']);
 });
 

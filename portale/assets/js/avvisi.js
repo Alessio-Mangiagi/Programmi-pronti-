@@ -97,6 +97,7 @@ function renderVisti() {
       <td class="muted">${esc(a.visto_da)} · ${esc(fmtData(a.visto_il))}</td>
     </tr>`).join('');
   document.getElementById('vistiEmpty').hidden = visti.length > 0;
+  document.getElementById('vistiTabella').hidden = visti.length === 0;
 }
 
 async function segnaVisto(corpo, btn) {
