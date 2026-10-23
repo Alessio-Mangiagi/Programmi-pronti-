@@ -26,7 +26,6 @@
   </a>
   <nav class="nav-links">
     <a href="#come">Come funziona</a>
-    <a href="#requisiti">Requisiti</a>
   </nav>
   <a href="#carica" class="nav-cta">Avvia confronto</a>
 </header>
@@ -193,49 +192,50 @@
     <div class="section-title reveal">
       <span class="kicker">Guida</span>
       <h2>Come <em>funziona</em></h2>
-      <p>Tre passaggi, elaborazione interamente in locale.</p>
+      <p>Quello che serve per fare un confronto e leggere il risultato.</p>
     </div>
     <div class="readme-grid">
       <div class="shell reveal" style="transition-delay:.05s"><div class="core">
         <h3>Utilizzo</h3>
         <ol>
-          <li>Trascina (o clicca per scegliere) i <strong>due documenti</strong> — PDF, immagini (JPG/PNG/TIFF), Word (.docx) o testo</li>
-          <li>Scegli <strong>risoluzione</strong> e <strong>lingua OCR</strong>: le pagine con testo selezionabile sono lette all'istante, le scansioni passano per <strong>Tesseract</strong> con pulizia automatica</li>
-          <li>Attiva il <strong>confronto tollerante</strong> per ignorare il rumore OCR (0/O, l/1, punteggiatura) ed evitare differenze finte</li>
-          <li>Premi <strong>Avvia confronto</strong> — annullabile in ogni momento</li>
-          <li>Leggi il report: righe <code>−</code>/<code>+</code>, parole cambiate evidenziate, <strong>Anteprima</strong> per il confronto visuale (affiancato o sovrapposto con cursore)</li>
-          <li><strong>Scarica report</strong> per un HTML stampabile da allegare</li>
+          <li>Scegli i <strong>due documenti</strong> da confrontare: PDF, immagini (JPG/PNG/TIFF), Word (.docx) o testo</li>
+          <li>Per prenderli da una cartella: <strong>Scegli cartella</strong> nel pannello a sinistra, poi trascina un file sul riquadro <strong>A</strong> o <strong>B</strong> oppure usa i pulsanti A/B della riga</li>
+          <li>In alternativa clicca un riquadro per scegliere il file dal PC, o trascinalo lì da Esplora risorse</li>
+          <li>Premi <strong>Avvia confronto</strong>: puoi annullarlo in ogni momento</li>
+          <li>Il report elenca le pagine: quelle con differenze sono già aperte sulle righe cambiate</li>
         </ol>
       </div></div>
 
-      <div class="shell reveal" id="requisiti" style="transition-delay:.12s"><div class="core">
-        <h3>Requisiti</h3>
+      <div class="shell reveal" style="transition-delay:.12s"><div class="core">
+        <h3>Impostazioni</h3>
         <ul>
-          <li><strong>Tesseract OCR</strong> installato, con la cartella <code>tessdata</code> e le lingue <code>ita+eng</code></li>
-          <li>Python con <code>pymupdf</code>, <code>flask</code>, <code>pillow</code>, <code>numpy</code>, <code>pytesseract</code></li>
-          <li><strong>Nessun Ollama, nessun servizio esterno, nessuna connessione</strong></li>
-          <li>Il pallino in alto indica se Tesseract è pronto</li>
+          <li><strong>Motore OCR</strong>: <code>tesseract</code> va bene per i documenti stampati; <code>paddle</code>, se presente, legge meglio le scansioni sporche o sbiadite ma è più lento</li>
+          <li><strong>Risoluzione</strong>: 200 DPI va bene quasi sempre; 300 per documenti fitti o caratteri piccoli (più lento)</li>
+          <li><strong>Lingua OCR</strong>: la lingua del documento</li>
+          <li><strong>Confronto tollerante</strong>: ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte</li>
+          <li><strong>Migliora scansioni</strong>: raddrizza e pulisce le pagine scansionate prima di leggerle</li>
+          <li><strong>Righe da ignorare</strong> (opzioni avanzate): numeri di pagina, date, timbri di revisione da non considerare</li>
+          <li>Le impostazioni restano salvate per la volta dopo</li>
         </ul>
       </div></div>
 
       <div class="shell reveal" style="transition-delay:.19s"><div class="core">
-        <h3>Motore OCR</h3>
+        <h3>Leggere il report</h3>
         <ul>
-          <li><code>tesseract</code> — OCR locale velocissimo (~1s/pagina), ideale per testo stampato pulito</li>
-          <li><code>paddle</code> — PaddleOCR (PP-OCRv5, GPU): più preciso su <strong>scansioni molto sporche</strong> o sbiadite; più lento all'avvio. Appare solo se installato</li>
-          <li>Pagine con <strong>testo embedded</strong>: lette direttamente, OCR saltato (istantaneo)</li>
-          <li>DPI più alti = scansione più precisa ma più lenta (300 per documenti fitti)</li>
-          <li>I risultati OCR vanno in <strong>cache su disco</strong>: i riconfronti sono immediati</li>
+          <li>Righe <strong>rosse</strong> (<code>−</code>): presenti solo in A; righe <strong>verdi</strong> (<code>+</code>): presenti solo in B</li>
+          <li>Dentro la riga sono evidenziate le parole cambiate</li>
+          <li><strong>Anteprima</strong>: le due pagine affiancate, oppure sovrapposte con il cursore; <strong>Vista OCR</strong> mostra la pagina come l'ha letta il programma</li>
+          <li><strong>Report Word</strong> / <strong>Report PDF</strong>: il confronto da salvare o allegare</li>
         </ul>
       </div></div>
 
       <div class="shell reveal" style="transition-delay:.26s"><div class="core">
-        <h3>Privacy e note</h3>
+        <h3>Da sapere</h3>
         <ul>
-          <li>Elaborazione <strong>100% locale e offline</strong>: nessun documento lascia questa macchina</li>
-          <li>I file caricati vengono <strong>eliminati</strong> a fine confronto</li>
-          <li>L'OCR può variare leggermente tra esecuzioni: piccole differenze di spaziatura sono normalizzate</li>
-          <li>Avvio rapido: <code>avvia.vbs</code> (nascosto) o <code>Avvia con console.bat</code> (con log)</li>
+          <li>I documenti restano su questo computer e vengono eliminati a fine confronto</li>
+          <li>Le pagine con testo selezionabile sono lette subito; le scansioni richiedono qualche secondo a pagina</li>
+          <li>Riconfrontare gli stessi file è immediato</li>
+          <li>Piccole differenze di spaziatura vengono ignorate</li>
         </ul>
       </div></div>
     </div>
