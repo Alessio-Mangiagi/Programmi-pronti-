@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <!--
   index.html — unica pagina dell'app "Confronto Documenti" (SPA senza framework).
-  Struttura: nav, hero, sezione CARICA (upload + controlli), ELABORAZIONE
-  (barra), REPORT (risultati), COME FUNZIONA (guida), footer e il #viewer
-  (dialog a schermo intero per il confronto visuale).
+  Struttura: nav (con il pulsante "Come funziona"), cassetto cartella, COME
+  FUNZIONA (guida in cima, nascosta finché non si preme il pulsante), hero,
+  sezione CARICA (upload + controlli), ELABORAZIONE (barra), REPORT
+  (risultati), footer e il #viewer (dialog a schermo intero per il confronto
+  visuale).
   Tutta la logica è in js/app.js (module), caricato in fondo al <body>.
   Il markup è statico: i moduli JS lo popolano/mostrano agganciandosi agli id.
 -->
@@ -25,7 +27,10 @@
     <span class="brand-text">COSEDIL<span class="brand-sub">Confronto Documenti</span></span>
   </a>
   <nav class="nav-links">
-    <a href="#come">Come funziona</a>
+    <button type="button" class="help-btn" id="helpBtn" aria-controls="come" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      Come funziona
+    </button>
   </nav>
   <a href="#carica" class="nav-cta">Avvia confronto</a>
 </header>
@@ -53,6 +58,61 @@
 </aside>
 
 <main>
+
+  <!-- ============ COME FUNZIONA (guida, aperta dal pulsante in alto · app.js) ============ -->
+  <section id="come" class="block help-panel" hidden>
+    <div class="section-title">
+      <span class="kicker">Guida</span>
+      <h2>Come <em>funziona</em></h2>
+      <p>Quello che serve per fare un confronto e leggere il risultato.</p>
+      <button type="button" class="ghost-btn help-close" id="helpClose">Chiudi guida</button>
+    </div>
+    <div class="readme-grid">
+      <div class="shell" style="transition-delay:.05s"><div class="core">
+        <h3>Utilizzo</h3>
+        <ol>
+          <li>Scegli i <strong>due documenti</strong> da confrontare: PDF, immagini (JPG/PNG/TIFF), Word (.docx) o testo</li>
+          <li>Per prenderli da una cartella: <strong>Scegli cartella</strong> nel pannello a sinistra, poi trascina un file sul riquadro <strong>A</strong> o <strong>B</strong> oppure usa i pulsanti A/B della riga</li>
+          <li>In alternativa clicca un riquadro per scegliere il file dal PC, o trascinalo lì da Esplora risorse</li>
+          <li>Premi <strong>Avvia confronto</strong>: puoi annullarlo in ogni momento</li>
+          <li>Il report elenca le pagine: quelle con differenze sono già aperte sulle righe cambiate</li>
+        </ol>
+      </div></div>
+
+      <div class="shell" style="transition-delay:.12s"><div class="core">
+        <h3>Impostazioni</h3>
+        <ul>
+          <li><strong>Motore OCR</strong>: <code>tesseract</code> va bene per i documenti stampati; <code>paddle</code>, se presente, legge meglio le scansioni sporche o sbiadite ma è più lento</li>
+          <li><strong>Risoluzione</strong>: 200 DPI va bene quasi sempre; 300 per documenti fitti o caratteri piccoli (più lento)</li>
+          <li><strong>Lingua OCR</strong>: la lingua del documento</li>
+          <li><strong>Confronto tollerante</strong>: ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte</li>
+          <li><strong>Migliora scansioni</strong>: raddrizza e pulisce le pagine scansionate prima di leggerle</li>
+          <li><strong>Righe da ignorare</strong> (opzioni avanzate): numeri di pagina, date, timbri di revisione da non considerare</li>
+          <li>Le impostazioni restano salvate per la volta dopo</li>
+        </ul>
+      </div></div>
+
+      <div class="shell" style="transition-delay:.19s"><div class="core">
+        <h3>Leggere il report</h3>
+        <ul>
+          <li>Righe <strong>rosse</strong> (<code>−</code>): presenti solo in A; righe <strong>verdi</strong> (<code>+</code>): presenti solo in B</li>
+          <li>Dentro la riga sono evidenziate le parole cambiate</li>
+          <li><strong>Anteprima</strong>: le due pagine affiancate, oppure sovrapposte con il cursore; <strong>Vista OCR</strong> mostra la pagina come l'ha letta il programma</li>
+          <li><strong>Report Word</strong> / <strong>Report PDF</strong>: il confronto da salvare o allegare</li>
+        </ul>
+      </div></div>
+
+      <div class="shell" style="transition-delay:.26s"><div class="core">
+        <h3>Da sapere</h3>
+        <ul>
+          <li>I documenti restano su questo computer e vengono eliminati a fine confronto</li>
+          <li>Le pagine con testo selezionabile sono lette subito; le scansioni richiedono qualche secondo a pagina</li>
+          <li>Riconfrontare gli stessi file è immediato</li>
+          <li>Piccole differenze di spaziatura vengono ignorate</li>
+        </ul>
+      </div></div>
+    </div>
+  </section>
 
   <!-- ============ HERO ============ -->
   <section class="hero">
@@ -187,59 +247,6 @@
     <div id="pages"></div>
   </section>
 
-  <!-- ============ COME FUNZIONA ============ -->
-  <section id="come" class="block">
-    <div class="section-title reveal">
-      <span class="kicker">Guida</span>
-      <h2>Come <em>funziona</em></h2>
-      <p>Quello che serve per fare un confronto e leggere il risultato.</p>
-    </div>
-    <div class="readme-grid">
-      <div class="shell reveal" style="transition-delay:.05s"><div class="core">
-        <h3>Utilizzo</h3>
-        <ol>
-          <li>Scegli i <strong>due documenti</strong> da confrontare: PDF, immagini (JPG/PNG/TIFF), Word (.docx) o testo</li>
-          <li>Per prenderli da una cartella: <strong>Scegli cartella</strong> nel pannello a sinistra, poi trascina un file sul riquadro <strong>A</strong> o <strong>B</strong> oppure usa i pulsanti A/B della riga</li>
-          <li>In alternativa clicca un riquadro per scegliere il file dal PC, o trascinalo lì da Esplora risorse</li>
-          <li>Premi <strong>Avvia confronto</strong>: puoi annullarlo in ogni momento</li>
-          <li>Il report elenca le pagine: quelle con differenze sono già aperte sulle righe cambiate</li>
-        </ol>
-      </div></div>
-
-      <div class="shell reveal" style="transition-delay:.12s"><div class="core">
-        <h3>Impostazioni</h3>
-        <ul>
-          <li><strong>Motore OCR</strong>: <code>tesseract</code> va bene per i documenti stampati; <code>paddle</code>, se presente, legge meglio le scansioni sporche o sbiadite ma è più lento</li>
-          <li><strong>Risoluzione</strong>: 200 DPI va bene quasi sempre; 300 per documenti fitti o caratteri piccoli (più lento)</li>
-          <li><strong>Lingua OCR</strong>: la lingua del documento</li>
-          <li><strong>Confronto tollerante</strong>: ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte</li>
-          <li><strong>Migliora scansioni</strong>: raddrizza e pulisce le pagine scansionate prima di leggerle</li>
-          <li><strong>Righe da ignorare</strong> (opzioni avanzate): numeri di pagina, date, timbri di revisione da non considerare</li>
-          <li>Le impostazioni restano salvate per la volta dopo</li>
-        </ul>
-      </div></div>
-
-      <div class="shell reveal" style="transition-delay:.19s"><div class="core">
-        <h3>Leggere il report</h3>
-        <ul>
-          <li>Righe <strong>rosse</strong> (<code>−</code>): presenti solo in A; righe <strong>verdi</strong> (<code>+</code>): presenti solo in B</li>
-          <li>Dentro la riga sono evidenziate le parole cambiate</li>
-          <li><strong>Anteprima</strong>: le due pagine affiancate, oppure sovrapposte con il cursore; <strong>Vista OCR</strong> mostra la pagina come l'ha letta il programma</li>
-          <li><strong>Report Word</strong> / <strong>Report PDF</strong>: il confronto da salvare o allegare</li>
-        </ul>
-      </div></div>
-
-      <div class="shell reveal" style="transition-delay:.26s"><div class="core">
-        <h3>Da sapere</h3>
-        <ul>
-          <li>I documenti restano su questo computer e vengono eliminati a fine confronto</li>
-          <li>Le pagine con testo selezionabile sono lette subito; le scansioni richiedono qualche secondo a pagina</li>
-          <li>Riconfrontare gli stessi file è immediato</li>
-          <li>Piccole differenze di spaziatura vengono ignorate</li>
-        </ul>
-      </div></div>
-    </div>
-  </section>
 </main>
 
 <footer>
