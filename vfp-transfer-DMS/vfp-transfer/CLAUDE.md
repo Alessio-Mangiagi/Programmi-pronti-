@@ -68,6 +68,13 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   il registrato con il letto (avviso "ATTENZIONE", difesa dalle truffe sul cambio IBAN); `Archivio.salva(conferma=True)`
   registra, e cambiare un dato registrato richiede `aggiorna_anagrafica=True` (storico). `sezioni` con testo fisso e
   segnaposto `{id_campo}` (`testo_sezione`, `blocchi_scheda`), es. Art. 1 tracciabilita' (L. 136/2010).
+- Modelli Word protetti (trasporti, contratti): `modelli_protetti.py` (logica + CLI, GUI da fare). Documento in
+  "Limita modifica" sola lettura; le aree gialle sono le eccezioni `<w:permStart w:id>`...`<w:permEnd>`: si cambiano
+  solo i `<w:t>` li' dentro (minima differenza, una riga per paragrafo o sostituzioni `[[da, a]]`), poi
+  `_testo_fuori` deve risultare identico e le altre parti dello zip restano byte per byte. Originali in
+  `MODELLI_SORGENTE` (condivisa, mai scritta), pratiche in `MODELLI_LAVORO/<id>/` (`originale_*` intatto con SHA-256,
+  copia compilata rifatta sempre dall'originale, `record.json`). `.doc` rifiutati: LibreOffice perde le aree, Word
+  COM non c'e' sul PC.
 - Estrazione dal DMS di origine: `estrai_dms.py` (CLI separata). `LetturaSicura` ammette solo GET e `POST /login`
   (`ScritturaBloccata`), niente redirect, freno richieste/s (raddoppiato su 429), retry su 429/5xx/rete, `DmsSovraccarico`
   dopo N errori di fila, finestra `--orario`. Adattatore `SorgenteSeedDms` (login/logout/cartella/figli/versioni/scarica):
