@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import dns from 'node:dns'
 import { fileURLToPath } from 'node:url'
+import { segnala, intercettaConsole } from '../../shared/avvisi/avvisi.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const LOG_FILE = path.join(__dirname, '..', 'agente.log')
@@ -10,6 +11,18 @@ const LOG_FILE = path.join(__dirname, '..', 'agente.log')
 const SERVER_HOST = os.hostname()
 // "><(((º> sabusabu <º)))><"
 const SERVER_USER = os.userInfo().username
+
+// Avvisi per gli admin del Portale (pagina Avvisi): gli eventi qui sotto e ogni
+// console.error dell'app. Gli altri eventi restano solo nel log.
+const EVENTI_AVVISO: Record<string, { livello: 'errore' | 'attenzione'; titolo: string }> = {
+  job_error: { livello: 'errore', titolo: 'Report pianificato non riuscito' },
+  claude_agent_error: { livello: 'errore', titolo: "Errore dell'agente AI" },
+  suite_tool_error: { livello: 'errore', titolo: 'Azione sulla suite non riuscita' },
+  ollama_autostart_failed: { livello: 'errore', titolo: 'Ollama non si avvia' },
+  claude_budget_exceeded: { livello: 'attenzione', titolo: 'Budget token di Claude superato' },
+  analysis_budget_exceeded: { livello: 'attenzione', titolo: "Budget dell'analisi superato" },
+}
+intercettaConsole('agente')
 
 export interface LogContext {
   clientIp?: string   // IP del client che ha fatto la richiesta
@@ -38,6 +51,14 @@ export function log(event: string, ctx: LogContext = {}, extra: Record<string, u
     rotateIfBig()
     fs.appendFileSync(LOG_FILE, line + '\n')
   } catch { /* ignora errori di log */ }
+  const avviso = EVENTI_AVVISO[event]
+  if (avviso) {
+    const dettaglio = Object.entries(extra).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join('\n')
+    segnala({
+      app: 'agente', livello: avviso.livello, titolo: avviso.titolo, chiave: event,
+      testo: dettaglio + (entry.user !== '-' ? `\nutente: ${entry.user}` : ''),
+    })
+  }
 }
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024 // 5 MB → ruota
