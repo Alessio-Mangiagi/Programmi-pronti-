@@ -66,6 +66,7 @@ import auth
 import cassaforte
 import env_config
 import mail_send
+import modelli_protetti
 import report_excel
 import vfp_mail
 import vfp_transfer as vt
@@ -268,7 +269,8 @@ def run_login(cfg):
 
 def api_get_config():
     s = env_config.load_settings()
-    env = {k: (SECRET_MASK if k in env_config.SECRET_KEYS and s.get(k) else s.get(k, "")) for k in env_config.DEFAULTS}
+    env = {k: (SECRET_MASK if k in env_config.SECRET_KEYS and s.get(k) else s.get(k, "")) for k in env_config.DEFAULTS
+           if k not in env_config.SOLO_SVILUPPATORI}
     return {"env": env, "saved": env_config.ENV_PATH.exists(), "problems": env_config.vfp_problems(s),
             "mail_problems": env_config.mail_problems(s), "mail_warnings": env_config.mail_warnings(s),
             "send_problems": mail_send.send_problems(s), "approval_active": not mail_send.send_problems(s),
@@ -278,6 +280,11 @@ def api_get_config():
 def api_save_config(body, user, token=""):
     values = {k: str(v) for k, v in (body.get("env") or {}).items() if k in env_config.DEFAULTS}
     current = env_config.load_settings()  # valori in uso (file + variabili di Windows)
+    vietate = sorted(k for k in env_config.SOLO_SVILUPPATORI & set(values) if values[k] != current.get(k, ""))
+    if vietate:
+        raise ValueError(f"{', '.join(vietate)}: si cambia solo nel file .env, a cura degli sviluppatori")
+    for k in env_config.SOLO_SVILUPPATORI:
+        values.pop(k, None)
     try:
         extra = json.loads(values.get("VFP_DOCUMENT_DEFAULTS") or "{}")
         if not isinstance(extra, dict):
@@ -710,6 +717,27 @@ def api_notify_test(sess):
     return {"ok": True, "message": f"Email di prova inviata a {settings['ADMIN_EMAIL']}"}
 
 
+def api_modelli_avvisi():
+    return modelli_protetti.avvisi_aperti() | {"impostata": bool(env_config.load_settings().get("MODELLI_SORGENTE"))}
+
+
+def api_modelli_visto(body, sess):
+    a = modelli_protetti.segna_visto(str(body.get("id") or ""), sess["user"])
+    attivita.record(sess["user"], "modifica", "Avviso modelli trasporti segnato come visto", a["id"], role="admin")
+    return api_modelli_avvisi()
+
+
+def _controllo_modelli():
+    """Ogni ora guarda se e' dovuto il controllo mensile dei modelli nella cartella condivisa (sola lettura)."""
+    time.sleep(90)  # lascia partire prima interfaccia e posta
+    while True:
+        try:
+            modelli_protetti.controlla_modelli(env_config.load_settings())
+        except Exception:
+            log.exception("Controllo mensile dei modelli non riuscito")
+        time.sleep(3600)
+
+
 # --------------------------------------------------------------------------- server HTTP
 
 STATIC_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -811,6 +839,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/users": ("admin", lambda: api_users()),
             "/api/activity": ("admin", lambda: api_activity(q, self._token())),
             "/api/ai/status": ("admin", lambda: api_ai_status()),
+            "/api/modelli/avvisi": ("admin", lambda: api_modelli_avvisi()),
         }
         if url.path in routes:
             role, fn = routes[url.path]
@@ -920,6 +949,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/ai/analyze": ("admin", lambda: api_ai_analyze(body)),
             "/api/ai/start": ("admin", lambda: api_ai_start(body)),
             "/api/activity/session-close": ("admin", lambda: api_session_close(body, sess, self._token())),
+            "/api/modelli/avvisi/visto": ("admin", lambda: api_modelli_visto(body, sess)),
         }
         if path not in routes:
             return self._send(404, {"error": "non trovato"})
@@ -1160,6 +1190,7 @@ def main():
     MAIL.start()
     api_posta.WATCHER = MAIL
     threading.Thread(target=_watchdog, name="sorveglianza", daemon=True).start()
+    threading.Thread(target=_controllo_modelli, name="controllo-modelli", daemon=True).start()
     log.info("Interfaccia trasferimento VFP attiva su %s", url)
     if sys.stdout:
         print(f"Interfaccia trasferimento VFP attiva su {url}\nLasciare aperta questa finestra; per chiuderla premere Ctrl+C.")

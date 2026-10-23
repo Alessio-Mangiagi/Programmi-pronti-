@@ -31,6 +31,7 @@ moduli_in_arrivo/
 
 # modelli Word protetti: copie compilate (dati dei contratti)
 modelli_compilati/
+stato_modelli.json
 
 # archivio SQL
 stato_sql.json

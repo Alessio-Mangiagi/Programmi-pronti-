@@ -12,12 +12,16 @@ Ogni pratica e' una cartella interna MODELLI_LAVORO/<id>/ con:
 Nel file .docx un'area consentita e' il tratto tra <w:permStart w:id="N"/> e <w:permEnd w:id="N"/>. Si cambia
 solo il testo dei <w:t> in quel tratto (minima differenza: la formattazione delle parti non toccate resta), poi si
 controlla che il testo fuori dalle aree e tutte le altre parti del file siano identici all'originale.
+Le due cartelle si impostano solo nel .env (env_config.SOLO_SVILUPPATORI): l'interfaccia non le cambia.
+Ogni mese controlla_modelli confronta le impronte SHA-256 degli originali con il controllo precedente e lascia un
+avviso all'amministratore (stato_modelli.json) se qualcuno li ha modificati, aggiunti o rimossi.
 I .doc (Word 97-2003) non si gestiscono: la conversione senza Word perde le aree consentite. Vanno salvati in .docx.
 
 Prova da riga di comando:
   python modelli_protetti.py elenco
   python modelli_protetti.py aree --file contratto.docx
   python modelli_protetti.py compila --file contratto.docx --valori valori.json [--utente nome]
+  python modelli_protetti.py controlla
   valori.json: {"<id area>": "nuovo testo (una riga per paragrafo)", "<id area>": [["da", "a"], ...]}
 """
 
@@ -420,11 +424,111 @@ def pratiche(s):
     return Pratiche(cartella_lavoro(s), cartella_sorgente(s))
 
 
+# --------------------------------------------------------------------------- controllo mensile degli originali
+
+STATO_CONTROLLO = env_config.BASE_DIR / "stato_modelli.json"
+MAX_AVVISI = 50
+_LOCK_CONTROLLO = threading.Lock()
+
+
+def _leggi_stato(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def controllo_dovuto(stato, ora=None):
+    """Un controllo al mese: il primo giro utile dopo l'inizio di un mese nuovo."""
+    ora = ora or datetime.now()
+    return not str(stato.get("ultimo_controllo", "")).startswith(f"{ora:%Y-%m}")
+
+
+def _impronte(s):
+    """({rel: {"sha256", "byte"}}, [file illeggibili]) dei modelli nella cartella condivisa."""
+    root = cartella_sorgente(s)
+    out, illeggibili = {}, []
+    for m in elenco_modelli(s, max_file=5000):
+        try:
+            out[m["rel"]] = {"sha256": hashlib.sha256((root / m["rel"]).read_bytes()).hexdigest(), "byte": m["byte"]}
+        except OSError:
+            illeggibili.append(m["rel"])
+    return out, illeggibili
+
+
+def _aggiungi_avviso(stato, avviso, ora):
+    avviso = {"id": f"{ora:%Y%m%d-%H%M%S}-{secrets.token_hex(3)}", "data": ora.isoformat(timespec="seconds"),
+              "visto_da": "", "visto_il": "", **avviso}
+    stato["avvisi"] = (stato.get("avvisi", []) + [avviso])[-MAX_AVVISI:]
+    return avviso
+
+
+def controlla_modelli(s, path=None, ora=None, forza=False):
+    """
+    Confronta i modelli della cartella condivisa con la fotografia del controllo precedente (SHA-256 di ogni file).
+    Modificati, aggiunti o rimossi = un avviso per l'amministratore, che resta finche' non lo segna come visto.
+    Il primo controllo (o un cambio di cartella) fa solo la fotografia. Restituisce l'avviso creato o None.
+    """
+    ora, path = ora or datetime.now(), Path(path or STATO_CONTROLLO)
+    with _LOCK_CONTROLLO:
+        stato = _leggi_stato(path)
+        root = cartella_sorgente(s)
+        if not root or not (forza or controllo_dovuto(stato, ora)):
+            return None
+        try:
+            attuali, illeggibili = _impronte(s)
+        except ModelloError as e:  # cartella non raggiungibile: si riprova al giro dopo, un solo avviso aperto
+            log.error("Controllo dei modelli non riuscito: %s", e)
+            if any(a.get("tipo") == "errore" and not a.get("visto_il") for a in stato.get("avvisi", [])):
+                return None
+            avviso = _aggiungi_avviso(stato, {"tipo": "errore", "testo": str(e)}, ora)
+            _scrivi_json(path, stato)
+            return avviso
+        avviso = None
+        precedenti = stato.get("file") if stato.get("sorgente") == str(root) else None
+        if precedenti is not None:
+            diff = {
+                "modificati": sorted(k for k in attuali if k in precedenti and attuali[k]["sha256"] != precedenti[k]["sha256"]),
+                "aggiunti": sorted(set(attuali) - set(precedenti)),
+                "rimossi": sorted(set(precedenti) - set(attuali) - set(illeggibili)),
+                "illeggibili": illeggibili,
+            }
+            if any(diff.values()):
+                avviso = _aggiungi_avviso(stato, {"tipo": "modifiche", **diff}, ora)
+                log.warning("Modelli cambiati nella cartella condivisa: %s modificati, %s aggiunti, %s rimossi",
+                            len(diff["modificati"]), len(diff["aggiunti"]), len(diff["rimossi"]))
+        for rel in illeggibili:  # un file illeggibile tiene l'impronta vecchia: si ricontrolla la volta dopo
+            if precedenti and rel in precedenti:
+                attuali[rel] = precedenti[rel]
+        stato.update(sorgente=str(root), file=attuali, ultimo_controllo=ora.isoformat(timespec="seconds"))
+        _scrivi_json(path, stato)
+        return avviso
+
+
+def avvisi_aperti(path=None):
+    stato = _leggi_stato(path or STATO_CONTROLLO)
+    return {"avvisi": [a for a in stato.get("avvisi", []) if not a.get("visto_il")],
+            "ultimo_controllo": stato.get("ultimo_controllo", ""), "file": len(stato.get("file", {}))}
+
+
+def segna_visto(avviso_id, utente, path=None):
+    path = Path(path or STATO_CONTROLLO)
+    with _LOCK_CONTROLLO:
+        stato = _leggi_stato(path)
+        for a in stato.get("avvisi", []):
+            if a["id"] == avviso_id:
+                if not a.get("visto_il"):
+                    a.update(visto_da=utente, visto_il=datetime.now().isoformat(timespec="seconds"))
+                    _scrivi_json(path, stato)
+                return a
+    raise ModelloError("avviso non trovato")
+
+
 # --------------------------------------------------------------------------- CLI di prova
 
 def main():
     p = argparse.ArgumentParser(description="Modelli Word protetti: si compilano solo le aree consentite (fondo giallo).")
-    p.add_argument("azione", choices=("elenco", "aree", "compila"))
+    p.add_argument("azione", choices=("elenco", "aree", "compila", "controlla"))
     p.add_argument("--file", help="modello: percorso relativo alla cartella condivisa, oppure assoluto")
     p.add_argument("--valori", help="file JSON {id area: testo oppure [[da, a], ...]}")
     p.add_argument("--utente", default="")
@@ -436,6 +540,10 @@ def main():
         if args.azione == "elenco":
             for m in elenco_modelli(s):
                 print(f"  {m['rel']}" + ("" if m["gestito"] else "   (.doc: salvarlo come .docx)"))
+            return
+        if args.azione == "controlla":  # controllo subito, senza aspettare il mese
+            avviso = controlla_modelli(s, forza=True)
+            print(json.dumps(avviso, ensure_ascii=False, indent=1) if avviso else "Nessuna modifica (o prima fotografia).")
             return
         if not args.file:
             raise ModelloError("indicare --file")

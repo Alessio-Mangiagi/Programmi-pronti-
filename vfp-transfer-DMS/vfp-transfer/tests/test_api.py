@@ -16,6 +16,7 @@ from tests import ROOT  # noqa: F401
 import api_posta
 import auth
 import env_config
+import modelli_protetti
 import protocollo
 import vfp_gui
 import vfp_mail
@@ -47,6 +48,7 @@ class ApiTest(unittest.TestCase):
             mock.patch.object(api_posta, "PATHS", {"mail_log": log, "report": report}),
             mock.patch.object(env_config, "load_settings", lambda *a, **k: dict(cls.settings)),
             mock.patch.object(protocollo, "OVERRIDES_PATH", d / "manuali.json"),
+            mock.patch.object(modelli_protetti, "STATO_CONTROLLO", d / "stato_modelli.json"),
             mock.patch.object(auth, "session", lambda token: {
                 "ok": {"user": "prova", "role": "admin", "area": "documenti"},
                 "doc": {"user": "ufficio", "role": "utente", "area": "documenti"},
@@ -187,6 +189,27 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(body.startswith(b"PK"))
         self.assertEqual(self.call("/api/protocolli.xlsx?anno=abc")[0], 400)
+
+    def test_cartelle_modelli_solo_nel_env(self):
+        _, body, _ = self.call("/api/config")
+        self.assertNotIn("MODELLI_SORGENTE", json.loads(body)["env"])
+        with mock.patch.object(env_config, "save_settings") as salva:
+            code, body, _ = self.call("/api/config", {"env": {"MODELLI_SORGENTE": "C:\altro"}})
+            self.assertEqual(code, 400)
+            self.assertIn("solo nel file .env", json.loads(body)["error"])
+            salva.assert_not_called()
+
+    def test_avvisi_modelli(self):
+        stato = modelli_protetti.STATO_CONTROLLO
+        stato.write_text(json.dumps({"avvisi": [{"id": "a1", "tipo": "modifiche", "data": "2026-11-01T08:00:00",
+                                                 "modificati": ["contratto.docx"], "visto_il": ""}]}), encoding="utf-8")
+        self.assertEqual(self.call("/api/modelli/avvisi", cookie="doc")[0], 403)
+        _, body, _ = self.call("/api/modelli/avvisi")
+        self.assertEqual([a["id"] for a in json.loads(body)["avvisi"]], ["a1"])
+        self.assertEqual(self.call("/api/modelli/avvisi/visto", {"id": "a1"}, cookie="doc")[0], 403)
+        code, body, _ = self.call("/api/modelli/avvisi/visto", {"id": "a1"})
+        self.assertEqual((code, json.loads(body)["avvisi"]), (200, []))
+        self.assertEqual(self.call("/api/modelli/avvisi/visto", {"id": "x"})[0], 400)
 
 
 if __name__ == "__main__":

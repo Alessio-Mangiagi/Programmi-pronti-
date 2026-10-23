@@ -74,6 +74,7 @@ async function loadOverview() {
   state.ovReport = report.rows || [];
   renderOverview();
   if (isAdmin()) loadProt();
+  if (isAdmin()) loadModelliAvvisi();
   clearTimeout(state.ovTimer);
   if (!$('#view-panoramica').hidden) state.ovTimer = setTimeout(loadOverview, 20000);
 }
@@ -181,3 +182,42 @@ function updateOverviewCountdown() {
 setInterval(updateOverviewCountdown, 1000);
 
 $('#ovCheck').addEventListener('click', () => $('#btnMailCheck').click());
+
+// ------------------------------------------------------------------ avvisi sui modelli trasporti (solo admin)
+
+const MODELLI_VOCI = { modificati: 'Modificati', aggiunti: 'Aggiunti', rimossi: 'Rimossi', illeggibili: 'Non leggibili' };
+
+async function loadModelliAvvisi() {
+  let data;
+  try {
+    data = await api('/api/modelli/avvisi');
+  } catch { return; /* gia' segnalato */ }
+  renderModelliAvvisi(data);
+}
+
+function renderModelliAvvisi({ avvisi }) {
+  const banner = $('#ovModelliBanner');
+  banner.hidden = !(avvisi || []).length;
+  $('#ovModelliList').innerHTML = (avvisi || []).map((a) => {
+    const quando = new Date(a.data).toLocaleDateString('it-IT');
+    const corpo = a.tipo === 'errore'
+      ? `<strong>Controllo dei modelli trasporti non riuscito</strong> (${esc(quando)}): ${esc(a.testo)}`
+      : `<strong>Modelli trasporti cambiati nella cartella condivisa</strong> (controllo del ${esc(quando)})
+         <ul class="banner-list">${Object.entries(MODELLI_VOCI).filter(([k]) => (a[k] || []).length)
+           .map(([k, lbl]) => `<li>${lbl}: ${a[k].map(esc).join(', ')}</li>`).join('')}</ul>`;
+    return `<p>${corpo} <button class="btn btn-sm btn-secondary banner-btn" type="button" data-modello-visto="${esc(a.id)}">
+      <svg class="ic"><use href="#i-check"/></svg>Segna come visto</button></p>`;
+  }).join('');
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-modello-visto]');
+  if (!btn) return;
+  setLoading(btn, true);
+  try {
+    renderModelliAvvisi(await api('/api/modelli/avvisi/visto', { method: 'POST', body: { id: btn.dataset.modelloVisto } }));
+  } catch (err) {
+    toast(err.message, 'err');
+    setLoading(btn, false);
+  }
+});
