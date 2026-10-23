@@ -37,6 +37,7 @@ Verrà richiesto di **cambiare la password** al primo accesso.
 - `TRUST_PROXY` — impostare a `1` se il portale è dietro un reverse proxy (nginx/IIS): legge l'IP client da `X-Forwarded-For`.
 - `TLS_CERT` / `TLS_KEY` — percorsi di certificato e chiave: se ci sono entrambi il portale parla **HTTPS** e marca il cookie di sessione `Secure`. Se sono indicati ma illeggibili il portale **non parte** (meglio fermo che in chiaro per sbaglio).
 - `COOKIE_SECURE=1` — cookie `Secure` anche senza TLS_CERT, per quando è il reverse proxy a fare l'HTTPS.
+- `SUITE_AVVISI_DIR` — cartella di arrivo degli avvisi dei programmi (default `DATA_DIR/avvisi-in`). Il portale la passa alle app che avvia.
 
 ## Test
 
@@ -114,6 +115,17 @@ Su un server centrale in LAN, certe postazioni possono **elevare ad amministrato
 - `apps`: `ddt`, `agente`, `confronta`, `ocr`, `scadenzario`, `requisiti`, `trimble`, `auguri`, `portale`, oppure `*` (tutte).
 - Le modifiche valgono ai **nuovi accessi**: chi è già loggato deve rifare login.
 
+## Avvisi dei programmi
+
+Ogni programma della suite lascia i suoi avvisi al portale (modulo `shared/avvisi`, vedi il suo README): errori dei log, lavori automatici falliti, scadenze nuove dello Scadenzario, modelli Word cambiati in VFP Transfer, allarmi di Auguri. Il portale stesso segnala le app cadute e riavviate dal keep-alive, gli avvii a caldo falliti e i login bloccati per troppi tentativi.
+
+Per gli admin:
+
+- pagina **`/avvisi`** — avvisi da vedere (filtri per programma e gravità) e storico dei visti con chi e quando. Un avviso resta aperto finché un admin non lo segna come visto; le ripetizioni dello stesso problema si accorpano con un contatore;
+- sulla **plancia** — contatore accanto al link *Avvisi* (rosso se ci sono errori) e, appena ci si collega, un riquadro con i primi avvisi da vedere (una volta per accesso).
+
+API (solo admin): `GET /api/avvisi`, `GET /api/avvisi/conteggio`, `POST /api/avvisi/visto` con `{ id }` o `{ tutti: true }`.
+
 ## Avvio a caldo (pre-warm)
 
 Per non far aspettare l'utente, il portale può avviare all'accensione le app più lente e tenerle accese (le riavvia se cadono). Configurazione in `data/warm.json`:
@@ -142,6 +154,8 @@ La funzione è `pathDalRegistro()` in `server.js`; fuori da Windows restituisce 
   - `accessi.log` — registro accessi (NDJSON).
   - `ip-admin.json` — regole admin per-IP.
   - `warm.json` — app da avviare a caldo.
+  - `avvisi.json` — avvisi dei programmi (aperti + ultimi 300 visti).
+  - `avvisi-in/` — cartella di arrivo degli avvisi dalle app.
   - `.session-secret` — chiave di firma delle sessioni.
   - `server.log` — errori a runtime (oltre 5 MB diventa `server.log.1`).
 - `server.test.js` — test (`npm test`).

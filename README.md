@@ -28,6 +28,7 @@ regole IP, avvio a caldo) e nel gate SSO.
 |---|---|
 | `shared/sso/` | Il gate SSO montato da tutte le app (vedi `shared/sso/README.md`) |
 | `shared/node/` | Utilità comuni alle app Node: lock di istanza unica, configurazione di winston |
+| `shared/avvisi/` | Avvisi dei programmi per gli admin del Portale (vedi `shared/avvisi/README.md`) |
 | `shared/avvia/` | Script di avvio condivisi |
 
 `shared/` **non ha un `node_modules` proprio**: quello che sta lì dentro usa solo
