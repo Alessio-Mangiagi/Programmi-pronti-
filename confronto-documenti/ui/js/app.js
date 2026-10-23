@@ -37,6 +37,18 @@ initFolder();
 initCompare();
 initViewer();
 
+// Guida "Come funziona": sta in cima alla pagina, nascosta; il pulsante nella
+// nav la apre/chiude e la porta in vista.
+const helpBtn = document.querySelector('#helpBtn'), help = document.querySelector('#come');
+const showHelp = on => {
+  help.hidden = !on;
+  helpBtn.setAttribute('aria-expanded', String(on));
+  if (on) window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+helpBtn.addEventListener('click', () => showHelp(help.hidden));
+document.querySelector('#helpClose').addEventListener('click', () => { showHelp(false); helpBtn.focus(); });
+if (location.hash === '#come') showHelp(true);   // link diretto alla guida
+
 // Pattern "ignora" (regex per riga) persistiti tra sessioni in localStorage.
 const ignoreBox = document.querySelector('#ignore');
 // "><(((º> sabusabu <º)))><"

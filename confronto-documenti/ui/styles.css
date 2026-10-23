@@ -69,14 +69,22 @@ body {
 }
 .brand-sub { font-family: var(--display); font-weight: 700; font-size: 1.05rem; color: var(--ink-2); }
 .nav-links { margin-left: auto; display: flex; align-items: center; gap: 1.6rem; }
-.nav-links a { font-weight: 600; font-size: .86rem; color: var(--ink-2); text-decoration: none; transition: color .15s; }
-.nav-links a:hover { color: var(--navy); }
+/* Pulsante "Come funziona": blu pieno, in hover (e a guida aperta) colori
+   invertiti. Resta visibile anche sul telefono. */
+.help-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--body); font-weight: 700; font-size: .9rem; line-height: 1;
+  color: #fff; background: var(--navy); border: 2px solid var(--navy); border-radius: 8px;
+  padding: .6rem 1.1rem; cursor: pointer; transition: background .15s, color .15s;
+}
+.help-btn:hover, .help-btn[aria-expanded="true"] { background: var(--bg); color: var(--navy); }
+.help-btn:focus-visible { outline: 3px solid rgba(16,64,112,.35); outline-offset: 2px; }
 .nav-cta {
   font-weight: 600; font-size: .86rem; color: #fff; background: var(--navy);
   border-radius: 8px; padding: .55rem 1.1rem; text-decoration: none; transition: background .15s;
 }
 .nav-cta:hover { background: var(--navy-d); }
-@media (max-width: 768px) { .nav-links, .nav-cta { display: none; } }
+@media (max-width: 768px) { .nav-cta, .brand-sub { display: none; } }
 
 /* ---------- cassetto cartella (folder.js) ----------
    Pannello a sinistra sotto la nav con i file di una cartella. Da 900px in
@@ -320,6 +328,14 @@ select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.
 }
 .eye-btn:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
 .eye-btn svg { stroke: currentColor; }
+
+/* ---------- guida "come funziona" (in cima, aperta dal pulsante) ---------- */
+.help-panel { padding-bottom: .4rem; }
+.help-panel[hidden] { display: none; }
+.help-panel .section-title { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .3rem 1rem; }
+.help-panel .section-title > :not(.help-close) { flex-basis: 100%; }
+.help-panel .section-title > p:not(.help-close) { flex: 1 1 auto; }   /* testo e "Chiudi guida" sulla stessa riga */
+.help-close { margin-left: auto; }
 
 /* ---------- griglia "come funziona" ---------- */
 .readme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
