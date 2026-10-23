@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 // "><(((º> sabusabu <º)))><"
 import { CONFIG } from './config.js';
+import { segnalaErrore } from '../../shared/avvisi/avvisi.mjs';
 
 const FILE = path.join(CONFIG.cartellaDati, 'app.log');
 
@@ -19,5 +20,9 @@ function scrivi(livello, messaggio, extra) {
 export const log = {
   info: (m, e) => scrivi('INFO', m, e),
   avviso: (m, e) => scrivi('AVVISO', m, e),
-  errore: (m, e) => scrivi('ERRORE', m, e),
+  errore: (m, e) => {
+    scrivi('ERRORE', m, e);
+    // Anche agli admin del Portale, nella pagina Avvisi.
+    segnalaErrore('trimble', m, e ? JSON.stringify(e) : '');
+  },
 };
