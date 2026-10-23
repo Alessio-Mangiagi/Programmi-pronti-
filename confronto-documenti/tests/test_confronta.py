@@ -197,3 +197,36 @@ def test_cache_roundtrip():
     # chiave diversa (lang) -> miss
     assert c.cache_get(h, 0, 200, "tesseract", "eng") is None
     c._cache_path(h, 0, 200, "tesseract", "ita").unlink(missing_ok=True)
+
+
+# ----- righe da ignorare (testo in chiaro, jolly # e *) -----
+
+def _ignora(filtri, testo):
+    return c.apply_ignore(c.normalize_lines(testo), c.compile_ignore(filtri))
+
+
+def test_ignore_plain_text_contains_case_insensitive():
+    righe = "Computo metrico\nDOCUMENTO RISERVATO - copia\nImporto 1.200,00"
+    assert _ignora(["Documento riservato"], righe) == ["Computo metrico", "Importo 1.200,00"]
+
+
+def test_ignore_hash_matches_any_number():
+    righe = "Pagina 3 di 12\nData 21/10/2026\nrev. 15\nImporto 1.200,00\nPagina finale"
+    filtri = ["Pagina # di #", "Data #/#/#", "Rev. #"]
+    assert _ignora(filtri, righe) == ["Importo 1.200,00", "Pagina finale"]
+
+
+def test_ignore_star_and_spaces():
+    righe = "Timbro   ufficio tecnico del 12\nTimbro mancante"
+    assert _ignora(["Timbro * del #"], righe) == ["Timbro mancante"]
+
+
+def test_ignore_regex_chars_are_literal():
+    # niente regex: punti, parentesi e quadre valgono per quello che sono
+    righe = "Rev. (A) [bozza]\nRevXAX bozza"
+    assert _ignora(["Rev. (A) [bozza]"], righe) == ["RevXAX bozza"]
+    assert c.compile_ignore(["(a+)+$", "[rotta"])   # compilano senza errori
+
+
+def test_ignore_skips_blank_and_too_long():
+    assert c.compile_ignore(["", "   ", "x" * (c.MAX_IGNORE_PATTERN_LEN + 1)]) == []

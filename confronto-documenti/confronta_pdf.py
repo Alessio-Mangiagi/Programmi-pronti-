@@ -10,7 +10,7 @@ Uso CLI:
     python confronta_pdf.py a.pdf b.pdf --model tesseract --lang ita+eng
     python confronta_pdf.py a.pdf b.pdf --model paddle       # scansioni sporche
     python confronta_pdf.py a.pdf b.pdf --tollerante        # ignora rumore OCR
-    python confronta_pdf.py a.pdf b.pdf --ignora "Pagina \\d+ di \\d+"
+    python confronta_pdf.py a.pdf b.pdf --ignora "Pagina # di #"   # # = un numero
 """
 
 import argparse
@@ -782,37 +782,42 @@ def apply_ignore(lines: list[str], patterns: list[re.Pattern]) -> list[str]:
     return [l for l in lines if not any(p.search(l) for p in patterns)]
 
 
-# Limiti anti-ReDoS sui pattern "ignora" forniti dall'utente. Le regex utente
-# vengono eseguite su OGNI riga di OGNI pagina: una regex malevola/maldestra con
-# quantificatori annidati (es. "(a+)+$") può innescare backtracking catastrofico
-# e bloccare la CPU. Python `re` non offre timeout, quindi ci difendiamo a monte:
-# limitiamo numero e lunghezza dei pattern e rifiutiamo le forme note pericolose.
+# Filtri "ignora" scritti in chiaro dall'utente, una riga per filtro: una riga
+# del documento viene scartata se CONTIENE il testo del filtro (maiuscole e
+# minuscole indifferenti, spazi multipli = uno). Due jolly per le parti che
+# cambiano: "#" = un numero qualsiasi (anche 1.200,00), "*" = testo qualsiasi.
+# Il resto è letterale: niente regex, quindi niente ReDoS da input utente.
 MAX_IGNORE_PATTERNS = 200
 MAX_IGNORE_PATTERN_LEN = 500
-# Gruppo con quantificatore interno, a sua volta quantificato: la sorgente
-# principale di ReDoS. Euristica best-effort (non copre ogni caso, es. "(a|a)+").
-_REDOS_RE = re.compile(r"\([^)]*[*+][^)]*\)\s*[*+{]")
+_IGNORE_NUM = r"\d+(?:[.,]\d+)*"
 
 
-def _looks_catastrophic(pattern: str) -> bool:
-    """True se la regex ha una struttura a rischio backtracking esponenziale."""
-    return bool(_REDOS_RE.search(pattern))
+def ignore_to_regex(text: str) -> str:
+    """Traduce un filtro in chiaro (jolly # e *) nella regex equivalente."""
+    out = []
+    for ch in text:
+        if ch == "#":
+            out.append(_IGNORE_NUM)
+        elif ch == "*":
+            if not out or out[-1] != ".*":   # "**" = "*": niente .*.* ridondanti
+                out.append(".*")
+        elif ch.isspace():
+            if not out or out[-1] != r"\s+":
+                out.append(r"\s+")
+        else:
+            out.append(re.escape(ch))
+    return "".join(out)
 
 
-def compile_ignore(raw_patterns: list[str]) -> list[re.Pattern]:
-    """Compila i filtri regex, saltando righe vuote, pattern non validi,
-    troppo lunghi o a rischio ReDoS. Al più MAX_IGNORE_PATTERNS pattern."""
+def compile_ignore(raw_filters: list[str]) -> list[re.Pattern]:
+    """Compila i filtri in chiaro, saltando righe vuote e filtri troppo lunghi.
+    Al più MAX_IGNORE_PATTERNS filtri."""
     compiled = []
-    for raw in raw_patterns:
+    for raw in raw_filters:
         raw = raw.strip()
-        if not raw:
+        if not raw or len(raw) > MAX_IGNORE_PATTERN_LEN:
             continue
-        if len(raw) > MAX_IGNORE_PATTERN_LEN or _looks_catastrophic(raw):
-            continue                     # pattern troppo lungo o pericoloso: ignorato
-        try:
-            compiled.append(re.compile(raw, re.IGNORECASE))
-        except re.error:
-            continue
+        compiled.append(re.compile(ignore_to_regex(raw), re.IGNORECASE))
         if len(compiled) >= MAX_IGNORE_PATTERNS:
             break                        # tetto al numero di filtri
     return compiled
@@ -1027,7 +1032,7 @@ def main() -> int:
                         help="disattiva il preprocessing delle scansioni")
     parser.add_argument("--report", type=Path, default=None, help="salva report su file")
     parser.add_argument("--ignora", action="append", default=[],
-                        help="regex di righe da ignorare (ripetibile)")
+                        help="righe da ignorare, testo in chiaro: # = un numero, * = testo qualsiasi (ripetibile)")
     args = parser.parse_args()
 
     if args.file1 is None or args.file2 is None:

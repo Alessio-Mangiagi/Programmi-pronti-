@@ -87,7 +87,7 @@
           <li><strong>Lingua OCR</strong>: la lingua del documento</li>
           <li><strong>Confronto tollerante</strong>: ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte</li>
           <li><strong>Migliora scansioni</strong>: raddrizza e pulisce le pagine scansionate prima di leggerle</li>
-          <li><strong>Righe da ignorare</strong> (opzioni avanzate): numeri di pagina, date, timbri di revisione da non considerare</li>
+          <li><strong>Righe da ignorare</strong> (opzioni avanzate): un testo per riga, le righe che lo contengono non vengono confrontate. <code>#</code> = un numero qualsiasi, <code>*</code> = testo qualsiasi (es. <code>Pagina # di #</code>)</li>
           <li>Le impostazioni restano salvate per la volta dopo</li>
         </ul>
       </div></div>
@@ -206,9 +206,11 @@
 
     <details class="adv reveal" style="transition-delay:.24s">
       <summary>Opzioni avanzate · righe da ignorare</summary>
-      <textarea id="ignore" placeholder="Una regex per riga, es.:&#10;Pagina \d+ di \d+&#10;\d{2}/\d{2}/\d{4}&#10;Rev\. \d+"></textarea>
-      <div class="hint">Le righe che corrispondono a uno di questi pattern (regex, una per riga)
-      vengono escluse dal confronto — utile per numeri di pagina, date, timbri di revisione.</div>
+      <textarea id="ignore" placeholder="Un testo per riga, es.:&#10;Pagina # di #&#10;Data #/#/#&#10;Rev. #&#10;Documento riservato"></textarea>
+      <div class="hint">Le righe del documento che contengono uno di questi testi vengono escluse dal
+      confronto (maiuscole e minuscole indifferenti). Per le parti che cambiano usa
+      <b>#</b> = un numero qualsiasi e <b>*</b> = testo qualsiasi: utile per numeri di pagina,
+      date, timbri di revisione.</div>
     </details>
   </section>
 
