@@ -17,6 +17,11 @@ import { TIPOLOGIE_VALIDE, estraiAssistito } from './server/assist.ts'
 import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
+import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
+
+// Ogni console.error (lavori falliti, worker OCR che non parte...) arriva anche
+// agli admin del Portale, nella pagina Avvisi.
+intercettaConsole('ocr')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
