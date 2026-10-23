@@ -130,6 +130,12 @@
       <button class="btn btn-primary btn-sm" type="button" id="ovLoginBtn"><svg class="ic"><use href="#i-key"/></svg>Accedi a Viewpoint</button>
     </div>
 
+    <!-- controllo mensile dei modelli trasporti nella cartella condivisa (modelli_protetti.controlla_modelli) -->
+    <div class="banner banner-err" id="ovModelliBanner" data-admin hidden>
+      <svg class="ic"><use href="#i-file"/></svg>
+      <div class="banner-grow" id="ovModelliList"></div>
+    </div>
+
     <section class="kpis">
       <article class="card kpi" data-area="documenti"><svg class="ic kpi-ic"><use href="#i-upload"/></svg><span class="kpi-lbl">Documenti caricati oggi</span><span class="kpi-val mono" id="ovDocs">0</span><span class="kpi-sub" id="ovDocsSub"></span></article>
       <article class="card kpi kpi-err" id="ovTrErrCard" data-area="documenti"><svg class="ic kpi-ic"><use href="#i-alert"/></svg><span class="kpi-lbl">Errori di caricamento oggi</span><span class="kpi-val mono" id="ovTrErr">0</span><span class="kpi-sub" id="ovTrErrSub"></span></article>

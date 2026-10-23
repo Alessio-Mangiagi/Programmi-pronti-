@@ -152,5 +152,62 @@ class ModelliProtettiTest(unittest.TestCase):
             mp.pratiche(self.settings()).nuova(vuoto)
 
 
+class ControlloMensileTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.cond = self.dir / "condivisa"
+        (self.cond / "Trasporti").mkdir(parents=True)
+        crea_docx(self.cond / "Trasporti" / "contratto.docx")
+        crea_docx(self.cond / "Trasporti" / "vecchio.docx")
+        self.s = {"MODELLI_SORGENTE": str(self.cond)}
+        self.stato = self.dir / "stato_modelli.json"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def controlla(self, giorno, **k):
+        return mp.controlla_modelli(self.s, self.stato, ora=mp.datetime.fromisoformat(giorno), **k)
+
+    def test_prima_fotografia_poi_un_controllo_al_mese(self):
+        self.assertIsNone(self.controlla("2026-10-01T09:00"))  # prima volta: solo fotografia
+        self.assertEqual(mp.avvisi_aperti(self.stato)["file"], 2)
+        crea_docx(self.cond / "Trasporti" / "contratto.docx", corpo="<w:p><w:r><w:t>cambiato</w:t></w:r></w:p>")
+        self.assertIsNone(self.controlla("2026-10-20T09:00"))  # stesso mese: niente controllo
+        (self.cond / "Trasporti" / "vecchio.docx").unlink()
+        crea_docx(self.cond / "nuovo.docx")
+        a = self.controlla("2026-11-01T08:00")
+        self.assertEqual((a["tipo"], a["modificati"], a["aggiunti"], a["rimossi"]),
+                         ("modifiche", ["Trasporti/contratto.docx"], ["nuovo.docx"], ["Trasporti/vecchio.docx"]))
+        self.assertIsNone(self.controlla("2026-11-02T08:00"))
+        self.assertIsNone(self.controlla("2026-12-01T08:00"))  # nessun cambiamento: nessun avviso nuovo
+        self.assertEqual([x["id"] for x in mp.avvisi_aperti(self.stato)["avvisi"]], [a["id"]])
+        visto = mp.segna_visto(a["id"], "admin", self.stato)
+        self.assertEqual(visto["visto_da"], "admin")
+        self.assertEqual(mp.avvisi_aperti(self.stato)["avvisi"], [])
+        with self.assertRaises(mp.ModelloError):
+            mp.segna_visto("inesistente", "admin", self.stato)
+
+    def test_cartella_non_raggiungibile_un_solo_avviso(self):
+        self.controlla("2026-10-01T09:00")
+        self.s["MODELLI_SORGENTE"] = str(self.dir / "assente")
+        self.assertEqual(self.controlla("2026-11-01T09:00")["tipo"], "errore")
+        self.assertIsNone(self.controlla("2026-11-01T10:00"))  # si riprova, ma senza un secondo avviso
+        self.assertEqual(len(mp.avvisi_aperti(self.stato)["avvisi"]), 1)
+
+    def test_cambio_cartella_nuova_fotografia(self):
+        self.controlla("2026-10-01T09:00")
+        altra = self.dir / "altra"
+        altra.mkdir()
+        crea_docx(altra / "x.docx")
+        self.s["MODELLI_SORGENTE"] = str(altra)
+        self.assertIsNone(self.controlla("2026-10-02T09:00", forza=True))
+        self.assertEqual(mp.avvisi_aperti(self.stato)["file"], 1)
+
+    def test_senza_cartella_nessun_controllo(self):
+        self.assertIsNone(mp.controlla_modelli({}, self.stato))
+        self.assertFalse(self.stato.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

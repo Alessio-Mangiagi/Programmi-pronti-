@@ -143,6 +143,8 @@ SECRET_BINDINGS = {
     "DMS_PASSWORD": ("DMS_URL", "DMS_USER", "DMS_TIPO"),
     "SQL_PASSWORD": ("SQL_SERVER", "SQL_DATABASE", "SQL_USER", "SQL_AUTH", "SQL_DRIVER"),
 }
+# impostazioni che si cambiano solo scrivendo nel .env (sviluppatori): l'interfaccia non le mostra e le rifiuta
+SOLO_SVILUPPATORI = {"MODELLI_SORGENTE", "MODELLI_LAVORO"}
 # credenziali e identificativi delle API: stanno nella cassaforte cifrata, mai nel .env in chiaro
 VAULT_KEYS = SECRET_KEYS | {"VFP_CLIENT_ID", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "IMAP_USER", "PEC_USER", "SMTP_USER",
                             "DMS_USER", "SQL_USER"}
