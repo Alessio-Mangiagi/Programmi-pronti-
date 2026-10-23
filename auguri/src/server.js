@@ -9,6 +9,7 @@ const { execFile } = require('child_process');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const L = require('./logica');
 const cosedilSSO = require('../../shared/sso/cosedil-sso');
+const avvisi = require('../../shared/avvisi/avvisi');
 const { cosedilSocketIO } = cosedilSSO;
 
 const PORT = 3000;
@@ -123,6 +124,9 @@ function log(msg, tipo = 'info') {
     console.log(`[${riga.ts}] ${msg}`);
     try { fs.appendFileSync(fileLogOggi(), `[${riga.ts}] [${tipo}] ${msg}\n`, 'utf8'); }
     catch { /* log su file best effort: non deve mai fermare l'app */ }
+    // Errori e allarmi (auguri non partiti, WhatsApp scollegato) anche agli
+    // admin del Portale, nella pagina Avvisi.
+    if (tipo === 'errore') avvisi.segnalaErrore('auguri', msg);
 }
 
 function pushStato() {
