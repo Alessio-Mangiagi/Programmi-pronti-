@@ -31,8 +31,10 @@ const FILE_MAX = 3;
  * @param opzioni.servizio nome che finisce in ogni riga come `service`
  * @param opzioni.cartella dove scrivere error.log e combined.log
  * @param opzioni.consoleInSviluppo aggiunge la console fuori da produzione (default: sì)
+ * @param opzioni.avvisi id dell'app nel Portale: gli 'error' diventano anche
+ *        avvisi per gli admin (shared/avvisi). Assente = nessun inoltro.
  */
-function opzioniLogger(winston, { servizio, cartella, consoleInSviluppo = true }) {
+function opzioniLogger(winston, { servizio, cartella, consoleInSviluppo = true, avvisi = '' }) {
   if (!servizio) throw new Error('opzioniLogger: manca "servizio"');
   if (!cartella) throw new Error('opzioniLogger: manca "cartella"');
 
@@ -60,6 +62,10 @@ function opzioniLogger(winston, { servizio, cartella, consoleInSviluppo = true }
         format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
       })
     );
+  }
+
+  if (avvisi) {
+    transports.push(require('../avvisi/avvisi').trasportoWinston(winston, avvisi));
   }
 
   return {
