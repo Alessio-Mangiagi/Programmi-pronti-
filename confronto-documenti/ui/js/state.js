@@ -7,6 +7,7 @@ export const state = {
   polling: null,  // id del setInterval che interroga il job (per clearInterval)
   jobId: null,    // id del job corrente sul server
   job: null,      // ultimo job completato (results usato da render.js/viewer.js)
+  dragged: null,  // File della riga del cassetto cartella in trascinamento (folder.js)
 };
 
 // Stato del visualizzatore immagini.

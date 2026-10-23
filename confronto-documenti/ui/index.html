@@ -31,6 +31,25 @@
   <a href="#carica" class="nav-cta">Avvia confronto</a>
 </header>
 
+<!-- ============ CASSETTO CARTELLA (folder.js) ============ -->
+<aside id="folderDrawer" class="drawer" aria-label="File della cartella" inert>
+  <div class="drawer-head">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    <span class="drawer-title" id="folderName">Nessuna cartella</span>
+    <button type="button" class="v-btn drawer-close" id="folderClose" aria-label="Chiudi pannello cartella">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-count" id="folderCount">Trascina un file sul riquadro A o B, oppure usa i pulsanti A/B.</div>
+  <div class="drawer-tools">
+    <input type="search" id="folderSearch" placeholder="Cerca per nome…" aria-label="Cerca file nella cartella">
+    <button type="button" class="ghost-btn" id="folderPick">Cambia cartella</button>
+  </div>
+  <ul class="drawer-list" id="folderList"></ul>
+  <p class="drawer-empty" id="folderEmpty">Scegli una cartella per vedere i suoi documenti.</p>
+  <input type="file" id="folderInput" webkitdirectory multiple hidden>
+</aside>
+
 <main>
 
   <!-- ============ HERO ============ -->
@@ -52,6 +71,14 @@
       <span class="kicker">Passo 1</span>
       <h2>Carica i documenti</h2>
       <p>Trascina o seleziona i due PDF da mettere a confronto.</p>
+    </div>
+
+    <div class="deck-tools reveal">
+      <button type="button" class="ghost-btn" id="folderBtn" aria-controls="folderDrawer" aria-expanded="false">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        Sfoglia cartella
+      </button>
+      <span class="deck-hint">oppure apri una cartella e trascina i file nei riquadri</span>
     </div>
 
     <div class="deck">

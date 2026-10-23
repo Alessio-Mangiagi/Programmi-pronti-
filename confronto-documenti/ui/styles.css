@@ -369,6 +369,64 @@ footer {
 .ov-corner.a { left: .5rem; }
 .ov-corner.b { right: .5rem; }
 
+/* ---------- cassetto cartella (folder.js) ----------
+   Pannello fisso a sinistra con i file di una cartella. Sopra la nav (z 40),
+   sotto il viewer (z 60). Aperto, sposta a destra le sezioni .block quanto
+   basta a non coprire i riquadri A/B, così si trascina senza ostacoli. */
+:root { --drawer-w: 340px; }
+.deck-tools { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.deck-hint { font-family: var(--mono); font-size: .66rem; color: var(--dim); }
+#folderBtn[aria-expanded="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.drawer {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 50; width: var(--drawer-w); max-width: 92vw;
+  display: flex; flex-direction: column; gap: .7rem; padding: 1.1rem 1rem;
+  background: var(--surface); border-right: 1px solid var(--line); box-shadow: 8px 0 24px rgba(16,64,112,.08);
+  transform: translateX(-100%); visibility: hidden;
+  transition: transform .25s var(--ease), visibility 0s linear .25s;
+}
+.drawer.open { transform: none; visibility: visible; transition: transform .25s var(--ease); }
+@media (prefers-reduced-motion: reduce) { .drawer, .drawer.open { transition: none; } }
+@media (min-width: 900px) {
+  /* .block è centrato (max 1180px): il padding copre solo la parte di cassetto
+     che sporge oltre il margine sinistro libero. */
+  body.drawer-open main > .block {
+    padding-left: max(1.5rem, calc(var(--drawer-w) + 1.5rem - max(0px, (100vw - 1180px) / 2)));
+  }
+}
+.drawer-head { display: flex; align-items: center; gap: .55rem; color: var(--navy); }
+.drawer-title { flex: 1; min-width: 0; font-family: var(--display); font-weight: 800; font-size: 1rem; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-close { width: 38px; height: 34px; }
+.drawer-count { font-family: var(--mono); font-size: .64rem; line-height: 1.5; color: var(--dim); }
+.drawer-tools { display: flex; gap: .5rem; }
+.drawer-tools input {
+  flex: 1; min-width: 0; font-family: var(--body); font-size: .85rem; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .7rem; outline: none;
+}
+.drawer-tools input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.12); }
+.drawer-tools .ghost-btn { padding: .5rem .8rem; }
+.drawer-list { list-style: none; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding-right: .2rem; }
+.drawer-empty { font-size: .85rem; color: var(--dim); text-align: center; padding: 2rem .5rem; }
+.f-row {
+  display: flex; align-items: center; gap: .55rem; padding: .55rem .6rem;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; cursor: grab;
+  transition: border-color .15s, box-shadow .15s;
+}
+.f-row:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(16,64,112,.08); }
+.f-row.dragging { opacity: .5; }
+.f-row.is-a, .f-row.is-b { border-color: var(--navy); background: rgba(16,64,112,.05); }
+.f-grip { color: #9aa7b4; font-size: .8rem; letter-spacing: -2px; }
+.f-ext { font-family: var(--mono); font-weight: 700; font-size: .58rem; color: var(--navy); background: var(--surface-2); border-radius: 4px; padding: .2rem .35rem; min-width: 2.6rem; text-align: center; }
+.f-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.f-name { font-size: .8rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-meta { font-family: var(--mono); font-size: .58rem; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-pick {
+  width: 28px; height: 28px; flex-shrink: 0; border-radius: 6px; cursor: pointer;
+  font-family: var(--mono); font-weight: 700; font-size: .7rem;
+  color: var(--navy); background: var(--bg); border: 1px solid var(--line); transition: all .15s var(--ease);
+}
+.f-pick:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
+.f-row.is-a .f-pick[data-k="a"], .f-row.is-b .f-pick[data-k="b"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+
 /* ---------- reveal ---------- */
 .reveal { opacity: 0; transform: translateY(.6rem); transition: opacity .4s var(--ease), transform .4s var(--ease); }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
