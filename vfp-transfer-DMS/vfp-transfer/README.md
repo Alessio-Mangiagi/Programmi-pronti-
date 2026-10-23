@@ -327,6 +327,47 @@ Un modulo è un file `moduli/<id>.json` (vedi `moduli/esempio_ddt.json`): nome, 
 cercare, regex facoltativa) e, se c'è, il PDF compilabile da riempire (`pdf` + `pdf_campo` per ogni campo). Senza PDF
 compilabile il programma genera una scheda PDF con tutti i campi.
 
+## Archivio SQL in sola lettura (Alyante, data lake)
+
+`sorgente_sql.py` legge i documenti direttamente da un database SQL Server (es. quello di Alyante o un data lake con
+endpoint SQL) e li carica in VFP, senza export manuali. **Non scrive mai nel database**: esegue solo `SELECT`, apre
+la connessione in sola lettura e va usato con un utente SQL che ha **solo** il ruolo `db_datareader`.
+
+**Cosa chiedere all'IT**
+1. il driver **ODBC Driver 18 for SQL Server** installato su questo PC (serve l'amministratore; senza, si usa il
+   vecchio driver "SQL Server" di Windows, che non va bene per i database in cloud);
+2. server, nome del database e un utente di sola lettura (oppure accesso con l'utente Windows o un'app Entra ID);
+3. una **vista** dedicata con queste colonne (i nomi contano, le maiuscole no):
+
+| colonna | contenuto | |
+|---|---|---|
+| `id` | identificativo del documento | obbligatoria |
+| `nome_file` | nome del file con estensione | obbligatoria |
+| `contenuto` | il file (varbinary) — con `SQL_FILE_MODE=contenuto` | una delle due |
+| `percorso` | percorso del file in rete — con `SQL_FILE_MODE=percorso` | una delle due |
+| `cartella` | cartella di destinazione in VFP, separata da `/` | facoltativa |
+| `nome` | nome del documento in VFP (vuota = nome del file) | facoltativa |
+| `revisione` | revisione (vuota = `VFP_DEFAULT_REVISION`) | facoltativa |
+| `descrizione` | descrizione | facoltativa |
+| `modificato` | data di modifica: a ogni giro si leggono solo le novità | facoltativa |
+
+Così il programma non dipende dalle tabelle interne del gestionale: se cambiano, basta aggiornare la vista.
+
+**Impostazioni** nel `.env`, sezione *archivio SQL* (`SQL_SERVER`, `SQL_DATABASE`, `SQL_VIEW`, `SQL_AUTH`...);
+utente e password finiscono nella cassaforte cifrata. Con `SQL_FILE_MODE=percorso` i file devono stare sotto
+`SQL_PATH_ROOT`: quelli fuori vengono saltati.
+
+```
+python sorgente_sql.py prova                    # collegamento, colonne della vista, numero di documenti
+python sorgente_sql.py trasferisci --dry-run    # scarica e mostra cosa verrebbe caricato
+python sorgente_sql.py trasferisci              # carica in VFP
+```
+
+I file presi dal database vengono scritti in `specchio_sql\<id>\<revisione>\` (`SQL_CACHE_DIR`). La data dell'ultima
+modifica letta sta in `stato_sql.json` e avanza solo se il giro finisce senza errori; i documenti già caricati vengono
+riconosciuti da `stato_trasferimento.json`, lo stesso dell'interfaccia. Non lanciarlo mentre dall'interfaccia è in
+corso un trasferimento.
+
 ## Avvio in VS Code
 
 1. Installare Python da https://www.python.org/downloads/ (spuntare "Add python.exe to PATH").

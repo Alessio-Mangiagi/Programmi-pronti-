@@ -112,10 +112,22 @@ DEFAULTS = {
     "PEC_USER": "",
     "PEC_PASSWORD": "",
     "PEC_FOLDER": "INBOX",
+    # ---- archivio SQL in sola lettura (sorgente_sql.py)
+    "SQL_SERVER": "",
+    "SQL_DATABASE": "",
+    "SQL_DRIVER": "",  # vuoto = il migliore installato (ODBC Driver 18, 17, poi "SQL Server")
+    "SQL_AUTH": "sql",
+    "SQL_USER": "",
+    "SQL_PASSWORD": "",
+    "SQL_TRUST_CERT": "false",
+    "SQL_VIEW": "",
+    "SQL_FILE_MODE": "contenuto",
+    "SQL_PATH_ROOT": "",
+    "SQL_CACHE_DIR": "specchio_sql",
 }
 
 SECRET_KEYS = {"VFP_CLIENT_SECRET", "GRAPH_CLIENT_SECRET", "IMAP_PASSWORD", "PEC_PASSWORD", "SMTP_PASSWORD",
-               "ANTHROPIC_API_KEY", "DMS_PASSWORD"}
+               "ANTHROPIC_API_KEY", "DMS_PASSWORD", "SQL_PASSWORD"}
 # una password resta valida solo per il server a cui era destinata: se cambia uno di questi campi va reinserita,
 # altrimenti chi modifica l'indirizzo del server si farebbe mandare la password vera
 SECRET_BINDINGS = {
@@ -126,9 +138,11 @@ SECRET_BINDINGS = {
     "SMTP_PASSWORD": ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_SECURITY"),
     "ANTHROPIC_API_KEY": (),  # indirizzo di Anthropic fisso nel codice: la chiave non puo' essere dirottata
     "DMS_PASSWORD": ("DMS_URL", "DMS_USER", "DMS_TIPO"),
+    "SQL_PASSWORD": ("SQL_SERVER", "SQL_DATABASE", "SQL_USER", "SQL_AUTH", "SQL_DRIVER"),
 }
 # credenziali e identificativi delle API: stanno nella cassaforte cifrata, mai nel .env in chiaro
-VAULT_KEYS = SECRET_KEYS | {"VFP_CLIENT_ID", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "IMAP_USER", "PEC_USER", "SMTP_USER", "DMS_USER"}
+VAULT_KEYS = SECRET_KEYS | {"VFP_CLIENT_ID", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "IMAP_USER", "PEC_USER", "SMTP_USER",
+                            "DMS_USER", "SQL_USER"}
 # impostazioni che si possono cambiare solo con il codice inviato via email all'amministratore
 OTP_KEYS = VAULT_KEYS | {
     "ADMIN_EMAIL", "REPORT_SEND_METHOD", "REPORT_FROM", "REPORT_EMAIL_DOMAINS", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURITY",
@@ -137,6 +151,7 @@ OTP_KEYS = VAULT_KEYS | {
     "MAIL_ALLOWED_SENDERS", "MAIL_REQUIRE_AUTH", "MAIL_ANTIVIRUS", "MAIL_ALLOWED_EXT", "MAIL_MAX_MB", "CLAUDE_MODEL",
     "VFP_DOC_URL", "GUI_BIND", "GUI_HOSTNAME", "GUI_TLS_CERT", "GUI_TLS_KEY",
     "MODULI_AI", "DMS_URL", "DMS_TIPO",  # MODULI_AI decide se il contenuto dei documenti puo' andare ad Anthropic
+    "SQL_SERVER", "SQL_DATABASE", "SQL_DRIVER", "SQL_AUTH", "SQL_TRUST_CERT", "SQL_VIEW", "SQL_FILE_MODE", "SQL_PATH_ROOT",
 }
 # campi che, se cambiano, rendono inutilizzabile l'accesso Viewpoint salvato (il token va rifatto)
 TOKEN_BINDINGS = ("VFP_AUTH_URL", "VFP_TOKEN_URL", "VFP_BASE_URL", "VFP_CLIENT_ID", "VFP_REDIRECT_URI")
@@ -214,8 +229,26 @@ def validate_settings(values, current):
         u = urlparse(doc_url.replace("{id}", "x"))
         if u.scheme != "https" or not _host_allowed(u.hostname, VFP_HOSTS) or "{id}" not in doc_url:
             raise ValueError(f"VFP_DOC_URL: indirizzo https su {', '.join(VFP_HOSTS)} con {{id}} al posto dell'ID")
+    validate_sql(values)
     validate_network(values.get("GUI_BIND", current.get("GUI_BIND", "")), values.get("GUI_HOSTNAME", current.get("GUI_HOSTNAME", "")),
                      values.get("GUI_TLS_CERT", current.get("GUI_TLS_CERT", "")), values.get("GUI_TLS_KEY", current.get("GUI_TLS_KEY", "")))
+
+
+def validate_sql(values):
+    """Archivio SQL: i valori finiscono nella stringa di connessione e nella SELECT, quindi formati chiusi."""
+    import sorgente_sql as sq  # qui: sorgente_sql importa env_config
+
+    checks = (("SQL_SERVER", sq._SERVER_RE, "nome del server non valido (es. srv-sql, srv-sql\\ISTANZA, srv-sql,1433)"),
+              ("SQL_DATABASE", sq._DATABASE_RE, "nome del database non valido"),
+              ("SQL_DRIVER", sq._DRIVER_RE, "nome del driver non valido (es. ODBC Driver 18 for SQL Server)"),
+              ("SQL_VIEW", sq._VIEW_RE, "nome della vista non valido (es. dbo.vfp_documenti)"))
+    for k, rx, msg in checks:
+        if values.get(k) and not rx.match(values[k]):
+            raise ValueError(f"{k}: {msg}")
+    if values.get("SQL_AUTH", "sql") not in sq.AUTH_MODES:
+        raise ValueError(f"SQL_AUTH: {' oppure '.join(sq.AUTH_MODES)}")
+    if values.get("SQL_FILE_MODE", "contenuto") not in sq.FILE_COLS:
+        raise ValueError("SQL_FILE_MODE: contenuto oppure percorso")
 
 
 def is_local_bind(bind):
