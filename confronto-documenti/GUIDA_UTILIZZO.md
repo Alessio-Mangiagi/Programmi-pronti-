@@ -73,7 +73,7 @@ trascinaci sopra un altro file.
 | **Motore OCR** | `tesseract` va bene per i documenti stampati. `paddle`, se presente, legge meglio le scansioni sporche o sbiadite ma è più lento. |
 | **Risoluzione** | 200 DPI va bene quasi sempre. 300 DPI per documenti fitti o caratteri piccoli (più lento). |
 | **Lingua OCR** | La lingua del documento. |
-| **Confronto tollerante** | Ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte. |
+| **Confronto tollerante** | Ignora gli errori tipici di lettura (0/O, l/1, I/l, punteggiatura, m²/m³) che creano differenze finte, e segna in grigio come *incerte* le parole lette in modo appena diverso. I numeri non vengono mai "aggiustati": una cifra cambiata è sempre segnalata. Consigliato per le scansioni. |
 | **Migliora scansioni** | Raddrizza e pulisce le pagine scansionate prima di leggerle. |
 | **Righe da ignorare** | In *Opzioni avanzate*: un testo per riga; le righe del documento che lo contengono non vengono confrontate (maiuscole e minuscole indifferenti). Vedi sotto. |
 
@@ -106,6 +106,11 @@ tolta ogni riga che contiene la parola "pagina".
   - Righe **rosse** con `−`: presenti solo nel documento A.
   - Righe **verdi** con `+`: presenti solo nel documento B.
   - Dentro la riga sono evidenziate le parole cambiate.
+  - Righe **grigie** con l'etichetta *incerta* (solo con il confronto
+    tollerante): probabilmente un errore di lettura della scansione, per
+    esempio "foglio" letto "toglio". Non sono nascoste: se il punto è
+    importante, verificalo con **Anteprima**. Le pagine che hanno solo righe
+    incerte sono marcate *solo differenze incerte* e restano chiuse.
 - **Anteprima** apre il confronto visuale della pagina:
   - **Affianca**: A e B uno accanto all'altro, con le zone cambiate riquadrate;
   - **Sovrapponi**: B sopra A, con il cursore per passare dall'uno all'altro;

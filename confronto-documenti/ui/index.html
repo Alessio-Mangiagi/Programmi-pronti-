@@ -85,7 +85,7 @@
           <li><strong>Motore OCR</strong>: <code>tesseract</code> va bene per i documenti stampati; <code>paddle</code>, se presente, legge meglio le scansioni sporche o sbiadite ma è più lento</li>
           <li><strong>Risoluzione</strong>: 200 DPI va bene quasi sempre; 300 per documenti fitti o caratteri piccoli (più lento)</li>
           <li><strong>Lingua OCR</strong>: la lingua del documento</li>
-          <li><strong>Confronto tollerante</strong>: ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte</li>
+          <li><strong>Confronto tollerante</strong>: ignora gli errori tipici di lettura (0/O, l/1, punteggiatura, m²/m³) e segna in grigio come <em>incerte</em> le parole lette appena diverse; una cifra cambiata è sempre segnalata. Consigliato per le scansioni</li>
           <li><strong>Migliora scansioni</strong>: raddrizza e pulisce le pagine scansionate prima di leggerle</li>
           <li><strong>Righe da ignorare</strong> (opzioni avanzate): un testo per riga, le righe che lo contengono non vengono confrontate. <code>#</code> = un numero qualsiasi, <code>*</code> = testo qualsiasi (es. <code>Pagina # di #</code>)</li>
           <li>Le impostazioni restano salvate per la volta dopo</li>
@@ -97,6 +97,7 @@
         <ul>
           <li>Righe <strong>rosse</strong> (<code>−</code>): presenti solo in A; righe <strong>verdi</strong> (<code>+</code>): presenti solo in B</li>
           <li>Dentro la riga sono evidenziate le parole cambiate</li>
+          <li>Righe <strong>grigie</strong> “incerta”: probabile errore di lettura della scansione, da verificare con Anteprima se il punto è importante</li>
           <li><strong>Anteprima</strong>: le due pagine affiancate, oppure sovrapposte con il cursore; <strong>Vista OCR</strong> mostra la pagina come l'ha letta il programma</li>
           <li><strong>Report Word</strong> / <strong>Report PDF</strong>: il confronto da salvare o allegare</li>
         </ul>

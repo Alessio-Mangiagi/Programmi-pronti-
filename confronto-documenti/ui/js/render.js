@@ -3,6 +3,9 @@
 // source_a/b, only_in }. Ogni `op` è una riga del diff con type:
 //   equal | add | del | change. Per 'change' i lati a/b sono liste di segmenti
 //   {s, eq} dove eq=false marca le parole cambiate (diff a livello di parola).
+//   'change' con incerta=true = probabile errore di lettura OCR (modo
+//   tollerante): mostrata in grigio, mai nascosta. status 'uncertain' = pagina
+//   con sole differenze incerte.
 import { $, esc, pageLabel } from './dom.js';
 import { state } from './state.js';
 import { openViewer } from './viewer.js';
@@ -15,6 +18,10 @@ function segsHtml(list, cls) {
 // Una riga di diff → HTML. 'change' produce DUE righe (rimossa + aggiunta) con
 // evidenziazione parola-per-parola; gli altri type una riga sola colorata.
 function opHtml(op) {
+  if (op.type === 'change' && op.incerta) {
+    return '<div class="line incerta" title="Probabile errore di lettura: verifica con Anteprima">' +
+           '<span class="inc-tag">incerta</span>' + segsHtml(op.a, 'winc') + ' → ' + segsHtml(op.b, 'winc') + '</div>';
+  }
   if (op.type === 'change') {
     return '<div class="line del">' + segsHtml(op.a, 'wdel') + '</div>' +
            '<div class="line add">' + segsHtml(op.b, 'wadd') + '</div>';
@@ -46,10 +53,12 @@ export function render(job) {
     // Card per pagina: le pagine con differenze nascono già espanse (.open),
     // quelle identiche restano collassate per non affollare il report.
     const card = document.createElement('div');
-    card.className = 'page-card shell' + (p.status !== 'equal' ? ' open' : '');
+    // Le pagine con sole differenze incerte restano chiuse: si aprono a richiesta.
+    card.className = 'page-card shell' + (p.status === 'diff' || p.status === 'missing' ? ' open' : '');
     let badge, label;
     if (p.status === 'equal') { badge = 'equal'; label = 'identica'; }
     else if (p.status === 'missing') { badge = 'missing'; label = 'solo in ' + p.only_in; }
+    else if (p.status === 'uncertain') { badge = 'uncertain'; label = 'solo differenze incerte'; }
     else { badge = 'diff'; label = 'differenze'; }
 
     const lines = p.ops.map(opHtml).join('');
