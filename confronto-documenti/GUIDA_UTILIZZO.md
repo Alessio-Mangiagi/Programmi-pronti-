@@ -28,6 +28,10 @@ Come confrontare due versioni di un documento e trovare ogni differenza.
 └────────────────────┴─────────────────────────────────────────┘
 ```
 
+Il pulsante blu **Come funziona** in alto apre in cima alla pagina una guida
+rapida (utilizzo, impostazioni, lettura del report). Si chiude con
+**Chiudi guida** o premendo di nuovo il pulsante.
+
 ---
 
 ## Fare un confronto
