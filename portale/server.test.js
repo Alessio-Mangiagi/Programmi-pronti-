@@ -30,6 +30,7 @@ const {
   rowsToUsers, csvToRows,
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
   riepilogoAttivita, riepilogoUtenti,
+  normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,
 } = require('./server.js');
 
 const reqCon = (host, headers = {}) => ({ headers: Object.assign({ host }, headers), socket: {} });
@@ -433,4 +434,73 @@ test('riepilogoUtenti: numeri di tutta la suite', () => {
   assert.equal(n.utentiTotali, 3);
   assert.equal(n.accessiOggi, 1);
   assert.deepEqual(n.piuUsata, { appId: 'scadenzario', volte: 2 });
+});
+
+// ---------------------------------------------------------------------------
+// Avvisi dei programmi: le app lasciano un file (shared/avvisi), il portale li
+// raccoglie, accorpa le ripetizioni e li tiene finché un admin non li vede.
+// ---------------------------------------------------------------------------
+test('normalizzaAvviso: scarta senza app o titolo, livello sconosciuto = attenzione', () => {
+  assert.equal(normalizzaAvviso(null), null);
+  assert.equal(normalizzaAvviso({ app: 'ddt' }), null);
+  assert.equal(normalizzaAvviso({ titolo: 'x' }), null);
+  const a = normalizzaAvviso({ app: 'ddt', titolo: 'Giro fallito', livello: 'boh', data: 'non una data' }, Date.parse('2026-10-23T08:00:00Z'));
+  assert.equal(a.livello, 'attenzione');
+  assert.equal(a.data, '2026-10-23T08:00:00.000Z');
+  assert.equal(a.testo, '');
+});
+
+test('unisciAvviso: stessa app+chiave aperta = un avviso col contatore, il livello sale', () => {
+  const l = [];
+  unisciAvviso(l, { app: 'ddt', titolo: 'A', testo: '', livello: 'attenzione', chiave: 'k', data: '2026-10-23T08:00:00.000Z' }, 'id1');
+  unisciAvviso(l, { app: 'ddt', titolo: 'B', testo: 't', livello: 'errore', chiave: 'k', data: '2026-10-23T09:00:00.000Z' }, 'id2');
+  unisciAvviso(l, { app: 'ocr', titolo: 'C', testo: '', livello: 'info', chiave: 'k', data: '2026-10-23T09:00:00.000Z' }, 'id3');
+  unisciAvviso(l, { app: 'ddt', titolo: 'D', testo: '', livello: 'info', chiave: '', data: '2026-10-23T09:00:00.000Z' }, 'id4');
+  assert.equal(l.length, 3);
+  assert.deepEqual([l[0].id, l[0].n, l[0].titolo, l[0].livello, l[0].ultimo], ['id1', 2, 'B', 'errore', '2026-10-23T09:00:00.000Z']);
+  // Una volta visto, lo stesso problema riapre un avviso nuovo.
+  l[0].visto_il = '2026-10-23T10:00:00.000Z';
+  unisciAvviso(l, { app: 'ddt', titolo: 'E', testo: '', livello: 'info', chiave: 'k', data: '2026-10-23T11:00:00.000Z' }, 'id5');
+  assert.equal(l.length, 4);
+});
+
+test('potaAvvisi: tiene tutti gli aperti e gli ultimi 300 visti', () => {
+  const l = [];
+  for (let i = 0; i < 310; i++) l.push({ id: 'v' + i, visto_il: 'x' });
+  l.push({ id: 'aperto', visto_il: '' });
+  const p = potaAvvisi(l);
+  assert.equal(p.length, 301);
+  assert.ok(p.some((a) => a.id === 'aperto'));
+  assert.ok(!p.some((a) => a.id === 'v0'));
+});
+
+test("vistaAvvisi: aperti più recenti prima, nome leggibile dell'app", () => {
+  const v = vistaAvvisi([
+    { id: 'a', app: 'ddt', data: '2026-10-01', ultimo: '2026-10-01', visto_il: '' },
+    { id: 'b', app: 'vfp', data: '2026-10-02', ultimo: '2026-10-02', visto_il: '' },
+    { id: 'c', app: 'ddt', data: '2026-09-01', visto_il: '2026-10-03' },
+  ], (id) => ({ ddt: 'Lettore DDT' }[id] || id));
+  assert.deepEqual(v.aperti.map((a) => a.id), ['b', 'a']);
+  assert.equal(v.aperti[1].appNome, 'Lettore DDT');
+  assert.deepEqual(v.visti.map((a) => a.id), ['c']);
+});
+
+test("shared/avvisi + raccogliAvvisi: il file di un'app arriva nel portale e sparisce", () => {
+  const { segnala } = require('../shared/avvisi/avvisi.js');
+  const prima = process.env.SUITE_AVVISI_DIR;
+  process.env.SUITE_AVVISI_DIR = path.join(DATA_TMP, 'avvisi-in');
+  try {
+    assert.equal(segnala({ app: 'scadenzario', titolo: 'Email non inviata', livello: 'errore', chiave: 'email' }), true);
+    assert.equal(segnala({ app: 'scadenzario', titolo: 'Email non inviata', livello: 'errore', chiave: 'email' }), true);
+    assert.equal(segnala({ titolo: 'senza app' }), false);
+  } finally {
+    if (prima === undefined) delete process.env.SUITE_AVVISI_DIR; else process.env.SUITE_AVVISI_DIR = prima;
+  }
+  // Scrittura in corso: il .tmp non va toccato.
+  fs.writeFileSync(path.join(DATA_TMP, 'avvisi-in', 'in-corso.tmp'), '{');
+  assert.equal(raccogliAvvisi(), 2);
+  const l = loadAvvisi();
+  assert.equal(l.length, 1);
+  assert.equal(l[0].n, 2);
+  assert.deepEqual(fs.readdirSync(path.join(DATA_TMP, 'avvisi-in')), ['in-corso.tmp']);
 });

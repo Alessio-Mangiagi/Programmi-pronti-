@@ -311,8 +311,50 @@ async function loadMe() {
   // admin del portale: ruolo "vero" oppure elevazione dall'IP (adminPortale).
   isAdmin = !!(me.adminPortale || me.ruolo === 'admin');
   document.getElementById('adminLink').hidden = !isAdmin;
+  document.getElementById('avvisiLink').hidden = !isAdmin;
   return true;
 }
+
+// ---------------------------------------------------------------- avvisi
+
+// Avvisi lasciati dai programmi (vedi /avvisi). Il contatore sta nella barra in
+// alto; il riquadro si apre una volta per accesso, se c'è qualcosa da vedere.
+async function aggiornaAvvisi(allAccesso) {
+  if (!isAdmin) return;
+  let data;
+  try {
+    const r = await fetch('/api/avvisi');
+    if (!r.ok) return;
+    data = await r.json();
+  } catch { return; }
+  const aperti = data.aperti || [];
+  const errori = aperti.filter((a) => a.livello === 'errore').length;
+  const n = document.getElementById('avvisiN');
+  n.hidden = aperti.length === 0;
+  n.textContent = aperti.length;
+  n.classList.toggle('err', errori > 0);
+  document.getElementById('avvisiLink').title = aperti.length
+    ? `${aperti.length} da vedere${errori ? `, ${errori} errori` : ''}` : 'Nessun avviso da vedere';
+
+  if (!allAccesso || !aperti.length) return;
+  try {
+    if (sessionStorage.getItem('avvisiMostrati')) return;
+    sessionStorage.setItem('avvisiMostrati', '1');
+  } catch { /* storage bloccato: si mostra comunque */ }
+  document.getElementById('avvisiDlgSotto').textContent =
+    `${aperti.length === 1 ? 'C\'è 1 avviso' : `Ci sono ${aperti.length} avvisi`} da vedere` +
+    (errori ? `, di cui ${errori} ${errori === 1 ? 'errore' : 'errori'}.` : '.');
+  const primi = aperti.slice(0, 5);
+  document.getElementById('avvisiDlgLista').innerHTML = primi.map((a) =>
+    `<li class="${esc(a.livello)}"><b>${esc(a.appNome)}</b> ${esc(a.titolo)}${a.n > 1 ? ` <small>(${a.n} volte)</small>` : ''}</li>`).join('') +
+    (aperti.length > primi.length ? `<li class="altri">e altri ${aperti.length - primi.length}…</li>` : '');
+  const dlg = document.getElementById('avvisiDlg');
+  if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+}
+document.getElementById('avvisiDlgDopo').addEventListener('click', () => {
+  const dlg = document.getElementById('avvisiDlg');
+  if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+});
 
 document.getElementById('logout').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' });
@@ -325,9 +367,11 @@ async function init() {
   apps = (await (await fetch('/api/apps')).json()).apps;
   renderApps();
   aggiornaPlancia();
+  aggiornaAvvisi(true);
   pollStatus();
   setInterval(pollStatus, 4000);
   setInterval(aggiornaPlancia, 60000);
+  setInterval(() => aggiornaAvvisi(false), 60000);
 }
 
 init();
