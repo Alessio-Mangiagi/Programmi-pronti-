@@ -10,8 +10,10 @@ Entry point di produzione: un solo processo serve API e frontend sulla stessa po
 In sviluppo si continua a usare `uvicorn app.main:app` + `vite` con proxy.
 La cartella si può spostare con WEB_DIST (es. nel container).
 """
+import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -35,8 +37,35 @@ class SPAStaticFiles(StaticFiles):
             raise
 
 
+SHARED = Path(__file__).resolve().parents[2] / "shared"
+
+
+def collega_avvisi(avvisi_dir: Path = SHARED / "avvisi") -> None:
+    """Dentro la Suite Cosedil gli errori del log arrivano agli admin del portale (pagina Avvisi).
+
+    Va fatto ad avvio completato: uvicorn configura i suoi logger all'avvio e
+    toglierebbe un handler messo prima. "uvicorn.error" non propaga alla radice
+    ed è lì che finiscono le eccezioni non gestite delle richieste.
+    Fuori dalla suite la cartella non c'è e non succede niente.
+    """
+    if not (avvisi_dir / "avvisi.py").is_file():
+        return
+    if str(avvisi_dir) not in sys.path:
+        sys.path.insert(0, str(avvisi_dir))
+    import avvisi
+
+    for nome in ("", "uvicorn.error"):
+        avvisi.collega_log("incampo", logging.getLogger(nome or None))
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    collega_avvisi()
+    yield
+
+
 def create_app(dist: Path = DIST) -> FastAPI:
-    root = FastAPI(title="Field View", docs_url=None, redoc_url=None, openapi_url=None)
+    root = FastAPI(title="Field View", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     root.mount("/api", api)
     if dist.is_dir():
         root.mount("/", SPAStaticFiles(directory=dist, html=True), name="web")
