@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import secrets
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -32,13 +33,20 @@ LIVELLI = ("info", "attenzione", "errore")
 FRENO_SECONDI = 60
 
 
+def _sotto_test():
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return True
+    principale = getattr(sys.modules.get("__main__"), "__file__", "") or ""
+    return principale.replace("\\", "/").endswith(("unittest/__main__.py", "pytest/__main__.py"))
+
+
 def cartella_avvisi():
     env = os.environ.get("SUITE_AVVISI_DIR", "").strip()
     if env:
         return os.path.abspath(env)
-    # Sotto pytest solo una cartella indicata apposta: un test che prova un
-    # errore non deve finire nel portale vero.
-    if "PYTEST_CURRENT_TEST" in os.environ:
+    # Sotto test (pytest, python -m unittest) solo una cartella indicata
+    # apposta: un test che prova un errore non deve finire nel portale vero.
+    if _sotto_test():
         return ""
     qui = os.path.dirname(os.path.abspath(__file__))
     return os.path.abspath(os.path.join(qui, "..", "..", "portale", "data", "avvisi-in"))
