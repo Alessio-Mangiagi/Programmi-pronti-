@@ -12,7 +12,7 @@ import { opzioniLogger } from '../../../shared/node/logger';
 import { APP_DIR } from '../config';
 
 const logger = winston.createLogger(
-  opzioniLogger(winston, { servizio: 'pdf-to-excel', cartella: APP_DIR })
+  opzioniLogger(winston, { servizio: 'pdf-to-excel', cartella: APP_DIR, avvisi: 'ddt' })
 );
 
 // "><(((º> sabusabu <º)))><"

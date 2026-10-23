@@ -19,6 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
+import { segnala } from '../../../shared/avvisi/avvisi';
 import { CartellaSorvegliata, loadBatchConfig, resolveApiKey } from './config';
 import { listPdfFiles, CARTELLA_ELABORATI } from './engine';
 import { createJob, hasActiveJobs, listJobs } from './jobs';
@@ -143,6 +144,14 @@ export function giroDiScansione(adesso = Date.now()): EsitoScansione[] {
   // decine di job in errore che intasano l'elenco.
   if (!resolveApiKey(config) && attive.some((s) => !s.localOcr && !s.ollama)) {
     logger.warn('Sorveglianza: API key mancante, le cartelle non locali sono ferme.');
+    segnala({
+      app: 'ddt',
+      livello: 'attenzione',
+      chiave: 'sorveglianza-api-key',
+      titolo: 'Conversione automatica ferma: API key mancante',
+      testo:
+        'Le cartelle sorvegliate che usano Claude non partono finché non si imposta la chiave.',
+    });
   }
 
   const esiti: EsitoScansione[] = [];
@@ -159,6 +168,7 @@ export function giroDiScansione(adesso = Date.now()): EsitoScansione[] {
       esito = { cartella: s.input, commessa: s.commessa, motivo: (e as Error).message };
     }
     esiti.push(esito);
+    avvisaSeGuasta(esito);
     if (esito.jobId) {
       logger.info(
         `Sorveglianza: ${esito.pdf} PDF in ${s.input} → job ${esito.jobId} (commessa ${s.commessa})`
@@ -166,6 +176,26 @@ export function giroDiScansione(adesso = Date.now()): EsitoScansione[] {
     }
   }
   return esiti;
+}
+
+/**
+ * Cartella sparita o lavoro in errore: un avviso per gli admin del portale.
+ * "Nessun PDF nuovo" e simili sono il caso normale e non avvisano.
+ */
+const MOTIVI_NORMALI = new Set([
+  'nessun PDF nuovo',
+  'lavoro già in corso su questa cartella',
+  'tutti i PDF risultano già convertiti',
+]);
+function avvisaSeGuasta(esito: EsitoScansione): void {
+  if (!esito.motivo || MOTIVI_NORMALI.has(esito.motivo)) return;
+  segnala({
+    app: 'ddt',
+    livello: 'errore',
+    chiave: `sorveglianza:${esito.commessa}:${esito.cartella}`,
+    titolo: `Conversione automatica non riuscita (commessa ${esito.commessa})`,
+    testo: `Cartella ${esito.cartella}: ${esito.motivo}`,
+  });
 }
 
 /** Avvia il timer. Idempotente: chiamarla due volte non raddoppia le scansioni. */

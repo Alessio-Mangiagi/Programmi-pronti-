@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
+import { segnala } from '../../../shared/avvisi/avvisi';
 import {
   BASE_DIR,
   appConfig,
@@ -695,6 +696,27 @@ function finish(
     cartellaInput: job.inputDir,
     errore: job.error || '',
   });
+
+  // Lavoro andato male: lo sanno anche gli admin del portale (pagina Avvisi),
+  // non solo chi guarda l'elenco dei lavori.
+  if (status === 'errore' || (status === 'completato' && job.progress.failed > 0)) {
+    segnala({
+      app: 'ddt',
+      livello: status === 'errore' ? 'errore' : 'attenzione',
+      chiave: `job:${job.id}`,
+      titolo:
+        status === 'errore'
+          ? `Conversione DDT non riuscita (commessa ${job.commessaId})`
+          : `Conversione DDT con ${job.progress.failed} file non convertiti (commessa ${job.commessaId})`,
+      testo: [
+        job.error,
+        `Cartella: ${job.inputDir}`,
+        job.createdBy ? `Avviato da: ${job.createdBy}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+  }
 }
 
 /**
