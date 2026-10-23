@@ -29,6 +29,9 @@ registro_posta.tmp
 moduli_compilati/
 moduli_in_arrivo/
 
+# modelli Word protetti: copie compilate (dati dei contratti)
+modelli_compilati/
+
 # archivio SQL
 stato_sql.json
 specchio_sql/

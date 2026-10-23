@@ -89,6 +89,9 @@ DEFAULTS = {
     "MODULI_AI": "conferma",
     "MODULI_DIR": "moduli",
     "MODULI_ARCHIVIO": "moduli_compilati",
+    # ---- modelli Word protetti (es. trasporti): cartella condivisa in sola lettura -> copie interne compilate
+    "MODELLI_SORGENTE": "",
+    "MODELLI_LAVORO": "modelli_compilati",
     # ---- DMS di origine (sola lettura, vedi estrai_dms.py)
     "DMS_TIPO": "seeddms",
     "DMS_URL": "",
@@ -215,7 +218,7 @@ def validate_settings(values, current):
         u = urlparse(values["DMS_URL"])
         if u.username or u.password or not (u.scheme == "https" or (u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost", "::1"))):
             raise ValueError("DMS_URL: serve https (http solo per un DMS di prova su questo PC)")
-    for k in ("MODULI_DIR", "MODULI_ARCHIVIO"):
+    for k in ("MODULI_DIR", "MODULI_ARCHIVIO", "MODELLI_LAVORO"):
         if k in values and (not re.fullmatch(r"[A-Za-z0-9 _.\-]{1,80}", values[k]) or values[k].startswith("..")):
             raise ValueError(f"{k}: solo il nome di una cartella dentro quella del programma")
     for k in ("MAIL_DONE_FOLDER", "MAIL_ERROR_FOLDER", "MAIL_QUARANTINE_FOLDER"):
