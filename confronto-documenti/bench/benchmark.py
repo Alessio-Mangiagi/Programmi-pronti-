@@ -350,7 +350,7 @@ def confronta(pa: Path, pb: Path, dpi: int, tolerant: bool, preprocess: bool):
     segn = []
     for ia, ib in c.align_pages(ta, tb, tolerant=tolerant):
         if ia is None or ib is None:
-            segn.append({"pagina": True, "pag_a": ia, "pag_b": ib, "a": "", "b": ""})
+            segn.append({"pagina": True, "pag_a": ia, "pag_b": ib, "a": "", "b": "", "incerta": False})
             continue
         ops = c.line_ops(c.normalize_lines(ta[ia]), c.normalize_lines(tb[ib]), tolerant=tolerant)
         for op in ops:
@@ -367,7 +367,7 @@ def confronta(pa: Path, pb: Path, dpi: int, tolerant: bool, preprocess: bool):
                 b = op["text"] if op["type"] == "add" else ""
                 da, dbb = a, b
             segn.append({"pagina": False, "pag_a": ia, "pag_b": ib, "a": a, "b": b,
-                         "diff_a": da, "diff_b": dbb})
+                         "diff_a": da, "diff_b": dbb, "incerta": bool(op.get("incerta"))})
     return segn, len(ta)
 
 
@@ -393,13 +393,17 @@ def _colpita(parole: list[str], evidenziato: str) -> bool:
 
 
 def valuta(segn: list[dict], verita: list[dict], n_pag_a: int) -> dict:
+    """Abbina segnalazioni e modifiche vere. Una modifica trovata solo da
+    segnalazioni "incerte" (grigie nel report) conta come trovata_incerta: è
+    visibile ma declassata, quindi un difetto da tenere a zero."""
     trovate = [False] * len(verita)
+    certe = [False] * len(verita)
     usata = [False] * len(segn)
     for vi, v in enumerate(verita):
         if v["tipo"] == "pagina_aggiunta":
             for si, s in enumerate(segn):
                 if s["pagina"] and s["pag_a"] is None and s["pag_b"] == v["pag_b"]:
-                    trovate[vi] = usata[si] = True
+                    trovate[vi] = certe[vi] = usata[si] = True
             continue
         for si, s in enumerate(segn):
             if s["pagina"] or s["pag_a"] != v["pag_a"]:
@@ -411,19 +415,18 @@ def valuta(segn: list[dict], verita: list[dict], n_pag_a: int) -> dict:
                 ok = _colpita(pa, s["diff_a"]) or _colpita(pb, s["diff_b"])
             if ok:
                 trovate[vi] = usata[si] = True
+                certe[vi] = certe[vi] or not s["incerta"]
     # pagine aggiunte: le righe interne non sono "finte"
     pag_extra = {v["pag_b"] for v in verita if v["tipo"] == "pagina_aggiunta"}
-    finte = [s for si, s in enumerate(segn) if not usata[si] and s["pag_b"] not in pag_extra]
-    pag_mod = {v["pag_a"] for v in verita if "pag_a" in v}
-    pag_pulite = [i for i in range(n_pag_a) if i not in pag_mod]
-    pulite_segnalate = sum(1 for i in pag_pulite if any(s["pag_a"] == i for s in finte))
+    libere = [s for si, s in enumerate(segn) if not usata[si] and s["pag_b"] not in pag_extra]
+    finte = [s for s in libere if not s["incerta"]]
     return {
-        "verita": [dict(v, trovata=t) for v, t in zip(verita, trovate)],
+        "verita": [dict(v, trovata=t, trovata_incerta=t and not ce)
+                   for v, t, ce in zip(verita, trovate, certe)],
         "finte": len(finte),
+        "finte_incerte": len(libere) - len(finte),
         "esempi_finte": [(s["a"], s["b"]) for s in finte[:4]],
         "pagine": n_pag_a,
-        "pagine_pulite": len(pag_pulite),
-        "pulite_segnalate": pulite_segnalate,
     }
 
 # --------------------------------------------------------------------------
@@ -478,10 +481,9 @@ def main() -> int:
     for variante, dpi, tol, pre in CONFIG:
         t0 = time.time()
         agg = {"variante": variante, "dpi": dpi, "tollerante": tol, "migliora": pre,
-               "per_tipo": {}, "vere": 0, "trovate": 0, "finte": 0, "pagine": 0,
-               "pagine_pulite": 0, "pulite_segnalate": 0, "critiche_perse": [], "esempi_finte": []}
-        # la cache OCR dell'app non distingue "migliora scansioni": cartelle separate
-        c.CACHE_DIR = lavoro / ("cache_ocr" if pre else "cache_ocr_grezza")
+               "per_tipo": {}, "vere": 0, "trovate": 0, "trovate_incerte": 0, "finte": 0,
+               "finte_incerte": 0, "pagine": 0, "critiche_perse": [], "esempi_finte": []}
+        c.CACHE_DIR = lavoro / "cache_ocr"   # separata da quella dell'app
         for k, (files, ver, n_a) in enumerate(coppie):
             segn, _ = confronta(files[(variante, "a")], files[(variante, "b")], dpi, tol, pre)
             v = valuta(segn, ver, n_a)
@@ -491,21 +493,25 @@ def main() -> int:
                 t[1] += r["trovata"]
                 agg["vere"] += 1
                 agg["trovate"] += r["trovata"]
+                agg["trovate_incerte"] += r["trovata_incerta"]
                 if not r["trovata"] and r["tipo"] in CRITICI:
                     agg["critiche_perse"].append({"coppia": k, "tipo": r["tipo"], "a": r["a"], "b": r["b"]})
             agg["finte"] += v["finte"]
+            agg["finte_incerte"] += v["finte_incerte"]
             agg["pagine"] += v["pagine"]
-            agg["pagine_pulite"] += v["pagine_pulite"]
-            agg["pulite_segnalate"] += v["pulite_segnalate"]
             if len(agg["esempi_finte"]) < 6:
                 agg["esempi_finte"] += v["esempi_finte"][:2]
         agg["secondi"] = round(time.time() - t0, 1)
         agg["recall"] = agg["trovate"] / agg["vere"] if agg["vere"] else 0
-        agg["precisione"] = agg["trovate"] / (agg["trovate"] + agg["finte"]) if agg["trovate"] + agg["finte"] else 1
+        # precisione delle segnalazioni piene (non incerte): quanto di ciò che il
+        # report mette in evidenza è una differenza vera
+        piene = agg["trovate"] - agg["trovate_incerte"]
+        agg["precisione"] = piene / (piene + agg["finte"]) if piene + agg["finte"] else 1
         risultati.append(agg)
         print(f"{variante:17s} {dpi}dpi tol={'sì' if tol else 'no'} pre={'sì' if pre else 'no'}: "
-              f"trovate {agg['trovate']}/{agg['vere']} ({agg['recall']:.0%}), finte {agg['finte']} "
-              f"({agg['finte'] / agg['pagine']:.1f}/pag), precisione {agg['precisione']:.0%}, "
+              f"trovate {agg['trovate']}/{agg['vere']} ({agg['recall']:.0%}, incerte {agg['trovate_incerte']}), "
+              f"finte {agg['finte'] / agg['pagine']:.1f}/pag + incerte "
+              f"{agg['finte_incerte'] / agg['pagine']:.1f}/pag, precisione {agg['precisione']:.0%}, "
               f"{agg['secondi']}s", flush=True)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -521,12 +527,17 @@ def scrivi_report(ris: list[dict], args, path: Path):
          f"{args.coppie} coppie di documenti sintetici da {args.pagine} pagine, "
          f"{args.modifiche} modifiche note per coppia (+1 pagina aggiunta in una coppia su 4), "
          f"seed {args.seed}. Generato da `bench/benchmark.py`.", "",
-         "| Documenti | DPI | Tollerante | Migliora | Trovate | Segnalazioni finte / pag | Pagine identiche segnalate | Precisione |",
+         "*Trovate*: modifiche vere segnalate (tra parentesi quante solo come incerte, in grigio). "
+         "*Finte / pag*: segnalazioni piene che non corrispondono a modifiche vere. "
+         "*Incerte / pag*: segnalazioni grigie \"probabile errore di lettura\" (solo in modo "
+         "tollerante). *Precisione*: quota di segnalazioni piene che sono differenze vere.", "",
+         "| Documenti | DPI | Tollerante | Migliora | Trovate | Finte / pag | Incerte / pag | Precisione |",
          "|---|---|---|---|---|---|---|---|"]
     for a in ris:
+        inc = f", {a['trovate_incerte']} incerte" if a["trovate_incerte"] else ""
         r.append(f"| {a['variante']} | {a['dpi']} | {'sì' if a['tollerante'] else 'no'} | "
-                 f"{'sì' if a['migliora'] else 'no'} | {a['trovate']}/{a['vere']} ({a['recall']:.0%}) | "
-                 f"{a['finte'] / a['pagine']:.1f} | {a['pulite_segnalate']}/{a['pagine_pulite']} | "
+                 f"{'sì' if a['migliora'] else 'no'} | {a['trovate']}/{a['vere']} ({a['recall']:.0%}{inc}) | "
+                 f"{a['finte'] / a['pagine']:.1f} | {a['finte_incerte'] / a['pagine']:.1f} | "
                  f"{a['precisione']:.0%} |")
     r += ["", "## Per tipo di modifica (trovate / totali)", ""]
     tipi = sorted({t for a in ris for t in a["per_tipo"]})

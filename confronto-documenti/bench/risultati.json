@@ -40,10 +40,10 @@
   },
   "vere": 132,
   "trovate": 132,
+  "trovate_incerte": 0,
   "finte": 0,
+  "finte_incerte": 0,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 0,
   "critiche_perse": [],
   "esempi_finte": [],
   "secondi": 2.3,
@@ -78,7 +78,7 @@
    ],
    "numero": [
     16,
-    14
+    16
    ],
    "data": [
     4,
@@ -90,28 +90,15 @@
    ]
   },
   "vere": 132,
-  "trovate": 130,
+  "trovate": 132,
+  "trovate_incerte": 0,
   "finte": 0,
+  "finte_incerte": 0,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 0,
-  "critiche_perse": [
-   {
-    "coppia": 3,
-    "tipo": "numero",
-    "a": "Importo dei lavori a corpo: euro 385.649,80",
-    "b": "Importo dei lavori a corpo: euro 385.949,80"
-   },
-   {
-    "coppia": 8,
-    "tipo": "numero",
-    "a": "m² 364,40 x 123,65 = 45.058,06",
-    "b": "m² 364,40 x 123,65 = 45.058,09"
-   }
-  ],
+  "critiche_perse": [],
   "esempi_finte": [],
-  "secondi": 3.1,
-  "recall": 0.9848484848484849,
+  "secondi": 3.4,
+  "recall": 1.0,
   "precisione": 1.0
  },
  {
@@ -155,10 +142,10 @@
   },
   "vere": 132,
   "trovate": 132,
+  "trovate_incerte": 0,
   "finte": 106,
+  "finte_incerte": 0,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
   "critiche_perse": [],
   "esempi_finte": [
    [
@@ -218,7 +205,7 @@
    ],
    "numero": [
     16,
-    14
+    16
    ],
    "data": [
     4,
@@ -230,25 +217,12 @@
    ]
   },
   "vere": 132,
-  "trovate": 130,
-  "finte": 96,
+  "trovate": 132,
+  "trovate_incerte": 0,
+  "finte": 17,
+  "finte_incerte": 1,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
-  "critiche_perse": [
-   {
-    "coppia": 3,
-    "tipo": "numero",
-    "a": "Importo dei lavori a corpo: euro 385.649,80",
-    "b": "Importo dei lavori a corpo: euro 385.949,80"
-   },
-   {
-    "coppia": 8,
-    "tipo": "numero",
-    "a": "m² 364,40 x 123,65 = 45.058,06",
-    "b": "m² 364,40 x 123,65 = 45.058,09"
-   }
-  ],
+  "critiche_perse": [],
   "esempi_finte": [
    [
     "m3 736,00 x 82,59 = 60.786,24",
@@ -259,25 +233,29 @@
     "Mm 27,14 x 128,82 = 3.496,17"
    ],
    [
-    "m? 584,41 x 102,25 = 59.755,92",
-    "m3 584,41 x 102,25 = 59.755,92"
-   ],
-   [
-    "m? 735,43 x 84,62 = 62.232,09",
-    ""
+    "Mm? 689,04 x 19,63 = 13.525,86",
+    "m? 689,04 x 19,63 = 13.525,86"
    ],
    [
     "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. 1",
     "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. Il"
    ],
    [
-    "capitolato. Il programma esecutivo deve essere aggiornato a ogni variazione sostanziale.",
-    "capitolato. ll programma esecutivo deve essere aggiornato a ogni variazione sostanziale."
+    "La documentazione as built va consegnata entro trenta giorni dalla fine lavori. {I",
+    "La documentazione as built va consegnata entro trenta giorni dalla fine lavori. Il"
+   ],
+   [
+    "",
+    "oO"
+   ],
+   [
+    "(i)",
+    ""
    ]
   ],
-  "secondi": 3.9,
-  "recall": 0.9848484848484849,
-  "precisione": 0.5752212389380531
+  "secondi": 3.8,
+  "recall": 1.0,
+  "precisione": 0.8859060402684564
  },
  {
   "variante": "scansione_buona",
@@ -307,7 +285,7 @@
    ],
    "numero": [
     16,
-    14
+    16
    ],
    "data": [
     4,
@@ -319,54 +297,41 @@
    ]
   },
   "vere": 132,
-  "trovate": 130,
-  "finte": 75,
+  "trovate": 132,
+  "trovate_incerte": 0,
+  "finte": 14,
+  "finte_incerte": 0,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
-  "critiche_perse": [
-   {
-    "coppia": 3,
-    "tipo": "numero",
-    "a": "Importo dei lavori a corpo: euro 385.649,80",
-    "b": "Importo dei lavori a corpo: euro 385.949,80"
-   },
-   {
-    "coppia": 8,
-    "tipo": "numero",
-    "a": "m² 364,40 x 123,65 = 45.058,06",
-    "b": "m² 364,40 x 123,65 = 45.058,09"
-   }
-  ],
+  "critiche_perse": [],
   "esempi_finte": [
    [
-    "m3 436,49 x 43,52 = 18.996,04",
-    "m? 436,49 x 43,52 = 18.996,04"
+    "ms 689,04 x 19,63 = 13.525,86",
+    "m3 689,04 x 19,63 = 13.525,86"
    ],
    [
-    "m3 425,12 x 167,52 = 71.216,10",
-    "m? 425,12 x 167,52 = 71.216,10"
+    "m3 696,84 x 27,74 = 19.330,34",
+    "Mm? 696,84 x 27,74 = 19.330,34"
    ],
    [
-    "m3 30,39 x 114,19 = 3.470,23",
-    "m? 30,39 x 114,19 = 3.470,23"
+    "Mm 746,36 x 22,75 = 16.979,69",
+    "m 746,36 x 22,75 = 16.979,69"
    ],
    [
-    "committente può sospendere i lavori per ragioni di pubblico interesse. Il getto del",
-    "committente può sospendere i lavori per ragioni di pubblico interesse. ll getto del"
+    "m3 786,95 x 94,62 = 74.461,21",
+    "Mm? 786,95 x 94,62 = 74.461,21"
    ],
    [
-    "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. Il",
-    "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. II"
+    "m? 37,27 x 74,34 = 2.770,65",
+    "Mm? 37,27 x 74,34 = 2.770,65"
    ],
    [
-    "m? 792,05 x 178,34 = 141.254,20",
-    "m3 792,05 x 178,34 = 141.254,20"
+    "m3 738,02 x 57,35 = 42.325,45",
+    "ms 738,02 x 57,35 = 42.325,45"
    ]
   ],
-  "secondi": 222.1,
-  "recall": 0.9848484848484849,
-  "precisione": 0.6341463414634146
+  "secondi": 223.1,
+  "recall": 1.0,
+  "precisione": 0.9041095890410958
  },
  {
   "variante": "scansione_scarsa",
@@ -409,10 +374,10 @@
   },
   "vere": 132,
   "trovate": 132,
+  "trovate_incerte": 0,
   "finte": 625,
+  "finte_incerte": 0,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
   "critiche_perse": [],
   "esempi_finte": [
    [
@@ -440,7 +405,7 @@
     "An. 17 - Sicurezza in cantiere"
    ]
   ],
-  "secondi": 147.1,
+  "secondi": 147.5,
   "recall": 1.0,
   "precisione": 0.17437252311756934
  },
@@ -472,7 +437,7 @@
    ],
    "numero": [
     16,
-    14
+    16
    ],
    "data": [
     4,
@@ -484,54 +449,41 @@
    ]
   },
   "vere": 132,
-  "trovate": 130,
-  "finte": 381,
+  "trovate": 132,
+  "trovate_incerte": 0,
+  "finte": 198,
+  "finte_incerte": 79,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
-  "critiche_perse": [
-   {
-    "coppia": 3,
-    "tipo": "numero",
-    "a": "Importo dei lavori a corpo: euro 385.649,80",
-    "b": "Importo dei lavori a corpo: euro 385.949,80"
-   },
-   {
-    "coppia": 8,
-    "tipo": "numero",
-    "a": "m² 364,40 x 123,65 = 45.058,06",
-    "b": "m² 364,40 x 123,65 = 45.058,09"
-   }
-  ],
+  "critiche_perse": [],
   "esempi_finte": [
-   [
-    "Commessa 2024/75 - toglio 1",
-    "Commessa 2024/75 - foglio 1"
-   ],
    [
     "Mm 486,57 x 53,91 = 26.230,99",
     "m 486,57 x 53.91 = 26.230,99"
+   ],
+   [
+    "Mm 27.14 x 128,82 = 3.496,17",
+    "m 27,14 x 128,82 = 3.496,17"
    ],
    [
     "kg 361.23 x 70,51 = 25.470,33",
     "kg 361,23 x 70,51 a 25.470.33"
    ],
    [
-    "E.03.063 Rinterro con materiale proveniente dagli scavi",
-    "£.03.063 Rinterro con materiale proveniente dagli scavi"
-   ],
-   [
-    "CAPITOLATO SPECIALE D'APPALTO - parte 1",
-    "CAPITOLATO SPECIALE D'APPALTO - parle 1"
+    "C€.19.081 Calcestruzzo per strutture in elevazione C30/37",
+    "C.19.081 Calcestruzzo per strutture in elevazione C30/37"
    ],
    [
     "Art. 17 - Sicurezza in cantiere",
     "An. 17 - Sicurezza in cantiere"
+   ],
+   [
+    "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. I",
+    "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. il"
    ]
   ],
-  "secondi": 4.0,
-  "recall": 0.9848484848484849,
-  "precisione": 0.25440313111545987
+  "secondi": 3.9,
+  "recall": 1.0,
+  "precisione": 0.4
  },
  {
   "variante": "scansione_scarsa",
@@ -574,10 +526,10 @@
   },
   "vere": 132,
   "trovate": 132,
+  "trovate_incerte": 0,
   "finte": 613,
+  "finte_incerte": 0,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
   "critiche_perse": [],
   "esempi_finte": [
    [
@@ -605,7 +557,7 @@
     "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei giorni feriali. il"
    ]
   ],
-  "secondi": 218.1,
+  "secondi": 219.6,
   "recall": 1.0,
   "precisione": 0.17718120805369128
  },
@@ -637,7 +589,7 @@
    ],
    "numero": [
     16,
-    14
+    16
    ],
    "data": [
     4,
@@ -649,41 +601,28 @@
    ]
   },
   "vere": 132,
-  "trovate": 130,
-  "finte": 372,
+  "trovate": 132,
+  "trovate_incerte": 0,
+  "finte": 185,
+  "finte_incerte": 77,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
-  "critiche_perse": [
-   {
-    "coppia": 3,
-    "tipo": "numero",
-    "a": "Importo dei lavori a corpo: euro 385.649,80",
-    "b": "Importo dei lavori a corpo: euro 385.949,80"
-   },
-   {
-    "coppia": 8,
-    "tipo": "numero",
-    "a": "m² 364,40 x 123,65 = 45.058,06",
-    "b": "m² 364,40 x 123,65 = 45.058,09"
-   }
-  ],
+  "critiche_perse": [],
   "esempi_finte": [
-   [
-    "Commessa 2024/75 - toglio 1",
-    "Commessa 2024/75 - foglio 1"
-   ],
    [
     "E.11.027 Calcestruzzo per fondazioni ciasse C25/30",
     ""
    ],
    [
-    "E.12.118 Acciaio in barre per armature B450C",
-    "€.12.118 Acciaio in barre per armature B450C"
+    "m® 736,00 x 82.59 = 60.786,24",
+    ""
    ],
    [
-    "C.19.081 Caicestruzzo per strutture in elevazione C30/37",
-    "C.19.081 Calcestruzzo per strutture in elevazione C30/37"
+    "£.01.017 Tubazione in PVC per scarichi diametro 125",
+    "£.01.017 Tubazione in PVC per scarichi diametro 1 25"
+   ],
+   [
+    "mm 30,39 x 114,19 = 3.470.23",
+    "m 30,39 x 114,19 = 3.470,23"
    ],
    [
     "Art. 17 - Sicurezza in cantiere",
@@ -695,8 +634,8 @@
    ]
   ],
   "secondi": 4.0,
-  "recall": 0.9848484848484849,
-  "precisione": 0.2589641434262948
+  "recall": 1.0,
+  "precisione": 0.416403785488959
  },
  {
   "variante": "scansione_scarsa",
@@ -726,7 +665,7 @@
    ],
    "numero": [
     16,
-    14
+    16
    ],
    "data": [
     4,
@@ -738,25 +677,12 @@
    ]
   },
   "vere": 132,
-  "trovate": 130,
-  "finte": 414,
+  "trovate": 132,
+  "trovate_incerte": 0,
+  "finte": 278,
+  "finte_incerte": 18,
   "pagine": 48,
-  "pagine_pulite": 2,
-  "pulite_segnalate": 2,
-  "critiche_perse": [
-   {
-    "coppia": 3,
-    "tipo": "numero",
-    "a": "Importo dei lavori a corpo: euro 385.649,80",
-    "b": "Importo dei lavori a corpo: euro 385.949,80"
-   },
-   {
-    "coppia": 8,
-    "tipo": "numero",
-    "a": "m² 364,40 x 123,65 = 45.058,06",
-    "b": "m² 364,40 x 123,65 = 45.058,09"
-   }
-  ],
+  "critiche_perse": [],
   "esempi_finte": [
    [
     "Mm? 360,51 x 64,54 = 23.267,32",
@@ -771,8 +697,8 @@
     "C.14.065 Pavimento in gres porca 30x60"
    ],
    [
-    "C.12.029 Isolamento termico in pannelli EPS 12 cm",
-    "©.12.029 Isolamento termico in pannelli EPS 12 cm"
+    "€.17.013 Serramento in alluminio a taglio termico",
+    "C.17.013 Serramento in alluminio a taglio termico"
    ],
    [
     "Art. 17 - Sicurezza in cantiere i",
@@ -783,8 +709,8 @@
     "Le lavorazioni rumorose sono consentite dalle ore 8 alle ore 18 dei an feriali. Il"
    ]
   ],
-  "secondi": 212.6,
-  "recall": 0.9848484848484849,
-  "precisione": 0.23897058823529413
+  "secondi": 212.9,
+  "recall": 1.0,
+  "precisione": 0.32195121951219513
  }
 ]
