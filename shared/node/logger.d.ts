@@ -11,6 +11,8 @@ export interface OpzioniLoggerInput {
   cartella: string;
   /** Aggiunge il transport console fuori da produzione. Default: true. */
   consoleInSviluppo?: boolean;
+  /** Id dell'app nel Portale: gli 'error' diventano avvisi per gli admin. */
+  avvisi?: string;
 }
 
 /**
