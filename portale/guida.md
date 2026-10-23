@@ -65,6 +65,8 @@ Se il tuo account è amministratore (o accedi da una postazione abilitata), in a
 - **Gestire gli utenti** — aggiungere o rimuovere persone, anche importandole in blocco da un file Excel o CSV.
 - **Consultare gli accessi** — vedere chi ha aperto o avviato quale programma, con data e ora.
 
+Accanto ad Amministrazione c'è **Avvisi**: qui finiscono i problemi segnalati dai programmi (un lavoro automatico fallito, un'email non partita, scadenze nuove, un programma che si è fermato da solo...). Il numero accanto alla voce dice quanti avvisi sono da vedere, ed è rosso se tra questi c'è un errore. Appena entri, se ci sono avvisi nuovi, si apre un riquadro con i primi: **Apri gli avvisi** porta alla pagina, **Più tardi** lo chiude. Quando hai letto un avviso premi **Segna come visto**: passa nello storico, con il tuo nome e l'ora.
+
 I nuovi utenti ricevono una password provvisoria e la cambiano al primo accesso.
 
 Sulle card dei programmi accesi vedi anche un pulsante quadrato **Ferma**: spegne il programma e libera memoria sul server. Chiede conferma, perché **chi lo sta usando in quel momento perde il lavoro non salvato**: usalo a fine giornata o su programmi che nessuno sta usando.
