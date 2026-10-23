@@ -75,9 +75,26 @@ trascinaci sopra un altro file.
 | **Lingua OCR** | La lingua del documento. |
 | **Confronto tollerante** | Ignora gli errori tipici di lettura (0/O, l/1, punteggiatura) che creano differenze finte. |
 | **Migliora scansioni** | Raddrizza e pulisce le pagine scansionate prima di leggerle. |
-| **Righe da ignorare** | In *Opzioni avanzate*: una regola per riga per escludere numeri di pagina, date, timbri di revisione. Esempi: `Pagina \d+ di \d+`, `\d{2}/\d{2}/\d{4}`. |
+| **Righe da ignorare** | In *Opzioni avanzate*: un testo per riga; le righe del documento che lo contengono non vengono confrontate (maiuscole e minuscole indifferenti). Vedi sotto. |
 
 Le impostazioni restano salvate per la volta successiva.
+
+### Righe da ignorare
+
+Scrivi il testo così come compare nel documento, uno per riga. Viene tolta dal
+confronto **tutta la riga** che lo contiene. Per le parti che cambiano da una
+pagina o da una versione all'altra ci sono due simboli:
+
+| Simbolo | Vale | Esempio | Toglie le righe come |
+|---------|------|---------|----------------------|
+| `#` | un numero qualsiasi | `Pagina # di #` | Pagina 3 di 12 · PAGINA 10 di 40 |
+| `#` | | `Data #/#/#` | Data 21/10/2026 |
+| `#` | | `Rev. #` | Rev. 2 · rev. 15 |
+| `*` | testo qualsiasi | `Timbro * del #` | Timbro ufficio tecnico del 12 |
+| | testo semplice | `Documento riservato` | Documento riservato – copia controllata |
+
+Attenzione a non scrivere testi troppo generici: con `Pagina` da solo viene
+tolta ogni riga che contiene la parola "pagina".
 
 ---
 

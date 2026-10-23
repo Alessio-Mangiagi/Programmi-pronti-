@@ -49,7 +49,7 @@ helpBtn.addEventListener('click', () => showHelp(help.hidden));
 document.querySelector('#helpClose').addEventListener('click', () => { showHelp(false); helpBtn.focus(); });
 if (location.hash === '#come') showHelp(true);   // link diretto alla guida
 
-// Pattern "ignora" (regex per riga) persistiti tra sessioni in localStorage.
+// Filtri "ignora" (testo in chiaro per riga, jolly # e *) persistiti tra sessioni in localStorage.
 const ignoreBox = document.querySelector('#ignore');
 // "><(((º> sabusabu <º)))><"
 ignoreBox.value = localStorage.getItem('ignorePatterns') || '';
