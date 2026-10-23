@@ -38,6 +38,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import cosedil_sso  # noqa: E402  (import dopo il sys.path: è l'unico modo di trovarlo)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+# Eccezioni nelle richieste (Flask le logga) anche agli admin del portale.
+notifiche.avvisi.collega_log("scadenzario")
 # Tetto al corpo delle richieste: un allegato oltre il limite viene rifiutato
 # prima di finire su disco (margine per i campi multipart).
 app.config["MAX_CONTENT_LENGTH"] = config.ALLEGATI_MAX_BYTE + 1024 * 1024
