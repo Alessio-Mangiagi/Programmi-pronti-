@@ -10,7 +10,7 @@ import { opzioniLogger } from '../../../shared/node/logger';
 import { APP_DIR } from '../config';
 
 const logger = winston.createLogger(
-  opzioniLogger(winston, { servizio: 'verifica-requisiti', cartella: APP_DIR })
+  opzioniLogger(winston, { servizio: 'verifica-requisiti', cartella: APP_DIR, avvisi: 'requisiti' })
 );
 
 export default logger;
