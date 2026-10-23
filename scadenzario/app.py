@@ -1902,13 +1902,22 @@ def _giro_notifiche_dovuto(adesso: datetime) -> bool:
 def _lavori_di_sfondo():
     time.sleep(30)  # lascia finire l'avvio prima del primo giro
     while True:
+        # Due lavori, due try: un backup rotto non deve saltare le notifiche.
+        # Ogni errore arriva anche agli admin del Portale (pagina Avvisi).
         try:
             if config.NOTIFICHE_AUTOMATICHE and _giro_notifiche_dovuto(datetime.now()):
                 esito = notifiche.esegui_notifiche()
                 print(f"Giro notifiche automatico: {esito['inviate']} nuove.", flush=True)
-            backup.backup_giornaliero()
-        except Exception:
+        except Exception as exc:
             traceback.print_exc()  # un giro fallito non deve fermare i successivi
+            notifiche.avvisi.segnala("scadenzario", "Giro notifiche automatico fallito", repr(exc),
+                                     livello="errore", chiave="giro-notifiche")
+        try:
+            backup.backup_giornaliero()
+        except Exception as exc:
+            traceback.print_exc()
+            notifiche.avvisi.segnala("scadenzario", "Backup giornaliero non riuscito", repr(exc),
+                                     livello="errore", chiave="backup")
         time.sleep(15 * 60)
 
 
