@@ -63,6 +63,7 @@ import ai_smistamento
 import api_posta
 import attivita
 import auth
+import avvisi_portale
 import cassaforte
 import env_config
 import mail_send
@@ -1125,6 +1126,7 @@ def _setup_logging():
     file_handler.setFormatter(fmt)
     root.addHandler(file_handler)
     root.addHandler(LOGS)
+    avvisi_portale.collega_log()  # errori anche nella pagina Avvisi del Portale
     logging.getLogger("vfp_transfer").addFilter(_UploadPartFilter())
     # eccezioni non gestite in qualunque thread finiscono nel registro invece di sparire
     sys.excepthook = lambda *exc: logging.critical("Errore non gestito", exc_info=exc)

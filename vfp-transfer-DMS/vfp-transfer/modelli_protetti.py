@@ -40,6 +40,7 @@ from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import avvisi_portale
 import env_config
 
 log = logging.getLogger("modelli_protetti")
@@ -460,7 +461,20 @@ def _aggiungi_avviso(stato, avviso, ora):
     avviso = {"id": f"{ora:%Y%m%d-%H%M%S}-{secrets.token_hex(3)}", "data": ora.isoformat(timespec="seconds"),
               "visto_da": "", "visto_il": "", **avviso}
     stato["avvisi"] = (stato.get("avvisi", []) + [avviso])[-MAX_AVVISI:]
+    _al_portale(avviso)
     return avviso
+
+
+def _al_portale(avviso):
+    """Lo stesso avviso anche nella pagina Avvisi del Portale, per gli admin che non aprono la Panoramica."""
+    if avviso.get("tipo") == "errore":
+        avvisi_portale.segnala("Controllo dei modelli Word non riuscito", avviso.get("testo", ""),
+                               livello="errore", chiave="modelli-errore")
+        return
+    righe = [f"{k.capitalize()}: {', '.join(avviso[k][:20])}" + (" …" if len(avviso[k]) > 20 else "")
+             for k in ("modificati", "aggiunti", "rimossi", "illeggibili") if avviso.get(k)]
+    avvisi_portale.segnala("Modelli Word cambiati nella cartella condivisa", "\n".join(righe),
+                           livello="attenzione", chiave="modelli-modifiche")
 
 
 def controlla_modelli(s, path=None, ora=None, forza=False):
