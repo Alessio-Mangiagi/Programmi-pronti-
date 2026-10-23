@@ -645,21 +645,29 @@ def run_ocr(image_png: bytes, model: str, ollama_url: str, timeout: int,
 # Cache OCR su disco (chiave su hash contenuto, senza renderizzare i pixel)
 # --------------------------------------------------------------------------
 
-def _cache_path(doc_hash: str, page: int, dpi: int, model: str, lang: str) -> Path:
+def _cache_path(doc_hash: str, page: int, dpi: int, model: str, lang: str,
+                preprocess: bool = True) -> Path:
+    # "Migliora scansioni" spento cambia il testo letto: chiave a parte. Con
+    # l'opzione accesa (default) la chiave resta quella di prima, così la cache
+    # esistente rimane valida.
     raw = f"{PIPELINE_VERSION}|{model}|{lang}|{dpi}|{doc_hash}|{page}"
+    if not preprocess:
+        raw += "|grezza"
     return CACHE_DIR / f"{hashlib.sha256(raw.encode()).hexdigest()}.txt"
 
 
-def cache_get(doc_hash: str, page: int, dpi: int, model: str, lang: str) -> str | None:
-    path = _cache_path(doc_hash, page, dpi, model, lang)
+def cache_get(doc_hash: str, page: int, dpi: int, model: str, lang: str,
+              preprocess: bool = True) -> str | None:
+    path = _cache_path(doc_hash, page, dpi, model, lang, preprocess)
     if path.is_file():
         return path.read_text(encoding="utf-8")
     return None
 
 
-def cache_put(doc_hash: str, page: int, dpi: int, model: str, lang: str, text: str):
+def cache_put(doc_hash: str, page: int, dpi: int, model: str, lang: str, text: str,
+              preprocess: bool = True):
     CACHE_DIR.mkdir(exist_ok=True)
-    _cache_path(doc_hash, page, dpi, model, lang).write_text(text, encoding="utf-8")
+    _cache_path(doc_hash, page, dpi, model, lang, preprocess).write_text(text, encoding="utf-8")
 
 
 def prune_cache(max_age_days: int = 30):
@@ -682,12 +690,14 @@ def _needs_ocr(doc: Document, i: int) -> bool:
     return len(doc.embedded_text(i)) < MIN_EMBEDDED_CHARS
 
 
-def ocr_needed_count(doc: Document, model: str, dpi: int, lang: str) -> int:
+def ocr_needed_count(doc: Document, model: str, dpi: int, lang: str,
+                     preprocess: bool | None = None) -> int:
     """Quante pagine richiederanno OCR vero (né embedded né cache)."""
+    pre = OCR_PREPROCESS if preprocess is None else preprocess
     h = doc.content_hash()
     return sum(1 for i in range(doc.count)
                if _needs_ocr(doc, i)
-               and cache_get(h, i, dpi, model, lang) is None)
+               and cache_get(h, i, dpi, model, lang, pre) is None)
 
 
 # --------------------------------------------------------------------------
@@ -706,6 +716,7 @@ def collect_texts(doc: Document, model: str, ollama_url: str = OLLAMA_URL_DEFAUL
     """
     n = doc.count
     h = doc.content_hash()
+    pre = OCR_PREPROCESS if preprocess is None else preprocess   # parte della chiave cache
     texts: list[str | None] = [None] * n
     sources = ["ocr"] * n
 
@@ -715,7 +726,7 @@ def collect_texts(doc: Document, model: str, ollama_url: str = OLLAMA_URL_DEFAUL
             texts[i] = doc.embedded_text(i)
             sources[i] = "testo"
             continue
-        cached = cache_get(h, i, dpi, model, lang)
+        cached = cache_get(h, i, dpi, model, lang, pre)
         if cached is not None:
             texts[i] = cached
             sources[i] = "cache"
@@ -730,7 +741,7 @@ def collect_texts(doc: Document, model: str, ollama_url: str = OLLAMA_URL_DEFAUL
         png = doc.render_full(i, dpi)
         text = run_ocr(png, model, ollama_url, timeout, lang=lang,
                        preprocess=preprocess)
-        cache_put(h, i, dpi, model, lang, text)
+        cache_put(h, i, dpi, model, lang, text, pre)
         return i, text
 
     if need:
@@ -823,28 +834,51 @@ def compile_ignore(raw_filters: list[str]) -> list[re.Pattern]:
     return compiled
 
 
-# Confusabili OCR: cifre/simboli verso la lettera visivamente equivalente.
-# Usato SOLO in modo tollerante. Non fonde cifre diverse tra loro, quindi
-# importi distinti restano distinti.
+# Confusabili OCR: lettera/simbolo verso la cifra (o lettera) visivamente
+# equivalente. Usato SOLO in modo tollerante. Va sempre da lettera a cifra e
+# mai da cifra a cifra, così due cifre diverse non diventano mai uguali:
+# prima 6 e 9 finivano entrambe su "g" e 385.649,80 = 385.949,80 (misurato
+# con bench/benchmark.py).
 _OCR_CONFUSABLES = str.maketrans({
-    "0": "o", "1": "l", "|": "l", "!": "l", "5": "s", "8": "b",
-    "2": "z", "6": "g", "9": "g",
+    "o": "0", "l": "1", "i": "1", "|": "1", "!": "1", "s": "5", "b": "8",
+    "z": "2", "g": "9", "€": "e", "£": "e", "©": "c",
 })
+# m² / m³ letti come m2, m3, m?, m°: in modo tollerante sono tutti "m".
+_UNITA_M = re.compile(r"\bm[23]\b")
 
 
 def norm_compare(s: str, tolerant: bool) -> str:
     """
     Chiave di confronto. In modo tollerante ignora il rumore OCR:
-    minuscole, accenti rimossi, confusabili normalizzati, punteggiatura via.
+    minuscole, accenti rimossi, confusabili normalizzati, unità m²/m³
+    unificate, punteggiatura via.
     """
     if not tolerant:
         return s
     s = s.lower()
-    s = unicodedata.normalize("NFKD", s)
+    s = unicodedata.normalize("NFKD", s)          # anche ² ³ -> 2 3
     s = "".join(c for c in s if not unicodedata.combining(c))
+    s = _UNITA_M.sub("m", s)
     s = s.translate(_OCR_CONFUSABLES)
     s = re.sub(r"[^a-z0-9 ]+", " ", s)
     return " ".join(s.split())
+
+
+def _solo_rumore(segs_a: list[dict], segs_b: list[dict]) -> bool:
+    """True se una riga cambiata differisce solo per parole lette in modo
+    leggermente diverso (es. "toglio"/"foglio"): stesse parole a coppie, senza
+    cifre, lunghe almeno 4 lettere e molto simili. Numeri, parole aggiunte o
+    tolte (un "non") e parole davvero diverse non sono mai rumore."""
+    da = [s["s"] for s in segs_a if not s["eq"]]
+    db = [s["s"] for s in segs_b if not s["eq"]]
+    if not da or len(da) != len(db):
+        return False
+    for wa, wb in zip(da, db):
+        if any(ch.isdigit() for ch in wa + wb) or min(len(wa), len(wb)) < 4:
+            return False
+        if difflib.SequenceMatcher(a=wa.lower(), b=wb.lower()).ratio() < 0.75:
+            return False
+    return True
 
 
 def word_segments(a: str, b: str, tolerant: bool = False) -> tuple[list[dict], list[dict]]:
@@ -875,7 +909,9 @@ def line_ops(lines1: list[str], lines2: list[str], tolerant: bool = False) -> li
     Diff riga per riga. L'allineamento e l'uguaglianza usano le chiavi
     normalizzate (in modo tollerante), ma il report mostra il testo ORIGINALE.
     Le righe simili diventano op 'change' con evidenziazione a livello di
-    parola; le altre 'del'/'add'.
+    parola; le altre 'del'/'add'. In modo tollerante una 'change' che è solo
+    rumore di lettura (_solo_rumore) porta "incerta": True: resta nel report,
+    ma mostrata come probabile errore OCR.
     """
     keys1 = [norm_compare(l, tolerant) for l in lines1]
     keys2 = [norm_compare(l, tolerant) for l in lines2]
@@ -890,7 +926,10 @@ def line_ops(lines1: list[str], lines2: list[str], tolerant: bool = False) -> li
                 a, b = lines1[i1 + k], lines2[j1 + k]
                 if difflib.SequenceMatcher(a=keys1[i1 + k], b=keys2[j1 + k]).ratio() >= 0.5:
                     segs_a, segs_b = word_segments(a, b, tolerant)
-                    ops.append({"type": "change", "a": segs_a, "b": segs_b})
+                    op = {"type": "change", "a": segs_a, "b": segs_b}
+                    if tolerant and _solo_rumore(segs_a, segs_b):
+                        op["incerta"] = True
+                    ops.append(op)
                 else:
                     ops.append({"type": "del", "text": a})
                     ops.append({"type": "add", "text": b})

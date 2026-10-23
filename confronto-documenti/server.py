@@ -303,8 +303,8 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
             raise OcrCancelled()
 
         # barra progresso: conta solo le pagine che faranno OCR vero
-        ocr_total = (ocr_needed_count(doc1, model, dpi, lang)
-                     + ocr_needed_count(doc2, model, dpi, lang))
+        ocr_total = (ocr_needed_count(doc1, model, dpi, lang, preprocess)
+                     + ocr_needed_count(doc2, model, dpi, lang, preprocess))
         update_job(job_id, total_pages=ocr_total, current_page=0,
                    pages_a=doc1.count, pages_b=doc2.count, status="ocr",
                    message=("Lettura testo embedded..." if ocr_total == 0
@@ -328,6 +328,7 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
 
         results = []
         diff_count = 0
+        uncertain_count = 0   # pagine con sole differenze "incerte" (probabile rumore OCR)
         for idx_a, idx_b in pairs:
             if is_cancelled(job_id):
                 raise OcrCancelled()
@@ -350,15 +351,19 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
             lines1 = apply_ignore(normalize_lines(texts1[idx_a]), ignore)
             lines2 = apply_ignore(normalize_lines(texts2[idx_b]), ignore)
             ops = line_ops(lines1, lines2, tolerant=tolerant)
-            has_diff = any(op["type"] != "equal" for op in ops)
+            has_diff = any(op["type"] != "equal" and not op.get("incerta") for op in ops)
+            only_uncertain = not has_diff and any(op.get("incerta") for op in ops)
             if has_diff:
                 diff_count += 1
+            elif only_uncertain:
+                uncertain_count += 1
 
             img_a, img_b = prev1[idx_a], prev2[idx_b]
             boxes = diff_boxes(img_a, img_b) if (img_a and img_b) else []
             results.append({
                 "page_a": idx_a + 1, "page_b": idx_b + 1,
-                "status": "diff" if has_diff else "equal",
+                "status": ("diff" if has_diff else
+                           "uncertain" if only_uncertain else "equal"),
                 "ops": ops, "boxes": boxes,
                 "source_a": src1[idx_a], "source_b": src2[idx_b],
                 "text_a": texts1[idx_a], "text_b": texts2[idx_b],
@@ -366,11 +371,16 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
             label = (f"pagina {idx_a + 1}" if idx_a == idx_b
                      else f"pagina {idx_a + 1}<->{idx_b + 1}")
             print(f"[{job_id}]   {label}: "
-                  f"{'DIFFERENZE' if has_diff else 'identica'}", flush=True)
+                  f"{'DIFFERENZE' if has_diff else 'incerte' if only_uncertain else 'identica'}",
+                  flush=True)
 
+        message = ("Nessuna differenza rilevata." if diff_count == 0
+                   else f"Differenze in {diff_count} pagina/e.")
+        if uncertain_count:
+            message += (f" {uncertain_count} pagina/e con sole differenze incerte"
+                        " (probabili errori di lettura).")
         update_job(job_id, results=results, status="done", diff_count=diff_count,
-                   message=("Nessuna differenza rilevata." if diff_count == 0
-                            else f"Differenze in {diff_count} pagina/e."))
+                   uncertain_count=uncertain_count, message=message)
     except OcrCancelled:
         update_job(job_id, status="cancelled", message="Confronto annullato.")
     except requests.ConnectionError:
@@ -427,6 +437,11 @@ def _rows_b(p: dict, colors: dict) -> list:
             rows.append([("- " + op["text"], RED, True)])
         elif op["type"] == "add":
             rows.append([("+ " + op["text"], BLUE, True)])
+        elif op.get("incerta"):                    # probabile errore di lettura
+            row = [("? ", GREY, False)]
+            row += [(s["s"] + " ", GREY if not s["eq"] else INK, not s["eq"])
+                    for s in op["b"]]
+            rows.append(row)
         else:
             row = [("~ ", INK, False)]
             row += [(s["s"] + " ", GREEN if not s["eq"] else INK, not s["eq"])
@@ -445,6 +460,8 @@ def _side_titles(p: dict) -> tuple[str, str]:
         right = f'pagina {p["page_b"]} - aggiunta'
     elif p["status"] == "equal":
         right = f'pagina {p["page_b"]} - identica'
+    elif p["status"] == "uncertain":
+        right = f'pagina {p["page_b"]} - solo differenze incerte'
     else:
         right = f'pagina {p["page_b"]} - differenze'
     return left, right
@@ -486,7 +503,8 @@ def build_report_docx(job: dict) -> bytes:
     doc.add_paragraph().add_run(job.get("message", "")).bold = True
 
     leg = doc.add_paragraph()
-    for text, color in (("modificato   ", GREEN), ("mancante   ", RED), ("aggiunto", BLUE)):
+    for text, color in (("modificato   ", GREEN), ("mancante   ", RED), ("aggiunto   ", BLUE),
+                        ("? incerto (probabile errore di lettura)", GREY)):
         run = leg.add_run(text)
         run.font.size = Pt(9)
         run.font.color.rgb = color
@@ -615,7 +633,8 @@ def build_report_pdf(job: dict) -> bytes:
     cover.insert_text((M, M + 72), latin(job.get("message", "")),
                       fontname="hebo", fontsize=10, color=INK)
     x = M
-    for lbl, col in (("modificato", GREEN), ("mancante", RED), ("aggiunto", BLUE)):
+    for lbl, col in (("modificato", GREEN), ("mancante", RED), ("aggiunto", BLUE),
+                     ("? incerto", GREY)):
         cover.insert_text((x, M + 94), lbl, fontname="hebo", fontsize=9, color=col)
         x += fitz.get_text_length(lbl + "     ", fontname="hebo", fontsize=9)
     cover.insert_text((M, M + 114),
