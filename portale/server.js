@@ -30,6 +30,10 @@ const LOG_FILE = path.join(DATA_DIR, 'server.log');         // errori runtime
 const IP_ADMIN_FILE = path.join(DATA_DIR, 'ip-admin.json'); // regole IP -> admin per-app
 const WARM_FILE = path.join(DATA_DIR, 'warm.json');        // app da avviare "a caldo"
 const APP_EXTRA_FILE = path.join(DATA_DIR, 'app-extra.json'); // programmi aggiunti dagli admin
+const AVVISI_FILE = path.join(DATA_DIR, 'avvisi.json');    // avvisi dei programmi per gli admin
+// Cartella di arrivo degli avvisi: le app ci lasciano un file JSON ciascuno
+// (shared/avvisi). Passata alle app lanciate dal portale come SUITE_AVVISI_DIR.
+const AVVISI_IN = process.env.SUITE_AVVISI_DIR ? path.resolve(process.env.SUITE_AVVISI_DIR) : path.join(DATA_DIR, 'avvisi-in');
 
 const ACCESSI_CAP = 5000;   // eventi massimi conservati
 const SESSION_MS = 8 * 60 * 60 * 1000;
@@ -545,6 +549,113 @@ function trimAccessi() {
   const kept = list.slice(-ACCESSI_CAP);
   try { writeFileAtomic(ACCESSI_FILE, kept.map((e) => JSON.stringify(e)).join('\n') + '\n'); }
   catch (e) { logError('trim accessi', e); }
+}
+
+// ---------------------------------------------------------------------------
+// Avvisi dei programmi per gli admin.
+// Le app lasciano un file in AVVISI_IN (shared/avvisi); il portale li raccoglie
+// in avvisi.json, unico scrittore, e li mostra in /avvisi e sulla plancia.
+// Un avviso resta "aperto" finché un admin non lo segna come visto.
+// ---------------------------------------------------------------------------
+const LIVELLI_AVVISO = ['info', 'attenzione', 'errore'];
+const AVVISI_VISTI_CAP = 300;   // storico dei già visti conservato
+
+// Dal file grezzo di un'app a un avviso pulito, o null se inutilizzabile.
+function normalizzaAvviso(raw, ora = Date.now()) {
+  if (!raw || typeof raw !== 'object') return null;
+  const app = String(raw.app || '').trim().slice(0, 40);
+  const titolo = String(raw.titolo || '').trim().slice(0, 200);
+  if (!app || !titolo) return null;
+  const t = Date.parse(raw.data);
+  return {
+    app, titolo,
+    testo: String(raw.testo || '').slice(0, 4000),
+    livello: LIVELLI_AVVISO.includes(raw.livello) ? raw.livello : 'attenzione',
+    chiave: String(raw.chiave || '').slice(0, 200),
+    data: new Date(Number.isFinite(t) ? t : ora).toISOString(),
+  };
+}
+
+// Aggiunge un avviso all'elenco. Funzione pura (testata): con una chiave, un
+// avviso ancora aperto della stessa app e chiave si aggiorna e conta le
+// ripetizioni invece di duplicarsi.
+function unisciAvviso(lista, a, id) {
+  if (a.chiave) {
+    const aperto = lista.find((x) => !x.visto_il && x.app === a.app && x.chiave === a.chiave);
+    if (aperto) {
+      aperto.n = (aperto.n || 1) + 1;
+      aperto.ultimo = a.data;
+      aperto.titolo = a.titolo;
+      aperto.testo = a.testo;
+      if (LIVELLI_AVVISO.indexOf(a.livello) > LIVELLI_AVVISO.indexOf(aperto.livello)) aperto.livello = a.livello;
+      return aperto;
+    }
+  }
+  const nuovo = { id, ...a, ultimo: a.data, n: 1, visto_da: '', visto_il: '' };
+  lista.push(nuovo);
+  return nuovo;
+}
+
+// Tiene tutti gli aperti e solo gli ultimi AVVISI_VISTI_CAP già visti.
+function potaAvvisi(lista) {
+  const visti = lista.filter((a) => a.visto_il);
+  if (visti.length <= AVVISI_VISTI_CAP) return lista;
+  const via = new Set(visti.slice(0, visti.length - AVVISI_VISTI_CAP));
+  return lista.filter((a) => !via.has(a));
+}
+
+function loadAvvisi() {
+  try { const l = JSON.parse(fs.readFileSync(AVVISI_FILE, 'utf8')); return Array.isArray(l) ? l : []; }
+  catch { return []; }
+}
+function saveAvvisi(lista) {
+  writeFileAtomic(AVVISI_FILE, JSON.stringify(potaAvvisi(lista), null, 1));
+}
+const idAvviso = () => Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex');
+
+// Avviso generato dal portale stesso (app caduta, login bloccati...).
+function segnalaPortale(avviso) {
+  const a = normalizzaAvviso({ app: 'portale', ...avviso });
+  if (!a) return;
+  try { const l = loadAvvisi(); unisciAvviso(l, a, idAvviso()); saveAvvisi(l); }
+  catch (e) { logError('avviso portale', e); }
+}
+
+// Sposta in avvisi.json i file arrivati dalle app. I .tmp sono scritture in
+// corso: si lasciano al giro dopo. Un file illeggibile si scarta comunque, o
+// verrebbe riletto per sempre.
+function raccogliAvvisi() {
+  let nomi;
+  try { nomi = fs.readdirSync(AVVISI_IN).filter((n) => n.endsWith('.json')).sort(); }
+  catch { return 0; }
+  if (!nomi.length) return 0;
+  const lista = loadAvvisi();
+  let presi = 0;
+  for (const nome of nomi) {
+    const file = path.join(AVVISI_IN, nome);
+    try {
+      const a = normalizzaAvviso(JSON.parse(fs.readFileSync(file, 'utf8')));
+      if (a) { unisciAvviso(lista, a, idAvviso()); presi++; }
+    } catch (e) { logError('avviso illeggibile ' + nome, e); }
+    try { fs.unlinkSync(file); } catch { /* già sparito */ }
+  }
+  if (presi) saveAvvisi(lista);
+  return presi;
+}
+
+// Programmi che segnalano avvisi senza stare nel registro APPS.
+const NOMI_AVVISO = { portale: 'Portale', vfp: 'VFP Transfer' };
+const nomeAppAvviso = (id) => (APPS.find((a) => a.id === id) || {}).nome || NOMI_AVVISO[id] || id;
+
+// Per la pagina: aperti (più recenti prima) + storico dei visti, con il nome
+// leggibile dell'app.
+function vistaAvvisi(lista, nomeApp) {
+  const conNome = (a) => ({ ...a, appNome: nomeApp(a.app) });
+  const recenti = (x, y) => ((x.ultimo || x.data) < (y.ultimo || y.data) ? 1 : -1);
+  return {
+    aperti: lista.filter((a) => !a.visto_il).sort(recenti).map(conNome),
+    visti: lista.filter((a) => a.visto_il).sort((x, y) => (x.visto_il < y.visto_il ? 1 : -1)).slice(0, 100).map(conNome),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1172,7 +1283,9 @@ function launchApp(app) {
   // locale (le espone il proxy, non la LAN) e il gate SSO, quando serve il
   // login, rimanda al portale pubblico invece che a localhost:8080. La verifica
   // della sessione resta in locale (COSEDIL_PORTAL), veloce e senza TLS.
-  const env = { ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro() };
+  // SUITE_AVVISI_DIR: gli avvisi dell'app finiscono dove il portale li legge,
+  // anche se DATA_DIR è stata spostata.
+  const env = { ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro(), SUITE_AVVISI_DIR: AVVISI_IN };
   if (SUITE_DOMINIO) {
     env.HOST = '127.0.0.1';
     env.COSEDIL_PORTAL_PUBBLICO = PORTALE_PUBBLICO;
@@ -1264,19 +1377,29 @@ const warmLaunchedAt = new Map();         // appId -> ultimo (ri)avvio a caldo
 // riaccenderebbe entro 30 secondi e il pulsante "Ferma" sembrerebbe rotto.
 // Il consenso torna quando qualcuno preme "Avvia" (o al riavvio del portale).
 const spenteAMano = new Set();
+// App viste accese da questo keep-alive: se una di queste sparisce senza che
+// nessuno l'abbia fermata è caduta, e l'admin lo deve sapere.
+const warmVisteSu = new Set();
 async function warmApps() {
   for (const id of getWarmList()) {
     const app = APPS.find((a) => a.id === id);
-    if (!app || spenteAMano.has(id)) continue;
+    if (!app || spenteAMano.has(id)) { warmVisteSu.delete(id); continue; }
     try {
-      if (await checkPort(app.porta)) continue;                              // già su: niente da fare
+      if (await checkPort(app.porta)) { warmVisteSu.add(id); continue; }    // già su: niente da fare
       if (Date.now() - (warmLaunchedAt.get(id) || 0) < WARM_BOOT_MS) continue; // sta ancora partendo
+      if (warmVisteSu.delete(id)) {
+        segnalaPortale({
+          titolo: `${app.nome} si è fermata da sola`, livello: 'errore', chiave: 'caduta:' + id,
+          testo: `Non risponde più sulla porta ${app.porta}: il portale la riavvia in automatico. Se si ripete, guardare i log dell'app.`,
+        });
+      }
       const r = launchApp(app);
       if (r.ok) {
         warmLaunchedAt.set(id, Date.now());
         console.log(`  [WARM] Avvio a caldo: ${app.nome} (porta ${app.porta})`);
       } else {
         logError('warm ' + id, r.error);
+        segnalaPortale({ titolo: `${app.nome}: avvio a caldo non riuscito`, testo: String(r.error), livello: 'errore', chiave: 'avvio:' + id });
       }
     } catch (e) { logError('warm ' + id, e); }
   }
@@ -1341,6 +1464,10 @@ async function handle(req, res) {
       logAccesso({
         ts: new Date().toISOString(), username: String(username || '').toLowerCase().trim(),
         nome: null, appId: null, appNome: null, azione: 'login-bloccato', ip,
+      });
+      segnalaPortale({
+        titolo: `Accessi bloccati dal PC ${ip}`, livello: 'attenzione', chiave: 'login-bloccato:' + ip,
+        testo: `Troppi tentativi di login falliti (ultimo utente provato: "${String(username || '').slice(0, 60)}"). Il blocco dura ${LOGIN_LOCK_MS / 60000} minuti.`,
       });
       return sendJson(res, 429, {
         ok: false,
@@ -1563,6 +1690,34 @@ async function handle(req, res) {
     return sendFile(res, path.join(PAGES_DIR, 'admin.html'), 'text/html');
   }
 
+  // ---- Avvisi dei programmi (solo admin) ----
+  if (p === '/avvisi' || p === '/avvisi.html') {
+    if (!isAdmin) { res.writeHead(302, { Location: '/' }); return res.end(); }
+    return sendFile(res, path.join(PAGES_DIR, 'avvisi.html'), 'text/html');
+  }
+  if (p === '/api/avvisi' || p === '/api/avvisi/conteggio') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    raccogliAvvisi();
+    const lista = loadAvvisi();
+    if (p === '/api/avvisi/conteggio') {
+      const aperti = lista.filter((a) => !a.visto_il);
+      return sendJson(res, 200, { aperti: aperti.length, errori: aperti.filter((a) => a.livello === 'errore').length });
+    }
+    return sendJson(res, 200, vistaAvvisi(lista, nomeAppAvviso));
+  }
+  // Segna come visto un avviso ({ id }) o tutti gli aperti ({ tutti: true }).
+  if (p === '/api/avvisi/visto' && req.method === 'POST') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const { id, tutti } = await readJsonBody(req);
+    const lista = loadAvvisi();
+    const ora = new Date().toISOString();
+    const presi = lista.filter((a) => !a.visto_il && (tutti === true || a.id === id));
+    if (!presi.length) return sendJson(res, 404, { ok: false, error: 'Avviso non trovato o già visto' });
+    for (const a of presi) { a.visto_il = ora; a.visto_da = session.nome || session.username; }
+    saveAvvisi(lista);
+    return sendJson(res, 200, { ok: true, visti: presi.length });
+  }
+
   // ---- Plancia degli admin: elenco utenti + attività di un utente ----
   if (p === '/api/plancia') {
     if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
@@ -1702,6 +1857,10 @@ process.on('unhandledRejection', (e) => logError('unhandledRejection', e));
 if (require.main === module) {
   ensureData();
   trimAccessi();   // limita la crescita del log a ogni avvio
+  // Avvisi arrivati a portale spento, poi un giro al minuto: la cartella di
+  // arrivo resta piccola anche se nessun admin apre la pagina per giorni.
+  raccogliAvvisi();
+  setInterval(() => { try { raccogliAvvisi(); } catch (e) { logError('raccolta avvisi', e); } }, 60_000).unref();
   server.listen(PORT, HOST, () => {
     const addr = (TLS_ON ? 'https' : 'http') + '://localhost:' + PORT;
     console.log('============================================');
@@ -1754,5 +1913,6 @@ module.exports = {
   rispondiAssistente,                              // assistente
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
   riepilogoAttivita, riepilogoUtenti,              // plancia degli admin
+  normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,   // avvisi dei programmi
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };

@@ -1,0 +1,39 @@
+/* Pagina Avvisi: si appoggia ad admin.css (pannelli, badge, tabelle). */
+/* "><(((º> sabusabu <º)))><" */
+
+:root { --avv-rosso: #c0392b; --avv-ambra: #b7791f; }
+
+.stat .value.rosso { color: var(--avv-rosso); }
+.nota { font-family: var(--font-ui); font-size: 0.8rem; }
+
+.avvisi { list-style: none; margin: 0; padding: 0; }
+.avviso {
+  padding: 1rem 1.35rem 0.85rem 1.2rem;
+  border-top: 1px solid var(--cosedil-border);
+  border-left: 4px solid var(--cosedil-blue-light);
+}
+.avviso:first-child { border-top: none; }
+.avviso.errore { border-left-color: var(--avv-rosso); }
+.avviso.attenzione { border-left-color: var(--avv-ambra); }
+.avviso-testa { display: flex; align-items: center; gap: 0.6rem 0.9rem; flex-wrap: wrap; }
+.avviso-app { font-family: var(--font-ui); font-weight: 600; font-size: 0.85rem; color: var(--cosedil-blue); }
+.avviso-quando { font-family: var(--font-ui); font-size: 0.78rem; color: var(--cosedil-gray); margin-left: auto; }
+.avviso-titolo { font-family: var(--font-display); font-weight: 500; font-size: 1rem; color: var(--cosedil-text-strong); margin: 0.45rem 0 0.2rem; }
+.avviso-testo { font-size: 0.86rem; color: var(--cosedil-text); margin: 0 0 0.3rem; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 110ch; }
+
+.badge.liv-errore { background: rgba(192,57,43,0.10); color: var(--avv-rosso); }
+.badge.liv-errore .dot { background: var(--avv-rosso); }
+.badge.liv-attenzione { background: rgba(183,121,31,0.12); color: var(--avv-ambra); }
+.badge.liv-attenzione .dot { background: var(--avv-ambra); }
+.badge.liv-info { background: rgba(25,143,217,0.12); color: var(--cosedil-blue-light); }
+.badge.liv-info .dot { background: var(--cosedil-blue-light); }
+
+.btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+.btn-link:disabled { opacity: 0.5; cursor: default; }
+[hidden] { display: none !important; }
+
+@media (max-width: 640px) {
+  .avviso-quando { margin-left: 0; width: 100%; }
+  .filters { width: 100%; }
+  .filters select, .filters .btn { flex: 1 1 100%; }
+}

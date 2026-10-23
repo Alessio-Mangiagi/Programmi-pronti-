@@ -16,7 +16,11 @@ form.addEventListener('submit', async (e) => {
       }),
     });
     const data = await r.json();
-    if (data.ok) { window.location.href = '/'; return; }
+    if (data.ok) {
+      // Nuovo accesso: la plancia dell'admin torna a mostrare il riquadro avvisi.
+      try { sessionStorage.removeItem('avvisiMostrati'); } catch { /* storage bloccato */ }
+      window.location.href = '/'; return;
+    }
     err.textContent = data.error || 'Accesso non riuscito';
   } catch (e) {
     err.textContent = 'Errore di rete. Riprova.';
