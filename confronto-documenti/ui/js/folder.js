@@ -55,30 +55,35 @@ function render() {
   const q = $('#folderSearch').value.trim().toLowerCase();
   const shown = files.filter(f => rel(f).toLowerCase().includes(q));
   $('#folderList').replaceChildren(...shown.map(row));
-  const empty = $('#folderEmpty');
-  empty.hidden = shown.length > 0;
-  empty.textContent = !files.length ? 'Scegli una cartella per vedere i suoi documenti.'
-                                    : 'Nessun file corrisponde alla ricerca.';
+  $('#folderEmpty').hidden = shown.length > 0;
+  $('#folderEmptyMsg').textContent = !files.length ? 'Scegli una cartella per vedere i suoi documenti.'
+                                                   : 'Nessun file corrisponde alla ricerca.';
+  $('#folderPickEmpty').hidden = files.length > 0;
 }
 
 export function initFolder() {
   const drawer = $('#folderDrawer'), input = $('#folderInput'), btn = $('#folderBtn');
   const isOpen = () => drawer.classList.contains('open');
-  const open = () => {
+  // Aperto/chiuso ricordato tra le sessioni ('1'/'0' in localStorage).
+  const remember = v => { try { localStorage.setItem('folderDrawer', v); } catch { /* storage bloccato */ } };
+  const open = (pick = true) => {
     drawer.classList.add('open'); drawer.inert = false;
     document.body.classList.add('drawer-open');
     btn.setAttribute('aria-expanded', 'true');
-    if (!files.length) input.click();   // prima apertura: chiede subito la cartella
+    remember('1');
+    if (pick && !files.length) input.click();   // aperto a mano e vuoto: chiede subito la cartella
   };
   const close = () => {
     drawer.classList.remove('open'); drawer.inert = true;
     document.body.classList.remove('drawer-open');
     btn.setAttribute('aria-expanded', 'false');
+    remember('0');
   };
 
   btn.addEventListener('click', () => (isOpen() ? close() : open()));
   $('#folderClose').addEventListener('click', close);
   $('#folderPick').addEventListener('click', () => input.click());
+  $('#folderPickEmpty').addEventListener('click', () => input.click());
   $('#folderSearch').addEventListener('input', render);
   document.addEventListener('docs:change', render);
   // Esc chiude il cassetto, ma non mentre il visualizzatore (che ha il suo Esc) è aperto.
@@ -98,4 +103,9 @@ export function initFolder() {
   });
 
   render();
+  // Su schermo largo il cassetto parte aperto (senza aprire il selettore),
+  // salvo che l'utente l'abbia chiuso l'ultima volta.
+  let saved = null;
+  try { saved = localStorage.getItem('folderDrawer'); } catch { /* storage bloccato */ }
+  if (saved !== '0' && window.matchMedia('(min-width: 900px)').matches) open(false);
 }

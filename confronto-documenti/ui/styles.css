@@ -405,7 +405,8 @@ footer {
 .drawer-tools input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.12); }
 .drawer-tools .ghost-btn { padding: .5rem .8rem; }
 .drawer-list { list-style: none; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding-right: .2rem; }
-.drawer-empty { font-size: .85rem; color: var(--dim); text-align: center; padding: 2rem .5rem; }
+.drawer-empty { font-size: .85rem; color: var(--dim); text-align: center; padding: 2rem .5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.drawer-empty[hidden], .drawer-empty .cta[hidden] { display: none; }
 .f-row {
   display: flex; align-items: center; gap: .55rem; padding: .55rem .6rem;
   background: var(--bg); border: 1px solid var(--line); border-radius: 8px; cursor: grab;

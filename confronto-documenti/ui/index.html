@@ -45,8 +45,11 @@
     <input type="search" id="folderSearch" placeholder="Cerca per nome…" aria-label="Cerca file nella cartella">
     <button type="button" class="ghost-btn" id="folderPick">Cambia cartella</button>
   </div>
+  <div class="drawer-empty" id="folderEmpty">
+    <p id="folderEmptyMsg">Scegli una cartella per vedere i suoi documenti.</p>
+    <button type="button" class="cta" id="folderPickEmpty">Scegli cartella</button>
+  </div>
   <ul class="drawer-list" id="folderList"></ul>
-  <p class="drawer-empty" id="folderEmpty">Scegli una cartella per vedere i suoi documenti.</p>
   <input type="file" id="folderInput" webkitdirectory multiple hidden>
 </aside>
 
