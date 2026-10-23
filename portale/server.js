@@ -652,8 +652,11 @@ const nomeAppAvviso = (id) => (APPS.find((a) => a.id === id) || {}).nome || NOMI
 function vistaAvvisi(lista, nomeApp) {
   const conNome = (a) => ({ ...a, appNome: nomeApp(a.app) });
   const recenti = (x, y) => ((x.ultimo || x.data) < (y.ultimo || y.data) ? 1 : -1);
+  // Errori in cima, poi attenzione, poi informazioni; a parità, i più recenti.
+  const gravita = (a) => LIVELLI_AVVISO.indexOf(a.livello);
+  const perGravita = (x, y) => gravita(y) - gravita(x) || recenti(x, y);
   return {
-    aperti: lista.filter((a) => !a.visto_il).sort(recenti).map(conNome),
+    aperti: lista.filter((a) => !a.visto_il).sort(perGravita).map(conNome),
     visti: lista.filter((a) => a.visto_il).sort((x, y) => (x.visto_il < y.visto_il ? 1 : -1)).slice(0, 100).map(conNome),
   };
 }
