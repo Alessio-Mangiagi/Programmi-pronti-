@@ -318,6 +318,11 @@ select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.
 .line mark { font-weight: 800; padding: 0 .15em; border-radius: 3px; }
 .line mark.wdel { background: var(--del); color: #fff; }
 .line mark.wadd { background: var(--add); color: #fff; }
+/* Differenza incerta (probabile errore OCR, modo tollerante): grigia, una riga. */
+.line.incerta { color: var(--dim); background: var(--surface-2); border-left: 3px dashed #9aa7b4; }
+.line mark.winc { background: #dfe5ec; color: var(--ink-2); }
+.inc-tag { font-family: var(--body); font-size: .68rem; font-weight: 600; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .5rem; }
+.badge.uncertain { color: var(--ink-2); background: var(--surface-2); border-color: var(--line); }
 .src-tag { font-size: .7rem; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: .15rem .5rem; }
 
 /* ---------- pulsante anteprima ---------- */
