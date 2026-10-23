@@ -70,6 +70,17 @@ except ImportError as err:   # gate assente = app senza login: meglio non partir
 # usare l'app da sola quando il portale è spento.
 cosedil_sso.init(app, app_id="confronta")
 
+# Errori del log (eccezioni nelle richieste, OCR fallito...) anche agli admin del
+# portale, nella pagina Avvisi (shared/avvisi). Facoltativo: nell'exe o fuori
+# dalla suite il modulo puo' mancare e l'app funziona come prima.
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared" / "avvisi"))
+try:
+    import avvisi
+    avvisi.collega_log("confronta")
+except ImportError:
+    pass
+
 # Content Security Policy: l'app è interamente self-hosted (font, css, js locali),
 # quindi 'self' basta. 'unsafe-inline' su style serve solo per gli attributi
 # style="transition-delay" nel markup; img data: per le freccine SVG in CSS e le

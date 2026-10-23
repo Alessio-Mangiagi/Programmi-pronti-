@@ -14,7 +14,7 @@ a = Analysis(
     # Il gate SSO vive in shared/sso (condiviso con le altre app della suite):
     # senza questo path PyInstaller non risolve "import cosedil_sso" e l'exe
     # parte senza login. Allineato al sys.path di server.py.
-    pathex=['../shared/sso'],
+    pathex=['../shared/sso', '../shared/avvisi'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
