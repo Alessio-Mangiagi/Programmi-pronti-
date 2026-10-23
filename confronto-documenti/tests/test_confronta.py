@@ -16,10 +16,16 @@ import confronta_pdf as c
 # ----- normalizzazione tollerante -----
 
 def test_norm_compare_folds_ocr_noise():
-    # 1->l, O/0->o, punteggiatura via, minuscole: "1O0,OO" e "loo oo" coincidono
-    assert c.norm_compare("Importo: 1O0,OO €", True) == c.norm_compare("importo loo oo", True)
+    # O->0, l->1, punteggiatura via, minuscole: "1O0,OO" e "100.00" coincidono
+    assert c.norm_compare("Importo: 1O0,OO €", True) == c.norm_compare("importo 100.00 €", True)
     # accenti rimossi
-    assert c.norm_compare("Città", True) == "citta"
+    assert c.norm_compare("Città", True) == c.norm_compare("Citta", True)
+    # letture tipiche delle scansioni
+    assert c.norm_compare("Il getto", True) == c.norm_compare("ll getto", True)
+    assert c.norm_compare("classe", True) == c.norm_compare("ciasse", True)
+    assert c.norm_compare("E.12.118", True) == c.norm_compare("€.12.118", True)
+    for unita in ("m3", "m?", "m°", "m²"):
+        assert c.norm_compare(f"{unita} 736,00", True) == c.norm_compare("m³ 736,00", True)
 
 
 def test_norm_compare_exact_is_identity():
@@ -30,6 +36,11 @@ def test_distinct_numbers_stay_distinct():
     # importi diversi non devono diventare uguali in modo tollerante
     assert c.norm_compare("100", True) != c.norm_compare("200", True)
     assert c.norm_compare("1.245.900", True) != c.norm_compare("1.245.901", True)
+    # nessuna coppia di cifre diverse può coincidere (prima 6 e 9 -> "g")
+    for x in "0123456789":
+        for y in "0123456789":
+            if x != y:
+                assert c.norm_compare(f"385.{x}49,80", True) != c.norm_compare(f"385.{y}49,80", True)
 
 
 # ----- diff riga -----
@@ -230,3 +241,41 @@ def test_ignore_regex_chars_are_literal():
 
 def test_ignore_skips_blank_and_too_long():
     assert c.compile_ignore(["", "   ", "x" * (c.MAX_IGNORE_PATTERN_LEN + 1)]) == []
+
+
+# ----- differenze incerte (probabile rumore OCR) -----
+
+def _change(a, b):
+    return [op for op in c.line_ops([a], [b], tolerant=True) if op["type"] != "equal"]
+
+
+def test_incerta_for_similar_word_misread():
+    ops = _change("Commessa 2024/75 - foglio 1", "Commessa 2024/75 - toglio 1")
+    assert len(ops) == 1 and ops[0].get("incerta") is True
+
+
+def test_never_incerta_for_numbers_negations_or_real_words():
+    for a, b in [
+        ("Importo euro 385.649,80", "Importo euro 385.949,80"),       # cifra
+        ("L'impresa deve mantenere pulite le aree", "L'impresa non deve mantenere pulite le aree"),
+        ("Lavori nei giorni feriali", "Lavori nei giorni festivi"),
+        ("Fornitura di calcestruzzo armato", "Fornitura di conglomerato armato"),
+    ]:
+        ops = _change(a, b)
+        assert ops and not any(op.get("incerta") for op in ops), (a, b)
+
+
+def test_incerta_only_in_tolerant_mode():
+    ops = c.line_ops(["foglio 1"], ["toglio 1"], tolerant=False)
+    assert not any(op.get("incerta") for op in ops)
+
+
+def test_cache_key_depends_on_preprocess():
+    h = "cafebabe" * 8
+    c.cache_put(h, 0, 200, "tesseract", "ita", "pulito", True)
+    assert c.cache_get(h, 0, 200, "tesseract", "ita", False) is None
+    c.cache_put(h, 0, 200, "tesseract", "ita", "grezzo", False)
+    assert c.cache_get(h, 0, 200, "tesseract", "ita", True) == "pulito"
+    assert c.cache_get(h, 0, 200, "tesseract", "ita", False) == "grezzo"
+    for pre in (True, False):
+        c._cache_path(h, 0, 200, "tesseract", "ita", pre).unlink(missing_ok=True)
