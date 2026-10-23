@@ -20,11 +20,17 @@ Canali:
                i messaggi in un file/coda condivisa che il bot legge.
 """
 
+import os
+import sys
 from datetime import datetime
 
 import config
 import database
 import scadenze
+
+# Avvisi per gli admin del Portale (shared/avvisi, cartella sorella come shared/sso).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared", "avvisi"))
+import avvisi  # noqa: E402
 
 # Nome soggetto per le scadenze aziendali (soggetto_tipo='azienda', soggetto_id NULL)
 NOME_AZIENDA = scadenze.NOME_AZIENDA
@@ -215,9 +221,27 @@ def esegui_notifiche() -> dict:
             "INSERT OR REPLACE INTO meta (chiave, valore) "
             "VALUES ('ultimo_giro_notifiche', datetime('now','localtime'))")
         conn.commit()
+        if nuove:
+            _avvisa_portale(nuove, esito_email, dettaglio)
         return {"inviate": len(nuove), "log": log}
     finally:
         conn.close()
+
+
+def _avvisa_portale(nuove, esito_email, dettaglio):
+    """Le scadenze nuove del giro diventano un avviso nel Portale (pagina Avvisi
+    dell'admin), come già finiscono nell'email di riepilogo. Un'email non
+    partita è un avviso a parte: senza, nessuno saprebbe che il riepilogo manca."""
+    scadute = sum(1 for _, _, c in nuove if c == "scaduta")
+    righe = [m for _, m, _ in nuove]
+    testo = "\n".join(righe[:30]) + (f"\n… e altre {len(righe) - 30}" if len(righe) > 30 else "")
+    avvisi.segnala("scadenzario",
+                   f"{len(nuove)} {'scadenza' if len(nuove) == 1 else 'scadenze'} da verificare"
+                   + (f" ({scadute} già scadut{'a' if scadute == 1 else 'e'})" if scadute else ""),
+                   testo, livello="errore" if scadute else "attenzione", chiave="scadenze")
+    if esito_email == "errore":
+        avvisi.segnala("scadenzario", "Email di riepilogo delle scadenze non inviata", dettaglio,
+                       livello="errore", chiave="email")
 
 
 def ultimo_giro():

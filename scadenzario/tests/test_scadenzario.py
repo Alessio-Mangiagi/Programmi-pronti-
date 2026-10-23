@@ -7,6 +7,8 @@ notificata, e come viene letto un file Excel dell'ufficio, si verificavano solo
 aprendo la pagina e guardando. Qui non serve né il database né un file vero:
 sono tutte funzioni che prendono valori e restituiscono valori.
 """
+import json
+import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -147,6 +149,36 @@ def test_messaggio_senza_soggetto_usa_il_nome_azienda():
         "giorni_rimanenti": 5,
     })
     assert notifiche.NOME_AZIENDA in testo
+
+
+def _avvisi_lasciati():
+    cartella = os.environ["SUITE_AVVISI_DIR"]
+    if not os.path.isdir(cartella):
+        return []
+    out = []
+    for nome in sorted(os.listdir(cartella)):
+        with open(os.path.join(cartella, nome), encoding="utf-8") as f:
+            out.append(json.load(f))
+        os.unlink(os.path.join(cartella, nome))
+    return out
+
+
+def test_scadenze_nuove_diventano_un_avviso_per_il_portale():
+    _avvisi_lasciati()
+    notifiche._avvisa_portale([({}, "Visita medica scade", "soglia_30"),
+                               ({}, "DURC scaduto", "scaduta")], "ok", "")
+    (a,) = _avvisi_lasciati()
+    assert a["app"] == "scadenzario" and a["chiave"] == "scadenze"
+    assert a["livello"] == "errore"  # c'è una scaduta
+    assert a["titolo"].startswith("2 scadenze da verificare")
+    assert "DURC scaduto" in a["testo"]
+
+
+def test_email_non_partita_e_un_avviso_a_parte():
+    _avvisi_lasciati()
+    notifiche._avvisa_portale([({}, "Visita medica scade", "soglia_30")], "errore", "[invio email fallito: timeout]")
+    titoli = {(a["livello"], a["chiave"]) for a in _avvisi_lasciati()}
+    assert titoli == {("attenzione", "scadenze"), ("errore", "email")}
 
 
 # ----- scadenze: stato calcolato (modulo condiviso da app e notifiche) -----

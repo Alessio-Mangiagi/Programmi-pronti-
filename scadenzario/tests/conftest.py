@@ -19,3 +19,5 @@ _cartella = tempfile.mkdtemp(prefix="scadenzario_test_")
 config.DB_PATH = os.path.join(_cartella, "test.db")
 config.ALLEGATI_DIR = os.path.join(_cartella, "allegati")
 config.BACKUP_DIR = os.path.join(_cartella, "backup")
+# Gli avvisi per il portale (shared/avvisi) restano qui, non nel portale vero.
+os.environ["SUITE_AVVISI_DIR"] = os.path.join(_cartella, "avvisi")
