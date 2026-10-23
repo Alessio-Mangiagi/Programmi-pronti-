@@ -6,6 +6,7 @@
 //   dom.js       micro-helper ($, escape HTML, formattazioni)
 //   models.js    popola la tendina "Motore OCR" da /api/models
 //   dropzones.js drag&drop dei due file → state.a / state.b
+//   folder.js    cassetto laterale "Sfoglia cartella" → righe da trascinare su A/B
 //   compare.js   POST /api/compare, poi polling di /api/jobs/<id> fino a fine
 //   render.js    disegna il report a pagine dal job completato
 //   viewer.js    visualizzatore immagini (affianca / sovrapponi, zoom, sync)
@@ -17,6 +18,7 @@
 // =============================================================================
 import { loadModels } from './models.js';
 import { wireDrop } from './dropzones.js';
+import { initFolder } from './folder.js';
 import { initCompare } from './compare.js';
 import { initViewer } from './viewer.js';
 
@@ -31,6 +33,7 @@ document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 loadModels();
 wireDrop('#dropA', 'a');   // 'a' / 'b' = chiave nello state e lato server (pdf1/pdf2)
 wireDrop('#dropB', 'b');
+initFolder();
 initCompare();
 initViewer();
 
