@@ -21,6 +21,7 @@ CATEGORIES = {
     "modifica": "Modifiche",
     "trasferimento": "Trasferimenti",
     "report": "Report",
+    "confronto": "Confronti",
     "sicurezza": "Sicurezza",
 }
 OUTCOMES = {"ok": "Riuscita", "fallito": "Non riuscita", "negato": "Negata"}

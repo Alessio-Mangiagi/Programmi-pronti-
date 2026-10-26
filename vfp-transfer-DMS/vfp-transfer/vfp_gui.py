@@ -33,6 +33,9 @@ Le pagine stanno in ui/ (HTML, CSS, JS senza dipendenze); questo file espone una
   GET  /api/report [U]        righe di report_trasferimento.csv  (/api/report.csv = download)
   GET  /api/auth              stato del login Viewpoint
   POST /api/login | /api/logout | /api/state/reset
+  /api/confronto/... [U]      confronto documenti (confronto.py): ognuno vede i suoi confronti, l'admin tutti
+    GET  stato | storico | jobs/<id> | jobs/<id>/report.(pdf|docx|xlsx) | jobs/<id>/page/<n>/<a|b>
+    POST compare (multipart, fino a 200 MB) | jobs/<id>/cancel | jobs/<id>/revisione | jobs/<id>/delete
 """
 
 import argparse
@@ -44,6 +47,7 @@ import json
 import logging
 import logging.handlers
 import os
+import re
 import secrets
 import socket
 import ssl
@@ -65,6 +69,7 @@ import attivita
 import auth
 import avvisi_portale
 import cassaforte
+import confronto
 import env_config
 import mail_send
 import modelli_protetti
@@ -728,6 +733,14 @@ def api_modelli_visto(body, sess):
     return api_modelli_avvisi()
 
 
+def _avvia_confronto():
+    """Motore del confronto pronto prima che qualcuno apra la pagina (il primo avvio impiega qualche secondo)."""
+    try:
+        confronto.MOTORE.avvia()
+    except confronto.MotoreNonDisponibile as e:
+        log.warning("Confronto documenti non disponibile: %s", e)
+
+
 def _controllo_modelli():
     """Ogni ora guarda se e' dovuto il controllo mensile dei modelli nella cartella condivisa (sola lettura)."""
     time.sleep(90)  # lascia partire prima interfaccia e posta
@@ -887,6 +900,8 @@ class Handler(BaseHTTPRequestHandler):
             attivita.record(sess["user"], "report", "Report CSV scaricato", "", role=sess["role"])
             return self._send(200, report_csv(), "text/csv; charset=utf-8",
                               {"Content-Disposition": 'attachment; filename="report_trasferimento.csv"'})
+        if url.path.startswith("/api/confronto/"):
+            return self._allowed(sess, "utente") and self._confronto_get(url, sess)
         if url.path.startswith("/api/"):
             return self._send(404, {"error": "non trovato"})
         # pagine: senza sessione si va al login, con la sessione il login rimanda alla pagina principale
@@ -903,6 +918,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._host_ok() or self.headers.get(CSRF_HEADER) != "1":
             return self._send(403, {"error": "richiesta non ammessa"})
+        if urlparse(self.path).path.startswith("/api/confronto/"):  # file fino a 200 MB: prima del limite JSON
+            sess = self._session()
+            return self._allowed(sess, "utente") and self._confronto_post(urlparse(self.path).path, sess)
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -973,6 +991,93 @@ class Handler(BaseHTTPRequestHandler):
         attivita.record(auth.session(token)["user"], "accesso", "Accesso", "", role=role)
         cookie = f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict{'; Secure' if NET['tls'] else ''}"
         self._send(200, {"ok": True, "role": role}, extra={"Set-Cookie": cookie})
+
+    # ----------------------------------------------------------------------- confronto documenti (confronto.py)
+
+    def _motore(self, metodo, path, corpo=None, intestazioni=None, extra=None, se_ok=None):
+        """Inoltra al motore e manda la sua risposta cosi' com'e'; restituisce lo stato HTTP (0 se non raggiunto).
+        se_ok gira prima della risposta, solo se il motore ha risposto 200 (registro e attivita' gia' aggiornati)."""
+        try:
+            stato, h, dati = confronto.MOTORE.chiama(metodo, path, corpo, intestazioni)
+        except confronto.MotoreNonDisponibile as e:
+            self._send(503, {"error": f"Confronto documenti non disponibile: {e}", "motore": False})
+            return 0
+        except OSError as e:
+            self._send(502, {"error": f"Il motore del confronto non ha risposto: {e}"})
+            return 0
+        if "content-disposition" in h:
+            extra = {"Content-Disposition": h["content-disposition"], **(extra or {})}
+        if stato == 200 and se_ok:
+            se_ok()
+        self._send(stato, dati, h.get("content-type", "application/json; charset=utf-8"), extra)
+        return stato
+
+    def _confronto_get(self, url, sess):
+        if url.path == "/api/confronto/stato":  # all'apertura della pagina: avvia il motore e chiede i motori OCR
+            return self._motore("GET", "/api/models")
+        if url.path == "/api/confronto/storico":
+            return self._guard(lambda: {"confronti": confronto.elenco(sess)})
+        m = re.fullmatch(r"/api/confronto/jobs/([0-9a-f]{12})(?:/report\.(pdf|docx|xlsx)|/page/(\d{1,5})/([ab]))?", url.path)
+        if not m or not confronto.puo_vedere(m[1], sess):
+            return self._send(404, {"error": "Confronto non trovato"})
+        if m[2]:
+            return self._motore("GET", f"/api/jobs/{m[1]}/report.{m[2]}", se_ok=lambda: attivita.record(
+                sess["user"], "report", "Report del confronto scaricato", m[2].upper(), role=sess["role"]))
+        if m[3]:
+            proc = "?v=proc" if parse_qs(url.query).get("v") == ["proc"] else ""
+            return self._motore("GET", f"/api/jobs/{m[1]}/page/{int(m[3])}/{m[4]}{proc}")
+        return self._motore("GET", f"/api/jobs/{m[1]}")
+
+    def _confronto_post(self, path, sess):
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if path == "/api/confronto/compare":
+            ctype = self.headers.get("Content-Type") or ""
+            if not ctype.startswith("multipart/form-data"):
+                return self._send(400, {"error": "Servono due documenti"})
+            if length <= 0 or length > confronto.MAX_UPLOAD:
+                return self._send(413, {"error": "Documenti troppo grandi: al massimo 200 MB in tutto"})
+            try:
+                stato, dati = confronto.MOTORE.invia_file(ctype, length, self.rfile)
+            except confronto.MotoreNonDisponibile as e:
+                self.close_connection = True  # il corpo non letto non deve finire nella richiesta successiva
+                return self._send(503, {"error": f"Confronto documenti non disponibile: {e}", "motore": False})
+            except (ValueError, OSError) as e:
+                self.close_connection = True
+                return self._send(400, {"error": f"Caricamento non riuscito: {e}"})
+            risposta = json.loads(dati or b"{}")
+            if stato == 200 and risposta.get("job_id"):
+                job_id = risposta["job_id"]
+                _, _, info = confronto.MOTORE.chiama("GET", f"/api/jobs/{job_id}")
+                info = json.loads(info or b"{}")
+                confronto.registra(job_id, sess["user"], info.get("name_a", ""), info.get("name_b", ""))
+                log.info("Confronto %s avviato da %s", job_id, sess["user"])
+                attivita.record(sess["user"], "confronto", "Confronto avviato",
+                                f"{info.get('name_a', '')} ↔ {info.get('name_b', '')}", role=sess["role"])
+            return self._send(stato, risposta)
+        if length < 0 or length > MAX_BODY:
+            return self._send(413, {"error": "richiesta troppo grande"})
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(body, dict):
+                raise ValueError
+        except ValueError:
+            return self._send(400, {"error": "JSON non valido"})
+        m = re.fullmatch(r"/api/confronto/jobs/([0-9a-f]{12})/(cancel|revisione|delete)", path)
+        if not m or not confronto.puo_vedere(m[1], sess):
+            return self._send(404, {"error": "Confronto non trovato"})
+        job_id, azione = m[1], m[2]
+        if azione == "cancel":
+            return self._motore("POST", f"/api/jobs/{job_id}/cancel")
+        if azione == "revisione":
+            corpo = json.dumps({k: body.get(k) for k in ("chiave", "stato", "nota")}).encode()
+            return self._motore("PUT", f"/api/jobs/{job_id}/revisione", corpo, {"Content-Type": "application/json"})
+        def eliminato():
+            confronto.togli(job_id)
+            attivita.record(sess["user"], "confronto", "Confronto eliminato", job_id, role=sess["role"])
+        return self._motore("DELETE", f"/api/jobs/{job_id}", se_ok=eliminato)
 
 
 def _post_event(path, body):
@@ -1193,6 +1298,7 @@ def main():
     api_posta.WATCHER = MAIL
     threading.Thread(target=_watchdog, name="sorveglianza", daemon=True).start()
     threading.Thread(target=_controllo_modelli, name="controllo-modelli", daemon=True).start()
+    threading.Thread(target=_avvia_confronto, name="motore-confronto", daemon=True).start()
     log.info("Interfaccia trasferimento VFP attiva su %s", url)
     if sys.stdout:
         print(f"Interfaccia trasferimento VFP attiva su {url}\nLasciare aperta questa finestra; per chiuderla premere Ctrl+C.")

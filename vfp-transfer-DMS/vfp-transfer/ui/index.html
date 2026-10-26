@@ -58,6 +58,12 @@
     <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.4-7.5-10A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7.5 3c0 5.6-7.5 10-7.5 10z"/></symbol>
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
     <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="7.5" height="16" rx="1.2"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.2"/><path d="M5.5 8.5h2.5M5.5 11.5h2.5M16 8.5h2.5M16 11.5h2.5M16 14.5h2.5"/></symbol>
+    <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4M8.5 11h5M11 8.5v5"/></symbol>
+    <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4M8.5 11h5"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 4 8.5 4.5L12 13 3.5 8.5z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9L17.5 7"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14.5 4.5h-8a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5h8M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/></symbol>
   </defs>
 </svg>
@@ -76,12 +82,14 @@
     <button class="area-btn" type="button" data-area="posta" aria-pressed="false"><svg class="ic"><use href="#i-mail"/></svg>Posta<span class="nav-count" id="areaMailCount" hidden>0</span></button>
   </div>
   <nav class="nav" role="tablist" aria-label="Sezioni">
-    <button class="tab is-active" role="tab" data-area="comune" data-view="panoramica" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Panoramica</button>
+    <button class="tab is-active" role="tab" data-area="comune" data-tutti data-view="panoramica" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Panoramica</button>
     <button class="tab" role="tab" data-admin data-area="documenti" data-view="trasferimento" aria-selected="false"><svg class="ic"><use href="#i-swap"/></svg>Trasferimento</button>
     <button class="tab" role="tab" data-admin data-area="documenti" data-view="smistamento" aria-selected="false"><svg class="ic"><use href="#i-spark"/></svg>Smistamento AI</button>
     <button class="tab" role="tab" data-admin data-area="documenti" data-view="storico" aria-selected="false"><svg class="ic"><use href="#i-history"/></svg>Storico</button>
     <button class="tab" role="tab" data-admin data-area="posta" data-view="flusso" aria-selected="false"><svg class="ic"><use href="#i-board"/></svg>Flusso posta<span class="nav-count" id="flCount" hidden>0</span></button>
     <button class="tab" role="tab" data-admin data-area="posta" data-view="posta" aria-selected="false"><svg class="ic"><use href="#i-mail"/></svg>Caselle email<span class="tab-dot" id="mailDot" hidden></span></button>
+    <p class="nav-sep">Strumenti</p>
+    <button class="tab" role="tab" data-area="comune" data-tutti data-view="confronto" aria-selected="false"><svg class="ic"><use href="#i-compare"/></svg>Confronta documenti<span class="nav-count nav-count-run" id="cfRunCount" hidden>0</span></button>
     <p class="nav-sep" data-admin>Generale</p>
     <button class="tab" role="tab" data-admin data-area="comune" data-view="attivita" aria-selected="false"><svg class="ic"><use href="#i-activity"/></svg>Attività utenti<span class="nav-count" id="actAlert" hidden>!</span></button>
     <button class="tab" role="tab" data-admin data-area="comune" data-view="impostazioni" aria-selected="false"><svg class="ic"><use href="#i-gear"/></svg>Impostazioni<span class="tab-badge" id="settingsBadge" hidden>!</span></button>
@@ -623,6 +631,173 @@
           <p>Nessun trasferimento registrato.</p>
           <a href="#" class="btn btn-primary btn-sm" id="rpEmptyGo" data-goto="trasferimento"><svg class="ic"><use href="#i-upload"/></svg>Nuovo trasferimento</a>
         </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ======================================================= CONFRONTA DOCUMENTI (per tutti, confronto.js) -->
+  <section class="view" id="view-confronto" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Strumenti · per tutti gli utenti</p>
+        <h1>Confronta documenti</h1>
+        <p class="lead">Metti a confronto due versioni dello stesso documento (PDF, scansioni, immagini, Word o testo): il programma legge il testo, anche con l'OCR, e mostra pagina per pagina cosa è cambiato, con i numeri e le date modificati in evidenza.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="cfHelpBtn" type="button" aria-expanded="false" aria-controls="cfHelp"><svg class="ic"><use href="#i-info"/></svg>Come funziona</button>
+        <button class="btn btn-secondary" id="cfStoricoBtn" type="button"><svg class="ic"><use href="#i-history"/></svg>I miei confronti</button>
+      </div>
+    </div>
+
+    <div class="banner banner-err" id="cfOff" hidden>
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <div class="banner-grow"><strong>Confronto non disponibile.</strong> <span id="cfOffText"></span></div>
+      <button class="btn btn-secondary btn-sm" type="button" id="cfRetry"><svg class="ic"><use href="#i-refresh"/></svg>Riprova</button>
+    </div>
+
+    <article class="card cf-help" id="cfHelp" hidden>
+      <div class="card-head">
+        <h2 class="card-title" style="margin:0"><svg class="ic"><use href="#i-info"/></svg>Come funziona</h2>
+        <button class="icon-btn" type="button" id="cfHelpClose" aria-label="Chiudi la guida"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <ol class="cf-steps">
+        <li><strong>Scegli i due documenti.</strong> A è l'originale (o la versione precedente), B quello da controllare. Trascinali nei riquadri, oppure apri una cartella e usa i pulsanti A e B accanto a ogni file.</li>
+        <li><strong>Avvia il confronto.</strong> I PDF con testo si leggono subito; le scansioni passano dall'OCR e impiegano qualche secondo per pagina.</li>
+        <li><strong>Controlla le differenze.</strong> <span class="cf-leg cf-leg-del">rosso</span> = solo in A, <span class="cf-leg cf-leg-add">verde</span> = solo in B, <span class="cf-leg cf-leg-inc">grigio</span> = incerta (probabile errore di lettura). Clic su una riga per vederla sulla pagina; <kbd>N</kbd> e <kbd>P</kbd> passano alla differenza successiva e precedente.</li>
+        <li><strong>Segna le differenze</strong> come vista, accettata o da chiarire, con una nota: tutto finisce nell'elenco Excel. Scarica il report in PDF o Word da allegare.</li>
+      </ol>
+      <p class="muted small">I documenti restano su questo server solo per il tempo del confronto; il risultato e le anteprime restano per 30 giorni in "I miei confronti", visibili solo a te e all'amministratore.</p>
+    </article>
+
+    <div class="layout cf-layout">
+      <div class="col-main">
+        <article class="card">
+          <div class="step-title"><span class="step-num">1</span><div><h2>Scegli i documenti</h2><p class="muted">PDF, immagini (JPG, PNG, TIFF…), Word .docx, testo. Al massimo 200 MB in tutto.</p></div></div>
+          <div class="cf-drops">
+            <label class="cf-drop" id="cfDropA">
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.docx,.txt,.md,.csv" hidden>
+              <span class="cf-side">A</span>
+              <span class="cf-drop-txt"><strong class="cf-fname">Documento originale</strong><small class="cf-fmeta">Trascina qui il file o fai clic per sceglierlo</small></span>
+            </label>
+            <button class="icon-btn cf-swap" id="cfSwap" type="button" title="Scambia A e B" aria-label="Scambia A e B"><svg class="ic"><use href="#i-swap"/></svg></button>
+            <label class="cf-drop" id="cfDropB">
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.docx,.txt,.md,.csv" hidden>
+              <span class="cf-side cf-side-b">B</span>
+              <span class="cf-drop-txt"><strong class="cf-fname">Documento da controllare</strong><small class="cf-fmeta">Trascina qui il file o fai clic per sceglierlo</small></span>
+            </label>
+          </div>
+
+          <details class="advanced cf-folder" id="cfFolder">
+            <summary><svg class="ic"><use href="#i-chevron"/></svg>Scegli da una cartella (anche più confronti insieme)</summary>
+            <div class="cf-folder-head">
+              <button class="btn btn-secondary btn-sm" type="button" id="cfFolderPick"><svg class="ic"><use href="#i-folder"/></svg>Apri una cartella</button>
+              <span class="muted small" id="cfFolderInfo">Nessuna cartella aperta.</span>
+              <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="cfFolderSearch" placeholder="Cerca un file"></label>
+            </div>
+            <input type="file" id="cfFolderInput" webkitdirectory multiple hidden>
+            <input type="file" id="cfFolderInputB" webkitdirectory multiple hidden>
+            <ul class="cf-files" id="cfFiles"></ul>
+            <div class="btn-row cf-lotti" id="cfLottiBox" hidden>
+              <button class="btn btn-ghost btn-sm" type="button" id="cfLottiVersioni"><svg class="ic"><use href="#i-layers"/></svg>Abbina le versioni nella cartella</button>
+              <button class="btn btn-ghost btn-sm" type="button" id="cfLottiAltra"><svg class="ic"><use href="#i-folder"/></svg>Confronta con un'altra cartella</button>
+            </div>
+            <p class="hint">I file restano sul tuo PC finché non avvii il confronto: il programma riceve solo quelli che confronti.</p>
+          </details>
+        </article>
+
+        <article class="card progress-card" id="cfProgress" hidden>
+          <div class="card-head" style="margin-bottom:.75rem">
+            <div><h2 id="cfProgTitle">Confronto in corso</h2><p class="muted small" style="margin:0" id="cfProgNames"></p></div>
+            <button class="btn btn-danger-outline btn-sm" type="button" id="cfCancel"><svg class="ic"><use href="#i-stop"/></svg>Annulla</button>
+          </div>
+          <div class="progress-meta"><span id="cfProgMsg">Caricamento dei file…</span><span class="mono" id="cfProgCount"></span></div>
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span id="cfProgBar"></span></div>
+        </article>
+      </div>
+
+      <aside class="col-side">
+        <article class="card side-card">
+          <div class="step-title"><span class="step-num">2</span><div><h2>Impostazioni</h2><p class="muted">Vanno bene quasi sempre così.</p></div></div>
+          <div class="field">
+            <label for="cfProfilo">Profilo salvato</label>
+            <div class="input-group">
+              <select id="cfProfilo"><option value="">— nessun profilo —</option></select>
+              <button class="icon-btn" type="button" id="cfProfiloSalva" title="Salva le impostazioni come profilo" aria-label="Salva profilo"><svg class="ic"><use href="#i-download"/></svg></button>
+              <button class="icon-btn" type="button" id="cfProfiloElimina" title="Elimina il profilo" aria-label="Elimina profilo" disabled><svg class="ic"><use href="#i-trash"/></svg></button>
+            </div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="cfTolerant"><span class="toggle-ui"></span><span>Scansioni: ignora i piccoli errori di lettura<span class="tip" tabindex="0" data-tip="Confronto tollerante: le parole quasi uguali, tipiche degli errori dell'OCR, sono segnate come incerte invece che come differenze.">?</span></span></label>
+          <label class="toggle"><input type="checkbox" id="cfRipetute" checked><span class="toggle-ui"></span><span>Ignora intestazioni e piè di pagina ripetuti</span></label>
+          <details class="advanced">
+            <summary><svg class="ic"><use href="#i-chevron"/></svg>Altre impostazioni</summary>
+            <div class="field">
+              <label for="cfModel">Lettura delle scansioni (OCR)</label>
+              <select id="cfModel"><option value="tesseract">Tesseract (locale)</option></select>
+            </div>
+            <div class="field-grid" style="margin-top:0">
+              <div class="field">
+                <label for="cfDpi">Risoluzione</label>
+                <select id="cfDpi"><option value="150">150 dpi · veloce</option><option value="200" selected>200 dpi</option><option value="300">300 dpi · scansioni piccole</option></select>
+              </div>
+              <div class="field">
+                <label for="cfLang">Lingua</label>
+                <select id="cfLang"><option value="ita+eng" selected>Italiano + inglese</option><option value="ita">Italiano</option><option value="eng">Inglese</option></select>
+              </div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="cfPreprocess" checked><span class="toggle-ui"></span><span>Pulisci le scansioni prima della lettura</span></label>
+            <div class="field" style="margin-top:1rem">
+              <label for="cfIgnore">Righe da ignorare <span class="tip" tabindex="0" data-tip="Una per riga, testo in chiaro: le righe che lo contengono non contano come differenze. # = una cifra qualsiasi, * = qualsiasi testo. Es.: Pagina # di #">?</span></label>
+              <textarea id="cfIgnore" class="mono" rows="3" spellcheck="false" placeholder="Pagina # di #&#10;Stampato il *"></textarea>
+            </div>
+          </details>
+          <button class="btn btn-primary btn-block cf-go" type="button" id="cfGo" disabled><svg class="ic"><use href="#i-compare"/></svg>Avvia il confronto</button>
+        </article>
+      </aside>
+    </div>
+
+    <!-- risultato -->
+    <article class="card cf-results" id="cfResults" hidden>
+      <div class="card-head">
+        <div class="cf-res-title">
+          <p class="eyebrow" style="margin-bottom:.35rem">Risultato</p>
+          <h2 id="cfResNames"></h2>
+          <p class="cf-summary" id="cfSummary"></p>
+        </div>
+        <div class="card-actions">
+          <a class="btn btn-secondary btn-sm" id="cfDlPdf" href="#" download><svg class="ic"><use href="#i-download"/></svg>Report PDF</a>
+          <a class="btn btn-secondary btn-sm" id="cfDlDocx" href="#" download><svg class="ic"><use href="#i-download"/></svg>Word</a>
+          <a class="btn btn-secondary btn-sm" id="cfDlXlsx" href="#" download><svg class="ic"><use href="#i-table"/></svg>Elenco Excel</a>
+        </div>
+      </div>
+      <div class="cf-nav" id="cfNav" hidden>
+        <div class="btn-row">
+          <button class="btn btn-ghost btn-sm" type="button" id="cfPrev" title="Differenza precedente (P)"><svg class="ic cf-flip"><use href="#i-chevron"/></svg>Precedente</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="cfNext" title="Differenza successiva (N)">Successiva<svg class="ic"><use href="#i-chevron"/></svg></button>
+        </div>
+        <span class="mono small" id="cfDiffCount"></span>
+        <label class="toggle"><input type="checkbox" id="cfOnlyNum"><span class="toggle-ui"></span><span>Solo numeri e date</span></label>
+        <span class="muted small cf-rev-count" id="cfRevCount"></span>
+      </div>
+      <div class="cf-riepilogo" id="cfRiepilogo" hidden></div>
+      <div class="cf-pages" id="cfPages"></div>
+    </article>
+
+    <!-- confronti fatti -->
+    <article class="card" id="cfStorico">
+      <div class="card-head">
+        <div><h2 class="card-title" style="margin-bottom:.3rem"><svg class="ic"><use href="#i-history"/></svg><span id="cfStoricoTitle">I miei confronti</span></h2>
+          <p class="muted small" style="margin:0">Restano per 30 giorni. Clic su una riga per riaprire il risultato.</p></div>
+        <div class="card-actions">
+          <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="cfStoricoSearch" placeholder="Cerca un documento"></label>
+          <button class="btn btn-ghost btn-sm" type="button" id="cfStoricoReload"><svg class="ic"><use href="#i-refresh"/></svg>Aggiorna</button>
+        </div>
+      </div>
+      <div class="table-wrap table-scroll">
+        <table class="data">
+          <thead><tr><th>Data</th><th>Documenti</th><th>Esito</th><th data-admin>Utente</th><th class="num"></th></tr></thead>
+          <tbody id="cfStoricoBody"></tbody>
+        </table>
+        <div class="empty small" id="cfStoricoEmpty" hidden><svg class="ic ic-xl"><use href="#i-compare"/></svg><p>Ancora nessun confronto.</p></div>
       </div>
     </article>
   </section>
@@ -1202,6 +1377,59 @@
   </div>
 </div>
 
+<!-- Confronto: anteprima delle pagine a schermo intero -->
+<div class="cf-viewer" id="cfViewer" hidden role="dialog" aria-modal="true" aria-label="Anteprima delle pagine">
+  <header class="cf-vbar">
+    <div class="cf-vtitle"><strong class="mono" id="cfVPage"></strong><span class="muted small" id="cfVNames"></span></div>
+    <div class="cf-vtools">
+      <button class="icon-btn" type="button" id="cfVPrev" title="Pagina precedente (←)" aria-label="Pagina precedente"><svg class="ic cf-flip"><use href="#i-chevron"/></svg></button>
+      <button class="icon-btn" type="button" id="cfVNext" title="Pagina successiva (→)" aria-label="Pagina successiva"><svg class="ic"><use href="#i-chevron"/></svg></button>
+      <span class="cf-vsep"></span>
+      <button class="btn btn-ghost btn-sm" type="button" id="cfVMode"><svg class="ic"><use href="#i-layers"/></svg><span>Sovrapponi</span></button>
+      <button class="btn btn-ghost btn-sm" type="button" id="cfVProc" aria-pressed="false"><svg class="ic"><use href="#i-eye"/></svg><span>Vista OCR</span></button>
+      <span class="cf-vsep"></span>
+      <button class="icon-btn" type="button" id="cfVZoomOut" title="Riduci" aria-label="Riduci"><svg class="ic"><use href="#i-zoom-out"/></svg></button>
+      <button class="btn btn-ghost btn-sm mono" type="button" id="cfVZoom" title="Dimensione originale">100%</button>
+      <button class="icon-btn" type="button" id="cfVZoomIn" title="Ingrandisci" aria-label="Ingrandisci"><svg class="ic"><use href="#i-zoom-in"/></svg></button>
+      <span class="cf-vsep"></span>
+      <button class="icon-btn" type="button" id="cfVClose" title="Chiudi (Esc)" aria-label="Chiudi"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+  </header>
+  <div class="cf-vbody">
+    <div class="cf-vside" id="cfVSide">
+      <div class="cf-vcol"><div class="cf-vlabel"><span class="cf-side">A</span><span id="cfVNameA"></span></div><div class="cf-vpane" id="cfVPaneA"></div></div>
+      <div class="cf-vcol"><div class="cf-vlabel"><span class="cf-side cf-side-b">B</span><span id="cfVNameB"></span></div><div class="cf-vpane" id="cfVPaneB"></div></div>
+    </div>
+    <div class="cf-voverlay" id="cfVOverlayWrap" hidden>
+      <div class="cf-vlabel"><span class="cf-side">A</span>a sinistra del cursore, <span class="cf-side cf-side-b">B</span>a destra<input type="range" id="cfVSlider" min="0" max="100" value="50" aria-label="Posizione del cursore A/B"></div>
+      <div class="cf-vpane" id="cfVOverlay"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Confronto: più confronti in un colpo -->
+<div class="modal" id="cfLottiModal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="cfLottiTitle">
+    <header class="modal-head">
+      <h2 id="cfLottiTitle">Confronti da avviare</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Chiudi"><svg class="ic"><use href="#i-x"/></svg></button>
+    </header>
+    <div class="modal-body cf-lotti-body">
+      <p class="muted small">Le coppie sono abbinate dal nome del file. Togli la spunta a quelle che non servono: i confronti partono tutti e si seguono in "I miei confronti".</p>
+      <ul class="cf-lotti-list" id="cfLottiList"></ul>
+      <div id="cfLottiSoli"></div>
+    </div>
+    <footer class="modal-foot">
+      <span class="muted small" id="cfLottiEsito"></span>
+      <div class="btn-row">
+        <button class="btn btn-ghost" type="button" data-close>Annulla</button>
+        <button class="btn btn-primary" type="button" id="cfLottiGo">Avvia</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="js/base.js"></script>
@@ -1219,6 +1447,7 @@
 <script src="js/smistamento.js"></script>
 <script src="js/protocolli.js"></script>
 <script src="js/ricerca.js"></script>
+<script src="js/confronto.js"></script>
 <script src="js/avvio.js"></script>
 </body>
 </html>

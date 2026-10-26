@@ -61,7 +61,7 @@ L'interfaccia chiede **nome utente e password**. Due ruoli:
 | Ruolo | Cosa vede e fa |
 |---|---|
 | **Amministratore** | Tutto, in entrambe le aree (Documenti e Posta): impostazioni, trasferimenti, posta, storico, download dei report, gestione utenti |
-| **Utente** | Solo la Panoramica **della sua area** e la richiesta del report: indica l'indirizzo email e il report Excel arriva lì e, in copia, all'amministratore (non viene scaricato) |
+| **Utente** | La Panoramica **della sua area**, la richiesta del report (indica l'indirizzo email e il report Excel arriva lì e, in copia, all'amministratore: non viene scaricato) e **Confronta documenti** |
 
 **Aree.** Il programma ha due aree: **Documenti** (trasferimento, smistamento, storico, moduli) e **Posta** (flusso
 posta, caselle email). L'amministratore passa dall'una all'altra con il selettore in alto a sinistra. Ogni utente
@@ -117,6 +117,33 @@ Doppio clic su **`avvia_interfaccia.bat`**: si apre il browser su `http://127.0.
    firma, **anteprima e download degli allegati** salvati, link ai **documenti creati in Viewpoint**
    (con `VFP_DOC_URL`), correzione a mano del protocollo e, per le email in errore, **Riprova adesso**: l'email
    viene rimessa dalla cartella degli errori in quella controllata e ricaricata subito.
+
+## Confronta documenti (tutti gli utenti)
+
+Voce **Confronta documenti** nel menu di sinistra, sotto *Strumenti*: la vedono tutti gli utenti, di qualsiasi
+area. Mette a confronto due versioni di un documento (PDF, scansioni con OCR, immagini, Word `.docx`, testo) e
+mostra pagina per pagina le righe tolte, aggiunte e cambiate, con le parole modificate evidenziate e in cima il
+riepilogo dei **numeri e date cambiati**.
+
+- **Scelta dei file**: trascinandoli nei riquadri A (originale) e B (da controllare), oppure aprendo una cartella
+  del PC e usando i pulsanti A/B accanto a ogni file. Dalla cartella si possono avviare **più confronti insieme**:
+  *Abbina le versioni* (computo_rev1 / computo_rev2…) o *Confronta con un'altra cartella* (file con nome uguale o
+  simile).
+- **Impostazioni**: confronto tollerante per le scansioni, intestazioni ripetute ignorate, motore OCR,
+  risoluzione, lingua, righe da ignorare; si salvano come **profili** con un nome (nel browser).
+- **Risultato**: navigazione tra le differenze (pulsanti o tasti `N` / `P`), filtro *Solo numeri e date*,
+  **anteprima** delle pagine affiancate o sovrapposte con le zone diverse riquadrate, vista OCR, zoom.
+  Ogni differenza si segna come *vista*, *accettata* o *da chiarire*, con una nota.
+- **Report** in PDF e Word, **elenco Excel** delle differenze con la revisione.
+- **I miei confronti**: restano 30 giorni. Ogni utente vede solo i suoi, l'amministratore tutti (con il nome
+  di chi li ha fatti). Avvio, eliminazione e report scaricati finiscono nel registro attività (categoria Confronti).
+
+Il motore è l'app **confronto-documenti** (cartella accanto a `vfp-transfer-DMS`), con il suo `.venv`: il programma
+la avvia da solo, nascosta, solo su `127.0.0.1` e con una password casuale, e la chiude quando si chiude. I file
+caricati restano solo il tempo del confronto; risultati e anteprime stanno in `confronti\` (esclusa da git).
+Se il motore manca o non parte la pagina lo dice (dettagli in `logs\confronto_motore.log`). Percorsi diversi:
+`CONFRONTO_DIR` e `CONFRONTO_PYTHON` nel `.env` (solo sviluppatori, non dall'interfaccia). Per leggere le
+scansioni serve Tesseract installato, come per l'app da sola.
 
 ## Attività utenti (solo amministratori)
 

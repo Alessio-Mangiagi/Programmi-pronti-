@@ -32,8 +32,14 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Attività utenti: `attivita.py` (JSONL con catena di impronte SHA-256, `record()` non solleva mai). Eventi
   scritti in `vfp_gui.py` (login, rifiuti in `_allowed`, `_post_event` per le chiamate semplici) e in `auth.py`
   (codici). Pagina `/api/activity`, export `/api/activity.xlsx`, chiusura sessioni `auth.close_session`.
+- Confronto documenti (pagina per tutti, `ui/js/confronto.js`): `confronto.py` avvia come processo figlio l'app
+  sorella `confronto-documenti` (suo `.venv`, `COSEDIL_SSO=off`, 127.0.0.1, porta libera, `CONFRONTO_PASSWORD` casuale,
+  Job Object KILL_ON_JOB_CLOSE) e `vfp_gui` fa da proxy su `/api/confronto/...` (`_confronto_get/_post`, multipart
+  inoltrato a blocchi prima del limite JSON). Proprietario di ogni confronto in `confronti/registro.json`
+  (`puo_vedere`: proprietario o admin, altrimenti 404). Nessuna copia della logica del motore: le sue rotte sono in
+  `confronto-documenti/server.py`. Voci di menu per tutti = `data-tutti` (`showView` le lascia aprire all'utente).
 - Accesso: `auth.py` (utenti nella cassaforte, PBKDF2, sessioni in memoria con cookie HttpOnly SameSite=Strict,
-  blocco dopo 5 errori). Ruoli `admin` (tutto) e `utente` (solo Panoramica + `/api/report/send`); i permessi
+  blocco dopo 5 errori). Ruoli `admin` (tutto) e `utente` (Panoramica, Confronta documenti, `/api/report/send`); i permessi
   per rotta sono in `Handler.do_GET`/`do_POST` di `vfp_gui.py`, l'interfaccia nasconde le voci `[data-admin]`.
 - Invio email (report Excel all'admin + indirizzo scelto): `mail_send.py`, SMTP con TLS verificato o Graph sendMail.
 - PEC: `pec.py` legge `daticert.xml` (ElementTree, niente DOCTYPE/ENTITY) e verifica `smime.p7s` con crypt32

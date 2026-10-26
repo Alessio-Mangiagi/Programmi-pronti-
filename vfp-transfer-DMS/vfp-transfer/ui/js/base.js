@@ -171,7 +171,8 @@ try { setArea(localStorage.getItem('vfp.area') || 'documenti', { go: false }); }
 // ------------------------------------------------------------------ navigazione
 
 function showView(name) {
-  if (!isAdmin()) name = 'panoramica';  // l'utente vede solo la prima pagina
+  // l'utente vede solo le pagine per tutti (voci di menu con data-tutti: Panoramica, Confronta documenti)
+  if (!isAdmin() && !$(`.tab[data-view="${name}"][data-tutti]`)) name = 'panoramica';
   // un collegamento verso una pagina dell'altra area (es. "Vai al flusso posta") cambia area da solo
   const target = $(`.tab[data-view="${name}"]`);
   if (target && AREAS[target.dataset.area] && target.dataset.area !== document.body.dataset.area) {
@@ -192,6 +193,7 @@ function showView(name) {
   if (name === 'attivita') loadActivity();
   if (name === 'posta' || name === 'flusso') loadMail();
   if (name === 'panoramica') loadOverview();
+  if (name === 'confronto') loadConfronto();
   if (name === 'impostazioni') { loadAuth(); loadMailLog(); loadUsers(); loadHealth(); }
   window.scrollTo({ top: 0 });
 }

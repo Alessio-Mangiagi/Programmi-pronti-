@@ -127,6 +127,9 @@ DEFAULTS = {
     "SQL_FILE_MODE": "contenuto",
     "SQL_PATH_ROOT": "",
     "SQL_CACHE_DIR": "specchio_sql",
+    # ---- confronto documenti: il motore e' l'app confronto-documenti, avviata dal programma (confronto.py)
+    "CONFRONTO_DIR": "",     # vuoto = cartella confronto-documenti accanto a vfp-transfer-DMS
+    "CONFRONTO_PYTHON": "",  # vuoto = il .venv del motore (con le sue librerie: PyMuPDF, numpy, Tesseract...)
 }
 
 SECRET_KEYS = {"VFP_CLIENT_SECRET", "GRAPH_CLIENT_SECRET", "IMAP_PASSWORD", "PEC_PASSWORD", "SMTP_PASSWORD",
@@ -144,7 +147,7 @@ SECRET_BINDINGS = {
     "SQL_PASSWORD": ("SQL_SERVER", "SQL_DATABASE", "SQL_USER", "SQL_AUTH", "SQL_DRIVER"),
 }
 # impostazioni che si cambiano solo scrivendo nel .env (sviluppatori): l'interfaccia non le mostra e le rifiuta
-SOLO_SVILUPPATORI = {"MODELLI_SORGENTE", "MODELLI_LAVORO"}
+SOLO_SVILUPPATORI = {"MODELLI_SORGENTE", "MODELLI_LAVORO", "CONFRONTO_DIR", "CONFRONTO_PYTHON"}
 # credenziali e identificativi delle API: stanno nella cassaforte cifrata, mai nel .env in chiaro
 VAULT_KEYS = SECRET_KEYS | {"VFP_CLIENT_ID", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "IMAP_USER", "PEC_USER", "SMTP_USER",
                             "DMS_USER", "SQL_USER"}
