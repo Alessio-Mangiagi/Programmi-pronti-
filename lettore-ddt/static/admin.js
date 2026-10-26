@@ -134,7 +134,10 @@ function filterActiveAccounts() {
 }
 
 function csvEsc(s) {
-  s = String(s ?? '').replace(/"/g, '""');
+  s = String(s ?? '');
+  // CSV injection: = + - @ in testa li apre Excel come formula (vedi src/utils/csv.ts).
+  if (s.length > 1 && /^[=+\-@\t\r]/.test(s) && !/^[-+]?\d+(?:[.,]\d+)?$/.test(s)) s = `'${s}`;
+  s = s.replace(/"/g, '""');
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
 }
 

@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import { Request } from 'express';
 import { config } from '../config';
 import { ipReale } from '../utils/richiesta';
+import { neutralizzaFormula } from '../utils/csv';
 
 export const appConfig = config;
 
@@ -197,7 +198,7 @@ export function isBoundedArray(value: unknown, max: number = MAX_ARRAY_ITEMS): b
 export function toCsv(headers: string[], rows: (string | number | null)[][]): string {
   // Helper escape: se valore contiene , " newline → wrap in quotes e raddoppia "
   const esc = (v: string | number | null): string => {
-    const s = String(v ?? '');
+    const s = typeof v === 'number' ? String(v) : neutralizzaFormula(String(v ?? ''));
     return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 

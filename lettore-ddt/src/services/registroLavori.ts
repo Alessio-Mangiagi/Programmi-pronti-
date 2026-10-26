@@ -11,6 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { commessaDataDir } from '../routes/helpers';
+import { neutralizzaFormula } from '../utils/csv';
 
 export const NOME_REGISTRO = 'registro-conversioni.csv';
 
@@ -61,9 +62,11 @@ export function registroPath(commessaId: string): string {
 function campo(v: string | number | null): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'number') return v.toString().replace('.', ',');
-  const s = String(v)
-    .replace(/[\r\n]+/g, ' ')
-    .trim();
+  const s = neutralizzaFormula(
+    String(v)
+      .replace(/[\r\n]+/g, ' ')
+      .trim()
+  );
   return /[";]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
