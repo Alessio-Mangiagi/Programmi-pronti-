@@ -335,3 +335,8 @@ def test_data_cambiata_in_intestazione_non_e_nascosta():
     assert c._chiave_ripetuta("Pagina 1 di 3") in chiavi
     ops = c.line_ops(c.togli_ripetute(a[0], chiavi)[0], c.togli_ripetute(b[0], chiavi)[0])
     assert any(op["type"] == "change" for op in ops)    # la data cambiata si vede
+
+
+def test_codice_voce_non_e_un_numero_cambiato():
+    ops = c.line_ops(["A.01.003 Scavo di sbancamento", "B.02.010 Muratura"], ["B.02.010 Muratura"])
+    assert c.numeri_cambiati(ops) == []

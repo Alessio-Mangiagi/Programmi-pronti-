@@ -11,11 +11,14 @@
 //   render.js    disegna il report a pagine dal job completato
 //   viewer.js    visualizzatore immagini (affianca / sovrapponi, zoom, sync)
 //   diffnav.js   navigazione tra le differenze (N/P) e filtro numeri/date
+//   revisione.js vista / accettata / da chiarire + nota su ogni differenza
+//   storico.js   confronti fatti, riapribili (anche via ?job=<id>)
 //
 // Flusso: scelta file → "Avvia confronto" → compare.js crea il job sul server →
 //   polling aggiorna la barra → a "done" render.js costruisce le card → l'utente
-//   apre l'anteprima (viewer.js). Lo stato NON è persistito (ricaricare = reset),
-//   tranne le PREFERENZE UI qui sotto, salvate in localStorage.
+//   apre l'anteprima (viewer.js). I confronti finiti restano sul server
+//   (storico) e si riaprono dallo Storico o da ?job=<id>; le PREFERENZE UI qui
+//   sotto e l'elenco dei propri confronti stanno in localStorage.
 // =============================================================================
 import { loadModels } from './models.js';
 import { wireDrop } from './dropzones.js';
@@ -23,6 +26,7 @@ import { initFolder } from './folder.js';
 import { initCompare } from './compare.js';
 import { initViewer } from './viewer.js';
 import { initDiffNav } from './diffnav.js';
+import { initStorico } from './storico.js';
 
 // Animazione "reveal" allo scroll: aggiunge .in quando l'elemento entra nel
 // viewport, poi smette di osservarlo (one-shot, niente ri-trigger a ritroso).
@@ -39,6 +43,7 @@ initFolder();
 initCompare();
 initViewer();
 initDiffNav();
+initStorico();
 
 // Guida "Come funziona": sta in cima alla pagina, nascosta; il pulsante nella
 // nav la apre/chiude e la porta in vista.

@@ -17,6 +17,7 @@ import { $, esc, pageLabel } from './dom.js';
 import { state } from './state.js';
 import { openViewer } from './viewer.js';
 import { refreshNav } from './diffnav.js';
+import { initRevisione } from './revisione.js';
 
 // Rende una lista di segmenti evidenziando (con <mark>) le parole non uguali.
 function segsHtml(list, cls) {
@@ -159,6 +160,7 @@ export function render(job) {
     el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
   });
 
+  initRevisione(job);
   refreshNav();
   $('#results').style.display = 'block';
   $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });

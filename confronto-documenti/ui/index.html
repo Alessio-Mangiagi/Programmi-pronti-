@@ -27,6 +27,10 @@
     <span class="brand-text">COSEDIL<span class="brand-sub">Confronto Documenti</span></span>
   </a>
   <nav class="nav-links">
+    <button type="button" class="ghost-btn nav-sto" id="storicoBtn" aria-controls="storico" aria-expanded="false">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+      Storico
+    </button>
     <button type="button" class="help-btn" id="helpBtn" aria-controls="come" aria-expanded="false">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
       Come funziona
@@ -58,6 +62,17 @@
 </aside>
 
 <main>
+
+  <!-- ============ STORICO (storico.js): confronti fatti, riapribili ============ -->
+  <section id="storico" class="block help-panel" hidden>
+    <div class="section-title">
+      <span class="kicker">Storico</span>
+      <h2>I tuoi confronti</h2>
+      <p>Restano disponibili per 30 giorni, anche dopo un riavvio. I file originali non vengono conservati: solo il risultato.</p>
+      <button type="button" class="ghost-btn help-close" id="storicoClose">Chiudi storico</button>
+    </div>
+    <div class="storico-lista" id="storicoLista"></div>
+  </section>
 
   <!-- ============ COME FUNZIONA (guida, aperta dal pulsante in alto · app.js) ============ -->
   <section id="come" class="block help-panel" hidden>
@@ -262,6 +277,7 @@
       <button type="button" class="ghost-btn" id="diffNext" title="Differenza successiva (N)">Successiva ↓</button>
       <label class="chk"><input type="checkbox" id="onlyNum"> Solo numeri e date</label>
       <span class="chk-hint">tasti N / P</span>
+      <span class="rev-count" id="revCount"></span>
     </div>
     <div id="pages"></div>
   </section>

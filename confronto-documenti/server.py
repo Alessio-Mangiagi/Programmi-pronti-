@@ -9,8 +9,9 @@ Modello di esecuzione (ASINCRONO):
     con un job_id; il lavoro pesante (OCR, diff) non blocca la richiesta.
   - Lo stato di ogni job vive in RAM nel dict JOBS (protetto da JOBS_LOCK); il
     front-end fa polling su GET /api/jobs/<id> per avanzamento ed esito.
-  - Le anteprime pagina (JPEG) stanno in PREVIEWS, sempre in RAM: se ne tengono
-    poche (MAX_JOBS_KEPT) per non gonfiare la memoria. Riavviare = tutto perso.
+  - Le anteprime pagina (JPEG) stanno in PREVIEWS finché il job è in RAM.
+  - A fine confronto job e anteprime vanno anche su disco (storico.py): dopo
+    un riavvio, o quando escono dalla RAM (MAX_JOBS_KEPT), si rileggono da lì.
   - I file caricati vanno in una cartella temporanea e sono cancellati a fine job.
 
 OCR: testo embedded quando c'è, altrimenti Tesseract o PaddleOCR (scelta via
@@ -39,6 +40,8 @@ from pathlib import Path
 import numpy as np
 from flask import Flask, Response, jsonify, request, send_from_directory
 from PIL import Image
+
+import storico
 
 from confronta_pdf import (DocumentError, OcrCancelled, MIN_EMBEDDED_CHARS,
                            PADDLE_WORKER, align_pages, apply_ignore,
@@ -106,7 +109,7 @@ JOBS_LOCK = threading.Lock()
 # Confronti eseguiti insieme: gli altri aspettano in coda ("In coda...").
 MAX_PARALLELI = max(1, int(os.environ.get("CONFRONTO_MAX_PARALLELI", "2")))
 _SLOT_CONFRONTO = threading.BoundedSemaphore(MAX_PARALLELI)
-MAX_JOBS_KEPT = 2   # anteprime in RAM: tenerne poche
+MAX_JOBS_KEPT = 2   # job FINITI tenuti in RAM (sono comunque su disco)
 PREVIEW_MAX_W = 1100
 
 # Stati di revisione di una differenza (revisione.js / PUT .../revisione).
@@ -229,12 +232,23 @@ def diff_boxes(img1: Image.Image, img2: Image.Image,
 
 
 def prune_old_jobs():
-    """Tiene in memoria solo gli ultimi job (anteprime incluse)."""
+    """Tiene in RAM solo gli ultimi MAX_JOBS_KEPT job finiti (anteprime
+    incluse): quelli in coda o in corso restano sempre."""
     with JOBS_LOCK:
-        while len(JOBS) > MAX_JOBS_KEPT:
-            oldest = next(iter(JOBS))
-            JOBS.pop(oldest, None)
-            PREVIEWS.pop(oldest, None)
+        finiti = [k for k, j in JOBS.items()
+                  if j.get("status") in ("done", "error", "cancelled")]
+        for k in finiti[:max(0, len(finiti) - MAX_JOBS_KEPT)]:
+            JOBS.pop(k, None)
+            PREVIEWS.pop(k, None)
+
+
+def get_job(job_id: str) -> dict | None:
+    """Copia del job: dalla RAM se c'è, altrimenti dallo storico su disco."""
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is not None:
+            return dict(job)
+    return storico.carica(job_id)
 
 
 # --------------------------------------------------------------------------
@@ -455,6 +469,13 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
         update_job(job_id, results=results, status="done", diff_count=diff_count,
                    uncertain_count=uncertain_count, visual_count=visual_count,
                    riepilogo=riepilogo, message=message)
+        with JOBS_LOCK:
+            snap, anteprime = dict(JOBS.get(job_id, {})), dict(PREVIEWS.get(job_id, {}))
+        try:
+            storico.salva(job_id, snap, anteprime)
+        except OSError as exc:      # disco pieno/non scrivibile: il confronto resta valido
+            print(f"[{job_id}] storico non salvato: {exc}", flush=True)
+        prune_old_jobs()
     except OcrCancelled:
         update_job(job_id, status="cancelled", message="Confronto annullato.")
     except Exception as exc:  # pragma: no cover
@@ -932,6 +953,7 @@ def compare():
 
     with JOBS_LOCK:
         JOBS[job_id] = {
+            "id": job_id, "creato": datetime.now().isoformat(timespec="seconds"),
             "status": "queued", "message": "In coda...", "cancel": False,
             "name_a": f1.filename, "name_b": f2.filename,
             "total_pages": 0, "current_page": 0, "results": [],
@@ -957,11 +979,8 @@ def cancel_job(job_id: str):
 
 
 def _done_snapshot(job_id: str) -> dict | None:
-    with JOBS_LOCK:
-        job = JOBS.get(job_id)
-        if job is None or job.get("status") != "done":
-            return None
-        return dict(job)
+    job = get_job(job_id)
+    return job if job and job.get("status") == "done" else None
 
 
 @app.get("/api/jobs/<job_id>/report.docx")
@@ -1009,9 +1028,13 @@ def page_preview(job_id: str, page: int, side: str):
         return jsonify({"error": "side deve essere 'a' o 'b'."}), 400
     key = f"{page}{side}" + ("p" if request.args.get("v") == "proc" else "")
     with JOBS_LOCK:
-        img = PREVIEWS.get(job_id, {}).get(key)
-        if img is None and key.endswith("p"):        # fallback all'originale
-            img = PREVIEWS.get(job_id, {}).get(f"{page}{side}")
+        mem = PREVIEWS.get(job_id)
+        img = mem.get(key) if mem else None
+        if mem and img is None and key.endswith("p"):   # fallback all'originale
+            img = mem.get(f"{page}{side}")
+    if mem is None:                                       # job uscito dalla RAM
+        img = (storico.anteprima(job_id, key)
+               or (storico.anteprima(job_id, f"{page}{side}") if key.endswith("p") else None))
     if img is None:
         return jsonify({"error": "Anteprima non disponibile."}), 404
     return Response(img, mimetype="image/jpeg")
@@ -1019,11 +1042,56 @@ def page_preview(job_id: str, page: int, side: str):
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        return jsonify({"error": "Confronto non trovato (forse eliminato o scaduto)."}), 404
+    return jsonify(job)
+
+
+@app.delete("/api/jobs/<job_id>")
+def job_delete(job_id: str):
+    """Elimina un confronto dallo storico (e dalla RAM se finito)."""
     with JOBS_LOCK:
         job = JOBS.get(job_id)
-        if job is None:
-            return jsonify({"error": "Job non trovato."}), 404
-        return jsonify(job)
+        if job and job.get("status") not in ("done", "error", "cancelled"):
+            return jsonify({"error": "Confronto in corso: annullalo prima."}), 409
+        JOBS.pop(job_id, None)
+        PREVIEWS.pop(job_id, None)
+    storico.elimina(job_id)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/storico")
+def storico_lista():
+    """Riassunti dei confronti di cui il browser conosce l'id (?ids=a,b,c)."""
+    ids = [i for i in request.args.get("ids", "").split(",") if i]
+    return jsonify({"confronti": storico.riassunti(ids)})
+
+
+@app.put("/api/jobs/<job_id>/revisione")
+def job_revisione(job_id: str):
+    """Stato di revisione di una differenza: {"chiave": "r:o", "stato":
+    "vista"|"ok"|"dubbio"|"", "nota": "..."}. Stato vuoto e nota vuota =
+    tolta. Salvato nel job (RAM e storico), finisce nell'export Excel."""
+    dati = request.get_json(silent=True) or {}
+    chiave = str(dati.get("chiave", ""))
+    stato = str(dati.get("stato") or "")
+    nota = str(dati.get("nota") or "")[:1000]
+    if not re.fullmatch(r"\d{1,5}:\d{1,6}", chiave) or (stato and stato not in _STATI_REVISIONE):
+        return jsonify({"error": "Dati di revisione non validi."}), 400
+    job = get_job(job_id)
+    if job is None or job.get("status") != "done":
+        return jsonify({"error": "Confronto non trovato."}), 404
+    rev = dict(job.get("revisione") or {})
+    if stato or nota:
+        rev[chiave] = {"stato": stato, "nota": nota}
+    else:
+        rev.pop(chiave, None)
+    with JOBS_LOCK:
+        if job_id in JOBS:
+            JOBS[job_id]["revisione"] = rev
+    storico.aggiorna(job_id, revisione=rev)
+    return jsonify({"ok": True, "revisione": rev})
 
 
 if __name__ == "__main__":
@@ -1035,6 +1103,7 @@ if __name__ == "__main__":
     indirizzo = f"http://{'localhost' if HOST == '0.0.0.0' else HOST}:{PORT}"
     print(f"Confronta documenti — {indirizzo}" + (" (e in LAN)" if HOST == "0.0.0.0" else ""))
     prune_cache(max_age_days=30)
+    storico.pulisci()
     if getattr(sys, "frozen", False):
         # exe standalone: apri il browser da solo dopo l'avvio
         import webbrowser

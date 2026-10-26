@@ -40,3 +40,6 @@ desktop.ini
 .idea/
 *.suo
 *.user
+
+# Storico confronti (risultati e anteprime, 30 giorni)
+storico/

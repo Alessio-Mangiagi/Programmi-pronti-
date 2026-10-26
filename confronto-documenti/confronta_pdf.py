@@ -1089,6 +1089,8 @@ def numeri_cambiati(ops: list[dict]) -> list[dict]:
             db = b = op["text"] if op["type"] == "add" else ""
         else:
             continue
+        # il codice di voce in testa alla riga non è un numero da controllare
+        da, db = (s[len(cod):] if (cod := _codice_voce(s)) else s for s in (da, db))
         if not any(ch.isdigit() for ch in da + db):
             continue
         tipo = "data" if _DATA.search(da) or _DATA.search(db) else "numero"

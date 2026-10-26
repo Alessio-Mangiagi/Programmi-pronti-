@@ -4,6 +4,7 @@
 import { $ } from './dom.js';
 import { state } from './state.js';
 import { render } from './render.js';
+import { ricorda } from './storico.js';
 
 // Interroga lo stato del job ogni ~0.9s finché non termina, aggiornando la
 // barra di avanzamento. Il server rende il progresso via total_pages/current_page.
@@ -35,6 +36,7 @@ function poll(jobId) {
       if (job.status === 'done') {
         $('#progBar').style.transform = 'scaleX(1)';
         render(job);
+        history.replaceState(null, '', '?job=' + jobId + '#results');   // link diretto al confronto
       }
     }
   }, 900);
@@ -66,6 +68,7 @@ export function initCompare() {
       const r = await fetch('/api/compare', { method: 'POST', body: fd });
       const d = await r.json();
       if (d.error) throw new Error(d.error);
+      ricorda(d.job_id, state.a.name, state.b.name);
       poll(d.job_id);
     } catch (err) {
       $('#progMsg').textContent = 'Errore: ' + err.message;
