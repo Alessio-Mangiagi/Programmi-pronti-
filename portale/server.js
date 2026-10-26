@@ -34,8 +34,24 @@ const AVVISI_FILE = path.join(DATA_DIR, 'avvisi.json');    // avvisi dei program
 // Cartella di arrivo degli avvisi: le app ci lasciano un file JSON ciascuno
 // (shared/avvisi). Passata alle app lanciate dal portale come SUITE_AVVISI_DIR.
 const AVVISI_IN = process.env.SUITE_AVVISI_DIR ? path.resolve(process.env.SUITE_AVVISI_DIR) : path.join(DATA_DIR, 'avvisi-in');
+const CONTATTI_FILE = path.join(DATA_DIR, 'contatti.json');  // { "emailAdmin": "..." }
 
-const ACCESSI_CAP = 5000;   // eventi massimi conservati
+// Casella dell'amministratore a cui l'assistente e la pagina di login mandano
+// chi ha bisogno di una persona. Variabile ADMIN_EMAIL, altrimenti
+// data/contatti.json; riletta a ogni richiesta, così si cambia senza riavvio.
+// Un valore che non sembra un indirizzo vale come assente.
+function emailAdmin() {
+  let v = process.env.ADMIN_EMAIL || '';
+  if (!v) {
+    try { v = String(JSON.parse(fs.readFileSync(CONTATTI_FILE, 'utf8')).emailAdmin || ''); } catch { v = ''; }
+  }
+  v = v.trim();
+  return /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(v) ? v : '';
+}
+
+// Eventi massimi conservati. Alzato quando le app hanno iniziato a scrivere nel
+// registro le loro azioni (es. ogni DDT convertito), non solo aperture e login.
+const ACCESSI_CAP = 20000;
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const MIN_PW_LEN = 8;
 // Username dell'admin creato al primo avvio (la password è casuale, vedi ensureData).
@@ -69,22 +85,30 @@ const COOKIE_SECURE = TLS_ON || process.env.COOKIE_SECURE === '1'
   || (!!SUITE_DOMINIO && SUITE_SCHEMA === 'https');
 
 // Tentativi di login falliti: soglia e finestra di blocco.
-// Due contatori: per utente+IP (5) e per solo IP (20). Il primo protegge il
-// singolo account; il secondo ferma chi dallo stesso PC prova 5 tentativi su
-// OGNI username — senza, il limite per-account non limitava niente.
-const LOGIN_MAX_FAIL = 5;
-const LOGIN_MAX_FAIL_IP = 20;
+// Due contatori: per utente+IP (15) e per solo IP (50). Il primo protegge il
+// singolo account; il secondo ferma chi dallo stesso PC prova qualche tentativo
+// su OGNI username — senza, il limite per-account non limitava niente.
+// 15 e non 5: con 5 si bloccava chi aveva solo il blocco maiuscole inserito.
+// Quello per IP resta ben sopra, così non scatta prima di quello per account.
+const LOGIN_MAX_FAIL = 15;
+const LOGIN_MAX_FAIL_IP = 50;
 const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
 // Registro delle app della suite.
 // Campi extra usati SOLO dall'assistente (vedi "Assistente della suite"):
 //   kw        — parole e frasi con cui la gente nomina l'app (anche a sproposito).
 //   dettaglio — risposta lunga a "cosa fa X?"; il campo desc resta quello della card.
+// fai   — l'attività come la direbbe chi lavora ("Trasformare una bolla in Excel"):
+//         è il titolo della scheda nella home degli utenti.
+// guida — due righe su cosa serve e cosa succede dentro l'app: il suggerimento
+//         che compare passando sopra la scheda.
 const APPS = [
   {
     id: 'ddt',
     nome: 'Lettore DDT',
     sottotitolo: 'Da PDF a Excel',
+    fai: 'Trasformare una bolla in Excel',
+    guida: 'Tieni a portata di mano il PDF della bolla: lo carichi, controlli i dati estratti e scarichi il foglio Excel pronto.',
     desc: 'Converte i documenti di trasporto (DDT) da PDF a Excel. Gestione utenti, template e storico versioni.',
     porta: 5050,
     dir: 'lettore-ddt',
@@ -98,6 +122,8 @@ const APPS = [
     id: 'agente',
     nome: 'Analista Dati',
     sottotitolo: 'Domande sui dati, risposte con AI',
+    fai: 'Fare una domanda sui dati aziendali',
+    guida: 'Scrivi la domanda come la faresti a un collega, per esempio «fatturato per cantiere nel 2025». Ricevi tabelle e grafici, senza conoscere SQL.',
     desc: 'Agente AI che interroga i database aziendali in linguaggio naturale e produce report e grafici.',
     porta: 5173,
     dir: 'analista-dati',
@@ -112,6 +138,8 @@ const APPS = [
     id: 'confronta',
     nome: 'Confronto Documenti',
     sottotitolo: 'Raffronto documenti',
+    fai: 'Trovare le differenze tra due PDF',
+    guida: 'Servono due versioni dello stesso documento: le carichi una accanto all’altra e scarichi il report delle differenze in Word o PDF.',
     desc: 'Confronta due documenti PDF evidenziando le differenze, con OCR e report scaricabile in Word o PDF.',
     porta: 5001,
     dir: 'confronto-documenti',
@@ -126,12 +154,15 @@ const APPS = [
     id: 'ocr',
     nome: 'OCR Documenti',
     sottotitolo: 'OCR ed estrazione',
+    fai: 'Leggere un documento scansionato',
+    guida: 'Usala quando il PDF è una foto e il testo non si seleziona: carichi la scansione e copi o esporti il testo riconosciuto.',
     desc: 'Riconoscimento testo da immagini e scansioni (PaddleOCR) con estrazione di articoli e prestazioni.',
     porta: 5179,
     dir: 'ocr-documenti',
     launch: 'avvia.vbs',
     tipo: 'Node.js + OCR',
-    kw: ['ocr documenti', 'ocr', 'paddle', 'paddleocr', 'scansione', 'scansioni', 'scansionato', 'scannerizzato',
+    kw: ['ocr documenti', 'ocr', 'paddle', 'paddleocr', 'scansione', 'scansioni', 'scansionato', 'scansionata', 'scansionati', 'scansionate',
+      'pdf scansionato', 'pdf scansionati', 'scannerizzato',
       'immagine', 'immagini', 'foto', 'riconoscimento testo', 'riconoscere', 'estrazione',
       'estrarre', 'articoli', 'prestazioni', 'testo da immagine'],
     dettaglio: 'Riconosce il testo dentro immagini e scansioni, anche storte o di bassa qualità, e ne estrae articoli e prestazioni. È l\'app da usare quando un PDF è una fotografia e non testo selezionabile.',
@@ -140,6 +171,8 @@ const APPS = [
     id: 'scadenzario',
     nome: 'Scadenzario',
     sottotitolo: 'Scadenze e adempimenti',
+    fai: 'Controllare scadenze e adempimenti',
+    guida: 'Trovi l’elenco delle scadenze con quelle vicine in evidenza. Puoi aggiungerne di nuove o importarle da un file Excel.',
     desc: 'Tiene sotto controllo scadenze e adempimenti aziendali, con preavvisi automatici e importazione da Excel.',
     porta: 5180,
     dir: 'scadenzario',
@@ -155,6 +188,8 @@ const APPS = [
     id: 'requisiti',
     nome: 'Verifica Requisiti',
     sottotitolo: 'Ricerca e checklist sui documenti',
+    fai: 'Verificare i requisiti di un documento',
+    guida: 'Carichi DURC, visure o certificati e fai passare la checklist: per ogni requisito vedi l’esito e il punto del testo che lo dimostra.',
     desc: 'Cerca parole e frasi dentro i documenti scansionati (con OCR) e applica una checklist di requisiti, con report Excel.',
     porta: 5185,
     dir: 'verifica-requisiti',
@@ -175,6 +210,8 @@ const APPS = [
     id: 'incampo',
     nome: 'InCampo',
     sottotitolo: 'Gestione cantiere',
+    fai: 'Seguire il lavoro in cantiere',
+    guida: 'Planimetrie con i pin, moduli di controllo, task e non conformità. Dentro si entra con il proprio account InCampo; c’è anche l’app per telefono, che funziona senza rete.',
     desc: 'Planimetrie con pin, moduli di controllo, task e non conformità dei cantieri, da web e da app mobile anche offline.',
     porta: 5190,
     dir: 'incampo',
@@ -192,6 +229,8 @@ const APPS = [
     id: 'trimble',
     nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',
+    fai: 'Caricare un PDF su Trimble',
+    guida: 'Per PCQ, computi e SAL: estrae le voci riga per riga, segnala gli scostamenti e carica il file su Trimble Connect.',
     desc: 'Converte PCQ, computi economici e SAL da PDF a file strutturati e li carica su Trimble via API. Riservato agli amministratori.',
     porta: 3011,
     dir: 'ponte-trimble',
@@ -207,6 +246,8 @@ const APPS = [
     id: 'auguri',
     nome: 'Auguri',
     sottotitolo: 'Compleanni su WhatsApp',
+    fai: 'Gestire gli auguri di compleanno',
+    guida: 'Controlli l’elenco dei compleanni e i messaggi WhatsApp che partono in automatico.',
     desc: 'Invia in automatico gli auguri di compleanno su WhatsApp. Riservato agli amministratori.',
     porta: 3000,
     dir: 'auguri',
@@ -267,11 +308,58 @@ const CHAT_ESEMPI = 'Prova con: "cosa fa l\'OCR?", "quale app per i PDF scansion
 
 // Ritorna { risposta, apps: [id] }: gli id servono al widget per mostrare i
 // pulsanti Avvia/Apri della card corrispondente.
-function rispondiAssistente(domanda, apps) {
+// Insulti all'assistente: non si risponde nel merito, si chiede di riformulare
+// con calma. Elenco volutamente corto e su parole intere (testo già normalizzato:
+// minuscolo, senza accenti): "scemo" non deve scattare su "scemato".
+const INSULTI = /(^|\s)(stupid[oaie]|idiot[aie]|cretin[oaie]|scem[oaie]|imbecill[ei]|deficient[ei]|coglion[ei]|stronz[oaie]|vaffanculo|fanculo|merda|schifo|inutile|incapace|ritardat[oaie])($|\s)/;
+function eInsulto(qn) { return INSULTI.test(qn); }
+const RISPOSTA_INSULTO = 'Sono un assistente automatico e ti aiuto volentieri, ma ti chiedo di scrivere con rispetto. '
+  + 'Riprova a farmi la domanda con calma, per esempio «quale app per le bolle?».';
+
+// Dove mandare chi ha bisogno di una persona: credenziali, password dimenticata,
+// domande che l'assistente non sa o che sono troppo articolate. Senza indirizzo
+// configurato si dice di rivolgersi a un amministratore, senza inventarne uno.
+function rimandoAdmin(email) {
+  return email ? `scrivi all'amministratore del portale: ${email}` : 'rivolgiti a un amministratore del portale';
+}
+const DOMANDA_ACCOUNT = /(^|\s)(password|passwd|credenzial\w*|account|username|nome utente|login|bloccat\w*|dimenticat\w*|accedere|accesso negato|non (riesco|posso) (a )?(entrare|accedere)|nuovo utente|abilitazion\w*|permess\w*)($|\s)/;
+// Oltre questa lunghezza la domanda è un ragionamento, non una richiesta su
+// un'app: meglio una persona che una risposta a parole chiave.
+const PAROLE_DOMANDA_COMPLESSA = 25;
+
+// opts.emailAdmin: indirizzo dell'amministratore (vedi emailAdmin()).
+// La risposta porta `contatto: { email }` quando rimanda a una persona: la
+// pagina ci aggancia il pulsante "Scrivi all'amministratore".
+function rispondiAssistente(domanda, apps, opts = {}) {
   const qn = normalizza(domanda);
+  const email = opts.emailAdmin || '';
   if (!qn) return { risposta: 'Scrivi una domanda sulle app della suite. ' + CHAT_ESEMPI, apps: [] };
+  if (eInsulto(qn)) return { risposta: RISPOSTA_INSULTO, apps: [], insulto: true };
 
   const parole = qn.split(' ');
+
+  // Credenziali e password: il cambio lo fa l'utente da sé, il resto un admin.
+  if (DOMANDA_ACCOUNT.test(qn)) {
+    return {
+      risposta: 'Per cambiare la tua password usa «Cambia password». '
+        + `Se l'hai dimenticata, se l'account è bloccato o ti servono credenziali o permessi nuovi, ${rimandoAdmin(email)}.`,
+      apps: [],
+      contatto: { email },
+    };
+  }
+
+  // Domanda lunga e articolata: la si gira a una persona, citando le app che
+  // c'entrano se ce ne sono.
+  if (parole.length > PAROLE_DOMANDA_COMPLESSA) {
+    const app = appPertinenti(qn, apps).slice(0, 2).map((t) => t.app);
+    return {
+      risposta: 'È una domanda articolata e rischierei di risponderti male: '
+        + `${rimandoAdmin(email)}, spiegando cosa ti serve.`
+        + (app.length ? `\nIntanto, le app che potrebbero servirti: ${app.map((a) => a.nome).join(', ')}.` : ''),
+      apps: app.map((a) => a.id),
+      contatto: { email },
+    };
+  }
 
   // Saluto secco (non "ciao, cosa fa il ddt?": quello prosegue).
   if (parole.length <= 3 && /(^|\s)(ciao|salve|buongiorno|buonasera|hey|ehi)($|\s)/.test(qn)) {
@@ -300,7 +388,7 @@ function rispondiAssistente(domanda, apps) {
     const a = trovate.length ? trovate[0].app : null;
     const dove = a ? `di ${a.nome}` : 'dell\'app';
     return {
-      risposta: `Gli indirizzi delle app non servono: usa i pulsanti "Avvia" e "Apri" sulla card ${dove} e il portale la apre da solo.`,
+      risposta: `Gli indirizzi delle app non servono: clicca sulla scheda ${dove} e il portale la apre da sé (se è spenta prima la avvia).`,
       apps: a ? [a.id] : [],
     };
   }
@@ -308,9 +396,9 @@ function rispondiAssistente(domanda, apps) {
   // Come si avvia / si apre.
   if (/(^|\s)(avvi|avvio|avviare|aprire|apro|accendere|accendo|lanciare|start)/.test(qn)) {
     const a = trovate.length ? trovate[0].app : null;
-    const dove = a ? `sulla card di ${a.nome}` : 'sulla card dell\'app';
+    const dove = a ? `sulla scheda di ${a.nome}` : 'sulla scheda dell\'app';
     return {
-      risposta: `Premi "Avvia" ${dove}: il portale accende il programma e lo apre da solo appena è pronto. Se è già acceso (pallino verde "Attivo") usa direttamente "Apri". Le app più pesanti, come l'OCR, ci mettono qualche secondo la prima volta.`,
+      risposta: `Clicca ${dove}: se il programma è spento il portale lo accende e lo apre da solo appena è pronto. Le app più pesanti, come OCR Documenti, ci mettono qualche secondo la prima volta.`,
       apps: a ? [a.id] : [],
     };
   }
@@ -329,10 +417,12 @@ function rispondiAssistente(domanda, apps) {
     return { risposta, apps: [prima.app.id] };
   }
 
-  // Fuori tema: non lo so e lo dico.
+  // Fuori tema: non lo so, lo dico, e indico una persona a cui chiedere.
   return {
-    risposta: `Su questo non so rispondere: conosco solo le app della suite e cosa fanno.\n${CHAT_ESEMPI}`,
+    risposta: `Su questo non so rispondere: conosco solo le app della suite e cosa fanno.\n${CHAT_ESEMPI}\n`
+      + `Per domande più complesse ${rimandoAdmin(email)}.`,
     apps: [],
+    contatto: { email },
   };
 }
 
@@ -465,7 +555,10 @@ function logAccesso(entry) {
 // solo le proprie righe, e solo per le app che può ancora vedere — un'app tolta
 // a un utente sparisce anche dal suo storico, come sparisce dalla home.
 const GIORNO_MS = 24 * 60 * 60 * 1000;
-function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
+// `giorno` (YYYY-MM-DD locale, facoltativo) restringe SOLO l'elenco attività
+// a quel giorno — il clic sul calendario — mentre numeri e "riprendi" restano
+// quelli dell'utente.
+function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now(), giorno = null) {
   const mie = accessi
     .filter((e) => e && e.username === username && e.ts)
     .filter((e) => !e.appId || puoVedere(e.appId))
@@ -493,7 +586,14 @@ function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
   const meseCorrente = new Date(ora).toISOString().slice(0, 7);
 
   return {
-    attivita: mie.slice(0, 40).map((e) => ({ ts: e.ts, azione: e.azione, appId: e.appId || null })),
+    // Campi extra solo dove ci sono: "chiudi" porta inizio e durata, "evento"
+    // il nome dell'azione fatta nell'app e il suo dettaglio.
+    attivita: (giorno ? mie.filter((e) => giornoLocale(e.ts) === giorno) : mie).slice(0, giorno ? 300 : 80).map((e) => {
+      const r = { ts: e.ts, azione: e.azione, appId: e.appId || null };
+      if (e.azione === 'chiudi') { r.inizio = e.inizio || null; r.durataMin = Number(e.durataMin) || 0; }
+      if (e.azione === 'evento') { r.evento = e.evento || ''; r.dettaglio = e.dettaglio || ''; }
+      return r;
+    }),
     riprendi,
     numeri: {
       aperture7: mie.filter(dopo(7)).filter(usoApp).length,
@@ -507,6 +607,31 @@ function riepilogoAttivita(accessi, username, puoVedere, ora = Date.now()) {
 // Elenco utenti per la plancia degli admin. Funzione pura (testata).
 // Una riga per utente registrato — anche chi non è mai entrato, così l'admin
 // vede gli account inutilizzati — ordinata dall'attività più recente.
+// Attività giorno per giorno, per il calendario della plancia. Funzione pura
+// (testata). Chiave = data LOCALE (YYYY-MM-DD), non UTC: un accesso alle 00:30
+// italiane appartiene a quel giorno, non al precedente.
+function giornoLocale(ts) {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function calendarioAttivita(accessi) {
+  const giorni = {};
+  const utenti = {};
+  for (const e of accessi) {
+    if (!e || !e.ts || !e.username) continue;
+    const g = giornoLocale(e.ts);
+    if (!g) continue;
+    const c = giorni[g] || (giorni[g] = { accessi: 0, aperture: 0, azioni: 0, utenti: 0 });
+    if (e.azione === 'login') c.accessi++;
+    else if (e.appId && (e.azione === 'apri' || e.azione === 'avvia')) c.aperture++;
+    else if (e.azione === 'evento') c.azioni++;
+    (utenti[g] || (utenti[g] = new Set())).add(e.username);
+  }
+  for (const g of Object.keys(giorni)) giorni[g].utenti = utenti[g].size;
+  return giorni;
+}
+
 function riepilogoUtenti(accessi, utenti, ora = Date.now()) {
   const oggi = new Date(ora).toISOString().slice(0, 10);
   const dopo30 = (e) => ora - Date.parse(e.ts) <= 30 * GIORNO_MS;
@@ -541,6 +666,103 @@ function riepilogoUtenti(accessi, utenti, ora = Date.now()) {
       piuUsata: piuUsataId ? { appId: piuUsataId, volte: piuUsataVolte } : null,
     },
   };
+}
+
+// ---- Presenza nelle app: quando un utente le chiude ----
+// Il portale non vede le schede delle app (stanno su altre porte). Le app però
+// gli segnalano, dal loro backend, che l'utente le sta usando (vedi
+// shared/sso, segnalaPresenza): al massimo una volta al minuto per utente e app.
+// Una sessione d'uso resta "aperta" finché arrivano segnali; dopo
+// PRESENZA_TIMEOUT_MS di silenzio è chiusa, e nel registro finisce una riga
+// "chiudi" con l'ora dell'ultimo segnale e la durata. La chiusura è quindi
+// precisa al minuto, non al secondo: il browser non avvisa in modo affidabile
+// quando una scheda viene chiusa.
+//
+// Lo stato vive in data/presenze.json e non in memoria: il portale degli utenti
+// e la plancia admin possono girare insieme sulla stessa cartella dati, e
+// qualunque dei due riceva i segnali, l'altro deve vedere chi è dentro adesso.
+const PRESENZE_FILE = path.join(DATA_DIR, 'presenze.json');
+const PRESENZA_TIMEOUT_MS = 3 * 60 * 1000;
+
+function loadPresenze() {
+  try {
+    const j = JSON.parse(fs.readFileSync(PRESENZE_FILE, 'utf8'));
+    return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+  } catch { return {}; }
+}
+function savePresenze(presenze) {
+  try { fs.writeFileSync(PRESENZE_FILE, JSON.stringify(presenze, null, 2)); }
+  catch (e) { logError('salva presenze', e); }
+}
+
+// Riga di registro per una sessione d'uso conclusa. Funzione pura (testata).
+function rigaChiusura(p) {
+  const durataMin = Math.max(0, Math.round((Date.parse(p.ultimo) - Date.parse(p.inizio)) / 60000));
+  return {
+    ts: p.ultimo, username: p.username, nome: p.nome,
+    appId: p.appId, appNome: p.appNome, azione: 'chiudi', inizio: p.inizio, durataMin,
+  };
+}
+
+// Toglie le sessioni scadute. Funzione pura (testata): ritorna le presenze
+// rimaste e le righe "chiudi" da scrivere.
+function chiudiPresenzeScadute(presenze, ora = Date.now()) {
+  const restano = {};
+  const chiuse = [];
+  for (const [k, p] of Object.entries(presenze)) {
+    if (!p || !p.ultimo || ora - Date.parse(p.ultimo) > PRESENZA_TIMEOUT_MS) {
+      if (p && p.ultimo && p.inizio) chiuse.push(rigaChiusura(p));
+    } else restano[k] = p;
+  }
+  return { presenze: restano, chiuse };
+}
+
+// Un segnale "sto usando l'app". Funzione pura (testata). Se la sessione
+// precedente era già scaduta (segnali ripresi dopo una pausa lunga) la chiude e
+// ne apre una nuova: due usi separati restano due righe nel registro.
+function segnaPresenza(presenze, chi, ora = Date.now()) {
+  const k = chi.username + '|' + chi.appId;
+  const adesso = new Date(ora).toISOString();
+  const prima = presenze[k];
+  const chiuse = [];
+  const out = { ...presenze };
+  if (prima && prima.ultimo && ora - Date.parse(prima.ultimo) <= PRESENZA_TIMEOUT_MS) {
+    out[k] = { ...prima, ultimo: adesso };
+  } else {
+    if (prima && prima.ultimo && prima.inizio) chiuse.push(rigaChiusura(prima));
+    out[k] = { username: chi.username, nome: chi.nome, appId: chi.appId, appNome: chi.appNome, inizio: adesso, ultimo: adesso };
+  }
+  return { presenze: out, chiuse };
+}
+
+// App in uso adesso per un utente (o per tutti, senza username). Pura (testata).
+function inUso(presenze, username, ora = Date.now()) {
+  return Object.values(presenze)
+    .filter((p) => p && (!username || p.username === username) && ora - Date.parse(p.ultimo) <= PRESENZA_TIMEOUT_MS)
+    .map((p) => ({ username: p.username, appId: p.appId, dal: p.inizio, ultimo: p.ultimo }))
+    .sort((a, b) => (a.dal < b.dal ? -1 : 1));
+}
+
+// Rilegge il file subito prima di scrivere: con due portali sulla stessa
+// cartella la finestra in cui uno può pestare l'altro resta minima.
+function registraPresenza(chi) {
+  const { presenze, chiuse } = segnaPresenza(loadPresenze(), chi);
+  savePresenze(presenze);
+  chiuse.forEach(logAccesso);
+}
+function sweepPresenze() {
+  const prima = loadPresenze();
+  const { presenze, chiuse } = chiudiPresenzeScadute(prima);
+  if (!chiuse.length) return;
+  savePresenze(presenze);
+  chiuse.forEach(logAccesso);
+}
+
+// Azione fatta DENTRO un'app (es. "DDT convertito in Excel"), segnalata dal suo
+// backend. Nome e dettaglio arrivano da un'altra app: si tagliano e si tolgono
+// i caratteri di controllo, il registro resta una riga per evento.
+function pulisciTestoEvento(s, max) {
+  return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, max);
 }
 
 function trimAccessi() {
@@ -764,6 +986,75 @@ function noteLoginFail(key, now = Date.now(), maxFail = LOGIN_MAX_FAIL) {
 }
 function clearLoginFails(key) {
   loginFails.delete(key);
+}
+// Sblocco di un account da parte di un admin: via i blocchi di quell'utente da
+// QUALUNQUE PC (le chiavi sono "utente|ip").
+function sbloccaUtente(username) {
+  const pre = String(username || '').toLowerCase().trim() + '|';
+  for (const k of [...loginFails.keys()]) if (k.startsWith(pre)) loginFails.delete(k);
+}
+
+// ---------------------------------------------------------------------------
+// Richieste di aiuto dal login: password dimenticata o account bloccato.
+// Chi non riesce a entrare lascia nome, cognome, email e (se lo ricorda)
+// username; nella plancia degli admin compare un avviso con l'IP di provenienza,
+// marcato interno/esterno, e da lì l'admin reimposta la password.
+// ---------------------------------------------------------------------------
+const RICHIESTE_FILE = path.join(DATA_DIR, 'richieste.json');
+const RICHIESTE_MAX_IP_ORA = 5;          // per IP: oltre, 429 (niente spam di avvisi)
+const RICHIESTE_CAP = 500;               // richieste conservate
+const richiesteIp = new Map();           // ip -> [ms, ...] dell'ultima ora
+
+// IP della rete aziendale o esterno? Pura (testata). Privati IPv4 (10/8,
+// 172.16/12, 192.168/16), loopback, link-local e IPv6 locali (fc00::/7, fe80::/10).
+function ipInterno(ip) {
+  const s = String(ip || '').toLowerCase();
+  if (!s) return false;
+  if (s === '::1' || s === 'localhost') return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(s) || /^fe[89ab][0-9a-f]:/.test(s)) return true;
+  const n = ipv4ToInt(s);
+  if (n == null) return false;
+  const in4 = (base, bits) => ipMatches(s, base + '/' + bits);
+  return in4('10.0.0.0', 8) || in4('172.16.0.0', 12) || in4('192.168.0.0', 16)
+    || in4('127.0.0.0', 8) || in4('169.254.0.0', 16);
+}
+
+// Controlla e ripulisce i campi del modulo. Pura (testata).
+function validaRichiesta(b) {
+  const t = (v, max) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, max);
+  const d = {
+    nome: t(b && b.nome, 60), cognome: t(b && b.cognome, 60),
+    email: t(b && b.email, 120), username: t(b && b.username, 60).toLowerCase(),
+    messaggio: t(b && b.messaggio, 500),
+  };
+  if (b && b.sito) return { ok: false, errore: 'Richiesta non valida' };   // campo esca per i bot
+  if (!d.nome || !d.cognome) return { ok: false, errore: 'Scrivi nome e cognome' };
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(d.email)) return { ok: false, errore: 'Scrivi un indirizzo email valido: serve per ricontattarti' };
+  return { ok: true, dati: d };
+}
+
+function loadRichieste() {
+  try { const j = JSON.parse(fs.readFileSync(RICHIESTE_FILE, 'utf8')); return Array.isArray(j) ? j : []; } catch { return []; }
+}
+function saveRichieste(list) {
+  writeFileAtomic(RICHIESTE_FILE, JSON.stringify(list.slice(-RICHIESTE_CAP), null, 2));
+}
+function richiestaTroppoFrequente(ip, now = Date.now()) {
+  const recenti = (richiesteIp.get(ip) || []).filter((t) => now - t < 60 * 60 * 1000);
+  if (recenti.length >= RICHIESTE_MAX_IP_ORA) { richiesteIp.set(ip, recenti); return true; }
+  recenti.push(now);
+  richiesteIp.set(ip, recenti);
+  if (richiesteIp.size > 2000) richiesteIp.clear();
+  return false;
+}
+
+// Password temporanea leggibile al telefono: niente 0/O, 1/l/I.
+function passwordTemporanea() {
+  const alfabeto = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const b = crypto.randomBytes(12);
+  let s = '';
+  for (let i = 0; i < 12; i++) s += alfabeto[b[i] % alfabeto.length];
+  return s.slice(0, 4) + '-' + s.slice(4, 8) + '-' + s.slice(8);
 }
 // La mappa non deve crescere all'infinito: via le voci ferme da un pezzo e non
 // più in blocco.
@@ -1286,9 +1577,17 @@ function launchApp(app) {
   // locale (le espone il proxy, non la LAN) e il gate SSO, quando serve il
   // login, rimanda al portale pubblico invece che a localhost:8080. La verifica
   // della sessione resta in locale (COSEDIL_PORTAL), veloce e senza TLS.
-  // SUITE_AVVISI_DIR: gli avvisi dell'app finiscono dove il portale li legge,
-  // anche se DATA_DIR è stata spostata.
-  const env = { ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro(), SUITE_AVVISI_DIR: AVVISI_IN };
+  //
+  // COSEDIL_EVENTI: dove l'app manda presenza e azioni (shared/sso). Il portale
+  // che la avvia si propone lui, se nessuno l'ha già fissato a mano: così anche
+  // un portale su un'altra porta (es. la plancia admin) riceve i segnali.
+  const env = {
+    ...process.env, PORTALE_APRE_BROWSER: '1', HOST, PATH: pathDalRegistro(),
+    COSEDIL_EVENTI: process.env.COSEDIL_EVENTI || ('http://127.0.0.1:' + PORT),
+    // SUITE_AVVISI_DIR: gli avvisi dell'app finiscono dove il portale li legge,
+    // anche se DATA_DIR è stata spostata.
+    SUITE_AVVISI_DIR: AVVISI_IN,
+  };
   if (SUITE_DOMINIO) {
     env.HOST = '127.0.0.1';
     env.COSEDIL_PORTAL_PUBBLICO = PORTALE_PUBBLICO;
@@ -1448,6 +1747,37 @@ async function handle(req, res) {
   }
 
   // ---- Pagina di login (pubblica) ----
+  // Contatto dell'amministratore, PRIMA del login: serve proprio a chi non
+  // riesce a entrare ("Password dimenticata?"). Espone solo l'indirizzo.
+  if (p === '/api/contatti') {
+    return sendJson(res, 200, { emailAdmin: emailAdmin() });
+  }
+
+  // Richiesta di aiuto dal login (password dimenticata / account bloccato).
+  // Senza sessione di proposito: chi è bloccato non può entrare. Non dice mai
+  // se l'username esiste (lo vede solo l'admin), così il modulo non serve a
+  // scoprire gli account.
+  if (p === '/api/richiesta-password' && req.method === 'POST') {
+    const ip = clientIp(req);
+    if (richiestaTroppoFrequente(ip)) {
+      return sendJson(res, 429, { ok: false, error: 'Hai già mandato diverse richieste: l’amministratore le ha ricevute. Riprova più tardi.' });
+    }
+    const v = validaRichiesta(await readJsonBody(req));
+    if (!v.ok) return sendJson(res, 400, { ok: false, error: v.errore });
+    const utente = v.dati.username ? loadUtenti().find((u) => u.username === v.dati.username) : null;
+    const r = {
+      id: crypto.randomBytes(6).toString('hex'), ts: new Date().toISOString(),
+      ...v.dati, account: !!utente, ip, interno: ipInterno(ip), stato: 'aperta',
+    };
+    const list = loadRichieste();
+    list.push(r);
+    saveRichieste(list);
+    if (utente) {
+      logAccesso({ ts: r.ts, username: utente.username, nome: utente.nome, appId: null, appNome: null, azione: 'richiesta-aiuto', ip });
+    }
+    return sendJson(res, 200, { ok: true });
+  }
+
   if (p === '/login' || p === '/login.html') {
     return sendFile(res, path.join(PAGES_DIR, 'login.html'), 'text/html');
   }
@@ -1460,6 +1790,16 @@ async function handle(req, res) {
     // Chiave del contatore per solo IP: '*' non può collidere con uno username
     // vero (il login li normalizza e '*' non è un nome valido).
     const keyIp = loginKey('*', ip);
+
+    // Sblocco fatto da un admin (reset password) DOPO l'ultimo errore: il blocco
+    // non vale più. Serve perché i blocchi stanno nella RAM di ogni processo:
+    // l'admin che sblocca dalla plancia (8090) non tocca la memoria del portale
+    // utenti (8080), mentre utenti.json sì.
+    const uSblocco = loadUtenti().find((u) => u.username === String(username || '').toLowerCase().trim());
+    if (uSblocco && uSblocco.sbloccatoIl) {
+      const t = Date.parse(uSblocco.sbloccatoIl);
+      for (const k of [key, keyIp]) { const e = loginFails.get(k); if (e && e.ts < t) clearLoginFails(k); }
+    }
 
     const bloccoMs = Math.max(loginBlockedMs(key), loginBlockedMs(keyIp));
     if (bloccoMs > 0) {
@@ -1498,6 +1838,14 @@ async function handle(req, res) {
 
   // ---- Logout ----
   if (p === '/api/logout' && req.method === 'POST') {
+    // Uscita volontaria nel registro, così la plancia sa quando ha smesso.
+    const chiEsce = getSession(req);
+    if (chiEsce) {
+      logAccesso({
+        ts: new Date().toISOString(), username: chiEsce.username, nome: chiEsce.nome,
+        appId: null, appNome: null, azione: 'logout', ip: clientIp(req),
+      });
+    }
     return sendJson(res, 200, { ok: true }, { 'Set-Cookie': CLEAR_COOKIE });
   }
 
@@ -1612,6 +1960,7 @@ async function handle(req, res) {
     return sendJson(res, 200, {
       apps: APPS.filter(canSeeApp).map((a) => ({
         id: a.id, nome: a.nome, sottotitolo: a.sottotitolo, desc: a.desc,
+        fai: a.fai, guida: a.guida,   // home utenti: l'attività e il suggerimento al passaggio del mouse
         porta: a.porta, tipo: a.tipo, url: appUrl(req, a),
         adminOnly: !!a.adminOnly,   // la home le raggruppa in "Area riservata"
       })),
@@ -1624,7 +1973,7 @@ async function handle(req, res) {
   if (p === '/api/chat' && req.method === 'POST') {
     const { domanda } = await readJsonBody(req);
     const q = String(domanda || '').slice(0, 500);   // domande lunghe: tagliate
-    return sendJson(res, 200, rispondiAssistente(q, APPS.filter(canSeeApp)));
+    return sendJson(res, 200, rispondiAssistente(q, APPS.filter(canSeeApp), { emailAdmin: emailAdmin() }));
   }
 
   // ---- Stato app ----
@@ -1685,6 +2034,33 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true });
   }
 
+  // ---- Segnali dalle app: presenza ("la sto usando") e azioni fatte dentro ----
+  // Li manda il BACKEND dell'app (shared/sso), inoltrando il cookie del browser:
+  // è la sessione del portale a dire chi è l'utente, non il corpo della richiesta.
+  // L'header X-Cosedil-App obbliga a un preflight CORS che il portale qui non
+  // concede: una pagina di un altro sito non può scrivere nel registro a nome
+  // di chi la apre.
+  if ((p === '/api/presenza' || p === '/api/evento') && req.method === 'POST') {
+    if (!req.headers['x-cosedil-app']) return sendJson(res, 400, { ok: false, error: 'Header X-Cosedil-App mancante' });
+    const body = await readJsonBody(req);
+    const app = APPS.find((a) => a.id === (body && body.appId));
+    if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false });
+    const chi = { username: session.username, nome: session.nome, appId: app.id, appNome: app.nome };
+    if (p === '/api/presenza') {
+      registraPresenza(chi);
+      return sendJson(res, 200, { ok: true });
+    }
+    const evento = pulisciTestoEvento(body.azione, 80);
+    if (!evento) return sendJson(res, 400, { ok: false, error: 'Azione mancante' });
+    // Un'azione dimostra anche che l'app è in uso: allunga la presenza.
+    registraPresenza(chi);
+    logAccesso({
+      ts: new Date().toISOString(), ...chi, azione: 'evento',
+      evento, dettaglio: pulisciTestoEvento(body.dettaglio, 200),
+    });
+    return sendJson(res, 200, { ok: true });
+  }
+
   // ================= area amministrazione =================
   const isAdmin = adminPortale;
 
@@ -1724,14 +2100,70 @@ async function handle(req, res) {
   // ---- Plancia degli admin: elenco utenti + attività di un utente ----
   if (p === '/api/plancia') {
     if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
-    return sendJson(res, 200, riepilogoUtenti(loadAccessi(), loadUtenti()));
+    // Chiude prima le sessioni d'uso scadute: la plancia non deve dare per
+    // "dentro" chi ha chiuso l'app da un pezzo solo perché lo sweep non è passato.
+    sweepPresenze();
+    const registro = loadAccessi();
+    const r = riepilogoUtenti(registro, loadUtenti());
+    r.giorni = calendarioAttivita(registro);
+    const ora = inUso(loadPresenze());
+    for (const u of r.utenti) u.inUso = ora.filter((x) => x.username === u.username);
+    r.numeri.inUsoOra = new Set(ora.map((x) => x.username)).size;
+    return sendJson(res, 200, r);
   }
+  // ---- Richieste di aiuto dal login: elenco, gestita, reimposta password ----
+  if (p === '/api/richieste') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const aperte = loadRichieste().filter((r) => r.stato === 'aperta').reverse();   // più recenti prima
+    return sendJson(res, 200, { richieste: aperte });
+  }
+  const mRich = /^\/api\/richieste\/([0-9a-f]{12})\/(gestita|reimposta)$/.exec(p);
+  if (mRich && req.method === 'POST') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const list = loadRichieste();
+    const r = list.find((x) => x.id === mRich[1]);
+    if (!r) return sendJson(res, 404, { ok: false, error: 'Richiesta non trovata' });
+    let password = null;
+    if (mRich[2] === 'reimposta') {
+      const utenti = loadUtenti();
+      const u = utenti.find((x) => x.username === r.username);
+      if (!u) return sendJson(res, 404, { ok: false, error: 'Nessun account con questo username: crealo da Amministrazione' });
+      // Password temporanea mostrata UNA volta all'admin, che la comunica a voce
+      // o per mail; al primo accesso l'utente deve cambiarla. sv++ chiude le
+      // sessioni ancora aperte, sbloccaUtente toglie il blocco per tentativi.
+      password = passwordTemporanea();
+      u.salt = crypto.randomBytes(16).toString('hex');
+      u.hash = hashPw(password, u.salt);
+      u.mustChange = true;
+      u.sv = (u.sv || 1) + 1;
+      u.sbloccatoIl = new Date().toISOString();   // vale anche per l'altro portale (vedi /api/login)
+      saveUtenti(utenti);
+      sbloccaUtente(u.username);
+    }
+    r.stato = 'gestita';
+    r.gestitaDa = session.username;
+    r.gestitaIl = new Date().toISOString();
+    r.esito = mRich[2] === 'reimposta' ? 'password reimpostata' : 'gestita';
+    saveRichieste(list);
+    logAccesso({
+      ts: r.gestitaIl, username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: mRich[2] === 'reimposta' ? 'reset-password' : 'richiesta-gestita', per: r.username || null,
+    });
+    return sendJson(res, 200, { ok: true, password });
+  }
+
   if (p === '/api/attivita') {
     if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
     const chi = String(new URL(req.url, 'http://x').searchParams.get('utente') || session.username).toLowerCase();
     if (!loadUtenti().some((u) => u.username === chi)) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
     // L'admin vede già l'intero registro (/api/accessi): qui nessun filtro per app.
-    return sendJson(res, 200, riepilogoAttivita(loadAccessi(), chi, () => true));
+    sweepPresenze();
+    const g = String(new URL(req.url, 'http://x').searchParams.get('giorno') || '');
+    const giorno = /^\d{4}-\d{2}-\d{2}$/.test(g) ? g : null;
+    const r = riepilogoAttivita(loadAccessi(), chi, () => true, Date.now(), giorno);
+    r.giorno = giorno;
+    r.inUso = inUso(loadPresenze(), chi);
+    return sendJson(res, 200, r);
   }
 
   if (p === '/api/accessi') {
@@ -1841,9 +2273,12 @@ async function handle(req, res) {
   }
 
   // ---- Portale (home) ----
-  // Gli admin vedono la plancia (utenti e attività), gli altri la griglia delle app.
+  // Gli admin vedono la plancia (utenti e attività), gli altri la home delle app.
+  // ?vista=utente: l'admin vede la home come la vedono gli utenti (link
+  // "Vista utente" nella plancia), per controllarla senza un secondo account.
   if (p === '/' || p === '/index.html') {
-    return sendFile(res, path.join(PAGES_DIR, isAdmin ? 'plancia.html' : 'index.html'), 'text/html');
+    const vistaUtente = url.searchParams.get('vista') === 'utente';
+    return sendFile(res, path.join(PAGES_DIR, isAdmin && !vistaUtente ? 'plancia.html' : 'index.html'), 'text/html');
   }
 
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -1864,6 +2299,8 @@ if (require.main === module) {
   // arrivo resta piccola anche se nessun admin apre la pagina per giorni.
   raccogliAvvisi();
   setInterval(() => { try { raccogliAvvisi(); } catch (e) { logError('raccolta avvisi', e); } }, 60_000).unref();
+  // Sessioni d'uso delle app rimaste senza segnali: chiuse e registrate.
+  setInterval(sweepPresenze, 60_000).unref();
   server.listen(PORT, HOST, () => {
     const addr = (TLS_ON ? 'https' : 'http') + '://localhost:' + PORT;
     console.log('============================================');
@@ -1910,12 +2347,14 @@ module.exports = {
   ipMatches, admForIp, isAdminForApp, clientIp,   // admin per-IP / per-app (testabili)
   getWarmList,                                     // pre-warm (testabile)
   portalHostname, appUrl, isSuiteOrigin,           // URL/CORS in LAN
-  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails,   // freno al brute force
+  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
   parseNetstatPid,                                 // spegnimento app
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
-  riepilogoAttivita, riepilogoUtenti,              // plancia degli admin
+  riepilogoAttivita, riepilogoUtenti, calendarioAttivita,   // plancia degli admin
   normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,   // avvisi dei programmi
+  ipInterno, validaRichiesta, passwordTemporanea,  // richieste di aiuto dal login
+  segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,   // presenza/azioni nelle app
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };

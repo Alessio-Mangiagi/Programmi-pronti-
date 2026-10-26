@@ -1,209 +1,121 @@
-/* Portale (home): hero, griglia app, card, badge di stato, footer.
-   Richiede tokens.css + shell.css. */
+/* "><(((º> sabusabu <º)))><" */
+/* Home degli utenti: pannello blu a sinistra (aiuto), a destra "Cosa devi
+   fare oggi?" con la ricerca/assistente e una scheda per attività.
+   Brand Cosedil: blu e verde, Ubuntu per i titoli, Inter per il testo.
+   Richiede tokens.css (e chat.css per il widget dell'assistente). */
 
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(101,188,123,0.5); }
-  70% { box-shadow: 0 0 0 6px rgba(101,188,123,0); }
-  100% { box-shadow: 0 0 0 0 rgba(101,188,123,0); }
-}
-
-/* ---- Hero ---- */
-.hero {
-  max-width: 1400px;
-  margin-inline: auto;
-  padding: clamp(2rem, 5vw, 3.5rem) clamp(1rem, 4vw, 3rem) 0.5rem;
-}
-.hero-eyebrow {
-  font-family: var(--font-ui);
-  /* "><(((º> sabusabu <º)))><" */
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--cosedil-blue);
-  margin: 0 0 0.5rem;
-}
-.hero h1 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(2rem, 4vw, 3.25rem);
-  letter-spacing: -0.01em;
-  color: var(--cosedil-text-strong);
-  margin: 0 0 0.6rem;
-}
-.hero p {
-  max-width: 60ch;
-  color: var(--cosedil-gray);
-  margin: 0;
+:root {
+  --ink: #1b2430;
+  --grigio: #5b6573;
+  --linea: #dfe4ea;
+  --fondo: #f5f7f9;
+  --tinta: #e8f0f7;
 }
 
-/* ---- Griglia app ---- */
-main {
-  max-width: 1400px;
-  margin-inline: auto;
-  padding: 1.75rem clamp(1rem, 4vw, 3rem) 3rem;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-}
-@media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+body { margin: 0; background: var(--fondo); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+h1, h2, b { font-family: var(--font-display); }
+a { color: var(--cosedil-blue); }
+:focus-visible { outline: 2px solid var(--cosedil-blue); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.card {
-  background: var(--cosedil-surface);
-  border: 1px solid var(--cosedil-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow 0.3s var(--ease-out), transform 0.3s var(--ease-out);
-}
-.card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
-}
-.card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.9rem;
-}
-.card-icon {
-  width: 44px; height: 44px;
-  border-radius: 8px;
-  background: var(--cosedil-bg-alt);
-  color: var(--cosedil-blue);
-  display: grid; place-items: center;
-  flex-shrink: 0;
-}
-.card-icon svg { width: 24px; height: 24px; }
-.card-icon svg.logo { width: 100%; height: 100%; }   /* logo proprio dell'app (InCampo): riempie il riquadro */
+/* ---------------- testata ---------------- */
+.top { background: #fff; border-bottom: 1px solid var(--linea); position: sticky; top: 0; z-index: 20; }
+.top-in { max-width: 1600px; margin: 0 auto; padding: 12px clamp(16px, 3vw, 40px); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.mark { width: 38px; height: 38px; border-radius: 8px; background: var(--cosedil-blue); display: grid; place-items: center; }
+.brand b { font-size: 18px; font-weight: 500; display: block; line-height: 1.1; }
+.brand small { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--cosedil-blue); }
+.utente { display: flex; align-items: center; gap: 12px; font-size: 14px; flex-wrap: wrap; }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--cosedil-blue); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.ghost { min-height: 40px; padding: 0 14px; border: 1px solid var(--linea); border-radius: 6px; background: #fff; font: inherit; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.ghost:hover { border-color: var(--cosedil-blue); color: var(--cosedil-blue); }
 
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.status .dot { width: 7px; height: 7px; border-radius: 50%; }
-.status.online { background: rgba(101,188,123,0.14); color: var(--cosedil-green-text); }
-.status.online .dot { background: var(--cosedil-green); }
-.status.offline { background: var(--cosedil-bg-alt); color: var(--cosedil-gray); }
-.status.offline .dot { background: #b7bbc0; }
-.status.checking { background: var(--cosedil-bg-alt); color: var(--cosedil-gray); }
-.status.checking .dot { background: var(--cosedil-blue-light); animation: pulse 1.5s infinite; }
+/* ---------------- impianto ---------------- */
+.lay { display: flex; flex-wrap: wrap; min-height: calc(100dvh - 63px); }
+.pan { flex: 1 1 280px; max-width: 380px; background: var(--cosedil-blue); color: #fff; padding: clamp(28px, 4vw, 56px) clamp(20px, 3vw, 40px); display: flex; flex-direction: column; gap: 18px; }
+.pan h1 { margin: 0; font-size: clamp(30px, 3vw, 44px); font-weight: 700; line-height: 1.05; }
+.pan p { margin: 0; color: #cfe0ee; }
+.linee { margin-top: auto; display: flex; flex-direction: column; }
+.linee a { color: #fff; text-decoration: none; display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, .2); }
+.linee a:hover { color: var(--cosedil-green); }
 
-.card h2 {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 1.2rem;
-  color: var(--cosedil-text-strong);
-  margin: 0 0 0.15rem;
-}
-.card-sub {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--cosedil-blue);
-  margin: 0 0 0.7rem;
-}
-.card p.desc {
-  font-size: 0.92rem;
-  color: var(--cosedil-gray);
-  margin: 0 0 1.1rem;
-  flex-grow: 1;
-}
-.actions { display: flex; gap: 0.6rem; }
-.btn {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: var(--radius-btn);
-  padding: 0.7rem 1.1rem;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: transform 0.15s var(--ease-out), background 0.2s var(--ease-out), color 0.2s var(--ease-out);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  text-decoration: none;
-  flex: 1;
-}
-.btn svg { width: 16px; height: 16px; }
-.btn-primary {
-  background: var(--cosedil-blue);
-  color: #fff;
-}
-.btn-primary:hover { background: var(--cosedil-blue-hover); transform: translateY(-1px); }
-.btn-primary:active { transform: scale(0.98); }
-.btn-primary.disabled {
-  background: var(--cosedil-bg-alt);
-  color: #a7abb1;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.btn-outline {
-  background: transparent;
-  color: var(--cosedil-blue);
-  border-color: var(--cosedil-blue);
-}
-.btn-outline:hover { background: var(--cosedil-blue); color: #fff; }
-.btn-outline:active { transform: scale(0.98); }
-.btn.busy { opacity: 0.7; pointer-events: none; }
-/* "Ferma": solo agli admin e solo su app accese. Quadrato e defilato — è
-   l'azione che rovina la giornata a chi sta usando l'app, non la si preme per
-   sbaglio al posto di "Apri". */
-.btn-stop {
-  flex: 0 0 auto;
-  padding: 0.7rem;
-  background: transparent;
-  color: #a7abb1;
-  border-color: var(--cosedil-border);
-}
-.btn-stop:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
-.btn-stop:active { transform: scale(0.98); }
-.btn-stop.hidden { display: none; }
+.corpo { flex: 999 1 560px; min-width: 0; max-width: 1240px; padding: clamp(24px, 4vw, 56px) clamp(16px, 3vw, 48px) 56px; display: flex; flex-direction: column; gap: 22px; }
+.corpo h2 { margin: 0; font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; line-height: 1.1; }
+.sub { margin: -12px 0 0; color: var(--grigio); }
 
-footer {
-  border-top: 1px solid var(--cosedil-border);
-  background: var(--cosedil-surface);
+/* ---------------- ricerca = assistente ---------------- */
+.cerca { display: flex; align-items: center; gap: 10px; max-width: 760px; background: #fff; border: 1px solid var(--linea); border-radius: 8px; padding: 0 6px 0 16px; min-height: 56px; color: var(--grigio); }
+.cerca:focus-within { border-color: var(--cosedil-blue); box-shadow: 0 0 0 3px rgba(12, 69, 119, .12); }
+.cerca input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 17px; color: var(--ink); background: transparent; }
+.invia { min-height: 44px; padding: 0 18px; border: 0; border-radius: 6px; background: var(--cosedil-blue); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.invia:hover { background: var(--cosedil-blue-hover); }
+
+.avviso-ai { margin: -10px 0 0; max-width: 760px; display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 8px; background: #eef7f0; border: 1px solid #cfe7d6; color: #24563a; font-size: 14px; }
+.avviso-ai svg { flex: none; margin-top: 2px; }
+.avviso-ai b { font-family: var(--font-ui); font-weight: 600; }
+.avviso-ai[hidden] { display: none; }
+
+.risposta { max-width: 760px; background: #fff; border: 1px solid var(--linea); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.risposta[hidden] { display: none; }
+.risposta .chi { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--cosedil-blue); font-weight: 600; }
+.risposta .testo { white-space: pre-line; }
+.risposta .azioni { display: flex; flex-wrap: wrap; gap: 8px; }
+.apri { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 6px; background: var(--cosedil-blue); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.apri:hover { background: var(--cosedil-blue-hover); }
+
+/* ---------------- schede attività ---------------- */
+.task { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.t { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr) 28px; gap: 16px; align-items: center; width: 100%; background: #fff; border: 1px solid var(--linea); border-radius: 10px; padding: 20px; color: var(--ink); min-height: 104px; text-align: left; font: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.t:hover, .t:focus-visible { border-color: var(--cosedil-blue); box-shadow: 0 12px 30px -20px rgba(12, 69, 119, .5); }
+.t:hover .fr, .t:focus-visible .fr { color: var(--cosedil-blue); transform: translateX(3px); }
+.t[hidden] { display: none; }
+.t.busy { cursor: progress; }
+.t.busy .fr { animation: pulsa 1s ease-in-out infinite; }
+.t .ic { width: 56px; height: 56px; border-radius: 50%; background: var(--tinta); color: var(--cosedil-blue); display: grid; place-items: center; }
+.t .ic svg { width: 26px; height: 26px; }
+.t b { display: block; font-weight: 500; font-size: 19px; line-height: 1.25; }
+.t small { color: var(--grigio); font-size: 13.5px; }
+.t small i { font-style: normal; color: var(--cosedil-green-text); font-weight: 600; }
+.fr { color: #9aa5b1; transition: transform .15s; }
+.vuoto { margin: 0; color: var(--grigio); }
+.vuoto[hidden] { display: none; }
+
+/* Suggerimento della scheda: compare sopra al passaggio del mouse o col
+   Tab da tastiera. Dice cosa serve e cosa succede dentro l'app. */
+.t .tip { position: absolute; left: 16px; right: 16px; bottom: calc(100% + 10px); z-index: 5; padding: 12px 14px; border-radius: 8px; background: var(--ink); color: #fff; font-size: 13.5px; line-height: 1.45; box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .45); opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .15s .25s, transform .15s .25s; }
+.t .tip::after { content: ""; position: absolute; left: 28px; top: 100%; border: 7px solid transparent; border-top-color: var(--ink); }
+.t .tip em { display: block; margin-top: 6px; font-style: normal; color: #a9d8b6; font-size: 12.5px; }
+.t:hover .tip, .t:focus-visible .tip { opacity: 1; transform: none; }
+
+/* Suggerimento breve su link e pulsanti: data-tip="…" */
+[data-tip] { position: relative; }
+[data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px); z-index: 30; width: max-content; max-width: 240px; padding: 8px 10px; border-radius: 6px; background: var(--ink); color: #fff; font: 500 12.5px/1.4 var(--font-ui); text-align: left; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .15s .3s, transform .15s .3s; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+/* In testata i pulsanti stanno sul bordo destro: il suggerimento si allinea a
+   destra, altrimenti uscirebbe dallo schermo (e allargherebbe la pagina). */
+.utente [data-tip]::after { left: auto; right: 0; transform: translateY(4px); }
+.utente [data-tip]:hover::after, .utente [data-tip]:focus-visible::after { transform: none; }
+.linee [data-tip]::after { top: 50%; left: calc(100% + 14px); transform: translate(4px, -50%); }
+.linee [data-tip]:hover::after, .linee [data-tip]:focus-visible::after { transform: translate(0, -50%); }
+
+.aiuto { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: #fff; border: 1px dashed #b9c6d3; border-radius: 10px; padding: 18px 20px; }
+.aiuto b { font-weight: 500; }
+.aiuto-azioni { display: flex; gap: 8px; flex-wrap: wrap; }
+.aiuto-azioni [hidden], .linee [hidden] { display: none; }
+.aiuto span span { color: var(--grigio); }
+
+.toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; font-size: .9rem; padding: .75rem 1.25rem; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .3s var(--ease-out), transform .3s var(--ease-out); z-index: 50; max-width: 90vw; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@keyframes pulsa { 50% { opacity: .35; } }
+
+@media (min-width: 1800px) { body { font-size: 16px; } .corpo { max-width: 1500px; } }
+@media (max-width: 720px) {
+  .pan { max-width: none; }
+  .linee { margin-top: 8px; }
+  .linee [data-tip]::after { display: none; }   /* su telefono non c'è hover: il testo del link basta */
+  .lay { min-height: 0; }
 }
-.footer-inner {
-  max-width: 1400px;
-  margin-inline: auto;
-  padding: 1.25rem clamp(1rem, 4vw, 3rem);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.5rem;
-  justify-content: space-between;
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
-  color: var(--cosedil-gray);
-}
-footer .tag { color: var(--cosedil-blue); font-weight: 600; }
-.footer-links { display: flex; gap: 0.6rem; }
-.footer-btn {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  font-family: var(--font-ui); font-weight: 600; font-size: 0.78rem;
-  color: var(--cosedil-blue); text-decoration: none;
-  border: 1px solid var(--cosedil-border); border-radius: var(--radius-btn);
-  padding: 0.35rem 0.7rem; transition: all 0.2s var(--ease-out);
-}
-.footer-btn:hover { border-color: var(--cosedil-blue); background: var(--cosedil-blue); color: #fff; }
-.footer-btn svg { width: 15px; height: 15px; }
+@media (max-width: 420px) { .task { grid-template-columns: 1fr; } .invia { padding: 0 12px; } }
+@media (hover: none) { .t .tip, [data-tip]::after, .solo-mouse { display: none; } }
+@media (prefers-reduced-motion: reduce) { .t, .fr, .t .tip, [data-tip]::after, .toast { transition: none; } .t.busy .fr { animation: none; } }

@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 // Plancia degli amministratori: barra delle app (lanciatore) + utenti e attività.
 // Gli utenti normali ricevono index.html, la griglia di sempre.
 //
@@ -196,9 +197,174 @@ function quando(ts) {
 // Le azioni come nomi, non come participi: "Scadenzario · Apertura" vale per
 // qualunque app, senza accordare maschile e femminile.
 const AZIONI = {
-  login: 'Accesso', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
-  'login-bloccato': 'Accesso bloccato',
+  login: 'Accesso', logout: 'Uscita', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
+  chiudi: 'Chiusura', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
+  'richiesta-aiuto': 'Richiesta aiuto', 'reset-password': 'Reset password', 'richiesta-gestita': 'Richiesta gestita',
 };
+
+// ---------------------------------------------------------------- richieste di aiuto
+// Dal login (password dimenticata / account bloccato). Ogni avviso dice chi è,
+// come ricontattarlo e da dove scrive (IP interno o esterno alla rete aziendale).
+
+async function caricaRichieste() {
+  let r;
+  try {
+    const res = await fetch('/api/richieste');
+    if (!res.ok) return;
+    r = await res.json();
+  } catch { return; }
+  const lista = r.richieste || [];
+  const box = document.getElementById('richieste');
+  box.hidden = !lista.length;
+  if (!lista.length) return;
+  document.getElementById('richiesteN').textContent = lista.length === 1 ? '1 da gestire' : lista.length + ' da gestire';
+  const el = document.getElementById('richiesteLista');
+  // Una password temporanea appena generata non va cancellata dal giro di aggiornamento.
+  if (el.querySelector('.pwd-temp')) return;
+  el.innerHTML = lista.map((q) => {
+    const account = q.username
+      ? (q.account ? `account <b>${esc(q.username)}</b>` : `username «${esc(q.username)}» <span class="tag no">non esiste</span>`)
+      : '<span class="tag no">username non indicato</span>';
+    return `<li class="avviso" data-id="${esc(q.id)}">
+      <div class="chi">
+        <b>${esc(q.nome)} ${esc(q.cognome)}</b> chiede di reimpostare la password
+        <p><a href="mailto:${esc(q.email)}">${esc(q.email)}</a> · ${account} · IP ${esc(q.ip)}
+          <span class="tag ${q.interno ? 'interno' : 'esterno'}">${q.interno ? 'Interno' : 'Esterno'}</span> · ${esc(quando(q.ts))}</p>
+        ${q.messaggio ? `<p class="msg">${esc(q.messaggio)}</p>` : ''}
+      </div>
+      <div class="az">
+        ${q.account ? `<button type="button" class="primario" data-reimposta="${esc(q.id)}">Reimposta password</button>` : ''}
+        <button type="button" data-gestita="${esc(q.id)}">Segna gestita</button>
+      </div>
+    </li>`;
+  }).join('');
+  el.querySelectorAll('[data-reimposta]').forEach((b) => b.addEventListener('click', () => gestisciRichiesta(b.dataset.reimposta, 'reimposta', b)));
+  el.querySelectorAll('[data-gestita]').forEach((b) => b.addEventListener('click', () => gestisciRichiesta(b.dataset.gestita, 'gestita', b)));
+}
+
+async function gestisciRichiesta(id, azione, btn) {
+  const li = btn.closest('.avviso');
+  const nome = li.querySelector('.chi b').textContent;
+  if (azione === 'reimposta' && !confirm(`Reimpostare la password di ${nome}?\n\nLa password attuale smette di funzionare e le sue sessioni aperte si chiudono. Riceverai una password temporanea da comunicargli.`)) return;
+  li.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  try {
+    const res = await fetch(`/api/richieste/${encodeURIComponent(id)}/${azione}`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) { toast(data.error || 'Operazione non riuscita'); li.querySelectorAll('button').forEach((b) => { b.disabled = false; }); return; }
+    if (data.password) {
+      // Mostrata una sola volta: il server non la conserva in chiaro.
+      const email = li.querySelector('.chi a').textContent;
+      li.querySelector('.az').remove();
+      const box = document.createElement('div');
+      box.className = 'pwd-temp';
+      box.innerHTML = `Password temporanea: <code>${esc(data.password)}</code>
+        <button type="button" class="copia">Copia</button>
+        <a href="mailto:${esc(email)}?subject=${encodeURIComponent('Portale Suite Cosedil — nuova password')}&body=${encodeURIComponent('Ciao,\n\nti ho reimpostato la password del portale.\nPassword temporanea: ' + data.password + '\n\nAl primo accesso ti verrà chiesto di sceglierne una nuova.\n')}">Mandala per email</a>
+        <button type="button" class="fatto">Fatto</button>`;
+      li.appendChild(box);
+      box.querySelector('.copia').addEventListener('click', () => { navigator.clipboard.writeText(data.password).then(() => toast('Password copiata.'), () => toast('Copia non riuscita: selezionala a mano.')); });
+      box.querySelector('.fatto').addEventListener('click', () => { li.remove(); caricaRichieste(); });
+      toast('Password reimpostata e account sbloccato.');
+    } else {
+      li.remove();
+      toast('Richiesta segnata come gestita.');
+      caricaRichieste();
+    }
+  } catch {
+    toast('Il portale non risponde. Riprova.');
+    li.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  }
+}
+
+function durata(min) {
+  const m = Math.max(0, Math.round(Number(min) || 0));
+  if (m < 1) return 'meno di 1 min';
+  if (m < 60) return m + ' min';
+  return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+}
+
+// Nome breve dell'app per le frasi ("in DDT dalle 10:03").
+const nomeApp = (id) => { const a = appById(id); return a ? sigla(a) : id; };
+
+// ---------------------------------------------------------------- calendario
+// Mese a griglia (lunedì per primo). Ogni giorno ha un livello di attività
+// (utenti distinti quel giorno, relativo al giorno più attivo del mese) e il
+// dettaglio nel tooltip. Clic su un giorno = filtra le attività dell'utente
+// selezionato su quel giorno; secondo clic o "Tutti i giorni" toglie il filtro.
+
+let giorni = {};             // 'YYYY-MM-DD' -> { accessi, aperture, azioni, utenti } (da /api/plancia)
+let meseVisto = null;        // Date al primo del mese mostrato
+let giornoSel = null;        // 'YYYY-MM-DD' filtrato, o null
+
+// '2026-10-13' -> "lunedì 13 ottobre" (da mezzogiorno: niente scivoloni di fuso).
+const giornoTesto = (k) => new Date(k + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+const chiaveGiorno = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+function renderCalendario() {
+  const oggi = new Date();
+  if (!meseVisto) meseVisto = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
+  const anno = meseVisto.getFullYear();
+  const mese = meseVisto.getMonth();
+  document.getElementById('calTitolo').textContent = meseVisto.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  const stessoMese = anno === oggi.getFullYear() && mese === oggi.getMonth();
+  document.getElementById('calOggi').hidden = stessoMese && !giornoSel;
+  // Mese futuro: non c'è niente da vedere.
+  document.getElementById('calNext').disabled = stessoMese || meseVisto > oggi;
+
+  const nGiorni = new Date(anno, mese + 1, 0).getDate();
+  const vuoti = (new Date(anno, mese, 1).getDay() + 6) % 7;   // lunedì = 0
+  let max = 0;
+  for (let g = 1; g <= nGiorni; g++) {
+    const c = giorni[chiaveGiorno(new Date(anno, mese, g))];
+    if (c && c.utenti > max) max = c.utenti;
+  }
+
+  const celle = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((n, i) => `<span class="cal-h${i > 4 ? ' we' : ''}">${n}</span>`);
+  for (let i = 0; i < vuoti; i++) celle.push('<span class="cal-v" aria-hidden="true"></span>');
+  const chiaveOggi = chiaveGiorno(oggi);
+  for (let g = 1; g <= nGiorni; g++) {
+    const d = new Date(anno, mese, g);
+    const k = chiaveGiorno(d);
+    const c = giorni[k];
+    const futuro = d > oggi && k !== chiaveOggi;
+    // 3 livelli: un giorno "pieno" è vicino al massimo del mese, non a un numero fisso.
+    const lv = c && c.utenti ? Math.min(3, Math.max(1, Math.ceil((c.utenti / max) * 3))) : 0;
+    const etichetta = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+    const det = c
+      ? `${c.utenti} ${c.utenti === 1 ? 'utente' : 'utenti'} · ${c.accessi} accessi · ${c.aperture} aperture · ${c.azioni} azioni`
+      : 'nessuna attività';
+    const cls = ['cal-d', lv ? 'lv' + lv : '', k === chiaveOggi ? 'oggi' : '', k === giornoSel ? 'sel' : '', d.getDay() % 6 === 0 ? 'we' : ''].filter(Boolean).join(' ');
+    celle.push(`<button type="button" class="${cls}" data-giorno="${k}" ${futuro ? 'disabled' : ''}
+      title="${esc(etichetta + ': ' + det)}" aria-label="${esc(etichetta + ', ' + det)}" aria-pressed="${k === giornoSel}">
+      <b>${g}</b>${c && c.utenti ? `<small>${c.utenti}</small>` : ''}</button>`);
+  }
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = celle.join('');
+  grid.querySelectorAll('[data-giorno]').forEach((b) => b.addEventListener('click', () => {
+    giornoSel = giornoSel === b.dataset.giorno ? null : b.dataset.giorno;
+    renderCalendario();
+    caricaAttivita();
+  }));
+}
+
+function spostaMese(delta) {
+  meseVisto = new Date(meseVisto.getFullYear(), meseVisto.getMonth() + delta, 1);
+  renderCalendario();
+}
+document.getElementById('calPrev').addEventListener('click', () => spostaMese(-1));
+document.getElementById('calNext').addEventListener('click', () => spostaMese(1));
+document.getElementById('calOggi').addEventListener('click', () => {
+  const oggi = new Date();
+  meseVisto = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
+  giornoSel = null;
+  renderCalendario();
+  caricaAttivita();
+});
+document.getElementById('togliFiltro').addEventListener('click', () => {
+  giornoSel = null;
+  renderCalendario();
+  caricaAttivita();
+});
 
 let me = null;               // utente collegato (da /api/me)
 let utenti = [];             // righe di /api/plancia
@@ -209,9 +375,13 @@ function renderUtenti() {
   if (!utenti.length) { el.innerHTML = '<p class="empty">Nessun utente registrato.</p>'; return; }
   el.innerHTML = utenti.map((u) => {
     const app = u.ultimaApp && appById(u.ultimaApp.appId);
-    const meta = u.ultimoAccesso ? 'Ultimo accesso ' + quando(u.ultimoAccesso) : 'Mai entrato';
+    const ora = u.inUso || [];
+    // Chi ha un'app aperta adesso lo si dice prima di tutto: è la domanda della plancia.
+    const meta = ora.length
+      ? 'Ora in ' + ora.map((x) => nomeApp(x.appId)).join(', ')
+      : u.ultimoAccesso ? 'Ultimo accesso ' + quando(u.ultimoAccesso) : 'Mai entrato';
     return `<button type="button" class="urow" role="option" data-utente="${esc(u.username)}" aria-selected="${u.username === selezionato}">
-      <span class="u-av${u.attivoOggi ? ' oggi' : ''}" title="${u.attivoOggi ? 'Attivo oggi' : ''}">${esc(iniz(u.nome))}</span>
+      <span class="u-av${ora.length ? ' live' : u.attivoOggi ? ' oggi' : ''}" title="${ora.length ? 'In uso adesso' : u.attivoOggi ? 'Attivo oggi' : ''}">${esc(iniz(u.nome))}</span>
       <span class="u-name"><b>${esc(u.nome)}</b><span class="u-meta">${esc(u.username)} · ${esc(meta)}</span></span>
       <span class="u-role">${u.ruolo === 'admin' ? 'Admin' : 'Utente'}</span>
       <span class="u-num"><b>${u.accessi30}</b><small>accessi 30 gg</small></span>
@@ -225,22 +395,50 @@ function renderUtenti() {
   }));
 }
 
-function renderTimeline(attivita, nome) {
+// Testo della riga: cosa è successo, con i dettagli che l'azione porta con sé.
+function testoRiga(e, app) {
+  const nomeB = app ? `<b>${esc(app.nome)}</b>` : e.appId ? `<b>${esc(e.appId)}</b>` : '';
+  if (e.azione === 'chiudi') {
+    const dal = e.inizio ? ora2(new Date(e.inizio)) + '–' + ora2(new Date(e.ts)) : '';
+    return `${nomeB} <small>usata ${esc(dal)} · ${esc(durata(e.durataMin))}</small>`;
+  }
+  if (e.azione === 'evento') {
+    return `${nomeB} · ${esc(e.evento || 'Azione')}` + (e.dettaglio ? ` <small>${esc(e.dettaglio)}</small>` : '');
+  }
+  if (e.azione === 'login') return 'Accesso al Portale';
+  if (e.azione === 'logout') return 'Uscita dal Portale';
+  return nomeB || esc(AZIONI[e.azione] || e.azione);
+}
+
+function renderTimeline(attivita, nome, inUso) {
   const el = document.getElementById('timeline');
-  if (!attivita.length) {
-    el.innerHTML = `<li class="empty">${esc(nome)} non ha ancora attività registrate nel Portale.</li>`;
+  // In cima, le app aperte adesso: sessione ancora viva, chiusura non ancora nota.
+  // Con un giorno passato filtrato, "Adesso" non c'entra.
+  const conVive = !giornoSel || giornoSel === chiaveGiorno(new Date());
+  const vive = (conVive ? inUso || [] : []).map((x) => {
+    const app = appById(x.appId);
+    return `<li class="live">
+      <time datetime="${esc(x.dal)}">${esc(ora2(new Date(x.dal)))}</time>
+      <span class="k">${app ? esc(sigla(app)) : '—'}</span>
+      <span class="t"><b>${esc(app ? app.nome : x.appId)}</b> <small>aperta da ${esc(durata((Date.now() - Date.parse(x.dal)) / 60000))}</small></span>
+      <span class="az">In uso ora</span></li>`;
+  });
+  if (!attivita.length && !vive.length) {
+    el.innerHTML = giornoSel
+      ? `<li class="empty">${esc(nome)} non ha attività registrate ${esc(giornoTesto(giornoSel))}.</li>`
+      : `<li class="empty">${esc(nome)} non ha ancora attività registrate nel Portale.</li>`;
     return;
   }
   let ultimoGiorno = '';
-  const righe = [];
-  for (const e of attivita.slice(0, 16)) {
+  const righe = vive.length ? ['<li class="day">Adesso</li>', ...vive] : [];
+  for (const e of giornoSel ? attivita : attivita.slice(0, 40)) {
     const d = new Date(e.ts);
     const g = giornoEtichetta(d);
     if (g !== ultimoGiorno) { righe.push(`<li class="day">${esc(g)}</li>`); ultimoGiorno = g; }
     const app = e.appId ? appById(e.appId) : null;
     // App non più nell'elenco (rimossa o non visibile): si mostra l'id, non si perde la riga.
-    const testo = app ? `<b>${esc(app.nome)}</b>` : e.appId ? `<b>${esc(e.appId)}</b>` : (e.azione === 'login' ? 'Accesso al Portale' : esc(AZIONI[e.azione] || e.azione));
-    righe.push(`<li class="${e.azione === 'login-bloccato' ? 'warn' : ''}">
+    const testo = testoRiga(e, app);
+    righe.push(`<li class="${e.azione === 'login-bloccato' ? 'warn' : e.azione === 'evento' ? 'ev' : ''}">
       <time datetime="${esc(e.ts)}">${esc(ora2(d))}</time>
       <span class="k">${app ? esc(sigla(app)) : '—'}</span>
       <span class="t">${testo}</span>
@@ -254,17 +452,20 @@ async function caricaAttivita() {
   const u = utenti.find((x) => x.username === selezionato);
   const nome = u ? u.nome : selezionato;
   document.getElementById('titoloAttivita').textContent = 'Attività di ' + nome;
+  document.getElementById('togliFiltro').hidden = !giornoSel;
   let r;
   try {
-    const res = await fetch('/api/attivita?utente=' + encodeURIComponent(selezionato));
+    const q = '?utente=' + encodeURIComponent(selezionato) + (giornoSel ? '&giorno=' + giornoSel : '');
+    const res = await fetch('/api/attivita' + q);
     if (!res.ok) throw new Error();
     r = await res.json();
   } catch { document.getElementById('timeline').innerHTML = '<li class="empty">Attività non disponibili. Riprova tra poco.</li>'; return; }
   const n = r.numeri || {};
   const piu = n.piuUsata && appById(n.piuUsata.appId);
-  document.getElementById('notaAttivita').textContent =
-    `${n.aperture7 ?? 0} app aperte in 7 gg` + (piu ? ` · più usata: ${sigla(piu)}` : '');
-  renderTimeline(r.attivita || [], nome);
+  document.getElementById('notaAttivita').textContent = giornoSel
+    ? 'Solo ' + giornoTesto(giornoSel)
+    : `${n.aperture7 ?? 0} app aperte in 7 gg` + (piu ? ` · più usata: ${sigla(piu)}` : '');
+  renderTimeline(r.attivita || [], nome, r.inUso);
 }
 
 async function aggiornaPlancia() {
@@ -288,18 +489,22 @@ async function aggiornaPlancia() {
     ? `${piu.nome} · ${n.piuUsata.volte} ${n.piuUsata.volte === 1 ? 'volta' : 'volte'} in 30 gg`
     : 'negli ultimi 30 giorni';
   document.getElementById('aggiornato').textContent = 'Aggiornato alle ' + ora2(new Date());
+  giorni = r.giorni || {};
+  renderOggi();
+  renderCalendario();
   renderUtenti();
   caricaAttivita();
 }
 
 // ---------------------------------------------------------------- avvio
 
-function saluto(nome) {
-  const h = new Date().getHours();
-  // "><(((º> sabusabu <º)))><"
-  const s = h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
-  const primo = String(nome || '').trim().split(/\s+/)[0];
-  return primo ? `${s},<br>${esc(primo)}` : s;
+// Testata: la data di oggi in grande. Si riscrive a ogni aggiornamento, così
+// una plancia lasciata aperta passa da sola al giorno dopo.
+function renderOggi() {
+  const d = new Date();
+  document.getElementById('oggiNum').textContent = String(d.getDate());
+  document.getElementById('oggiGiorno').textContent = d.toLocaleDateString('it-IT', { weekday: 'long' });
+  document.getElementById('oggiMese').textContent = d.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 }
 
 async function loadMe() {
@@ -310,7 +515,6 @@ async function loadMe() {
   if (me.mustChange) { window.location.href = '/password'; return false; }
   document.getElementById('userName').textContent = me.nome;
   document.getElementById('avatar').textContent = iniz(me.nome);
-  document.getElementById('saluto').innerHTML = saluto(me.nome);
   // admin del portale: ruolo "vero" oppure elevazione dall'IP (adminPortale).
   isAdmin = !!(me.adminPortale || me.ruolo === 'admin');
   document.getElementById('adminLink').hidden = !isAdmin;
@@ -369,8 +573,12 @@ async function init() {
   if (!ok) return;
   apps = (await (await fetch('/api/apps')).json()).apps;
   renderApps();
+  renderOggi();
+  renderCalendario();   // subito, vuoto: i livelli arrivano con /api/plancia
   aggiornaPlancia();
   aggiornaAvvisi(true);
+  caricaRichieste();
+  setInterval(caricaRichieste, 20000);   // una richiesta di aiuto non aspetta il minuto
   pollStatus();
   setInterval(pollStatus, 4000);
   setInterval(aggiornaPlancia, 60000);

@@ -15,6 +15,15 @@ function iniz(nome) {
   return (nome || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
+// Link "scrivi all'amministratore": apre il programma di posta con oggetto e,
+// se c'è, la domanda già nel testo. Vuoto se l'indirizzo non è configurato.
+function mailAdmin(email, domanda) {
+  if (!email) return '';
+  const corpo = domanda ? `Ciao,\n\nho chiesto all'assistente del portale:\n«${domanda}»\n\nPotete aiutarmi?\n` : '';
+  return `mailto:${encodeURIComponent(email).replace('%40', '@')}?subject=${encodeURIComponent('Portale Suite Cosedil — richiesta di aiuto')}`
+    + (corpo ? `&body=${encodeURIComponent(corpo)}` : '');
+}
+
 // Toast in basso al centro. Richiede un elemento #toast nella pagina.
 let _toastTimer;
 function toast(msg, ms = 3300) {

@@ -121,6 +121,7 @@
   transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
 }
 .chat-azione:hover { background: var(--cosedil-blue); color: #fff; }
+a.chat-azione { text-decoration: none; display: inline-flex; align-items: center; }   /* "Scrivi all'amministratore" è un link mailto */
 
 /* Suggerimenti iniziali. */
 .chat-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-self: flex-start; }

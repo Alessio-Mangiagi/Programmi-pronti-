@@ -16,5 +16,9 @@ export const leggiSid = mod.leggiSid;
 export const PORTAL = mod.PORTAL;
 export const PORTAL_PUBBLICO = mod.PORTAL_PUBBLICO;
 export const FAIL_OPEN = mod.FAIL_OPEN;
+export const cosedilAttivita = mod.cosedilAttivita;
+export const segnalaPresenza = mod.segnalaPresenza;
+export const registraEvento = mod.registraEvento;
+export const EVENTI = mod.EVENTI;
 
 export default mod;

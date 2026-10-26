@@ -94,3 +94,25 @@ admin **per quell'app**, in base al ruolo utente o all'IP di provenienza
 - **Lettore DDT** compila in `dist/`: `src/` e `dist/` stanno entrambi un livello sotto la
   radice dell'app, quindi `../../shared/sso/cosedil-sso` risolve identico prima e dopo il
   build.
+
+## Attività per la plancia admin
+
+`cosedilAttivita({ app, eventi })` manda al registro del portale:
+
+- **presenza**: a ogni richiesta del browser che porta il cookie del portale, al massimo
+  una volta al minuto. Dopo 3 minuti senza segnali il portale chiude la sessione d'uso e
+  scrive una riga `chiudi` con ora e durata (la plancia mostra "usata 10:03–11:40").
+  Serve che la pagina faccia almeno una richiesta ogni tanto (DDT: `keepalive.js`).
+- **eventi**: le rotte elencate, se rispondono con status < 400, diventano azioni nel
+  registro (`DDT convertito in Excel · bolla.pdf`).
+
+```ts
+import cosedilSSO, { cosedilAttivita } from '../../shared/sso/cosedil-sso';
+app.use(cosedilAttivita({ app: 'ddt', eventi: [
+  { percorso: '/claude-to-excel', azione: 'DDT convertito in Excel', dettaglio: (req) => req.body?.pdfFileName },
+] }));
+```
+
+Destinazione: `COSEDIL_EVENTI` (default `COSEDIL_PORTAL`). Il portale che avvia l'app la
+imposta su se stesso. Tutto fire-and-forget: un portale giù non rallenta l'app.
+Per ora c'è solo la versione JS; le app Python non mandano ancora presenza ed eventi.

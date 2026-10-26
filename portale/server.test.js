@@ -24,13 +24,15 @@ test.after(() => fs.rmSync(DATA_TMP, { recursive: true, force: true }));
 const {
   ipMatches, isAdminForApp, clientIp,
   portalHostname, appUrl, isSuiteOrigin,
-  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails,
+  loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,
   parseNetstatPid,
   rispondiAssistente, APPS,
   rowsToUsers, csvToRows,
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
-  riepilogoAttivita, riepilogoUtenti,
+  riepilogoAttivita, riepilogoUtenti, calendarioAttivita,
   normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,
+  ipInterno, validaRichiesta, passwordTemporanea,
+  segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,
 } = require('./server.js');
 
 const reqCon = (host, headers = {}) => ({ headers: Object.assign({ host }, headers), socket: {} });
@@ -109,13 +111,14 @@ test('isSuiteOrigin: un dominio che contiene un IP privato non passa', () => {
 // ---------------------------------------------------------------------------
 // Freno ai tentativi di login.
 // ---------------------------------------------------------------------------
-test('login: blocca dopo 5 tentativi falliti', () => {
+test('login: blocca dopo LOGIN_MAX_FAIL (15) tentativi falliti', () => {
   const k = loginKey('mario', '192.168.1.9');
   clearLoginFails(k);
-  for (let i = 0; i < 4; i++) noteLoginFail(k);
-  assert.equal(loginBlockedMs(k), 0, 'al quarto tentativo deve ancora poter provare');
+  assert.equal(LOGIN_MAX_FAIL, 15);
+  for (let i = 0; i < LOGIN_MAX_FAIL - 1; i++) noteLoginFail(k);
+  assert.equal(loginBlockedMs(k), 0, 'al penultimo tentativo deve ancora poter provare');
   noteLoginFail(k);
-  assert.ok(loginBlockedMs(k) > 0, 'al quinto scatta il blocco');
+  assert.ok(loginBlockedMs(k) > 0, 'all’ultimo scatta il blocco');
   clearLoginFails(k);
 });
 
@@ -123,7 +126,7 @@ test('login: il blocco scade', () => {
   const k = loginKey('mario', '192.168.1.9');
   clearLoginFails(k);
   const t0 = 1_000_000;
-  for (let i = 0; i < 5; i++) noteLoginFail(k, t0);
+  for (let i = 0; i < LOGIN_MAX_FAIL; i++) noteLoginFail(k, t0);
   assert.ok(loginBlockedMs(k, t0 + 60_000) > 0, 'dopo un minuto ancora bloccato');
   assert.equal(loginBlockedMs(k, t0 + 16 * 60_000), 0, 'dopo un quarto d\'ora si riprova');
   clearLoginFails(k);
@@ -139,15 +142,16 @@ test('login: il successo azzera i tentativi', () => {
   clearLoginFails(k);
 });
 
-test('login: contatore per solo IP con soglia propria (20)', () => {
+test('login: contatore per solo IP con soglia propria, sopra quella per account', () => {
   // Stesso IP, username sempre diversi: il contatore per utente+IP non scatta
   // mai, quello per IP sì. È il freno alla scansione di account.
   const kIp = loginKey('*', '192.168.1.77');
   clearLoginFails(kIp);
-  for (let i = 0; i < 19; i++) noteLoginFail(kIp, Date.now(), 20);
-  assert.equal(loginBlockedMs(kIp), 0, 'al diciannovesimo può ancora provare');
-  noteLoginFail(kIp, Date.now(), 20);
-  assert.ok(loginBlockedMs(kIp) > 0, 'al ventesimo scatta il blocco IP');
+  assert.ok(LOGIN_MAX_FAIL_IP > LOGIN_MAX_FAIL, 'il blocco del PC non deve scattare prima di quello dell’account');
+  for (let i = 0; i < LOGIN_MAX_FAIL_IP - 1; i++) noteLoginFail(kIp, Date.now(), LOGIN_MAX_FAIL_IP);
+  assert.equal(loginBlockedMs(kIp), 0, 'al penultimo può ancora provare');
+  noteLoginFail(kIp, Date.now(), LOGIN_MAX_FAIL_IP);
+  assert.ok(loginBlockedMs(kIp) > 0, 'all’ultimo scatta il blocco IP');
   clearLoginFails(kIp);
 });
 
@@ -155,7 +159,7 @@ test('login: il blocco è per utente+IP, non per utente', () => {
   const k1 = loginKey('mario', '192.168.1.9');
   const k2 = loginKey('mario', '192.168.1.10');
   clearLoginFails(k1); clearLoginFails(k2);
-  for (let i = 0; i < 5; i++) noteLoginFail(k1);
+  for (let i = 0; i < LOGIN_MAX_FAIL; i++) noteLoginFail(k1);
   assert.ok(loginBlockedMs(k1) > 0);
   assert.equal(loginBlockedMs(k2), 0, 'un altro PC non deve restare fuori');
   clearLoginFails(k1); clearLoginFails(k2);
@@ -227,7 +231,7 @@ test('assistente: non dice mai la porta', () => {
 
 test('assistente: alla domanda sulla porta risponde comunque qualcosa di utile', () => {
   const { risposta, apps } = rispondiAssistente('che porta usa il ddt?', APPS);
-  assert.match(risposta, /Avvia|Apri/);
+  assert.match(risposta, /scheda .* apre/);
   assert.deepEqual(apps, ['ddt']);
 });
 
@@ -504,4 +508,176 @@ test("shared/avvisi + raccogliAvvisi: il file di un'app arriva nel portale e spa
   assert.equal(l.length, 1);
   assert.equal(l[0].n, 2);
   assert.deepEqual(fs.readdirSync(path.join(DATA_TMP, 'avvisi-in')), ['in-corso.tmp']);
+});
+
+// ---- Presenza nelle app e azioni fatte dentro ----
+
+const T0 = Date.parse('2026-10-14T10:00:00.000Z');
+const DDT = { username: 'mrossi', nome: 'Mario Rossi', appId: 'ddt', appNome: 'DDT Suite' };
+
+test('segnaPresenza: il primo segnale apre la sessione, i successivi la allungano', () => {
+  let { presenze, chiuse } = segnaPresenza({}, DDT, T0);
+  assert.equal(chiuse.length, 0);
+  assert.equal(presenze['mrossi|ddt'].inizio, '2026-10-14T10:00:00.000Z');
+  ({ presenze, chiuse } = segnaPresenza(presenze, DDT, T0 + 60_000));
+  assert.equal(chiuse.length, 0);
+  assert.equal(presenze['mrossi|ddt'].inizio, '2026-10-14T10:00:00.000Z');
+  assert.equal(presenze['mrossi|ddt'].ultimo, '2026-10-14T10:01:00.000Z');
+});
+
+test('segnaPresenza: dopo una pausa lunga chiude la vecchia sessione e ne apre una nuova', () => {
+  let presenze = {};
+  for (let m = 0; m <= 20; m++) ({ presenze } = segnaPresenza(presenze, DDT, T0 + m * 60_000));   // 10:00 → 10:20
+  const dopo = T0 + 20 * 60_000 + PRESENZA_TIMEOUT_MS + 1;
+  const r = segnaPresenza(presenze, DDT, dopo);
+  assert.equal(r.chiuse.length, 1);
+  assert.equal(r.chiuse[0].azione, 'chiudi');
+  assert.equal(r.chiuse[0].ts, '2026-10-14T10:20:00.000Z');      // ora dell'ultimo segnale
+  assert.equal(r.chiuse[0].durataMin, 20);
+  assert.equal(r.presenze['mrossi|ddt'].inizio, new Date(dopo).toISOString());
+});
+
+test('chiudiPresenzeScadute: chiude solo chi tace da più del timeout', () => {
+  let { presenze } = segnaPresenza({}, DDT, T0);
+  ({ presenze } = segnaPresenza(presenze, { ...DDT, appId: 'ocr', appNome: 'OCR' }, T0 + 5 * 60_000));
+  const r = chiudiPresenzeScadute(presenze, T0 + 5 * 60_000 + 1000);
+  assert.deepEqual(r.chiuse.map((c) => c.appId), ['ddt']);
+  assert.deepEqual(Object.keys(r.presenze), ['mrossi|ocr']);
+});
+
+test('inUso: solo sessioni vive, filtrabili per utente', () => {
+  let { presenze } = segnaPresenza({}, DDT, T0);
+  ({ presenze } = segnaPresenza(presenze, { ...DDT, username: 'gverdi', nome: 'Giulia Verdi' }, T0));
+  assert.equal(inUso(presenze, null, T0 + 1000).length, 2);
+  assert.deepEqual(inUso(presenze, 'gverdi', T0 + 1000).map((x) => x.appId), ['ddt']);
+  assert.equal(inUso(presenze, null, T0 + PRESENZA_TIMEOUT_MS + 1).length, 0);
+});
+
+test('pulisciTestoEvento: niente a capo né caratteri di controllo, lunghezza tagliata', () => {
+  assert.equal(pulisciTestoEvento(['riga1', 'riga2' + String.fromCharCode(9, 7) + 'x'].join(String.fromCharCode(10)), 100), 'riga1 riga2 x');
+  assert.equal(pulisciTestoEvento('a'.repeat(300), 200).length, 200);
+  assert.equal(pulisciTestoEvento(null, 10), '');
+});
+
+test('riepilogoAttivita: chiusura con durata ed evento con dettaglio arrivano alla plancia', () => {
+  const reg = [
+    { ts: '2026-10-14T10:20:00.000Z', username: 'mrossi', appId: 'ddt', azione: 'chiudi', inizio: '2026-10-14T10:00:00.000Z', durataMin: 20 },
+    { ts: '2026-10-14T10:05:00.000Z', username: 'mrossi', appId: 'ddt', azione: 'evento', evento: 'DDT convertito in Excel', dettaglio: 'bolla.pdf' },
+    { ts: '2026-10-14T10:25:00.000Z', username: 'mrossi', appId: null, azione: 'logout' },
+  ];
+  const r = riepilogoAttivita(reg, 'mrossi', () => true, T0 + 30 * 60_000);
+  assert.deepEqual(r.attivita.map((e) => e.azione), ['logout', 'chiudi', 'evento']);
+  assert.equal(r.attivita[1].durataMin, 20);
+  assert.equal(r.attivita[2].dettaglio, 'bolla.pdf');
+  assert.equal(r.attivita[0].dettaglio, undefined);
+});
+
+test('calendarioAttivita: per giorno locale, accessi/aperture/azioni e utenti distinti', () => {
+  const locale = (y, m, d, h) => new Date(y, m - 1, d, h, 30).toISOString();
+  const g = calendarioAttivita([
+    { ts: locale(2026, 10, 14, 0), username: 'mrossi', azione: 'login' },          // 00:30 locali: è il 14
+    { ts: locale(2026, 10, 14, 9), username: 'gverdi', azione: 'login' },
+    { ts: locale(2026, 10, 14, 9), username: 'gverdi', appId: 'ddt', azione: 'apri' },
+    { ts: locale(2026, 10, 14, 10), username: 'gverdi', appId: 'ddt', azione: 'evento' },
+    { ts: locale(2026, 10, 13, 18), username: 'mrossi', appId: 'ddt', azione: 'avvia' },
+    { ts: 'non-una-data', username: 'x', azione: 'login' },
+    { ts: locale(2026, 10, 12, 8) },                                                   // riga senza utente
+  ]);
+  assert.deepEqual(g['2026-10-14'], { accessi: 2, aperture: 1, azioni: 1, utenti: 2 });
+  assert.deepEqual(g['2026-10-13'], { accessi: 0, aperture: 1, azioni: 0, utenti: 1 });
+  assert.deepEqual(Object.keys(g).sort(), ['2026-10-13', '2026-10-14']);
+});
+
+test('riepilogoAttivita: il filtro per giorno restringe solo l\'elenco', () => {
+  const locale = (d, h) => new Date(2026, 9, d, h).toISOString();
+  const reg = [
+    { ts: locale(14, 9), username: 'mrossi', azione: 'login' },
+    { ts: locale(13, 9), username: 'mrossi', azione: 'login' },
+    { ts: locale(13, 10), username: 'mrossi', appId: 'ddt', azione: 'apri' },
+  ];
+  const ora = new Date(2026, 9, 14, 12).getTime();
+  const r = riepilogoAttivita(reg, 'mrossi', () => true, ora, '2026-10-13');
+  assert.equal(r.attivita.length, 2);
+  assert.equal(r.numeri.aperture7, 1);
+  assert.equal(riepilogoAttivita(reg, 'mrossi', () => true, ora).attivita.length, 3);
+});
+
+test('assistente: agli insulti chiede rispetto e non suggerisce app', () => {
+  for (const q of ['sei uno STUPIDO', 'che app inutile', 'Vaffanculo', 'idiota, dov’è il ddt?']) {
+    const r = rispondiAssistente(q, APPS);
+    assert.equal(r.insulto, true, q);
+    assert.deepEqual(r.apps, []);
+    assert.match(r.risposta, /rispetto/);
+  }
+});
+
+test('assistente: parole che contengono un insulto non scattano', () => {
+  for (const q of ['quale app per le bolle?', 'come si scematizza un pdf', 'documenti stupidamente lunghi']) {
+    assert.notEqual(rispondiAssistente(q, APPS).insulto, true, q);
+  }
+});
+
+test('assistente: gli esempi che propone trovano davvero un\'app', () => {
+  const visibili = APPS.filter((a) => !a.adminOnly && !a.riservata);
+  for (const q of ['cosa fa l\'OCR?', 'quale app per i PDF scansionati?', 'come si avvia il DDT?', 'quali app ci sono?']) {
+    assert.ok(rispondiAssistente(q, visibili).apps.length > 0, q);
+  }
+});
+
+test('assistente: credenziali e password rimandano all\'amministratore', () => {
+  for (const q of ['ho dimenticato la password', 'il mio account è bloccato', 'mi servono le credenziali per il ddt', 'non riesco ad accedere']) {
+    const r = rispondiAssistente(q, APPS, { emailAdmin: 'admin@cosedil.it' });
+    assert.deepEqual(r.contatto, { email: 'admin@cosedil.it' }, q);
+    assert.match(r.risposta, /admin@cosedil\.it/);
+    assert.match(r.risposta, /Cambia password/);
+  }
+});
+
+test('assistente: senza indirizzo configurato non ne inventa uno', () => {
+  const r = rispondiAssistente('ho dimenticato la password', APPS);
+  assert.deepEqual(r.contatto, { email: '' });
+  assert.match(r.risposta, /rivolgiti a un amministratore/);
+  assert.doesNotMatch(r.risposta, /@/);
+});
+
+test('assistente: domande fuori tema o lunghe vanno a una persona, quelle sulle app no', () => {
+  const o = { emailAdmin: 'admin@cosedil.it' };
+  assert.ok(rispondiAssistente('come faccio il bilancio consolidato?', APPS, o).contatto);
+  const lunga = 'devo preparare un report che incroci le bolle del mese con le scadenze dei fornitori e poi '
+    + 'confrontare il risultato con la versione di settembre per capire quali fornitori hanno cambiato condizioni';
+  const r = rispondiAssistente(lunga, APPS, o);
+  assert.ok(r.contatto);
+  assert.ok(r.apps.includes('ddt'));
+  assert.equal(rispondiAssistente('cosa fa l\'OCR?', APPS, o).contatto, undefined);
+});
+
+test('ipInterno: reti private e loopback interne, il resto esterno', () => {
+  for (const ip of ['10.1.2.3', '172.16.0.9', '172.31.255.1', '192.168.1.50', '127.0.0.1', '::1', 'fd12:3456::1', 'fe80::1', '169.254.3.4']) {
+    assert.equal(ipInterno(ip), true, ip);
+  }
+  for (const ip of ['8.8.8.8', '172.32.0.1', '93.184.216.34', '2001:4860::8888', '', null]) {
+    assert.equal(ipInterno(ip), false, String(ip));
+  }
+});
+
+test('validaRichiesta: nome, cognome ed email obbligatori; campi ripuliti', () => {
+  assert.equal(validaRichiesta({ nome: 'Mario', email: 'm@x.it' }).ok, false);
+  assert.equal(validaRichiesta({ nome: 'Mario', cognome: 'Rossi', email: 'non-una-mail' }).ok, false);
+  assert.equal(validaRichiesta({ nome: 'Mario', cognome: 'Rossi', email: 'm@x.it', sito: 'spam' }).ok, false);
+  const v = validaRichiesta({ nome: ' Mario ', cognome: 'Rossi', email: 'mario.rossi@cosedil.it', username: ' MRossi ', messaggio: 'riga1' + String.fromCharCode(10) + 'riga2' });
+  assert.equal(v.ok, true);
+  assert.deepEqual(v.dati, { nome: 'Mario', cognome: 'Rossi', email: 'mario.rossi@cosedil.it', username: 'mrossi', messaggio: 'riga1 riga2' });
+});
+
+test('passwordTemporanea: 12 caratteri leggibili a gruppi, ogni volta diversa', () => {
+  const a = passwordTemporanea();
+  assert.match(a, /^[a-km-zA-HJ-NP-Z2-9]{4}-[a-km-zA-HJ-NP-Z2-9]{4}-[a-km-zA-HJ-NP-Z2-9]{4}$/);
+  assert.notEqual(a, passwordTemporanea());
+});
+
+test('APPS: ogni app ha attività e guida per la home utenti', () => {
+  for (const a of APPS) {
+    assert.ok(a.fai && a.fai.length < 60, a.id + ' fai');
+    assert.ok(a.guida && a.guida.length > 40, a.id + ' guida');
+  }
 });

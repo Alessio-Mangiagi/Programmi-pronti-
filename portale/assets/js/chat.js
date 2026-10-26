@@ -30,6 +30,25 @@ function chatMostraMsg(testo, chi) {
 // card corrispondente, così la logica di avvio resta una sola (quella di index.js)
 // e lo stato mostrato è sempre quello vero della card.
 function chatMostraAzioni(ids) {
+  // Home degli utenti: un solo gesto, "Apri" (avvia da sé se serve), via la
+  // funzione della pagina. Le card con Avvia/Apri separati esistono solo nella
+  // plancia degli admin.
+  if (typeof window.apriApp === 'function') {
+    const valide = (ids || []).filter((id) => apps.some((a) => a.id === id));
+    if (!valide.length) return;
+    const box = document.createElement('div');
+    box.className = 'chat-azioni';
+    for (const id of valide) {
+      const b = document.createElement('button');
+      b.className = 'chat-azione';
+      b.textContent = 'Apri ' + apps.find((a) => a.id === id).nome;
+      b.addEventListener('click', () => window.apriApp(id));
+      box.appendChild(b);
+    }
+    chatLog.appendChild(box);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return;
+  }
   const validi = (ids || []).filter((id) => document.querySelector(`.card[data-id="${id}"]`));
   if (!validi.length) return;
   const box = document.createElement('div');
@@ -97,6 +116,19 @@ async function chatChiedi(domanda) {
     const data = await r.json();
     chatMostraMsg(data.risposta, 'bot');
     chatMostraAzioni(data.apps);
+    // Rimando a una persona: mail all'amministratore con la domanda già scritta.
+    const mail = data.contatto && typeof mailAdmin === 'function' ? mailAdmin(data.contatto.email, q) : '';
+    if (mail) {
+      const box = document.createElement('div');
+      box.className = 'chat-azioni';
+      const a = document.createElement('a');
+      a.className = 'chat-azione';
+      a.href = mail;
+      a.textContent = 'Scrivi all’amministratore';
+      box.appendChild(a);
+      chatLog.appendChild(box);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
   } catch {
     chatMostraMsg('Non riesco a rispondere: il portale non risponde. Riprova tra poco.', 'bot');
   } finally {
@@ -129,7 +161,7 @@ function chatInit() {
   panel.innerHTML = `
     <div class="chat-head">
       <h2>Assistente della suite</h2>
-      <p>Rispondo solo sulle app e su cosa fanno</p>
+      <p>Assistente automatico (AI): rispondo solo sulle app e su cosa fanno</p>
     </div>
     <div class="chat-log" id="chatLog"></div>
     <form class="chat-form" id="chatForm">
@@ -145,7 +177,8 @@ function chatInit() {
   chatLog = document.getElementById('chatLog');
   chatInput = document.getElementById('chatInput');
 
-  chatMostraMsg('Ciao. Ti dico cosa fanno le app della suite e quale usare. Su altro non so rispondere.', 'bot');
+  chatMostraMsg('Ciao. Sono un assistente automatico, non una persona: ti dico cosa fanno le app della suite e quale usare. '
+    + 'Scrivimi con rispetto, senza insulti. Su altro non so rispondere.', 'bot');
   chatMostraChips();
 
   fab.addEventListener('click', () => chatApri(!chatPanel.classList.contains('aperto')));

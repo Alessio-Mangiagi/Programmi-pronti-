@@ -18,6 +18,12 @@ Portale locale che riunisce in un unico accesso le applicazioni della suite Cose
 
 All'avvio in locale il browser si apre da solo su `http://localhost:8080`.
 
+### Plancia admin (porta 8090)
+
+- **Avvia**: `avvia-admin.vbs` (invisibile) o `avvia-admin.bat` (con log). **Ferma**: `ferma-admin.vbs`.
+- Stesso `server.js` su `http://localhost:8090`: gli admin vedono la plancia (utenti e attività), gli altri la griglia delle app.
+- Per condividere utenti, sessioni e registro accessi col portale degli utenti (8080), impostare una volta `setx PORTALE_DATA_DIR "<cartella data del portale 8080>"`. Senza, usa `./data`.
+
 ### Primo accesso
 
 Al primo avvio viene creato un amministratore predefinito:
@@ -38,6 +44,7 @@ Verrà richiesto di **cambiare la password** al primo accesso.
 - `TLS_CERT` / `TLS_KEY` — percorsi di certificato e chiave: se ci sono entrambi il portale parla **HTTPS** e marca il cookie di sessione `Secure`. Se sono indicati ma illeggibili il portale **non parte** (meglio fermo che in chiaro per sbaglio).
 - `COOKIE_SECURE=1` — cookie `Secure` anche senza TLS_CERT, per quando è il reverse proxy a fare l'HTTPS.
 - `SUITE_AVVISI_DIR` — cartella di arrivo degli avvisi dei programmi (default `DATA_DIR/avvisi-in`). Il portale la passa alle app che avvia.
+- `ADMIN_EMAIL` — casella dell'amministratore (in alternativa `data/contatti.json` con `{"emailAdmin": "..."}`, riletto senza riavvio). L'assistente ci manda chi ha problemi di credenziali o password dimenticata e chi fa domande che non sa o troppo articolate; compare anche nel login ("Password dimenticata?") e nella home. Senza indirizzo si dice di rivolgersi a un amministratore.
 
 ## Test
 
@@ -164,7 +171,7 @@ La funzione è `pathDalRegistro()` in `server.js`; fuori da Windows restituisce 
 
 - Le password sono salvate con hash **scrypt** + salt; nessuna password in chiaro.
 - Le sessioni sono cookie **HttpOnly** firmati **HMAC-SHA256** (nessuno stato in RAM).
-- Dopo **5 tentativi di login falliti** quella coppia utente+PC resta bloccata **15 minuti**. Il conteggio sta in RAM: si azzera al riavvio del portale.
+- Dopo **15 tentativi di login falliti** quella coppia utente+PC resta bloccata **15 minuti** (dallo stesso PC, 50 tentativi in tutto su username diversi). Chi resta bloccato chiede aiuto dal login ("Password dimenticata o account bloccato?") e l'admin lo sblocca dalla plancia reimpostando la password. Il conteggio sta in RAM: si azzera al riavvio del portale.
 - **Su HTTP le password viaggiano in chiaro sulla LAN.** Chi vuole cifrarle imposta `TLS_CERT`/`TLS_KEY` (basta un certificato interno) oppure mette davanti un reverse proxy HTTPS con `COOKIE_SECURE=1`. Le app della suite restano su HTTP: il link dal portale è una normale navigazione e il browser non la blocca.
 - `GET /api/verify` risponde in CORS solo alle app sullo **stesso host del portale** (o su IP privati di LAN), mai a un sito su internet.
 - L'IP **non è una password**: chi usa una postazione "fidata" ne eredita i privilegi. Usare IP fissi/prenotazione DHCP per le postazioni admin, e mantenere comunque il login.

@@ -50,5 +50,19 @@ input:focus { border-color: var(--cosedil-blue-light); box-shadow: 0 0 0 2px rgb
 .hint { margin-top: 1.25rem; font-size: 0.78rem; color: var(--cosedil-gray); text-align: center; }
 .hint a { color: var(--cosedil-blue); font-weight: 600; text-decoration: none; }
 .hint a:hover { text-decoration: underline; }
+/* Richiesta di aiuto (password dimenticata / account bloccato). */
+.card[hidden] { display: none; }
+.link { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--cosedil-blue); cursor: pointer; }
+.link:hover { text-decoration: underline; }
+.riga2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 0.75rem; }
+.opz { font-weight: 400; color: #8a8f96; }
+textarea {
+  width: 100%; font-family: var(--font-body); font-size: 0.95rem; color: var(--cosedil-text-strong); resize: vertical;
+  border: 1px solid #d2d2d2; border-radius: var(--radius-btn); padding: 0.7rem 0.85rem; outline: none;
+}
+textarea:focus { border-color: var(--cosedil-blue-light); box-shadow: 0 0 0 2px rgba(25,143,217,0.35); }
+.esca { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+@media (max-width: 420px) { .riga2 { grid-template-columns: 1fr; } }
+
 /* Banner "cambio obbligatorio" nella pagina password. */
 .note { background: rgba(25,143,217,0.10); border: 1px solid rgba(25,143,217,0.35); color: var(--cosedil-blue); font-family: var(--font-ui); font-size: 0.83rem; border-radius: var(--radius-btn); padding: 0.7rem 0.85rem; margin: 0 0 1.25rem; }

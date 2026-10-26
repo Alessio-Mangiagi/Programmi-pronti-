@@ -182,6 +182,90 @@ function cosedilSocketIO(opts = {}) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Attività nelle app: presenza e azioni, verso il registro del portale.
+//
+// La plancia degli admin vuole sapere quando un utente ha CHIUSO un'app e cosa
+// ci ha fatto dentro. Il portale non vede le schede delle app, quindi glielo
+// dice il backend dell'app, inoltrando il cookie del browser come fa il gate:
+//   - presenza: a ogni richiesta del browser (pagine, API, ping di keepalive)
+//     si segnala "la sta usando", al massimo una volta al minuto per utente e
+//     app. Quando i segnali smettono il portale chiude la sessione d'uso.
+//   - eventi: le rotte elencate in `eventi`, se vanno a buon fine (status <400),
+//     scrivono un'azione nel registro, es. "DDT convertito in Excel".
+//
+// Tutto fire-and-forget: un portale giù o lento non rallenta né rompe l'app.
+//
+// Config: COSEDIL_EVENTI=http://host:porta (default: il portale del gate).
+// Il portale che avvia un'app la imposta da sé verso se stesso.
+
+const EVENTI = (process.env.COSEDIL_EVENTI || PORTAL).replace(/\/+$/, '');
+const PRESENZA_OGNI = 60_000;
+const ultimaPresenza = new Map();   // `${sid}|${app}` -> ms dell'ultimo segnale
+
+function inviaAlPortale(percorso, cookie, corpo) {
+  return fetch(EVENTI + percorso, {
+    method: 'POST',
+    headers: { Cookie: cookie || '', 'Content-Type': 'application/json', 'X-Cosedil-App': corpo.appId },
+    body: JSON.stringify(corpo),
+    signal: AbortSignal.timeout(5000),
+  }).then((r) => r.ok, () => false);
+}
+
+// Segnale di presenza, limitato a uno al minuto. Ritorna true se è partito.
+function segnalaPresenza(cookie, app, ora = Date.now()) {
+  const sid = leggiSid(cookie);
+  if (!ENABLED || !sid || !app) return false;
+  const key = sid + '|' + app;
+  const prima = ultimaPresenza.get(key);
+  if (prima && ora - prima < PRESENZA_OGNI) return false;
+  if (ultimaPresenza.size > 5000) ultimaPresenza.clear();   // sid vecchi: niente crescita infinita
+  ultimaPresenza.set(key, ora);
+  inviaAlPortale('/api/presenza', cookie, { appId: app });
+  return true;
+}
+
+// Un'azione fatta nell'app, a nome dell'utente del cookie. Usabile anche a mano
+// da una rotta: registraEvento(req, 'ddt', 'Versione salvata', nome).
+function registraEvento(req, app, azione, dettaglio) {
+  const cookie = req && req.headers && req.headers.cookie;
+  if (!ENABLED || !leggiSid(cookie) || !app || !azione) return Promise.resolve(false);
+  return inviaAlPortale('/api/evento', cookie, { appId: app, azione, dettaglio: dettaglio || '' });
+}
+
+function percorsoDi(req) {
+  return String(req.path || req.url || '/').split('?')[0];
+}
+
+// Middleware: app.use(cosedilAttivita({ app: 'ddt', eventi: [
+//   { metodo: 'POST', percorso: '/claude-to-excel', azione: 'DDT convertito in Excel',
+//     dettaglio: (req) => req.body && req.body.pdfFileName },
+// ] }))
+// `percorso` è una stringa esatta o una RegExp; `dettaglio` legge req.body a
+// risposta finita, quindi il parser JSON può stare anche dopo questo middleware.
+function cosedilAttivita(opts = {}) {
+  const app = opts.app || '';
+  const eventi = Array.isArray(opts.eventi) ? opts.eventi : [];
+  return function cosedilAttivitaMiddleware(req, res, next) {
+    try {
+      segnalaPresenza(req.headers.cookie, app);
+      const metodo = String(req.method || 'GET').toUpperCase();
+      const percorso = percorsoDi(req);
+      const ev = eventi.find((e) => String(e.metodo || 'POST').toUpperCase() === metodo
+        && (e.percorso instanceof RegExp ? e.percorso.test(percorso) : e.percorso === percorso));
+      if (ev && typeof res.on === 'function') {
+        res.on('finish', () => {
+          if (res.statusCode >= 400) return;
+          let dettaglio = '';
+          try { dettaglio = typeof ev.dettaglio === 'function' ? String(ev.dettaglio(req) || '') : ''; } catch { /* dettaglio facoltativo */ }
+          registraEvento(req, app, ev.azione, dettaglio);
+        });
+      }
+    } catch { /* il registro non deve mai bloccare l'app */ }
+    next();
+  };
+}
+
 module.exports = cosedilSSO;
 module.exports.default = cosedilSSO;          // interop con gli import ESM/TS
 module.exports.cosedilSSO = cosedilSSO;
@@ -191,3 +275,7 @@ module.exports.leggiSid = leggiSid;
 module.exports.PORTAL = PORTAL;
 module.exports.PORTAL_PUBBLICO = PORTAL_PUBBLICO;
 module.exports.FAIL_OPEN = FAIL_OPEN;
+module.exports.cosedilAttivita = cosedilAttivita;
+module.exports.segnalaPresenza = segnalaPresenza;
+module.exports.registraEvento = registraEvento;
+module.exports.EVENTI = EVENTI;
