@@ -2,24 +2,23 @@
 # Confronto Documenti senza il portale
 
 Il portale Suite Cosedil serve all'app solo per il login (gate SSO di
-`shared/sso`). Per usarla da sola bisogna spegnere quel controllo e tenere
-raggiungibili i moduli condivisi che l'app importa all'avvio.
+`shared/sso`). Per usarla da sola basta spegnere quel controllo. Per gli altri
+modi di installarla (server in ufficio, Docker, cloud) vedi
+[INSTALLAZIONE.md](INSTALLAZIONE.md).
 
-## 1. Disattivare il gate SSO (obbligatorio)
+## 1. Disattivare il gate SSO
 
-Il gate si regola con variabili d'ambiente lette da `shared/sso/cosedil_sso.py`:
+Il gate si regola con variabili d'ambiente:
 
 | Variabile | Valore | Effetto |
 |-----------|--------|---------|
-| `COSEDIL_SSO` | `off` | Login spento del tutto: l'app risponde senza chiedere niente. Per l'uso in locale. |
+| `COSEDIL_SSO` | `off` | Login spento del tutto: l'app risponde senza chiedere niente. Il modulo `shared/sso` non serve più. |
 | `COSEDIL_SSO_FAIL` | `open` | Il login resta attivo, ma se il portale è spento le richieste passano. |
 | `COSEDIL_SSO_FAIL` | `closed` (default) | Con il portale spento le API rispondono 503. |
 | `COSEDIL_PORTAL` | URL (default `http://localhost:8080`) | Indirizzo del portale da interrogare. |
 
-`avvia.vbs` e `Avvia con console.bat` oggi **non** impostano queste variabili,
-quindi senza il portale l'app è bloccata.
-
-Modifica minima per avviarla senza login:
+`avvia.vbs` e `Avvia con console.bat` **non** impostano `COSEDIL_SSO`: senza
+il portale aggiungi, prima dell'avvio del server:
 
 - `Avvia con console.bat`, prima di `"%PYTHON%" server.py`:
 
@@ -33,31 +32,23 @@ Modifica minima per avviarla senza login:
   shell.Environment("PROCESS")("COSEDIL_SSO") = "off"
   ```
 
-## 2. File condivisi che devono restare accanto all'app
+Il server di rete (`avvia-server-rete.cmd`) e il container Docker spengono già
+il login da soli, salvo scelta diversa.
+
+## 2. File condivisi
 
 | Percorso | Necessario | Note |
 |----------|------------|------|
-| `../shared/sso/cosedil_sso.py` | Sì | Importato anche con `COSEDIL_SSO=off`: se manca, `server.py` esce con `sys.exit(1)`. Nell'exe PyInstaller è già incluso (`pathex` in `ConfrontaPDF.spec`). |
-| `../shared/avvia/libera-porta.bat` | Consigliato | Chiamato da entrambi gli avviatori per liberare la porta 5001. Se manca, `avvia.vbs` prosegue e il `.bat` mostra solo un errore. |
-| `../shared/avvisi` | No | Inoltra gli errori del log alla pagina Avvisi del portale. Se manca, l'app parte uguale. |
+| `../shared/sso/cosedil_sso.py` | Solo con il login attivo | Con `COSEDIL_SSO=off` l'app parte anche senza: la cartella `confronto-documenti` si può copiare da sola. Con il login attivo e il modulo mancante, l'avvio viene annullato. |
+| `../shared/avvia/libera-porta.bat` | Consigliato | Chiamato dagli avviatori per liberare la porta 5001; se manca mostrano solo un errore. |
+| `../shared/avvisi` | No | Inoltra gli errori del log alla pagina Avvisi del portale. |
 
-Se si copia solo la cartella `confronto-documenti` fuori dal repo, l'app non
-parte: bisogna portare anche `shared/sso` (stessa struttura di cartelle) oppure
-usare l'exe.
-
-## 3. Requisiti indipendenti dal portale
+## 3. Requisiti
 
 - **Python 3.10+** con il `.venv` creato da `Installa.bat` e i pacchetti di
-  `requirements.txt` (flask, requests, pymupdf, pillow, numpy, pytesseract,
-  python-docx, waitress).
-- **Tesseract OCR** installato sul sistema (motore OCR di base).
-- **Facoltativi**:
-  - Ollama su `http://localhost:11434`.
-  - PaddleOCR tramite il venv della webapp OCR (variabile `PADDLE_APP_DIR`).
-- **Rete**: per default ascolta su `127.0.0.1:5001`. Si cambia con le variabili
-  `HOST` e `PORT`.
-
-## Possibile miglioramento
-
-Rendere facoltativo l'import di `cosedil_sso` quando `COSEDIL_SSO=off`, così
-l'app non avrebbe più bisogno di `shared/sso` e si potrebbe copiare da sola.
+  `requirements.txt`.
+- **Tesseract OCR** installato, oppure la cartella `Tesseract-OCR` copiata
+  accanto all'app.
+- **Facoltativo:** PaddleOCR tramite il venv della webapp OCR
+  (variabile `PADDLE_APP_DIR`).
+- **Rete:** per default ascolta su `127.0.0.1:5001` (variabili `HOST` e `PORT`).
