@@ -279,3 +279,59 @@ def test_cache_key_depends_on_preprocess():
     assert c.cache_get(h, 0, 200, "tesseract", "ita", False) == "grezzo"
     for pre in (True, False):
         c._cache_path(h, 0, 200, "tesseract", "ita", pre).unlink(missing_ok=True)
+
+
+# ----- intestazioni/piè di pagina ripetuti -----
+
+def test_righe_ripetute_trovate_e_tolte_solo_ai_bordi():
+    def corpo(i):
+        return [f"riga {k} del capitolo {'abcde'[i - 1]}" for k in range(6)]
+    pagine = [["Cosedil S.p.A. - Commessa 2026/12", f"Capitolo {i}: {'abcde'[i - 1]}"]
+              + corpo(i) + [f"Totale foglio {i}: euro {i}.345,67", f"Pagina {i} di 5"]
+              for i in range(1, 6)]
+    chiavi = c.righe_ripetute(pagine, pagine)
+    righe, tolte = c.togli_ripetute(pagine[2], chiavi)
+    assert tolte == 2                    # intestazione e "Pagina 3 di 5"
+    assert "Totale foglio 3: euro 3.345,67" in righe   # gli importi restano sempre
+    assert righe[0] == "Capitolo 3: c"
+
+
+def test_righe_ripetute_non_su_pochi_documenti():
+    assert c.righe_ripetute([["Pagina 1 di 1", "testo"]], [["Pagina 1 di 1", "altro"]]) == set()
+
+
+# ----- righe spostate e voci con lo stesso codice -----
+
+def test_riga_spostata_non_e_differenza():
+    a = ["uno", "due", "tre", "quattro"]
+    b = ["due", "tre", "quattro", "uno"]
+    ops = c.line_ops(a, b)
+    assert [op["type"] for op in ops if op["type"] != "equal"] == ["moved"]
+
+
+def test_voce_stesso_codice_diventa_change():
+    a = ["A.01.003 Scavo di sbancamento", "B.02.010 Muratura in blocchi"]
+    b = ["B.02.010 Muratura in blocchi", "A.01.003 Scavo a sezione obbligata per fondazioni"]
+    ops = [op for op in c.line_ops(a, b) if op["type"] not in ("equal", "moved")]
+    assert len(ops) == 1 and ops[0]["type"] == "change" and ops[0]["voce"] == "A.01.003"
+
+
+def test_numeri_cambiati_nel_riepilogo():
+    ops = c.line_ops(["Importo euro 1.250,00", "Data 21/10/2026", "Testo uguale", "Penale alta"],
+                     ["Importo euro 1.280,00", "Data 22/10/2026", "Testo uguale", "Penale bassa"])
+    tipi = [n["tipo"] for n in c.numeri_cambiati(ops)]
+    assert tipi == ["numero", "data"]               # "Penale" non ha cifre
+
+
+def test_data_cambiata_in_intestazione_non_e_nascosta():
+    # "Rev. ... del <data>" uguale in A e cambiata in B: le due versioni non
+    # devono fondersi in un'unica intestazione ignorata
+    corpo = ["testo uno", "testo due", "testo tre", "testo quattro", "testo cinque"]
+    a = [["Rev. 2 del 01/10/2026"] + corpo + [f"Pagina {i} di 3"] for i in range(1, 4)]
+    b = [["Rev. 2 del 15/10/2026"] + corpo + [f"Pagina {i} di 3"] for i in range(1, 4)]
+    chiavi = c.righe_ripetute(a, b)
+    assert c._chiave_ripetuta("Rev. 2 del 01/10/2026") not in chiavi
+    assert c._chiave_ripetuta("Rev. 2 del 15/10/2026") not in chiavi
+    assert c._chiave_ripetuta("Pagina 1 di 3") in chiavi
+    ops = c.line_ops(c.togli_ripetute(a[0], chiavi)[0], c.togli_ripetute(b[0], chiavi)[0])
+    assert any(op["type"] == "change" for op in ops)    # la data cambiata si vede

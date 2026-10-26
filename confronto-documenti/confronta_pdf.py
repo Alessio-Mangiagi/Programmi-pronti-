@@ -796,6 +796,70 @@ def apply_ignore(lines: list[str], patterns: list[re.Pattern]) -> list[str]:
     return [l for l in lines if not any(p.search(l) for p in patterns)]
 
 
+# Intestazioni e piè di pagina ripetuti: righe (con i numeri sostituiti da #)
+# che compaiono in cima o in fondo a molte pagine dei due documenti, tipo
+# "Pagina 3 di 12", "Rev. 2 del 01/10/2026", la ragione sociale. Si cercano
+# solo nelle prime/ultime RIPETUTE_BORDO righe e si tolgono solo lì, così una
+# riga uguale in mezzo al testo resta confrontata.
+RIPETUTE_BORDO = 4
+RIPETUTE_QUOTA = 0.5      # presente in almeno metà delle pagine di A e di B...
+RIPETUTE_MIN_PAGINE = 3   # ...e in almeno 3 pagine in tutto
+# Righe con importi (1.250,00 / 12.345) non sono mai intestazioni: "Totale
+# foglio 3: euro 12.345,67" si ripete in fondo a ogni pagina cambiando solo i
+# numeri, e toglierla nasconderebbe un totale cambiato.
+_IMPORTO = re.compile(r"\d,\d{2}\b|\d\.\d{3}\b")
+
+
+# Numero "di pagina": intero isolato di 1-3 cifre, non parte di una data, di
+# un codice o di un importo. È l'unica cosa che può cambiare tra le copie di
+# un'intestazione: date, codici e importi devono essere identici, altrimenti
+# una data cambiata in testa a ogni pagina verrebbe nascosta (misurato con
+# bench/benchmark.py).
+_NUM_PAGINA = re.compile(r"(?<![\d/.,:\-])\d{1,3}(?![\d/.,:\-])")
+
+
+def _chiave_ripetuta(line: str) -> str | None:
+    if _IMPORTO.search(line):
+        return None
+    return norm_compare(_NUM_PAGINA.sub("#", line), True)
+
+
+def _conta_bordi(pagine: list[list[str]]) -> dict[str, int]:
+    conta: dict[str, int] = {}
+    for righe in pagine:
+        bordo = righe[:RIPETUTE_BORDO] + righe[-RIPETUTE_BORDO:]
+        for k in {_chiave_ripetuta(l) for l in bordo}:
+            if k and k.strip():                   # righe di soli numeri di pagina: no
+                conta[k] = conta.get(k, 0) + 1
+    return conta
+
+
+def righe_ripetute(pagine_a: list[list[str]], pagine_b: list[list[str]]) -> set[str]:
+    """Chiavi delle righe di intestazione/piè di pagina ricorrenti.
+    `pagine_a/b` = righe normalizzate delle pagine di A e di B. Una riga conta
+    solo se è ricorrente in ENTRAMBI i documenti: un'intestazione cambiata da A
+    a B (es. "Rev. 2 del 01/10" -> "Rev. 3 del 15/10") è una differenza vera e
+    resta nel confronto."""
+    if len(pagine_a) + len(pagine_b) < RIPETUTE_MIN_PAGINE:
+        return set()
+    ca, cb = _conta_bordi(pagine_a), _conta_bordi(pagine_b)
+    sa = RIPETUTE_QUOTA * len(pagine_a)
+    sb = RIPETUTE_QUOTA * len(pagine_b)
+    return {k for k in ca.keys() & cb.keys() if ca[k] >= sa and cb[k] >= sb}
+
+
+def togli_ripetute(righe: list[str], chiavi: set[str]) -> tuple[list[str], int]:
+    """Toglie le righe ricorrenti dal bordo alto/basso della pagina.
+    Ritorna (righe rimaste, quante tolte)."""
+    if not chiavi:
+        return righe, 0
+    n = len(righe)
+    tenute = [l for i, l in enumerate(righe)
+              if not ((i < RIPETUTE_BORDO or i >= n - RIPETUTE_BORDO)
+                      and _chiave_ripetuta(l) in chiavi)]
+    return tenute, n - len(tenute)
+
+
 # Filtri "ignora" scritti in chiaro dall'utente, una riga per filtro: una riga
 # del documento viene scartata se CONTIENE il testo del filtro (maiuscole e
 # minuscole indifferenti, spazi multipli = uno). Due jolly per le parti che
@@ -942,7 +1006,94 @@ def line_ops(lines1: list[str], lines2: list[str], tolerant: bool = False) -> li
             ops.extend({"type": "del", "text": t} for t in lines1[i1:i2])
         else:  # insert
             ops.extend({"type": "add", "text": t} for t in lines2[j1:j2])
-    return ops
+    return _abbina_spostate(ops, tolerant)
+
+
+# Codice di voce di computo / elenco prezzi in testa alla riga: "A.01.003",
+# "E.11.027", "01.02.003", "NP-12/3". Almeno due separatori, così "Art. 12"
+# o una data non contano come codice.
+_CODICE_VOCE = re.compile(r"^(?=\S*[.\-/]\S*[.\-/])([A-Za-z]{0,4}[.\-]?\d+(?:[.\-/]\d+){1,4})(?=\s|$)")
+
+
+def _codice_voce(line: str) -> str | None:
+    m = _CODICE_VOCE.match(line)
+    if not m or _DATA.fullmatch(m.group(1)):   # una data non è un codice
+        return None
+    return m.group(1).upper()
+
+
+def _abbina_spostate(ops: list[dict], tolerant: bool) -> list[dict]:
+    """Seconda passata sulle righe tolte/aggiunte non abbinate dal diff:
+    - stessa riga (a meno del rumore) tolta in un punto e aggiunta in un altro
+      -> op 'moved' (spostata: contenuto uguale, cambia solo la posizione);
+    - stesso codice di voce (computi) -> op 'change' anche se la riga è
+      cambiata molto o ha cambiato posto, così si vede cosa è cambiato nella
+      voce invece di una riga rossa e una verde lontane."""
+    dels = [i for i, op in enumerate(ops) if op["type"] == "del"]
+    adds = [i for i, op in enumerate(ops) if op["type"] == "add"]
+    if not dels or not adds:
+        return ops
+    via: set[int] = set()
+
+    per_testo: dict[str, list[int]] = {}
+    for j in adds:
+        per_testo.setdefault(norm_compare(ops[j]["text"], tolerant), []).append(j)
+    for i in dels:
+        lista = per_testo.get(norm_compare(ops[i]["text"], tolerant))
+        if lista:
+            j = lista.pop(0)
+            ops[i] = {"type": "moved", "text": ops[i]["text"]}
+            via.add(j)
+
+    codici_add: dict[str, list[int]] = {}
+    for j in adds:
+        if j not in via and (c := _codice_voce(ops[j]["text"])):
+            codici_add.setdefault(c, []).append(j)
+    codici_del: dict[str, int] = {}
+    for i in dels:
+        if ops[i]["type"] == "del" and (c := _codice_voce(ops[i]["text"])):
+            codici_del[c] = codici_del.get(c, 0) + 1
+    for i in dels:
+        if ops[i]["type"] != "del":
+            continue
+        c = _codice_voce(ops[i]["text"])
+        # solo codici univoci: con duplicati l'abbinamento sarebbe un azzardo
+        if c and codici_del.get(c) == 1 and len(codici_add.get(c, [])) == 1:
+            j = codici_add[c][0]
+            segs_a, segs_b = word_segments(ops[i]["text"], ops[j]["text"], tolerant)
+            op = {"type": "change", "a": segs_a, "b": segs_b, "voce": c}
+            if tolerant and _solo_rumore(segs_a, segs_b):
+                op["incerta"] = True
+            ops[i] = op
+            via.add(j)
+    return [op for k, op in enumerate(ops) if k not in via]
+
+
+# Numeri e date cambiati: le righe da guardare per prime in un computo o in un
+# contratto. Una differenza "numerica" ha cifre tra le parti evidenziate.
+_DATA = re.compile(r"\b\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}\b")
+
+
+def numeri_cambiati(ops: list[dict]) -> list[dict]:
+    """Righe di `ops` in cui cambia un numero o una data, per il riepilogo.
+    Ogni voce: {"idx": indice dell'op, "tipo": "data"|"numero", "a", "b"}."""
+    out = []
+    for k, op in enumerate(ops):
+        if op["type"] == "change" and not op.get("incerta"):
+            da = " ".join(s["s"] for s in op["a"] if not s["eq"])
+            db = " ".join(s["s"] for s in op["b"] if not s["eq"])
+            a = " ".join(s["s"] for s in op["a"])
+            b = " ".join(s["s"] for s in op["b"])
+        elif op["type"] in ("del", "add"):
+            da = a = op["text"] if op["type"] == "del" else ""
+            db = b = op["text"] if op["type"] == "add" else ""
+        else:
+            continue
+        if not any(ch.isdigit() for ch in da + db):
+            continue
+        tipo = "data" if _DATA.search(da) or _DATA.search(db) else "numero"
+        out.append({"idx": k, "tipo": tipo, "a": a, "b": b})
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -1134,7 +1285,7 @@ def main() -> int:
         lines1 = apply_ignore(normalize_lines(texts1[idx_a]), ignore)
         lines2 = apply_ignore(normalize_lines(texts2[idx_b]), ignore)
         ops = line_ops(lines1, lines2, tolerant=args.tollerante)
-        changed = [op for op in ops if op["type"] != "equal"]
+        changed = [op for op in ops if op["type"] not in ("equal", "moved")]
         label = (f"pag. {idx_a + 1}" if idx_a == idx_b
                  else f"pag. {idx_a + 1} ↔ {idx_b + 1}")
 
@@ -1154,6 +1305,8 @@ def main() -> int:
                 lines = [f"- {a}", f"+ {b}"]
             elif op["type"] == "del":
                 lines = [f"- {op['text']}"]
+            elif op["type"] == "moved":
+                lines = [f"= {op['text']}  (spostata)"]
             else:
                 lines = [f"+ {op['text']}"]
             for line in lines:

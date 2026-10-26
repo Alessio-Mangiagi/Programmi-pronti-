@@ -348,13 +348,18 @@ def confronta(pa: Path, pb: Path, dpi: int, tolerant: bool, preprocess: bool):
     ta, _ = c.collect_texts(da, "tesseract", dpi=dpi, lang="ita+eng", preprocess=preprocess)
     tb, _ = c.collect_texts(db, "tesseract", dpi=dpi, lang="ita+eng", preprocess=preprocess)
     segn = []
+    # come l'app con "Ignora intestazioni ripetute" acceso (default)
+    ra = [c.normalize_lines(t) for t in ta]
+    rb = [c.normalize_lines(t) for t in tb]
+    chiavi = c.righe_ripetute(ra, rb)
     for ia, ib in c.align_pages(ta, tb, tolerant=tolerant):
         if ia is None or ib is None:
             segn.append({"pagina": True, "pag_a": ia, "pag_b": ib, "a": "", "b": "", "incerta": False})
             continue
-        ops = c.line_ops(c.normalize_lines(ta[ia]), c.normalize_lines(tb[ib]), tolerant=tolerant)
+        ops = c.line_ops(c.togli_ripetute(ra[ia], chiavi)[0], c.togli_ripetute(rb[ib], chiavi)[0],
+                         tolerant=tolerant)
         for op in ops:
-            if op["type"] == "equal":
+            if op["type"] in ("equal", "moved"):   # spostata = stesso testo
                 continue
             if op["type"] == "change":
                 a = " ".join(s["s"] for s in op["a"])
