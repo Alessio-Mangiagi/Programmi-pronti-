@@ -10,6 +10,7 @@
 //   compare.js   POST /api/compare, poi polling di /api/jobs/<id> fino a fine
 //   render.js    disegna il report a pagine dal job completato
 //   viewer.js    visualizzatore immagini (affianca / sovrapponi, zoom, sync)
+//   diffnav.js   navigazione tra le differenze (N/P) e filtro numeri/date
 //
 // Flusso: scelta file → "Avvia confronto" → compare.js crea il job sul server →
 //   polling aggiorna la barra → a "done" render.js costruisce le card → l'utente
@@ -21,6 +22,7 @@ import { wireDrop } from './dropzones.js';
 import { initFolder } from './folder.js';
 import { initCompare } from './compare.js';
 import { initViewer } from './viewer.js';
+import { initDiffNav } from './diffnav.js';
 
 // Animazione "reveal" allo scroll: aggiunge .in quando l'elemento entra nel
 // viewport, poi smette di osservarlo (one-shot, niente ri-trigger a ritroso).
@@ -36,6 +38,7 @@ wireDrop('#dropB', 'b');
 initFolder();
 initCompare();
 initViewer();
+initDiffNav();
 
 // Guida "Come funziona": sta in cima alla pagina, nascosta; il pulsante nella
 // nav la apre/chiude e la porta in vista.
@@ -59,7 +62,7 @@ ignoreBox.addEventListener('input', () => {
 
 // Opzioni di confronto persistenti tra sessioni: coppie [selettore, chiave
 // localStorage]. Checkbox salvate come '1'/'0', select come valore testuale.
-[['#tolerant', 'optTolerant'], ['#preprocess', 'optPreprocess'], ['#lang', 'optLang'], ['#dpi', 'optDpi']]
+[['#tolerant', 'optTolerant'], ['#preprocess', 'optPreprocess'], ['#ripetute', 'optRipetute'], ['#lang', 'optLang'], ['#dpi', 'optDpi']]
   .forEach(([sel, key]) => {
     const el = document.querySelector(sel);
     if (!el) return;

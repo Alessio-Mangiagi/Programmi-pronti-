@@ -43,7 +43,8 @@ from PIL import Image
 from confronta_pdf import (DocumentError, OcrCancelled, MIN_EMBEDDED_CHARS,
                            PADDLE_WORKER, align_pages, apply_ignore,
                            collect_texts, compile_ignore, find_tesseract,
-                           line_ops, normalize_lines, ocr_needed_count,
+                           line_ops, normalize_lines, numeri_cambiati,
+                           ocr_needed_count, righe_ripetute, togli_ripetute,
                            open_document, preprocess_for_ocr, prune_cache,
                            _paddle_python)
 
@@ -107,6 +108,9 @@ MAX_PARALLELI = max(1, int(os.environ.get("CONFRONTO_MAX_PARALLELI", "2")))
 _SLOT_CONFRONTO = threading.BoundedSemaphore(MAX_PARALLELI)
 MAX_JOBS_KEPT = 2   # anteprime in RAM: tenerne poche
 PREVIEW_MAX_W = 1100
+
+# Stati di revisione di una differenza (revisione.js / PUT .../revisione).
+_STATI_REVISIONE = {"vista": "vista", "ok": "accettata", "dubbio": "da chiarire"}
 
 ALLOWED_EXTS = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
                 ".webp", ".gif", ".docx", ".txt", ".md", ".csv"}
@@ -277,6 +281,28 @@ def _build_previews(job_id: str, doc, side: str) -> list[Image.Image | None]:
     return pil_pages
 
 
+def _posizioni(ops: list[dict], n_a: int, n_b: int):
+    """Posizione verticale approssimata (0-1) di ogni riga sulle due pagine,
+    per portare l'anteprima sul punto della differenza cliccata. Stima dalla
+    posizione della riga nel testo, con i margini tipici di una pagina."""
+    ia = ib = 0
+
+    def y(i: int, n: int) -> float:
+        return round(0.06 + 0.88 * (i + 0.5) / max(n, 1), 4)
+
+    for op in ops:
+        t = op["type"]
+        if t in ("equal", "change"):
+            op["ya"], op["yb"] = y(ia, n_a), y(ib, n_b)
+            ia, ib = ia + 1, ib + 1
+        elif t in ("del", "moved"):
+            op["ya"], op["yb"] = y(ia, n_a), y(ib, n_b)
+            ia += 1
+        else:  # add
+            op["ya"], op["yb"] = y(ia, n_a), y(ib, n_b)
+            ib += 1
+
+
 def run_compare_in_coda(job_id: str, path1: Path, path2: Path, *args):
     """Aspetta uno slot libero (MAX_PARALLELI) e poi esegue run_compare.
     Annullato mentre è in coda: niente lavoro, file caricati cancellati."""
@@ -294,7 +320,7 @@ def run_compare_in_coda(job_id: str, path1: Path, path2: Path, *args):
 
 def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
                 model: str, dpi: int, lang: str, tolerant: bool,
-                preprocess: bool, ignore_raw: list[str]):
+                preprocess: bool, ignore_raw: list[str], ripetute: bool = True):
     """Worker del confronto, eseguito in un thread separato (vedi /api/compare).
 
     Non ritorna niente: comunica solo aggiornando il job via update_job()
@@ -345,9 +371,17 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
         # "><(((º> sabusabu <º)))><"
         pairs = align_pages(texts1, texts2, tolerant=tolerant)
 
+        # righe di ogni pagina dopo i filtri "ignora" dell'utente
+        righe1 = [apply_ignore(normalize_lines(t), ignore) for t in texts1]
+        righe2 = [apply_ignore(normalize_lines(t), ignore) for t in texts2]
+        chiavi = righe_ripetute(righe1, righe2) if ripetute else set()
+
         results = []
         diff_count = 0
         uncertain_count = 0   # pagine con sole differenze "incerte" (probabile rumore OCR)
+        visual_count = 0      # pagine con testo uguale ma grafica diversa (PDF nativi)
+        ripetute_tolte = 0
+        riepilogo = []        # numeri e date cambiati, per il riquadro in cima al report
         for idx_a, idx_b in pairs:
             if is_cancelled(job_id):
                 raise OcrCancelled()
@@ -367,22 +401,37 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
                 diff_count += 1
                 continue
 
-            lines1 = apply_ignore(normalize_lines(texts1[idx_a]), ignore)
-            lines2 = apply_ignore(normalize_lines(texts2[idx_b]), ignore)
+            lines1, tolte1 = togli_ripetute(righe1[idx_a], chiavi)
+            lines2, tolte2 = togli_ripetute(righe2[idx_b], chiavi)
+            ripetute_tolte += tolte1 + tolte2
             ops = line_ops(lines1, lines2, tolerant=tolerant)
-            has_diff = any(op["type"] != "equal" and not op.get("incerta") for op in ops)
+            _posizioni(ops, len(lines1), len(lines2))
+            has_diff = any(op["type"] not in ("equal", "moved") and not op.get("incerta")
+                           for op in ops)
             only_uncertain = not has_diff and any(op.get("incerta") for op in ops)
+
+            img_a, img_b = prev1[idx_a], prev2[idx_b]
+            boxes = diff_boxes(img_a, img_b) if (img_a and img_b) else []
+            # Testo uguale ma immagine diversa: timbro, firma, disegno. Solo con
+            # testo embedded da entrambe le parti: sulle scansioni i pixel
+            # differiscono sempre un po' e sarebbe solo rumore.
+            only_visual = (not has_diff and not only_uncertain and bool(boxes)
+                           and src1[idx_a] == src2[idx_b] == "testo")
             if has_diff:
                 diff_count += 1
             elif only_uncertain:
                 uncertain_count += 1
+            elif only_visual:
+                visual_count += 1
 
-            img_a, img_b = prev1[idx_a], prev2[idx_b]
-            boxes = diff_boxes(img_a, img_b) if (img_a and img_b) else []
+            numeri = numeri_cambiati(ops)
+            label_pag = (f"{idx_a + 1}" if idx_a == idx_b else f"{idx_a + 1}↔{idx_b + 1}")
+            riepilogo += [dict(n, pagina=label_pag, risultato=len(results)) for n in numeri]
             results.append({
                 "page_a": idx_a + 1, "page_b": idx_b + 1,
                 "status": ("diff" if has_diff else
-                           "uncertain" if only_uncertain else "equal"),
+                           "uncertain" if only_uncertain else
+                           "visual" if only_visual else "equal"),
                 "ops": ops, "boxes": boxes,
                 "source_a": src1[idx_a], "source_b": src2[idx_b],
                 "text_a": texts1[idx_a], "text_b": texts2[idx_b],
@@ -398,8 +447,14 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
         if uncertain_count:
             message += (f" {uncertain_count} pagina/e con sole differenze incerte"
                         " (probabili errori di lettura).")
+        if visual_count:
+            message += (f" {visual_count} pagina/e con testo uguale ma grafica diversa"
+                        " (timbri, firme, disegni).")
+        if ripetute_tolte:
+            message += f" Ignorate {ripetute_tolte} righe di intestazione/piè di pagina ripetute."
         update_job(job_id, results=results, status="done", diff_count=diff_count,
-                   uncertain_count=uncertain_count, message=message)
+                   uncertain_count=uncertain_count, visual_count=visual_count,
+                   riepilogo=riepilogo, message=message)
     except OcrCancelled:
         update_job(job_id, status="cancelled", message="Confronto annullato.")
     except Exception as exc:  # pragma: no cover
@@ -453,6 +508,8 @@ def _rows_b(p: dict, colors: dict) -> list:
             rows.append([("- " + op["text"], RED, True)])
         elif op["type"] == "add":
             rows.append([("+ " + op["text"], BLUE, True)])
+        elif op["type"] == "moved":                # stessa riga, altra posizione
+            rows.append([("  " + op["text"] + "   [spostata]", GREY, False)])
         elif op.get("incerta"):                    # probabile errore di lettura
             row = [("? ", GREY, False)]
             row += [(s["s"] + " ", GREY if not s["eq"] else INK, not s["eq"])
@@ -464,6 +521,15 @@ def _rows_b(p: dict, colors: dict) -> list:
                     for s in op["b"]]
             rows.append(row)
     return rows
+
+
+def _righe_riepilogo(job: dict) -> list[str]:
+    """Righe del riepilogo "numeri e date cambiati" per i report scaricabili."""
+    out = []
+    for n in job.get("riepilogo") or []:
+        a, b = n.get("a") or "(assente)", n.get("b") or "(assente)"
+        out.append(f'Pag. {n["pagina"]} - {n["tipo"]}: {a}  ->  {b}')
+    return out
 
 
 def _side_titles(p: dict) -> tuple[str, str]:
@@ -478,6 +544,8 @@ def _side_titles(p: dict) -> tuple[str, str]:
         right = f'pagina {p["page_b"]} - identica'
     elif p["status"] == "uncertain":
         right = f'pagina {p["page_b"]} - solo differenze incerte'
+    elif p["status"] == "visual":
+        right = f'pagina {p["page_b"]} - testo uguale, grafica diversa'
     else:
         right = f'pagina {p["page_b"]} - differenze'
     return left, right
@@ -517,6 +585,14 @@ def build_report_docx(job: dict) -> bytes:
     mr.italic = True
     mr.font.color.rgb = GREY
     doc.add_paragraph().add_run(job.get("message", "")).bold = True
+    righe_num = _righe_riepilogo(job)
+    if righe_num:
+        doc.add_heading("Numeri e date cambiati", level=2)
+        for riga in righe_num:
+            par = doc.add_paragraph(riga)
+            par.paragraph_format.space_after = Pt(0)
+            for run in par.runs:
+                run.font.size = Pt(9)
 
     leg = doc.add_paragraph()
     for text, color in (("modificato   ", GREEN), ("mancante   ", RED), ("aggiunto   ", BLUE),
@@ -561,6 +637,92 @@ def build_report_docx(job: dict) -> bytes:
 
     buf = BytesIO()
     doc.save(buf)
+    return buf.getvalue()
+
+
+# --------------------------------------------------------------------------
+# Elenco differenze Excel (.xlsx)
+# --------------------------------------------------------------------------
+
+_TIPO_OP = {"change": "modificata", "del": "solo in A", "add": "solo in B",
+            "moved": "spostata"}
+
+
+def righe_differenze(job: dict) -> list[dict]:
+    """Una riga per differenza (anche pagine mancanti), base dell'export Excel.
+    Le righe uguali non ci sono; le spostate sì, segnate come tali."""
+    numeri = {(n["risultato"], n["idx"]) for n in job.get("riepilogo") or []}
+    out = []
+    for r, p in enumerate(job.get("results", [])):
+        base = {"pag_a": p.get("page_a"), "pag_b": p.get("page_b"), "risultato": r}
+        if p["status"] == "missing":
+            out.append(dict(base, op=None, tipo=f'pagina solo in {p.get("only_in", "")}',
+                            a="", b="", parole_a="", parole_b="", numeri=False))
+            continue
+        if p["status"] == "visual":
+            out.append(dict(base, op=None, tipo="grafica diversa (timbri, firme, disegni)",
+                            a="", b="", parole_a="", parole_b="", numeri=False))
+        for o, op in enumerate(p.get("ops", [])):
+            if op["type"] == "equal":
+                continue
+            if op["type"] == "change":
+                a = " ".join(s["s"] for s in op["a"])
+                b = " ".join(s["s"] for s in op["b"])
+                pa = " ".join(s["s"] for s in op["a"] if not s["eq"])
+                pb = " ".join(s["s"] for s in op["b"] if not s["eq"])
+                tipo = "incerta (probabile errore di lettura)" if op.get("incerta") else "modificata"
+            else:
+                a = op["text"] if op["type"] in ("del", "moved") else ""
+                b = op["text"] if op["type"] in ("add", "moved") else ""
+                pa = pb = ""
+                tipo = _TIPO_OP[op["type"]]
+            out.append(dict(base, op=o, tipo=tipo, a=a, b=b, parole_a=pa, parole_b=pb,
+                            numeri=(r, o) in numeri))
+    return out
+
+
+def build_report_xlsx(job: dict) -> bytes:
+    """Elenco Excel delle differenze: filtri attivi, intestazione bloccata,
+    colonna "Numeri/date" per isolare gli importi cambiati."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    revisione = job.get("revisione") or {}
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Differenze"
+    head = ["Pag. A", "Pag. B", "Tipo", "Numeri/date", "Testo A", "Testo B",
+            "Parole cambiate A", "Parole cambiate B", "Revisione", "Nota"]
+    ws.append(head)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="104070")
+    for d in righe_differenze(job):
+        rev = revisione.get(f'{d["risultato"]}:{d["op"]}', {}) if d["op"] is not None else {}
+        ws.append([d["pag_a"], d["pag_b"], d["tipo"], "sì" if d["numeri"] else "",
+                   d["a"], d["b"], d["parole_a"], d["parole_b"],
+                   _STATI_REVISIONE.get(rev.get("stato"), ""), rev.get("nota", "")])
+    for col, w in zip("ABCDEFGHIJ", (8, 8, 22, 12, 60, 60, 25, 25, 14, 40)):
+        ws.column_dimensions[col].width = w
+    for row in ws.iter_rows(min_row=2):
+        for cell in row[4:8]:
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    info = wb.create_sheet("Confronto")
+    for k, v in (("Documento A", job.get("name_a", "")), ("Documento B", job.get("name_b", "")),
+                 ("Esito", job.get("message", "")),
+                 ("Data", datetime.now().strftime("%d/%m/%Y %H:%M"))):
+        info.append([k, v])
+        info.cell(info.max_row, 1).font = Font(bold=True)
+    info.column_dimensions["A"].width = 14
+    info.column_dimensions["B"].width = 100
+
+    buf = BytesIO()
+    wb.save(buf)
     return buf.getvalue()
 
 
@@ -657,6 +819,20 @@ def build_report_pdf(job: dict) -> bytes:
                       latin("Sinistra: documento A originale. "
                             "Destra: documento B con le differenze."),
                       fontname="helv", fontsize=9, color=GREY)
+    righe_num = _righe_riepilogo(job)
+    if righe_num:
+        y = M + 142
+        cover.insert_text((M, y), latin("Numeri e date cambiati"),
+                          fontname="hebo", fontsize=11, color=INK)
+        massimo = int((H - M - y - 14) // 13)
+        for riga in righe_num[:massimo]:
+            y += 13
+            cover.insert_text((M, y), latin(riga[:150]), fontname="helv",
+                              fontsize=8.5, color=INK)
+        if len(righe_num) > massimo:
+            cover.insert_text((M, y + 13), latin(f"... e altre {len(righe_num) - massimo}"
+                                                 " (vedi le pagine)"),
+                              fontname="helv", fontsize=8.5, color=GREY)
 
     # ---- una pagina (o piu') per ogni pagina confrontata -------------------
     x_left, x_right = M, M + COLW + GAP
@@ -741,6 +917,7 @@ def compare():
     tolerant = request.form.get("tolerant", "0") in ("1", "true", "on")
     preprocess = request.form.get("preprocess", "1") not in ("0", "false", "off")
     ignore_raw = request.form.get("ignore", "").splitlines()
+    ripetute = request.form.get("ripetute", "1") not in ("0", "false", "off")
 
     tmp_dir = Path(tempfile.gettempdir())
     job_id = uuid.uuid4().hex[:12]
@@ -764,7 +941,7 @@ def compare():
     threading.Thread(
         target=run_compare_in_coda,
         args=(job_id, path1, path2, f1.filename, f2.filename,
-              model, dpi, lang, tolerant, preprocess, ignore_raw),
+              model, dpi, lang, tolerant, preprocess, ignore_raw, ripetute),
         daemon=True,
     ).start()
     return jsonify({"job_id": job_id})
@@ -799,6 +976,20 @@ def job_report_docx(job_id: str):
     return Response(data,
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": 'attachment; filename="report_confronto.docx"'})
+
+
+@app.get("/api/jobs/<job_id>/report.xlsx")
+def job_report_xlsx(job_id: str):
+    snap = _done_snapshot(job_id)
+    if snap is None:
+        return jsonify({"error": "Report non disponibile."}), 404
+    try:
+        data = build_report_xlsx(snap)
+    except ImportError:
+        return jsonify({"error": "Modulo 'openpyxl' mancante. Esegui: pip install openpyxl"}), 500
+    return Response(data,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="differenze_confronto.xlsx"'})
 
 
 @app.get("/api/jobs/<job_id>/report.pdf")

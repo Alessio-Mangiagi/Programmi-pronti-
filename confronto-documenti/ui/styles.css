@@ -323,6 +323,48 @@ select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.
 .line mark.winc { background: #dfe5ec; color: var(--ink-2); }
 .inc-tag { font-family: var(--body); font-size: .68rem; font-weight: 600; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .5rem; }
 .badge.uncertain { color: var(--ink-2); background: var(--surface-2); border-color: var(--line); }
+.line.moved { color: var(--dim); font-style: italic; }
+
+/* Righe di differenza cliccabili (render.js): clic/Invio = anteprima sul punto. */
+.line.d { cursor: pointer; border-radius: 4px; transition: box-shadow .15s; }
+.line.d:hover, .line.d:focus-visible { box-shadow: 0 0 0 2px rgba(27,111,179,.35); outline: none; }
+.line.chg { padding: 0; margin: 2px 0; }
+.line.chg > .line { margin: 0; }
+.line.d.flash { animation: flash 1.2s var(--ease); }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--b); } 100% { box-shadow: 0 0 0 0 transparent; } }
+#pages.solo-num .page-body > .line:not([data-num]) { display: none; }
+
+/* Riepilogo numeri e date cambiati */
+.res-names { font-weight: 600; color: var(--ink-2); }
+.riepilogo { padding: 1rem 1.2rem; margin-bottom: 1rem; }
+.riepilogo h3 { font-weight: 700; font-size: .95rem; color: var(--navy); margin-bottom: .6rem; display: flex; align-items: center; gap: .5rem; }
+.riepilogo .count { font-size: .75rem; color: #fff; background: var(--del); border-radius: 999px; padding: .05rem .5rem; }
+.riepilogo ul { list-style: none; display: grid; gap: .25rem; max-height: 320px; overflow-y: auto; }
+.rie-item {
+  width: 100%; display: grid; grid-template-columns: 4.5rem 4.2rem minmax(0,1fr) auto minmax(0,1fr); gap: .5rem; align-items: baseline;
+  text-align: left; font: inherit; font-size: .8rem; background: var(--bg); border: 1px solid transparent; border-radius: 6px; padding: .35rem .5rem; cursor: pointer;
+}
+.rie-item:hover { border-color: var(--accent); background: var(--surface); }
+.rie-pag { font-family: var(--mono); font-weight: 700; color: var(--ink); }
+.rie-tipo { font-size: .7rem; font-weight: 600; color: var(--dim); text-transform: uppercase; }
+.rie-a { color: var(--del); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rie-b { color: var(--add); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rie-arrow { color: var(--dim); }
+@media (max-width: 768px) { .rie-item { grid-template-columns: 1fr; } .rie-arrow { display: none; } }
+
+/* Barra di navigazione tra le differenze: resta in vista sotto la nav */
+.diff-nav {
+  position: sticky; top: calc(var(--nav-h) + .5rem); z-index: 20; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap;
+  padding: .55rem .8rem; margin-bottom: 1rem; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(16,64,112,.08);
+}
+.diff-nav[hidden] { display: none; }
+.diff-count { font-weight: 600; font-size: .88rem; min-width: 10rem; text-align: center; }
+.diff-nav .ghost-btn { padding: .45rem .8rem; }
+.diff-nav .ghost-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Fascia nell'anteprima sul punto della differenza cliccata (posizione stimata) */
+.focus-band { position: absolute; left: 0; right: 0; height: 2.8%; background: rgba(168,72,0,.16); border-top: 2px solid var(--b); border-bottom: 2px solid var(--b); pointer-events: none; }
 .src-tag { font-size: .7rem; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: .15rem .5rem; }
 
 /* ---------- pulsante anteprima ---------- */

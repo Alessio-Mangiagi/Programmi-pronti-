@@ -50,7 +50,22 @@ function pageUrl(page, side) {
          (viewer.proc ? '?v=proc' : '');
 }
 
-function renderPane(paneId, side, page, boxes, missingName) {
+// Fascia sul punto della differenza cliccata nel report (y = 0..1 stimata
+// dal server dalla posizione della riga nel testo: è approssimata).
+function bandHtml(y) {
+  return y == null ? '' :
+    '<div class="focus-band" style="top:calc(' + (y * 100) + '% - 1.4%)" title="Zona della differenza (posizione stimata)"></div>';
+}
+
+// Porta il pannello sul punto y appena l'immagine ha le sue dimensioni.
+function scrollToY(pane, y) {
+  if (y == null) return;
+  const img = pane.querySelector('img');
+  const go = () => { pane.scrollTop = Math.max(0, y * pane.scrollHeight - pane.clientHeight / 2); };
+  if (img && !img.complete) img.addEventListener('load', go, { once: true }); else go();
+}
+
+function renderPane(paneId, side, page, boxes, missingName, y) {
   const pane = $(paneId);
   if (missingName) {
     pane.innerHTML = '<div class="pane-empty">Pagina non presente in<br><b>' + esc(missingName) + '</b></div>';
@@ -59,20 +74,22 @@ function renderPane(paneId, side, page, boxes, missingName) {
   pane.innerHTML =
     '<div class="page-wrap">' +
       '<img src="' + pageUrl(page, side) + '" alt="pagina ' + page + '">' +
-      boxesHtml(boxes) +
+      boxesHtml(boxes) + bandHtml(y) +
     '</div>';
+  scrollToY(pane, y);
 }
 
-function renderOverlay(p) {
+function renderOverlay(p, y) {
   $('#vOverlay').innerHTML =
     '<div class="ov-wrap">' +
       '<span class="ov-corner a">A</span><span class="ov-corner b">B</span>' +
       '<img src="' + pageUrl(p.page_a, 'a') + '" alt="A">' +
       '<img class="top" src="' + pageUrl(p.page_b, 'b') + '" alt="B">' +
       '<div class="ov-divider"></div>' +
-      boxesHtml(p.boxes) +
+      boxesHtml(p.boxes) + bandHtml(y) +
     '</div>';
   applySlider($('#ovSlider').value);
+  scrollToY($('#vOverlay'), y);
 }
 
 // Slider overlay: v = % (0..100). Ritaglia il bordo sinistro dell'immagine B
@@ -94,7 +111,9 @@ function setMode(mode) {
 
 // Apre (o aggiorna) il visualizzatore sulla pagina `idx`. Usata anche per
 // ridisegnare dopo cambio modalità/zoom/vista, quindi è idempotente.
-export function openViewer(idx) {
+// `focus` (facoltativo) = op del report cliccata: porta le due pagine sulla
+// sua posizione (ya/yb) e la segna con una fascia.
+export function openViewer(idx, focus) {
   if (!state.job) return;
   viewer.idx = Math.max(0, Math.min(idx, state.job.results.length - 1));   // clamp negli estremi
   // "><(((º> sabusabu <º)))><"
@@ -110,10 +129,10 @@ export function openViewer(idx) {
   if (missing && viewer.mode === 'overlay') setMode('side');
 
   if (viewer.mode === 'overlay') {
-    renderOverlay(p);
+    renderOverlay(p, focus?.ya);
   } else {
-    renderPane('#vPaneA', 'a', p.page_a, p.boxes, p.page_a == null ? state.job.name_a : null);
-    renderPane('#vPaneB', 'b', p.page_b, p.boxes, p.page_b == null ? state.job.name_b : null);
+    renderPane('#vPaneA', 'a', p.page_a, p.boxes, p.page_a == null ? state.job.name_a : null, focus?.ya);
+    renderPane('#vPaneB', 'b', p.page_b, p.boxes, p.page_b == null ? state.job.name_b : null, focus?.yb);
   }
   applyZoom();
 

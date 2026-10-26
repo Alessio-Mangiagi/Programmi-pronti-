@@ -52,6 +52,7 @@ export function initCompare() {
     fd.append('lang', $('#lang').value);                           // lingue OCR (Tesseract)
     fd.append('tolerant', $('#tolerant').checked ? '1' : '0');     // confronto tollerante al rumore OCR
     fd.append('preprocess', $('#preprocess').checked ? '1' : '0'); // pulizia scansioni pre-OCR
+    fd.append('ripetute', $('#ripetute').checked ? '1' : '0');     // intestazioni/piè di pagina ripetuti ignorati
     fd.append('ignore', $('#ignore').value);                       // righe da ignorare (testo in chiaro, una per riga)
 
     $('#go').disabled = true;

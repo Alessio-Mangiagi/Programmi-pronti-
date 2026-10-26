@@ -195,6 +195,7 @@
         <div class="field toggles">
           <label class="chk"><input type="checkbox" id="tolerant"> Confronto tollerante <span class="chk-hint">(ignora rumore OCR)</span></label>
           <label class="chk"><input type="checkbox" id="preprocess" checked> Migliora scansioni <span class="chk-hint">(deskew · pulizia)</span></label>
+          <label class="chk"><input type="checkbox" id="ripetute" checked> Ignora intestazioni ripetute <span class="chk-hint">(testa e piè di pagina)</span></label>
         </div>
       </div>
       <button class="cta" id="go" disabled>
@@ -234,7 +235,8 @@
     <div class="section-title">
       <span class="kicker">Risultato</span>
       <h2>Report differenze</h2>
-      <p>Righe rimosse in rosso, aggiunte in verde. Apri l'anteprima per il confronto visuale.</p>
+      <p>Righe rimosse in rosso, aggiunte in verde. Clicca una differenza per vederla nell'anteprima.</p>
+      <p class="res-names" id="resNames"></p>
     </div>
     <div class="summary-row">
       <div class="summary" id="summary"></div>
@@ -246,6 +248,20 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
         Report PDF
       </a>
+      <a class="ghost-btn" id="dlXlsx" download>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Elenco Excel
+      </a>
+    </div>
+    <!-- Numeri e date cambiati (render.js) -->
+    <section class="riepilogo shell" id="riepilogo" hidden></section>
+    <!-- Navigazione tra le differenze (diffnav.js): resta in vista scorrendo -->
+    <div class="diff-nav" id="diffNav" hidden>
+      <button type="button" class="ghost-btn" id="diffPrev" title="Differenza precedente (P)">↑ Precedente</button>
+      <span class="diff-count" id="diffCount"></span>
+      <button type="button" class="ghost-btn" id="diffNext" title="Differenza successiva (N)">Successiva ↓</button>
+      <label class="chk"><input type="checkbox" id="onlyNum"> Solo numeri e date</label>
+      <span class="chk-hint">tasti N / P</span>
     </div>
     <div id="pages"></div>
   </section>

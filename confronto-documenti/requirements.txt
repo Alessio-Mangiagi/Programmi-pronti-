@@ -7,4 +7,5 @@ pillow>=10.0
 numpy>=1.26
 pytesseract>=0.3.10   # solo se si usa il motore Tesseract
 python-docx>=1.1      # report Word .docx
+openpyxl>=3.1         # elenco differenze Excel .xlsx
 waitress>=3.0         # server WSGI di produzione
