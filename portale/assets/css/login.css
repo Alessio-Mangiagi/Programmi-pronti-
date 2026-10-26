@@ -21,6 +21,10 @@ body {
 .brand { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.75rem; }
 .brand-mark { width: 42px; height: 42px; background: var(--cosedil-blue); border-radius: 8px; display: grid; place-items: center; }
 .brand-mark svg { width: 25px; height: 25px; }
+/* l'airone della suite è blu, alto e sottile: sul riquadro blu sparirebbe e
+   in un quadrato da 42px diventa minuscolo, quindi sta da solo, più grande */
+.brand-mark:has(.airone) { background: none; width: 56px; height: 64px; }
+.brand-mark .airone { width: 64px; height: 64px; }
 .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--cosedil-text-strong); line-height: 1.1; }
 .brand-sub { font-family: var(--font-ui); font-weight: 600; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cosedil-blue); }
 h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.5rem; color: var(--cosedil-text-strong); margin: 0 0 0.25rem; }

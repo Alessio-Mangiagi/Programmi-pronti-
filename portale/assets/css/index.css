@@ -81,6 +81,7 @@ main {
   flex-shrink: 0;
 }
 .card-icon svg { width: 24px; height: 24px; }
+.card-icon svg.logo { width: 100%; height: 100%; }   /* logo proprio dell'app (InCampo): riempie il riquadro */
 
 .status {
   display: inline-flex;

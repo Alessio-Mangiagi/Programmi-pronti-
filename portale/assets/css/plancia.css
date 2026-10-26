@@ -31,6 +31,7 @@ button { font: inherit; }
 .card .hit { position: absolute; inset: 0; border: 0; background: none; cursor: pointer; padding: 0; }
 .card .hit:hover ~ .k, .card .hit:hover ~ .n { color: var(--cosedil-blue); }
 .card .k { font-family: var(--font-cond); font-weight: 900; font-stretch: 62%; font-size: 22px; line-height: 1; pointer-events: none; }
+.card .k svg { display: block; width: 22px; height: 22px; }
 .card .n { font-family: var(--font-cond); font-weight: 600; font-stretch: 85%; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .card .right { display: flex; align-items: center; gap: 8px; position: relative; }
 /* lo stato lo dice il quadratino (legenda in fondo); la scritta compare solo

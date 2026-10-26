@@ -6,10 +6,13 @@
 // [data-launch] e [data-open], gli agganci che chat.js usa per avviare e
 // aprire le app dalle risposte dell'assistente.
 
-// Sigle al posto delle icone. Un programma aggiunto dagli admin (app-extra) non
-// è qui: prende le prime tre lettere del nome.
+// Sigle per le colonne di testo (utenti, attività, "più usata"). Un programma
+// aggiunto dagli admin (app-extra) non è qui: prende le prime tre lettere del nome.
 const SIGLE = { ddt: 'DDT', agente: 'AI', confronta: 'PDF', ocr: 'OCR', scadenzario: 'SCA', requisiti: 'REQ', incampo: 'CAM', trimble: 'TRM', auguri: 'WA' };
 const sigla = (a) => SIGLE[a.id] || String(a.nome || a.id).replace(/[^A-Za-zÀ-ÿ]/g, '').slice(0, 3).toUpperCase();
+// Nella barra delle app, le stesse icone della griglia (ICONS, in common.js);
+// la sigla resta per chi un'icona non ce l'ha.
+const marchio = (a) => ICONS[a.id] || esc(sigla(a));
 
 let apps = [];
 let isAdmin = false;   // solo gli admin del portale possono fermare le app
@@ -22,7 +25,7 @@ function cardHtml(a) {
   return `
     <div class="card${a.adminOnly ? ' adm' : ''}" data-id="${esc(a.id)}">
       <button class="hit" type="button" data-go="${esc(a.id)}" aria-label="${esc(a.nome)}: apri o avvia"></button>
-      <span class="k">${esc(sigla(a))}</span>
+      <span class="k">${marchio(a)}</span>
       <span class="n" title="${esc(a.nome)}">${esc(a.nome)}</span>
       <span class="right">
         <span class="state" data-state>…</span>
