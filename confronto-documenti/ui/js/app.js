@@ -13,6 +13,8 @@
 //   diffnav.js   navigazione tra le differenze (N/P) e filtro numeri/date
 //   revisione.js vista / accettata / da chiarire + nota su ogni differenza
 //   storico.js   confronti fatti, riapribili (anche via ?job=<id>)
+//   lotti.js     più confronti in un colpo (versioni / due cartelle)
+//   profili.js   impostazioni salvate con un nome
 //
 // Flusso: scelta file → "Avvia confronto" → compare.js crea il job sul server →
 //   polling aggiorna la barra → a "done" render.js costruisce le card → l'utente
@@ -27,6 +29,8 @@ import { initCompare } from './compare.js';
 import { initViewer } from './viewer.js';
 import { initDiffNav } from './diffnav.js';
 import { initStorico } from './storico.js';
+import { initLotti } from './lotti.js';
+import { initProfili } from './profili.js';
 
 // Animazione "reveal" allo scroll: aggiunge .in quando l'elemento entra nel
 // viewport, poi smette di osservarlo (one-shot, niente ri-trigger a ritroso).
@@ -44,6 +48,8 @@ initCompare();
 initViewer();
 initDiffNav();
 initStorico();
+initLotti();
+initProfili();
 
 // Guida "Come funziona": sta in cima alla pagina, nascosta; il pulsante nella
 // nav la apre/chiude e la porta in vista.

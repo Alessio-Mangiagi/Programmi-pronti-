@@ -9,6 +9,9 @@ import { isAllowed, assignFile } from './dropzones.js';
 
 let files = [];   // File della cartella scelta, già filtrati e ordinati per percorso
 
+// File utilizzabili della cartella aperta (per i confronti in lotto, lotti.js).
+export const fileCartella = () => files;
+
 const rel = f => f.webkitRelativePath || f.name;
 
 // Sottocartella del file relativa alla cartella scelta ('' se sta nella radice).
@@ -98,6 +101,7 @@ export function initFolder() {
       .sort((x, y) => rel(x).localeCompare(rel(y), 'it', { numeric: true }));
     $('#folderName').textContent = rel(all[0]).split('/')[0];
     $('#folderCount').textContent = `${files.length} documenti utilizzabili su ${all.length} file`;
+    $('#lottiBox').hidden = files.length < 2;
     input.value = '';   // riscegliere la stessa cartella la rilegge (file nuovi o modificati)
     render();
   });

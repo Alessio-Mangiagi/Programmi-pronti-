@@ -400,6 +400,36 @@ select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.
 .sto-vuoto { color: var(--dim); font-size: .9rem; }
 @media (max-width: 768px) { .sto-item { grid-template-columns: 1fr; } .sto-az { grid-column: 1; grid-row: auto; } .nav-sto { padding: .5rem .6rem; } }
 
+/* Confronti in lotto (lotti.js) */
+.lotti-box { display: flex; gap: .4rem; flex-wrap: wrap; }
+.lotti-box[hidden] { display: none; }
+.lotti-box .ghost-btn { padding: .45rem .7rem; font-size: .78rem; }
+dialog.lotti { width: min(820px, 94vw); max-height: 86vh; margin: auto; border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem 1.3rem; box-shadow: 0 20px 60px rgba(16,64,112,.25); color: var(--ink); }
+dialog.lotti::backdrop { background: rgba(11,45,80,.35); }
+dialog.lotti[open] { display: flex; flex-direction: column; gap: .8rem; }
+.lotti-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.lotti-head h2 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; color: var(--navy); }
+.lotti-help { font-size: .86rem; color: var(--dim); }
+.lotti-lista { list-style: none; overflow-y: auto; display: grid; gap: .35rem; min-height: 3rem; }
+.lotto-riga { display: grid; grid-template-columns: auto minmax(0,1fr); gap: .1rem .6rem; align-items: center; padding: .5rem .7rem; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.lotto-riga:hover { border-color: var(--accent); }
+.lotto-riga input { grid-row: span 2; width: 16px; height: 16px; accent-color: var(--navy); }
+.lotto-nomi { font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lotto-freccia { color: var(--dim); }
+.lotto-motivo { font-size: .76rem; color: var(--dim); }
+.lotto-vuoto { color: var(--dim); font-size: .9rem; }
+.lotti-soli { font-size: .8rem; color: var(--dim); }
+.lotti-soli ul { padding-left: 1.2rem; max-height: 120px; overflow-y: auto; }
+.lotti-foot { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; }
+.lotti-esito { margin-right: auto; font-size: .85rem; color: var(--dim); }
+
+/* Profili di impostazioni (profili.js) */
+.profili { margin-top: .9rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.profili label { font-weight: 600; font-size: .78rem; color: var(--dim); }
+.profili select { min-width: 14rem; }
+.profili .ghost-btn { padding: .5rem .8rem; }
+.profili .ghost-btn:disabled { opacity: .4; cursor: not-allowed; }
+
 .focus-band { position: absolute; left: 0; right: 0; height: 2.8%; background: rgba(168,72,0,.16); border-top: 2px solid var(--b); border-bottom: 2px solid var(--b); pointer-events: none; }
 .src-tag { font-size: .7rem; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: .15rem .5rem; }
 

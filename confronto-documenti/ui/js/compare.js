@@ -42,13 +42,9 @@ function poll(jobId) {
   }, 900);
 }
 
-// Collega il pulsante "Avvia confronto" e l'annullamento.
-export function initCompare() {
-  $('#go').addEventListener('click', async () => {
-    // I nomi dei campi DEVONO combaciare con request.form.get(...) in server.py.
-    const fd = new FormData();
-    fd.append('pdf1', state.a);                                    // lato A
-    fd.append('pdf2', state.b);                                    // lato B
+// Impostazioni correnti del confronto nella FormData (usata anche dai lotti).
+// I nomi dei campi DEVONO combaciare con request.form.get(...) in server.py.
+export function impostazioni(fd) {
     fd.append('model', $('#model').value);                         // motore OCR: tesseract|paddle|<vision>
     fd.append('dpi', $('#dpi').value);                             // risoluzione rendering pagine
     fd.append('lang', $('#lang').value);                           // lingue OCR (Tesseract)
@@ -56,6 +52,15 @@ export function initCompare() {
     fd.append('preprocess', $('#preprocess').checked ? '1' : '0'); // pulizia scansioni pre-OCR
     fd.append('ripetute', $('#ripetute').checked ? '1' : '0');     // intestazioni/piè di pagina ripetuti ignorati
     fd.append('ignore', $('#ignore').value);                       // righe da ignorare (testo in chiaro, una per riga)
+}
+
+// Collega il pulsante "Avvia confronto" e l'annullamento.
+export function initCompare() {
+  $('#go').addEventListener('click', async () => {
+    const fd = new FormData();
+    fd.append('pdf1', state.a);                                    // lato A
+    fd.append('pdf2', state.b);                                    // lato B
+    impostazioni(fd);
 
     $('#go').disabled = true;
     $('#results').style.display = 'none';

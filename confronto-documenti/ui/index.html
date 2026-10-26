@@ -57,8 +57,13 @@
     <p id="folderEmptyMsg">Scegli una cartella per vedere i suoi documenti.</p>
     <button type="button" class="cta" id="folderPickEmpty">Scegli cartella</button>
   </div>
+  <div class="lotti-box" id="lottiBox" hidden>
+    <button type="button" class="ghost-btn" id="lottiVersioni" title="Raggruppa rev1/rev2, v1/v2, date e confronta le versioni">Abbina versioni</button>
+    <button type="button" class="ghost-btn" id="lottiAltra" title="Abbina per nome con i file di un'altra cartella">Con altra cartella…</button>
+  </div>
   <ul class="drawer-list" id="folderList"></ul>
   <input type="file" id="folderInput" webkitdirectory multiple hidden>
+  <input type="file" id="folderInputB" webkitdirectory multiple hidden>
 </aside>
 
 <main>
@@ -221,6 +226,13 @@
       </button>
     </div>
 
+    <div class="profili reveal">
+      <label for="profilo">Profilo</label>
+      <select id="profilo"><option value="">— nessun profilo —</option></select>
+      <button type="button" class="ghost-btn" id="profiloSalva" title="Salva le impostazioni attuali con un nome">Salva come…</button>
+      <button type="button" class="ghost-btn danger" id="profiloElimina" disabled>Elimina</button>
+    </div>
+
     <details class="adv reveal" style="transition-delay:.24s">
       <summary>Opzioni avanzate · righe da ignorare</summary>
       <textarea id="ignore" placeholder="Un testo per riga, es.:&#10;Pagina # di #&#10;Data #/#/#&#10;Rev. #&#10;Documento riservato"></textarea>
@@ -295,6 +307,23 @@
     <span>© Confronto Documenti</span>
   </div>
 </footer>
+
+<!-- ============ LOTTI (lotti.js): più confronti in un colpo ============ -->
+<dialog id="lotti" class="lotti" aria-labelledby="lottiTitolo">
+  <div class="lotti-head">
+    <h2 id="lottiTitolo">Confronti in lotto</h2>
+    <button type="button" class="v-btn" id="lottiChiudi" aria-label="Chiudi">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <p class="lotti-help">Spunta le coppie da confrontare (A = versione precedente, B = nuova). Partono con le impostazioni attuali; avanzamento e risultati nello <b>Storico</b>.</p>
+  <ul class="lotti-lista" id="lottiLista"></ul>
+  <div id="lottiSoli" class="lotti-soli"></div>
+  <div class="lotti-foot">
+    <span id="lottiEsito" class="lotti-esito"></span>
+    <button type="button" class="cta" id="lottiVia">Avvia</button>
+  </div>
+</dialog>
 
 <!-- ============ VIEWER (confronto visuale) ============
      Dialog a schermo intero, nascosto finché viewer.js non aggiunge .open.

@@ -80,15 +80,28 @@ export async function mostra() {
   box.innerHTML = '<ul>' + righe.join('') + '</ul>';
 }
 
+// Aggiornamento automatico dell'elenco finché ci sono confronti in corso
+// (es. dopo un lotto) e il pannello è aperto.
+let timer = null;
+function aggiornaFinche() {
+  clearTimeout(timer);
+  if ($('#storico').hidden || !document.querySelector('.sto-item.run')) return;
+  timer = setTimeout(async () => { await mostra(); aggiornaFinche(); }, 3000);
+}
+
+let show = () => {};
+export const mostraStorico = () => show(true);
+
 export function initStorico() {
   const btn = $('#storicoBtn'), panel = $('#storico');
-  const show = async on => {
+  show = async on => {
     panel.hidden = !on;
     btn.setAttribute('aria-expanded', String(on));
     if (on) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       $('#storicoLista').innerHTML = '<p class="sto-vuoto">Caricamento…</p>';
       await mostra();
+      aggiornaFinche();
     }
   };
   btn.addEventListener('click', () => show(panel.hidden));
