@@ -7,6 +7,7 @@ import { verifyPassword, updatePassword } from '../models/users';
 import { logActivity } from '../models/activityLog';
 import { requireAuth } from '../middleware/auth';
 import { clientIp } from './helpers';
+import logger from '../utils/logger';
 
 const router = express.Router();
 
@@ -98,17 +99,25 @@ router.post('/auth/login', (req: Request, res: Response) => {
     return res.status(403).json({ error: "Account disabilitato. Contatta l'amministratore." });
   }
   clearLoginFails(lockKey);
-  req.session.userId = user.id;
-  req.session.username = user.username;
-  req.session.commessaId = user.commessaId;
-  req.session.displayName = user.displayName;
-  req.session.isAdmin = !!user.isAdmin;
-  logActivity('login_success', user.username, user.commessaId, ip);
-  res.json({
-    username: user.username,
-    commessaId: user.commessaId,
-    displayName: user.displayName,
-    isAdmin: !!user.isAdmin,
+  // Nuovo id di sessione al login: un cookie piantato prima (session fixation)
+  // non diventa mai una sessione autenticata.
+  req.session.regenerate((err) => {
+    if (err) {
+      logger.error(`Rigenerazione sessione fallita: ${err.message}`);
+      return res.status(500).json({ error: 'Errore interno durante il login' });
+    }
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    req.session.commessaId = user.commessaId;
+    req.session.displayName = user.displayName;
+    req.session.isAdmin = !!user.isAdmin;
+    logActivity('login_success', user.username, user.commessaId, ip);
+    res.json({
+      username: user.username,
+      commessaId: user.commessaId,
+      displayName: user.displayName,
+      isAdmin: !!user.isAdmin,
+    });
   });
 });
 
