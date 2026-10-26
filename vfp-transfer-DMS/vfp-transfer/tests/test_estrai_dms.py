@@ -206,6 +206,54 @@ class EstrazioneTest(unittest.TestCase):
         self.assertTrue(stato["scaricati"])
         self.assertTrue((self.dest / "manifest.csv").exists())
 
+    def test_verifica_trova_file_cambiati_e_vfp_transfer_non_li_carica(self):
+        ed.Estrazione(self.src, self.dest).esegui(ed.inventario(self.src, 1))
+        stato = json.loads((self.dest / "stato_estrazione.json").read_text(encoding="utf-8"))
+        cambiato = self.dest / stato["scaricati"]["10:1"]["file"]
+        cambiato.write_bytes(b"PRIMA")  # stessa dimensione, contenuto diverso
+        # vfp_transfer legge lo SHA-256 dal manifest e scarta il file anche in prova
+        items = vt.load_items(self.dest, self.dest / "manifest.csv", "1")
+        eventi = []
+        t = vt.Transfer(None, {"target": {"type": "folder", "id": "F"}}, self.dest / "stato_vfp.json", None,
+                        dry_run=True, on_event=lambda item, esito, doc, msg: eventi.append((item.file, esito)))
+        t.run(items)
+        self.assertIn((cambiato, "errore"), eventi)
+        # anche la v2 dello stesso documento resta ferma: finirebbe sopra la v1 mancante
+        self.assertEqual(sum(1 for _, esito in eventi if esito == "errore"), 2)
+        self.assertEqual(sum(1 for _, esito in eventi if esito == "prova"), 2)
+        # la verifica lo toglie dallo stato: rilanciando l'estrazione viene riscaricato
+        problemi = ed.Estrazione(None, self.dest).verifica()
+        self.assertEqual(list(problemi), ["10:1"])
+        self.src.download.clear()
+        ed.Estrazione(self.src, self.dest).esegui(ed.inventario(self.src, 1))
+        self.assertEqual(self.src.download, [(10, 1)])
+        self.assertEqual(cambiato.read_bytes(), b"prima")
+
+    def test_stato_modificato_non_porta_fuori_dalla_cartella(self):
+        ed.Estrazione(self.src, self.dest).esegui(ed.inventario(self.src, 1))
+        path = self.dest / "stato_estrazione.json"
+        stato = json.loads(path.read_text(encoding="utf-8"))
+        (self.dest / "segreto.dat").write_bytes(b"prima")
+        stato["scaricati"]["10:1"]["file"] = "file/../segreto.dat"
+        path.write_text(json.dumps(stato), encoding="utf-8")
+        e = ed.Estrazione(self.src, self.dest)
+        e.scrivi_manifest(ed.inventario(self.src, 1))
+        self.assertNotIn("segreto", (self.dest / "manifest.csv").read_text(encoding="utf-8-sig"))
+        self.assertIn("10:1", e.verifica())
+
+    def test_download_piu_grande_del_dichiarato_interrotto(self):
+        originale = self.src.scarica
+        self.src.scarica = lambda d, v: Risposta(200, originale(d, v).corpo + b"altro")
+        conti = ed.Estrazione(self.src, self.dest).esegui(ed.inventario(self.src, 1))
+        self.assertEqual(conti["errore"], 4)
+        self.assertEqual(list(self.dest.rglob("*.part")), [])
+
+    def test_cartelle_circolari_lette_una_volta(self):
+        figli = self.src.figli
+        self.src.figli = lambda f: figli(f) + ([("folder", 1, "Indietro", "")] if f == 3 else [])
+        voci = ed.inventario(self.src, 1)
+        self.assertEqual(len(voci), 4)
+
     def test_nome_sicuro(self):
         self.assertEqual(ed.nome_sicuro("..\\..\\Windows\\evil.pdf"), "evil.pdf")
         self.assertEqual(ed.nome_sicuro("CON.pdf"), "_CON.pdf")

@@ -15,7 +15,8 @@ Protezioni per il DMS di origine (classe LetturaSicura):
   - stop automatico dopo --max-errori errori di fila: il DMS e' in difficolta', meglio fermarsi;
   - --orario 20:00-07:00: lavora solo nella finestra, fuori aspetta.
 Integrita' e ripresa: download in .part, controllo della dimensione dichiarata dal DMS, SHA-256 salvato
-in stato_estrazione.json; rilanciando si scaricano solo le versioni mancanti (anche quelle nuove).
+in stato_estrazione.json e nel manifest (vfp_transfer non carica un file cambiato); rilanciando si scaricano
+solo le versioni mancanti (anche quelle nuove). --verifica --dest D:\\estrazione ricontrolla gli SHA-256.
 
 Per ora c'e' l'adattatore per SeedDMS (SorgenteSeedDms): per un altro DMS basta una classe con gli stessi
 metodi (login, logout, figli, versioni, scarica).
@@ -48,7 +49,7 @@ ATTESA_MAX = 120  # secondi, tetto dell'attesa tra un tentativo e l'altro
 RETRY_STATUS = {429, 500, 502, 503, 504}
 BLOCCO = 1024 * 1024
 LOCALI = {"127.0.0.1", "localhost", "::1"}
-MANIFEST_FIELDS = ["file", "folder", "name", "revision", "description"]
+MANIFEST_FIELDS = ["file", "folder", "name", "revision", "description", "sha256"]
 REPORT_FIELDS = ["data", "esito", "cartella", "documento", "versione", "file", "byte", "sha256", "dettaglio"]
 _VIETATI = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _RISERVATI = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
@@ -210,7 +211,8 @@ class SorgenteSeedDms:
 
     def figli(self, folder_id):
         """[(tipo 'folder'|'document', id, nome, commento)]"""
-        return [(d["type"], d["id"], d["name"], d.get("comment") or "") for d in self._dati(f"/folder/{int(folder_id)}/children")]
+        # id sempre interi: finiscono nei percorsi su disco (file/<doc>/...)
+        return [(d["type"], int(d["id"]), d["name"], d.get("comment") or "") for d in self._dati(f"/folder/{int(folder_id)}/children")]
 
     def versioni(self, doc_id):
         """[{'versione', 'commento', 'nome_file', 'byte', 'data'}] in ordine crescente."""
@@ -261,12 +263,17 @@ def nome_sicuro(nome, ripiego="documento"):
 def inventario(sorgente, radice_id):
     """Percorre l'albero partendo da radice_id (esclusa) e restituisce una Voce per ogni versione."""
     voci, pila = [], [(int(radice_id), ())]
-    nomi_visti = {}
+    nomi_visti, cartelle_viste = {}, {int(radice_id)}
     while pila:
         folder_id, percorso = pila.pop()
         sottocartelle = []
         for tipo, oid, nome, commento in sorgente.figli(folder_id):
             if tipo == "folder":
+                # un collegamento che riporta a una cartella gia' letta farebbe girare all'infinito sul DMS
+                if oid in cartelle_viste:
+                    log.warning("Cartella %s gia' letta (collegamento circolare?): saltata", oid)
+                    continue
+                cartelle_viste.add(oid)
                 # "/" separa le cartelle nel manifest: dentro un nome diventa "-"
                 sottocartelle.append((oid, percorso + (nome.replace("/", "-").replace("\\", "-").strip(),)))
                 continue
@@ -297,9 +304,17 @@ class Estrazione:
         if self.stato_path.exists():
             self.stato = json.loads(self.stato_path.read_text(encoding="utf-8"))
 
+    def _percorso(self, s):
+        """Percorso su disco di una voce dello stato, solo se dentro dest/file (stato modificato a mano = None)."""
+        p = (self.dest / s["file"]).resolve()
+        return p if p.is_relative_to((self.dest / "file").resolve()) else None
+
     def _gia_presente(self, voce):
         s = self.stato["scaricati"].get(voce.chiave)
-        return bool(s) and (self.dest / s["file"]).is_file() and (self.dest / s["file"]).stat().st_size == s["byte"]
+        if not s:
+            return False
+        p = self._percorso(s)
+        return p is not None and p.is_file() and p.stat().st_size == s["byte"]
 
     def scarica(self, voce):
         """Scarica una versione con i controlli di integrita'; restituisce (percorso relativo, byte, sha256)."""
@@ -311,13 +326,16 @@ class Estrazione:
         resp = self.sorgente.scarica(voce.doc_id, voce.versione)
         try:
             dichiarati = resp.headers.get("Content-Length")
-            if dichiarati is not None and int(dichiarati) != voce.byte:
+            # con gzip Content-Length e' la dimensione compressa: vale solo il conteggio dei byte scritti
+            if dichiarati is not None and not resp.headers.get("Content-Encoding") and int(dichiarati) != voce.byte:
                 raise ValueError(f"dimensione diversa: il DMS dichiara {voce.byte} byte, il download {dichiarati}")
             with open(part, "wb") as f:
                 for blocco in resp.iter_content(BLOCCO):
+                    scritti += len(blocco)
+                    if scritti > voce.byte:  # non riempire il disco con un download che non finisce
+                        raise ValueError(f"file piu' grande del dichiarato ({voce.byte} byte)")
                     f.write(blocco)
                     h.update(blocco)
-                    scritti += len(blocco)
         except Exception:
             part.unlink(missing_ok=True)
             raise
@@ -376,24 +394,61 @@ class Estrazione:
                 if self._gia_presente(voce):
                     s = self.stato["scaricati"][voce.chiave]
                     w.writerow([csv_cell(x) for x in (s["file"], "/".join(voce.cartella), voce.nome,
-                                                      voce.versione, voce.commento or voce.commento_doc)])
+                                                      voce.versione, voce.commento or voce.commento_doc, s["sha256"])])
         os.replace(tmp, self.dest / "manifest.csv")
+
+    def verifica(self):
+        """Ricalcola lo SHA-256 dei file scaricati, senza toccare il DMS. Le voci mancanti o diverse escono dallo
+        stato (e quindi dal manifest): rilanciando l'estrazione vengono riscaricate. Restituisce {chiave: problema}."""
+        problemi = {}
+        for chiave, s in list(self.stato["scaricati"].items()):
+            p = self._percorso(s)
+            if p is None:
+                problemi[chiave] = f"percorso fuori dalla cartella dei file: {s['file']}"
+            elif not p.is_file():
+                problemi[chiave] = f"file mancante: {s['file']}"
+            else:
+                h = hashlib.sha256()
+                with open(p, "rb") as f:
+                    while blocco := f.read(BLOCCO):
+                        h.update(blocco)
+                if h.hexdigest() != s["sha256"]:
+                    problemi[chiave] = f"file cambiato dopo l'estrazione: {s['file']}"
+        for chiave, problema in problemi.items():
+            log.error("Verifica %s: %s", chiave, problema)
+            del self.stato["scaricati"][chiave]
+        if problemi:
+            _scrivi_json(self.stato_path, self.stato)
+        return problemi
 
 
 # --------------------------------------------------------------------------- CLI
 
 def main():
     p = argparse.ArgumentParser(description="Estrae in sola lettura documenti e revisioni dal DMS di origine.")
-    p.add_argument("--url", required=True, help="indirizzo delle API del DMS (es. https://dms/restapi/index.php)")
-    p.add_argument("--user", required=True, help="utente del DMS, meglio un utente tecnico in sola lettura")
+    p.add_argument("--url", help="indirizzo delle API del DMS (es. https://dms/restapi/index.php)")
+    p.add_argument("--user", help="utente del DMS, meglio un utente tecnico in sola lettura")
     p.add_argument("--cartella", type=int, default=1, help="ID della cartella da estrarre (es. una commessa); 1 = tutto")
     p.add_argument("--dest", help="cartella locale dove scaricare (obbligatoria se non --dry-run)")
     p.add_argument("--dry-run", action="store_true", help="conta cartelle, documenti e dimensione senza scaricare")
     p.add_argument("--richieste-al-secondo", type=float, default=2.0)
     p.add_argument("--max-errori", type=int, default=10, help="errori di fila prima di fermarsi")
     p.add_argument("--orario", help="lavora solo in questa fascia, es. 20:00-07:00")
+    p.add_argument("--verifica", action="store_true",
+                   help="ricontrolla lo SHA-256 dei file in --dest, senza collegarsi al DMS")
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.verifica:
+        if not args.dest:
+            p.error("--verifica richiede --dest")
+        estrazione = Estrazione(None, args.dest)
+        problemi = estrazione.verifica()
+        log.info("Verifica: %s file controllati, %s problemi", len(estrazione.stato["scaricati"]) + len(problemi), len(problemi))
+        if problemi:
+            sys.exit("Rilanciare l'estrazione per riscaricare i file segnalati (poi rifare il manifest).")
+        return
+    if not args.url or not args.user:
+        p.error("--url e --user sono obbligatori (tranne con --verifica)")
     if not args.dry_run and not args.dest:
         p.error("--dest e' obbligatoria (oppure --dry-run)")
     if not 0 < args.richieste_al_secondo <= 20:

@@ -412,11 +412,20 @@ class SourceItem:
     name: str
     revision: str
     description: str = ""
+    sha256: str = ""  # dal manifest di estrai_dms.py: il file deve essere ancora quello estratto
 
     @property
     def key(self):
         """Chiave usata nel file di stato per riconoscere un file gia' trasferito."""
         return f"{self.file}|{self.revision}"
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while block := f.read(1024 * 1024):
+            h.update(block)
+    return h.hexdigest()
 
 
 def _is_ignored(path):
@@ -466,6 +475,7 @@ def items_from_manifest(manifest_path, base_dir, default_revision):
                 name=(row.get("name") or file.stem).strip(),
                 revision=(row.get("revision") or default_revision).strip(),
                 description=(row.get("description") or "").strip(),
+                sha256=(row.get("sha256") or "").strip().lower(),
             )
 
 
@@ -558,6 +568,8 @@ class Transfer:
                 problem = "una revisione precedente dello stesso documento non e' stata caricata"
             elif not item.file.is_file():
                 problem = "file di origine non trovato"
+            elif item.sha256 and file_sha256(item.file) != item.sha256:
+                problem = "file diverso da quello estratto (SHA-256): non caricato"
             elif not item.folder and self.target_type == "project":
                 # in VFP un documento deve stare dentro una Document Folder, non direttamente nel progetto
                 problem = "file nella radice: con destinazione 'progetto' serve una cartella"
