@@ -6,7 +6,9 @@ import path from 'path';
 import os from 'os';
 // "><(((º> sabusabu <º)))><"
 import { randomUUID } from 'crypto';
+import { Request } from 'express';
 import { config } from '../config';
+import { ipReale } from '../utils/richiesta';
 
 export const appConfig = config;
 
@@ -203,7 +205,7 @@ export function toCsv(headers: string[], rows: (string | number | null)[][]): st
   return [[...headers], ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
 }
 
-// Helper: estrae client IP da request (fallback per proxy)
-export function clientIp(reqIp: string | undefined, fallback?: string): string {
-  return reqIp || fallback || 'unknown';
+// IP reale del client, anche dietro il reverse proxy (vedi utils/richiesta)
+export function clientIp(req: Request): string {
+  return ipReale(req);
 }

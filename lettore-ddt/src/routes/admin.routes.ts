@@ -40,7 +40,7 @@ router.get('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
 
 router.post('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
   const { username, password, commessaId, displayName, isAdmin } = req.body || {};
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!username || !password || !commessaId) {
     return res.status(400).json({ error: 'username, password e commessaId obbligatori' });
   }
@@ -78,7 +78,7 @@ router.post('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
 
 router.delete('/admin/api/users/:id', requireAdmin, (req: Request, res: Response) => {
   const id = param(req.params, 'id');
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
   if (id === req.session.userId) {
     return res.status(400).json({ error: 'Non puoi revocare il tuo stesso account' });
@@ -97,7 +97,7 @@ router.delete('/admin/api/users/:id', requireAdmin, (req: Request, res: Response
 router.post('/admin/api/users/:id/password', requireAdmin, (req: Request, res: Response) => {
   const id = param(req.params, 'id');
   const { password } = req.body || {};
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
   const target = findUserById(id);
   if (!target) return res.status(404).json({ error: 'Utente non trovato' });
@@ -114,7 +114,7 @@ router.post('/admin/api/users/:id/password', requireAdmin, (req: Request, res: R
 router.post('/admin/api/users/:id/disabled', requireAdmin, (req: Request, res: Response) => {
   const id = param(req.params, 'id');
   const { disabled } = req.body || {};
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
   if (id === req.session.userId) {
     return res.status(400).json({ error: 'Non puoi disabilitare il tuo stesso account' });
@@ -188,7 +188,7 @@ router.get('/admin/api/apikey', requireAdmin, (req: Request, res: Response) => {
 
 router.post('/admin/api/apikey', requireAdmin, (req: Request, res: Response) => {
   const raw = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!raw) return res.status(400).json({ error: 'Chiave API mancante' });
   if (!isValidApiKeyFormat(raw)) {
     return res.status(400).json({
@@ -206,7 +206,7 @@ router.post('/admin/api/apikey', requireAdmin, (req: Request, res: Response) => 
 });
 
 router.delete('/admin/api/apikey', requireAdmin, (req: Request, res: Response) => {
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   const removed = deleteStoredApiKey();
   if (removed) logActivity('apikey_deleted', req.session.username || 'admin', null, ip);
   const config = loadBatchConfig();

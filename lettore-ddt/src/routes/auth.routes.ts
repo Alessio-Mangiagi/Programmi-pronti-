@@ -72,7 +72,7 @@ function clearLoginFails(key: string): void {
 // ── Autenticazione ──────────────────────────────────────────────────────────
 router.post('/auth/login', (req: Request, res: Response) => {
   const { username, password } = req.body || {};
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!username || !password) {
     return res.status(400).json({ error: 'Username e password obbligatori' });
   }
@@ -115,7 +115,7 @@ router.post('/auth/login', (req: Request, res: Response) => {
 // Cambio password del proprio account
 router.post('/auth/change-password', requireAuth, (req: Request, res: Response) => {
   const { currentPassword, newPassword } = req.body || {};
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'currentPassword e newPassword obbligatori' });
   }
@@ -133,7 +133,7 @@ router.post('/auth/change-password', requireAuth, (req: Request, res: Response) 
 });
 
 router.post('/auth/logout', (req: Request, res: Response) => {
-  const ip = clientIp(req.ip, req.connection.remoteAddress);
+  const ip = clientIp(req);
   if (req.session.username) {
     logActivity('logout', req.session.username, req.session.commessaId || null, ip);
   }

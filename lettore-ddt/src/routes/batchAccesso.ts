@@ -12,6 +12,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { loadBatchConfig } from '../batch/config';
+import { richiestaLocale } from '../utils/richiesta';
 
 export interface BrowseEntry {
   name: string;
@@ -19,9 +20,9 @@ export interface BrowseEntry {
 }
 
 export function isLoopback(req: Request): boolean {
-  // Socket TCP reale: non spoofabile via X-Forwarded-For, a differenza di req.ip.
-  const ip = req.socket.remoteAddress || '';
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  // Socket dal loopback E nessun header di inoltro: dietro il reverse proxy
+  // della suite ogni connessione viene da 127.0.0.1 (vedi utils/richiesta).
+  return richiestaLocale(req);
 }
 
 /**

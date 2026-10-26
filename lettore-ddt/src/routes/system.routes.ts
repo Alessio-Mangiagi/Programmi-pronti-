@@ -9,6 +9,7 @@ import zlib from 'zlib';
 import { register } from '../utils/metrics';
 import { asyncHandler } from '../utils/errorHandler';
 import logger from '../utils/logger';
+import { richiestaLocale } from '../utils/richiesta';
 import { VERSION } from '../config';
 import { listUsers } from '../models/users';
 import { requireAuth, requireAdmin } from '../middleware/auth';
@@ -89,9 +90,8 @@ router.get('/status', (req: Request, res: Response) => {
 router.get(
   '/metrics',
   asyncHandler(async (req: Request, res: Response) => {
-    // Indirizzo del socket TCP reale, non spoofabile via X-Forwarded-For
-    const ip = req.socket.remoteAddress || '';
-    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip)) {
+    // Solo dalla macchina stessa: socket dal loopback e nessun proxy in mezzo.
+    if (!richiestaLocale(req)) {
       return res.status(403).json({ error: 'Accesso non consentito' });
     }
     res.set('Content-Type', register.contentType);
