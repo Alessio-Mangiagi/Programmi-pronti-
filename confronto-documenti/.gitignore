@@ -43,3 +43,6 @@ desktop.ini
 
 # Storico confronti (risultati e anteprime, 30 giorni)
 storico/
+
+# Log del server di rete (avvia-server-rete.cmd)
+logs/

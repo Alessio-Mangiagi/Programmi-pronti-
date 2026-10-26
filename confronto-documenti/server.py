@@ -1102,6 +1102,18 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "5001"))
     indirizzo = f"http://{'localhost' if HOST == '0.0.0.0' else HOST}:{PORT}"
     print(f"Confronta documenti — {indirizzo}" + (" (e in LAN)" if HOST == "0.0.0.0" else ""))
+    if HOST == "0.0.0.0":
+        # indirizzi da dare ai colleghi (server in rete, installa-server-rete.ps1)
+        import socket
+        try:
+            ips = sorted({a for a in socket.gethostbyname_ex(socket.gethostname())[2]
+                          if not a.startswith(("127.", "169.254."))})
+        except OSError:
+            ips = []
+        for a in [socket.gethostname()] + ips:
+            print(f"  in rete: http://{a}:{PORT}")
+        print(f"  login: {'nessuno (rete interna)' if os.environ.get('COSEDIL_SSO', 'on').lower() == 'off' else 'portale Suite Cosedil'}"
+              f" · confronti in parallelo: {MAX_PARALLELI} · dati: {storico.DATI}", flush=True)
     prune_cache(max_age_days=30)
     storico.pulisci()
     if getattr(sys, "frozen", False):
