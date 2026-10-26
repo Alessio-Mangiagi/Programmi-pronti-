@@ -121,9 +121,11 @@ app.use(
 // Dietro reverse proxy/HTTPS (Nginx, Caddy, Render, ecc.) per cookie secure e req.ip corretti.
 if (appCfg.trustProxy) app.set('trust proxy', 1);
 
-// Parser JSON/form con limite 50MB per upload PDF e file grossi
+// JSON fino a 50MB: estrazioni e versioni di progetto grosse. I PDF passano da
+// multer, e nessun client manda form urlencoded: lì basta poco, così un corpo
+// enorme non tiene occupato il parser.
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Store sessioni persistente su file system. Le sessioni sopravvivono ai riavvii (single-process).
 // Per architetture multi-istanza usare store condiviso come Redis o Database.
