@@ -73,7 +73,7 @@ Sulle card, gli **amministratori del portale** vedono un pulsante quadrato **Fer
 
 ### Utenti: password e disattivazione
 
-Dalla pagina **Amministrazione** l'admin, oltre a creare utenti a mano o da foglio `.xlsx`/`.csv`, per ogni riga può:
+Dalla pagina **Utenti** (`/utenti`, voce *Gestione → Utenti* nella barra di sinistra della plancia; `pages/utenti.html` + `assets/js/utenti.js`) l'admin crea utenti a mano o da foglio `.xlsx`/`.csv`, sceglie i programmi visibili e per ogni riga può:
 
 - **Password** → `POST /api/utenti/<username>/password` con `{ password }` (min 8 caratteri) o vuoto per una temporanea generata, restituita una sola volta. Imposta `mustChange`, incrementa `sv` (scollega le sessioni aperte) e toglie il blocco per tentativi falliti. Registrato come `reset-password`.
 - **Disattiva / Riattiva** → `PUT /api/utenti/<username>/attivo` con `{ attivo }`. Campo `disattivato` in `utenti.json`: il login risponde *Account disattivato* (solo a chi ha la password giusta) e `getSession` scarta i suoi cookie, quindi anche il gate SSO delle app. Non si può disattivare se stessi né l'ultimo admin attivo. Registrato come `disattiva`/`riattiva`.

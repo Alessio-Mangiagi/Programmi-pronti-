@@ -2090,6 +2090,12 @@ async function handle(req, res) {
     return sendFile(res, path.join(PAGES_DIR, 'admin.html'), 'text/html');
   }
 
+  // ---- Gestione utenti (solo admin): pagina; le API sono /api/utenti* ----
+  if (p === '/utenti' || p === '/utenti.html') {
+    if (!isAdmin) { res.writeHead(302, { Location: '/' }); return res.end(); }
+    return sendFile(res, path.join(PAGES_DIR, 'utenti.html'), 'text/html');
+  }
+
   // ---- Avvisi dei programmi (solo admin) ----
   if (p === '/avvisi' || p === '/avvisi.html') {
     if (!isAdmin) { res.writeHead(302, { Location: '/' }); return res.end(); }

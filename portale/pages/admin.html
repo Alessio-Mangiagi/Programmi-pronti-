@@ -29,6 +29,7 @@
       </div>
       <div class="header-actions">
         <a class="link-back" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Torna al portale</a>
+        <a class="link-back" href="/utenti">Utenti</a>
         <a class="link-back" href="/avvisi">Avvisi</a>
         <div class="user-chip">
           <span class="avatar" id="avatar">?</span>
@@ -76,70 +77,8 @@
       <div class="empty" id="logEmpty" style="display:none">Nessun accesso registrato con questi filtri.</div>
     </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Utenti</h2>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Nome</th><th>Username</th><th>Ruolo</th><th>Stato</th><th>Programmi visibili</th><th></th></tr>
-          </thead>
-          <tbody id="userBody"></tbody>
-        </table>
-      </div>
-      <form class="user-form" id="userForm">
-        <div class="fld"><label for="nUsername">Username</label><input id="nUsername" required /></div>
-        <div class="fld"><label for="nNome">Nome e cognome</label><input id="nNome" required /></div>
-        <div class="fld"><label for="nPassword">Password</label><input id="nPassword" type="password" required /></div>
-        <div class="fld"><label for="nRuolo">Ruolo</label>
-          <select id="nRuolo"><option value="utente">Utente</option><option value="admin">Amministratore</option></select>
-        </div>
-        <div class="fld fld-apps" id="nAppsFld" hidden>
-          <label>Programmi visibili</label>
-          <div class="accessi" id="nApps"></div>
-        </div>
-        <button class="btn btn-primary" type="submit">Aggiungi</button>
-      </form>
-      <div class="form-msg" id="formMsg"></div>
-
-      <div class="import-box">
-        <div class="import-head">
-          <div>
-            <h3>Importa da foglio Excel</h3>
-            <p class="import-hint">Carica un file <strong>.xlsx</strong> o <strong>.csv</strong> con le colonne <code>username</code> e <code>nome</code> (facoltative: <code>password</code>, <code>ruolo</code>). Chi non ha una password nel foglio riceve quella predefinita e dovrà cambiarla al primo accesso.</p>
-          </div>
-          <button type="button" class="btn-link" id="downloadModello">Scarica modello CSV</button>
-        </div>
-        <div class="import-fields">
-          <div class="fld"><label for="impFile">File Excel / CSV</label><input id="impFile" type="file" accept=".xlsx,.csv" /></div>
-          <div class="fld"><label for="impDefaultPw">Password predefinita</label><input id="impDefaultPw" type="text" placeholder="min 8 caratteri" autocomplete="off" /></div>
-          <button class="btn btn-primary" type="button" id="impBtn">Importa</button>
-        </div>
-        <div class="import-result" id="impResult"></div>
-      </div>
-    </section>
+    <p class="rimando">Utenti, password e disattivazioni: <a href="/utenti">pagina Utenti</a>.</p>
   </main>
-
-  <!-- Password di un utente impostata dall'admin: scelta a mano o generata.
-       In entrambi i casi l'utente la cambia al primo accesso. -->
-  <dialog class="pw-dlg" id="pwDlg" aria-labelledby="pwTitolo">
-    <form method="dialog" id="pwForm">
-      <h2 id="pwTitolo">Nuova password</h2>
-      <p class="pw-sotto" id="pwSotto"></p>
-      <label class="chk"><input type="radio" name="pwModo" value="genera" checked /> <span>Generane una temporanea</span></label>
-      <label class="chk"><input type="radio" name="pwModo" value="scegli" /> <span>La scelgo io</span></label>
-      <div class="fld" id="pwSceltaFld" hidden>
-        <label for="pwScelta">Password (min 8 caratteri)</label>
-        <input id="pwScelta" type="text" autocomplete="off" minlength="8" />
-      </div>
-      <p class="pw-esito" id="pwEsito" role="status"></p>
-      <div class="pw-azioni">
-        <button type="button" class="btn-link" id="pwChiudi">Annulla</button>
-        <button type="submit" class="btn btn-primary" id="pwOk">Imposta password</button>
-      </div>
-    </form>
-  </dialog>
 
   <div class="toast" id="toast"></div>
 

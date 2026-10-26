@@ -62,6 +62,13 @@ button { font: inherit; }
 .side-links a { color: var(--ink); text-decoration: none; border-bottom: 1.5px solid var(--ink); }
 .side-links a:hover { color: var(--cosedil-blue); border-color: var(--cosedil-blue); }
 
+/* voci di gestione (Utenti, Registro accessi, Avvisi): plancia e pagina Utenti */
+.side-nav { display: flex; flex-direction: column; }
+.side-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-top: 1px solid var(--soft); color: var(--ink); text-decoration: none; font-family: var(--font-cond); font-weight: 600; font-stretch: 85%; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.side-nav a:hover { color: var(--cosedil-blue); }
+.side-nav a[aria-current="page"] { background: var(--ink); color: #fff; }
+@media (max-width: 720px) { .side-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* ---------------- area principale ---------------- */
 /* Fluida: riempie qualsiasi monitor. Il tetto è alto (ultrawide) solo per non
    ridurre le righe a strisce illeggibili oltre i 2400px. */

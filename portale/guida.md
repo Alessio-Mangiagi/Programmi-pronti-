@@ -62,7 +62,7 @@ Premi **Esci** in alto a destra per chiudere la tua sessione. È buona norma far
 
 Se il tuo account è amministratore (o accedi da una postazione abilitata), in alto compare il pulsante **Amministrazione**. Da lì puoi:
 
-- **Gestire gli utenti** — aggiungere o rimuovere persone, anche importandole in blocco da un file Excel o CSV.
+- **Gestire gli utenti** — dalla voce **Utenti** nella barra di sinistra della plancia: **+ Nuovo utente** per crearne uno, **Importa da Excel** per caricare il personale in blocco da un file Excel o CSV, cerca e filtra per stato. Il numero di programmi sulla riga apre l'elenco dei programmi che quella persona vede.
 - **Cambiare la password di un utente** — pulsante **Password** sulla sua riga: ne generi una temporanea (la vedi una volta sola, comunicala tu) oppure la scegli. L'utente la cambia al primo accesso e viene scollegato da dove era entrato.
 - **Disattivare un utente** — pulsante **Disattiva**: non può più entrare e viene scollegato subito, ma restano il suo storico e i suoi programmi. **Riattiva** lo rimette com'era; **Elimina** lo toglie del tutto.
 - **Consultare gli accessi** — vedere chi ha aperto o avviato quale programma, con data e ora.

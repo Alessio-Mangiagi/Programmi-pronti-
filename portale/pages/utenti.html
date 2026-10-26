@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="/assets/manifest.webmanifest" />
+  <meta name="theme-color" content="#0c4577" />
+  <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Cosedil" />
+  <title>Utenti — Portale Suite Cosedil</title>
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 21V11l7-4 7 4v10' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/plancia.css" />
+  <link rel="stylesheet" href="/assets/css/utenti.css" />
+</head>
+<body>
+  <div class="layout">
+    <!-- Stessa barra della plancia, ma qui solo la navigazione di gestione:
+         il lanciatore delle app resta sulla plancia. -->
+    <aside class="side" aria-label="Navigazione">
+      <div class="brand"><span class="brand-word">Cosedil</span><span class="brand-word acc">Suite</span></div>
+      <p class="side-sec">Gestione</p>
+      <nav class="side-nav">
+        <a href="/">Plancia</a>
+        <a href="/utenti" aria-current="page">Utenti</a>
+        <a href="/admin">Registro accessi</a>
+        <a href="/avvisi">Avvisi</a>
+      </nav>
+      <div class="side-links side-links-fondo">
+        <a href="/doc?f=guida">Guida</a><a href="/doc?f=readme">README</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <span class="who"><span class="avatar" id="avatar">?</span><span id="userName">…</span></span>
+        <a href="/password">Password</a>
+        <button id="logout" type="button">Esci</button>
+      </div>
+
+      <header class="u-head">
+        <h1>Utenti</h1>
+        <p>Crea le utenze, importa il personale da Excel, cambia le password e disattiva chi non deve più entrare.</p>
+      </header>
+
+      <section class="kpi" aria-label="Numeri degli utenti">
+        <div><b id="kTot">–</b><span>Utenti</span><small id="kAdmin">&nbsp;</small></div>
+        <div><b id="kAttivi">–</b><span>Attivi</span><small>possono entrare</small></div>
+        <div><b id="kCambio">–</b><span>Password da cambiare</span><small>al prossimo accesso</small></div>
+        <div><b id="kOff">–</b><span>Disattivati</span><small>non possono entrare</small></div>
+      </section>
+
+      <section class="box">
+        <div class="u-bar">
+          <input type="search" id="cerca" placeholder="Cerca per nome o username" aria-label="Cerca utente" />
+          <select id="fStato" aria-label="Filtra per stato">
+            <option value="">Tutti</option>
+            <option value="attivo">Attivi</option>
+            <option value="cambio">Password da cambiare</option>
+            <option value="off">Disattivati</option>
+            <option value="admin">Amministratori</option>
+          </select>
+          <span class="u-bar-sp"></span>
+          <button type="button" class="b" id="apriImport">Importa da Excel</button>
+          <button type="button" class="b pri" id="apriNuovo">+ Nuovo utente</button>
+        </div>
+        <div class="u-wrap">
+          <table class="u-tab">
+            <thead>
+              <tr><th>Utente</th><th>Ruolo</th><th>Stato</th><th>Programmi</th><th>Creato</th><th class="az-h"><span class="sr-only">Azioni</span></th></tr>
+            </thead>
+            <tbody id="righe"></tbody>
+          </table>
+          <p class="empty" id="vuoto" hidden>Nessun utente con questi filtri.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Nuovo utente -->
+  <dialog class="dlg" id="dlgNuovo" aria-labelledby="nuovoT">
+    <form id="formNuovo">
+      <h2 id="nuovoT">Nuovo utente</h2>
+      <p class="sotto">Al primo accesso dovrà scegliere una sua password.</p>
+      <div class="griglia2">
+        <div class="fld"><label for="nNome">Nome e cognome</label><input id="nNome" required maxlength="80" /></div>
+        <div class="fld"><label for="nUsername">Username</label><input id="nUsername" required maxlength="60" autocomplete="off" placeholder="es. mrossi" /></div>
+        <div class="fld"><label for="nPassword">Password iniziale</label><input id="nPassword" type="text" required minlength="8" autocomplete="off" placeholder="min 8 caratteri" /></div>
+        <div class="fld"><label for="nRuolo">Ruolo</label>
+          <select id="nRuolo"><option value="utente">Utente</option><option value="admin">Amministratore</option></select>
+        </div>
+      </div>
+      <div class="fld" id="nAppsFld">
+        <label>Programmi visibili</label>
+        <div class="chks" id="nApps"></div>
+      </div>
+      <p class="esito" id="nuovoEsito" role="status"></p>
+      <div class="azioni">
+        <button type="button" class="b" data-chiudi>Annulla</button>
+        <button type="submit" class="b pri">Crea utente</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Import da Excel / CSV -->
+  <dialog class="dlg" id="dlgImport" aria-labelledby="importT">
+    <form id="formImport">
+      <h2 id="importT">Importa da Excel</h2>
+      <p class="sotto">File <b>.xlsx</b> o <b>.csv</b> con le colonne <code>username</code> e <code>nome</code> (facoltative <code>password</code> e <code>ruolo</code>). Chi non ha una password nel foglio riceve quella predefinita; tutti la cambiano al primo accesso. Gli username già presenti vengono saltati.</p>
+      <div class="fld"><label for="impFile">File</label><input id="impFile" type="file" accept=".xlsx,.csv" required /></div>
+      <div class="fld"><label for="impPw">Password predefinita</label><input id="impPw" type="text" autocomplete="off" placeholder="min 8 caratteri" /></div>
+      <p class="sotto"><button type="button" class="link" id="modello">Scarica il modello</button></p>
+      <div class="esito" id="importEsito" role="status"></div>
+      <div class="azioni">
+        <button type="button" class="b" data-chiudi>Chiudi</button>
+        <button type="submit" class="b pri" id="importOk">Importa</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Password di un utente -->
+  <dialog class="dlg" id="dlgPw" aria-labelledby="pwT">
+    <form id="formPw">
+      <h2 id="pwT">Nuova password</h2>
+      <p class="sotto" id="pwSotto"></p>
+      <label class="chk"><input type="radio" name="pwModo" value="genera" checked /> <span>Generane una temporanea</span></label>
+      <label class="chk"><input type="radio" name="pwModo" value="scegli" /> <span>La scelgo io</span></label>
+      <div class="fld" id="pwSceltaFld" hidden>
+        <label for="pwScelta">Password (min 8 caratteri)</label>
+        <input id="pwScelta" type="text" autocomplete="off" minlength="8" />
+      </div>
+      <div class="esito" id="pwEsito" role="status"></div>
+      <div class="azioni">
+        <button type="button" class="b" data-chiudi id="pwChiudi">Annulla</button>
+        <button type="submit" class="b pri" id="pwOk">Imposta password</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Programmi visibili a un utente -->
+  <dialog class="dlg" id="dlgApps" aria-labelledby="appsT">
+    <form id="formApps">
+      <h2 id="appsT">Programmi visibili</h2>
+      <p class="sotto" id="appsSotto"></p>
+      <div class="chks" id="appsChks"></div>
+      <div class="esito" id="appsEsito" role="status"></div>
+      <div class="azioni">
+        <button type="button" class="b" data-chiudi>Annulla</button>
+        <button type="submit" class="b pri">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/js/common.js"></script>
+  <script src="/assets/js/utenti.js"></script>
+</body>
+</html>
