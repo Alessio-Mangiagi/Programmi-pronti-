@@ -99,8 +99,16 @@ router.get(
   })
 );
 
+const escapeHtml = (s: string): string =>
+  s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string
+  );
+
 const markdownToHtml = (text: string): string => {
-  let html = text;
+  // Prima l'escape: l'HTML grezzo nei .md non arriva mai al browser (i commenti
+  // si tolgono e basta, altrimenti comparirebbero come testo).
+  let html = escapeHtml(text.replace(/<!--[\s\S]*?-->/g, ''));
   // Headers
   html = html.replace(
     /^### (.*?)$/gm,
@@ -116,10 +124,11 @@ const markdownToHtml = (text: string): string => {
   );
   // Bold
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:600;">$1</strong>');
-  // Links
-  html = html.replace(
-    /\[(.*?)\]\((.*?)\)/g,
-    '<a href="$2" style="color:#0c4577;text-decoration:underline;">$1</a>'
+  // Links: solo http(s), mailto e percorsi relativi — niente javascript: e simili
+  html = html.replace(/\[(.*?)\]\((.*?)\)/g, (_m, testo: string, href: string) =>
+    /^(https?:|mailto:)/i.test(href) || !href.includes(':')
+      ? `<a href="${href}" style="color:#0c4577;text-decoration:underline;">${testo}</a>`
+      : testo
   );
   // List items
   html = html.replace(/^- (.*?)$/gm, '<li style="margin-bottom:4px;">$1</li>');
