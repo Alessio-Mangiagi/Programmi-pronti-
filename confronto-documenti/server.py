@@ -13,9 +13,12 @@ Modello di esecuzione (ASINCRONO):
     poche (MAX_JOBS_KEPT) per non gonfiare la memoria. Riavviare = tutto perso.
   - I file caricati vanno in una cartella temporanea e sono cancellati a fine job.
 
-OCR: testo embedded quando c'è, altrimenti Tesseract / PaddleOCR / modello vision
-Ollama (scelta via campo 'model'), con preprocessing scansioni e confronto
-tollerante al rumore OCR.
+OCR: testo embedded quando c'è, altrimenti Tesseract o PaddleOCR (scelta via
+campo 'model'), con preprocessing scansioni e confronto tollerante al rumore
+OCR. I modelli vision via Ollama restano solo nella CLI di confronta_pdf.py.
+
+Confronti contemporanei limitati (CONFRONTO_MAX_PARALLELI, default 2): l'OCR
+usa già tutti i core, oltre si va in coda invece di rallentare tutti.
 
 Avvio:
     python server.py
@@ -34,7 +37,6 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import requests
 from flask import Flask, Response, jsonify, request, send_from_directory
 from PIL import Image
 
@@ -49,7 +51,6 @@ if getattr(sys, "frozen", False):
     UI_DIR = Path(getattr(sys, "_MEIPASS", ".")) / "ui"   # bundle PyInstaller
 else:
     UI_DIR = Path(__file__).parent / "ui"
-OLLAMA_URL = "http://localhost:11434"
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
@@ -101,6 +102,9 @@ def _security_headers(resp):
 JOBS: dict[str, dict] = {}
 PREVIEWS: dict[str, dict[str, bytes]] = {}  # job_id -> {"<pagina><a|b>[p]": jpeg}
 JOBS_LOCK = threading.Lock()
+# Confronti eseguiti insieme: gli altri aspettano in coda ("In coda...").
+MAX_PARALLELI = max(1, int(os.environ.get("CONFRONTO_MAX_PARALLELI", "2")))
+_SLOT_CONFRONTO = threading.BoundedSemaphore(MAX_PARALLELI)
 MAX_JOBS_KEPT = 2   # anteprime in RAM: tenerne poche
 PREVIEW_MAX_W = 1100
 
@@ -273,6 +277,21 @@ def _build_previews(job_id: str, doc, side: str) -> list[Image.Image | None]:
     return pil_pages
 
 
+def run_compare_in_coda(job_id: str, path1: Path, path2: Path, *args):
+    """Aspetta uno slot libero (MAX_PARALLELI) e poi esegue run_compare.
+    Annullato mentre è in coda: niente lavoro, file caricati cancellati."""
+    while not _SLOT_CONFRONTO.acquire(timeout=1):
+        if is_cancelled(job_id):
+            update_job(job_id, status="cancelled", message="Confronto annullato.")
+            for p in (path1, path2):
+                p.unlink(missing_ok=True)
+            return
+    try:
+        run_compare(job_id, path1, path2, *args)
+    finally:
+        _SLOT_CONFRONTO.release()
+
+
 def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
                 model: str, dpi: int, lang: str, tolerant: bool,
                 preprocess: bool, ignore_raw: list[str]):
@@ -316,7 +335,7 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
             update_job(job_id, current_page=progress_state["done"],
                        message=f"OCR: pagina {progress_state['done']} di {ocr_total}...")
 
-        common = dict(ollama_url=OLLAMA_URL, timeout=600, dpi=dpi, lang=lang,
+        common = dict(timeout=600, dpi=dpi, lang=lang,
                       preprocess=preprocess, progress=prog,
                       cancel=lambda: is_cancelled(job_id))
         texts1, src1 = collect_texts(doc1, model, **common)
@@ -383,9 +402,6 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
                    uncertain_count=uncertain_count, message=message)
     except OcrCancelled:
         update_job(job_id, status="cancelled", message="Confronto annullato.")
-    except requests.ConnectionError:
-        update_job(job_id, status="error",
-                   message="Ollama non raggiungibile. Avvia Ollama e riprova.")
     except Exception as exc:  # pragma: no cover
         update_job(job_id, status="error", message=f"Errore: {exc}")
     finally:
@@ -555,7 +571,7 @@ def build_report_pdf(job: dict) -> bytes:
     B con le differenze: verde = parti modificate, rosso = parti mancanti (in A
     e non in B), blu = parti aggiunte (solo in B).
     """
-    import fitz
+    import pymupdf as fitz
 
     RED, GREEN, GREY = (0.63, 0.13, 0.25), (0.10, 0.48, 0.31), (0.45, 0.50, 0.55)
     BLUE = (0.10, 0.31, 0.75)
@@ -746,7 +762,7 @@ def compare():
     prune_old_jobs()
 
     threading.Thread(
-        target=run_compare,
+        target=run_compare_in_coda,
         args=(job_id, path1, path2, f1.filename, f2.filename,
               model, dpi, lang, tolerant, preprocess, ignore_raw),
         daemon=True,

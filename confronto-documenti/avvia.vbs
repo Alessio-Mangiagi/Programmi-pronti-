@@ -9,16 +9,15 @@ Set fso   = CreateObject("Scripting.FileSystemObject")
 Set http  = CreateObject("MSXML2.XMLHTTP")
 
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-pythonExe = "C:\Users\aless\AppData\Local\Python\pythoncore-3.14-64\python.exe"
 serverUrl = "http://localhost:5001"
 
-' Preferisci l'ambiente virtuale creato da Installa.bat, se presente.
+' Ambiente virtuale creato da Installa.bat; senza, il python nel PATH.
 Dim venvPy
 venvPy = scriptDir & "\.venv\Scripts\python.exe"
 If fso.FileExists(venvPy) Then
     pythonExe = venvPy
-ElseIf Not fso.FileExists(pythonExe) Then
-    pythonExe = "python"   ' fallback: python nel PATH
+Else
+    pythonExe = "python"
 End If
 
 ' Istanza precedente rimasta appesa sulla porta 5001? Chiusura forzata prima

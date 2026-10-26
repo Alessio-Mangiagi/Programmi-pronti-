@@ -57,3 +57,10 @@ jobs:
 
       - name: Test
         run: python -m pytest tests/ -q
+
+      # Banco di prova ridotto sui PDF nativi (niente OCR, pochi secondi): fallisce
+      # se una modifica vera viene persa o compare una segnalazione finta, come
+      # l'importo 6->9 che il confronto tollerante nascondeva.
+      - name: Banco di prova (PDF nativi)
+        if: matrix.nome == 'confronta-pdf'
+        run: python bench/benchmark.py --solo-nativi --coppie 8 --verifica --out "$RUNNER_TEMP/bench/risultati"

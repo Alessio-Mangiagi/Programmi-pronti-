@@ -26,7 +26,7 @@ import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF ("import fitz" è deprecato)
 import requests
 
 OLLAMA_URL_DEFAULT = "http://localhost:11434"
@@ -67,6 +67,9 @@ def app_dir() -> Path:
 CACHE_DIR = app_dir() / ".ocr_cache"
 
 TESSERACT_CANDIDATES = [
+    # copia portabile accanto all'exe/all'app (cartella Tesseract-OCR copiata
+    # così com'è): l'exe funziona anche su PC senza Tesseract installato
+    app_dir() / "Tesseract-OCR" / "tesseract.exe",
     Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
     Path(r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"),
 ]

@@ -31,7 +31,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import fitz
+import pymupdf as fitz
 import numpy as np
 from PIL import Image, ImageFilter
 
@@ -455,6 +455,11 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--lavoro", type=Path, default=None, help="cartella di lavoro (default: temporanea)")
     ap.add_argument("--out", type=Path, default=Path(__file__).parent / "risultati")
+    ap.add_argument("--solo-nativi", action="store_true",
+                    help="solo PDF nativi: niente OCR, pochi secondi (per la CI)")
+    ap.add_argument("--verifica", action="store_true",
+                    help="esce con errore se sui PDF nativi una modifica vera è persa "
+                         "o compare una segnalazione finta")
     args = ap.parse_args()
 
     lavoro = args.lavoro or Path(tempfile.mkdtemp(prefix="bench_confronto_"))
@@ -470,7 +475,7 @@ def main() -> int:
             nat = lavoro / f"c{k:02d}_{lato}_nativo.pdf"
             pdf_nativo(pag, nat)
             files[("nativo", lato)] = nat
-            for nome, p in SCANSIONI.items():
+            for nome, p in ({} if args.solo_nativi else SCANSIONI).items():
                 dst = lavoro / f"c{k:02d}_{lato}_{nome}.pdf"
                 pdf_scansione(nat, dst, p, random.Random(f"{args.seed}-{k}-{lato}-{nome}"))
                 files[(nome, lato)] = dst
@@ -479,6 +484,8 @@ def main() -> int:
 
     risultati = []
     for variante, dpi, tol, pre in CONFIG:
+        if args.solo_nativi and variante != "nativo":
+            continue
         t0 = time.time()
         agg = {"variante": variante, "dpi": dpi, "tollerante": tol, "migliora": pre,
                "per_tipo": {}, "vere": 0, "trovate": 0, "trovate_incerte": 0, "finte": 0,
@@ -518,6 +525,14 @@ def main() -> int:
     args.out.with_suffix(".json").write_text(json.dumps(risultati, ensure_ascii=False, indent=1), encoding="utf-8")
     scrivi_report(risultati, args, args.out.with_suffix(".md"))
     print(f"Report: {args.out.with_suffix('.md')}")
+    if args.verifica:
+        male = [a for a in risultati if a["variante"] == "nativo"
+                and (a["trovate"] < a["vere"] or a["finte"] or a["trovate_incerte"])]
+        for a in male:
+            print(f"VERIFICA FALLITA: nativo tollerante={a['tollerante']}: "
+                  f"{a['trovate']}/{a['vere']} trovate, {a['finte']} finte, "
+                  f"{a['trovate_incerte']} vere segnalate solo come incerte", file=sys.stderr)
+        return 1 if male else 0
     return 0
 
 
