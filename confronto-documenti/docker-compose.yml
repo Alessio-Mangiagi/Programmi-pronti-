@@ -1,0 +1,22 @@
+# "><(((º> sabusabu <º)))><"
+# Confronto Documenti con Docker Compose (server Linux o PC con Docker):
+#   CONFRONTO_PASSWORD=una-password-lunga docker compose up -d --build
+# Poi http://<server>:8080 (in internet: sempre dietro un proxy HTTPS).
+services:
+  confronto:
+    build: .
+    image: confronto-documenti
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Obbligatoria se il server è raggiungibile da internet; vuota = nessun login
+      CONFRONTO_PASSWORD: ${CONFRONTO_PASSWORD:-}
+      CONFRONTO_UTENTE: ${CONFRONTO_UTENTE:-cosedil}
+      CONFRONTO_MAX_PARALLELI: ${CONFRONTO_MAX_PARALLELI:-2}
+      CONFRONTO_STORICO_GIORNI: ${CONFRONTO_STORICO_GIORNI:-30}
+    volumes:
+      - confronto-dati:/data     # cache OCR e storico dei confronti
+
+volumes:
+  confronto-dati:

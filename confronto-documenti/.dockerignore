@@ -1,0 +1,20 @@
+# "><(((º> sabusabu <º)))><"
+# Nel container vanno solo l'app e la UI (vedi COPY nel Dockerfile).
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ocr_cache/
+storico/
+logs/
+build/
+dist/
+tests/
+bench/
+tessdata/
+*.pdf
+*.exe
+*.spec
+.git
+.claude/

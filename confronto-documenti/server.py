@@ -65,15 +65,38 @@ app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
 # lo trova pathex in ConfrontaPDF.spec, che va tenuto allineato a questo path.
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared" / "sso"))
+SSO_SPENTO = os.environ.get("COSEDIL_SSO", "on").lower() == "off"
 try:
     import cosedil_sso
-except ImportError as err:   # gate assente = app senza login: meglio non partire
-    print(f"Gate SSO non trovato ({err}): shared/sso/cosedil_sso.py manca o non è "
-          "raggiungibile. Avvio annullato (COSEDIL_SSO=off per farne a meno).")
-    sys.exit(1)
-# COSEDIL_SSO=off per lo sviluppo in locale; COSEDIL_SSO_FAIL=open per tornare a
-# usare l'app da sola quando il portale è spento.
-cosedil_sso.init(app, app_id="confronta")
+except ImportError as err:
+    if not SSO_SPENTO:       # gate assente = app senza login: meglio non partire
+        print(f"Gate SSO non trovato ({err}): shared/sso/cosedil_sso.py manca o non è "
+              "raggiungibile. Avvio annullato (COSEDIL_SSO=off per farne a meno).")
+        sys.exit(1)
+    cosedil_sso = None       # login spento: l'app gira anche fuori dalla suite (Docker)
+# COSEDIL_SSO=off per lo sviluppo in locale o fuori dalla suite;
+# COSEDIL_SSO_FAIL=open per tornare a usare l'app da sola quando il portale è spento.
+if cosedil_sso is not None:
+    cosedil_sso.init(app, app_id="confronta")
+
+# Password semplice per l'uso fuori dall'ufficio (Docker / cloud, sempre dietro
+# HTTPS): con CONFRONTO_PASSWORD impostata ogni richiesta chiede utente e
+# password (HTTP Basic). Utente: CONFRONTO_UTENTE, default "cosedil".
+_PASSWORD = os.environ.get("CONFRONTO_PASSWORD", "")
+_UTENTE = os.environ.get("CONFRONTO_UTENTE", "cosedil")
+if _PASSWORD:
+    import hmac
+
+    @app.before_request
+    def _password_gate():
+        if request.path == "/healthz":          # controllo di salute del container
+            return None
+        auth = request.authorization
+        if (auth and hmac.compare_digest(auth.username or "", _UTENTE)
+                and hmac.compare_digest(auth.password or "", _PASSWORD)):
+            return None
+        return Response("Accesso riservato.", 401,
+                        {"WWW-Authenticate": 'Basic realm="Confronto Documenti", charset="UTF-8"'})
 
 # Errori del log (eccezioni nelle richieste, OCR fallito...) anche agli admin del
 # portale, nella pagina Avvisi (shared/avvisi). Facoltativo: nell'exe o fuori
@@ -902,6 +925,12 @@ def ui_asset(filename: str):
     return resp
 
 
+@app.get("/healthz")
+def healthz():
+    """Controllo di salute (Docker HEALTHCHECK, piattaforme cloud): niente dati."""
+    return jsonify({"ok": True, "tesseract": find_tesseract() is not None})
+
+
 @app.get("/api/models")
 def models():
     """Motori OCR locali disponibili: Tesseract sempre, PaddleOCR se installato."""
@@ -1112,7 +1141,9 @@ if __name__ == "__main__":
             ips = []
         for a in [socket.gethostname()] + ips:
             print(f"  in rete: http://{a}:{PORT}")
-        print(f"  login: {'nessuno (rete interna)' if os.environ.get('COSEDIL_SSO', 'on').lower() == 'off' else 'portale Suite Cosedil'}"
+        login = ("password (CONFRONTO_PASSWORD)" if _PASSWORD else
+                 "nessuno (rete interna)" if SSO_SPENTO else "portale Suite Cosedil")
+        print(f"  login: {login}"
               f" · confronti in parallelo: {MAX_PARALLELI} · dati: {storico.DATI}", flush=True)
     prune_cache(max_age_days=30)
     storico.pulisci()

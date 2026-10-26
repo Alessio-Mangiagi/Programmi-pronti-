@@ -22,9 +22,9 @@ import threading
 import time
 from pathlib import Path
 
-from confronta_pdf import app_dir
+from confronta_pdf import DATA_DIR
 
-DATI = Path(os.environ.get("CONFRONTO_DATI") or app_dir())
+DATI = DATA_DIR
 CARTELLA = DATI / "storico"
 GIORNI = int(os.environ.get("CONFRONTO_STORICO_GIORNI", "30"))
 

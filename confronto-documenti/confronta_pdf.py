@@ -64,7 +64,10 @@ def app_dir() -> Path:
     return Path(__file__).parent
 
 
-CACHE_DIR = app_dir() / ".ocr_cache"
+# Dati scrivibili (cache OCR, storico): CONFRONTO_DATI se impostata (es. il
+# volume /data in Docker), altrimenti la cartella dell'app.
+DATA_DIR = Path(os.environ.get("CONFRONTO_DATI") or app_dir())
+CACHE_DIR = DATA_DIR / ".ocr_cache"
 
 TESSERACT_CANDIDATES = [
     # copia portabile accanto all'exe/all'app (cartella Tesseract-OCR copiata
