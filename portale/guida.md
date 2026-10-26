@@ -63,6 +63,8 @@ Premi **Esci** in alto a destra per chiudere la tua sessione. È buona norma far
 Se il tuo account è amministratore (o accedi da una postazione abilitata), in alto compare il pulsante **Amministrazione**. Da lì puoi:
 
 - **Gestire gli utenti** — aggiungere o rimuovere persone, anche importandole in blocco da un file Excel o CSV.
+- **Cambiare la password di un utente** — pulsante **Password** sulla sua riga: ne generi una temporanea (la vedi una volta sola, comunicala tu) oppure la scegli. L'utente la cambia al primo accesso e viene scollegato da dove era entrato.
+- **Disattivare un utente** — pulsante **Disattiva**: non può più entrare e viene scollegato subito, ma restano il suo storico e i suoi programmi. **Riattiva** lo rimette com'era; **Elimina** lo toglie del tutto.
 - **Consultare gli accessi** — vedere chi ha aperto o avviato quale programma, con data e ora.
 
 Accanto ad Amministrazione c'è **Avvisi**: qui finiscono i problemi segnalati dai programmi (un lavoro automatico fallito, un'email non partita, scadenze nuove, un programma che si è fermato da solo...). Il numero accanto alla voce dice quanti avvisi sono da vedere, ed è rosso se tra questi c'è un errore. Appena entri, se ci sono avvisi nuovi, si apre un riquadro con i primi: **Apri gli avvisi** porta alla pagina, **Più tardi** lo chiude. Quando hai letto un avviso premi **Segna come visto**: passa nello storico, con il tuo nome e l'ora.

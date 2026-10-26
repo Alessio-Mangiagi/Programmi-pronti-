@@ -208,6 +208,7 @@ button { font: inherit; }
 .u-name b { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .u-meta { font-size: 11.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .u-role { font-family: var(--font-cond); font-weight: 800; font-stretch: 80%; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; border: 1.5px solid currentColor; padding: 2px 5px; }
+.u-role.off { color: #c0392b; }
 .u-num { text-align: right; font-variant-numeric: tabular-nums; }
 .u-num b { font-family: var(--font-cond); font-weight: 900; font-stretch: 62%; font-size: 22px; line-height: 1; display: block; }
 .u-num small { font-size: 10px; color: var(--grey); white-space: nowrap; }

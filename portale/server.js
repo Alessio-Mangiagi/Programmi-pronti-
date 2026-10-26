@@ -643,7 +643,7 @@ function riepilogoUtenti(accessi, utenti, ora = Date.now()) {
     const login = mie.filter((e) => e.azione === 'login');
     const ultimaApp = mie.find(usoApp);
     return {
-      username: u.username, nome: u.nome, ruolo: u.ruolo,
+      username: u.username, nome: u.nome, ruolo: u.ruolo, disattivato: !!u.disattivato,
       ultimaAttivita: mie[0] ? mie[0].ts : null,
       ultimoAccesso: login[0] ? login[0].ts : null,
       accessi30: login.filter(dopo30).length,
@@ -902,6 +902,18 @@ function makeUser(username, nome, password, ruolo, mustChange) {
     sv: 1,
   };
 }
+// Perché un admin NON può disattivare quell'utente ('' = può). Funzione pura
+// (testata). Non se stesso, e mai l'ultimo admin attivo: resterebbe un
+// portale che nessuno può più amministrare.
+function motivoNoDisattiva(utenti, username, me) {
+  const u = utenti.find((x) => x.username === username);
+  if (!u) return 'Utente non trovato';
+  if (username === me) return 'Non puoi disattivare te stesso';
+  const adminAttivi = utenti.filter((x) => x.ruolo === 'admin' && !x.disattivato);
+  if (u.ruolo === 'admin' && !u.disattivato && adminAttivi.length <= 1) return "È l'ultimo amministratore attivo";
+  return '';
+}
+
 function verifyPw(user, password) {
   const h = Buffer.from(hashPw(password, user.salt), 'hex');
   const stored = Buffer.from(user.hash, 'hex');
@@ -954,7 +966,7 @@ function getSession(req) {
   // è un file piccolo letto dal filesystem (in cache dell'OS): il costo per
   // richiesta è trascurabile rispetto alla verifica HMAC appena fatta.
   const u = loadUtenti().find((x) => x.username === s.username);
-  if (!u || (u.sv || 1) !== (p.v || 1)) return null;
+  if (!u || u.disattivato || (u.sv || 1) !== (p.v || 1)) return null;
   return s;
 }
 
@@ -1826,6 +1838,15 @@ async function handle(req, res) {
     }
     clearLoginFails(key);
     clearLoginFails(keyIp);   // login riuscito: il PC non è (più) sospetto
+    // Disattivato da un admin: lo si dice solo a chi ha la password giusta,
+    // così il messaggio non rivela quali account esistono.
+    if (user.disattivato) {
+      logAccesso({
+        ts: new Date().toISOString(), username: user.username, nome: user.nome,
+        appId: null, appNome: null, azione: 'login-disattivato', ip,
+      });
+      return sendJson(res, 403, { ok: false, error: 'Account disattivato: rivolgiti a un amministratore' });
+    }
     const adm = admForIp(ip);   // app in cui questo IP eleva l'utente ad admin
     logAccesso({
       ts: new Date().toISOString(), username: user.username, nome: user.nome,
@@ -2181,6 +2202,7 @@ async function handle(req, res) {
       const list = loadUtenti().map((u) => ({
         username: u.username, nome: u.nome, ruolo: u.ruolo, creato: u.creato,
         apps: Array.isArray(u.apps) ? u.apps : predefinite,
+        attivo: !u.disattivato, mustChange: !!u.mustChange,
       }));
       // assegnabili: le app da proporre come caselle nella tabella utenti.
       return sendJson(res, 200, { utenti: list, assegnabili: appAssegnabili() });
@@ -2258,6 +2280,67 @@ async function handle(req, res) {
       dettaglio: uname + ' -> ' + (u.apps.join(', ') || 'nessun programma'),
     });
     return sendJson(res, 200, { ok: true, apps: u.apps });
+  }
+
+  // ---- Password di un utente impostata dall'admin ----
+  // Con "password" nel corpo si usa quella; senza, se ne genera una temporanea,
+  // restituita UNA volta (il server tiene solo l'hash). In entrambi i casi
+  // l'utente la cambia al primo accesso, le sue sessioni aperte si chiudono
+  // (sv++) e cade l'eventuale blocco per tentativi falliti.
+  const mPw = /^\/api\/utenti\/([^/]+)\/password$/.exec(p);
+  if (mPw && req.method === 'POST') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const uname = decodeURIComponent(mPw[1]);
+    const { password } = await readJsonBody(req);
+    const scelta = String(password || '');
+    if (scelta && scelta.length < MIN_PW_LEN) return sendJson(res, 400, { ok: false, error: `La password deve avere almeno ${MIN_PW_LEN} caratteri` });
+    const list = loadUtenti();
+    const u = list.find((x) => x.username === uname);
+    if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    if (uname === session.username) return sendJson(res, 400, { ok: false, error: 'La tua password la cambi da «Password»' });
+    const nuova = scelta || passwordTemporanea();
+    u.salt = crypto.randomBytes(16).toString('hex');
+    u.hash = hashPw(nuova, u.salt);
+    u.mustChange = true;
+    u.sv = (u.sv || 1) + 1;
+    u.sbloccatoIl = new Date().toISOString();   // vale anche per l'altro portale (vedi /api/login)
+    saveUtenti(list);
+    sbloccaUtente(u.username);
+    logAccesso({
+      ts: u.sbloccatoIl, username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: 'reset-password', per: uname,
+    });
+    return sendJson(res, 200, { ok: true, password: scelta ? null : nuova });
+  }
+
+  // ---- Disattiva / riattiva un utente ----
+  // Disattivato = resta in elenco con storico e programmi, ma non entra: il
+  // login lo rifiuta e getSession scarta i cookie che ha già (sv++ per
+  // sicurezza anche sul gate SSO delle app). Riattivarlo lo rimette com'era.
+  const mAtt = /^\/api\/utenti\/([^/]+)\/attivo$/.exec(p);
+  if (mAtt && req.method === 'PUT') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const uname = decodeURIComponent(mAtt[1]);
+    const { attivo } = await readJsonBody(req);
+    const list = loadUtenti();
+    const u = list.find((x) => x.username === uname);
+    if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    if (!attivo) {
+      const no = motivoNoDisattiva(list, uname, session.username);
+      if (no) return sendJson(res, 400, { ok: false, error: no });
+      u.disattivato = true;
+      u.disattivatoIl = new Date().toISOString();
+      u.sv = (u.sv || 1) + 1;
+    } else {
+      delete u.disattivato;
+      delete u.disattivatoIl;
+    }
+    saveUtenti(list);
+    logAccesso({
+      ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: attivo ? 'riattiva' : 'disattiva', per: uname,
+    });
+    return sendJson(res, 200, { ok: true, attivo: !u.disattivato });
   }
 
   if (p.startsWith('/api/utenti/') && req.method === 'DELETE') {
@@ -2355,6 +2438,7 @@ module.exports = {
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,   // plancia degli admin
   normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,   // avvisi dei programmi
   ipInterno, validaRichiesta, passwordTemporanea,  // richieste di aiuto dal login
+  motivoNoDisattiva,                               // utenti disattivati dagli admin
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,   // presenza/azioni nelle app
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
 };

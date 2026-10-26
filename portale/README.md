@@ -71,6 +71,13 @@ Il portale verifica lo stato di ogni servizio (porta in ascolto) ogni pochi seco
 
 Sulle card, gli **amministratori del portale** vedono un pulsante quadrato **Ferma** accanto ad "Apri" (solo se l'app è accesa): chiude il processo in ascolto su quella porta, con conferma. Serve a liberare RAM sul server centrale. Un'app fermata a mano non viene riaccesa dall'avvio a caldo finché qualcuno non preme "Avvia" (o non si riavvia il portale).
 
+### Utenti: password e disattivazione
+
+Dalla pagina **Amministrazione** l'admin, oltre a creare utenti a mano o da foglio `.xlsx`/`.csv`, per ogni riga può:
+
+- **Password** → `POST /api/utenti/<username>/password` con `{ password }` (min 8 caratteri) o vuoto per una temporanea generata, restituita una sola volta. Imposta `mustChange`, incrementa `sv` (scollega le sessioni aperte) e toglie il blocco per tentativi falliti. Registrato come `reset-password`.
+- **Disattiva / Riattiva** → `PUT /api/utenti/<username>/attivo` con `{ attivo }`. Campo `disattivato` in `utenti.json`: il login risponde *Account disattivato* (solo a chi ha la password giusta) e `getSession` scarta i suoi cookie, quindi anche il gate SSO delle app. Non si può disattivare se stessi né l'ultimo admin attivo. Registrato come `disattiva`/`riattiva`.
+
 ### Chi vede quali programmi
 
 Si decide dall'area **Amministrazione** (link in alto nella home, solo per gli admin), riquadro **Utenti**. Ogni riga ha la colonna *Programmi visibili*, una casella per programma: spuntare abilita, togliere revoca, il salvataggio è immediato. Le stesse caselle sono nel form di creazione, così un utente nasce già con i suoi programmi. Gli admin hanno *tutti (admin)*: entrano ovunque per ruolo, senza spunte.

@@ -7,12 +7,14 @@ const AZIONE_LABEL = { avvia: 'Avvio', apri: 'Apertura', login: 'Login portale',
 
 let accessi = [];
 let assegnabili = [];   // programmi assegnabili: [{ id, nome, riservata }]
+let meUsername = null;  // la propria riga non ha azioni: password da «Password», niente auto-disattivazione
 
 async function loadMe() {
   const r = await fetch('/api/me');
   if (r.status === 401) { window.location.href = '/login'; return; }
   const me = await r.json();
   if (me.mustChange) { window.location.href = '/password'; return; }
+  meUsername = me.username;
   document.getElementById('userName').textContent = me.nome;
   document.getElementById('avatar').textContent = iniz(me.nome);
 }
@@ -88,18 +90,88 @@ async function loadUtenti() {
   assegnabili = data.assegnabili || [];
   const body = document.getElementById('userBody');
   body.innerHTML = (data.utenti || []).map(u => `
-    <tr>
+    <tr class="${u.attivo ? '' : 'off'}">
       <td><div class="who"><span class="av">${esc(iniz(u.nome))}</span><span>${esc(u.nome)}</span></div></td>
       <td class="muted">${esc(u.username)}</td>
       <td>${u.ruolo === 'admin' ? '<span class="badge avvia"><span class="dot"></span>Admin</span>' : '<span class="muted">Utente</span>'}</td>
+      <td>${statoUtente(u)}</td>
       <td>${celleAccessi(u)}</td>
-      <td class="num"><button class="btn-ghost" data-del="${esc(u.username)}">Elimina</button></td>
+      <td class="num azioni-utente">${u.username === meUsername ? '<span class="muted">sei tu</span>' : `
+        <button class="btn-link" data-pw="${esc(u.username)}" data-nome="${esc(u.nome)}">Password</button>
+        <button class="btn-link" data-att="${esc(u.username)}" data-attivo="${u.attivo ? '0' : '1'}">${u.attivo ? 'Disattiva' : 'Riattiva'}</button>
+        <button class="btn-ghost" data-del="${esc(u.username)}">Elimina</button>`}</td>
     </tr>
   `).join('');
   body.querySelectorAll('[data-app]').forEach(c => c.addEventListener('change', () => salvaAccessi(c.dataset.user)));
   renderAppsForm();
+  body.querySelectorAll('[data-pw]').forEach(b => b.addEventListener('click', () => apriPassword(b.dataset.pw, b.dataset.nome)));
+  body.querySelectorAll('[data-att]').forEach(b => b.addEventListener('click', () => cambiaAttivo(b.dataset.att, b.dataset.attivo === '1')));
   body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => delUtente(b.dataset.del)));
 }
+
+function statoUtente(u) {
+  if (!u.attivo) return '<span class="badge off"><span class="dot"></span>Disattivato</span>';
+  if (u.mustChange) return '<span class="badge login" title="Al prossimo accesso dovrà scegliere una sua password"><span class="dot"></span>Password da cambiare</span>';
+  return '<span class="badge apri"><span class="dot"></span>Attivo</span>';
+}
+
+// Disattivato = non entra più e viene scollegato subito; storico e programmi
+// restano, e "Riattiva" lo rimette com'era. Per toglierlo del tutto c'è "Elimina".
+async function cambiaAttivo(username, attivo) {
+  if (!attivo && !confirm(`Disattivare "${username}"?\n\nNon potrà più entrare nel portale e le sue sessioni aperte si chiudono subito. Potrai riattivarlo quando vuoi.`)) return;
+  const r = await fetch('/api/utenti/' + encodeURIComponent(username) + '/attivo', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attivo }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (data.ok) { toast(username + (attivo ? ' riattivato' : ' disattivato')); loadUtenti(); }
+  else toast(data.error || 'Errore');
+}
+
+// ---- Password di un utente ----
+const pwDlg = document.getElementById('pwDlg');
+let pwUtente = null;
+
+function apriPassword(username, nome) {
+  pwUtente = username;
+  document.getElementById('pwForm').reset();
+  document.getElementById('pwSceltaFld').hidden = true;
+  document.getElementById('pwEsito').innerHTML = '';
+  document.getElementById('pwOk').hidden = false;
+  document.getElementById('pwChiudi').textContent = 'Annulla';
+  document.getElementById('pwSotto').textContent =
+    `${nome} (${username}) dovrà cambiarla al primo accesso. Le sue sessioni aperte si chiudono.`;
+  pwDlg.showModal();
+}
+
+document.querySelectorAll('[name="pwModo"]').forEach(r => r.addEventListener('change', () => {
+  const scegli = document.querySelector('[name="pwModo"]:checked').value === 'scegli';
+  document.getElementById('pwSceltaFld').hidden = !scegli;
+  document.getElementById('pwScelta').required = scegli;
+  if (scegli) document.getElementById('pwScelta').focus();
+}));
+
+document.getElementById('pwChiudi').addEventListener('click', () => pwDlg.close());
+
+document.getElementById('pwForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const esito = document.getElementById('pwEsito');
+  const scegli = document.querySelector('[name="pwModo"]:checked').value === 'scegli';
+  const password = scegli ? document.getElementById('pwScelta').value : '';
+  const r = await fetch('/api/utenti/' + encodeURIComponent(pwUtente) + '/password', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!data.ok) { esito.innerHTML = `<span class="ko">${esc(data.error || 'Errore')}</span>`; return; }
+  document.getElementById('pwOk').hidden = true;
+  document.getElementById('pwChiudi').textContent = 'Chiudi';
+  // La temporanea si vede solo qui, una volta: il server non la conserva in chiaro.
+  esito.innerHTML = data.password
+    ? `Password temporanea: <code>${esc(data.password)}</code><br><span class="muted">Comunicala all'utente: non sarà più visibile.</span>`
+    : '<span class="ok">Password impostata.</span>';
+  loadUtenti();
+});
 
 // Caselle di una riga utente: un programma per casella. Un admin entra ovunque
 // per ruolo, quindi le sue caselle non si spuntano: si dice perché.
@@ -241,6 +313,6 @@ document.getElementById('logout').addEventListener('click', async () => {
   window.location.href = '/login';
 });
 
-loadMe();
+// La tabella utenti aspetta loadMe: senza meUsername la propria riga avrebbe i pulsanti.
+loadMe().then(loadUtenti);
 loadAccessi();
-loadUtenti();

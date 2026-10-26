@@ -200,6 +200,7 @@ const AZIONI = {
   login: 'Accesso', logout: 'Uscita', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
   chiudi: 'Chiusura', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
   'richiesta-aiuto': 'Richiesta aiuto', 'reset-password': 'Reset password', 'richiesta-gestita': 'Richiesta gestita',
+  disattiva: 'Disattivazione', riattiva: 'Riattivazione', 'login-disattivato': 'Accesso rifiutato (disattivato)',
 };
 
 // ---------------------------------------------------------------- richieste di aiuto
@@ -383,7 +384,7 @@ function renderUtenti() {
     return `<button type="button" class="urow" role="option" data-utente="${esc(u.username)}" aria-selected="${u.username === selezionato}">
       <span class="u-av${ora.length ? ' live' : u.attivoOggi ? ' oggi' : ''}" title="${ora.length ? 'In uso adesso' : u.attivoOggi ? 'Attivo oggi' : ''}">${esc(iniz(u.nome))}</span>
       <span class="u-name"><b>${esc(u.nome)}</b><span class="u-meta">${esc(u.username)} · ${esc(meta)}</span></span>
-      <span class="u-role">${u.ruolo === 'admin' ? 'Admin' : 'Utente'}</span>
+      <span class="u-role${u.disattivato ? ' off' : ''}">${u.disattivato ? 'Disattivato' : u.ruolo === 'admin' ? 'Admin' : 'Utente'}</span>
       <span class="u-num"><b>${u.accessi30}</b><small>accessi 30 gg</small></span>
       <span class="u-app" title="${app ? 'Ultima app: ' + esc(app.nome) : ''}">${app ? esc(sigla(app)) : '—'}</span>
     </button>`;

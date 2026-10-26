@@ -32,6 +32,7 @@ const {
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,
   normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,
   ipInterno, validaRichiesta, passwordTemporanea,
+  motivoNoDisattiva,
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,
 } = require('./server.js');
 
@@ -680,4 +681,19 @@ test('APPS: ogni app ha attività e guida per la home utenti', () => {
     assert.ok(a.fai && a.fai.length < 60, a.id + ' fai');
     assert.ok(a.guida && a.guida.length > 40, a.id + ' guida');
   }
+});
+
+test("motivoNoDisattiva: non se stessi, non l'ultimo admin attivo", () => {
+  const u = [
+    { username: 'capo', ruolo: 'admin' },
+    { username: 'vice', ruolo: 'admin', disattivato: true },
+    { username: 'mrossi', ruolo: 'utente' },
+  ];
+  assert.equal(motivoNoDisattiva(u, 'mrossi', 'capo'), '');
+  assert.match(motivoNoDisattiva(u, 'capo', 'capo'), /te stesso/);
+  assert.match(motivoNoDisattiva(u, 'capo', 'mrossi'), /ultimo amministratore/);
+  assert.match(motivoNoDisattiva(u, 'nessuno', 'capo'), /non trovato/);
+  // Con un secondo admin attivo il primo si può disattivare.
+  u[1].disattivato = false;
+  assert.equal(motivoNoDisattiva(u, 'capo', 'vice'), '');
 });

@@ -43,7 +43,29 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.login .dot { background: #9aa0a6; }
 .badge.abilita { background: rgba(25,143,217,0.12); color: var(--cosedil-blue-light); }
 .badge.abilita .dot { background: var(--cosedil-blue-light); }
+.badge.off { background: rgba(192,57,43,0.10); color: #c0392b; }
+.badge.off .dot { background: #c0392b; }
 .muted { color: var(--cosedil-gray); }
+tbody tr.off td { color: var(--cosedil-gray); }
+.azioni-utente { white-space: nowrap; }
+.azioni-utente .btn-link { margin-left: 0.6rem; }
+
+/* Password di un utente impostata dall'admin */
+.pw-dlg { border: 1px solid var(--cosedil-border); border-radius: var(--radius); box-shadow: var(--shadow-card-hover, 0 10px 30px rgba(0,0,0,.15)); padding: 1.4rem 1.5rem; width: min(440px, calc(100vw - 32px)); }
+.pw-dlg::backdrop { background: rgba(21,25,30,.45); }
+.pw-dlg h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.2rem; color: var(--cosedil-text-strong); margin: 0 0 0.3rem; }
+.pw-sotto { font-size: 0.85rem; color: var(--cosedil-gray); margin: 0 0 1rem; line-height: 1.45; }
+.pw-dlg .chk { display: flex; margin-bottom: 0.5rem; }
+.pw-dlg .fld { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.4rem 0 0.2rem; }
+.pw-dlg .fld[hidden] { display: none; }
+.pw-dlg .fld label { font-family: var(--font-ui); font-weight: 600; font-size: 0.75rem; color: var(--cosedil-gray); }
+.pw-dlg input[type=text] { font-family: var(--font-body); font-size: 0.9rem; border: 1px solid #d2d2d2; border-radius: var(--radius-btn); padding: 0.5rem 0.65rem; }
+.pw-esito { font-family: var(--font-ui); font-size: 0.85rem; margin: 0.8rem 0; line-height: 1.6; }
+.pw-esito code { font-size: 1rem; background: var(--cosedil-bg-alt); border-radius: 4px; padding: 0.15rem 0.45rem; color: var(--cosedil-blue); user-select: all; }
+.pw-esito .ok { color: var(--cosedil-green-text); font-weight: 600; }
+.pw-esito .ko { color: #c0392b; font-weight: 600; }
+.pw-azioni { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; }
+.pw-azioni [hidden] { display: none; }
 .empty { padding: 2.5rem 1.35rem; text-align: center; color: var(--cosedil-gray); }
 
 .btn { font-family: var(--font-display); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; border-radius: var(--radius-btn); padding: 0.6rem 1.1rem; cursor: pointer; border: 1px solid transparent; transition: all 0.2s var(--ease-out); display: inline-flex; align-items: center; gap: 0.4rem; }

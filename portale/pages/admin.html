@@ -83,7 +83,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Nome</th><th>Username</th><th>Ruolo</th><th>Programmi visibili</th><th></th></tr>
+            <tr><th>Nome</th><th>Username</th><th>Ruolo</th><th>Stato</th><th>Programmi visibili</th><th></th></tr>
           </thead>
           <tbody id="userBody"></tbody>
         </table>
@@ -120,6 +120,26 @@
       </div>
     </section>
   </main>
+
+  <!-- Password di un utente impostata dall'admin: scelta a mano o generata.
+       In entrambi i casi l'utente la cambia al primo accesso. -->
+  <dialog class="pw-dlg" id="pwDlg" aria-labelledby="pwTitolo">
+    <form method="dialog" id="pwForm">
+      <h2 id="pwTitolo">Nuova password</h2>
+      <p class="pw-sotto" id="pwSotto"></p>
+      <label class="chk"><input type="radio" name="pwModo" value="genera" checked /> <span>Generane una temporanea</span></label>
+      <label class="chk"><input type="radio" name="pwModo" value="scegli" /> <span>La scelgo io</span></label>
+      <div class="fld" id="pwSceltaFld" hidden>
+        <label for="pwScelta">Password (min 8 caratteri)</label>
+        <input id="pwScelta" type="text" autocomplete="off" minlength="8" />
+      </div>
+      <p class="pw-esito" id="pwEsito" role="status"></p>
+      <div class="pw-azioni">
+        <button type="button" class="btn-link" id="pwChiudi">Annulla</button>
+        <button type="submit" class="btn btn-primary" id="pwOk">Imposta password</button>
+      </div>
+    </form>
+  </dialog>
 
   <div class="toast" id="toast"></div>
 
