@@ -89,7 +89,8 @@ export default function IfcView({ url, markups, selectedRef, drawing, onPick, on
         setProgress(null);
       } catch (err) {
         console.error("viewer IFC:", err);
-        // web-ifc genera codice a runtime: con una CSP senza 'unsafe-eval' non parte (docs/adr.md ADR-22)
+        // fino a web-ifc 0.0.57 embind generava codice con eval, bloccato dalla CSP (ADR-22): ora non più, ma se
+        // una versione futura lo reintroducesse l'utente riceve un messaggio chiaro invece dell'errore tecnico
         const blocked = err instanceof EvalError || /Content Security Policy|unsafe-eval/i.test((err as Error).message);
         if (alive) setError(blocked
           ? "il viewer 3D non può avviarsi con le impostazioni di sicurezza di questa installazione. Usa «Scarica» per aprire il modello in un programma BIM."
