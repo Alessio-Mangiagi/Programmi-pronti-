@@ -87,7 +87,9 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
     <MarkupLayer page={page} markups={markups} numbers={numbers} selectedId={selectedId} drawing={drawing}
                  draft={draft && "page" in draft ? draft : null} onDraw={(a) => { setDraft(a); setDrawing(false); setPanel(true); }} onSelect={setSelectedId} />
   );
-  const step = (dir: 1 | -1) => setZoom((z) => ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, ZOOMS.indexOf(z) + dir))]);
+  const step = (dir: 1 | -1) => setZoom((z) => (dir > 0
+    ? ZOOMS.find((x) => x > z + 0.001) ?? ZOOMS[ZOOMS.length - 1]
+    : [...ZOOMS].reverse().find((x) => x < z - 0.001) ?? ZOOMS[0]));
 
   return (
     <Dialog open fullScreen onClose={onClose} aria-label="Visualizzatore documento">
@@ -107,9 +109,9 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           )}
           {isPdf && !browserPdf && (
             <Stack direction="row" alignItems="center">
-              <IconButton aria-label="Riduci" disabled={zoom === ZOOMS[0]} onClick={() => step(-1)}><ZoomOutIcon /></IconButton>
+              <IconButton aria-label="Riduci" disabled={zoom <= ZOOMS[0]} onClick={() => step(-1)}><ZoomOutIcon /></IconButton>
               <Typography variant="body2" width={44} textAlign="center">{Math.round(zoom * 100)}%</Typography>
-              <IconButton aria-label="Ingrandisci" disabled={zoom === ZOOMS[ZOOMS.length - 1]} onClick={() => step(1)}><ZoomInIcon /></IconButton>
+              <IconButton aria-label="Ingrandisci" disabled={zoom >= ZOOMS[ZOOMS.length - 1]} onClick={() => step(1)}><ZoomInIcon /></IconButton>
               {pages > 0 && <Typography variant="caption" color="text.secondary" ml={0.5}>{pages} pag.</Typography>}
             </Stack>
           )}
@@ -163,7 +165,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
           {link && !error && (isPdf && !browserPdf ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <PdfView url={link.url} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
+              <PdfView key={link.url} url={link.url}
+                       onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
             </Suspense>
           ) : isIfc ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>

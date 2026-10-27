@@ -17,6 +17,7 @@ export interface PdfViewProps {
   zoom: number;
   focusPage: { page: number; seq: number } | null;
   onPages: (n: number) => void;
+  onFit?: (zoom: number) => void;      // zoom che adatta la prima pagina alla larghezza disponibile
   overlay: (page: number) => ReactNode;
 }
 
@@ -34,11 +35,12 @@ function useDocument(url: string | null | undefined) {
   return state;
 }
 
-export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, overlay }: PdfViewProps) {
+export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onFit, overlay }: PdfViewProps) {
   const { doc: pdf, error } = useDocument(url);
   const { doc: cmp, error: cmpError } = useDocument(compareUrl);
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
+  const fitted = useRef(false);
 
   useEffect(() => {
     if (!pdf) return;
@@ -49,6 +51,12 @@ export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, ove
     });
     return () => { alive = false; };
   }, [pdf]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!base || fitted.current || !container.current) return;
+    fitted.current = true;
+    onFit?.((container.current.clientWidth - 48) / base.w);
+  });
 
   useEffect(() => {
     if (!focusPage) return;

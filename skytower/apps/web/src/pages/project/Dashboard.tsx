@@ -70,7 +70,7 @@ export function DashboardTab({ project }: { project: Project }) {
         <Typography variant="caption" color="text.secondary">Aggiornato alle {new Date(d.generated_at).toLocaleTimeString("it-IT")}</Typography>
       </Stack>
 
-      <Box display="grid" gap={1.5} gridTemplateColumns="repeat(auto-fill, minmax(190px, 1fr))">
+      <Box display="grid" gap={1.5} gridTemplateColumns="repeat(auto-fill, minmax(165px, 1fr))">
         <Stat label="Documenti" value={d.documents.total} sub={`${d.documents.by_state.PUBLISHED ?? 0} pubblicati`} />
         <Stat label="In approvazione" value={d.awaiting.workflows_running} sub={`${d.awaiting.tasks_open} compiti aperti`} />
         <Stat label="Compiti scaduti" value={d.awaiting.tasks_overdue} critical={d.awaiting.tasks_overdue > 0} sub="da sollecitare" />
@@ -267,7 +267,7 @@ function Weekly({ uploads }: { uploads: Kpi["uploads"] }) {
     d.setDate(d.getDate() - (11 - i) * 7);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const rows = uploads.filter((u) => u.week === key);
-    return { key, label: day(d.toISOString()), total: rows.reduce((s, r) => s + r.n, 0), rows };
+    return { key, label: day(d.toISOString()), short: `${d.getDate()}/${d.getMonth() + 1}`, total: rows.reduce((s, r) => s + r.n, 0), rows };
   });
   const max = Math.max(1, ...weeks.map((w) => w.total));
   const total = weeks.reduce((s, w) => s + w.total, 0);
@@ -285,8 +285,9 @@ function Weekly({ uploads }: { uploads: Kpi["uploads"] }) {
       </Box>
       <Box display="flex" gap="2px" mt={0.5}>
         {weeks.map((w, i) => (
-          <Typography key={w.key} flex={1} variant="caption" color="text.secondary" textAlign="center" noWrap>
-            {i % 3 === 0 ? w.label : ""}
+          <Typography key={w.key} flex={1} minWidth={0} variant="caption" color="text.secondary" textAlign="center"
+                      whiteSpace="nowrap" overflow="visible">
+            {i % 3 === 0 ? w.short : ""}
           </Typography>
         ))}
       </Box>
