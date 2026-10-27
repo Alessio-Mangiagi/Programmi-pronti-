@@ -68,8 +68,21 @@ cd apps/api
 - `tests/test_db_isolation.py` — 113 casi direttamente sul database come `cde_app` (scenari T1–T10, matrice ruolo × azione, escalation, append-only).
 - `tests/test_api_auth.py` — login, lockout, rate limit, MFA TOTP/recovery, rotazione refresh e riuso (T9), inviti, reset.
 - `tests/test_api_admin.py` — isolamento via HTTP (404 vs 403), grant, membri, ruoli, flusso completo del Project Admin.
+- `tests/test_security_owasp.py` — OWASP API Top 10 su tutte le rotte dell'app (BOLA, token contraffatti, mass assignment, header); vedi `docs/pentest.md`.
+- `tests/test_api_naming_auto.py` — rinomina automatica, serie, numeri consecutivi, prenotazioni.
 
 In CI si usa un Postgres 16 di servizio (`CDE_TEST_SUPERUSER_URI`).
+
+Test nel browser (Playwright): avviano da soli un ambiente usa-e-getta (`cde dev --reset` su una cartella
+dati propria, porte 8310/4310), quindi non toccano `.devdata` né l'istanza su 8100.
+
+```powershell
+cd apps/web
+npm run e2e        # rinomina e prenotazione, stati CDE, approvazione con pubblicazione, ricerca nel PDF
+```
+
+Altri strumenti: `infra/load/carico.py` (utenti concorrenti) e `infra/load/upload.py` (upload paralleli),
+risultati in `docs/prestazioni.md`; `infra/smoke.py` dopo ogni deploy (`docs/runbook.md`); collaudo utenti in `docs/uat.md`.
 
 ## Sicurezza: principi applicati
 
