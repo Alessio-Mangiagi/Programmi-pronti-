@@ -25,6 +25,7 @@ from .modules import (
     notifications,
     organizations,
     projects,
+    reports,
     rfis,
     states,
     transmittals,
@@ -101,6 +102,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return svc.tokens.jwks
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
-                   rfis, audit, markups, dashboard, transmittals):
+                   rfis, audit, markups, dashboard, transmittals, reports):
         app.include_router(module.router)
     return app
