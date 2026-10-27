@@ -1,21 +1,24 @@
 // "><(((º> sabusabu <º)))><"
+import { lazy, Suspense } from "react";
 import { Link as RouterLink, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Box, Breadcrumbs, Link, Stack, Tab, Tabs, Typography } from "@mui/material";
+import { Alert, Box, Breadcrumbs, LinearProgress, Link, Stack, Tab, Tabs, Typography } from "@mui/material";
 import { api, ApiError, Project } from "../api";
-import { AreasTab } from "./project/Areas";
 import { FolderView } from "./project/Folder";
-import { PrivateAreasTab } from "./project/PrivateAreas";
-import { AuditTab } from "./project/Audit";
-import { DashboardTab } from "./project/Dashboard";
-import { RfisTab } from "./project/Rfis";
-import { TransmittalsTab } from "./project/Transmittals";
 import { ReportMenu } from "../components/ReportMenu";
-import { WorkflowsTab } from "./project/Workflows";
-import { MembersTab } from "./project/Members";
-import { OrganizationsTab } from "./project/Organizations";
-import { RolesTab } from "./project/Roles";
-import { NamingTab } from "./project/Naming";
+
+// Le schede diverse da Cartelle si caricano quando si aprono: il bundle iniziale resta leggero.
+const AreasTab = lazy(() => import("./project/Areas").then((m) => ({ default: m.AreasTab })));
+const PrivateAreasTab = lazy(() => import("./project/PrivateAreas").then((m) => ({ default: m.PrivateAreasTab })));
+const AuditTab = lazy(() => import("./project/Audit").then((m) => ({ default: m.AuditTab })));
+const DashboardTab = lazy(() => import("./project/Dashboard").then((m) => ({ default: m.DashboardTab })));
+const RfisTab = lazy(() => import("./project/Rfis").then((m) => ({ default: m.RfisTab })));
+const TransmittalsTab = lazy(() => import("./project/Transmittals").then((m) => ({ default: m.TransmittalsTab })));
+const WorkflowsTab = lazy(() => import("./project/Workflows").then((m) => ({ default: m.WorkflowsTab })));
+const MembersTab = lazy(() => import("./project/Members").then((m) => ({ default: m.MembersTab })));
+const OrganizationsTab = lazy(() => import("./project/Organizations").then((m) => ({ default: m.OrganizationsTab })));
+const RolesTab = lazy(() => import("./project/Roles").then((m) => ({ default: m.RolesTab })));
+const NamingTab = lazy(() => import("./project/Naming").then((m) => ({ default: m.NamingTab })));
 
 const TABS = [
   { path: "cartelle", label: "Cartelle" },
@@ -63,6 +66,7 @@ export function ProjectPage() {
           {tabs.map((t) => <Tab key={t.path} label={t.label} component={RouterLink} to={`/progetti/${projectId}/${t.path}`} />)}
         </Tabs>
       </Box>
+      <Suspense fallback={<LinearProgress />}>
       <Routes>
         <Route index element={<Navigate to="cartelle" replace />} />
         <Route path="container" element={<Navigate to="../cartelle" replace />} />
@@ -82,6 +86,7 @@ export function ProjectPage() {
         <Route path="ruoli" element={<RolesTab project={project} canManage={isProjectAdmin} />} />
         <Route path="naming" element={<NamingTab project={project} canManage={isProjectAdmin} />} />
       </Routes>
+      </Suspense>
     </Stack>
   );
 }

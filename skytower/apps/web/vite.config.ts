@@ -18,4 +18,17 @@ export default defineConfig({
   plugins: [react()],
   server: { port: 5195, strictPort: true, proxy: api },
   preview: { port: 5195, strictPort: true, proxy: api },
+  build: {
+    rollupOptions: {
+      output: {
+        // librerie in chunk separati: cambiano di rado, quindi restano in cache tra un rilascio e l'altro
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          mui: ["@mui/material", "@emotion/react", "@emotion/styled"],
+          "mui-tree": ["@mui/x-tree-view"],
+          query: ["@tanstack/react-query"],
+        },
+      },
+    },
+  },
 });
