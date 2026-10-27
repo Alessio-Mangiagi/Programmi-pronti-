@@ -14,11 +14,15 @@ click==8.5.0
 colorama==0.4.6
 croniter==6.2.4
 cryptography==50.0.2
+defusedxml==0.7.1
 Deprecated==3.0.0
 dnspython==2.9.0
 email-validator==2.3.0
+et-xmlfile==2.0.0
 fastapi==0.161.1
 filetype==1.2.0
+fonttools==4.67.0
+fpdf2==2.8.1
 h11==0.16.0
 httptools==0.9.0
 idna==3.20
@@ -27,6 +31,7 @@ jmespath==1.1.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 limits==5.8.0
+openpyxl==3.1.5
 opentelemetry-api==1.45.1
 packaging==26.3
 pillow==13.0.0
