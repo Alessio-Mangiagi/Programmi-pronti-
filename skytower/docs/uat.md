@@ -30,6 +30,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U06 (ricerca nel testo, annotazioni) | `viewer.spec.ts`, `annotazioni.spec.ts` |
 | U07, U08, U09, U10 | `approvazione.spec.ts` |
 | U11 (differenze in rosso/blu, verificate sui pixel) | `confronto.spec.ts` |
+| U12 (caricamento, albero spaziale, vista 3D non vuota) | `ifc.spec.ts` |
 | U13, U14 | `rfi.spec.ts` |
 | U15 | `transmittal.spec.ts` |
 | U16, U17, U18 | `admin.spec.ts` |
@@ -38,8 +39,8 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U22 | `profilo.spec.ts`, `mfa.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 
-Resta solo manuale il modello IFC 3D (U12): il rendering WebGL va giudicato a occhio. Per tutti gli altri
-scenari il collaudo valuta chiarezza e usabilità.
+Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
+(in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
 
 ## Scenari
 
