@@ -283,8 +283,8 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                 {!item.auto && item.check?.valid && <Chip size="small" color="primary" variant="outlined"
                                             label={`${item.check.current_revision ?? "nuovo"} → ${item.check.next_revision}`} />}
                 {item.phase === "uploading"
-                  ? <IconButton size="small" onClick={() => item.controller?.abort()}><CloseIcon fontSize="small" /></IconButton>
-                  : item.phase !== "done" && <IconButton size="small" onClick={async () => {
+                  ? <IconButton size="small" aria-label={`Interrompi il caricamento di ${item.file.name}`} onClick={() => item.controller?.abort()}><CloseIcon fontSize="small" /></IconButton>
+                  : item.phase !== "done" && <IconButton size="small" aria-label={`Togli ${item.file.name} dall'elenco`} onClick={async () => {
                       await abortUpload(item.file);
                       setItems((l) => l.filter((i) => i !== item));
                     }}><CloseIcon fontSize="small" /></IconButton>}

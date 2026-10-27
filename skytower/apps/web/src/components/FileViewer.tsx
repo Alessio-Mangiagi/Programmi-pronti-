@@ -171,14 +171,14 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           )}
           {isPdf && (
             <Tooltip title="Il visualizzatore del browser permette la stampa, senza annotazioni">
-              <ToggleButton size="small" value="browser" selected={browserPdf} onChange={() => { setBrowserPdf((b) => !b); setDrawing(false); }}>
+              <ToggleButton size="small" value="browser" selected={browserPdf} sx={{ color: "text.primary" }} onChange={() => { setBrowserPdf((b) => !b); setDrawing(false); }}>
                 Visualizzatore del browser
               </ToggleButton>
             </Tooltip>
           )}
           {canEdit && !editing && <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>Modifica</Button>}
           {canDraw && (
-            <ToggleButton size="small" value="draw" selected={drawing} color="primary" onChange={() => setDrawing((d) => !d)}>
+            <ToggleButton size="small" value="draw" selected={drawing} color="primary" sx={{ color: "text.primary" }} onChange={() => setDrawing((d) => !d)}>
               <DrawIcon fontSize="small" sx={{ mr: 0.5 }} />Annota
             </ToggleButton>
           )}
@@ -192,7 +192,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
         </Toolbar>
       </AppBar>
       <Box display="flex" flexGrow={1} minHeight={0}>
-        <Box data-pdf-scroll flexGrow={1} bgcolor="#525659" overflow="auto" minWidth={0} display="flex" flexDirection="column"
+        <Box data-pdf-scroll tabIndex={0} role="region" aria-label="Contenuto del documento" flexGrow={1} bgcolor="#525659" overflow="auto" minWidth={0} display="flex" flexDirection="column"
              alignItems={fill ? "stretch" : "center"} justifyContent={fill ? "flex-start" : "center"}>
           {rev && rev.scan_status !== "CLEAN" && (
             <Alert severity={rev.scan_status === "PENDING" ? "info" : "error"}>
