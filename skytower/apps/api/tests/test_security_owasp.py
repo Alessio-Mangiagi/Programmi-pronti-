@@ -306,3 +306,34 @@ def test_api8_cors_origine_estranea(client):
 def test_api8_metodi_non_previsti(client, as_user):
     r = client.request("TRACE", "/me", headers=as_user("sub1_user"))
     assert r.status_code in (405, 404)
+
+
+# ---------------------------------------------------------------- IP del client dietro l'edge
+
+
+def _ip_of(header_name, headers):
+    from types import SimpleNamespace
+
+    from starlette.requests import Request
+
+    from cde_api.deps import client_ip
+
+    app = SimpleNamespace(state=SimpleNamespace(services=SimpleNamespace(
+        settings=SimpleNamespace(client_ip_header=header_name))))
+    scope = {"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+             "client": ("10.50.1.7", 41000), "app": app}
+    return client_ip(Request(scope))
+
+
+def test_ip_client_x_forwarded_for_ignorato():
+    """Senza header dell'edge configurato conta il peer TCP: X-Forwarded-For non sposta il rate limit."""
+    assert _ip_of(None, {"X-Forwarded-For": "1.2.3.4"}) == "10.50.1.7"
+
+
+def test_ip_client_da_cloudfront():
+    h = "cloudfront-viewer-address"
+    assert _ip_of(h, {h: "203.0.113.9:51234"}) == "203.0.113.9"
+    assert _ip_of(h, {h: "2001:db8::17:443"}) == "2001:db8::17"
+    assert _ip_of(h, {h: "[2001:db8::17]:443"}) == "2001:db8::17"
+    assert _ip_of(h, {h: "non-un-ip:1"}) is None
+    assert _ip_of(h, {}) == "10.50.1.7"

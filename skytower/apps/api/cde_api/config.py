@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     # Rate limit: memory:// in dev, redis://host:6379 in staging/prod
     rate_limit_storage: str = "memory://"
+    # Header con l'IP del client impostato dall'edge (prod: "cloudfront-viewer-address", "ip:porta").
+    # Solo se l'origin non è raggiungibile direttamente: altrimenti chiunque potrebbe falsificarlo.
+    client_ip_header: str | None = None
     login_rate_limit: str = "5/minute"
 
     # Lockout progressivo

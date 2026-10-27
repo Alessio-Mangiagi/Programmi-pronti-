@@ -41,8 +41,13 @@ def services(request: Request) -> Services:
 
 
 def client_ip(request: Request) -> str | None:
-    """IP del client (dietro ALB: uvicorn --proxy-headers). None se non è un indirizzo valido."""
-    host = request.client.host if request.client else None
+    """IP del client: header dell'edge se configurato (CloudFront-Viewer-Address), altrimenti il peer TCP.
+    None se non è un indirizzo valido."""
+    header = request.app.state.services.settings.client_ip_header
+    if header and (value := request.headers.get(header)):
+        host = value.rsplit(":", 1)[0].strip("[]")   # "ip:porta", IPv6 anche senza parentesi
+    else:
+        host = request.client.host if request.client else None
     try:
         return str(ipaddress.ip_address(host)) if host else None
     except ValueError:
