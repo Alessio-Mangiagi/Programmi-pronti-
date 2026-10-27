@@ -237,6 +237,7 @@ def validate_name(project_id: uuid.UUID, body: NameCheckIn, c: Ctx = Depends(ctx
             out["archived"] = bool(doc and doc["archived_at"])
             out["current_revision"] = latest["revision_code"] if latest else None
             out["next_revision"] = _next_wip(conn, doc["id"]) if doc else next_wip_revision(None)
+            out["reserved_elsewhere"] = doc is None and _reserved_elsewhere(conn, project_id, result.identifier)
         return out
 
 
@@ -250,6 +251,11 @@ def propose_name(project_id: uuid.UUID, body: NameProposalIn, c: Ctx = Depends(c
         result, _ = check_name(conn, project, name)
         return {"name": name, "number": number, "source_filename": body.filename,
                 **result.model_dump(include={"valid", "identifier", "fields", "errors"})}
+
+
+class ReservationIn(AutoNameIn):
+    count: int = Field(default=1, ge=1, le=50)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class NameProposalsIn(BaseModel):
@@ -270,6 +276,62 @@ def propose_names(project_id: uuid.UUID, body: NameProposalsIn, c: Ctx = Depends
             out.append({"name": name, "number": number, "source_filename": item.filename,
                         **result.model_dump(include={"valid", "identifier", "fields", "errors"})})
         return out
+
+
+RESERVATION_SQL = """
+    SELECT r.id, r.identifier, r.naming_fields, r.note, r.created_at, r.used_at, r.document_id, r.released_at,
+           r.reserved_by, u.first_name || ' ' || u.last_name AS reserved_by_name
+    FROM cde.naming_reservations r JOIN cde.users u ON u.id = r.reserved_by"""
+
+
+@router.post("/projects/{project_id}/naming/reservations", status_code=201)
+def reserve_names(project_id: uuid.UUID, body: ReservationIn, c: Ctx = Depends(ctx)):
+    """Prenota identificativi conformi con il progressivo della serie (elenco elaborati da produrre)."""
+    with c.tx() as conn:
+        project = require_project(conn, project_id, "WRITE")
+        ids = []
+        for _ in range(body.count):
+            name, _ = auto_name(conn, project, "", body.fields, reserve=True)
+            result, _ = check_name(conn, project, name)
+            if not result.valid:
+                raise ApiError(422, "invalid_name", "; ".join(f"{e.label}: {e.message}" for e in result.errors))
+            ids.append(conn.execute(
+                """INSERT INTO cde.naming_reservations (project_id, identifier, naming_fields, organization_id,
+                       reserved_by, note)
+                   VALUES (%s, %s, %s, cde.current_app_org(), cde.current_app_user(), %s) RETURNING id""",
+                [project_id, result.identifier, Jsonb(result.fields), body.note]).fetchone()["id"])
+        security_event(conn, "NAMING_RESERVED", user_id=c.user_id, project_id=project_id, ip=c.ip, count=len(ids))
+        return conn.execute(RESERVATION_SQL + " WHERE r.id = ANY(%s) ORDER BY r.identifier", [ids]).fetchall()
+
+
+@router.get("/projects/{project_id}/naming/reservations")
+def list_reservations(project_id: uuid.UUID, status: Literal["open", "all"] = "open", c: Ctx = Depends(ctx)):
+    """Prenotazioni della propria organizzazione (quelle delle altre non sono visibili)."""
+    with c.tx() as conn:
+        require_project(conn, project_id)
+        where = " AND r.used_at IS NULL AND r.released_at IS NULL" if status == "open" else ""
+        return conn.execute(RESERVATION_SQL + " WHERE r.project_id = %s" + where
+                            + " ORDER BY r.created_at DESC, r.identifier LIMIT 500", [project_id]).fetchall()
+
+
+@router.post("/naming/reservations/{reservation_id}/release")
+def release_reservation(reservation_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Rinuncia a un identificativo prenotato e non usato: il numero non torna disponibile."""
+    with c.tx() as conn:
+        row = conn.execute("SELECT * FROM cde.naming_reservations WHERE id = %s", [reservation_id]).fetchone()
+        if row is None:
+            raise not_found("Prenotazione")
+        if row["used_at"] or row["released_at"]:
+            raise ApiError(409, "reservation_closed", "Prenotazione già usata o rilasciata")
+        conn.execute("UPDATE cde.naming_reservations SET released_at = now() WHERE id = %s", [reservation_id])
+        security_event(conn, "NAMING_RESERVATION_RELEASED", user_id=c.user_id, project_id=row["project_id"], ip=c.ip,
+                       identifier=row["identifier"])
+        return conn.execute(RESERVATION_SQL + " WHERE r.id = %s", [reservation_id]).fetchone()
+
+
+def _reserved_elsewhere(conn, project_id: uuid.UUID, identifier: str) -> bool:
+    return conn.execute("SELECT cde.identifier_reserved_elsewhere(%s, %s) AS r",
+                        [project_id, identifier]).fetchone()["r"]
 
 
 # ---------------------------------------------------------------------
@@ -334,6 +396,8 @@ def initiate_upload(body: UploadInitIn, c: Ctx = Depends(ctx)):
                                         [project["id"], result.identifier]).fetchone()["t"]:
             # esiste in un container che non vedo: l'identificativo è comunque univoco nel progetto
             raise ApiError(409, "identifier_taken", "Identificativo già usato nel progetto")
+        if doc is None and _reserved_elsewhere(conn, project["id"], result.identifier):
+            raise ApiError(409, "identifier_reserved", "Identificativo prenotato da un'altra organizzazione")
         if doc and doc["container_id"] != body.container_id:
             raise ApiError(409, "wrong_container", "Il documento esiste in un altro container: caricare la revisione lì")
         latest = _latest_revision(conn, doc["id"]) if doc else None
@@ -433,6 +497,10 @@ def complete_upload(upload_id: uuid.UUID, c: Ctx = Depends(ctx)):
                 [doc_id, s["project_id"], s["container_id"], s["identifier"], Jsonb(s["naming_fields"]),
                  meta["title"], meta.get("description"), Jsonb(meta.get("attributes") or {})],
             )
+            # una prenotazione della propria organizzazione per questo identificativo è ora usata
+            conn.execute("""UPDATE cde.naming_reservations SET used_at = now(), document_id = %s
+                            WHERE project_id = %s AND identifier = %s AND used_at IS NULL AND released_at IS NULL""",
+                         [doc_id, s["project_id"], s["identifier"]])
         else:
             doc_id = doc["id"]
         code = _next_wip(conn, doc_id)

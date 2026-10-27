@@ -196,3 +196,92 @@ def test_schema_personalizzato_con_progressivo(client, api_world, as_user, auto_
     # il progressivo deve stare nello schema inviato
     bad = {**body, "auto_number": {"field": "number"}}
     assert client.put(url, headers=as_user("com_admin"), json=bad).status_code == 422
+
+
+# ---------------------------------------------------------------- prenotazione degli identificativi
+
+
+def _reserve(client, w, headers, fields, count=1, note=None):
+    return client.post(f"/projects/{w.project_id}/naming/reservations", headers=headers,
+                       json={"fields": fields, "count": count, "note": note})
+
+
+def test_prenotazione_e_consumo_nella_stessa_organizzazione(client, api_world, as_user, auto_settings, volume):
+    _, w = api_world
+    auto_settings(start=1, series=["volume"], defaults={"level": "00", "type": "DR", "role": "A"})
+    des, sub1 = as_user("des_lead"), as_user("sub1_user")
+
+    r = _reserve(client, w, des, {"volume": volume}, count=3, note="Tavole piano terra")
+    assert r.status_code == 201, r.text
+    ids = [x["identifier"] for x in r.json()]
+    assert ids == [f"PRJ01-DES-{volume}-00-DR-A-{n:04d}" for n in (1, 2, 3)]
+    assert r.json()[0]["note"] == "Tavole piano terra" and r.json()[0]["reserved_by_name"]
+
+    # la serie prosegue dopo i numeri prenotati, anche per la rinomina di altre organizzazioni
+    assert _propose(client, w, sub1, {"volume": volume}).json()["number"] == 4
+    seen_by_sub1 = client.get(f"/projects/{w.project_id}/naming/reservations", headers=sub1).json()
+    assert not set(ids) & {x["identifier"] for x in seen_by_sub1}           # prenotazioni altrui invisibili
+
+    # un collega della stessa organizzazione carica col numero prenotato: la prenotazione si consuma
+    rev = _upload_named(client, as_user("des_designer"), w.containers["des_arch"], ids[0] + ".pdf")
+    assert rev.status_code == 200, rev.text
+    mine = {x["identifier"]: x for x in client.get(f"/projects/{w.project_id}/naming/reservations", headers=des,
+                                                   params={"status": "all"}).json()}
+    assert mine[ids[0]]["used_at"] and mine[ids[0]]["document_id"] == rev.json()["document_id"]
+    still_open = {x["identifier"] for x in client.get(f"/projects/{w.project_id}/naming/reservations", headers=des).json()}
+    assert ids[0] not in still_open and {ids[1], ids[2]} <= still_open
+
+    # rilascio: una volta sola, solo dalla propria organizzazione; il numero non torna libero
+    rid = mine[ids[2]]["id"]
+    assert client.post(f"/naming/reservations/{rid}/release", headers=sub1).status_code == 404
+    rel = client.post(f"/naming/reservations/{rid}/release", headers=des)
+    assert rel.status_code == 200 and rel.json()["released_at"]
+    assert client.post(f"/naming/reservations/{rid}/release", headers=des).status_code == 409
+    assert client.post(f"/naming/reservations/{mine[ids[0]]['id']}/release", headers=des).status_code == 409
+    assert _propose(client, w, des, {"volume": volume}).json()["number"] == 4
+
+
+def test_schema_senza_originatore_prenotato_non_caricabile_da_altri(client, api_world, as_user, auto_settings):
+    """Senza campo originatore due organizzazioni possono scrivere lo stesso nome: vince la prenotazione."""
+    _, w = api_world
+    auto_settings(start=1)                      # ripristino a fine test
+    disc = "D" + os.urandom(1).hex().upper()[:1]
+    scheme = {"separator": "_", "fields": [
+        {"key": "project", "label": "Progetto", "kind": "fixed", "value": "PRJ01", "min_length": 5, "max_length": 5},
+        {"key": "disc", "label": "Disciplina", "kind": "list", "min_length": 2, "max_length": 2, "codes": {disc: "Prova"}},
+        {"key": "seq", "label": "Progressivo", "kind": "regex", "pattern": r"\d{3}", "min_length": 3, "max_length": 3},
+    ]}
+    r = client.put(f"/projects/{w.project_id}/document-settings", headers=as_user("com_admin"), json={
+        "naming_scheme": scheme, "metadata_schema": {"type": "object"},
+        "auto_number": {"field": "seq", "start": 1, "series": [], "defaults": {"disc": disc}}})
+    assert r.status_code == 200, r.text
+    reserved = _reserve(client, w, as_user("des_lead"), {}).json()[0]["identifier"]
+    assert reserved == f"PRJ01_{disc}_001"
+
+    sub1 = as_user("sub1_user")
+    v = client.post(f"/projects/{w.project_id}/naming/validate", headers=sub1, json={"name": reserved + ".pdf"}).json()
+    assert v["valid"] and v["reserved_elsewhere"] is True
+    r = client.post("/uploads/initiate", headers=sub1, json={
+        "container_id": str(w.containers["sub1_root"]), "filename": reserved + ".pdf", "size_bytes": len(PDF),
+        "sha256": hashlib.sha256(PDF).hexdigest(), "content_type": "application/pdf", "title": "Tentativo"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "identifier_reserved"
+    # per l'organizzazione che ha prenotato il nome è libero
+    v = client.post(f"/projects/{w.project_id}/naming/validate", headers=as_user("des_designer"),
+                    json={"name": reserved + ".pdf"}).json()
+    assert v["valid"] and v["reserved_elsewhere"] is False
+
+
+def test_prenotazione_richiede_scrittura(client, api_world, as_user, auto_settings, volume):
+    _, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
+    assert _reserve(client, w, as_user("des_viewer"), {"volume": volume}).status_code == 403
+    assert _reserve(client, w, as_user("des_lead"), {"volume": volume}, count=51).status_code == 422
+
+
+def _upload_named(client, headers, container_id, filename):
+    body = {"container_id": str(container_id), "filename": filename, "size_bytes": len(PDF),
+            "sha256": hashlib.sha256(PDF).hexdigest(), "content_type": "application/pdf", "title": "Da prenotazione"}
+    r = client.post("/uploads/initiate", headers=headers, json=body)
+    assert r.status_code == 201, r.text
+    put_parts(client, headers, r.json(), PDF)
+    return client.post(f"/uploads/{r.json()['upload_id']}/complete", headers=headers)
