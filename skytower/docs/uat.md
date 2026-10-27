@@ -33,11 +33,12 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U15 | `transmittal.spec.ts` |
 | U16, U17, U18 | `admin.spec.ts` |
 | U20 | `riservate.spec.ts` |
+| U21, U23 | `isolamento.spec.ts` |
 | U22 | `profilo.spec.ts`, `mfa.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 
-Restano solo manuali: confronto revisioni (U11), modello IFC (U12),
-isolamento da link copiato (U21, coperto però dai test API OWASP), uso da tablet (U23).
+Restano solo manuali il confronto visivo tra revisioni (U11) e il modello IFC 3D (U12): il rendering su canvas
+WebGL va giudicato a occhio. Per tutti gli altri il collaudo valuta chiarezza e usabilità.
 
 ## Scenari
 
