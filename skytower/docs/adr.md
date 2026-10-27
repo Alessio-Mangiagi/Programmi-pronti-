@@ -187,3 +187,45 @@ chi ha ruoli con scope PROJECT, con accesso concesso caso per caso.
   decisione.
 - `private_areas(progetto)` mostra a ogni membro anche le aree chiuse (nome e stato della propria richiesta):
   il nome dell'area non è considerato riservato, il contenuto sì.
+
+## ADR-17 — Viewer e annotazioni (migrazione 0011)
+
+**Decisione.**
+- **PDF** con PDF.js su canvas, pagine rese solo quando entrano in vista; resta disponibile il
+  visualizzatore del browser (ricerca nel testo, stampa). Il confronto tra due revisioni sovrappone le
+  pagine pixel per pixel: rosso = solo nella revisione aperta, blu = solo in quella di confronto.
+- **IFC** letto nel browser con web-ifc (WASM) e mostrato con three.js, invece della conversione in
+  "fragments" lato worker prevista dal piano: niente derivati da conservare e versionare, stesso URL
+  firmato del download. Da rivedere se il test di carico mostra modelli troppo grandi per il browser
+  (> 300–500 MB): allora conversione nel worker.
+- **DWG** non gestito: richiede Autodesk APS (licenza, invio del file a un servizio esterno). Si scarica.
+- **Annotazioni** (`revision_markups`, `markup_replies`): ancorate a pagina + rettangolo in coordinate
+  0..1 (indipendenti dallo zoom) oppure a un elemento del modello (GUID IFC); facoltativamente legate al
+  task di revisione. La visibilità riusa la RLS delle revisioni con sottoquery nelle policy; il testo è
+  immutabile, si risolve o si riapre (autore, organizzazione emittente, Project Admin).
+
+## ADR-18 — Cruscotto, transmittal e report (migrazioni 0012–0013)
+
+**Decisione.**
+- **KPI** calcolati live da `cde.project_dashboard()` (SECURITY DEFINER, solo Project Admin) invece di viste
+  materializzate: numeri sempre allineati, nessun job di refresh. Gli aggregati comprendono il WIP delle
+  altre organizzazioni solo come conteggi; il drill-down passa dalle API dei documenti, soggette alla RLS.
+  Se il test di carico (G56) lo richiede si passa a viste materializzate senza cambiare il contratto.
+- **Transmittal**: registro append-only con numero `TRM-nnnn` per commessa; le revisioni trasmesse sono
+  fotografate all'emissione (identificativo, revisione, idoneità, stato, file, SHA-256), così il protocollo
+  resta fedele anche dopo nuove revisioni. Si trasmettono solo revisioni condivise o pubblicate e
+  verificate. La trasmissione non concede accesso: il destinatario scarica secondo i propri permessi.
+  PDF generato al volo (fpdf2, font standard Latin-1).
+- **Report Excel** generati in modo sincrono nella transazione dell'utente (stessa RLS delle pagine), con
+  tetto di 50.000 righe; i testi che iniziano con `=` restano testo. Il passaggio a job asincrono con link a
+  scadenza è rimandato a quando i volumi lo richiederanno.
+
+## ADR-19 — Valore legale del registro (migrazione 0014)
+
+**Decisione.** L'ancora giornaliera dell'hash di testa viene scritta dal worker su S3 come JSON con
+Object Lock (`COMPLIANCE` in produzione, `GOVERNANCE` in sviluppo, 10 anni) e, se `CDE_TSA_URL` è
+configurato, marcata da una TSA RFC 3161 (in produzione una TSA qualificata eIDAS). La prova
+(`audit_anchor_proofs`) è append-only. La verifica confronta le ultime 14 ancore con l'hash attuale della
+catena e con la copia su S3: una riscrittura completa della catena da parte di chi ha accesso al database
+non passa inosservata. Il token TSA si verifica con strumenti standard (`openssl ts -verify`).
+

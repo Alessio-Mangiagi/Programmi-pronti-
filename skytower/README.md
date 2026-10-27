@@ -13,7 +13,8 @@ Piano di riferimento: [`docs/piano-sviluppo.md`](docs/piano-sviluppo.md) · deci
 | 3 | Stati CDE WIP → SHARED → PUBLISHED → archiviazione, visibilità per stato, bulk, liste < 200 ms su 100k | ✅ completato (0.3.0) |
 | 4 | Workflow di approvazione, scadenze, notifiche, RFI (API + designer workflow, inbox compiti, pagine RFI) | ✅ completato |
 | extra | Layout a tre colonne (commesse e cartelle · contenuto · "Per me"), profilo personale, aree riservate con richiesta di accesso | ✅ |
-| 5 | Audit trail con hash chain, verifica ed export CSV firmato ✅ · lettura in piattaforma di PDF/immagini/testo ✅ · viewer IFC/DWG e markup da fare | in corso |
+| 5 | Audit trail con hash chain, ancore giornaliere su S3 WORM + marca RFC 3161, export CSV firmato · viewer PDF (PDF.js, confronto tra revisioni), immagini, testo, modelli IFC 3D · annotazioni su pagina ed elemento | ✅ (manca il viewer DWG: richiede licenza Autodesk APS) |
+| 6 | Cruscotto KPI per il Project Manager · transmittal con protocollo e PDF · report Excel (documenti, approvazioni, RFI) | ✅ funzionale (restano test di carico, pentest, ambiente di produzione, UAT) |
 
 ## Struttura
 
