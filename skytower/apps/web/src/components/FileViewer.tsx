@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 // Lettura di un documento in piattaforma su URL firmato a scadenza: PDF con PDF.js (pagine su canvas e
 // annotazioni sovrapposte) oppure nel visualizzatore del browser (ricerca, stampa); immagini con
-// annotazioni; testo nel browser. Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
+// annotazioni; modelli IFC in 3D con annotazioni sugli elementi; testo nel browser. Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -15,11 +15,12 @@ import DrawIcon from "@mui/icons-material/Draw";
 import InfoIcon from "@mui/icons-material/Info";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { api, ApiError, type Anchor, type Markup } from "../api";
+import { api, ApiError, type Draft, type Markup } from "../api";
 import { MarkupLayer } from "./markup/MarkupLayer";
 import { MarkupPanel } from "./markup/MarkupPanel";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
+const IfcView = lazy(() => import("./markup/IfcView"));
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string }
 interface Doc { id: string; identifier: string; title: string; revisions: Rev[] }
@@ -58,7 +59,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const [zoom, setZoom] = useState(1.25);
   const [pages, setPages] = useState(0);
   const [drawing, setDrawing] = useState(false);
-  const [draft, setDraft] = useState<Anchor | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
   useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); }, [revisionId]);
@@ -68,12 +69,15 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
     .map((m, i) => [m.id, i + 1])), [markups]);
   const isPdf = link?.content_type === "application/pdf";
   const isImage = !!link?.content_type?.startsWith("image/");
-  const canDraw = (isPdf && !browserPdf) || isImage;
+  const isIfc = link?.content_type === "application/x-step";
+  const canDraw = (isPdf && !browserPdf) || isImage || isIfc;
+  const fill = (isPdf && !browserPdf) || isIfc;
+  const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
 
   const layer = (page: number) => (
-    <MarkupLayer page={page} markups={markups} numbers={numbers} selectedId={selectedId} drawing={drawing} draft={draft}
-                 onDraw={(a) => { setDraft(a); setDrawing(false); setPanel(true); }} onSelect={setSelectedId} />
+    <MarkupLayer page={page} markups={markups} numbers={numbers} selectedId={selectedId} drawing={drawing}
+                 draft={draft && "page" in draft ? draft : null} onDraw={(a) => { setDraft(a); setDrawing(false); setPanel(true); }} onSelect={setSelectedId} />
   );
   const step = (dir: 1 | -1) => setZoom((z) => ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, ZOOMS.indexOf(z) + dir))]);
 
@@ -124,7 +128,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
       </AppBar>
       <Box display="flex" flexGrow={1} minHeight={0}>
         <Box flexGrow={1} bgcolor="#525659" overflow="auto" minWidth={0} display="flex" flexDirection="column"
-             alignItems={isPdf && !browserPdf ? "stretch" : "center"} justifyContent={isPdf && !browserPdf ? "flex-start" : "center"}>
+             alignItems={fill ? "stretch" : "center"} justifyContent={fill ? "flex-start" : "center"}>
           {rev && rev.scan_status !== "CLEAN" && (
             <Alert severity={rev.scan_status === "PENDING" ? "info" : "error"}>
               {rev.scan_status === "PENDING" ? "Verifica antivirus in corso: riprova tra poco." : "File in quarantena: non visualizzabile."}
@@ -143,6 +147,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           {link && !error && (isPdf && !browserPdf ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <PdfView url={link.url} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
+            </Suspense>
+          ) : isIfc ? (
+            <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
+              <IfcView url={link.url} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
+                       onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>
           ) : isImage ? (
             <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "100%", m: 2 }}>

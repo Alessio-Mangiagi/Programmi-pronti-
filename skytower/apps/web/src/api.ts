@@ -186,6 +186,9 @@ export interface Markup {
 /** Area disegnata sulla pagina, in coordinate normalizzate 0..1 (w/h assenti = puntina). */
 export interface Anchor { page: number; x: number; y: number; w?: number; h?: number }
 
+/** Bozza di annotazione: area su una pagina oppure elemento di un modello (GUID IFC). */
+export type Draft = Anchor | { element_ref: string; label: string };
+
 export interface Project {
   id: string;
   code: string;

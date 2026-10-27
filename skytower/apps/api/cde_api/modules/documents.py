@@ -491,6 +491,7 @@ VIEWABLE = {
     "application/pdf": (".pdf",), "image/png": (".png",), "image/jpeg": (".jpg", ".jpeg"), "image/webp": (".webp",),
     "image/gif": (".gif",),
     "text/plain; charset=utf-8": (".txt", ".csv", ".log", ".svg"),   # SVG come testo: niente script nel browser
+    "application/x-step": (".ifc",),                                 # modello BIM: lo legge il viewer 3D (web-ifc)
 }
 
 

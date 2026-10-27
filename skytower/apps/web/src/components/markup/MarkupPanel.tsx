@@ -10,7 +10,7 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
 import ReplayIcon from "@mui/icons-material/Replay";
-import { api, ApiError, type Anchor, type Markup } from "../../api";
+import { api, ApiError, type Draft, type Markup } from "../../api";
 
 export const COLORS = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e24aa"];
 
@@ -20,7 +20,7 @@ export function MarkupPanel({ revisionId, taskId, markups, numbers, selectedId, 
   markups: Markup[];
   numbers: Map<string, number>;
   selectedId: string | null;
-  draft: Anchor | null;
+  draft: Draft | null;
   onClearDraft: () => void;
   onSelect: (m: Markup) => void;
 }) {
@@ -32,7 +32,9 @@ export function MarkupPanel({ revisionId, taskId, markups, numbers, selectedId, 
 
   const create = useMutation({
     mutationFn: () => api<Markup>(`/revisions/${revisionId}/markups`, {
-      method: "POST", json: { body: text.trim(), color, task_id: taskId ?? null, ...(draft ?? {}) },
+      method: "POST",
+      json: { body: text.trim(), color, task_id: taskId ?? null,
+              ...(draft ? ("element_ref" in draft ? { element_ref: draft.element_ref } : draft) : {}) },
     }),
     onSuccess: (m) => { setText(""); onClearDraft(); refresh(); onSelect(m); },
   });
@@ -53,8 +55,8 @@ export function MarkupPanel({ revisionId, taskId, markups, numbers, selectedId, 
       <Paper variant="outlined" sx={{ mx: 2, p: 1.5, borderColor: draft ? "primary.main" : "divider" }}>
         <Typography variant="caption" color="text.secondary" display="block" mb={1}>
           {draft
-            ? `${draft.w ? "Area" : "Punto"} a pagina ${draft.page}`
-            : "Commento generale. Per annotare un punto, attiva \"Annota\" e traccia un'area sulla pagina."}
+            ? ("element_ref" in draft ? `Elemento: ${draft.label || draft.element_ref}` : `${draft.w ? "Area" : "Punto"} a pagina ${draft.page}`)
+            : "Commento generale. Per annotare, attiva \"Annota\" e traccia un'area sulla pagina o scegli un elemento del modello."}
         </Typography>
         <TextField size="small" fullWidth multiline minRows={2} maxRows={8} placeholder="Scrivi l'osservazione…"
                    value={text} onChange={(e) => setText(e.target.value)} inputProps={{ maxLength: 4000 }} />
