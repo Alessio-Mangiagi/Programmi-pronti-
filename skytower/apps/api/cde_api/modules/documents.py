@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import base64
 import binascii
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import jsonschema
 from fastapi import APIRouter, Depends, Query, Response
-from iso19650 import NamingScheme, ValidationResult, default_scheme, next_wip_revision
+from iso19650 import AutoNumbering, NamingScheme, ValidationResult, default_scheme, next_wip_revision
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field, field_validator
 
@@ -38,6 +39,7 @@ Suitability = Literal["S0", "S1", "S2", "S3", "S4", "A1", "A2", "A3", "A4", "A5"
 # ---------------------------------------------------------------------
 class DocumentSettingsIn(BaseModel):
     naming_scheme: NamingScheme | None = None
+    auto_number: AutoNumbering | None = None    # rinomina automatica in caricamento (None = disattivata)
     metadata_schema: dict = Field(default_factory=lambda: {"type": "object", "additionalProperties": True})
 
     @field_validator("metadata_schema")
@@ -54,6 +56,15 @@ class NameCheckIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
 
 
+class AutoNameIn(BaseModel):
+    """Valori dei campi scelti da chi carica; progressivo, campi fissi e predefiniti li mette l'API."""
+    fields: dict[str, str] = Field(default_factory=dict, max_length=12)
+
+
+class NameProposalIn(AutoNameIn):
+    filename: str = Field(min_length=1, max_length=255)
+
+
 class UploadInitIn(BaseModel):
     container_id: uuid.UUID
     filename: str = Field(min_length=3, max_length=255)
@@ -66,6 +77,7 @@ class UploadInitIn(BaseModel):
     comment: str | None = Field(default=None, max_length=2000)
     attributes: dict = Field(default_factory=dict)
     expected_revision: str | None = None       # lock ottimistico: ultima revisione vista dal client
+    auto_name: AutoNameIn | None = None        # rinomina secondo la naming convention (filename = nome originale)
 
 
 class PartRequest(BaseModel):
@@ -118,6 +130,38 @@ def load_settings(conn, project: dict) -> tuple[NamingScheme, dict, bool]:
     return scheme, metadata_schema, custom
 
 
+def load_auto_number(conn, project_id: uuid.UUID) -> AutoNumbering | None:
+    row = conn.execute("SELECT auto_number FROM cde.project_document_settings WHERE project_id = %s",
+                       [project_id]).fetchone()
+    return AutoNumbering.model_validate(row["auto_number"]) if row and row["auto_number"] else None
+
+
+def _extension(filename: str) -> str | None:
+    m = re.match(r"^.*\.([A-Za-z0-9]{1,10})$", filename.strip())
+    return m.group(1).lower() if m else None
+
+
+def auto_name(conn, project: dict, filename: str, chosen: dict[str, str], *, reserve: bool) -> tuple[str, int]:
+    """Nome conforme per un file caricato con un nome qualsiasi: valori scelti, poi predefiniti dell'admin,
+    originatore = organizzazione di chi carica, progressivo della serie (riservato solo se reserve)."""
+    scheme, _, _ = load_settings(conn, project)
+    auto = load_auto_number(conn, project["id"])
+    if auto is None:
+        raise ApiError(409, "auto_number_off", "Rinomina automatica non attiva: va configurata dal Project Admin")
+    values = {**auto.defaults, **{k: v.strip().upper() for k, v in chosen.items() if v and v.strip()}}
+    if any(f.key == "originator" for f in scheme.fields):
+        values["originator"] = _my_org_code(conn)
+    values.pop(auto.field, None)
+    fn = "cde.reserve_document_number" if reserve else "cde.peek_document_number"
+    number = conn.execute(f"SELECT {fn}(%s, %s, %s, %s) AS n",
+                          [project["id"], auto.field, Jsonb(scheme.series(auto, values)), auto.start]).fetchone()["n"]
+    try:
+        values[auto.field] = scheme.format_number(auto, number)
+    except ValueError as exc:
+        raise ApiError(409, "numbering_exhausted", str(exc)) from None
+    return scheme.compose(values, _extension(filename)), number
+
+
 def _validate_attributes(schema: dict, attributes: dict) -> None:
     errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(attributes), key=lambda e: list(e.path))
     if errors:
@@ -140,24 +184,33 @@ def get_document_settings(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         project = require_project(conn, project_id)
         scheme, metadata_schema, custom = load_settings(conn, project)
+        auto = load_auto_number(conn, project_id)
         return {"naming_scheme": scheme.model_dump(), "metadata_schema": metadata_schema, "custom_naming": custom,
-                "example": scheme.example()}
+                "example": scheme.example(), "auto_number": auto.model_dump() if auto else None}
 
 
 @router.put("/projects/{project_id}/document-settings")
 def put_document_settings(project_id: uuid.UUID, body: DocumentSettingsIn, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
-        require_project(conn, project_id, "ADMIN", "PROJECT")
+        project = require_project(conn, project_id, "ADMIN", "PROJECT")
+        if body.auto_number:
+            scheme = body.naming_scheme or default_scheme(project["code"], _participant_codes(conn, project_id))
+            try:
+                scheme.check_auto_numbering(body.auto_number)
+            except ValueError as exc:
+                raise ApiError(422, "invalid_auto_number", str(exc)) from None
         conn.execute(
-            """INSERT INTO cde.project_document_settings (project_id, naming_scheme, metadata_schema, updated_by)
-               VALUES (%(p)s, %(n)s, %(m)s, cde.current_app_user())
+            """INSERT INTO cde.project_document_settings (project_id, naming_scheme, metadata_schema, auto_number,
+                   updated_by)
+               VALUES (%(p)s, %(n)s, %(m)s, %(a)s, cde.current_app_user())
                ON CONFLICT (project_id) DO UPDATE SET naming_scheme = EXCLUDED.naming_scheme,
-                   metadata_schema = EXCLUDED.metadata_schema, updated_by = EXCLUDED.updated_by, updated_at = now()""",
+                   metadata_schema = EXCLUDED.metadata_schema, auto_number = EXCLUDED.auto_number,
+                   updated_by = EXCLUDED.updated_by, updated_at = now()""",
             {"p": project_id, "n": Jsonb(body.naming_scheme.model_dump()) if body.naming_scheme else None,
-             "m": Jsonb(body.metadata_schema)},
+             "m": Jsonb(body.metadata_schema), "a": Jsonb(body.auto_number.model_dump()) if body.auto_number else None},
         )
         security_event(conn, "DOCUMENT_SETTINGS_UPDATED", user_id=c.user_id, project_id=project_id, ip=c.ip,
-                       custom_naming=body.naming_scheme is not None)
+                       custom_naming=body.naming_scheme is not None, auto_number=body.auto_number is not None)
     return get_document_settings(project_id, c)
 
 
@@ -178,6 +231,18 @@ def validate_name(project_id: uuid.UUID, body: NameCheckIn, c: Ctx = Depends(ctx
             out["current_revision"] = latest["revision_code"] if latest else None
             out["next_revision"] = _next_wip(conn, doc["id"]) if doc else next_wip_revision(None)
         return out
+
+
+@router.post("/projects/{project_id}/naming/propose")
+def propose_name(project_id: uuid.UUID, body: NameProposalIn, c: Ctx = Depends(ctx)):
+    """Anteprima della rinomina automatica: il progressivo mostrato non è ancora riservato
+    (lo diventa all'avvio del caricamento, quindi può cambiare se altri caricano nel frattempo)."""
+    with c.tx() as conn:
+        project = require_project(conn, project_id)
+        name, number = auto_name(conn, project, body.filename, body.fields, reserve=False)
+        result, _ = check_name(conn, project, name)
+        return {"name": name, "number": number, "source_filename": body.filename,
+                **result.model_dump(include={"valid", "identifier", "fields", "errors"})}
 
 
 # ---------------------------------------------------------------------
@@ -224,7 +289,11 @@ def initiate_upload(body: UploadInitIn, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         container = require_container(conn, body.container_id, "WRITE")
         project = require_project(conn, container["project_id"])
-        result, _ = check_name(conn, project, body.filename)
+        filename, source_filename = body.filename, None
+        if body.auto_name is not None:
+            filename, _ = auto_name(conn, project, body.filename, body.auto_name.fields, reserve=True)
+            source_filename = body.filename
+        result, _ = check_name(conn, project, filename)
         if not result.valid:
             raise ApiError(422, "invalid_name", "; ".join(f"{e.label}: {e.message}" for e in result.errors))
 
@@ -259,14 +328,16 @@ def initiate_upload(body: UploadInitIn, c: Ctx = Depends(ctx)):
                    naming_fields, size_bytes, content_type, sha256, storage_key, s3_upload_id, part_size, part_count,
                    metadata, expires_at)
                VALUES (%s, %s, %s, cde.current_app_user(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            [upload_id, project["id"], body.container_id, body.filename, result.identifier, Jsonb(result.fields),
+            [upload_id, project["id"], body.container_id, filename, result.identifier, Jsonb(result.fields),
              body.size_bytes, body.content_type, bytes.fromhex(body.sha256), key, s3_upload_id, part_size, part_count,
              Jsonb({"title": body.title, "description": body.description, "suitability": body.suitability,
-                    "comment": body.comment, "attributes": body.attributes, "expected_revision": current}),
+                    "comment": body.comment, "attributes": body.attributes, "expected_revision": current,
+                    "source_filename": source_filename}),
              expires],
         )
         next_code = _next_wip(conn, doc["id"]) if doc else next_wip_revision(None)
-    return {"upload_id": upload_id, "identifier": result.identifier, "part_size": part_size, "part_count": part_count,
+    return {"upload_id": upload_id, "identifier": result.identifier, "filename": filename,
+            "source_filename": source_filename, "part_size": part_size, "part_count": part_count,
             "expires_at": expires, "document_id": doc["id"] if doc else None, "current_revision": current,
             "next_revision": next_code}
 
@@ -338,12 +409,16 @@ def complete_upload(upload_id: uuid.UUID, c: Ctx = Depends(ctx)):
         else:
             doc_id = doc["id"]
         code = _next_wip(conn, doc_id)
+        source = meta.get("source_filename")
+        comment = meta.get("comment")
+        if source:   # rinomina automatica: il nome di partenza resta nelle note della revisione
+            comment = "\n\n".join(filter(None, [comment, f"Nome originale del file: {source}"]))
         conn.execute(
             """INSERT INTO cde.document_revisions (id, document_id, project_id, sequence, revision_code, suitability,
-                   state, file_object_id, original_filename, comment, created_by)
-               VALUES (%s, %s, %s, %s, %s, %s, 'WIP', %s, %s, %s, cde.current_app_user())""",
+                   state, file_object_id, original_filename, source_filename, comment, created_by)
+               VALUES (%s, %s, %s, %s, %s, %s, 'WIP', %s, %s, %s, %s, cde.current_app_user())""",
             [revision_id, doc_id, s["project_id"], (latest["sequence"] + 1) if latest else 1, code,
-             meta.get("suitability") or "S0", file_id, s["filename"], meta.get("comment")],
+             meta.get("suitability") or "S0", file_id, s["filename"], source, comment],
         )
         conn.execute("UPDATE cde.upload_sessions SET status = 'COMPLETED', revision_id = %s, completed_at = now() "
                      "WHERE id = %s", [revision_id, upload_id])
@@ -368,7 +443,7 @@ def abort_upload(upload_id: uuid.UUID, c: Ctx = Depends(ctx)):
 # ---------------------------------------------------------------------
 REVISION_SQL = """
     SELECT r.id, r.document_id, r.sequence, r.revision_code, r.suitability, r.state, r.derived_from,
-           r.transition_reason, r.original_filename, r.comment,
+           r.transition_reason, r.original_filename, r.source_filename, r.comment,
            r.created_by, r.created_at, u.first_name || ' ' || u.last_name AS created_by_name,
            f.size_bytes, f.content_type, f.scan_status, f.sha256_verified, f.scan_detail,
            encode(f.sha256, 'hex') AS sha256

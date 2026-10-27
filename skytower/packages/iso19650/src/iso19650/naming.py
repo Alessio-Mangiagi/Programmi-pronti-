@@ -67,6 +67,18 @@ class ValidationResult(BaseModel):
     errors: list[FieldError] = Field(default_factory=list)
 
 
+class AutoNumbering(BaseModel):
+    """Rinomina automatica in caricamento, decisa dal Project Admin.
+
+    ``series``: campi i cui valori identificano una serie di numerazione. ``None`` = tutti gli altri
+    campi (un progressivo per ogni combinazione), ``[]`` = un solo progressivo per l'intero progetto.
+    ``defaults``: valori proposti per i campi che chi carica non indica."""
+    field: str = Field(default="number", pattern=r"^[a-z_]{2,30}$")
+    start: int = Field(default=1, ge=0, le=999_999_999)
+    series: list[str] | None = None
+    defaults: dict[str, str] = Field(default_factory=dict)
+
+
 class NamingScheme(BaseModel):
     separator: str = Field(default="-", min_length=1, max_length=1, pattern=r"^[-_.]$")
     fields: list[FieldSpec] = Field(min_length=2, max_length=12)
@@ -97,6 +109,39 @@ class NamingScheme(BaseModel):
             else:
                 parts.append(("0" if "\\d" in (f.pattern or "") else "X") * f.min_length)
         return self.separator.join(parts)
+
+    def check_auto_numbering(self, auto: AutoNumbering) -> None:
+        """Coerenza della configurazione con lo schema: ValueError con un messaggio per l'admin."""
+        if auto.field not in self._by_key:
+            raise ValueError(f"Campo progressivo '{auto.field}' assente nella naming convention")
+        spec = self.field(auto.field)
+        if spec.kind != "regex" or not re.fullmatch(spec.pattern, self.format_number(auto, max(auto.start, 1))):
+            raise ValueError(f"Il campo '{spec.label}' non accetta numeri progressivi")
+        unknown = [k for k in [*(auto.series or []), *auto.defaults] if k not in self._by_key or k == auto.field]
+        if unknown:
+            raise ValueError(f"Campi non validi nella configurazione: {', '.join(unknown)}")
+        for key, value in auto.defaults.items():
+            error = _check_field(self.field(key), value, None)
+            if error:
+                raise ValueError(f"Valore predefinito di '{error.label}': {error.message}")
+
+    def series(self, auto: AutoNumbering, values: dict[str, str]) -> dict[str, str]:
+        """Valori che identificano la serie di numerazione del nome composto."""
+        keys = auto.series if auto.series is not None else [f.key for f in self.fields if f.key != auto.field]
+        return {k: values[k] for k in keys if k in values}
+
+    def format_number(self, auto: AutoNumbering, number: int) -> str:
+        spec = self.field(auto.field)
+        text = str(number).zfill(spec.min_length)
+        if len(text) > spec.max_length:
+            raise ValueError(f"Progressivo {number} oltre le {spec.max_length} cifre del campo '{spec.label}'")
+        return text
+
+    def compose(self, values: dict[str, str], extension: str | None = None) -> str:
+        """Nome file dai valori dei campi (i campi fissi si compilano da soli)."""
+        parts = [f.value if f.kind == "fixed" else values.get(f.key, "") for f in self.fields]
+        stem = self.separator.join(parts)
+        return f"{stem}.{extension}" if extension else stem
 
     def validate_name(self, name: str, *, extra_codes: dict[str, set[str]] | None = None) -> ValidationResult:
         """Valida un nome file (estensione opzionale). ``extra_codes`` restringe ulteriormente

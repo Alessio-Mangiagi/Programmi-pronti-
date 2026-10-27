@@ -1,6 +1,7 @@
 # "><(((º> sabusabu <º)))><"
 import pytest
 from iso19650 import (
+    AutoNumbering,
     FieldSpec,
     NamingScheme,
     default_scheme,
@@ -184,3 +185,55 @@ def test_idoneita():
     assert suitability_stage("CR") == "PUBLISHED"
     with pytest.raises(ValueError):
         suitability_stage("S9")
+
+
+# ---------------------------------------------------------------------
+# Rinomina automatica: progressivo deciso dall'admin
+# ---------------------------------------------------------------------
+VALUES = {"originator": "DES", "volume": "ZZ", "level": "01", "type": "DR", "role": "A"}
+
+
+def test_compose_e_formato_numero(scheme):
+    auto = AutoNumbering()
+    name = scheme.compose({**VALUES, "number": scheme.format_number(auto, 7)}, "pdf")
+    assert name == "PRJ01-DES-ZZ-01-DR-A-0007.pdf"
+    assert scheme.validate_name(name).valid
+    assert scheme.compose(VALUES) == "PRJ01-DES-ZZ-01-DR-A-"
+    assert scheme.format_number(auto, 123456) == "123456"
+    with pytest.raises(ValueError, match="oltre le 6 cifre"):
+        scheme.format_number(auto, 1_000_000)
+
+
+def test_serie_di_numerazione(scheme):
+    assert scheme.series(AutoNumbering(), VALUES) == VALUES   # campi assenti (qui il fisso) ignorati
+    tutti = scheme.series(AutoNumbering(), {"project": "PRJ01", **VALUES})
+    assert tutti == {"project": "PRJ01", **VALUES}
+    assert scheme.series(AutoNumbering(series=["originator", "type"]), VALUES) == {"originator": "DES", "type": "DR"}
+    assert scheme.series(AutoNumbering(series=[]), VALUES) == {}
+
+
+def test_configurazione_valida(scheme):
+    scheme.check_auto_numbering(AutoNumbering(start=1, series=["originator"], defaults={"volume": "ZZ", "level": "ZZ"}))
+
+
+@pytest.mark.parametrize(("auto", "message"), [
+    (AutoNumbering(field="assente"), "assente nella naming convention"),
+    (AutoNumbering(field="type"), "non accetta numeri progressivi"),
+    (AutoNumbering(field="originator"), "non accetta numeri progressivi"),
+    (AutoNumbering(series=["inventato"]), "Campi non validi"),
+    (AutoNumbering(series=["number"]), "Campi non validi"),
+    (AutoNumbering(defaults={"inventato": "X"}), "Campi non validi"),
+    (AutoNumbering(defaults={"type": "QQ"}), "Valore predefinito di 'Tipo'"),
+])
+def test_configurazione_non_valida(scheme, auto, message):
+    with pytest.raises(ValueError, match=message):
+        scheme.check_auto_numbering(auto)
+
+
+def test_progressivo_su_campo_non_numerico():
+    scheme = NamingScheme(fields=[
+        FieldSpec(key="project", label="Progetto", kind="fixed", value="P1", min_length=2, max_length=2),
+        FieldSpec(key="code", label="Codice", kind="regex", pattern="[A-Z]{4}", min_length=4, max_length=4),
+    ])
+    with pytest.raises(ValueError, match="non accetta numeri progressivi"):
+        scheme.check_auto_numbering(AutoNumbering(field="code"))
