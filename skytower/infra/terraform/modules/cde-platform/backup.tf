@@ -1,5 +1,5 @@
 # "><(((º> sabusabu <º)))><"
-# AWS Backup: snapshot giornalieri e mensili del database, copiati nella regione DR.
+# AWS Backup: snapshot giornalieri e mensili del database, copiati nella regione DR (se enable_dr).
 # Si aggiungono al PITR di RDS (35 gg, RPO ~5') e servono per ripristini oltre la finestra PITR
 # o con la regione primaria non disponibile. Vault lock: nessuno può cancellare i recovery point.
 
@@ -9,9 +9,10 @@ resource "aws_backup_vault" "main" {
 }
 
 resource "aws_backup_vault" "dr" {
+  count       = local.dr
   provider    = aws.dr
   name        = "${local.prefix}-backup-dr"
-  kms_key_arn = module.kms_dr.key_arn
+  kms_key_arn = module.kms_dr[0].key_arn
 }
 
 resource "aws_backup_vault_lock_configuration" "main" {
@@ -22,8 +23,9 @@ resource "aws_backup_vault_lock_configuration" "main" {
 }
 
 resource "aws_backup_vault_lock_configuration" "dr" {
+  count               = local.dr
   provider            = aws.dr
-  backup_vault_name   = aws_backup_vault.dr.name
+  backup_vault_name   = aws_backup_vault.dr[0].name
   min_retention_days  = 35
   max_retention_days  = 3650
   changeable_for_days = 3
@@ -43,10 +45,13 @@ resource "aws_backup_plan" "db" {
       delete_after = 35
     }
 
-    copy_action {
-      destination_vault_arn = aws_backup_vault.dr.arn
-      lifecycle {
-        delete_after = 35
+    dynamic "copy_action" {
+      for_each = aws_backup_vault.dr
+      content {
+        destination_vault_arn = copy_action.value.arn
+        lifecycle {
+          delete_after = 35
+        }
       }
     }
   }
@@ -63,11 +68,14 @@ resource "aws_backup_plan" "db" {
       delete_after       = 3650 # 10 anni, come la retention dei documenti
     }
 
-    copy_action {
-      destination_vault_arn = aws_backup_vault.dr.arn
-      lifecycle {
-        cold_storage_after = 90
-        delete_after       = 3650
+    dynamic "copy_action" {
+      for_each = aws_backup_vault.dr
+      content {
+        destination_vault_arn = copy_action.value.arn
+        lifecycle {
+          cold_storage_after = 90
+          delete_after       = 3650
+        }
       }
     }
   }

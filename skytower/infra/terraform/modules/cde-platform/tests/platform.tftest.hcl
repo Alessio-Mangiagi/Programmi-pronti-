@@ -1,5 +1,5 @@
 # "><(((º> sabusabu <º)))><"
-# terraform test: plan/apply con provider simulati (nessuna credenziale AWS). Verifica che lo stack si
+# terraform test del modulo: plan/apply con provider simulati (nessuna credenziale AWS). Verifica che lo stack si
 # pianifichi senza cicli e che i requisiti di G58 non vengano allentati per errore.
 
 mock_provider "aws" {
@@ -206,6 +206,7 @@ mock_provider "aws" {
 }
 
 variables {
+  environment                = "prod"
   domain_name                = "cde.example.com"
   cloudfront_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/test"
   alb_certificate_arn        = "arn:aws:acm:eu-south-1:123456789012:certificate/test"
@@ -227,7 +228,7 @@ run "requisiti_produzione" {
   }
 
   assert {
-    condition     = aws_s3_bucket_replication_configuration.documents.rule[0].destination[0].replication_time[0].time[0].minutes == 15
+    condition     = aws_s3_bucket_replication_configuration.documents[0].rule[0].destination[0].replication_time[0].time[0].minutes == 15
     error_message = "Replica dei documenti con RTC a 15' (RPO)"
   }
 
@@ -260,4 +261,37 @@ run "mittente_email_valido" {
   }
 
   expect_failures = [var.mail_from]
+}
+
+run "staging_senza_dr" {
+  command = apply
+
+  variables {
+    environment      = "staging"
+    enable_dr        = false
+    db_multi_az      = false
+    nat_per_az       = false
+    object_lock_mode = "GOVERNANCE"
+    object_lock_days = 30
+  }
+
+  assert {
+    condition     = length(aws_s3_bucket_replication_configuration.documents) == 0 && length(aws_backup_vault.dr) == 0
+    error_message = "Senza DR non si crea niente nella regione di disaster recovery"
+  }
+
+  assert {
+    condition     = length(aws_backup_plan.db.rule) == 2 && alltrue([for r in aws_backup_plan.db.rule : length(r.copy_action) == 0])
+    error_message = "Senza DR i backup non si copiano altrove"
+  }
+
+  assert {
+    condition     = length([for e in jsondecode(aws_ecs_task_definition.api.container_definitions)[0].environment : e if e.name == "CDE_AUDIT_LOCK_MODE" && e.value == "GOVERNANCE"]) == 1
+    error_message = "Lock delle ancore coerente con l'ambiente"
+  }
+
+  assert {
+    condition     = !contains(keys(aws_cloudwatch_metric_alarm.this), "s3-replication-latency")
+    error_message = "Nessun allarme di replica senza replica"
+  }
 }

@@ -1,4 +1,5 @@
 # "><(((º> sabusabu <º)))><"
+# Ingressi dell'ambiente: tutto il resto ha i valori di produzione come default del modulo.
 variable "region" {
   description = "Regione AWS primaria (dati in UE)"
   type        = string
@@ -14,17 +15,6 @@ variable "dr_region" {
 variable "environment" {
   type    = string
   default = "prod"
-}
-
-variable "name" {
-  description = "Prefisso risorse"
-  type        = string
-  default     = "cde"
-}
-
-variable "vpc_cidr" {
-  type    = string
-  default = "10.50.0.0/16"
 }
 
 variable "domain_name" {
@@ -52,55 +42,6 @@ variable "image_tag" {
   type        = string
 }
 
-variable "db_instance_class" {
-  type    = string
-  default = "db.r6g.large"
-}
-
-variable "db_backup_retention_days" {
-  description = "PITR: 35 giorni (massimo RDS)"
-  type        = number
-  default     = 35
-}
-
-variable "api_cpu" {
-  type    = number
-  default = 1024
-}
-
-variable "api_memory" {
-  type    = number
-  default = 2048
-}
-
-variable "api_min_tasks" {
-  description = "Almeno 2 task su AZ diverse"
-  type        = number
-  default     = 2
-}
-
-variable "api_max_tasks" {
-  type    = number
-  default = 10
-}
-
-variable "worker_tasks" {
-  type    = number
-  default = 2
-}
-
-variable "object_lock_days" {
-  description = "Retention COMPLIANCE delle versioni dei documenti (irreversibile)"
-  type        = number
-  default     = 3650
-}
-
-variable "waf_rate_limit_per_5min" {
-  description = "Richieste per IP in 5 minuti oltre cui il WAF blocca"
-  type        = number
-  default     = 3000
-}
-
 variable "tsa_url" {
   description = "TSA qualificata eIDAS (RFC 3161) per le ancore del registro attività"
   type        = string
@@ -108,11 +49,7 @@ variable "tsa_url" {
 }
 
 variable "mail_from" {
-  description = "Mittente SES nel formato \"Nome <indirizzo>\" (l'indirizzo vincola la policy IAM)"
+  description = "Mittente SES nel formato \"Nome <indirizzo>\""
   type        = string
   default     = "CDE <no-reply@cde.example.com>"
-  validation {
-    condition     = can(regex("<[^@<>]+@[^@<>]+>", var.mail_from))
-    error_message = "mail_from deve contenere l'indirizzo tra < >."
-  }
 }

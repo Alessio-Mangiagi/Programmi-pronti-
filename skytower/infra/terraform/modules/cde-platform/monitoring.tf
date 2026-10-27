@@ -107,20 +107,6 @@ locals {
       threshold   = 75
       operator    = "GreaterThanThreshold"
     }
-    s3-replication-latency = {
-      description = "Replica dei documenti in DR oltre 15 minuti (RPO a rischio)"
-      namespace   = "AWS/S3"
-      metric      = "ReplicationLatency"
-      dimensions = {
-        SourceBucket      = module.documents_bucket.s3_bucket_id
-        DestinationBucket = module.documents_dr_bucket.s3_bucket_id
-        RuleId            = "dr"
-      }
-      statistic = "Maximum"
-      period    = 300
-      threshold = 900
-      operator  = "GreaterThanThreshold"
-    }
     app-errors = {
       description = "Righe ERROR nei log di API e worker oltre 10 in 5 minuti"
       namespace   = "CDE/${local.prefix}"
@@ -148,8 +134,27 @@ resource "aws_cloudwatch_log_metric_filter" "errors" {
   }
 }
 
+locals {
+  dr_alarms = var.enable_dr ? {
+    s3-replication-latency = {
+      description = "Replica dei documenti in DR oltre 15 minuti (RPO a rischio)"
+      namespace   = "AWS/S3"
+      metric      = "ReplicationLatency"
+      dimensions = {
+        SourceBucket      = module.documents_bucket.s3_bucket_id
+        DestinationBucket = module.documents_dr_bucket[0].s3_bucket_id
+        RuleId            = "dr"
+      }
+      statistic = "Maximum"
+      period    = 300
+      threshold = 900
+      operator  = "GreaterThanThreshold"
+    }
+  } : {}
+}
+
 resource "aws_cloudwatch_metric_alarm" "this" {
-  for_each = local.alarms
+  for_each = merge(local.alarms, local.dr_alarms)
 
   alarm_name          = "${local.prefix}-${each.key}"
   alarm_description   = each.value.description

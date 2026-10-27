@@ -42,7 +42,7 @@ resource "aws_ecs_cluster" "main" {
 resource "aws_cloudwatch_log_group" "ecs" {
   for_each          = toset(["api", "worker", "clamav", "migrate"])
   name              = "/ecs/${local.prefix}/${each.key}"
-  retention_in_days = 365
+  retention_in_days = var.log_retention_days
   kms_key_id        = module.kms_data.key_arn
 }
 
@@ -159,7 +159,7 @@ locals {
     CDE_CLIENT_IP_HEADER          = "cloudfront-viewer-address"
     CDE_COOKIE_SECURE             = "true"
     CDE_S3_BUCKET                 = module.documents_bucket.s3_bucket_id
-    CDE_AUDIT_LOCK_MODE           = "COMPLIANCE"
+    CDE_AUDIT_LOCK_MODE           = var.object_lock_mode
     CDE_TSA_URL                   = var.tsa_url
     CDE_SCANNER                   = "clamd"
     CDE_CLAMD_HOST                = "127.0.0.1"

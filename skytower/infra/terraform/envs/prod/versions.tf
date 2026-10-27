@@ -45,3 +45,11 @@ provider "aws" {
     tags = local.tags
   }
 }
+
+locals {
+  tags = {
+    Project     = "cde-iso19650"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
