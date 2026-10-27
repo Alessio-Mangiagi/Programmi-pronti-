@@ -50,7 +50,11 @@ def chiedi_si_no(domanda: str, default: bool = False) -> bool:
         return True
     if not sys.stdin or not sys.stdin.isatty():
         return default
-    r = input(f"{domanda} [s/N] ").strip().lower()
+    try:
+        r = input(f"{domanda} [s/N] ").strip().lower()
+    except EOFError:
+        # Terminale che si dichiara interattivo ma con stdin già chiuso.
+        return default
     return r in ("s", "si", "sì", "y", "yes")
 
 def run(cmd: str, cwd: Path | None = None, env: dict | None = None) -> None:
@@ -307,7 +311,10 @@ def menu() -> list[str]:
     say("   0. Esci")
     say()
     while True:
-        scelta = input("Cosa installo? (numeri separati da virgola, es. 1,4,6): ").strip()
+        try:
+            scelta = input("Cosa installo? (numeri separati da virgola, es. 1,4,6): ").strip()
+        except EOFError:
+            return []
         if scelta == "0":
             return []
         try:
@@ -378,7 +385,10 @@ def main() -> int:
     say()
     say("Completato senza errori." if not falliti else f"Completato con {falliti} errore/i.")
     if not AUTO_SI and sys.stdin and sys.stdin.isatty():
-        input("Premi INVIO per chiudere...")
+        try:
+            input("Premi INVIO per chiudere...")
+        except EOFError:
+            pass
     return 1 if falliti else 0
 
 if __name__ == "__main__":
