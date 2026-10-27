@@ -29,6 +29,7 @@
     "web-ifc": "0.0.57"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
