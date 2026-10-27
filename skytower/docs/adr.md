@@ -229,3 +229,17 @@ configurato, marcata da una TSA RFC 3161 (in produzione una TSA qualificata eIDA
 catena e con la copia su S3: una riscrittura completa della catena da parte di chi ha accesso al database
 non passa inosservata. Il token TSA si verifica con strumenti standard (`openssl ts -verify`).
 
+
+## ADR-20 — Rinomina automatica in caricamento (migrazione 0015)
+
+**Decisione.** Il Project Admin attiva in `document-settings.auto_number` un progressivo su un campo della
+naming convention (di norma *Numero*), con primo numero, serie e valori proposti per gli altri campi. La
+serie predefinita è una per ogni combinazione degli altri campi (prassi ISO 19650); in alternativa una
+sola per commessa o per i campi scelti. Chi carica un file con un nome qualsiasi attiva "Rinomina secondo
+naming", sceglie i campi, e l'API compone il nome: l'originatore è sempre la propria organizzazione, il
+progressivo si **riserva** all'avvio del caricamento con `cde.reserve_document_number()` (SECURITY DEFINER,
+lock di riga per serie). Il conteggio considera anche i documenti che chi carica non vede, quindi
+l'identificativo resta univoco nella commessa senza rivelare nulla oltre al numero. L'anteprima
+(`/naming/propose`) non riserva. Un caricamento annullato dopo la riserva lascia un buco: i numeri non si
+riusano. Il nome di partenza resta sulla revisione (`source_filename`) e nelle sue note; il file si scarica
+con il nome conforme.
