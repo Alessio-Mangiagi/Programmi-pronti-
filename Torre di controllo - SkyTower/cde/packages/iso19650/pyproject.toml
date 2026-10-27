@@ -1,0 +1,21 @@
+# "><(((º> sabusabu <º)))><"
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iso19650"
+version = "0.1.0"
+description = "Naming convention, revisioni e codici di idoneità ISO 19650-2 (Annex nazionale UK) configurabili per progetto"
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
