@@ -120,7 +120,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
     : [...ZOOMS].reverse().find((x) => x < z - 0.001) ?? ZOOMS[0]));
 
   return (
-    <Dialog open fullScreen onClose={onClose} aria-label="Visualizzatore documento">
+    <Dialog open fullScreen onClose={onClose}
+            PaperProps={{ "aria-label": doc?.title ? `Visualizzatore: ${doc.title}` : "Visualizzatore documento" }}>
       <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
         <Toolbar sx={{ gap: 1, flexWrap: "wrap", py: 0.5 }}>
           <Box flexGrow={1} minWidth={0}>

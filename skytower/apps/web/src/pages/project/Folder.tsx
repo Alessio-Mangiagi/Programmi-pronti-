@@ -158,7 +158,9 @@ export function FolderView({ project }: { project: Project }) {
                   <TableCell>
                     <Stack direction="row" spacing={1.25} alignItems="center">
                       {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
-                      <Typography variant="body2" fontWeight={500}>{c.name}</Typography>
+                      {/* link vero: la cartella si apre anche da tastiera (Tab + Invio), non solo cliccando la riga */}
+                      <Link component={RouterLink} to={`/progetti/${project.id}/cartelle/${c.id}`} variant="body2" fontWeight={500}
+                            color="inherit" underline="hover" onClick={(e) => e.stopPropagation()}>{c.name}</Link>
                       <Chip size="small" variant="outlined" label={c.owner_organization_code} />
                     </Stack>
                   </TableCell>
