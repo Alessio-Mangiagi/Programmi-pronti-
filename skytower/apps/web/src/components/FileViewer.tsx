@@ -1,9 +1,10 @@
 // "><(((º> sabusabu <º)))><"
 // Lettura di un documento in piattaforma su URL firmato a scadenza: PDF con PDF.js (pagine su canvas e
 // annotazioni sovrapposte) oppure nel visualizzatore del browser (ricerca, stampa); immagini con
-// annotazioni; modelli IFC in 3D con annotazioni sugli elementi; testo nel browser. Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
+// annotazioni; modelli IFC in 3D con annotazioni sugli elementi; testo nel browser, modificabile: il salvataggio
+// crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert, AppBar, Badge, Box, Button, CircularProgress, Dialog, IconButton, MenuItem, Stack, TextField, ToggleButton,
   Toolbar, Tooltip, Typography,
@@ -12,18 +13,20 @@ import CloseIcon from "@mui/icons-material/Close";
 import CommentIcon from "@mui/icons-material/Comment";
 import DownloadIcon from "@mui/icons-material/Download";
 import DrawIcon from "@mui/icons-material/Draw";
+import EditIcon from "@mui/icons-material/Edit";
 import InfoIcon from "@mui/icons-material/Info";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import { api, ApiError, type Draft, type Markup } from "../api";
 import { MarkupLayer } from "./markup/MarkupLayer";
 import { MarkupPanel } from "./markup/MarkupPanel";
+import { uploadFile } from "../upload";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
 const IfcView = lazy(() => import("./markup/IfcView"));
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string }
-interface Doc { id: string; identifier: string; title: string; revisions: Rev[] }
+interface Doc { id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
 interface Link { url: string; filename: string; content_type: string | null }
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
@@ -31,7 +34,11 @@ const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 export function FileViewer({ documentId, revisionId: initialRevision, taskId, onClose, onDetails }: {
   documentId: string; revisionId?: string; taskId?: string; onClose: () => void; onDetails?: () => void;
 }) {
-  const { data: doc } = useQuery({ queryKey: ["document", documentId], queryFn: () => api<Doc>(`/documents/${documentId}`) });
+  const { data: doc } = useQuery({
+    queryKey: ["document", documentId], queryFn: () => api<Doc>(`/documents/${documentId}`),
+    // revisione appena caricata (anche da "Modifica"): si ricontrolla finché l'antivirus non ha finito
+    refetchInterval: (q) => (q.state.data?.revisions.some((r) => r.scan_status === "PENDING") ? 2000 : false),
+  });
   const [revisionId, setRevisionId] = useState<string | null>(initialRevision ?? null);
   useEffect(() => { if (doc && !revisionId) setRevisionId(doc.revisions[0]?.id ?? null); }, [doc, revisionId]);
   const rev = doc?.revisions.find((r) => r.id === revisionId);
@@ -62,6 +69,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   });
   const notViewable = (error as ApiError | null)?.status === 415;
 
+  const [editing, setEditing] = useState(false);
   const [panel, setPanel] = useState(true);
   const [browserPdf, setBrowserPdf] = useState(false);
   const [zoom, setZoom] = useState(1.25);
@@ -70,7 +78,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
-  useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); }, [revisionId]);
+  useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); setEditing(false); }, [revisionId]);
 
   // numerazione stabile per data di creazione, indipendente dai filtri
   const numbers = useMemo(() => new Map([...markups].sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -79,6 +87,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const isImage = !!link?.content_type?.startsWith("image/");
   const isIfc = link?.content_type === "application/x-step";
   const canDraw = (isPdf && !browserPdf) || isImage || isIfc;
+  const isText = !!link?.content_type?.startsWith("text/plain");
+  const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
   const fill = (isPdf && !browserPdf) || isIfc;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
@@ -131,6 +141,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
               </ToggleButton>
             </Tooltip>
           )}
+          {canEdit && !editing && <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>Modifica</Button>}
           {canDraw && (
             <ToggleButton size="small" value="draw" selected={drawing} color="primary" onChange={() => setDrawing((d) => !d)}>
               <DrawIcon fontSize="small" sx={{ mr: 0.5 }} />Annota
@@ -163,7 +174,10 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           )}
           {error && !notViewable && <Alert severity="error">{(error as ApiError).message}</Alert>}
           {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
-          {link && !error && (isPdf && !browserPdf ? (
+          {link && !error && (editing && doc && rev ? (
+            <TextEditor url={link.url} doc={doc} rev={rev} onCancel={() => setEditing(false)}
+                        onSaved={(id) => { setEditing(false); setRevisionId(id); }} />
+          ) : isPdf && !browserPdf ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <PdfView key={link.url} url={link.url}
                        onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
@@ -193,5 +207,50 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
         )}
       </Box>
     </Dialog>
+  );
+}
+
+function TextEditor({ url, doc, rev, onCancel, onSaved }: {
+  url: string; doc: Doc; rev: Rev; onCancel: () => void; onSaved: (revisionId: string) => void;
+}) {
+  const qc = useQueryClient();
+  const [text, setText] = useState<string | null>(null);
+  const [original, setOriginal] = useState("");
+  const [comment, setComment] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((t) => { setText(t); setOriginal(t); }).catch((e: Error) => setLoadError(e.message));
+  }, [url]);
+  const save = useMutation({
+    mutationFn: () => uploadFile({
+      containerId: doc.container_id, comment: comment.trim() || "Modifica in piattaforma",
+      file: new File([text ?? ""], rev.original_filename, { type: "text/plain" }),
+      expectedRevision: rev.revision_code,
+    }),
+    onSuccess: async (r) => {
+      await qc.invalidateQueries({ queryKey: ["document", doc.id] });
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      onSaved(r.id);
+    },
+  });
+  if (loadError) return <Alert severity="error" sx={{ m: 3 }}>File non leggibile: {loadError}</Alert>;
+  if (text === null) return <CircularProgress sx={{ color: "#fff", m: "auto" }} />;
+  return (
+    <Stack flexGrow={1} alignSelf="stretch" bgcolor="background.paper" minHeight={0}>
+      <Stack direction="row" gap={1} p={1} alignItems="center" borderBottom={1} borderColor="divider" flexWrap="wrap">
+        <TextField size="small" placeholder="Cosa è cambiato (facoltativo)" value={comment} onChange={(e) => setComment(e.target.value)}
+                   sx={{ flexGrow: 1, minWidth: 220 }} inputProps={{ maxLength: 500 }} />
+        <Button onClick={onCancel} disabled={save.isPending}>Annulla</Button>
+        <Button variant="contained" disabled={save.isPending || text === original} onClick={() => save.mutate()}>
+          {save.isPending ? "Salvataggio…" : "Salva come nuova revisione"}
+        </Button>
+      </Stack>
+      {save.error && <Alert severity="error" sx={{ m: 1 }}>{(save.error as ApiError).message}</Alert>}
+      <Box component="textarea" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false}
+           aria-label="Contenuto del file"
+           sx={{ flexGrow: 1, border: 0, outline: 0, resize: "none", p: 2, fontFamily: "ui-monospace, Consolas, monospace",
+                 fontSize: 14, lineHeight: 1.5, bgcolor: "background.paper", color: "text.primary" }} />
+    </Stack>
   );
 }
