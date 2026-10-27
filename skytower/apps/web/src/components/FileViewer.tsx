@@ -6,8 +6,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert, AppBar, Badge, Box, Button, CircularProgress, Dialog, IconButton, MenuItem, Stack, TextField, ToggleButton,
-  Toolbar, Tooltip, Typography,
+  Alert, AppBar, Badge, Box, Button, CircularProgress, Dialog, IconButton, InputAdornment, MenuItem, Stack, TextField,
+  ToggleButton, Toolbar, Tooltip, Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import CommentIcon from "@mui/icons-material/Comment";
@@ -15,6 +15,9 @@ import DownloadIcon from "@mui/icons-material/Download";
 import DrawIcon from "@mui/icons-material/Draw";
 import EditIcon from "@mui/icons-material/Edit";
 import InfoIcon from "@mui/icons-material/Info";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import SearchIcon from "@mui/icons-material/Search";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import { api, ApiError, type Draft, type Markup } from "../api";
@@ -78,6 +81,15 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [matchCount, setMatchCount] = useState(0);
+  const [activeMatch, setActiveMatch] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setActiveMatch(0); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  const nextMatch = (d: 1 | -1) => matchCount && setActiveMatch((m) => (m + d + matchCount) % matchCount);
   useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); setEditing(false); }, [revisionId]);
 
   // numerazione stabile per data di creazione, indipendente dai filtri
@@ -125,6 +137,23 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
               {pages > 0 && <Typography variant="caption" color="text.secondary" ml={0.5}>{pages} pag.</Typography>}
             </Stack>
           )}
+          {isPdf && !browserPdf && (
+            <Stack direction="row" alignItems="center">
+              <TextField size="small" placeholder="Cerca nel testo" value={searchInput} sx={{ width: 190 }}
+                         onChange={(e) => setSearchInput(e.target.value)}
+                         onKeyDown={(e) => { if (e.key === "Enter") nextMatch(e.shiftKey ? -1 : 1); }}
+                         InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
+              {search.trim().length >= 2 && (
+                <>
+                  <Typography variant="caption" width={52} textAlign="center" color={matchCount ? "text.primary" : "error"}>
+                    {matchCount ? `${activeMatch + 1}/${matchCount}` : "0"}
+                  </Typography>
+                  <IconButton size="small" aria-label="Occorrenza precedente" disabled={!matchCount} onClick={() => nextMatch(-1)}><KeyboardArrowUpIcon /></IconButton>
+                  <IconButton size="small" aria-label="Occorrenza successiva" disabled={!matchCount} onClick={() => nextMatch(1)}><KeyboardArrowDownIcon /></IconButton>
+                </>
+              )}
+            </Stack>
+          )}
           {isPdf && !browserPdf && doc && doc.revisions.length > 1 && (
             <TextField select size="small" label="Confronta con" value={compareId} sx={{ minWidth: 170 }}
                        onChange={(e) => setCompareId(e.target.value)}>
@@ -135,7 +164,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
             </TextField>
           )}
           {isPdf && (
-            <Tooltip title="Il visualizzatore del browser permette ricerca nel testo e stampa, senza annotazioni">
+            <Tooltip title="Il visualizzatore del browser permette la stampa, senza annotazioni">
               <ToggleButton size="small" value="browser" selected={browserPdf} onChange={() => { setBrowserPdf((b) => !b); setDrawing(false); }}>
                 Visualizzatore del browser
               </ToggleButton>
@@ -157,7 +186,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
         </Toolbar>
       </AppBar>
       <Box display="flex" flexGrow={1} minHeight={0}>
-        <Box flexGrow={1} bgcolor="#525659" overflow="auto" minWidth={0} display="flex" flexDirection="column"
+        <Box data-pdf-scroll flexGrow={1} bgcolor="#525659" overflow="auto" minWidth={0} display="flex" flexDirection="column"
              alignItems={fill ? "stretch" : "center"} justifyContent={fill ? "flex-start" : "center"}>
           {rev && rev.scan_status !== "CLEAN" && (
             <Alert severity={rev.scan_status === "PENDING" ? "info" : "error"}>
@@ -180,7 +209,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           ) : isPdf && !browserPdf ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <PdfView key={link.url} url={link.url}
-                       onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
+                       onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer}
+                       search={search} activeMatch={activeMatch} onMatches={setMatchCount} />
             </Suspense>
           ) : isIfc ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>

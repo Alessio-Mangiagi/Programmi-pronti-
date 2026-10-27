@@ -2,6 +2,7 @@
 // PDF reso con PDF.js su canvas, pagina per pagina solo quando entra in vista (file grandi), con uno
 // strato sovrapposto per le annotazioni. Con compareUrl le due revisioni si sovrappongono: in rosso ciò che
 // c'è solo nella revisione aperta, in blu ciò che c'è solo in quella di confronto, in nero le parti uguali.
+// Ricerca nel testo: le occorrenze si evidenziano sulla pagina (giallo; arancione quella corrente).
 // Caricato a richiesta: pdf.js non pesa sul bundle iniziale.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Box, CircularProgress } from "@mui/material";
@@ -19,6 +20,35 @@ export interface PdfViewProps {
   onPages: (n: number) => void;
   onFit?: (zoom: number) => void;      // zoom che adatta la prima pagina alla larghezza disponibile
   overlay: (page: number) => ReactNode;
+  search?: string;                     // testo da cercare (almeno 2 caratteri), senza distinzione maiuscole
+  activeMatch?: number;                // indice dell'occorrenza corrente: la pagina scorre fin lì
+  onMatches?: (count: number) => void;
+}
+
+/** Occorrenza in coordinate CSS a zoom 1, relative alla pagina. */
+interface Match { page: number; x: number; y: number; w: number; h: number }
+
+async function findMatches(pdf: PDFDocumentProxy, query: string, alive: () => boolean): Promise<Match[]> {
+  const q = query.toLocaleLowerCase("it");
+  const out: Match[] = [];
+  for (let n = 1; n <= pdf.numPages && alive(); n++) {
+    const page = await pdf.getPage(n);
+    const vp = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    for (const item of content.items) {
+      if (!("str" in item) || !item.str) continue;
+      const text = item.str.toLocaleLowerCase("it");
+      const [, , c, d, e, f] = item.transform as number[];
+      const fontH = Math.hypot(c, d) || item.height;
+      for (let i = text.indexOf(q); i >= 0; i = text.indexOf(q, i + q.length)) {
+        const x1 = e + item.width * (i / text.length);
+        const x2 = x1 + item.width * (q.length / text.length);
+        const [ax, ay, bx, by] = vp.convertToViewportRectangle([x1, f - fontH * 0.2, x2, f + fontH * 0.9]);
+        out.push({ page: n, x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), h: Math.abs(by - ay) });
+      }
+    }
+  }
+  return out;
 }
 
 function useDocument(url: string | null | undefined) {
@@ -35,12 +65,33 @@ function useDocument(url: string | null | undefined) {
   return state;
 }
 
-export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onFit, overlay }: PdfViewProps) {
+export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onFit, overlay, search, activeMatch, onMatches }: PdfViewProps) {
   const { doc: pdf, error } = useDocument(url);
   const { doc: cmp, error: cmpError } = useDocument(compareUrl);
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const fitted = useRef(false);
+  const [matches, setMatches] = useState<Match[]>([]);
+
+  useEffect(() => {
+    const q = (search ?? "").trim();
+    if (!pdf || q.length < 2) { setMatches([]); onMatches?.(0); return; }
+    let alive = true;
+    findMatches(pdf, q, () => alive).then((m) => { if (alive) { setMatches(m); onMatches?.(m.length); } })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [pdf, search]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const m = activeMatch !== undefined ? matches[activeMatch] : undefined;
+    if (!m) return;
+    const pageEl = container.current?.querySelector<HTMLElement>(`[data-page="${m.page}"]`);
+    const scroller = pageEl?.closest<HTMLElement>("[data-pdf-scroll]") ?? pageEl?.parentElement?.parentElement;
+    if (pageEl && scroller) {
+      const top = pageEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      scroller.scrollTo({ top: top + m.y * zoom - scroller.clientHeight / 3, behavior: "smooth" });
+    }
+  }, [activeMatch, matches]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!pdf) return;
@@ -80,7 +131,14 @@ export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onF
       )}
       {Array.from({ length: Math.max(pdf.numPages, comparing ? cmp!.numPages : 0) }, (_, i) => (
         <PdfPage key={`${i + 1}-${comparing}`} pdf={pdf} cmp={comparing ? cmp : null} page={i + 1} zoom={zoom} base={base}
-                 overlay={overlay(i + 1)} />
+                 overlay={<>
+                   {matches.map((m, k) => m.page === i + 1 && (
+                     <Box key={k} sx={{ position: "absolute", left: m.x * zoom, top: m.y * zoom, width: m.w * zoom, height: m.h * zoom,
+                                        bgcolor: k === activeMatch ? "rgba(255,140,0,.55)" : "rgba(255,230,0,.45)",
+                                        pointerEvents: "none", mixBlendMode: "multiply" }} />
+                   ))}
+                   {overlay(i + 1)}
+                 </>} />
       ))}
     </Box>
   );
