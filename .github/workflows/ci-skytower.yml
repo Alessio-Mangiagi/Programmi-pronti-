@@ -55,6 +55,50 @@ jobs:
       - uses: actions/checkout@v4
       - run: semgrep scan --config p/python --config p/typescript --config p/owasp-top-ten --config p/secrets --error skytower
 
+  dast:
+    name: DAST (OWASP ZAP, scansione API autenticata)
+    runs-on: ubuntu-24.04
+    needs: api
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: skytower
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: skytower/apps/api/requirements.lock
+      - run: pip install -r apps/api/requirements.lock -e "packages/iso19650" -e apps/api
+      - name: Avvio API con dati demo (Postgres embedded + S3 emulato)
+        run: |
+          nohup cde dev --reset > api.log 2>&1 &
+          for i in $(seq 1 90); do curl -fsS http://127.0.0.1:8100/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8100/health
+      - name: Token di accesso per la scansione (15', basta per la scansione API)
+        run: |
+          TOKEN=$(curl -fsS -X POST http://127.0.0.1:8100/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"com.admin@com.example","password":"Cantiere-2026!"}' | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+          echo "::add-mask::$TOKEN"
+          echo "ZAP_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+      - name: ZAP API scan (OpenAPI)
+        run: |
+          chmod a+rwx infra/zap   # il container gira come utente "zap"
+          docker run --rm --network host -v "$PWD/infra/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:2.16.1 \
+            zap-api-scan.py -t http://127.0.0.1:8100/openapi.json -f openapi -c regole.tsv -I \
+            -r zap-report.html -J zap-report.json \
+            -z "-config replacer.full_list(0).description=auth -config replacer.full_list(0).enabled=true \
+                -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Authorization \
+                -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=Bearer\ ${ZAP_TOKEN}"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            skytower/infra/zap/zap-report.*
+            skytower/api.log
+
   web:
     name: Web — typecheck, build, audit
     runs-on: ubuntu-24.04

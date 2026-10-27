@@ -1,0 +1,18 @@
+# "><(((º> sabusabu <º)))><"
+# Regole ZAP per zap-api-scan.py (-c): id<TAB>IGNORE|WARN|FAIL<TAB>nome.
+# Non elencate = WARN. FAIL solo per le classi che bloccano il rilascio (G57: critiche/alte).
+6	FAIL	(Path Traversal)
+7	FAIL	(Remote File Inclusion)
+40009	FAIL	(Server Side Include)
+40012	FAIL	(Cross Site Scripting (Reflected))
+40014	FAIL	(Cross Site Scripting (Persistent))
+40018	FAIL	(SQL Injection)
+40019	FAIL	(SQL Injection - MySQL)
+40022	FAIL	(SQL Injection - PostgreSQL)
+40024	FAIL	(SQL Injection - SQLite)
+40046	FAIL	(Server Side Request Forgery)
+90019	FAIL	(Server Side Code Injection)
+90020	FAIL	(Remote OS Command Injection)
+90023	FAIL	(XML External Entity Attack)
+90024	FAIL	(Generic Padding Oracle)
+10049	IGNORE	(Non-Storable Content: no-store voluto sulle API)
