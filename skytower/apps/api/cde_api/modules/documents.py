@@ -278,6 +278,8 @@ def propose_names(project_id: uuid.UUID, body: NameProposalsIn, c: Ctx = Depends
         return out
 
 
+MAX_OPEN_RESERVATIONS = 500   # per organizzazione e commessa: la numerazione non si consuma in massa
+
 RESERVATION_SQL = """
     SELECT r.id, r.identifier, r.naming_fields, r.note, r.created_at, r.used_at, r.document_id, r.released_at,
            r.reserved_by, u.first_name || ' ' || u.last_name AS reserved_by_name
@@ -289,6 +291,12 @@ def reserve_names(project_id: uuid.UUID, body: ReservationIn, c: Ctx = Depends(c
     """Prenota identificativi conformi con il progressivo della serie (elenco elaborati da produrre)."""
     with c.tx() as conn:
         project = require_project(conn, project_id, "WRITE")
+        open_now = conn.execute("""SELECT count(*) AS n FROM cde.naming_reservations WHERE project_id = %s
+                                   AND used_at IS NULL AND released_at IS NULL""", [project_id]).fetchone()["n"]
+        if open_now + body.count > MAX_OPEN_RESERVATIONS:
+            raise ApiError(409, "too_many_reservations",
+                           f"La tua organizzazione ha già {open_now} prenotazioni aperte (massimo {MAX_OPEN_RESERVATIONS}): "
+                           "usa o rilascia quelle esistenti")
         ids = []
         for _ in range(body.count):
             name, _ = auto_name(conn, project, "", body.fields, reserve=True)

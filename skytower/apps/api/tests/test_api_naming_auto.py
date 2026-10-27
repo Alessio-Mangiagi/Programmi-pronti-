@@ -285,3 +285,15 @@ def _upload_named(client, headers, container_id, filename):
     assert r.status_code == 201, r.text
     put_parts(client, headers, r.json(), PDF)
     return client.post(f"/uploads/{r.json()['upload_id']}/complete", headers=headers)
+
+
+def test_tetto_alle_prenotazioni_aperte(client, api_world, as_user, auto_settings, volume, monkeypatch):
+    from cde_api.modules import documents
+    _, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
+    h = as_user("sub2_user")
+    open_now = len(client.get(f"/projects/{w.project_id}/naming/reservations", headers=h).json())
+    monkeypatch.setattr(documents, "MAX_OPEN_RESERVATIONS", open_now + 2)
+    assert _reserve(client, w, h, {"volume": volume}, count=2).status_code == 201
+    r = _reserve(client, w, h, {"volume": volume})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "too_many_reservations"
