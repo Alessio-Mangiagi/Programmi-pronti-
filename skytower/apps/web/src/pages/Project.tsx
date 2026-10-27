@@ -6,6 +6,7 @@ import { api, ApiError, Project } from "../api";
 import { AreasTab } from "./project/Areas";
 import { FolderView } from "./project/Folder";
 import { PrivateAreasTab } from "./project/PrivateAreas";
+import { AuditTab } from "./project/Audit";
 import { RfisTab } from "./project/Rfis";
 import { WorkflowsTab } from "./project/Workflows";
 import { MembersTab } from "./project/Members";
@@ -21,6 +22,7 @@ const TABS = [
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
+  { path: "registro", label: "Registro", adminOnly: true },
 ];
 
 export function ProjectPage() {
@@ -34,8 +36,9 @@ export function ProjectPage() {
   if (error) return <Alert severity="error">{(error as ApiError).status === 404 ? "Progetto non trovato" : (error as Error).message}</Alert>;
   if (!project) return null;
 
-  const current = TABS.findIndex((t) => location.pathname.includes(`/${t.path}`));
   const isProjectAdmin = !!project.my_permissions?.ADMIN?.PROJECT;
+  const tabs = TABS.filter((t) => !t.adminOnly || isProjectAdmin);
+  const current = tabs.findIndex((t) => location.pathname.includes(`/${t.path}`));
   const isAnyAdmin = isProjectAdmin || !!project.my_permissions?.ADMIN?.OWN_ORGANIZATION;
 
   return (
@@ -47,7 +50,7 @@ export function ProjectPage() {
       <Typography variant="h4" fontWeight={600}>{project.name}</Typography>
       <Box borderBottom={1} borderColor="divider">
         <Tabs value={current < 0 ? 0 : current} variant="scrollable">
-          {TABS.map((t) => <Tab key={t.path} label={t.label} component={RouterLink} to={`/progetti/${projectId}/${t.path}`} />)}
+          {tabs.map((t) => <Tab key={t.path} label={t.label} component={RouterLink} to={`/progetti/${projectId}/${t.path}`} />)}
         </Tabs>
       </Box>
       <Routes>
@@ -60,6 +63,7 @@ export function ProjectPage() {
         <Route path="rfi" element={<RfisTab project={project} />} />
         <Route path="rfi/:rfiId" element={<RfisTab project={project} />} />
         <Route path="workflow" element={<WorkflowsTab project={project} canManage={isProjectAdmin} />} />
+        <Route path="registro" element={<AuditTab project={project} />} />
         <Route path="membri" element={<MembersTab project={project} canManage={isAnyAdmin} />} />
         <Route path="organizzazioni" element={<OrganizationsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="ruoli" element={<RolesTab project={project} canManage={isProjectAdmin} />} />

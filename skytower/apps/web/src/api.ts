@@ -73,6 +73,25 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
   return parse(res);
 }
 
+/** Scarica un file da un endpoint autenticato (il token non può viaggiare in un semplice link). */
+export async function apiDownload(path: string, fallbackName: string): Promise<Response> {
+  const doFetch = () => fetch(`/api${path}`, {
+    credentials: "same-origin",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  let res = await doFetch();
+  if (res.status === 401 && accessToken && (await refreshSession())) res = await doFetch();
+  if (!res.ok) await parse(res);
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.clone().blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return res;
+}
+
 // ---------------------------------------------------------------------
 // Tipi principali
 // ---------------------------------------------------------------------
