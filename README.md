@@ -15,6 +15,7 @@ Ogni cartella ha il nome dell'app, e sul server lo stesso nome diventa il suo in
 | `scadenzario/` | Scadenzario — scadenze e adempimenti | 5180 | Python |
 | `verifica-requisiti/` | Verifica Requisiti — ricerca e checklist sui documenti (riservata) | 5185 | Node.js + OCR |
 | `incampo/` | InCampo — gestione cantiere: planimetrie, moduli, task; web e app mobile | 5190 | Python + React |
+| `skytower/` | SkyTower — CDE ISO 19650: documenti e revisioni di commessa, approvazioni, RFI (riservata) | 5195 | Python + React |
 | `ponte-trimble/` | Ponte Trimble — PCQ, computi e SAL da PDF a Trimble (solo admin) | 3011 | Node.js |
 | `auguri/` | Auguri — compleanni su WhatsApp (solo admin) | 3000 | Node.js |
 
@@ -56,6 +57,7 @@ reverse proxy, ogni app ha un indirizzo col proprio nome:
 | `https://scadenzario.<dominio>` | Scadenzario |
 | `https://verifica-requisiti.<dominio>` | Verifica Requisiti |
 | `https://incampo.<dominio>` | InCampo |
+| `https://skytower.<dominio>` | SkyTower |
 | `https://ponte-trimble.<dominio>` | Ponte Trimble |
 
 Si attiva con una sola variabile, letta dal portale e dal Caddyfile:
@@ -99,6 +101,10 @@ verifica il cookie di sessione contro `<portale>/api/verify`. Conseguenze pratic
 - **InCampo** ha anche un suo login: il gate controlla solo le pagine web, le API restano
   al JWT di InCampo perché l'app mobile il cookie del portale non ce l'ha. Dopo il
   portale si entra con l'account InCampo (`incampo/README-SUITE.md`).
+- **SkyTower** non monta il gate SSO: è multi-azienda e ha un login suo (JWT, MFA,
+  isolamento per riga nel database). Dal portale si apre, poi si entra con l'account
+  SkyTower. In locale gira in modalità sviluppo (`cde dev`: Postgres embedded, S3
+  emulato in memoria, dati demo; vedi `skytower/README.md`).
 - **Auguri** è riservata agli admin del portale, e lo impone l'app stessa: il
   flag `adminOnly` nel registro del portale nasconde solo la card.
 
@@ -127,6 +133,7 @@ Ogni app si controlla da sola, e la CI le controlla tutte.
 | `.github/workflows/ci-suite.yml` | portale, ocr, verifica-requisiti, auto-scan, Auguri |
 | `.github/workflows/ci-python.yml` | `confronta file` e `scadenzario` |
 | `.github/workflows/ci-incampo.yml` | `incampo` (pytest SQLite e Postgres, web e2e, mobile, Docker) |
+| `.github/workflows/ci-skytower.yml` | `skytower` (ruff, test isolamento su Postgres, naming 100%, build web, Semgrep, Terraform) |
 
 In locale, dentro la cartella dell'app: `npm test` (Node) o `python -m pytest tests/ -q`
 (Python). Le app Node con TypeScript hanno anche `npm run type-check` (o `typecheck`):

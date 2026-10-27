@@ -226,6 +226,26 @@ const APPS = [
     dettaglio: 'Gestisce il lavoro in cantiere: carichi le planimetrie, ci metti i pin, compili moduli di controllo (anche i PCQ) e apri task e non conformità assegnandoli alle persone. Ha un\'app per telefono e tablet che funziona anche senza rete e si sincronizza quando torna la connessione. Dentro InCampo si entra con il proprio account InCampo.',
   },
   {
+    id: 'skytower',
+    nome: 'SkyTower',
+    sottotitolo: 'Documenti di commessa (CDE ISO 19650)',
+    fai: 'Condividere i documenti di progetto',
+    guida: 'Carichi elaborati e revisioni con il nome ISO 19650, li porti da WIP a condiviso a pubblicato e segui approvazioni e RFI. Dentro si entra con il proprio account SkyTower.',
+    desc: 'Ambiente di condivisione dati (CDE) secondo ISO 19650: documenti e revisioni, stati WIP/Shared/Published, approvazioni e RFI tra le aziende del cantiere.',
+    porta: 5195,
+    dir: 'skytower',
+    launch: 'avvia.vbs',
+    tipo: 'Python + React',
+    // In sviluppo (Sprint 4) e con dati demo: la vedono gli admin del portale e
+    // chi ha 'skytower' spuntato in Amministrazione > Utenti.
+    riservata: true,
+    kw: ['skytower', 'sky tower', 'torre di controllo', 'cde', 'common data environment', 'iso 19650', '19650',
+      'documenti di progetto', 'elaborati', 'elaborato', 'tavole', 'revisione', 'revisioni', 'bim',
+      'wip', 'shared', 'published', 'pubblicato', 'approvazione', 'approvazioni', 'rfi',
+      'progettista', 'committente', 'subappaltatore', 'container', 'naming'],
+    dettaglio: 'È l\'ambiente comune dei dati di commessa secondo la ISO 19650: committente, progettisti e subappaltatori caricano elaborati e revisioni con il nome a norma, li fanno passare da WIP a condiviso a pubblicato e gestiscono approvazioni, scadenze e RFI. Ogni azienda vede solo quello che le è condiviso. Dentro SkyTower si entra con il proprio account SkyTower.',
+  },
+  {
     id: 'trimble',
     nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',

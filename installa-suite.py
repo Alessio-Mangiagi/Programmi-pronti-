@@ -17,6 +17,7 @@ Uso:
 """
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -231,6 +232,24 @@ def installa_incampo(d: Path) -> str:
     return ("venv + build web + database. Porta 5190. Primo admin: "
             r'.venv\Scripts\python.exe -m scripts.create_admin EMAIL "Nome Cognome"')
 
+def installa_skytower(d: Path) -> str:
+    # Come installa.bat: l'API vuole Python >= 3.12 (requires-python), il
+    # python_sistema() della suite si accontenta di 3.10.
+    py = next((c for c in ("py -3.12", "py -3.13", "py -3.14", "python")
+               if re.match(r"Python 3\.1[2-9]", output_di(f"{c} --version"))), "")
+    if not py:
+        raise RuntimeError("SkyTower richiede Python 3.12+ (installa da python.org)")
+    vpy = d / ".venv" / "Scripts" / "python.exe"
+    if not vpy.exists():
+        run(f'{py} -m venv ".venv"', cwd=d)
+    run(f'"{vpy}" -m pip install --upgrade pip', cwd=d)
+    run(f'"{vpy}" -m pip install -r apps\\api\\requirements.lock -e packages\\iso19650 -e apps\\api', cwd=d)
+    richiedi_node("Il frontend di SkyTower")
+    npm_install(d / "apps" / "web")
+    run("npm run build", cwd=d / "apps" / "web")        # apps/web/dist, servito da vite preview
+    return ("venv + build web. Porta 5195 (API interna 8100). Al primo avvio crea il database"
+            " con i dati demo: password Cantiere-2026! (vedi skytower/README.md)")
+
 def installa_verifica(d: Path) -> str:
     richiedi_node("Verifica Requisiti")
     npm_install(d)
@@ -281,6 +300,7 @@ APPS = [
     ("scadenzario", "Scadenzario - scadenze e adempimenti (porta 5180)",         "scadenzario",         installa_scadenzario),
     ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)",     "verifica-requisiti",  installa_verifica),
     ("incampo",     "InCampo - gestione cantiere, web e app mobile (porta 5190)", "incampo",            installa_incampo),
+    ("skytower",    "SkyTower - documenti di commessa CDE ISO 19650 (porta 5195)", "skytower",          installa_skytower),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),

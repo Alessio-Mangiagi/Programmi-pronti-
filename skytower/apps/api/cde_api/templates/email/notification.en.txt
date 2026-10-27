@@ -1,0 +1,10 @@
+{# "><(((º> sabusabu <º)))>< #}Dear {{ first_name }},
+
+{{ title }}
+
+{{ body }}
+{% if link %}
+Open in the CDE: {{ link }}
+{% endif %}
+--
+CDE ISO 19650 · You can change your notification preferences from the Security page.
