@@ -243,3 +243,10 @@ l'identificativo resta univoco nella commessa senza rivelare nulla oltre al nume
 (`/naming/propose`) non riserva. Un caricamento annullato dopo la riserva lascia un buco: i numeri non si
 riusano. Il nome di partenza resta sulla revisione (`source_filename`) e nelle sue note; il file si scarica
 con il nome conforme.
+
+**Prenotazione (migrazione 0016).** Chi ha permesso di scrittura nella commessa prenota fino a 50 identificativi
+alla volta dallo stesso contatore della rinomina (`naming_reservations`, visibili solo alla propria
+organizzazione). Finché non è usato o rilasciato, un identificativo prenotato non è caricabile da altre
+organizzazioni (`cde.identifier_reserved_elsewhere()`, conta per gli schemi senza originatore); il primo
+caricamento della propria organizzazione lo consuma. Il massimo della serie include i prenotati, quindi i numeri
+non si sovrappongono neanche cambiando la configurazione della serie.

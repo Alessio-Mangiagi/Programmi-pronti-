@@ -40,6 +40,7 @@ principale). I KO non bloccanti vanno nel piano di rientro con una data.
 | U17 | BIM Manager | Esporta Excel registro documenti, approvazioni, RFI aperte | File apribili, colonne leggibili, nessuna formula eseguibile | |
 | U18 | BIM Manager | Registro attività: filtra per documento, verifica integrità, esporta CSV e PDF firmati | Catena integra, eventi degli scenari precedenti presenti | |
 | U19 | BIM Manager | Scheda Naming: cambia il primo numero del progressivo e un valore proposto | Il successivo caricamento rinominato rispetta le nuove impostazioni | |
+| U19b | Progettista | Scheda Naming: prenota 5 numeri con una nota, poi carica un file con uno dei nomi prenotati | I 5 identificativi compaiono come "Prenotato"; quello caricato passa a "Usato"; la serie di altri utenti riparte dopo i prenotati | |
 | U20 | BIM Manager | Crea un'area riservata; il progettista ne chiede l'accesso; l'admin approva | Accesso concesso solo dopo approvazione, revocabile | |
 | U21 | Subappaltatore | Prova ad aprire l'indirizzo di un documento DES copiato da un collega | "Non trovato", nessun dettaglio rivelato | |
 | U22 | Tutti | Profilo: cambia nome e preferenze notifiche; attiva l'MFA | Modifiche salvate; il login successivo chiede il codice | |
