@@ -5,13 +5,13 @@ Gira nel worker con il ruolo cde_worker; idempotente (emailed_at).
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
 _env = Environment(loader=PackageLoader("cde_api", "templates"), undefined=StrictUndefined,
-                   autoescape=False, keep_trailing_newline=True)   # testo semplice: nessun HTML
+                   autoescape=False, keep_trailing_newline=True)  # noqa: S701 - testo semplice: nessun HTML
 DIGEST_SUBJECT = {"it": "Riepilogo giornaliero CDE", "en": "CDE daily digest"}
 
 
@@ -38,7 +38,7 @@ def send_notification_email(conn: psycopg.Connection, mailer, base_url: str, not
 
 def send_daily_digests(conn: psycopg.Connection, mailer, base_url: str, now: datetime | None = None) -> int:
     """Un'email per utente in modalità digest con le notifiche non ancora inviate delle ultime 24 ore."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     rows = conn.execute(
         """SELECT n.id, n.user_id, n.title, n.link, u.email, u.first_name, u.locale
            FROM cde.notifications n JOIN cde.users u ON u.id = n.user_id AND u.status = 'ACTIVE'
