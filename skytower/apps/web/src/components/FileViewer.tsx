@@ -43,6 +43,14 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
     staleTime: 4 * 60_000,          // l'URL firmato vale 5'
     retry: false,
   });
+  const [compareId, setCompareId] = useState("");
+  const { data: compareLink } = useQuery({
+    queryKey: ["view-link", compareId],
+    queryFn: () => api<Link>(`/revisions/${compareId}/download?disposition=inline`),
+    enabled: !!compareId,
+    staleTime: 4 * 60_000,
+    retry: false,
+  });
   const { data: markups = [] } = useQuery({
     queryKey: ["markups", revisionId],
     queryFn: () => api<Markup[]>(`/revisions/${revisionId}/markups`),
@@ -62,7 +70,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
-  useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); }, [revisionId]);
+  useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); }, [revisionId]);
 
   // numerazione stabile per data di creazione, indipendente dai filtri
   const numbers = useMemo(() => new Map([...markups].sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -105,6 +113,15 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
               {pages > 0 && <Typography variant="caption" color="text.secondary" ml={0.5}>{pages} pag.</Typography>}
             </Stack>
           )}
+          {isPdf && !browserPdf && doc && doc.revisions.length > 1 && (
+            <TextField select size="small" label="Confronta con" value={compareId} sx={{ minWidth: 170 }}
+                       onChange={(e) => setCompareId(e.target.value)}>
+              <MenuItem value="">Nessun confronto</MenuItem>
+              {doc.revisions.filter((r) => r.id !== revisionId && r.scan_status === "CLEAN").map((r) => (
+                <MenuItem key={r.id} value={r.id}>{r.revision_code} · {r.state}</MenuItem>
+              ))}
+            </TextField>
+          )}
           {isPdf && (
             <Tooltip title="Il visualizzatore del browser permette ricerca nel testo e stampa, senza annotazioni">
               <ToggleButton size="small" value="browser" selected={browserPdf} onChange={() => { setBrowserPdf((b) => !b); setDrawing(false); }}>
@@ -146,7 +163,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
           {link && !error && (isPdf && !browserPdf ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <PdfView url={link.url} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
+              <PdfView url={link.url} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer} />
             </Suspense>
           ) : isIfc ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
