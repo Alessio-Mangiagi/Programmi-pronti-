@@ -19,7 +19,7 @@ GrantAction = Literal["READ", "WRITE", "DOWNLOAD", "APPROVE"]
 
 CONTAINER_SQL = """
     SELECT c.id, c.project_id, c.parent_id, c.owner_organization_id, o.code AS owner_organization_code,
-           c.name, c.inherit_permissions, c.created_by, c.created_at, c.updated_at,
+           c.name, c.inherit_permissions, c.is_private, c.created_by, c.created_at, c.updated_at,
            cde.my_container_actions(c.id)::text[] AS my_actions
     FROM cde.containers c
     JOIN cde.organizations o ON o.id = c.owner_organization_id"""
@@ -29,6 +29,7 @@ class ContainerIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     parent_id: uuid.UUID | None = None
     inherit_permissions: bool = True
+    is_private: bool = False      # area riservata: solo radice, solo admin (le sottocartelle la ereditano)
 
 
 class ContainerPatch(BaseModel):
@@ -80,9 +81,9 @@ def create_container(project_id: uuid.UUID, body: ContainerIn, c: Ctx = Depends(
             require_project(conn, project_id, "WRITE", None)
         conn.execute(
             """INSERT INTO cde.containers (id, project_id, parent_id, owner_organization_id, name,
-                                           inherit_permissions, created_by)
-               VALUES (%s, %s, %s, cde.current_app_org(), %s, %s, cde.current_app_user())""",
-            [container_id, project_id, body.parent_id, body.name, body.inherit_permissions],
+                                           inherit_permissions, is_private, created_by)
+               VALUES (%s, %s, %s, cde.current_app_org(), %s, %s, %s, cde.current_app_user())""",
+            [container_id, project_id, body.parent_id, body.name, body.inherit_permissions, body.is_private],
         )
         return _container(conn, container_id)
 

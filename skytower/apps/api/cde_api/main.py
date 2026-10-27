@@ -13,7 +13,19 @@ from .config import Settings, get_settings
 from .db import Database
 from .deps import Services
 from .mail import build_mailer
-from .modules import auth, containers, documents, me, notifications, organizations, projects, rfis, states, workflows
+from .modules import (
+    access,
+    auth,
+    containers,
+    documents,
+    me,
+    notifications,
+    organizations,
+    projects,
+    rfis,
+    states,
+    workflows,
+)
 from .security.kms import build_kms
 from .security.ratelimit import RateLimiter
 from .security.tokens import TokenService
@@ -84,6 +96,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     def jwks():
         return svc.tokens.jwks
 
-    for module in (auth, me, organizations, projects, containers, documents, states, workflows, notifications, rfis):
+    for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
+                   rfis):
         app.include_router(module.router)
     return app

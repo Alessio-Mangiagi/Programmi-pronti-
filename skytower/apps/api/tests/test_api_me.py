@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from test_api_admin import as_user  # noqa: F401 - fixture riusata
 
 

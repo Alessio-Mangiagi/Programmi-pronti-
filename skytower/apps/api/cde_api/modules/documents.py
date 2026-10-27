@@ -443,8 +443,9 @@ def get_document(document_id: uuid.UUID, c: Ctx = Depends(ctx)):
         revisions = conn.execute(REVISION_SQL + " WHERE r.document_id = %s ORDER BY r.sequence DESC",
                                  [document_id]).fetchall()
         can_download_published = conn.execute(
-            "SELECT cde.has_project_permission(cde.current_app_user(), %s, 'DOWNLOAD', NULL) ok",
-            [doc["project_id"]]).fetchone()["ok"]
+            "SELECT cde.has_project_permission(cde.current_app_user(), %s, 'DOWNLOAD', NULL)"
+            " AND (%s NOT IN (SELECT cde.private_containers()) OR 'DOWNLOAD' = ANY(%s::text[])) ok",
+            [doc["project_id"], doc["container_id"], actions]).fetchone()["ok"]
         reviews = [r["id"] for r in conn.execute("SELECT cde.my_review_revisions() AS id").fetchall()]
         return {**doc, "revisions": revisions, "my_actions": actions,
                 "can_download_published": can_download_published,
@@ -497,8 +498,9 @@ def download_revision(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
                                  [revision_id]).fetchone()["r"]
         if in_review:
             pass                                    # il revisore assegnato può sempre scaricare
-        elif rev["state"] in ("WIP", "SHARED"):
-            # WIP e SHARED: permesso DOWNLOAD sul container (ruolo o grant)
+        elif rev["state"] in ("WIP", "SHARED") or conn.execute(
+                "SELECT %s IN (SELECT cde.private_containers()) p", [rev["container_id"]]).fetchone()["p"]:
+            # WIP e SHARED, e ogni stato in un'area riservata: permesso DOWNLOAD sul container (ruolo o grant)
             if "DOWNLOAD" not in conn.execute("SELECT cde.my_container_actions(%s)::text[] a",
                                               [rev["container_id"]]).fetchone()["a"]:
                 raise forbidden()
