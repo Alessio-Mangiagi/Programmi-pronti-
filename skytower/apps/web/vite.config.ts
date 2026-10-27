@@ -17,7 +17,9 @@ const api = {
 export default defineConfig({
   plugins: [react()],
   server: { port: 5195, strictPort: true, proxy: api },
-  preview: { port: 5195, strictPort: true, proxy: api },
+  // CDE_PREVIEW_CSP: i test e2e servono la build con la Content-Security-Policy di produzione
+  preview: { port: 5195, strictPort: true, proxy: api,
+             headers: process.env.CDE_PREVIEW_CSP ? { "Content-Security-Policy": process.env.CDE_PREVIEW_CSP } : {} },
   build: {
     rollupOptions: {
       output: {

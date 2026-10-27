@@ -13,6 +13,13 @@ const PYTHON = process.env.PYTHON
   ?? "python";
 const API_PORT = 8310;
 const WEB_PORT = 4310;
+const S3 = `http://127.0.0.1:${API_PORT + 1000}`;   // S3 emulato al posto del bucket regionale
+// stessa CSP della produzione (modules/cde-platform/edge.tf, spa_csp): tutti i test girano sotto questa politica
+export const SPA_CSP = [
+  "default-src 'self'", "script-src 'self' 'wasm-unsafe-eval'", "worker-src 'self' blob:", "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${S3}`, "font-src 'self' data:", `connect-src 'self' ${S3}`, `frame-src 'self' blob: ${S3}`,
+  "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'",
+].join("; ");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -41,7 +48,7 @@ export default defineConfig({
     },
     {
       command: `npm run build && npx vite preview --port ${WEB_PORT} --strictPort`,
-      env: { CDE_API_URL: `http://127.0.0.1:${API_PORT}` },
+      env: { CDE_API_URL: `http://127.0.0.1:${API_PORT}`, CDE_PREVIEW_CSP: SPA_CSP },
       url: `http://localhost:${WEB_PORT}`,
       reuseExistingServer: false,
       timeout: 180_000,
