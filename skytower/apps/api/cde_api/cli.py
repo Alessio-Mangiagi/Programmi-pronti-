@@ -4,6 +4,7 @@
   cde dev            Postgres embedded + S3 emulato + migrazioni + dati demo + worker + API su :8100
   cde worker         worker Procrastinate (verifica file) — CDE_DATABASE_URL_WORKER
   cde migrate        applica le migrazioni (CDE_DATABASE_URL_OWNER)
+  cde bootstrap-db   RDS: crea database e ruoli, DSN in Secrets Manager (CDE_DB_MASTER_USER/_PASSWORD)
   cde seed-demo      carica il dataset dimostrativo (CDE_DATABASE_URL_OWNER)
 """
 from __future__ import annotations
@@ -12,6 +13,7 @@ import argparse
 import os
 import sys
 import threading
+from urllib.parse import quote
 
 from .tooling import dbadmin, demo_seed
 
@@ -88,6 +90,24 @@ def cmd_migrate(_args) -> None:
     print(dbadmin.migrate(_owner_url()))
 
 
+def cmd_bootstrap_db(args) -> None:
+    import boto3
+
+    user, password = os.environ.get("CDE_DB_MASTER_USER"), os.environ.get("CDE_DB_MASTER_PASSWORD")
+    if not (user and password):
+        sys.exit("Impostare CDE_DB_MASTER_USER e CDE_DB_MASTER_PASSWORD")
+    superuser = (f"postgresql://{quote(user)}:{quote(password)}@{args.host}:{args.port}/postgres"
+                 f"?sslmode={args.sslmode}")
+    sm = boto3.client("secretsmanager", region_name=os.environ.get("CDE_AWS_REGION", "eu-south-1"))
+    for name in dbadmin.bootstrap_to_secrets(superuser, args.dbname, args.secret_prefix, sm):
+        print("segreto aggiornato:", name)
+    print("Migrazioni:", dbadmin.migrate(_dsn_from(sm, f"{args.secret_prefix}/cde_owner")) or "nessuna")
+
+
+def _dsn_from(sm, secret_id: str) -> str:
+    return sm.get_secret_value(SecretId=secret_id)["SecretString"]
+
+
 def cmd_seed(_args) -> None:
     world = demo_seed.seed(_owner_url())
     print(f"Progetto demo {world.project_id}; password {demo_seed.DEMO_PASSWORD}")
@@ -114,6 +134,13 @@ def main(argv: list[str] | None = None) -> None:
     dev.set_defaults(func=cmd_dev)
     sub.add_parser("worker", help="worker asincrono").set_defaults(func=cmd_worker)
     sub.add_parser("migrate").set_defaults(func=cmd_migrate)
+    boot = sub.add_parser("bootstrap-db", help="RDS: database, ruoli e DSN in Secrets Manager (ruota le password)")
+    boot.add_argument("--host", required=True)
+    boot.add_argument("--port", type=int, default=5432)
+    boot.add_argument("--dbname", default="cde")
+    boot.add_argument("--secret-prefix", required=True, help="es. cde-prod/db")
+    boot.add_argument("--sslmode", default="verify-full")
+    boot.set_defaults(func=cmd_bootstrap_db)
     sub.add_parser("seed-demo").set_defaults(func=cmd_seed)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")

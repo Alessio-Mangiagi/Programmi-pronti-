@@ -1,10 +1,12 @@
 # "><(((º> sabusabu <º)))><"
 """Amministrazione database: Postgres embedded per sviluppo/test, bootstrap ruoli, migrazioni.
 
-In AWS i ruoli e il database li crea Terraform (RDS); qui serve solo per dev e CI.
+In AWS (RDS) il database e i ruoli li crea `cde bootstrap-db` con l'utente master, che scrive i DSN
+in Secrets Manager (bootstrap_to_secrets): le password non passano mai da terminale o log.
 """
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
@@ -50,6 +52,9 @@ def bootstrap(superuser_uri: str, dbname: str, passwords: dict[str, str], *, rec
             exists = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [role]).fetchone()
             stmt = "ALTER ROLE {} WITH LOGIN PASSWORD {}" if exists else "CREATE ROLE {} WITH LOGIN PASSWORD {}"
             conn.execute(sql.SQL(stmt).format(sql.Identifier(role), sql.Literal(passwords[role])))
+        # RDS: il master non è superuser e per creare il database di cde_owner deve poterne assumere il ruolo
+        if not conn.execute("SELECT rolsuper FROM pg_roles WHERE rolname = current_user").fetchone()[0]:
+            conn.execute("GRANT cde_owner TO CURRENT_USER")
         # cde_owner esegue le migrazioni ma non è superuser: la RLS resta significativa per gli altri
         conn.execute("ALTER ROLE cde_app SET search_path = cde, public")
         conn.execute("ALTER ROLE cde_auth SET search_path = cde, public")
@@ -68,6 +73,21 @@ def bootstrap(superuser_uri: str, dbname: str, passwords: dict[str, str], *, rec
         auth=with_credentials(superuser_uri, "cde_auth", passwords["cde_auth"], dbname),
         worker=with_credentials(superuser_uri, "cde_worker", passwords["cde_worker"], dbname),
     )
+
+
+def bootstrap_to_secrets(superuser_uri: str, dbname: str, secret_prefix: str, secretsmanager) -> list[str]:
+    """Bootstrap con password casuali nuove e DSN salvati nei segreti `<prefix>/<ruolo>`.
+
+    Rieseguirlo ruota le password: i task in esecuzione vanno riavviati per leggere i nuovi DSN.
+    Restituisce i nomi dei segreti aggiornati (mai i valori)."""
+    passwords = {role: secrets.token_urlsafe(32) for role in DB_ROLES}
+    urls = bootstrap(superuser_uri, dbname, passwords)
+    updated = []
+    for role in DB_ROLES:
+        name = f"{secret_prefix}/{role}"
+        secretsmanager.put_secret_value(SecretId=name, SecretString=getattr(urls, role.removeprefix("cde_")))
+        updated.append(name)
+    return updated
 
 
 def ensure_job_queue_schema(owner_uri: str) -> bool:
