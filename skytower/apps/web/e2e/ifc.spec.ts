@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
-// Viewer IFC nel browser (web-ifc + three.js): il modello si carica, l'albero spaziale mostra edificio e piani,
-// e il canvas 3D disegna qualcosa (pixel non uniformi). Il giudizio visivo resta al collaudo.
+// Viewer IFC nel browser (web-ifc + three.js), sotto la CSP di produzione (niente 'unsafe-eval', ADR-22): il
+// modello si carica, l'albero spaziale mostra edificio e piani, il canvas 3D disegna qualcosa (pixel non uniformi).
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,10 +10,6 @@ import { apiAs, loginUi, projectAndFolder, uploadFile } from "./helpers";
 const IFC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "edificio.ifc"));
 
 test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => {
-  // PROBLEMA APERTO (docs/adr.md ADR-22): web-ifc (Emscripten/embind) genera funzioni con eval e la CSP di
-  // produzione, servita anche in questi test, non ammette 'unsafe-eval'. Quando il viewer IFC sarà isolato
-  // (o web-ifc ricompilato senza eval) questo test passerà e Playwright lo segnalerà: togliere allora test.fail.
-  test.fail(true, "viewer IFC bloccato dalla CSP di produzione (unsafe-eval), vedi ADR-22");
   test.setTimeout(90_000);
   const des = await apiAs(baseURL, "des.lead@des.example");
   const { projectId, folderId } = await projectAndFolder(des, (n) => n === "Tavole architettoniche");
@@ -23,12 +19,6 @@ test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => 
                    buffer: IFC }, "Modello architettonico e2e");
   await page.reload();
   await page.getByText("Modello architettonico e2e").dblclick();
-  // finché vale ADR-22 il viewer deve almeno spiegarsi, senza mostrare l'errore tecnico
-  const blocked = page.getByText(/non può avviarsi con le impostazioni di sicurezza/);
-  if (await blocked.waitFor({ timeout: 15_000 }).then(() => true, () => false)) {
-    await expect(page.getByText(/Evaluating a string/)).toHaveCount(0);
-  }
-
   await expect(page.getByText("Padiglione A")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Piano terra")).toBeVisible();
   await expect(page.getByText("Piano · Piano 1")).toBeVisible();
@@ -48,4 +38,9 @@ test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => 
     return seen.size;
   }, shot);
   expect(varied).toBeGreaterThan(5);
+
+  // clic sul modello: l'elemento selezionato mostra tipo IFC e GUID nel pannello proprietà
+  const box = (await page.locator("canvas").first().boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByText(/^Ifc[A-Z][A-Za-z]+$/).first()).toBeVisible({ timeout: 10_000 });
 });
