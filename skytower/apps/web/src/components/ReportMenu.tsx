@@ -10,6 +10,7 @@ const REPORTS = [
   { kind: "documents", label: "Registro documenti", detail: "Ultima revisione, stato e cartella di ogni documento" },
   { kind: "approvals", label: "Stato approvazioni", detail: "Workflow, step corrente, chi deve rispondere" },
   { kind: "rfis", label: "RFI", detail: "Richieste di informazioni con scadenze e risposte" },
+  { kind: "reservations", label: "Numeri prenotati", detail: "Elenco elaborati prenotati dalla tua organizzazione e loro stato" },
 ];
 
 export function ReportMenu({ projectId }: { projectId: string }) {

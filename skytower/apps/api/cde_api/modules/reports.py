@@ -32,7 +32,8 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 WF_STATUS = {"RUNNING": "In corso", "APPROVED": "Approvato", "REJECTED": "Rifiutato", "CANCELLED": "Annullato"}
 RFI_STATUS = {"OPEN": "Aperta", "ANSWERED": "Con risposta", "CLOSED": "Chiusa"}
-TITLES = {"documents": "Registro documenti", "approvals": "Stato approvazioni", "rfis": "RFI"}
+TITLES = {"documents": "Registro documenti", "approvals": "Stato approvazioni", "rfis": "RFI",
+          "reservations": "Numeri prenotati"}
 
 Column = tuple[str, int]   # intestazione, larghezza
 
@@ -157,11 +158,27 @@ def _rfis(conn, project_id) -> tuple[list[Column], list[list]]:
                    "Sì" if r["overdue"] else "", r["answered_at"], r["closed_at"], r["message_count"]] for r in rows]
 
 
-BUILDERS = {"documents": _documents, "approvals": _approvals, "rfis": _rfis}
+def _reservations(conn, project_id) -> tuple[list[Column], list[list]]:
+    """Elenco elaborati prenotati dalla propria organizzazione (la RLS esclude quelle delle altre)."""
+    rows = conn.execute(
+        """SELECT r.identifier, r.note, u.first_name || ' ' || u.last_name AS reserved_by, r.created_at,
+                  r.used_at, r.released_at, d.title
+           FROM cde.naming_reservations r JOIN cde.users u ON u.id = r.reserved_by
+           LEFT JOIN cde.documents d ON d.id = r.document_id
+           WHERE r.project_id = %s ORDER BY r.identifier LIMIT %s""", [project_id, MAX_ROWS + 1]).fetchall()
+    cols = [("Identificativo", 34), ("Nota", 40), ("Prenotato da", 24), ("Prenotato il", 17), ("Stato", 12),
+            ("Usato il", 17), ("Documento caricato", 40), ("Rilasciato il", 17)]
+    def status(r):
+        return "Usato" if r["used_at"] else "Rilasciato" if r["released_at"] else "Prenotato"
+    return cols, [[r["identifier"], r["note"], r["reserved_by"], r["created_at"], status(r), r["used_at"], r["title"],
+                   r["released_at"]] for r in rows]
+
+
+BUILDERS = {"documents": _documents, "approvals": _approvals, "rfis": _rfis, "reservations": _reservations}
 
 
 @router.get("/projects/{project_id}/reports/{kind}.xlsx")
-def report(project_id: uuid.UUID, kind: Literal["documents", "approvals", "rfis"], c: Ctx = Depends(ctx)):
+def report(project_id: uuid.UUID, kind: Literal["documents", "approvals", "rfis", "reservations"], c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         project = require_project(conn, project_id)
         cols, rows = BUILDERS[kind](conn, project_id)

@@ -342,3 +342,21 @@ def test_validazione_segnala_la_prenotazione_della_propria_organizzazione(client
     other = client.post(f"/projects/{w.project_id}/naming/validate", headers=as_user("des_lead"),
                         json={"name": ident.replace(volume, volume[:2] + "Z") + ".pdf"}).json()
     assert other["reserved_by_my_org"] is False
+
+
+def test_report_excel_delle_prenotazioni(client, api_world, as_user, auto_settings, volume):
+    import io
+
+    from openpyxl import load_workbook
+    _, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
+    ids = [x["identifier"] for x in _reserve(client, w, as_user("des_lead"), {"volume": volume}, count=2,
+                                            note="Elenco tavole").json()]
+
+    def rows(user):
+        r = client.get(f"/projects/{w.project_id}/reports/reservations.xlsx", headers=as_user(user))
+        assert r.status_code == 200, r.text
+        return list(load_workbook(io.BytesIO(r.content), read_only=True).worksheets[1].iter_rows(values_only=True))
+    mine = {x[0]: x for x in rows("des_designer")}
+    assert set(ids) <= set(mine) and mine[ids[0]][1] == "Elenco tavole" and mine[ids[0]][4] == "Prenotato"
+    assert not set(ids) & {x[0] for x in rows("sub1_user")}      # le prenotazioni DES non escono per SUB1
