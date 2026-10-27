@@ -33,10 +33,11 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U15 | `transmittal.spec.ts` |
 | U16, U17, U18 | `admin.spec.ts` |
 | U20 | `riservate.spec.ts` |
+| U22 (profilo e preferenze, non l'MFA) | `profilo.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 
 Restano solo manuali: confronto revisioni (U11), modello IFC (U12),
-isolamento da link copiato (U21, coperto però dai test API OWASP), profilo e MFA (U22), uso da tablet (U23).
+isolamento da link copiato (U21, coperto però dai test API OWASP), attivazione MFA (U22), uso da tablet (U23).
 
 ## Scenari
 
