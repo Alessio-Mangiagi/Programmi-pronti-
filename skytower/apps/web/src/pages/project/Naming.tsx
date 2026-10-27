@@ -305,9 +305,9 @@ function SchemeEditor({ project, settings, onDone }: { project: Project; setting
             <TextField size="small" type="number" label="Max" value={f.max_length} sx={{ width: 80 }}
                        onChange={(e) => set(i, { max_length: Number(e.target.value) || 1 })} />
             <Stack direction="row" ml="auto">
-              <IconButton size="small" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUpwardIcon fontSize="small" /></IconButton>
-              <IconButton size="small" disabled={i === fields.length - 1} onClick={() => move(i, 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
-              <IconButton size="small" disabled={fields.length <= 2} onClick={() => remove(i)}><DeleteIcon fontSize="small" /></IconButton>
+              <IconButton size="small" aria-label={`Sposta ${f.label} prima`} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUpwardIcon fontSize="small" /></IconButton>
+              <IconButton size="small" aria-label={`Sposta ${f.label} dopo`} disabled={i === fields.length - 1} onClick={() => move(i, 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
+              <IconButton size="small" aria-label={`Elimina il campo ${f.label}`} disabled={fields.length <= 2} onClick={() => remove(i)}><DeleteIcon fontSize="small" /></IconButton>
             </Stack>
           </Stack>
           <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
