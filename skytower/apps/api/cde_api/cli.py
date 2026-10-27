@@ -93,6 +93,16 @@ def cmd_seed(_args) -> None:
     print(f"Progetto demo {world.project_id}; password {demo_seed.DEMO_PASSWORD}")
 
 
+def cmd_demo_content(args) -> None:
+    from .tooling import demo_content
+
+    sys.stdout.reconfigure(errors="replace")         # console Windows: caratteri fuori codepage
+    out = demo_content.populate(args.api, args.password)
+    print(f"Commessa {out['project_id']}: {out['documents']} documenti caricati")
+    for err in out["errors"]:
+        print("  attenzione:", err)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="cde")
     sub = parser.add_subparsers(required=True)
@@ -105,6 +115,10 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("worker", help="worker asincrono").set_defaults(func=cmd_worker)
     sub.add_parser("migrate").set_defaults(func=cmd_migrate)
     sub.add_parser("seed-demo").set_defaults(func=cmd_seed)
+    demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
+    demo.add_argument("--api", default="http://127.0.0.1:8100")
+    demo.add_argument("--password", default="Cantiere-2026!", help="password degli utenti demo")
+    demo.set_defaults(func=cmd_demo_content)
     args = parser.parse_args(argv)
     args.func(args)
 
