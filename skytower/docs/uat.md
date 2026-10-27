@@ -37,8 +37,8 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U22 | `profilo.spec.ts`, `mfa.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 
-Restano solo manuali il confronto visivo tra revisioni (U11) e il modello IFC 3D (U12): il rendering su canvas
-WebGL va giudicato a occhio. Per tutti gli altri il collaudo valuta chiarezza e usabilità.
+Restano solo manuali il confronto visivo tra revisioni (U11) e il modello IFC 3D (U12): il risultato grafico (canvas e WebGL)
+va giudicato a occhio. Per tutti gli altri il collaudo valuta chiarezza e usabilità.
 
 ## Scenari
 
