@@ -167,3 +167,23 @@ Verifiche (`tests/test_db_permissions_perf.py`):
 - **benchmark** (`CDE_PERF=1`), 100.000 documenti, prima pagina (51 righe) con RLS attiva, PostgreSQL 16
   locale: **23–32 ms** di mediana per Project Admin, progettista e subappaltatori (obiettivo < 200 ms).
 
+## ADR-16 — Aree riservate e richieste di accesso (migrazione 0009)
+
+**Contesto.** Serve un'area per commessa (offerte, contratti, documenti interni) che resti chiusa anche a
+chi ha ruoli con scope PROJECT, con accesso concesso caso per caso.
+
+**Decisione.**
+- `containers.is_private` sulla cartella radice; le sottocartelle lo ereditano e nessuna cartella si sposta
+  dentro o fuori dall'area (altrimenti un grant su un antenato non riservato "filtrerebbe" dentro).
+- In `has_permission()` e `my_containers()` il ruolo vale, sulle cartelle riservate, solo se concede ADMIN
+  (Project Admin; admin dell'organizzazione proprietaria con scope OWN_ORGANIZATION). Tutti gli altri
+  passano da un grant esplicito, che resta soggetto alla regola generale "il grant estende la visibilità,
+  non i privilegi del ruolo". Le due funzioni restano equivalenti (test di equivalenza invariato).
+- PUBLISHED/archiviato, altrove visibile a tutto il progetto, in un'area riservata richiede READ sulla
+  cartella (policy `revisions_select`), e il download richiede DOWNLOAD sulla cartella.
+- `access_requests`: il membro chiede (motivazione, permessi, scadenza facoltativa), gli admin dell'area
+  ricevono una notifica e decidono; l'approvazione crea un grant `USER` con la scadenza scelta, revocabile
+  come ogni grant. Scritture solo tramite funzioni `SECURITY DEFINER`; eventi di sicurezza su richiesta e
+  decisione.
+- `private_areas(progetto)` mostra a ogni membro anche le aree chiuse (nome e stato della propria richiesta):
+  il nome dell'area non è considerato riservato, il contenuto sì.

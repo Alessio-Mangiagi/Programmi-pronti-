@@ -11,7 +11,9 @@ Piano di riferimento: [`docs/piano-sviluppo.md`](docs/piano-sviluppo.md) · deci
 | 1 | Multi-tenancy, RBAC, RLS, autenticazione + MFA, API admin, UI | ✅ completato (`v0.1.0`) |
 | 2 | Storage S3 immutabile, naming ISO 19650, revisioni, worker verifica file, UI upload | ✅ completato (`v0.2.0`) |
 | 3 | Stati CDE WIP → SHARED → PUBLISHED → archiviazione, visibilità per stato, bulk, liste < 200 ms su 100k | ✅ completato (0.3.0) |
-| 4 | Workflow di approvazione, scadenze, notifiche, RFI | in corso |
+| 4 | Workflow di approvazione, scadenze, notifiche, RFI (API + designer workflow, inbox compiti, pagine RFI) | ✅ completato |
+| extra | Layout a tre colonne (commesse e cartelle · contenuto · "Per me"), profilo personale, aree riservate con richiesta di accesso | ✅ |
+| 5 | Viewer 2D/3D, audit trail con hash chain | da fare |
 
 ## Struttura
 
