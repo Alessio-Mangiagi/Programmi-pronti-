@@ -16,7 +16,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const wide = useMediaQuery(theme.breakpoints.up("lg"));
   const [treeOpen, setTreeOpen] = useState(false);
   const [perMeOpen, setPerMeOpen] = useState(false);
-  const { tasks } = usePerMe();
+  const { tasks, transmittals } = usePerMe();
 
   return (
     <Stack height="100vh">
@@ -35,7 +35,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <Box flexGrow={1} />
           {!wide && (
             <IconButton color="inherit" aria-label="Per me" onClick={() => setPerMeOpen(true)}>
-              <Badge badgeContent={tasks.length} color="secondary"><AssignmentTurnedInIcon /></Badge>
+              <Badge badgeContent={tasks.length + transmittals.length} color="secondary"><AssignmentTurnedInIcon /></Badge>
             </IconButton>
           )}
           <NotificationBell />

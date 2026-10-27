@@ -1,5 +1,5 @@
 // "><(((º> sabusabu <º)))><"
-// Colonna destra "Per me": compiti di revisione, RFI e notifiche dell'utente su tutte le commesse.
+// Colonna destra "Per me": compiti di revisione, trasmissioni da confermare, RFI e notifiche dell'utente su tutte le commesse.
 // Si chiude in una barra di icone con i contatori; lo stato aperto/chiuso resta nel browser.
 import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +13,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ForumIcon from "@mui/icons-material/Forum";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import { api, AppNotification, MyTask, Rfi } from "../api";
+import type { TransmittalRow } from "../pages/project/Transmittals";
 
 type Filter = "ALL" | "TASKS" | "RFI" | "NOTIFICATIONS";
 const STORAGE_KEY = "cde.perMe.open";
@@ -32,13 +33,16 @@ function when(iso: string | null) {
 
 export function usePerMe() {
   const tasks = useQuery({ queryKey: ["my-tasks", "OPEN"], queryFn: () => api<MyTask[]>("/me/tasks?status=OPEN") });
+  const transmittals = useQuery({
+    queryKey: ["my-transmittals"], queryFn: () => api<TransmittalRow[]>("/me/transmittals"), refetchInterval: 120_000,
+  });
   const rfis = useQuery({ queryKey: ["my-rfis"], queryFn: () => api<Rfi[]>("/me/rfis"), refetchInterval: 120_000 });
   const notifications = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api<{ items: AppNotification[]; unread: number }>("/notifications?limit=30"),
     refetchInterval: 60_000,
   });
-  return { tasks: tasks.data ?? [], rfis: rfis.data ?? [], notifications: notifications.data };
+  return { tasks: tasks.data ?? [], transmittals: transmittals.data ?? [], rfis: rfis.data ?? [], notifications: notifications.data };
 }
 
 export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "docked" | "drawer"; onNavigate?: () => void }) {
@@ -46,7 +50,7 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
   const qc = useQueryClient();
   const [open, setOpenState] = useState(variant === "drawer" || remembered());
   const [filter, setFilter] = useState<Filter>("ALL");
-  const { tasks, rfis, notifications } = usePerMe();
+  const { tasks, transmittals, rfis, notifications } = usePerMe();
 
   const setOpen = (v: boolean) => {
     setOpenState(v);
@@ -69,7 +73,7 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
             <ChevronLeftIcon />
           </IconButton>
         </Tooltip>
-        <RailButton label="Compiti di revisione" count={tasks.length} alert={urgent.length > 0}
+        <RailButton label="Compiti e trasmissioni" count={tasks.length + transmittals.length} alert={urgent.length > 0}
                     onClick={() => { setFilter("TASKS"); setOpen(true); }} icon={<AssignmentTurnedInIcon />} />
         <RailButton label="RFI" count={toAnswer.length + waiting.length}
                     onClick={() => { setFilter("RFI"); setOpen(true); }} icon={<ForumIcon />} />
@@ -80,7 +84,7 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
   }
 
   const show = (f: Filter) => filter === "ALL" || filter === f;
-  const empty = tasks.length + rfis.length + (notifications?.items.length ?? 0) === 0;
+  const empty = tasks.length + transmittals.length + rfis.length + (notifications?.items.length ?? 0) === 0;
 
   return (
     <Stack width={variant === "drawer" ? "100%" : 320} height="100%" borderLeft={variant === "docked" ? 1 : 0}
@@ -99,7 +103,7 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
         <ToggleButtonGroup size="small" exclusive value={filter} onChange={(_, v) => v && setFilter(v)} fullWidth
                            aria-label="Tipo di azione">
           <ToggleButton value="ALL">Tutto</ToggleButton>
-          <ToggleButton value="TASKS">Compiti {tasks.length || ""}</ToggleButton>
+          <ToggleButton value="TASKS">Compiti {tasks.length + transmittals.length || ""}</ToggleButton>
           <ToggleButton value="RFI">RFI {rfis.length || ""}</ToggleButton>
           <ToggleButton value="NOTIFICATIONS" aria-label="Notifiche"><NotificationsIcon fontSize="small" /></ToggleButton>
         </ToggleButtonGroup>
@@ -117,6 +121,12 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
           <Item key={t.id} kicker={`Revisione${t.due_at ? ` · entro ${when(t.due_at)}` : ""}`}
                 title={`${t.title} ${t.revision_code}`} detail={`${t.project_code} · ${t.step_name} · ${t.template_name}`}
                 onClick={() => go(`/compiti?instance=${t.instance_id}`)} />
+        ))}
+        {show("TASKS") && transmittals.length > 0 && <Section title="Trasmissioni da confermare" />}
+        {show("TASKS") && transmittals.map((t) => (
+          <Item key={t.id} kicker={`${t.code} · ${t.item_count} documenti`} title={t.subject}
+                detail={`${t.project_code} · da ${t.sender_org_code} ${t.sender_name}`}
+                onClick={() => go(`/progetti/${t.project_id}/transmittal/${t.id}`)} />
         ))}
         {show("RFI") && toAnswer.length > 0 && <Section title="RFI da rispondere" />}
         {show("RFI") && toAnswer.map((r) => (

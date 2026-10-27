@@ -16,6 +16,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import HistoryIcon from "@mui/icons-material/History";
 import LockIcon from "@mui/icons-material/Lock";
 import SearchIcon from "@mui/icons-material/Search";
+import SendIcon from "@mui/icons-material/Send";
 import ShareIcon from "@mui/icons-material/Share";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -26,6 +27,7 @@ import { DocumentDrawer, DocumentRow, formatBytes, UploadDialog } from "./Docume
 import { STATE_COLOR, STATE_LABEL } from "./Transitions";
 import { FileViewer } from "../../components/FileViewer";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
+import { NewTransmittalDialog } from "./Transmittals";
 
 // Colore per tipo informativo ISO 19650 (5° campo dell'identificativo): tavole, modelli, relazioni, ...
 const TYPE_COLOR: Record<string, string> = {
@@ -53,7 +55,7 @@ export function FolderView({ project }: { project: Project }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [openDoc, setOpenDoc] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<"upload" | "folder" | "grant" | "shares" | "workflow" | null>(null);
+  const [dialog, setDialog] = useState<"upload" | "folder" | "grant" | "shares" | "workflow" | "transmit" | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setSearch(q), 300); return () => clearTimeout(t); }, [q]);
   useEffect(() => { setSelected(null); setQ(""); }, [containerId]);
@@ -116,6 +118,11 @@ export function FolderView({ project }: { project: Project }) {
                     onClick={() => download.mutate(doc!.current_revision_id!)}>Scarica</Button>
             <Button startIcon={<TaskAltIcon />} disabled={!doc?.current_revision_id || !!doc.archived_at} onClick={() => setDialog("workflow")}>
               Avvia approvazione
+            </Button>
+            <Button startIcon={<SendIcon />} onClick={() => setDialog("transmit")}
+                    disabled={!doc?.current_revision_id || doc.current_scan_status !== "CLEAN" || !!doc.archived_at
+                              || !(doc.current_state === "SHARED" || doc.current_state === "PUBLISHED")}>
+              Trasmetti
             </Button>
             <Button startIcon={<HistoryIcon />} disabled={!doc} onClick={() => setOpenDoc(doc!.id)}>Dettagli e cronologia</Button>
             <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
@@ -205,6 +212,7 @@ export function FolderView({ project }: { project: Project }) {
         <StartWorkflowDialog projectId={project.id} revisionId={doc.current_revision_id}
                              label={`${doc.identifier} ${doc.current_revision}`} onClose={() => setDialog(null)} />
       )}
+      {dialog === "transmit" && doc && <NewTransmittalDialog project={project} initial={[doc]} onClose={() => setDialog(null)} />}
       <DocumentDrawer projectId={project.id} documentId={openDoc} onClose={() => setOpenDoc(null)} />
       {viewDoc && <FileViewer documentId={viewDoc} onClose={() => setViewDoc(null)}
                               onDetails={() => { setOpenDoc(viewDoc); setViewDoc(null); }} />}

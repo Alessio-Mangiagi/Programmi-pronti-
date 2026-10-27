@@ -9,6 +9,7 @@ import { PrivateAreasTab } from "./project/PrivateAreas";
 import { AuditTab } from "./project/Audit";
 import { DashboardTab } from "./project/Dashboard";
 import { RfisTab } from "./project/Rfis";
+import { TransmittalsTab } from "./project/Transmittals";
 import { WorkflowsTab } from "./project/Workflows";
 import { MembersTab } from "./project/Members";
 import { OrganizationsTab } from "./project/Organizations";
@@ -19,6 +20,7 @@ const TABS = [
   { path: "documenti", label: "Aree CDE" },
   { path: "riservate", label: "Aree riservate" },
   { path: "rfi", label: "RFI" },
+  { path: "transmittal", label: "Transmittal" },
   { path: "workflow", label: "Workflow" },
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
@@ -64,6 +66,8 @@ export function ProjectPage() {
         <Route path="riservate" element={<PrivateAreasTab project={project} />} />
         <Route path="rfi" element={<RfisTab project={project} />} />
         <Route path="rfi/:rfiId" element={<RfisTab project={project} />} />
+        <Route path="transmittal" element={<TransmittalsTab project={project} />} />
+        <Route path="transmittal/:transmittalId" element={<TransmittalsTab project={project} />} />
         <Route path="workflow" element={<WorkflowsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="cruscotto" element={<DashboardTab project={project} />} />
         <Route path="registro" element={<AuditTab project={project} />} />
