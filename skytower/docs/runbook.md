@@ -16,7 +16,9 @@ Obiettivi: **RPO 15'**, **RTO 4 h**.
 ## 1. Prima installazione
 
 1. **Prerequisiti fuori stack**: bucket di stato e tabella di lock (`backend.hcl.example`), certificati ACM
-   per `domain_name` (in **us-east-1**) e `origin.<domain_name>` (in eu-south-1), identità SES verificata per `mail_from`.
+   per `domain_name` (in **us-east-1**) e `origin.<domain_name>` (in eu-south-1), identità SES verificata per `mail_from`,
+   provider OIDC di GitHub e ruolo IAM per il workflow di deploy (`vars.AWS_DEPLOY_ROLE_ARN` dell'environment),
+   con trust limitato a questo repository e all'environment `skytower-<ambiente>`.
 2. `terraform init -backend-config=backend.hcl` e `terraform apply -var-file=prod.tfvars`
    (`domain_name`, i due certificati, `alert_emails`, `image_tag`, `tsa_url`).
 3. DNS: `domain_name` → output `cloudfront_domain`; `origin.<domain_name>` → output `alb_dns_name`.
