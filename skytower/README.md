@@ -13,7 +13,7 @@ Piano di riferimento: [`docs/piano-sviluppo.md`](docs/piano-sviluppo.md) · deci
 | 3 | Stati CDE WIP → SHARED → PUBLISHED → archiviazione, visibilità per stato, bulk, liste < 200 ms su 100k | ✅ completato (0.3.0) |
 | 4 | Workflow di approvazione, scadenze, notifiche, RFI (API + designer workflow, inbox compiti, pagine RFI) | ✅ completato |
 | extra | Layout a tre colonne (commesse e cartelle · contenuto · "Per me"), profilo personale, aree riservate con richiesta di accesso | ✅ |
-| 5 | Viewer 2D/3D, audit trail con hash chain | da fare |
+| 5 | Audit trail con hash chain, verifica ed export CSV firmato ✅ · lettura in piattaforma di PDF/immagini/testo ✅ · viewer IFC/DWG e markup da fare | in corso |
 
 ## Struttura
 
