@@ -2,108 +2,30 @@
    coerente con l'app "100% locale/offline". Le famiglie caricate qui
    (Archivo display, Inter body, JetBrains Mono) sono referenziate via i token
    --display/--body/--mono in styles.css. font-display: swap = testo subito
-   visibile col fallback finché il woff2 non è pronto. */
+   visibile col fallback finché il woff2 non è pronto.
+   Un solo file variabile per famiglia: il range di font-weight copre tutti
+   i pesi usati, niente copie identiche per peso. */
 @font-face {
   font-family: 'Archivo';
   font-style: normal;
-  font-weight: 600;
+  font-weight: 600 900;
   font-display: swap;
   /* "><(((º> sabusabu <º)))><" */
-  src: url('fonts/Archivo-600.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('fonts/Archivo-700.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('fonts/Archivo-800.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 900;
-  font-display: swap;
-  src: url('fonts/Archivo-900.woff2') format('woff2');
+  src: url('fonts/Archivo-var.woff2') format('woff2');
 }
 
 @font-face {
   font-family: 'Inter';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 800;
   font-display: swap;
-  src: url('fonts/Inter-400.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('fonts/Inter-500.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('fonts/Inter-600.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('fonts/Inter-700.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('fonts/Inter-800.woff2') format('woff2');
+  src: url('fonts/Inter-var.woff2') format('woff2');
 }
 
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 800;
   font-display: swap;
-  src: url('fonts/JetBrainsMono-400.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('fonts/JetBrainsMono-500.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('fonts/JetBrainsMono-700.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('fonts/JetBrainsMono-800.woff2') format('woff2');
+  src: url('fonts/JetBrainsMono-var.woff2') format('woff2');
 }
