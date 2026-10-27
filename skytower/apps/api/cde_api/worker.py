@@ -203,6 +203,17 @@ def audit_publish_anchors(timestamp: int) -> None:
         log.info("registro: %s ancore pubblicate su S3", n)
 
 
+@app.periodic(cron="40 2 * * *", periodic_id="naming-reservations-expiry")
+@app.task(name="cde.naming_release_expired", queue="default")
+def naming_release_expired(timestamp: int) -> None:
+    """Rilascia le prenotazioni di identificativi scadute (auto_number.reservation_days della commessa)."""
+    _, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
+        n = conn.execute("SELECT cde.naming_release_expired(to_timestamp(%s))", [timestamp]).fetchone()[0]
+    if n:
+        log.info("naming: %s prenotazioni scadute rilasciate", n)
+
+
 @app.periodic(cron="0 7 * * *", periodic_id="daily-digest")
 @app.task(name="cde.daily_digest", queue="default")
 def daily_digest(timestamp: int) -> None:

@@ -31,6 +31,7 @@ export interface AutoNumbering {
   start: number;
   series: string[] | null;
   defaults: Record<string, string>;
+  reservation_days?: number | null;
 }
 
 export interface DocumentSettings {
@@ -167,6 +168,10 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
               </TextField>
               <TextField size="small" type="number" label="Primo numero" value={auto.start} disabled={!canManage} sx={{ width: 140 }}
                          inputProps={{ min: 0 }} onChange={(e) => setAuto({ ...auto, start: Math.max(0, Number(e.target.value) || 0) })} />
+              <TextField size="small" type="number" label="Scadenza prenotazioni (giorni)" disabled={!canManage} sx={{ width: 230 }}
+                         value={auto.reservation_days ?? ""} helperText="Vuoto = le prenotazioni non scadono"
+                         inputProps={{ min: 1, max: 3650 }}
+                         onChange={(e) => setAuto({ ...auto, reservation_days: e.target.value ? Math.min(3650, Math.max(1, Number(e.target.value))) : null })} />
             </Stack>
 
             <div>
@@ -382,7 +387,9 @@ function ReservationsPanel({ project, settings }: { project: Project; settings: 
       <Typography variant="subtitle1" fontWeight={600}>Prenota numeri</Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         Per un elenco elaborati da produrre: prenota gli identificativi in anticipo. Restano riservati alla tua
-        organizzazione finché un caricamento con quel nome non li usa. Un numero rilasciato non torna disponibile.
+        organizzazione finché un caricamento con quel nome non li usa
+        {auto.reservation_days ? ` (al massimo ${auto.reservation_days} giorni, poi vengono rilasciati in automatico)` : ""}.
+        Un numero rilasciato non torna disponibile.
       </Typography>
       <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap alignItems="flex-start">
         {fieldsList.map((f) => (

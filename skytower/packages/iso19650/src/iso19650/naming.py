@@ -72,11 +72,13 @@ class AutoNumbering(BaseModel):
 
     ``series``: campi i cui valori identificano una serie di numerazione. ``None`` = tutti gli altri
     campi (un progressivo per ogni combinazione), ``[]`` = un solo progressivo per l'intero progetto.
-    ``defaults``: valori proposti per i campi che chi carica non indica."""
+    ``defaults``: valori proposti per i campi che chi carica non indica.
+    ``reservation_days``: dopo quanti giorni una prenotazione non usata viene rilasciata (None = mai)."""
     field: str = Field(default="number", pattern=r"^[a-z_]{2,30}$")
     start: int = Field(default=1, ge=0, le=999_999_999)
     series: list[str] | None = None
     defaults: dict[str, str] = Field(default_factory=dict)
+    reservation_days: int | None = Field(default=None, ge=1, le=3650)
 
 
 class NamingScheme(BaseModel):

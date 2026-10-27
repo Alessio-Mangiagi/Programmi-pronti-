@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 
+import psycopg
 import pytest
 from test_api_documents import PDF, put_parts
 
@@ -312,3 +313,20 @@ def test_nome_originale_nel_registro_excel(client, api_world, as_user, auto_sett
     col = rows[0].index("Nome originale")
     mine = next(x for x in rows if x[0] == rev["original_filename"].rsplit(".", 1)[0])
     assert mine[col] == "vecchio nome.pdf"
+
+
+def test_prenotazioni_scadute_rilasciate_dal_worker(client, api_world, as_user, auto_settings, volume):
+    urls, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"}, reservation_days=10)
+    h = as_user("des_lead")
+    old, fresh = (x["id"] for x in _reserve(client, w, h, {"volume": volume}, count=2).json())
+    with psycopg.connect(urls.owner) as conn:   # simula una prenotazione di 11 giorni fa
+        conn.execute("UPDATE cde.naming_reservations SET created_at = now() - interval '11 days' WHERE id = %s", [old])
+    with psycopg.connect(urls.worker, autocommit=True) as conn:
+        assert conn.execute("SELECT cde.naming_release_expired(now())").fetchone()[0] >= 1
+    mine = {x["id"]: x for x in client.get(f"/projects/{w.project_id}/naming/reservations", headers=h,
+                                           params={"status": "all"}).json()}
+    assert mine[old]["released_at"] and not mine[fresh]["released_at"]
+    events = client.get(f"/projects/{w.project_id}/audit", headers=as_user("com_admin"),
+                        params={"event_type": "NAMING_RESERVATIONS_EXPIRED"}).json()
+    assert any(mine[old]["identifier"] in e["details"]["identifiers"] for e in events)

@@ -29,6 +29,7 @@ interface Verify {
 
 const EVENT_LABEL: Record<string, string> = {
   DOCUMENT_SETTINGS_UPDATED: "Impostazioni naming", NAMING_RESERVED: "Numeri prenotati", NAMING_RESERVATION_RELEASED: "Prenotazione rilasciata",
+  NAMING_RESERVATIONS_EXPIRED: "Prenotazioni scadute",
   DOCUMENT_VIEWED: "Documento visualizzato", REVISION_DOWNLOADED: "Download", REVISION_UPLOADED: "Caricamento",
   REVISION_STATE_CHANGED: "Cambio di stato", BULK_STATE_CHANGE: "Cambio di stato multiplo", WORKFLOW_STARTED: "Workflow avviato",
   WORKFLOW_CANCELLED: "Workflow annullato", TASK_COMPLETED: "Esito di revisione", WORKFLOW_TEMPLATE_SAVED: "Template workflow",
