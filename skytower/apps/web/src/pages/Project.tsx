@@ -7,6 +7,7 @@ import { AreasTab } from "./project/Areas";
 import { FolderView } from "./project/Folder";
 import { PrivateAreasTab } from "./project/PrivateAreas";
 import { AuditTab } from "./project/Audit";
+import { DashboardTab } from "./project/Dashboard";
 import { RfisTab } from "./project/Rfis";
 import { WorkflowsTab } from "./project/Workflows";
 import { MembersTab } from "./project/Members";
@@ -22,6 +23,7 @@ const TABS = [
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
+  { path: "cruscotto", label: "Cruscotto", adminOnly: true },
   { path: "registro", label: "Registro", adminOnly: true },
 ];
 
@@ -63,6 +65,7 @@ export function ProjectPage() {
         <Route path="rfi" element={<RfisTab project={project} />} />
         <Route path="rfi/:rfiId" element={<RfisTab project={project} />} />
         <Route path="workflow" element={<WorkflowsTab project={project} canManage={isProjectAdmin} />} />
+        <Route path="cruscotto" element={<DashboardTab project={project} />} />
         <Route path="registro" element={<AuditTab project={project} />} />
         <Route path="membri" element={<MembersTab project={project} canManage={isAnyAdmin} />} />
         <Route path="organizzazioni" element={<OrganizationsTab project={project} canManage={isProjectAdmin} />} />
