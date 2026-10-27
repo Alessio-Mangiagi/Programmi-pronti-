@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from ..deps import Ctx, ctx
 from ..errors import unauthorized
@@ -10,11 +11,31 @@ from ..errors import unauthorized
 router = APIRouter(tags=["me"])
 
 USER_COLUMNS = ("u.id, u.organization_id, u.email, u.first_name, u.last_name, u.status, u.is_org_admin, "
-                "u.is_platform_admin, u.last_login_at, u.created_at")
+                "u.is_platform_admin, u.last_login_at, u.created_at, u.phone, u.job_title, u.locale")
+
+
+class ProfileIn(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    phone: str | None = Field(default=None, max_length=30, pattern=r"^(\+?[0-9 ./()-]{5,30})?$")
+    job_title: str | None = Field(default=None, max_length=120)
 
 
 @router.get("/me")
 def me(c: Ctx = Depends(ctx)):
+    return _me(c)
+
+
+@router.patch("/me")
+def update_me(body: ProfileIn, c: Ctx = Depends(ctx)):
+    """Dati anagrafici modificabili dall'utente stesso (email e organizzazione no: le gestisce l'admin)."""
+    with c.tx() as conn:
+        conn.execute("SELECT cde.update_my_profile(%s, %s, %s, %s)",
+                     [body.first_name, body.last_name, body.phone, body.job_title])
+    return _me(c)
+
+
+def _me(c: Ctx) -> dict:
     with c.tx() as conn:
         row = conn.execute(
             f"""SELECT {USER_COLUMNS}, o.legal_name AS organization_name, o.code AS organization_code,
