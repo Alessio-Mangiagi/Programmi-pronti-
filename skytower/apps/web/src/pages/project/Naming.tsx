@@ -64,7 +64,7 @@ export function FieldValueInput({ field, value, onChange, allowEmpty }: {
       </TextField>
     );
   return (
-    <TextField size="small" label={field.label} value={value} helperText={field.help ?? undefined} sx={{ minWidth: 140 }}
+    <TextField size="small" label={field.label} value={value} helperText={field.help ?? undefined} sx={{ width: 190 }}
                inputProps={{ maxLength: field.max_length, style: { textTransform: "uppercase" } }}
                onChange={(e) => onChange(e.target.value.toUpperCase())} />
   );
@@ -282,7 +282,7 @@ function SchemeEditor({ project, settings, onDone }: { project: Project; setting
         <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="flex-start">
             <TextField size="small" label="Etichetta" value={f.label} onChange={(e) => set(i, { label: e.target.value })} sx={{ width: 180 }} />
-            <TextField size="small" label="Chiave" value={f.key} helperText="minuscole e _"
+            <TextField size="small" label="Chiave" value={f.key} title="Solo lettere minuscole e _"
                        onChange={(e) => set(i, { key: e.target.value.toLowerCase().replace(/[^a-z_]/g, "") })} sx={{ width: 140 }} />
             <TextField select size="small" label="Tipo" value={f.kind} sx={{ width: 160 }}
                        onChange={(e) => set(i, { kind: e.target.value as NamingField["kind"],
