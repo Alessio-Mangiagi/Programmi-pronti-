@@ -1,16 +1,17 @@
 // "><(((º> sabusabu <º)))><"
-// Colonna sinistra: organizzazione in alto, sotto le commesse in ordine alfabetico, ognuna con l'albero
-// delle cartelle (container) caricato alla prima apertura. Lo stato segue l'URL.
+// Colonna sinistra: le commesse in ordine alfabetico, ognuna con l'albero delle cartelle (container)
+// caricato alla prima apertura, e in fondo le aree riservate (lucchetto se chiuse). Lo stato segue l'URL.
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Avatar, Box, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
+import { Box, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import FolderIcon from "@mui/icons-material/Folder";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import FolderSpecialIcon from "@mui/icons-material/FolderSpecial";
+import LockIcon from "@mui/icons-material/Lock";
 import SearchIcon from "@mui/icons-material/Search";
-import { api, Container, Project } from "../api";
-import { useAuth } from "../auth";
+import { api, Container, PrivateArea, Project } from "../api";
 
 const ROUTE = /^\/progetti\/([^/]+)(?:\/cartelle\/([^/?#]+))?/;
 
@@ -22,7 +23,10 @@ export function folderTree(containers: Container[]) {
     const key = c.parent_id && ids.has(c.parent_id) ? c.parent_id : null;
     byParent.set(key, [...(byParent.get(key) ?? []), c]);
   }
-  for (const list of byParent.values()) list.sort((a, b) => a.name.localeCompare(b.name, "it", { numeric: true }));
+  // cartelle normali prima, aree riservate in fondo; poi per nome con i numeri in ordine naturale
+  for (const list of byParent.values()) {
+    list.sort((a, b) => Number(a.is_private) - Number(b.is_private) || a.name.localeCompare(b.name, "it", { numeric: true }));
+  }
   return byParent;
 }
 
@@ -34,8 +38,15 @@ export function useContainers(projectId: string | undefined, enabled = true) {
   });
 }
 
+export function usePrivateAreas(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["private-areas", projectId],
+    queryFn: () => api<PrivateArea[]>(`/projects/${projectId}/private-areas`),
+    enabled: !!projectId && enabled,
+  });
+}
+
 export function ProjectTree({ onNavigate }: { onNavigate?: () => void }) {
-  const { me } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [filter, setFilter] = useState("");
@@ -54,28 +65,19 @@ export function ProjectTree({ onNavigate }: { onNavigate?: () => void }) {
       .sort((a, b) => a.name.localeCompare(b.name, "it", { numeric: true }));
   }, [projects, filter]);
 
-  // id dei nodi: "p:<commessa>" e "c:<commessa>:<cartella>"
+  // id dei nodi: "p:<commessa>", "c:<commessa>:<cartella>", "r:<commessa>:<area chiusa>"
   const go = (itemId: string) => {
     const [kind, projectId, folderId] = itemId.split(":");
     if (kind === "p" && !folderId) navigate(`/progetti/${projectId}`);
     else if (kind === "c") navigate(`/progetti/${projectId}/cartelle/${folderId}`);
+    else if (kind === "r") navigate(`/progetti/${projectId}/riservate`);
     else return;
     onNavigate?.();
   };
 
   return (
     <Stack height="100%" component="nav" aria-label="Commesse e cartelle">
-      <Box px={1.75} pt={1.75} pb={1.25} borderBottom={1} borderColor="divider">
-        <Typography variant="overline" color="text.secondary" lineHeight={1.5}>Organizzazione</Typography>
-        <Stack direction="row" alignItems="center" spacing={1.25} mt={0.5} px={1.25} py={1}
-               border={1} borderColor="divider" borderRadius={2} bgcolor="background.default">
-          <Avatar variant="rounded" sx={{ width: 28, height: 28, bgcolor: "primary.main", fontSize: 11, fontWeight: 700 }}>
-            {me?.organization_code.slice(0, 3)}
-          </Avatar>
-          <Typography fontWeight={600} variant="body2" noWrap>{me?.organization_name}</Typography>
-        </Stack>
-      </Box>
-      <Box px={1.75} pt={1.5} pb={1}>
+      <Box px={1.75} pt={1.75} pb={1}>
         <Typography variant="overline" color="text.secondary" lineHeight={1.5}>Commesse</Typography>
         <TextField size="small" fullWidth placeholder="Cerca commessa" value={filter} onChange={(e) => setFilter(e.target.value)}
                    sx={{ mt: 0.5 }} inputProps={{ "aria-label": "Cerca commessa" }}
@@ -89,8 +91,7 @@ export function ProjectTree({ onNavigate }: { onNavigate?: () => void }) {
           </Typography>
         )}
         <SimpleTreeView expandedItems={expanded} onExpandedItemsChange={(_, ids) => setExpanded(ids)}
-                        selectedItems={selected} onItemClick={(_, id) => go(id)}
-                        expansionTrigger="iconContainer">
+                        selectedItems={selected} onItemClick={(_, id) => go(id)} expansionTrigger="iconContainer">
           {sorted.map((p) => (
             <ProjectNode key={p.id} project={p} open={expanded.includes(`p:${p.id}`)}
                          currentFolder={routeProject === p.id ? routeFolder : undefined} onExpand={expand} />
@@ -105,7 +106,9 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
   project: Project; open: boolean; currentFolder?: string; onExpand: (ids: string[]) => void;
 }) {
   const { data: containers } = useContainers(project.id, open);
+  const { data: areas = [] } = usePrivateAreas(project.id, open);
   const tree = useMemo(() => folderTree(containers ?? []), [containers]);
+  const locked = areas.filter((a) => !a.has_access);
 
   // apre la catena di cartelle fino a quella nell'URL
   useEffect(() => {
@@ -119,12 +122,16 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containers, currentFolder]);
 
+  const icon = (c: Container) =>
+    c.is_private && !c.parent_id ? <FolderSpecialIcon fontSize="small" sx={{ color: "#7a4fb5" }} />
+      : c.id === currentFolder ? <FolderOpenIcon fontSize="small" sx={{ color: "#c08a1e" }} />
+      : <FolderIcon fontSize="small" sx={{ color: c.is_private ? "#9b7ccc" : "#d9a93c" }} />;
+
   const renderFolders = (parent: string | null) =>
     (tree.get(parent) ?? []).map((c) => (
       <TreeItem key={c.id} itemId={`c:${project.id}:${c.id}`}
                 label={<Stack direction="row" alignItems="center" spacing={1} py={0.25}>
-                  {c.id === currentFolder ? <FolderOpenIcon fontSize="small" sx={{ color: "#c08a1e" }} />
-                                          : <FolderIcon fontSize="small" sx={{ color: "#d9a93c" }} />}
+                  {icon(c)}
                   <Typography variant="body2" noWrap>{c.name}</Typography>
                 </Stack>}>
         {renderFolders(c.id)}
@@ -139,9 +146,17 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
               </Stack>}>
       {containers === undefined
         ? <TreeItem itemId={`p:${project.id}:loading`} label={<Typography variant="caption" color="text.secondary">caricamento…</Typography>} />
-        : containers.length === 0
+        : containers.length === 0 && locked.length === 0
           ? <TreeItem itemId={`p:${project.id}:loading`} disabled label={<Typography variant="caption" color="text.secondary">nessuna cartella visibile</Typography>} />
           : renderFolders(null)}
+      {locked.map((a) => (
+        <TreeItem key={a.id} itemId={`r:${project.id}:${a.id}`}
+                  label={<Stack direction="row" alignItems="center" spacing={1} py={0.25} color="text.secondary">
+                    <LockIcon fontSize="small" />
+                    <Typography variant="body2" noWrap>{a.name}</Typography>
+                    {a.request_status === "PENDING" && <Typography variant="caption">· richiesta inviata</Typography>}
+                  </Stack>} />
+      ))}
     </TreeItem>
   );
 }

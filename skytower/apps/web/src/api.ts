@@ -161,7 +161,39 @@ export interface Container {
   owner_organization_code: string;
   name: string;
   inherit_permissions: boolean;
+  is_private: boolean;
   my_actions: Action[];
+}
+
+export interface PrivateArea {
+  id: string;
+  name: string;
+  owner_organization_code: string;
+  has_access: boolean;
+  is_admin: boolean;
+  request_id: string | null;
+  request_status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | null;
+  pending_requests: number | null;
+}
+
+export interface AccessRequest {
+  id: string;
+  project_id: string;
+  container_id: string;
+  container_name: string | null;
+  requester_id: string;
+  requester_name: string;
+  requester_email: string;
+  requester_org_code: string;
+  actions: Action[];
+  reason: string;
+  valid_until: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+  decided_at: string | null;
+  decided_by_name: string | null;
+  decision_note: string | null;
+  created_at: string;
+  can_decide: boolean;
 }
 
 export interface Grant {

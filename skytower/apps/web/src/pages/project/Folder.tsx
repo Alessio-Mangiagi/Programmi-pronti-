@@ -14,6 +14,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import FolderIcon from "@mui/icons-material/Folder";
 import GroupIcon from "@mui/icons-material/Group";
 import HistoryIcon from "@mui/icons-material/History";
+import LockIcon from "@mui/icons-material/Lock";
 import SearchIcon from "@mui/icons-material/Search";
 import ShareIcon from "@mui/icons-material/Share";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
@@ -94,6 +95,11 @@ export function FolderView({ project }: { project: Project }) {
           : <Link key={c.id} component={RouterLink} to={`/progetti/${project.id}/cartelle/${c.id}`} underline="hover" color="inherit">{c.name}</Link>)}
       </Breadcrumbs>
 
+      {current?.is_private && (
+        <Alert severity="info" icon={<LockIcon fontSize="small" />}>
+          Area riservata: la vedono solo gli amministratori e chi ha avuto l'accesso su richiesta.
+        </Alert>
+      )}
       <Paper variant="outlined" sx={{ p: 1, display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }} role="toolbar" aria-label="Funzioni">
         {current && <Button variant="contained" startIcon={<CloudUploadIcon />} disabled={!can("WRITE")} onClick={() => setDialog("upload")}>Carica</Button>}
         <Button startIcon={<CreateNewFolderIcon />} disabled={current ? !can("WRITE") : !canCreateRoot} onClick={() => setDialog("folder")}>
@@ -141,7 +147,7 @@ export function FolderView({ project }: { project: Project }) {
                   <TableCell padding="checkbox" />
                   <TableCell>
                     <Stack direction="row" spacing={1.25} alignItems="center">
-                      <FolderIcon sx={{ color: "#d9a93c" }} />
+                      {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
                       <Typography variant="body2" fontWeight={500}>{c.name}</Typography>
                       <Chip size="small" variant="outlined" label={c.owner_organization_code} />
                     </Stack>
