@@ -1,0 +1,15 @@
+# "><(((º> sabusabu <º)))><"
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+**/node_modules
+.venv
+.devdata
+.secrets
+**/.env
+apps/web
+apps/api/tests
+infra
+docs

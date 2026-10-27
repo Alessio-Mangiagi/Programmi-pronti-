@@ -1,0 +1,7 @@
+# "><(((º> sabusabu <º)))><"
+# Copiare in backend.hcl (non versionato). Bucket e tabella di lock si creano una tantum (bootstrap).
+bucket         = "cde-terraform-state"
+key            = "envs/prod/terraform.tfstate"
+region         = "eu-south-1"
+dynamodb_table = "cde-terraform-lock"
+encrypt        = true
