@@ -55,7 +55,8 @@ export function PrivateAreasTab({ project }: { project: Project }) {
           Le aree riservate sono accessibili solo agli amministratori. Gli altri membri della commessa le vedono chiuse
           e possono chiedere l'accesso: decide un amministratore, anche con una scadenza.
         </Typography>
-        {isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>Nuova area riservata</Button>}
+        {isAdmin && <Button variant="contained" startIcon={<AddIcon />} sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+                            onClick={() => setCreating(true)}>Nuova area riservata</Button>}
       </Stack>
 
       {toDecide.length > 0 && (
