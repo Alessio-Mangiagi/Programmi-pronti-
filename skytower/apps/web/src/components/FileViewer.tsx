@@ -31,8 +31,10 @@ const IfcView = lazy(() => import("./markup/IfcView"));
 const OfficeView = lazy(() => import("./OfficeView"));
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+// l'anteprima Office si converte nella pagina: oltre questa soglia (o con file compressi ostili) la bloccherebbe
+const OFFICE_PREVIEW_MAX = 25 * 1024 * 1024;
 
-interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string }
+interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string; size_bytes: number }
 interface Doc { id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
 interface Link { url: string; filename: string; content_type: string | null }
 
@@ -224,6 +226,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
               <IfcView url={link.url} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>
+          ) : office && (rev?.size_bytes ?? 0) > OFFICE_PREVIEW_MAX ? (
+            <Stack alignItems="center" spacing={2} p={3} m="auto" bgcolor="background.paper" borderRadius={2}>
+              <Typography>File troppo grande per l'anteprima in piattaforma (oltre 25 MB).</Typography>
+              <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => download.mutate()}>Scarica il file</Button>
+            </Stack>
           ) : office ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <OfficeView url={link.url} kind={office} />
