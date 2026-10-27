@@ -20,6 +20,10 @@ desktop.ini
 # Temporanei
 *.tmp
 
+# Installer compilato da installa-suite.py: si rigenera, non si versiona
+# (ogni build ne portava una copia da ~7 MB nella storia).
+/InstallaSuite.exe
+
 # Documenti aziendali reali (contratti, registri, corrispondenza): mai
 # versionare. Restano sul disco di chi li usa; nessun codice li legge.
 # (ocr-documenti/Elenchi/ invece resta: l'app la legge all'avvio.)
