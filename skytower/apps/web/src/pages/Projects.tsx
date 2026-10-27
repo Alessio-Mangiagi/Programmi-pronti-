@@ -32,7 +32,7 @@ export function ProjectsPage() {
               <CardActionArea component={RouterLink} to={`/progetti/${p.id}`}>
                 <CardContent>
                   <Typography variant="overline" color="primary">{p.code}</Typography>
-                  <Typography variant="h6" gutterBottom>{p.name}</Typography>
+                  <Typography variant="h6" component="h2" gutterBottom>{p.name}</Typography>
                   <Typography variant="body2" color="text.secondary" gutterBottom>Committente: {p.owner_name}</Typography>
                   <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                     <Chip size="small" label={p.status} />

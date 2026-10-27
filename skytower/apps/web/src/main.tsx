@@ -23,6 +23,9 @@ const theme = createTheme({
                  styleOverrides: { root: { textTransform: "none", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 } } },
     MuiFormControlLabel: { styleOverrides: { root: { flexShrink: 0 }, label: { whiteSpace: "nowrap" } } },
     MuiTab: { styleOverrides: { root: { textTransform: "none", fontWeight: 600 } } },
+    // gerarchia dei titoli per gli screen reader: h4 è il titolo di pagina, h5/h6 le sezioni; i sottotitoli
+    // sono etichette, non titoli (axe: page-has-heading-one, heading-order)
+    MuiTypography: { defaultProps: { variantMapping: { h4: "h1", h5: "h2", h6: "h3", subtitle1: "p", subtitle2: "p" } } },
   },
 });
 
