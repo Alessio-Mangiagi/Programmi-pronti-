@@ -92,6 +92,20 @@ def test_export_csv_firmato(client, api_world, as_user, events):  # noqa: F811
     assert rows and rows[0]["details"]["sha256"] == claims["sha256"]
 
 
+def test_export_pdf_firmato(client, api_world, as_user, events):  # noqa: F811
+    _, w = api_world
+    assert client.get(f"/projects/{w.project_id}/audit/export.pdf", headers=as_user("des_lead")).status_code == 403
+    r = client.get(f"/projects/{w.project_id}/audit/export.pdf", headers=as_user("com_admin"),
+                   params={"event_type": "CONTAINER_CREATED"})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert r.content.startswith(b"%PDF") and 'filename="registro-PRJ01-' in r.headers["content-disposition"]
+    assert hashlib.sha256(r.content).hexdigest() == r.headers["x-cde-sha256"]
+    key = jwt.PyJWK(client.get("/.well-known/jwks.json").json()["keys"][0]).key
+    claims = jwt.decode(r.headers["x-cde-signature"], key, algorithms=["RS256"], options={"verify_aud": False})
+    assert claims["kind"] == "audit-pdf" and claims["sha256"] == r.headers["x-cde-sha256"] and claims["rows"] >= 1
+    assert claims["filters"]["event_type"] == "CONTAINER_CREATED"
+
+
 def test_ancora_giornaliera(api_world, events):
     urls, _ = api_world
     with psycopg.connect(urls.worker, autocommit=True) as conn:

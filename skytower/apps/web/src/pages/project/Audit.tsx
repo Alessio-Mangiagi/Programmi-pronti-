@@ -1,5 +1,5 @@
 // "><(((º> sabusabu <º)))><"
-// Registro attività della commessa (solo Project Admin): filtri, verifica della hash chain, export CSV firmato.
+// Registro attività della commessa (solo Project Admin): filtri, verifica della hash chain, export CSV e PDF firmati.
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -59,7 +59,7 @@ export function AuditTab({ project }: { project: Project }) {
   });
   const verify = useMutation({ mutationFn: () => api<Verify>(`/projects/${project.id}/audit/verify`) });
   const exportCsv = useMutation({
-    mutationFn: () => apiDownload(`/projects/${project.id}/audit/export.csv${qs ? `?${qs}` : ""}`, "registro.csv"),
+    mutationFn: (ext: "csv" | "pdf") => apiDownload(`/projects/${project.id}/audit/export.${ext}${qs ? `?${qs}` : ""}`, `registro.${ext}`),
   });
 
   if (error) return <Alert severity="warning">{(error as ApiError).message}</Alert>;
@@ -68,7 +68,7 @@ export function AuditTab({ project }: { project: Project }) {
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
         Ogni azione su documenti, permessi, workflow e RFI resta nel registro. Gli eventi vengono sigillati in una
-        catena di hash: qualsiasi modifica successiva è rilevata dalla verifica. L'export CSV è firmato digitalmente.
+        catena di hash: qualsiasi modifica successiva è rilevata dalla verifica. Gli export CSV e PDF sono firmati digitalmente.
       </Typography>
       <Paper variant="outlined" sx={{ p: 1.5, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
         <TextField size="small" type="date" label="Dal" value={from} onChange={(e) => setFrom(e.target.value)} InputLabelProps={{ shrink: true }} />
@@ -81,7 +81,10 @@ export function AuditTab({ project }: { project: Project }) {
                    onChange={(e) => setObject(e.target.value)} />
         <Box flexGrow={1} />
         <Button startIcon={<VerifiedIcon />} disabled={verify.isPending} onClick={() => verify.mutate()}>Verifica integrità</Button>
-        <Button variant="contained" startIcon={<DownloadIcon />} disabled={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
+        <Button startIcon={<DownloadIcon />} disabled={exportCsv.isPending} onClick={() => exportCsv.mutate("pdf")}>
+          PDF firmato
+        </Button>
+        <Button variant="contained" startIcon={<DownloadIcon />} disabled={exportCsv.isPending} onClick={() => exportCsv.mutate("csv")}>
           Esporta CSV firmato
         </Button>
       </Paper>
