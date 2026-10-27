@@ -21,7 +21,11 @@ interface AuditEvent {
   chain_seq: number | null;
   hash: string | null;
 }
-interface Verify { ok: boolean; checked: number; first_broken_seq: number | null; head_seq: number | null; head_hash: string | null; unsealed: number }
+interface Anchor { day: string; chain_seq: number; matches_chain: boolean; matches_s3: boolean | null; has_tsa: boolean; lock_mode: string | null; retain_until: string | null }
+interface Verify {
+  ok: boolean; checked: number; first_broken_seq: number | null; head_seq: number | null; head_hash: string | null; unsealed: number;
+  anchors_ok: boolean; anchors: Anchor[];
+}
 
 const EVENT_LABEL: Record<string, string> = {
   DOCUMENT_VIEWED: "Documento visualizzato", REVISION_DOWNLOADED: "Download", REVISION_UPLOADED: "Caricamento",
@@ -84,8 +88,13 @@ export function AuditTab({ project }: { project: Project }) {
       {verify.data && (
         verify.data.ok
           ? <Alert severity="success">Catena integra: {verify.data.checked} eventi verificati
-              {verify.data.unsealed ? `, ${verify.data.unsealed} in attesa di sigillo` : ""}. Hash di testa <code>{verify.data.head_hash?.slice(0, 16)}…</code></Alert>
-          : <Alert severity="error">Catena interrotta all'evento n. {verify.data.first_broken_seq}: il registro è stato alterato.</Alert>
+              {verify.data.unsealed ? `, ${verify.data.unsealed} in attesa di sigillo` : ""}. Hash di testa <code>{verify.data.head_hash?.slice(0, 16)}…</code>
+              {verify.data.anchors.length > 0 && <AnchorsLine anchors={verify.data.anchors} />}</Alert>
+          : verify.data.first_broken_seq !== null
+            ? <Alert severity="error">Catena interrotta all'evento n. {verify.data.first_broken_seq}: il registro è stato alterato.</Alert>
+            : <Alert severity="error">La catena non corrisponde alle ancore giornaliere
+                {" "}({verify.data.anchors.filter((a) => !a.matches_chain || a.matches_s3 === false).map((a) => a.day).join(", ")}):
+                il registro è stato riscritto.</Alert>
       )}
       {(verify.error || exportCsv.error) && <Alert severity="error">{((verify.error || exportCsv.error) as ApiError).message}</Alert>}
       <Paper variant="outlined" sx={{ overflowX: "auto" }}>
@@ -121,5 +130,16 @@ export function AuditTab({ project }: { project: Project }) {
         )}
       </Paper>
     </Stack>
+  );
+}
+
+function AnchorsLine({ anchors }: { anchors: Anchor[] }) {
+  const onS3 = anchors.filter((a) => a.matches_s3).length;
+  const stamped = anchors.filter((a) => a.has_tsa).length;
+  return (
+    <Typography variant="body2" mt={0.5}>
+      Ultime {anchors.length} ancore giornaliere coerenti con la catena; {onS3} confermate dalla copia su S3 non modificabile
+      {stamped ? `, ${stamped} con marca temporale` : ""}.
+    </Typography>
   );
 }
