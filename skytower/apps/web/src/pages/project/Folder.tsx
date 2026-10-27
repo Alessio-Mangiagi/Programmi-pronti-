@@ -205,7 +205,8 @@ export function FolderView({ project }: { project: Project }) {
       {dialog === "folder" && <NewContainerDialog project={project} parent={current} onClose={() => setDialog(null)} />}
       {dialog === "grant" && current && <GrantDialog project={project} container={current} onClose={() => setDialog(null)} />}
       {dialog === "shares" && current && (
-        <Dialog open onClose={() => setDialog(null)} fullWidth maxWidth="sm">
+        <Dialog open onClose={() => setDialog(null)} fullWidth maxWidth="sm"
+                PaperProps={{ "aria-label": `Accessi e condivisioni di ${current.name}` }}>
           <DialogContent><ContainerDetail container={current} project={project} onNewFolder={() => setDialog("folder")} /></DialogContent>
           <DialogActions><Button onClick={() => setDialog(null)}>Chiudi</Button></DialogActions>
         </Dialog>
