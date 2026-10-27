@@ -1,21 +1,9 @@
 // "><(((º> sabusabu <º)))><"
 // Stati del CDE dal browser: il progettista carica in WIP e condivide; la visibilità segue lo stato
 // (WIP solo all'organizzazione autrice, SHARED anche all'Information Manager del committente, non al subappaltatore).
-import { expect, request, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { apiAs, findDocs as find, loginUi } from "./helpers";
 import { textPdf } from "./pdf";
-
-const PASSWORD = "Cantiere-2026!";
-
-async function apiAs(baseURL: string | undefined, email: string): Promise<APIRequestContext> {
-  const anon = await request.newContext({ baseURL });
-  const { access_token } = await (await anon.post("/api/auth/login", { data: { email, password: PASSWORD } })).json();
-  return request.newContext({ baseURL, extraHTTPHeaders: { Authorization: `Bearer ${access_token}` } });
-}
-
-async function find(api: APIRequestContext, projectId: string, q: string) {
-  const r = await api.get(`/api/projects/${projectId}/documents`, { params: { q } });
-  return (await r.json()).items as { id: string; current_revision: string; current_state: string; current_scan_status: string }[];
-}
 
 test("WIP visibile solo all'autore, condivisione dal dettaglio documento", async ({ page, baseURL }) => {
   const des = await apiAs(baseURL, "des.lead@des.example");
@@ -25,11 +13,7 @@ test("WIP visibile solo all'autore, condivisione dal dettaglio documento", async
   const folder = (await (await des.get(`/api/projects/${projectId}/containers`)).json())
     .find((c: { name: string }) => c.name === "Tavole architettoniche");
 
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("des.lead@des.example");
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Accedi" }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await loginUi(page, "des.lead@des.example");
   await page.goto(`/progetti/${projectId}/cartelle/${folder.id}`);
 
   await page.getByRole("button", { name: "Carica" }).first().click();
@@ -39,11 +23,11 @@ test("WIP visibile solo all'autore, condivisione dal dettaglio documento", async
   await page.getByRole("button", { name: /^Carica 1$/ }).click();
   await expect(page.getByText("Revisione P01.01 creata")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Chiudi" }).click();
-  await expect.poll(async () => (await find(des, projectId, "e2e"))[0]?.current_scan_status, { timeout: 30_000 }).toBe("CLEAN");
+  await expect.poll(async () => (await find(des, projectId, "primo"))[0]?.current_scan_status, { timeout: 30_000 }).toBe("CLEAN");
 
   // WIP: né il committente né il subappaltatore lo vedono
-  expect(await find(com, projectId, "e2e")).toHaveLength(0);
-  expect(await find(sub, projectId, "e2e")).toHaveLength(0);
+  expect(await find(com, projectId, "primo")).toHaveLength(0);
+  expect(await find(sub, projectId, "primo")).toHaveLength(0);
 
   await page.reload();
   await page.getByText("Pianta piano primo e2e").click();
@@ -57,10 +41,10 @@ test("WIP visibile solo all'autore, condivisione dal dettaglio documento", async
   }
   await dialog.getByLabel(/Motivazione/).fill("Per coordinamento impianti");
   await dialog.getByRole("button", { name: "Condividi" }).click();
-  await expect.poll(async () => (await find(des, projectId, "e2e"))[0]?.current_state, { timeout: 15_000 }).toBe("SHARED");
+  await expect.poll(async () => (await find(des, projectId, "primo"))[0]?.current_state, { timeout: 15_000 }).toBe("SHARED");
 
-  const doc = (await find(des, projectId, "e2e"))[0];
+  const doc = (await find(des, projectId, "primo"))[0];
   expect(doc.current_revision).toBe("P01");                       // ricodifica in condivisione
-  expect(await find(com, projectId, "e2e")).toHaveLength(1);       // l'Information Manager coordina
-  expect(await find(sub, projectId, "e2e")).toHaveLength(0);       // il subappaltatore no
+  expect(await find(com, projectId, "primo")).toHaveLength(1);       // l'Information Manager coordina
+  expect(await find(sub, projectId, "primo")).toHaveLength(0);       // il subappaltatore no
 });

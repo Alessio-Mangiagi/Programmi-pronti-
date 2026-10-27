@@ -1,24 +1,18 @@
 // "><(((º> sabusabu <º)))><"
 // Viewer PDF in piattaforma: ricerca nel testo con evidenziazione e navigazione tra le occorrenze.
-import { expect, request, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { apiAs, loginUi } from "./helpers";
 import { textPdf } from "./pdf";
 
 const ADMIN = "com.admin@com.example";
-const PASSWORD = "Cantiere-2026!";
 
 test("ricerca nel testo del PDF", async ({ page, baseURL }) => {
-  const anon = await request.newContext({ baseURL });
-  const { access_token } = await (await anon.post("/api/auth/login", { data: { email: ADMIN, password: PASSWORD } })).json();
-  const api = await request.newContext({ baseURL, extraHTTPHeaders: { Authorization: `Bearer ${access_token}` } });
+  const api = await apiAs(baseURL, ADMIN);
   const projectId = (await (await api.get("/api/projects")).json()).find((p: { code: string }) => p.code === "PRJ01").id;
   const folderId = (await (await api.get(`/api/projects/${projectId}/containers`)).json())
     .find((c: { name: string }) => c.name.startsWith("COM")).id;
 
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(ADMIN);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Accedi" }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await loginUi(page, ADMIN);
   await page.goto(`/progetti/${projectId}/cartelle/${folderId}`);
 
   const name = "PRJ01-COM-ZZ-00-RP-Z-0900.pdf";
