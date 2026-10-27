@@ -102,7 +102,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const isPdf = link?.content_type === "application/pdf";
   const isImage = !!link?.content_type?.startsWith("image/");
   const isIfc = link?.content_type === "application/x-step";
-  const office = link?.content_type === DOCX ? "docx" : link?.content_type === XLSX ? "xlsx" : null;
+  const isCsv = !!link?.filename?.toLowerCase().endsWith(".csv");
+  const office = link?.content_type === DOCX ? "docx" : link?.content_type === XLSX ? "xlsx" : isCsv ? "csv" : null;
   const canDraw = (isPdf && !browserPdf) || isImage || isIfc;
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;

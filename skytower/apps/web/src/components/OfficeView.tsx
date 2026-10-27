@@ -2,6 +2,7 @@
 // Anteprima in sola lettura di Word (.docx) ed Excel (.xlsx) nel browser, senza servizi esterni.
 // Word: mammoth converte in HTML semantico, mostrato in un iframe sandbox senza script (un documento ostile
 // non può eseguire nulla, nemmeno con link javascript:). Excel: valori delle celle, un foglio per scheda.
+// CSV: stessa tabella, separatore (; , tab) riconosciuto dalla prima riga.
 // Caricato a richiesta: le librerie non pesano sul bundle iniziale.
 import { useEffect, useState } from "react";
 import { Alert, Box, CircularProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography } from "@mui/material";
@@ -21,6 +22,30 @@ const DOC_CSS = `
 
 type Sheet = { sheet: string; data: unknown[][] };
 
+/** CSV con campi tra virgolette (anche su più righe) e virgolette raddoppiate. */
+export function parseCsv(text: string): string[][] {
+  const body = text.replace(/^﻿/, "");
+  const first = body.split(/\r?\n/, 1)[0] ?? "";
+  const sep = [";", "\t", ","].reduce((best, c) => (first.split(c).length > first.split(best).length ? c : best), ",");
+  const rows: string[][] = [];
+  let row: string[] = [], field = "", quoted = false;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (quoted) {
+      if (ch === '"' && body[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"' && field === "") quoted = true;
+    else if (ch === sep) { row.push(field); field = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && body[i + 1] === "\n") i++;
+      row.push(field); rows.push(row); row = []; field = "";
+    } else field += ch;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
 function colName(i: number): string {
   let s = "";
   for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
@@ -34,7 +59,7 @@ function cell(v: unknown): string {
   return String(v);
 }
 
-export default function OfficeView({ url, kind }: { url: string; kind: "docx" | "xlsx" }) {
+export default function OfficeView({ url, kind }: { url: string; kind: "docx" | "xlsx" | "csv" }) {
   const [html, setHtml] = useState<string | null>(null);
   const [sheets, setSheets] = useState<Sheet[] | null>(null);
   const [tab, setTab] = useState(0);
@@ -46,6 +71,11 @@ export default function OfficeView({ url, kind }: { url: string; kind: "docx" | 
     (async () => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (kind === "csv") {
+        const text = await res.text();
+        if (alive) setSheets([{ sheet: "CSV", data: parseCsv(text) }]);
+        return;
+      }
       const buf = await res.arrayBuffer();
       if (kind === "docx") {
         const out = await mammoth.convertToHtml({ arrayBuffer: buf });
