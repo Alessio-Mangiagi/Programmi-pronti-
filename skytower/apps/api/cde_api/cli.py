@@ -13,6 +13,7 @@ import argparse
 import os
 import sys
 import threading
+from pathlib import Path
 from urllib.parse import quote
 
 from .tooling import dbadmin, demo_seed
@@ -29,21 +30,22 @@ def _owner_url() -> str:
     return url
 
 
-def _start_dev_s3() -> str:
+def _start_dev_s3(port: int) -> str:
     """S3 emulato (moto) in memoria: i file spariscono al riavvio, il database no (usare --reset)."""
     from moto.server import ThreadedMotoServer
 
     for k, v in {"AWS_ACCESS_KEY_ID": "dev", "AWS_SECRET_ACCESS_KEY": "dev", "AWS_DEFAULT_REGION": "eu-south-1"}.items():
         os.environ.setdefault(k, v)
-    ThreadedMotoServer(ip_address="127.0.0.1", port=DEV_S3_PORT, verbose=False).start()
-    return f"http://127.0.0.1:{DEV_S3_PORT}"
+    ThreadedMotoServer(ip_address="127.0.0.1", port=port, verbose=False).start()
+    return f"http://127.0.0.1:{port}"
 
 
 def cmd_dev(args) -> None:
     import psycopg
     import uvicorn
 
-    superuser = dbadmin.start_embedded(DEV_DIR / "pg", cleanup_mode=None)
+    data_dir = args.data_dir
+    superuser = dbadmin.start_embedded(data_dir / "pg", cleanup_mode=None)
     urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=args.reset)
     applied = dbadmin.migrate(urls.owner)
     print(f"Migrazioni applicate: {applied or 'nessuna (schema aggiornato)'}")
@@ -55,13 +57,13 @@ def cmd_dev(args) -> None:
         for key, email in world.emails.items():
             print(f"  {key:<14} {email}")
 
-    s3 = _start_dev_s3()
+    s3 = _start_dev_s3(args.s3_port)
     os.environ.update({
         "CDE_ENV": "dev",
         "CDE_DATABASE_URL_APP": urls.app,
         "CDE_DATABASE_URL_AUTH": urls.auth,
         "CDE_DATABASE_URL_WORKER": urls.worker,
-        "CDE_LOCAL_SECRETS_DIR": str(DEV_DIR / "secrets"),
+        "CDE_LOCAL_SECRETS_DIR": str(data_dir / "secrets"),
         "CDE_COOKIE_SECURE": "false",
         "CDE_REFRESH_COOKIE_PATH": "/api/auth",
         "CDE_S3_ENDPOINT_URL": s3,
@@ -131,6 +133,9 @@ def main(argv: list[str] | None = None) -> None:
     dev.add_argument("--port", type=int, default=8100)
     dev.add_argument("--reset", action="store_true", help="ricrea il database da zero")
     dev.add_argument("--no-worker", action="store_true", help="non avviare il worker nel processo")
+    dev.add_argument("--data-dir", type=Path, default=DEV_DIR,
+                     help="database e segreti (default .devdata; i test e2e ne usano uno proprio)")
+    dev.add_argument("--s3-port", type=int, default=DEV_S3_PORT)
     dev.set_defaults(func=cmd_dev)
     sub.add_parser("worker", help="worker asincrono").set_defaults(func=cmd_worker)
     sub.add_parser("migrate").set_defaults(func=cmd_migrate)
