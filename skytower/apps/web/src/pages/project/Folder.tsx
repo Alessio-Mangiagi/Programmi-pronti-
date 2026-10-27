@@ -24,6 +24,7 @@ import { folderTree, useContainers } from "../../components/ProjectTree";
 import { ContainerDetail, GrantDialog, NewContainerDialog } from "./Containers";
 import { DocumentDrawer, DocumentRow, formatBytes, UploadDialog } from "./Documents";
 import { STATE_COLOR, STATE_LABEL } from "./Transitions";
+import { FileViewer } from "../../components/FileViewer";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 
 // Colore per tipo informativo ISO 19650 (5° campo dell'identificativo): tavole, modelli, relazioni, ...
@@ -51,6 +52,7 @@ export function FolderView({ project }: { project: Project }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [openDoc, setOpenDoc] = useState<string | null>(null);
+  const [viewDoc, setViewDoc] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"upload" | "folder" | "grant" | "shares" | "workflow" | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setSearch(q), 300); return () => clearTimeout(t); }, [q]);
@@ -109,13 +111,13 @@ export function FolderView({ project }: { project: Project }) {
         {current && (
           <>
             <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-            <Button startIcon={<VisibilityIcon />} disabled={!doc} onClick={() => setOpenDoc(doc!.id)}>Apri</Button>
+            <Button startIcon={<VisibilityIcon />} disabled={!doc} onClick={() => setViewDoc(doc!.id)}>Apri</Button>
             <Button startIcon={<DownloadIcon />} disabled={!doc?.current_revision_id || doc.current_scan_status !== "CLEAN" || download.isPending}
                     onClick={() => download.mutate(doc!.current_revision_id!)}>Scarica</Button>
             <Button startIcon={<TaskAltIcon />} disabled={!doc?.current_revision_id || !!doc.archived_at} onClick={() => setDialog("workflow")}>
               Avvia approvazione
             </Button>
-            <Button startIcon={<HistoryIcon />} disabled={!doc} onClick={() => setOpenDoc(doc!.id)}>Cronologia</Button>
+            <Button startIcon={<HistoryIcon />} disabled={!doc} onClick={() => setOpenDoc(doc!.id)}>Dettagli e cronologia</Button>
             <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
             <Button startIcon={<ShareIcon />} disabled={!can("ADMIN")} onClick={() => setDialog("grant")}>Condividi cartella</Button>
             <Button startIcon={<GroupIcon />} onClick={() => setDialog("shares")}>Accessi</Button>
@@ -162,7 +164,7 @@ export function FolderView({ project }: { project: Project }) {
                 const state = d.archived_at ? "ARCHIVED" : (d.current_state ?? "WIP");
                 return (
                   <TableRow key={d.id} hover selected={d.id === selected} sx={{ cursor: "pointer" }}
-                            onClick={() => setSelected(d.id)} onDoubleClick={() => setOpenDoc(d.id)}>
+                            onClick={() => setSelected(d.id)} onDoubleClick={() => setViewDoc(d.id)}>
                     <TableCell padding="checkbox">
                       <Radio size="small" checked={d.id === selected} onChange={() => setSelected(d.id)} inputProps={{ "aria-label": `Seleziona ${d.title}` }} />
                     </TableCell>
@@ -204,6 +206,8 @@ export function FolderView({ project }: { project: Project }) {
                              label={`${doc.identifier} ${doc.current_revision}`} onClose={() => setDialog(null)} />
       )}
       <DocumentDrawer projectId={project.id} documentId={openDoc} onClose={() => setOpenDoc(null)} />
+      {viewDoc && <FileViewer documentId={viewDoc} onClose={() => setViewDoc(null)}
+                              onDetails={() => { setOpenDoc(viewDoc); setViewDoc(null); }} />}
     </Stack>
   );
 }
