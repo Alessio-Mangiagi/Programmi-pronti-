@@ -59,6 +59,8 @@ interface NameCheck {
   current_revision?: string | null;
   next_revision?: string;
   reserved_elsewhere?: boolean;
+  reserved_by_my_org?: boolean;
+  reservation_note?: string | null;
 }
 
 const SCAN: Record<string, { label: string; color: "default" | "success" | "error" | "warning" }> = {
@@ -280,6 +282,11 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                             textDecoration: item.auto?.proposal?.valid ? "line-through" : undefined,
                             color: item.auto ? "text.secondary" : undefined }}>{item.file.name}</Typography>
                 <Typography variant="caption" color="text.secondary">{formatBytes(item.file.size)}</Typography>
+                {!item.auto && item.check?.reserved_by_my_org && (
+                  <Tooltip title={item.check.reservation_note ?? "Identificativo prenotato dalla tua organizzazione"}>
+                    <Chip size="small" color="success" variant="outlined" label="Prenotato" />
+                  </Tooltip>
+                )}
                 {!item.auto && item.check?.valid && <Chip size="small" color="primary" variant="outlined"
                                             label={`${item.check.current_revision ?? "nuovo"} → ${item.check.next_revision}`} />}
                 {item.phase === "uploading"

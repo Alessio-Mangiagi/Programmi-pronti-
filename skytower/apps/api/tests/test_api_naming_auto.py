@@ -330,3 +330,15 @@ def test_prenotazioni_scadute_rilasciate_dal_worker(client, api_world, as_user, 
     events = client.get(f"/projects/{w.project_id}/audit", headers=as_user("com_admin"),
                         params={"event_type": "NAMING_RESERVATIONS_EXPIRED"}).json()
     assert any(mine[old]["identifier"] in e["details"]["identifiers"] for e in events)
+
+
+def test_validazione_segnala_la_prenotazione_della_propria_organizzazione(client, api_world, as_user, auto_settings, volume):
+    _, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
+    ident = _reserve(client, w, as_user("des_lead"), {"volume": volume}, note="Tavola copertura").json()[0]["identifier"]
+    v = client.post(f"/projects/{w.project_id}/naming/validate", headers=as_user("des_designer"),
+                    json={"name": ident + ".pdf"}).json()
+    assert v["reserved_by_my_org"] is True and v["reservation_note"] == "Tavola copertura"
+    other = client.post(f"/projects/{w.project_id}/naming/validate", headers=as_user("des_lead"),
+                        json={"name": ident.replace(volume, volume[:2] + "Z") + ".pdf"}).json()
+    assert other["reserved_by_my_org"] is False

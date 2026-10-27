@@ -238,6 +238,11 @@ def validate_name(project_id: uuid.UUID, body: NameCheckIn, c: Ctx = Depends(ctx
             out["current_revision"] = latest["revision_code"] if latest else None
             out["next_revision"] = _next_wip(conn, doc["id"]) if doc else next_wip_revision(None)
             out["reserved_elsewhere"] = doc is None and _reserved_elsewhere(conn, project_id, result.identifier)
+            mine = doc is None and conn.execute(   # RLS: solo le prenotazioni della propria organizzazione
+                """SELECT r.note FROM cde.naming_reservations r WHERE r.project_id = %s AND r.identifier = %s
+                   AND r.used_at IS NULL AND r.released_at IS NULL""", [project_id, result.identifier]).fetchone()
+            out["reserved_by_my_org"] = bool(mine)
+            out["reservation_note"] = mine["note"] if mine else None
         return out
 
 
