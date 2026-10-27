@@ -447,6 +447,8 @@ def get_document(document_id: uuid.UUID, c: Ctx = Depends(ctx)):
             " AND (%s NOT IN (SELECT cde.private_containers()) OR 'DOWNLOAD' = ANY(%s::text[])) ok",
             [doc["project_id"], doc["container_id"], actions]).fetchone()["ok"]
         reviews = [r["id"] for r in conn.execute("SELECT cde.my_review_revisions() AS id").fetchall()]
+        security_event(conn, "DOCUMENT_VIEWED", user_id=c.user_id, project_id=doc["project_id"], ip=c.ip,
+                       user_agent=c.user_agent, document=document_id, identifier=doc["identifier"])
         return {**doc, "revisions": revisions, "my_actions": actions,
                 "can_download_published": can_download_published,
                 "review_revision_ids": [r["id"] for r in revisions if r["id"] in reviews]}

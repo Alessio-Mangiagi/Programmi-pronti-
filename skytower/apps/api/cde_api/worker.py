@@ -168,6 +168,28 @@ def check_deadlines(timestamp: int) -> None:
     log.info("scadenze elaborate: %s notifiche", n)
 
 
+@app.periodic(cron="* * * * *", periodic_id="audit-seal")
+@app.task(name="cde.audit_seal", queue="default")
+def audit_seal(timestamp: int) -> None:
+    """Sigilla nella hash chain gli eventi del registro non ancora sigillati."""
+    _, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
+        n = conn.execute("SELECT cde.audit_seal()").fetchone()[0]
+    if n:
+        log.info("registro: %s eventi sigillati", n)
+
+
+@app.periodic(cron="5 0 * * *", periodic_id="audit-anchor")
+@app.task(name="cde.audit_anchor", queue="default")
+def audit_anchor(timestamp: int) -> None:
+    """Ancora giornaliera dell'hash di testa della catena (giorno UTC appena concluso)."""
+    _, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
+        seq = conn.execute("SELECT cde.audit_anchor((to_timestamp(%s) AT TIME ZONE 'UTC')::date - 1)",
+                           [timestamp]).fetchone()[0]
+    log.info("registro: ancora giornaliera fino all'evento %s", seq)
+
+
 @app.periodic(cron="0 7 * * *", periodic_id="daily-digest")
 @app.task(name="cde.daily_digest", queue="default")
 def daily_digest(timestamp: int) -> None:

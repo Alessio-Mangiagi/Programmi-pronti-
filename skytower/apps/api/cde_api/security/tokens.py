@@ -73,6 +73,13 @@ class TokenService:
     def decode_sse_ticket(self, token: str) -> uuid.UUID:
         return uuid.UUID(self._decode(token, SSE)["sub"])
 
+    def sign_export(self, claims: dict) -> str:
+        """Firma RS256 di un export (es. registro attività), verificabile con la JWKS pubblica.
+        Nessuna scadenza: la firma attesta il contenuto al momento dell'emissione."""
+        now = int(time.time())
+        payload = {"iss": self.s.jwt_issuer, "iat": now, "typ": "export", "jti": str(uuid.uuid4()), **claims}
+        return jwt.encode(payload, self._private, algorithm="RS256", headers={"kid": self.kid})
+
 
 SSE = "sse"
 

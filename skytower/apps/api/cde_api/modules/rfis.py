@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from ..deps import Ctx, ctx, require_project
 from ..errors import ApiError, not_found
+from ..events import security_event
 
 router = APIRouter(tags=["rfi"])
 
@@ -105,6 +106,7 @@ def create_rfi(project_id: uuid.UUID, body: RfiIn, c: Ctx = Depends(ctx)):
             "SELECT cde.rfi_create(%s, %s, %s, %s, %s::uuid[], %s::uuid[], %s::uuid[]) AS id",
             [project_id, body.subject, body.question, body.due_at, body.recipient_organization_ids,
              body.recipient_user_ids, body.revision_ids]).fetchone()["id"]
+        security_event(conn, "RFI_CREATED", user_id=c.user_id, project_id=project_id, ip=c.ip, rfi=rid)
         return _rfi(conn, rid)
 
 
@@ -120,11 +122,16 @@ def post_message(rfi_id: uuid.UUID, body: MessageIn, c: Ctx = Depends(ctx)):
         _check_attachments(conn, body.revision_ids)
         conn.execute("SELECT cde.rfi_post_message(%s, %s, %s, %s::uuid[])",
                      [rfi_id, body.body, body.is_answer, body.revision_ids])
-        return _rfi(conn, rfi_id)
+        rfi = _rfi(conn, rfi_id)
+        security_event(conn, "RFI_ANSWERED" if body.is_answer else "RFI_MESSAGE_POSTED", user_id=c.user_id,
+                       project_id=rfi["project_id"], ip=c.ip, rfi=rfi_id)
+        return rfi
 
 
 @router.post("/rfis/{rfi_id}/close")
 def close_rfi(rfi_id: uuid.UUID, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         conn.execute("SELECT cde.rfi_close(%s)", [rfi_id])
-        return _rfi(conn, rfi_id)
+        rfi = _rfi(conn, rfi_id)
+        security_event(conn, "RFI_CLOSED", user_id=c.user_id, project_id=rfi["project_id"], ip=c.ip, rfi=rfi_id)
+        return rfi

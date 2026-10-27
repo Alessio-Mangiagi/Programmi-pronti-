@@ -182,7 +182,10 @@ def get_workflow(instance_id: uuid.UUID, c: Ctx = Depends(ctx)):
 def cancel_workflow(instance_id: uuid.UUID, body: CancelIn, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         conn.execute("SELECT cde.workflow_cancel(%s, %s)", [instance_id, body.reason])
-        return _instance(conn, instance_id)
+        inst = _instance(conn, instance_id)
+        security_event(conn, "WORKFLOW_CANCELLED", user_id=c.user_id, project_id=inst["project_id"], ip=c.ip,
+                       instance=instance_id, reason=body.reason)
+        return inst
 
 
 @router.get("/documents/{document_id}/workflows")

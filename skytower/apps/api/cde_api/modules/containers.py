@@ -85,6 +85,8 @@ def create_container(project_id: uuid.UUID, body: ContainerIn, c: Ctx = Depends(
                VALUES (%s, %s, %s, cde.current_app_org(), %s, %s, %s, cde.current_app_user())""",
             [container_id, project_id, body.parent_id, body.name, body.inherit_permissions, body.is_private],
         )
+        security_event(conn, "CONTAINER_CREATED", user_id=c.user_id, project_id=project_id, ip=c.ip,
+                       container=container_id, name=body.name, private=body.is_private)
         return _container(conn, container_id)
 
 

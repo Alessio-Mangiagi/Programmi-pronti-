@@ -15,6 +15,7 @@ from .deps import Services
 from .mail import build_mailer
 from .modules import (
     access,
+    audit,
     auth,
     containers,
     documents,
@@ -97,6 +98,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return svc.tokens.jwks
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
-                   rfis):
+                   rfis, audit):
         app.include_router(module.router)
     return app
