@@ -88,7 +88,12 @@ export default function IfcView({ url, markups, selectedRef, drawing, onPick, on
         setTree(await e.spatial());
         setProgress(null);
       } catch (err) {
-        if (alive) setError((err as Error).message);
+        console.error("viewer IFC:", err);
+        // web-ifc genera codice a runtime: con una CSP senza 'unsafe-eval' non parte (docs/adr.md ADR-22)
+        const blocked = err instanceof EvalError || /Content Security Policy|unsafe-eval/i.test((err as Error).message);
+        if (alive) setError(blocked
+          ? "il viewer 3D non può avviarsi con le impostazioni di sicurezza di questa installazione. Usa «Scarica» per aprire il modello in un programma BIM."
+          : (err as Error).message);
       }
     })();
     return () => { alive = false; e.dispose(); engine.current = null; };

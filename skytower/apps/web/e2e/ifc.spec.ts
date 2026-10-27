@@ -23,6 +23,11 @@ test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => 
                    buffer: IFC }, "Modello architettonico e2e");
   await page.reload();
   await page.getByText("Modello architettonico e2e").dblclick();
+  // finché vale ADR-22 il viewer deve almeno spiegarsi, senza mostrare l'errore tecnico
+  const blocked = page.getByText(/non può avviarsi con le impostazioni di sicurezza/);
+  if (await blocked.waitFor({ timeout: 15_000 }).then(() => true, () => false)) {
+    await expect(page.getByText(/Evaluating a string/)).toHaveCount(0);
+  }
 
   await expect(page.getByText("Padiglione A")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Piano terra")).toBeVisible();
