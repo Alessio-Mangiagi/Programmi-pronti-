@@ -18,6 +18,26 @@ principale). I KO non bloccanti vanno nel piano di rientro con una data.
 | Progettista capogruppo | `des.lead@des.example` | Studio di progettazione (DES) |
 | Subappaltatore | `sub1.user@sub1.example` | Impianti elettrici (SUB1) |
 
+## Copertura automatica
+
+Questi scenari girano già a ogni merge come test nel browser (`apps/web/e2e`, `npm run e2e`): in collaudo
+servono soprattutto a giudicare chiarezza e usabilità, non a cercare regressioni.
+
+| Scenari | Test |
+|---|---|
+| U01, U04, U05 | `stati.spec.ts` |
+| U02, U03, U19, U19b | `rinomina.spec.ts` |
+| U06 (ricerca nel testo) | `viewer.spec.ts` |
+| U07, U09, U10 | `approvazione.spec.ts` |
+| U13, U14 | `rfi.spec.ts` |
+| U15 | `transmittal.spec.ts` |
+| U16, U17, U18 | `admin.spec.ts` |
+| U20 | `riservate.spec.ts` |
+| Anteprima Word/Excel/CSV | `office.spec.ts` |
+
+Restano solo manuali: annotazioni (U06), rifiuto con commento (U08), confronto revisioni (U11), modello IFC (U12),
+isolamento da link copiato (U21, coperto però dai test API OWASP), profilo e MFA (U22), uso da tablet (U23).
+
 ## Scenari
 
 | ID | Ruolo | Passi | Risultato atteso | Esito |
