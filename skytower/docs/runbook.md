@@ -31,6 +31,9 @@ Obiettivi: **RPO 15'**, **RTO 4 h**.
 
 ## 2. Deploy
 
+Automatico con il workflow **Deploy — SkyTower** (`.github/workflows/deploy-skytower.yml`, avvio manuale,
+approvazione obbligatoria per la produzione): esegue i passi qui sotto nello stesso ordine.
+
 1. Build e push dell'immagine con tag = commit SHA (i tag ECR sono immutabili).
 2. Migrazioni: `aws ecs run-task --task-definition <migrate_task_definition> ...` e attendere exit code 0.
    Le migrazioni devono restare compatibili con la versione precedente (expand → deploy → contract).

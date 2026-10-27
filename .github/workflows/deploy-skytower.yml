@@ -1,0 +1,120 @@
+# "><(((º> sabusabu <º)))><"
+# Deploy di SkyTower su staging o produzione (docs/runbook.md §2), avviato a mano.
+# Credenziali AWS solo via OIDC (nessuna chiave nel repository). Configurazione per environment GitHub
+# ("skytower-staging", "skytower-prod"; in produzione con approvazione obbligatoria):
+#   vars.AWS_DEPLOY_ROLE_ARN   ruolo IAM assumibile da questo repository
+#   vars.TF_BACKEND_BUCKET     bucket dello stato Terraform (tabella di lock: vars.TF_LOCK_TABLE)
+#   vars.TFVARS                contenuto del file .tfvars dell'ambiente (domain_name, certificati, alert_emails...)
+#   vars.SMOKE_EMAIL           utente di collaudo; secrets.SMOKE_PASSWORD la sua password
+# La prima installazione (stato vuoto, chiave JWT, db-bootstrap) resta manuale: runbook §1.
+name: Deploy — SkyTower
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Ambiente
+        type: choice
+        options: [staging, prod]
+        default: staging
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-skytower-${{ inputs.env }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.env }}
+    runs-on: ubuntu-24.04-arm   # immagine ARM64 come i task Fargate, senza emulazione
+    environment: skytower-${{ inputs.env }}
+    timeout-minutes: 60
+    env:
+      AWS_REGION: eu-south-1
+      TAG: ${{ github.sha }}
+    defaults:
+      run:
+        working-directory: skytower
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-south-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Terraform init e lettura degli output
+        working-directory: skytower/infra/terraform/envs/${{ inputs.env }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_BACKEND_BUCKET }}" \
+            -backend-config="key=envs/${{ inputs.env }}/terraform.tfstate" \
+            -backend-config="region=eu-south-1" \
+            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}" \
+            -backend-config="encrypt=true"
+          printf '%s' "${{ vars.TFVARS }}" > deploy.auto.tfvars
+          terraform output -json > "$RUNNER_TEMP/out.json"
+          for k in ecr_repository_url ecs_cluster migrate_task_definition api_security_group_id web_bucket cloudfront_distribution_id cloudfront_domain; do
+            echo "$k=$(jq -r ".${k}.value" "$RUNNER_TEMP/out.json")" >> "$GITHUB_ENV"
+          done
+          echo "subnets=$(jq -r '.private_subnets.value | join(",")' "$RUNNER_TEMP/out.json")" >> "$GITHUB_ENV"
+
+      - name: Immagine API/worker su ECR (tag = commit)
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${ecr_repository_url%%/*}"
+          docker build -f apps/api/Dockerfile -t "$ecr_repository_url:$TAG" .
+          docker push "$ecr_repository_url:$TAG"
+
+      - name: Migrazioni prima del rilascio (expand → deploy → contract)
+        working-directory: skytower/infra/terraform/envs/${{ inputs.env }}
+        run: |
+          # solo la definizione del task di migrazione passa alla nuova immagine; i servizi restano com'erano
+          terraform apply -input=false -auto-approve -var "image_tag=$TAG" -target=module.platform.aws_ecs_task_definition.migrate
+          arn=$(aws ecs run-task --cluster "$ecs_cluster" --launch-type FARGATE --task-definition "$migrate_task_definition" \
+            --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$api_security_group_id],assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          aws ecs wait tasks-stopped --cluster "$ecs_cluster" --tasks "$arn"
+          code=$(aws ecs describe-tasks --cluster "$ecs_cluster" --tasks "$arn" --query 'tasks[0].containers[0].exitCode' --output text)
+          echo "migrazioni: exit code $code"
+          test "$code" = "0"
+
+      - name: Rilascio di API e worker
+        working-directory: skytower/infra/terraform/envs/${{ inputs.env }}
+        run: |
+          terraform apply -input=false -auto-approve -var "image_tag=$TAG"
+          aws ecs wait services-stable --cluster "$ecs_cluster" --services api worker
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: skytower/apps/web/package-lock.json
+
+      - name: SPA su S3 e invalidazione CloudFront
+        working-directory: skytower/apps/web
+        run: |
+          npm ci
+          npm run build
+          # asset con hash: cache lunga; index.html sempre rivalidato
+          aws s3 sync dist/ "s3://$web_bucket" --delete --exclude index.html --cache-control "public,max-age=31536000,immutable"
+          aws s3 cp dist/index.html "s3://$web_bucket/index.html" --cache-control "no-cache"
+          aws cloudfront create-invalidation --distribution-id "$cloudfront_distribution_id" --paths "/index.html" "/"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Smoke test (codice diverso da 0 → rollback, runbook §2)
+        env:
+          CDE_SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: |
+          pip install httpx
+          python infra/smoke.py --api "https://$cloudfront_domain/api" --email "${{ vars.SMOKE_EMAIL }}"
