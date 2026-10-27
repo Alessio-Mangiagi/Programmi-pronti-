@@ -50,3 +50,38 @@ test("avvio dal documento, approvazione del DL, pubblicazione automatica", async
   expect(published.current_revision).toBe("C01");
   await dlContext.close();
 });
+
+test("il DL rifiuta con commento obbligatorio e l'autore viene avvisato", async ({ page, browser, baseURL }) => {
+  const admin = await apiAs(baseURL, "com.admin@com.example");
+  const des = await apiAs(baseURL, "des.lead@des.example");
+  const { projectId, folderId } = await projectAndFolder(des, (n) => n === "Tavole architettoniche");
+  const members = await (await admin.get(`/api/projects/${projectId}/members`)).json();
+  const dl = members.find((m: { email: string }) => m.email === "com.dl@com.example");
+  const tpl = await (await admin.post(`/api/projects/${projectId}/workflow-templates`, { data: {
+    code: "E2E_DL_RIFIUTO", name: "Verifica DL (e2e)",
+    definition: { steps: [{ name: "Verifica DL", assignees: [{ type: "user", id: dl.user_id ?? dl.id }] }] },
+  } })).json();
+
+  await loginUi(page, "des.lead@des.example");
+  const doc = await uploadPdf(page, des, projectId, folderId, "PRJ01-DES-ZZ-03-DR-A-0780.pdf", "Pianta piano terzo e2e",
+                              ["Pianta piano terzo"]);
+  const shared = await (await des.post(`/api/revisions/${doc.current_revision_id}/transitions`,
+                                       { data: { to_state: "SHARED", suitability: "S4", reason: "Per verifica" } })).json();
+  expect((await des.post(`/api/revisions/${shared.id}/workflows`, { data: { template_id: tpl.id } })).ok()).toBeTruthy();
+
+  const dlContext = await browser.newContext();
+  const dlPage = await dlContext.newPage();
+  await loginUi(dlPage, "com.dl@com.example");
+  await dlPage.goto("/compiti");
+  await dlPage.getByRole("cell", { name: /Pianta piano terzo e2e/ }).click();
+  await dlPage.getByRole("button", { name: "Rifiutato" }).click();
+  await expect(dlPage.getByRole("button", { name: "Conferma esito" })).toBeDisabled();   // senza commento non si rifiuta
+  await dlPage.getByLabel(/Commento/).fill("Manca la sezione B-B");
+  await dlPage.getByRole("button", { name: "Conferma esito" }).click();
+  await dlContext.close();
+
+  const workflows = await (await des.get(`/api/documents/${doc.id}/workflows`)).json();
+  expect(workflows[0].status).toBe("REJECTED");
+  await page.goto("/");
+  await expect(page.getByText(/Manca la sezione B-B/).first()).toBeVisible();          // notifica all'autore
+});
