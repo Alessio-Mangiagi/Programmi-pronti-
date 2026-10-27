@@ -169,7 +169,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        dir: [envs/dev, envs/staging, envs/prod, modules/cde-platform]
+        dir: [bootstrap, envs/dev, envs/staging, envs/prod, modules/cde-platform]
     defaults:
       run:
         working-directory: skytower/infra/terraform/${{ matrix.dir }}
