@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert, Button, Checkbox, Chip, FormControlLabel, FormGroup, MenuItem, Paper, Radio, RadioGroup, Stack, Switch,
-  Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
+  Alert, Button, Checkbox, Chip, FormControlLabel, FormGroup, IconButton, MenuItem, Paper, Radio, RadioGroup, Stack,
+  Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { api, ApiError, Project } from "../../api";
 
 export interface NamingField {
@@ -75,6 +79,7 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
   const [auto, setAuto] = useState<AutoNumbering>({ field: "number", start: 1, series: null, defaults: {} });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [editingScheme, setEditingScheme] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -113,12 +118,17 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
   return (
     <Stack spacing={2}>
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600}>Naming convention ISO 19650</Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Typography variant="subtitle1" fontWeight={600}>Naming convention ISO 19650</Typography>
+          {canManage && !editingScheme && <Button onClick={() => setEditingScheme(true)}>Modifica schema</Button>}
+        </Stack>
         <Typography variant="body2" color="text.secondary" mb={1}>
           {settings.custom_naming ? "Schema personalizzato del progetto" : "Schema predefinito (UK NA)"} · esempio{" "}
           <Chip size="small" label={settings.example} sx={{ fontFamily: "monospace" }} />
         </Typography>
-        <Table size="small">
+        {editingScheme
+          ? <SchemeEditor project={project} settings={settings} onDone={() => setEditingScheme(false)} />
+          : <Table size="small">
           <TableHead><TableRow><TableCell>Campo</TableCell><TableCell>Tipo</TableCell><TableCell>Valori</TableCell></TableRow></TableHead>
           <TableBody>
             {fields.map((f) => (
@@ -131,7 +141,7 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table>}
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
@@ -205,6 +215,118 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
           </Stack>
         )}
       </Paper>
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Editor dello schema (Project Admin): campi, ordine, codici, formati, separatore
+// ---------------------------------------------------------------------
+const codesToText = (codes: Record<string, string>) => Object.entries(codes).map(([k, v]) => `${k} = ${v}`).join("\n");
+const textToCodes = (text: string) => Object.fromEntries(text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+  const [code, ...label] = l.split("=");
+  return [code.trim().toUpperCase(), label.join("=").trim() || code.trim().toUpperCase()];
+}));
+
+function blankField(n: number): NamingField {
+  return { key: `campo_${"abcdefghijkl"[n] ?? "x"}`, label: "Nuovo campo", kind: "list", min_length: 1, max_length: 3,
+           value: null, codes: { XX: "Da definire" }, pattern: null, example: null, help: null };
+}
+
+function SchemeEditor({ project, settings, onDone }: { project: Project; settings: DocumentSettings; onDone: () => void }) {
+  const qc = useQueryClient();
+  const [separator, setSeparator] = useState(settings.naming_scheme.separator);
+  const [fields, setFields] = useState<NamingField[]>(settings.naming_scheme.fields.map((f) => ({ ...f })));
+  const [codesText, setCodesText] = useState<string[]>(settings.naming_scheme.fields.map((f) => codesToText(f.codes)));
+  const [error, setError] = useState<string | null>(null);
+
+  const put = useMutation({
+    mutationFn: (scheme: DocumentSettings["naming_scheme"] | null) => api(`/projects/${project.id}/document-settings`, {
+      method: "PUT",
+      json: { naming_scheme: scheme, metadata_schema: settings.metadata_schema, auto_number: settings.auto_number },
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["document-settings", project.id] }); onDone(); },
+    onError: (e: ApiError) => setError(e.message),
+  });
+
+  const set = (i: number, patch: Partial<NamingField>) => setFields((l) => l.map((f, k) => (k === i ? { ...f, ...patch } : f)));
+  const move = (i: number, d: -1 | 1) => {
+    const swap = <T,>(l: T[]) => { const c = [...l]; [c[i], c[i + d]] = [c[i + d], c[i]]; return c; };
+    setFields(swap); setCodesText(swap);
+  };
+  const remove = (i: number) => { setFields((l) => l.filter((_, k) => k !== i)); setCodesText((l) => l.filter((_, k) => k !== i)); };
+  const add = () => { const f = blankField(fields.length); setFields((l) => [...l, f]); setCodesText((l) => [...l, codesToText(f.codes)]); };
+
+  const draft = () => ({
+    separator,
+    fields: fields.map((f, i) => ({
+      ...f,
+      value: f.kind === "fixed" ? (f.value ?? "").toUpperCase() : null,
+      codes: f.kind === "list" ? textToCodes(codesText[i]) : {},
+      pattern: f.kind === "regex" ? f.pattern : null,
+    })),
+  });
+  const preview = draft().fields.map((f) => f.kind === "fixed" ? f.value : f.kind === "list" ? Object.keys(f.codes)[0] ?? "?"
+    : f.example || "#".repeat(f.min_length)).join(separator);
+
+  return (
+    <Stack spacing={1.5}>
+      <Alert severity="warning">
+        I documenti già caricati mantengono il loro identificativo: lo schema vale per i nuovi caricamenti.
+        Con uno schema personalizzato l'elenco degli originatori non si aggiorna più da solo quando entra una nuova organizzazione.
+      </Alert>
+      <TextField select size="small" label="Separatore" value={separator} onChange={(e) => setSeparator(e.target.value)} sx={{ width: 160 }}>
+        {["-", "_", "."].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+      </TextField>
+      {fields.map((f, i) => (
+        <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="flex-start">
+            <TextField size="small" label="Etichetta" value={f.label} onChange={(e) => set(i, { label: e.target.value })} sx={{ width: 180 }} />
+            <TextField size="small" label="Chiave" value={f.key} helperText="minuscole e _"
+                       onChange={(e) => set(i, { key: e.target.value.toLowerCase().replace(/[^a-z_]/g, "") })} sx={{ width: 140 }} />
+            <TextField select size="small" label="Tipo" value={f.kind} sx={{ width: 160 }}
+                       onChange={(e) => set(i, { kind: e.target.value as NamingField["kind"],
+                                                  pattern: e.target.value === "regex" ? f.pattern ?? "\\d{4}" : f.pattern })}>
+              <MenuItem value="fixed">Fisso</MenuItem>
+              <MenuItem value="list">Lista di codici</MenuItem>
+              <MenuItem value="regex">Formato (regex)</MenuItem>
+            </TextField>
+            <TextField size="small" type="number" label="Min" value={f.min_length} sx={{ width: 80 }}
+                       onChange={(e) => set(i, { min_length: Number(e.target.value) || 1 })} />
+            <TextField size="small" type="number" label="Max" value={f.max_length} sx={{ width: 80 }}
+                       onChange={(e) => set(i, { max_length: Number(e.target.value) || 1 })} />
+            <Stack direction="row" ml="auto">
+              <IconButton size="small" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUpwardIcon fontSize="small" /></IconButton>
+              <IconButton size="small" disabled={i === fields.length - 1} onClick={() => move(i, 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
+              <IconButton size="small" disabled={fields.length <= 2} onClick={() => remove(i)}><DeleteIcon fontSize="small" /></IconButton>
+            </Stack>
+          </Stack>
+          <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
+            {f.kind === "fixed" && <TextField size="small" label="Valore" value={f.value ?? ""} sx={{ width: 180 }}
+                                              onChange={(e) => set(i, { value: e.target.value.toUpperCase() })} />}
+            {f.kind === "list" && <TextField size="small" multiline minRows={2} maxRows={8} fullWidth label="Codici (uno per riga: CODICE = descrizione)"
+                                             value={codesText[i]} onChange={(e) => setCodesText((l) => l.map((t, k) => (k === i ? e.target.value : t)))} />}
+            {f.kind === "regex" && <>
+              <TextField size="small" label="Espressione regolare" value={f.pattern ?? ""} sx={{ width: 220, fontFamily: "monospace" }}
+                         onChange={(e) => set(i, { pattern: e.target.value })} />
+              <TextField size="small" label="Esempio" value={f.example ?? ""} sx={{ width: 120 }}
+                         onChange={(e) => set(i, { example: e.target.value.toUpperCase() || null })} />
+              <TextField size="small" label="Aiuto per chi carica" value={f.help ?? ""} sx={{ flexGrow: 1, minWidth: 200 }}
+                         onChange={(e) => set(i, { help: e.target.value || null })} />
+            </>}
+          </Stack>
+        </Paper>
+      ))}
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Button startIcon={<AddIcon />} disabled={fields.length >= 12} onClick={add}>Campo</Button>
+        <Typography variant="body2" ml={2}>Esempio: <Chip size="small" label={preview} sx={{ fontFamily: "monospace" }} /></Typography>
+      </Stack>
+      {error && <Alert severity="error">{error}</Alert>}
+      <Stack direction="row" spacing={1} justifyContent="flex-end">
+        {settings.custom_naming && <Button color="warning" disabled={put.isPending} onClick={() => put.mutate(null)}>Ripristina schema predefinito</Button>}
+        <Button onClick={onDone}>Annulla</Button>
+        <Button variant="contained" disabled={put.isPending} onClick={() => { setError(null); put.mutate(draft()); }}>Salva schema</Button>
+      </Stack>
     </Stack>
   );
 }

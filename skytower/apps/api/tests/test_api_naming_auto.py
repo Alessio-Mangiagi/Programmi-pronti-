@@ -170,3 +170,29 @@ def test_anteprima_di_piu_file_numeri_consecutivi(client, api_world, as_user, au
     for it, p in zip(items, r.json(), strict=True):
         rev = _upload_auto(client, h, w.containers["des_arch"], it["fields"], filename=it["filename"]).json()
         assert rev["original_filename"] == p["name"]
+
+
+def test_schema_personalizzato_con_progressivo(client, api_world, as_user, auto_settings):
+    """Lo schema scritto dall'admin (separatore, campi, codici) vale anche per la rinomina."""
+    _, w = api_world
+    auto_settings(start=1)                      # registra il ripristino a fine test
+    url = f"/projects/{w.project_id}/document-settings"
+    disc = "D" + os.urandom(1).hex().upper()[:1]
+    scheme = {"separator": "_", "fields": [
+        {"key": "project", "label": "Progetto", "kind": "fixed", "value": "PRJ01", "min_length": 5, "max_length": 5},
+        {"key": "originator", "label": "Originatore", "kind": "list", "min_length": 3, "max_length": 4,
+         "codes": {"DES": "Progettista", "SUB1": "Impianti"}},
+        {"key": "disc", "label": "Disciplina", "kind": "list", "min_length": 2, "max_length": 2,
+         "codes": {disc: "Prova", "AR": "Architettonico"}},
+        {"key": "seq", "label": "Progressivo", "kind": "regex", "pattern": r"\d{3}", "min_length": 3, "max_length": 3},
+    ]}
+    body = {"naming_scheme": scheme, "metadata_schema": {"type": "object"},
+            "auto_number": {"field": "seq", "start": 10, "series": ["disc"], "defaults": {"disc": disc}}}
+    r = client.put(url, headers=as_user("com_admin"), json=body)
+    assert r.status_code == 200, r.text
+    assert r.json()["custom_naming"] and r.json()["auto_number"]["field"] == "seq"
+    p = _propose(client, w, as_user("des_lead"), {}, filename="relazione.docx").json()
+    assert p["valid"] and p["name"] == f"PRJ01_DES_{disc}_010.docx"
+    # il progressivo deve stare nello schema inviato
+    bad = {**body, "auto_number": {"field": "number"}}
+    assert client.put(url, headers=as_user("com_admin"), json=bad).status_code == 422
