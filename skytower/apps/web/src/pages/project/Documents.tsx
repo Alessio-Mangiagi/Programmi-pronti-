@@ -13,6 +13,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import { api, ApiError, Container, Project } from "../../api";
 import { abortUpload, uploadFile } from "../../upload";
 import { ACTION_LABEL, CdeState, STATE_COLOR, STATE_LABEL, TransitionDialog, useTransitionRules } from "./Transitions";
+import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
+import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowProgress";
 
 export interface DocumentRow {
   id: string;
@@ -274,6 +276,13 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
     mutationFn: (revisionId: string) => api<{ url: string }>(`/revisions/${revisionId}/download`),
     onSuccess: ({ url }) => { window.location.href = url; },
   });
+  const { data: workflows = [] } = useQuery({
+    queryKey: ["document", documentId, "workflows"],
+    queryFn: () => api<WorkflowInstance[]>(`/documents/${documentId}/workflows`),
+    enabled: !!documentId,
+  });
+  const [starting, setStarting] = useState(false);
+  const running = workflows.find((w) => w.status === "RUNNING");
 
   const canDownload = (r: Revision) =>
     r.state === "PUBLISHED" ? doc?.can_download_published : doc?.my_actions.includes("DOWNLOAD");
@@ -307,6 +316,14 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
               ))}
             </Stack>
           )}
+          <Stack direction="row" alignItems="center">
+            <Typography variant="subtitle2" flexGrow={1}>Approvazioni</Typography>
+            {!doc.archived_at && !running && doc.current_revision_id && (
+              <Button size="small" onClick={() => setStarting(true)}>Avvia approvazione</Button>
+            )}
+          </Stack>
+          {workflows.length === 0 && <Typography variant="body2" color="text.secondary">Nessun workflow avviato.</Typography>}
+          {workflows.slice(0, 3).map((w) => <WorkflowProgress key={w.id} instanceId={w.id} />)}
           <Typography variant="subtitle2">Revisioni (immutabili)</Typography>
           <List dense disablePadding>
             {doc.revisions.map((r) => (
@@ -347,6 +364,10 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
             </>
           )}
         </Stack>
+      )}
+      {starting && doc?.current_revision_id && (
+        <StartWorkflowDialog projectId={projectId} revisionId={doc.current_revision_id}
+                             label={`${doc.identifier} ${doc.current_revision}`} onClose={() => setStarting(false)} />
       )}
       {action && (
         <TransitionDialog projectId={projectId} from={action.from} to={action.to}

@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Alert, Box, Breadcrumbs, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, InputAdornment,
-  Link, MenuItem, Paper, Radio, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
+  Alert, Box, Breadcrumbs, Button, Chip, Dialog, DialogActions, DialogContent, Divider, InputAdornment,
+  Link, Paper, Radio, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
@@ -24,6 +24,7 @@ import { folderTree, useContainers } from "../../components/ProjectTree";
 import { ContainerDetail, GrantDialog, NewContainerDialog } from "./Containers";
 import { DocumentDrawer, DocumentRow, formatBytes, UploadDialog } from "./Documents";
 import { STATE_COLOR, STATE_LABEL } from "./Transitions";
+import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 
 // Colore per tipo informativo ISO 19650 (5° campo dell'identificativo): tavole, modelli, relazioni, ...
 const TYPE_COLOR: Record<string, string> = {
@@ -204,48 +205,5 @@ export function FolderView({ project }: { project: Project }) {
       )}
       <DocumentDrawer projectId={project.id} documentId={openDoc} onClose={() => setOpenDoc(null)} />
     </Stack>
-  );
-}
-
-interface Template { id: string; code: string; version: number; name: string; is_active: boolean }
-
-export function StartWorkflowDialog({ projectId, revisionId, label, onClose }: {
-  projectId: string; revisionId: string; label: string; onClose: () => void;
-}) {
-  const navigate = useNavigate();
-  const [templateId, setTemplateId] = useState("");
-  const [comment, setComment] = useState("");
-  const { data: templates = [] } = useQuery({
-    queryKey: ["workflow-templates", projectId],
-    queryFn: () => api<Template[]>(`/projects/${projectId}/workflow-templates`),
-  });
-  const start = useMutation({
-    mutationFn: () => api<{ id: string }>(`/revisions/${revisionId}/workflows`, {
-      method: "POST", json: { template_id: templateId, comment: comment || null },
-    }),
-    onSuccess: (wf) => { onClose(); navigate(`/compiti?instance=${wf.id}`); },
-  });
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Avvia approvazione</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} mt={1}>
-          <Typography variant="body2">Documento: <b>{label}</b>. Durante la revisione il documento è bloccato.</Typography>
-          {start.error && <Alert severity="error">{(start.error as ApiError).message}</Alert>}
-          {templates.length === 0
-            ? <Alert severity="info">Nessun workflow configurato per la commessa: lo crea il Project Admin nella scheda Workflow.</Alert>
-            : (
-              <TextField select label="Workflow" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                {templates.filter((t) => t.is_active).map((t) => <MenuItem key={t.id} value={t.id}>{t.name} (v{t.version})</MenuItem>)}
-              </TextField>
-            )}
-          <TextField label="Nota per i revisori" multiline minRows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Annulla</Button>
-        <Button variant="contained" disabled={!templateId || start.isPending} onClick={() => start.mutate()}>Avvia</Button>
-      </DialogActions>
-    </Dialog>
   );
 }

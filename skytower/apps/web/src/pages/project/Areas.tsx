@@ -1,6 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 // Viste per area del CDE (ISO 19650): WIP, Condivisi, Pubblicati, Archiviati — su tutto il progetto.
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Box, Button, Checkbox, Chip, InputAdornment, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow,
@@ -24,7 +25,12 @@ export function AreasTab({ project }: { project: Project }) {
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [openDoc, setOpenDoc] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [openDoc, setOpenDocState] = useState<string | null>(params.get("doc"));   // link delle notifiche
+  const setOpenDoc = (id: string | null) => {
+    setOpenDocState(id);
+    if (!id && params.has("doc")) setParams((p) => { p.delete("doc"); return p; }, { replace: true });
+  };
   const [action, setAction] = useState<CdeState | null>(null);
   const { data: rules = [] } = useTransitionRules(project.id);
 
