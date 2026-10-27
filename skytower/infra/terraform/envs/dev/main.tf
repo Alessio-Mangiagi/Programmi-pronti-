@@ -84,7 +84,7 @@ resource "aws_security_group" "db" {
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description     = "PostgreSQL dall'API"
+    description     = "PostgreSQL dai task API"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
