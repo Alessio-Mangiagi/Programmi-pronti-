@@ -10,11 +10,11 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 from psycopg.rows import dict_row
+from test_api_documents import PDF, des_name, upload
+from test_api_states import as_user, transition, worker  # noqa: F401 - fixture riusate
 
 from cde_api.mail import ConsoleMailer
 from cde_api.notifier import send_daily_digests, send_notification_email
-from test_api_documents import PDF, des_name, upload
-from test_api_states import as_user, transition, worker  # noqa: F401 - fixture riusate
 
 
 def template_body(w, code=None, *, steps=None, on_approved=None, escalation=None):
@@ -363,6 +363,11 @@ def test_rfi_ciclo_completo(client, api_world, as_user, shared):  # noqa: F811
 
     des = as_user("des_lead")
     assert any(n["data"].get("rfi_id") == rfi["id"] for n in notifications(client, des, "RFI_CREATED"))
+    # pannello "Per me": il destinatario la vede da rispondere, l'autore in attesa, un estraneo no
+    mine = {x["id"]: x for x in client.get("/me/rfis", headers=des).json()}
+    assert mine[rfi["id"]]["i_am_recipient"] and mine[rfi["id"]]["project_code"]
+    assert not {x["id"]: x for x in client.get("/me/rfis", headers=sub).json()}[rfi["id"]]["i_am_recipient"]
+    assert rfi["id"] not in {x["id"] for x in client.get("/me/rfis", headers=as_user("sub2_user")).json()}
     assert client.get(f"/rfis/{rfi['id']}", headers=as_user("sub2_user")).status_code == 404
     assert client.get(f"/rfis/{rfi['id']}", headers=as_user("com_admin")).status_code == 200      # Project Admin
     assert client.post(f"/rfis/{rfi['id']}/messages", headers=sub,

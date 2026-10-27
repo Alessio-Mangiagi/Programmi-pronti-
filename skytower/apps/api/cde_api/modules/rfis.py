@@ -82,6 +82,20 @@ def list_rfis(project_id: uuid.UUID, status: Literal["OPEN", "ANSWERED", "CLOSED
                             + " ORDER BY f.number DESC", {"p": project_id, "s": status}).fetchall()
 
 
+@router.get("/me/rfis")
+def my_rfis(c: Ctx = Depends(ctx)):
+    """RFI non chiuse in cui l'utente deve rispondere (destinatario) o attende risposta (autore), su tutti i
+    progetti: alimenta il pannello "Per me"."""
+    with c.tx() as conn:
+        return conn.execute(
+            "SELECT r.*, p.code AS project_code, cde.current_app_user() IN (SELECT cde.rfi_recipient_users(r.id))"
+            " AS i_am_recipient FROM (" + RFI_SQL + " WHERE f.status <> 'CLOSED') r"
+            " JOIN cde.projects p ON p.id = r.project_id"
+            " WHERE r.author_id = cde.current_app_user()"
+            "    OR cde.current_app_user() IN (SELECT cde.rfi_recipient_users(r.id))"
+            " ORDER BY r.due_at NULLS LAST, r.created_at DESC LIMIT 100").fetchall()
+
+
 @router.post("/projects/{project_id}/rfis", status_code=201)
 def create_rfi(project_id: uuid.UUID, body: RfiIn, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
