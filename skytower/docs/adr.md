@@ -250,3 +250,8 @@ organizzazione). Finché non è usato o rilasciato, un identificativo prenotato 
 organizzazioni (`cde.identifier_reserved_elsewhere()`, conta per gli schemi senza originatore); il primo
 caricamento della propria organizzazione lo consuma. Il massimo della serie include i prenotati, quindi i numeri
 non si sovrappongono neanche cambiando la configurazione della serie.
+
+**Scadenza (migrazione 0017).** Con `auto_number.reservation_days` le prenotazioni non usate oltre quel numero di
+giorni vengono rilasciate dal job giornaliero del worker (`cde.naming_release_expired()`, 02:40); ogni rilascio
+automatico è un evento `NAMING_RESERVATIONS_EXPIRED` nel registro della commessa. Massimo 500 prenotazioni
+aperte per organizzazione e commessa.
