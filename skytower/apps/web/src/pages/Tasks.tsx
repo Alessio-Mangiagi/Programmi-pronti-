@@ -8,7 +8,9 @@ import {
   TableCell, TableHead, TableRow, Tabs, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
+import DrawIcon from "@mui/icons-material/Draw";
 import { api, ApiError } from "../api";
+import { FileViewer } from "../components/FileViewer";
 import { WorkflowProgress } from "../components/WorkflowProgress";
 
 interface Task {
@@ -22,6 +24,7 @@ interface Task {
   step_name: string;
   identifier: string;
   title: string;
+  document_id: string;
   revision_id: string;
   revision_code: string;
   suitability: string;
@@ -88,6 +91,7 @@ function ReviewDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   const qc = useQueryClient();
   const [outcome, setOutcome] = useState<string>("APPROVED");
   const [comment, setComment] = useState("");
+  const [viewing, setViewing] = useState(false);
   const download = useMutation({
     mutationFn: () => api<{ url: string }>(`/revisions/${task.revision_id}/download`),
     onSuccess: ({ url }) => { window.location.href = url; },
@@ -110,9 +114,12 @@ function ReviewDialog({ task, onClose }: { task: Task; onClose: () => void }) {
           {complete.error && <Alert severity="error">{(complete.error as ApiError).message}</Alert>}
           {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
           <Typography>{task.title} — idoneità {task.suitability}</Typography>
-          <Button variant="outlined" startIcon={<DownloadIcon />} sx={{ alignSelf: "flex-start" }} onClick={() => download.mutate()}>
-            Scarica il file da esaminare
-          </Button>
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <Button variant="contained" startIcon={<DrawIcon />} onClick={() => setViewing(true)}>Apri e annota</Button>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => download.mutate()}>
+              Scarica il file da esaminare
+            </Button>
+          </Stack>
           <WorkflowProgress instanceId={task.instance_id} />
           <ToggleButtonGroup exclusive value={outcome} onChange={(_, v) => v && setOutcome(v)} color="primary">
             <ToggleButton value="APPROVED">Approvato</ToggleButton>
@@ -130,6 +137,10 @@ function ReviewDialog({ task, onClose }: { task: Task; onClose: () => void }) {
           Conferma esito
         </Button>
       </DialogActions>
+      {viewing && (
+        <FileViewer documentId={task.document_id} revisionId={task.revision_id}
+                    taskId={task.status === "OPEN" ? task.id : undefined} onClose={() => setViewing(false)} />
+      )}
     </Dialog>
   );
 }

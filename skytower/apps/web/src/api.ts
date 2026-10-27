@@ -160,6 +160,32 @@ export interface AppNotification {
   read_at: string | null;
 }
 
+export interface Markup {
+  id: string;
+  revision_id: string;
+  task_id: string | null;
+  page: number | null;
+  x: number | null;
+  y: number | null;
+  w: number | null;
+  h: number | null;
+  element_ref: string | null;
+  color: string;
+  body: string;
+  status: "OPEN" | "RESOLVED";
+  created_at: string;
+  resolved_at: string | null;
+  author_id: string;
+  author_name: string | null;
+  author_org_code: string | null;
+  resolved_by_name: string | null;
+  replies: { id: string; author_name: string | null; body: string; created_at: string }[];
+  can_resolve: boolean;
+}
+
+/** Area disegnata sulla pagina, in coordinate normalizzate 0..1 (w/h assenti = puntina). */
+export interface Anchor { page: number; x: number; y: number; w?: number; h?: number }
+
 export interface Project {
   id: string;
   code: string;
