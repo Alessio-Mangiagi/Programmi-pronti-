@@ -66,3 +66,19 @@ test("la scheda Naming mostra schema e progressivo attivo", async ({ page }) => 
   await expect(page.getByLabel("Attiva")).toBeChecked();
   await expect(page.getByRole("button", { name: "Modifica schema" })).toBeVisible();
 });
+
+test("prenotazione di numeri dalla scheda Naming", async ({ page }) => {
+  await login(page, ADMIN);
+  await page.goto(`/progetti/${projectId}/naming`);
+  await page.getByLabel("Quanti").fill("2");
+  await page.getByLabel("Nota (es. elenco tavole piano terra)").fill("Contratti da firmare");
+  await page.getByRole("button", { name: "Prenota", exact: true }).click();
+  // la serie prosegue dopo i due file caricati nel primo test
+  const first = page.getByRole("cell", { name: "PRJ01-COM-ZZ-00-CO-Z-0003" });
+  await expect(first).toBeVisible();
+  await expect(page.getByRole("cell", { name: "PRJ01-COM-ZZ-00-CO-Z-0004" })).toBeVisible();
+  await page.getByRole("row", { name: /0004/ }).getByRole("button", { name: "Rilascia" }).click();
+  await expect(page.getByRole("cell", { name: "PRJ01-COM-ZZ-00-CO-Z-0004" })).toBeHidden();
+  await page.getByLabel("Anche usate e rilasciate").check();
+  await expect(page.getByRole("row", { name: /0004/ }).getByText("Rilasciato")).toBeVisible();
+});

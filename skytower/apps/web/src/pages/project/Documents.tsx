@@ -58,6 +58,7 @@ interface NameCheck {
   existing_container_id?: string | null;
   current_revision?: string | null;
   next_revision?: string;
+  reserved_elsewhere?: boolean;
 }
 
 const SCAN: Record<string, { label: string; color: "default" | "success" | "error" | "warning" }> = {
@@ -173,6 +174,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
       let message: string | undefined;
       if (check.valid && check.existing_container_id && check.existing_container_id !== container.id)
         message = "Documento esistente in un altro container";
+      if (check.valid && check.reserved_elsewhere) message = "Identificativo prenotato da un'altra organizzazione";
       update(file, { check, phase: check.valid && !message ? "ready" : "error", message });
       if (!check.valid && autoNumber) propose(file, defaultFields());   // nome non conforme: rinomina subito proposta
     });

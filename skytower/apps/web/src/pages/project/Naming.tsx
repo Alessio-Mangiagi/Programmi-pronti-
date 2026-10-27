@@ -1,5 +1,6 @@
 // "><(((º> sabusabu <º)))><"
-// Naming convention del progetto e rinomina automatica in caricamento (progressivo deciso dal Project Admin).
+// Naming convention del progetto, rinomina automatica in caricamento (progressivo deciso dal Project Admin)
+// e prenotazione degli identificativi per chi carica.
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -105,6 +106,8 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
   });
 
   if (!settings) return null;
+  const canWrite = Object.values(project.my_permissions?.WRITE ?? {}).some(Boolean)
+    || Object.values(project.my_permissions?.ADMIN ?? {}).some(Boolean);
   const fields = settings.naming_scheme.fields;
   const numericFields = fields.filter((f) => f.kind === "regex");
   const others = fields.filter((f) => f.key !== auto.field);
@@ -215,6 +218,7 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
           </Stack>
         )}
       </Paper>
+      {settings.auto_number && canWrite && <ReservationsPanel project={project} settings={settings} />}
     </Stack>
   );
 }
@@ -328,5 +332,101 @@ function SchemeEditor({ project, settings, onDone }: { project: Project; setting
         <Button variant="contained" disabled={put.isPending} onClick={() => { setError(null); put.mutate(draft()); }}>Salva schema</Button>
       </Stack>
     </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Prenotazione degli identificativi (elenco elaborati): per chi carica, con il progressivo attivo
+// ---------------------------------------------------------------------
+interface Reservation {
+  id: string;
+  identifier: string;
+  note: string | null;
+  created_at: string;
+  used_at: string | null;
+  released_at: string | null;
+  document_id: string | null;
+  reserved_by_name: string;
+}
+
+function ReservationsPanel({ project, settings }: { project: Project; settings: DocumentSettings }) {
+  const qc = useQueryClient();
+  const auto = settings.auto_number!;
+  const fieldsList = choosableFields(settings.naming_scheme.fields, auto);
+  const [fields, setFields] = useState<Record<string, string>>(
+    Object.fromEntries(fieldsList.map((f) => [f.key, auto.defaults[f.key] ?? ""])));
+  const [count, setCount] = useState(5);
+  const [note, setNote] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const key = ["naming-reservations", project.id, showAll];
+  const { data: list = [] } = useQuery({
+    queryKey: key,
+    queryFn: () => api<Reservation[]>(`/projects/${project.id}/naming/reservations?status=${showAll ? "all" : "open"}`),
+  });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["naming-reservations", project.id] });
+  const reserve = useMutation({
+    mutationFn: () => api<Reservation[]>(`/projects/${project.id}/naming/reservations`, {
+      method: "POST", json: { fields, count, note: note || null } }),
+    onSuccess: () => { setNote(""); refresh(); },
+  });
+  const release = useMutation({
+    mutationFn: (id: string) => api(`/naming/reservations/${id}/release`, { method: "POST" }),
+    onSuccess: refresh,
+  });
+  const copyAll = () => navigator.clipboard?.writeText(list.filter((r) => !r.used_at && !r.released_at).map((r) => r.identifier).join("\n"));
+  const status = (r: Reservation) => r.used_at ? <Chip size="small" color="success" label="Usato" />
+    : r.released_at ? <Chip size="small" label="Rilasciato" /> : <Chip size="small" color="primary" variant="outlined" label="Prenotato" />;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="subtitle1" fontWeight={600}>Prenota numeri</Typography>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Per un elenco elaborati da produrre: prenota gli identificativi in anticipo. Restano riservati alla tua
+        organizzazione finché un caricamento con quel nome non li usa. Un numero rilasciato non torna disponibile.
+      </Typography>
+      <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap alignItems="flex-start">
+        {fieldsList.map((f) => (
+          <FieldValueInput key={f.key} field={f} value={fields[f.key] ?? ""} onChange={(v) => setFields({ ...fields, [f.key]: v })} />
+        ))}
+        <TextField size="small" type="number" label="Quanti" value={count} sx={{ width: 100 }} inputProps={{ min: 1, max: 50 }}
+                   onChange={(e) => setCount(Math.min(50, Math.max(1, Number(e.target.value) || 1)))} />
+        <TextField size="small" label="Nota (es. elenco tavole piano terra)" value={note} sx={{ flexGrow: 1, minWidth: 240 }}
+                   inputProps={{ maxLength: 500 }} onChange={(e) => setNote(e.target.value)} />
+        <Button variant="contained" disabled={reserve.isPending} onClick={() => reserve.mutate()}>Prenota</Button>
+      </Stack>
+      {reserve.error && <Alert severity="error" sx={{ mt: 1 }}>{(reserve.error as ApiError).message}</Alert>}
+      {release.error && <Alert severity="error" sx={{ mt: 1 }}>{(release.error as ApiError).message}</Alert>}
+
+      <Stack direction="row" alignItems="center" spacing={1} mt={2}>
+        <Typography variant="body2" fontWeight={600} flexGrow={1}>Prenotazioni della tua organizzazione</Typography>
+        <FormControlLabel label="Anche usate e rilasciate" control={<Switch size="small" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />} />
+        <Button size="small" disabled={!list.some((r) => !r.used_at && !r.released_at)} onClick={copyAll}>Copia elenco</Button>
+      </Stack>
+      {list.length === 0
+        ? <Typography variant="body2" color="text.secondary">Nessuna prenotazione aperta.</Typography>
+        : (
+          <Table size="small">
+            <TableHead><TableRow>
+              <TableCell>Identificativo</TableCell><TableCell>Nota</TableCell><TableCell>Prenotato da</TableCell>
+              <TableCell>Stato</TableCell><TableCell />
+            </TableRow></TableHead>
+            <TableBody>
+              {list.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell sx={{ fontFamily: "monospace" }}>{r.identifier}</TableCell>
+                  <TableCell>{r.note}</TableCell>
+                  <TableCell>{r.reserved_by_name} · {new Date(r.created_at).toLocaleDateString("it-IT")}</TableCell>
+                  <TableCell>{status(r)}</TableCell>
+                  <TableCell align="right">
+                    {!r.used_at && !r.released_at && (
+                      <Button size="small" color="warning" disabled={release.isPending} onClick={() => release.mutate(r.id)}>Rilascia</Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+    </Paper>
   );
 }
