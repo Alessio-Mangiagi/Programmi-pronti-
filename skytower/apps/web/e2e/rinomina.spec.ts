@@ -81,4 +81,11 @@ test("prenotazione di numeri dalla scheda Naming", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "PRJ01-COM-ZZ-00-CO-Z-0004" })).toBeHidden();
   await page.getByLabel("Anche usate e rilasciate").check();
   await expect(page.getByRole("row", { name: /0004/ }).getByText("Rilasciato")).toBeVisible();
+
+  // chi carica con il nome prenotato lo vede riconosciuto nel dialog
+  await page.goto(`/progetti/${projectId}/cartelle/${folderId}`);
+  await page.getByRole("button", { name: "Carica" }).first().click();
+  await page.locator('input[type="file"]').setInputFiles({ name: "PRJ01-COM-ZZ-00-CO-Z-0003.pdf", mimeType: "application/pdf",
+                                                           buffer: Buffer.from("%PDF-1.4\n") });
+  await expect(page.getByRole("dialog").getByText("Prenotato", { exact: true })).toBeVisible();
 });
