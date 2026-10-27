@@ -10,6 +10,7 @@ import { AuditTab } from "./project/Audit";
 import { DashboardTab } from "./project/Dashboard";
 import { RfisTab } from "./project/Rfis";
 import { TransmittalsTab } from "./project/Transmittals";
+import { ReportMenu } from "../components/ReportMenu";
 import { WorkflowsTab } from "./project/Workflows";
 import { MembersTab } from "./project/Members";
 import { OrganizationsTab } from "./project/Organizations";
@@ -51,7 +52,10 @@ export function ProjectPage() {
         <Link component={RouterLink} to="/" underline="hover" color="inherit">Progetti</Link>
         <Typography color="text.primary">{project.code}</Typography>
       </Breadcrumbs>
-      <Typography variant="h4" fontWeight={600}>{project.name}</Typography>
+      <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
+        <Typography variant="h4" fontWeight={600} flexGrow={1}>{project.name}</Typography>
+        <ReportMenu projectId={project.id} />
+      </Stack>
       <Box borderBottom={1} borderColor="divider">
         <Tabs value={current < 0 ? 0 : current} variant="scrollable">
           {tabs.map((t) => <Tab key={t.path} label={t.label} component={RouterLink} to={`/progetti/${projectId}/${t.path}`} />)}
