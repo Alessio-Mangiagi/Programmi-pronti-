@@ -54,9 +54,9 @@ export function WorkflowsTab({ project, canManage }: { project: Project; canMana
           I workflow definiscono chi approva un documento e in che ordine. Si avviano dalla cartella con
           "Avvia approvazione"; durante la revisione il documento è bloccato.
         </Typography>
-        <Stack direction="row" alignItems="center">
+        <Stack direction="row" alignItems="center" flexShrink={0}>
           <Switch checked={showOld} onChange={(e) => setShowOld(e.target.checked)} inputProps={{ "aria-label": "Mostra versioni disattivate" }} />
-          <Typography variant="body2">Versioni disattivate</Typography>
+          <Typography variant="body2" noWrap>Versioni disattivate</Typography>
         </Stack>
         {canManage && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>Nuovo workflow</Button>}
       </Stack>

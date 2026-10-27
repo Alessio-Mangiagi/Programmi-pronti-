@@ -18,7 +18,10 @@ const theme = createTheme({
   shape: { borderRadius: 8 },
   typography: { fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif' },
   components: {
-    MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { textTransform: "none", fontWeight: 600 } } },
+    // pulsanti su una riga: accanto a un testo lungo il flex li restringerebbe mandandoli a capo
+    MuiButton: { defaultProps: { disableElevation: true },
+                 styleOverrides: { root: { textTransform: "none", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 } } },
+    MuiFormControlLabel: { styleOverrides: { root: { flexShrink: 0 }, label: { whiteSpace: "nowrap" } } },
     MuiTab: { styleOverrides: { root: { textTransform: "none", fontWeight: 600 } } },
   },
 });
