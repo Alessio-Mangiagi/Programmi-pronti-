@@ -13,6 +13,7 @@ principale). I KO non bloccanti vanno nel piano di rientro con una data.
 | Ruolo | Utente demo | Organizzazione |
 |---|---|---|
 | BIM Manager / Project Admin | `com.admin@com.example` | Committente (COM) |
+| Information Manager | `com.im@com.example` | Committente (COM) |
 | Direttore dei lavori | `com.dl@com.example` | Committente (COM) |
 | Progettista capogruppo | `des.lead@des.example` | Studio di progettazione (DES) |
 | Subappaltatore | `sub1.user@sub1.example` | Impianti elettrici (SUB1) |
@@ -26,11 +27,11 @@ principale). I KO non bloccanti vanno nel piano di rientro con una data.
 | U03 | Progettista | Carica tre file non conformi insieme | Numeri consecutivi nell'anteprima e identici dopo il caricamento | |
 | U04 | Subappaltatore | Cerca il documento di U01 | Non visibile (WIP di un'altra organizzazione) | |
 | U05 | Progettista | Condivide il documento di U01 (WIP → SHARED) con motivazione | Revisione P01, visibile al team di coordinamento | |
-| U06 | Direttore dei lavori | Apre il documento condiviso, cerca una parola nel testo del PDF, aggiunge un'annotazione | Occorrenze evidenziate; annotazione visibile agli altri con numero e stato | |
-| U07 | BIM Manager | Avvia il workflow di revisione sul documento | Compito nella colonna "Per me" del verificatore; il documento non accetta nuove revisioni | |
-| U08 | Direttore dei lavori | Rifiuta con commento | Il progettista riceve la notifica; il documento torna modificabile | |
-| U09 | Progettista | Carica la nuova revisione e la riconduce in approvazione; il DL approva | Revisione approvata, pubblicabile | |
-| U10 | BIM Manager | Pubblica (SHARED → PUBLISHED) | Revisione C01 visibile a tutti i membri, subappaltatore incluso | |
+| U06 | Information Manager | Apre il documento condiviso, cerca una parola nel testo del PDF, aggiunge un'annotazione | Occorrenze evidenziate; annotazione visibile agli altri con numero e stato | |
+| U07 | BIM Manager | Avvia il workflow di revisione sul documento con l'Information Manager come verificatore | Compito nella colonna "Per me" del verificatore; il documento non accetta nuove revisioni | |
+| U08 | Information Manager | Rifiuta con commento | Il progettista riceve la notifica; il documento torna modificabile | |
+| U09 | Progettista | Carica la nuova revisione e la riconduce in approvazione; il verificatore approva | Revisione approvata, pubblicabile | |
+| U10 | BIM Manager | Pubblica (SHARED → PUBLISHED) | Revisione C01 visibile a tutti i membri, subappaltatore e Direttore dei lavori inclusi | |
 | U11 | Progettista | Confronta due revisioni PDF | Rosso solo nella revisione aperta, blu solo in quella di confronto | |
 | U12 | Progettista | Apre il modello IFC, seleziona un elemento, lascia un'annotazione sull'elemento | Albero spaziale, proprietà e sezione funzionano; annotazione legata all'elemento | |
 | U13 | Subappaltatore | Apre una RFI verso il progettista allegando un documento già caricato | Numero progressivo, destinatario notificato, scadenza visibile | |
