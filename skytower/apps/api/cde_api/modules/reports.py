@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -43,37 +44,38 @@ def _local(v):
     return v
 
 
+def _cell(ws, value, **style) -> WriteOnlyCell:
+    cell = WriteOnlyCell(ws, value=_local(value))
+    if isinstance(cell.value, str) and cell.value.startswith("="):
+        cell.data_type = "s"                    # testo dell'utente, mai una formula
+    elif isinstance(cell.value, datetime):
+        cell.number_format = "dd/mm/yyyy hh:mm"
+    for k, v in style.items():
+        setattr(cell, k, v)
+    return cell
+
+
 def _sheet(wb: Workbook, title: str, columns: list[Column], rows: list[list]) -> None:
+    """Foglio in streaming (write_only): tempo e memoria lineari nelle righe, anche a 50.000."""
     ws = wb.create_sheet(title)
-    ws.append([c for c, _ in columns])
-    for cell in ws[1]:
-        cell.fill, cell.font = HEAD_FILL, HEAD_FONT
-        cell.alignment = Alignment(vertical="center")
-    for row in rows:
-        ws.append([_local(v) for v in row])
-        for cell in ws[ws.max_row]:
-            if isinstance(cell.value, str) and cell.value.startswith("="):
-                cell.data_type = "s"            # testo dell'utente, mai una formula
-            elif isinstance(cell.value, datetime):
-                cell.number_format = "dd/mm/yyyy hh:mm"
     for i, (_, width) in enumerate(columns, start=1):
         ws.column_dimensions[get_column_letter(i)].width = width
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{len(rows) + 1}"
+    ws.append([_cell(ws, c, fill=HEAD_FILL, font=HEAD_FONT, alignment=Alignment(vertical="center")) for c, _ in columns])
+    for row in rows:
+        ws.append([_cell(ws, v) for v in row])
 
 
 def _info(wb: Workbook, project: dict, title: str, who: str, rows: int, truncated: bool) -> None:
-    ws = wb.active
-    ws.title = "Info"
-    for label, value in [("Commessa", f"{project['code']} - {project['name']}"), ("Report", title),
-                         ("Generato il", _local(datetime.now(UTC))), ("Da", who), ("Righe", rows),
-                         ("Nota", "Contiene solo le informazioni visibili a chi ha esportato."
-                                  + (f" Troncato a {MAX_ROWS} righe." if truncated else ""))]:
-        ws.append([label, value])
-        ws.cell(ws.max_row, 1).font = Font(bold=True)
-    ws["B3"].number_format = "dd/mm/yyyy hh:mm"
+    ws = wb.create_sheet("Info")
     ws.column_dimensions["A"].width = 16
     ws.column_dimensions["B"].width = 70
+    for label, value in [("Commessa", f"{project['code']} - {project['name']}"), ("Report", title),
+                         ("Generato il", datetime.now(UTC)), ("Da", who), ("Righe", rows),
+                         ("Nota", "Contiene solo le informazioni visibili a chi ha esportato."
+                                  + (f" Troncato a {MAX_ROWS} righe." if truncated else ""))]:
+        ws.append([_cell(ws, label, font=Font(bold=True)), _cell(ws, value)])
 
 
 def _paths(conn, project_id: uuid.UUID) -> dict[uuid.UUID, str]:
@@ -165,7 +167,7 @@ def report(project_id: uuid.UUID, kind: Literal["documents", "approvals", "rfis"
         rows = rows[:MAX_ROWS]
         security_event(conn, "REPORT_EXPORTED", user_id=c.user_id, project_id=project_id, ip=c.ip,
                        report=kind, rows=len(rows))
-    wb = Workbook()
+    wb = Workbook(write_only=True)
     _info(wb, project, TITLES[kind], who, len(rows), truncated)
     _sheet(wb, TITLES[kind], cols, rows)
     buf = io.BytesIO()
