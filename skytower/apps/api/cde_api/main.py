@@ -18,6 +18,7 @@ from .modules import (
     audit,
     auth,
     containers,
+    dashboard,
     documents,
     markups,
     me,
@@ -99,6 +100,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return svc.tokens.jwks
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
-                   rfis, audit, markups):
+                   rfis, audit, markups, dashboard):
         app.include_router(module.router)
     return app
