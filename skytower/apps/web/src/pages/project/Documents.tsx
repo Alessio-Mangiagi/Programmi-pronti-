@@ -174,8 +174,12 @@ export function UploadDialog({ project, container, onClose }: { project: Project
       if (check.valid && check.existing_container_id && check.existing_container_id !== container.id)
         message = "Documento esistente in un altro container";
       update(file, { check, phase: check.valid && !message ? "ready" : "error", message });
+      if (!check.valid && autoNumber) propose(file, defaultFields());   // nome non conforme: rinomina subito proposta
     });
   };
+
+  const defaultFields = () => Object.fromEntries(
+    choosableFields(settings!.naming_scheme.fields, autoNumber!).map((f) => [f.key, autoNumber!.defaults[f.key] ?? ""]));
 
   const propose = async (file: File, fields: Record<string, string>) => {
     update(file, { auto: { fields } });
@@ -189,7 +193,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
 
   const toggleAuto = (item: Item, on: boolean) => {
     if (!on || !autoNumber) return update(item.file, { auto: undefined });
-    propose(item.file, Object.fromEntries(choosableFields(settings!.naming_scheme.fields, autoNumber).map((f) => [f.key, autoNumber.defaults[f.key] ?? ""])));
+    propose(item.file, defaultFields());
   };
 
   const start = async (item: Item) => {
@@ -289,6 +293,11 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                       {e.suggestions.length > 0 && <> — prova: {e.suggestions.map((s) => <Chip key={s} size="small" label={s} sx={{ ml: 0.5 }} />)}</>}
                     </Alert>
                   ))}
+                  {autoNumber
+                    ? <Box><Button size="small" variant="contained" onClick={() => toggleAuto(item, true)}>Rinomina con progressivo</Button></Box>
+                    : settings && <Typography variant="caption" color="text.secondary">
+                        Rinomina automatica non attiva: il Project Admin può attivare il progressivo nella scheda "Naming".
+                      </Typography>}
                 </Stack>
               )}
               {needsTitle(item) && (
