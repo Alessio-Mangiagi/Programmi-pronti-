@@ -99,6 +99,22 @@ jobs:
             skytower/infra/zap/zap-report.*
             skytower/api.log
 
+  docker:
+    name: Immagine Docker (build e verifica)
+    runs-on: ubuntu-24.04-arm   # stessa architettura dei task Fargate
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f skytower/apps/api/Dockerfile -t cde-api:ci skytower
+      - name: L'immagine importa l'app e trova migrazioni e CA di RDS
+        run: |
+          docker run --rm --read-only --tmpfs /tmp cde-api:ci python -c "
+          import cde_api.main, os
+          from cde_api.tooling import dbadmin
+          assert dbadmin.MIGRATIONS_DIR.is_dir() and any(dbadmin.MIGRATIONS_DIR.glob('*.sql'))
+          assert os.path.getsize(os.environ['PGSSLROOTCERT']) > 1000
+          print('ok', os.getuid())"
+          docker run --rm cde-api:ci cde --help
+
   web:
     name: Web — typecheck, build, audit
     runs-on: ubuntu-24.04
