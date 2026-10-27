@@ -78,7 +78,7 @@ dati propria, porte 8310/4310), quindi non toccano `.devdata` né l'istanza su 8
 
 ```powershell
 cd apps/web
-npm run e2e        # rinomina e prenotazione, stati CDE, approvazione, ricerca nel PDF, anteprima Word/Excel
+npm run e2e        # rinomina e prenotazione, stati CDE, approvazione, RFI, transmittal, ricerca nel PDF, anteprima Office
 ```
 
 Altri strumenti: `infra/load/carico.py` (utenti concorrenti) e `infra/load/upload.py` (upload paralleli),
