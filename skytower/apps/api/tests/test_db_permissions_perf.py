@@ -151,3 +151,66 @@ def test_lista_documenti_sotto_200ms_su_100k(perf_db, user, area):
     median = statistics.median(timings[1:])
     print(f"\n{user:<10} area={area or 'tutte':<7} righe={len(rows):<3} mediana={median:.1f} ms")
     assert median < 200, f"{user}: {median:.0f} ms"
+
+
+def _timed(urls, world, user, sql, params, runs=4):
+    timings = []
+    with psycopg.connect(urls.app, row_factory=dict_row) as conn:
+        for _ in range(runs):
+            with conn.transaction():
+                act_as(conn, world.users[user])
+                t = time.perf_counter()
+                rows = conn.execute(sql, params).fetchall()
+                timings.append((time.perf_counter() - t) * 1000)
+    return statistics.median(timings[1:]), rows
+
+
+@pytest.mark.skipif(not os.environ.get("CDE_PERF"), reason="benchmark opt-in: CDE_PERF=1")
+@pytest.mark.parametrize("org, discipline", [(None, None), ("DES", None), (None, "A")])
+def test_cruscotto_sotto_1s_su_100k(perf_db, org, discipline):
+    urls, world = perf_db
+    median, rows = _timed(urls, world, "com_admin", "SELECT cde.project_dashboard(%s, %s, %s) AS d",
+                          [world.project_id, world.orgs[org] if org else None, discipline])
+    total = rows[0]["d"]["documents"]["total"]
+    print(f"\ncruscotto org={org or 'tutte'} disciplina={discipline or 'tutte'} documenti={total} mediana={median:.0f} ms")
+    assert (total > 0 or discipline) and median < 1000, f"{median:.0f} ms"
+
+
+@pytest.mark.skipif(not os.environ.get("CDE_PERF"), reason="benchmark opt-in: CDE_PERF=1")
+def test_report_documenti_rispetta_rls_e_tetto(perf_db):
+    from cde_api.modules.reports import MAX_ROWS, _documents
+
+    urls, world = perf_db
+    # committente: solo i 30.000 condivisi (il WIP altrui non c'è); progettista: 60.000, tagliati al tetto
+    for user, expected in (("com_admin", 30_000), ("des_lead", MAX_ROWS + 1)):
+        with psycopg.connect(urls.app, row_factory=dict_row) as conn, conn.transaction():
+            act_as(conn, world.users[user])
+            t = time.perf_counter()
+            _, rows = _documents(conn, world.project_id)
+            ms = (time.perf_counter() - t) * 1000
+        print(f"\nreport documenti {user}: {len(rows)} righe in {ms:.0f} ms")
+        assert len(rows) == expected and ms < 10_000
+
+
+@pytest.mark.skipif(not os.environ.get("CDE_PERF"), reason="benchmark opt-in: CDE_PERF=1")
+def test_file_excel_50k_righe_sotto_20s(perf_db):
+    import io
+
+    from openpyxl import Workbook
+
+    from cde_api.modules.reports import MAX_ROWS, _documents, _info, _sheet
+
+    urls, world = perf_db
+    with psycopg.connect(urls.app, row_factory=dict_row) as conn, conn.transaction():
+        act_as(conn, world.users["des_lead"])
+        t = time.perf_counter()
+        cols, rows = _documents(conn, world.project_id)
+    rows = rows[:MAX_ROWS]
+    wb = Workbook(write_only=True)
+    _info(wb, {"code": "PRJ01", "name": "Perf"}, "Registro documenti", "des_lead", len(rows), True)
+    _sheet(wb, "Registro documenti", cols, rows)
+    buf = io.BytesIO()
+    wb.save(buf)
+    s = time.perf_counter() - t
+    print(f"\nexcel registro documenti: {len(rows)} righe, {len(buf.getvalue()) / 1e6:.1f} MB in {s:.1f} s")
+    assert s < 20
