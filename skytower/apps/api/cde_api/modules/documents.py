@@ -141,9 +141,11 @@ def _extension(filename: str) -> str | None:
     return m.group(1).lower() if m else None
 
 
-def auto_name(conn, project: dict, filename: str, chosen: dict[str, str], *, reserve: bool) -> tuple[str, int]:
+def auto_name(conn, project: dict, filename: str, chosen: dict[str, str], *, reserve: bool,
+              previewed: dict[str, int] | None = None) -> tuple[str, int]:
     """Nome conforme per un file caricato con un nome qualsiasi: valori scelti, poi predefiniti dell'admin,
-    originatore = organizzazione di chi carica, progressivo della serie (riservato solo se reserve)."""
+    originatore = organizzazione di chi carica, progressivo della serie (riservato solo se reserve).
+    ``previewed`` (anteprima di più file insieme): quanti numeri della stessa serie sono già stati proposti."""
     scheme, _, _ = load_settings(conn, project)
     auto = load_auto_number(conn, project["id"])
     if auto is None:
@@ -153,8 +155,13 @@ def auto_name(conn, project: dict, filename: str, chosen: dict[str, str], *, res
         values["originator"] = _my_org_code(conn)
     values.pop(auto.field, None)
     fn = "cde.reserve_document_number" if reserve else "cde.peek_document_number"
+    series = scheme.series(auto, values)
     number = conn.execute(f"SELECT {fn}(%s, %s, %s, %s) AS n",
-                          [project["id"], auto.field, Jsonb(scheme.series(auto, values)), auto.start]).fetchone()["n"]
+                          [project["id"], auto.field, Jsonb(series), auto.start]).fetchone()["n"]
+    if previewed is not None:
+        key = repr(sorted(series.items()))
+        number += previewed.get(key, 0)
+        previewed[key] = previewed.get(key, 0) + 1
     try:
         values[auto.field] = scheme.format_number(auto, number)
     except ValueError as exc:
@@ -243,6 +250,26 @@ def propose_name(project_id: uuid.UUID, body: NameProposalIn, c: Ctx = Depends(c
         result, _ = check_name(conn, project, name)
         return {"name": name, "number": number, "source_filename": body.filename,
                 **result.model_dump(include={"valid", "identifier", "fields", "errors"})}
+
+
+class NameProposalsIn(BaseModel):
+    items: list[NameProposalIn] = Field(min_length=1, max_length=100)
+
+
+@router.post("/projects/{project_id}/naming/propose-batch")
+def propose_names(project_id: uuid.UUID, body: NameProposalsIn, c: Ctx = Depends(ctx)):
+    """Anteprima per più file caricati insieme: nella stessa serie i numeri proseguono nell'ordine dato,
+    lo stesso in cui il client avvia i caricamenti (che riservano davvero i numeri)."""
+    with c.tx() as conn:
+        project = require_project(conn, project_id)
+        previewed: dict[str, int] = {}
+        out = []
+        for item in body.items:
+            name, number = auto_name(conn, project, item.filename, item.fields, reserve=False, previewed=previewed)
+            result, _ = check_name(conn, project, name)
+            out.append({"name": name, "number": number, "source_filename": item.filename,
+                        **result.model_dump(include={"valid", "identifier", "fields", "errors"})})
+        return out
 
 
 # ---------------------------------------------------------------------

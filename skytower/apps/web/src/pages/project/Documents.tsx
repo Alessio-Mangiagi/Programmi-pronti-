@@ -150,7 +150,7 @@ interface Item {
   message?: string;
   controller?: AbortController;
   /** Rinomina attiva: valori scelti e nome proposto dal server (progressivo riservato solo all'avvio). */
-  auto?: { fields: Record<string, string>; proposal?: Proposal; error?: string };
+  auto?: { fields: Record<string, string>; proposal?: Proposal; error?: string; pending?: boolean };
 }
 
 export function UploadDialog({ project, container, onClose }: { project: Project; container: Container; onClose: () => void }) {
@@ -181,15 +181,35 @@ export function UploadDialog({ project, container, onClose }: { project: Project
   const defaultFields = () => Object.fromEntries(
     choosableFields(settings!.naming_scheme.fields, autoNumber!).map((f) => [f.key, autoNumber!.defaults[f.key] ?? ""]));
 
-  const propose = async (file: File, fields: Record<string, string>) => {
-    update(file, { auto: { fields } });
-    try {
-      const proposal = await api<Proposal>(`/projects/${project.id}/naming/propose`, { method: "POST", json: { filename: file.name, fields } });
-      setItems((list) => list.map((i) => (i.file === file && i.auto?.fields === fields ? { ...i, auto: { fields, proposal } } : i)));
-    } catch (e) {
-      setItems((list) => list.map((i) => (i.file === file && i.auto?.fields === fields ? { ...i, auto: { fields, error: (e as Error).message } } : i)));
-    }
-  };
+  // L'anteprima si ricalcola (con debounce) per tutti i file da rinominare insieme: nella stessa serie i numeri
+  // proseguono nell'ordine della lista, lo stesso in cui partono i caricamenti che li riservano.
+  const propose = (file: File, fields: Record<string, string>) =>
+    setItems((list) => list.map((i) => (i.file === file ? { ...i, auto: { fields, proposal: i.auto?.proposal, pending: true } } : i)));
+
+  const idle = (i: Item) => i.phase === "check" || i.phase === "ready" || i.phase === "error";
+  const toPropose = items.filter((i) => i.auto && idle(i));
+  const proposeKey = JSON.stringify(toPropose.map((i) => [i.file.name, i.file.size, i.auto!.fields]));
+  useEffect(() => {
+    if (toPropose.length === 0) return;
+    const batch = toPropose;
+    const timer = setTimeout(async () => {
+      const current = (i: Item, k: number) => k >= 0 && i.auto?.fields === batch[k].auto!.fields;
+      try {
+        const res = await api<Proposal[]>(`/projects/${project.id}/naming/propose-batch`, {
+          method: "POST", json: { items: batch.map((i) => ({ filename: i.file.name, fields: i.auto!.fields })) } });
+        setItems((list) => list.map((i) => {
+          const k = batch.findIndex((b) => b.file === i.file);
+          return current(i, k) ? { ...i, auto: { fields: i.auto!.fields, proposal: res[k] } } : i;
+        }));
+      } catch (e) {
+        setItems((list) => list.map((i) => {
+          const k = batch.findIndex((b) => b.file === i.file);
+          return current(i, k) ? { ...i, auto: { fields: i.auto!.fields, error: (e as Error).message } } : i;
+        }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [proposeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleAuto = (item: Item, on: boolean) => {
     if (!on || !autoNumber) return update(item.file, { auto: undefined });
@@ -217,11 +237,15 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     }
   };
 
-  const idle = (i: Item) => i.phase === "check" || i.phase === "ready" || i.phase === "error";
-  const ready = (i: Item) => i.auto ? idle(i) && !!i.auto.proposal?.valid && !!i.title.trim()
+  const ready = (i: Item) => i.auto ? idle(i) && !i.auto.pending && !!i.auto.proposal?.valid && !!i.title.trim()
                                     : i.phase === "ready" && (!!i.check?.existing_document_id || !!i.title.trim());
   const needsTitle = (i: Item) => idle(i) && (i.auto ? !!i.auto.proposal?.valid : i.phase === "ready" && !i.check?.existing_document_id);
   const readyToStart = items.filter(ready);
+  const startAll = async () => {
+    const list = readyToStart;
+    list.filter((i) => !i.auto).forEach(start);
+    for (const i of list.filter((x) => x.auto)) await start(i);   // in ordine: i numeri riservati seguono l'anteprima
+  };
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
@@ -272,7 +296,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                   </Stack>
                   {item.auto.proposal && (
                     <Typography variant="body2">
-                      Nuovo nome: <Chip size="small" color={item.auto.proposal.valid ? "success" : "default"}
+                      Nuovo nome: <Chip size="small" color={item.auto.proposal.valid && !item.auto.pending ? "success" : "default"}
                                         label={item.auto.proposal.name} sx={{ fontFamily: "monospace" }} />
                       <Typography component="span" variant="caption" color="text.secondary" ml={1}>
                         progressivo assegnato all'avvio del caricamento
@@ -312,7 +336,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Chiudi</Button>
-        <Button variant="contained" disabled={readyToStart.length === 0} onClick={() => readyToStart.forEach(start)}>
+        <Button variant="contained" disabled={readyToStart.length === 0} onClick={startAll}>
           Carica {readyToStart.length || ""}
         </Button>
       </DialogActions>

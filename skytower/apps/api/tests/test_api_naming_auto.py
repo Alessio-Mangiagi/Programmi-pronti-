@@ -152,3 +152,21 @@ def test_file_senza_estensione(client, api_world, as_user, auto_settings, volume
     auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
     p = _propose(client, w, as_user("des_lead"), {"volume": volume}, filename="LEGGIMI").json()
     assert p["valid"] and p["name"] == f"PRJ01-DES-{volume}-00-DR-A-0001"
+
+
+def test_anteprima_di_piu_file_numeri_consecutivi(client, api_world, as_user, auto_settings, volume):
+    _, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
+    h = as_user("des_lead")
+    items = [{"filename": "a.pdf", "fields": {"volume": volume}},
+             {"filename": "b.dwg", "fields": {"volume": volume, "type": "M3"}},
+             {"filename": "c.pdf", "fields": {"volume": volume}}]
+    r = client.post(f"/projects/{w.project_id}/naming/propose-batch", headers=h, json={"items": items})
+    assert r.status_code == 200, r.text
+    assert [p["name"] for p in r.json()] == [f"PRJ01-DES-{volume}-00-DR-A-0001.pdf",
+                                             f"PRJ01-DES-{volume}-00-M3-A-0001.dwg",
+                                             f"PRJ01-DES-{volume}-00-DR-A-0002.pdf"]
+    # caricati nello stesso ordine, i numeri riservati coincidono con l'anteprima
+    for it, p in zip(items, r.json(), strict=True):
+        rev = _upload_auto(client, h, w.containers["des_arch"], it["fields"], filename=it["filename"]).json()
+        assert rev["original_filename"] == p["name"]
