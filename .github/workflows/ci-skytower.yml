@@ -116,6 +116,38 @@ jobs:
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
+  e2e:
+    name: E2E (Playwright, ambiente usa-e-getta)
+    runs-on: ubuntu-24.04
+    needs: [api, web]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: skytower/apps/api/requirements.lock
+      - working-directory: skytower
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r apps/api/requirements.lock -e "packages/iso19650" -e "apps/api[dev]"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: skytower/apps/web/package-lock.json
+      - working-directory: skytower/apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-trace
+          path: skytower/apps/web/test-results
+
   terraform:
     name: Terraform — fmt, validate, test (${{ matrix.env }})
     runs-on: ubuntu-24.04

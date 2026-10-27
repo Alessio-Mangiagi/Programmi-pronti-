@@ -9,6 +9,8 @@ __pycache__/
 # Node
 node_modules/
 dist/
+test-results/
+playwright-report/
 
 # Ambiente locale: dati Postgres embedded, chiavi dev, segreti
 .devdata/
@@ -23,6 +25,7 @@ infra/terraform/**/.terraform/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+backend.hcl
 
 # IDE / OS
 .vscode/
