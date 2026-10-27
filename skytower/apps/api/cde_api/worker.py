@@ -21,6 +21,7 @@ import procrastinate
 import psycopg
 from psycopg.rows import dict_row
 
+from .anchoring import publish_pending
 from .config import Settings, get_settings
 from .events import security_event
 from .mail import build_mailer
@@ -188,6 +189,18 @@ def audit_anchor(timestamp: int) -> None:
         seq = conn.execute("SELECT cde.audit_anchor((to_timestamp(%s) AT TIME ZONE 'UTC')::date - 1)",
                            [timestamp]).fetchone()[0]
     log.info("registro: ancora giornaliera fino all'evento %s", seq)
+    audit_publish_anchors(timestamp)
+
+
+@app.periodic(cron="15 * * * *", periodic_id="audit-publish-anchors")
+@app.task(name="cde.audit_publish_anchors", queue="default")
+def audit_publish_anchors(timestamp: int) -> None:
+    """Copia le ancore su S3 WORM con marca temporale; ritenta ogni ora quelle rimaste indietro (es. TSA giù)."""
+    storage, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
+        n = publish_pending(conn, storage, settings)
+    if n:
+        log.info("registro: %s ancore pubblicate su S3", n)
 
 
 @app.periodic(cron="0 7 * * *", periodic_id="daily-digest")

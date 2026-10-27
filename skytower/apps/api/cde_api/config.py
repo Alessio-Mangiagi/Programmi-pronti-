@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -59,6 +60,12 @@ class Settings(BaseSettings):
     upload_part_size: int = 64 * 1024 * 1024
     upload_max_bytes: int = 50 * 1024 ** 3
     upload_session_ttl_hours: int = 24
+
+    # Registro attività: ancore giornaliere su S3 WORM e marca temporale RFC 3161 (TSA qualificata in produzione)
+    audit_anchor_prefix: str = "audit-anchors"
+    audit_lock_mode: Literal["GOVERNANCE", "COMPLIANCE"] = "GOVERNANCE"   # COMPLIANCE in produzione
+    audit_lock_days: int = 3650
+    tsa_url: str | None = None
 
     # Worker: coda Procrastinate (ruolo cde_worker) e antivirus
     database_url_worker: str = "postgresql://cde_worker:cde_worker@127.0.0.1:5432/cde"

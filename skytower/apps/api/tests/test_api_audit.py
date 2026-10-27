@@ -103,3 +103,64 @@ def test_ancora_giornaliera(api_world, events):
         assert row[0] == seq                                            # la prima ancora del giorno non cambia
         with pytest.raises(psycopg.Error, match="append-only"):
             conn.execute("DELETE FROM cde.audit_anchors")
+
+
+def test_ancore_su_s3_worm_con_marca_temporale(client, api_world, api_app, api_settings, as_user, events):  # noqa: F811
+    from botocore.exceptions import ClientError
+
+    from cde_api import anchoring
+
+    urls, w = api_world
+    with psycopg.connect(urls.worker, autocommit=True) as conn:
+        conn.execute("SELECT cde.audit_anchor('2001-01-02')")
+    settings = api_settings.model_copy(update={"tsa_url": "https://tsa.example/ts"})
+    asked = []
+
+    def fake_tsa(url, digest):           # risposta TSA "granted" con un token fittizio
+        asked.append(digest)
+        token = anchoring._seq(anchoring._oid("1.2.840.113549.1.7.2"))
+        return anchoring.timestamp_token(anchoring._seq(anchoring._seq(anchoring._int(0)), token))
+
+    storage = api_app.state.services.storage
+    with psycopg.connect(urls.worker, row_factory=dict_row) as conn:
+        assert anchoring.publish_pending(conn, storage, settings, tsa=fake_tsa) >= 1
+        assert anchoring.publish_pending(conn, storage, settings, tsa=fake_tsa) == 0      # già pubblicate
+    with psycopg.connect(urls.owner, row_factory=dict_row) as conn:
+        proof = conn.execute("SELECT * FROM cde.audit_anchor_proofs WHERE day = '2001-01-02'").fetchone()
+        with pytest.raises(psycopg.Error):
+            conn.execute("DELETE FROM cde.audit_anchor_proofs")
+    body = storage.get_bytes(proof["s3_key"], proof["s3_version_id"])
+    assert hashlib.sha256(body).digest() == bytes(proof["document_sha256"]) in asked
+    assert proof["tsa_token"] and proof["lock_mode"] == "GOVERNANCE"
+    with pytest.raises(ClientError):     # WORM: la versione non si cancella prima della scadenza
+        storage.client.delete_object(Bucket=storage.bucket, Key=proof["s3_key"], VersionId=proof["s3_version_id"])
+
+    v = client.get(f"/projects/{w.project_id}/audit/verify", headers=as_user("com_admin")).json()
+    a = next(x for x in v["anchors"] if x["day"] == "2001-01-02")
+    assert a["matches_chain"] and a["matches_s3"] and a["has_tsa"] and v["anchors_ok"] and v["ok"]
+
+
+def test_tsa_non_disponibile_rimanda(api_world, api_app, api_settings, events):
+    from cde_api import anchoring
+
+    urls, _ = api_world
+    with psycopg.connect(urls.worker, autocommit=True) as conn:
+        conn.execute("SELECT cde.audit_anchor('2001-01-03')")
+
+    def down(url, digest):
+        raise OSError("TSA irraggiungibile")
+
+    settings = api_settings.model_copy(update={"tsa_url": "https://tsa.example/ts"})
+    with psycopg.connect(urls.worker, row_factory=dict_row) as conn:
+        anchoring.publish_pending(conn, api_app.state.services.storage, settings, tsa=down)
+        pending = [r["day"].isoformat() for r in conn.execute("SELECT * FROM cde.audit_anchors_pending(100)")]
+    assert "2001-01-03" in pending
+
+
+def test_codifica_rfc3161():
+    from cde_api import anchoring
+
+    req = anchoring.timestamp_request(b"\x11" * 32, 7)
+    assert "0609608648016503040201" in req.hex() and req.endswith(b"\x01\x01\xff")
+    with pytest.raises(ValueError, match="rifiutata"):
+        anchoring.timestamp_token(anchoring._seq(anchoring._seq(anchoring._int(2))))

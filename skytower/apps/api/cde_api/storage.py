@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import datetime
 from urllib.parse import quote
 
 import boto3
@@ -106,6 +107,18 @@ class Storage:
             Bucket=self.bucket, Key=key, **({"VersionId": version_id} if version_id else {}),
             Tagging={"TagSet": [{"Key": k, "Value": v} for k, v in tags.items()]},
         )
+
+    # ------------------------------------------------------------ WORM
+    def put_locked(self, key: str, body: bytes, content_type: str, mode: str, retain_until: datetime) -> str | None:
+        """Oggetto con Object Lock: non si cancella né si sovrascrive (la versione) fino a retain_until."""
+        res = self.client.put_object(Bucket=self.bucket, Key=key, Body=body, ContentType=content_type,
+                                     ObjectLockMode=mode, ObjectLockRetainUntilDate=retain_until,
+                                     ChecksumAlgorithm="SHA256")
+        return res.get("VersionId")
+
+    def get_bytes(self, key: str, version_id: str | None) -> bytes:
+        params = {"Bucket": self.bucket, "Key": key, **({"VersionId": version_id} if version_id else {})}
+        return self.client.get_object(**params)["Body"].read()
 
     # ------------------------------------------------------------ sviluppo
     def ensure_bucket(self, object_lock_days: int = 1) -> None:

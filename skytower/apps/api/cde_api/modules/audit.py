@@ -10,6 +10,7 @@ import csv
 import hashlib
 import io
 import json
+import logging
 import uuid
 from datetime import datetime
 
@@ -18,6 +19,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from ..deps import Ctx, ctx, require_project
 from ..events import security_event
 
+log = logging.getLogger("cde.audit")
 router = APIRouter(tags=["audit"])
 
 COLUMNS = ["id", "occurred_at", "event_type", "user_name", "organization_code", "ip", "user_agent", "details",
@@ -46,7 +48,20 @@ def verify(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         require_project(conn, project_id, "ADMIN", "PROJECT")
         result = conn.execute("SELECT * FROM cde.audit_verify()").fetchone()
-    return {**result, "ok": result["first_broken_seq"] is None}
+        anchors = conn.execute("SELECT * FROM cde.audit_anchor_check(14)").fetchall()
+    for a in anchors:
+        a["matches_chain"] = a["current_hash"] == a["anchored_hash"]
+        a["matches_s3"] = None
+        if a["s3_key"]:
+            try:
+                doc = json.loads(c.svc.storage.get_bytes(a["s3_key"], a["s3_version_id"]))
+                a["matches_s3"] = doc.get("head_hash") == a["anchored_hash"] and doc.get("chain_seq") == a["chain_seq"]
+            except Exception:
+                log.exception("ancora del %s non leggibile da S3", a["day"])
+                a["matches_s3"] = False
+    anchors_ok = all(a["matches_chain"] and a["matches_s3"] is not False for a in anchors)
+    return {**result, "ok": result["first_broken_seq"] is None and anchors_ok, "anchors_ok": anchors_ok,
+            "anchors": anchors}
 
 
 def _cell(value) -> str:
