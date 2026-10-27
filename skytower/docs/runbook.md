@@ -1,7 +1,9 @@
 <!-- "><(((º> sabusabu <º)))><" -->
 # Runbook di produzione (G58)
 
-Stack: `infra/terraform/envs/prod`. Regione primaria `eu-south-1`, DR `eu-central-1`.
+Stack: `infra/terraform/envs/prod`, che usa il modulo `modules/cde-platform` con i valori di produzione.
+`envs/staging` usa lo stesso modulo con taglie ridotte e senza DR (test di carico, pentest, UAT).
+Regione primaria `eu-south-1`, DR `eu-central-1`.
 Obiettivi: **RPO 15'**, **RTO 4 h**.
 
 | Componente | Protezione | RPO effettivo |
