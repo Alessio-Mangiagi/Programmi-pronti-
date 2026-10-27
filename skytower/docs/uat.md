@@ -29,6 +29,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U02, U03, U19, U19b | `rinomina.spec.ts` |
 | U06 (ricerca nel testo, annotazioni) | `viewer.spec.ts`, `annotazioni.spec.ts` |
 | U07, U08, U09, U10 | `approvazione.spec.ts` |
+| U11 (differenze in rosso/blu, verificate sui pixel) | `confronto.spec.ts` |
 | U13, U14 | `rfi.spec.ts` |
 | U15 | `transmittal.spec.ts` |
 | U16, U17, U18 | `admin.spec.ts` |
@@ -37,8 +38,8 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U22 | `profilo.spec.ts`, `mfa.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 
-Restano solo manuali il confronto visivo tra revisioni (U11) e il modello IFC 3D (U12): il risultato grafico (canvas e WebGL)
-va giudicato a occhio. Per tutti gli altri il collaudo valuta chiarezza e usabilità.
+Resta solo manuale il modello IFC 3D (U12): il rendering WebGL va giudicato a occhio. Per tutti gli altri
+scenari il collaudo valuta chiarezza e usabilità.
 
 ## Scenari
 
