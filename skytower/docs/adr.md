@@ -268,3 +268,20 @@ Accessibilità: axe-core con regole WCAG 2.1 A/AA su pagine e dialog principali,
 qualsiasi livello; i dialog si analizzano da soli e a dissolvenza finita. Navigazione da sola tastiera
 verificata su cartelle e documenti. Layout: nessuno scroll orizzontale a 1280 e 820 px in tutte le schede.
 Nel tema MUI i comandi non vanno a capo e i titoli seguono una gerarchia h1→h3.
+
+## ADR-22 — Viewer IFC e Content-Security-Policy (decisione aperta)
+
+**Contesto.** Gli e2e servono ora la SPA con la CSP di produzione. PDF, Word ed Excel funzionano; il viewer IFC
+no: web-ifc (Emscripten/embind) crea funzioni con `eval`/`new Function`, e la CSP non ammette `'unsafe-eval'`
+(errore "Evaluating a string as JavaScript violates the following Content Security Policy directive").
+In sviluppo, senza CSP, il viewer funziona: dietro CloudFront sarebbe rotto.
+
+**Opzioni.**
+1. Aggiungere `'unsafe-eval'` alla CSP di tutta la SPA: una riga, ma riapre a tutta l'app i vettori XSS basati su eval.
+2. **Isolare il viewer IFC** in una pagina propria (`/ifc-viewer.html`) caricata in un iframe, servita da un
+   comportamento CloudFront dedicato con CSP che ammette `'unsafe-eval'` solo lì; la SPA resta senza eval.
+   Il modello e le annotazioni passano via `postMessage`. Consigliata.
+3. Ricompilare web-ifc con `-sDYNAMIC_EXECUTION=0`: nessuna eccezione alla CSP, ma un fork da mantenere.
+
+**Stato.** Da decidere. Il test `e2e/ifc.spec.ts` è marcato come fallimento atteso: quando il problema sarà
+risolto passerà e Playwright chiederà di togliere il marcatore.

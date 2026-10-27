@@ -30,7 +30,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U06 (ricerca nel testo, annotazioni) | `viewer.spec.ts`, `annotazioni.spec.ts` |
 | U07, U08, U09, U10 | `approvazione.spec.ts` |
 | U11 (differenze in rosso/blu, verificate sui pixel) | `confronto.spec.ts` |
-| U12 (caricamento, albero spaziale, vista 3D non vuota) | `ifc.spec.ts` |
+| U12 (caricamento, albero spaziale, vista 3D non vuota) | `ifc.spec.ts` — **oggi bloccato dalla CSP di produzione, ADR-22** |
 | U13, U14 | `rfi.spec.ts` |
 | U15 | `transmittal.spec.ts` |
 | U16, U17, U18 | `admin.spec.ts` |

@@ -10,6 +10,10 @@ import { apiAs, loginUi, projectAndFolder, uploadFile } from "./helpers";
 const IFC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "edificio.ifc"));
 
 test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => {
+  // PROBLEMA APERTO (docs/adr.md ADR-22): web-ifc (Emscripten/embind) genera funzioni con eval e la CSP di
+  // produzione, servita anche in questi test, non ammette 'unsafe-eval'. Quando il viewer IFC sarà isolato
+  // (o web-ifc ricompilato senza eval) questo test passerà e Playwright lo segnalerà: togliere allora test.fail.
+  test.fail(true, "viewer IFC bloccato dalla CSP di produzione (unsafe-eval), vedi ADR-22");
   test.setTimeout(90_000);
   const des = await apiAs(baseURL, "des.lead@des.example");
   const { projectId, folderId } = await projectAndFolder(des, (n) => n === "Tavole architettoniche");
