@@ -61,8 +61,22 @@ controllo progetto, lista con RLS), metà overhead di FastAPI. Sotto carico cont
   margine per worker e manutenzione; con molti container usare RDS Proxy.
 - Il worker gira in un servizio separato dall'API (in sviluppo condividono il processo).
 
+## Caricamenti paralleli (`infra/load/upload.py`)
+
+Percorso completo del browser: impronta, initiate, URL presigned per parte, PUT diretto su S3, complete,
+poi verifica del worker (SHA-256 + antivirus). Dati generati in streaming: in memoria solo le parti in volo.
+
+```powershell
+.venv\Scripts\python infra\load\upload.py --api http://127.0.0.1:8100 --upload 50 --mb 1024 --parti-in-volo 32
+```
+
+In locale (S3 emulato in memoria, quindi solo prova del percorso): 2 × 140 MB in tre parti da 64 MB,
+74 MB/s aggregati, initiate p50 340 ms, complete p50 540 ms, entrambi verificati dal worker (CLEAN).
+I numeri veri vanno presi su staging: il collo di bottiglia atteso è la rete verso S3 e il tempo del worker
+antivirus sui file da 1 GB, non l'API (che non vede mai i byte del file).
+
 ## Ancora da misurare
 
 - 500 utenti concorrenti su staging AWS, con generatori su macchine separate.
-- 50 caricamenti paralleli da 1 GB (multipart diretto su S3: il carico è su S3 e sul worker antivirus).
+- 50 caricamenti paralleli da 1 GB su staging con `upload.py` (lo script è pronto).
 - Liste su 1.000.000 di documenti.
