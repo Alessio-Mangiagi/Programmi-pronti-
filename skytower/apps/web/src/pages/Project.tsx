@@ -6,6 +6,8 @@ import { api, ApiError, Project } from "../api";
 import { AreasTab } from "./project/Areas";
 import { FolderView } from "./project/Folder";
 import { PrivateAreasTab } from "./project/PrivateAreas";
+import { RfisTab } from "./project/Rfis";
+import { WorkflowsTab } from "./project/Workflows";
 import { MembersTab } from "./project/Members";
 import { OrganizationsTab } from "./project/Organizations";
 import { RolesTab } from "./project/Roles";
@@ -14,6 +16,8 @@ const TABS = [
   { path: "cartelle", label: "Cartelle" },
   { path: "documenti", label: "Aree CDE" },
   { path: "riservate", label: "Aree riservate" },
+  { path: "rfi", label: "RFI" },
+  { path: "workflow", label: "Workflow" },
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
@@ -53,6 +57,9 @@ export function ProjectPage() {
         <Route path="cartelle/:containerId" element={<FolderView project={project} />} />
         <Route path="documenti" element={<AreasTab project={project} />} />
         <Route path="riservate" element={<PrivateAreasTab project={project} />} />
+        <Route path="rfi" element={<RfisTab project={project} />} />
+        <Route path="rfi/:rfiId" element={<RfisTab project={project} />} />
+        <Route path="workflow" element={<WorkflowsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="membri" element={<MembersTab project={project} canManage={isAnyAdmin} />} />
         <Route path="organizzazioni" element={<OrganizationsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="ruoli" element={<RolesTab project={project} canManage={isProjectAdmin} />} />
