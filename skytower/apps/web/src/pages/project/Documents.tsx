@@ -211,6 +211,11 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     return () => clearTimeout(timer);
   }, [proposeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Stessi campi a tutti gli altri file in rinomina (ognuno mantiene il suo progressivo). */
+  const applyToAll = (source: Item) =>
+    setItems((list) => list.map((i) => (i !== source && i.auto && idle(i)
+      ? { ...i, auto: { fields: { ...source.auto!.fields }, proposal: i.auto.proposal, pending: true } } : i)));
+
   const toggleAuto = (item: Item, on: boolean) => {
     if (!on || !autoNumber) return update(item.file, { auto: undefined });
     propose(item.file, defaultFields());
@@ -293,6 +298,9 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                       <FieldValueInput key={f.key} field={f} value={item.auto!.fields[f.key] ?? ""}
                                        onChange={(v) => propose(item.file, { ...item.auto!.fields, [f.key]: v })} />
                     ))}
+                    {items.filter((o) => o !== item && o.auto && idle(o)).length > 0 && (
+                      <Button size="small" onClick={() => applyToAll(item)}>Applica a tutti i file</Button>
+                    )}
                   </Stack>
                   {item.auto.proposal && (
                     <Typography variant="body2">
