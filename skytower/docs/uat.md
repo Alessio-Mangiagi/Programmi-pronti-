@@ -27,7 +27,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 |---|---|
 | U01, U04, U05 | `stati.spec.ts` |
 | U02, U03, U19, U19b | `rinomina.spec.ts` |
-| U06 (ricerca nel testo) | `viewer.spec.ts` |
+| U06 (ricerca nel testo, annotazioni) | `viewer.spec.ts`, `annotazioni.spec.ts` |
 | U07, U08, U09, U10 | `approvazione.spec.ts` |
 | U13, U14 | `rfi.spec.ts` |
 | U15 | `transmittal.spec.ts` |
@@ -35,7 +35,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U20 | `riservate.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 
-Restano solo manuali: annotazioni (U06), confronto revisioni (U11), modello IFC (U12),
+Restano solo manuali: confronto revisioni (U11), modello IFC (U12),
 isolamento da link copiato (U21, coperto però dai test API OWASP), profilo e MFA (U22), uso da tablet (U23).
 
 ## Scenari
