@@ -35,7 +35,9 @@ Obiettivi: **RPO 15'**, **RTO 4 h**.
 3. `terraform apply -var image_tag=<sha>`: ECS sostituisce i task con 100% minimo sano;
    il circuit breaker fa rollback da solo se i nuovi task non superano l'health check.
 4. SPA: `npm run build`, `aws s3 sync dist/ s3://<web_bucket> --delete`, invalidazione CloudFront `/*`.
-5. Smoke test: `/api/health`, login, apertura di una commessa, download di un documento.
+5. Smoke test: `python infra/smoke.py --api https://<domain_name>/api --email <utente di collaudo>` con la
+   password in `CDE_SMOKE_PASSWORD` (salute, header, login, commesse, lettura di un file da S3, integrità del
+   registro). Codice d'uscita diverso da 0 → rollback.
 
 **Rollback**: `terraform apply -var image_tag=<sha precedente>`; per la SPA, ripristino delle versioni
 precedenti nel bucket (versioning attivo) e nuova invalidazione.
