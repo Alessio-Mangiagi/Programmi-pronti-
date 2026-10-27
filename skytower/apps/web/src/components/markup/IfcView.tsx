@@ -23,6 +23,11 @@ interface SpatialNode { expressID: number; type: string; children: SpatialNode[]
 interface Props { name: string; guid: string; type: string; psets: { name: string; props: [string, string][] }[] }
 
 const SELECT_COLOR = new THREE.Color("#1976d2");
+const TYPE_COLOR: Record<string, string> = {
+  IFCWALL: "#e6dccb", IFCWALLSTANDARDCASE: "#e6dccb", IFCSLAB: "#aeb7c0", IFCROOF: "#b5654f", IFCBEAM: "#c2a27c",
+  IFCCOLUMN: "#c2a27c", IFCMEMBER: "#c2a27c", IFCWINDOW: "#9fd0ee", IFCDOOR: "#a77b52", IFCSTAIR: "#cfc6b8",
+  IFCRAILING: "#7d8790", IFCCOVERING: "#ddd5c8", IFCFURNISHINGELEMENT: "#d8b98c",
+};
 const str = (v: unknown): string => {
   if (v === null || v === undefined) return "";
   if (typeof v === "object" && "value" in (v as Record<string, unknown>)) return String((v as { value: unknown }).value);
@@ -260,6 +265,7 @@ class Engine {
     await this.ifc.Init((path) => (path.endsWith(".wasm") ? wasmUrl : path));
     this.model = this.ifc.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
     const materials = new Map<string, THREE.MeshLambertMaterial>();
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.45, clippingPlanes: [this.clip] });
     let last = 0;
     this.ifc.StreamAllMeshes(this.model, (mesh, index, total) => {
       const placed = mesh.geometries;
@@ -274,11 +280,15 @@ class Engine {
         geom.setAttribute("normal", new THREE.InterleavedBufferAttribute(inter, 3, 3));
         geom.setIndex(new THREE.BufferAttribute(new Uint32Array(index3), 1));
         g.delete();
-        const key = `${pg.color.x},${pg.color.y},${pg.color.z},${pg.color.w}`;
+        // senza stili nel file (grigio uniforme) si colora per tipo di elemento, per distinguerli a colpo d'occhio
+        const unstyled = pg.color.x === pg.color.y && pg.color.y === pg.color.z && pg.color.w === 1;
+        const byType = unstyled ? TYPE_COLOR[this.typeOf(mesh.expressID)] : undefined;
+        const key = byType ?? `${pg.color.x},${pg.color.y},${pg.color.z},${pg.color.w}`;
         let mat = materials.get(key);
         if (!mat) {
           mat = new THREE.MeshLambertMaterial({
-            color: new THREE.Color(pg.color.x, pg.color.y, pg.color.z), side: THREE.DoubleSide,
+            color: byType ? new THREE.Color(byType) : new THREE.Color(pg.color.x, pg.color.y, pg.color.z), side: THREE.DoubleSide,
+            polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
             transparent: pg.color.w < 1, opacity: pg.color.w, clippingPlanes: [this.clip],
           });
           materials.set(key, mat);
@@ -289,6 +299,11 @@ class Engine {
         m.userData.id = mesh.expressID;
         this.base.set(m, mat);
         this.root.add(m);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom, 30), edgeMat);   // spigoli
+        edges.matrixAutoUpdate = false;
+        edges.matrix.copy(m.matrix);
+        edges.raycast = () => undefined;
+        this.root.add(edges);
         const list = this.meshes.get(mesh.expressID) ?? [];
         list.push(m);
         this.meshes.set(mesh.expressID, list);
@@ -315,7 +330,7 @@ class Engine {
     const size = box.getSize(new THREE.Vector3()).length() || 1;
     const center = box.getCenter(new THREE.Vector3());
     this.controls.target.copy(center);
-    this.camera.position.copy(center).add(new THREE.Vector3(1, 0.8, 1).normalize().multiplyScalar(size * 1.1));
+    this.camera.position.copy(center).add(new THREE.Vector3(1, 0.8, 1).normalize().multiplyScalar(size * 1.5));
     this.camera.near = size / 1000;
     this.camera.far = size * 20;
     this.camera.updateProjectionMatrix();
@@ -371,6 +386,10 @@ class Engine {
   tint(colors: Map<string, string>) { this.tints = colors; this.paint(); }
   idOf(guid: string) { return this.guids.get(guid); }
 
+  private typeOf(id: number): string {
+    try { return (this.ifc.GetNameFromTypeCode(this.ifc.GetLineType(this.model, id)) ?? "").toUpperCase(); } catch { return ""; }
+  }
+
   nameOf(id: number): string {
     try { return str(this.ifc.GetLine(this.model, id)?.Name); } catch { return ""; }
   }
@@ -399,7 +418,7 @@ class Engine {
     cancelAnimationFrame(this.frame);
     this.resize.disconnect();
     this.controls.dispose();
-    this.root.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+    this.root.traverse((o) => { if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose(); });
     this.renderer.dispose();
     this.renderer.domElement.remove();
     try { if (this.model >= 0) this.ifc.CloseModel(this.model); } catch { /* già chiuso */ }
