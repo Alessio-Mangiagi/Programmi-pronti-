@@ -255,3 +255,16 @@ non si sovrappongono neanche cambiando la configurazione della serie.
 giorni vengono rilasciate dal job giornaliero del worker (`cde.naming_release_expired()`, 02:40); ogni rilascio
 automatico è un evento `NAMING_RESERVATIONS_EXPIRED` nel registro della commessa. Massimo 500 prenotazioni
 aperte per organizzazione e commessa.
+
+## ADR-21 — Test nel browser, accessibilità e layout come regressioni
+
+**Decisione.** I flussi utente si verificano con Playwright contro un ambiente usa-e-getta avviato dai test
+stessi (`cde dev --reset --data-dir <tmp>` su porte dedicate + build di produzione servita da `vite preview`):
+nessuna dipendenza dall'istanza di sviluppo né dai suoi dati. Unica differenza dalla configurazione reale:
+il limite di login per IP è alzato in quell'ambiente, perché ogni test fa il proprio accesso.
+Ogni scenario del collaudo (`docs/uat.md`) ha un test; la resa grafica di PDF e IFC si controlla sui pixel
+(differenze rosso/blu, canvas 3D non uniforme), il giudizio estetico resta al collaudo.
+Accessibilità: axe-core con regole WCAG 2.1 A/AA su pagine e dialog principali, soglia **zero violazioni** di
+qualsiasi livello; i dialog si analizzano da soli e a dissolvenza finita. Navigazione da sola tastiera
+verificata su cartelle e documenti. Layout: nessuno scroll orizzontale a 1280 e 820 px in tutte le schede.
+Nel tema MUI i comandi non vanno a capo e i titoli seguono una gerarchia h1→h3.

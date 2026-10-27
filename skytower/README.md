@@ -45,7 +45,8 @@ npm ci
 npm run dev                      # SPA su http://localhost:5195 (proxy /api → :8100)
 ```
 
-`cde dev --reset` ricrea il database. Dati demo: password `Cantiere-2026!` per tutti gli utenti, ad esempio
+`cde dev --reset` ricrea il database. `--data-dir` e `--s3-port` avviano un'istanza separata accanto a quella
+in uso (lo fanno i test e2e). Dati demo: password `Cantiere-2026!` per tutti gli utenti, ad esempio
 
 | Utente | Ruolo |
 |---|---|
