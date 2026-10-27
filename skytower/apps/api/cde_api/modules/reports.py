@@ -98,7 +98,10 @@ def _documents(conn, project_id) -> tuple[list[Column], list[list]]:
     rows = conn.execute(
         """SELECT d.identifier, d.title, o.code AS originator, d.container_id, d.naming_fields ->> 'role' AS discipline,
                   lr.revision_code, lr.suitability, lr.state, lr.created_at, lr.original_filename, lr.size_bytes,
-                  d.archived_at
+                  d.archived_at,
+                  (SELECT r0.source_filename FROM cde.document_revisions r0      -- nome con cui era arrivato (rinomina)
+                    WHERE r0.document_id = d.id AND r0.source_filename IS NOT NULL
+                    ORDER BY r0.sequence DESC LIMIT 1) AS source_filename
            FROM cde.documents d JOIN cde.organizations o ON o.id = d.originator_organization_id
            JOIN LATERAL (SELECT r.revision_code, r.suitability, r.state, r.created_at, r.original_filename, f.size_bytes
                          FROM cde.document_revisions r JOIN cde.file_objects f ON f.id = r.file_object_id
@@ -106,10 +109,11 @@ def _documents(conn, project_id) -> tuple[list[Column], list[list]]:
            WHERE d.project_id = %s ORDER BY d.identifier LIMIT %s""", [project_id, MAX_ROWS + 1]).fetchall()
     cols = [("Identificativo", 34), ("Titolo", 44), ("Originatore", 12), ("Cartella", 36), ("Disciplina", 11),
             ("Revisione", 10), ("Idoneità", 9), ("Stato", 12), ("Data revisione", 17), ("File", 36),
-            ("Dimensione (KB)", 15), ("Archiviato il", 17)]
+            ("Nome originale", 36), ("Dimensione (KB)", 15), ("Archiviato il", 17)]
     return cols, [[r["identifier"], r["title"], r["originator"], paths.get(r["container_id"], ""), r["discipline"],
                    r["revision_code"], r["suitability"], STATE_LABEL.get(r["state"], r["state"]), r["created_at"],
-                   r["original_filename"], round(r["size_bytes"] / 1024, 1), r["archived_at"]] for r in rows]
+                   r["original_filename"], r["source_filename"], round(r["size_bytes"] / 1024, 1), r["archived_at"]]
+                  for r in rows]
 
 
 def _approvals(conn, project_id) -> tuple[list[Column], list[list]]:

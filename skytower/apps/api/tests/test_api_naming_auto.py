@@ -297,3 +297,18 @@ def test_tetto_alle_prenotazioni_aperte(client, api_world, as_user, auto_setting
     assert _reserve(client, w, h, {"volume": volume}, count=2).status_code == 201
     r = _reserve(client, w, h, {"volume": volume})
     assert r.status_code == 409 and r.json()["error"]["code"] == "too_many_reservations"
+
+
+def test_nome_originale_nel_registro_excel(client, api_world, as_user, auto_settings, volume):
+    import io
+
+    from openpyxl import load_workbook
+    _, w = api_world
+    auto_settings(start=1, defaults={"level": "00", "type": "DR", "role": "A"})
+    h = as_user("des_lead")
+    rev = _upload_auto(client, h, w.containers["des_arch"], {"volume": volume}, filename="vecchio nome.pdf").json()
+    r = client.get(f"/projects/{w.project_id}/reports/documents.xlsx", headers=h)
+    rows = list(load_workbook(io.BytesIO(r.content), read_only=True).worksheets[1].iter_rows(values_only=True))
+    col = rows[0].index("Nome originale")
+    mine = next(x for x in rows if x[0] == rev["original_filename"].rsplit(".", 1)[0])
+    assert mine[col] == "vecchio nome.pdf"
