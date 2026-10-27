@@ -2,9 +2,9 @@
 import { DragEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, IconButton, InputAdornment,
-  LinearProgress, List, ListItem, ListItemText, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow,
-  TextField, Tooltip, Typography,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, FormControlLabel, IconButton,
+  InputAdornment, LinearProgress, List, ListItem, ListItemText, Paper, Stack, Switch, Table, TableBody, TableCell,
+  TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -16,6 +16,7 @@ import { ACTION_LABEL, CdeState, STATE_COLOR, STATE_LABEL, TransitionDialog, use
 import { FileViewer } from "../../components/FileViewer";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowProgress";
+import { choosableFields, FieldValueInput, useDocumentSettings } from "./Naming";
 
 export interface DocumentRow {
   id: string;
@@ -39,6 +40,7 @@ interface Revision {
   transition_reason: string | null;
   suitability: string;
   original_filename: string;
+  source_filename: string | null;
   comment: string | null;
   created_at: string;
   created_by_name: string;
@@ -130,8 +132,15 @@ export function DocumentsPanel({ project, container }: { project: Project; conta
 }
 
 // ---------------------------------------------------------------------
-// Upload multiplo con validazione del nome in tempo reale
+// Upload multiplo con validazione del nome in tempo reale e rinomina automatica secondo la naming
 // ---------------------------------------------------------------------
+interface Proposal {
+  name: string;
+  number: number;
+  valid: boolean;
+  errors: NameCheck["errors"];
+}
+
 interface Item {
   file: File;
   check?: NameCheck;
@@ -140,10 +149,14 @@ interface Item {
   progress: number;
   message?: string;
   controller?: AbortController;
+  /** Rinomina attiva: valori scelti e nome proposto dal server (progressivo riservato solo all'avvio). */
+  auto?: { fields: Record<string, string>; proposal?: Proposal; error?: string };
 }
 
 export function UploadDialog({ project, container, onClose }: { project: Project; container: Container; onClose: () => void }) {
   const qc = useQueryClient();
+  const { data: settings } = useDocumentSettings(project.id);
+  const autoNumber = settings?.auto_number ?? null;
   const [items, setItems] = useState<Item[]>([]);
   const [drag, setDrag] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -164,17 +177,35 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     });
   };
 
+  const propose = async (file: File, fields: Record<string, string>) => {
+    update(file, { auto: { fields } });
+    try {
+      const proposal = await api<Proposal>(`/projects/${project.id}/naming/propose`, { method: "POST", json: { filename: file.name, fields } });
+      setItems((list) => list.map((i) => (i.file === file && i.auto?.fields === fields ? { ...i, auto: { fields, proposal } } : i)));
+    } catch (e) {
+      setItems((list) => list.map((i) => (i.file === file && i.auto?.fields === fields ? { ...i, auto: { fields, error: (e as Error).message } } : i)));
+    }
+  };
+
+  const toggleAuto = (item: Item, on: boolean) => {
+    if (!on || !autoNumber) return update(item.file, { auto: undefined });
+    propose(item.file, Object.fromEntries(choosableFields(settings!.naming_scheme.fields, autoNumber).map((f) => [f.key, autoNumber.defaults[f.key] ?? ""])));
+  };
+
   const start = async (item: Item) => {
     const controller = new AbortController();
     update(item.file, { phase: "uploading", controller, progress: 0, message: undefined });
     try {
       const rev = await uploadFile({
         containerId: container.id, file: item.file, title: item.title || undefined,
-        expectedRevision: item.check?.current_revision ?? null, signal: controller.signal,
+        expectedRevision: item.auto ? null : item.check?.current_revision ?? null, signal: controller.signal,
+        autoName: item.auto?.fields,
         onProgress: (phase, f) => update(item.file, { progress: phase === "hash" ? f * 0.1 : 0.1 + f * 0.9,
                                                       message: phase === "hash" ? "Calcolo impronta SHA-256…" : "Caricamento…" }),
       });
-      update(item.file, { phase: "done", progress: 1, message: `Revisione ${rev.revision_code} creata` });
+      update(item.file, { phase: "done", progress: 1, message: item.auto
+        ? `Caricato come ${rev.original_filename} (revisione ${rev.revision_code}); nome originale nelle note`
+        : `Revisione ${rev.revision_code} creata` });
       qc.invalidateQueries({ queryKey: ["documents", project.id] });
     } catch (e) {
       if ((e as Error).name === "AbortError") return update(item.file, { phase: "ready", progress: 0, message: "Interrotto: riprenderà da dove si era fermato" });
@@ -182,7 +213,11 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     }
   };
 
-  const readyToStart = items.filter((i) => i.phase === "ready" && (i.check?.existing_document_id || i.title.trim()));
+  const idle = (i: Item) => i.phase === "check" || i.phase === "ready" || i.phase === "error";
+  const ready = (i: Item) => i.auto ? idle(i) && !!i.auto.proposal?.valid && !!i.title.trim()
+                                    : i.phase === "ready" && (!!i.check?.existing_document_id || !!i.title.trim());
+  const needsTitle = (i: Item) => idle(i) && (i.auto ? !!i.auto.proposal?.valid : i.phase === "ready" && !i.check?.existing_document_id);
+  const readyToStart = items.filter(ready);
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
@@ -195,16 +230,22 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                    textAlign: "center", cursor: "pointer", bgcolor: drag ? "action.hover" : "transparent", mb: 2 }}>
           <CloudUploadIcon color="primary" sx={{ fontSize: 40 }} />
           <Typography>Trascina qui i file o fai clic per sceglierli</Typography>
-          <Typography variant="caption" color="text.secondary">Il nome del file deve rispettare la naming convention ISO 19650 del progetto</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {autoNumber
+              ? "Nome conforme alla naming convention ISO 19650, oppure usa \"Rinomina secondo naming\": il progressivo lo assegna la piattaforma"
+              : "Il nome del file deve rispettare la naming convention ISO 19650 del progetto"}
+          </Typography>
           <input ref={input} type="file" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
         </Box>
         <Stack spacing={1.5}>
           {items.map((item) => (
             <Paper key={item.file.name + item.file.size} variant="outlined" sx={{ p: 1.5 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography fontFamily="monospace" fontSize={14} flexGrow={1} sx={{ wordBreak: "break-all" }}>{item.file.name}</Typography>
+                <Typography fontFamily="monospace" fontSize={14} flexGrow={1} sx={{ wordBreak: "break-all",
+                            textDecoration: item.auto?.proposal?.valid ? "line-through" : undefined,
+                            color: item.auto ? "text.secondary" : undefined }}>{item.file.name}</Typography>
                 <Typography variant="caption" color="text.secondary">{formatBytes(item.file.size)}</Typography>
-                {item.check?.valid && <Chip size="small" color="primary" variant="outlined"
+                {!item.auto && item.check?.valid && <Chip size="small" color="primary" variant="outlined"
                                             label={`${item.check.current_revision ?? "nuovo"} → ${item.check.next_revision}`} />}
                 {item.phase === "uploading"
                   ? <IconButton size="small" onClick={() => item.controller?.abort()}><CloseIcon fontSize="small" /></IconButton>
@@ -213,7 +254,34 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                       setItems((l) => l.filter((i) => i !== item));
                     }}><CloseIcon fontSize="small" /></IconButton>}
               </Stack>
-              {item.check && !item.check.valid && (
+              {autoNumber && idle(item) && item.phase !== "check" && (
+                <FormControlLabel sx={{ mt: 0.5 }} label="Rinomina secondo naming"
+                                  control={<Switch size="small" checked={!!item.auto} onChange={(e) => toggleAuto(item, e.target.checked)} />} />
+              )}
+              {item.auto && idle(item) && settings && autoNumber && (
+                <Stack spacing={1} mt={1}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {choosableFields(settings.naming_scheme.fields, autoNumber).map((f) => (
+                      <FieldValueInput key={f.key} field={f} value={item.auto!.fields[f.key] ?? ""}
+                                       onChange={(v) => propose(item.file, { ...item.auto!.fields, [f.key]: v })} />
+                    ))}
+                  </Stack>
+                  {item.auto.proposal && (
+                    <Typography variant="body2">
+                      Nuovo nome: <Chip size="small" color={item.auto.proposal.valid ? "success" : "default"}
+                                        label={item.auto.proposal.name} sx={{ fontFamily: "monospace" }} />
+                      <Typography component="span" variant="caption" color="text.secondary" ml={1}>
+                        progressivo assegnato all'avvio del caricamento
+                      </Typography>
+                    </Typography>
+                  )}
+                  {item.auto.proposal?.errors.map((e) => (
+                    <Alert key={e.field} severity="warning" sx={{ py: 0 }}><b>{e.label}</b>: {e.message}</Alert>
+                  ))}
+                  {item.auto.error && <Alert severity="error" sx={{ py: 0 }}>{item.auto.error}</Alert>}
+                </Stack>
+              )}
+              {!item.auto && item.check && !item.check.valid && (
                 <Stack spacing={0.5} mt={1}>
                   {item.check.errors.map((e) => (
                     <Alert key={e.field} severity="error" sx={{ py: 0 }}>
@@ -223,7 +291,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
                   ))}
                 </Stack>
               )}
-              {item.phase === "ready" && !item.check?.existing_document_id && (
+              {needsTitle(item) && (
                 <TextField size="small" fullWidth sx={{ mt: 1 }} label="Titolo (nuovo documento)" value={item.title}
                            onChange={(e) => update(item.file, { title: e.target.value })} />
               )}
@@ -349,6 +417,7 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
                     {new Date(r.created_at).toLocaleString("it-IT")} · {r.created_by_name} · {formatBytes(r.size_bytes)}
                     <br /><span style={{ fontFamily: "monospace", fontSize: 11 }}>SHA-256 {r.sha256.slice(0, 16)}…</span>
                     {r.transition_reason && <><br />Motivazione: {r.transition_reason}</>}
+                    {r.comment && <><br /><span style={{ whiteSpace: "pre-line" }}>Note: {r.comment}</span></>}
                     {r.scan_status !== "CLEAN" && r.scan_detail && <><br />{r.scan_detail}</>}
                   </>} />
               </ListItem>

@@ -7,6 +7,8 @@ import { api } from "./api";
 export interface InitiateResult {
   upload_id: string;
   identifier: string;
+  filename: string;
+  source_filename: string | null;
   part_size: number;
   part_count: number;
   current_revision: string | null;
@@ -21,6 +23,8 @@ export interface UploadOptions {
   comment?: string;
   attributes?: Record<string, unknown>;
   expectedRevision?: string | null;
+  /** Rinomina secondo la naming convention: valori dei campi scelti (progressivo assegnato dal server). */
+  autoName?: Record<string, string>;
   onProgress?: (phase: "hash" | "upload", fraction: number) => void;
   signal?: AbortSignal;
 }
@@ -105,6 +109,7 @@ export async function uploadFile(opts: UploadOptions) {
         content_type: file.type || "application/octet-stream", title: opts.title || null,
         description: opts.description || null, comment: opts.comment || null, attributes: opts.attributes ?? {},
         ...(opts.expectedRevision !== undefined ? { expected_revision: opts.expectedRevision } : {}),
+        ...(opts.autoName ? { auto_name: { fields: opts.autoName } } : {}),
       },
     });
     session = { uploadId: init.upload_id, sha256, partSize: init.part_size, partCount: init.part_count };
@@ -134,7 +139,7 @@ export async function uploadFile(opts: UploadOptions) {
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length || 1) }, worker));
 
-  const revision = await api<{ id: string; document_id: string; revision_code: string }>(
+  const revision = await api<{ id: string; document_id: string; revision_code: string; original_filename: string }>(
     `/uploads/${session.uploadId}/complete`, { method: "POST" });
   saveResume(fp, null);
   return revision;

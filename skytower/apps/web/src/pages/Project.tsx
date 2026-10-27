@@ -15,6 +15,7 @@ import { WorkflowsTab } from "./project/Workflows";
 import { MembersTab } from "./project/Members";
 import { OrganizationsTab } from "./project/Organizations";
 import { RolesTab } from "./project/Roles";
+import { NamingTab } from "./project/Naming";
 
 const TABS = [
   { path: "cartelle", label: "Cartelle" },
@@ -26,6 +27,7 @@ const TABS = [
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
+  { path: "naming", label: "Naming" },
   { path: "cruscotto", label: "Cruscotto", adminOnly: true },
   { path: "registro", label: "Registro", adminOnly: true },
 ];
@@ -78,6 +80,7 @@ export function ProjectPage() {
         <Route path="membri" element={<MembersTab project={project} canManage={isAnyAdmin} />} />
         <Route path="organizzazioni" element={<OrganizationsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="ruoli" element={<RolesTab project={project} canManage={isProjectAdmin} />} />
+        <Route path="naming" element={<NamingTab project={project} canManage={isProjectAdmin} />} />
       </Routes>
     </Stack>
   );
