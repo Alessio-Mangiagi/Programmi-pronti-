@@ -27,7 +27,8 @@ cde/
 │  └─ web/        React 18 + Vite + MUI + TanStack Query
 ├─ packages/iso19650/  naming convention, revisioni, codici di idoneità (100% coverage)
 ├─ db/migrations/ SQL versionato (yoyo): schema, RBAC, RLS, seed ruoli, documenti/revisioni
-├─ infra/terraform/envs/dev/  VPC, RDS PostgreSQL 16, S3 Object Lock, KMS, Secrets Manager
+├─ infra/terraform/  modules/cde-platform (piattaforma completa) · envs/prod · envs/staging · envs/dev
+├─ infra/load/  test di carico (utenti concorrenti, upload paralleli) · infra/smoke.py dopo i deploy
 ├─ docs/adr.md
 └─ .github/workflows/ci.yml   lint, test isolamento, Semgrep, audit dipendenze, build, terraform validate
 ```
