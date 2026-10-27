@@ -89,3 +89,26 @@ test("dialog di RFI, trasmissione, profilo ed editor della naming", async ({ pag
   found.push(...await violations(page, "editor naming"));
   expect(found).toEqual([]);
 });
+
+test("cartelle e documenti utilizzabili da sola tastiera", async ({ page, baseURL }) => {
+  const api = await apiAs(baseURL, "des.lead@des.example");
+  const { projectId, folderId } = await projectAndFolder(api, (n) => n === "DES - Progetto architettonico");
+  const tavole = await projectAndFolder(api, (n) => n === "Tavole architettoniche");
+  await loginUi(page, "des.lead@des.example");
+  await uploadPdf(page, api, projectId, tavole.folderId, "PRJ01-DES-ZZ-05-DR-A-0790.pdf", "Pianta da tastiera e2e", ["Pianta"]);
+  await page.goto(`/progetti/${projectId}/cartelle/${folderId}`);
+  const sub = page.getByRole("main").getByRole("link", { name: "Tavole architettoniche" });
+  await sub.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/cartelle\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("main").getByText("Tavole architettoniche").first()).toBeVisible();
+  const radio = page.getByRole("radio").first();
+  await radio.focus();
+  await page.keyboard.press("Space");
+  await expect(radio).toBeChecked();
+  const open = page.getByRole("button", { name: "Apri", exact: true });
+  await open.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Visualizzatore: Pianta da tastiera e2e" })).toBeVisible();
+  await page.keyboard.press("Escape");
+});
