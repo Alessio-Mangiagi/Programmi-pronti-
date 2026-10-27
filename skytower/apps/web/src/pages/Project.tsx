@@ -4,14 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Alert, Box, Breadcrumbs, Link, Stack, Tab, Tabs, Typography } from "@mui/material";
 import { api, ApiError, Project } from "../api";
 import { AreasTab } from "./project/Areas";
-import { ContainersTab } from "./project/Containers";
+import { FolderView } from "./project/Folder";
 import { MembersTab } from "./project/Members";
 import { OrganizationsTab } from "./project/Organizations";
 import { RolesTab } from "./project/Roles";
 
 const TABS = [
+  { path: "cartelle", label: "Cartelle" },
   { path: "documenti", label: "Aree CDE" },
-  { path: "container", label: "Container" },
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
@@ -45,9 +45,11 @@ export function ProjectPage() {
         </Tabs>
       </Box>
       <Routes>
-        <Route index element={<Navigate to="documenti" replace />} />
+        <Route index element={<Navigate to="cartelle" replace />} />
+        <Route path="container" element={<Navigate to="../cartelle" replace />} />
+        <Route path="cartelle" element={<FolderView project={project} />} />
+        <Route path="cartelle/:containerId" element={<FolderView project={project} />} />
         <Route path="documenti" element={<AreasTab project={project} />} />
-        <Route path="container" element={<ContainersTab project={project} />} />
         <Route path="membri" element={<MembersTab project={project} canManage={isAnyAdmin} />} />
         <Route path="organizzazioni" element={<OrganizationsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="ruoli" element={<RolesTab project={project} canManage={isProjectAdmin} />} />

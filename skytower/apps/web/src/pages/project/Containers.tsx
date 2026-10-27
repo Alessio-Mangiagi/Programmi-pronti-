@@ -84,7 +84,7 @@ export function ContainersTab({ project }: { project: Project }) {
   );
 }
 
-function ContainerDetail({ container, project, onNewFolder }: { container: Container; project: Project; onNewFolder: () => void }) {
+export function ContainerDetail({ container, project, onNewFolder }: { container: Container; project: Project; onNewFolder: () => void }) {
   const qc = useQueryClient();
   const isAdmin = container.my_actions.includes("ADMIN");
   const [sharing, setSharing] = useState(false);
@@ -133,7 +133,7 @@ function ContainerDetail({ container, project, onNewFolder }: { container: Conta
   );
 }
 
-function NewContainerDialog({ project, parent, onClose }: { project: Project; parent: Container | null; onClose: () => void }) {
+export function NewContainerDialog({ project, parent, onClose }: { project: Project; parent: Container | null; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [inherit, setInherit] = useState(true);
@@ -162,7 +162,7 @@ function NewContainerDialog({ project, parent, onClose }: { project: Project; pa
   );
 }
 
-function GrantDialog({ container, project, onClose }: { container: Container; project: Project; onClose: () => void }) {
+export function GrantDialog({ container, project, onClose }: { container: Container; project: Project; onClose: () => void }) {
   const qc = useQueryClient();
   const [type, setType] = useState<"ORGANIZATION" | "USER">("ORGANIZATION");
   const [grantee, setGrantee] = useState("");

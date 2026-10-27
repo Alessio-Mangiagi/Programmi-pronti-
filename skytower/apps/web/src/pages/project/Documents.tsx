@@ -139,7 +139,7 @@ interface Item {
   controller?: AbortController;
 }
 
-function UploadDialog({ project, container, onClose }: { project: Project; container: Container; onClose: () => void }) {
+export function UploadDialog({ project, container, onClose }: { project: Project; container: Container; onClose: () => void }) {
   const qc = useQueryClient();
   const [items, setItems] = useState<Item[]>([]);
   const [drag, setDrag] = useState(false);

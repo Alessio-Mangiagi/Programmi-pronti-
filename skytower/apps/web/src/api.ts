@@ -91,6 +91,54 @@ export interface Me {
   is_platform_admin: boolean;
   mfa: boolean;
   mfa_required: boolean;
+  phone: string | null;
+  job_title: string | null;
+  locale: "it" | "en";
+}
+
+export interface MyTask {
+  id: string;
+  status: "OPEN" | "DONE" | "CANCELLED";
+  due_at: string | null;
+  created_at: string;
+  instance_id: string;
+  step_name: string;
+  identifier: string;
+  title: string;
+  revision_code: string;
+  template_name: string;
+  project_id: string;
+  project_code: string;
+  overdue: boolean;
+}
+
+export interface Rfi {
+  id: string;
+  project_id: string;
+  number: number;
+  code: string;
+  subject: string;
+  question: string;
+  status: "OPEN" | "ANSWERED" | "CLOSED";
+  due_at: string | null;
+  created_at: string;
+  author_id: string;
+  author_name: string | null;
+  author_org_code: string | null;
+  overdue: boolean;
+  message_count: number;
+  i_am_recipient?: boolean;
+  project_code?: string;
+}
+
+export interface AppNotification {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  link: string | null;
+  created_at: string;
+  read_at: string | null;
 }
 
 export interface Project {

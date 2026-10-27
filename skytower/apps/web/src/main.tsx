@@ -10,12 +10,17 @@ import { InvitationPage, ForgotPasswordPage, ResetPasswordPage } from "./pages/A
 import { ProjectsPage } from "./pages/Projects";
 import { ProjectPage } from "./pages/Project";
 import { SecurityPage } from "./pages/Security";
+import { TasksPage } from "./pages/Tasks";
 import { Shell } from "./components/Shell";
 
 const theme = createTheme({
   palette: { primary: { main: "#1f4e79" }, secondary: { main: "#e07a1f" }, background: { default: "#f4f6f8" } },
   shape: { borderRadius: 8 },
-  components: { MuiButton: { defaultProps: { disableElevation: true } } },
+  typography: { fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif' },
+  components: {
+    MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { textTransform: "none", fontWeight: 600 } } },
+    MuiTab: { styleOverrides: { root: { textTransform: "none", fontWeight: 600 } } },
+  },
 });
 
 const queryClient = new QueryClient({
@@ -48,6 +53,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/" element={<Protected><ProjectsPage /></Protected>} />
               <Route path="/progetti/:projectId/*" element={<Protected><ProjectPage /></Protected>} />
               <Route path="/sicurezza" element={<Protected><SecurityPage /></Protected>} />
+              <Route path="/compiti" element={<Protected><TasksPage /></Protected>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
