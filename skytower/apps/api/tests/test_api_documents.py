@@ -218,6 +218,11 @@ def test_visualizzazione_in_piattaforma(client, api_world, as_user, worker):
     worker()
     assert client.get(f"/revisions/{dwg['id']}/download", headers=h, params={"disposition": "inline"}).status_code == 415
     assert client.get(f"/revisions/{dwg['id']}/download", headers=h).status_code == 200
+    # Word: anteprima convertita nel browser, servita col suo tipo (la SPA la mostra in un iframe sandbox)
+    docx = upload(client, h, w.containers["des_arch"], des_name(ext="docx"), b"PK" + os.urandom(256)).json()
+    worker()
+    r = client.get(f"/revisions/{docx['id']}/download", headers=h, params={"disposition": "inline"})
+    assert r.status_code == 200 and r.json()["content_type"].endswith("wordprocessingml.document")
     # il modello IFC lo legge il viewer 3D del browser
     ifc = upload(client, h, w.containers["des_arch"], des_name(ext="ifc"), b"ISO-10303-21;\nHEADER;\n" + os.urandom(256)).json()
     worker()

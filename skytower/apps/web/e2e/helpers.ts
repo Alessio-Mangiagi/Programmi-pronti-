@@ -36,9 +36,15 @@ export async function findDocs(api: APIRequestContext, projectId: string, q: str
 /** Carica dal dialog un PDF con nome conforme e aspetta la verifica del worker. */
 export async function uploadPdf(page: Page, api: APIRequestContext, projectId: string, folderId: string,
                                 name: string, title: string, lines: string[]): Promise<DocRow> {
+  return uploadFile(page, api, projectId, folderId, { name, mimeType: "application/pdf", buffer: textPdf(lines) }, title);
+}
+
+/** Carica dal dialog un file con nome conforme e aspetta la verifica del worker (impronta + antivirus). */
+export async function uploadFile(page: Page, api: APIRequestContext, projectId: string, folderId: string,
+                                 file: { name: string; mimeType: string; buffer: Buffer }, title: string): Promise<DocRow> {
   await page.goto(`/progetti/${projectId}/cartelle/${folderId}`);
   await page.getByRole("button", { name: "Carica" }).first().click();
-  await page.locator('input[type="file"]').setInputFiles({ name, mimeType: "application/pdf", buffer: textPdf(lines) });
+  await page.locator('input[type="file"]').setInputFiles(file);
   await page.getByLabel("Titolo (nuovo documento)").fill(title);
   await page.getByRole("button", { name: /^Carica 1$/ }).click();
   await expect(page.getByText("Revisione P01.01 creata")).toBeVisible({ timeout: 30_000 });

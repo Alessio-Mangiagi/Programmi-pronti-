@@ -1,7 +1,8 @@
 // "><(((º> sabusabu <º)))><"
 // Lettura di un documento in piattaforma su URL firmato a scadenza: PDF con PDF.js (pagine su canvas e
 // annotazioni sovrapposte) oppure nel visualizzatore del browser (ricerca, stampa); immagini con
-// annotazioni; modelli IFC in 3D con annotazioni sugli elementi; testo nel browser, modificabile: il salvataggio
+// annotazioni; modelli IFC in 3D con annotazioni sugli elementi; Word ed Excel in anteprima di sola lettura;
+// testo nel browser, modificabile: il salvataggio
 // crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +28,9 @@ import { uploadFile } from "../upload";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
 const IfcView = lazy(() => import("./markup/IfcView"));
+const OfficeView = lazy(() => import("./OfficeView"));
+const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string }
 interface Doc { id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
@@ -98,10 +102,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const isPdf = link?.content_type === "application/pdf";
   const isImage = !!link?.content_type?.startsWith("image/");
   const isIfc = link?.content_type === "application/x-step";
+  const office = link?.content_type === DOCX ? "docx" : link?.content_type === XLSX ? "xlsx" : null;
   const canDraw = (isPdf && !browserPdf) || isImage || isIfc;
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
-  const fill = (isPdf && !browserPdf) || isIfc;
+  const fill = (isPdf && !browserPdf) || isIfc || !!office;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
 
@@ -216,6 +221,10 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <IfcView url={link.url} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
+            </Suspense>
+          ) : office ? (
+            <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
+              <OfficeView url={link.url} kind={office} />
             </Suspense>
           ) : isImage ? (
             <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "100%", m: 2 }}>
