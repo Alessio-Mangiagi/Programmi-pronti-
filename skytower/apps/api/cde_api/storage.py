@@ -84,9 +84,14 @@ class Storage:
         self.client.abort_multipart_upload(Bucket=self.bucket, Key=key, UploadId=upload_id)
 
     # ------------------------------------------------------------ download
-    def presign_get(self, key: str, version_id: str | None, filename: str, ttl: int = 300) -> str:
+    def presign_get(self, key: str, version_id: str | None, filename: str, ttl: int = 300, *,
+                    inline_type: str | None = None) -> str:
+        """URL firmato per scaricare; con inline_type il browser lo mostra (visualizzatore in piattaforma)."""
+        disposition = "inline" if inline_type else "attachment"
         params = {"Bucket": self.bucket, "Key": key,
-                  "ResponseContentDisposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+                  "ResponseContentDisposition": f"{disposition}; filename*=UTF-8''{quote(filename)}"}
+        if inline_type:
+            params["ResponseContentType"] = inline_type
         if version_id:
             params["VersionId"] = version_id
         return self.client.generate_presigned_url("get_object", Params=params, ExpiresIn=ttl)

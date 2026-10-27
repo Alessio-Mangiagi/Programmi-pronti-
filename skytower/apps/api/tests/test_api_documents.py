@@ -202,6 +202,30 @@ def test_sessione_upload_di_altri_invisibile(client, api_world, as_user):
     assert client.post(f"/uploads/{up['upload_id']}/complete", headers=as_user("des_designer")).status_code == 404
 
 
+def test_visualizzazione_in_piattaforma(client, api_world, as_user, worker):
+    _, w = api_world
+    h = as_user("des_lead")
+    rev = upload(client, h, w.containers["des_arch"], des_name(), PDF, title="Da leggere").json()
+    worker()
+    r = client.get(f"/revisions/{rev['id']}/download", headers=h, params={"disposition": "inline"})
+    assert r.status_code == 200, r.text
+    assert r.json()["content_type"] == "application/pdf"
+    shown = httpx.get(r.json()["url"])
+    assert shown.content == PDF and shown.headers["content-disposition"].startswith("inline")
+    assert shown.headers["content-type"] == "application/pdf"
+    # un formato che il browser non mostra si scarica e basta
+    dwg = upload(client, h, w.containers["des_arch"], des_name(ext="dwg"), b"AC1032" + os.urandom(512)).json()
+    worker()
+    assert client.get(f"/revisions/{dwg['id']}/download", headers=h, params={"disposition": "inline"}).status_code == 415
+    assert client.get(f"/revisions/{dwg['id']}/download", headers=h).status_code == 200
+    # chi non può scaricare non può nemmeno vedere
+    assert client.get(f"/revisions/{rev['id']}/download", headers=as_user("sub1_user"),
+                      params={"disposition": "inline"}).status_code == 404
+    with psycopg.connect(api_world[0].owner) as conn:
+        assert conn.execute("SELECT count(*) FROM cde.security_events WHERE event_type = 'REVISION_VIEWED' "
+                            "AND details->>'revision' = %s", [rev["id"]]).fetchone()[0] == 1
+
+
 # ---------------------------------------------------------------------
 # Quarantena
 # ---------------------------------------------------------------------

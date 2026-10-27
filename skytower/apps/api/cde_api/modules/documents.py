@@ -486,8 +486,23 @@ def initiate_revision(document_id: uuid.UUID, body: UploadInitIn, c: Ctx = Depen
     return initiate_upload(body, c)
 
 
+# Formati che il browser mostra da sé (PDF con zoom e ricerca, immagini, testo): tipo servito → estensioni
+VIEWABLE = {
+    "application/pdf": (".pdf",), "image/png": (".png",), "image/jpeg": (".jpg", ".jpeg"), "image/webp": (".webp",),
+    "image/gif": (".gif",),
+    "text/plain; charset=utf-8": (".txt", ".csv", ".log", ".svg"),   # SVG come testo: niente script nel browser
+}
+
+
+def viewable_type(filename: str) -> str | None:
+    name = filename.lower()
+    return next((t for t, exts in VIEWABLE.items() if name.endswith(exts)), None)
+
+
 @router.get("/revisions/{revision_id}/download")
-def download_revision(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
+def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment", "inline"] = "attachment",
+                      c: Ctx = Depends(ctx)):
+    """URL firmato (5'). disposition=inline: da visualizzare in piattaforma (solo formati visualizzabili)."""
     with c.tx() as conn:
         rev = conn.execute(
             """SELECT r.id, r.original_filename, r.project_id, r.state, d.container_id, f.storage_key,
@@ -513,8 +528,12 @@ def download_revision(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
             raise ApiError(409, "scan_pending", "Verifica antivirus in corso: riprovare tra poco")
         if rev["scan_status"] != "CLEAN" or not rev["sha256_verified"]:
             raise ApiError(423, "quarantined", "File in quarantena: download non consentito")
-        security_event(conn, "REVISION_DOWNLOADED", user_id=c.user_id, project_id=rev["project_id"], ip=c.ip,
-                       revision=revision_id)
+        inline_type = viewable_type(rev["original_filename"]) if disposition == "inline" else None
+        if disposition == "inline" and inline_type is None:
+            raise ApiError(415, "not_viewable", "Formato non visualizzabile in piattaforma: scaricare il file")
+        security_event(conn, "REVISION_VIEWED" if inline_type else "REVISION_DOWNLOADED", user_id=c.user_id,
+                       project_id=rev["project_id"], ip=c.ip, revision=revision_id)
     ttl = 300
-    return {"url": _storage(c).presign_get(rev["storage_key"], rev["storage_version_id"], rev["original_filename"], ttl),
-            "expires_in": ttl, "filename": rev["original_filename"]}
+    url = _storage(c).presign_get(rev["storage_key"], rev["storage_version_id"], rev["original_filename"], ttl,
+                                  inline_type=inline_type)
+    return {"url": url, "expires_in": ttl, "filename": rev["original_filename"], "content_type": inline_type}
