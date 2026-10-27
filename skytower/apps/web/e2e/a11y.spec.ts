@@ -6,8 +6,11 @@ import { apiAs, loginUi, projectAndFolder, uploadPdf } from "./helpers";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-async function violations(page: Page, where: string): Promise<string[]> {
-  const r = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+/** Con un dialog aperto si analizza solo il dialog: la pagina dietro è oscurata e inerte. */
+async function violations(page: Page, where: string, only?: string): Promise<string[]> {
+  if (only) await page.waitForTimeout(500);            // fine della dissolvenza: a opacità parziale il contrasto è falsato
+  const builder = new AxeBuilder({ page }).withTags(WCAG);
+  const r = await (only ? builder.include(only) : builder).analyze();
   return r.violations.map((v) => `${where} ${v.id} [${v.impact}] ×${v.nodes.length}: ${v.help} — ${v.nodes[0]?.target.join(" ")}`);
 }
 
@@ -47,11 +50,42 @@ test("dialog di caricamento con rinomina e viewer PDF", async ({ page, baseURL }
   await page.getByRole("button", { name: "Carica" }).first().click();
   await page.locator('input[type="file"]').setInputFiles({ name: "nome qualsiasi.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n") });
   await expect(page.getByText(/PRJ01-COM-ZZ-00-/).first()).toBeVisible();
-  const found = await violations(page, "dialog upload");
+  const found = await violations(page, "dialog upload", '[role="dialog"]');
   await page.getByRole("button", { name: "Chiudi" }).click();
 
   await page.getByText("Verbale accessibile e2e").dblclick();
   await expect(page.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
   found.push(...await violations(page, "viewer PDF"));
+  expect(found).toEqual([]);
+});
+
+test("dialog di RFI, trasmissione, profilo ed editor della naming", async ({ page, baseURL }) => {
+  const api = await apiAs(baseURL, "com.admin@com.example");
+  const { projectId } = await projectAndFolder(api, () => true);
+  await loginUi(page, "com.admin@com.example");
+  const found: string[] = [];
+
+  await page.goto(`/progetti/${projectId}/rfi`);
+  await page.getByRole("button", { name: "Nuova RFI" }).click();
+  await page.getByRole("dialog").waitFor();
+  found.push(...await violations(page, "nuova RFI", '[role="dialog"]'));
+  await page.keyboard.press("Escape");
+
+  await page.goto(`/progetti/${projectId}/transmittal`);
+  await page.getByRole("button", { name: "Nuova trasmissione" }).click();
+  await page.getByRole("dialog").waitFor();
+  found.push(...await violations(page, "nuova trasmissione", '[role="dialog"]'));
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Il mio profilo" }).click();
+  await page.getByRole("menuitem", { name: "Modifica il mio profilo" }).click();
+  await page.getByRole("dialog").waitFor();
+  found.push(...await violations(page, "profilo", '[role="dialog"]'));
+  await page.keyboard.press("Escape");
+
+  await page.goto(`/progetti/${projectId}/naming`);
+  await page.getByRole("button", { name: "Modifica schema" }).click();
+  await page.getByLabel("Separatore").waitFor();
+  found.push(...await violations(page, "editor naming"));
   expect(found).toEqual([]);
 });
