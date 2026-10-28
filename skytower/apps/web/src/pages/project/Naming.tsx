@@ -1,17 +1,23 @@
 // "><(((º> sabusabu <º)))><"
-// Naming convention del progetto, rinomina automatica in caricamento (progressivo deciso dal Project Admin)
-// e prenotazione degli identificativi per chi carica; filigrana sui PDF (Watermark.tsx).
-import { useEffect, useState } from "react";
+// Naming convention della commessa e schemi di naming per cartelle (il Project Admin li definisce qui e li applica
+// alle cartelle scelte da un albero in un popup), rinomina automatica in caricamento (progressivo deciso dal Project
+// Admin) e prenotazione degli identificativi per chi carica; filigrana sui PDF (Watermark.tsx).
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert, Button, Checkbox, Chip, FormControlLabel, FormGroup, IconButton, MenuItem, Paper, Radio, RadioGroup, Stack,
-  Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
+  Alert, Box, Button, Checkbox, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
+  FormGroup, IconButton, MenuItem, Paper, Radio, RadioGroup, Stack, Switch, Tab, Table, TableBody, TableCell,
+  TableHead, TableRow, Tabs, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { api, ApiError, Project } from "../../api";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FolderIcon from "@mui/icons-material/Folder";
+import { api, ApiError, Container, Project } from "../../api";
+import { folderTree, useContainers } from "../../components/ProjectTree";
 import { WatermarkPanel } from "./Watermark";
 
 export interface NamingField {
@@ -35,18 +41,51 @@ export interface AutoNumbering {
   reservation_days?: number | null;
 }
 
+export type NamingScheme = { separator: string; fields: NamingField[] };
+
 export interface DocumentSettings {
-  naming_scheme: { separator: string; fields: NamingField[] };
+  naming_scheme: NamingScheme;
   metadata_schema: Record<string, unknown>;
   custom_naming: boolean;
   example: string;
   auto_number: AutoNumbering | null;
 }
 
+export interface NamingProfile {
+  id: string;
+  name: string;
+  naming_scheme: NamingScheme;
+  auto_number: AutoNumbering | null;
+  example: string;
+  container_ids: string[];
+}
+
+export interface FolderNaming {
+  naming_scheme: NamingScheme;
+  auto_number: AutoNumbering | null;
+  example: string;
+  profile: { id: string; name: string } | null;
+}
+
 export function useDocumentSettings(projectId: string) {
   return useQuery({
     queryKey: ["document-settings", projectId],
     queryFn: () => api<DocumentSettings>(`/projects/${projectId}/document-settings`),
+  });
+}
+
+/** Schema che vale per i caricamenti in una cartella: il suo, se il Project Admin gliene ha applicato uno. */
+export function useFolderNaming(containerId: string) {
+  return useQuery({
+    queryKey: ["folder-naming", containerId],
+    queryFn: () => api<FolderNaming>(`/containers/${containerId}/naming`),
+  });
+}
+
+function useNamingProfiles(projectId: string) {
+  return useQuery({
+    queryKey: ["naming-profiles", projectId],
+    queryFn: () => api<NamingProfile[]>(`/projects/${projectId}/naming-profiles`),
   });
 }
 
@@ -73,44 +112,264 @@ export function FieldValueInput({ field, value, onChange, allowEmpty }: {
   );
 }
 
-type SeriesMode = "combination" | "project" | "custom";
+/** Quello che si modifica nella scheda: lo schema della commessa o uno schema per cartelle. */
+interface NamingTarget {
+  key: string;
+  scheme: NamingScheme;
+  custom: boolean;
+  example: string;
+  auto: AutoNumbering | null;
+  profileId: string | null;
+  /** scheme: null = torna allo schema predefinito (solo commessa), undefined = invariato */
+  save: (scheme: NamingScheme | null | undefined, auto: AutoNumbering | null) => Promise<unknown>;
+}
 
 export function NamingTab({ project, canManage }: { project: Project; canManage: boolean }) {
   const qc = useQueryClient();
   const { data: settings } = useDocumentSettings(project.id);
-  const [enabled, setEnabled] = useState(false);
-  const [auto, setAuto] = useState<AutoNumbering>({ field: "number", start: 1, series: null, defaults: {} });
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [editingScheme, setEditingScheme] = useState(false);
+  const { data: profiles = [] } = useNamingProfiles(project.id);
+  const [current, setCurrent] = useState("project");
+  const [creating, setCreating] = useState(false);
+  const [picking, setPicking] = useState<NamingProfile | null>(null);
+  const profile = profiles.find((p) => p.id === current) ?? null;
+  useEffect(() => { if (current !== "project" && profiles.length && !profile) setCurrent("project"); }, [profiles, profile, current]);
 
-  useEffect(() => {
-    if (!settings) return;
-    setEnabled(!!settings.auto_number);
-    if (settings.auto_number) setAuto(settings.auto_number);
-    else {
-      const numeric = settings.naming_scheme.fields.find((f) => f.kind === "regex" && /\\d/.test(f.pattern ?? ""));
-      setAuto((a) => ({ ...a, field: numeric?.key ?? a.field }));
-    }
-  }, [settings]);
-
-  const save = useMutation({
-    mutationFn: () => api(`/projects/${project.id}/document-settings`, {
-      method: "PUT",
-      json: {
-        naming_scheme: settings!.custom_naming ? settings!.naming_scheme : null,
-        metadata_schema: settings!.metadata_schema,
-        auto_number: enabled ? { ...auto, defaults: Object.fromEntries(Object.entries(auto.defaults).filter(([, v]) => v)) } : null,
-      },
-    }),
-    onSuccess: () => { setError(null); setSaved(true); qc.invalidateQueries({ queryKey: ["document-settings", project.id] }); },
-    onError: (e: ApiError) => { setSaved(false); setError(e.message); },
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["document-settings", project.id] });
+    qc.invalidateQueries({ queryKey: ["naming-profiles", project.id] });
+    qc.invalidateQueries({ queryKey: ["folder-naming"] });
+  };
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/naming-profiles/${id}`, { method: "DELETE" }),
+    onSuccess: () => { setCurrent("project"); refresh(); qc.invalidateQueries({ queryKey: ["containers", project.id] }); },
   });
 
   if (!settings) return null;
   const canWrite = Object.values(project.my_permissions?.WRITE ?? {}).some(Boolean)
     || Object.values(project.my_permissions?.ADMIN ?? {}).some(Boolean);
-  const fields = settings.naming_scheme.fields;
+  const target: NamingTarget = profile ? {
+    key: profile.id, scheme: profile.naming_scheme, custom: true, example: profile.example, auto: profile.auto_number,
+    profileId: profile.id,
+    save: (scheme, auto) => api(`/naming-profiles/${profile.id}`, {
+      method: "PUT", json: { name: profile.name, naming_scheme: scheme ?? profile.naming_scheme, auto_number: auto } }),
+  } : {
+    key: "project", scheme: settings.naming_scheme, custom: settings.custom_naming, example: settings.example,
+    auto: settings.auto_number, profileId: null,
+    save: (scheme, auto) => api(`/projects/${project.id}/document-settings`, {
+      method: "PUT",
+      json: { naming_scheme: scheme === undefined ? (settings.custom_naming ? settings.naming_scheme : null) : scheme,
+              metadata_schema: settings.metadata_schema, auto_number: auto } }),
+  };
+
+  return (
+    <Stack spacing={2}>
+      <Paper variant="outlined" sx={{ p: 2 }} component="section" aria-label="Schemi di naming">
+        <Typography variant="subtitle1" fontWeight={600}>Schemi di naming</Typography>
+        <Typography variant="body2" color="text.secondary" mb={1}>
+          Ogni cartella usa lo schema della commessa, a meno che non le venga applicato uno schema per cartelle
+          (es. foto di cantiere, modelli BIM): crealo qui e applicalo alle cartelle che vuoi.
+        </Typography>
+        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap>
+          <Tabs value={profile ? profile.id : "project"} onChange={(_, v) => setCurrent(v)} variant="scrollable" scrollButtons="auto"
+                sx={{ flexGrow: 1, minWidth: 0 }} aria-label="Schema da modificare">
+            <Tab value="project" label="Commessa (predefinito)" />
+            {profiles.map((p) => <Tab key={p.id} value={p.id} label={`${p.name} · ${p.container_ids.length} cart.`} />)}
+          </Tabs>
+          {canManage && <Button startIcon={<AddIcon />} onClick={() => setCreating(true)}>Nuovo schema per cartelle</Button>}
+        </Stack>
+        {profile && (
+          <ProfileHeader key={profile.id} project={project} profile={profile} canManage={canManage}
+                         onApply={() => setPicking(profile)} onRenamed={refresh}
+                         onDelete={() => { if (confirm(`Eliminare lo schema «${profile.name}»? Le sue cartelle tornano allo schema della commessa.`)) remove.mutate(profile.id); }} />
+        )}
+        {!profile && profiles.length > 0 && (
+          <Typography variant="body2" mt={1}>
+            Cartelle con uno schema proprio: {profiles.reduce((n, p) => n + p.container_ids.length, 0)} — tutte le altre usano questo.
+          </Typography>
+        )}
+      </Paper>
+
+      <NamingEditor key={target.key} target={target} canManage={canManage} onSaved={refresh} />
+      {target.auto && canWrite && <ReservationsPanel key={`r-${target.key}`} project={project} scheme={target.scheme}
+                                                    auto={target.auto} profileId={target.profileId} />}
+      {!profile && <WatermarkPanel project={project} canManage={canManage} />}
+
+      {creating && <NewProfileDialog project={project} onClose={() => setCreating(false)}
+                                     onCreated={(p) => { setCreating(false); refresh(); setCurrent(p.id); setPicking(p); }} />}
+      {picking && <ApplyToFoldersDialog project={project} profile={picking} profiles={profiles} onClose={() => setPicking(null)}
+                                        onSaved={() => { setPicking(null); refresh(); qc.invalidateQueries({ queryKey: ["containers", project.id] }); }} />}
+    </Stack>
+  );
+}
+
+function ProfileHeader({ project, profile, canManage, onApply, onRenamed, onDelete }: {
+  project: Project; profile: NamingProfile; canManage: boolean; onApply: () => void; onRenamed: () => void; onDelete: () => void;
+}) {
+  const [name, setName] = useState(profile.name);
+  const { data: containers = [] } = useContainers(project.id);
+  const names = containers.filter((c) => profile.container_ids.includes(c.id)).map((c) => c.name);
+  const rename = useMutation({
+    mutationFn: () => api(`/naming-profiles/${profile.id}`, {
+      method: "PUT", json: { name, naming_scheme: profile.naming_scheme, auto_number: profile.auto_number } }),
+    onSuccess: onRenamed,
+  });
+  return (
+    <Stack spacing={1} mt={1.5}>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <TextField size="small" label="Nome dello schema" value={name} disabled={!canManage} sx={{ width: 260 }}
+                   inputProps={{ maxLength: 80 }} onChange={(e) => setName(e.target.value)} />
+        {canManage && name.trim() && name !== profile.name && (
+          <Button disabled={rename.isPending} onClick={() => rename.mutate()}>Rinomina</Button>
+        )}
+        {canManage && <Button variant="contained" startIcon={<FolderIcon />} onClick={onApply}>Applica a cartelle…</Button>}
+        {canManage && <Button color="error" startIcon={<DeleteIcon />} onClick={onDelete}>Elimina schema</Button>}
+      </Stack>
+      {rename.error && <Alert severity="error">{(rename.error as ApiError).message}</Alert>}
+      <Typography variant="body2" color="text.secondary">
+        {names.length ? <>Applicato a: {names.map((n) => <Chip key={n} size="small" icon={<FolderIcon />} label={n} sx={{ mr: 0.5, mb: 0.5 }} />)}</>
+          : "Non ancora applicato a nessuna cartella."}
+      </Typography>
+    </Stack>
+  );
+}
+
+function NewProfileDialog({ project, onClose, onCreated }: {
+  project: Project; onClose: () => void; onCreated: (p: NamingProfile) => void;
+}) {
+  const [name, setName] = useState("");
+  const create = useMutation({
+    mutationFn: () => api<NamingProfile>(`/projects/${project.id}/naming-profiles`, { method: "POST", json: { name: name.trim() } }),
+    onSuccess: onCreated,
+  });
+  return (
+    <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Nuovo schema per cartelle</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Parte come copia dello schema della commessa: poi lo modifichi e scegli a quali cartelle applicarlo.
+        </Typography>
+        <TextField autoFocus fullWidth size="small" label="Nome (es. Foto di cantiere)" value={name} inputProps={{ maxLength: 80 }}
+                   onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) create.mutate(); }} />
+        {create.error && <Alert severity="error" sx={{ mt: 2 }}>{(create.error as ApiError).message}</Alert>}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Annulla</Button>
+        <Button variant="contained" disabled={!name.trim() || create.isPending} onClick={() => create.mutate()}>Crea</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Popup con l'albero delle cartelle: lo schema vale esattamente per quelle spuntate
+// ---------------------------------------------------------------------
+function ApplyToFoldersDialog({ project, profile, profiles, onClose, onSaved }: {
+  project: Project; profile: NamingProfile; profiles: NamingProfile[]; onClose: () => void; onSaved: () => void;
+}) {
+  const { data: containers } = useContainers(project.id);
+  const tree = useMemo(() => folderTree(containers ?? []), [containers]);
+  const [checked, setChecked] = useState<Set<string>>(new Set(profile.container_ids));
+  const [withChildren, setWithChildren] = useState(true);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  useEffect(() => {                                  // aperte le cartelle che portano a quelle già spuntate
+    if (!containers) return;
+    const byId = new Map(containers.map((c) => [c.id, c]));
+    const o = new Set<string>();
+    for (const id of profile.container_ids) for (let c = byId.get(id); c?.parent_id; c = byId.get(c.parent_id)) o.add(c.parent_id);
+    setOpen(o);
+  }, [containers, profile.container_ids]);
+  const other = new Map(profiles.filter((p) => p.id !== profile.id).flatMap((p) => p.container_ids.map((id) => [id, p.name] as const)));
+
+  const descendants = (id: string): string[] => (tree.get(id) ?? []).flatMap((c) => [c.id, ...descendants(c.id)]);
+  const toggle = (c: Container, on: boolean) => setChecked((cur) => {
+    const next = new Set(cur);
+    for (const id of [c.id, ...(withChildren ? descendants(c.id) : [])]) { if (on) next.add(id); else next.delete(id); }
+    return next;
+  });
+  const save = useMutation({
+    mutationFn: () => api(`/naming-profiles/${profile.id}/containers`, { method: "PUT", json: { container_ids: [...checked] } }),
+    onSuccess: onSaved,
+  });
+  const moved = [...checked].filter((id) => other.has(id)).length;
+
+  const render = (parent: string | null, depth: number): JSX.Element[] => (tree.get(parent) ?? []).map((c) => {
+    const kids = tree.get(c.id) ?? [];
+    const isOpen = open.has(c.id);
+    return (
+      <Box key={c.id}>
+        <Stack direction="row" alignItems="center" pl={depth * 2.5} minHeight={34}>
+          <IconButton size="small" aria-label={isOpen ? `Chiudi ${c.name}` : `Apri ${c.name}`} sx={{ visibility: kids.length ? "visible" : "hidden" }}
+                      onClick={() => setOpen((o) => { const n = new Set(o); if (isOpen) n.delete(c.id); else n.add(c.id); return n; })}>
+            {isOpen ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+          </IconButton>
+          <FormControlLabel sx={{ mr: 1 }}
+                            control={<Checkbox size="small" checked={checked.has(c.id)} onChange={(e) => toggle(c, e.target.checked)}
+                                               indeterminate={!checked.has(c.id) && descendants(c.id).some((id) => checked.has(id))} />}
+                            label={<Stack direction="row" alignItems="center" spacing={0.75}>
+                              <FolderIcon fontSize="small" sx={{ color: c.is_private ? "#9b7ccc" : "#d9a93c" }} />
+                              <Typography variant="body2">{c.name}</Typography>
+                            </Stack>} />
+          {other.has(c.id) && (
+            <Chip size="small" variant="outlined" label={checked.has(c.id) ? `ora «${other.get(c.id)}»: passa a questo` : `schema «${other.get(c.id)}»`}
+                  color={checked.has(c.id) ? "warning" : "default"} />
+          )}
+        </Stack>
+        {kids.length > 0 && <Collapse in={isOpen} unmountOnExit>{render(c.id, depth + 1)}</Collapse>}
+      </Box>
+    );
+  });
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Applica «{profile.name}» alle cartelle</DialogTitle>
+      <DialogContent dividers sx={{ minHeight: 320 }}>
+        <Typography variant="body2" color="text.secondary" mb={1}>
+          Spunta le cartelle che devono usare questo schema; quelle non spuntate usano lo schema della commessa (o un altro
+          schema per cartelle, se ne hanno uno). I documenti già caricati tengono il loro identificativo.
+        </Typography>
+        <FormControlLabel label="Spuntando una cartella, spunta anche le sottocartelle"
+                          control={<Switch size="small" checked={withChildren} onChange={(e) => setWithChildren(e.target.checked)} />} />
+        <Box role="tree" aria-label="Cartelle della commessa" mt={1}>
+          {containers === undefined ? <Typography variant="body2">Caricamento…</Typography>
+            : containers.length === 0 ? <Typography variant="body2">Nessuna cartella.</Typography> : render(null, 0)}
+        </Box>
+        {save.error && <Alert severity="error" sx={{ mt: 2 }}>{(save.error as ApiError).message}</Alert>}
+      </DialogContent>
+      <DialogActions>
+        <Typography variant="body2" color="text.secondary" mr="auto" ml={2}>
+          {checked.size} cartell{checked.size === 1 ? "a" : "e"}{moved ? ` · ${moved} cambiano schema` : ""}
+        </Typography>
+        <Button onClick={onClose}>Annulla</Button>
+        <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>Applica</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Schema e rinomina automatica dello schema selezionato
+// ---------------------------------------------------------------------
+type SeriesMode = "combination" | "project" | "custom";
+
+function NamingEditor({ target, canManage, onSaved }: { target: NamingTarget; canManage: boolean; onSaved: () => void }) {
+  const [enabled, setEnabled] = useState(!!target.auto);
+  const [auto, setAuto] = useState<AutoNumbering>(() => {
+    if (target.auto) return target.auto;
+    const numeric = target.scheme.fields.find((f) => f.kind === "regex" && /\\d/.test(f.pattern ?? ""));
+    return { field: numeric?.key ?? "number", start: 1, series: null, defaults: {} };
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [editingScheme, setEditingScheme] = useState(false);
+
+  const save = useMutation({
+    mutationFn: () => target.save(undefined,
+      enabled ? { ...auto, defaults: Object.fromEntries(Object.entries(auto.defaults).filter(([, v]) => v)) } : null),
+    onSuccess: () => { setError(null); setSaved(true); onSaved(); },
+    onError: (e: ApiError) => { setSaved(false); setError(e.message); },
+  });
+
+  const fields = target.scheme.fields;
   const numericFields = fields.filter((f) => f.kind === "regex");
   const others = fields.filter((f) => f.key !== auto.field);
   const mode: SeriesMode = auto.series === null ? "combination" : auto.series.length === 0 ? "project" : "custom";
@@ -118,21 +377,25 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
   const sample = fields.map((f) => f.kind === "fixed" ? f.value
     : f.key === auto.field ? String(Math.max(auto.start, 1)).padStart(numberField?.min_length ?? 4, "0")
     : f.key === "originator" ? "‹organizzazione›"
-    : auto.defaults[f.key] || `‹${f.label.toLowerCase()}›`).join(settings.naming_scheme.separator);
+    : auto.defaults[f.key] || `‹${f.label.toLowerCase()}›`).join(target.scheme.separator);
 
   return (
-    <Stack spacing={2}>
+    <>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle1" fontWeight={600}>Naming convention ISO 19650</Typography>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {target.profileId ? "Naming convention dello schema" : "Naming convention ISO 19650"}
+          </Typography>
           {canManage && !editingScheme && <Button onClick={() => setEditingScheme(true)}>Modifica schema</Button>}
         </Stack>
         <Typography variant="body2" color="text.secondary" mb={1}>
-          {settings.custom_naming ? "Schema personalizzato del progetto" : "Schema predefinito (UK NA)"} · esempio{" "}
-          <Chip size="small" label={settings.example} sx={{ fontFamily: "monospace" }} />
+          {target.profileId ? "Vale per le cartelle a cui è applicato" : target.custom ? "Schema personalizzato del progetto" : "Schema predefinito (UK NA)"}
+          {" "}· esempio <Chip size="small" label={target.example} sx={{ fontFamily: "monospace" }} />
         </Typography>
         {editingScheme
-          ? <SchemeEditor project={project} settings={settings} onDone={() => setEditingScheme(false)} />
+          ? <SchemeEditor scheme={target.scheme} canReset={!target.profileId && target.custom}
+                          onSave={async (scheme) => { await target.save(scheme, target.auto); onSaved(); setEditingScheme(false); }}
+                          onCancel={() => setEditingScheme(false)} />
           : <Table size="small">
           <TableHead><TableRow><TableCell>Campo</TableCell><TableCell>Tipo</TableCell><TableCell>Valori</TableCell></TableRow></TableHead>
           <TableBody>
@@ -224,9 +487,7 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
           </Stack>
         )}
       </Paper>
-      {settings.auto_number && canWrite && <ReservationsPanel project={project} settings={settings} />}
-      <WatermarkPanel project={project} canManage={canManage} />
-    </Stack>
+    </>
   );
 }
 
@@ -244,21 +505,15 @@ function blankField(n: number): NamingField {
            value: null, codes: { XX: "Da definire" }, pattern: null, example: null, help: null };
 }
 
-function SchemeEditor({ project, settings, onDone }: { project: Project; settings: DocumentSettings; onDone: () => void }) {
-  const qc = useQueryClient();
-  const [separator, setSeparator] = useState(settings.naming_scheme.separator);
-  const [fields, setFields] = useState<NamingField[]>(settings.naming_scheme.fields.map((f) => ({ ...f })));
-  const [codesText, setCodesText] = useState<string[]>(settings.naming_scheme.fields.map((f) => codesToText(f.codes)));
+function SchemeEditor({ scheme, canReset, onSave, onCancel }: {
+  scheme: NamingScheme; canReset: boolean; onSave: (scheme: NamingScheme | null) => Promise<void>; onCancel: () => void;
+}) {
+  const [separator, setSeparator] = useState(scheme.separator);
+  const [fields, setFields] = useState<NamingField[]>(scheme.fields.map((f) => ({ ...f })));
+  const [codesText, setCodesText] = useState<string[]>(scheme.fields.map((f) => codesToText(f.codes)));
   const [error, setError] = useState<string | null>(null);
 
-  const put = useMutation({
-    mutationFn: (scheme: DocumentSettings["naming_scheme"] | null) => api(`/projects/${project.id}/document-settings`, {
-      method: "PUT",
-      json: { naming_scheme: scheme, metadata_schema: settings.metadata_schema, auto_number: settings.auto_number },
-    }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["document-settings", project.id] }); onDone(); },
-    onError: (e: ApiError) => setError(e.message),
-  });
+  const put = useMutation({ mutationFn: onSave, onError: (e: ApiError) => setError(e.message) });
 
   const set = (i: number, patch: Partial<NamingField>) => setFields((l) => l.map((f, k) => (k === i ? { ...f, ...patch } : f)));
   const move = (i: number, d: -1 | 1) => {
@@ -268,7 +523,7 @@ function SchemeEditor({ project, settings, onDone }: { project: Project; setting
   const remove = (i: number) => { setFields((l) => l.filter((_, k) => k !== i)); setCodesText((l) => l.filter((_, k) => k !== i)); };
   const add = () => { const f = blankField(fields.length); setFields((l) => [...l, f]); setCodesText((l) => [...l, codesToText(f.codes)]); };
 
-  const draft = () => ({
+  const draft = (): NamingScheme => ({
     separator,
     fields: fields.map((f, i) => ({
       ...f,
@@ -334,8 +589,8 @@ function SchemeEditor({ project, settings, onDone }: { project: Project; setting
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
       <Stack direction="row" spacing={1} justifyContent="flex-end">
-        {settings.custom_naming && <Button color="warning" disabled={put.isPending} onClick={() => put.mutate(null)}>Ripristina schema predefinito</Button>}
-        <Button onClick={onDone}>Annulla</Button>
+        {canReset && <Button color="warning" disabled={put.isPending} onClick={() => put.mutate(null)}>Ripristina schema predefinito</Button>}
+        <Button onClick={onCancel}>Annulla</Button>
         <Button variant="contained" disabled={put.isPending} onClick={() => { setError(null); put.mutate(draft()); }}>Salva schema</Button>
       </Stack>
     </Stack>
@@ -356,10 +611,11 @@ interface Reservation {
   reserved_by_name: string;
 }
 
-function ReservationsPanel({ project, settings }: { project: Project; settings: DocumentSettings }) {
+function ReservationsPanel({ project, scheme, auto, profileId }: {
+  project: Project; scheme: NamingScheme; auto: AutoNumbering; profileId: string | null;
+}) {
   const qc = useQueryClient();
-  const auto = settings.auto_number!;
-  const fieldsList = choosableFields(settings.naming_scheme.fields, auto);
+  const fieldsList = choosableFields(scheme.fields, auto);
   const [fields, setFields] = useState<Record<string, string>>(
     Object.fromEntries(fieldsList.map((f) => [f.key, auto.defaults[f.key] ?? ""])));
   const [count, setCount] = useState(5);
@@ -373,7 +629,7 @@ function ReservationsPanel({ project, settings }: { project: Project; settings: 
   const refresh = () => qc.invalidateQueries({ queryKey: ["naming-reservations", project.id] });
   const reserve = useMutation({
     mutationFn: () => api<Reservation[]>(`/projects/${project.id}/naming/reservations`, {
-      method: "POST", json: { fields, count, note: note || null } }),
+      method: "POST", json: { fields, count, note: note || null, profile_id: profileId } }),
     onSuccess: () => { setNote(""); refresh(); },
   });
   const release = useMutation({
@@ -388,8 +644,8 @@ function ReservationsPanel({ project, settings }: { project: Project; settings: 
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="subtitle1" fontWeight={600}>Prenota numeri</Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
-        Per un elenco elaborati da produrre: prenota gli identificativi in anticipo. Restano riservati alla tua
-        organizzazione finché un caricamento con quel nome non li usa
+        Per un elenco elaborati da produrre: prenota gli identificativi in anticipo{profileId ? ", con questo schema" : ""}. Restano
+        riservati alla tua organizzazione finché un caricamento con quel nome non li usa
         {auto.reservation_days ? ` (al massimo ${auto.reservation_days} giorni, poi vengono rilasciati in automatico)` : ""}.
         Un numero rilasciato non torna disponibile.
       </Typography>

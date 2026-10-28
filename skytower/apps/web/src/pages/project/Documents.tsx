@@ -18,7 +18,7 @@ import { ACTION_LABEL, CdeState, STATE_COLOR, STATE_LABEL, TransitionDialog, use
 import { openDocument } from "../../openDocument";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowProgress";
-import { choosableFields, FieldValueInput, useDocumentSettings } from "./Naming";
+import { choosableFields, FieldValueInput, useFolderNaming } from "./Naming";
 
 export interface DocumentRow {
   id: string;
@@ -160,7 +160,7 @@ interface Item {
 
 export function UploadDialog({ project, container, onClose }: { project: Project; container: Container; onClose: () => void }) {
   const qc = useQueryClient();
-  const { data: settings } = useDocumentSettings(project.id);
+  const { data: settings } = useFolderNaming(container.id);     // lo schema della cartella, o quello della commessa
   const autoNumber = settings?.auto_number ?? null;
   const [items, setItems] = useState<Item[]>([]);
   const [drag, setDrag] = useState(false);
@@ -173,7 +173,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     const added = [...files].filter((f) => !items.some((i) => i.file.name === f.name && i.file.size === f.size));
     setItems((list) => [...list, ...added.map((file) => ({ file, title: "", phase: "check" as const, progress: 0 }))]);
     added.forEach(async (file) => {
-      const check: NameCheck = await api<NameCheck>(`/projects/${project.id}/naming/validate`, { method: "POST", json: { name: file.name } })
+      const check: NameCheck = await api<NameCheck>(`/projects/${project.id}/naming/validate`, { method: "POST", json: { name: file.name, container_id: container.id } })
         .catch((e: ApiError) => ({ valid: false, identifier: null, errors: [{ field: "_", label: "Errore", value: null, message: e.message, suggestions: [] }] }));
       let message: string | undefined;
       if (check.valid && check.existing_container_id && check.existing_container_id !== container.id)
@@ -202,7 +202,7 @@ export function UploadDialog({ project, container, onClose }: { project: Project
       const current = (i: Item, k: number) => k >= 0 && i.auto?.fields === batch[k].auto!.fields;
       try {
         const res = await api<Proposal[]>(`/projects/${project.id}/naming/propose-batch`, {
-          method: "POST", json: { items: batch.map((i) => ({ filename: i.file.name, fields: i.auto!.fields })) } });
+          method: "POST", json: { container_id: container.id, items: batch.map((i) => ({ filename: i.file.name, fields: i.auto!.fields })) } });
         setItems((list) => list.map((i) => {
           const k = batch.findIndex((b) => b.file === i.file);
           return current(i, k) ? { ...i, auto: { fields: i.auto!.fields, proposal: res[k] } } : i;
@@ -262,6 +262,12 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Carica documenti in "{container.name}"</DialogTitle>
       <DialogContent>
+        {settings && (
+          <Typography variant="body2" color="text.secondary" mb={1.5}>
+            Naming {settings.profile ? <>della cartella: <b>{settings.profile.name}</b></> : "della commessa"} · esempio{" "}
+            <Chip size="small" label={settings.example} sx={{ fontFamily: "monospace" }} />
+          </Typography>
+        )}
         <Box onDragOver={(e: DragEvent) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
              onDrop={(e: DragEvent) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
              onClick={() => input.current?.click()}
