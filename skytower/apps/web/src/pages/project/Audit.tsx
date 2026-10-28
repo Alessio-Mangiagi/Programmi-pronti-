@@ -38,7 +38,12 @@ const EVENT_LABEL: Record<string, string> = {
   CONTAINER_UPDATED: "Cartella modificata", MEMBER_ADDED: "Membro aggiunto", MEMBER_REMOVED: "Membro rimosso",
   ROLE_CREATED: "Ruolo creato", ROLE_UPDATED: "Ruolo modificato", ROLE_DELETED: "Ruolo eliminato",
   ACCESS_REQUESTED: "Richiesta di accesso", ACCESS_GRANTED: "Accesso concesso", ACCESS_REJECTED: "Accesso negato",
-  AUDIT_EXPORTED: "Registro esportato", PROJECT_UPDATED: "Commessa modificata",
+  AUDIT_EXPORTED: "Registro esportato", PROJECT_UPDATED: "Commessa modificata", PROJECT_CREATED: "Commessa creata",
+  PROJECT_ORGANIZATION_ADDED: "Organizzazione aggiunta", PROJECT_ORGANIZATION_UPDATED: "Organizzazione modificata",
+  PROJECT_ORGANIZATION_REMOVED: "Organizzazione rimossa", REVISION_VIEWED: "Visualizzazione", FILE_QUARANTINED: "File in quarantena",
+  MARKUP_CREATED: "Annotazione", MARKUP_REPLIED: "Risposta a un'annotazione", MARKUP_RESOLVED: "Annotazione risolta",
+  TRANSMITTAL_ISSUED: "Transmittal emesso", TRANSMITTAL_PRINTED: "Transmittal stampato", TRANSMITTAL_ACKNOWLEDGED: "Ricevuta transmittal",
+  REPORT_EXPORTED: "Report esportato", WATERMARK_UPDATED: "Impostazioni filigrana",
 };
 
 const toIso = (date: string, endOfDay = false) => (date ? new Date(`${date}T${endOfDay ? "23:59:59" : "00:00:00"}`).toISOString() : "");
