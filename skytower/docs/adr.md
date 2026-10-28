@@ -323,3 +323,26 @@ in tempo reale; una chiave FIDO2 firma solo per l'origin vero.
 
 Non è (ancora) login senza password: la passkey è il secondo fattore. Il passo successivo naturale è il
 login "passwordless" con credenziali residenti, da valutare con la policy delle organizzazioni.
+
+## ADR-25 — Single sign-on OpenID Connect per organizzazione
+
+**Contesto.** ADR-05 lasciava in backlog la federazione con l'identità aziendale (Entra ID in testa). Imprese e
+studi vogliono che chi lascia l'azienda perda l'accesso al CDE quando l'IT ne disattiva l'account.
+
+**Decisione.** OpenID Connect (non SAML), configurato da ciascuna organizzazione per i propri domini email:
+- authorization code + **PKCE S256**, `state` (salvato come hash) e `nonce` casuali **monouso**, 10', legati al
+  browser che ha iniziato con un cookie HttpOnly SameSite=Lax: un link di callback inoltrato da altri non apre
+  una sessione (login CSRF);
+  id_token verificato con la JWKS dell'IdP (firma, `iss`, `aud`, `exp`, `nonce`), discovery e chiavi in cache 1 h
+  con rilettura alla rotazione; segreto del client cifrato con la KMS, mai restituito;
+- l'email si prende da `email` (o da `preferred_username`/`upn` per Entra ID), mai se `email_verified` è falso,
+  e deve stare nei domini dell'organizzazione; **nessun account creato dall'IdP**: l'utente dev'essere già
+  invitato (al primo accesso l'invito vale come attivazione) e attivo;
+- l'esito torna alla SPA nel frammento `#sso=...` (non arriva ai server né ai log); la sessione è il solito
+  cookie di refresh impostato dalla callback;
+- MFA: se l'IdP la impone (accesso condizionale) la sessione vale come "con MFA" (amr `fed,mfa`), altrimenti
+  resta il secondo fattore del CDE; un dominio appartiene a una sola organizzazione (trigger);
+- obbligo opzionale: con `enforce` la password degli utenti dell'organizzazione non vale più (il login con
+  password prosegue verso l'IdP); il platform admin ne è escluso per non chiudersi fuori.
+
+L'e2e usa un IdP finto (`e2e/mock-idp.mjs`) che fa davvero PKCE, firma RS256 e nonce.

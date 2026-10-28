@@ -61,6 +61,12 @@ precedenti nel bucket (versioning attivo) e nuova invalidazione.
   verificato l'identità fuori banda (telefonata al numero noto, non quello indicato nella richiesta). L'azzeramento
   chiude anche le sessioni aperte e finisce nel registro (`MFA_RESET_BY_ADMIN`). Se l'admin è irraggiungibile o è
   lui ad averlo perso, interviene il platform admin dalla stessa pagina.
+- **Single sign-on con Microsoft Entra ID** (per ogni organizzazione che lo chiede): in Entra → *Registrazioni app* →
+  nuova app web, URI di reindirizzamento quello mostrato nella pagina Organizzazione
+  (`https://<dominio>/api/auth/sso/callback`); *Certificati e segreti* → nuovo segreto client. Nella pagina
+  Organizzazione: issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`, Client ID dell'app, segreto, domini
+  email; *Prova la connessione*; un accesso di prova; solo dopo, se richiesto, l'obbligo. Alla scadenza del segreto
+  in Entra va inserito il nuovo (finché non lo si fa, il single sign-on fallisce con "errore del provider").
 - **Allarmi** (SNS → `alert_emails`): 5xx, p95 > 500 ms, task non sani, worker fermo, CPU/memoria/spazio DB,
   CPU Redis, latenza di replica S3 > 15', errori nei log.
 

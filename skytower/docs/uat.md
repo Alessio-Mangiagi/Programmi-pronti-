@@ -41,6 +41,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U24 | `filigrana.spec.ts` |
 | U25 | `passkey.spec.ts` (autenticatore virtuale del browser) |
 | U26 | `organizzazione.spec.ts` |
+| U27 | `sso.spec.ts` (IdP finto) |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -76,6 +77,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U24 | BIM Manager | Scheda Naming: attiva la filigrana sui PDF condivisi e pubblicati; un progettista apre e scarica un PDF condiviso | Il visualizzatore mostra "Filigranato"; ogni pagina, anche nel file scaricato, riporta nome, email, organizzazione, data e ora, IP, documento e revisione | |
 | U25 | Tutti | Profilo → Sicurezza: aggiunge una chiave di sicurezza (YubiKey) o la passkey del telefono, poi esce e rientra | Al login, dopo la password, basta toccare la chiave; recovery code mostrati alla prima registrazione | |
 | U26 | Admin di organizzazione | Menu del profilo → "La mia organizzazione e gli utenti": invita un collega, reinvia l'invito, disattiva e riattiva un utente, nomina un secondo amministratore | Email d'invito ricevuta; l'utente disattivato non accede più; l'ultimo amministratore non si può togliere | |
+| U27 | Admin di organizzazione + IT | Registra il CDE nel tenant Entra ID (runbook §3), configura il single sign-on nella pagina Organizzazione, prova la connessione; un collega entra con "Usa l'account aziendale (SSO)" | Accesso senza password del CDE; con l'obbligo attivo la password porta al login Microsoft; un account disattivato in Entra non entra più | |
 
 ## Verbale
 
