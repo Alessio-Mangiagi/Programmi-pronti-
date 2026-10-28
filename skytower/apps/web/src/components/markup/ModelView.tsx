@@ -1,11 +1,11 @@
 // "><(((º> sabusabu <º)))><"
-// Modello IFC nel browser: geometria letta con web-ifc (WASM) e resa con three.js. Orbita, selezione di un
-// elemento con proprietà e Pset, albero spaziale per piani, sezioni orizzontale e verticale (asse X o Y, lato
-// invertibile, piano guida visibile mentre si trascina). Gli elementi annotati sono
-// colorati con il colore dell'annotazione; in modalità "Annota" un clic su un elemento lo propone per un commento.
-// Per l'elemento selezionato: misure ricavate dalla geometria, piano con il codice livello della naming convention,
-// documenti che lo citano (nome o GUID nel testo indicizzato) e tavole dello stesso piano, apribili al volo.
-// Caricato a richiesta: three.js e web-ifc non pesano sul bundle iniziale.
+// Modello 3D nel browser, reso con three.js: IFC letto con web-ifc (WASM) oppure glTF/GLB (es. esportato da Blender)
+// letto con il GLTFLoader. Orbita, selezione di un elemento con proprietà e Pset, albero spaziale per piani,
+// sezioni orizzontale e verticale (asse X o Y, lato invertibile, piano guida visibile mentre si trascina). Gli
+// elementi annotati sono colorati con il colore dell'annotazione; in modalità "Annota" un clic su un elemento lo
+// propone per un commento. Per l'elemento selezionato: misure ricavate dalla geometria, piano con il codice livello
+// della naming convention, documenti che lo citano (nome o GUID nel testo indicizzato) e tavole dello stesso piano,
+// apribili al volo. Caricato a richiesta: three.js e il lettore del formato non pesano sul bundle iniziale.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -18,13 +18,12 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { IfcAPI } from "web-ifc";
-import wasmUrl from "../../../node_modules/web-ifc/web-ifc.wasm?url";   // fuori dall'export map del pacchetto
 import { api, type Markup } from "../../api";
+import { STOREY_TYPES, type ElementProps, type ModelSource, type SpatialNode } from "./model3d";
 
-export interface PickedElement { guid: string; label: string }
+export interface PickedElement { ref: string; label: string }
+export type ModelFormat = "ifc" | "glb" | "gltf";
 
-interface SpatialNode { expressID: number; type: string; children: SpatialNode[] }
 type Axis = "x" | "z";
 interface Range { x: [number, number]; y: [number, number]; z: [number, number] }
 interface Storey { id: number; name: string; elevation: number; level: string }
@@ -34,23 +33,20 @@ interface LinkedDoc {
   match_snippet?: string | null; match_revision?: string | null;
 }
 interface ElementDocs { cited: LinkedDoc[]; same_level: LinkedDoc[]; level: string | null }
-interface Props { name: string; guid: string; type: string; psets: { name: string; props: [string, string][] }[] }
 
 const SELECT_COLOR = new THREE.Color("#1976d2");
 const OFF = 1e9;
-const TYPE_COLOR: Record<string, string> = {
-  IFCWALL: "#e6dccb", IFCWALLSTANDARDCASE: "#e6dccb", IFCSLAB: "#aeb7c0", IFCROOF: "#b5654f", IFCBEAM: "#c2a27c",
-  IFCCOLUMN: "#c2a27c", IFCMEMBER: "#c2a27c", IFCWINDOW: "#9fd0ee", IFCDOOR: "#a77b52", IFCSTAIR: "#cfc6b8",
-  IFCRAILING: "#7d8790", IFCCOVERING: "#ddd5c8", IFCFURNISHINGELEMENT: "#d8b98c",
-};
-const str = (v: unknown): string => {
-  if (v === null || v === undefined) return "";
-  if (typeof v === "object" && "value" in (v as Record<string, unknown>)) return String((v as { value: unknown }).value);
-  return String(v);
-};
+// oltre questa soglia di triangoli per geometria (modelli Blender molto dettagliati) niente spigoli: costano troppo
+const EDGES_MAX_TRIANGLES = 100_000;
 
-export interface IfcViewProps {
+async function sourceFor(format: ModelFormat): Promise<ModelSource> {
+  if (format === "ifc") return new (await import("./ifcSource")).IfcSource();
+  return new (await import("./gltfSource")).GltfSource(format === "gltf");
+}
+
+export interface ModelViewProps {
   url: string;
+  format: ModelFormat;
   projectId: string;
   documentId: string;
   /** apre un altro documento (in una nuova scheda), con il testo da evidenziare */
@@ -62,13 +58,13 @@ export interface IfcViewProps {
   onSelectMarkup: (id: string) => void;
 }
 
-export default function IfcView({ url, projectId, documentId, onOpenDocument, markups, selectedRef, drawing, onPick, onSelectMarkup }: IfcViewProps) {
+export default function ModelView({ url, format, projectId, documentId, onOpenDocument, markups, selectedRef, drawing, onPick, onSelectMarkup }: ModelViewProps) {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
   const [progress, setProgress] = useState<number | null>(0);
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<SpatialNode | null>(null);
-  const [selected, setSelected] = useState<{ id: number; props: Props | null } | null>(null);
+  const [selected, setSelected] = useState<{ id: number; props: ElementProps | null } | null>(null);
   const [storeys, setStoreys] = useState<Map<number, Storey>>(new Map());
   const measures = useMemo(() => (selected ? engine.current?.measures(selected.id) ?? null : null), [selected?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [cut, setCut] = useState<number | null>(null);
@@ -89,8 +85,8 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
     const props = await e.properties(id);
     setSelected({ id, props });
     if (fromClick && props) {
-      const markup = markups.find((m) => m.element_ref === props.guid);
-      if (drawingRef.current) onPick({ guid: props.guid, label: `${props.type} ${props.name}`.trim() });
+      const markup = markups.find((m) => m.element_ref === props.ref);
+      if (drawingRef.current) onPick({ ref: props.ref, label: `${props.type} ${props.name}`.trim() });
       else if (markup) onSelectMarkup(markup.id);
     }
   };
@@ -106,8 +102,9 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = new Uint8Array(await res.arrayBuffer());
+        const source = await sourceFor(format);
         if (!alive) return;
-        await e.load(data, (p) => alive && setProgress(p));
+        await e.load(source, data, (p) => alive && setProgress(p));
         if (!alive) return;
         setBounds(e.ranges());
         const spatial = await e.spatial();
@@ -115,7 +112,7 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
         if (spatial) setStoreys(storeyIndex(spatial, e));
         setProgress(null);
       } catch (err) {
-        console.error("viewer IFC:", err);
+        console.error("viewer 3D:", err);
         // fino a web-ifc 0.0.57 embind generava codice con eval, bloccato dalla CSP (ADR-22): ora non più, ma se
         // una versione futura lo reintroducesse l'utente riceve un messaggio chiaro invece dell'errore tecnico
         const blocked = err instanceof EvalError || /Content Security Policy|unsafe-eval/i.test((err as Error).message);
@@ -125,7 +122,7 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
       }
     })();
     return () => { alive = false; e.dispose(); engine.current = null; };
-  }, [url]);
+  }, [url, format]);
 
   // annotazioni sugli elementi: colore dell'annotazione aperta più recente
   useEffect(() => {
@@ -145,7 +142,7 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
   useEffect(() => { engine.current?.sectionV(vAxis, vCut, vFlip); }, [vAxis, vCut, vFlip]);
   useEffect(() => { engine.current?.showGuide(guide); }, [guide, cut, vAxis, vCut]);
   const vRange = bounds && vAxis ? bounds[vAxis] : null;
-  // in three.js l'asse Y del modello IFC è -Z: le quote mostrate sono quelle del file
+  // in three.js l'asse Y del modello (IFC, o Blender con Z in alto) è -Z: le quote mostrate sono quelle del file
   const vLabel = (v: number) => `${(vAxis === "z" ? -v : v).toFixed(2)} m`;
   const step = (r: [number, number]) => (r[1] - r[0]) / 200 || 0.01;
 
@@ -159,7 +156,7 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
           <LinearProgress variant="determinate" value={progress * 100} sx={{ width: 240 }} />
         </Stack>
       )}
-      {error && <Alert severity="error" sx={{ position: "absolute", top: 16, left: 16 }}>Modello non leggibile: {error}</Alert>}
+      {error && <Alert severity="error" sx={{ position: "absolute", top: 16, left: 16, maxWidth: "calc(100% - 32px)" }}>Modello non leggibile: {error}</Alert>}
       {progress === null && (
         <Paper elevation={3} sx={{ position: "absolute", top: 12, left: 12, width: 280, maxHeight: "calc(100% - 24px)",
                                     display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -210,7 +207,7 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
                 <Box flexGrow={1} minWidth={0}>
                   <Typography fontWeight={600}>{selected.props.name || "(senza nome)"}</Typography>
                   <Typography variant="caption" color="text.secondary" display="block">{selected.props.type}</Typography>
-                  <Typography variant="caption" fontFamily="monospace" color="text.secondary">{selected.props.guid}</Typography>
+                  {selected.props.guid && <Typography variant="caption" fontFamily="monospace" color="text.secondary">{selected.props.guid}</Typography>}
                 </Box>
                 <Tooltip title="Inquadra">
                   <IconButton size="small" onClick={() => engine.current?.focus(selected.id)}><CenterFocusStrongIcon fontSize="small" /></IconButton>
@@ -335,7 +332,7 @@ export function levelCode(name: string, rank: number, groundRank: number): strin
 function storeyIndex(root: SpatialNode, engine: Engine): Map<number, Storey> {
   const found: { node: SpatialNode; name: string; elevation: number }[] = [];
   const walk = (n: SpatialNode) => {
-    if (n.type.toUpperCase() === "IFCBUILDINGSTOREY") found.push({ node: n, name: engine.nameOf(n.expressID), elevation: engine.elevationOf(n.expressID) });
+    if (STOREY_TYPES.has(n.type.toUpperCase())) found.push({ node: n, name: engine.nameOf(n.expressID), elevation: engine.elevationOf(n.expressID) });
     else n.children.forEach(walk);
   };
   walk(root);
@@ -369,9 +366,11 @@ function Pset({ name, props }: { name: string; props: [string, string][] }) {
   );
 }
 
-// web-ifc restituisce i tipi con maiuscole miste (IFCPROJECT, IfcSite): si confrontano in maiuscolo
+// web-ifc restituisce i tipi con maiuscole miste (IFCPROJECT, IfcSite): si confrontano in maiuscolo.
+// Per i glTF: scena, gruppi (nodi vuoti) e gruppi con il nome di un piano.
 const SPATIAL: Record<string, string> = {
   IFCPROJECT: "Progetto", IFCSITE: "Sito", IFCBUILDING: "Edificio", IFCBUILDINGSTOREY: "Piano", IFCSPACE: "Spazio",
+  SCENE: "Scena", GROUP: "Gruppo", LEVEL: "Piano",
 };
 
 function TreeNode({ node, engine, depth, selectedId, onSelect }: {
@@ -381,17 +380,19 @@ function TreeNode({ node, engine, depth, selectedId, onSelect }: {
   const name = useMemo(() => engine?.nameOf(node.expressID) ?? "", [engine, node.expressID]);
   const kind = SPATIAL[node.type.toUpperCase()];
   const spatial = kind !== undefined;
-  const label = `${kind ?? node.type.replace(/^ifc/i, "")}${name ? ` · ${name}` : ""}`;
+  const nested = !spatial && node.children.length > 0;          // oggetto glTF con oggetti figli
+  const label = kind ? `${kind}${name ? ` · ${name}` : ""}`
+    : node.type === "MESH" ? name || "(senza nome)" : `${node.type.replace(/^ifc/i, "")}${name ? ` · ${name}` : ""}`;
   return (
     <List dense disablePadding>
       <ListItemButton selected={selectedId === node.expressID} sx={{ pl: 1 + depth * 1.5, py: 0.25 }}
-                      onClick={() => (spatial ? setOpen(!open) : onSelect(node.expressID))}>
+                      onClick={() => { if (spatial) setOpen(!open); else { onSelect(node.expressID); if (nested) setOpen(!open); } }}>
         <ListItemText primary={label} primaryTypographyProps={{ variant: "body2", noWrap: true, fontWeight: spatial ? 600 : 400 }}
                       secondary={spatial && node.children.length ? `${node.children.length} elementi` : undefined}
                       secondaryTypographyProps={{ variant: "caption" }} />
-        {spatial && node.children.length > 0 && (open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />)}
+        {node.children.length > 0 && (open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />)}
       </ListItemButton>
-      {spatial && (
+      {(spatial || nested) && (
         <Collapse in={open} unmountOnExit>
           {node.children.slice(0, 500).map((c) => (
             <TreeNode key={c.expressID} node={c} engine={engine} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
@@ -403,11 +404,10 @@ function TreeNode({ node, engine, depth, selectedId, onSelect }: {
 }
 
 // ---------------------------------------------------------------------
-// Motore: scena three.js + modello web-ifc
+// Motore: scena three.js; il file lo legge la sorgente del formato
 // ---------------------------------------------------------------------
 class Engine {
-  private ifc = new IfcAPI();
-  private model = -1;
+  private source: ModelSource | null = null;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(50, 1, 0.1, 5000);
@@ -416,12 +416,14 @@ class Engine {
   private meshes = new Map<number, THREE.Mesh[]>();
   private guids = new Map<string, number>();
   private base = new Map<THREE.Mesh, THREE.Material>();
+  private edgeCache = new Map<THREE.BufferGeometry, THREE.EdgesGeometry>();
   private highlighted: number | null = null;
   private tints = new Map<string, string>();
   // piani di taglio: un piano "spento" ha la costante enorme e non taglia niente
   private clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), OFF);
   private clipV = new THREE.Plane(new THREE.Vector3(-1, 0, 0), OFF);
   private planes = [this.clip, this.clipV];
+  private edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.45, clippingPlanes: this.planes });
   private guide = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ color: 0x1976d2, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
   private frame = 0;
@@ -455,61 +457,39 @@ class Engine {
     loop();
   }
 
-  async load(data: Uint8Array, onProgress: (p: number) => void) {
-    await this.ifc.Init((path) => (path.endsWith(".wasm") ? wasmUrl : path));
-    this.model = this.ifc.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
-    const materials = new Map<string, THREE.MeshLambertMaterial>();
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.45, clippingPlanes: this.planes });
-    let last = 0;
-    this.ifc.StreamAllMeshes(this.model, (mesh, index, total) => {
-      const placed = mesh.geometries;
-      for (let i = 0; i < placed.size(); i++) {
-        const pg = placed.get(i);
-        const g = this.ifc.GetGeometry(this.model, pg.geometryExpressID);
-        const verts = this.ifc.GetVertexArray(g.GetVertexData(), g.GetVertexDataSize());
-        const index3 = this.ifc.GetIndexArray(g.GetIndexData(), g.GetIndexDataSize());
-        const geom = new THREE.BufferGeometry();
-        const inter = new THREE.InterleavedBuffer(new Float32Array(verts), 6);
-        geom.setAttribute("position", new THREE.InterleavedBufferAttribute(inter, 3, 0));
-        geom.setAttribute("normal", new THREE.InterleavedBufferAttribute(inter, 3, 3));
-        geom.setIndex(new THREE.BufferAttribute(new Uint32Array(index3), 1));
-        g.delete();
-        // senza stili nel file (grigio uniforme) si colora per tipo di elemento, per distinguerli a colpo d'occhio
-        const unstyled = pg.color.x === pg.color.y && pg.color.y === pg.color.z && pg.color.w === 1;
-        const byType = unstyled ? TYPE_COLOR[this.typeOf(mesh.expressID)] : undefined;
-        const key = byType ?? `${pg.color.x},${pg.color.y},${pg.color.z},${pg.color.w}`;
-        let mat = materials.get(key);
-        if (!mat) {
-          mat = new THREE.MeshLambertMaterial({
-            color: byType ? new THREE.Color(byType) : new THREE.Color(pg.color.x, pg.color.y, pg.color.z), side: THREE.DoubleSide,
-            polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-            transparent: pg.color.w < 1, opacity: pg.color.w, clippingPlanes: this.planes,
-          });
-          materials.set(key, mat);
-        }
-        const m = new THREE.Mesh(geom, mat);
-        m.matrixAutoUpdate = false;
-        m.matrix.fromArray(pg.flatTransformation);
-        m.userData.id = mesh.expressID;
-        this.base.set(m, mat);
-        this.root.add(m);
-        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom, 30), edgeMat);   // spigoli
-        edges.matrixAutoUpdate = false;
-        edges.matrix.copy(m.matrix);
-        edges.raycast = () => undefined;
-        this.root.add(edges);
-        const list = this.meshes.get(mesh.expressID) ?? [];
-        list.push(m);
-        this.meshes.set(mesh.expressID, list);
-      }
-      if (index - last > 50 || index === total - 1) { last = index; onProgress((index + 1) / total); }
-    });
+  async load(source: ModelSource, data: Uint8Array, onProgress: (p: number) => void) {
+    this.source = source;
+    await source.load(data, onProgress, (id, geometry, material, matrix) => this.add(id, geometry, material, matrix));
     for (const id of this.meshes.keys()) {
-      const guid = this.ifc.GetGuidFromExpressId(this.model, id);
-      if (typeof guid === "string") this.guids.set(guid, id);
+      const ref = source.refOf(id);
+      if (ref) this.guids.set(ref, id);
     }
     this.root.updateMatrixWorld(true);
     this.frameAll();
+  }
+
+  /** Una mesh dell'elemento `id`, già nella posizione finale, con gli spigoli in evidenza. */
+  private add(id: number, geometry: THREE.BufferGeometry, material: THREE.Material, matrix: THREE.Matrix4) {
+    material.clippingPlanes = this.planes;
+    const m = new THREE.Mesh(geometry, material);
+    m.matrixAutoUpdate = false;
+    m.matrix.copy(matrix);
+    m.userData.id = id;
+    this.base.set(m, material);
+    this.root.add(m);
+    const triangles = (geometry.index?.count ?? geometry.getAttribute("position").count) / 3;
+    if (triangles <= EDGES_MAX_TRIANGLES) {
+      let edgeGeom = this.edgeCache.get(geometry);       // geometria condivisa (glTF): spigoli calcolati una volta
+      if (!edgeGeom) { edgeGeom = new THREE.EdgesGeometry(geometry, 30); this.edgeCache.set(geometry, edgeGeom); }
+      const edges = new THREE.LineSegments(edgeGeom, this.edgeMat);
+      edges.matrixAutoUpdate = false;
+      edges.matrix.copy(m.matrix);
+      edges.raycast = () => undefined;
+      this.root.add(edges);
+    }
+    const list = this.meshes.get(id) ?? [];
+    list.push(m);
+    this.meshes.set(id, list);
   }
 
   private fit() {
@@ -603,17 +583,16 @@ class Engine {
 
   highlight(id: number | null) { this.highlighted = id; this.paint(); }
   tint(colors: Map<string, string>) { this.tints = colors; this.paint(); }
-  idOf(guid: string) { return this.guids.get(guid); }
+  idOf(ref: string) { return this.guids.get(ref); }
+  nameOf(id: number) { return this.source?.nameOf(id) ?? ""; }
+  elevationOf(id: number) { return this.source?.elevationOf(id) ?? 0; }
+  async properties(id: number) { return this.source ? this.source.properties(id) : null; }
+  async spatial() { return this.source ? this.source.spatial() : null; }
 
-  private typeOf(id: number): string {
-    try { return (this.ifc.GetNameFromTypeCode(this.ifc.GetLineType(this.model, id)) ?? "").toUpperCase(); } catch { return ""; }
-  }
-
-  elevationOf(id: number): number {
-    try { return Number(str(this.ifc.GetLine(this.model, id)?.Elevation)) || 0; } catch { return 0; }
-  }
-
-  /** Ingombro nel sistema locale del primo pezzo dell'elemento e volume dalla mesh chiusa (metri). */
+  /**
+   * Ingombro nel sistema locale del primo pezzo dell'elemento e volume dalla mesh chiusa (metri). La scala del
+   * pezzo (in Blender le dimensioni stanno spesso nella scala dell'oggetto) si riporta sull'ingombro.
+   */
   measures(id: number): Measures | null {
     const list = this.meshes.get(id);
     if (!list?.length) return null;
@@ -634,37 +613,14 @@ class Engine {
       }
       volume += part * m.matrix.determinant();
     }
-    const size = local.getSize(new THREE.Vector3()).toArray();
+    const scale = new THREE.Vector3().setFromMatrixScale(list[0].matrix).toArray();
+    const size = local.getSize(new THREE.Vector3()).toArray().map((s, i) => s * scale[i]);
     // l'asse locale che nella scena punta più in verticale (Y) è l'altezza; degli altri due il maggiore è la lunghezza
     const up = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]
       .map((ax) => Math.abs(ax.transformDirection(list[0].matrix).y));
     const vertical = up.indexOf(Math.max(...up));
     const [length, width] = size.filter((_, i) => i !== vertical).sort((x, y) => y - x);
     return { length, width, height: size[vertical], volume: Math.abs(volume) };
-  }
-
-  nameOf(id: number): string {
-    try { return str(this.ifc.GetLine(this.model, id)?.Name); } catch { return ""; }
-  }
-
-  async properties(id: number): Promise<Props | null> {
-    try {
-      const item = await this.ifc.properties.getItemProperties(this.model, id);
-      const psets = await this.ifc.properties.getPropertySets(this.model, id, true);
-      return {
-        name: str(item?.Name), guid: str(item?.GlobalId), type: this.ifc.GetNameFromTypeCode(item?.type) ?? "",
-        psets: (psets ?? []).map((p) => ({
-          name: str(p.Name) || "Proprietà",
-          props: ((p.HasProperties ?? p.Quantities ?? []) as Record<string, unknown>[]).map((x) => [
-            str(x.Name), str(x.NominalValue ?? x.LengthValue ?? x.AreaValue ?? x.VolumeValue ?? x.CountValue ?? x.WeightValue),
-          ] as [string, string]),
-        })).filter((p) => p.props.length),
-      };
-    } catch { return null; }
-  }
-
-  async spatial(): Promise<SpatialNode | null> {
-    try { return await this.ifc.properties.getSpatialStructure(this.model) as SpatialNode; } catch { return null; }
   }
 
   dispose() {
@@ -674,6 +630,6 @@ class Engine {
     this.root.traverse((o) => { if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose(); });
     this.renderer.dispose();
     this.renderer.domElement.remove();
-    try { if (this.model >= 0) this.ifc.CloseModel(this.model); } catch { /* già chiuso */ }
+    this.source?.dispose();
   }
 }

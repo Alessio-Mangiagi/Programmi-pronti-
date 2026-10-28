@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 // Lettura di un documento in piattaforma su URL firmato a scadenza: PDF con PDF.js (pagine su canvas e
 // annotazioni sovrapposte) oppure nel visualizzatore del browser (ricerca, stampa); immagini con
-// annotazioni; modelli IFC in 3D con annotazioni sugli elementi; Word ed Excel in anteprima di sola lettura;
+// annotazioni; modelli IFC e glTF/GLB (Blender) in 3D con annotazioni sugli elementi; Word ed Excel in anteprima di sola lettura;
 // testo nel browser, modificabile: il salvataggio
 // crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -28,7 +28,7 @@ import { uploadFile } from "../upload";
 import { openDocument } from "../openDocument";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
-const IfcView = lazy(() => import("./markup/IfcView"));
+const ModelView = lazy(() => import("./markup/ModelView"));
 const OfficeView = lazy(() => import("./OfficeView"));
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -107,13 +107,14 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
     .map((m, i) => [m.id, i + 1])), [markups]);
   const isPdf = link?.content_type === "application/pdf";
   const isImage = !!link?.content_type?.startsWith("image/");
-  const isIfc = link?.content_type === "application/x-step";
+  const model = link?.content_type === "application/x-step" ? "ifc" as const
+    : link?.content_type === "model/gltf-binary" ? "glb" as const : link?.content_type === "model/gltf+json" ? "gltf" as const : null;
   const isCsv = !!link?.filename?.toLowerCase().endsWith(".csv");
   const office = link?.content_type === DOCX ? "docx" : link?.content_type === XLSX ? "xlsx" : isCsv ? "csv" : null;
-  const canDraw = (isPdf && !browserPdf) || isImage || isIfc;
+  const canDraw = (isPdf && !browserPdf) || isImage || !!model;
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
-  const fill = (isPdf && !browserPdf) || isIfc || !!office;
+  const fill = (isPdf && !browserPdf) || !!model || !!office;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
 
@@ -215,6 +216,12 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
           {notViewable && (
             <Stack alignItems="center" spacing={2} p={3} bgcolor="background.paper" borderRadius={2}>
               <Typography>{rev?.original_filename}: questo formato non si apre nel browser.</Typography>
+              {rev?.original_filename.toLowerCase().endsWith(".blend") && (
+                <Typography variant="body2" maxWidth={520}>
+                  Per vederlo in 3D qui, da Blender: File → Esporta → glTF 2.0, formato «glTF Binary (.glb)», e carica il .glb
+                  come nuova revisione o documento collegato.
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary">Puoi comunque lasciare commenti generali nel pannello a destra.</Typography>
               <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => download.mutate()}>Scarica il file</Button>
             </Stack>
@@ -230,11 +237,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
                        onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer}
                        search={search} activeMatch={activeMatch} onMatches={setMatchCount} />
             </Suspense>
-          ) : isIfc ? (
+          ) : model ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <IfcView url={link.url} projectId={doc?.project_id ?? ""} documentId={documentId}
+              <ModelView url={link.url} format={model} projectId={doc?.project_id ?? ""} documentId={documentId}
                        onOpenDocument={(id, search) => openDocument(id, { search })} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
-                       onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
+                       onPick={(e) => { setDraft({ element_ref: e.ref, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>
           ) : office && (rev?.size_bytes ?? 0) > OFFICE_PREVIEW_MAX ? (
             <Stack alignItems="center" spacing={2} p={3} m="auto" bgcolor="background.paper" borderRadius={2}>
