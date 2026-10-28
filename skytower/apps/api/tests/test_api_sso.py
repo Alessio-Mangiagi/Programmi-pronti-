@@ -215,3 +215,15 @@ def test_link_di_callback_altrui_non_apre_sessioni(client, api_world, idp, gco_s
     r = client.get("/auth/sso/callback", params={"state": state, "code": code}, follow_redirects=False)
     assert _fragment(r) == {"sso": "error", "reason": "expired"}
     assert "cde_rt" not in r.headers.get("set-cookie", "")
+
+
+def test_issuer_verso_indirizzi_interni_rifiutato(monkeypatch):
+    """SSRF: in produzione l'API non scarica discovery o JWKS da metadati AWS, VPC o loopback."""
+    monkeypatch.setenv("CDE_ENV", "prod")
+    for url in ("http://169.254.169.254/latest/meta-data/", "http://127.0.0.1:8100/health", "https://10.0.3.7/jwks",
+                "http://[::1]/x"):
+        with pytest.raises(oidc.OidcError) as exc:
+            oidc.fetch_json(url)
+        assert exc.value.code == "idp_error", url
+    with pytest.raises(oidc.OidcError):
+        oidc.fetch_json("file:///etc/passwd")

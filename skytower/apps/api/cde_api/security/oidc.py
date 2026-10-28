@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
 import json
+import os
 import secrets
+import socket
 import time
 import urllib.error
 import urllib.parse
@@ -29,10 +32,27 @@ class OidcError(Exception):
         self.code = code
 
 
+def _public_host(url: str) -> None:
+    """SSRF: l'issuer lo sceglie l'admin di un'organizzazione, quindi fuori da dev/test niente indirizzi interni
+    (metadati AWS 169.254.x, VPC, loopback). Resta il rischio di DNS rebinding tra risoluzione e connessione."""
+    if os.environ.get("CDE_ENV", "dev") in ("dev", "test"):
+        return
+    host = urllib.parse.urlparse(url).hostname or ""
+    try:
+        addrs = {ai[4][0] for ai in socket.getaddrinfo(host, None)}
+    except OSError:
+        raise OidcError("idp_unreachable", f"host {host} non risolto") from None
+    for addr in addrs:
+        ip = ipaddress.ip_address(addr.split("%")[0])
+        if not ip.is_global:
+            raise OidcError("idp_error", f"indirizzo non pubblico {ip} per {host}")
+
+
 def fetch_json(url: str, form: dict | None = None, *, basic: tuple[str, str] | None = None) -> dict:
     """GET (o POST application/x-www-form-urlencoded) di un documento JSON, timeout 10"."""
     if not url.startswith(("https://", "http://")):
         raise OidcError("idp_error", "URL non HTTP")
+    _public_host(url)
     data = urllib.parse.urlencode(form).encode() if form is not None else None
     req = urllib.request.Request(url, data=data, headers={"Accept": "application/json"})  # noqa: S310
     if basic:
