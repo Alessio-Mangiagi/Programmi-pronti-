@@ -19,7 +19,7 @@ GrantAction = Literal["READ", "WRITE", "DOWNLOAD", "APPROVE"]
 
 CONTAINER_SQL = """
     SELECT c.id, c.project_id, c.parent_id, c.owner_organization_id, o.code AS owner_organization_code,
-           c.name, c.inherit_permissions, c.is_private, c.created_by, c.created_at, c.updated_at,
+           c.name, c.inherit_permissions, c.is_private, c.naming_profile_id, c.created_by, c.created_at, c.updated_at,
            cde.my_container_actions(c.id)::text[] AS my_actions
     FROM cde.containers c
     JOIN cde.organizations o ON o.id = c.owner_organization_id"""

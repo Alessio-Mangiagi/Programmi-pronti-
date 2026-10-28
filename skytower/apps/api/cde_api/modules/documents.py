@@ -73,6 +73,7 @@ class WatermarkIn(BaseModel):
 
 class NameCheckIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    container_id: uuid.UUID | None = None      # cartella di destinazione: vale il suo schema di naming
 
 
 class AutoNameIn(BaseModel):
@@ -82,6 +83,7 @@ class AutoNameIn(BaseModel):
 
 class NameProposalIn(AutoNameIn):
     filename: str = Field(min_length=1, max_length=255)
+    container_id: uuid.UUID | None = None
 
 
 class UploadInitIn(BaseModel):
@@ -160,20 +162,42 @@ def _extension(filename: str) -> str | None:
     return m.group(1).lower() if m else None
 
 
+def load_naming(conn, project: dict, *, container_id: uuid.UUID | None = None,
+                profile_id: uuid.UUID | None = None) -> tuple[NamingScheme, AutoNumbering | None, dict | None]:
+    """(schema, rinomina automatica, schema per cartelle {id, name} o None) che valgono per una cartella o per uno
+    schema per cartelle indicato; altrimenti quelli della commessa."""
+    if profile_id is None and container_id is not None:
+        row = conn.execute("SELECT naming_profile_id FROM cde.containers WHERE id = %s AND project_id = %s",
+                           [container_id, project["id"]]).fetchone()
+        profile_id = row["naming_profile_id"] if row else None
+    if profile_id is not None:
+        prof = conn.execute("SELECT id, name, naming_scheme, auto_number FROM cde.naming_profiles "
+                            "WHERE id = %s AND project_id = %s", [profile_id, project["id"]]).fetchone()
+        if prof is None:
+            raise not_found("Schema di naming")
+        auto = AutoNumbering.model_validate(prof["auto_number"]) if prof["auto_number"] else None
+        return NamingScheme.model_validate(prof["naming_scheme"]), auto, {"id": prof["id"], "name": prof["name"]}
+    scheme, _, _ = load_settings(conn, project)
+    return scheme, load_auto_number(conn, project["id"]), None
+
+
 def auto_name(conn, project: dict, filename: str, chosen: dict[str, str], *, reserve: bool,
-              previewed: dict[str, int] | None = None) -> tuple[str, int]:
+              previewed: dict[str, int] | None = None, container_id: uuid.UUID | None = None,
+              profile_id: uuid.UUID | None = None) -> tuple[str, int]:
     """Nome conforme per un file caricato con un nome qualsiasi: valori scelti, poi predefiniti dell'admin,
     originatore = organizzazione di chi carica, progressivo della serie (riservato solo se reserve).
+    Schema e progressivo sono quelli della cartella di destinazione (o dello schema per cartelle indicato).
     ``previewed`` (anteprima di più file insieme): quanti numeri della stessa serie sono già stati proposti."""
-    scheme, _, _ = load_settings(conn, project)
-    auto = load_auto_number(conn, project["id"])
+    scheme, auto, profile = load_naming(conn, project, container_id=container_id, profile_id=profile_id)
     if auto is None:
         raise ApiError(409, "auto_number_off", "Rinomina automatica non attiva: va configurata dal Project Admin")
     values = {**auto.defaults, **{k: v.strip().upper() for k, v in chosen.items() if v and v.strip()}}
     if any(f.key == "originator" for f in scheme.fields):
         values["originator"] = _my_org_code(conn)
     values.pop(auto.field, None)
-    fn = "cde.reserve_document_number" if reserve else "cde.peek_document_number"
+    if profile:     # schema per cartelle: i campi fissi ("FT" foto, "RL" rilievi) distinguono la serie
+        values.update({f.key: f.value for f in scheme.fields if f.kind == "fixed" and f.value})
+    fn ="cde.reserve_document_number" if reserve else "cde.peek_document_number"
     series = scheme.series(auto, values)
     number = conn.execute(f"SELECT {fn}(%s, %s, %s, %s) AS n",
                           [project["id"], auto.field, Jsonb(series), auto.start]).fetchone()["n"]
@@ -199,10 +223,21 @@ def _my_org_code(conn) -> str:
     return conn.execute("SELECT code FROM cde.organizations WHERE id = cde.current_app_org()").fetchone()["code"]
 
 
-def check_name(conn, project: dict, name: str) -> tuple[ValidationResult, NamingScheme]:
-    scheme, _, _ = load_settings(conn, project)
+def check_name(conn, project: dict, name: str, *, container_id: uuid.UUID | None = None,
+               profile_id: uuid.UUID | None = None) -> tuple[ValidationResult, NamingScheme]:
+    """Nome secondo lo schema della cartella. Un documento già presente nella cartella tiene il suo identificativo
+    anche se lo schema è cambiato dopo il primo caricamento: le nuove revisioni non si bloccano."""
+    scheme, _, _ = load_naming(conn, project, container_id=container_id, profile_id=profile_id)
     restrict = {"originator": {_my_org_code(conn)}} if any(f.key == "originator" for f in scheme.fields) else None
-    return scheme.validate_name(name, extra_codes=restrict), scheme
+    result = scheme.validate_name(name, extra_codes=restrict)
+    if not result.valid and container_id is not None:
+        stem, _, ext = name.rpartition(".") if "." in name else (name, "", "")
+        known = conn.execute("SELECT identifier, naming_fields FROM cde.documents WHERE project_id = %s "
+                             "AND container_id = %s AND identifier = %s", [project["id"], container_id, stem]).fetchone()
+        if known:
+            result = ValidationResult(name=name, valid=True, identifier=known["identifier"], extension=ext.lower() or None,
+                                      fields=known["naming_fields"] or {})
+    return result, scheme
 
 
 @router.get("/projects/{project_id}/document-settings")
@@ -246,6 +281,17 @@ def load_watermark(conn, project_id: uuid.UUID) -> WatermarkIn | None:
     return WatermarkIn.model_validate(row["watermark"]) if row and row["watermark"] else None
 
 
+@router.get("/containers/{container_id}/naming")
+def get_container_naming(container_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Schema di naming e rinomina automatica che valgono per i caricamenti in questa cartella."""
+    with c.tx() as conn:
+        container = require_container(conn, container_id)
+        project = require_project(conn, container["project_id"])
+        scheme, auto, profile = load_naming(conn, project, container_id=container_id)
+        return {"naming_scheme": scheme.model_dump(), "auto_number": auto.model_dump() if auto else None,
+                "example": scheme.example(), "profile": profile}
+
+
 @router.get("/projects/{project_id}/watermark")
 def get_watermark(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
@@ -275,7 +321,9 @@ def validate_name(project_id: uuid.UUID, body: NameCheckIn, c: Ctx = Depends(ctx
     """Validazione in tempo reale per la UI: esito per campo, suggerimenti e prossima revisione."""
     with c.tx() as conn:
         project = require_project(conn, project_id)
-        result, _ = check_name(conn, project, body.name)
+        if body.container_id:
+            require_container(conn, body.container_id)
+        result, _ = check_name(conn, project, body.name, container_id=body.container_id)
         out = result.model_dump()
         if result.valid:
             doc = conn.execute("SELECT id, container_id, archived_at FROM cde.documents "
@@ -301,8 +349,8 @@ def propose_name(project_id: uuid.UUID, body: NameProposalIn, c: Ctx = Depends(c
     (lo diventa all'avvio del caricamento, quindi può cambiare se altri caricano nel frattempo)."""
     with c.tx() as conn:
         project = require_project(conn, project_id)
-        name, number = auto_name(conn, project, body.filename, body.fields, reserve=False)
-        result, _ = check_name(conn, project, name)
+        name, number = auto_name(conn, project, body.filename, body.fields, reserve=False, container_id=body.container_id)
+        result, _ = check_name(conn, project, name, container_id=body.container_id)
         return {"name": name, "number": number, "source_filename": body.filename,
                 **result.model_dump(include={"valid", "identifier", "fields", "errors"})}
 
@@ -310,10 +358,12 @@ def propose_name(project_id: uuid.UUID, body: NameProposalIn, c: Ctx = Depends(c
 class ReservationIn(AutoNameIn):
     count: int = Field(default=1, ge=1, le=50)
     note: str | None = Field(default=None, max_length=500)
+    profile_id: uuid.UUID | None = None         # schema per cartelle (None = quello della commessa)
 
 
 class NameProposalsIn(BaseModel):
     items: list[NameProposalIn] = Field(min_length=1, max_length=100)
+    container_id: uuid.UUID | None = None
 
 
 @router.post("/projects/{project_id}/naming/propose-batch")
@@ -325,8 +375,10 @@ def propose_names(project_id: uuid.UUID, body: NameProposalsIn, c: Ctx = Depends
         previewed: dict[str, int] = {}
         out = []
         for item in body.items:
-            name, number = auto_name(conn, project, item.filename, item.fields, reserve=False, previewed=previewed)
-            result, _ = check_name(conn, project, name)
+            where = item.container_id or body.container_id
+            name, number = auto_name(conn, project, item.filename, item.fields, reserve=False, previewed=previewed,
+                                     container_id=where)
+            result, _ = check_name(conn, project, name, container_id=where)
             out.append({"name": name, "number": number, "source_filename": item.filename,
                         **result.model_dump(include={"valid", "identifier", "fields", "errors"})})
         return out
@@ -353,8 +405,8 @@ def reserve_names(project_id: uuid.UUID, body: ReservationIn, c: Ctx = Depends(c
                            "usa o rilascia quelle esistenti")
         ids = []
         for _ in range(body.count):
-            name, _ = auto_name(conn, project, "", body.fields, reserve=True)
-            result, _ = check_name(conn, project, name)
+            name, _ = auto_name(conn, project, "", body.fields, reserve=True, profile_id=body.profile_id)
+            result, _ = check_name(conn, project, name, profile_id=body.profile_id)
             if not result.valid:
                 raise ApiError(422, "invalid_name", "; ".join(f"{e.label}: {e.message}" for e in result.errors))
             ids.append(conn.execute(
@@ -442,9 +494,10 @@ def initiate_upload(body: UploadInitIn, c: Ctx = Depends(ctx)):
         project = require_project(conn, container["project_id"])
         filename, source_filename = body.filename, None
         if body.auto_name is not None:
-            filename, _ = auto_name(conn, project, body.filename, body.auto_name.fields, reserve=True)
+            filename, _ = auto_name(conn, project, body.filename, body.auto_name.fields, reserve=True,
+                                    container_id=body.container_id)
             source_filename = body.filename
-        result, _ = check_name(conn, project, filename)
+        result, _ = check_name(conn, project, filename, container_id=body.container_id)
         if not result.valid:
             raise ApiError(422, "invalid_name", "; ".join(f"{e.label}: {e.message}" for e in result.errors))
 
