@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     upload_session_ttl_hours: int = 24
     # Filigrana: i PDF passano dall'API (non dall'URL firmato di S3), quindi c'è un tetto alla dimensione
     watermark_max_bytes: int = 200 * 1024 ** 2
+    zip_max_bytes: int = 2 * 1024 ** 3      # download multiplo: oltre si scarica in più parti
     public_api_prefix: str = "/api"      # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
 
     # Registro attività: ancore giornaliere su S3 WORM e marca temporale RFC 3161 (TSA qualificata in produzione)
