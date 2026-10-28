@@ -17,6 +17,7 @@ from .modules import (
     access,
     audit,
     auth,
+    bim,
     bundles,
     containers,
     dashboard,
@@ -106,7 +107,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return svc.tokens.jwks
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
-                   rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles):
+                   rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles, bim):
         app.include_router(module.router)
     app.include_router(passkeys.login_router)
     return app
