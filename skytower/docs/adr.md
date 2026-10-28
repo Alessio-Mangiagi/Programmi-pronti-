@@ -387,3 +387,27 @@ fare da sole l'intero accesso, con meno phishing e senza password da ricordare.
 
 Nessuna nuova impostazione per organizzazione: chi ha una passkey ce l'ha già come secondo fattore, e il modo
 per vietare l'accesso fuori dall'IdP resta l'SSO obbligatorio.
+
+## ADR-28 — Dal modello BIM alle tavole: misure e documenti che citano l'elemento
+
+**Contesto.** Nel viewer IFC chi seleziona un elemento vuole sapere quanto è grande e dove compare negli
+elaborati, senza aprire a mano le tavole una per una.
+
+**Decisione.**
+- **Misure** calcolate nel browser dalla geometria già caricata: ingombro nel sistema locale dell'elemento
+  (un muro ruotato non risulta più largo), l'asse più verticale è l'altezza (lo spessore per solai e coperture),
+  degli altri due il maggiore è la lunghezza; volume dalla mesh chiusa (somma dei tetraedri con l'origine).
+  Le quantità scritte nel file (IfcElementQuantity) restano visibili accanto, come Pset.
+- **Citato in**: `GET /projects/{id}/model-element/documents` cerca nel testo indicizzato (ADR-26) il nome
+  dell'elemento o il suo GlobalId come **frase esatta** ("Muro perimetrale sud P0" non trova "... P1"),
+  esclusi il modello stesso e gli altri modelli (M2, M3, MR: il loro testo STEP ripete i nomi). Estratto
+  evidenziato; un clic apre il documento sopra il modello con il nome già cercato nel PDF.
+- **Tavole del piano**: il piano dell'elemento (albero spaziale IFC) dà il codice livello della naming
+  convention — dal nome ("Piano terra" 00, "Piano 2" 02, "Interrato" B1, "Copertura" RF) o, se il nome non
+  lo dice, dall'ordine per quota rispetto al piano più vicino a quota 0 — e si elencano le tavole (tipo DR)
+  con quel livello.
+- Visibilità: la RLS su documenti, revisioni e testo vale anche qui; nessuna tabella nuova.
+
+**Limiti.** Il collegamento è testuale: funziona se le tavole riportano nome o GUID degli elementi (legende,
+abachi, cartigli esportati dal software BIM). I PDF scansionati non hanno testo (vedi ADR-26). Un
+collegamento esplicito elemento ↔ tavola, salvato nel CDE, si potrà aggiungere se il testo non basta.

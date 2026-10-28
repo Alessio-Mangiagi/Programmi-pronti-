@@ -47,6 +47,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U30 | `segui.spec.ts` |
 | U31 | `ricerca.spec.ts` |
 | U32 | `passkey.spec.ts` |
+| U33 | `ifc.spec.ts` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -88,6 +89,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U30 | Information Manager | Nel dettaglio di un documento clicca "Segui"; il progettista carica una nuova revisione e poi la condivide | Notifica a ogni passaggio che può vedere (la WIP di un'altra organizzazione no); "Seguito" si toglie con un clic | |
 | U31 | Progettista | Aree CDE: cerca una parola che compare solo dentro un PDF o un Word, con "anche nel testo dei file" | Il documento compare con un estratto e la parola evidenziata; un collega di un'altra organizzazione non trova i tuoi WIP | |
 | U32 | Progettista | Dal profilo aggiunge la passkey del computer o del telefono; esce e nella pagina di accesso usa "Usa una passkey (senza password)" | Entra con PIN o impronta, senza email né password; il profilo indica che la chiave vale anche per l'accesso senza password | |
+| U33 | Direttore dei lavori | Nel modello BIM seleziona un muro del piano terra | Vede lunghezza, spessore, altezza e volume, il piano con il livello 00, le tavole che citano il muro (estratto evidenziato) e quelle del piano; un clic apre la tavola con il muro già cercato | |
 
 ## Verbale
 
