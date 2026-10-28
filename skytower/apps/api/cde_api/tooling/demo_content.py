@@ -14,6 +14,8 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from . import ifc_complex
+
 DEMO_PASSWORD = "Cantiere-2026!"  # noqa: S105 - utenti demo
 
 USERS = {k: f"{k.replace('_', '.')}@{d}" for k, d in {
@@ -450,6 +452,9 @@ def populate(api: str, password: str = DEMO_PASSWORD) -> dict:
     add("contr", "com_admin", "Contratti e offerte", "COM", "ZZ", "CO", "Z", "pdf", pdf, "Contratto d'appalto",
         lambda c, r, v: report_pdf(400, "Contratto d'appalto", c, r, ["Oggetto", "Importi", "Penali", "Garanzie"]),
         "WIP", "com_admin")
+    # aggiunte successive in fondo: la numerazione dei documenti già caricati non cambia (niente doppioni)
+    add("ifc_full", "des_lead", "Modelli BIM", "DES", "ZZ", "M3", "A", "ifc", ifc, "Modello completo Padiglione B",
+        lambda c, r, v: ifc_complex.build(), "SHARED", "des_admin")
 
     # annotazioni sulle tavole e sul modello
     if "pianta0" in docs:

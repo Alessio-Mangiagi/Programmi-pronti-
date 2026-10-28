@@ -7,6 +7,7 @@
   cde bootstrap-db   RDS: crea database e ruoli, DSN in Secrets Manager (CDE_DB_MASTER_USER/_PASSWORD)
   cde seed-demo      carica il dataset dimostrativo (CDE_DATABASE_URL_OWNER)
   cde utente-dev     account personale nell'ambiente dev (password da CDE_NUOVA_PWD, mai su file)
+  cde genera-ifc     modello IFC4 complesso (padiglione di sei livelli) per provare il viewer BIM
 """
 from __future__ import annotations
 
@@ -155,6 +156,17 @@ def cmd_dev_user(args) -> None:
     print(f"Account {email} pronto ({'creato' if created else 'password aggiornata'}), anche dopo i reset")
 
 
+def cmd_ifc(args) -> None:
+    from .tooling import ifc_complex
+
+    data = ifc_complex.build(padiglioni=args.padiglioni)
+    args.file.write_bytes(data)
+    elements = sum(data.count(f"={e}(".encode()) for e in ("IFCWALL", "IFCSLAB", "IFCCOLUMN", "IFCBEAM", "IFCWINDOW",
+                                                          "IFCDOOR", "IFCSTAIR", "IFCRAILING", "IFCROOF",
+                                                          "IFCFURNISHINGELEMENT"))
+    print(f"{args.file}: {len(data) / 1e6:.1f} MB, {elements} elementi, {args.padiglioni} padiglione/i")
+
+
 def cmd_demo_content(args) -> None:
     from .tooling import demo_content
 
@@ -195,6 +207,10 @@ def main(argv: list[str] | None = None) -> None:
     user.add_argument("--data-dir", type=Path, default=DEV_DIR)
     user.add_argument("--solo-verifica", action="store_true", help="controlla solo la policy della password")
     user.set_defaults(func=cmd_dev_user)
+    ifc = sub.add_parser("genera-ifc", help="modello IFC4 complesso per provare il viewer BIM")
+    ifc.add_argument("file", type=Path)
+    ifc.add_argument("--padiglioni", type=int, default=1, help="edifici affiancati (prove di carico)")
+    ifc.set_defaults(func=cmd_ifc)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")
     demo.add_argument("--password", default="Cantiere-2026!", help="password degli utenti demo")
