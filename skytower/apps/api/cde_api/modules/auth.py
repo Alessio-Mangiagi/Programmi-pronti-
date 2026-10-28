@@ -1,7 +1,7 @@
 # "><(((º> sabusabu <º)))><"
 """Autenticazione (Sprint 1, G5–G6).
 
-Login Argon2id → (eventuale) MFA TOTP/recovery code → JWT RS256 15' + refresh token opaco in cookie
+Login Argon2id → (eventuale) MFA TOTP, chiave di sicurezza (passkeys.py) o recovery code → JWT RS256 15' + refresh token opaco in cookie
 HttpOnly, ruotato a ogni uso; il riuso di un token già ruotato revoca l'intera famiglia.
 Lavora solo con il ruolo DB cde_auth.
 """
@@ -124,7 +124,7 @@ def _start_session(svc: Services, conn: psycopg.Connection, response: Response, 
     conn.execute(
         """INSERT INTO cde.refresh_tokens (user_id, family_id, token_hash, mfa_verified, expires_at, ip, user_agent)
            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-        [user["id"], family_id or uuid.uuid4(), token_hash, "otp" in amr,
+        [user["id"], family_id or uuid.uuid4(), token_hash, "otp" in amr or "hwk" in amr,
          _now() + timedelta(seconds=svc.settings.refresh_token_ttl_s), client_ip(request), _ua(request)],
     )
     _set_refresh_cookie(svc, response, token)
@@ -236,7 +236,10 @@ def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, respo
 
         if _has_verified_factor(conn, user["id"]):
             security_event(conn, "LOGIN_PASSWORD_OK", user_id=user["id"], ip=ip, next="mfa")
-            return {"status": "mfa_required", "methods": ["TOTP", "RECOVERY_CODE"],
+            methods = [r["method"] for r in conn.execute(
+                "SELECT DISTINCT method::text FROM cde.user_mfa_factors WHERE user_id = %s AND verified_at IS NOT NULL "
+                "ORDER BY 1 DESC", [user["id"]]).fetchall()]
+            return {"status": "mfa_required", "methods": [*methods, "RECOVERY_CODE"],
                     "mfa_token": svc.tokens.issue_mfa_pending(user["id"], enroll=False)}
         if user["mfa_required"]:
             security_event(conn, "LOGIN_PASSWORD_OK", user_id=user["id"], ip=ip, next="mfa_enrollment")

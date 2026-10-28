@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     recovery_codes_count: int = 10
 
     totp_issuer: str = "CDE ISO 19650"
+    # WebAuthn: RP ID = dominio della SPA (default: host di web_base_url); origin ammessi oltre a web_base_url e CORS
+    webauthn_rp_id: str | None = None
+    webauthn_origins: list[str] = []
     web_base_url: str = "http://localhost:5195"
     cors_origins: list[str] = ["http://localhost:5195"]
 
