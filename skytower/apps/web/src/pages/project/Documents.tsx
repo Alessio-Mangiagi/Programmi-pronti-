@@ -10,6 +10,8 @@ import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DownloadIcon from "@mui/icons-material/Download";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import { api, ApiError, Container, Project } from "../../api";
 import { abortUpload, uploadFile } from "../../upload";
 import { ACTION_LABEL, CdeState, STATE_COLOR, STATE_LABEL, TransitionDialog, useTransitionRules } from "./Transitions";
@@ -382,7 +384,7 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
   const { data: doc } = useQuery({
     queryKey: ["document", documentId],
     queryFn: () => api<DocumentRow & { description: string | null; revisions: Revision[]; my_actions: string[];
-                                       can_download_published: boolean; archive_reason: string | null }>(`/documents/${documentId}`),
+                                       can_download_published: boolean; archive_reason: string | null; following: boolean }>(`/documents/${documentId}`),
     enabled: !!documentId,
     refetchInterval: (query) => (query.state.data?.revisions.some((r) => r.scan_status === "PENDING") ? 3000 : false),
   });
@@ -399,6 +401,11 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
     queryKey: ["document", documentId, "workflows"],
     queryFn: () => api<WorkflowInstance[]>(`/documents/${documentId}/workflows`),
     enabled: !!documentId,
+  });
+  const qc = useQueryClient();
+  const follow = useMutation({
+    mutationFn: (on: boolean) => api(`/documents/${documentId}/follow`, { method: on ? "PUT" : "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["document", documentId] }),
   });
   const [starting, setStarting] = useState(false);
   const [viewing, setViewing] = useState(false);
@@ -422,6 +429,13 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1}>
             <Typography variant="h6" flexGrow={1}>{doc.title}</Typography>
+            <Tooltip describeChild title={doc.following ? "Ricevi una notifica a ogni nuova revisione e cambio di stato. Clic per smettere."
+                                          : "Ricevi una notifica a ogni nuova revisione e cambio di stato che puoi vedere"}>
+              <Button size="small" variant={doc.following ? "contained" : "outlined"} color={doc.following ? "secondary" : "primary"}
+                      disabled={follow.isPending} aria-pressed={doc.following}
+                      startIcon={doc.following ? <NotificationsActiveIcon /> : <NotificationsNoneIcon />}
+                      onClick={() => follow.mutate(!doc.following)}>{doc.following ? "Seguito" : "Segui"}</Button>
+            </Tooltip>
             <Button variant="contained" size="small" onClick={() => setViewing(true)}>Apri</Button>
           </Stack>
           {doc.description && <Typography variant="body2">{doc.description}</Typography>}
