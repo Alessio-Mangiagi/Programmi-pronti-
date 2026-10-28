@@ -134,7 +134,10 @@ def cmd_dev_user(args) -> None:
     try:
         validate_password(password, email, get_settings().password_min_length)
     except ApiError as exc:
-        sys.exit(exc.message)
+        sys.exit(f"Password non accettata: {exc.message}")
+    if args.solo_verifica:                       # il lanciatore controlla la password prima di avviare tutto
+        print("Password accettata")
+        return
     superuser = dbadmin.start_embedded(args.data_dir / "pg", cleanup_mode=None)
     urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=False)
     pwd_hash = PasswordHasher().hash(password)
@@ -203,6 +206,7 @@ def main(argv: list[str] | None = None) -> None:
     user.add_argument("--cognome", default="Personale")
     user.add_argument("--org", default="COM", help="codice dell'organizzazione")
     user.add_argument("--data-dir", type=Path, default=DEV_DIR)
+    user.add_argument("--solo-verifica", action="store_true", help="controlla solo la policy della password")
     user.set_defaults(func=cmd_dev_user)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")
