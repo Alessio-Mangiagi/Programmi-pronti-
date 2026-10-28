@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { apiAs, loginUi, projectAndFolder, uploadFile } from "./helpers";
+import { apiAs, loginUi, projectAndFolder, uploadFile, uploadPdf } from "./helpers";
 
 const IFC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "edificio.ifc"));
 
@@ -43,4 +43,33 @@ test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => 
   const box = (await page.locator("canvas").first().boundingBox())!;
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.getByText(/^Ifc[A-Z][A-Za-z]+$/).first()).toBeVisible({ timeout: 10_000 });
+});
+
+test("elemento del modello: misure e tavole che lo citano", async ({ page, baseURL }) => {
+  test.setTimeout(120_000);
+  const des = await apiAs(baseURL, "des.lead@des.example");
+  const { projectId, folderId } = await projectAndFolder(des, (n) => n === "Tavole architettoniche");
+  await loginUi(page, "des.lead@des.example");
+  // tavola che nella legenda cita un muro del modello (stesso nome dell'IFC)
+  await uploadPdf(page, des, projectId, folderId, "PRJ01-DES-ZZ-00-DR-A-0793.pdf", "Pianta BIM e2e",
+                  ["Pianta piano terra", "Elementi BIM rappresentati", "Muro perimetrale sud P0"]);
+  await expect.poll(async () => (await (await des.get(`/api/projects/${projectId}/documents`,
+    { params: { q: "perimetrale", content: true } })).json()).items.length, { timeout: 60_000 }).toBeGreaterThan(0);
+  await uploadFile(page, des, projectId, folderId, { name: "PRJ01-DES-ZZ-ZZ-M3-A-0794.ifc", mimeType: "application/octet-stream",
+                   buffer: IFC }, "Modello collegato e2e");
+  await page.reload();
+  await page.getByText("Modello collegato e2e").dblclick();
+  await page.getByText("Piano · Piano terra").click({ timeout: 45_000 });          // apre il piano nell'albero
+  await page.getByText("Muro perimetrale sud P0").first().click();
+
+  const misure = page.getByRole("region", { name: "Misure" });
+  await expect(misure.getByText("Lunghezza")).toBeVisible();
+  await expect(misure.getByText("Spessore")).toBeVisible();
+  await expect(misure.getByText("Volume")).toBeVisible();
+  const links = page.getByRole("region", { name: "Tavole e documenti collegati" });
+  await expect(links.getByText("livello 00").first()).toBeVisible();
+  await links.getByText("Pianta BIM e2e").first().click();
+  // la tavola si apre sopra il modello con il nome dell'elemento già cercato
+  await expect(page.getByPlaceholder("Cerca nel testo")).toHaveValue("Muro perimetrale sud P0");
+  await expect(page.getByText("1/1")).toBeVisible({ timeout: 20_000 });
 });

@@ -35,13 +35,15 @@ const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const OFFICE_PREVIEW_MAX = 25 * 1024 * 1024;
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string; size_bytes: number }
-interface Doc { id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
+interface Doc { id: string; project_id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
 interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean }
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
-export function FileViewer({ documentId, revisionId: initialRevision, taskId, onClose, onDetails }: {
+export function FileViewer({ documentId, revisionId: initialRevision, taskId, initialSearch, onClose, onDetails }: {
   documentId: string; revisionId?: string; taskId?: string; onClose: () => void; onDetails?: () => void;
+  /** testo da cercare ed evidenziare subito nel PDF (es. l'elemento del modello che la tavola cita) */
+  initialSearch?: string;
 }) {
   const { data: doc } = useQuery({
     queryKey: ["document", documentId], queryFn: () => api<Doc>(`/documents/${documentId}`),
@@ -87,7 +89,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = useState(initialSearch ?? "");
+  const [linked, setLinked] = useState<{ id: string; search: string } | null>(null);   // tavola aperta dal modello
   const [search, setSearch] = useState("");
   const [matchCount, setMatchCount] = useState(0);
   const [activeMatch, setActiveMatch] = useState(0);
@@ -228,7 +231,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
             </Suspense>
           ) : isIfc ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <IfcView url={link.url} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
+              <IfcView url={link.url} projectId={doc?.project_id ?? ""} documentId={documentId}
+                       onOpenDocument={(id, search) => setLinked({ id, search })} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>
           ) : office && (rev?.size_bytes ?? 0) > OFFICE_PREVIEW_MAX ? (
@@ -259,6 +263,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           </Box>
         )}
       </Box>
+      {linked && <FileViewer key={linked.id} documentId={linked.id} initialSearch={linked.search} onClose={() => setLinked(null)} />}
     </Dialog>
   );
 }

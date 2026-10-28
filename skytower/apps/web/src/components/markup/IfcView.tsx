@@ -2,8 +2,11 @@
 // Modello IFC nel browser: geometria letta con web-ifc (WASM) e resa con three.js. Orbita, selezione di un
 // elemento con proprietà e Pset, albero spaziale per piani, sezione orizzontale. Gli elementi annotati sono
 // colorati con il colore dell'annotazione; in modalità "Annota" un clic su un elemento lo propone per un commento.
+// Per l'elemento selezionato: misure ricavate dalla geometria, piano con il codice livello della naming convention,
+// documenti che lo citano (nome o GUID nel testo indicizzato) e tavole dello stesso piano, apribili al volo.
 // Caricato a richiesta: three.js e web-ifc non pesano sul bundle iniziale.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Alert, Box, CircularProgress, Collapse, Divider, IconButton, LinearProgress, List, ListItemButton, ListItemText,
   Paper, Slider, Stack, Tooltip, Typography,
@@ -15,11 +18,18 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { IfcAPI } from "web-ifc";
 import wasmUrl from "../../../node_modules/web-ifc/web-ifc.wasm?url";   // fuori dall'export map del pacchetto
-import type { Markup } from "../../api";
+import { api, type Markup } from "../../api";
 
 export interface PickedElement { guid: string; label: string }
 
 interface SpatialNode { expressID: number; type: string; children: SpatialNode[] }
+interface Storey { id: number; name: string; elevation: number; level: string }
+interface Measures { length: number; width: number; height: number; volume: number }
+interface LinkedDoc {
+  id: string; identifier: string; title: string; current_revision: string | null; current_state: string | null;
+  match_snippet?: string | null; match_revision?: string | null;
+}
+interface ElementDocs { cited: LinkedDoc[]; same_level: LinkedDoc[]; level: string | null }
 interface Props { name: string; guid: string; type: string; psets: { name: string; props: [string, string][] }[] }
 
 const SELECT_COLOR = new THREE.Color("#1976d2");
@@ -36,6 +46,10 @@ const str = (v: unknown): string => {
 
 export interface IfcViewProps {
   url: string;
+  projectId: string;
+  documentId: string;
+  /** apre un altro documento sopra il modello, con il testo da evidenziare */
+  onOpenDocument: (documentId: string, search: string) => void;
   markups: Markup[];
   selectedRef: string | null;
   drawing: boolean;
@@ -43,13 +57,15 @@ export interface IfcViewProps {
   onSelectMarkup: (id: string) => void;
 }
 
-export default function IfcView({ url, markups, selectedRef, drawing, onPick, onSelectMarkup }: IfcViewProps) {
+export default function IfcView({ url, projectId, documentId, onOpenDocument, markups, selectedRef, drawing, onPick, onSelectMarkup }: IfcViewProps) {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
   const [progress, setProgress] = useState<number | null>(0);
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<SpatialNode | null>(null);
   const [selected, setSelected] = useState<{ id: number; props: Props | null } | null>(null);
+  const [storeys, setStoreys] = useState<Map<number, Storey>>(new Map());
+  const measures = useMemo(() => (selected ? engine.current?.measures(selected.id) ?? null : null), [selected?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [cut, setCut] = useState<number | null>(null);
   const [bounds, setBounds] = useState<[number, number] | null>(null);
   const drawingRef = useRef(drawing);
@@ -85,7 +101,9 @@ export default function IfcView({ url, markups, selectedRef, drawing, onPick, on
         await e.load(data, (p) => alive && setProgress(p));
         if (!alive) return;
         setBounds(e.heightRange());
-        setTree(await e.spatial());
+        const spatial = await e.spatial();
+        setTree(spatial);
+        if (spatial) setStoreys(storeyIndex(spatial, e));
         setProgress(null);
       } catch (err) {
         console.error("viewer IFC:", err);
@@ -159,6 +177,9 @@ export default function IfcView({ url, markups, selectedRef, drawing, onPick, on
                   <IconButton size="small" onClick={() => engine.current?.focus(selected.id)}><CenterFocusStrongIcon fontSize="small" /></IconButton>
                 </Tooltip>
               </Stack>
+              <MeasuresTable type={selected.props.type} m={measures} />
+              <ElementLinks projectId={projectId} documentId={documentId} name={selected.props.name} guid={selected.props.guid}
+                            storey={storeys.get(selected.id) ?? null} onOpen={onOpenDocument} />
               {selected.props.psets.map((p) => <Pset key={p.name} name={p.name} props={p.props} />)}
             </>
           )}
@@ -166,6 +187,128 @@ export default function IfcView({ url, markups, selectedRef, drawing, onPick, on
       )}
     </Box>
   );
+}
+
+const m2 = (v: number) => `${v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
+const FLAT = new Set(["IFCSLAB", "IFCROOF", "IFCCOVERING", "IFCPLATE"]);
+const THIN = new Set(["IFCWALL", "IFCWALLSTANDARDCASE", "IFCCURTAINWALL"]);
+
+/** Misure dell'ingombro dell'elemento, nel suo sistema locale (un muro ruotato non si "allarga"). */
+function MeasuresTable({ type, m }: { type: string; m: Measures | null }) {
+  if (!m) return null;
+  const t = type.toUpperCase();
+  const rows: [string, string][] = FLAT.has(t)
+    ? [["Lunghezza", m2(m.length)], ["Larghezza", m2(m.width)], ["Spessore", m2(m.height)],
+       ["Superficie", `${(m.length * m.width).toLocaleString("it-IT", { maximumFractionDigits: 2 })} m²`]]
+    : [["Lunghezza", m2(m.length)], [THIN.has(t) ? "Spessore" : "Larghezza", m2(m.width)], ["Altezza", m2(m.height)]];
+  if (m.volume > 0) rows.push(["Volume", `${m.volume.toLocaleString("it-IT", { maximumFractionDigits: 3 })} m³`]);
+  return (
+    <Box mt={1} component="section" aria-label="Misure">
+      <Typography variant="body2" fontWeight={600} px={0.5}>Misure</Typography>
+      <Box component="table" sx={{ width: "100%", fontSize: 12, borderCollapse: "collapse", "& td": { py: 0.25, px: 0.5 } }}>
+        <tbody>{rows.map(([k, v]) => <tr key={k}><td style={{ color: "#666" }}>{k}</td><td>{v}</td></tr>)}</tbody>
+      </Box>
+    </Box>
+  );
+}
+
+const STATE: Record<string, string> = { WIP: "In lavorazione", SHARED: "Condiviso", PUBLISHED: "Pubblicato", ARCHIVED: "Archiviato" };
+
+/** Documenti che citano l'elemento e tavole del suo piano: un clic apre il documento con il nome evidenziato. */
+function ElementLinks({ projectId, documentId, name, guid, storey, onOpen }: {
+  projectId: string; documentId: string; name: string; guid: string; storey: Storey | null;
+  onOpen: (documentId: string, search: string) => void;
+}) {
+  const params = new URLSearchParams({ exclude: documentId });
+  if (name) params.set("name", name);
+  if (guid) params.set("guid", guid);
+  if (storey) params.set("level", storey.level);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["model-element-docs", projectId, params.toString()],
+    queryFn: () => api<ElementDocs>(`/projects/${projectId}/model-element/documents?${params}`),
+    enabled: !!(name || guid || storey),
+    staleTime: 60_000,
+  });
+  const item = (d: LinkedDoc, search: string) => (
+    <ListItemButton key={d.id} dense onClick={() => onOpen(d.id, search)} sx={{ px: 0.5, alignItems: "flex-start" }}>
+      <ListItemText
+        primary={<><Typography component="span" variant="caption" fontFamily="monospace" display="block">{d.identifier}</Typography>{d.title}</>}
+        primaryTypographyProps={{ variant: "body2", component: "div" }}
+        secondary={<>
+          {`Rev. ${d.match_revision ?? d.current_revision ?? "–"}${d.current_state ? ` · ${STATE[d.current_state] ?? d.current_state}` : ""}`}
+          {d.match_snippet && <Snippet text={d.match_snippet} />}
+        </>}
+        secondaryTypographyProps={{ variant: "caption", component: "div" }} />
+    </ListItemButton>
+  );
+  return (
+    <Box mt={1} component="section" aria-label="Tavole e documenti collegati">
+      {storey && (
+        <Typography variant="caption" color="text.secondary" display="block" px={0.5}>
+          Piano: {storey.name || "senza nome"} · livello {storey.level}
+        </Typography>
+      )}
+      {isLoading && <LinearProgress sx={{ my: 1 }} />}
+      {isError && <Typography variant="caption" color="error" px={0.5}>Documenti collegati non disponibili.</Typography>}
+      {data && (
+        <>
+          <Typography variant="body2" fontWeight={600} px={0.5} mt={0.5}>Citato in</Typography>
+          {data.cited.length ? <List dense disablePadding>{data.cited.map((d) => item(d, name || guid))}</List>
+            : <Typography variant="caption" color="text.secondary" px={0.5} display="block">Nessuna tavola o documento cita questo elemento.</Typography>}
+          {storey && (
+            <>
+              <Typography variant="body2" fontWeight={600} px={0.5} mt={1}>Tavole del piano (livello {storey.level})</Typography>
+              {data.same_level.length ? <List dense disablePadding>{data.same_level.map((d) => item(d, ""))}</List>
+                : <Typography variant="caption" color="text.secondary" px={0.5} display="block">Nessuna tavola con livello {storey.level}.</Typography>}
+            </>
+          )}
+        </>
+      )}
+    </Box>
+  );
+}
+
+/** Estratto con le parole trovate: i marcatori ⟦ ⟧ vengono da ts_headline, il resto è testo (niente HTML). */
+function Snippet({ text }: { text: string }) {
+  return (
+    <Typography component="span" variant="caption" display="block" sx={{ mt: 0.25 }}>
+      {text.split(/(⟦[^⟧]*⟧)/).map((p, i) => p.startsWith("⟦") ? <mark key={i}>{p.slice(1, -1)}</mark> : <span key={i}>{p}</span>)}
+    </Typography>
+  );
+}
+
+/**
+ * Codice livello ISO 19650 del piano: dal nome ("Piano terra" → 00, "Piano 2" → 02, "Interrato" → B1,
+ * "Copertura" → RF) o, se il nome non lo dice, dalla posizione per quota rispetto al piano più vicino a quota 0.
+ */
+export function levelCode(name: string, rank: number, groundRank: number): string {
+  const n = name.toLowerCase();
+  if (/terra|ground/.test(n)) return "00";
+  if (/copertura|tetto|roof/.test(n)) return "RF";
+  const num = n.match(/-?\d+/);
+  if (/interrat|basement/.test(n)) return `B${Math.abs(num ? parseInt(num[0], 10) : 1) || 1}`;
+  if (num) { const k = parseInt(num[0], 10); return k < 0 ? `B${-k}` : String(k).padStart(2, "0"); }
+  const rel = rank - groundRank;
+  return rel >= 0 ? String(rel).padStart(2, "0") : `B${-rel}`;
+}
+
+/** Per ogni elemento contenuto in un piano (anche dentro gli spazi), il piano con il suo codice livello. */
+function storeyIndex(root: SpatialNode, engine: Engine): Map<number, Storey> {
+  const found: { node: SpatialNode; name: string; elevation: number }[] = [];
+  const walk = (n: SpatialNode) => {
+    if (n.type.toUpperCase() === "IFCBUILDINGSTOREY") found.push({ node: n, name: engine.nameOf(n.expressID), elevation: engine.elevationOf(n.expressID) });
+    else n.children.forEach(walk);
+  };
+  walk(root);
+  const sorted = [...found].sort((a, b) => a.elevation - b.elevation);
+  const ground = sorted.reduce((best, s, i) => (Math.abs(s.elevation) < Math.abs(sorted[best].elevation) ? i : best), 0);
+  const out = new Map<number, Storey>();
+  sorted.forEach((s, rank) => {
+    const storey = { id: s.node.expressID, name: s.name, elevation: s.elevation, level: levelCode(s.name, rank, ground) };
+    const mark = (n: SpatialNode) => { out.set(n.expressID, storey); n.children.forEach(mark); };
+    mark(s.node);
+  });
+  return out;
 }
 
 function Pset({ name, props }: { name: string; props: [string, string][] }) {
@@ -394,6 +537,40 @@ class Engine {
 
   private typeOf(id: number): string {
     try { return (this.ifc.GetNameFromTypeCode(this.ifc.GetLineType(this.model, id)) ?? "").toUpperCase(); } catch { return ""; }
+  }
+
+  elevationOf(id: number): number {
+    try { return Number(str(this.ifc.GetLine(this.model, id)?.Elevation)) || 0; } catch { return 0; }
+  }
+
+  /** Ingombro nel sistema locale del primo pezzo dell'elemento e volume dalla mesh chiusa (metri). */
+  measures(id: number): Measures | null {
+    const list = this.meshes.get(id);
+    if (!list?.length) return null;
+    const inv = list[0].matrix.clone().invert();
+    const local = new THREE.Box3();
+    const v = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    let volume = 0;
+    for (const m of list) {
+      const pos = m.geometry.getAttribute("position");
+      const toLocal = inv.clone().multiply(m.matrix);
+      for (let i = 0; i < pos.count; i++) local.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(toLocal));
+      const index = m.geometry.getIndex();
+      if (!index) continue;
+      let part = 0;
+      for (let t = 0; t + 2 < index.count; t += 3) {
+        a.fromBufferAttribute(pos, index.getX(t)); b.fromBufferAttribute(pos, index.getX(t + 1)); c.fromBufferAttribute(pos, index.getX(t + 2));
+        part += a.dot(b.cross(c)) / 6;          // tetraedro con l'origine: la somma è il volume del solido chiuso
+      }
+      volume += part * m.matrix.determinant();
+    }
+    const size = local.getSize(new THREE.Vector3()).toArray();
+    // l'asse locale che nella scena punta più in verticale (Y) è l'altezza; degli altri due il maggiore è la lunghezza
+    const up = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]
+      .map((ax) => Math.abs(ax.transformDirection(list[0].matrix).y));
+    const vertical = up.indexOf(Math.max(...up));
+    const [length, width] = size.filter((_, i) => i !== vertical).sort((x, y) => y - x);
+    return { length, width, height: size[vertical], volume: Math.abs(volume) };
   }
 
   nameOf(id: number): string {
