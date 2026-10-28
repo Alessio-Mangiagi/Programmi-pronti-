@@ -349,3 +349,19 @@ studi vogliono che chi lascia l'azienda perda l'accesso al CDE quando l'IT ne di
   password prosegue verso l'IdP); il platform admin ne è escluso per non chiudersi fuori.
 
 L'e2e usa un IdP finto (`e2e/mock-idp.mjs`) che fa davvero PKCE, firma RS256 e nonce.
+
+## ADR-26 — Ricerca nel contenuto dei file
+
+**Decisione.** Full-text di PostgreSQL (configurazione `italian`), senza un motore esterno: il worker, dopo la
+verifica antivirus, estrae il testo (PDF con pypdf, Word ed Excel dall'XML OOXML con defusedxml, testo semplice)
+e lo salva in `revision_text` con un tsvector indicizzato GIN; un job ogni 10' recupera i file rimasti indietro
+e quelli caricati prima della funzione. Le revisioni SHARED/PUBLISHED riusano il file della WIP, quindi il
+testo si copia senza riscaricare nulla.
+
+**Sicurezza.** `revision_text` ha la stessa visibilità di `document_revisions` (RLS): cercare nel contenuto
+non rivela il testo di una WIP di un'altra organizzazione né di un'area riservata. Tetti contro i file ostili:
+100 MB, 500 pagine, 300.000 caratteri, 20 MB di XML decompresso, nessuna entità XML esterna.
+
+**Limiti.** I PDF solo immagine (scansioni) non hanno testo: servirebbe l'OCR, da valutare a parte; i DWG e
+gli IFC binari non si indicizzano. Se il volume crescesse oltre qualche milione di pagine si valuterà
+OpenSearch, mantenendo lo stesso filtro di visibilità.
