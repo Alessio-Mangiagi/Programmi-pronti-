@@ -25,6 +25,7 @@ import { api, ApiError, type Draft, type Markup } from "../api";
 import { MarkupLayer } from "./markup/MarkupLayer";
 import { MarkupPanel } from "./markup/MarkupPanel";
 import { uploadFile } from "../upload";
+import { openDocument } from "../openDocument";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
 const IfcView = lazy(() => import("./markup/IfcView"));
@@ -40,9 +41,6 @@ interface Link { url: string; filename: string; content_type: string | null; wat
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
-/** Tavola citata dal modello: nella sua scheda del browser, accanto al modello, con il testo già cercato. */
-const openInNewTab = (documentId: string, search: string) =>
-  window.open(`/documenti/${documentId}${search ? `?cerca=${encodeURIComponent(search)}` : ""}`, "_blank", "noopener");
 
 export function FileViewer({ documentId, revisionId: initialRevision, taskId, initialSearch, onClose, onDetails }: {
   documentId: string; revisionId?: string; taskId?: string; onClose: () => void; onDetails?: () => void;
@@ -235,7 +233,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
           ) : isIfc ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <IfcView url={link.url} projectId={doc?.project_id ?? ""} documentId={documentId}
-                       onOpenDocument={openInNewTab} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
+                       onOpenDocument={(id, search) => openDocument(id, { search })} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>
           ) : office && (rev?.size_bytes ?? 0) > OFFICE_PREVIEW_MAX ? (

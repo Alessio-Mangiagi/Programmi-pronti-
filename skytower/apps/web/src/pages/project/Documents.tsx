@@ -15,7 +15,7 @@ import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import { api, ApiError, Container, Project } from "../../api";
 import { abortUpload, uploadFile } from "../../upload";
 import { ACTION_LABEL, CdeState, STATE_COLOR, STATE_LABEL, TransitionDialog, useTransitionRules } from "./Transitions";
-import { FileViewer } from "../../components/FileViewer";
+import { openDocument } from "../../openDocument";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowProgress";
 import { choosableFields, FieldValueInput, useDocumentSettings } from "./Naming";
@@ -408,7 +408,6 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
     onSuccess: () => qc.invalidateQueries({ queryKey: ["document", documentId] }),
   });
   const [starting, setStarting] = useState(false);
-  const [viewing, setViewing] = useState(false);
   const running = workflows.find((w) => w.status === "RUNNING");
 
   const canDownload = (r: Revision) =>
@@ -436,7 +435,7 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
                       startIcon={doc.following ? <NotificationsActiveIcon /> : <NotificationsNoneIcon />}
                       onClick={() => follow.mutate(!doc.following)}>{doc.following ? "Seguito" : "Segui"}</Button>
             </Tooltip>
-            <Button variant="contained" size="small" onClick={() => setViewing(true)}>Apri</Button>
+            <Button variant="contained" size="small" onClick={() => documentId && openDocument(documentId)}>Apri</Button>
           </Stack>
           {doc.description && <Typography variant="body2">{doc.description}</Typography>}
           <Typography variant="body2" color="text.secondary">Originatore: {doc.originator_code}</Typography>
@@ -503,7 +502,6 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
           )}
         </Stack>
       )}
-      {viewing && documentId && <FileViewer documentId={documentId} onClose={() => setViewing(false)} />}
       {starting && doc?.current_revision_id && (
         <StartWorkflowDialog projectId={projectId} revisionId={doc.current_revision_id}
                              label={`${doc.identifier} ${doc.current_revision}`} onClose={() => setStarting(false)} />

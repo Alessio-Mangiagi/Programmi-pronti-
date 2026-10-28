@@ -26,7 +26,7 @@ import { folderTree, useContainers } from "../../components/ProjectTree";
 import { ContainerDetail, GrantDialog, NewContainerDialog } from "./Containers";
 import { DocumentDrawer, DocumentRow, formatBytes, UploadDialog } from "./Documents";
 import { STATE_COLOR, STATE_LABEL } from "./Transitions";
-import { FileViewer } from "../../components/FileViewer";
+import { openDocument } from "../../openDocument";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 import { NewTransmittalDialog } from "./Transmittals";
 
@@ -55,7 +55,6 @@ export function FolderView({ project }: { project: Project }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [openDoc, setOpenDoc] = useState<string | null>(null);
-  const [viewDoc, setViewDoc] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"upload" | "folder" | "grant" | "shares" | "workflow" | "transmit" | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setSearch(q), 300); return () => clearTimeout(t); }, [q]);
@@ -119,7 +118,7 @@ export function FolderView({ project }: { project: Project }) {
         {current && (
           <>
             <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-            <Button startIcon={<VisibilityIcon />} disabled={!doc} onClick={() => setViewDoc(doc!.id)}>Apri</Button>
+            <Button startIcon={<VisibilityIcon />} disabled={!doc} onClick={() => openDocument(doc!.id)}>Apri</Button>
             <Button startIcon={<DownloadIcon />} disabled={!doc?.current_revision_id || doc.current_scan_status !== "CLEAN" || download.isPending}
                     onClick={() => download.mutate(doc!.current_revision_id!)}>Scarica</Button>
             <Button startIcon={<FolderZipIcon />} disabled={zipIds.length === 0 || zip.isPending} onClick={() => zip.mutate(zipIds)}>
@@ -183,7 +182,7 @@ export function FolderView({ project }: { project: Project }) {
                 const state = d.archived_at ? "ARCHIVED" : (d.current_state ?? "WIP");
                 return (
                   <TableRow key={d.id} hover selected={d.id === selected} sx={{ cursor: "pointer" }}
-                            onClick={() => setSelected(d.id)} onDoubleClick={() => setViewDoc(d.id)}>
+                            onClick={() => setSelected(d.id)} onDoubleClick={() => openDocument(d.id)}>
                     <TableCell padding="checkbox">
                       <Radio size="small" checked={d.id === selected} onChange={() => setSelected(d.id)} inputProps={{ "aria-label": `Seleziona ${d.title}` }} />
                     </TableCell>
@@ -227,8 +226,6 @@ export function FolderView({ project }: { project: Project }) {
       )}
       {dialog === "transmit" && doc && <NewTransmittalDialog project={project} initial={[doc]} onClose={() => setDialog(null)} />}
       <DocumentDrawer projectId={project.id} documentId={openDoc} onClose={() => setOpenDoc(null)} />
-      {viewDoc && <FileViewer documentId={viewDoc} onClose={() => setViewDoc(null)}
-                              onDetails={() => { setOpenDoc(viewDoc); setViewDoc(null); }} />}
     </Stack>
   );
 }

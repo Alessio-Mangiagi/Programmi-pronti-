@@ -10,7 +10,7 @@ import {
 import DownloadIcon from "@mui/icons-material/Download";
 import DrawIcon from "@mui/icons-material/Draw";
 import { api, ApiError } from "../api";
-import { FileViewer } from "../components/FileViewer";
+import { openDocument } from "../openDocument";
 import { WorkflowProgress } from "../components/WorkflowProgress";
 
 interface Task {
@@ -91,7 +91,6 @@ function ReviewDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   const qc = useQueryClient();
   const [outcome, setOutcome] = useState<string>("APPROVED");
   const [comment, setComment] = useState("");
-  const [viewing, setViewing] = useState(false);
   const download = useMutation({
     mutationFn: () => api<{ url: string }>(`/revisions/${task.revision_id}/download`),
     onSuccess: ({ url }) => { window.location.href = url; },
@@ -115,7 +114,8 @@ function ReviewDialog({ task, onClose }: { task: Task; onClose: () => void }) {
           {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
           <Typography>{task.title} — idoneità {task.suitability}</Typography>
           <Stack direction="row" gap={1} flexWrap="wrap">
-            <Button variant="contained" startIcon={<DrawIcon />} onClick={() => setViewing(true)}>Apri e annota</Button>
+            <Button variant="contained" startIcon={<DrawIcon />} onClick={() => openDocument(task.document_id, {
+              revisionId: task.revision_id, taskId: task.status === "OPEN" ? task.id : undefined })}>Apri e annota</Button>
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => download.mutate()}>
               Scarica il file da esaminare
             </Button>
@@ -137,10 +137,6 @@ function ReviewDialog({ task, onClose }: { task: Task; onClose: () => void }) {
           Conferma esito
         </Button>
       </DialogActions>
-      {viewing && (
-        <FileViewer documentId={task.document_id} revisionId={task.revision_id}
-                    taskId={task.status === "OPEN" ? task.id : undefined} onClose={() => setViewing(false)} />
-      )}
     </Dialog>
   );
 }
