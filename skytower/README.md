@@ -58,8 +58,13 @@ in uso (lo fanno i test e2e). Dati demo: password `Cantiere-2026!` per tutti gli
 | `sub1.user@sub1.example` | Subappaltatore — SUBCONTRACTOR (vede solo SUB1) |
 | `platform@com.example` | Platform admin (crea organizzazioni) |
 
-Le email (inviti, reset password) in sviluppo sono stampate nel log dell'API. L'S3 emulato è in memoria:
-dopo un riavvio i file non ci sono più mentre il database sì — usare `cde dev --reset`.
+Le email (inviti, reset password) in sviluppo sono stampate nel log dell'API. L'S3 emulato (moto) salva i
+file in `.devdata/s3-state.pkl` ogni pochi secondi e li ricarica all'avvio, con le stesse versioni: database e
+file restano allineati tra un riavvio e l'altro; `--reset` cancella entrambi.
+
+Avvio con un doppio clic: `Torre di controllo - SkyTower\Avvia SkyTower.bat` ricompila il frontend, avvia
+API e worker, carica i documenti demo che mancano (`cde demo-contenuti`), crea o aggiorna l'account personale
+(`cde utente-dev`, password chiesta nascosta o da `CDE_NUOVA_PWD`, mai su file) e apre Firefox.
 
 ## Test
 

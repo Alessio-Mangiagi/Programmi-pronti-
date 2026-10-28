@@ -1,7 +1,7 @@
 # "><(((º> sabusabu <º)))><"
 """Comandi di sviluppo e operativi.
 
-  cde dev            Postgres embedded + S3 emulato + migrazioni + dati demo + worker + API su :8100
+  cde dev            Postgres embedded + S3 emulato (salvato su disco) + migrazioni + dati demo + worker + API :8100
   cde worker         worker Procrastinate (verifica file) — CDE_DATABASE_URL_WORKER
   cde migrate        applica le migrazioni (CDE_DATABASE_URL_OWNER)
   cde bootstrap-db   RDS: crea database e ruoli, DSN in Secrets Manager (CDE_DB_MASTER_USER/_PASSWORD)
@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 from urllib.parse import quote
 
-from .tooling import dbadmin, demo_seed
+from .tooling import dbadmin, demo_seed, dev_s3
 
 DEV_DIR = dbadmin.REPO_ROOT / ".devdata"
 DEV_PASSWORDS = {"cde_owner": "dev-owner", "cde_app": "dev-app", "cde_auth": "dev-auth", "cde_worker": "dev-worker"}
@@ -31,34 +31,31 @@ def _owner_url() -> str:
     return url
 
 
-def _start_dev_s3(port: int) -> str:
-    """S3 emulato (moto) in memoria: i file spariscono al riavvio, il database no (usare --reset)."""
-    from moto.server import ThreadedMotoServer
-
-    for k, v in {"AWS_ACCESS_KEY_ID": "dev", "AWS_SECRET_ACCESS_KEY": "dev", "AWS_DEFAULT_REGION": "eu-south-1"}.items():
-        os.environ.setdefault(k, v)
-    ThreadedMotoServer(ip_address="127.0.0.1", port=port, verbose=False).start()
-    return f"http://127.0.0.1:{port}"
-
-
 def cmd_dev(args) -> None:
     import psycopg
     import uvicorn
 
     data_dir = args.data_dir
+    s3_state = data_dir / "s3-state.pkl"          # file dell'S3 emulato: vanno e vengono con il database
+    if args.reset:
+        s3_state.unlink(missing_ok=True)
     superuser = dbadmin.start_embedded(data_dir / "pg", cleanup_mode=None)
     urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=args.reset)
     applied = dbadmin.migrate(urls.owner)
     print(f"Migrazioni applicate: {applied or 'nessuna (schema aggiornato)'}")
     with psycopg.connect(urls.owner) as conn:
         empty = conn.execute("SELECT count(*) FROM cde.organizations").fetchone()[0] == 0
+        orphans = not s3_state.exists() and conn.execute("SELECT EXISTS (SELECT 1 FROM cde.file_objects)").fetchone()[0]
+    if orphans:
+        print("ATTENZIONE: documenti nel database ma file dell'S3 emulato non salvati (versione precedente): "
+              "non si apriranno. Ripartire con 'cde dev --reset'.")
     if empty:
         world = demo_seed.seed(urls.owner)
         print(f"Dati demo caricati — password per tutti: {demo_seed.DEMO_PASSWORD}")
         for key, email in world.emails.items():
             print(f"  {key:<14} {email}")
 
-    s3 = _start_dev_s3(args.s3_port)
+    s3 = dev_s3.start(args.s3_port, s3_state)
     os.environ.update({
         "CDE_ENV": "dev",
         "CDE_DATABASE_URL_APP": urls.app,
