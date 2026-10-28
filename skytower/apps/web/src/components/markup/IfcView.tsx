@@ -1,6 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 // Modello IFC nel browser: geometria letta con web-ifc (WASM) e resa con three.js. Orbita, selezione di un
-// elemento con proprietà e Pset, albero spaziale per piani, sezione orizzontale. Gli elementi annotati sono
+// elemento con proprietà e Pset, albero spaziale per piani, sezioni orizzontale e verticale (asse X o Y, lato
+// invertibile, piano guida visibile mentre si trascina). Gli elementi annotati sono
 // colorati con il colore dell'annotazione; in modalità "Annota" un clic su un elemento lo propone per un commento.
 // Per l'elemento selezionato: misure ricavate dalla geometria, piano con il codice livello della naming convention,
 // documenti che lo citano (nome o GUID nel testo indicizzato) e tavole dello stesso piano, apribili al volo.
@@ -9,11 +10,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert, Box, CircularProgress, Collapse, Divider, IconButton, LinearProgress, List, ListItemButton, ListItemText,
-  Paper, Slider, Stack, Tooltip, Typography,
+  Paper, Slider, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from "@mui/material";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { IfcAPI } from "web-ifc";
@@ -23,6 +25,8 @@ import { api, type Markup } from "../../api";
 export interface PickedElement { guid: string; label: string }
 
 interface SpatialNode { expressID: number; type: string; children: SpatialNode[] }
+type Axis = "x" | "z";
+interface Range { x: [number, number]; y: [number, number]; z: [number, number] }
 interface Storey { id: number; name: string; elevation: number; level: string }
 interface Measures { length: number; width: number; height: number; volume: number }
 interface LinkedDoc {
@@ -33,6 +37,7 @@ interface ElementDocs { cited: LinkedDoc[]; same_level: LinkedDoc[]; level: stri
 interface Props { name: string; guid: string; type: string; psets: { name: string; props: [string, string][] }[] }
 
 const SELECT_COLOR = new THREE.Color("#1976d2");
+const OFF = 1e9;
 const TYPE_COLOR: Record<string, string> = {
   IFCWALL: "#e6dccb", IFCWALLSTANDARDCASE: "#e6dccb", IFCSLAB: "#aeb7c0", IFCROOF: "#b5654f", IFCBEAM: "#c2a27c",
   IFCCOLUMN: "#c2a27c", IFCMEMBER: "#c2a27c", IFCWINDOW: "#9fd0ee", IFCDOOR: "#a77b52", IFCSTAIR: "#cfc6b8",
@@ -67,7 +72,11 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
   const [storeys, setStoreys] = useState<Map<number, Storey>>(new Map());
   const measures = useMemo(() => (selected ? engine.current?.measures(selected.id) ?? null : null), [selected?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [cut, setCut] = useState<number | null>(null);
-  const [bounds, setBounds] = useState<[number, number] | null>(null);
+  const [bounds, setBounds] = useState<Range | null>(null);
+  const [vAxis, setVAxis] = useState<Axis | null>(null);
+  const [vCut, setVCut] = useState(0);
+  const [vFlip, setVFlip] = useState(false);
+  const [guide, setGuide] = useState<"h" | "v" | null>(null);      // piano guida mentre si trascina
   const drawingRef = useRef(drawing);
   drawingRef.current = drawing;
 
@@ -100,7 +109,7 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
         if (!alive) return;
         await e.load(data, (p) => alive && setProgress(p));
         if (!alive) return;
-        setBounds(e.heightRange());
+        setBounds(e.ranges());
         const spatial = await e.spatial();
         setTree(spatial);
         if (spatial) setStoreys(storeyIndex(spatial, e));
@@ -133,6 +142,12 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
   }, [selectedRef, progress]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { engine.current?.section(cut); }, [cut]);
+  useEffect(() => { engine.current?.sectionV(vAxis, vCut, vFlip); }, [vAxis, vCut, vFlip]);
+  useEffect(() => { engine.current?.showGuide(guide); }, [guide, cut, vAxis, vCut]);
+  const vRange = bounds && vAxis ? bounds[vAxis] : null;
+  // in three.js l'asse Y del modello IFC è -Z: le quote mostrate sono quelle del file
+  const vLabel = (v: number) => `${(vAxis === "z" ? -v : v).toFixed(2)} m`;
+  const step = (r: [number, number]) => (r[1] - r[0]) / 200 || 0.01;
 
   return (
     <Box display="flex" flexGrow={1} minHeight={0} width="100%" position="relative">
@@ -149,11 +164,35 @@ export default function IfcView({ url, projectId, documentId, onOpenDocument, ma
         <Paper elevation={3} sx={{ position: "absolute", top: 12, left: 12, width: 280, maxHeight: "calc(100% - 24px)",
                                     display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {bounds && (
-            <Box px={2} pt={1.5}>
+            <Box px={2} pt={1.5} component="section" aria-label="Sezioni">
               <Typography variant="caption" color="text.secondary">Sezione orizzontale</Typography>
-              <Slider size="small" min={bounds[0]} max={bounds[1]} step={(bounds[1] - bounds[0]) / 200 || 0.01}
-                      value={cut ?? bounds[1]} onChange={(_, v) => setCut(v as number >= bounds[1] ? null : v as number)}
+              <Slider size="small" min={bounds.y[0]} max={bounds.y[1]} step={step(bounds.y)} aria-label="Sezione orizzontale"
+                      value={cut ?? bounds.y[1]} onChange={(_, v) => { setGuide("h"); setCut(v as number >= bounds.y[1] ? null : v as number); }}
+                      onChangeCommitted={() => setGuide(null)}
                       valueLabelDisplay="auto" valueLabelFormat={(v) => `${v.toFixed(2)} m`} />
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="caption" color="text.secondary" flexGrow={1}>Sezione verticale</Typography>
+                <ToggleButtonGroup size="small" exclusive value={vAxis ?? "off"} aria-label="Asse della sezione verticale"
+                                   onChange={(_, v) => {
+                                     if (!v) return;
+                                     const axis = v === "off" ? null : v as Axis;
+                                     setVAxis(axis);
+                                     if (axis) setVCut((bounds[axis][0] + bounds[axis][1]) / 2);
+                                   }}>
+                  <ToggleButton value="off" sx={{ py: 0.25, px: 1 }}>No</ToggleButton>
+                  <ToggleButton value="x" sx={{ py: 0.25, px: 1 }} title="Piano perpendicolare all'asse X del modello">X</ToggleButton>
+                  <ToggleButton value="z" sx={{ py: 0.25, px: 1 }} title="Piano perpendicolare all'asse Y del modello">Y</ToggleButton>
+                </ToggleButtonGroup>
+                <IconButton size="small" aria-label="Inverti lato della sezione" title="Mostra l'altra metà"
+                            disabled={!vAxis} onClick={() => setVFlip((f) => !f)}>
+                  <SwapHorizIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+              {vRange && (
+                <Slider size="small" min={vRange[0]} max={vRange[1]} step={step(vRange)} aria-label="Sezione verticale"
+                        value={vCut} onChange={(_, v) => { setGuide("v"); setVCut(v as number); }}
+                        onChangeCommitted={() => setGuide(null)} valueLabelDisplay="auto" valueLabelFormat={vLabel} />
+              )}
             </Box>
           )}
           <Divider />
@@ -379,7 +418,12 @@ class Engine {
   private base = new Map<THREE.Mesh, THREE.Material>();
   private highlighted: number | null = null;
   private tints = new Map<string, string>();
-  private clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+  // piani di taglio: un piano "spento" ha la costante enorme e non taglia niente
+  private clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), OFF);
+  private clipV = new THREE.Plane(new THREE.Vector3(-1, 0, 0), OFF);
+  private planes = [this.clip, this.clipV];
+  private guide = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: 0x1976d2, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
   private frame = 0;
   private resize: ResizeObserver;
 
@@ -387,12 +431,13 @@ class Engine {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor("#e9edf1");
-    this.renderer.localClippingEnabled = false;
+    this.renderer.localClippingEnabled = true;
+    this.guide.visible = false;
     host.appendChild(this.renderer.domElement);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.2);
     sun.position.set(50, 100, 30);
-    this.scene.add(sun, this.root);
+    this.scene.add(sun, this.root, this.guide);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.resize = new ResizeObserver(() => this.fit());
@@ -414,7 +459,7 @@ class Engine {
     await this.ifc.Init((path) => (path.endsWith(".wasm") ? wasmUrl : path));
     this.model = this.ifc.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
     const materials = new Map<string, THREE.MeshLambertMaterial>();
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.45, clippingPlanes: [this.clip] });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.45, clippingPlanes: this.planes });
     let last = 0;
     this.ifc.StreamAllMeshes(this.model, (mesh, index, total) => {
       const placed = mesh.geometries;
@@ -438,7 +483,7 @@ class Engine {
           mat = new THREE.MeshLambertMaterial({
             color: byType ? new THREE.Color(byType) : new THREE.Color(pg.color.x, pg.color.y, pg.color.z), side: THREE.DoubleSide,
             polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-            transparent: pg.color.w < 1, opacity: pg.color.w, clippingPlanes: [this.clip],
+            transparent: pg.color.w < 1, opacity: pg.color.w, clippingPlanes: this.planes,
           });
           materials.set(key, mat);
         }
@@ -493,14 +538,39 @@ class Engine {
     this.frameBox(box);
   }
 
-  heightRange(): [number, number] {
-    const box = new THREE.Box3().setFromObject(this.root);
-    return [Number(box.min.y.toFixed(2)), Number(box.max.y.toFixed(2))];
+  private box = new THREE.Box3();
+
+  ranges(): Range {
+    this.box = new THREE.Box3().setFromObject(this.root);
+    const r = (a: number, b: number): [number, number] => [Number(a.toFixed(2)), Number(b.toFixed(2))];
+    const { min, max } = this.box;
+    return { x: r(min.x, max.x), y: r(min.y, max.y), z: r(min.z, max.z) };
   }
 
-  section(y: number | null) {
-    this.renderer.localClippingEnabled = y !== null;
-    this.clip.constant = y ?? 0;
+  /** Taglio orizzontale: resta ciò che sta sotto la quota y. */
+  section(y: number | null) { this.clip.constant = y ?? OFF; }
+
+  /** Taglio verticale perpendicolare a X o Z: resta il lato "prima" del piano, o l'altro con flip. */
+  sectionV(axis: Axis | null, value: number, flip: boolean) {
+    if (!axis) { this.clipV.constant = OFF; return; }
+    const sign = flip ? 1 : -1;
+    this.clipV.normal.set(axis === "x" ? sign : 0, 0, axis === "z" ? sign : 0);
+    this.clipV.constant = flip ? -value : value;
+  }
+
+  /** Piano semitrasparente sulla sezione che si sta regolando, grande quanto il modello. */
+  showGuide(which: "h" | "v" | null) {
+    const g = this.guide;
+    const plane = which === "h" ? this.clip : which === "v" ? this.clipV : null;
+    if (!plane || plane.constant >= OFF || this.box.isEmpty()) { g.visible = false; return; }
+    const size = this.box.getSize(new THREE.Vector3()).multiplyScalar(1.1);
+    const center = this.box.getCenter(new THREE.Vector3());
+    const at = -plane.constant / (plane.normal.x + plane.normal.y + plane.normal.z);   // un solo asse non nullo
+    g.rotation.set(0, 0, 0);
+    if (which === "h") { g.rotation.x = -Math.PI / 2; g.scale.set(size.x, size.z, 1); g.position.set(center.x, plane.constant, center.z); }
+    else if (plane.normal.x) { g.rotation.y = Math.PI / 2; g.scale.set(size.z, size.y, 1); g.position.set(at, center.y, center.z); }
+    else { g.scale.set(size.x, size.y, 1); g.position.set(center.x, center.y, at); }
+    g.visible = true;
   }
 
   private pick(e: PointerEvent): number | null {
@@ -508,7 +578,7 @@ class Engine {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
     const hits = ray.intersectObjects(this.root.children, false)
-      .filter((h) => !this.renderer.localClippingEnabled || h.point.y <= this.clip.constant + 1e-6);
+      .filter((h) => this.planes.every((p) => p.distanceToPoint(h.point) >= -1e-6));   // niente parti tagliate
     return hits.length ? (hits[0].object.userData.id as number) : null;
   }
 
@@ -525,7 +595,7 @@ class Engine {
   private solid(color: string) {
     let mat = this.solids.get(color);
     if (!mat) {
-      mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color), side: THREE.DoubleSide, clippingPlanes: [this.clip] });
+      mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color), side: THREE.DoubleSide, clippingPlanes: this.planes });
       this.solids.set(color, mat);
     }
     return mat;
