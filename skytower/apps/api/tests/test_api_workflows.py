@@ -330,8 +330,9 @@ def test_email_immediata_it_en_e_digest(client, api_world, as_user, template, sh
             conn.execute("SELECT cde.notify(%s, %s, 'TEST', 'Prova digest', 'corpo')", [w.users["des_lead"], w.project_id])
         digest = ConsoleMailer()
         with psycopg.connect(urls.worker, row_factory=dict_row) as conn:
-            assert send_daily_digests(conn, digest, "https://cde.example") == 1
-        assert digest.outbox[0].subject == "Riepilogo giornaliero CDE" and "Prova digest" in digest.outbox[0].body
+            assert send_daily_digests(conn, digest, "https://cde.example") >= 1   # anche i "Segui" di altri utenti
+        mine = next(m for m in digest.outbox if m.to == w.emails["des_lead"])
+        assert mine.subject == "Riepilogo giornaliero CDE" and "Prova digest" in mine.body
         assert shared2
     finally:
         client.put("/me/notification-preferences", headers=h, json={"email_enabled": True, "daily_digest": False, "locale": "it"})

@@ -1,9 +1,11 @@
 {# "><(((º> sabusabu <º)))>< #}Gentile {{ first_name }},
 
 ecco il riepilogo delle ultime 24 ore ({{ items|length }} notifiche):
-{% for n in items %}
+{% for title, group in sections %}
+{{ title }} ({{ group|length }})
+{%- for n in group %}
 - {{ n.title }}{% if n.link %} — {{ base_url }}{{ n.link }}{% endif %}
 {%- endfor %}
-
+{% endfor %}
 --
 CDE ISO 19650

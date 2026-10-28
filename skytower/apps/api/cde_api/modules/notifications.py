@@ -27,6 +27,7 @@ class ReadIn(BaseModel):
 class PreferencesIn(BaseModel):
     email_enabled: bool = True
     daily_digest: bool = False
+    follow_digest: bool = True          # documenti seguiti: per email solo nel riepilogo giornaliero
     locale: Literal["it", "en"] = "it"
 
 
@@ -60,20 +61,20 @@ def mark_read(body: ReadIn, c: Ctx = Depends(ctx)):
 @router.get("/me/notification-preferences")
 def get_preferences(c: Ctx = Depends(ctx)):
     with c.tx() as conn:
-        row = conn.execute("SELECT email_enabled, daily_digest FROM cde.notification_preferences").fetchone()
+        row = conn.execute("SELECT email_enabled, daily_digest, follow_digest FROM cde.notification_preferences").fetchone()
         locale = conn.execute("SELECT locale FROM cde.users WHERE id = cde.current_app_user()").fetchone()["locale"]
-    return {**(row or {"email_enabled": True, "daily_digest": False}), "locale": locale}
+    return {**(row or {"email_enabled": True, "daily_digest": False, "follow_digest": True}), "locale": locale}
 
 
 @router.put("/me/notification-preferences")
 def put_preferences(body: PreferencesIn, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         conn.execute(
-            """INSERT INTO cde.notification_preferences (user_id, email_enabled, daily_digest)
-               VALUES (cde.current_app_user(), %(e)s, %(d)s)
+            """INSERT INTO cde.notification_preferences (user_id, email_enabled, daily_digest, follow_digest)
+               VALUES (cde.current_app_user(), %(e)s, %(d)s, %(f)s)
                ON CONFLICT (user_id) DO UPDATE SET email_enabled = EXCLUDED.email_enabled,
-                   daily_digest = EXCLUDED.daily_digest, updated_at = now()""",
-            {"e": body.email_enabled, "d": body.daily_digest})
+                   daily_digest = EXCLUDED.daily_digest, follow_digest = EXCLUDED.follow_digest, updated_at = now()""",
+            {"e": body.email_enabled, "d": body.daily_digest, "f": body.follow_digest})
         conn.execute("SELECT cde.set_my_locale(%s)", [body.locale])
     return body
 
