@@ -63,7 +63,7 @@ test("la scheda Naming mostra schema e progressivo attivo", async ({ page }) => 
   await page.goto(`/progetti/${projectId}/naming`);
   await expect(page.getByText("Naming convention ISO 19650")).toBeVisible();
   await expect(page.getByText("Rinomina automatica in caricamento")).toBeVisible();
-  await expect(page.getByLabel("Attiva")).toBeChecked();
+  await expect(page.getByLabel("Attiva", { exact: true })).toBeChecked();
   await expect(page.getByRole("button", { name: "Modifica schema" })).toBeVisible();
 });
 
