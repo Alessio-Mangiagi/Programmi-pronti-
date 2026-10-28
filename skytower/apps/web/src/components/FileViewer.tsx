@@ -1,7 +1,8 @@
 // "><(((º> sabusabu <º)))><"
 // Lettura di un documento in piattaforma su URL firmato a scadenza: PDF con PDF.js (pagine su canvas e
 // annotazioni sovrapposte) oppure nel visualizzatore del browser (ricerca, stampa); immagini con
-// annotazioni; modelli IFC e glTF/GLB (Blender) in 3D con annotazioni sugli elementi; Word ed Excel in anteprima di sola lettura;
+// annotazioni; modelli IFC e glTF/GLB (Blender) in 3D con annotazioni sugli elementi (gli IFC pesanti nella
+// versione .glb preparata dal worker, ADR-31, con l'originale a un clic); Word ed Excel in anteprima di sola lettura;
 // testo nel browser, modificabile: il salvataggio
 // crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -37,7 +38,8 @@ const OFFICE_PREVIEW_MAX = 25 * 1024 * 1024;
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string; size_bytes: number }
 interface Doc { id: string; project_id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
-interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean }
+interface Derivative { status: "READY" | "PENDING" | "FAILED"; url: string | null; size_bytes: number | null }
+interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean; derivative?: Derivative | null }
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -83,6 +85,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const notViewable = (error as ApiError | null)?.status === 415;
 
   const [editing, setEditing] = useState(false);
+  const [originalIfc, setOriginalIfc] = useState(false);      // IFC pesante: l'originale invece del derivato .glb
   const [panel, setPanel] = useState(true);
   const [browserPdf, setBrowserPdf] = useState(false);
   const [zoom, setZoom] = useState(1.25);
@@ -100,7 +103,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
     return () => clearTimeout(t);
   }, [searchInput]);
   const nextMatch = (d: 1 | -1) => matchCount && setActiveMatch((m) => (m + d + matchCount) % matchCount);
-  useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); setEditing(false); }, [revisionId]);
+  useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); setEditing(false); setOriginalIfc(false); }, [revisionId]);
 
   // numerazione stabile per data di creazione, indipendente dai filtri
   const numbers = useMemo(() => new Map([...markups].sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -111,6 +114,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
     : link?.content_type === "model/gltf-binary" ? "glb" as const : link?.content_type === "model/gltf+json" ? "gltf" as const : null;
   const isCsv = !!link?.filename?.toLowerCase().endsWith(".csv");
   const office = link?.content_type === DOCX ? "docx" : link?.content_type === XLSX ? "xlsx" : isCsv ? "csv" : null;
+  const derivative = model === "ifc" ? link?.derivative ?? null : null;
+  const optimized = derivative?.status === "READY" && !!derivative.url && !originalIfc;
   const canDraw = (isPdf && !browserPdf) || isImage || !!model;
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
@@ -184,6 +189,19 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
               </ToggleButton>
             </Tooltip>
           )}
+          {derivative?.status === "READY" && (
+            <Tooltip title="Il modello è pesante: si apre la versione ottimizzata preparata dal server (stessi elementi, piani e proprietà). L'IFC originale si legge nel browser, più lentamente.">
+              <ToggleButton size="small" value="original" selected={originalIfc} sx={{ color: "text.primary" }}
+                            onChange={() => { setOriginalIfc((o) => !o); setSelectedId(null); }}>
+                {originalIfc ? "IFC originale" : "Versione ottimizzata"}
+              </ToggleButton>
+            </Tooltip>
+          )}
+          {derivative?.status === "PENDING" && (
+            <Tooltip title="Il server sta preparando la versione ottimizzata del modello: intanto si legge l'IFC originale">
+              <Chip size="small" variant="outlined" label="Versione ottimizzata in preparazione" tabIndex={0} />
+            </Tooltip>
+          )}
           {canEdit && !editing && <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>Modifica</Button>}
           {canDraw && (
             <ToggleButton size="small" value="draw" selected={drawing} color="primary" sx={{ color: "text.primary" }} onChange={() => setDrawing((d) => !d)}>
@@ -239,7 +257,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
             </Suspense>
           ) : model ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <ModelView url={link.url} format={model} projectId={doc?.project_id ?? ""} documentId={documentId}
+              <ModelView key={optimized ? "glb" : "ifc"} url={optimized ? derivative!.url! : link.url} format={optimized ? "glb" : model} projectId={doc?.project_id ?? ""} documentId={documentId}
                        onOpenDocument={(id, search) => openDocument(id, { search })} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.ref, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>

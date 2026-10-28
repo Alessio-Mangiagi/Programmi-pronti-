@@ -5,11 +5,22 @@
 // "Livello 2", "Copertura"), fanno da piano con quota e codice livello come i piani IFC.
 // Sotto la CSP di produzione: le texture si caricano come <img> (img-src blob:/data:), non con fetch, e un .gltf
 // con i buffer in data: URI si ricompone in .glb prima della lettura (connect-src non ammette data:).
+// Il derivato di un IFC pesante prodotto dal worker (ifc2glb.py) porta in `extras` GlobalId, tipo IFC, quota dei
+// piani e Pset: albero, annotazioni e tavole collegate si comportano come sull'IFC originale. La geometria di un
+// elemento sta in un nodo figlio "part" (matrice di posizionamento): appartiene all'elemento, non è un nodo a sé.
 import * as THREE from "three";
 import { GLTFLoader, type GLTF, type GLTFLoaderPlugin, type GLTFParser } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { AddMesh, ElementProps, ModelSource, SpatialNode } from "./model3d";
 
 interface NodeDef { name?: string; mesh?: number; children?: number[]; extras?: Record<string, unknown> }
+
+const isPart = (n: NodeDef | undefined) => n?.extras?.part === true;
+
+/** Dati IFC di un nodo del derivato (vuoto per i glTF qualsiasi). */
+function ifcOf(n: NodeDef | undefined): { guid: string; type: string } | null {
+  const e = n?.extras;
+  return e && typeof e.type === "string" && /^Ifc/.test(e.type) ? { guid: typeof e.GlobalId === "string" ? e.GlobalId : "", type: e.type } : null;
+}
 interface GltfJson {
   scene?: number;
   scenes?: { name?: string; nodes?: number[] }[];
@@ -56,7 +67,7 @@ export class GltfSource implements ModelSource {
       const out: number[] = [];
       for (let x: THREE.Object3D | null = o; x; x = x.parent) {
         const n = assoc.get(x)?.nodes;
-        if (n !== undefined) out.push(n);
+        if (n !== undefined && !isPart(this.json.nodes?.[n])) out.push(n);
       }
       return out;
     };
@@ -86,6 +97,8 @@ export class GltfSource implements ModelSource {
     for (const n of nodes) if (n.name) seen.set(n.name, (seen.get(n.name) ?? 0) + 1);
     for (const id of this.triangles.keys()) {
       const name = nodes[id]?.name ?? "";
+      const guid = ifcOf(nodes[id])?.guid;
+      if (guid) { this.refs.set(id, guid); continue; }                 // derivato IFC: le annotazioni restano sul GUID
       this.refs.set(id, name && seen.get(name) === 1 ? name.slice(0, 120) : `${name.slice(0, 100) || "nodo"}#${id}`);
     }
   }
@@ -98,6 +111,8 @@ export class GltfSource implements ModelSource {
   }
 
   elevationOf(id: number): number {
+    const elevation = this.json.nodes?.[id]?.extras?.Elevation;
+    if (typeof elevation === "number") return elevation;
     const box = this.boxes.get(id);
     return box && !box.isEmpty() ? box.min.y : 0;
   }
@@ -105,17 +120,25 @@ export class GltfSource implements ModelSource {
   async properties(id: number): Promise<ElementProps | null> {
     const node = this.json.nodes?.[id];
     if (!node) return null;
-    const mesh = node.mesh !== undefined ? this.json.meshes?.[node.mesh] : undefined;
+    const owner = node.mesh !== undefined ? node
+      : (node.children ?? []).map((c) => this.json.nodes?.[c]).find((c) => isPart(c) && c?.mesh !== undefined);
+    const mesh = owner?.mesh !== undefined ? this.json.meshes?.[owner.mesh] : undefined;
     const materials = [...new Set((mesh?.primitives ?? []).map((p) => (p.material !== undefined ? this.json.materials?.[p.material]?.name : undefined))
       .filter((n): n is string => !!n))];
-    const extras = Object.entries(node.extras ?? {}).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)] as [string, string]);
+    const ifc = ifcOf(node);
+    const text = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
+    const extras = Object.entries(node.extras ?? {}).filter(([k]) => !ifc || !["GlobalId", "type", "Psets"].includes(k))
+      .map(([k, v]) => [k, text(v)] as [string, string]);
+    const psets = ifc ? Object.entries((node.extras?.Psets ?? {}) as Record<string, Record<string, unknown>>)
+      .map(([name, props]) => ({ name, props: Object.entries(props).map(([k, v]) => [k, text(v)] as [string, string]) })) : [];
     const geometry: [string, string][] = [];
     if (mesh?.name) geometry.push(["Mesh", mesh.name]);
     if (materials.length) geometry.push([materials.length > 1 ? "Materiali" : "Materiale", materials.join(", ")]);
     geometry.push(["Triangoli", Math.round(this.triangles.get(id) ?? 0).toLocaleString("it-IT")]);
     return {
-      name: node.name ?? "", guid: "", ref: this.refs.get(id) ?? `nodo#${id}`, type: "Oggetto glTF",
-      psets: [{ name: "Proprietà personalizzate", props: extras }, { name: "Geometria", props: geometry }].filter((p) => p.props.length),
+      name: node.name ?? "", guid: ifc?.guid ?? "", ref: this.refs.get(id) ?? `nodo#${id}`, type: ifc?.type ?? "Oggetto glTF",
+      psets: [...psets, { name: ifc ? "Altro" : "Proprietà personalizzate", props: extras }, { name: "Geometria", props: geometry }]
+        .filter((p) => p.props.length),
     };
   }
 
@@ -123,13 +146,16 @@ export class GltfSource implements ModelSource {
     const nodes = this.json.nodes ?? [];
     const build = (i: number, depth: number): SpatialNode | null => {
       const n = nodes[i];
-      if (!n || depth > 64) return null;
+      if (!n || depth > 64 || isPart(n)) return null;
       const children = (n.children ?? []).map((c) => build(c, depth + 1)).filter((c): c is SpatialNode => !!c);
-      if (n.mesh === undefined && !children.length) return null;           // camere, luci, vuoti senza geometria
-      const type = n.mesh !== undefined ? "MESH" : LEVEL.test(n.name ?? "") ? "LEVEL" : "GROUP";
+      const ownsGeometry = n.mesh !== undefined || (n.children ?? []).some((c) => isPart(nodes[c]));
+      if (!ownsGeometry && !children.length && !ifcOf(n)) return null;     // camere, luci, vuoti senza geometria
+      const type = ifcOf(n)?.type ?? (ownsGeometry ? "MESH" : LEVEL.test(n.name ?? "") ? "LEVEL" : "GROUP");
       return { expressID: i, type, children };
     };
     const roots = this.json.scenes?.[this.json.scene ?? 0]?.nodes ?? [];
+    const top = roots.map((i) => build(i, 0)).filter((c): c is SpatialNode => !!c);
+    if (top.length === 1 && top[0].type.toUpperCase() === "IFCPROJECT") return top[0];   // come l'albero di web-ifc
     return { expressID: -1, type: "SCENE", children: roots.map((i) => build(i, 0)).filter((c): c is SpatialNode => !!c) };
   }
 
