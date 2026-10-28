@@ -171,6 +171,7 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
           Un utente disattivato non accede più e i suoi link già emessi smettono di funzionare; i documenti e lo storico restano.
         </Typography>
       </Paper>
+      <SecurityLog orgId={orgId} />
       {resetting && (
         <Dialog open onClose={() => setResetting(null)} maxWidth="xs">
           <DialogTitle>Azzerare l'MFA di {resetting.first_name} {resetting.last_name}?</DialogTitle>
@@ -345,6 +346,71 @@ function SsoPanel({ orgId }: { orgId: string }) {
             </Stack>
           </Stack>
         </Box>
+      )}
+    </Paper>
+  );
+}
+
+interface SecEvent { id: number; occurred_at: string; event_type: string; user_name: string | null; email: string | null; ip: string | null; details: Record<string, unknown> }
+
+const SEC_LABEL: Record<string, string> = {
+  LOGIN_OK: "Accesso", LOGIN_FAIL: "Accesso fallito", LOGIN_LOCKED: "Accesso bloccato (troppi tentativi)",
+  LOGIN_PASSWORD_OK: "Password corretta, in attesa del 2° fattore", LOGIN_SSO_OK: "Single sign-on riuscito", LOGOUT: "Uscita",
+  MFA_FAIL: "Secondo fattore errato", MFA_ENROLLED: "Secondo fattore configurato", MFA_ENROLL_FAIL: "Configurazione MFA fallita",
+  MFA_REMOVED: "Secondo fattore rimosso", MFA_RESET_BY_ADMIN: "MFA azzerata dall'admin", RECOVERY_CODES_REGENERATED: "Recovery code rigenerati",
+  PASSWORD_CHANGED: "Password cambiata", PASSWORD_CHANGE_FAIL: "Cambio password fallito", PASSWORD_RESET: "Password reimpostata",
+  PASSWORD_RESET_REQUESTED: "Reset password richiesto", TOKEN_REUSE: "Riuso di una sessione (possibile furto)",
+  SESSION_REVOKED: "Sessione chiusa", SESSIONS_REVOKED: "Chiuse le altre sessioni", INVITATION_ACCEPTED: "Invito accettato",
+  USER_INVITED: "Utente invitato", USER_UPDATED: "Utente modificato", ORGANIZATION_UPDATED: "Organizzazione modificata",
+  ORGANIZATION_CREATED: "Organizzazione creata", SSO_CONFIGURED: "Single sign-on configurato", SSO_REMOVED: "Single sign-on rimosso",
+  SSO_FAIL: "Single sign-on fallito",
+};
+const ALERT = new Set(["LOGIN_LOCKED", "TOKEN_REUSE", "MFA_RESET_BY_ADMIN", "SSO_FAIL"]);
+
+function SecurityLog({ orgId }: { orgId: string }) {
+  const [type, setType] = useState("");
+  const [pages, setPages] = useState<SecEvent[][]>([]);
+  const { data: first = [] } = useQuery({
+    queryKey: ["organization", orgId, "security-events", type],
+    queryFn: () => api<SecEvent[]>(`/organizations/${orgId}/security-events?limit=50${type ? `&type=${type}` : ""}`),
+  });
+  useEffect(() => setPages([]), [type, orgId]);
+  const events = [first, ...pages].flat();
+  const more = useMutation({
+    mutationFn: () => api<SecEvent[]>(`/organizations/${orgId}/security-events?limit=50&before=${events[events.length - 1].id}${type ? `&type=${type}` : ""}`),
+    onSuccess: (page) => setPages((p) => [...p, page]),
+  });
+  const exhausted = pages.length > 0 && pages[pages.length - 1].length < 50;
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }} component="section" aria-label="Accessi e sicurezza">
+      <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap" mb={1}>
+        <Typography variant="h6" component="h3" fontWeight={600} flexGrow={1}>Accessi e sicurezza</Typography>
+        <TextField select size="small" label="Evento" value={type} sx={{ minWidth: 220 }} onChange={(e) => setType(e.target.value)}>
+          <MenuItem value="">Tutti</MenuItem>
+          {Object.entries(SEC_LABEL).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
+        </TextField>
+      </Stack>
+      <Typography variant="body2" color="text.secondary" mb={1}>
+        Accessi, secondo fattore, single sign-on e gestione degli utenti. Le attività nelle commesse sono nel registro di ciascuna commessa.
+      </Typography>
+      <Table size="small">
+        <TableHead><TableRow><TableCell>Quando</TableCell><TableCell>Evento</TableCell><TableCell>Utente</TableCell><TableCell>IP</TableCell></TableRow></TableHead>
+        <TableBody>
+          {events.map((e) => (
+            <TableRow key={e.id}>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>{new Date(e.occurred_at).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" })}</TableCell>
+              <TableCell>
+                {ALERT.has(e.event_type) ? <Chip size="small" color="warning" label={SEC_LABEL[e.event_type]} /> : (SEC_LABEL[e.event_type] ?? e.event_type)}
+              </TableCell>
+              <TableCell>{e.user_name ?? (typeof e.details.email === "string" ? e.details.email : "—")}</TableCell>
+              <TableCell>{e.ip ?? "—"}</TableCell>
+            </TableRow>
+          ))}
+          {events.length === 0 && <TableRow><TableCell colSpan={4}>Nessun evento.</TableCell></TableRow>}
+        </TableBody>
+      </Table>
+      {events.length >= 50 && !exhausted && (
+        <Button sx={{ mt: 1 }} disabled={more.isPending} onClick={() => more.mutate()}>Carica i precedenti</Button>
       )}
     </Paper>
   );

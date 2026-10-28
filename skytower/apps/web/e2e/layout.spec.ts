@@ -13,7 +13,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 900 }], ["ta
     const { projectId } = await projectAndFolder(api, () => true);
     await page.setViewportSize(viewport);
     await loginUi(page, "com.admin@com.example");
-    const pages = [...TABS.map((t) => `/progetti/${projectId}/${t}`), "/", "/compiti", "/sicurezza"];
+    const pages = [...TABS.map((t) => `/progetti/${projectId}/${t}`), "/", "/compiti", "/sicurezza", "/organizzazione"];
     const overflowing: string[] = [];
     for (const path of pages) {
       await page.goto(path);

@@ -52,6 +52,11 @@ test("l'admin gestisce gli utenti della propria organizzazione", async ({ page, 
   await page.getByRole("dialog", { name: /Azzerare l'MFA di Des Viewer/ }).getByRole("button", { name: "Azzera" }).click();
   await expect(page.getByText(/Secondo fattore azzerato per des\.viewer@des\.example/)).toBeVisible();
   await expect(viewer.getByText("App", { exact: true })).toBeHidden();
+  // e l'azzeramento resta nel registro di sicurezza dell'organizzazione
+  const log = page.getByRole("region", { name: "Accessi e sicurezza" });
+  await page.reload();
+  await expect(log.getByText("MFA azzerata dall'admin").first()).toBeVisible();
+  await expect(log.getByRole("row", { name: /Utente invitato/ }).first()).toBeVisible();
 
   // l'admin non può togliersi il ruolo da solo
   const self = users.getByRole("row", { name: /des\.admin@des\.example/ });
