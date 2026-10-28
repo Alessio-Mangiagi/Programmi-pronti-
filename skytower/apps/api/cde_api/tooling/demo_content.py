@@ -457,6 +457,8 @@ def populate(api: str, password: str = DEMO_PASSWORD) -> dict:
         lambda c, r, v: ifc_complex.build(), "SHARED", "des_admin")
     add("glb_vis", "des_designer", "Modelli BIM", "DES", "ZZ", "M3", "A", "glb", "model/gltf-binary",
         "Modello di studio Padiglione C (Blender)", lambda c, r, v: glb_model.build(), "SHARED", "des_lead")
+    add("ifc_campus", "des_lead", "Modelli BIM", "DES", "ZZ", "M3", "A", "ifc", ifc, "Modello campus 4 padiglioni",
+        lambda c, r, v: ifc_complex.build(padiglioni=4), "SHARED", "des_admin")      # pesante: derivato .glb (ADR-31)
 
     # annotazioni sulle tavole e sul modello
     if "pianta0" in docs:

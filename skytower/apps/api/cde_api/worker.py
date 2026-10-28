@@ -5,15 +5,19 @@ Pipeline post-upload (G15): lettura in streaming dell'oggetto S3 → SHA-256 con
 dichiarato → antivirus → tipo MIME reale. Esito su cde.file_objects; file non conformi in quarantena
 (download bloccato dal DB, oggetto S3 marcato con tag).
 
+Dopo la verifica: testo per la ricerca (ADR-26) e, per gli IFC pesanti, il derivato .glb per il viewer (ADR-31).
+
 Avvio: ``cde worker``.
 """
 from __future__ import annotations
 
 import hashlib
 import logging
+import tempfile
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from uuid import UUID
 
 import filetype
@@ -64,8 +68,10 @@ class _Tap:
             pass
 
 
-def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UUID) -> VerifyOutcome | None:
-    """Idempotente: un file già verificato viene ignorato. Nessun lock tenuto durante la scansione."""
+def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UUID, *,
+                derivative_min_bytes: int | None = None) -> VerifyOutcome | None:
+    """Idempotente: un file già verificato viene ignorato. Nessun lock tenuto durante la scansione.
+    Con ``derivative_min_bytes`` un IFC verificato di almeno quella dimensione riceve subito il derivato .glb."""
     f = conn.execute(
         "SELECT id, project_id, storage_key, storage_version_id, size_bytes, content_type, sha256, scan_status "
         "FROM cde.file_objects WHERE id = %s", [file_id],
@@ -110,7 +116,44 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
         except Exception:                   # noqa: BLE001 - la ricerca non deve mai far ripetere la verifica
             conn.rollback()
             log.exception("testo del file %s non indicizzato: ci riprova il job periodico", file_id)
+        if derivative_min_bytes is not None:
+            with conn.transaction():
+                wanted = conn.execute("SELECT cde.derivative_request(%s, %s) AS w",
+                                      [file_id, derivative_min_bytes]).fetchone()["w"]
+            if wanted:
+                make_derivatives(conn, storage)
     return outcome
+
+
+def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2, stale: str = "30 minutes") -> int:
+    """Converte gli IFC in attesa di derivato (.glb). Un errore non blocca: dopo tre tentativi resta FAILED e il
+    viewer apre l'IFC originale con web-ifc."""
+    from . import ifc2glb
+
+    with conn.transaction():
+        rows = conn.execute("SELECT * FROM cde.derivatives_claim(%s, %s::interval)", [limit, stale]).fetchall()
+    for r in rows:
+        key = f"projects/{r['project_id']}/derivatives/{r['file_id']}.glb"
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                src, dst = Path(tmp) / "modello.ifc", Path(tmp) / "modello.glb"
+                with src.open("wb") as out:
+                    for chunk in storage.iter_object(r["storage_key"], r["storage_version_id"]):
+                        out.write(chunk)
+                result = ifc2glb.convert(src, dst)
+                version = storage.put_file(key, str(dst), "model/gltf-binary")
+            detail = f"{result.elements} elementi, {result.triangles} triangoli"
+            with conn.transaction():
+                conn.execute("SELECT cde.derivative_done(%s, true, %s, %s, %s, %s)",
+                             [r["file_id"], key, version, result.size_bytes, detail])
+            log.info("derivato .glb del file %s: %s, %s byte", r["file_id"], detail, result.size_bytes)
+        except Exception as exc:  # noqa: BLE001 - IFC malformati o non supportati: il viewer usa l'originale
+            conn.rollback()
+            log.exception("derivato .glb del file %s non riuscito (tentativo %s)", r["file_id"], r["attempts"])
+            with conn.transaction():
+                conn.execute("SELECT cde.derivative_done(%s, false, NULL, NULL, NULL, %s)",
+                             [r["file_id"], f"{type(exc).__name__}: {exc}"])
+    return len(rows)
 
 
 def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None = None, limit: int = 20) -> int:
@@ -151,7 +194,7 @@ app = procrastinate.App(connector=procrastinate.PsycopgConnector(conninfo=get_se
 def verify_file_task(file_id: str) -> None:
     storage, scanner, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
-        verify_file(conn, storage, scanner, UUID(file_id))
+        verify_file(conn, storage, scanner, UUID(file_id), derivative_min_bytes=settings.ifc_derivative_min_bytes)
 
 
 def run_worker() -> None:  # pragma: no cover - processo di lunga durata
@@ -201,6 +244,15 @@ def index_text_task(timestamp: int) -> None:
         n = index_text(conn, storage, limit=50)
     if n:
         log.info("testo indicizzato per %s file", n)
+
+
+@app.periodic(cron="*/5 * * * *", periodic_id="ifc-derivatives")
+@app.task(name="cde.ifc_derivatives", queue="default")
+def ifc_derivatives_task(timestamp: int) -> None:
+    """Riprende i derivati .glb rimasti in attesa (worker fermato durante la conversione, errori temporanei)."""
+    storage, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
+        make_derivatives(conn, storage, limit=4)
 
 
 @app.periodic(cron="*/15 * * * *", periodic_id="deadlines")

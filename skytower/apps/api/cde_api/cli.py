@@ -75,6 +75,8 @@ def cmd_dev(args) -> None:
         "CDE_REFRESH_COOKIE_PATH": "/api/auth",
         "CDE_S3_ENDPOINT_URL": s3,
     })
+    # in sviluppo il derivato .glb si vede già con il modello demo da 4 padiglioni (2,4 MB)
+    os.environ.setdefault("CDE_IFC_DERIVATIVE_MIN_BYTES", str(2 * 1024 ** 2))
     from .config import get_settings
     from .storage import Storage
 

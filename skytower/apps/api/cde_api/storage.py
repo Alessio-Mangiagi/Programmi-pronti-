@@ -116,6 +116,11 @@ class Storage:
                                      ChecksumAlgorithm="SHA256")
         return res.get("VersionId")
 
+    def put_file(self, key: str, path: str, content_type: str) -> str | None:
+        """Carica un file prodotto dal worker (es. derivato per il viewer), in più parti se grande."""
+        self.client.upload_file(path, self.bucket, key, ExtraArgs={"ContentType": content_type, "ChecksumAlgorithm": "SHA256"})
+        return self.client.head_object(Bucket=self.bucket, Key=key).get("VersionId")
+
     def get_bytes(self, key: str, version_id: str | None) -> bytes:
         params = {"Bucket": self.bucket, "Key": key, **({"VersionId": version_id} if version_id else {})}
         return self.client.get_object(**params)["Body"].read()

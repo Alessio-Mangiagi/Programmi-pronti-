@@ -828,7 +828,7 @@ def _downloadable(conn, revision_id: uuid.UUID) -> dict:
     """La revisione, se l'utente corrente può scaricarla e il file è verificato; altrimenti 403/404/409/423."""
     rev = conn.execute(
         """SELECT r.id, r.original_filename, r.project_id, r.state, r.revision_code, d.container_id, d.identifier,
-                  f.storage_key, f.storage_version_id, f.scan_status, f.sha256_verified, f.size_bytes
+                  f.id AS file_id, f.storage_key, f.storage_version_id, f.scan_status, f.sha256_verified, f.size_bytes
            FROM cde.document_revisions r JOIN cde.documents d ON d.id = r.document_id
            JOIN cde.file_objects f ON f.id = r.file_object_id WHERE r.id = %s""", [revision_id]).fetchone()
     if rev is None:
@@ -888,8 +888,25 @@ def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment",
     else:
         url = _storage(c).presign_get(rev["storage_key"], rev["storage_version_id"], rev["original_filename"], ttl,
                                       inline_type=inline_type)
-    return {"url": url, "expires_in": ttl, "filename": rev["original_filename"], "content_type": inline_type,
-            "watermark": watermark}
+    out = {"url": url, "expires_in": ttl, "filename": rev["original_filename"], "content_type": inline_type,
+           "watermark": watermark, "derivative": None}
+    if inline_type == "application/x-step":
+        out["derivative"] = _derivative(c, rev, ttl)
+    return out
+
+
+def _derivative(c: Ctx, rev: dict, ttl: int) -> dict | None:
+    """Derivato .glb di un IFC pesante (ADR-31): pronto, in preparazione o non riuscito."""
+    with c.tx() as conn:
+        d = conn.execute("SELECT status, storage_key, storage_version_id, size_bytes FROM cde.file_derivatives "
+                         "WHERE file_object_id = %s AND kind = 'GLB'", [rev["file_id"]]).fetchone()
+    if d is None:
+        return None
+    if d["status"] != "READY":
+        return {"status": d["status"], "url": None, "size_bytes": None}
+    url = _storage(c).presign_get(d["storage_key"], d["storage_version_id"], f"{rev['identifier']}.glb", ttl,
+                                  inline_type="model/gltf-binary")
+    return {"status": "READY", "url": url, "size_bytes": d["size_bytes"]}
 
 
 @router.get("/revisions/{revision_id}/watermarked")
