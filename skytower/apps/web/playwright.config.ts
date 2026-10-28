@@ -13,6 +13,7 @@ const PYTHON = process.env.PYTHON
   ?? "python";
 const API_PORT = 8310;
 const WEB_PORT = 4310;
+export const IDP_PORT = 4320;
 const S3 = `http://127.0.0.1:${API_PORT + 1000}`;   // S3 emulato al posto del bucket regionale
 // stessa CSP della produzione (modules/cde-platform/edge.tf, spa_csp): tutti i test girano sotto questa politica
 export const SPA_CSP = [
@@ -36,11 +37,19 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 1000 } } }],
   webServer: [
     {
+      // IdP OpenID Connect finto per sso.spec.ts
+      command: `node e2e/mock-idp.mjs ${IDP_PORT}`,
+      url: `http://127.0.0.1:${IDP_PORT}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
       command: `"${PYTHON}" -m cde_api.cli dev --reset --data-dir "${join(tmpdir(), "cde-e2e")}" --port ${API_PORT} --s3-port ${API_PORT + 1000}`,
       cwd: resolve(ROOT, "apps/api"),
       // ambiente usa-e-getta: ogni test fa il proprio login, il limite anti-forzatura di produzione li bloccherebbe
-      // la SPA di prova gira su un altro origin: le chiavi di sicurezza devono poterlo usare
-      env: { CDE_LOGIN_RATE_LIMIT: "1000/minute", CDE_WEBAUTHN_ORIGINS: `["http://localhost:${WEB_PORT}"]` },
+      // la SPA di prova gira su un altro origin: chiavi di sicurezza e ritorno dal single sign-on puntano lì
+      env: { CDE_LOGIN_RATE_LIMIT: "1000/minute", CDE_WEB_BASE_URL: `http://localhost:${WEB_PORT}`,
+             CDE_WEBAUTHN_ORIGINS: `["http://localhost:${WEB_PORT}"]` },
       url: `http://127.0.0.1:${API_PORT}/health`,
       reuseExistingServer: false,
       timeout: 180_000,

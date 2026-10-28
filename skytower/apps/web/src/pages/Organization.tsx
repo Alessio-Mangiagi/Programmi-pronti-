@@ -1,11 +1,11 @@
 // "><(((º> sabusabu <º)))><"
 // La mia organizzazione (org admin): dati, policy MFA, utenti — inviti, reinvio, disattivazione, ruolo di admin.
-// Il platform admin sceglie l'organizzazione da gestire e ne crea di nuove.
-import { FormEvent, useState } from "react";
+// Il platform admin sceglie l'organizzazione da gestire e ne crea di nuove. Single sign-on OpenID Connect (SsoPanel).
+import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack,
   Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import { api, ApiError } from "../api";
@@ -107,6 +107,7 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
         )}
       </Paper>
 
+      <SsoPanel orgId={orgId} />
       <Paper variant="outlined" sx={{ p: 2 }} component="section" aria-label="Utenti dell'organizzazione">
         <Stack direction="row" alignItems="center" mb={1}>
           <Typography variant="h6" component="h3" fontWeight={600} flexGrow={1}>Utenti ({users.length})</Typography>
@@ -253,5 +254,98 @@ function NewOrgDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <Button type="submit" variant="contained" disabled={create.isPending}>Crea</Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+interface SsoConfig {
+  issuer: string; client_id: string; email_domains: string[]; enabled: boolean; enforce: boolean; idp_mfa: boolean;
+  has_client_secret: boolean;
+}
+
+function SsoPanel({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["organization", orgId, "sso"],
+    queryFn: () => api<{ redirect_uri: string; sso: SsoConfig | null }>(`/organizations/${orgId}/sso`),
+  });
+  const [form, setForm] = useState({ issuer: "", client_id: "", client_secret: "", domains: "", enabled: true, enforce: false, idp_mfa: true });
+  const [editing, setEditing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    const c = data?.sso;
+    if (c) setForm({ issuer: c.issuer, client_id: c.client_id, client_secret: "", domains: c.email_domains.join(", "),
+                     enabled: c.enabled, enforce: c.enforce, idp_mfa: c.idp_mfa });
+  }, [data]);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["organization", orgId, "sso"] });
+  const save = useMutation({
+    mutationFn: () => api(`/organizations/${orgId}/sso`, { method: "PUT", json: {
+      issuer: form.issuer.trim(), client_id: form.client_id.trim(), client_secret: form.client_secret || null,
+      email_domains: form.domains.split(/[,\s]+/).filter(Boolean), enabled: form.enabled, enforce: form.enforce, idp_mfa: form.idp_mfa,
+    } }),
+    onSuccess: () => { setEditing(false); setNotice("Single sign-on salvato"); refresh(); },
+  });
+  const check = useMutation({
+    mutationFn: () => api<{ authorization_endpoint: string }>(`/organizations/${orgId}/sso/test`, { method: "POST" }),
+    onSuccess: (r) => setNotice(`Il provider risponde (accesso su ${new URL(r.authorization_endpoint).host})`),
+  });
+  const remove = useMutation({
+    mutationFn: () => api(`/organizations/${orgId}/sso`, { method: "DELETE" }),
+    onSuccess: () => { setNotice("Single sign-on rimosso: si accede con email e password"); refresh(); },
+  });
+  const failure = [save.error, check.error, remove.error].find(Boolean) as ApiError | undefined;
+  if (!data) return null;
+  const cfg = data.sso;
+  const set = (k: keyof typeof form) => (e: { target: { value: string; checked?: boolean } }) =>
+    setForm({ ...form, [k]: typeof form[k] === "boolean" ? !!e.target.checked : e.target.value });
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }} component="section" aria-label="Single sign-on">
+      <Typography variant="h6" component="h3" fontWeight={600}>Single sign-on (OpenID Connect)</Typography>
+      <Typography variant="body2" color="text.secondary" mb={1.5}>
+        Gli utenti accedono con l'account aziendale (Microsoft Entra ID, Google Workspace, Okta...). Nel provider
+        registra un'applicazione web con questo URI di reindirizzamento: <b style={{ wordBreak: "break-all" }}>{data.redirect_uri}</b>
+      </Typography>
+      {notice && <Alert severity="success" onClose={() => setNotice(null)} sx={{ mb: 1.5 }}>{notice}</Alert>}
+      {failure && <Alert severity="error" sx={{ mb: 1.5 }}>{failure.message}</Alert>}
+      {cfg && !editing ? (
+        <Stack spacing={1}>
+          <Typography variant="body2">Issuer <b>{cfg.issuer}</b> · client <b>{cfg.client_id}</b> · domini <b>{cfg.email_domains.join(", ")}</b></Typography>
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <Chip size="small" color={cfg.enabled ? "success" : "default"} label={cfg.enabled ? "Attivo" : "Disattivato"} />
+            {cfg.enforce && <Chip size="small" color="warning" label="Password disattivata per gli utenti" />}
+            <Chip size="small" variant="outlined" label={cfg.idp_mfa ? "MFA garantita dal provider" : "MFA del CDE"} />
+          </Stack>
+          <Stack direction="row" gap={1} flexWrap="wrap" mt={1}>
+            <Button variant="outlined" onClick={() => setEditing(true)}>Modifica</Button>
+            <Button onClick={() => check.mutate()} disabled={check.isPending}>Prova la connessione</Button>
+            <Button color="error" onClick={() => remove.mutate()} disabled={remove.isPending}>Rimuovi</Button>
+          </Stack>
+        </Stack>
+      ) : !cfg && !editing ? (
+        <Button variant="outlined" onClick={() => setEditing(true)}>Configura il single sign-on</Button>
+      ) : (
+        <Box component="form" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
+          <Stack spacing={2} maxWidth={560}>
+            <TextField size="small" label="Issuer" required value={form.issuer} onChange={set("issuer")}
+                       helperText="Es. https://login.microsoftonline.com/<tenant-id>/v2.0" />
+            <TextField size="small" label="Client ID" required value={form.client_id} onChange={set("client_id")} />
+            <TextField size="small" label="Client secret" type="password" value={form.client_secret} onChange={set("client_secret")}
+                       autoComplete="new-password"
+                       helperText={cfg?.has_client_secret ? "Lascia vuoto per mantenere quello salvato" : "Vuoto per un client pubblico (solo PKCE)"} />
+            <TextField size="small" label="Domini email" required value={form.domains} onChange={set("domains")}
+                       helperText="Separati da virgola, es. impresa.it, impresa.com" />
+            <FormControlLabel label="Attivo" control={<Switch checked={form.enabled} onChange={set("enabled")} />} />
+            <FormControlLabel label="Il provider impone già l'autenticazione a due fattori" control={<Switch checked={form.idp_mfa} onChange={set("idp_mfa")} />} />
+            <FormControlLabel label="Obbligatorio: disattiva l'accesso con password per gli utenti dell'organizzazione"
+                              control={<Switch checked={form.enforce} onChange={set("enforce")} />} />
+            {form.enforce && <Alert severity="warning">Prova prima l'accesso con il single sign-on: con l'obbligo attivo la password non vale più.</Alert>}
+            <Stack direction="row" gap={1}>
+              <Button type="submit" variant="contained" disabled={save.isPending}>Salva</Button>
+              <Button onClick={() => setEditing(false)}>Annulla</Button>
+            </Stack>
+          </Stack>
+        </Box>
+      )}
+    </Paper>
   );
 }
