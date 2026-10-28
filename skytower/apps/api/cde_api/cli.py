@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 from urllib.parse import quote
 
-from .tooling import dbadmin, demo_seed, dev_s3
+from .tooling import dbadmin, demo_seed, dev_s3, personal_accounts
 
 DEV_DIR = dbadmin.REPO_ROOT / ".devdata"
 DEV_PASSWORDS = {"cde_owner": "dev-owner", "cde_app": "dev-app", "cde_auth": "dev-auth", "cde_worker": "dev-worker"}
@@ -39,8 +39,12 @@ def cmd_dev(args) -> None:
     s3_state = data_dir / "s3-state.pkl"          # file dell'S3 emulato: vanno e vengono con il database
     if args.reset:
         s3_state.unlink(missing_ok=True)
+    personal = data_dir / personal_accounts.FILENAME
     superuser = dbadmin.start_embedded(data_dir / "pg", cleanup_mode=None)
-    urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=args.reset)
+    urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=False)
+    personal_accounts.export(urls.owner, personal)           # anche la password cambiata dall'app
+    if args.reset:
+        urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=True)
     applied = dbadmin.migrate(urls.owner)
     print(f"Migrazioni applicate: {applied or 'nessuna (schema aggiornato)'}")
     with psycopg.connect(urls.owner) as conn:
@@ -54,6 +58,9 @@ def cmd_dev(args) -> None:
         print(f"Dati demo caricati — password per tutti: {demo_seed.DEMO_PASSWORD}")
         for key, email in world.emails.items():
             print(f"  {key:<14} {email}")
+    restored = personal_accounts.restore(urls.owner, personal)
+    if restored:
+        print("Account personali pronti (stessa password di sempre):", ", ".join(restored))
 
     s3 = dev_s3.start(args.s3_port, s3_state)
     os.environ.update({
@@ -114,9 +121,10 @@ def cmd_seed(_args) -> None:
 
 
 def cmd_dev_user(args) -> None:
-    """Crea o aggiorna un account amministratore nell'ambiente `cde dev` (dopo un --reset sparisce).
+    """Crea un account amministratore nell'ambiente `cde dev` o ne cambia la password; resta anche dopo i reset.
 
-    La password arriva solo da CDE_NUOVA_PWD: non compare su file, nella riga di comando né nei log.
+    La password arriva solo da CDE_NUOVA_PWD: non compare su file, nella riga di comando né nei log
+    (in .devdata/account-personali.json finisce solo la sua impronta argon2, come nel database).
     """
     import psycopg
     from argon2 import PasswordHasher
@@ -142,27 +150,9 @@ def cmd_dev_user(args) -> None:
         org = conn.execute("SELECT id FROM cde.organizations WHERE code = %s", [args.org]).fetchone()
         if org is None:
             sys.exit(f"Organizzazione {args.org} non trovata")
-        row = conn.execute("SELECT id FROM cde.users WHERE email = %s", [email]).fetchone()
-        if row:
-            user_id = row[0]
-            conn.execute("""UPDATE cde.users SET password_hash = %s, status = 'ACTIVE', is_org_admin = true,
-                                is_platform_admin = true, failed_login_count = 0, locked_until = NULL,
-                                password_changed_at = now() WHERE id = %s""", [pwd_hash, user_id])
-        else:
-            user_id = conn.execute(
-                """INSERT INTO cde.users (organization_id, email, first_name, last_name, password_hash, status,
-                                          is_org_admin, is_platform_admin, password_changed_at)
-                   VALUES (%s, %s, %s, %s, %s, 'ACTIVE', true, true, now()) RETURNING id""",
-                [org[0], email, args.nome, args.cognome, pwd_hash]).fetchone()[0]
-        # Project Admin sulle commesse dell'organizzazione
-        added = conn.execute(
-            """INSERT INTO cde.project_memberships (project_id, user_id, role_id)
-               SELECT p.id, %s, r.id FROM cde.projects p
-               JOIN cde.roles r ON r.project_id IS NULL AND r.code = 'PROJECT_ADMIN'
-               WHERE p.owner_organization_id = %s
-                 AND NOT EXISTS (SELECT 1 FROM cde.project_memberships m WHERE m.project_id = p.id AND m.user_id = %s)""",
-            [user_id, org[0], user_id]).rowcount
-    print(f"Account {email} pronto ({'aggiornato' if row else 'creato'}; Project Admin su {added} commesse nuove)")
+        created = personal_accounts.upsert(conn, org[0], email, args.nome, args.cognome, pwd_hash)
+    personal_accounts.export(urls.owner, args.data_dir / personal_accounts.FILENAME)
+    print(f"Account {email} pronto ({'creato' if created else 'password aggiornata'}), anche dopo i reset")
 
 
 def cmd_demo_content(args) -> None:
