@@ -302,6 +302,9 @@ con `watermark: true`).
 filigranato è rifiutato con un messaggio, perché consegnare l'originale annullerebbe la scelta dell'admin.
 PDF protetti da password o danneggiati: errore 422, da risolvere ricaricando il file. Dissuade e traccia,
 non impedisce: chi ha il permesso di scaricare può comunque fotografare o ricopiare il contenuto.
+Il ticket viaggia nella query string, quindi compare nei log di accesso di CloudFront e ALB: vale 5', solo
+per quella revisione e quell'utente, e a ogni uso si ricontrollano permessi e stato dell'utente; chi legge
+quei log ha comunque accesso privilegiato all'infrastruttura.
 
 ## ADR-24 — Chiavi di sicurezza e passkey (WebAuthn) come secondo fattore
 
