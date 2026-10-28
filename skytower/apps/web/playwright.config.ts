@@ -39,7 +39,8 @@ export default defineConfig({
       command: `"${PYTHON}" -m cde_api.cli dev --reset --data-dir "${join(tmpdir(), "cde-e2e")}" --port ${API_PORT} --s3-port ${API_PORT + 1000}`,
       cwd: resolve(ROOT, "apps/api"),
       // ambiente usa-e-getta: ogni test fa il proprio login, il limite anti-forzatura di produzione li bloccherebbe
-      env: { CDE_LOGIN_RATE_LIMIT: "1000/minute" },
+      // la SPA di prova gira su un altro origin: le chiavi di sicurezza devono poterlo usare
+      env: { CDE_LOGIN_RATE_LIMIT: "1000/minute", CDE_WEBAUTHN_ORIGINS: `["http://localhost:${WEB_PORT}"]` },
       url: `http://127.0.0.1:${API_PORT}/health`,
       reuseExistingServer: false,
       timeout: 180_000,

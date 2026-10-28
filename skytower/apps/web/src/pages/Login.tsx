@@ -5,17 +5,20 @@ import { Alert, Box, Button, Link, Stack, TextField, Typography } from "@mui/mat
 import { api, ApiError, setAccessToken } from "../api";
 import { useAuth } from "../auth";
 import { AuthCard, RecoveryCodes } from "../components/AuthCard";
+import { createCredential, getAssertion, webauthnError, webauthnSupported } from "../webauthn";
 
 type LoginResult =
   | { status: "ok"; access_token: string }
-  | { status: "mfa_required"; mfa_token: string }
+  | { status: "mfa_required"; mfa_token: string; methods: string[] }
   | { status: "mfa_enrollment_required"; mfa_token: string };
 
 interface Enrollment { factor_id: string; secret: string; qr_svg: string }
+interface Ceremony { challenge_id: string; options: Record<string, unknown> }
+type Session = { access_token: string; recovery_codes: string[] | null };
 
 type Step =
   | { kind: "credentials" }
-  | { kind: "verify"; mfaToken: string; useRecovery: boolean }
+  | { kind: "verify"; mfaToken: string; useRecovery: boolean; methods: string[] }
   | { kind: "enroll"; mfaToken: string; enrollment: Enrollment }
   | { kind: "codes"; codes: string[]; accessToken: string };
 
@@ -37,7 +40,7 @@ export function LoginPage() {
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Errore di rete");
+      setError(e instanceof ApiError ? e.message : webauthnError(e) ?? "Errore di rete");
     } finally {
       setBusy(false);
     }
@@ -53,13 +56,49 @@ export function LoginPage() {
     run(async () => {
       const r = await api<LoginResult>("/auth/login", { method: "POST", json: { email, password } });
       if (r.status === "ok") return finish(r.access_token);
-      if (r.status === "mfa_required") return setStep({ kind: "verify", mfaToken: r.mfa_token, useRecovery: false });
+      if (r.status === "mfa_required")
+        return setStep({ kind: "verify", mfaToken: r.mfa_token, useRecovery: false, methods: r.methods ?? ["TOTP"] });
       const enrollment = await api<Enrollment>("/auth/mfa/totp/enroll", { method: "POST", json: { mfa_token: r.mfa_token } });
       setStep({ kind: "enroll", mfaToken: r.mfa_token, enrollment });
     });
   };
 
-  if (step.kind === "verify")
+  const verifyWithKey = (mfaToken: string) => run(async () => {
+    const c = await api<Ceremony>("/auth/mfa/webauthn/options", { method: "POST", json: { mfa_token: mfaToken } });
+    const credential = await getAssertion(c.options);
+    const r = await api<{ access_token: string }>("/auth/mfa/webauthn/verify", {
+      method: "POST", json: { mfa_token: mfaToken, challenge_id: c.challenge_id, credential },
+    });
+    finish(r.access_token);
+  });
+
+  const enrollKey = (mfaToken: string) => run(async () => {
+    const c = await api<Ceremony>("/auth/mfa/webauthn/register/options", { method: "POST", json: { mfa_token: mfaToken } });
+    const credential = await createCredential(c.options);
+    const r = await api<Session>("/auth/mfa/webauthn/register/verify", {
+      method: "POST", json: { mfa_token: mfaToken, challenge_id: c.challenge_id, credential, label: "Chiave di sicurezza" },
+    });
+    if (r.recovery_codes) setStep({ kind: "codes", codes: r.recovery_codes, accessToken: r.access_token });
+    else finish(r.access_token);
+  });
+
+  if (step.kind === "verify") {
+    const hasKey = step.methods.includes("WEBAUTHN") && webauthnSupported();
+    const hasTotp = step.methods.includes("TOTP");
+    if (hasKey && !hasTotp && !step.useRecovery)
+      return (
+        <AuthCard title="Verifica in due passaggi" subtitle="Usa la chiave di sicurezza o la passkey registrata sul tuo account.">
+          <Stack spacing={2}>
+            {error && <Alert severity="error">{error}</Alert>}
+            <Button variant="contained" size="large" disabled={busy} autoFocus onClick={() => verifyWithKey(step.mfaToken)}>
+              Usa la chiave di sicurezza
+            </Button>
+            <Link component="button" type="button" onClick={() => { setCode(""); setStep({ ...step, useRecovery: true }); }}>
+              Non hai la chiave? Usa un recovery code
+            </Link>
+          </Stack>
+        </AuthCard>
+      );
     return (
       <AuthCard title="Verifica in due passaggi"
                 subtitle={step.useRecovery ? "Inserisci uno dei recovery code salvati." : "Inserisci il codice a 6 cifre dell'app di autenticazione."}>
@@ -77,13 +116,18 @@ export function LoginPage() {
                        onChange={(e) => setCode(e.target.value.trim())}
                        inputProps={step.useRecovery ? {} : { inputMode: "numeric", pattern: "\\d{6}", maxLength: 6 }} />
             <Button type="submit" variant="contained" disabled={busy}>Verifica</Button>
+            {hasKey && hasTotp && !step.useRecovery && (
+              <Button variant="outlined" disabled={busy} onClick={() => verifyWithKey(step.mfaToken)}>Usa la chiave di sicurezza</Button>
+            )}
             <Link component="button" type="button" onClick={() => { setCode(""); setStep({ ...step, useRecovery: !step.useRecovery }); }}>
-              {step.useRecovery ? "Usa l'app di autenticazione" : "Non hai il telefono? Usa un recovery code"}
+              {step.useRecovery ? (hasTotp ? "Usa l'app di autenticazione" : "Usa la chiave di sicurezza")
+                : "Non hai il telefono? Usa un recovery code"}
             </Link>
           </Stack>
         </Box>
       </AuthCard>
     );
+  }
 
   if (step.kind === "enroll")
     return (
@@ -104,6 +148,11 @@ export function LoginPage() {
             <TextField label="Codice a 6 cifre" value={code} onChange={(e) => setCode(e.target.value.trim())} fullWidth
                        inputProps={{ inputMode: "numeric", pattern: "\\d{6}", maxLength: 6 }} />
             <Button type="submit" variant="contained" disabled={busy} fullWidth>Attiva</Button>
+            {webauthnSupported() && (
+              <Button variant="outlined" disabled={busy} fullWidth onClick={() => enrollKey(step.mfaToken)}>
+                Usa invece una chiave di sicurezza o una passkey
+              </Button>
+            )}
           </Stack>
         </Box>
       </AuthCard>
