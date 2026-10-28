@@ -14,7 +14,7 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from . import ifc_complex
+from . import glb_model, ifc_complex
 
 DEMO_PASSWORD = "Cantiere-2026!"  # noqa: S105 - utenti demo
 
@@ -455,6 +455,8 @@ def populate(api: str, password: str = DEMO_PASSWORD) -> dict:
     # aggiunte successive in fondo: la numerazione dei documenti già caricati non cambia (niente doppioni)
     add("ifc_full", "des_lead", "Modelli BIM", "DES", "ZZ", "M3", "A", "ifc", ifc, "Modello completo Padiglione B",
         lambda c, r, v: ifc_complex.build(), "SHARED", "des_admin")
+    add("glb_vis", "des_designer", "Modelli BIM", "DES", "ZZ", "M3", "A", "glb", "model/gltf-binary",
+        "Modello di studio Padiglione C (Blender)", lambda c, r, v: glb_model.build(), "SHARED", "des_lead")
 
     # annotazioni sulle tavole e sul modello
     if "pianta0" in docs:

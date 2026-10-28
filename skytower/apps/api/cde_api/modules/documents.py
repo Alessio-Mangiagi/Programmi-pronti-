@@ -752,12 +752,14 @@ def initiate_revision(document_id: uuid.UUID, body: UploadInitIn, c: Ctx = Depen
     return initiate_upload(body, c)
 
 
-# Formati visualizzabili in piattaforma (PDF, immagini, testo, IFC, Word/Excel): tipo servito → estensioni
+# Formati visualizzabili in piattaforma (PDF, immagini, testo, IFC, glTF, Word/Excel): tipo servito → estensioni
 VIEWABLE = {
     "application/pdf": (".pdf",), "image/png": (".png",), "image/jpeg": (".jpg", ".jpeg"), "image/webp": (".webp",),
     "image/gif": (".gif",),
     "text/plain; charset=utf-8": (".txt", ".csv", ".log", ".svg"),   # SVG come testo: niente script nel browser
     "application/x-step": (".ifc",),                                 # modello BIM: lo legge il viewer 3D (web-ifc)
+    "model/gltf-binary": (".glb",),                                  # modello 3D (es. da Blender): viewer 3D (three.js)
+    "model/gltf+json": (".gltf",),                                   # solo se autonomo (buffer e texture incorporati)
     # Office: anteprima in sola lettura convertita nel browser (Word in iframe sandbox, Excel in tabella)
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (".docx",),
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (".xlsx",),

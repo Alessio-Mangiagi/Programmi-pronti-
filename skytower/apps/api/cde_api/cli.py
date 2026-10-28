@@ -8,6 +8,7 @@
   cde seed-demo      carica il dataset dimostrativo (CDE_DATABASE_URL_OWNER)
   cde utente-dev     account personale nell'ambiente dev (password da CDE_NUOVA_PWD, mai su file)
   cde genera-ifc     modello IFC4 complesso (padiglione di sei livelli) per provare il viewer BIM
+  cde genera-glb     modello glTF binario (come da Blender) per provare il viewer 3D
 """
 from __future__ import annotations
 
@@ -167,6 +168,15 @@ def cmd_ifc(args) -> None:
     print(f"{args.file}: {len(data) / 1e6:.1f} MB, {elements} elementi, {args.padiglioni} padiglione/i")
 
 
+def cmd_glb(args) -> None:
+    from .tooling import glb_model
+
+    data = glb_model.build()
+    args.file.write_bytes(data)
+    doc, _ = glb_model.parse(data)
+    print(f"{args.file}: {len(data) / 1e3:.0f} kB, {sum('mesh' in n for n in doc['nodes'])} oggetti")
+
+
 def cmd_demo_content(args) -> None:
     from .tooling import demo_content
 
@@ -211,6 +221,9 @@ def main(argv: list[str] | None = None) -> None:
     ifc.add_argument("file", type=Path)
     ifc.add_argument("--padiglioni", type=int, default=1, help="edifici affiancati (prove di carico)")
     ifc.set_defaults(func=cmd_ifc)
+    glb = sub.add_parser("genera-glb", help="modello glTF binario di prova (oggetti come da Blender)")
+    glb.add_argument("file", type=Path)
+    glb.set_defaults(func=cmd_glb)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")
     demo.add_argument("--password", default="Cantiere-2026!", help="password degli utenti demo")
