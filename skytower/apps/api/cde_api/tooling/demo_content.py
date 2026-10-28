@@ -57,7 +57,9 @@ def _title_block(pdf, x, y, w, project: str, title: str, code: str, rev: str, sc
     pdf.text(x + w * 0.62 + 4, y + 24, f"Rev. {rev}")
 
 
-def drawing_pdf(seed: int, title: str, code: str, rev: str, variant: int = 0, pages: int = 1) -> bytes:
+def drawing_pdf(seed: int, title: str, code: str, rev: str, variant: int = 0, pages: int = 1,
+                legend: list[str] | None = None) -> bytes:
+    """Tavola A3 con il cartiglio; legend = elementi del modello BIM rappresentati (nomi come nell'IFC)."""
     from fpdf import FPDF
 
     rnd = random.Random(seed)
@@ -93,6 +95,12 @@ def drawing_pdf(seed: int, title: str, code: str, rev: str, variant: int = 0, pa
             pdf.text(ox + 312, oy + 55, "Ampliamento")
             pdf.ellipse(ox + cw * 0.3, oy + ch * 0.3, 18, 18)
             pdf.text(ox + cw * 0.3 + 2, oy + ch * 0.3 + 25, f"Rev. {rev}")
+        if legend:                                                                                  # elementi BIM
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.text(338, 125, "Elementi BIM rappresentati")
+            pdf.set_font("Helvetica", "", 7)
+            for k, item in enumerate(legend[:20]):
+                pdf.text(338, 131 + k * 4.5, f"- {item}")
         pdf.set_font("Helvetica", "B", 9)
         pdf.text(360, 24, "N")
         pdf.line(362, 26, 362, 40)
@@ -231,6 +239,26 @@ def ifc_model(seed: int, storeys: int = 2) -> bytes:
     return ("ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [ReferenceView]'),'2;1');\n"
             "FILE_NAME('modello.ifc','2026-10-01T09:00:00',('CDE demo'),(''),'','','');\nFILE_SCHEMA(('IFC4'));\n"
             f"ENDSEC;\nDATA;\n{body}\nENDSEC;\nEND-ISO-10303-21;\n").encode()
+
+
+WALLS = ["Muro perimetrale sud", "Muro perimetrale nord", "Muro perimetrale ovest", "Muro perimetrale est",
+         "Tramezzo interno"]
+# viste generali: quali elementi del modello citano (nel viewer IFC compaiono come "Citato in")
+BIM_VIEWS = {
+    "Prospetto sud": [f"Muro perimetrale sud P{s}" for s in range(3)],
+    "Prospetto nord": [f"Muro perimetrale nord P{s}" for s in range(3)],
+    "Sezione A-A": ["Solaio P0", "Solaio P1", "Tramezzo interno P0", "Tramezzo interno P1"],
+    "Sezione B-B": ["Muro perimetrale ovest P0", "Muro perimetrale est P0", "Solaio P0"],
+    "Nodo parete-solaio": ["Muro perimetrale nord P0", "Solaio P0"],
+}
+
+
+def bim_legend(level: str) -> list[str] | None:
+    """Elementi dell'IFC demo in una pianta: livello 00 → piano P0, 01 → P1, ..."""
+    if not level.isdigit():
+        return None
+    s = int(level)
+    return [f"{w} P{s}" for w in WALLS] + [f"Solaio P{s}"]
 
 
 def schedule_csv(seed: int, codes: list[tuple[str, str]]) -> bytes:
@@ -376,14 +404,17 @@ def populate(api: str, password: str = DEMO_PASSWORD) -> dict:
              ("Pianta copertura", "RF"), ("Pianta piano interrato", "B1")]
     for i, (title, level) in enumerate(plans):
         add(f"pianta{i}", "des_lead", "Piante", "DES", level, "DR", "A", "pdf", pdf, title,
-            lambda c, r, v, i=i, t=title: drawing_pdf(10 + i, t, c, r, v, pages=2 if i == 0 else 1),
+            lambda c, r, v, i=i, t=title, lv=level: drawing_pdf(10 + i, t, c, r, v, pages=2 if i == 0 else 1,
+                                                                 legend=bim_legend(lv)),
             ["REV2", "PUBLISHED", "SHARED", "SHARED", "WIP"][i], "des_admin")
     for i, title in enumerate(["Prospetto sud", "Prospetto nord", "Sezione A-A", "Sezione B-B"]):
         add(f"prosp{i}", "des_designer", "Prospetti e sezioni", "DES", "ZZ", "DR", "A", "pdf", pdf, title,
-            lambda c, r, v, i=i, t=title: drawing_pdf(30 + i, t, c, r, v), ["PUBLISHED", "SHARED", "SHARED", "WIP"][i], "des_lead")
+            lambda c, r, v, i=i, t=title: drawing_pdf(30 + i, t, c, r, v, legend=BIM_VIEWS[t]),
+            ["PUBLISHED", "SHARED", "SHARED", "WIP"][i], "des_lead")
     for i, title in enumerate(["Nodo parete-solaio", "Dettaglio serramento", "Dettaglio copertura"]):
         add(f"det{i}", "des_lead", "Dettagli costruttivi", "DES", "ZZ", "DR", "A", "pdf", pdf, title,
-            lambda c, r, v, i=i, t=title: drawing_pdf(40 + i, t, c, r, v), ["SHARED", "WIP", "PUBLISHED"][i], "des_admin")
+            lambda c, r, v, i=i, t=title: drawing_pdf(40 + i, t, c, r, v, legend=BIM_VIEWS.get(t)),
+            ["SHARED", "WIP", "PUBLISHED"][i], "des_admin")
     add("ifc_arch", "des_lead", "Modelli BIM", "DES", "ZZ", "M3", "A", "ifc", ifc, "Modello architettonico",
         lambda c, r, v: ifc_model(50 + v, storeys=3 if v else 2), "REV2", "des_admin")
     add("ifc_str", "des_designer", "Modelli BIM", "DES", "ZZ", "M3", "S", "ifc", ifc, "Modello strutturale",
