@@ -48,7 +48,7 @@ export interface IfcViewProps {
   url: string;
   projectId: string;
   documentId: string;
-  /** apre un altro documento sopra il modello, con il testo da evidenziare */
+  /** apre un altro documento (in una nuova scheda), con il testo da evidenziare */
   onOpenDocument: (documentId: string, search: string) => void;
   markups: Markup[];
   selectedRef: string | null;
@@ -214,7 +214,7 @@ function MeasuresTable({ type, m }: { type: string; m: Measures | null }) {
 
 const STATE: Record<string, string> = { WIP: "In lavorazione", SHARED: "Condiviso", PUBLISHED: "Pubblicato", ARCHIVED: "Archiviato" };
 
-/** Documenti che citano l'elemento e tavole del suo piano: un clic apre il documento con il nome evidenziato. */
+/** Documenti che citano l'elemento e tavole del suo piano: un clic apre il documento in una nuova scheda, con il nome evidenziato. */
 function ElementLinks({ projectId, documentId, name, guid, storey, onOpen }: {
   projectId: string; documentId: string; name: string; guid: string; storey: Storey | null;
   onOpen: (documentId: string, search: string) => void;

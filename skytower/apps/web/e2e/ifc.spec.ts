@@ -68,8 +68,11 @@ test("elemento del modello: misure e tavole che lo citano", async ({ page, baseU
   await expect(misure.getByText("Volume")).toBeVisible();
   const links = page.getByRole("region", { name: "Tavole e documenti collegati" });
   await expect(links.getByText("livello 00").first()).toBeVisible();
-  await links.getByText("Pianta BIM e2e").first().click();
-  // la tavola si apre sopra il modello con il nome dell'elemento già cercato
-  await expect(page.getByPlaceholder("Cerca nel testo")).toHaveValue("Muro perimetrale sud P0");
-  await expect(page.getByText("1/1")).toBeVisible({ timeout: 20_000 });
+  // la tavola si apre in una nuova scheda, con il nome dell'elemento già cercato; il modello resta aperto
+  const [tab] = await Promise.all([page.context().waitForEvent("page"), links.getByText("Pianta BIM e2e").first().click()]);
+  await expect(tab).toHaveURL(/\/documenti\/[0-9a-f-]+\?cerca=Muro/);
+  await expect(tab.getByPlaceholder("Cerca nel testo")).toHaveValue("Muro perimetrale sud P0");
+  await expect(tab.getByText("1/1")).toBeVisible({ timeout: 20_000 });
+  await expect(tab).toHaveTitle(/PRJ01-DES-ZZ-00-DR-A-0793/);
+  await expect(page.getByRole("region", { name: "Misure" })).toBeVisible();
 });

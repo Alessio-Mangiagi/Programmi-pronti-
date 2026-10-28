@@ -40,6 +40,10 @@ interface Link { url: string; filename: string; content_type: string | null; wat
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
+/** Tavola citata dal modello: nella sua scheda del browser, accanto al modello, con il testo già cercato. */
+const openInNewTab = (documentId: string, search: string) =>
+  window.open(`/documenti/${documentId}${search ? `?cerca=${encodeURIComponent(search)}` : ""}`, "_blank", "noopener");
+
 export function FileViewer({ documentId, revisionId: initialRevision, taskId, initialSearch, onClose, onDetails }: {
   documentId: string; revisionId?: string; taskId?: string; onClose: () => void; onDetails?: () => void;
   /** testo da cercare ed evidenziare subito nel PDF (es. l'elemento del modello che la tavola cita) */
@@ -90,7 +94,6 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
   const [searchInput, setSearchInput] = useState(initialSearch ?? "");
-  const [linked, setLinked] = useState<{ id: string; search: string } | null>(null);   // tavola aperta dal modello
   const [search, setSearch] = useState("");
   const [matchCount, setMatchCount] = useState(0);
   const [activeMatch, setActiveMatch] = useState(0);
@@ -232,7 +235,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
           ) : isIfc ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <IfcView url={link.url} projectId={doc?.project_id ?? ""} documentId={documentId}
-                       onOpenDocument={(id, search) => setLinked({ id, search })} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
+                       onOpenDocument={openInNewTab} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.guid, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>
           ) : office && (rev?.size_bytes ?? 0) > OFFICE_PREVIEW_MAX ? (
@@ -263,7 +266,6 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
           </Box>
         )}
       </Box>
-      {linked && <FileViewer key={linked.id} documentId={linked.id} initialSearch={linked.search} onClose={() => setLinked(null)} />}
     </Dialog>
   );
 }

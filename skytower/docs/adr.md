@@ -401,7 +401,8 @@ elaborati, senza aprire a mano le tavole una per una.
 - **Citato in**: `GET /projects/{id}/model-element/documents` cerca nel testo indicizzato (ADR-26) il nome
   dell'elemento o il suo GlobalId come **frase esatta** ("Muro perimetrale sud P0" non trova "... P1"),
   esclusi il modello stesso e gli altri modelli (M2, M3, MR: il loro testo STEP ripete i nomi). Estratto
-  evidenziato; un clic apre il documento sopra il modello con il nome già cercato nel PDF.
+  evidenziato; un clic apre il documento in una nuova scheda del browser (`/documenti/:id?cerca=`), accanto al
+  modello, con il nome già cercato nel PDF.
 - **Tavole del piano**: il piano dell'elemento (albero spaziale IFC) dà il codice livello della naming
   convention — dal nome ("Piano terra" 00, "Piano 2" 02, "Interrato" B1, "Copertura" RF) o, se il nome non
   lo dice, dall'ordine per quota rispetto al piano più vicino a quota 0 — e si elencano le tavole (tipo DR)
