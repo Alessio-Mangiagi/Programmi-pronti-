@@ -412,3 +412,26 @@ elaborati, senza aprire a mano le tavole una per una.
 **Limiti.** Il collegamento è testuale: funziona se le tavole riportano nome o GUID degli elementi (legende,
 abachi, cartigli esportati dal software BIM). I PDF scansionati non hanno testo (vedi ADR-26). Un
 collegamento esplicito elemento ↔ tavola, salvato nel CDE, si potrà aggiungere se il testo non basta.
+
+## ADR-29 — Modelli glTF/GLB (Blender) nel viewer 3D
+
+**Contesto.** Parte dei modelli arriva da Blender, che non salva IFC senza componenti aggiuntivi (Bonsai). Il
+formato .blend è interno a Blender e leggerlo lato server richiederebbe Blender installato; glTF 2.0 è invece
+l'esportazione standard di Blender, aperta e già letta da three.js.
+
+**Decisione.**
+- `.glb` (`model/gltf-binary`) e `.gltf` (`model/gltf+json`) sono visualizzabili in piattaforma come l'IFC.
+- Il viewer 3D separa la scena (sezioni, misure, selezione, annotazioni, tavole collegate) dal lettore del
+  formato (`ModelSource`): `ifcSource` (web-ifc) e `gltfSource` (GLTFLoader), caricati a richiesta: chi apre
+  un GLB non scarica web-ifc.
+- Nel glTF ogni nodo con una mesh è un elemento; le proprietà personalizzate di Blender (`extras`) sono il
+  "Pset"; la chiave delle annotazioni è il nome dell'oggetto (unico in Blender; se manca o si ripete, anche
+  l'indice del nodo). I nodi vuoti sono gruppi e, se il nome è quello di un piano, fanno da piano con quota e
+  codice livello (ADR-28): "Citato in" e "Tavole del piano" funzionano anche per i modelli Blender.
+- Le misure tengono conto della scala dell'oggetto (in Blender le dimensioni stanno spesso lì).
+- CSP invariata: le texture si caricano come immagini (`img-src blob:`) e non con `fetch`; un .gltf con i
+  buffer in data: URI si ricompone in .glb nel browser prima della lettura.
+- Un .blend resta scaricabile; il viewer spiega come esportarlo in .glb.
+
+**Limiti.** Non supportati: .gltf con file esterni (.bin, texture separate), compressione Draco/meshopt, texture
+KTX2 — il messaggio dice come riesportare. Nessuna conversione lato server (servirebbe Blender sul worker).
