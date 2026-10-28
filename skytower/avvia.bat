@@ -21,11 +21,12 @@ if not exist "%VITE%" (
     echo Eseguire prima installa.bat.
     goto errore
 )
-if not exist "apps\web\dist\index.html" (
-    echo Frontend non compilato: compilo apps\web\dist ...
-    call npm --prefix apps\web run build
-    if errorlevel 1 goto errore
-)
+REM Il frontend si ricompila a ogni avvio: altrimenti "vite preview" servirebbe la
+REM build vecchia e le modifiche al codice non si vedrebbero (l'API parte gia' dal
+REM codice corrente e applica da sola le migrazioni nuove).
+echo Compilo il frontend ^(apps\web\dist^) con il codice corrente ...
+call npm --prefix apps\web run build
+if errorlevel 1 goto errore
 
 REM Indirizzo della SPA: link di email e inviti, CORS dell'API.
 if not defined HOST set "HOST=127.0.0.1"
