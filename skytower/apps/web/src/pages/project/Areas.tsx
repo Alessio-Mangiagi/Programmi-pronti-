@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Alert, Box, Button, Checkbox, Chip, InputAdornment, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow,
+  Alert, Box, Button, Checkbox, Chip, FormControlLabel, InputAdornment, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow,
   Tabs, TextField, Typography,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
@@ -24,6 +24,7 @@ export function AreasTab({ project }: { project: Project }) {
   const [area, setArea] = useState<CdeState>("WIP");
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
+  const [inText, setInText] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [params, setParams] = useSearchParams();
   const [openDoc, setOpenDocState] = useState<string | null>(params.get("doc"));   // link delle notifiche
@@ -41,9 +42,9 @@ export function AreasTab({ project }: { project: Project }) {
   useEffect(() => setSelected(new Set()), [area, search]);
 
   const { data } = useQuery({
-    queryKey: ["area", project.id, area, search],
-    queryFn: () => api<{ items: DocumentRow[] }>(
-      `/projects/${project.id}/documents?area=${area}&limit=200${search ? `&q=${encodeURIComponent(search)}` : ""}`),
+    queryKey: ["area", project.id, area, search, inText],
+    queryFn: () => api<{ items: (DocumentRow & { match_snippet?: string | null })[] }>(
+      `/projects/${project.id}/documents?area=${area}&limit=200${search ? `&q=${encodeURIComponent(search)}${inText ? "&content=true" : ""}` : ""}`),
   });
   const items = data?.items ?? [];
   const targets = area === "ARCHIVED" ? [] : rules.filter((r) => r.from_state === area).map((r) => r.to_state);
@@ -66,6 +67,8 @@ export function AreasTab({ project }: { project: Project }) {
       </Tabs>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} mb={1}>
         <Typography variant="body2" color="text.secondary" flexGrow={1}>{AREA_HELP[area]}</Typography>
+        <FormControlLabel sx={{ mr: 0 }} label="anche nel testo dei file"
+                          control={<Checkbox size="small" checked={inText} onChange={(e) => setInText(e.target.checked)} />} />
         <TextField size="small" placeholder="Cerca" value={q} onChange={(e) => setQ(e.target.value)}
                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
         <Button variant="outlined" size="small" disabled={zipIds.length === 0 || zip.isPending} onClick={() => zip.mutate()}>
@@ -100,7 +103,10 @@ export function AreasTab({ project }: { project: Project }) {
                   <Checkbox checked={selected.has(d.id)} onChange={() => toggle(d.id)} inputProps={{ "aria-label": `Seleziona ${d.identifier}` }} />
                 </TableCell>
                 <TableCell sx={{ fontFamily: "monospace", whiteSpace: "nowrap" }}>{d.identifier}</TableCell>
-                <TableCell>{d.title}</TableCell>
+                <TableCell>
+                  {d.title}
+                  {d.match_snippet && <Snippet text={d.match_snippet} />}
+                </TableCell>
                 <TableCell>{d.originator_code}</TableCell>
                 <TableCell><b>{d.current_revision}</b></TableCell>
                 <TableCell>{d.current_suitability}</TableCell>
@@ -121,5 +127,15 @@ export function AreasTab({ project }: { project: Project }) {
       )}
       <DocumentDrawer projectId={project.id} documentId={openDoc} onClose={() => setOpenDoc(null)} />
     </Paper>
+  );
+}
+
+/** Estratto del testo con le parole trovate: i marcatori ⟦ ⟧ vengono da ts_headline, il resto è testo (niente HTML). */
+function Snippet({ text }: { text: string }) {
+  const parts = text.split(/(⟦[^⟧]*⟧)/);
+  return (
+    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+      {parts.map((p, i) => p.startsWith("⟦") ? <mark key={i}>{p.slice(1, -1)}</mark> : <span key={i}>{p}</span>)}
+    </Typography>
   );
 }
