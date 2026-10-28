@@ -98,6 +98,8 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
         if n and outcome.status != "CLEAN":
             security_event(conn, "FILE_QUARANTINED", project_id=f["project_id"], file=file_id,
                            status=outcome.status, detail=outcome.detail)
+        elif n:                                 # revisione scaricabile: avviso a chi segue il documento
+            conn.execute("SELECT cde.notify_followers_of_file(%s)", [file_id])
     if n and outcome.status != "CLEAN":
         storage.tag_object(f["storage_key"], f["storage_version_id"], {"cde-quarantine": outcome.status.lower()})
     log.info("file %s → %s (%s)", file_id, outcome.status, outcome.detail)
@@ -147,8 +149,11 @@ def run_worker() -> None:  # pragma: no cover - processo di lunga durata
 @app.task(name="cde.notify_state_changed", queue="default",
           retry=procrastinate.RetryStrategy(max_attempts=5, exponential_wait=10))
 def notify_state_changed(document_id: str, revision_id: str, to_state: str) -> None:
-    """Evento revision.state_changed (outbox). Sprint 4: notifiche in-app ed email."""
-    log.info("documento %s: revisione %s → %s", document_id, revision_id, to_state)
+    """Evento revision.state_changed (outbox): avviso a chi segue il documento e vede la nuova revisione."""
+    _, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
+        n = conn.execute("SELECT cde.notify_followers_of_transition(%s, %s)", [revision_id, to_state]).fetchone()[0]
+    log.info("documento %s: revisione %s → %s, %s follower avvisati", document_id, revision_id, to_state, n)
 
 
 @app.task(name="cde.send_notification_email", queue="default",

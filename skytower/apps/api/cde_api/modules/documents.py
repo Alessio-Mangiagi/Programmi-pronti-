@@ -679,11 +679,30 @@ def get_document(document_id: uuid.UUID, c: Ctx = Depends(ctx)):
             " AND (%s NOT IN (SELECT cde.private_containers()) OR 'DOWNLOAD' = ANY(%s::text[])) ok",
             [doc["project_id"], doc["container_id"], actions]).fetchone()["ok"]
         reviews = [r["id"] for r in conn.execute("SELECT cde.my_review_revisions() AS id").fetchall()]
+        following = conn.execute("SELECT EXISTS (SELECT 1 FROM cde.document_followers WHERE document_id = %s) ok",
+                                 [document_id]).fetchone()["ok"]           # RLS: solo le mie righe
         security_event(conn, "DOCUMENT_VIEWED", user_id=c.user_id, project_id=doc["project_id"], ip=c.ip,
                        user_agent=c.user_agent, document=document_id, identifier=doc["identifier"])
         return {**doc, "revisions": revisions, "my_actions": actions,
-                "can_download_published": can_download_published,
+                "can_download_published": can_download_published, "following": following,
                 "review_revision_ids": [r["id"] for r in revisions if r["id"] in reviews]}
+
+
+@router.put("/documents/{document_id}/follow", status_code=204)
+def follow_document(document_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Notifiche a ogni nuova revisione e cambio di stato del documento (solo per ciò che si può vedere)."""
+    with c.tx() as conn:
+        _document(conn, document_id)
+        conn.execute("INSERT INTO cde.document_followers (user_id, document_id) VALUES (cde.current_app_user(), %s) "
+                     "ON CONFLICT DO NOTHING", [document_id])
+    return Response(status_code=204)
+
+
+@router.delete("/documents/{document_id}/follow", status_code=204)
+def unfollow_document(document_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    with c.tx() as conn:
+        conn.execute("DELETE FROM cde.document_followers WHERE document_id = %s", [document_id])   # RLS: le mie
+    return Response(status_code=204)
 
 
 @router.patch("/documents/{document_id}")
