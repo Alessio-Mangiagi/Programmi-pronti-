@@ -12,6 +12,7 @@ import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import DownloadIcon from "@mui/icons-material/Download";
 import FolderIcon from "@mui/icons-material/Folder";
+import FolderZipIcon from "@mui/icons-material/FolderZip";
 import GroupIcon from "@mui/icons-material/Group";
 import HistoryIcon from "@mui/icons-material/History";
 import LockIcon from "@mui/icons-material/Lock";
@@ -20,7 +21,7 @@ import SendIcon from "@mui/icons-material/Send";
 import ShareIcon from "@mui/icons-material/Share";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import { api, ApiError, Container, Project } from "../../api";
+import { api, apiDownload, ApiError, Container, Project } from "../../api";
 import { folderTree, useContainers } from "../../components/ProjectTree";
 import { ContainerDetail, GrantDialog, NewContainerDialog } from "./Containers";
 import { DocumentDrawer, DocumentRow, formatBytes, UploadDialog } from "./Documents";
@@ -81,6 +82,10 @@ export function FolderView({ project }: { project: Project }) {
     mutationFn: (revisionId: string) => api<{ url: string }>(`/revisions/${revisionId}/download`),
     onSuccess: ({ url }) => { window.location.href = url; },
   });
+  // tutta la cartella in uno ZIP (ultime revisioni verificate), con elenco.csv di identificativi e impronte
+  const zip = useMutation({
+    mutationFn: (ids: string[]) => apiDownload(`/projects/${project.id}/zip`, "documenti.zip", { method: "POST", json: { revision_ids: ids } }),
+  });
 
   if (isLoading) return null;
   if (containerId && !current) return <Alert severity="warning">Cartella non trovata o non visibile.</Alert>;
@@ -88,6 +93,7 @@ export function FolderView({ project }: { project: Project }) {
   const sub = (tree.get(current?.id ?? null) ?? []).filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()));
   const items = docs?.items ?? [];
   const doc = items.find((d) => d.id === selected) ?? null;
+  const zipIds = items.filter((d) => d.current_revision_id && d.current_scan_status === "CLEAN").map((d) => d.current_revision_id!);
   const can = (a: string) => !!current?.my_actions.includes(a as never);
   const canCreateRoot = Object.values(project.my_permissions?.WRITE ?? {}).some(Boolean);
 
@@ -116,6 +122,9 @@ export function FolderView({ project }: { project: Project }) {
             <Button startIcon={<VisibilityIcon />} disabled={!doc} onClick={() => setViewDoc(doc!.id)}>Apri</Button>
             <Button startIcon={<DownloadIcon />} disabled={!doc?.current_revision_id || doc.current_scan_status !== "CLEAN" || download.isPending}
                     onClick={() => download.mutate(doc!.current_revision_id!)}>Scarica</Button>
+            <Button startIcon={<FolderZipIcon />} disabled={zipIds.length === 0 || zip.isPending} onClick={() => zip.mutate(zipIds)}>
+              {zip.isPending ? "Preparazione ZIP…" : `Scarica cartella (${zipIds.length})`}
+            </Button>
             <Button startIcon={<TaskAltIcon />} disabled={!doc?.current_revision_id || !!doc.archived_at} onClick={() => setDialog("workflow")}>
               Avvia approvazione
             </Button>
@@ -136,6 +145,7 @@ export function FolderView({ project }: { project: Project }) {
                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
       </Paper>
       {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
+      {zip.error && <Alert severity="error">{(zip.error as ApiError).message}</Alert>}
 
       <Paper variant="outlined" sx={{ overflowX: "auto" }}>
         {sub.length === 0 && items.length === 0 ? (

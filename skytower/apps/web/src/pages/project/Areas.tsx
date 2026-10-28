@@ -2,13 +2,13 @@
 // Viste per area del CDE (ISO 19650): WIP, Condivisi, Pubblicati, Archiviati — su tutto il progetto.
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Box, Button, Checkbox, Chip, InputAdornment, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow,
+  Alert, Box, Button, Checkbox, Chip, InputAdornment, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow,
   Tabs, TextField, Typography,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { api, Project } from "../../api";
+import { api, apiDownload, ApiError, Project } from "../../api";
 import { DocumentDrawer, DocumentRow, formatBytes } from "./Documents";
 import { ACTION_LABEL, CdeState, STATE_COLOR, STATE_LABEL, TransitionDialog, useTransitionRules } from "./Transitions";
 
@@ -48,6 +48,10 @@ export function AreasTab({ project }: { project: Project }) {
   const items = data?.items ?? [];
   const targets = area === "ARCHIVED" ? [] : rules.filter((r) => r.from_state === area).map((r) => r.to_state);
   const chosen = items.filter((d) => selected.has(d.id));
+  const zipIds = chosen.filter((d) => d.current_revision_id && d.current_scan_status === "CLEAN").map((d) => d.current_revision_id!);
+  const zip = useMutation({
+    mutationFn: () => apiDownload(`/projects/${project.id}/zip`, "documenti.zip", { method: "POST", json: { revision_ids: zipIds } }),
+  });
 
   const toggle = (id: string) => setSelected((s) => {
     const n = new Set(s);
@@ -64,24 +68,27 @@ export function AreasTab({ project }: { project: Project }) {
         <Typography variant="body2" color="text.secondary" flexGrow={1}>{AREA_HELP[area]}</Typography>
         <TextField size="small" placeholder="Cerca" value={q} onChange={(e) => setQ(e.target.value)}
                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
+        <Button variant="outlined" size="small" disabled={zipIds.length === 0 || zip.isPending} onClick={() => zip.mutate()}>
+          Scarica ZIP {zipIds.length > 0 ? `(${zipIds.length})` : ""}
+        </Button>
         {targets.map((t) => (
           <Button key={t} variant="contained" size="small" disabled={chosen.length === 0} onClick={() => setAction(t)}>
             {ACTION_LABEL[t]} {chosen.length > 0 ? `(${chosen.length})` : ""}
           </Button>
         ))}
       </Stack>
+      {zip.error && <Alert severity="error" sx={{ mb: 1 }}>{(zip.error as ApiError).message}</Alert>}
       {items.length === 0 ? (
         <Box py={3}><Typography color="text.secondary" textAlign="center">Nessun documento in quest'area.</Typography></Box>
       ) : (
         <Table size="small">
           <TableHead>
             <TableRow>
-              {targets.length > 0 && (
-                <TableCell padding="checkbox">
-                  <Checkbox checked={chosen.length === items.length} indeterminate={chosen.length > 0 && chosen.length < items.length}
-                            onChange={(e) => setSelected(e.target.checked ? new Set(items.map((d) => d.id)) : new Set())} />
-                </TableCell>
-              )}
+              <TableCell padding="checkbox">
+                <Checkbox checked={chosen.length === items.length} indeterminate={chosen.length > 0 && chosen.length < items.length}
+                          inputProps={{ "aria-label": "Seleziona tutti" }}
+                          onChange={(e) => setSelected(e.target.checked ? new Set(items.map((d) => d.id)) : new Set())} />
+              </TableCell>
               <TableCell>Identificativo</TableCell><TableCell>Titolo</TableCell><TableCell>Originatore</TableCell>
               <TableCell>Rev.</TableCell><TableCell>Idoneità</TableCell><TableCell>Stato</TableCell><TableCell>File</TableCell>
             </TableRow>
@@ -89,11 +96,9 @@ export function AreasTab({ project }: { project: Project }) {
           <TableBody>
             {items.map((d) => (
               <TableRow key={d.id} hover selected={selected.has(d.id)} sx={{ cursor: "pointer" }} onClick={() => setOpenDoc(d.id)}>
-                {targets.length > 0 && (
-                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox checked={selected.has(d.id)} onChange={() => toggle(d.id)} />
-                  </TableCell>
-                )}
+                <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={selected.has(d.id)} onChange={() => toggle(d.id)} inputProps={{ "aria-label": `Seleziona ${d.identifier}` }} />
+                </TableCell>
                 <TableCell sx={{ fontFamily: "monospace", whiteSpace: "nowrap" }}>{d.identifier}</TableCell>
                 <TableCell>{d.title}</TableCell>
                 <TableCell>{d.originator_code}</TableCell>

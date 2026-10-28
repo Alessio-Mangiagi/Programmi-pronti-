@@ -74,10 +74,15 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
 }
 
 /** Scarica un file da un endpoint autenticato (il token non può viaggiare in un semplice link). */
-export async function apiDownload(path: string, fallbackName: string): Promise<Response> {
+export async function apiDownload(path: string, fallbackName: string, init: { method?: string; json?: unknown } = {}): Promise<Response> {
   const doFetch = () => fetch(`/api${path}`, {
+    method: init.method ?? "GET",
     credentials: "same-origin",
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(init.json !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
   });
   let res = await doFetch();
   if (res.status === 401 && accessToken && (await refreshSession())) res = await doFetch();
