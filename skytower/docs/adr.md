@@ -324,8 +324,7 @@ in tempo reale; una chiave FIDO2 firma solo per l'origin vero.
   "preferred" perché la password è già il primo fattore;
 - i recovery code nascono con il primo fattore; aggiungere una chiave a un TOTP esistente non li cambia.
 
-Non è (ancora) login senza password: la passkey è il secondo fattore. Il passo successivo naturale è il
-login "passwordless" con credenziali residenti, da valutare con la policy delle organizzazioni.
+Il login senza password con le passkey residenti è venuto dopo (ADR-27).
 
 ## ADR-25 — Single sign-on OpenID Connect per organizzazione
 
@@ -365,3 +364,26 @@ non rivela il testo di una WIP di un'altra organizzazione né di un'area riserva
 **Limiti.** I PDF solo immagine (scansioni) non hanno testo: servirebbe l'OCR, da valutare a parte; i DWG e
 gli IFC binari non si indicizzano. Se il volume crescesse oltre qualche milione di pagine si valuterà
 OpenSearch, mantenendo lo stesso filtro di visibilità.
+
+## ADR-27 — Accesso senza password con passkey
+
+**Contesto.** ADR-24 ha portato le passkey come secondo fattore dopo la password. Le passkey moderne (iCloud,
+Google, Windows Hello, YubiKey recenti) conservano l'account sul dispositivo (credenziali residenti): possono
+fare da sole l'intero accesso, con meno phishing e senza password da ricordare.
+
+**Decisione.** Pulsante "Usa una passkey (senza password)" nella pagina di accesso:
+- `POST /auth/passkey/options` crea una challenge **anonima** (32 byte, 5', monouso, limite 30/min per IP) e
+  chiede al browser una credenziale per l'RP senza `allowCredentials`: il browser propone le passkey salvate;
+- `POST /auth/passkey/verify` trova la chiave dal suo id, controlla che lo `userHandle` dichiarato
+  dall'autenticatore sia l'utente a cui è registrata, poi firma, origin, RP e contatore come in ADR-24;
+- la **verifica dell'utente** (PIN o biometria sul dispositivo) è obbligatoria: possesso della chiave + PIN o
+  impronta = due fattori, quindi la sessione vale come "con MFA" (amr `hwk,mfa`) e soddisfa l'obbligo MFA
+  dell'organizzazione;
+- utente o organizzazione non attivi → rifiuto; organizzazione con **SSO obbligatorio** → rifiuto
+  (`sso_required`), perché chi è stato disattivato sull'IdP non deve rientrare dalla passkey; il blocco per
+  password sbagliate non si applica (una firma non si indovina per tentativi);
+- in registrazione si chiede l'estensione `credProps`: `webauthn_discoverable` dice se la chiave conserva
+  l'account; diventa vero anche al primo accesso riuscito così. Il profilo lo mostra accanto alla chiave.
+
+Nessuna nuova impostazione per organizzazione: chi ha una passkey ce l'ha già come secondo fattore, e il modo
+per vietare l'accesso fuori dall'IdP resta l'SSO obbligatorio.

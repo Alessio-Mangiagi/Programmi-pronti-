@@ -46,6 +46,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U29 | `zip.spec.ts` |
 | U30 | `segui.spec.ts` |
 | U31 | `ricerca.spec.ts` |
+| U32 | `passkey.spec.ts` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -86,6 +87,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U29 | Direttore dei lavori | Scarica una cartella intera e, dalle Aree CDE, una selezione di documenti pubblicati | Un solo ZIP con i file originali (PDF filigranati se previsto) ed elenco.csv con identificativi, revisioni e impronte SHA-256 | |
 | U30 | Information Manager | Nel dettaglio di un documento clicca "Segui"; il progettista carica una nuova revisione e poi la condivide | Notifica a ogni passaggio che può vedere (la WIP di un'altra organizzazione no); "Seguito" si toglie con un clic | |
 | U31 | Progettista | Aree CDE: cerca una parola che compare solo dentro un PDF o un Word, con "anche nel testo dei file" | Il documento compare con un estratto e la parola evidenziata; un collega di un'altra organizzazione non trova i tuoi WIP | |
+| U32 | Progettista | Dal profilo aggiunge la passkey del computer o del telefono; esce e nella pagina di accesso usa "Usa una passkey (senza password)" | Entra con PIN o impronta, senza email né password; il profilo indica che la chiave vale anche per l'accesso senza password | |
 
 ## Verbale
 
