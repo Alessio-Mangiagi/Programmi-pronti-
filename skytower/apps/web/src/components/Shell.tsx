@@ -1,11 +1,13 @@
 // "><(((º> sabusabu <º)))><"
 // Layout a tre colonne: commesse e cartelle a sinistra, contenuto al centro, "Per me" a destra.
 // Sotto i 1200 px le colonne laterali diventano cassetti apribili dalla barra in alto.
+// Nella barra, accanto al logo, le frecce Indietro / Avanti tra le pagine visitate.
 import { ReactNode, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { AppBar, Avatar, Badge, Box, Drawer, IconButton, Stack, Toolbar, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import MenuIcon from "@mui/icons-material/Menu";
+import { HistoryArrows } from "./HistoryArrows";
 import { NotificationBell } from "./NotificationBell";
 import { PerMePanel, usePerMe } from "./PerMePanel";
 import { ProfileMenu } from "./ProfileMenu";
@@ -32,6 +34,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: "#fff", color: "primary.main", fontWeight: 700 }}>C</Avatar>
             <Typography fontWeight={600} sx={{ display: { xs: "none", sm: "block" } }}>CDE · ISO 19650</Typography>
           </Stack>
+          <HistoryArrows />
           <Box flexGrow={1} />
           {!wide && (
             <IconButton color="inherit" aria-label="Per me" onClick={() => setPerMeOpen(true)}>

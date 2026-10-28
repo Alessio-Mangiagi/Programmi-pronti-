@@ -77,7 +77,7 @@ export function LoginPage() {
 
   const finish = (token: string) => {
     setAccessToken(token);
-    navigate("/");
+    navigate("/", { replace: true });           // la pagina di accesso non resta nella cronologia
   };
 
   const startSso = (address: string) => run(async () => {
