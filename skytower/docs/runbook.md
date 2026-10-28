@@ -56,6 +56,11 @@ precedenti nel bucket (versioning attivo) e nuova invalidazione.
   per api e worker. Tra le due operazioni le nuove connessioni falliscono: eseguire in finestra di manutenzione.
 - **Rotazione chiave JWT**: caricare la nuova chiave e ridistribuire; gli access token (15') scadono da soli,
   i refresh token restano validi perché opachi.
+- **Utente che ha perso telefono o chiave di sicurezza** e non ha più recovery code: lo gestisce l'admin
+  della sua organizzazione (menu del profilo → "La mia organizzazione e gli utenti" → *Azzera MFA*), dopo averne
+  verificato l'identità fuori banda (telefonata al numero noto, non quello indicato nella richiesta). L'azzeramento
+  chiude anche le sessioni aperte e finisce nel registro (`MFA_RESET_BY_ADMIN`). Se l'admin è irraggiungibile o è
+  lui ad averlo perso, interviene il platform admin dalla stessa pagina.
 - **Allarmi** (SNS → `alert_emails`): 5xx, p95 > 500 ms, task non sani, worker fermo, CPU/memoria/spazio DB,
   CPU Redis, latenza di replica S3 > 15', errori nei log.
 
