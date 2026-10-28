@@ -39,6 +39,7 @@ from ..config import Settings
 from ..deps import Services, client_ip, services
 from ..errors import ApiError, unauthorized
 from ..events import security_event
+from ..security import alerts
 from .auth import (
     _access_user,
     _load_user,
@@ -189,6 +190,7 @@ def _register_tx(body: RegisterVerifyIn, user_id: uuid.UUID, via_login: bool, re
         security_event(conn, "MFA_ENROLLED", user_id=user_id, organization_id=user["organization_id"],
                        ip=client_ip(request), method="WEBAUTHN", factor_id=factor_id,
                        backed_up=verified.credential_backed_up)
+        alerts.send(svc, conn, user_id, "mfa_added", ip=client_ip(request), detail=body.label.strip())
         # i recovery code nascono col primo fattore; chi aggiunge una chiave al TOTP tiene i suoi
         result: dict = {"factor_id": factor_id, "recovery_codes": (
             _new_recovery_codes(conn, user_id, svc.settings.recovery_codes_count) if first else None)}

@@ -8,7 +8,7 @@ Piano di riferimento: [`docs/piano-sviluppo.md`](docs/piano-sviluppo.md) · deci
 
 | Sprint | Contenuto | Stato |
 |---|---|---|
-| 1 | Multi-tenancy, RBAC, RLS, autenticazione + MFA (app TOTP, chiavi di sicurezza e passkey WebAuthn, recovery code), single sign-on OpenID Connect per organizzazione (Entra ID), cambio password e sessioni aperte dal profilo, API admin, UI | ✅ completato (`v0.1.0`) |
+| 1 | Multi-tenancy, RBAC, RLS, autenticazione + MFA (app TOTP, chiavi di sicurezza e passkey WebAuthn, recovery code), single sign-on OpenID Connect per organizzazione (Entra ID), cambio password e sessioni aperte dal profilo, avvisi email di sicurezza (dispositivo nuovo, password, secondo fattore), API admin, UI | ✅ completato (`v0.1.0`) |
 | 2 | Storage S3 immutabile, naming ISO 19650, revisioni, worker verifica file, UI upload | ✅ completato (`v0.2.0`) |
 | 3 | Stati CDE WIP → SHARED → PUBLISHED → archiviazione, visibilità per stato, bulk, liste < 200 ms su 100k | ✅ completato (0.3.0) |
 | 4 | Workflow di approvazione, scadenze, notifiche, RFI (API + designer workflow, inbox compiti, pagine RFI) | ✅ completato |

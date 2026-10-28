@@ -28,6 +28,7 @@ from pydantic import BaseModel, EmailStr, Field
 from ..deps import Services, bearer_token, client_ip, services
 from ..errors import ApiError, unauthorized
 from ..events import security_event
+from ..security import alerts
 from ..security.tokens import MFA_AMR, hash_token, new_opaque_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -120,6 +121,14 @@ def _has_verified_factor(conn: psycopg.Connection, user_id: uuid.UUID) -> bool:
 
 def _start_session(svc: Services, conn: psycopg.Connection, response: Response, user: dict, *,
                    amr: list[str], request: Request, family_id: uuid.UUID | None = None) -> dict:
+    if family_id is None:                      # nuovo accesso (non un rinnovo): dispositivo mai visto?
+        seen = conn.execute(
+            """SELECT EXISTS (SELECT 1 FROM cde.refresh_tokens WHERE user_id = %(u)s) AS any,
+                      EXISTS (SELECT 1 FROM cde.refresh_tokens WHERE user_id = %(u)s AND user_agent = %(a)s) AS same""",
+            {"u": user["id"], "a": _ua(request)}).fetchone()
+        if seen["any"] and not seen["same"]:
+            alerts.send(svc, conn, user["id"], "new_device", ip=client_ip(request),
+                        detail=alerts.device_label(_ua(request)))
     token, token_hash = new_opaque_token()
     conn.execute(
         """INSERT INTO cde.refresh_tokens (user_id, family_id, token_hash, mfa_verified, expires_at, ip, user_agent)
@@ -381,6 +390,7 @@ def totp_confirm(body: TotpConfirmIn, request: Request, response: Response, svc:
         user = _load_user(conn, user_id)
         security_event(conn, "MFA_ENROLLED", user_id=user_id, organization_id=user["organization_id"],
                        ip=client_ip(request), method="TOTP")
+        alerts.send(svc, conn, user_id, "mfa_added", ip=client_ip(request), detail="app di autenticazione")
         result = {"recovery_codes": codes}
         if via_login:
             result |= _start_session(svc, conn, response, user, amr=["pwd", "otp"], request=request)
@@ -409,10 +419,12 @@ def delete_factor(factor_id: uuid.UUID, request: Request, svc: Services = Depend
                          [user_id]).fetchone()["n"]
         if user["mfa_required"] and n <= 1:
             raise ApiError(409, "mfa_required", "La tua organizzazione richiede almeno un fattore MFA")
-        if conn.execute("DELETE FROM cde.user_mfa_factors WHERE id = %s AND user_id = %s",
-                        [factor_id, user_id]).rowcount == 0:
+        removed = conn.execute("DELETE FROM cde.user_mfa_factors WHERE id = %s AND user_id = %s RETURNING label, method",
+                               [factor_id, user_id]).fetchone()
+        if removed is None:
             raise ApiError(404, "not_found", "Fattore non trovato")
         security_event(conn, "MFA_REMOVED", user_id=user_id, ip=client_ip(request), factor_id=factor_id)
+        alerts.send(svc, conn, user_id, "mfa_removed", ip=client_ip(request), detail=removed["label"])
     return Response(status_code=204)
 
 
@@ -553,4 +565,5 @@ def reset_password(body: ResetPasswordIn, request: Request, svc: Services = Depe
         conn.execute("UPDATE cde.refresh_tokens SET revoked_at = now() WHERE user_id = %s AND revoked_at IS NULL",
                      [row["user_id"]])
         security_event(conn, "PASSWORD_RESET", user_id=row["user_id"], ip=client_ip(request))
+        alerts.send(svc, conn, row["user_id"], "password_reset", ip=client_ip(request))
     return {"status": "ok"}

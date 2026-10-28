@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from ..deps import Services, bearer_token, client_ip, services
 from ..errors import ApiError, not_found, unauthorized
 from ..events import security_event
+from ..security import alerts
 from ..security.tokens import hash_token
 from .auth import _access_user, _has_verified_factor, _raise_if_error, _ua, ph, validate_password
 
@@ -76,6 +77,7 @@ def _change_tx(body: PasswordChangeIn, user_id: uuid.UUID, mfa: bool, request: R
         closed = _revoke_others(conn, user_id, _current_family(svc, conn, request, user_id))
         security_event(conn, "PASSWORD_CHANGED", user_id=user_id, ip=client_ip(request), user_agent=_ua(request),
                        sessions_closed=closed)
+        alerts.send(svc, conn, user_id, "password_changed", ip=client_ip(request))
     return {"status": "ok", "sessions_closed": closed}
 
 

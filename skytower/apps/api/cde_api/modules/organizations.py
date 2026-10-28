@@ -12,6 +12,7 @@ from pydantic import BaseModel, EmailStr, Field
 from ..deps import Ctx, ctx
 from ..errors import ApiError, forbidden, not_found
 from ..events import security_event
+from ..security import alerts
 from ..security.tokens import new_opaque_token
 from .me import USER_COLUMNS
 
@@ -189,6 +190,9 @@ def reset_mfa(org_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(ctx)):
         removed = conn.execute("SELECT cde.reset_user_mfa(%s) n", [user_id]).fetchone()["n"]
         security_event(conn, "MFA_RESET_BY_ADMIN", user_id=c.user_id, organization_id=org_id, ip=c.ip,
                        target=user_id, factors=removed)
+        admin = conn.execute("SELECT first_name || ' ' || last_name AS n FROM cde.users WHERE id = %s",
+                             [c.user_id]).fetchone()
+        alerts.send(c.svc, conn, user_id, "mfa_reset", ip=c.ip, detail=admin["n"] if admin else "")
     return {"factors_removed": removed}
 
 
