@@ -1,9 +1,12 @@
 // "><(((º> sabusabu <º)))><"
-// Campanella notifiche: lista, segna come lette, aggiornamento in tempo reale via SSE (ticket di 60").
+// Campanella notifiche: lista con il tipo di ogni avviso e filtro per tipo, segna come lette, aggiornamento in
+// tempo reale via SSE (ticket di 60").
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge, Box, Button, Divider, IconButton, List, ListItemButton, ListItemText, Popover, Stack, Typography } from "@mui/material";
+import {
+  Badge, Box, Button, Chip, Divider, IconButton, List, ListItemButton, ListItemText, Popover, Stack, Typography,
+} from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import { api } from "../api";
 
@@ -17,10 +20,22 @@ interface Notification {
   read_at: string | null;
 }
 
+// tipi raggruppati come nel riepilogo giornaliero (notifier.py)
+const GROUPS: { key: string; label: string; kinds: string[] }[] = [
+  { key: "task", label: "Compiti", kinds: ["TASK_ASSIGNED", "TASK_REMINDER", "TASK_OVERDUE", "TASK_ESCALATED", "WORKFLOW_APPROVED", "WORKFLOW_REJECTED"] },
+  { key: "rfi", label: "RFI", kinds: ["RFI_CREATED", "RFI_REMINDER", "RFI_OVERDUE"] },
+  { key: "transmittal", label: "Transmittal", kinds: ["TRANSMITTAL_RECEIVED", "TRANSMITTAL_ACKNOWLEDGED"] },
+  { key: "follow", label: "Documenti seguiti", kinds: ["DOCUMENT_FOLLOWED"] },
+  { key: "access", label: "Accessi", kinds: ["ACCESS_REQUESTED"] },
+];
+const groupOf = (kind: string) => GROUPS.find((g) => g.kinds.includes(kind)) ?? { key: "other", label: "Altro", kinds: [] };
+const URGENT = new Set(["TASK_OVERDUE", "TASK_ESCALATED", "RFI_OVERDUE", "WORKFLOW_REJECTED"]);
+
 export function NotificationBell() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [filter, setFilter] = useState<string | null>(null);
   const { data } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api<{ items: Notification[]; unread: number }>("/notifications?limit=30"),
@@ -61,6 +76,11 @@ export function NotificationBell() {
     if (n.link) navigate(n.link);
   };
 
+  const items = data?.items ?? [];
+  const present = [...GROUPS, { key: "other", label: "Altro", kinds: [] }]
+    .filter((g) => items.some((n) => groupOf(n.kind).key === g.key));
+  const shown = filter ? items.filter((n) => groupOf(n.kind).key === filter) : items;
+
   return (
     <>
       <IconButton color="inherit" onClick={(e) => setAnchor(e.currentTarget)} aria-label="notifiche">
@@ -73,12 +93,26 @@ export function NotificationBell() {
             <Typography fontWeight={600} flexGrow={1}>Notifiche</Typography>
             <Button size="small" disabled={!data?.unread} onClick={() => markAll.mutate()}>Segna tutte come lette</Button>
           </Stack>
+          {present.length > 1 && (
+            <Stack direction="row" spacing={0.5} px={2} pb={1} flexWrap="wrap" useFlexGap role="group" aria-label="Filtra per tipo">
+              <Chip size="small" label="Tutte" color={filter ? "default" : "primary"} onClick={() => setFilter(null)} />
+              {present.map((g) => (
+                <Chip key={g.key} size="small" label={g.label} color={filter === g.key ? "primary" : "default"}
+                      onClick={() => setFilter(filter === g.key ? null : g.key)} />
+              ))}
+            </Stack>
+          )}
           <Divider />
-          {data?.items.length === 0 && <Typography p={2} color="text.secondary">Nessuna notifica.</Typography>}
+          {shown.length === 0 && <Typography p={2} color="text.secondary">Nessuna notifica.</Typography>}
           <List dense disablePadding>
-            {data?.items.map((n) => (
+            {shown.map((n) => (
               <ListItemButton key={n.id} onClick={() => open(n)} sx={{ bgcolor: n.read_at ? "transparent" : "action.hover" }}>
-                <ListItemText primary={n.title} primaryTypographyProps={{ fontWeight: n.read_at ? 400 : 600 }}
+                <ListItemText primary={<>
+                                <Typography component="span" variant="caption" color={URGENT.has(n.kind) ? "error.main" : "primary.main"}
+                                            fontWeight={600} display="block">{groupOf(n.kind).label}</Typography>
+                                {n.title}
+                              </>}
+                              primaryTypographyProps={{ fontWeight: n.read_at ? 400 : 600, component: "div" }}
                               secondary={`${new Date(n.created_at).toLocaleString("it-IT")} · ${n.body}`}
                               secondaryTypographyProps={{ noWrap: true }} />
               </ListItemButton>

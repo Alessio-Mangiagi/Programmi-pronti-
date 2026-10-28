@@ -73,7 +73,7 @@ export function ProfileMenu() {
   );
 }
 
-interface Preferences { email_enabled: boolean; daily_digest: boolean; locale: "it" | "en" }
+interface Preferences { email_enabled: boolean; daily_digest: boolean; follow_digest: boolean; locale: "it" | "en" }
 
 function ProfileDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
@@ -143,6 +143,9 @@ function ProfileDialog({ me, onClose }: { me: Me; onClose: () => void }) {
               <FormControlLabel label="Un solo riepilogo al giorno invece di un'email per ogni notifica"
                                 control={<Switch checked={prefs.daily_digest} disabled={!prefs.email_enabled}
                                                  onChange={(e) => setPrefs({ ...prefs, daily_digest: e.target.checked })} />} />
+              <FormControlLabel label="Documenti che seguo: via email solo nel riepilogo del mattino"
+                                control={<Switch checked={prefs.daily_digest || prefs.follow_digest} disabled={!prefs.email_enabled || prefs.daily_digest}
+                                                 onChange={(e) => setPrefs({ ...prefs, follow_digest: e.target.checked })} />} />
             </>
           )}
         </Stack>
