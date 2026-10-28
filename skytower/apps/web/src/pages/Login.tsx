@@ -114,6 +114,16 @@ export function LoginPage() {
     finish(r.access_token);
   });
 
+  // accesso senza password: il browser propone le passkey salvate per questo sito, senza email (ADR-27)
+  const passkeyLogin = () => run(async () => {
+    const c = await api<Ceremony>("/auth/passkey/options", { method: "POST" });
+    const credential = await getAssertion(c.options);
+    const r = await api<{ access_token: string }>("/auth/passkey/verify", {
+      method: "POST", json: { challenge_id: c.challenge_id, credential },
+    });
+    finish(r.access_token);
+  });
+
   const enrollKey = (mfaToken: string) => run(async () => {
     const c = await api<Ceremony>("/auth/mfa/webauthn/register/options", { method: "POST", json: { mfa_token: mfaToken } });
     const credential = await createCredential(c.options);
@@ -235,6 +245,9 @@ export function LoginPage() {
           <Button type="submit" variant="contained" size="large" disabled={busy}>Accedi</Button>
           <Link component={RouterLink} to="/password-dimenticata" variant="body2" textAlign="center">Password dimenticata?</Link>
           <Button variant="outlined" onClick={() => { setError(null); setStep({ kind: "sso" }); }}>Usa l'account aziendale (SSO)</Button>
+          {webauthnSupported() && (
+            <Button variant="outlined" disabled={busy} onClick={passkeyLogin}>Usa una passkey (senza password)</Button>
+          )}
         </Stack>
       </Box>
     </AuthCard>

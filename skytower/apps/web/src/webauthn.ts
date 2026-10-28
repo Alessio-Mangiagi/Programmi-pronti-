@@ -46,6 +46,8 @@ export async function createCredential(options: Json): Promise<Json> {
       clientDataJSON: toB64url(r.clientDataJSON), attestationObject: toB64url(r.attestationObject),
       transports: typeof r.getTransports === "function" ? r.getTransports() : [],
     },
+    // credProps.rk: la chiave conserva l'account (passkey) → vale anche per l'accesso senza password
+    clientExtensionResults: { credProps: (cred.getClientExtensionResults() as { credProps?: unknown }).credProps ?? null },
   };
 }
 

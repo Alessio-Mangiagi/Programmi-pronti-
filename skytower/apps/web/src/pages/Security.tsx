@@ -9,7 +9,7 @@ import { useAuth } from "../auth";
 import { RecoveryCodes } from "../components/AuthCard";
 import { createCredential, webauthnError, webauthnSupported } from "../webauthn";
 
-interface Factors { factors: { id: string; method: string; label: string; created_at: string; last_used_at: string | null }[]; recovery_codes_remaining: number }
+interface Factors { factors: { id: string; method: string; label: string; discoverable: boolean | null; created_at: string; last_used_at: string | null }[]; recovery_codes_remaining: number }
 interface Enrollment { factor_id: string; secret: string; qr_svg: string }
 interface Ceremony { challenge_id: string; options: Record<string, unknown> }
 
@@ -75,7 +75,7 @@ export function SecurityPage() {
           {data?.factors.map((f) => (
             <ListItem key={f.id} secondaryAction={<Button color="error" size="small" disabled={!me?.mfa} onClick={() => remove.mutate(f.id)}>Rimuovi</Button>}>
               <ListItemText primary={`${f.label} (${METHOD[f.method] ?? f.method})`}
-                            secondary={`Aggiunta il ${new Date(f.created_at).toLocaleDateString("it-IT")}${f.last_used_at ? ` · ultimo uso ${new Date(f.last_used_at).toLocaleString("it-IT")}` : ""}`} />
+                            secondary={`Aggiunta il ${new Date(f.created_at).toLocaleDateString("it-IT")}${f.last_used_at ? ` · ultimo uso ${new Date(f.last_used_at).toLocaleString("it-IT")}` : ""}${f.discoverable ? " · vale anche per l'accesso senza password" : ""}`} />
             </ListItem>
           ))}
         </List>
@@ -97,7 +97,8 @@ export function SecurityPage() {
         <Typography variant="subtitle1" fontWeight={600}>Chiavi di sicurezza e passkey</Typography>
         <Typography variant="body2" color="text.secondary" mb={1.5}>
           Una chiave USB/NFC (es. YubiKey) o la passkey del telefono o del computer: al login basta toccarla,
-          niente codici da ricopiare, e non funziona su siti falsi che imitano questo.
+          niente codici da ricopiare, e non funziona su siti falsi che imitano questo. Con una passkey si può anche
+          entrare senza password, dal pulsante "Usa una passkey" della pagina di accesso.
         </Typography>
         {keyError && <Alert severity="error" sx={{ mb: 1.5 }}>{keyError}</Alert>}
         {webauthnSupported() ? (

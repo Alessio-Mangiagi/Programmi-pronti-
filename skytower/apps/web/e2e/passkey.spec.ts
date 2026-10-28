@@ -37,4 +37,13 @@ test("chiave di sicurezza: registrazione dal profilo e accesso", async ({ page, 
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
   const after = (await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials[0];
   expect(after.signCount).toBeGreaterThan(credentials[0].signCount);
+
+  // la chiave conserva l'account (passkey residente): si entra anche senza email e password
+  expect(credentials[0].isResidentCredential).toBe(true);
+  await context.clearCookies();
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Usa una passkey (senza password)" }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await page.goto("/sicurezza");
+  await expect(page.getByText("vale anche per l'accesso senza password")).toBeVisible();
 });
