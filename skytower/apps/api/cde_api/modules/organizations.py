@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from ..deps import Ctx, ctx
-from ..errors import forbidden, not_found
+from ..errors import ApiError, forbidden, not_found
 from ..events import security_event
 from ..security.tokens import new_opaque_token
 from .me import USER_COLUMNS
@@ -114,8 +114,15 @@ def update_organization(org_id: uuid.UUID, body: OrganizationPatch, c: Ctx = Dep
 def list_users(org_id: uuid.UUID, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         _get_org(conn, org_id)
-        return conn.execute(f"SELECT {USER_COLUMNS} FROM cde.users u WHERE u.organization_id = %s "
-                            "ORDER BY u.last_name, u.first_name", [org_id]).fetchall()
+        users = conn.execute(f"SELECT {USER_COLUMNS} FROM cde.users u WHERE u.organization_id = %s "
+                             "ORDER BY u.last_name, u.first_name", [org_id]).fetchall()
+        if conn.execute("SELECT cde.can_manage_org(%s) ok", [org_id]).fetchone()["ok"]:
+            # solo l'admin vede chi ha il secondo fattore (metodi, mai segreti)
+            mfa = {r["user_id"]: r for r in conn.execute("SELECT * FROM cde.org_users_mfa(%s)", [org_id]).fetchall()}
+            for u in users:
+                u["mfa_methods"] = mfa[u["id"]]["methods"] if u["id"] in mfa else []
+                u["recovery_codes_left"] = mfa[u["id"]]["recovery_codes_left"] if u["id"] in mfa else 0
+        return users
 
 
 def _send_invitation(c: Ctx, conn, user_id: uuid.UUID, email: str, org_name: str) -> None:
@@ -162,15 +169,35 @@ def resend_invitation(org_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(ct
     return Response(status_code=204)
 
 
+@router.post("/{org_id}/users/{user_id}/mfa/reset")
+def reset_mfa(org_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Azzera il secondo fattore di chi ha perso telefono o chiave e chiude le sue sessioni."""
+    with c.tx() as conn:
+        if conn.execute("SELECT 1 FROM cde.users WHERE id = %s AND organization_id = %s",
+                        [user_id, org_id]).fetchone() is None:
+            raise not_found("Utente")
+        removed = conn.execute("SELECT cde.reset_user_mfa(%s) n", [user_id]).fetchone()["n"]
+        security_event(conn, "MFA_RESET_BY_ADMIN", user_id=c.user_id, organization_id=org_id, ip=c.ip,
+                       target=user_id, factors=removed)
+    return {"factors_removed": removed}
+
+
 @router.patch("/{org_id}/users/{user_id}")
 def update_user(org_id: uuid.UUID, user_id: uuid.UUID, body: UserPatch, c: Ctx = Depends(ctx)):
     changes = body.model_dump(exclude_unset=True)
     if user_id == c.user_id and (changes.get("status") == "DISABLED" or changes.get("is_org_admin") is False):
         raise forbidden("Non puoi disabilitare o declassare te stesso")
     with c.tx() as conn:
-        if conn.execute("SELECT 1 FROM cde.users WHERE id = %s AND organization_id = %s",
-                        [user_id, org_id]).fetchone() is None:
+        target = conn.execute("SELECT is_org_admin, status FROM cde.users WHERE id = %s AND organization_id = %s",
+                              [user_id, org_id]).fetchone()
+        if target is None:
             raise not_found("Utente")
+        demoting = changes.get("is_org_admin") is False or changes.get("status") == "DISABLED"
+        if demoting and target["is_org_admin"] and target["status"] == "ACTIVE" and not conn.execute(
+                """SELECT EXISTS (SELECT 1 FROM cde.users WHERE organization_id = %s AND id <> %s
+                       AND is_org_admin AND status = 'ACTIVE') ok""", [org_id, user_id]).fetchone()["ok"]:
+            # l'organizzazione resterebbe senza nessuno che inviti o sblocchi gli utenti
+            raise ApiError(409, "last_org_admin", "È l'ultimo amministratore attivo: nominarne prima un altro")
         if changes:
             if conn.execute(patch_sql("cde.users", changes), {**changes, "_key": user_id}).rowcount == 0:
                 raise forbidden()

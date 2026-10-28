@@ -257,3 +257,50 @@ def test_disabilitare_utente_blocca_subito_l_accesso(client, api_world, as_user)
     finally:
         client.patch(f"/organizations/{w.orgs['SUB1']}/users/{w.users['sub1_nomember']}",
                      headers=as_user("sub1_admin"), json={"status": "ACTIVE"})
+
+
+def test_ultimo_admin_non_si_toglie(client, api_world, as_user):
+    _, w = api_world
+    url = f"/organizations/{w.orgs['SUB1']}/users/{w.users['sub1_admin']}"
+    for change in ({"is_org_admin": False}, {"status": "DISABLED"}):
+        r = client.patch(url, headers=as_user("platform"), json=change)
+        assert r.status_code == 409 and r.json()["error"]["code"] == "last_org_admin"
+    # con un secondo admin attivo si può
+    other = f"/organizations/{w.orgs['SUB1']}/users/{w.users['sub1_nomember']}"
+    assert client.patch(other, headers=as_user("sub1_admin"), json={"is_org_admin": True}).status_code == 200
+    try:
+        assert client.patch(url, headers=as_user("platform"), json={"is_org_admin": False}).status_code == 200
+        assert client.patch(url, headers=as_user("platform"), json={"is_org_admin": True}).status_code == 200
+    finally:
+        client.patch(other, headers=as_user("sub1_admin"), json={"is_org_admin": False})
+
+
+def test_admin_vede_e_azzera_l_mfa(client, api_world, as_user):
+    import psycopg
+    urls, w = api_world
+    target = w.users["sub1_nomember"]
+    with psycopg.connect(urls.owner, autocommit=True) as conn:
+        conn.execute("""INSERT INTO cde.user_mfa_factors (user_id, method, label, totp_secret_encrypted, verified_at)
+                        VALUES (%s, 'TOTP', 'Telefono perso', %s, now())""", [target, bytes(1)])
+        conn.execute("INSERT INTO cde.user_recovery_codes (user_id, code_hash) VALUES (%s, 'x')", [target])
+        conn.execute("""INSERT INTO cde.refresh_tokens (user_id, family_id, token_hash, expires_at)
+                        VALUES (%s, gen_random_uuid(), sha256(random()::text::bytea), now() + interval '1 day')""", [target])
+    url = f"/organizations/{w.orgs['SUB1']}/users"
+    rows = {u["id"]: u for u in client.get(url, headers=as_user("sub1_admin")).json()}
+    assert rows[str(target)]["mfa_methods"] == ["TOTP"] and rows[str(target)]["recovery_codes_left"] == 1
+    # un utente qualsiasi vede i colleghi ma non il loro secondo fattore
+    assert "mfa_methods" not in client.get(url, headers=as_user("sub1_user")).json()[0]
+    reset = f"{url}/{target}/mfa/reset"
+    assert client.post(reset, headers=as_user("sub1_user")).status_code == 403
+    assert client.post(reset, headers=as_user("des_admin")).status_code == 404     # altra organizzazione
+    me = f"{url}/{w.users['sub1_admin']}/mfa/reset"
+    assert client.post(me, headers=as_user("sub1_admin")).status_code == 422      # il proprio si gestisce dal profilo
+    r = client.post(reset, headers=as_user("sub1_admin"))
+    assert r.status_code == 200 and r.json() == {"factors_removed": 1}
+    rows = {u["id"]: u for u in client.get(url, headers=as_user("sub1_admin")).json()}
+    assert rows[str(target)]["mfa_methods"] == [] and rows[str(target)]["recovery_codes_left"] == 0
+    with psycopg.connect(urls.owner) as conn:
+        assert conn.execute("SELECT count(*) FROM cde.refresh_tokens WHERE user_id = %s AND revoked_at IS NULL",
+                            [target]).fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM cde.security_events WHERE event_type = 'MFA_RESET_BY_ADMIN' "
+                            "AND details->>'target' = %s", [str(target)]).fetchone()[0] == 1
