@@ -73,6 +73,14 @@ class TokenService:
     def decode_sse_ticket(self, token: str) -> uuid.UUID:
         return uuid.UUID(self._decode(token, SSE)["sub"])
 
+    def issue_download_ticket(self, user_id: uuid.UUID, revision_id: uuid.UUID, *, inline: bool) -> str:
+        """Ticket di 5' per scaricare un PDF filigranato: il browser apre l'URL senza header Authorization."""
+        return self._encode({"typ": DOWNLOAD, "sub": str(user_id), "rev": str(revision_id), "inline": inline}, 300)
+
+    def decode_download_ticket(self, token: str) -> tuple[uuid.UUID, uuid.UUID, bool]:
+        p = self._decode(token, DOWNLOAD)
+        return uuid.UUID(p["sub"]), uuid.UUID(p["rev"]), bool(p.get("inline"))
+
     def sign_export(self, claims: dict) -> str:
         """Firma RS256 di un export (es. registro attività), verificabile con la JWKS pubblica.
         Nessuna scadenza: la firma attesta il contenuto al momento dell'emissione."""
@@ -82,6 +90,7 @@ class TokenService:
 
 
 SSE = "sse"
+DOWNLOAD = "download"
 
 
 def new_opaque_token() -> tuple[str, bytes]:

@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     upload_part_size: int = 64 * 1024 * 1024
     upload_max_bytes: int = 50 * 1024 ** 3
     upload_session_ttl_hours: int = 24
+    # Filigrana: i PDF passano dall'API (non dall'URL firmato di S3), quindi c'è un tetto alla dimensione
+    watermark_max_bytes: int = 200 * 1024 ** 2
+    public_api_prefix: str = "/api"      # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
 
     # Registro attività: ancore giornaliere su S3 WORM e marca temporale RFC 3161 (TSA qualificata in produzione)
     audit_anchor_prefix: str = "audit-anchors"

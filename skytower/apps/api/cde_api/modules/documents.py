@@ -17,17 +17,20 @@ import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
+from urllib.parse import quote
 
 import jsonschema
-from fastapi import APIRouter, Depends, Query, Response
+import jwt
+from fastapi import APIRouter, Depends, Query, Request, Response
 from iso19650 import AutoNumbering, NamingScheme, ValidationResult, default_scheme, next_wip_revision
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field, field_validator
 
-from ..deps import Ctx, ctx, require_container, require_project
-from ..errors import ApiError, forbidden, not_found
+from ..deps import Ctx, Services, client_ip, ctx, require_container, require_project, services
+from ..errors import ApiError, forbidden, not_found, unauthorized
 from ..events import security_event
 from ..storage import Storage, plan_parts
+from ..watermark import WatermarkError, stamp
 
 router = APIRouter(tags=["documents"])
 
@@ -50,6 +53,22 @@ class DocumentSettingsIn(BaseModel):
         except jsonschema.SchemaError as exc:
             raise ValueError(f"JSON Schema non valido: {exc.message}") from None
         return v
+
+
+class WatermarkIn(BaseModel):
+    """Filigrana sui PDF negli stati scelti; text è una riga aggiuntiva (es. "Uso interno, non diffondere")."""
+    states: list[Literal["WIP", "SHARED", "PUBLISHED", "ARCHIVED"]] = Field(min_length=1)
+    text: str | None = Field(default=None, max_length=120)
+
+    @field_validator("states")
+    @classmethod
+    def _unique(cls, v: list[str]) -> list[str]:
+        return sorted(set(v), key=["WIP", "SHARED", "PUBLISHED", "ARCHIVED"].index)
+
+    @field_validator("text")
+    @classmethod
+    def _strip(cls, v: str | None) -> str | None:
+        return (v or "").strip() or None
 
 
 class NameCheckIn(BaseModel):
@@ -219,6 +238,36 @@ def put_document_settings(project_id: uuid.UUID, body: DocumentSettingsIn, c: Ct
         security_event(conn, "DOCUMENT_SETTINGS_UPDATED", user_id=c.user_id, project_id=project_id, ip=c.ip,
                        custom_naming=body.naming_scheme is not None, auto_number=body.auto_number is not None)
     return get_document_settings(project_id, c)
+
+
+def load_watermark(conn, project_id: uuid.UUID) -> WatermarkIn | None:
+    row = conn.execute("SELECT watermark FROM cde.project_document_settings WHERE project_id = %s",
+                       [project_id]).fetchone()
+    return WatermarkIn.model_validate(row["watermark"]) if row and row["watermark"] else None
+
+
+@router.get("/projects/{project_id}/watermark")
+def get_watermark(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    with c.tx() as conn:
+        require_project(conn, project_id)
+        wm = load_watermark(conn, project_id)
+    return {"watermark": wm.model_dump() if wm else None}
+
+
+@router.put("/projects/{project_id}/watermark")
+def put_watermark(project_id: uuid.UUID, body: WatermarkIn | None = None, c: Ctx = Depends(ctx)):
+    """Corpo vuoto (null) = filigrana disattivata. Riservato al Project Admin."""
+    with c.tx() as conn:
+        require_project(conn, project_id, "ADMIN", "PROJECT")
+        conn.execute(
+            """INSERT INTO cde.project_document_settings (project_id, watermark, updated_by)
+               VALUES (%(p)s, %(w)s, cde.current_app_user())
+               ON CONFLICT (project_id) DO UPDATE SET watermark = EXCLUDED.watermark,
+                   updated_by = EXCLUDED.updated_by, updated_at = now()""",
+            {"p": project_id, "w": Jsonb(body.model_dump()) if body else None})
+        security_event(conn, "WATERMARK_UPDATED", user_id=c.user_id, project_id=project_id, ip=c.ip,
+                       states=body.states if body else [])
+    return {"watermark": body.model_dump() if body else None}
 
 
 @router.post("/projects/{project_id}/naming/validate")
@@ -686,41 +735,106 @@ def viewable_type(filename: str) -> str | None:
     return next((t for t, exts in VIEWABLE.items() if name.endswith(exts)), None)
 
 
+def _downloadable(conn, revision_id: uuid.UUID) -> dict:
+    """La revisione, se l'utente corrente può scaricarla e il file è verificato; altrimenti 403/404/409/423."""
+    rev = conn.execute(
+        """SELECT r.id, r.original_filename, r.project_id, r.state, r.revision_code, d.container_id, d.identifier,
+                  f.storage_key, f.storage_version_id, f.scan_status, f.sha256_verified, f.size_bytes
+           FROM cde.document_revisions r JOIN cde.documents d ON d.id = r.document_id
+           JOIN cde.file_objects f ON f.id = r.file_object_id WHERE r.id = %s""", [revision_id]).fetchone()
+    if rev is None:
+        raise not_found("Revisione")
+    in_review = conn.execute("SELECT %s IN (SELECT cde.my_review_revisions()) AS r", [revision_id]).fetchone()["r"]
+    if in_review:
+        pass                                    # il revisore assegnato può sempre scaricare
+    elif rev["state"] in ("WIP", "SHARED") or conn.execute(
+            "SELECT %s IN (SELECT cde.private_containers()) p", [rev["container_id"]]).fetchone()["p"]:
+        # WIP e SHARED, e ogni stato in un'area riservata: permesso DOWNLOAD sul container (ruolo o grant)
+        if "DOWNLOAD" not in conn.execute("SELECT cde.my_container_actions(%s)::text[] a",
+                                          [rev["container_id"]]).fetchone()["a"]:
+            raise forbidden()
+    elif not conn.execute("SELECT cde.has_project_permission(cde.current_app_user(), %s, 'DOWNLOAD', NULL) ok",
+                          [rev["project_id"]]).fetchone()["ok"]:
+        raise forbidden()   # PUBLISHED: chiunque nel progetto abbia DOWNLOAD in qualsiasi ambito
+    if rev["scan_status"] == "PENDING":
+        raise ApiError(409, "scan_pending", "Verifica antivirus in corso: riprovare tra poco")
+    if rev["scan_status"] != "CLEAN" or not rev["sha256_verified"]:
+        raise ApiError(423, "quarantined", "File in quarantena: download non consentito")
+    return rev
+
+
+def _watermarked(conn, rev: dict) -> WatermarkIn | None:
+    """La filigrana da applicare a questa revisione (PDF in uno stato scelto dal Project Admin), se c'è."""
+    if not rev["original_filename"].lower().endswith(".pdf"):
+        return None
+    wm = load_watermark(conn, rev["project_id"])
+    return wm if wm and rev["state"] in wm.states else None
+
+
+def _too_large(settings, rev: dict) -> ApiError:
+    return ApiError(413, "watermark_too_large", "PDF troppo grande per la filigrana: chiedere al Project Admin "
+                    f"(limite {settings.watermark_max_bytes // 1024 ** 2} MB)")
+
+
 @router.get("/revisions/{revision_id}/download")
 def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment", "inline"] = "attachment",
                       c: Ctx = Depends(ctx)):
-    """URL firmato (5'). disposition=inline: da visualizzare in piattaforma (solo formati visualizzabili)."""
+    """URL firmato (5'). disposition=inline: da visualizzare in piattaforma (solo formati visualizzabili).
+    PDF con la filigrana attiva nel suo stato: l'URL porta all'API, che timbra il file per chi lo ha chiesto."""
+    settings = c.svc.settings
     with c.tx() as conn:
-        rev = conn.execute(
-            """SELECT r.id, r.original_filename, r.project_id, r.state, d.container_id, f.storage_key,
-                      f.storage_version_id, f.scan_status, f.sha256_verified
-               FROM cde.document_revisions r JOIN cde.documents d ON d.id = r.document_id
-               JOIN cde.file_objects f ON f.id = r.file_object_id WHERE r.id = %s""", [revision_id]).fetchone()
-        if rev is None:
-            raise not_found("Revisione")
-        in_review = conn.execute("SELECT %s IN (SELECT cde.my_review_revisions()) AS r",
-                                 [revision_id]).fetchone()["r"]
-        if in_review:
-            pass                                    # il revisore assegnato può sempre scaricare
-        elif rev["state"] in ("WIP", "SHARED") or conn.execute(
-                "SELECT %s IN (SELECT cde.private_containers()) p", [rev["container_id"]]).fetchone()["p"]:
-            # WIP e SHARED, e ogni stato in un'area riservata: permesso DOWNLOAD sul container (ruolo o grant)
-            if "DOWNLOAD" not in conn.execute("SELECT cde.my_container_actions(%s)::text[] a",
-                                              [rev["container_id"]]).fetchone()["a"]:
-                raise forbidden()
-        elif not conn.execute("SELECT cde.has_project_permission(cde.current_app_user(), %s, 'DOWNLOAD', NULL) ok",
-                              [rev["project_id"]]).fetchone()["ok"]:
-            raise forbidden()   # PUBLISHED: chiunque nel progetto abbia DOWNLOAD in qualsiasi ambito
-        if rev["scan_status"] == "PENDING":
-            raise ApiError(409, "scan_pending", "Verifica antivirus in corso: riprovare tra poco")
-        if rev["scan_status"] != "CLEAN" or not rev["sha256_verified"]:
-            raise ApiError(423, "quarantined", "File in quarantena: download non consentito")
+        rev = _downloadable(conn, revision_id)
         inline_type = viewable_type(rev["original_filename"]) if disposition == "inline" else None
         if disposition == "inline" and inline_type is None:
             raise ApiError(415, "not_viewable", "Formato non visualizzabile in piattaforma: scaricare il file")
+        watermark = _watermarked(conn, rev) is not None
+        if watermark and rev["size_bytes"] > settings.watermark_max_bytes:
+            raise _too_large(settings, rev)
         security_event(conn, "REVISION_VIEWED" if inline_type else "REVISION_DOWNLOADED", user_id=c.user_id,
-                       project_id=rev["project_id"], ip=c.ip, revision=revision_id)
+                       project_id=rev["project_id"], ip=c.ip, revision=revision_id, watermark=watermark)
     ttl = 300
-    url = _storage(c).presign_get(rev["storage_key"], rev["storage_version_id"], rev["original_filename"], ttl,
-                                  inline_type=inline_type)
-    return {"url": url, "expires_in": ttl, "filename": rev["original_filename"], "content_type": inline_type}
+    if watermark:
+        ticket = c.svc.tokens.issue_download_ticket(c.user_id, revision_id, inline=inline_type is not None)
+        url = f"{settings.public_api_prefix}/revisions/{revision_id}/watermarked?ticket={ticket}"
+    else:
+        url = _storage(c).presign_get(rev["storage_key"], rev["storage_version_id"], rev["original_filename"], ttl,
+                                      inline_type=inline_type)
+    return {"url": url, "expires_in": ttl, "filename": rev["original_filename"], "content_type": inline_type,
+            "watermark": watermark}
+
+
+@router.get("/revisions/{revision_id}/watermarked")
+def watermarked_revision(revision_id: uuid.UUID, ticket: str, request: Request, svc: Services = Depends(services)):
+    """Il PDF timbrato per l'utente del ticket. I permessi si ricontrollano: il ticket non sopravvive a una revoca."""
+    try:
+        user_id, ticket_revision, inline = svc.tokens.decode_download_ticket(ticket)
+    except jwt.InvalidTokenError:
+        raise unauthorized("Link scaduto: riaprire il documento") from None
+    if ticket_revision != revision_id:
+        raise unauthorized("Link non valido")
+    with svc.db.app_tx(user_id) as conn:
+        who = conn.execute(
+            """SELECT u.first_name || ' ' || u.last_name AS name, u.email, u.status, o.code AS org
+               FROM cde.users u JOIN cde.organizations o ON o.id = u.organization_id WHERE u.id = %s""",
+            [user_id]).fetchone()
+        if who is None or who["status"] != "ACTIVE":
+            raise unauthorized("Utente non più attivo")
+        rev = _downloadable(conn, revision_id)
+        wm = _watermarked(conn, rev)
+        if wm is None:
+            raise ApiError(409, "watermark_off", "Filigrana non più richiesta: riaprire il documento")
+    if rev["size_bytes"] > svc.settings.watermark_max_bytes:
+        raise _too_large(svc.settings, rev)
+    data = b"".join(svc.storage.iter_object(rev["storage_key"], rev["storage_version_id"]))
+    when = datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC")
+    footer = [f"Scaricato da {who['name']} <{who['email']}> - {who['org']} - {when} - IP {client_ip(request) or 'n/d'}",
+              f"{rev['identifier']} rev. {rev['revision_code']} - stato {rev['state']}"
+              + (f" - {wm.text}" if wm.text else "")]
+    try:
+        body = stamp(data, f"{who['name']} - {who['org']} - {when[:10]}", footer)
+    except WatermarkError as exc:
+        raise ApiError(422, "watermark_failed", str(exc)) from None
+    disposition = "inline" if inline else "attachment"
+    return Response(body, media_type="application/pdf", headers={
+        "Content-Disposition": f"{disposition}; filename*=UTF-8''{quote(rev['original_filename'])}",
+        "Cache-Control": "private, no-store"})
