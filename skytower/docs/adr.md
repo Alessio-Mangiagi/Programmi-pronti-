@@ -281,3 +281,24 @@ Le alternative valutate (`'unsafe-eval'` su tutta la SPA, viewer isolato in un i
 ricompilazione propria con `-sDYNAMIC_EXECUTION=0`) non servono più. L'e2e `ifc.spec.ts` gira sotto la CSP e
 verifica albero spaziale, vista 3D e selezione di un elemento; se una versione futura reintroducesse `eval`,
 il test lo segnala e il viewer mostra un messaggio comprensibile invece dell'errore tecnico.
+
+## ADR-23 — Filigrana sui PDF scaricati
+
+**Contesto.** Un PDF condiviso o pubblicato, una volta scaricato, esce dal CDE senza traccia di chi lo ha
+preso. Il piano (G19) lasciava la filigrana in backlog.
+
+**Decisione.** Il Project Admin sceglie gli stati CDE in cui i PDF si scaricano e si visualizzano solo
+filigranati (scheda Naming, `PUT /projects/{id}/watermark`). Per quei PDF `/download` non restituisce l'URL
+firmato di S3 ma un URL dell'API con un ticket RS256 di 5' (utente + revisione + inline/allegato, perché il
+browser apre il link senza header `Authorization`). L'API ricontrolla utente attivo, permessi, verifica
+antivirus e impostazione, legge l'oggetto da S3 e timbra ogni pagina: scritta diagonale semitrasparente con
+nome, organizzazione e data, piè di pagina con email, data e ora UTC, IP, identificativo, revisione e stato,
+più una riga facoltativa dell'admin. La sovrapposizione si disegna con fpdf2 alla misura di ogni pagina
+(rotazione e mediabox gestite) e si fonde con **pypdf**: il contenuto originale resta, il file archiviato
+nello storage immutabile non cambia. Ogni apertura resta nel registro (`REVISION_VIEWED`/`DOWNLOADED`
+con `watermark: true`).
+
+**Limiti.** La filigrana si calcola in memoria: oltre `CDE_WATERMARK_MAX_BYTES` (200 MB) il download del PDF
+filigranato è rifiutato con un messaggio, perché consegnare l'originale annullerebbe la scelta dell'admin.
+PDF protetti da password o danneggiati: errore 422, da risolvere ricaricando il file. Dissuade e traccia,
+non impedisce: chi ha il permesso di scaricare può comunque fotografare o ricopiare il contenuto.

@@ -38,6 +38,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U21, U23 | `isolamento.spec.ts` |
 | U22 | `profilo.spec.ts`, `mfa.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
+| U24 | `filigrana.spec.ts` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -70,6 +71,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U21 | Subappaltatore | Prova ad aprire l'indirizzo di un documento DES copiato da un collega | "Non trovato", nessun dettaglio rivelato | |
 | U22 | Tutti | Profilo: cambia nome e preferenze notifiche; attiva l'MFA | Modifiche salvate; il login successivo chiede il codice | |
 | U23 | Tutti | Uso da tablet in cantiere: apre un PDF, zoom, annotazione | Leggibile e utilizzabile senza zoom del browser | |
+| U24 | BIM Manager | Scheda Naming: attiva la filigrana sui PDF condivisi e pubblicati; un progettista apre e scarica un PDF condiviso | Il visualizzatore mostra "Filigranato"; ogni pagina, anche nel file scaricato, riporta nome, email, organizzazione, data e ora, IP, documento e revisione | |
 
 ## Verbale
 
