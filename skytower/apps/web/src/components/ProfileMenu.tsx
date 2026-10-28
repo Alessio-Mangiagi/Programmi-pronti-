@@ -7,6 +7,7 @@ import {
   Alert, Avatar, Box, Button, ButtonBase, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
   FormControlLabel, ListItemIcon, Menu, MenuItem, Stack, Switch, TextField, Typography,
 } from "@mui/material";
+import BusinessIcon from "@mui/icons-material/Business";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LockIcon from "@mui/icons-material/Lock";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -56,6 +57,12 @@ export function ProfileMenu() {
         <MenuItem component={RouterLink} to="/sicurezza" onClick={() => setAnchor(null)}>
           <ListItemIcon><LockIcon fontSize="small" /></ListItemIcon>Password e autenticazione a due fattori
         </MenuItem>
+        {(me.is_org_admin || me.is_platform_admin) && (
+          <MenuItem component={RouterLink} to="/organizzazione" onClick={() => setAnchor(null)}>
+            <ListItemIcon><BusinessIcon fontSize="small" /></ListItemIcon>
+            {me.is_platform_admin ? "Organizzazioni e utenti" : "La mia organizzazione e gli utenti"}
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem sx={{ color: "error.main" }} onClick={async () => { setAnchor(null); await logout(); navigate("/login"); }}>
           <ListItemIcon><LogoutIcon fontSize="small" color="error" /></ListItemIcon>Esci

@@ -10,6 +10,7 @@ import { InvitationPage, ForgotPasswordPage, ResetPasswordPage } from "./pages/A
 import { ProjectsPage } from "./pages/Projects";
 import { ProjectPage } from "./pages/Project";
 import { SecurityPage } from "./pages/Security";
+import { OrganizationPage } from "./pages/Organization";
 import { TasksPage } from "./pages/Tasks";
 import { Shell } from "./components/Shell";
 
@@ -60,6 +61,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/" element={<Protected><ProjectsPage /></Protected>} />
               <Route path="/progetti/:projectId/*" element={<Protected><ProjectPage /></Protected>} />
               <Route path="/sicurezza" element={<Protected><SecurityPage /></Protected>} />
+              <Route path="/organizzazione" element={<Protected><OrganizationPage /></Protected>} />
               <Route path="/compiti" element={<Protected><TasksPage /></Protected>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
