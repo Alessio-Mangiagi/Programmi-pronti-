@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 // Viewer PDF in piattaforma: ricerca nel testo con evidenziazione e navigazione tra le occorrenze.
 import { expect, test } from "@playwright/test";
-import { apiAs, loginUi } from "./helpers";
+import { apiAs, loginUi, openInTab } from "./helpers";
 import { textPdf } from "./pdf";
 
 const ADMIN = "com.admin@com.example";
@@ -31,12 +31,12 @@ test("ricerca nel testo del PDF", async ({ page, baseURL }) => {
   }, { timeout: 30_000 }).toBe("CLEAN");
 
   await page.reload();
-  await page.getByText("Verbale di sopralluogo").dblclick();
-  const search = page.getByPlaceholder("Cerca nel testo");
+  const tab = await openInTab(page, () => page.getByText("Verbale di sopralluogo").dblclick());
+  const search = tab.getByPlaceholder("Cerca nel testo");
   await search.fill("cantiere");
-  await expect(page.getByText("1/2")).toBeVisible({ timeout: 15_000 });
+  await expect(tab.getByText("1/2")).toBeVisible({ timeout: 15_000 });
   await search.press("Enter");
-  await expect(page.getByText("2/2")).toBeVisible();
+  await expect(tab.getByText("2/2")).toBeVisible();
   await search.fill("inesistente");
-  await expect(page.getByLabel("Occorrenza successiva")).toBeDisabled();
+  await expect(tab.getByLabel("Occorrenza successiva")).toBeDisabled();
 });

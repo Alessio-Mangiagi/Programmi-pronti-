@@ -2,7 +2,7 @@
 // Isolamento dal browser e uso da tablet: un link copiato verso dati altrui non rivela nulla; su tablet
 // cartelle e viewer restano utilizzabili.
 import { devices, expect, test } from "@playwright/test";
-import { apiAs, loginUi, projectAndFolder, uploadPdf } from "./helpers";
+import { apiAs, loginUi, projectAndFolder, uploadPdf, openInTab } from "./helpers";
 
 test("un link a una cartella altrui non mostra nulla", async ({ page, baseURL }) => {
   const des = await apiAs(baseURL, "des.lead@des.example");
@@ -27,9 +27,9 @@ test.describe("tablet", () => {
     await page.reload();
     const width = page.viewportSize()!.width;
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);  // niente scroll orizzontale
-    await page.getByText("Verbale tablet e2e").dblclick();
-    await expect(page.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: "Annota", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Chiudi" }).last()).toBeInViewport();
+    const tab = await openInTab(page, () => page.getByText("Verbale tablet e2e").dblclick());
+    await expect(tab.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
+    await expect(tab.getByRole("button", { name: "Annota", exact: true })).toBeVisible();
+    await expect(tab.getByRole("button", { name: "Chiudi" }).last()).toBeInViewport();
   });
 });

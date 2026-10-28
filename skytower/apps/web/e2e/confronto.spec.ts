@@ -2,7 +2,7 @@
 // Confronto tra due revisioni PDF nel viewer: le differenze compaiono colorate (rosso = solo nella revisione
 // aperta, blu = solo in quella di confronto). Il test conta i pixel colorati sulla pagina composta.
 import { expect, test } from "@playwright/test";
-import { apiAs, findDocs, loginUi, projectAndFolder, uploadPdf } from "./helpers";
+import { apiAs, findDocs, loginUi, projectAndFolder, uploadPdf, openInTab } from "./helpers";
 import { textPdf } from "./pdf";
 
 test("le differenze tra due revisioni si vedono in rosso e blu", async ({ page, baseURL }) => {
@@ -23,13 +23,13 @@ test("le differenze tra due revisioni si vedono in rosso e blu", async ({ page, 
     .toBe("CLEAN");
 
   await page.reload();
-  await page.getByText("Pianta confronto e2e").dblclick();
-  await expect(page.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
-  await page.getByLabel("Confronta con").click();
-  await page.getByRole("option", { name: /P01\.01/ }).click();
-  await expect(page.getByText(/solo nella revisione aperta/)).toBeVisible();
+  const tab = await openInTab(page, () => page.getByText("Pianta confronto e2e").dblclick());
+  await expect(tab.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
+  await tab.getByLabel("Confronta con").click();
+  await tab.getByRole("option", { name: /P01\.01/ }).click();
+  await expect(tab.getByText(/solo nella revisione aperta/)).toBeVisible();
 
-  const colors = async () => page.locator('[data-page="1"] canvas').evaluate((c: HTMLCanvasElement) => {
+  const colors = async () => tab.locator('[data-page="1"] canvas').evaluate((c: HTMLCanvasElement) => {
     const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
     let red = 0, blue = 0;
     for (let i = 0; i < d.length; i += 4) {

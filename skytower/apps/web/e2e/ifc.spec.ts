@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { apiAs, loginUi, projectAndFolder, uploadFile, uploadPdf } from "./helpers";
+import { apiAs, loginUi, projectAndFolder, uploadFile, uploadPdf, openInTab } from "./helpers";
 
 const IFC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "edificio.ifc"));
 
@@ -18,13 +18,13 @@ test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => 
   await uploadFile(page, des, projectId, folderId, { name: "PRJ01-DES-ZZ-ZZ-M3-A-0792.ifc", mimeType: "application/octet-stream",
                    buffer: IFC }, "Modello architettonico e2e");
   await page.reload();
-  await page.getByText("Modello architettonico e2e").dblclick();
-  await expect(page.getByText("Padiglione A")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByText("Piano terra")).toBeVisible();
-  await expect(page.getByText("Piano · Piano 1")).toBeVisible();
+  const tab = await openInTab(page, () => page.getByText("Modello architettonico e2e").dblclick());
+  await expect(tab.getByText("Padiglione A")).toBeVisible({ timeout: 45_000 });
+  await expect(tab.getByText("Piano terra")).toBeVisible();
+  await expect(tab.getByText("Piano · Piano 1")).toBeVisible();
   // il buffer WebGL non si rilegge dopo il disegno: si analizza uno screenshot del canvas
-  const shot = (await page.locator("canvas").first().screenshot()).toString("base64");
-  const varied = await page.evaluate(async (b64) => {
+  const shot = (await tab.locator("canvas").first().screenshot()).toString("base64");
+  const varied = await tab.evaluate(async (b64) => {
     const img = new Image();
     img.src = `data:image/png;base64,${b64}`;
     await img.decode();
@@ -40,9 +40,9 @@ test("modello IFC con albero spaziale e vista 3D", async ({ page, baseURL }) => 
   expect(varied).toBeGreaterThan(5);
 
   // clic sul modello: l'elemento selezionato mostra tipo IFC e GUID nel pannello proprietà
-  const box = (await page.locator("canvas").first().boundingBox())!;
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.getByText(/^Ifc[A-Z][A-Za-z]+$/).first()).toBeVisible({ timeout: 10_000 });
+  const box = (await tab.locator("canvas").first().boundingBox())!;
+  await tab.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(tab.getByText(/^Ifc[A-Z][A-Za-z]+$/).first()).toBeVisible({ timeout: 10_000 });
 });
 
 test("elemento del modello: misure e tavole che lo citano", async ({ page, baseURL }) => {
@@ -58,21 +58,21 @@ test("elemento del modello: misure e tavole che lo citano", async ({ page, baseU
   await uploadFile(page, des, projectId, folderId, { name: "PRJ01-DES-ZZ-ZZ-M3-A-0794.ifc", mimeType: "application/octet-stream",
                    buffer: IFC }, "Modello collegato e2e");
   await page.reload();
-  await page.getByText("Modello collegato e2e").dblclick();
-  await page.getByText("Piano · Piano terra").click({ timeout: 45_000 });          // apre il piano nell'albero
-  await page.getByText("Muro perimetrale sud P0").first().click();
+  const model = await openInTab(page, () => page.getByText("Modello collegato e2e").dblclick());
+  await model.getByText("Piano · Piano terra").click({ timeout: 45_000 });          // apre il piano nell'albero
+  await model.getByText("Muro perimetrale sud P0").first().click();
 
-  const misure = page.getByRole("region", { name: "Misure" });
+  const misure = model.getByRole("region", { name: "Misure" });
   await expect(misure.getByText("Lunghezza")).toBeVisible();
   await expect(misure.getByText("Spessore")).toBeVisible();
   await expect(misure.getByText("Volume")).toBeVisible();
-  const links = page.getByRole("region", { name: "Tavole e documenti collegati" });
+  const links = model.getByRole("region", { name: "Tavole e documenti collegati" });
   await expect(links.getByText("livello 00").first()).toBeVisible();
   // la tavola si apre in una nuova scheda, con il nome dell'elemento già cercato; il modello resta aperto
-  const [tab] = await Promise.all([page.context().waitForEvent("page"), links.getByText("Pianta BIM e2e").first().click()]);
+  const [tab] = await Promise.all([model.context().waitForEvent("page"), links.getByText("Pianta BIM e2e").first().click()]);
   await expect(tab).toHaveURL(/\/documenti\/[0-9a-f-]+\?cerca=Muro/);
   await expect(tab.getByPlaceholder("Cerca nel testo")).toHaveValue("Muro perimetrale sud P0");
   await expect(tab.getByText("1/1")).toBeVisible({ timeout: 20_000 });
   await expect(tab).toHaveTitle(/PRJ01-DES-ZZ-00-DR-A-0793/);
-  await expect(page.getByRole("region", { name: "Misure" })).toBeVisible();
+  await expect(model.getByRole("region", { name: "Misure" })).toBeVisible();
 });

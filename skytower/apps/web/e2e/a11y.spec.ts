@@ -2,7 +2,7 @@
 // Accessibilità (WCAG 2.1 A/AA con axe-core): nessuna violazione, di nessun livello, sulle pagine principali.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { apiAs, loginUi, projectAndFolder, uploadPdf } from "./helpers";
+import { apiAs, loginUi, projectAndFolder, uploadPdf, openInTab } from "./helpers";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -53,9 +53,9 @@ test("dialog di caricamento con rinomina e viewer PDF", async ({ page, baseURL }
   const found = await violations(page, "dialog upload", '[role="dialog"]');
   await page.getByRole("button", { name: "Chiudi" }).click();
 
-  await page.getByText("Verbale accessibile e2e").dblclick();
-  await expect(page.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
-  found.push(...await violations(page, "viewer PDF"));
+  const tab = await openInTab(page, () => page.getByText("Verbale accessibile e2e").dblclick());
+  await expect(tab.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
+  found.push(...await violations(tab, "viewer PDF"));
   expect(found).toEqual([]);
 });
 
@@ -108,7 +108,8 @@ test("cartelle e documenti utilizzabili da sola tastiera", async ({ page, baseUR
   await expect(radio).toBeChecked();
   const open = page.getByRole("button", { name: "Apri", exact: true });
   await open.focus();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "Visualizzatore: Pianta da tastiera e2e" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  const kbTab = await openInTab(page, () => page.keyboard.press("Enter"));
+  await expect(kbTab.getByRole("dialog", { name: "Visualizzatore: Pianta da tastiera e2e" })).toBeVisible();
+  // Esc chiude il visualizzatore e con lui la scheda del documento
+  await Promise.all([kbTab.waitForEvent("close"), kbTab.keyboard.press("Escape").catch(() => undefined)]);
 });

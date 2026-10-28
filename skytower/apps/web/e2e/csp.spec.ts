@@ -4,14 +4,16 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
-import { apiAs, loginUi, projectAndFolder, uploadFile, uploadPdf } from "./helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { apiAs, loginUi, projectAndFolder, uploadFile, uploadPdf, openInTab } from "./helpers";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 test("PDF, Word ed Excel con la CSP di produzione", async ({ page, baseURL }) => {
   const blocked: string[] = [];
-  page.on("console", (m) => { if (/Content Security Policy|Refused to/i.test(m.text())) blocked.push(m.text()); });
+  const watch = (p: Page) => p.on("console", (m) => { if (/Content Security Policy|Refused to/i.test(m.text())) blocked.push(m.text()); });
+  watch(page);
+  page.context().on("page", watch);                       // anche le schede dei documenti
   const csp = (await page.request.get("/")).headers()["content-security-policy"];
   expect(csp, "vite preview deve servire la CSP di produzione").toContain("script-src 'self' 'wasm-unsafe-eval'");
 
@@ -27,18 +29,18 @@ test("PDF, Word ed Excel con la CSP di produzione", async ({ page, baseURL }) =>
     buffer: readFileSync(join(FIXTURES, "computo.xlsx")) }, "Computo CSP e2e");
 
   await page.reload();
-  await page.getByText("Verbale CSP e2e").dblclick();
-  await expect(page.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
-  await page.getByPlaceholder("Cerca nel testo").fill("Verbale");
-  await expect(page.getByText("1/1")).toBeVisible();
-  await page.getByRole("button", { name: "Chiudi" }).last().click();
+  const pdfTab = await openInTab(page, () => page.getByText("Verbale CSP e2e").dblclick());
+  await expect(pdfTab.locator('[data-page="1"] canvas')).toBeVisible({ timeout: 15_000 });
+  await pdfTab.getByPlaceholder("Cerca nel testo").fill("Verbale");
+  await expect(pdfTab.getByText("1/1")).toBeVisible();
+  await pdfTab.getByRole("button", { name: "Chiudi" }).last().click();
 
-  await page.getByText("Capitolato CSP e2e").dblclick();
-  await expect(page.frameLocator('iframe[title="Anteprima del documento Word"]').getByText("NTC 2018")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Chiudi" }).last().click();
+  const wordTab = await openInTab(page, () => page.getByText("Capitolato CSP e2e").dblclick());
+  await expect(wordTab.frameLocator('iframe[title="Anteprima del documento Word"]').getByText("NTC 2018")).toBeVisible({ timeout: 15_000 });
+  await wordTab.getByRole("button", { name: "Chiudi" }).last().click();
 
-  await page.getByText("Computo CSP e2e").dblclick();
-  await expect(page.getByRole("cell", { name: "Calcestruzzo C25/30" })).toBeVisible({ timeout: 15_000 });
+  const excelTab = await openInTab(page, () => page.getByText("Computo CSP e2e").dblclick());
+  await expect(excelTab.getByRole("cell", { name: "Calcestruzzo C25/30" })).toBeVisible({ timeout: 15_000 });
 
   expect(blocked).toEqual([]);
 });

@@ -67,3 +67,10 @@ export function totp(secret: string, at = Date.now()): string {
   const offset = mac[mac.length - 1] & 0x0f;
   return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
+
+/** Documenti e modelli si aprono in una nuova scheda: esegue l'apertura e restituisce la scheda nuova. */
+export async function openInTab(page: Page, open: () => Promise<unknown>): Promise<Page> {
+  const [tab] = await Promise.all([page.context().waitForEvent("page"), open()]);
+  await tab.waitForLoadState();
+  return tab;
+}
