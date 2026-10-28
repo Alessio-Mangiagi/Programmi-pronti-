@@ -119,6 +119,14 @@ def _has_verified_factor(conn: psycopg.Connection, user_id: uuid.UUID) -> bool:
     ).fetchone()["ok"]
 
 
+def _sso_enforced(conn: psycopg.Connection, user_id: uuid.UUID) -> bool:
+    """Organizzazione con single sign-on obbligatorio: si entra solo dall'IdP (il platform admin resta fuori)."""
+    return conn.execute(
+        """SELECT EXISTS (SELECT 1 FROM cde.organization_sso s JOIN cde.users u ON u.organization_id = s.organization_id
+               WHERE u.id = %s AND s.enabled AND s.enforce AND NOT u.is_platform_admin) ok""",
+        [user_id]).fetchone()["ok"]
+
+
 def _start_session(svc: Services, conn: psycopg.Connection, response: Response, user: dict, *,
                    amr: list[str], request: Request, family_id: uuid.UUID | None = None) -> dict:
     if family_id is None:                      # nuovo accesso (non un rinnovo): dispositivo mai visto?
@@ -236,10 +244,7 @@ def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, respo
             return unauthorized(GENERIC_LOGIN_ERROR)
 
         # organizzazione con single sign-on obbligatorio: la password non basta (il platform admin resta fuori)
-        if conn.execute(
-                """SELECT EXISTS (SELECT 1 FROM cde.organization_sso s JOIN cde.users u ON u.organization_id = s.organization_id
-                       WHERE u.id = %s AND s.enabled AND s.enforce AND NOT u.is_platform_admin) ok""",
-                [user["id"]]).fetchone()["ok"]:
+        if _sso_enforced(conn, user["id"]):
             security_event(conn, "LOGIN_FAIL", user_id=user["id"], ip=ip, reason="sso_required")
             return ApiError(403, "sso_required", "La tua organizzazione usa il single sign-on: accedi con l'account aziendale")
 
@@ -402,7 +407,8 @@ def list_factors(request: Request, svc: Services = Depends(services)):
     user_id = _access_user(svc, request)
     with svc.db.auth_tx() as conn:
         factors = conn.execute(
-            """SELECT id, method, label, verified_at, last_used_at, created_at FROM cde.user_mfa_factors
+            """SELECT id, method, label, webauthn_discoverable AS discoverable, verified_at, last_used_at, created_at
+               FROM cde.user_mfa_factors
                WHERE user_id = %s AND verified_at IS NOT NULL ORDER BY created_at""", [user_id]).fetchall()
         remaining = conn.execute(
             "SELECT count(*) n FROM cde.user_recovery_codes WHERE user_id = %s AND used_at IS NULL",

@@ -6,6 +6,11 @@ Cerimonie in due passi, ciascuna con una challenge casuale monouso salvata nel D
   accesso        POST /auth/mfa/webauthn/options           → navigator.credentials.get    → .../verify
 La registrazione si fa dal profilo (token di accesso) o durante il login se l'organizzazione impone l'MFA
 (mfa_token di enrollment). L'accesso parte dal mfa_token rilasciato dopo la password: amr = pwd + hwk.
+
+Accesso senza password (ADR-27), con le passkey che conservano l'account (credenziali residenti):
+  POST /auth/passkey/options → navigator.credentials.get senza allowCredentials → POST /auth/passkey/verify
+L'utente lo indica l'autenticatore (userHandle = id utente) e la firma lo prova; la verifica dell'utente
+(PIN o biometria sul dispositivo) è obbligatoria, così la passkey vale da sola come accesso con MFA: amr = hwk + mfa.
 """
 from __future__ import annotations
 
@@ -47,11 +52,13 @@ from .auth import (
     _now,
     _pending_user,
     _raise_if_error,
+    _sso_enforced,
     _start_session,
     _ua,
 )
 
 router = APIRouter(prefix="/auth/mfa/webauthn", tags=["auth"])
+login_router = APIRouter(prefix="/auth/passkey", tags=["auth"])
 CHALLENGE_TTL = timedelta(minutes=5)
 TRANSPORTS = {t.value for t in AuthenticatorTransport}
 
@@ -77,6 +84,11 @@ class AuthVerifyIn(BaseModel):
     credential: dict
 
 
+class PasskeyVerifyIn(BaseModel):
+    challenge_id: uuid.UUID
+    credential: dict
+
+
 def rp_id(settings: Settings) -> str:
     return settings.webauthn_rp_id or urlparse(settings.web_base_url).hostname or "localhost"
 
@@ -86,10 +98,10 @@ def origins(settings: Settings) -> list[str]:
     return list(dict.fromkeys([settings.web_base_url.rstrip("/"), *settings.cors_origins, *settings.webauthn_origins]))
 
 
-def _new_challenge(conn: psycopg.Connection, user_id: uuid.UUID, purpose: str) -> tuple[uuid.UUID, bytes]:
-    # le challenge scadute o già usate dell'utente non si accumulano
-    conn.execute("DELETE FROM cde.webauthn_challenges WHERE user_id = %s AND (expires_at < now() OR used_at IS NOT NULL)",
-                 [user_id])
+def _new_challenge(conn: psycopg.Connection, user_id: uuid.UUID | None, purpose: str) -> tuple[uuid.UUID, bytes]:
+    # le challenge scadute o già usate dell'utente (o anonime, per l'accesso senza password) non si accumulano
+    conn.execute("""DELETE FROM cde.webauthn_challenges WHERE user_id IS NOT DISTINCT FROM %s
+                    AND (expires_at < now() OR used_at IS NOT NULL)""", [user_id])
     challenge = secrets.token_bytes(32)
     cid = conn.execute(
         """INSERT INTO cde.webauthn_challenges (user_id, purpose, challenge, expires_at)
@@ -97,10 +109,11 @@ def _new_challenge(conn: psycopg.Connection, user_id: uuid.UUID, purpose: str) -
     return cid, challenge
 
 
-def _consume_challenge(conn: psycopg.Connection, challenge_id: uuid.UUID, user_id: uuid.UUID, purpose: str) -> bytes:
+def _consume_challenge(conn: psycopg.Connection, challenge_id: uuid.UUID, user_id: uuid.UUID | None,
+                       purpose: str) -> bytes:
     row = conn.execute(
         """UPDATE cde.webauthn_challenges SET used_at = now()
-           WHERE id = %s AND user_id = %s AND purpose = %s AND used_at IS NULL AND expires_at > now()
+           WHERE id = %s AND user_id IS NOT DISTINCT FROM %s AND purpose = %s AND used_at IS NULL AND expires_at > now()
            RETURNING challenge""", [challenge_id, user_id, purpose]).fetchone()
     if row is None:
         raise ApiError(409, "challenge_expired", "Richiesta scaduta o già usata: riprovare")
@@ -152,7 +165,9 @@ def register_options(body: RegisterOptionsIn, request: Request, svc: Services = 
                 resident_key=ResidentKeyRequirement.PREFERRED,
                 user_verification=UserVerificationRequirement.PREFERRED),
         )
-    return {"challenge_id": challenge_id, "options": json.loads(options_to_json(options))}
+    out = json.loads(options_to_json(options))
+    out["extensions"] = {"credProps": True}       # il browser dice se la credenziale è residente (passkey)
+    return {"challenge_id": challenge_id, "options": out}
 
 
 @router.post("/register/verify")
@@ -178,14 +193,15 @@ def _register_tx(body: RegisterVerifyIn, user_id: uuid.UUID, via_login: bool, re
                         [verified.credential_id]).fetchone():
             return ApiError(409, "already_registered", "Questa chiave è già registrata")
         transports = [t for t in (body.credential.get("response") or {}).get("transports") or [] if t in TRANSPORTS]
+        rk = ((body.credential.get("clientExtensionResults") or {}).get("credProps") or {}).get("rk")
         first = conn.execute("SELECT NOT EXISTS (SELECT 1 FROM cde.user_mfa_factors WHERE user_id = %s "
                              "AND verified_at IS NOT NULL) f", [user_id]).fetchone()["f"]
         factor_id = conn.execute(
             """INSERT INTO cde.user_mfa_factors (user_id, method, label, webauthn_credential_id, webauthn_public_key,
-                   webauthn_sign_count, webauthn_transports, verified_at)
-               VALUES (%s, 'WEBAUTHN', %s, %s, %s, %s, %s, now()) RETURNING id""",
+                   webauthn_sign_count, webauthn_transports, webauthn_discoverable, verified_at)
+               VALUES (%s, 'WEBAUTHN', %s, %s, %s, %s, %s, %s, now()) RETURNING id""",
             [user_id, body.label.strip(), verified.credential_id, verified.credential_public_key, verified.sign_count,
-             transports]).fetchone()["id"]
+             transports, rk if isinstance(rk, bool) else None]).fetchone()["id"]
         user = _load_user(conn, user_id)
         security_event(conn, "MFA_ENROLLED", user_id=user_id, organization_id=user["organization_id"],
                        ip=client_ip(request), method="WEBAUTHN", factor_id=factor_id,
@@ -262,3 +278,73 @@ def _auth_tx(body: AuthVerifyIn, user_id: uuid.UUID, request: Request, response:
         security_event(conn, "LOGIN_OK", user_id=user_id, organization_id=user["organization_id"],
                        ip=client_ip(request), user_agent=_ua(request), amr="pwd,hwk")
         return _start_session(svc, conn, response, user, amr=["pwd", "hwk"], request=request)
+
+
+# ---------------------------------------------------------------------
+# Accesso senza password (passkey residenti)
+# ---------------------------------------------------------------------
+@login_router.post("/options")
+def passkey_options(request: Request, svc: Services = Depends(services)):
+    # endpoint anonimo: ogni chiamata scrive una challenge, quindi limite per IP
+    if not svc.limiter.hit("30/minute", "passkey-options", client_ip(request) or "-"):
+        raise ApiError(429, "rate_limited", "Troppe richieste: riprovare tra un minuto", {"Retry-After": "60"})
+    with svc.db.auth_tx() as conn:
+        challenge_id, challenge = _new_challenge(conn, None, "passwordless")
+    options = generate_authentication_options(
+        rp_id=rp_id(svc.settings), challenge=challenge, timeout=int(CHALLENGE_TTL.total_seconds() * 1000),
+        user_verification=UserVerificationRequirement.REQUIRED)
+    return {"challenge_id": challenge_id, "options": json.loads(options_to_json(options))}
+
+
+@login_router.post("/verify")
+def passkey_verify(body: PasskeyVerifyIn, request: Request, response: Response, svc: Services = Depends(services)):
+    if not svc.limiter.hit(svc.settings.login_rate_limit, "passkey", client_ip(request) or "-"):
+        raise ApiError(429, "rate_limited", "Troppi tentativi: riprovare tra un minuto", {"Retry-After": "60"})
+    return _raise_if_error(_passkey_tx(body, request, response, svc))
+
+
+PASSKEY_ERROR = "Passkey non riconosciuta: accedi con email e password"
+
+
+def _passkey_tx(body: PasskeyVerifyIn, request: Request, response: Response, svc: Services):
+    ip = client_ip(request)
+    with svc.db.auth_tx() as conn:
+        challenge = _consume_challenge(conn, body.challenge_id, None, "passwordless")
+        try:
+            raw_id = _b64url_decode(str(body.credential.get("rawId") or body.credential.get("id") or ""))
+            handle = _b64url_decode(str((body.credential.get("response") or {}).get("userHandle") or ""))
+        except ValueError:
+            raw_id = handle = b""
+        factor = conn.execute(
+            """SELECT id, user_id, webauthn_public_key, webauthn_sign_count FROM cde.user_mfa_factors
+               WHERE method = 'WEBAUTHN' AND verified_at IS NOT NULL AND webauthn_credential_id = %s
+               FOR UPDATE""", [raw_id]).fetchone()
+        user_id = factor["user_id"] if factor else None
+        try:
+            if factor is None:
+                raise InvalidAuthenticationResponse("chiave non registrata")
+            # la chiave deve dichiarare lo stesso account a cui è registrata
+            if handle != user_id.bytes:
+                raise InvalidAuthenticationResponse("userHandle diverso dall'utente della chiave")
+            verified = verify_authentication_response(
+                credential=body.credential, expected_challenge=challenge, expected_rp_id=rp_id(svc.settings),
+                expected_origin=origins(svc.settings), credential_public_key=bytes(factor["webauthn_public_key"]),
+                credential_current_sign_count=factor["webauthn_sign_count"] or 0, require_user_verification=True)
+        except (InvalidAuthenticationResponse, ValueError, KeyError, TypeError) as exc:
+            security_event(conn, "LOGIN_FAIL", user_id=user_id, ip=ip, user_agent=_ua(request), method="passkey",
+                           reason=str(exc)[:200])
+            return unauthorized(PASSKEY_ERROR)
+        user = _load_user(conn, user_id)
+        if user["status"] != "ACTIVE" or user["org_status"] != "ACTIVE":
+            security_event(conn, "LOGIN_FAIL", user_id=user_id, ip=ip, method="passkey", reason=f"status_{user['status']}")
+            return unauthorized(PASSKEY_ERROR)
+        if _sso_enforced(conn, user_id):
+            security_event(conn, "LOGIN_FAIL", user_id=user_id, ip=ip, method="passkey", reason="sso_required")
+            return ApiError(403, "sso_required", "La tua organizzazione usa il single sign-on: accedi con l'account aziendale")
+        # trovata senza allowCredentials: la chiave conserva l'account anche se il browser non l'aveva detto
+        conn.execute("""UPDATE cde.user_mfa_factors SET webauthn_sign_count = %s, last_used_at = now(),
+                            webauthn_discoverable = true WHERE id = %s""", [verified.new_sign_count, factor["id"]])
+        conn.execute("UPDATE cde.users SET last_login_at = now() WHERE id = %s", [user_id])
+        security_event(conn, "LOGIN_OK", user_id=user_id, organization_id=user["organization_id"], ip=ip,
+                       user_agent=_ua(request), amr="hwk,mfa", method="passkey")
+        return _start_session(svc, conn, response, user, amr=["hwk", "mfa"], request=request)
