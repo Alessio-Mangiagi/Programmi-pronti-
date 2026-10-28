@@ -1,8 +1,9 @@
 // "><(((º> sabusabu <º)))><"
-// Impostazioni di sicurezza personali: fattori MFA (app di autenticazione, chiavi di sicurezza e passkey) e recovery code.
-import { useState } from "react";
+// Impostazioni di sicurezza personali: password, sessioni aperte, fattori MFA (app di autenticazione, chiavi di
+// sicurezza e passkey) e recovery code.
+import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, List, ListItem, ListItemText, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, List, ListItem, ListItemText, Paper, Stack, TextField, Typography } from "@mui/material";
 import { api, ApiError } from "../api";
 import { useAuth } from "../auth";
 import { RecoveryCodes } from "../components/AuthCard";
@@ -57,6 +58,8 @@ export function SecurityPage() {
   return (
     <Stack spacing={2} maxWidth={640}>
       <Typography variant="h4" fontWeight={600}>Sicurezza</Typography>
+      <PasswordPanel />
+      <SessionsPanel />
       {me?.mfa_required && <Alert severity="info">La tua organizzazione richiede l'autenticazione a due fattori.</Alert>}
       {error && <Alert severity="error">{error.message}</Alert>}
       {codes && (
@@ -114,5 +117,90 @@ export function SecurityPage() {
         </Paper>
       )}
     </Stack>
+  );
+}
+
+function PasswordPanel() {
+  const [form, setForm] = useState({ current: "", next: "", confirm: "" });
+  const [done, setDone] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const change = useMutation({
+    mutationFn: () => api<{ sessions_closed: number }>("/auth/password/change", {
+      method: "POST", json: { current_password: form.current, new_password: form.next },
+    }),
+    onSuccess: (r) => {
+      setForm({ current: "", next: "", confirm: "" });
+      setDone(`Password cambiata${r.sessions_closed ? `: chiuse ${r.sessions_closed} sessioni su altri dispositivi` : ""}`);
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+    },
+    onMutate: () => setDone(null),
+  });
+  const mismatch = !!form.confirm && form.confirm !== form.next;
+  const submit = (e: FormEvent) => { e.preventDefault(); if (!mismatch) change.mutate(); };
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }} component="section" aria-label="Password">
+      <Typography variant="subtitle1" fontWeight={600}>Password</Typography>
+      <Typography variant="body2" color="text.secondary" mb={1.5}>
+        Almeno 12 caratteri, senza la tua email. Cambiandola esci da tutti gli altri dispositivi.
+      </Typography>
+      {done && <Alert severity="success" sx={{ mb: 1.5 }} onClose={() => setDone(null)}>{done}</Alert>}
+      {change.error && <Alert severity="error" sx={{ mb: 1.5 }}>{(change.error as ApiError).message}</Alert>}
+      <Box component="form" onSubmit={submit}>
+        <Stack spacing={1.5} maxWidth={360}>
+          <TextField size="small" type="password" label="Password attuale" autoComplete="current-password" required
+                     value={form.current} onChange={(e) => setForm({ ...form, current: e.target.value })} />
+          <TextField size="small" type="password" label="Nuova password" autoComplete="new-password" required
+                     value={form.next} onChange={(e) => setForm({ ...form, next: e.target.value })} />
+          <TextField size="small" type="password" label="Ripeti la nuova password" autoComplete="new-password" required
+                     value={form.confirm} error={mismatch} helperText={mismatch ? "Le due password non coincidono" : " "}
+                     onChange={(e) => setForm({ ...form, confirm: e.target.value })} />
+          <Box><Button type="submit" variant="outlined" disabled={change.isPending || mismatch}>Cambia password</Button></Box>
+        </Stack>
+      </Box>
+    </Paper>
+  );
+}
+
+interface Session { family_id: string; signed_in_at: string; last_seen_at: string; ip: string | null; user_agent: string | null; current: boolean }
+
+/** "Firefox su Windows" dallo user agent: basta per riconoscere i propri dispositivi. */
+function device(ua: string | null): string {
+  if (!ua) return "Dispositivo sconosciuto";
+  const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome"
+    : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const os = /Windows/.test(ua) ? "Windows" : /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android"
+    : /Mac OS X/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
+  return os ? `${browser} su ${os}` : browser;
+}
+
+function SessionsPanel() {
+  const qc = useQueryClient();
+  const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: () => api<Session[]>("/auth/sessions") });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["sessions"] });
+  const revoke = useMutation({ mutationFn: (id: string) => api(`/auth/sessions/${id}`, { method: "DELETE" }), onSuccess: refresh });
+  const others = useMutation({ mutationFn: () => api("/auth/sessions/revoke-others", { method: "POST" }), onSuccess: refresh });
+  const fmt = (d: string) => new Date(d).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }} component="section" aria-label="Sessioni aperte">
+      <Typography variant="subtitle1" fontWeight={600}>Sessioni aperte</Typography>
+      <Typography variant="body2" color="text.secondary">
+        I dispositivi da cui hai fatto l'accesso. Se non ne riconosci uno, chiudilo e cambia la password.
+      </Typography>
+      <List dense>
+        {sessions.map((s) => (
+          <ListItem key={s.family_id} secondaryAction={s.current ? <Chip size="small" color="success" label="Questo dispositivo" />
+            : <Button size="small" color="error" disabled={revoke.isPending} onClick={() => revoke.mutate(s.family_id)}
+                      aria-label={`Chiudi la sessione ${device(s.user_agent)} ${s.ip ?? ""}`}>Chiudi</Button>}>
+            <ListItemText primary={`${device(s.user_agent)}${s.ip ? ` · ${s.ip}` : ""}`}
+                          secondary={`Accesso il ${fmt(s.signed_in_at)} · ultima attività ${fmt(s.last_seen_at)}`} />
+          </ListItem>
+        ))}
+      </List>
+      {sessions.filter((s) => !s.current).length > 0 && (
+        <Button variant="outlined" color="error" disabled={others.isPending} onClick={() => others.mutate()}>
+          Esci da tutti gli altri dispositivi
+        </Button>
+      )}
+    </Paper>
   );
 }
