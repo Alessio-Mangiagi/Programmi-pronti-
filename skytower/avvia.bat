@@ -41,8 +41,12 @@ call "%~dp0..\shared\avvia\libera-porta.bat" 5195 8100 9100
 
 REM API in sviluppo locale: Postgres embedded (.devdata), S3 emulato, worker,
 REM dati demo al primo avvio. Stessa console: muore con questa finestra.
+REM SKYTOWER_RESET=1: database ricreato da zero (l'S3 emulato e' in memoria, i
+REM file non sopravvivono al riavvio: cosi' non restano documenti senza file).
+set "DEV_ARGS="
+if defined SKYTOWER_RESET set "DEV_ARGS=--reset"
 echo Avvio API su http://127.0.0.1:8100 ...
-start "" /b "%CDE%" dev
+start "" /b "%CDE%" dev %DEV_ARGS%
 
 echo.
 echo Avvio SkyTower su http://%HOST%:5195 ...

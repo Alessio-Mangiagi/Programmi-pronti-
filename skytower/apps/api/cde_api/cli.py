@@ -6,6 +6,7 @@
   cde migrate        applica le migrazioni (CDE_DATABASE_URL_OWNER)
   cde bootstrap-db   RDS: crea database e ruoli, DSN in Secrets Manager (CDE_DB_MASTER_USER/_PASSWORD)
   cde seed-demo      carica il dataset dimostrativo (CDE_DATABASE_URL_OWNER)
+  cde utente-dev     account personale nell'ambiente dev (password da CDE_NUOVA_PWD, mai su file)
 """
 from __future__ import annotations
 
@@ -115,6 +116,55 @@ def cmd_seed(_args) -> None:
     print(f"Progetto demo {world.project_id}; password {demo_seed.DEMO_PASSWORD}")
 
 
+def cmd_dev_user(args) -> None:
+    """Crea o aggiorna un account amministratore nell'ambiente `cde dev` (dopo un --reset sparisce).
+
+    La password arriva solo da CDE_NUOVA_PWD: non compare su file, nella riga di comando né nei log.
+    """
+    import psycopg
+    from argon2 import PasswordHasher
+
+    from .config import get_settings
+    from .errors import ApiError
+    from .modules.auth import validate_password
+
+    password, email = os.environ.get("CDE_NUOVA_PWD", ""), args.email.lower()
+    if not password:
+        sys.exit("Impostare CDE_NUOVA_PWD con la password dell'account")
+    try:
+        validate_password(password, email, get_settings().password_min_length)
+    except ApiError as exc:
+        sys.exit(exc.message)
+    superuser = dbadmin.start_embedded(args.data_dir / "pg", cleanup_mode=None)
+    urls = dbadmin.bootstrap(superuser, "cde", DEV_PASSWORDS, recreate=False)
+    pwd_hash = PasswordHasher().hash(password)
+    with psycopg.connect(urls.owner) as conn, conn.transaction():
+        org = conn.execute("SELECT id FROM cde.organizations WHERE code = %s", [args.org]).fetchone()
+        if org is None:
+            sys.exit(f"Organizzazione {args.org} non trovata")
+        row = conn.execute("SELECT id FROM cde.users WHERE email = %s", [email]).fetchone()
+        if row:
+            user_id = row[0]
+            conn.execute("""UPDATE cde.users SET password_hash = %s, status = 'ACTIVE', is_org_admin = true,
+                                is_platform_admin = true, failed_login_count = 0, locked_until = NULL,
+                                password_changed_at = now() WHERE id = %s""", [pwd_hash, user_id])
+        else:
+            user_id = conn.execute(
+                """INSERT INTO cde.users (organization_id, email, first_name, last_name, password_hash, status,
+                                          is_org_admin, is_platform_admin, password_changed_at)
+                   VALUES (%s, %s, %s, %s, %s, 'ACTIVE', true, true, now()) RETURNING id""",
+                [org[0], email, args.nome, args.cognome, pwd_hash]).fetchone()[0]
+        # Project Admin sulle commesse dell'organizzazione
+        added = conn.execute(
+            """INSERT INTO cde.project_memberships (project_id, user_id, role_id)
+               SELECT p.id, %s, r.id FROM cde.projects p
+               JOIN cde.roles r ON r.project_id IS NULL AND r.code = 'PROJECT_ADMIN'
+               WHERE p.owner_organization_id = %s
+                 AND NOT EXISTS (SELECT 1 FROM cde.project_memberships m WHERE m.project_id = p.id AND m.user_id = %s)""",
+            [user_id, org[0], user_id]).rowcount
+    print(f"Account {email} pronto ({'aggiornato' if row else 'creato'}; Project Admin su {added} commesse nuove)")
+
+
 def cmd_demo_content(args) -> None:
     from .tooling import demo_content
 
@@ -147,6 +197,13 @@ def main(argv: list[str] | None = None) -> None:
     boot.add_argument("--sslmode", default="verify-full")
     boot.set_defaults(func=cmd_bootstrap_db)
     sub.add_parser("seed-demo").set_defaults(func=cmd_seed)
+    user = sub.add_parser("utente-dev", help="account personale nell'ambiente dev (password da CDE_NUOVA_PWD)")
+    user.add_argument("--email", required=True)
+    user.add_argument("--nome", default="Utente")
+    user.add_argument("--cognome", default="Personale")
+    user.add_argument("--org", default="COM", help="codice dell'organizzazione")
+    user.add_argument("--data-dir", type=Path, default=DEV_DIR)
+    user.set_defaults(func=cmd_dev_user)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")
     demo.add_argument("--password", default="Cantiere-2026!", help="password degli utenti demo")
