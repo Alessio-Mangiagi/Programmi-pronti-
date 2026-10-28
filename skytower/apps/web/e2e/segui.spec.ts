@@ -38,5 +38,9 @@ test("segui un documento e ricevi la notifica della nuova revisione", async ({ p
     await im.keyboard.press("Escape");
     return found;
   }, { timeout: 30_000 }).toBeGreaterThan(0);
+  // nel pannello ogni avviso porta il suo tipo
+  await im.getByRole("banner").getByRole("button", { name: "notifiche" }).click();
+  const item = im.getByRole("button", { name: new RegExp(`Nuova revisione P01.02: ${doc.identifier}`) });
+  await expect(item.getByText("Documenti seguiti", { exact: true })).toBeVisible();
   await imContext.close();
 });

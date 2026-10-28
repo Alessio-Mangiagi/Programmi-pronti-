@@ -485,3 +485,16 @@ in "fragments" di That Open Engine; il viewer però legge già il glTF (ADR-29) 
 **Limiti.** Il derivato riflette quanto IfcOpenShell sa triangolare (aperture, spazi esclusi come nel viewer).
 Per modelli enormi conviene in seguito il caricamento progressivo per piano (più file .glb). Dipendenza nuova:
 `ifcopenshell` (ruote per Windows e Linux ARM64, immagine Docker invariata).
+
+## ADR-32 — Documenti seguiti nel riepilogo giornaliero
+
+**Contesto.** Con "Segui documento" ogni nuova revisione e ogni cambio di stato generano un avviso: chi segue
+molti documenti riceverebbe decine di email al giorno, confuse tra compiti e RFI che richiedono un'azione.
+
+**Decisione.**
+- Preferenza `follow_digest` (migrazione 0028, **attiva di serie**): gli avvisi `DOCUMENT_FOLLOWED` non partono
+  come email immediate ma arrivano nel riepilogo delle 7; compiti, RFI e transmittal restano immediati.
+  Con il riepilogo unico (`daily_digest`) tutto arriva al mattino, come prima.
+- Il riepilogo è diviso per tipo (approvazioni e compiti, RFI, transmittal, documenti seguiti, richieste di
+  accesso, altro), in italiano o inglese; il pannello notifiche mostra il tipo di ogni avviso e filtra per tipo.
+- La notifica in-app resta immediata per tutti: cambia solo il canale email.

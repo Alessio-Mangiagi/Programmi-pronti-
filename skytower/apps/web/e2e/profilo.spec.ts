@@ -10,7 +10,12 @@ test("modifica del proprio profilo e delle preferenze notifiche", async ({ page,
   const dialog = page.getByRole("dialog", { name: "Il mio profilo" });
   await dialog.getByLabel("Qualifica").fill("Capocantiere carpenterie");
   await dialog.getByLabel("Telefono").fill("+39 333 1234567");
+  // documenti seguiti nel riepilogo del mattino: attivo di serie, qui lo si spegne
+  const follow = dialog.getByLabel("Documenti che seguo: via email solo nel riepilogo del mattino");
+  await expect(follow).toBeChecked();
+  await follow.uncheck();
   await dialog.getByLabel("Un solo riepilogo al giorno invece di un'email per ogni notifica").check();
+  await expect(follow).toBeDisabled();              // col riepilogo unico tutto arriva al mattino
   await dialog.getByRole("button", { name: "Salva" }).click();
   await expect(dialog).toBeHidden();
 
@@ -20,6 +25,7 @@ test("modifica del proprio profilo e delle preferenze notifiche", async ({ page,
   expect(me.phone).toBe("+39 333 1234567");
   const prefs = await (await api.get("/api/me/notification-preferences")).json();
   expect(prefs.daily_digest).toBe(true);
+  expect(prefs.follow_digest).toBe(false);
 
   await page.reload();
   await page.getByRole("button", { name: "Il mio profilo" }).click();
