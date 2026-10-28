@@ -28,6 +28,7 @@ from .auth import _has_verified_factor, _load_user, _now, _start_session, _ua
 
 router = APIRouter(tags=["auth"])
 STATE_TTL = timedelta(minutes=10)
+BROWSER_COOKIE = "cde_sso"
 
 
 class SsoIn(BaseModel):
@@ -141,7 +142,7 @@ def sso_for_domain(conn, email: str) -> dict | None:
 # Login
 # ---------------------------------------------------------------------
 @router.post("/auth/sso/start")
-def sso_start(body: SsoStartIn, request: Request, svc: Services = Depends(services)):
+def sso_start(body: SsoStartIn, request: Request, response: Response, svc: Services = Depends(services)):
     email = body.email.lower()
     if not svc.limiter.hit("30/minute", "sso", client_ip(request) or "-"):     # niente credenziali, ma discovery e righe di stato
         raise ApiError(429, "rate_limited", "Troppi tentativi: riprovare tra un minuto", {"Retry-After": "60"})
@@ -153,13 +154,18 @@ def sso_start(body: SsoStartIn, request: Request, svc: Services = Depends(servic
             doc = oidc.discovery(cfg["issuer"])
         except oidc.OidcError:
             raise ApiError(502, "idp_unreachable", "Il single sign-on della tua organizzazione non risponde") from None
-        state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+        state, nonce, browser = secrets.token_urlsafe(32), secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         verifier, challenge = oidc.pkce_pair()
         conn.execute("DELETE FROM cde.sso_states WHERE expires_at < now()")
         conn.execute(
-            """INSERT INTO cde.sso_states (state_hash, organization_id, nonce, code_verifier, expires_at)
-               VALUES (%s, %s, %s, %s, %s)""",
-            [hashlib.sha256(state.encode()).digest(), cfg["organization_id"], nonce, verifier, _now() + STATE_TTL])
+            """INSERT INTO cde.sso_states (state_hash, browser_hash, organization_id, nonce, code_verifier, expires_at)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            [hashlib.sha256(state.encode()).digest(), hashlib.sha256(browser.encode()).digest(), cfg["organization_id"],
+             nonce, verifier, _now() + STATE_TTL])
+    # il ritorno dall'IdP è una navigazione di primo livello (GET): SameSite=Lax basta perché il cookie arrivi
+    response.set_cookie(BROWSER_COOKIE, browser, max_age=int(STATE_TTL.total_seconds()), httponly=True,
+                        secure=svc.settings.cookie_secure, samesite="lax",
+                        path=f"{svc.settings.refresh_cookie_path}/sso")
     url = oidc.authorize_url(doc, client_id=cfg["client_id"], redirect_uri=redirect_uri(svc), state=state, nonce=nonce,
                              challenge=challenge, login_hint=email)
     return {"sso": True, "authorize_url": url}
@@ -167,7 +173,9 @@ def sso_start(body: SsoStartIn, request: Request, svc: Services = Depends(servic
 
 def _back(svc: Services, **fragment) -> RedirectResponse:
     """Ritorno alla SPA: l'esito nel frammento (#), che il browser non manda ai server né scrive nei log."""
-    return RedirectResponse(f"{svc.settings.web_base_url.rstrip('/')}/login#{urlencode(fragment)}", status_code=303)
+    r = RedirectResponse(f"{svc.settings.web_base_url.rstrip('/')}/login#{urlencode(fragment)}", status_code=303)
+    r.delete_cookie(BROWSER_COOKIE, path=f"{svc.settings.refresh_cookie_path}/sso")
+    return r
 
 
 @router.get("/auth/sso/callback")
@@ -176,9 +184,10 @@ def sso_callback(request: Request, state: str = "", code: str = "", error: str =
     with svc.db.auth_tx() as conn:
         row = conn.execute(
             """UPDATE cde.sso_states SET used_at = now()
-               WHERE state_hash = %s AND used_at IS NULL AND expires_at > now()
+               WHERE state_hash = %s AND browser_hash = %s AND used_at IS NULL AND expires_at > now()
                RETURNING organization_id, nonce, code_verifier""",
-            [hashlib.sha256(state.encode()).digest()]).fetchone()
+            [hashlib.sha256(state.encode()).digest(),
+             hashlib.sha256(request.cookies.get(BROWSER_COOKIE, "").encode()).digest()]).fetchone()
     if row is None:
         return _back(svc, sso="error", reason="expired")
     if error or not code:

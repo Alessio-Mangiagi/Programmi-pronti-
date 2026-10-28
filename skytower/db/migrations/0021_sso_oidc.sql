@@ -5,7 +5,8 @@
 -- Single sign-on OpenID Connect per organizzazione (Entra ID, Google Workspace, Okta...). L'admin della
 -- organizzazione registra l'issuer, il client e i domini email; il login passa dall'IdP con authorization
 -- code + PKCE. Il segreto del client è cifrato con la KMS (envelope) e non torna mai al browser.
--- Gli stati del flusso (state, nonce, code_verifier) sono monouso e valgono 10 minuti.
+-- Gli stati del flusso (state, nonce, code_verifier) sono monouso, valgono 10 minuti e sono legati al browser
+-- che ha iniziato il login (cookie): un link di callback altrui non apre una sessione (login CSRF).
 -- =====================================================================
 
 CREATE TABLE cde.organization_sso (
@@ -38,6 +39,7 @@ CREATE TRIGGER trg_sso_domains BEFORE INSERT OR UPDATE ON cde.organization_sso
 CREATE TABLE cde.sso_states (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   state_hash       bytea       NOT NULL UNIQUE,                  -- SHA-256 dello state inviato all'IdP
+  browser_hash     bytea       NOT NULL,                         -- SHA-256 del cookie del browser che ha iniziato
   organization_id  uuid        NOT NULL REFERENCES cde.organizations (id) ON DELETE CASCADE,
   nonce            text        NOT NULL,
   code_verifier    text        NOT NULL,

@@ -203,3 +203,15 @@ def test_obbligo_sso_e_mfa_non_garantita_dall_idp(client, api_world, idp, gco_ss
     gco_sso(enabled=False)
     assert login(client, email).status_code == 200
     assert client.post("/auth/sso/start", json={"email": email}).json() == {"sso": False}
+
+
+def test_link_di_callback_altrui_non_apre_sessioni(client, api_world, idp, gco_sso):
+    """Login CSRF: chi inoltra il proprio link di ritorno dall'IdP non fa entrare la vittima nel suo account."""
+    _, w = api_world
+    idp.claims = {"email": w.emails["gc_admin"]}
+    start = client.post("/auth/sso/start", json={"email": w.emails["gc_admin"]}).json()
+    state, code = idp.authorize(start["authorize_url"])
+    client.cookies.clear()                       # il browser della vittima non ha il cookie di chi ha iniziato
+    r = client.get("/auth/sso/callback", params={"state": state, "code": code}, follow_redirects=False)
+    assert _fragment(r) == {"sso": "error", "reason": "expired"}
+    assert "cde_rt" not in r.headers.get("set-cookie", "")
