@@ -640,6 +640,7 @@ def _document(conn, document_id: uuid.UUID) -> dict:
 @router.get("/projects/{project_id}/documents")
 def list_documents(project_id: uuid.UUID, container_id: uuid.UUID | None = None,
                    q: str | None = Query(default=None, max_length=200),
+                   content: bool = Query(default=False, description="cerca anche nel testo dei file"),
                    area: Literal["WIP", "SHARED", "PUBLISHED", "ARCHIVED"] | None = None,
                    after: str | None = Query(default=None, description="cursore: ultimo identificativo ricevuto"),
                    limit: int = Query(default=50, ge=1, le=200), c: Ctx = Depends(ctx)):
@@ -648,7 +649,10 @@ def list_documents(project_id: uuid.UUID, container_id: uuid.UUID | None = None,
         where.append("d.container_id = %(c)s")
         params["c"] = container_id
     if q:
-        where.append("(d.search @@ websearch_to_tsquery('italian', %(q)s) OR d.identifier ILIKE %(like)s)")
+        # nel contenuto: solo il testo delle revisioni che chi cerca può vedere (RLS su revision_text)
+        in_text = (" OR EXISTS (SELECT 1 FROM cde.revision_text t WHERE t.document_id = d.id"
+                   " AND t.content @@ websearch_to_tsquery('italian', %(q)s))") if content else ""
+        where.append(f"(d.search @@ websearch_to_tsquery('italian', %(q)s) OR d.identifier ILIKE %(like)s{in_text})")
         params |= {"q": q, "like": f"%{q.replace('%', '').replace('_', '')}%"}
     if area == "ARCHIVED":
         where.append("d.archived_at IS NOT NULL")
@@ -662,8 +666,19 @@ def list_documents(project_id: uuid.UUID, container_id: uuid.UUID | None = None,
         require_project(conn, project_id)
         rows = conn.execute(DOCUMENT_SQL + " WHERE " + " AND ".join(where)
                             + " ORDER BY d.identifier LIMIT %(limit)s", params).fetchall()
-    more = len(rows) > limit
-    rows = rows[:limit]
+        more = len(rows) > limit
+        rows = rows[:limit]
+        if q and content and rows:
+            snippets = {r["document_id"]: r["snippet"] for r in conn.execute(
+                """SELECT DISTINCT ON (t.document_id) t.document_id,
+                          ts_headline('italian', t.body, websearch_to_tsquery('italian', %s),
+                                      'StartSel=⟦, StopSel=⟧, MaxFragments=2, MaxWords=18, MinWords=6, FragmentDelimiter=" … "')
+                          AS snippet
+                   FROM cde.revision_text t JOIN cde.document_revisions r ON r.id = t.revision_id
+                   WHERE t.document_id = ANY(%s) AND t.content @@ websearch_to_tsquery('italian', %s)
+                   ORDER BY t.document_id, r.sequence DESC""", [q, [r["id"] for r in rows], q]).fetchall()}
+            for r in rows:
+                r["match_snippet"] = snippets.get(r["id"])
     return {"items": rows, "next_cursor": rows[-1]["identifier"] if more else None}
 
 

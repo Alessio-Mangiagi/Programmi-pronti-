@@ -21,6 +21,7 @@ import procrastinate
 import psycopg
 from psycopg.rows import dict_row
 
+from . import textextract
 from .anchoring import publish_pending
 from .config import Settings, get_settings
 from .events import security_event
@@ -103,7 +104,33 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
     if n and outcome.status != "CLEAN":
         storage.tag_object(f["storage_key"], f["storage_version_id"], {"cde-quarantine": outcome.status.lower()})
     log.info("file %s → %s (%s)", file_id, outcome.status, outcome.detail)
+    if n and outcome.status == "CLEAN":
+        try:
+            index_text(conn, storage, file_id)
+        except Exception:                   # noqa: BLE001 - la ricerca non deve mai far ripetere la verifica
+            conn.rollback()
+            log.exception("testo del file %s non indicizzato: ci riprova il job periodico", file_id)
     return outcome
+
+
+def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None = None, limit: int = 20) -> int:
+    """Testo per la ricerca nel contenuto: un file appena verificato, oppure quelli ancora senza testo."""
+    if file_id:
+        rows = conn.execute("SELECT * FROM cde.text_extraction_file(%s)", [file_id]).fetchall()
+    else:
+        conn.execute("SELECT cde.text_copy_siblings()")       # revisioni condivise/pubblicate: stesso file
+        rows = conn.execute("SELECT * FROM cde.text_extraction_pending(%s)", [limit]).fetchall()
+    conn.commit()
+    done = 0
+    for r in rows:
+        body = ""
+        if textextract.wants(r["filename"]) and r["size_bytes"] <= textextract.MAX_FILE:
+            data = b"".join(storage.iter_object(r["storage_key"], r["storage_version_id"]))
+            body = textextract.extract(r["filename"], data)
+        with conn.transaction():
+            conn.execute("SELECT cde.store_revision_text(%s, %s)", [r["file_id"], body])
+        done += 1
+    return done
 
 
 # ---------------------------------------------------------------------
@@ -152,6 +179,7 @@ def notify_state_changed(document_id: str, revision_id: str, to_state: str) -> N
     """Evento revision.state_changed (outbox): avviso a chi segue il documento e vede la nuova revisione."""
     _, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
+        conn.execute("SELECT cde.text_copy_siblings(%s)", [document_id])   # la nuova revisione si trova subito
         n = conn.execute("SELECT cde.notify_followers_of_transition(%s, %s)", [revision_id, to_state]).fetchone()[0]
     log.info("documento %s: revisione %s → %s, %s follower avvisati", document_id, revision_id, to_state, n)
 
@@ -162,6 +190,17 @@ def send_notification_email_task(notification_id: int) -> None:
     _, _, settings, mailer = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         send_notification_email(conn, mailer, settings.web_base_url, notification_id)
+
+
+@app.periodic(cron="*/10 * * * *", periodic_id="text-index")
+@app.task(name="cde.index_text", queue="default")
+def index_text_task(timestamp: int) -> None:
+    """Recupera il testo dei file verificati che ne sono ancora senza (caricamenti precedenti, job persi)."""
+    storage, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
+        n = index_text(conn, storage, limit=50)
+    if n:
+        log.info("testo indicizzato per %s file", n)
 
 
 @app.periodic(cron="*/15 * * * *", periodic_id="deadlines")
