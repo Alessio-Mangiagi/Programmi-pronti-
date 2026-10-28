@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 // Naming convention del progetto, rinomina automatica in caricamento (progressivo deciso dal Project Admin)
-// e prenotazione degli identificativi per chi carica.
+// e prenotazione degli identificativi per chi carica; filigrana sui PDF (Watermark.tsx).
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,6 +12,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { api, ApiError, Project } from "../../api";
+import { WatermarkPanel } from "./Watermark";
 
 export interface NamingField {
   key: string;
@@ -224,6 +225,7 @@ export function NamingTab({ project, canManage }: { project: Project; canManage:
         )}
       </Paper>
       {settings.auto_number && canWrite && <ReservationsPanel project={project} settings={settings} />}
+      <WatermarkPanel project={project} canManage={canManage} />
     </Stack>
   );
 }

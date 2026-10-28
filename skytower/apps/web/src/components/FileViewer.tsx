@@ -7,7 +7,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert, AppBar, Badge, Box, Button, CircularProgress, Dialog, IconButton, InputAdornment, MenuItem, Stack, TextField,
+  Alert, AppBar, Badge, Box, Button, Chip, CircularProgress, Dialog, IconButton, InputAdornment, MenuItem, Stack, TextField,
   ToggleButton, Toolbar, Tooltip, Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -36,7 +36,7 @@ const OFFICE_PREVIEW_MAX = 25 * 1024 * 1024;
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string; size_bytes: number }
 interface Doc { id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
-interface Link { url: string; filename: string; content_type: string | null }
+interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean }
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -188,6 +188,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, on
           <ToggleButton size="small" value="panel" selected={panel} onChange={() => setPanel((p) => !p)} aria-label="Annotazioni">
             <Badge badgeContent={openCount} color="error"><CommentIcon fontSize="small" /></Badge>
           </ToggleButton>
+          {link?.watermark && (
+            <Tooltip title="Su ogni pagina, anche scaricata, compaiono il tuo nome, l'organizzazione, data e ora: lo ha deciso il Project Admin">
+              <Chip size="small" color="warning" variant="outlined" label="Filigranato" tabIndex={0} />
+            </Tooltip>
+          )}
           <Button startIcon={<DownloadIcon />} disabled={!revisionId || rev?.scan_status !== "CLEAN" || download.isPending}
                   onClick={() => download.mutate()}>Scarica</Button>
           {onDetails && <Button startIcon={<InfoIcon />} onClick={onDetails}>Dettagli e cronologia</Button>}
