@@ -15,6 +15,8 @@ from cryptography.hazmat.primitives import serialization
 from ..config import Settings
 
 ACCESS = "access"
+# amr che valgono come secondo fattore: TOTP, chiave di sicurezza, MFA garantita dall'IdP del single sign-on
+MFA_AMR = {"otp", "hwk", "mfa"}
 MFA_PENDING = "mfa_pending"
 
 
@@ -51,7 +53,7 @@ class TokenService:
 
     def issue_access(self, user_id: uuid.UUID, org_id: uuid.UUID, amr: list[str]) -> str:
         return self._encode({"typ": ACCESS, "sub": str(user_id), "org": str(org_id), "amr": amr,
-                             "mfa": "otp" in amr or "hwk" in amr}, self.s.access_token_ttl_s)
+                             "mfa": bool(MFA_AMR & set(amr))}, self.s.access_token_ttl_s)
 
     def decode_access(self, token: str) -> AccessClaims:
         p = self._decode(token, ACCESS)

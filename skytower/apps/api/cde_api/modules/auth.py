@@ -28,7 +28,7 @@ from pydantic import BaseModel, EmailStr, Field
 from ..deps import Services, bearer_token, client_ip, services
 from ..errors import ApiError, unauthorized
 from ..events import security_event
-from ..security.tokens import hash_token, new_opaque_token
+from ..security.tokens import MFA_AMR, hash_token, new_opaque_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 ph = PasswordHasher()
@@ -124,7 +124,7 @@ def _start_session(svc: Services, conn: psycopg.Connection, response: Response, 
     conn.execute(
         """INSERT INTO cde.refresh_tokens (user_id, family_id, token_hash, mfa_verified, expires_at, ip, user_agent)
            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-        [user["id"], family_id or uuid.uuid4(), token_hash, "otp" in amr or "hwk" in amr,
+        [user["id"], family_id or uuid.uuid4(), token_hash, bool(MFA_AMR & set(amr)),
          _now() + timedelta(seconds=svc.settings.refresh_token_ttl_s), client_ip(request), _ua(request)],
     )
     _set_refresh_cookie(svc, response, token)
@@ -225,6 +225,14 @@ def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, respo
         if user["status"] != "ACTIVE" or user["org_status"] != "ACTIVE":
             security_event(conn, "LOGIN_FAIL", user_id=user["id"], ip=ip, reason=f"status_{user['status']}")
             return unauthorized(GENERIC_LOGIN_ERROR)
+
+        # organizzazione con single sign-on obbligatorio: la password non basta (il platform admin resta fuori)
+        if conn.execute(
+                """SELECT EXISTS (SELECT 1 FROM cde.organization_sso s JOIN cde.users u ON u.organization_id = s.organization_id
+                       WHERE u.id = %s AND s.enabled AND s.enforce AND NOT u.is_platform_admin) ok""",
+                [user["id"]]).fetchone()["ok"]:
+            security_event(conn, "LOGIN_FAIL", user_id=user["id"], ip=ip, reason="sso_required")
+            return ApiError(403, "sso_required", "La tua organizzazione usa il single sign-on: accedi con l'account aziendale")
 
         updates = {"failed_login_count": 0, "locked_until": None, "last_login_at": _now()}
         if ph.check_needs_rehash(user["password_hash"]):
