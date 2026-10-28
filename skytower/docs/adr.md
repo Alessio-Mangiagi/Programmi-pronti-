@@ -302,3 +302,24 @@ con `watermark: true`).
 filigranato è rifiutato con un messaggio, perché consegnare l'originale annullerebbe la scelta dell'admin.
 PDF protetti da password o danneggiati: errore 422, da risolvere ricaricando il file. Dissuade e traccia,
 non impedisce: chi ha il permesso di scaricare può comunque fotografare o ricopiare il contenuto.
+
+## ADR-24 — Chiavi di sicurezza e passkey (WebAuthn) come secondo fattore
+
+**Contesto.** ADR-05 prevedeva MFA TOTP **e WebAuthn**; le colonne della credenziale erano nello schema dalla
+0001 ma mancavano API e interfaccia. Un codice TOTP può essere carpito da una pagina di phishing che lo inoltra
+in tempo reale; una chiave FIDO2 firma solo per l'origin vero.
+
+**Decisione.** WebAuthn (libreria `py_webauthn`) come secondo fattore, accanto al TOTP e ai recovery code:
+- registrazione dal profilo (sessione già autenticata) o durante il login se l'organizzazione impone l'MFA;
+  accesso dopo la password con amr `pwd,hwk` (sessione "con MFA", anche dopo il refresh);
+- ogni cerimonia usa una challenge casuale di 32 byte salvata nel DB, valida 5' e **monouso**
+  (`webauthn_challenges`, solo `cde_auth`): un'asserzione intercettata non si riusa neanche con
+  autenticatori che non incrementano il contatore; il contatore che torna indietro (chiave clonata) è
+  rifiutato;
+- RP ID = host di `CDE_WEB_BASE_URL` (il dominio CloudFront in produzione), origin ammessi = SPA, CORS e
+  `CDE_WEBAUTHN_ORIGINS`; attestazione `none` (nessun vincolo sul modello di chiave), verifica utente
+  "preferred" perché la password è già il primo fattore;
+- i recovery code nascono con il primo fattore; aggiungere una chiave a un TOTP esistente non li cambia.
+
+Non è (ancora) login senza password: la passkey è il secondo fattore. Il passo successivo naturale è il
+login "passwordless" con credenziali residenti, da valutare con la policy delle organizzazioni.

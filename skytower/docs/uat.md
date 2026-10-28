@@ -39,6 +39,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U22 | `profilo.spec.ts`, `mfa.spec.ts` |
 | Anteprima Word/Excel/CSV | `office.spec.ts` |
 | U24 | `filigrana.spec.ts` |
+| U25 | `passkey.spec.ts` (autenticatore virtuale del browser) |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -72,6 +73,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U22 | Tutti | Profilo: cambia nome e preferenze notifiche; attiva l'MFA | Modifiche salvate; il login successivo chiede il codice | |
 | U23 | Tutti | Uso da tablet in cantiere: apre un PDF, zoom, annotazione | Leggibile e utilizzabile senza zoom del browser | |
 | U24 | BIM Manager | Scheda Naming: attiva la filigrana sui PDF condivisi e pubblicati; un progettista apre e scarica un PDF condiviso | Il visualizzatore mostra "Filigranato"; ogni pagina, anche nel file scaricato, riporta nome, email, organizzazione, data e ora, IP, documento e revisione | |
+| U25 | Tutti | Profilo → Sicurezza: aggiunge una chiave di sicurezza (YubiKey) o la passkey del telefono, poi esce e rientra | Al login, dopo la password, basta toccare la chiave; recovery code mostrati alla prima registrazione | |
 
 ## Verbale
 

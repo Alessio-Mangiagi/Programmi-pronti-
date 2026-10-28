@@ -8,35 +8,36 @@ Piano di riferimento: [`docs/piano-sviluppo.md`](docs/piano-sviluppo.md) · deci
 
 | Sprint | Contenuto | Stato |
 |---|---|---|
-| 1 | Multi-tenancy, RBAC, RLS, autenticazione + MFA, API admin, UI | ✅ completato (`v0.1.0`) |
+| 1 | Multi-tenancy, RBAC, RLS, autenticazione + MFA (app TOTP, chiavi di sicurezza e passkey WebAuthn, recovery code), API admin, UI | ✅ completato (`v0.1.0`) |
 | 2 | Storage S3 immutabile, naming ISO 19650, revisioni, worker verifica file, UI upload | ✅ completato (`v0.2.0`) |
 | 3 | Stati CDE WIP → SHARED → PUBLISHED → archiviazione, visibilità per stato, bulk, liste < 200 ms su 100k | ✅ completato (0.3.0) |
 | 4 | Workflow di approvazione, scadenze, notifiche, RFI (API + designer workflow, inbox compiti, pagine RFI) | ✅ completato |
 | extra | Layout a tre colonne (commesse e cartelle · contenuto · "Per me"), profilo personale, aree riservate con richiesta di accesso | ✅ |
 | 5 | Audit trail con hash chain, ancore giornaliere su S3 WORM + marca RFC 3161, export CSV firmato · viewer PDF (PDF.js, confronto tra revisioni), immagini, testo, modelli IFC 3D · annotazioni su pagina ed elemento | ✅ (manca il viewer DWG: richiede licenza Autodesk APS) |
 | extra | Rinomina automatica in caricamento secondo la naming convention (progressivo deciso dal Project Admin, nome originale nelle note), scheda "Naming" · filigrana sui PDF scaricati e visualizzati negli stati scelti dal Project Admin (ADR-23) | ✅ |
-| 6 | Cruscotto KPI per il Project Manager · transmittal con protocollo e PDF · report Excel (documenti, approvazioni, RFI, numeri prenotati) · pentest automatico OWASP + ZAP in CI (`docs/pentest.md`) · Terraform modulare (prod con DR, staging), immagine Docker, workflow di deploy con smoke test, runbook DR (`docs/runbook.md`) · test di carico pronti (`docs/prestazioni.md`) · 28 test e2e sotto la CSP di produzione, incl. accessibilità WCAG 2.1 AA, piano UAT (`docs/uat.md`) | ✅ funzionale (restano: apply in AWS e misure su staging, pentest esterno, UAT con gli utenti pilota) |
+| 6 | Cruscotto KPI per il Project Manager · transmittal con protocollo e PDF · report Excel (documenti, approvazioni, RFI, numeri prenotati) · pentest automatico OWASP + ZAP in CI (`docs/pentest.md`) · Terraform modulare (prod con DR, staging), immagine Docker, workflow di deploy con smoke test, runbook DR (`docs/runbook.md`) · test di carico pronti (`docs/prestazioni.md`) · 30 test e2e sotto la CSP di produzione, incl. accessibilità WCAG 2.1 AA, piano UAT (`docs/uat.md`) | ✅ funzionale (restano: apply in AWS e misure su staging, pentest esterno, UAT con gli utenti pilota) |
 
 ## Struttura
 
 ```
-cde/
+skytower/
 ├─ apps/
-│  ├─ api/        FastAPI (Python 3.12) — moduli auth, me, organizations, projects, containers, documents;
-│  │              worker Procrastinate (verifica SHA-256 + antivirus)
-│  └─ web/        React 18 + Vite + MUI + TanStack Query
+│  ├─ api/        FastAPI (Python 3.12) — auth (password, TOTP, WebAuthn), organizzazioni, progetti, container,
+│  │              documenti (naming, rinomina, filigrana), stati, workflow, RFI, transmittal, audit, report;
+│  │              worker Procrastinate (verifica SHA-256 + antivirus, notifiche, ancore del registro)
+│  └─ web/        React 18 + Vite + MUI + TanStack Query · e2e/ test Playwright sotto la CSP di produzione
 ├─ packages/iso19650/  naming convention, revisioni, codici di idoneità (100% coverage)
-├─ db/migrations/ SQL versionato (yoyo): schema, RBAC, RLS, seed ruoli, documenti/revisioni
-├─ infra/terraform/  modules/cde-platform (piattaforma completa) · envs/prod · envs/staging · envs/dev
-├─ infra/load/  test di carico (utenti concorrenti, upload paralleli) · infra/smoke.py dopo i deploy
-├─ docs/adr.md
-└─ .github/workflows/ci.yml   lint, test isolamento, Semgrep, audit dipendenze, build, terraform validate
+├─ db/migrations/ SQL versionato (yoyo): schema, RBAC, RLS, documenti, stati, workflow, audit, naming, WebAuthn
+├─ infra/terraform/  bootstrap · modules/cde-platform (piattaforma completa) · envs/prod · envs/staging · envs/dev
+├─ infra/load/  test di carico · infra/smoke.py dopo i deploy · infra/zap/ regole del DAST
+├─ docs/        adr.md, runbook.md, pentest.md, prestazioni.md, uat.md
+└─ ../.github/workflows/  ci-skytower.yml (lint, test, Semgrep, audit, e2e, ZAP, Terraform) · deploy-skytower.yml
 ```
 
 ## Avvio locale (Windows/macOS/Linux, senza Docker)
 
 ```powershell
-cd cde
+cd skytower
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r apps/api/requirements.lock -e "packages/iso19650[dev]" -e "apps/api[dev]"
 .venv\Scripts\cde dev            # Postgres 16 embedded + S3 emulato (:9100) + worker + dati demo + API (:8100)
