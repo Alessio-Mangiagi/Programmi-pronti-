@@ -49,6 +49,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U32 | `passkey.spec.ts` |
 | U33 | `ifc.spec.ts` |
 | U34 | `gltf.spec.ts` |
+| U35 | `naming-cartelle.spec.ts`, `test_api_folder_naming.py` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -92,6 +93,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U32 | Progettista | Dal profilo aggiunge la passkey del computer o del telefono; esce e nella pagina di accesso usa "Usa una passkey (senza password)" | Entra con PIN o impronta, senza email né password; il profilo indica che la chiave vale anche per l'accesso senza password | |
 | U33 | Direttore dei lavori | Nel modello BIM seleziona un muro del piano terra | Vede lunghezza, spessore, altezza e volume, il piano con il livello 00, le tavole che citano il muro (estratto evidenziato) e quelle del piano; un clic apre la tavola in una nuova scheda con il muro già cercato | |
 | U34 | Progettista | Carica un modello esportato da Blender in .glb e lo apre | Vede il modello 3D con i piani, seleziona un oggetto e ne legge misure e proprietà personalizzate; un file .blend indica come esportarlo | |
+| U35 | Project Admin | Nella scheda Naming crea lo schema «Foto di cantiere» e lo applica alla cartella delle foto e alle sue sottocartelle dall'albero nel popup | Chi carica in quelle cartelle vede e usa il nuovo schema (anche nella rinomina automatica); le altre cartelle restano sullo schema della commessa; i documenti già caricati accettano nuove revisioni | |
 
 ## Verbale
 

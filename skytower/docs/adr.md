@@ -435,3 +435,28 @@ l'esportazione standard di Blender, aperta e già letta da three.js.
 
 **Limiti.** Non supportati: .gltf con file esterni (.bin, texture separate), compressione Draco/meshopt, texture
 KTX2 — il messaggio dice come riesportare. Nessuna conversione lato server (servirebbe Blender sul worker).
+
+## ADR-30 — Naming per cartella
+
+**Contesto.** Una sola naming convention per commessa non basta: foto di cantiere, modelli BIM o verbali hanno
+codifiche diverse da quelle delle tavole. Il Project Admin vuole decidere gli schemi nella scheda Naming e
+applicarli alle cartelle che sceglie.
+
+**Decisione.**
+- Tabella `naming_profiles` (migrazione 0026): schemi con nome per commessa, ognuno con la sua rinomina
+  automatica; `containers.naming_profile_id` indica lo schema di una cartella (NULL = schema della commessa).
+  Nessuna ereditarietà implicita: lo schema vale per le cartelle spuntate; il popup con l'albero spunta di
+  norma anche le sottocartelle, e si può togliere la spunta a quelle che non lo devono usare.
+- Assegnazione con `cde.set_container_naming` (SECURITY DEFINER): serve il Project Admin e la cartella deve
+  essergli visibile; la policy UPDATE dei container chiederebbe l'ADMIN sulla singola cartella.
+  `PUT /naming-profiles/{id}/containers` imposta esattamente l'elenco (quelle tolte tornano alla commessa,
+  quelle con un altro schema passano a questo).
+- Verifica del nome, proposta di rinomina, caricamento e `GET /containers/{id}/naming` usano lo schema della
+  cartella di destinazione; le prenotazioni quello scelto nella scheda.
+- L'identificativo resta univoco nella commessa. Un documento già presente nella cartella tiene il suo
+  identificativo anche se lo schema cambia dopo: le nuove revisioni non si bloccano.
+- Progressivo: per gli schemi per cartelle i campi fissi entrano nella serie (le foto "FT" e i rilievi "RL"
+  numerano ciascuno da sé); lo schema della commessa resta com'era (i contatori esistenti non cambiano chiave).
+
+**Limiti.** Le aree riservate che il Project Admin non vede non compaiono nell'albero e non si possono
+assegnare. Un nuovo schema parte come copia di quello della commessa.
