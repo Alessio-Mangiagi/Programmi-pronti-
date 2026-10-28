@@ -460,3 +460,28 @@ applicarli alle cartelle che sceglie.
 
 **Limiti.** Le aree riservate che il Project Admin non vede non compaiono nell'albero e non si possono
 assegnare. Un nuovo schema parte come copia di quello della commessa.
+
+## ADR-31 — Derivato .glb per gli IFC pesanti (G43)
+
+**Contesto.** Il viewer IFC (ADR-22) triangola il modello nel browser con web-ifc: oltre qualche centinaio di MB il
+caricamento dura minuti e la memoria del browser non basta. Il piano (G43) prevedeva la conversione lato worker
+in "fragments" di That Open Engine; il viewer però legge già il glTF (ADR-29) e il worker è in Python.
+
+**Decisione.**
+- Dopo la verifica (impronta, antivirus) il worker converte gli IFC di almeno `ifc_derivative_min_bytes`
+  (100 MB in produzione, 2 MB in `cde dev`) in glTF binario con **IfcOpenShell** (`ifc2glb.py`, più thread).
+  Il .glb conserva albero spaziale (tipi IFC, quota dei piani), un nodo per elemento con GlobalId, tipo e Pset,
+  geometria nel sistema locale con la matrice di posizionamento (misure vere degli elementi ruotati,
+  geometrie ripetute scritte una volta), colori e trasparenze degli stili. Assi e spostamento come web-ifc.
+- Tabella `file_derivatives` (migrazione 0027), legata al file: le revisioni condivise e pubblicate che riusano
+  il file della WIP hanno lo stesso derivato. Visibilità = quella del file (RLS). Il worker lavora solo tramite
+  funzioni SECURITY DEFINER; tre tentativi (job periodico ogni 5'), poi FAILED.
+- `GET /revisions/{id}/download?disposition=inline` per un IFC restituisce anche `derivative`
+  (`READY` con URL firmato, `PENDING`, `FAILED`). Il viewer apre il derivato se pronto, con un interruttore
+  "Versione ottimizzata / IFC originale"; annotazioni, "Citato in" e tavole del piano usano gli stessi GUID.
+- L'originale resta il documento (download, impronta, registro): il derivato è solo una vista, mai scaricato
+  come documento.
+
+**Limiti.** Il derivato riflette quanto IfcOpenShell sa triangolare (aperture, spazi esclusi come nel viewer).
+Per modelli enormi conviene in seguito il caricamento progressivo per piano (più file .glb). Dipendenza nuova:
+`ifcopenshell` (ruote per Windows e Linux ARM64, immagine Docker invariata).
