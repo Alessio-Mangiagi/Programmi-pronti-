@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from ..deps import Ctx, ctx
@@ -167,6 +167,16 @@ def resend_invitation(org_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(ct
             raise forbidden("L'utente ha già attivato l'account")
         _send_invitation(c, conn, user_id, user["email"], org["legal_name"])
     return Response(status_code=204)
+
+
+@router.get("/{org_id}/security-events")
+def org_security_events(org_id: uuid.UUID, type: str | None = Query(default=None, max_length=64),
+                        before: int | None = None, limit: int = Query(default=100, ge=1, le=500), c: Ctx = Depends(ctx)):
+    """Accessi, MFA, single sign-on e gestione utenti dell'organizzazione (non le attività nelle commesse)."""
+    with c.tx() as conn:
+        _get_org(conn, org_id)
+        return conn.execute("SELECT * FROM cde.org_security_events(%s, %s, %s, %s)",
+                            [org_id, type, limit, before]).fetchall()
 
 
 @router.post("/{org_id}/users/{user_id}/mfa/reset")

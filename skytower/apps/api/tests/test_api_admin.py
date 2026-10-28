@@ -304,3 +304,23 @@ def test_admin_vede_e_azzera_l_mfa(client, api_world, as_user):
                             [target]).fetchone()[0] == 0
         assert conn.execute("SELECT count(*) FROM cde.security_events WHERE event_type = 'MFA_RESET_BY_ADMIN' "
                             "AND details->>'target' = %s", [str(target)]).fetchone()[0] == 1
+
+
+def test_registro_di_sicurezza_dell_organizzazione(client, api_world, as_user):
+    _, w = api_world
+    client.post("/auth/login", json={"email": w.emails["sub1_user"], "password": "sbagliata-di-proposito"})
+    as_user("sub1_user")                                                     # un accesso riuscito
+    url = f"/organizations/{w.orgs['SUB1']}/security-events"
+    events = client.get(url, headers=as_user("sub1_admin")).json()
+    kinds = {e["event_type"] for e in events if e["email"] == w.emails["sub1_user"]}
+    assert {"LOGIN_FAIL", "LOGIN_OK"} <= kinds
+    # di chi non è dell'organizzazione compaiono solo le azioni fatte sull'organizzazione (es. dal platform admin)
+    outside = {e["event_type"] for e in events if e["email"] and not e["email"].endswith("@sub1.example")}
+    assert outside <= {"USER_UPDATED", "USER_INVITED", "ORGANIZATION_UPDATED", "MFA_RESET_BY_ADMIN", "SSO_CONFIGURED", "SSO_REMOVED"}
+    only = client.get(url, headers=as_user("sub1_admin"), params={"type": "LOGIN_FAIL"}).json()
+    assert only and {e["event_type"] for e in only} == {"LOGIN_FAIL"}
+    older = client.get(url, headers=as_user("sub1_admin"), params={"before": events[0]["id"], "limit": 1}).json()
+    assert len(older) == 1 and older[0]["id"] < events[0]["id"]
+    # né i colleghi né gli admin di altre organizzazioni
+    assert client.get(url, headers=as_user("sub1_user")).status_code == 403
+    assert client.get(url, headers=as_user("des_admin")).status_code == 403    # vede SUB1 (stessa commessa), non il registro
