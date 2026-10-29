@@ -30,6 +30,10 @@ class ProjectIn(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     timezone: str = "Europe/Rome"
+    # commessa esistente da usare come template (ADR-38): se ne copia la configurazione, non i documenti
+    template_id: uuid.UUID | None = None
+    with_organizations: bool = False     # anche organizzazioni partecipanti e loro cartelle
+    with_members: bool = False           # anche persone e ruoli (richiede le organizzazioni)
 
 
 class ProjectPatch(BaseModel):
@@ -81,12 +85,24 @@ class RolePatch(BaseModel):
 # ---------------------------------------------------------------------
 @router.post("", status_code=201)
 def create_project(body: ProjectIn, c: Ctx = Depends(ctx)):
+    if body.with_members and not body.with_organizations:
+        raise ApiError(422, "members_need_organizations", "Le persone si copiano solo insieme alle loro organizzazioni")
+    if (body.with_organizations or body.with_members) and body.template_id is None:
+        raise ApiError(422, "template_required", "Organizzazioni e persone si copiano solo da una commessa template")
     with c.tx() as conn:
-        pid = conn.execute(
-            "SELECT cde.create_project(%s, %s, %s, %s, %s, %s) AS id",
-            [body.code, body.name, body.description, body.start_date, body.end_date, body.timezone],
-        ).fetchone()["id"]
-        security_event(conn, "PROJECT_CREATED", user_id=c.user_id, project_id=pid, ip=c.ip)
+        if conn.execute("SELECT 1 FROM cde.projects WHERE owner_organization_id = cde.current_app_org() AND code = %s",
+                        [body.code]).fetchone():
+            raise ApiError(409, "code_taken", f"La tua organizzazione ha già una commessa con codice {body.code}")
+        args = [body.code, body.name, body.description, body.start_date, body.end_date, body.timezone]
+        if body.template_id is None:
+            pid = conn.execute("SELECT cde.create_project(%s, %s, %s, %s, %s, %s) AS id", args).fetchone()["id"]
+        else:
+            if conn.execute("SELECT 1 FROM cde.projects WHERE id = %s", [body.template_id]).fetchone() is None:
+                raise not_found("Commessa template")
+            pid = conn.execute("SELECT cde.create_project_from_template(%s, %s, %s, %s, %s, %s, %s, %s, %s) AS id",
+                               [body.template_id, *args, body.with_organizations, body.with_members]).fetchone()["id"]
+        security_event(conn, "PROJECT_CREATED", user_id=c.user_id, project_id=pid, ip=c.ip,
+                       template=body.template_id, organizations=body.with_organizations, members=body.with_members)
         return require_project(conn, pid)
 
 
@@ -94,6 +110,22 @@ def create_project(body: ProjectIn, c: Ctx = Depends(ctx)):
 def list_projects(c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         return conn.execute("SELECT * FROM cde.projects ORDER BY name").fetchall()
+
+
+@router.get("/templates")
+def list_templates(c: Ctx = Depends(ctx)):
+    """Commesse utilizzabili come template: quelle di cui si è Project Admin, con cosa contengono."""
+    with c.tx() as conn:
+        return conn.execute(
+            """SELECT p.id, p.code, p.name, p.status,
+                      (SELECT count(*) FROM cde.containers c WHERE c.project_id = p.id) AS folders,
+                      (SELECT count(*) FROM cde.naming_profiles n WHERE n.project_id = p.id) AS naming_profiles,
+                      (SELECT count(DISTINCT code) FROM cde.workflow_templates w
+                        WHERE w.project_id = p.id AND w.is_active) AS workflows,
+                      (SELECT count(*) FROM cde.project_organizations o WHERE o.project_id = p.id) AS organizations
+               FROM cde.projects p
+               WHERE cde.has_project_permission(cde.current_app_user(), p.id, 'ADMIN', 'PROJECT')
+               ORDER BY p.name""").fetchall()
 
 
 @router.get("/{project_id}")
