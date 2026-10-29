@@ -1,6 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 // Template di workflow della commessa: elenco versioni e designer (step, assegnatari, quorum, SLA,
-// esito automatico). Salvare con lo stesso codice crea una nuova versione e disattiva la precedente.
+// esito automatico). Salvare con lo stesso codice crea una nuova versione e disattiva la precedente. Un workflow
+// sviluppato in un altro progetto si importa adattandolo a questo (ADR-39).
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,6 +12,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import { api, ApiError, Member, Project, Role } from "../../api";
 
@@ -36,6 +38,8 @@ export function WorkflowsTab({ project, canManage }: { project: Project; canMana
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Template | "new" | null>(null);
   const [showOld, setShowOld] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<Imported | null>(null);
   const { data: templates = [] } = useQuery({
     queryKey: ["workflow-templates", project.id, "all"],
     queryFn: () => api<Template[]>(`/projects/${project.id}/workflow-templates?include_inactive=true`),
@@ -58,8 +62,16 @@ export function WorkflowsTab({ project, canManage }: { project: Project; canMana
           <Switch checked={showOld} onChange={(e) => setShowOld(e.target.checked)} inputProps={{ "aria-label": "Mostra versioni disattivate" }} />
           <Typography variant="body2" noWrap>Versioni disattivate</Typography>
         </Stack>
+        {canManage && <Button startIcon={<DownloadIcon />} onClick={() => setImporting(true)}>Importa da un altro progetto</Button>}
         {canManage && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>Nuovo workflow</Button>}
       </Stack>
+      {imported && (
+        <Alert severity={imported.changes.length ? "warning" : "success"} onClose={() => setImported(null)}>
+          Importato «{imported.name}» ({imported.code} · v{imported.version}).
+          {imported.changes.length > 0 && <> Adattato a questo progetto:
+            <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>{imported.changes.map((n) => <li key={n}>{n}</li>)}</ul></>}
+        </Alert>
+      )}
       {shown.length === 0 && <Alert severity="info">Nessun workflow configurato.{canManage ? "" : " Li crea il Project Admin."}</Alert>}
       {shown.map((t) => (
         <Paper key={t.id} variant="outlined" sx={{ p: 2, opacity: t.is_active ? 1 : 0.6 }}>
@@ -96,7 +108,65 @@ export function WorkflowsTab({ project, canManage }: { project: Project; canMana
         </Paper>
       ))}
       {editing && <TemplateDialog project={project} base={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
+      {importing && <ImportDialog project={project} onClose={() => setImporting(false)}
+                                  onImported={(t) => { setImporting(false); setImported(t); }} />}
     </Stack>
+  );
+}
+
+interface Importable extends Template { project_code: string; project_name: string; exists_here: boolean }
+type Imported = Template & { changes: string[] };
+
+/** Workflow attivi di altri progetti di cui si è Project Admin (ADR-39): persone e organizzazioni che qui non ci
+ *  sono vengono tolte, i ruoli personalizzati mancanti creati uguali; stesso codice ⇒ nuova versione. */
+function ImportDialog({ project, onClose, onImported }: { project: Project; onClose: () => void; onImported: (t: Imported) => void }) {
+  const qc = useQueryClient();
+  const [id, setId] = useState("");
+  const [code, setCode] = useState("");
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["workflow-importable", project.id],
+    queryFn: () => api<Importable[]>(`/projects/${project.id}/workflow-templates/importable`),
+  });
+  const chosen = items.find((t) => t.id === id);
+  const run = useMutation({
+    mutationFn: () => api<Imported>(`/projects/${project.id}/workflow-templates/import`, {
+      method: "POST", json: { template_id: id, code: code && code !== chosen?.code ? code : null } }),
+    onSuccess: (t) => { qc.invalidateQueries({ queryKey: ["workflow-templates", project.id] }); qc.invalidateQueries({ queryKey: ["roles", project.id] }); onImported(t); },
+  });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Importa un workflow da un altro progetto</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} mt={1}>
+          {!isLoading && items.length === 0 && <Alert severity="info">Nessun workflow attivo in altri progetti di cui sei Project Admin.</Alert>}
+          {items.length > 0 && (
+            <TextField select label="Workflow" value={id} onChange={(e) => { setId(e.target.value); setCode(items.find((t) => t.id === e.target.value)?.code ?? ""); }}>
+              {items.map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.project_code} · {t.name} ({t.code} v{t.version})</MenuItem>
+              ))}
+            </TextField>
+          )}
+          {chosen && (
+            <>
+              <Typography variant="body2" color="text.secondary">
+                {chosen.definition.steps.map((s) => s.name).join(" → ")} · dal progetto «{chosen.project_name}»
+              </Typography>
+              <TextField label="Codice in questo progetto" value={code} inputProps={{ maxLength: 41 }}
+                         onChange={(e) => setCode(e.target.value.toUpperCase())}
+                         helperText={code === chosen.code && chosen.exists_here
+                           ? "Qui esiste già un workflow con questo codice: l'import ne diventa la nuova versione"
+                           : "Persone e organizzazioni che non partecipano a questo progetto vengono tolte; i ruoli personalizzati mancanti si creano uguali"} />
+            </>
+          )}
+          {run.error && <Alert severity="error">{(run.error as ApiError).message}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Annulla</Button>
+        <Button variant="contained" disabled={!chosen || !/^[A-Z][A-Z0-9_]{1,40}$/.test(code) || run.isPending}
+                onClick={() => run.mutate()}>Importa</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
