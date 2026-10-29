@@ -445,7 +445,7 @@ applicarli alle cartelle che sceglie.
 **Decisione.**
 - Tabella `naming_profiles` (migrazione 0026): schemi con nome per commessa, ognuno con la sua rinomina
   automatica; `containers.naming_profile_id` indica lo schema di una cartella (NULL = schema della commessa).
-  Nessuna ereditarietà implicita: lo schema vale per le cartelle spuntate; il popup con l'albero spunta di
+  Nessuna ereditarietà implicita (opzionale da ADR-35): lo schema vale per le cartelle spuntate; il popup con l'albero spunta di
   norma anche le sottocartelle, e si può togliere la spunta a quelle che non lo devono usare.
 - Assegnazione con `cde.set_container_naming` (SECURITY DEFINER): serve il Project Admin e la cartella deve
   essergli visibile; la policy UPDATE dei container chiederebbe l'ADMIN sulla singola cartella.
@@ -533,3 +533,18 @@ il testo di pypdf: le pagine scansionate restano invisibili alla ricerca.
 - Le revisioni che condividono il file copiano anche `ocr_at`.
 
 **Conseguenze.** Nessun comando da lanciare dopo l'aggiornamento: un archivio di N PDF si rilegge in circa N/60 ore.
+
+## ADR-35 — Ereditarietà opzionale dello schema di naming
+
+**Contesto.** Con ADR-30 una sottocartella creata dopo l'applicazione di uno schema usa quello della commessa:
+il Project Admin deve ricordarsi di riaprire il popup. Per cartelle come "Foto di cantiere", divise per mese,
+le sottocartelle nuove sono la norma.
+
+**Decisione.**
+- `naming_profiles.inherit` (migrazione 0030, predefinito **no**): spunta "Vale anche per le sottocartelle create
+  dopo in queste cartelle" nella scheda Naming, solo Project Admin.
+- Il trigger `containers_inherit_naming` (BEFORE INSERT, SECURITY DEFINER) assegna alla cartella nuova lo schema
+  del padre se questo ha la spunta: chi crea la cartella non deve essere Project Admin. A catena: la sottocartella
+  ha lo schema, quindi lo passa alle sue.
+- Solo alla creazione: spostare una cartella o togliere la spunta non cambia le cartelle esistenti (si gestiscono
+  dal popup, come prima). Un PUT dello schema senza `inherit` lo lascia com'è.

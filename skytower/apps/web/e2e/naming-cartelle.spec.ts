@@ -1,7 +1,8 @@
 // "><(((º> sabusabu <º)))><"
 // Naming per cartella: dalla scheda Naming il Project Admin crea uno schema per cartelle e lo applica alle cartelle
 // scelte nell'albero del popup (con le sottocartelle); chi carica in quelle cartelle usa quello schema, le altre
-// restano sullo schema della commessa.
+// restano sullo schema della commessa. Con la spunta "Vale anche per le sottocartelle create dopo" lo schema passa
+// alle cartelle nuove.
 import { expect, test } from "@playwright/test";
 import { apiAs, loginUi, projectAndFolder } from "./helpers";
 
@@ -37,6 +38,15 @@ test("schema per cartelle applicato dall'albero nel popup", async ({ page, baseU
     const section = page.getByRole("region", { name: "Schemi di naming" });
     await expect(section.getByRole("tab", { name: new RegExp(name) })).toHaveAttribute("aria-selected", "true");
     await expect(section.getByText("Applicato a:")).toBeVisible();
+
+    // con la spunta lo schema passa anche alle sottocartelle create dopo
+    const inherit = section.getByRole("checkbox", { name: "Vale anche per le sottocartelle create dopo in queste cartelle" });
+    await expect(inherit).not.toBeChecked();
+    await inherit.click();
+    await expect(inherit).toBeChecked();                       // stato del server, dopo il salvataggio
+    const sub = await (await des.post(`/api/projects/${projectId}/containers`,
+      { data: { name: `Sotto e2e ${Date.now() % 10_000}`, parent_id: folderId } })).json();
+    expect((await (await des.get(`/api/containers/${sub.id}/naming`)).json()).profile.name).toBe(name);
 
     // chi carica in una cartella con lo schema lo vede nel dialog; nelle altre resta quello della commessa
     expect((await (await des.get(`/api/containers/${folderId}/naming`)).json()).profile.name).toBe(name);

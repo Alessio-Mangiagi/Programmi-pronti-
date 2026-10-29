@@ -161,3 +161,35 @@ def test_assegnazione_esatta_ed_eliminazione(client, api_world, as_user, profile
     assert out.status_code == 404
     containers = client.get(f"/projects/{w.project_id}/containers", headers=admin).json()
     assert all("naming_profile_id" in c for c in containers)
+
+
+def test_ereditarieta_nelle_sottocartelle_create_dopo(client, api_world, as_user, profiles):
+    _, w = api_world
+    admin, lead = as_user("com_admin"), as_user("des_lead")
+    parent = str(w.containers["des_arch"])
+    prof = profiles("Eredita", naming_scheme=photo_scheme("ER"))
+    assert prof["inherit"] is False
+    client.put(f"/naming-profiles/{prof['id']}/containers", headers=admin, json={"container_ids": [parent]})
+
+    def subfolder(of: str) -> str:
+        r = client.post(f"/projects/{w.project_id}/containers", headers=lead,
+                        json={"name": f"Sotto {os.urandom(2).hex()}", "parent_id": of})
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    plain = subfolder(parent)                         # senza spunta: nessuna ereditarietà (ADR-30)
+    assert client.get(f"/containers/{plain}/naming", headers=lead).json()["profile"] is None
+
+    r = client.put(f"/naming-profiles/{prof['id']}", headers=admin,
+                   json={"name": prof["name"], "auto_number": prof["auto_number"], "inherit": True})
+    assert r.status_code == 200 and r.json()["inherit"] is True
+    child = subfolder(parent)
+    assert client.get(f"/containers/{child}/naming", headers=lead).json()["profile"]["id"] == prof["id"]
+    grandchild = subfolder(child)                     # anche più in basso: la sottocartella ha lo schema
+    assert client.get(f"/containers/{grandchild}/naming", headers=lead).json()["profile"]["id"] == prof["id"]
+    assert client.get(f"/containers/{plain}/naming", headers=lead).json()["profile"] is None   # le vecchie restano
+
+    # un PUT senza "inherit" non la toglie
+    r = client.put(f"/naming-profiles/{prof['id']}", headers=admin, json={"name": prof["name"]})
+    assert r.json()["inherit"] is True
+    assert set(r.json()["container_ids"]) == {parent, child, grandchild}
