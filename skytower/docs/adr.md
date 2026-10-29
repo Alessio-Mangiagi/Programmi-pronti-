@@ -548,3 +548,23 @@ le sottocartelle nuove sono la norma.
   ha lo schema, quindi lo passa alle sue.
 - Solo alla creazione: spostare una cartella o togliere la spunta non cambia le cartelle esistenti (si gestiscono
   dal popup, come prima). Un PUT dello schema senza `inherit` lo lascia com'è.
+
+## ADR-36 — Derivato IFC diviso per piano, caricato progressivamente
+
+**Contesto.** Con ADR-31 il derivato è un solo .glb: su un modello enorme il browser scarica e legge tutto prima
+di mostrare qualcosa, e la memoria del parse cresce col modello intero.
+
+**Decisione.**
+- `ifc2glb.convert(..., parts_dir=...)` scrive un **indice** (albero spaziale, nomi, GUID, Pset; nessuna mesh) e
+  un .glb per piano con i soli nodi "part", che in `extras.owner` indicano l'elemento dell'indice. Gli elementi
+  fuori dai piani vanno in un pezzo finale. L'elenco, in ordine di quota, è in `scenes[0].extras.parts`.
+- `file_derivatives.parts` (migrazione 0031) conserva chiavi e versioni S3 dei piani; l'API restituisce `parts`
+  con un URL firmato per piano (15', perché si scaricano in sequenza).
+- Il viewer legge l'indice, poi aggiunge i piani dal più basso, scaricando il successivo mentre legge il corrente.
+  Dopo il primo piano la camera inquadra il modello e l'utente può già orbitare; una barra in basso dice quanti
+  piani sono arrivati. Albero, selezione e sezioni si attivano a caricamento finito, con lo stesso comportamento
+  di prima (GUID, Pset, misure, tavole collegate).
+- I derivati fatti prima (un solo file, `parts` NULL) si aprono come prima.
+
+**Limiti.** Un piano molto pesante resta un blocco unico; non c'è ancora lo scaricamento dei piani nascosti
+(tutti i piani si caricano comunque).

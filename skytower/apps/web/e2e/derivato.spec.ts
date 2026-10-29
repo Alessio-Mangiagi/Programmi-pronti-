@@ -1,7 +1,8 @@
 // "><(((º> sabusabu <º)))><"
 // IFC pesante (G43, ADR-31): il worker prepara la versione ottimizzata .glb e il viewer apre quella, con l'albero
 // dei piani, le proprietà IFC e le misure vere di un elemento ruotato; un clic riapre l'IFC originale (web-ifc).
-// In `cde dev` la soglia è 2 MB: il modello da 4 padiglioni (2,4 MB) la supera.
+// In `cde dev` la soglia è 2 MB: il modello da 4 padiglioni (2,4 MB) la supera. La versione ottimizzata arriva un
+// piano alla volta (ADR-36).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -25,6 +26,11 @@ test("IFC pesante aperto nella versione ottimizzata del server", async ({ page, 
                                mimeType: "application/octet-stream", buffer: readFileSync(file) }, "Campus pesante e2e");
   await expect.poll(async () => (await (await des.get(`/api/revisions/${doc.current_revision_id}/download`,
     { params: { disposition: "inline" } })).json()).derivative?.status, { timeout: 60_000 }).toBe("READY");
+  // diviso per piano (ADR-36): quattro padiglioni da sei livelli, dal più basso
+  const { derivative } = await (await des.get(`/api/revisions/${doc.current_revision_id}/download`,
+    { params: { disposition: "inline" } })).json();
+  expect(derivative.parts.length).toBeGreaterThanOrEqual(6);
+  expect(derivative.parts[0].name).toBe("Piano interrato");
 
   await page.reload();
   const tab = await openInTab(page, () => page.getByText("Campus pesante e2e").dblclick());

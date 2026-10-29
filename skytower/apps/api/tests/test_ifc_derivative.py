@@ -1,7 +1,8 @@
 # "><(((º> sabusabu <º)))><"
 """Derivato .glb degli IFC pesanti (G43, ADR-31): la conversione conserva elementi (GUID), albero spaziale, quote
 dei piani, Pset e trasparenze, con Y in alto; il worker lo prepara solo sopra la soglia e l'API lo offre al viewer
-insieme all'IFC originale, con la stessa visibilità del file."""
+insieme all'IFC originale, con la stessa visibilità del file. Il worker lo divide per piano (ADR-36): un indice
+con albero e proprietà e un .glb per piano, dal più basso."""
 from __future__ import annotations
 
 import math
@@ -79,6 +80,28 @@ def test_assi_matrici_e_misure(converted):
     struct.unpack_from("<3f", blob, view["byteOffset"])
 
 
+def test_diviso_per_piano():
+    with tempfile.TemporaryDirectory() as tmp:
+        src, dst = Path(tmp) / "m.ifc", Path(tmp) / "m.glb"
+        src.write_bytes(IFC)
+        result = ifc2glb.convert(src, dst, threads=2, parts_dir=Path(tmp) / "piani")
+        index, blob = glb_model.parse(dst.read_bytes())
+        pieces = [glb_model.parse(p.path.read_bytes()) for p in result.parts]
+    nodes = index["nodes"]
+    assert blob == b"" and "meshes" not in index and not any(n["extras"].get("part") for n in nodes)
+    listed = index["scenes"][0]["extras"]["parts"]
+    assert [p["name"] for p in listed] == ["Piano interrato", "Piano terra", "Piano 1", "Piano 2", "Piano 3", "Copertura"]
+    assert [p.name for p in result.parts] == [p["name"] for p in listed]
+    assert sum(p["elements"] for p in listed) == result.elements > 500
+    for meta, (doc, data) in zip(listed, pieces, strict=True):
+        assert nodes[meta["storey"]]["name"] == meta["name"] and len(doc["nodes"]) == meta["elements"]
+        assert all(n["extras"]["part"] and "mesh" in n for n in doc["nodes"]) and data
+        # ogni pezzo porta l'elemento del suo piano: l'owner è un figlio del piano nell'indice
+        assert all(n["extras"]["owner"] in nodes[meta["storey"]]["children"] for n in doc["nodes"])
+    muro = nodes.index(next(n for n in nodes if n.get("name") == "Muro perimetrale sud P1"))
+    assert any(n["extras"]["owner"] == muro for n in pieces[2][0]["nodes"])
+
+
 @pytest.fixture(autouse=True)
 def bucket(api_app):
     """I test con mock_aws (eseguiti prima in ordine alfabetico) azzerano lo stato globale di moto."""
@@ -102,8 +125,12 @@ def test_worker_e_api(client, api_app, api_world, as_user):  # noqa: F811
     assert link["content_type"] == "application/x-step"
     d = link["derivative"]
     assert d["status"] == "READY" and d["size_bytes"] > 0
+    assert [p["name"] for p in d["parts"]][:2] == ["Piano interrato", "Piano terra"] and len(d["parts"]) == 6
     with httpx.Client() as s3:
-        assert s3.get(d["url"]).content[:4] == b"glTF"
+        index, _ = glb_model.parse(s3.get(d["url"]).content)
+        assert len(index["scenes"][0]["extras"]["parts"]) == 6
+        piece, data = glb_model.parse(s3.get(d["parts"][1]["url"]).content)
+        assert len(piece["nodes"]) == d["parts"][1]["elements"] and data
 
     small = upload(client, h, w.containers["des_arch"], des_name(ext="ifc"), IFC, title="Modello leggero").json()
     _verify(urls, api_app, min_bytes=len(IFC) + 1)                 # sotto soglia: il viewer usa l'IFC

@@ -55,6 +55,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U38 | `ocr.spec.ts`, `test_ocr.py` |
 | U39 | `test_ocr.py` (`test_ri_ocr_dei_pdf_indicizzati_senza`) |
 | U40 | `naming-cartelle.spec.ts`, `test_api_folder_naming.py` |
+| U41 | `derivato.spec.ts`, `test_ifc_derivative.py` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -104,6 +105,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U38 | Direttore dei lavori | Carica un verbale firmato e scansionato, poi cerca una parola del verbale con "anche nel testo dei file" | Il verbale si trova, con l'estratto evidenziato; se cita un elemento del modello compare in "Citato in" | |
 | U39 | Information Manager | Cerca con "anche nel testo dei file" una parola di un verbale scansionato caricato prima dell'aggiornamento con l'OCR | Entro qualche decina di minuti dall'aggiornamento il verbale si trova, senza ricaricarlo | |
 | U40 | Project Admin + Progettista | Il Project Admin spunta "Vale anche per le sottocartelle create dopo" sullo schema «Foto di cantiere»; il progettista crea la sottocartella «Ottobre» dentro le foto e ci carica una foto | La sottocartella usa già lo schema delle foto, senza passare dal popup; senza la spunta userebbe quello della commessa | |
+| U41 | BIM Manager | Apre un modello IFC molto pesante (versione ottimizzata) | Il piano più basso compare dopo pochi secondi e si può già ruotare il modello; gli altri piani si aggiungono uno alla volta, con l'avanzamento in basso; alla fine albero, proprietà e misure come in U36 | |
 
 ## Verbale
 
