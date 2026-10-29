@@ -116,6 +116,119 @@ def create_template(project_id: uuid.UUID, body: TemplateIn, c: Ctx = Depends(ct
         return conn.execute(f"SELECT {TEMPLATE_COLS} FROM cde.workflow_templates WHERE id = %s", [tid]).fetchone()
 
 
+class ImportIn(BaseModel):
+    template_id: uuid.UUID
+    code: str | None = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]{1,40}$")   # None = stesso codice
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    copy_roles: bool = True        # ruoli personalizzati usati dal workflow e assenti qui: si creano uguali
+
+
+@router.get("/projects/{project_id}/workflow-templates/importable")
+def importable_templates(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Workflow attivi di altri progetti di cui si è Project Admin, da importare in questo (ADR-39)."""
+    with c.tx() as conn:
+        require_project(conn, project_id, "ADMIN", "PROJECT")
+        return conn.execute(
+            """SELECT t.id, t.code, t.version, t.name, t.definition, p.id AS project_id, p.code AS project_code,
+                      p.name AS project_name,
+                      EXISTS (SELECT 1 FROM cde.workflow_templates x WHERE x.project_id = %(p)s AND x.code = t.code)
+                        AS exists_here
+               FROM cde.workflow_templates t JOIN cde.projects p ON p.id = t.project_id
+               WHERE t.is_active AND t.project_id <> %(p)s
+                 AND cde.has_project_permission(cde.current_app_user(), t.project_id, 'ADMIN', 'PROJECT')
+               ORDER BY p.name, t.code""", {"p": project_id}).fetchall()
+
+
+def _adapt(conn, project_id: uuid.UUID, source_project: uuid.UUID, definition: dict,
+           copy_roles: bool) -> tuple[dict, list[str]]:
+    """Il workflow adattato al progetto di destinazione e l'elenco delle modifiche fatte.
+
+    Persone e organizzazioni che qui non ci sono si tolgono (un compito darebbe accesso al documento a chi non è nel
+    progetto); i ruoli personalizzati mancanti si creano uguali a quelli di partenza, oppure si segnalano."""
+    members = {r["user_id"] for r in conn.execute(
+        "SELECT user_id FROM cde.project_memberships WHERE project_id = %s", [project_id]).fetchall()}
+    orgs = {r["organization_id"] for r in conn.execute(
+        "SELECT organization_id FROM cde.project_organizations WHERE project_id = %s", [project_id]).fetchall()}
+    roles = {r["code"] for r in conn.execute(
+        "SELECT code FROM cde.roles WHERE project_id IS NULL OR project_id = %s", [project_id]).fetchall()}
+    names = {r["id"]: r["name"] for r in conn.execute(
+        "SELECT id, first_name || ' ' || last_name AS name FROM cde.users WHERE id = ANY(%s)",
+        [[a["id"] for s in definition["steps"] for a in s["assignees"] if a.get("id")]
+         + ([definition["escalation_user_id"]] if definition.get("escalation_user_id") else [])]).fetchall()}
+    notes: list[str] = []
+    steps = []
+    for step in definition["steps"]:
+        kept = []
+        for a in step["assignees"]:
+            if a["type"] == "user" and uuid.UUID(str(a["id"])) not in members:
+                notes.append(f"«{step['name']}»: tolta {names.get(uuid.UUID(str(a['id'])), 'una persona')}, "
+                             "non è in questo progetto")
+                continue
+            if a.get("organization_id") and uuid.UUID(str(a["organization_id"])) not in orgs:
+                notes.append(f"«{step['name']}»: tolto il ruolo {a['code']} limitato a un'organizzazione che qui non "
+                             "partecipa")
+                continue
+            if a["type"] != "user" and a["code"] not in roles:
+                source = conn.execute("SELECT id, name, description FROM cde.roles WHERE project_id = %s AND code = %s",
+                                      [source_project, a["code"]]).fetchone()
+                if copy_roles and source:
+                    rid = uuid.uuid4()
+                    conn.execute("INSERT INTO cde.roles (id, project_id, code, name, description) "
+                                 "VALUES (%s, %s, %s, %s, %s)", [rid, project_id, a["code"], source["name"],
+                                                                 source["description"]])
+                    conn.execute("INSERT INTO cde.role_permissions (role_id, action, scope) "
+                                 "SELECT %s, action, scope FROM cde.role_permissions WHERE role_id = %s",
+                                 [rid, source["id"]])
+                    roles.add(a["code"])
+                    notes.append(f"Creato il ruolo {a['code']} ({source['name']}), uguale a quello di partenza: "
+                                 "assegnarlo alle persone")
+                else:
+                    notes.append(f"«{step['name']}»: il ruolo {a['code']} qui non esiste, nessuno riceverà il compito "
+                                 "finché non lo si crea")
+            kept.append(a)
+        if not kept:
+            raise ApiError(422, "step_without_assignees",
+                           f"Lo step «{step['name']}» resterebbe senza assegnatari in questo progetto: "
+                           "aggiungere le persone al progetto o modificarlo nel progetto di partenza")
+        steps.append({**step, "assignees": kept})
+    out = {**definition, "steps": steps}
+    esc = definition.get("escalation_user_id")
+    if esc and uuid.UUID(str(esc)) not in members:
+        out["escalation_user_id"] = None
+        notes.append(f"Tolta l'escalation verso {names.get(uuid.UUID(str(esc)), 'una persona')}, non è in questo progetto")
+    return out, notes
+
+
+@router.post("/projects/{project_id}/workflow-templates/import", status_code=201)
+def import_template(project_id: uuid.UUID, body: ImportIn, c: Ctx = Depends(ctx)):
+    """Copia un workflow da un altro progetto: stesso codice ⇒ nuova versione qui, come un salvataggio."""
+    with c.tx() as conn:
+        require_project(conn, project_id, "ADMIN", "PROJECT")
+        src = conn.execute(f"SELECT {TEMPLATE_COLS} FROM cde.workflow_templates WHERE id = %s",
+                           [body.template_id]).fetchone()
+        if src is None:
+            raise not_found("Workflow")
+        require_project(conn, src["project_id"], "ADMIN", "PROJECT")
+        if src["project_id"] == project_id:
+            raise ApiError(409, "same_project", "Il workflow è già in questo progetto")
+        definition = Definition.model_validate(src["definition"]).model_dump(mode="json")
+        adapted, notes = _adapt(conn, project_id, src["project_id"], definition, body.copy_roles)
+        code, name = body.code or src["code"], body.name or src["name"]
+        version = conn.execute("SELECT coalesce(max(version), 0) + 1 AS v FROM cde.workflow_templates "
+                               "WHERE project_id = %s AND code = %s", [project_id, code]).fetchone()["v"]
+        conn.execute("UPDATE cde.workflow_templates SET is_active = false WHERE project_id = %s AND code = %s",
+                     [project_id, code])
+        tid = uuid.uuid4()
+        conn.execute(
+            """INSERT INTO cde.workflow_templates (id, project_id, code, version, name, definition, created_by)
+               VALUES (%s, %s, %s, %s, %s, %s, cde.current_app_user())""",
+            [tid, project_id, code, version, name, Jsonb(adapted)])
+        security_event(conn, "WORKFLOW_TEMPLATE_IMPORTED", user_id=c.user_id, project_id=project_id, ip=c.ip,
+                       template=tid, code=code, version=version, source=body.template_id, changes=len(notes))
+        row = conn.execute(f"SELECT {TEMPLATE_COLS} FROM cde.workflow_templates WHERE id = %s", [tid]).fetchone()
+        return {**row, "changes": notes}
+
+
 @router.patch("/workflow-templates/{template_id}")
 def update_template(template_id: uuid.UUID, body: TemplatePatch, c: Ctx = Depends(ctx)):
     changes = body.model_dump(exclude_unset=True)
