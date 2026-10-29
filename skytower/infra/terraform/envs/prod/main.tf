@@ -18,5 +18,7 @@ module "platform" {
   alert_emails               = var.alert_emails
   image_tag                  = var.image_tag
   tsa_url                    = var.tsa_url
+  onlyoffice_url             = var.onlyoffice_url
+  onlyoffice_jwt_secret_arn  = var.onlyoffice_jwt_secret_arn
   mail_from                  = var.mail_from
 }

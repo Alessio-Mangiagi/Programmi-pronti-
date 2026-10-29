@@ -77,7 +77,7 @@ resource "aws_iam_role_policy_attachment" "ecs_execution" {
 data "aws_iam_policy_document" "ecs_execution_secrets" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [for s in aws_secretsmanager_secret.db_dsn : s.arn]
+    resources = concat([for s in aws_secretsmanager_secret.db_dsn : s.arn], compact([var.onlyoffice_jwt_secret_arn]))
   }
   statement {
     actions   = ["kms:Decrypt"]
@@ -161,6 +161,7 @@ locals {
     CDE_S3_BUCKET                 = module.documents_bucket.s3_bucket_id
     CDE_AUDIT_LOCK_MODE           = var.object_lock_mode
     CDE_TSA_URL                   = var.tsa_url
+    CDE_ONLYOFFICE_URL            = var.onlyoffice_url
     CDE_SCANNER                   = "clamd"
     CDE_CLAMD_HOST                = "127.0.0.1"
     CDE_MAILER                    = "ses"
@@ -170,11 +171,14 @@ locals {
     PYTHONUNBUFFERED              = "1"
   } : { name = k, value = v } if v != ""]
 
-  app_secrets = [
+  # segreto condiviso con il Document Server OnlyOffice, se configurato (ADR-37)
+  onlyoffice_secrets = [for arn in compact([var.onlyoffice_jwt_secret_arn]) : { name = "CDE_ONLYOFFICE_JWT_SECRET", valueFrom = arn }]
+
+  app_secrets = concat([
     { name = "CDE_DATABASE_URL_APP", valueFrom = aws_secretsmanager_secret.db_dsn["cde_app"].arn },
     { name = "CDE_DATABASE_URL_AUTH", valueFrom = aws_secretsmanager_secret.db_dsn["cde_auth"].arn },
     { name = "CDE_DATABASE_URL_WORKER", valueFrom = aws_secretsmanager_secret.db_dsn["cde_worker"].arn },
-  ]
+  ], local.onlyoffice_secrets)
 
   log_options = { for k, g in aws_cloudwatch_log_group.ecs : k => {
     logDriver = "awslogs"

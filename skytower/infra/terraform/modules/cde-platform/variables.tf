@@ -149,6 +149,18 @@ variable "tsa_url" {
   default     = ""
 }
 
+variable "onlyoffice_url" {
+  description = "Document Server OnlyOffice (https://...) per modificare Word/Excel in piattaforma; vuoto = spento (ADR-37)"
+  type        = string
+  default     = ""
+}
+
+variable "onlyoffice_jwt_secret_arn" {
+  description = "ARN del segreto Secrets Manager con il segreto JWT condiviso con il Document Server"
+  type        = string
+  default     = ""
+}
+
 variable "mail_from" {
   description = "Mittente SES nel formato \"Nome <indirizzo>\" (l'indirizzo vincola la policy IAM)"
   type        = string

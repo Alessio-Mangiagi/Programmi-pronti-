@@ -201,13 +201,14 @@ locals {
   s3_regional = "https://${local.documents_bucket_name}.s3.${var.region}.amazonaws.com"
   spa_csp = join("; ", [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval'", # web-ifc (viewer IFC) compila WebAssembly
-    "worker-src 'self' blob:",              # PDF.js
-    "style-src 'self' 'unsafe-inline'",     # MUI/emotion
+    # web-ifc (viewer IFC) compila WebAssembly; lo script dell'editor OnlyOffice arriva dal Document Server
+    trimspace("script-src 'self' 'wasm-unsafe-eval' ${var.onlyoffice_url}"),
+    "worker-src 'self' blob:",          # PDF.js
+    "style-src 'self' 'unsafe-inline'", # MUI/emotion
     "img-src 'self' data: blob: ${local.s3_regional}",
     "font-src 'self' data:",
-    "connect-src 'self' ${local.s3_regional}", # upload/download diretti con URL presigned
-    "frame-src 'self' blob: ${local.s3_regional}",
+    "connect-src 'self' ${local.s3_regional}",                                      # upload/download diretti con URL presigned
+    trimspace("frame-src 'self' blob: ${local.s3_regional} ${var.onlyoffice_url}"), # editor OnlyOffice in iframe
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
