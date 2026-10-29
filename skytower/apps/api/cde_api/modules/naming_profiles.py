@@ -1,10 +1,11 @@
 # "><(((º> sabusabu <º)))><"
 """Naming per cartella: schemi con nome definiti dal Project Admin nella scheda Naming e assegnati alle cartelle
-scelte. Una cartella senza schema usa quello della commessa (ADR-30).
+scelte. Una cartella senza schema usa quello della commessa (ADR-30). Con "inherit" lo schema passa anche alle
+sottocartelle create dopo nelle sue cartelle (ADR-35).
 
   GET    /projects/{id}/naming-profiles        schemi, con le cartelle (visibili) a cui sono assegnati
   POST   /projects/{id}/naming-profiles        nuovo schema (senza schema nel corpo: copia quello della commessa)
-  PUT    /naming-profiles/{id}                 nome, schema, rinomina automatica
+  PUT    /naming-profiles/{id}                 nome, schema, rinomina automatica, ereditarietà
   DELETE /naming-profiles/{id}                 le sue cartelle tornano allo schema della commessa
   PUT    /naming-profiles/{id}/containers      cartelle a cui si applica: esattamente quelle indicate
 """
@@ -25,7 +26,7 @@ from .documents import load_auto_number, load_settings
 router = APIRouter(tags=["naming"])
 
 PROFILE_SQL = """
-    SELECT p.id, p.project_id, p.name, p.naming_scheme, p.auto_number, p.created_at, p.updated_at,
+    SELECT p.id, p.project_id, p.name, p.naming_scheme, p.auto_number, p.inherit, p.created_at, p.updated_at,
            coalesce(array_agg(c.id ORDER BY c.name) FILTER (WHERE c.id IS NOT NULL), '{}') AS container_ids
     FROM cde.naming_profiles p LEFT JOIN cde.containers c ON c.naming_profile_id = p.id"""
 
@@ -34,6 +35,7 @@ class ProfileIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     naming_scheme: NamingScheme | None = None    # in creazione: None = copia dello schema della commessa
     auto_number: AutoNumbering | None = None
+    inherit: bool | None = None                  # None = invariato (in creazione: no)
 
     @field_validator("name")
     @classmethod
@@ -95,10 +97,11 @@ def create_profile(project_id: uuid.UUID, body: ProfileIn, c: Ctx = Depends(ctx)
         _check_auto(scheme, auto)
         profile_id = uuid.uuid4()
         conn.execute(
-            """INSERT INTO cde.naming_profiles (id, project_id, name, naming_scheme, auto_number, created_by, updated_by)
-               VALUES (%s, %s, %s, %s, %s, cde.current_app_user(), cde.current_app_user())""",
+            """INSERT INTO cde.naming_profiles (id, project_id, name, naming_scheme, auto_number, inherit, created_by,
+                                              updated_by)
+               VALUES (%s, %s, %s, %s, %s, %s, cde.current_app_user(), cde.current_app_user())""",
             [profile_id, project_id, body.name, Jsonb(scheme.model_dump()),
-             Jsonb(auto.model_dump()) if auto else None])
+             Jsonb(auto.model_dump()) if auto else None, bool(body.inherit)])
         security_event(conn, "NAMING_PROFILE_CREATED", user_id=c.user_id, project_id=project_id, ip=c.ip,
                        profile=profile_id, name=body.name)
         return _out(_profile(conn, profile_id))
@@ -112,13 +115,14 @@ def update_profile(profile_id: uuid.UUID, body: ProfileIn, c: Ctx = Depends(ctx)
         _name_taken(conn, current["project_id"], body.name, exclude=profile_id)
         scheme = body.naming_scheme or NamingScheme.model_validate(current["naming_scheme"])
         _check_auto(scheme, body.auto_number)
+        inherit = current["inherit"] if body.inherit is None else body.inherit
         conn.execute(
-            """UPDATE cde.naming_profiles SET name = %s, naming_scheme = %s, auto_number = %s,
+            """UPDATE cde.naming_profiles SET name = %s, naming_scheme = %s, auto_number = %s, inherit = %s,
                    updated_by = cde.current_app_user(), updated_at = now() WHERE id = %s""",
             [body.name, Jsonb(scheme.model_dump()), Jsonb(body.auto_number.model_dump()) if body.auto_number else None,
-             profile_id])
+             inherit, profile_id])
         security_event(conn, "NAMING_PROFILE_UPDATED", user_id=c.user_id, project_id=current["project_id"], ip=c.ip,
-                       profile=profile_id, name=body.name, auto_number=body.auto_number is not None)
+                       profile=profile_id, name=body.name, auto_number=body.auto_number is not None, inherit=inherit)
         return _out(_profile(conn, profile_id))
 
 
