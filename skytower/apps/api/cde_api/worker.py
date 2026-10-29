@@ -130,32 +130,11 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
 def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2, stale: str = "30 minutes") -> int:
     """Converte gli IFC in attesa di derivato (.glb). Un errore non blocca: dopo tre tentativi resta FAILED e il
     viewer apre l'IFC originale con web-ifc."""
-    from . import ifc2glb
-
     with conn.transaction():
         rows = conn.execute("SELECT * FROM cde.derivatives_claim(%s, %s::interval)", [limit, stale]).fetchall()
     for r in rows:
-        base = f"projects/{r['project_id']}/derivatives/{r['file_id']}"
-        key = f"{base}.glb"
         try:
-            with tempfile.TemporaryDirectory() as tmp:
-                src, dst = Path(tmp) / "modello.ifc", Path(tmp) / "modello.glb"
-                with src.open("wb") as out:
-                    for chunk in storage.iter_object(r["storage_key"], r["storage_version_id"]):
-                        out.write(chunk)
-                result = ifc2glb.convert(src, dst, parts_dir=Path(tmp) / "piani")    # indice + un .glb per piano
-                parts = []
-                for k, part in enumerate(result.parts):
-                    part_key = f"{base}/{k}.glb"
-                    parts.append({"name": part.name, "key": part_key, "size_bytes": part.size_bytes,
-                                  "elements": part.elements,
-                                  "version": storage.put_file(part_key, str(part.path), "model/gltf-binary")})
-                version = storage.put_file(key, str(dst), "model/gltf-binary")
-            detail = f"{result.elements} elementi, {result.triangles} triangoli, {len(parts)} piani"
-            with conn.transaction():
-                conn.execute("SELECT cde.derivative_done(%s, true, %s, %s, %s, %s, %s)",
-                             [r["file_id"], key, version, result.size_bytes, detail, Jsonb(parts)])
-            log.info("derivato .glb del file %s: %s, %s byte", r["file_id"], detail, result.size_bytes)
+            _convert(conn, storage, r)
         except Exception as exc:  # noqa: BLE001 - IFC malformati o non supportati: il viewer usa l'originale
             conn.rollback()
             log.exception("derivato .glb del file %s non riuscito (tentativo %s)", r["file_id"], r["attempts"])
@@ -163,6 +142,49 @@ def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2,
                 conn.execute("SELECT cde.derivative_done(%s, false, NULL, NULL, NULL, %s)",
                              [r["file_id"], f"{type(exc).__name__}: {exc}"])
     return len(rows)
+
+
+def split_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 1) -> int:
+    """Derivati in un solo file (fatti prima della divisione per piano) rifatti divisi per piano (ADR-40). Se la
+    conversione non riesce resta il derivato intero: il tentativo è contato, dopo tre il file resta com'è."""
+    with conn.transaction():
+        rows = conn.execute("SELECT * FROM cde.derivatives_split_claim(%s)", [limit]).fetchall()
+    done = 0
+    for r in rows:
+        try:
+            _convert(conn, storage, r)
+            done += 1
+        except Exception:  # noqa: BLE001 - il derivato intero continua a valere
+            conn.rollback()
+            log.exception("divisione per piano del derivato del file %s non riuscita (tentativo %s)",
+                          r["file_id"], r["attempts"])
+    return done
+
+
+def _convert(conn: psycopg.Connection, storage: Storage, r: dict) -> None:
+    """IFC → indice .glb (albero e proprietà) + un .glb per piano, poi derivato pronto."""
+    from . import ifc2glb
+
+    base = f"projects/{r['project_id']}/derivatives/{r['file_id']}"
+    key = f"{base}.glb"
+    with tempfile.TemporaryDirectory() as tmp:
+        src, dst = Path(tmp) / "modello.ifc", Path(tmp) / "modello.glb"
+        with src.open("wb") as out:
+            for chunk in storage.iter_object(r["storage_key"], r["storage_version_id"]):
+                out.write(chunk)
+        result = ifc2glb.convert(src, dst, parts_dir=Path(tmp) / "piani")
+        parts = []
+        for k, part in enumerate(result.parts):
+            part_key = f"{base}/{k}.glb"
+            parts.append({"name": part.name, "key": part_key, "size_bytes": part.size_bytes,
+                          "elements": part.elements,
+                          "version": storage.put_file(part_key, str(part.path), "model/gltf-binary")})
+        version = storage.put_file(key, str(dst), "model/gltf-binary")
+    detail = f"{result.elements} elementi, {result.triangles} triangoli, {len(parts)} piani"
+    with conn.transaction():
+        conn.execute("SELECT cde.derivative_done(%s, true, %s, %s, %s, %s, %s)",
+                     [r["file_id"], key, version, result.size_bytes, detail, Jsonb(parts)])
+    log.info("derivato .glb del file %s: %s, %s byte", r["file_id"], detail, result.size_bytes)
 
 
 def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None = None, limit: int = 20,
@@ -284,10 +306,12 @@ def index_text_task(timestamp: int) -> None:
 @app.periodic(cron="*/5 * * * *", periodic_id="ifc-derivatives")
 @app.task(name="cde.ifc_derivatives", queue="default")
 def ifc_derivatives_task(timestamp: int) -> None:
-    """Riprende i derivati .glb rimasti in attesa (worker fermato durante la conversione, errori temporanei)."""
+    """Riprende i derivati .glb rimasti in attesa (worker fermato durante la conversione, errori temporanei) e divide
+    per piano quelli in un solo file, uno per giro."""
     storage, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         make_derivatives(conn, storage, limit=4)
+        split_derivatives(conn, storage, limit=1)
 
 
 @app.periodic(cron="*/15 * * * *", periodic_id="deadlines")

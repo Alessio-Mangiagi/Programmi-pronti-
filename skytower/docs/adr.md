@@ -633,3 +633,15 @@ già avviati, dove il template di progetto (ADR-38) non si può più usare.
   - uno step che resterebbe senza assegnatari blocca l'import (422) con il motivo.
 - Stesso codice di un workflow già presente ⇒ nuova versione, come un salvataggio dal designer; si può dare un
   codice diverso per tenerli separati. Registro: `WORKFLOW_TEMPLATE_IMPORTED` con il workflow di partenza.
+
+## ADR-40 — Derivati IFC in un solo file divisi per piano
+
+**Contesto.** I derivati .glb fatti prima della divisione per piano (ADR-36, migrazione 0031) sono rimasti in un
+solo file: il viewer li apre, ma senza il caricamento un piano alla volta.
+
+**Decisione.**
+- Il job periodico dei derivati (ogni 5') rifà, **uno per giro**, i derivati `READY` con `parts` nullo
+  (`cde.derivatives_split_claim`, migrazione 0033, solo per `cde_worker`).
+- Durante la conversione e in caso di errore resta valido il derivato intero: lo stato non passa da `PENDING`
+  e `derivative_done` si chiama solo a conversione riuscita. I tentativi sono contati insieme a quelli della prima
+  conversione: a tre il file resta com'è.

@@ -20,7 +20,7 @@ from test_api_documents import as_user, des_name, upload  # noqa: F401 - fixture
 from cde_api import ifc2glb
 from cde_api.scanner import EicarScanner
 from cde_api.tooling import glb_model, ifc_complex
-from cde_api.worker import verify_file
+from cde_api.worker import split_derivatives, verify_file
 
 IFC = ifc_complex.build()
 
@@ -151,3 +151,40 @@ def test_ifc_non_valido_non_blocca(client, api_app, api_world, as_user):  # noqa
     assert row["status"] == "PENDING" and row["attempts"] == 1 and row["detail"]    # riprova il job periodico
     link = client.get(f"/revisions/{rev['id']}/download?disposition=inline", headers=h).json()
     assert link["url"] and link["derivative"]["status"] == "PENDING" and link["derivative"]["url"] is None
+
+
+def _derivative_row(conn, revision_id):
+    return conn.execute("SELECT d.* FROM cde.file_derivatives d JOIN cde.document_revisions r "
+                        "ON r.file_object_id = d.file_object_id WHERE r.id = %s", [revision_id]).fetchone()
+
+
+def test_derivati_interi_divisi_per_piano(client, api_app, api_world, as_user):  # noqa: F811
+    """ADR-40: i derivati in un solo file (prima della 0031) si rifanno divisi per piano; se la conversione non
+    riesce resta valido il derivato intero."""
+    urls, w = api_world
+    h = as_user("des_lead")
+    good = upload(client, h, w.containers["des_arch"], des_name(ext="ifc"), IFC, title="Modello intero").json()
+    bad = upload(client, h, w.containers["des_arch"], des_name(ext="ifc"), b"ISO-10303-21;\nnon un modello\n" * 100,
+                 title="Derivato intero, IFC rotto").json()
+    _verify(urls, api_app, min_bytes=1)
+    with psycopg.connect(urls.owner, row_factory=dict_row, autocommit=True) as conn:     # com'erano prima della 0031
+        conn.execute("UPDATE cde.file_derivatives d SET parts = NULL FROM cde.document_revisions r "
+                     "WHERE r.file_object_id = d.file_object_id AND r.id = %s", [good["id"]])
+        conn.execute("UPDATE cde.file_derivatives d SET status = 'READY', storage_key = 'vecchio.glb', parts = NULL, "
+                     "attempts = 1 FROM cde.document_revisions r WHERE r.file_object_id = d.file_object_id "
+                     "AND r.id = %s", [bad["id"]])
+    assert client.get(f"/revisions/{good['id']}/download?disposition=inline", headers=h).json()["derivative"]["parts"] is None
+
+    storage = api_app.state.services.storage
+    # un giro per tentativo; DB condiviso tra esecuzioni: altri derivati interi possono venire prima
+    with psycopg.connect(urls.worker, row_factory=dict_row) as worker, \
+         psycopg.connect(urls.owner, row_factory=dict_row, autocommit=True) as owner:
+        for _ in range(6):
+            split_derivatives(worker, storage, limit=20)
+            ok, ko = _derivative_row(owner, good["id"]), _derivative_row(owner, bad["id"])
+            if ok["parts"] and ko["attempts"] >= 3:
+                break
+    assert ok["status"] == "READY" and len(ok["parts"]) == 6 and ok["parts"][0]["name"] == "Piano interrato"
+    assert ko["status"] == "READY" and ko["storage_key"] == "vecchio.glb" and ko["parts"] is None and ko["attempts"] == 3
+    d = client.get(f"/revisions/{good['id']}/download?disposition=inline", headers=h).json()["derivative"]
+    assert [p["name"] for p in d["parts"]][-1] == "Copertura"
