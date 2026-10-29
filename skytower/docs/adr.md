@@ -615,3 +615,21 @@ per cartelle, filigrana, ruoli, workflow. Richiesta dell'utente: usare i progett
 - Mai copiati: documenti e revisioni, contatori e prenotazioni del naming, grant espliciti, RFI, transmittal,
   registro. Gli assegnatari "utente" dei workflow restano: se quella persona non è nel progetto nuovo, il
   workflow va rivisto.
+
+## ADR-39 — Import dei workflow da un altro progetto
+
+**Contesto.** I workflow si sviluppano e si collaudano in un progetto (anche uno di prova) e poi servono in altri
+già avviati, dove il template di progetto (ADR-38) non si può più usare.
+
+**Decisione.**
+- Scheda Workflow → "Importa da un altro progetto": `GET /projects/{id}/workflow-templates/importable` elenca i
+  workflow attivi dei progetti di cui si è **Project Admin**; `POST .../workflow-templates/import` serve il Project
+  Admin sia di partenza sia di destinazione.
+- Il workflow si **adatta** al progetto di destinazione e l'API restituisce l'elenco delle modifiche:
+  - persone non membri (assegnatari ed escalation) e ruoli limitati a organizzazioni che non partecipano si
+    tolgono: un compito darebbe accesso al documento a chi non è nel progetto;
+  - i ruoli personalizzati mancanti si creano uguali a quelli di partenza, con gli stessi permessi (si possono
+    disattivare con `copy_roles: false`, e allora si segnalano);
+  - uno step che resterebbe senza assegnatari blocca l'import (422) con il motivo.
+- Stesso codice di un workflow già presente ⇒ nuova versione, come un salvataggio dal designer; si può dare un
+  codice diverso per tenerli separati. Registro: `WORKFLOW_TEMPLATE_IMPORTED` con il workflow di partenza.

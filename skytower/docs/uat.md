@@ -58,6 +58,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U41 | `derivato.spec.ts`, `test_ifc_derivative.py` |
 | U42 | `onlyoffice.spec.ts`, `test_api_office.py` (Document Server finto: su staging si prova quello vero) |
 | U43 | `template.spec.ts`, `test_api_project_templates.py` |
+| U44 | `workflow-import.spec.ts`, `test_api_workflow_import.py` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -110,6 +111,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U41 | BIM Manager | Apre un modello IFC molto pesante (versione ottimizzata) | Il piano più basso compare dopo pochi secondi e si può già ruotare il modello; gli altri piani si aggiungono uno alla volta, con l'avanzamento in basso; alla fine albero, proprietà e misure come in U36 | |
 | U42 | Progettista + Information Manager | Il progettista apre una relazione Word in WIP, sceglie "Modifica con OnlyOffice", la corregge insieme all'Information Manager che apre la stessa revisione, poi entrambi chiudono | Le modifiche di entrambi si vedono in tempo reale; alla chiusura compare la revisione WIP successiva con la nota "Modificata in piattaforma (OnlyOffice)"; su una revisione condivisa o pubblicata il pulsante non c'è | |
 | U43 | Admin dell'organizzazione committente | "Nuovo progetto" → "Parti da" una commessa esistente, con le organizzazioni partecipanti | La nuova commessa ha le stesse cartelle, naming con il nuovo codice, schemi per cartelle, ruoli e workflow, le stesse organizzazioni; nessun documento; senza la spunta solo le cartelle della propria organizzazione | |
+| U44 | Project Admin | In un progetto di prova crea e collauda un workflow, poi in un progetto avviato lo importa con "Importa da un altro progetto" | Il workflow compare con gli stessi step; l'avviso elenca le persone tolte perché non partecipano e i ruoli creati; con un codice già presente diventa la nuova versione | |
 
 ## Verbale
 
