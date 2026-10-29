@@ -54,6 +54,7 @@ pypdf==6.21.3
 PyJWT==2.15.1
 pyOpenSSL==26.4.0
 PyOTP==2.10.0
+pypdfium2==5.14.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.4
 PyYAML==6.0.3

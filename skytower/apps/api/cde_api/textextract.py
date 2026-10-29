@@ -1,7 +1,7 @@
 # "><(((º> sabusabu <º)))><"
 """Estrazione del testo dai file caricati, per la ricerca nel contenuto (migrazione 0024).
 
-PDF con pypdf, Word ed Excel leggendo l'XML dell'archivio OOXML (defusedxml: niente entità esterne né bombe XML),
+PDF con pypdf (le pagine scansionate, senza testo, con l'OCR di ocr.py se configurato), Word ed Excel leggendo l'XML dell'archivio OOXML (defusedxml: niente entità esterne né bombe XML),
 testo semplice decodificato. Tetti su dimensione del file, pagine, voci dello ZIP e caratteri: un file ostile non
 deve bloccare il worker. Formati non gestiti o illeggibili → stringa vuota (indicizzata come "niente testo").
 """
@@ -14,6 +14,8 @@ import zipfile
 
 from defusedxml import ElementTree
 from pypdf import PdfReader
+
+from .ocr import OcrConfig, needs_ocr, read_pages
 
 log = logging.getLogger("cde.textextract")
 
@@ -31,7 +33,7 @@ def _clip(text: str) -> str:
     return re.sub(r"[ \t\r\f\v]+", " ", text).strip()[:MAX_CHARS]
 
 
-def _pdf(data: bytes) -> str:
+def _pdf(data: bytes, ocr: OcrConfig | None = None) -> str:
     reader = PdfReader(io.BytesIO(data))
     if reader.is_encrypted and not reader.decrypt(""):
         return ""
@@ -42,6 +44,13 @@ def _pdf(data: bytes) -> str:
         size += len(text)
         if size > MAX_CHARS:
             break
+    scanned = [i for i, text in enumerate(out) if needs_ocr(text)]
+    if ocr and scanned:
+        try:
+            for i, text in read_pages(data, scanned, ocr).items():
+                out[i] = text
+        except Exception as exc:          # noqa: BLE001 - l'OCR non deve far perdere il testo già estratto
+            log.warning("OCR non riuscito: %s", str(exc)[:200])
     return "\n".join(out)
 
 
@@ -66,13 +75,13 @@ def _xlsx(data: bytes) -> str:
     return "\n".join("".join(t.text or "" for t in si.iter(f"{_S}t")) for si in root.iter(f"{_S}si"))
 
 
-def extract(filename: str, data: bytes) -> str:
+def extract(filename: str, data: bytes, ocr: OcrConfig | None = None) -> str:
     name = filename.lower()
     if len(data) > MAX_FILE:
         return ""
     try:
         if name.endswith(".pdf"):
-            return _clip(_pdf(data))
+            return _clip(_pdf(data, ocr))
         if name.endswith(".docx"):
             return _clip(_docx(data))
         if name.endswith(".xlsx"):

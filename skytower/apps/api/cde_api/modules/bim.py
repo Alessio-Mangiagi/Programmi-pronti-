@@ -24,6 +24,11 @@ LEVEL_RE = re.compile(r"^[A-Z0-9]{2,3}$")
 MODEL_TYPES = ["M2", "M3", "MR"]          # altri modelli: il loro testo (STEP) ripete i nomi, non sono tavole
 
 
+def _ocr_variant(name: str) -> str:
+    """Il nome come lo scrive spesso l'OCR: lo zero dentro un codice (P0, B01) letto come la lettera O."""
+    return re.sub(r"\b([A-Z]+)(\d+)\b", lambda m: m.group(1) + m.group(2).replace("0", "O"), name)
+
+
 @router.get("/projects/{project_id}/model-element/documents")
 def element_documents(project_id: uuid.UUID,
                       name: str | None = Query(default=None, max_length=200, description="nome dell'elemento"),
@@ -32,6 +37,8 @@ def element_documents(project_id: uuid.UUID,
                       exclude: uuid.UUID | None = Query(default=None, description="il modello stesso"),
                       c: Ctx = Depends(ctx)):
     terms = [t.strip() for t in (name, guid) if t and t.strip()]
+    if name and _ocr_variant(name.strip()) != name.strip():
+        terms.append(_ocr_variant(name.strip()))      # tavole scansionate: l'OCR legge "P0" come "PO"
     level = level.upper() if level and LEVEL_RE.match(level.upper()) else None
     with c.tx() as conn:
         require_project(conn, project_id)

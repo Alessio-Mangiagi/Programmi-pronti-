@@ -25,6 +25,7 @@ import procrastinate
 import psycopg
 from psycopg.rows import dict_row
 
+from . import ocr as ocr_mod
 from . import textextract
 from .anchoring import publish_pending
 from .config import Settings, get_settings
@@ -69,7 +70,7 @@ class _Tap:
 
 
 def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UUID, *,
-                derivative_min_bytes: int | None = None) -> VerifyOutcome | None:
+                derivative_min_bytes: int | None = None, ocr: ocr_mod.OcrConfig | None = None) -> VerifyOutcome | None:
     """Idempotente: un file già verificato viene ignorato. Nessun lock tenuto durante la scansione.
     Con ``derivative_min_bytes`` un IFC verificato di almeno quella dimensione riceve subito il derivato .glb."""
     f = conn.execute(
@@ -112,7 +113,7 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
     log.info("file %s → %s (%s)", file_id, outcome.status, outcome.detail)
     if n and outcome.status == "CLEAN":
         try:
-            index_text(conn, storage, file_id)
+            index_text(conn, storage, file_id, ocr=ocr)
         except Exception:                   # noqa: BLE001 - la ricerca non deve mai far ripetere la verifica
             conn.rollback()
             log.exception("testo del file %s non indicizzato: ci riprova il job periodico", file_id)
@@ -156,7 +157,8 @@ def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2,
     return len(rows)
 
 
-def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None = None, limit: int = 20) -> int:
+def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None = None, limit: int = 20,
+               ocr: ocr_mod.OcrConfig | None = None) -> int:
     """Testo per la ricerca nel contenuto: un file appena verificato, oppure quelli ancora senza testo."""
     if file_id:
         rows = conn.execute("SELECT * FROM cde.text_extraction_file(%s)", [file_id]).fetchall()
@@ -169,7 +171,7 @@ def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None 
         body = ""
         if textextract.wants(r["filename"]) and r["size_bytes"] <= textextract.MAX_FILE:
             data = b"".join(storage.iter_object(r["storage_key"], r["storage_version_id"]))
-            body = textextract.extract(r["filename"], data)
+            body = textextract.extract(r["filename"], data, ocr)
         with conn.transaction():
             conn.execute("SELECT cde.store_revision_text(%s, %s)", [r["file_id"], body])
         done += 1
@@ -194,7 +196,8 @@ app = procrastinate.App(connector=procrastinate.PsycopgConnector(conninfo=get_se
 def verify_file_task(file_id: str) -> None:
     storage, scanner, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
-        verify_file(conn, storage, scanner, UUID(file_id), derivative_min_bytes=settings.ifc_derivative_min_bytes)
+        verify_file(conn, storage, scanner, UUID(file_id), derivative_min_bytes=settings.ifc_derivative_min_bytes,
+                    ocr=ocr_mod.config_from(settings))
 
 
 def run_worker() -> None:  # pragma: no cover - processo di lunga durata
@@ -241,7 +244,7 @@ def index_text_task(timestamp: int) -> None:
     """Recupera il testo dei file verificati che ne sono ancora senza (caricamenti precedenti, job persi)."""
     storage, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
-        n = index_text(conn, storage, limit=50)
+        n = index_text(conn, storage, limit=50, ocr=ocr_mod.config_from(settings))
     if n:
         log.info("testo indicizzato per %s file", n)
 

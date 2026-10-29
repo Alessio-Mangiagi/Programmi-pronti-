@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     # Filigrana: i PDF passano dall'API (non dall'URL firmato di S3), quindi c'è un tetto alla dimensione
     watermark_max_bytes: int = 200 * 1024 ** 2
     zip_max_bytes: int = 2 * 1024 ** 3      # download multiplo: oltre si scarica in più parti
+    # OCR delle pagine scansionate dei PDF (Tesseract): senza eseguibile si salta (ADR-33)
+    ocr_enabled: bool = True
+    tesseract_cmd: str | None = None      # None = cercato nel PATH (e nella cartella predefinita su Windows)
+    ocr_languages: str = "ita+eng"
+    ocr_max_pages: int = 30
     # IFC da questa dimensione in su: il worker prepara un derivato .glb per il viewer (G43, ADR-31)
     ifc_derivative_min_bytes: int = 100 * 1024 ** 2
     public_api_prefix: str = "/api"      # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
