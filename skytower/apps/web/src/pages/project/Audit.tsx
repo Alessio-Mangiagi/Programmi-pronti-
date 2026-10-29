@@ -32,7 +32,7 @@ const EVENT_LABEL: Record<string, string> = {
   NAMING_PROFILE_CREATED: "Schema di naming creato", NAMING_PROFILE_UPDATED: "Schema di naming modificato",
   NAMING_PROFILE_DELETED: "Schema di naming eliminato", NAMING_PROFILE_ASSIGNED: "Schema di naming applicato a cartelle",
   NAMING_RESERVATIONS_EXPIRED: "Prenotazioni scadute",
-  DOCUMENT_VIEWED: "Documento visualizzato", REVISION_DOWNLOADED: "Download", REVISION_UPLOADED: "Caricamento",
+  DOCUMENT_VIEWED: "Documento visualizzato", REVISION_DOWNLOADED: "Download", REVISION_UPLOADED: "Caricamento", OFFICE_EDIT_OPENED: "Aperto nell'editor OnlyOffice",
   REVISION_STATE_CHANGED: "Cambio di stato", BULK_STATE_CHANGE: "Cambio di stato multiplo", WORKFLOW_STARTED: "Workflow avviato",
   WORKFLOW_CANCELLED: "Workflow annullato", TASK_COMPLETED: "Esito di revisione", WORKFLOW_TEMPLATE_SAVED: "Template workflow",
   RFI_CREATED: "RFI aperta", RFI_ANSWERED: "RFI risposta", RFI_MESSAGE_POSTED: "RFI messaggio", RFI_CLOSED: "RFI chiusa",

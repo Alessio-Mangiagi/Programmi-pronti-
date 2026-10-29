@@ -83,6 +83,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
     queryFn: () => api<Markup[]>(`/revisions/${revisionId}/markups`),
     enabled: !!revisionId,
   });
+  const { data: officeConfig } = useQuery({         // OnlyOffice attivo in questa installazione (ADR-37)
+    queryKey: ["office-config"],
+    queryFn: () => api<{ enabled: boolean }>("/office/config"),
+    staleTime: 10 * 60_000,
+  });
   const download = useMutation({
     mutationFn: () => api<{ url: string }>(`/revisions/${revisionId}/download`),
     onSuccess: ({ url }) => { window.location.href = url; },
@@ -124,6 +129,9 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const canDraw = (isPdf && !browserPdf) || isImage || !!model;
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
+  // Word ed Excel nell'editor OnlyOffice: solo l'ultima revisione, in WIP; il salvataggio crea la WIP successiva
+  const canOffice = !!officeConfig?.enabled && (office === "docx" || office === "xlsx") && !!doc
+    && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId && doc.revisions[0]?.state === "WIP";
   const fill = (isPdf && !browserPdf) || !!model || !!office;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
@@ -208,6 +216,12 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
             </Tooltip>
           )}
           {canEdit && !editing && <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>Modifica</Button>}
+          {canOffice && (
+            <Button startIcon={<EditIcon />}
+                    onClick={() => window.open(`/documenti/${documentId}/modifica?rev=${revisionId}`, "_blank", "noopener")}>
+              Modifica con OnlyOffice
+            </Button>
+          )}
           {canDraw && (
             <ToggleButton size="small" value="draw" selected={drawing} color="primary" sx={{ color: "text.primary" }} onChange={() => setDrawing((d) => !d)}>
               <DrawIcon fontSize="small" sx={{ mr: 0.5 }} />Annota

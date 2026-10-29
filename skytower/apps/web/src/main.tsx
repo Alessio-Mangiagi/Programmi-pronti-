@@ -13,6 +13,7 @@ import { SecurityPage } from "./pages/Security";
 import { OrganizationPage } from "./pages/Organization";
 import { TasksPage } from "./pages/Tasks";
 import { DocumentPage } from "./pages/DocumentPage";
+import { OfficeEditorPage } from "./pages/OfficeEditorPage";
 import { Shell } from "./components/Shell";
 
 const theme = createTheme({
@@ -65,6 +66,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/organizzazione" element={<Protected><OrganizationPage /></Protected>} />
               <Route path="/compiti" element={<Protected><TasksPage /></Protected>} />
               <Route path="/documenti/:documentId" element={<Protected><DocumentPage /></Protected>} />
+              <Route path="/documenti/:documentId/modifica" element={<Protected><OfficeEditorPage /></Protected>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
