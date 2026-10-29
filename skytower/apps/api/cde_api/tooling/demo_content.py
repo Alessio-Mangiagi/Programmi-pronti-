@@ -13,8 +13,11 @@ import io
 import random
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from . import glb_model, ifc_complex
+
+_FIXED_DATE = datetime(2026, 10, 1, tzinfo=UTC)          # PDF demo deterministici
 
 DEMO_PASSWORD = "Cantiere-2026!"  # noqa: S105 - utenti demo
 
@@ -137,6 +140,36 @@ def report_pdf(seed: int, title: str, code: str, rev: str, chapters: list[str]) 
         for _ in range(rnd.randint(3, 6)):
             pdf.multi_cell(0, 5.5, LOREM * rnd.randint(1, 3))
             pdf.ln(2)
+    return bytes(pdf.output())
+
+
+def scanned_pdf(seed: int, title: str, lines: list[str]) -> bytes:
+    """PDF "scansionato": ogni pagina è solo un'immagine (testo dattiloscritto leggermente ruotato, grana di
+    scansione), senza testo estraibile. Serve a provare l'OCR della ricerca nel contenuto (ADR-33)."""
+    from fpdf import FPDF
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+    rnd = random.Random(seed)
+    w, h = 1240, 1754                                                   # A4 a 150 dpi
+    img = Image.new("L", (w, h), 250)
+    d = ImageDraw.Draw(img)
+    big, body = ImageFont.load_default(size=44), ImageFont.load_default(size=30)
+    d.text((110, 140), title, fill=20, font=big)
+    y = 260
+    for line in lines:
+        d.text((110, y), line, fill=rnd.randint(15, 45), font=body)
+        y += 58
+    for _ in range(1500):                                               # polvere del vetro dello scanner
+        x, yy = rnd.randrange(w), rnd.randrange(h)
+        d.point((x, yy), fill=rnd.randint(150, 210))
+    img = img.rotate(rnd.uniform(-0.8, 0.8), fillcolor=250, resample=Image.BICUBIC).filter(ImageFilter.GaussianBlur(0.6))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=80)
+    buf.seek(0)
+    pdf = FPDF(unit="mm", format="A4")
+    pdf.set_creation_date(_FIXED_DATE)
+    pdf.add_page()
+    pdf.image(buf, x=0, y=0, w=210, h=297)
     return bytes(pdf.output())
 
 
@@ -459,6 +492,13 @@ def populate(api: str, password: str = DEMO_PASSWORD) -> dict:
         "Modello di studio Padiglione C (Blender)", lambda c, r, v: glb_model.build(), "SHARED", "des_lead")
     add("ifc_campus", "des_lead", "Modelli BIM", "DES", "ZZ", "M3", "A", "ifc", ifc, "Modello campus 4 padiglioni",
         lambda c, r, v: ifc_complex.build(padiglioni=4), "SHARED", "des_admin")      # pesante: derivato .glb (ADR-31)
+    add("scan_sopr", "com_admin", "Verbali", "COM", "ZZ", "MI", "Z", "pdf", pdf, "Verbale di sopralluogo (scansione)",
+        lambda c, r, v: scanned_pdf(500, "Verbale di sopralluogo n. 3", [
+            f"Documento {c} - copia firmata e scansionata", "Presenti: Direzione Lavori, Impresa, Progettista",
+            "Si rileva una fessura sul Muro perimetrale sud P0 in prossimita del pilastro P0-03.",
+            "Il Solaio P1 risulta completato; getto di completamento previsto venerdi.",
+            "Prescrizione: ripristino della fessura entro quindici giorni.",
+            "Prossimo sopralluogo: martedi alle ore 9:30."]), "PUBLISHED", "com_admin")   # OCR (ADR-33)
 
     # annotazioni sulle tavole e sul modello
     if "pianta0" in docs:

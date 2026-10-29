@@ -52,6 +52,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U35 | `naming-cartelle.spec.ts`, `test_api_folder_naming.py` |
 | U36 | `derivato.spec.ts`, `test_ifc_derivative.py` |
 | U37 | `segui.spec.ts`, `profilo.spec.ts`, `test_api_follow_digest.py` |
+| U38 | `ocr.spec.ts`, `test_ocr.py` |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -98,6 +99,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U35 | Project Admin | Nella scheda Naming crea lo schema «Foto di cantiere» e lo applica alla cartella delle foto e alle sue sottocartelle dall'albero nel popup | Chi carica in quelle cartelle vede e usa il nuovo schema (anche nella rinomina automatica); le altre cartelle restano sullo schema della commessa; i documenti già caricati accettano nuove revisioni | |
 | U36 | BIM Manager | Carica un IFC pesante e lo apre | Dopo la verifica il modello si apre nella versione ottimizzata in pochi secondi, con piani, proprietà e misure; l'interruttore riapre l'IFC originale | |
 | U37 | Information Manager | Segue alcuni documenti e lascia attivo "Documenti che seguo: via email solo nel riepilogo del mattino" | Gli avvisi dei documenti seguiti compaiono subito nel pannello (con il tipo) ma per email arrivano solo nel riepilogo, diviso per sezioni; i compiti arrivano subito | |
+| U38 | Direttore dei lavori | Carica un verbale firmato e scansionato, poi cerca una parola del verbale con "anche nel testo dei file" | Il verbale si trova, con l'estratto evidenziato; se cita un elemento del modello compare in "Citato in" | |
 
 ## Verbale
 

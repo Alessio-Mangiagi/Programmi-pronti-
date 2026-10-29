@@ -498,3 +498,21 @@ molti documenti riceverebbe decine di email al giorno, confuse tra compiti e RFI
 - Il riepilogo è diviso per tipo (approvazioni e compiti, RFI, transmittal, documenti seguiti, richieste di
   accesso, altro), in italiano o inglese; il pannello notifiche mostra il tipo di ogni avviso e filtra per tipo.
 - La notifica in-app resta immediata per tutti: cambia solo il canale email.
+
+## ADR-33 — OCR dei PDF scansionati
+
+**Contesto.** La ricerca nel contenuto (ADR-26) e "Citato in" (ADR-28) leggono il testo dei PDF con pypdf: verbali
+firmati e tavole scansionate sono solo immagini e restavano invisibili alla ricerca.
+
+**Decisione.**
+- Nel worker, le pagine di un PDF con meno di 20 caratteri di testo si rendono in immagine (pypdfium2, 200 dpi,
+  scala di grigi) e si leggono con **Tesseract** (`ita+eng`) in un processo separato, con 60 secondi al massimo
+  per pagina e fino a 30 pagine per file (`ocr_max_pages`). Le pagine con testo non passano dall'OCR.
+- Tesseract è nell'immagine Docker (`tesseract-ocr`, `tesseract-ocr-ita`) e nella CI; in sviluppo si cerca nel
+  PATH o in `C:\Program Files\Tesseract-OCR`. Senza eseguibile l'OCR si salta e il resto funziona.
+- "Citato in" cerca anche il nome con lo zero dei codici letto come la lettera O ("P0" → "PO"), l'errore più
+  comune dell'OCR sulle legende.
+- Il testo letto finisce nello stesso indice (RLS invariata).
+
+**Limiti.** Vale per i nuovi caricamenti (e per i file ancora senza testo ripresi dal job periodico); i PDF già
+indicizzati con testo vuoto non si rileggono da soli. Scritture a mano e scansioni molto storte restano poco leggibili.
