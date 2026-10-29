@@ -39,6 +39,9 @@ if defined SUITE_DOMINIO (
 REM Istanza precedente appesa? Web 5195, API 8100, S3 emulato 9100.
 call "%~dp0..\shared\avvia\libera-porta.bat" 5195 8100 9100
 
+REM Modifica di Word/Excel/PowerPoint: Document Server OnlyOffice in Docker, se c'e'.
+call "%~dp0onlyoffice.bat"
+
 REM API in sviluppo locale: Postgres embedded (.devdata), S3 emulato, worker,
 REM dati demo al primo avvio. Stessa console: muore con questa finestra.
 REM SKYTOWER_RESET=1: database ricreato da zero (l'S3 emulato e' in memoria, i
