@@ -26,6 +26,7 @@ from .modules import (
     me,
     naming_profiles,
     notifications,
+    office,
     organizations,
     passkeys,
     projects,
@@ -109,7 +110,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
                    rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles, bim,
-                   naming_profiles):
+                   naming_profiles, office):
         app.include_router(module.router)
     app.include_router(passkeys.login_router)
     return app

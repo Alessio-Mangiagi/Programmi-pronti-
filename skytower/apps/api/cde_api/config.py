@@ -77,6 +77,12 @@ class Settings(BaseSettings):
     # IFC da questa dimensione in su: il worker prepara un derivato .glb per il viewer (G43, ADR-31)
     ifc_derivative_min_bytes: int = 100 * 1024 ** 2
     public_api_prefix: str = "/api"      # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
+    # Modifica di Word/Excel/PowerPoint con OnlyOffice Docs (ADR-37). Senza URL la funzione è spenta.
+    onlyoffice_url: str | None = None              # Document Server come lo raggiunge il browser
+    onlyoffice_internal_url: str | None = None     # come lo raggiunge l'API (file salvati); default onlyoffice_url
+    onlyoffice_jwt_secret: str | None = None       # segreto condiviso (services.CoAuthoring.secret)
+    onlyoffice_callback_url: str | None = None     # API come la raggiunge il Document Server; default web_base_url + prefisso
+    office_edit_max_bytes: int = 100 * 1024 ** 2
 
     # Registro attività: ancore giornaliere su S3 WORM e marca temporale RFC 3161 (TSA qualificata in produzione)
     audit_anchor_prefix: str = "audit-anchors"
