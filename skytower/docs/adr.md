@@ -596,3 +596,22 @@ non Collabora.
 **Limiti.** In questa macchina di sviluppo non c'è Docker: l'integrazione è provata con un Document Server finto
 (test API e e2e); la prova con quello vero va fatta su staging o installando Docker. PowerPoint si modifica ma
 non ha anteprima nel visualizzatore (il pulsante compare per Word ed Excel).
+
+## ADR-38 — Progetti esistenti come template per i nuovi
+
+**Contesto.** Ogni commessa nuova ripeteva a mano la stessa impostazione: albero delle cartelle, naming, schemi
+per cartelle, filigrana, ruoli, workflow. Richiesta dell'utente: usare i progetti esistenti come template.
+
+**Decisione.**
+- Nel dialog "Nuovo progetto" si sceglie "Parti da": un progetto di cui si è **Project Admin** (`GET
+  /projects/templates`, con il numero di cartelle, schemi e workflow). Serve comunque essere admin della propria
+  organizzazione, come per un progetto vuoto.
+- `cde.create_project_from_template` (migrazione 0032, SECURITY DEFINER, una sola transazione) copia: impostazioni,
+  naming (il campo fisso `project` prende il codice nuovo, anche negli schemi per cartelle), metadati, rinomina
+  automatica, filigrana, schemi per cartelle con ereditarietà e assegnazioni, albero delle cartelle con aree
+  riservate, ruoli personalizzati con i permessi, ultima versione di ogni workflow attivo (che riparte da 1).
+- A scelta: **organizzazioni partecipanti** con le loro cartelle (senza, solo i rami della propria organizzazione)
+  e, solo insieme a queste, **persone con i ruoli** (utenti attivi, membership non scadute).
+- Mai copiati: documenti e revisioni, contatori e prenotazioni del naming, grant espliciti, RFI, transmittal,
+  registro. Gli assegnatari "utente" dei workflow restano: se quella persona non è nel progetto nuovo, il
+  workflow va rivisto.
