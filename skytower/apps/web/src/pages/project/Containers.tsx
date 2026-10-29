@@ -141,7 +141,11 @@ export function NewContainerDialog({ project, parent, onClose }: { project: Proj
     mutationFn: () => api(`/projects/${project.id}/containers`, {
       method: "POST", json: { name, parent_id: parent?.id ?? null, inherit_permissions: inherit },
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["containers", project.id] }); onClose(); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["containers", project.id] });
+      qc.invalidateQueries({ queryKey: ["naming-profiles", project.id] });   // può aver ereditato uno schema
+      onClose();
+    },
   });
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="xs">

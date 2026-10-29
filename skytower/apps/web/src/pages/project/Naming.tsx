@@ -58,6 +58,8 @@ export interface NamingProfile {
   auto_number: AutoNumbering | null;
   example: string;
   container_ids: string[];
+  /** passa da solo alle sottocartelle create dopo nelle sue cartelle */
+  inherit: boolean;
 }
 
 export interface FolderNaming {
@@ -213,6 +215,11 @@ function ProfileHeader({ project, profile, canManage, onApply, onRenamed, onDele
       method: "PUT", json: { name, naming_scheme: profile.naming_scheme, auto_number: profile.auto_number } }),
     onSuccess: onRenamed,
   });
+  const inherit = useMutation({
+    mutationFn: (value: boolean) => api(`/naming-profiles/${profile.id}`, {
+      method: "PUT", json: { name: profile.name, naming_scheme: profile.naming_scheme, auto_number: profile.auto_number, inherit: value } }),
+    onSuccess: onRenamed,
+  });
   return (
     <Stack spacing={1} mt={1.5}>
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -224,7 +231,12 @@ function ProfileHeader({ project, profile, canManage, onApply, onRenamed, onDele
         {canManage && <Button variant="contained" startIcon={<FolderIcon />} onClick={onApply}>Applica a cartelle…</Button>}
         {canManage && <Button color="error" startIcon={<DeleteIcon />} onClick={onDelete}>Elimina schema</Button>}
       </Stack>
+      <FormControlLabel
+        control={<Switch checked={profile.inherit} disabled={!canManage || inherit.isPending}
+                         onChange={(e) => inherit.mutate(e.target.checked)} />}
+        label="Vale anche per le sottocartelle create dopo in queste cartelle" />
       {rename.error && <Alert severity="error">{(rename.error as ApiError).message}</Alert>}
+      {inherit.error && <Alert severity="error">{(inherit.error as ApiError).message}</Alert>}
       <Typography variant="body2" color="text.secondary">
         {names.length ? <>Applicato a: {names.map((n) => <Chip key={n} size="small" icon={<FolderIcon />} label={n} sx={{ mr: 0.5, mb: 0.5 }} />)}</>
           : "Non ancora applicato a nessuna cartella."}
