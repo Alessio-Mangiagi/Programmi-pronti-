@@ -40,6 +40,8 @@ jobs:
           cache: pip
           cache-dependency-path: skytower/apps/api/requirements.lock
       - run: pip install -r requirements.lock -e ../../packages/iso19650[dev] -e ".[dev]" pip-audit
+      - name: Tesseract per l'OCR dei PDF scansionati (ADR-33)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ita
       - run: ruff check cde_api tests ../../packages/iso19650 --select E,F,W,B,S,UP,I --ignore S101,S311,E501,B008,S608
       - name: Motore naming ISO 19650 (copertura 100%)
         run: pytest -p no:cacheprovider ../../packages/iso19650 --cov=iso19650 --cov-fail-under=100

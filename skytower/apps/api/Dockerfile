@@ -24,7 +24,10 @@ ENV PATH=/opt/venv/bin:$PATH \
     PGSSLROOTCERT=/etc/ssl/rds-global-bundle.pem
 # CA di RDS: i DSN usano sslmode=verify-full (certificato e nome host verificati)
 ADD --chmod=444 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/rds-global-bundle.pem
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+# Tesseract (italiano): OCR delle pagine scansionate dei PDF per la ricerca nel contenuto (ADR-33)
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ita \
+    && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin cde
 COPY --from=build /opt/venv /opt/venv
 COPY --from=build /app /app
