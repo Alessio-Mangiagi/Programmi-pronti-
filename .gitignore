@@ -12,6 +12,9 @@ venv/
 __pycache__/
 *.py[cod]
 
+# Dati locali delle app (Postgres embedded, S3 emulato, chiavi di sviluppo)
+.devdata/
+
 # OS
 Thumbs.db
 desktop.ini

@@ -7,6 +7,9 @@ __pycache__/
 .ruff_cache/
 .coverage
 
+# Build incrementale di TypeScript: cambia a ogni compilazione
+*.tsbuildinfo
+
 # Node
 node_modules/
 dist/
