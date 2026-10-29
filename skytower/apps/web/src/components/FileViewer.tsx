@@ -27,6 +27,7 @@ import { MarkupLayer } from "./markup/MarkupLayer";
 import { MarkupPanel } from "./markup/MarkupPanel";
 import { uploadFile } from "../upload";
 import { openDocument } from "../openDocument";
+import type { ModelPart } from "./markup/model3d";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
 const ModelView = lazy(() => import("./markup/ModelView"));
@@ -38,7 +39,11 @@ const OFFICE_PREVIEW_MAX = 25 * 1024 * 1024;
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string; size_bytes: number }
 interface Doc { id: string; project_id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
-interface Derivative { status: "READY" | "PENDING" | "FAILED"; url: string | null; size_bytes: number | null }
+/** derivato .glb di un IFC pesante: con `parts` diviso per piano (indice in `url`, piani dal più basso) */
+interface Derivative {
+  status: "READY" | "PENDING" | "FAILED"; url: string | null; size_bytes: number | null;
+  parts?: ModelPart[] | null;
+}
 interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean; derivative?: Derivative | null }
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
@@ -257,7 +262,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
             </Suspense>
           ) : model ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <ModelView key={optimized ? "glb" : "ifc"} url={optimized ? derivative!.url! : link.url} format={optimized ? "glb" : model} projectId={doc?.project_id ?? ""} documentId={documentId}
+              <ModelView key={optimized ? "glb" : "ifc"} url={optimized ? derivative!.url! : link.url} format={optimized ? "glb" : model}
+                       parts={optimized ? derivative!.parts ?? undefined : undefined} projectId={doc?.project_id ?? ""} documentId={documentId}
                        onOpenDocument={(id, search) => openDocument(id, { search })} markups={markups} selectedRef={selectedRef} drawing={drawing} onSelectMarkup={setSelectedId}
                        onPick={(e) => { setDraft({ element_ref: e.ref, label: e.label }); setDrawing(false); setPanel(true); }} />
             </Suspense>

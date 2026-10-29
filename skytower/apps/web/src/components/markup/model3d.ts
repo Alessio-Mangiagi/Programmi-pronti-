@@ -17,9 +17,16 @@ export interface ElementProps {
 
 export type AddMesh = (id: number, geometry: THREE.BufferGeometry, material: THREE.Material, matrix: THREE.Matrix4) => void;
 
+/** Piano di un derivato IFC diviso per piano (ADR-36): un .glb da caricare dopo l'indice. */
+export interface ModelPart { name: string; url: string; elements: number; size_bytes: number }
+
+/** Avanzamento del caricamento a piani: un piano è appena entrato nella scena. */
+export type OnPart = (done: number, total: number, name: string) => void;
+
 export interface ModelSource {
-  /** legge il file e consegna le mesh già posizionate (coordinate della scena: Y in alto, metri) */
-  load(data: Uint8Array, onProgress: (p: number) => void, add: AddMesh): Promise<void>;
+  /** legge il file e consegna le mesh già posizionate (coordinate della scena: Y in alto, metri); con i piani
+   *  `data` è l'indice e `onPart` segnala ogni piano aggiunto, mentre gli altri arrivano */
+  load(data: Uint8Array, onProgress: (p: number) => void, add: AddMesh, onPart?: OnPart): Promise<void>;
   refOf(id: number): string | undefined;
   nameOf(id: number): string;
   elevationOf(id: number): number;

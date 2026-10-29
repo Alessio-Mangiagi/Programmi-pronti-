@@ -19,7 +19,7 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { api, type Markup } from "../../api";
-import { STOREY_TYPES, type ElementProps, type ModelSource, type SpatialNode } from "./model3d";
+import { STOREY_TYPES, type ElementProps, type ModelPart, type ModelSource, type OnPart, type SpatialNode } from "./model3d";
 
 export interface PickedElement { ref: string; label: string }
 export type ModelFormat = "ifc" | "glb" | "gltf";
@@ -39,14 +39,16 @@ const OFF = 1e9;
 // oltre questa soglia di triangoli per geometria (modelli Blender molto dettagliati) niente spigoli: costano troppo
 const EDGES_MAX_TRIANGLES = 100_000;
 
-async function sourceFor(format: ModelFormat): Promise<ModelSource> {
+async function sourceFor(format: ModelFormat, parts: ModelPart[]): Promise<ModelSource> {
   if (format === "ifc") return new (await import("./ifcSource")).IfcSource();
-  return new (await import("./gltfSource")).GltfSource(format === "gltf");
+  return new (await import("./gltfSource")).GltfSource(format === "gltf", parts);
 }
 
 export interface ModelViewProps {
   url: string;
   format: ModelFormat;
+  /** derivato IFC diviso per piano: `url` è l'indice, i piani si aggiungono alla scena man mano che arrivano */
+  parts?: ModelPart[];
   projectId: string;
   documentId: string;
   /** apre un altro documento (in una nuova scheda), con il testo da evidenziare */
@@ -58,10 +60,13 @@ export interface ModelViewProps {
   onSelectMarkup: (id: string) => void;
 }
 
-export default function ModelView({ url, format, projectId, documentId, onOpenDocument, markups, selectedRef, drawing, onPick, onSelectMarkup }: ModelViewProps) {
+export default function ModelView({ url, format, parts, projectId, documentId, onOpenDocument, markups, selectedRef, drawing, onPick, onSelectMarkup }: ModelViewProps) {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
   const [progress, setProgress] = useState<number | null>(0);
+  const [loaded, setLoaded] = useState<{ done: number; total: number; name: string } | null>(null);   // piani arrivati
+  const partsRef = useRef(parts ?? []);
+  partsRef.current = parts ?? [];
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<SpatialNode | null>(null);
   const [selected, setSelected] = useState<{ id: number; props: ElementProps | null } | null>(null);
@@ -102,9 +107,10 @@ export default function ModelView({ url, format, projectId, documentId, onOpenDo
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = new Uint8Array(await res.arrayBuffer());
-        const source = await sourceFor(format);
+        const source = await sourceFor(format, partsRef.current);
         if (!alive) return;
-        await e.load(source, data, (p) => alive && setProgress(p));
+        await e.load(source, data, (p) => alive && setProgress(p),
+                     (done, total, name) => alive && setLoaded({ done, total, name }));
         if (!alive) return;
         setBounds(e.ranges());
         const spatial = await e.spatial();
@@ -149,12 +155,19 @@ export default function ModelView({ url, format, projectId, documentId, onOpenDo
   return (
     <Box display="flex" flexGrow={1} minHeight={0} width="100%" position="relative">
       <Box ref={host} flexGrow={1} minWidth={0} sx={{ cursor: drawing ? "crosshair" : "grab", "& canvas": { display: "block" } }} />
-      {progress !== null && !error && (
+      {progress !== null && !error && !loaded && (
         <Stack position="absolute" top="45%" left={0} right={0} alignItems="center" spacing={1}>
           <CircularProgress sx={{ color: "#fff" }} />
           <Typography color="#fff" variant="body2">Lettura del modello… {Math.round(progress * 100)}%</Typography>
           <LinearProgress variant="determinate" value={progress * 100} sx={{ width: 240 }} />
         </Stack>
+      )}
+      {/* derivato a piani: il modello è già visibile e orbitabile mentre arrivano gli altri piani */}
+      {progress !== null && !error && loaded && (
+        <Paper elevation={3} role="status" sx={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", px: 2, py: 1, width: 320 }}>
+          <Typography variant="body2">Piani caricati: {loaded.done} di {loaded.total} (ultimo: {loaded.name})</Typography>
+          <LinearProgress variant="determinate" value={progress * 100} sx={{ mt: 0.5 }} />
+        </Paper>
       )}
       {error && <Alert severity="error" sx={{ position: "absolute", top: 16, left: 16, maxWidth: "calc(100% - 32px)" }}>Modello non leggibile: {error}</Alert>}
       {progress === null && (
@@ -457,15 +470,21 @@ class Engine {
     loop();
   }
 
-  async load(source: ModelSource, data: Uint8Array, onProgress: (p: number) => void) {
+  async load(source: ModelSource, data: Uint8Array, onProgress: (p: number) => void, onPart?: OnPart) {
     this.source = source;
-    await source.load(data, onProgress, (id, geometry, material, matrix) => this.add(id, geometry, material, matrix));
+    let framed = false;
+    await source.load(data, onProgress, (id, geometry, material, matrix) => this.add(id, geometry, material, matrix),
+                      (done, total, name) => {
+                        // primo piano subito in vista; poi la camera resta dove l'ha portata l'utente
+                        if (!framed) { this.root.updateMatrixWorld(true); this.frameAll(); framed = true; }
+                        onPart?.(done, total, name);
+                      });
     for (const id of this.meshes.keys()) {
       const ref = source.refOf(id);
       if (ref) this.guids.set(ref, id);
     }
     this.root.updateMatrixWorld(true);
-    this.frameAll();
+    if (!framed) this.frameAll();
   }
 
   /** Una mesh dell'elemento `id`, già nella posizione finale, con gli spigoli in evidenza. */

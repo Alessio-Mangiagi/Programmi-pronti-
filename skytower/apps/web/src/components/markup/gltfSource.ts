@@ -8,9 +8,12 @@
 // Il derivato di un IFC pesante prodotto dal worker (ifc2glb.py) porta in `extras` GlobalId, tipo IFC, quota dei
 // piani e Pset: albero, annotazioni e tavole collegate si comportano come sull'IFC originale. La geometria di un
 // elemento sta in un nodo figlio "part" (matrice di posizionamento): appartiene all'elemento, non è un nodo a sé.
+// Derivato diviso per piano (ADR-36): il file principale è l'indice (albero e Pset, nessuna mesh) e i piani arrivano
+// uno alla volta in .glb separati, dal più basso; i loro nodi "part" dicono in `extras.owner` di quale elemento
+// dell'indice sono. Il piano successivo si scarica mentre si legge quello corrente.
 import * as THREE from "three";
 import { GLTFLoader, type GLTF, type GLTFLoaderPlugin, type GLTFParser } from "three/examples/jsm/loaders/GLTFLoader.js";
-import type { AddMesh, ElementProps, ModelSource, SpatialNode } from "./model3d";
+import type { AddMesh, ElementProps, ModelPart, ModelSource, OnPart, SpatialNode } from "./model3d";
 
 interface NodeDef { name?: string; mesh?: number; children?: number[]; extras?: Record<string, unknown> }
 
@@ -23,7 +26,7 @@ function ifcOf(n: NodeDef | undefined): { guid: string; type: string } | null {
 }
 interface GltfJson {
   scene?: number;
-  scenes?: { name?: string; nodes?: number[] }[];
+  scenes?: { name?: string; nodes?: number[]; extras?: { parts?: unknown[] } }[];
   nodes?: NodeDef[];
   meshes?: { name?: string; primitives: { material?: number }[] }[];
   materials?: { name?: string }[];
@@ -45,39 +48,92 @@ export class GltfSource implements ModelSource {
   private refs = new Map<number, string>();
   private boxes = new Map<number, THREE.Box3>();
   private triangles = new Map<number, number>();
-  private scene: THREE.Object3D | null = null;
+  private scenes: THREE.Object3D[] = [];
+  private materialNames = new Map<number, Set<string>>();
 
-  constructor(private textual: boolean) {}
+  constructor(private textual: boolean, private parts: ModelPart[] = []) {}
 
-  async load(data: Uint8Array, onProgress: (p: number) => void, add: AddMesh) {
+  async load(data: Uint8Array, onProgress: (p: number) => void, add: AddMesh, onPart?: OnPart) {
     const glb = this.textual ? textToGlb(data) : data;
-    checkExtensions(glbJson(glb));
-    const loader = new GLTFLoader();
-    loader.register((parser: GLTFParser) => {
-      (parser as unknown as { textureLoader: THREE.Loader }).textureLoader = new THREE.TextureLoader(parser.options.manager);
-      return { name: "cde_texture_img" } as GLTFLoaderPlugin;   // nessuna estensione: serve solo a cambiare il loader
-    });
-    const buffer = glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength) as ArrayBuffer;
-    const gltf: GLTF = await loader.parseAsync(buffer, "");
-    this.json = gltf.parser.json as GltfJson;
-    this.scene = gltf.scene;
-    gltf.scene.updateMatrixWorld(true);
-    const assoc = gltf.parser.associations;
-    const nodesOf = (o: THREE.Object3D) => {      // il nodo dell'oggetto e i suoi antenati, dal più vicino
-      const out: number[] = [];
-      for (let x: THREE.Object3D | null = o; x; x = x.parent) {
-        const n = assoc.get(x)?.nodes;
-        if (n !== undefined && !isPart(this.json.nodes?.[n])) out.push(n);
-      }
+    const json = glbJson(glb);
+    checkExtensions(json);
+    if (this.parts.length && Array.isArray(json.scenes?.[json.scene ?? 0]?.extras?.parts)) {
+      this.json = json;
+      await this.loadParts(onProgress, add, onPart);
+    } else {
+      const gltf = await parse(glb);
+      this.json = gltf.parser.json as GltfJson;
+      const assoc = gltf.parser.associations;
+      this.ingest(gltf, (o) => {                 // il nodo dell'oggetto e i suoi antenati, dal più vicino
+        const out: number[] = [];
+        for (let x: THREE.Object3D | null = o; x; x = x.parent) {
+          const n = assoc.get(x)?.nodes;
+          if (n !== undefined && !isPart(this.json.nodes?.[n])) out.push(n);
+        }
+        return out;
+      }, add, onProgress);
+    }
+    // chiave per le annotazioni: il nome dell'oggetto (in Blender è unico); se manca o si ripete, anche l'indice
+    const nodes = this.json.nodes ?? [];
+    const seen = new Map<string, number>();
+    for (const n of nodes) if (n.name) seen.set(n.name, (seen.get(n.name) ?? 0) + 1);
+    for (const id of this.triangles.keys()) {
+      const name = nodes[id]?.name ?? "";
+      const guid = ifcOf(nodes[id])?.guid;
+      if (guid) { this.refs.set(id, guid); continue; }                 // derivato IFC: le annotazioni restano sul GUID
+      this.refs.set(id, name && seen.get(name) === 1 ? name.slice(0, 120) : `${name.slice(0, 100) || "nodo"}#${id}`);
+    }
+  }
+
+  /** Piani del derivato, uno dopo l'altro: ogni mesh va all'elemento dell'indice indicato dal suo nodo "part". */
+  private async loadParts(onProgress: (p: number) => void, add: AddMesh, onPart?: OnPart) {
+    const parents = new Map<number, number>();
+    (this.json.nodes ?? []).forEach((n, i) => n.children?.forEach((c) => parents.set(c, i)));
+    const chainOf = (id: number) => {
+      const out = [id];
+      for (let p = parents.get(id); p !== undefined && out.length < 64; p = parents.get(p)) out.push(p);
       return out;
     };
+    const download = (part: ModelPart) => {
+      const pending = fetch(part.url).then(async (res) => {
+        if (!res.ok) throw new Error(`piano «${part.name}» non scaricato (HTTP ${res.status})`);
+        return new Uint8Array(await res.arrayBuffer());
+      });
+      pending.catch(() => undefined);           // l'errore emerge quando il piano si legge
+      return pending;
+    };
+    const total = this.parts.length;
+    let next: Promise<Uint8Array> | null = download(this.parts[0]);
+    for (let k = 0; k < total; k++) {
+      const data: Uint8Array = await next!;
+      next = k + 1 < total ? download(this.parts[k + 1]) : null;
+      const gltf = await parse(data);
+      const json = gltf.parser.json as GltfJson;
+      const assoc = gltf.parser.associations;
+      this.ingest(gltf, (o) => {
+        for (let x: THREE.Object3D | null = o; x; x = x.parent) {
+          const n = assoc.get(x)?.nodes;
+          const owner = n !== undefined ? json.nodes?.[n]?.extras?.owner : undefined;
+          if (typeof owner === "number") return chainOf(owner);
+        }
+        return [];
+      }, add, (p) => onProgress((k + p) / total));
+      onPart?.(k + 1, total, this.parts[k].name);
+    }
+  }
+
+  /** Mesh di una scena glTF verso il motore; `chainOf` dà l'elemento e i suoi antenati (per i riquadri dei piani). */
+  private ingest(gltf: GLTF, chainOf: (o: THREE.Object3D) => number[], add: AddMesh, onProgress: (p: number) => void) {
+    this.scenes.push(gltf.scene);
+    gltf.scene.updateMatrixWorld(true);
     const meshes: THREE.Mesh[] = [];
     gltf.scene.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
     meshes.forEach((m, i) => {
-      const chain = nodesOf(m);
+      const chain = chainOf(m);
       if (!chain.length) return;
       const id = chain[0];
       const material = Array.isArray(m.material) ? m.material[0] : m.material;
+      if (material.name) this.materialNames.set(id, (this.materialNames.get(id) ?? new Set()).add(material.name));
       const matrices = m instanceof THREE.InstancedMesh
         ? Array.from({ length: m.count }, (_, k) => { const t = new THREE.Matrix4(); m.getMatrixAt(k, t); return m.matrixWorld.clone().multiply(t); })
         : [m.matrixWorld.clone()];
@@ -91,16 +147,6 @@ export class GltfSource implements ModelSource {
       this.triangles.set(id, (this.triangles.get(id) ?? 0) + tris * matrices.length);
       if (i % 50 === 0 || i === meshes.length - 1) onProgress((i + 1) / meshes.length);
     });
-    // chiave per le annotazioni: il nome dell'oggetto (in Blender è unico); se manca o si ripete, anche l'indice
-    const nodes = this.json.nodes ?? [];
-    const seen = new Map<string, number>();
-    for (const n of nodes) if (n.name) seen.set(n.name, (seen.get(n.name) ?? 0) + 1);
-    for (const id of this.triangles.keys()) {
-      const name = nodes[id]?.name ?? "";
-      const guid = ifcOf(nodes[id])?.guid;
-      if (guid) { this.refs.set(id, guid); continue; }                 // derivato IFC: le annotazioni restano sul GUID
-      this.refs.set(id, name && seen.get(name) === 1 ? name.slice(0, 120) : `${name.slice(0, 100) || "nodo"}#${id}`);
-    }
   }
 
   refOf(id: number) { return this.refs.get(id); }
@@ -123,8 +169,10 @@ export class GltfSource implements ModelSource {
     const owner = node.mesh !== undefined ? node
       : (node.children ?? []).map((c) => this.json.nodes?.[c]).find((c) => isPart(c) && c?.mesh !== undefined);
     const mesh = owner?.mesh !== undefined ? this.json.meshes?.[owner.mesh] : undefined;
-    const materials = [...new Set((mesh?.primitives ?? []).map((p) => (p.material !== undefined ? this.json.materials?.[p.material]?.name : undefined))
-      .filter((n): n is string => !!n))];
+    const materials = mesh
+      ? [...new Set(mesh.primitives.map((p) => (p.material !== undefined ? this.json.materials?.[p.material]?.name : undefined))
+        .filter((n): n is string => !!n))]
+      : [...(this.materialNames.get(id) ?? [])];                         // derivato a piani: la mesh sta nel piano
     const ifc = ifcOf(node);
     const text = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
     const extras = Object.entries(node.extras ?? {}).filter(([k]) => !ifc || !["GlobalId", "type", "Psets"].includes(k))
@@ -160,7 +208,7 @@ export class GltfSource implements ModelSource {
   }
 
   dispose() {
-    this.scene?.traverse((o) => {
+    for (const scene of this.scenes) scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
@@ -169,6 +217,15 @@ export class GltfSource implements ModelSource {
       }
     });
   }
+}
+
+async function parse(glb: Uint8Array): Promise<GLTF> {
+  const loader = new GLTFLoader();
+  loader.register((parser: GLTFParser) => {
+    (parser as unknown as { textureLoader: THREE.Loader }).textureLoader = new THREE.TextureLoader(parser.options.manager);
+    return { name: "cde_texture_img" } as GLTFLoaderPlugin;   // nessuna estensione: serve solo a cambiare il loader
+  });
+  return loader.parseAsync(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength) as ArrayBuffer, "");
 }
 
 function checkExtensions(json: GltfJson) {
