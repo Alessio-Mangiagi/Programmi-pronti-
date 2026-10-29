@@ -896,17 +896,24 @@ def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment",
 
 
 def _derivative(c: Ctx, rev: dict, ttl: int) -> dict | None:
-    """Derivato .glb di un IFC pesante (ADR-31): pronto, in preparazione o non riuscito."""
+    """Derivato .glb di un IFC pesante (ADR-31): pronto, in preparazione o non riuscito. Diviso per piano (ADR-36):
+    ``url`` è l'indice e ``parts`` i piani, in ordine di quota, da caricare uno dopo l'altro."""
     with c.tx() as conn:
-        d = conn.execute("SELECT status, storage_key, storage_version_id, size_bytes FROM cde.file_derivatives "
+        d = conn.execute("SELECT status, storage_key, storage_version_id, size_bytes, parts FROM cde.file_derivatives "
                          "WHERE file_object_id = %s AND kind = 'GLB'", [rev["file_id"]]).fetchone()
     if d is None:
         return None
     if d["status"] != "READY":
-        return {"status": d["status"], "url": None, "size_bytes": None}
-    url = _storage(c).presign_get(d["storage_key"], d["storage_version_id"], f"{rev['identifier']}.glb", ttl,
-                                  inline_type="model/gltf-binary")
-    return {"status": "READY", "url": url, "size_bytes": d["size_bytes"]}
+        return {"status": d["status"], "url": None, "size_bytes": None, "parts": None}
+    storage = _storage(c)
+    url = storage.presign_get(d["storage_key"], d["storage_version_id"], f"{rev['identifier']}.glb", ttl,
+                              inline_type="model/gltf-binary")
+    parts = [{"name": p["name"], "elements": p["elements"], "size_bytes": p["size_bytes"],
+              # si scaricano in sequenza: su un modello enorme l'ultimo piano parte dopo qualche minuto
+              "url": storage.presign_get(p["key"], p["version"], f"{rev['identifier']}-{k}.glb", max(ttl, 900),
+                                         inline_type="model/gltf-binary")}
+             for k, p in enumerate(d["parts"])] if d["parts"] is not None else None
+    return {"status": "READY", "url": url, "size_bytes": d["size_bytes"], "parts": parts}
 
 
 @router.get("/revisions/{revision_id}/watermarked")

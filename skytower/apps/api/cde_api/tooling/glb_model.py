@@ -164,5 +164,7 @@ def parse(data: bytes) -> tuple[dict, bytes]:
         raise ValueError("manca il blocco JSON")
     doc = json.loads(data[20:20 + n])
     rest = 20 + n
+    if rest + 8 > len(data):                       # senza blocco binario (es. l'indice di un derivato a piani)
+        return doc, b""
     bn, bkind = struct.unpack_from("<I4s", data, rest)
     return doc, data[rest + 8:rest + 8 + bn] if bkind == b"BIN\x00" else b""

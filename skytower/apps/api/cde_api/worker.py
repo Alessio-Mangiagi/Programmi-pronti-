@@ -24,6 +24,7 @@ import filetype
 import procrastinate
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from . import ocr as ocr_mod
 from . import textextract
@@ -134,19 +135,26 @@ def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2,
     with conn.transaction():
         rows = conn.execute("SELECT * FROM cde.derivatives_claim(%s, %s::interval)", [limit, stale]).fetchall()
     for r in rows:
-        key = f"projects/{r['project_id']}/derivatives/{r['file_id']}.glb"
+        base = f"projects/{r['project_id']}/derivatives/{r['file_id']}"
+        key = f"{base}.glb"
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 src, dst = Path(tmp) / "modello.ifc", Path(tmp) / "modello.glb"
                 with src.open("wb") as out:
                     for chunk in storage.iter_object(r["storage_key"], r["storage_version_id"]):
                         out.write(chunk)
-                result = ifc2glb.convert(src, dst)
+                result = ifc2glb.convert(src, dst, parts_dir=Path(tmp) / "piani")    # indice + un .glb per piano
+                parts = []
+                for k, part in enumerate(result.parts):
+                    part_key = f"{base}/{k}.glb"
+                    parts.append({"name": part.name, "key": part_key, "size_bytes": part.size_bytes,
+                                  "elements": part.elements,
+                                  "version": storage.put_file(part_key, str(part.path), "model/gltf-binary")})
                 version = storage.put_file(key, str(dst), "model/gltf-binary")
-            detail = f"{result.elements} elementi, {result.triangles} triangoli"
+            detail = f"{result.elements} elementi, {result.triangles} triangoli, {len(parts)} piani"
             with conn.transaction():
-                conn.execute("SELECT cde.derivative_done(%s, true, %s, %s, %s, %s)",
-                             [r["file_id"], key, version, result.size_bytes, detail])
+                conn.execute("SELECT cde.derivative_done(%s, true, %s, %s, %s, %s, %s)",
+                             [r["file_id"], key, version, result.size_bytes, detail, Jsonb(parts)])
             log.info("derivato .glb del file %s: %s, %s byte", r["file_id"], detail, result.size_bytes)
         except Exception as exc:  # noqa: BLE001 - IFC malformati o non supportati: il viewer usa l'originale
             conn.rollback()
