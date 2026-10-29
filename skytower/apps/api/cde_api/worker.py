@@ -166,16 +166,37 @@ def index_text(conn: psycopg.Connection, storage: Storage, file_id: UUID | None 
         conn.execute("SELECT cde.text_copy_siblings()")       # revisioni condivise/pubblicate: stesso file
         rows = conn.execute("SELECT * FROM cde.text_extraction_pending(%s)", [limit]).fetchall()
     conn.commit()
+    return _store_text(conn, storage, rows, ocr)
+
+
+def reocr_text(conn: psycopg.Connection, storage: Storage, limit: int = 10,
+               ocr: ocr_mod.OcrConfig | None = None) -> int:
+    """PDF indicizzati prima dell'OCR (o con Tesseract assente): si rileggono con l'OCR, pochi per giro (ADR-34)."""
+    if ocr is None:
+        return 0
+    rows = conn.execute("SELECT * FROM cde.text_ocr_pending(%s)", [limit]).fetchall()
+    conn.commit()
     done = 0
+    for r in rows:
+        try:
+            done += _store_text(conn, storage, [r], ocr)
+        except Exception:                     # noqa: BLE001 - un file illeggibile non blocca gli altri
+            conn.rollback()
+            log.exception("ri-OCR del file %s non riuscito: riprova più tardi", r["file_id"])
+            with conn.transaction():
+                conn.execute("SELECT cde.text_ocr_later(%s)", [r["file_id"]])
+    return done
+
+
+def _store_text(conn: psycopg.Connection, storage: Storage, rows: list, ocr: ocr_mod.OcrConfig | None) -> int:
     for r in rows:
         body = ""
         if textextract.wants(r["filename"]) and r["size_bytes"] <= textextract.MAX_FILE:
             data = b"".join(storage.iter_object(r["storage_key"], r["storage_version_id"]))
             body = textextract.extract(r["filename"], data, ocr)
-        with conn.transaction():
-            conn.execute("SELECT cde.store_revision_text(%s, %s)", [r["file_id"], body])
-        done += 1
-    return done
+        with conn.transaction():              # ocr_at: letto con l'OCR attivo, il ri-OCR non lo riprende
+            conn.execute("SELECT cde.store_revision_text(%s, %s, %s)", [r["file_id"], body, ocr is not None])
+    return len(rows)
 
 
 # ---------------------------------------------------------------------
@@ -241,12 +262,15 @@ def send_notification_email_task(notification_id: int) -> None:
 @app.periodic(cron="*/10 * * * *", periodic_id="text-index")
 @app.task(name="cde.index_text", queue="default")
 def index_text_task(timestamp: int) -> None:
-    """Recupera il testo dei file verificati che ne sono ancora senza (caricamenti precedenti, job persi)."""
+    """Recupera il testo dei file verificati che ne sono ancora senza (caricamenti precedenti, job persi) e rilegge
+    con l'OCR i PDF indicizzati senza."""
     storage, _, settings, _ = _runtime()
+    ocr = ocr_mod.config_from(settings)
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
-        n = index_text(conn, storage, limit=50, ocr=ocr_mod.config_from(settings))
-    if n:
-        log.info("testo indicizzato per %s file", n)
+        n = index_text(conn, storage, limit=50, ocr=ocr)
+        again = reocr_text(conn, storage, limit=10, ocr=ocr)
+    if n or again:
+        log.info("testo indicizzato per %s file, %s PDF riletti con l'OCR", n, again)
 
 
 @app.periodic(cron="*/5 * * * *", periodic_id="ifc-derivatives")
