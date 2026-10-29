@@ -53,6 +53,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U36 | `derivato.spec.ts`, `test_ifc_derivative.py` |
 | U37 | `segui.spec.ts`, `profilo.spec.ts`, `test_api_follow_digest.py` |
 | U38 | `ocr.spec.ts`, `test_ocr.py` |
+| U39 | `test_ocr.py` (`test_ri_ocr_dei_pdf_indicizzati_senza`) |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -100,6 +101,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U36 | BIM Manager | Carica un IFC pesante e lo apre | Dopo la verifica il modello si apre nella versione ottimizzata in pochi secondi, con piani, proprietà e misure; l'interruttore riapre l'IFC originale | |
 | U37 | Information Manager | Segue alcuni documenti e lascia attivo "Documenti che seguo: via email solo nel riepilogo del mattino" | Gli avvisi dei documenti seguiti compaiono subito nel pannello (con il tipo) ma per email arrivano solo nel riepilogo, diviso per sezioni; i compiti arrivano subito | |
 | U38 | Direttore dei lavori | Carica un verbale firmato e scansionato, poi cerca una parola del verbale con "anche nel testo dei file" | Il verbale si trova, con l'estratto evidenziato; se cita un elemento del modello compare in "Citato in" | |
+| U39 | Information Manager | Cerca con "anche nel testo dei file" una parola di un verbale scansionato caricato prima dell'aggiornamento con l'OCR | Entro qualche decina di minuti dall'aggiornamento il verbale si trova, senza ricaricarlo | |
 
 ## Verbale
 

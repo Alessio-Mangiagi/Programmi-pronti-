@@ -13,7 +13,7 @@ from cde_api import ocr, textextract
 from cde_api.modules.bim import _ocr_variant
 from cde_api.scanner import EicarScanner
 from cde_api.tooling.demo_content import drawing_pdf, scanned_pdf
-from cde_api.worker import verify_file
+from cde_api.worker import reocr_text, verify_file
 
 TESSERACT = ocr.find_tesseract()
 needs_tesseract = pytest.mark.skipif(TESSERACT is None, reason="Tesseract non installato")
@@ -69,6 +69,36 @@ def test_configurazione(monkeypatch):
     monkeypatch.setattr(ocr, "WINDOWS_DEFAULT", "/non/esiste.exe")
     assert ocr.config_from(S()) is None                          # senza eseguibile l'OCR si salta
     ocr.find_tesseract.cache_clear()
+
+
+def test_ri_ocr_dei_pdf_indicizzati_senza(client, api_app, api_world, as_user, monkeypatch):  # noqa: F811
+    urls, w = api_world
+    storage = api_app.state.services.storage
+    storage.ensure_bucket()
+    h = as_user("des_lead")
+    name = "PRJ01-DES-ZZ-00-DR-A-7732.pdf"
+    r = upload(client, h, w.containers["des_arch"], name, scanned_pdf(9, "Verbale", LINES), title="Prima dell'OCR")
+    assert r.status_code == 200, r.text
+    with psycopg.connect(urls.owner, row_factory=dict_row) as owner:
+        fid = owner.execute("SELECT r.file_object_id FROM cde.document_revisions r WHERE r.original_filename = %s "
+                            "ORDER BY r.created_at DESC LIMIT 1", [name]).fetchone()["file_object_id"]
+    with psycopg.connect(urls.worker, row_factory=dict_row) as conn:
+        verify_file(conn, storage, EicarScanner(), fid, ocr=None)              # come prima dell'OCR
+        assert reocr_text(conn, storage, ocr=None) == 0                         # senza Tesseract non si fa nulla
+
+        monkeypatch.setattr(textextract, "read_pages", lambda data, pages, config: {i: "fessura letta" for i in pages})
+        for _ in range(20):                       # DB condiviso: anche file di altre esecuzioni, pochi per giro
+            reocr_text(conn, storage, limit=100, ocr=ocr.OcrConfig("tesseract"))
+            left = {x["file_id"] for x in conn.execute("SELECT file_id FROM cde.text_ocr_pending(100)").fetchall()}
+            conn.commit()
+            if fid not in left:
+                break
+    with psycopg.connect(urls.owner, row_factory=dict_row) as owner:
+        row = owner.execute("SELECT t.body, t.ocr_at FROM cde.revision_text t JOIN cde.document_revisions r "
+                            "ON r.id = t.revision_id WHERE r.file_object_id = %s", [fid]).fetchone()
+    assert "fessura letta" in row["body"] and row["ocr_at"] is not None
+    found = client.get(f"/projects/{w.project_id}/documents", headers=h, params={"q": "fessura", "content": True}).json()
+    assert any(d["identifier"] == name[:-4] for d in found["items"])
 
 
 @needs_tesseract

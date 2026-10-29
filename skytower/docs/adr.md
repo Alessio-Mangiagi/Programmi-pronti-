@@ -515,4 +515,21 @@ firmati e tavole scansionate sono solo immagini e restavano invisibili alla rice
 - Il testo letto finisce nello stesso indice (RLS invariata).
 
 **Limiti.** Vale per i nuovi caricamenti (e per i file ancora senza testo ripresi dal job periodico); i PDF già
-indicizzati con testo vuoto non si rileggono da soli. Scritture a mano e scansioni molto storte restano poco leggibili.
+indicizzati con testo vuoto non si rileggono da soli (superato da ADR-34). Scritture a mano e scansioni molto storte
+restano poco leggibili.
+
+## ADR-34 — Ri-OCR dei PDF indicizzati prima dell'OCR
+
+**Contesto.** I PDF caricati prima di ADR-33, o letti dal worker quando Tesseract non c'era, hanno nell'indice solo
+il testo di pypdf: le pagine scansionate restano invisibili alla ricerca.
+
+**Decisione.**
+- `revision_text.ocr_at` (migrazione 0029) segna il testo estratto con l'OCR attivo; vuoto = letto senza.
+- Il job periodico `cde.index_text` (ogni 10') dopo i file senza testo rilegge fino a 10 PDF con `ocr_at` vuoto,
+  i più vecchi prima (`cde.text_ocr_pending`). Solo le pagine senza testo passano da Tesseract, quindi un PDF
+  vettoriale costa una lettura con pypdf.
+- Senza Tesseract il ri-OCR non parte e `ocr_at` resta vuoto: installato Tesseract, i PDF si riprendono da soli.
+- Un file illeggibile (S3 non raggiungibile) torna in fondo alla coda (`cde.text_ocr_later`) senza bloccare gli altri.
+- Le revisioni che condividono il file copiano anche `ocr_at`.
+
+**Conseguenze.** Nessun comando da lanciare dopo l'aggiornamento: un archivio di N PDF si rilegge in circa N/60 ore.
