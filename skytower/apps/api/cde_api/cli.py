@@ -9,6 +9,7 @@
   cde utente-dev     account personale nell'ambiente dev (password da CDE_NUOVA_PWD, mai su file)
   cde genera-ifc     modello IFC4 complesso (padiglione di sei livelli) per provare il viewer BIM
   cde genera-glb     modello glTF binario (come da Blender) per provare il viewer 3D
+  cde genera-galleria  modello IFC4 di una galleria stradale (conci, impianti, imbocchi)
 """
 from __future__ import annotations
 
@@ -179,6 +180,14 @@ def cmd_glb(args) -> None:
     print(f"{args.file}: {len(data) / 1e3:.0f} kB, {sum('mesh' in n for n in doc['nodes'])} oggetti")
 
 
+def cmd_tunnel(args) -> None:
+    from .tooling import ifc_tunnel
+
+    data = ifc_tunnel.build(lunghezza=args.lunghezza)
+    args.file.write_bytes(data)
+    print(f"{args.file}: {len(data) / 1e6:.1f} MB, galleria di {args.lunghezza:.0f} m")
+
+
 def cmd_demo_content(args) -> None:
     from .tooling import demo_content
 
@@ -226,6 +235,10 @@ def main(argv: list[str] | None = None) -> None:
     glb = sub.add_parser("genera-glb", help="modello glTF binario di prova (oggetti come da Blender)")
     glb.add_argument("file", type=Path)
     glb.set_defaults(func=cmd_glb)
+    tunnel = sub.add_parser("genera-galleria", help="modello IFC4 di una galleria stradale per provare il viewer BIM")
+    tunnel.add_argument("file", type=Path)
+    tunnel.add_argument("--lunghezza", type=float, default=480., help="metri (conci da 12 m)")
+    tunnel.set_defaults(func=cmd_tunnel)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")
     demo.add_argument("--password", default="Cantiere-2026!", help="password degli utenti demo")

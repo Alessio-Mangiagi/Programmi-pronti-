@@ -59,7 +59,8 @@ def _txt(s: str) -> str:
 class _Model:
     """Entità condivise (contesti, direzioni, stili, materiali) e costruttori di elementi."""
 
-    def __init__(self, seed: int):
+    def __init__(self, seed: int, name: str = "Nuovo Ospedale Nord",
+                 description: str = "Modello architettonico e strutturale di prova"):
         w = self.w = _Writer(seed)
         self.origin = w.add("IFCCARTESIANPOINT((0.,0.,0.))")
         self.z = w.add("IFCDIRECTION((0.,0.,1.))")
@@ -70,8 +71,7 @@ class _Model:
         units = [w.add("IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)"), w.add("IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)"),
                  w.add("IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.)"), w.add("IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)")]
         ua = w.add(f"IFCUNITASSIGNMENT({_ref(units)})")
-        self.project = w.add(f"IFCPROJECT('{w.guid()}',$,'Nuovo Ospedale Nord',"
-                             f"'Modello architettonico e strutturale di prova',$,$,$,(#{ctx}),#{ua})")
+        self.project = w.add(f"IFCPROJECT('{w.guid()}',$,{_txt(name)},{_txt(description)},$,$,$,(#{ctx}),#{ua})")
         rgb = w.add("IFCCOLOURRGB($,0.55,0.75,0.9)")
         rend = w.add(f"IFCSURFACESTYLERENDERING(#{rgb},0.6,$,$,$,$,$,$,.FLAT.)")
         self.glass = w.add(f"IFCSURFACESTYLE('Vetro',.BOTH.,(#{rend}))")
