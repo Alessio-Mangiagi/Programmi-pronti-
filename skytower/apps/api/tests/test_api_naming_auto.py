@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import string
 
 import psycopg
 import pytest
@@ -30,9 +31,20 @@ def as_user(client, api_world):
 
 
 @pytest.fixture
-def volume():
-    """Volume casuale: ogni test ha la sua serie (il DB di test è condiviso tra i moduli)."""
-    return "Q" + os.urandom(2).hex().upper()[:2]
+def volume(api_world):
+    """Volume mai usato: ogni test ha la sua serie (il DB di test è condiviso tra i moduli e tra le esecuzioni)."""
+    urls, _ = api_world
+    alphabet = string.ascii_uppercase + string.digits
+    with psycopg.connect(urls.owner) as conn:
+        while True:
+            v = "Q" + "".join(alphabet[b % len(alphabet)] for b in os.urandom(2))
+            used = conn.execute(
+                """SELECT EXISTS (SELECT 1 FROM cde.naming_counters WHERE series ->> 'volume' = %(v)s)
+                       OR EXISTS (SELECT 1 FROM cde.documents WHERE identifier LIKE %(like)s)
+                       OR EXISTS (SELECT 1 FROM cde.naming_reservations WHERE identifier LIKE %(like)s)""",
+                {"v": v, "like": f"%-{v}-%"}).fetchone()[0]
+            if not used:
+                return v
 
 
 @pytest.fixture
