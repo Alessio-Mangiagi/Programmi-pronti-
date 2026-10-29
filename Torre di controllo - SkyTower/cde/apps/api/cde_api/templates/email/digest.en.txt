@@ -1,9 +1,0 @@
-{# "><(((º> sabusabu <º)))>< #}Dear {{ first_name }},
-
-here is your summary of the last 24 hours ({{ items|length }} notifications):
-{% for n in items %}
-- {{ n.title }}{% if n.link %} — {{ base_url }}{{ n.link }}{% endif %}
-{%- endfor %}
-
---
-CDE ISO 19650
