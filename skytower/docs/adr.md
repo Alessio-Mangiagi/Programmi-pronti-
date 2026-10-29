@@ -568,3 +568,31 @@ di mostrare qualcosa, e la memoria del parse cresce col modello intero.
 
 **Limiti.** Un piano molto pesante resta un blocco unico; non c'è ancora lo scaricamento dei piani nascosti
 (tutti i piani si caricano comunque).
+
+## ADR-37 — Modifica di Word, Excel e PowerPoint con OnlyOffice Docs
+
+**Contesto.** Fino a qui Word ed Excel si vedevano in anteprima (sola lettura): per correggere una relazione
+bisognava scaricarla, modificarla e ricaricarla. Scelta dell'utente: **OnlyOffice Docs** (fedeltà OOXML, co-editing),
+non Collabora.
+
+**Decisione.**
+- Document Server separato (container ufficiale, edizione Community fino a 20 connessioni contemporanee, oltre
+  serve la licenza), con JWT attivo e segreto condiviso con l'API (`CDE_ONLYOFFICE_URL`,
+  `CDE_ONLYOFFICE_JWT_SECRET`; senza la funzione è spenta e il pulsante non compare).
+- Si modifica **solo l'ultima revisione, in WIP**, con il permesso WRITE sulla cartella e il documento non in
+  revisione: `POST /revisions/{id}/office-session` restituisce la configurazione dell'editor firmata (HS256).
+  Chiave del documento = id della revisione: chi apre la stessa revisione modifica insieme agli altri.
+- Il Document Server legge il file da `GET /office/files/{id}?ticket=` (ticket RS256 di 5' per utente e
+  revisione, permessi ricontrollati), non da un URL S3: funziona anche se il Document Server non vede S3.
+- `POST /office/callback/{id}`: valida solo con il JWT del segreto condiviso (nel corpo o nell'intestazione) e con
+  la chiave giusta. A modifiche finite (stato 2 o 6) l'API scarica il file **solo dall'origine del Document Server
+  configurato** (niente SSRF), con un tetto di 100 MB, e crea la WIP successiva (P01.02 → P01.03) con i permessi
+  (RLS) dell'ultimo utente che ha modificato, nota "Modificata in piattaforma (OnlyOffice)", verifica antivirus
+  come un caricamento. Callback ripetuta con lo stesso file: nessuna revisione doppia.
+- Frontend: "Modifica con OnlyOffice" nel visualizzatore apre `/documenti/:id/modifica` in una nuova scheda, che
+  carica lo script del Document Server (CSP: `script-src` e `frame-src` con il suo indirizzo, variabile Terraform
+  `onlyoffice_url`).
+
+**Limiti.** In questa macchina di sviluppo non c'è Docker: l'integrazione è provata con un Document Server finto
+(test API e e2e); la prova con quello vero va fatta su staging o installando Docker. PowerPoint si modifica ma
+non ha anteprima nel visualizzatore (il pulsante compare per Word ed Excel).

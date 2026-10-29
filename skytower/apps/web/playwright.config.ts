@@ -14,11 +14,14 @@ const PYTHON = process.env.PYTHON
 const API_PORT = 8310;
 const WEB_PORT = 4310;
 export const IDP_PORT = 4320;
+export const OFFICE_PORT = 4330;
+export const OFFICE_SECRET = "segreto-onlyoffice-e2e-0123456789abcdef";
+const OFFICE = `http://127.0.0.1:${OFFICE_PORT}`;   // Document Server OnlyOffice finto
 const S3 = `http://127.0.0.1:${API_PORT + 1000}`;   // S3 emulato al posto del bucket regionale
 // stessa CSP della produzione (modules/cde-platform/edge.tf, spa_csp): tutti i test girano sotto questa politica
 export const SPA_CSP = [
-  "default-src 'self'", "script-src 'self' 'wasm-unsafe-eval'", "worker-src 'self' blob:", "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${S3}`, "font-src 'self' data:", `connect-src 'self' ${S3}`, `frame-src 'self' blob: ${S3}`,
+  "default-src 'self'", `script-src 'self' 'wasm-unsafe-eval' ${OFFICE}`, "worker-src 'self' blob:", "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${S3}`, "font-src 'self' data:", `connect-src 'self' ${S3}`, `frame-src 'self' blob: ${S3} ${OFFICE}`,
   "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'",
 ].join("; ");
 
@@ -44,12 +47,20 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
+      // Document Server OnlyOffice finto per office.spec.ts
+      command: `node e2e/mock-onlyoffice.mjs ${OFFICE_PORT}`,
+      url: `${OFFICE}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
       command: `"${PYTHON}" -m cde_api.cli dev --reset --data-dir "${join(tmpdir(), "cde-e2e")}" --port ${API_PORT} --s3-port ${API_PORT + 1000}`,
       cwd: resolve(ROOT, "apps/api"),
       // ambiente usa-e-getta: ogni test fa il proprio login, il limite anti-forzatura di produzione li bloccherebbe
       // la SPA di prova gira su un altro origin: chiavi di sicurezza e ritorno dal single sign-on puntano lì
       env: { CDE_LOGIN_RATE_LIMIT: "1000/minute", CDE_WEB_BASE_URL: `http://localhost:${WEB_PORT}`,
-             CDE_WEBAUTHN_ORIGINS: `["http://localhost:${WEB_PORT}"]` },
+             CDE_WEBAUTHN_ORIGINS: `["http://localhost:${WEB_PORT}"]`,
+             CDE_ONLYOFFICE_URL: OFFICE, CDE_ONLYOFFICE_JWT_SECRET: OFFICE_SECRET },
       url: `http://127.0.0.1:${API_PORT}/health`,
       reuseExistingServer: false,
       timeout: 180_000,

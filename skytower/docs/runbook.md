@@ -67,6 +67,14 @@ precedenti nel bucket (versioning attivo) e nuova invalidazione.
   Organizzazione: issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`, Client ID dell'app, segreto, domini
   email; *Prova la connessione*; un accesso di prova; solo dopo, se richiesto, l'obbligo. Alla scadenza del segreto
   in Entra va inserito il nuovo (finché non lo si fa, il single sign-on fallisce con "errore del provider").
+- **OnlyOffice Docs** (modifica di Word/Excel in piattaforma, ADR-37): Document Server su un host o servizio ECS a
+  parte, immagine `onlyoffice/documentserver` con `JWT_ENABLED=true` e `JWT_SECRET` uguale al segreto in Secrets
+  Manager indicato da `onlyoffice_jwt_secret_arn`; `onlyoffice_url` = indirizzo https pubblico (entra nella CSP).
+  Il Document Server deve raggiungere `https://<dominio>/api/office/...` (lettura del file e callback). La
+  Community ammette 20 connessioni contemporanee: oltre, licenza Enterprise. In locale:
+  `docker run -d -p 8085:80 -e JWT_SECRET=<segreto> onlyoffice/documentserver` e nell'API
+  `CDE_ONLYOFFICE_URL=http://localhost:8085`, `CDE_ONLYOFFICE_JWT_SECRET=<segreto>`,
+  `CDE_ONLYOFFICE_CALLBACK_URL=http://host.docker.internal:8100`.
 - **Allarmi** (SNS → `alert_emails`): 5xx, p95 > 500 ms, task non sani, worker fermo, CPU/memoria/spazio DB,
   CPU Redis, latenza di replica S3 > 15', errori nei log.
 
