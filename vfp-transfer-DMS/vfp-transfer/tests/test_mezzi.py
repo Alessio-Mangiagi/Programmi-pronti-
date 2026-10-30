@@ -2,6 +2,7 @@
 import csv
 import json
 import os
+import re
 import stat
 import tempfile
 import unittest
@@ -27,6 +28,67 @@ CORPO = (
     '<w:p><w:r><w:t>Clausola fissa</w:t></w:r></w:p>'
     '<w:permStart w:id="4" w:edGrp="everyone"/><w:p><w:r><w:t>Area senza regola</w:t></w:r></w:p><w:permEnd w:id="4"/>'
 )
+
+
+class FintoSeedDms:
+    """SeedDMS restapi in memoria (cartella 5 = cartella dei mezzi), con la stessa forma delle risposte vere."""
+
+    def __init__(self):
+        self.headers = {}
+        self.cartelle = {1: {"name": "DMS", "padre": None}, 5: {"name": "Archivio", "padre": 1}}
+        self.documenti = {}
+        self.prossimo = 100
+        self.logout = False
+
+    class _R:
+        def __init__(self, stato, body):
+            self.status_code, self._body = stato, body
+
+        def json(self):
+            return self._body
+
+    def catena(self, doc_id):
+        f, out = self.documenti[doc_id]["padre"], []
+        while f != 5:
+            out.insert(0, f)
+            f = self.cartelle[f]["padre"]
+        return out
+
+    def request(self, metodo, url, timeout=None, allow_redirects=True, data=None, files=None):
+        path = url.split("/restapi/index.php", 1)[1]
+        ok = lambda d=None, stato=200: self._R(stato, {"success": True, "message": "", "data": d})  # noqa: E731
+        if path == "/login":
+            return ok()
+        if path == "/logout":
+            self.logout = True
+            return ok()
+        m = re.fullmatch(r"/folder/(\d+)/children", path)
+        if m:
+            fid = int(m[1])
+            figli = [{"type": "folder", "id": k, "name": v["name"]} for k, v in self.cartelle.items() if v["padre"] == fid]
+            figli += [{"type": "document", "id": k, "name": v["name"]} for k, v in self.documenti.items() if v["padre"] == fid]
+            return ok(figli)
+        m = re.fullmatch(r"/folder/(\d+)/folder", path)
+        if m:
+            self.prossimo += 1
+            self.cartelle[self.prossimo] = {"name": data["name"], "padre": int(m[1])}
+            return ok({"id": self.prossimo}, 201)
+        m = re.fullmatch(r"/folder/(\d+)/document", path)
+        if m:
+            self.prossimo += 1
+            self.documenti[self.prossimo] = {**data, "padre": int(m[1]), "versioni": [files["file"][1].read()]}
+            return ok({"version": 1}, 201)
+        m = re.fullmatch(r"/document/(\d+)/update", path)
+        if m:
+            doc, contenuto = self.documenti[int(m[1])], files["file"][1].read()
+            if contenuto == doc["versioni"][-1]:
+                return self._R(400, {"success": False, "message": "Uploaded file identical to last version", "data": ""})
+            doc["versioni"].append(contenuto)
+            return ok({"version": len(doc["versioni"])})
+        return self._R(404, {"success": False, "message": "non trovato", "data": ""})
+
+    def close(self):
+        pass
 
 
 def dati(**altri):
@@ -215,7 +277,9 @@ class MezziTest(unittest.TestCase):
         polizza = next(d for d in seed.documenti.values() if d["name"].startswith("Polizza"))
         self.assertEqual(polizza["expdate"], "2026-12-31")
         self.assertTrue(polizza["comment"].startswith("Scadenza 31/12/2026"))
-        # seconda volta: file uguali = gia' presenti, file cambiato = nuova versione (nessun doppione)
+        # seconda volta, cambiata la targa: la scheda diventa una nuova versione, gli altri file sono gia' presenti
+        rec = self.pr.salva(self.maschera, rec["id"], dati(targa="ZZ999ZZ"),
+                            [{"tipo": x["tipo"], "file": x["file"], "scadenza": x["scadenza"]} for x in rec["documenti"]], "prova")
         rec = mezzi.archivia_nel_dms(s, self.maschera, self.pr, rec["id"], sessione=seed)
         self.assertEqual(sorted(e["esito"] for e in rec["dms"]["esiti"]), ["gia' presente"] * 3 + ["nuova versione"])
         self.assertEqual(len(seed.documenti), 4)

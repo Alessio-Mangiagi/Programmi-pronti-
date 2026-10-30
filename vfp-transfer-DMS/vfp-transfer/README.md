@@ -188,10 +188,18 @@ I dati si scrivono una volta e servono a due cose:
    ogni area gialla con i dati al posto dei `____` (importi anche in lettere, es. "millecinquanta/00"); si corregge dove
    serve, si toglie la spunta alle aree da lasciare com'erano e *Compila contratto*. Si scrive solo nelle aree gialle:
    fuori il testo resta identico (controllo automatico). L'originale non si tocca: si scarica la copia compilata.
-2. **Documentazione in Viewpoint**: libretto, polizza RCT (con scadenza), dichiarazione CE, manuale, verifiche
-   periodiche... si scelgono dal PC o dalla rete e vengono copiati nella pratica. *Carica in Viewpoint* li manda,
-   insieme al contratto compilato e a una scheda PDF del mezzo, nella cartella `Mezzi / <commessa> / <mezzo - matricola>`
-   con nome e descrizione (scadenza, targa, ditta, contratto) presi dai dati. Prima conviene *Esegui prova*.
+2. **Documentazione nel DMS aziendale**: libretto, polizza RCT (con scadenza), dichiarazione CE, manuale, verifiche
+   periodiche... si scelgono dal proprio computer con *Scegli il file* (l'amministratore anche *Dal server*) e vengono
+   copiati nella pratica. *Archivia nel DMS* li mette, insieme al contratto compilato e a una scheda PDF del mezzo, nel
+   DMS (`DMS_URL`, `DMS_USER`, `DMS_PASSWORD`) nella cartella `Mezzi / <commessa> / <mezzo - matricola>` sotto la
+   cartella `DMS_MEZZI_CARTELLA`, con nome e descrizione presi dai dati e la scadenza (es. polizza) segnata nel DMS.
+   Un documento gia' presente diventa una nuova versione; se il file e' uguale non si carica di nuovo. E' l'unica
+   scrittura nel DMS: permessa solo per creare cartelle e caricare documenti, solo sotto quella cartella (l'utente del
+   DMS dovrebbe poter scrivere solo li'). L'amministratore puo' anche caricare in Viewpoint (*Prova Viewpoint*).
+
+Chi usa la pagina: l'amministratore e gli utenti con area **Mezzi** (vedono solo questa pagina). Un utente non
+amministratore non puo' prendere file dal disco del PC del programma ne' confermare il cambio di dati gia' registrati
+di una ditta (es. IBAN): lo fa l'amministratore.
 
 I dati della ditta si ritrovano dalla partita IVA (stessa anagrafica fornitori dei moduli). Se si scrive un dato
 diverso da quello registrato, ad esempio un altro IBAN, il programma si ferma e chiede una conferma esplicita:

@@ -90,6 +90,12 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   `modelli_protetti.Pratiche` (testi adattati ai paragrafi con `_adatta`). Viewpoint: `prepara_caricamento` scrive
   `manifest.csv` e `api_mezzi_carica` usa `api_start` (stesso lavoro e avanzamento del Trasferimento). Selettore file
   `openBrowser('doc', {onPick})` in `dialoghi.js` (`/api/browse?files=doc`).
+  Area utente `mezzi` (`auth.AREE`): rotte mezzi con ruolo `area:mezzi` (Viewpoint `/api/mezzi/carica` solo admin);
+  in UI le voci `data-utente` (Mezzi, Flusso posta) si aprono agli utenti della loro area (`showView`). File dal browser:
+  `POST /api/mezzi/allega` (corpo = file, letto a blocchi prima del limite JSON, `Pratiche.allega`); `percorso` sul disco
+  del server e `aggiorna_anagrafica` solo admin (`api_mezzi_salva`). DMS: `mezzi.ScritturaDms` (client separato, rotte
+  ammesse in `AMMESSE`, cartelle solo sotto `DMS_MEZZI_CARTELLA`), `archivia_nel_dms` usa le stesse righe di
+  `righe_dms`; esito in `record["dms"]`. `report_excel.build_report`: un'area diversa da documenti/posta non riceve nulla.
 - Modelli Word protetti (trasporti, contratti): `modelli_protetti.py` (logica + CLI, GUI da fare). Documento in
   "Limita modifica" sola lettura; le aree gialle sono le eccezioni `<w:permStart w:id>`...`<w:permEnd>`: si cambiano
   solo i `<w:t>` li' dentro (minima differenza, una riga per paragrafo o sostituzioni `[[da, a]]`), poi
