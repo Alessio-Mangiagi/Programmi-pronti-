@@ -11,7 +11,9 @@ Cosa scrive (tutto riconoscibile dal marchio [ESEMPIO] o dall'utente "esempio"):
   nella pagina Trasferimento con "Esegui prova") e righe nello Storico (report_trasferimento.csv);
 - Posta: email nel registro (registro_posta.csv), nella cronologia del Flusso posta (stato_posta.json) e copia
   locale degli allegati (MAIL_ARCHIVE_DIR), con una casella Microsoft 365 e una PEC;
-- Mezzi: tre pratiche di mezzi a nolo (MODULI_ARCHIVIO/mezzi) con documenti e scheda, due ditte in anagrafica;
+- Mezzi: cinque pratiche di mezzi a nolo (MODULI_ARCHIVIO/mezzi) con documenti e scheda, tre ditte in anagrafica,
+  contratti compilati dai format veri (se MODELLI_SORGENTE e LibreOffice ci sono), una pratica gia' caricata in
+  Viewpoint e archiviata nel DMS (solo segnata: nessuna chiamata a Viewpoint o al DMS);
 - Attivita' utenti: qualche evento degli utenti esempio.* (registro a catena di impronte: con --rimuovi restano).
 
 L'interfaccia rilegge i file a ogni richiesta: non serve riavviarla.
@@ -32,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attivita  # noqa: E402
 import env_config  # noqa: E402
 import mezzi  # noqa: E402
+import modelli_protetti  # noqa: E402
 import moduli  # noqa: E402
 import vfp_mail  # noqa: E402
 import vfp_transfer as vt  # noqa: E402
@@ -326,6 +329,12 @@ def piva_valida(radice):
     raise RuntimeError("nessuna cifra di controllo valida")
 
 
+def iban_valido(bban):
+    """IBAN italiano finto con le cifre di controllo giuste (mod 97): normalizza rifiuta gli altri."""
+    numeri = "".join(str(ord(c) - 55) if c.isalpha() else c for c in bban + "IT00")
+    return f"IT{98 - int(numeri) % 97:02d}{bban}"
+
+
 DITTE = {
     "edilnolo": {
         "ragione_sociale": "Edil Nolo Esempio S.r.l.", "piva": piva_valida("0987654321"),
@@ -345,11 +354,20 @@ DITTE = {
         "delegati": "Anna Esempio, nata ad Acireale il 03/11/1978, CF SMPNNA78S43A028Y\n"
                     "Luca Esempio, nato a Catania il 21/02/1985, CF SMPLCU85B21C351Z",
     },
+    "noleggietna": {
+        "ragione_sociale": "Noleggi Etna Esempio S.r.l.", "piva": piva_valida("0555566667"),
+        "sede": "Giarre (CT), via Callipoli n. 88", "rappresentante": "legale rappresentante Sig. Salvatore Esempio",
+        "nascita_rappresentante": "Giarre il 30/08/1965", "pec": "noleggietna@pec.esempio.it",
+        "white_list_dal": "20/06/2025", "white_list_prefettura": "Catania", "patente_crediti": "PC-2025-000789",
+        "banca": "Credito Siciliano Esempio", "iban_dedicato": iban_valido("A0300203280123456789012"),
+        "delegati": "Salvatore Esempio, nato a Giarre il 30/08/1965, CF SMPSVT65M30E017W",
+    },
 }
 UTILIZZATRICE = {"utilizzatrice": "COSEDIL S.p.A.", "utilizzatrice_sede": "Roma (RM)",
                  "utilizzatrice_indirizzo": "Piazza della Marina n. 1", "utilizzatrice_piva": "00512340878",
                  "firmatario_utilizzatrice": "Procuratore Speciale Geom. Mario Esempio"}
-# (ditta, dati del contratto e del mezzo, documenti [(tipo, titolo, scadenza in giorni da oggi o None)])
+# (ditta, dati del contratto e del mezzo, documenti [(tipo, titolo, scadenza in giorni da oggi o None)],
+#  stato: contratto = compilato dal format vero della commessa; invio = gia' caricato in Viewpoint; dms = archiviato)
 MEZZI = [
     ("edilnolo", {
         "tipo_nolo": "a freddo", "commessa": "101-003 SEDE ACIREALE", "codice_contratto": "2026_101-003 SEDE ACIREALE_004",
@@ -363,22 +381,52 @@ MEZZI = [
         "data_appalto": "10/01/2026", "oneri_proprietaria": "manutenzione ordinaria e straordinaria del mezzo",
         "oneri_utilizzatrice": "deposito entro l'area di cantiere; carburante; operatore del mezzo",
     }, [("assicurazione", "Polizza assicurativa RCT n. 4471/2026", 240), ("ce", "Dichiarazione CE di conformita'", None),
-        ("manuale", "Manuale d'uso e manutenzione", None), ("verifiche", "Verbale verifica periodica", 120)]),
+        ("manuale", "Manuale d'uso e manutenzione", None), ("verifiche", "Verbale verifica periodica", 120)],
+     {"contratto": True, "invio": True, "dms": True}),
     ("siciliamacchine", {
-        "tipo_nolo": "a caldo", "commessa": "101-006 RESIDENZE ACIREALE", "codice_contratto": "2026_101-006 RESIDENZE ACIREALE_009",
-        "cup": "J31B20000000006", "cig": "A0987654321", "data_contratto": quando(5).date().isoformat(),
+        "tipo_nolo": "a caldo", "commessa": "101-003 SEDE ACIREALE", "codice_contratto": "2026_101-003 SEDE ACIREALE_007",
+        "cup": "J31B20000000005", "cig": "A0123456789", "data_contratto": quando(5).date().isoformat(),
         "luogo_firma": "Santa Venerina", "data_inizio": quando(2).date().isoformat(),
         "data_fine": quando(-28).date().isoformat(), "pagamento": "60 gg. D.F.F.M.",
         "tipo_mezzo": "Autogru", "marca": "Liebherr", "modello": "LTM 1050-3.1", "matricola": "ESEMPLTM105000002",
         "targa": "FX123ES", "anno": "2019", "attrezzature": "jib 16 m, zavorra 12 t",
         "compenso": "MISURA", "um": "ore", "prezzo_unitario": "95,00", "quantita": "160", "oneri_sicurezza": "450,00",
-        "oggetto_appalto": "Realizzazione di residenze ad Acireale", "committente": "Residenze Acireale S.r.l.",
-        "data_appalto": "20/02/2026", "cuc": "CUC-2026-000456",
+        "oggetto_appalto": "Lavori di realizzazione della nuova sede di Acireale", "committente": "Comune di Acireale",
+        "data_appalto": "10/01/2026", "cuc": "CUC-2026-000456",
         "oneri_proprietaria": "operatore abilitato, manutenzione e verifiche periodiche",
         "oneri_utilizzatrice": "area di stazionamento e piano di sollevamento",
     }, [("assicurazione", "Polizza assicurativa RCT n. 9920/2026", 300), ("libretto", "Carta di circolazione", None),
         ("ce", "Dichiarazione CE di conformita'", None), ("manuale", "Manuale d'uso e manutenzione", None),
-        ("verifiche", "Verbale verifica periodica", 45), ("manutenzione", "Registro di controllo e manutenzione", None)]),
+        ("verifiche", "Verbale verifica periodica", 45), ("manutenzione", "Registro di controllo e manutenzione", None)],
+     {"contratto": True}),
+    ("noleggietna", {
+        "tipo_nolo": "a freddo", "commessa": "101-006 RESIDENZE ACIREALE", "codice_contratto": "2026_101-006 RESIDENZE ACIREALE_011",
+        "cup": "J31B20000000006", "cig": "A0987654321", "data_contratto": quando(20).date().isoformat(),
+        "luogo_firma": "Santa Venerina", "data_inizio": quando(15).date().isoformat(),
+        "data_fine": quando(-75).date().isoformat(), "pagamento": "30 gg. D.F.F.M.",
+        "tipo_mezzo": "Pala gommata", "marca": "Volvo", "modello": "L90H", "matricola": "ESEMPL90H00004", "targa": "FY456ES",
+        "anno": "2020", "attrezzature": "benna 3 mc, forche pallet",
+        "compenso": "MISURA", "um": "settimane", "prezzo_unitario": "1.450,00", "quantita": "12", "oneri_sicurezza": "250,00",
+        "oggetto_appalto": "Realizzazione di residenze ad Acireale", "committente": "Residenze Acireale S.r.l.",
+        "data_appalto": "20/02/2026", "oneri_proprietaria": "manutenzione ordinaria e straordinaria del mezzo",
+        "oneri_utilizzatrice": "carburante e operatore",
+    }, [("assicurazione", "Polizza assicurativa RCT n. 1180/2026", 180), ("libretto", "Carta di circolazione", None),
+        ("ce", "Dichiarazione CE di conformita'", None), ("manuale", "Manuale d'uso e manutenzione", None)],
+     {"invio": True}),
+    ("noleggietna", {
+        "tipo_nolo": "a caldo", "commessa": "101-003 SEDE ACIREALE", "codice_contratto": "2026_101-003 SEDE ACIREALE_006",
+        "cup": "J31B20000000005", "cig": "A0123456789", "data_contratto": quando(3).date().isoformat(),
+        "luogo_firma": "Santa Venerina", "data_inizio": quando(1).date().isoformat(),
+        "data_fine": quando(-14).date().isoformat(), "pagamento": "30 gg. D.F.F.M.",
+        "tipo_mezzo": "Piattaforma aerea", "marca": "Haulotte", "modello": "HA20 RTJ PRO", "matricola": "ESEMPHA2000005",
+        "anno": "2022", "attrezzature": "cestello 230 kg, 4x4",
+        "compenso": "MISURA", "um": "gg", "prezzo_unitario": "260,00", "quantita": "10",
+        "oggetto_appalto": "Lavori di realizzazione della nuova sede di Acireale", "committente": "Comune di Acireale",
+        "data_appalto": "10/01/2026", "cuc": "CUC-2026-000123",
+        "oneri_proprietaria": "operatore abilitato PLE, manutenzione e verifiche periodiche",
+    }, [("assicurazione", "Polizza assicurativa RCT n. 2231/2026", 90), ("ce", "Dichiarazione CE di conformita'", None),
+        ("manuale", "Manuale d'uso e manutenzione", None), ("verifiche", "Verbale verifica periodica", 30)],
+     {}),
     ("edilnolo", {
         "tipo_nolo": "a freddo", "commessa": "101-003 SEDE ACIREALE", "codice_contratto": "2026_101-003 SEDE ACIREALE_005",
         "data_contratto": quando(1).date().isoformat(), "luogo_firma": "Santa Venerina",
@@ -387,7 +435,7 @@ MEZZI = [
         "matricola": "ESEMPU27400003", "anno": "2023", "compenso": "MISURA", "um": "gg", "prezzo_unitario": "120,00",
         "quantita": "30", "oggetto_appalto": "Lavori di realizzazione della nuova sede di Acireale",
         "committente": "Comune di Acireale", "data_appalto": "10/01/2026",
-    }, [("ce", "Dichiarazione CE di conformita'", None)]),  # senza polizza e manuale: la pagina li segnala mancanti
+    }, [("ce", "Dichiarazione CE di conformita'", None)], {}),  # senza polizza e manuale: la pagina li segnala mancanti
 ]
 
 
@@ -395,11 +443,49 @@ def _matricole():
     return {m[1]["matricola"] for m in MEZZI}
 
 
+def _modello_contratto(s, dati):
+    """Format "nolo a freddo/caldo" della commessa del mezzo nella cartella condivisa (vuoto se non c'e')."""
+    try:
+        modelli = [m["rel"] for m in modelli_protetti.elenco_modelli(s) if m["gestito"]]
+    except modelli_protetti.ModelloError:
+        return ""
+    codice, tipo = dati["commessa"].split(" ")[0], f"nolo {dati['tipo_nolo']}"
+    buoni = [m for m in modelli if tipo in m.lower() and codice in m]
+    return sorted(buoni)[0] if buoni else ""
+
+
+def _compila_contratto(s, maschera, pr, rec):
+    """Contratto compilato dal format vero, con i testi proposti dai dati (come il pulsante nella pagina Mezzi)."""
+    modello = _modello_contratto(s, rec["valori"])
+    if not modello:
+        return "format della commessa non trovato in MODELLI_SORGENTE: contratto non compilato"
+    try:
+        anteprima = mezzi.anteprima_contratto(s, maschera, rec, modello)
+        testi = {a["id"]: a["nuovo"] for a in anteprima["aree"] if a.get("regola")}
+        mezzi.compila_contratto(s, pr, rec["id"], modello, testi, UTENTE)
+    except (mezzi.MezziError, modelli_protetti.ModelloError, OSError) as e:
+        return f"contratto non compilato ({e})"
+    return f"contratto compilato da {Path(modello).name} ({len(testi)} aree)"
+
+
+def _segna_invio_e_dms(maschera, pr, rec_id, stato):
+    """Pratica gia' caricata in Viewpoint / archiviata nel DMS: solo i segni nel record, nessuna chiamata esterna."""
+    rec = pr.leggi(rec_id)
+    righe = mezzi.righe_dms(maschera, rec, pr._dir(rec_id))  # scrive anche la scheda PDF
+    if stato.get("invio"):
+        pr.segna_invio(rec_id, len(righe))
+    if stato.get("dms"):
+        esiti = [{"nome": r["name"], "cartella": r["folder"], "file": Path(r["file"]).name,
+                  "esito": "nuova versione" if "Scheda" in r["name"] else "creato", "id": 9000 + i}
+                 for i, r in enumerate(righe, 1)]
+        pr.segna_dms(rec_id, {"data": iso(ORA - timedelta(hours=3)), "esiti": esiti})
+
+
 def crea_mezzi(s):
     maschera, pr = mezzi.carica_maschera(s), mezzi.pratiche(s)
     presenti = {p["matricola"] for p in pr.elenco()}
     creati = []
-    for ditta, dati, documenti in MEZZI:
+    for ditta, dati, documenti, stato in MEZZI:
         if dati["matricola"] in presenti:
             continue
         grezzi = {**UTILIZZATRICE, **DITTE[ditta], **dati}
@@ -414,6 +500,15 @@ def crea_mezzi(s):
                          "scadenza": quando(-giorni).date().isoformat() if giorni else "", "note": f"{MARCHIO} documento finto"})
         rec = pr.salva(maschera, "", grezzi, docs, utente=UTENTE)
         mezzi.scheda_pdf(maschera, rec, pr._dir(rec["id"]) / "scheda_mezzo.pdf")
+        note = []
+        if stato.get("contratto"):
+            note.append(_compila_contratto(s, maschera, pr, rec))
+        if stato.get("invio") or stato.get("dms"):
+            _segna_invio_e_dms(maschera, pr, rec["id"], stato)
+            segni = [n for n, k in (("caricata in Viewpoint", "invio"), ("archiviata nel DMS", "dms")) if stato.get(k)]
+            note.append("segnata come " + " e ".join(segni))
+        print(f"  - {dati['tipo_mezzo']} {dati['marca']} {dati['modello']}: pratica {rec['id']}"
+              + (" - " + "; ".join(note) if note else ""))
         creati.append(rec["id"])
     return creati
 
@@ -421,6 +516,13 @@ def crea_mezzi(s):
 def rimuovi_mezzi(s):
     pr = mezzi.pratiche(s)
     n = 0
+    try:  # contratti compilati dagli esempi (MODELLI_LAVORO/<id>/)
+        lavoro = modelli_protetti.pratiche(s)
+        for p in lavoro.elenco(limite=100000):
+            if p.get("utente") == UTENTE:
+                shutil.rmtree(lavoro._dir(p["id"]), ignore_errors=True)
+    except modelli_protetti.ModelloError:
+        pass
     for p in pr.elenco(limite=100000):
         if p["utente"] == UTENTE or p["matricola"] in _matricole():
             shutil.rmtree(pr._dir(p["id"]), ignore_errors=True)
@@ -477,8 +579,9 @@ def main():
     print(f"Documenti: {n_doc} file in {ESPORTAZIONE / COMMESSA} (manifest.csv) e {n_storico} righe nello Storico")
     n_mail, n_righe = crea_posta(s)
     print(f"Posta: {n_mail} email ({n_righe} elaborazioni) in {REGISTRO.name}, {STATO_POSTA.name} e {vfp_mail.archive_dir(s).name}")
+    print("Mezzi:")
     creati = crea_mezzi(s)
-    print(f"Mezzi: {len(creati)} pratiche create" + (" (gia' presenti: nessuna nuova)" if not creati else ": " + ", ".join(creati)))
+    print(f"  {len(creati)} pratiche create" + (" (gia' presenti: nessuna nuova)" if not creati else ""))
     print(f"Attivita' utenti: {crea_attivita()} eventi")
     print("Fatto: l'interfaccia li mostra subito (Panoramica, Storico, Flusso posta, Caselle email, Mezzi, Attivita').")
 

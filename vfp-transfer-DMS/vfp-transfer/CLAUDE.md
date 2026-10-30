@@ -120,7 +120,8 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   scarta i file cambiati dopo l'estrazione). `--verifica --dest` ricalcola gli SHA-256 e toglie dallo stato i file guasti.
   DMS di prova: SeedDMS 6 portabile fuori dal repo (`..\..\seeddms-prova`, porta 8780), dati finti con
   `strumenti_prova/popola_seeddms.py` (solo localhost).
-  Dati di esempio in tutte le aree (Storico, registro/cronologia posta con allegati, 3 pratiche Mezzi, eventi attivita'):
+  Dati di esempio in tutte le aree (Storico, registro/cronologia posta con allegati, 5 pratiche Mezzi con contratti
+  compilati dai format veri e segni invio/DMS, eventi attivita'):
   `python strumenti_prova/crea_esempi.py` (`--rimuovi` li toglie; marchio `[ESEMPIO]`, utente `esempio`, chiavi stabili).
 - Archivio SQL (sola lettura): `sorgente_sql.py` legge una vista SQL Server (colonne canoniche nel docstring) con ODBC
   via ctypes (`OdbcConnection`, niente pyodbc: Python 3.15 non ha la wheel), solo SELECT costruite da `build_query`,
