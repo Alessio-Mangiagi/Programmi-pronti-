@@ -38,3 +38,6 @@ stato_sql.json
 specchio_sql/
 # confronto documenti: registro dei proprietari, storico e cache OCR del motore (confronto.py)
 confronti/
+
+# dati di esempio generati da strumenti_prova/crea_esempi.py
+strumenti_prova/esempi/
