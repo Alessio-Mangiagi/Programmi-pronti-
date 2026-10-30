@@ -146,7 +146,7 @@ const badge = (s) => { const [c, l] = BADGES[s] || ['b-mute', s]; return `<span 
 
 // stesso programma, due aree: ogni voce del menu e ogni scheda della panoramica ha data-area
 // (documenti, posta, comune); quelle dell'altra area le nasconde il CSS (body[data-area])
-const AREAS = { documenti: 'Documenti', posta: 'Posta' };
+const AREAS = { documenti: 'Documenti', posta: 'Posta', mezzi: 'Mezzi' };
 
 function setArea(area, { go = true } = {}) {
   if (state.me && !isAdmin()) area = state.me.area;  // l'utente normale non cambia area
@@ -171,8 +171,13 @@ try { setArea(localStorage.getItem('vfp.area') || 'documenti', { go: false }); }
 // ------------------------------------------------------------------ navigazione
 
 function showView(name) {
-  // l'utente vede solo le pagine per tutti (voci di menu con data-tutti: Panoramica, Confronta documenti)
-  if (!isAdmin() && !$(`.tab[data-view="${name}"][data-tutti]`)) name = 'panoramica';
+  // l'utente vede le pagine per tutti (data-tutti: Panoramica, Confronta documenti) e quelle della sua area
+  // aperte agli utenti (data-utente: Flusso posta, Mezzi); l'utente dei mezzi parte dalla sua pagina
+  const tab = $(`.tab[data-view="${name}"]`);
+  const ammessa = tab && (tab.hasAttribute('data-tutti') || (tab.hasAttribute('data-utente') && state.me && tab.dataset.area === state.me.area));
+  if (!isAdmin() && (!ammessa || (name === 'panoramica' && state.me && state.me.area === 'mezzi'))) {
+    name = state.me && state.me.area === 'mezzi' ? 'mezzi' : 'panoramica';
+  }
   // un collegamento verso una pagina dell'altra area (es. "Vai al flusso posta") cambia area da solo
   const target = $(`.tab[data-view="${name}"]`);
   if (target && AREAS[target.dataset.area] && target.dataset.area !== document.body.dataset.area) {
@@ -190,6 +195,7 @@ function showView(name) {
   });
   if (name === 'storico') loadReport();
   if (name === 'smistamento') aiPoll();
+  if (name === 'mezzi' && $('#mzEditor').hidden) loadMezzi();
   if (name === 'attivita') loadActivity();
   if (name === 'posta' || name === 'flusso') loadMail();
   if (name === 'panoramica') loadOverview();

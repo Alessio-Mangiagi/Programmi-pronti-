@@ -74,13 +74,29 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   il registrato con il letto (avviso "ATTENZIONE", difesa dalle truffe sul cambio IBAN); `Archivio.salva(conferma=True)`
   registra, e cambiare un dato registrato richiede `aggiorna_anagrafica=True` (storico). `sezioni` con testo fisso e
   segnaposto `{id_campo}` (`testo_sezione`, `blocchi_scheda`), es. Art. 1 tracciabilita' (L. 136/2010).
+- Modelli .doc: `modelli_doc.py` legge il .doc (OLE/FIB/piece table, aree da PlcfBkfProt/PlcfBklProt in
+  FibRgFcLcb2003, aree accavallate unite), LibreOffice converte, `trova_aree` ritrova ogni area per contesto+testo
+  (solo se univoca), `metti_aree` rimette permStart/permEnd dividendo i run, `proteggi`; rifiuto se testo del corpo
+  o aree non identici. Cache `MODELLI_LAVORO/_convertiti/<sha>/`; `modelli_protetti.modello_docx` la usa.
+- Mezzi a nolo: `mezzi.py` (logica + CLI) + pagina Mezzi (`ui/js/mezzi.js`, rotte `/api/mezzi/...` admin in
+  `vfp_gui`). Maschera = modulo `moduli/mezzi_nolo.json` con in piu' `calcoli`, `contratto.aree` (regole `dopo` =
+  fine del testo che precede l'area, confrontato con `prima` di `leggi_aree`; oppure `{{campo}}` nel modello) e `dms`
+  (cartella/nome/descrizione + tipi di documento, `automatico` contratto/scheda); `contratto.sostituzioni`
+  [da, a] su tutte le aree (`sostituisci`: ___ = buco di qualsiasi lunghezza o `re:`; salta se manca un dato o se
+  cambierebbe i paragrafi). Campo `predefinito` usato solo dalla pagina. Testi: `{campo}`, `{campo:lettere}`
+  (`in_lettere`, stile contratti Cosedil: cento senza elisione), `[[...]]` facoltativo. Pratiche in
+  `MODULI_ARCHIVIO/mezzi/<id>/` (copie dei documenti con SHA-256); ditta nell'`Anagrafica` dei moduli: dato diverso
+  dal registrato = errore che inizia con "ANAGRAFICA" finche' non arriva `aggiorna_anagrafica`. Contratto via
+  `modelli_protetti.Pratiche` (testi adattati ai paragrafi con `_adatta`). Viewpoint: `prepara_caricamento` scrive
+  `manifest.csv` e `api_mezzi_carica` usa `api_start` (stesso lavoro e avanzamento del Trasferimento). Selettore file
+  `openBrowser('doc', {onPick})` in `dialoghi.js` (`/api/browse?files=doc`).
 - Modelli Word protetti (trasporti, contratti): `modelli_protetti.py` (logica + CLI, GUI da fare). Documento in
   "Limita modifica" sola lettura; le aree gialle sono le eccezioni `<w:permStart w:id>`...`<w:permEnd>`: si cambiano
   solo i `<w:t>` li' dentro (minima differenza, una riga per paragrafo o sostituzioni `[[da, a]]`), poi
   `_testo_fuori` deve risultare identico e le altre parti dello zip restano byte per byte. Originali in
   `MODELLI_SORGENTE` (condivisa, mai scritta), pratiche in `MODELLI_LAVORO/<id>/` (`originale_*` intatto con SHA-256,
   copia compilata rifatta sempre dall'originale, `record.json`). `.doc` rifiutati: LibreOffice perde le aree, Word
-  COM non c'e' sul PC. Le due cartelle sono in `env_config.SOLO_SVILUPPATORI`: `api_get_config` non le manda,
+  COM non c'e' sul PC: per i .doc c'e' `modelli_doc.py` (sotto). Le due cartelle sono in `env_config.SOLO_SVILUPPATORI`: `api_get_config` non le manda,
   `api_save_config` rifiuta modifiche (si cambiano solo nel `.env`). Controllo mensile: thread `_controllo_modelli`
   in `vfp_gui` (ogni ora guarda `controllo_dovuto`, primo giro del mese), `controlla_modelli` confronta SHA-256 con
   `stato_modelli.json` (prima volta o cartella cambiata = solo fotografia; cartella irraggiungibile = un solo avviso
@@ -116,6 +132,9 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Da verificare alla prima prova reale: formato delle risposte delle liste (gestito in `_items`),
   dettagli dello scambio token, disponibilita' dello scope `offline_access`.
 - Moduli: in attesa delle maschere vere dall'utente; da fare pagina "Moduli" + API in `vfp_gui.py`.
+- Mezzi: format veri in `Programmi-pronti-\Contratti\Modelli Word\Mezzi\FORMAT CONTRATTUALI\<commessa>\` (fuori da
+  git, = `MODELLI_SORGENTE` nel `.env` di sviluppo), 293 .doc + 8 .docx. Sostituzioni verificate sul nolo a freddo
+  101-003 (16 aree su 21 dai dati); nolo a caldo e righe INPS/INAIL a puntini da provare/compilare a mano.
   CPM e Alyante: servono documentazione e credenziali delle loro API.
 - Credenziali API (client_id) da richiedere a Trimble/Viewpoint (support@4projects.com).
 - DMS di origine reale ancora da definire: `estrai_dms.py` provato solo contro SeedDMS di prova (hash identici

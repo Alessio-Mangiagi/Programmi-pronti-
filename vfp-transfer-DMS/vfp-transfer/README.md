@@ -178,6 +178,39 @@ in cui archiviarlo, con un grado di sicurezza e il motivo.
 - Serve la chiave API di Anthropic (*Impostazioni > Smistamento con Claude*, `ANTHROPIC_API_KEY`); modello in
   `CLAUDE_MODEL`. Fino a 2.000 file per analisi, 80 per richiesta.
 
+## Mezzi a nolo (solo amministratori)
+
+Pagina **Mezzi**: una maschera sola per il mezzo, la ditta proprietaria e il contratto di nolo (a freddo o a caldo).
+I dati si scrivono una volta e servono a due cose:
+
+1. **Contratto**: i format stanno nella cartella dei modelli (`MODELLI_SORGENTE`, una sottocartella per commessa).
+   Scritti commessa (es. `101-003 SEDE ACIREALE`) e tipo di nolo, il format giusto si sceglie da solo. *Prepara* mostra
+   ogni area gialla con i dati al posto dei `____` (importi anche in lettere, es. "millecinquanta/00"); si corregge dove
+   serve, si toglie la spunta alle aree da lasciare com'erano e *Compila contratto*. Si scrive solo nelle aree gialle:
+   fuori il testo resta identico (controllo automatico). L'originale non si tocca: si scarica la copia compilata.
+2. **Documentazione in Viewpoint**: libretto, polizza RCT (con scadenza), dichiarazione CE, manuale, verifiche
+   periodiche... si scelgono dal PC o dalla rete e vengono copiati nella pratica. *Carica in Viewpoint* li manda,
+   insieme al contratto compilato e a una scheda PDF del mezzo, nella cartella `Mezzi / <commessa> / <mezzo - matricola>`
+   con nome e descrizione (scadenza, targa, ditta, contratto) presi dai dati. Prima conviene *Esegui prova*.
+
+I dati della ditta si ritrovano dalla partita IVA (stessa anagrafica fornitori dei moduli). Se si scrive un dato
+diverso da quello registrato, ad esempio un altro IBAN, il programma si ferma e chiede una conferma esplicita:
+va data solo dopo una verifica diretta con la ditta. Il cambio viene salvato nello storico.
+
+**Format .doc (Word 97-2003).** Senza Word sul PC li converte LibreOffice, che pero' perde le aree gialle: il
+programma (`modelli_doc.py`) le legge dal `.doc`, le rimette nel `.docx` con la protezione in sola lettura e controlla
+che testo del contratto e testo di ogni area siano identici all'originale. Se qualcosa non torna il format viene
+rifiutato con il motivo. La conversione si fa la prima volta che un format si usa (qualche secondo) e si rifa' solo se
+il `.doc` cambia. Serve LibreOffice installato. Per provarli tutti: `python modelli_doc.py prova`.
+
+Campi, documenti previsti e regole del contratto sono in `moduli/mezzi_nolo.json` (`contratto.sostituzioni`: testo
+o espressione regolare da cercare nelle aree gialle e testo con i dati). Una sostituzione scatta solo se i dati che
+usa sono compilati; altrimenti il buco resta. Per vedere cosa propone su un format:
+
+```
+python mezzi.py aree --modello "Mezzi\FORMAT CONTRATTUALIA-003 SEDE ACIREALE\Format Contratto nolo a freddo 2025 SEDE ACIREALE.doc"
+```
+
 ## Posta automatica
 
 Con `MAIL_ENABLED=true` il programma controlla le caselle attive (`MAIL_SOURCES`) ogni `MAIL_POLL_SECONDS` secondi.

@@ -289,8 +289,23 @@ def compila_file(origine, dest, valori):
 
 # --------------------------------------------------------------------------- cartella condivisa e pratiche
 
+def modello_docx(s, path):
+    """Il .docx da compilare: il modello stesso, oppure per un .doc la sua copia convertita (modelli_doc)."""
+    path = Path(path)
+    if path.suffix.lower() != ".doc":
+        return path
+    import modelli_doc
+    try:
+        return modelli_doc.docx_di(s, path)
+    except (modelli_doc.DocError, OSError) as e:
+        raise ModelloError(f"{path.name}: {e}")
+
+
 def elenco_modelli(s, max_file=500, profondita=6):
-    """Modelli nella cartella condivisa: [{"rel", "byte", "gestito"}] (i .doc compaiono ma non sono gestiti)."""
+    """Modelli nella cartella condivisa: [{"rel", "byte", "gestito"}]; i .doc sono gestiti se c'e' LibreOffice
+    per convertirli (modelli_doc), altrimenti compaiono ma non si possono usare."""
+    import modelli_doc
+    doc_ok = modelli_doc.soffice() is not None
     root = cartella_sorgente(s)
     if not root:
         raise ModelloError("cartella dei modelli non impostata (MODELLI_SORGENTE)")
@@ -306,7 +321,8 @@ def elenco_modelli(s, max_file=500, profondita=6):
             ext = Path(n).suffix.lower()
             if ext in (".docx", ".doc") and not n.startswith(("~$", ".")):
                 p = d / n
-                out.append({"rel": p.relative_to(root).as_posix(), "byte": p.stat().st_size, "gestito": ext == ".docx"})
+                out.append({"rel": p.relative_to(root).as_posix(), "byte": p.stat().st_size,
+                            "gestito": ext == ".docx" or doc_ok})
                 if len(out) >= max_file:
                     return out
     return out

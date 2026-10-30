@@ -27,7 +27,7 @@ class ApiTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         d = Path(cls.tmp.name)
-        cls.settings = dict(env_config.DEFAULTS, MAIL_ARCHIVE_DIR=str(d / "arch"))
+        cls.settings = dict(env_config.DEFAULTS, MAIL_ARCHIVE_DIR=str(d / "arch"), MODULI_ARCHIVIO=str(d / "moduli_compilati"))
         arch = d / "arch" / "20261005_100000_aaaaaaaaaa"
         arch.mkdir(parents=True)
         (arch / "verbale.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
@@ -53,6 +53,7 @@ class ApiTest(unittest.TestCase):
                 "ok": {"user": "prova", "role": "admin", "area": "documenti"},
                 "doc": {"user": "ufficio", "role": "utente", "area": "documenti"},
                 "posta": {"user": "segreteria", "role": "utente", "area": "posta"},
+                "mz": {"user": "officina", "role": "utente", "area": "mezzi"},
             }.get(token)),
             mock.patch.object(auth, "get_user", lambda name: {"email": ""}),
             mock.patch.object(vfp_gui.attivita, "record", lambda *a, **k: None),
@@ -83,6 +84,52 @@ class ApiTest(unittest.TestCase):
         except HTTPError as e:
             return e.code, e.read(), dict(e.headers)
 
+    def test_mezzi_solo_admin(self):
+        code, body, _ = self.call("/api/mezzi")
+        self.assertEqual(code, 200)
+        self.assertEqual(json.loads(body)["maschera"]["id"], "mezzi_nolo")
+        self.assertEqual(self.call("/api/mezzi", cookie="doc")[0], 403)
+        self.assertEqual(self.call("/api/mezzi/salva", {"valori": {}}, cookie="doc")[0], 403)
+        self.assertEqual(self.call("/api/mezzi/pratica?id=../../x")[0], 400)
+        code, body, _ = self.call("/api/mezzi/contratto.docx?id=20260101-000000-abcdef")
+        self.assertEqual(code, 404)
+
+    def test_utente_dei_mezzi(self):
+        # vede solo i mezzi: niente trasferimenti, posta o funzioni dell'amministratore
+        self.assertEqual(self.call("/api/mezzi", cookie="mz")[0], 200)
+        for path in ("/api/report", "/api/mail", "/api/browse?path=", "/api/config"):
+            self.assertEqual(self.call(path, cookie="mz")[0], 403, path)
+        self.assertEqual(self.call("/api/mezzi", cookie="posta")[0], 403)
+        self.assertEqual(self.call("/api/mezzi/carica", {"id": "x"}, cookie="mz")[0], 403)  # Viewpoint: solo admin
+        valori = {"tipo_mezzo": "Terna", "marca": "JCB", "modello": "3CX", "matricola": "JCB1"}
+        # nessun file preso dal disco del PC del programma
+        code, body, _ = self.call("/api/mezzi/salva", {"valori": valori, "documenti": [
+            {"tipo": "ce", "percorso": r"C:\Windows\win.ini"}]}, cookie="mz")
+        self.assertEqual(code, 400)
+        self.assertIn("proprio computer", json.loads(body)["error"])
+        code, body, _ = self.call("/api/mezzi/salva", {"valori": valori, "documenti": []}, cookie="mz")
+        self.assertEqual(code, 200)
+        rec_id = json.loads(body)["pratica"]["id"]
+        # il documento arriva dal browser: corpo = il file
+        def allega(nome, dati, cookie="mz"):
+            req = Request(f"http://127.0.0.1:{self.port}/api/mezzi/allega?id={rec_id}&tipo=ce&nome={nome}", data=dati,
+                          method="POST", headers={"Cookie": f"{vfp_gui.SESSION_COOKIE}={cookie}", "X-VFP-UI": "1",
+                                                  "Content-Type": "application/octet-stream"})
+            try:
+                with urlopen(req, timeout=10) as r:
+                    return r.status, json.loads(r.read())
+            except HTTPError as e:
+                return e.code, json.loads(e.read())
+        code, d = allega("ce.pdf", b"%PDF-1.4 ce\n%%EOF\n")
+        self.assertEqual(code, 200)
+        self.assertEqual([(x["tipo"], x["nome_file"]) for x in d["pratica"]["documenti"]], [("ce", "ce.pdf")])
+        self.assertEqual(allega("virus.exe", b"MZ")[0], 400)
+        self.assertEqual(allega("ce.pdf", b"%PDF", cookie="posta")[0], 403)
+        # il cambio dei dati gia' registrati di una ditta lo conferma solo l'amministratore
+        code, body, _ = self.call("/api/mezzi/salva", {"id": rec_id, "valori": valori, "documenti": [],
+                                                        "aggiorna_anagrafica": True}, cookie="mz")
+        self.assertEqual(code, 400)
+
     def test_senza_sessione(self):
         code, _, _ = self.call("/api/mail/log", cookie="no")
         self.assertEqual(code, 401)
@@ -102,7 +149,7 @@ class ApiTest(unittest.TestCase):
         _, body, _ = self.call("/api/session", cookie="posta")
         info = json.loads(body)
         self.assertEqual((info["role"], info["area"]), ("utente", "posta"))
-        self.assertEqual(set(info["areas"]), {"documenti", "posta"})
+        self.assertEqual(set(info["areas"]), {"documenti", "posta", "mezzi"})
 
     def test_report_per_area(self):
         import report_excel

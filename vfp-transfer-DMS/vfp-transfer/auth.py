@@ -40,7 +40,7 @@ import mail_send
 USERS_PATH = env_config.BASE_DIR / "utenti.json"
 ROLES = {"admin": "Amministratore", "utente": "Utente"}
 # area di lavoro di un utente normale (l'amministratore le vede tutte)
-AREE = {"documenti": "Documenti", "posta": "Posta"}
+AREE = {"documenti": "Documenti", "posta": "Posta", "mezzi": "Mezzi"}
 AREA_PREDEFINITA = "documenti"
 PBKDF2_ITERATIONS = 600_000
 MIN_PASSWORD = 8

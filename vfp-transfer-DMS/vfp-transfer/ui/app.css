@@ -157,7 +157,13 @@ h3 { font: 600 .95rem/1.3 var(--font-ui); }
 .area-btn .nav-count { margin-left: .1rem; }
 .nav-sep { margin: .9rem .75rem .25rem; font: 600 .68rem var(--font-ui); text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.45); }
 body[data-area="posta"] [data-area="documenti"]:not(.area-btn),
-body[data-area="documenti"] [data-area="posta"]:not(.area-btn) { display: none !important; }
+body[data-area="posta"] [data-area="mezzi"]:not(.area-btn),
+body[data-area="documenti"] [data-area="posta"]:not(.area-btn),
+body[data-area="documenti"] [data-area="mezzi"]:not(.area-btn),
+body[data-area="mezzi"] [data-area="documenti"]:not(.area-btn),
+body[data-area="mezzi"] [data-area="posta"]:not(.area-btn) { display: none !important; }
+/* utente dell'area Mezzi: solo la pagina Mezzi (la panoramica riguarda posta e trasferimenti) */
+.role-user[data-area="mezzi"] .tab[data-view="panoramica"] { display: none !important; }
 
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: .4rem; background: rgba(0,0,0,.14); border-radius: 8px; padding: .6rem; }
 .auth-pill {
@@ -223,7 +229,7 @@ body[data-area="documenti"] [data-area="posta"]:not(.area-btn) { display: none !
 /* ---------------------------------------------------------------- form */
 .field { margin-bottom: 1.1rem; }
 .field > label, .field > .label { display: block; font: 600 .85rem var(--font-ui); color: var(--text); margin-bottom: .4rem; }
-input[type=text], input[type=url], input[type=password], input[type=search], input[type=email], textarea, select {
+input[type=text], input[type=url], input[type=password], input[type=search], input[type=email], input[type=date], textarea, select {
   width: 100%; font: 400 .95rem var(--font-body); color: var(--strong);
   background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-btn);
   padding: .65rem .8rem; transition: border-color .2s, box-shadow .2s;
@@ -1019,3 +1025,56 @@ tr.cf-current td { background: var(--blue-soft); }
 }
 #cfStorico .card-actions { align-items: center; flex-wrap: nowrap; }
 @media (max-width: 768px) { #cfStorico .card-actions { flex-wrap: wrap; } }
+
+/* ---------------------------------------------------------------- mezzi a nolo */
+#mzList tr.is-click { cursor: pointer; }
+.mz-bar { position: sticky; top: 3.9rem; z-index: 5; display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; background: var(--save-bar-bg); backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: .6rem .75rem; }
+.mz-bar-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mz-bar-title strong { font: 600 1rem var(--font-ui); color: var(--strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#mzSaveState.is-dirty { color: var(--amber); font-weight: 600; }
+.mz-steps { display: flex; flex-direction: column; gap: 1.5rem; }
+.mz-steps .step-title { margin-bottom: 1.25rem; }
+.mz-sec { border: 0; border-top: 1px solid var(--border); margin: 0; padding: 1rem 0 0; }
+.mz-sec + .mz-sec { margin-top: .5rem; }
+.mz-sec legend { font: 600 .74rem var(--font-ui); text-transform: uppercase; letter-spacing: .08em; color: var(--blue-text); padding-right: .6rem; }
+.mz-sec .field-grid { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); margin-top: .5rem; }
+.mz-wide { grid-column: 1 / -1; }
+.mz-req { color: var(--red); }
+.mz-tag { font: 600 .66rem var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--border-strong); border-radius: 999px; padding: .05rem .4rem; margin-left: .3rem; vertical-align: middle; }
+.mz-note:empty { display: none; }
+.field.mz-from-anag input, .field.mz-from-anag textarea { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green); }
+.field.mz-differs input, .field.mz-differs textarea { border-color: var(--amber); }
+.field.mz-differs .mz-note { color: var(--amber); font-weight: 600; }
+.mz-docs { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 6px; }
+.mz-doc { padding: .7rem .9rem; }
+.mz-doc + .mz-doc { border-top: 1px solid var(--border); }
+.mz-doc-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.mz-doc-head strong { font: 600 .9rem var(--font-ui); color: var(--strong); }
+.mz-doc-head .btn { margin-left: auto; }
+.mz-file { display: flex; align-items: center; gap: .6rem; margin-top: .5rem; padding: .45rem .6rem; background: var(--surface-2); border-radius: 4px; font-size: .87rem; }
+.mz-file > .ic { color: var(--blue-text); flex: none; }
+.mz-fname { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mz-scad { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--muted); }
+.mz-scad input { width: auto; padding: .3rem .5rem; font-size: .85rem; }
+.mz-model select { flex: 1; min-width: 0; }
+.mz-areas { display: flex; flex-direction: column; gap: .75rem; margin: .75rem 0 1rem; }
+.mz-area { border: 1px solid var(--border); border-radius: 6px; padding: .75rem .9rem; background: var(--bg); }
+.mz-area.is-on { border-color: var(--border-strong); box-shadow: inset 3px 0 0 var(--amber); background: var(--surface-2); }
+.mz-area-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .5rem; }
+.mz-check { display: flex; gap: .5rem; align-items: flex-start; font-size: .85rem; color: var(--text); cursor: pointer; }
+.mz-check input { margin-top: .2rem; }
+.mz-area-old { font-size: .82rem; margin: 0 0 .5rem; color: var(--muted); white-space: pre-line; }
+.mz-area textarea { font-size: .88rem; }
+.mz-area textarea:disabled { opacity: .55; }
+.mz-done { display: flex; gap: .75rem; align-items: flex-start; border-radius: var(--radius); padding: .9rem 1.1rem; background: var(--green-soft); font-size: .92rem; }
+.mz-done > .ic { color: var(--green); margin-top: 2px; }
+.mz-done .btn-row { margin-top: .6rem; }
+.mz-dest { display: flex; gap: .6rem; align-items: flex-start; font-size: .9rem; }
+.mz-dest .ic { color: var(--blue-text); flex: none; margin-top: 2px; }
+@media (max-width: 768px) {
+  .mz-bar { flex-wrap: wrap; }
+  .mz-file { flex-wrap: wrap; }
+}
+.mz-esiti { margin-top: 1rem; border: 1px solid var(--border); border-radius: 6px; padding: .75rem .9rem; font-size: .87rem; }
+.mz-esiti ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+.mz-esiti li + li { margin-top: .2rem; }

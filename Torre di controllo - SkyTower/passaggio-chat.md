@@ -1,9 +1,10 @@
 <!-- "><(((º> sabusabu <º)))>< -->
-# Passaggio di consegne — SkyTower CDE, aggiornato al 28/10/2026 (sera)
+# Passaggio di consegne — SkyTower CDE, aggiornato al 29/10/2026
 
-Riassume quattro sessioni di lavoro (27/10 mattina, 27/10 pomeriggio-sera, 28/10, 28/10 sera) per continuare in una
-nuova chat. Leggilo tutto prima di agire. Il file **non si committa**. **La sessione 4 è in §7** e prevale sulle sezioni
-precedenti dove le contraddice (es. istanza 5195/8100, migrazione più recente, account personale).
+Riassume cinque sessioni di lavoro (27/10 mattina, 27/10 pomeriggio-sera, 28/10, 28/10 sera, 28–29/10) per
+continuare in una nuova chat. Leggilo tutto prima di agire. Il file **non si committa**. Le sessioni più recenti
+prevalgono sulle precedenti dove le contraddicono: **§8 (sessione 5)** > §7 (sessione 4) > §1–6.
+**Per ripartire: fine di §8.**
 
 ---
 
@@ -222,7 +223,7 @@ uvicorn.run("cde_api.main:create_app", factory=True, host="127.0.0.1", port=8200
 (500 utenti, upload da 1 GB, 1M documenti), pentest esterno (perimetro in `docs/pentest.md`), UAT con gli utenti
 pilota (`docs/uat.md`), poi produzione.
 
-**Per ripartire nella nuova chat:** vedi la fine di §7.
+**Per ripartire nella nuova chat:** vedi la fine di §8.
 
 ---
 
@@ -282,7 +283,7 @@ Test: pytest completo verde; e2e toccati verdi (31). Nuovi test API: `test_api_p
 `Torre di controllo - SkyTower/modelli-prova/ospedale-complesso.ifc` (0,6 MB) e `ospedale-4-padiglioni.ifc` (2,5 MB,
 2464 elementi). Si rigenerano con `cde genera-ifc`; non si committano.
 
-### In attesa di risposta dell'utente
+### In attesa di risposta dell'utente (risolto in sessione 5, vedi §8)
 
 - **File .blend** (il viewer BIM legge solo IFC). Opzioni proposte:
   1. esportare in IFC da Blender con Bonsai (nessuna modifica);
@@ -294,35 +295,87 @@ Test: pytest completo verde; e2e toccati verdi (31). Nuovi test API: `test_api_p
 
 ### Per ripartire nella nuova chat
 
-1. `/avvio`, poi leggere tutto questo file.
-2. `git status` e `git log -5` (atteso `dbae996` in cima, branch `feat/estrazione-dms`).
-3. Controllare `http://127.0.0.1:8100/health` e la 5195; se spente, lanciare `Avvia SkyTower.bat` (non chiede password).
-4. Chiedere all'utente la scelta per i .blend se non l'ha già data.
-5. Dopo ogni modifica: test, commit + push, **riavvio della 5195 con la versione nuova**.
+Superato: vedi la fine di §8.
 
 ---
 
-## 8. Sessione 5 (28–29/10) — prevale su quanto sopra
+## 8. Sessione 5 (28/10 sera – 29/10) — prevale su quanto sopra
 
-Commit tutti pushati su `feat/estrazione-dms` (ultimo `e2f2535`). Migrazione più recente: **0028**.
+### Richieste e scelte dell'utente
+
+1. "Leggi passaggio-chat e continua ad implementare" → chiesto il formato per i `.blend`: **scelto GLB/glTF nel viewer**.
+2. A metà lavoro: "il naming delle cartelle deve poter essere deciso dalla scheda apposita e trasferito a tutte le
+   cartelle che voglio tramite albero che si apre a popup" → schemi di naming per cartella.
+3. "Continua ad implementare secondo la tabella di marcia" → G43 (derivato IFC), digest "Segui", OCR.
+4. OCR: chiesto il motore → **scelto Tesseract** (già installato sul PC con `ita`).
+5. "Committa e vai avanti", "aggiorna passaggio chat".
+
+### Commit (tutti pushati su `feat/estrazione-dms`, ultimo `e2f2535`)
 
 | Commit | Contenuto |
 |---|---|
-| 9c887bc, 1e33de0, 0c7a5a3 | **glTF/GLB da Blender nel viewer 3D** (scelta utente: opzione GLB). `ModelView.tsx` (ex IfcView) + sorgenti `ifcSource.ts` / `gltfSource.ts` / `model3d.ts`; texture via TextureLoader (CSP invariata), .gltf autonomo ricomposto in .glb, .blend spiega l'export; `tooling/glb_model.py`, `cde genera-glb`; ADR-29, U34 |
-| 2fa9d8f, e9c9b8a, c31ad2d | **Naming per cartella** (richiesta utente): mig. 0026 `naming_profiles` + `containers.naming_profile_id`, `modules/naming_profiles.py`, `cde.set_container_naming`; scheda Naming con tab schemi, "Applica a cartelle…" con albero a spunte nel popup (sottocartelle incluse); nessuna ereditarietà implicita; doc esistenti tengono l'identificativo; campi fissi nella serie per gli schemi di cartella; ADR-30, U35 |
-| f9a52cf, e4cb477, ab5bc9c | **G43 derivato .glb degli IFC pesanti**: `ifc2glb.py` (IfcOpenShell 0.9, geometria locale + matrice in nodi `extras.part`), mig. 0027 `file_derivatives`, soglia `ifc_derivative_min_bytes` (100 MB prod, 2 MB in `cde dev`), viewer con interruttore "Versione ottimizzata / IFC originale"; demo "Modello campus 4 padiglioni"; ADR-31, U36 |
-| 3f51ddf, 6c9d81d, 9adac16 | **Documenti seguiti nel riepilogo**: mig. 0028 `follow_digest` (default true), digest diviso per sezioni, tipo + filtro nel pannello notifiche, switch nel profilo; ADR-32, U37 |
-| 2425838, 7166d3c, e2f2535 | **OCR Tesseract** (scelta utente): `ocr.py` (pypdfium2 + Tesseract ita+eng già installato in `C:\Program Files\Tesseract-OCR`), "Citato in" tollera P0→PO, Dockerfile/CI con tesseract-ocr-ita; demo "Verbale di sopralluogo (scansione)"; ADR-33, U38 |
+| 9c887bc, 1e33de0, 0c7a5a3 | **glTF/GLB da Blender nel viewer 3D**: `components/markup/ModelView.tsx` (ex `IfcView.tsx`, motore three.js generico) + lettori `ifcSource.ts` (web-ifc) e `gltfSource.ts` (GLTFLoader), contratto in `model3d.ts`, caricati a richiesta; texture con TextureLoader (niente fetch: CSP invariata); `.gltf` con data: URI ricomposto in `.glb`; un `.blend` spiega l'export; misure con la scala dell'oggetto; gruppi con nome di piano = piani. API: `model/gltf-binary` e `model/gltf+json` in `VIEWABLE`. `tooling/glb_model.py`, comando `cde genera-glb`, demo "Modello di studio Padiglione C (Blender)". ADR-29, UAT U34 |
+| 2fa9d8f, e9c9b8a, c31ad2d | **Naming per cartella**: mig. **0026** (`naming_profiles`, `containers.naming_profile_id`, `cde.set_container_naming` SECURITY DEFINER), `modules/naming_profiles.py` (CRUD + `PUT /naming-profiles/{id}/containers` con elenco esatto), `load_naming()` in `documents.py` (validate/propose/upload/prenotazioni con `container_id`/`profile_id`), `GET /containers/{id}/naming`. Scheda Naming con tab "Commessa (predefinito)" + schemi, "Nuovo schema per cartelle" (copia della commessa), "Applica a cartelle…" con **albero a spunte nel popup** (sottocartelle incluse di serie). Scelte prese da me: **nessuna ereditarietà implicita**; i documenti già presenti tengono l'identificativo; negli schemi di cartella i campi fissi entrano nella serie del progressivo. ADR-30, UAT U35 |
+| f9a52cf, e4cb477, ab5bc9c | **G43 — derivato .glb degli IFC pesanti**: `cde_api/ifc2glb.py` (IfcOpenShell 0.9, albero spaziale, GUID/tipo/Pset in `extras`, geometria locale in nodi figli `extras.part` con matrice, geometrie ripetute una volta), mig. **0027** `file_derivatives` (RLS = visibilità del file, funzioni `derivative_request/claim/done` per `cde_worker`, 3 tentativi, job ogni 5'), soglia `ifc_derivative_min_bytes` (100 MB prod, **2 MB in `cde dev`**), `Storage.put_file`, campo `derivative` nel download inline. Viewer: interruttore "Versione ottimizzata / IFC originale", etichetta "in preparazione". Demo "Modello campus 4 padiglioni". ADR-31, UAT U36 |
+| 3f51ddf, 6c9d81d, 9adac16 | **Documenti seguiti nel riepilogo**: mig. **0028** `notification_preferences.follow_digest` (default **true**, scelto da me) e `cde.notify` aggiornata; `notifier.sections()` divide il digest per tipo (it/en); campanella con tipo per avviso e filtro; switch nel profilo. ADR-32, UAT U37 |
+| 2425838, 7166d3c, e2f2535 | **OCR**: `cde_api/ocr.py` (pypdfium2 200 dpi + Tesseract `ita+eng`, 60 s/pagina, max 30 pagine, solo pagine con < 20 caratteri), configurazione `ocr_enabled`, `tesseract_cmd`, `ocr_languages`, `ocr_max_pages`; "Citato in" cerca anche la variante P0→PO; Dockerfile e CI installano `tesseract-ocr-ita`; demo "Verbale di sopralluogo (scansione)" (`scanned_pdf` in `demo_content.py`). ADR-33, UAT U38 |
 
-Dipendenze nuove: `ifcopenshell==0.9.0.post1` (+ isodate, lark, numpy, pyparsing, shapely), `pypdfium2==5.14.0`.
-Test: pytest completo verde; e2e 44+ verdi (`rinomina` una volta instabile nel giro completo, verde da solo e al giro dopo).
-Istanza 5195/8100 riavviata con la versione finale (migrazioni fino alla 0028, account personale ripristinato).
+Dipendenze nuove (in `pyproject.toml` e `requirements.lock`): `ifcopenshell==0.9.0.post1` (+ isodate, lark, numpy,
+pyparsing, shapely), `pypdfium2==5.14.0`. Ruote presenti anche per Linux ARM64 (immagine Docker).
 
-Lezioni: heredoc bash con `'''` annidati si troncano → script Python scritti con Write; un test con `mock_aws`
-(ordine alfabetico) azzera moto: nei test che usano S3 dopo, `storage.ensure_bucket()`; Playwright `getByLabel`
-prende anche i pulsanti "Apri X" → `getByRole("checkbox", { name, exact })`; secondo login nello stesso contesto →
-`context().clearCookies()`.
+Test nuovi: `test_glb_model.py`, `test_api_folder_naming.py`, `test_ifc_derivative.py`, `test_api_follow_digest.py`,
+`test_ocr.py`; e2e `gltf.spec.ts`, `naming-cartelle.spec.ts`, `derivato.spec.ts`, `ocr.spec.ts` (si salta senza
+Tesseract); aggiornati `profilo.spec.ts`, `segui.spec.ts`. Esito finale: **pytest completo verde, e2e 44/44**
+(`rinomina` è fallito una volta nel giro completo, verde da solo e al giro successivo: tenere d'occhio).
 
-Restano solo decisioni dell'utente / AWS: OnlyOffice o Collabora, Autodesk APS (DWG), TSA eIDAS, copia vecchia
-`cde/`, apply Terraform + test su staging, pentest esterno, UAT. Sviluppi possibili: caricamento progressivo per
-piano dei modelli enormi (più .glb), ri-OCR dei PDF già indicizzati senza testo.
+Docs: `docs/adr.md` fino ad **ADR-33**, `docs/uat.md` fino a **U38**, README (sezione Stato) aggiornato.
+
+### Istanze (fine sessione 5)
+
+- **5195 / 8100 / 9100** (lanciatore `Avvia SkyTower.bat`): riavviata con la versione finale, migrazioni fino alla
+  **0028**, account personale `a.mangiagi@nexora.srl` ripristinato. Contenuti demo nuovi in coda: Padiglione C
+  (GLB), campus 4 padiglioni (IFC con derivato), verbale scansionato (OCR).
+- Riavvio dopo una modifica: da PowerShell
+  `cmd.exe /c "\"...\Torre di controllo - SkyTower\Avvia SkyTower.bat\"" > <scratchpad>\launcherN.log` in background
+  (il .bat libera da solo le porte); attendere nel log "Account personali pronti" e "SkyTower pronto su http://127.0.0.1:5195".
+- Gli avvisi Vite "dynamically imported … but also statically imported" (Naming, Transmittals) sono vecchi e innocui.
+
+### Lezioni della sessione 5
+
+- Heredoc bash con `'''` annidati o testo lungo si troncano: per patch non banali **scrivere uno script Python con
+  Write nello scratchpad** e lanciarlo con `.venv/Scripts/python`. `python` di sistema su Windows può bloccarsi (stub
+  dello Store): usare sempre il python del venv.
+- Un test con `mock_aws` (ordine alfabetico, es. `test_dbadmin_bootstrap.py`, `test_dev_s3.py`) azzera lo stato
+  globale di moto: nei test successivi che usano S3 chiamare `api_app.state.services.storage.ensure_bucket()`.
+- Il DB di test è condiviso tra moduli e tra esecuzioni: nomi/numeri casuali, pulizia nei fixture.
+- Playwright: `getByLabel("Cartella X")` prende anche il pulsante "Apri Cartella X" → `getByRole("checkbox", { name, exact: true })`;
+  secondo login nella stessa pagina → `page.context().clearCookies()` prima.
+- Non ricompilare il frontend (`npm run build`) mentre gira un e2e completo: `vite preview` serve `dist`.
+- IfcOpenShell 0.9: `ifcopenshell.util.shape.get_shape_matrix(shape)` (4×4 per righe), materiali con
+  `m.diffuse.r()/g()/b()` e `m.transparency` (NaN = opaco), niente normali → le calcola il GLTFLoader (flat shading).
+- OCR: Tesseract legge spesso lo zero dei codici come O ("P0" → "PO").
+
+### Da fare / decisioni aperte (aggiornato)
+
+**Decisioni dell'utente (chiedere, non decidere):**
+1. OnlyOffice o Collabora per modificare Word/Excel in piattaforma.
+2. Autodesk APS per il viewer DWG (licenza).
+3. TSA qualificata eIDAS per `CDE_TSA_URL`.
+4. Copia vecchia `Torre di controllo - SkyTower/cde` (proposta: toglierla dal repository, resta nella storia git).
+
+**Richiedono AWS e persone:** `terraform apply` bootstrap e staging, test di carico su staging (500 utenti, upload
+1 GB, 1M documenti), pentest esterno (`docs/pentest.md`), UAT con utenti pilota (`docs/uat.md`, U01–U38), produzione.
+
+**Sviluppi possibili senza decisioni:** caricamento progressivo per piano dei modelli enormi (più file .glb per il
+derivato); ri-OCR dei PDF già indicizzati con testo vuoto (comando o job); ereditarietà opzionale dello schema di
+naming nelle sottocartelle create dopo (solo se l'utente la vuole).
+
+### Per ripartire nella nuova chat
+
+1. `/avvio`, poi leggere tutto questo file.
+2. `git status` e `git log -5` (atteso `e2f2535` in cima, branch `feat/estrazione-dms`; restano sempre modificati e
+   **non si committano** `skytower/apps/web/tsconfig.tsbuildinfo` e `skytower/packages/iso19650/.coverage`;
+   non versionati `modelli-prova/` e questo file).
+3. Controllare `http://127.0.0.1:8100/health` e la 5195; se spente, lanciare `Avvia SkyTower.bat` (non chiede password).
+4. Chiedere all'utente cosa vuole fra le decisioni aperte o gli sviluppi possibili.
+5. Dopo ogni modifica: test, commit per blocchi + push, **riavvio della 5195 con la versione nuova**.

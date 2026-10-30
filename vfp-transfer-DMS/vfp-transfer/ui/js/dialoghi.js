@@ -30,14 +30,17 @@ function confirmDialog({ title, html, okText = 'Conferma' }) {
 
 // ------------------------------------------------------------------ selettore cartelle
 
-const browse = { kind: 'source', path: '', parent: null };
+const browse = { kind: 'source', path: '', parent: null, onPick: null, lastDoc: '' };
 
-function openBrowser(kind) {
+// kind 'doc': scelta di un documento (pagina Mezzi), il percorso va a onPick
+function openBrowser(kind, { onPick = null } = {}) {
   browse.kind = kind;
-  $('#browseTitle').textContent = kind === 'manifest' ? 'Seleziona il file CSV' : 'Seleziona la cartella di origine';
-  $('#browseSelect').hidden = kind === 'manifest';
-  $('#browseHint').textContent = kind === 'manifest' ? 'Apri le cartelle e clicca sul file CSV.' : 'Apri la cartella desiderata, poi conferma.';
-  const current = (kind === 'manifest' ? $('#manPath').value : kind === 'ai' ? $('#aiSrc').value : $('#srcPath').value).trim();
+  browse.onPick = onPick;
+  const isFile = kind === 'manifest' || kind === 'doc';
+  $('#browseTitle').textContent = kind === 'doc' ? 'Seleziona il documento' : kind === 'manifest' ? 'Seleziona il file CSV' : 'Seleziona la cartella di origine';
+  $('#browseSelect').hidden = isFile;
+  $('#browseHint').textContent = kind === 'doc' ? 'Apri le cartelle e clicca sul file (PDF, Word, Excel, immagini).' : kind === 'manifest' ? 'Apri le cartelle e clicca sul file CSV.' : 'Apri la cartella desiderata, poi conferma.';
+  const current = (kind === 'doc' ? browse.lastDoc : kind === 'manifest' ? $('#manPath').value : kind === 'ai' ? $('#aiSrc').value : $('#srcPath').value).trim();
   let start = current;
   if (kind === 'manifest') start = current ? splitPath(current)[0] : $('#srcPath').value.trim();
   $('#browseModal').hidden = false;
@@ -48,7 +51,7 @@ async function loadBrowse(path) {
   const list = $('#browseList');
   list.innerHTML = '<li><div class="skel skel-row"></div></li><li><div class="skel skel-row"></div></li><li><div class="skel skel-row"></div></li>';
   try {
-    const q = new URLSearchParams({ path, files: browse.kind === 'manifest' ? 'csv' : '' });
+    const q = new URLSearchParams({ path, files: browse.kind === 'manifest' ? 'csv' : browse.kind === 'doc' ? 'doc' : '' });
     const d = await api(`/api/browse?${q}`);
     browse.path = d.path;
     browse.parent = d.parent;
@@ -57,7 +60,7 @@ async function loadBrowse(path) {
     $('#browseSelect').disabled = !d.path;
     const rows = [
       ...d.dirs.map((x) => `<li><button type="button" data-dir="${esc(x.path)}">${icon('folder')}<span>${esc(x.name)}</span><svg class="ic go"><use href="#i-chevron"/></svg></button></li>`),
-      ...d.files.map((x) => `<li><button type="button" class="is-file" data-file="${esc(x.path)}">${icon('table')}<span>${esc(x.name)}</span></button></li>`),
+      ...d.files.map((x) => `<li><button type="button" class="is-file" data-file="${esc(x.path)}">${icon(browse.kind === 'doc' ? 'file' : 'table')}<span>${esc(x.name)}</span></button></li>`),
     ];
     list.innerHTML = rows.join('') || '<li class="empty small">Cartella vuota.</li>';
   } catch (e) {
@@ -72,6 +75,7 @@ $('#browseList').addEventListener('click', (e) => {
   const d = e.target.closest('[data-dir]');
   if (d) return loadBrowse(d.dataset.dir);
   const f = e.target.closest('[data-file]');
+  if (f && browse.onPick) { browse.lastDoc = splitPath(f.dataset.file)[0]; const pick = browse.onPick; closeBrowser(); pick(f.dataset.file); return; }
   if (f) { const before = $('#manPath').value; $('#manPath').value = f.dataset.file; undoRecord($('#manPath'), before); closeBrowser(); onSourceChange(); }
 });
 $('#browseUp').addEventListener('click', () => loadBrowse(browse.parent || ''));
@@ -82,5 +86,5 @@ $('#browseSelect').addEventListener('click', () => {
   $('#srcPath').value = browse.path; undoRecord($('#srcPath'), before); closeBrowser(); onSourceChange();
 });
 $$('#browseModal [data-close]').forEach((b) => b.addEventListener('click', closeBrowser));
-function closeBrowser() { $('#browseModal').hidden = true; }
+function closeBrowser() { $('#browseModal').hidden = true; browse.onPick = null; }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#browseModal').hidden) closeBrowser(); });

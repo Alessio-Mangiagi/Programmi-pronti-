@@ -33,6 +33,10 @@ Le pagine stanno in ui/ (HTML, CSS, JS senza dipendenze); questo file espone una
   GET  /api/report [U]        righe di report_trasferimento.csv  (/api/report.csv = download)
   GET  /api/auth              stato del login Viewpoint
   POST /api/login | /api/logout | /api/state/reset
+  GET  /api/mezzi | /api/mezzi/pratica?id= | /api/mezzi/fornitore?piva= | /api/mezzi/modelli | /api/mezzi/contratto.docx?id=
+  POST /api/mezzi/salva | /api/mezzi/contratto/anteprima | /api/mezzi/contratto | /api/mezzi/dms   (mezzi.py, area mezzi)
+  POST /api/mezzi/allega?id=&tipo=&nome=&scadenza=   file del mezzo dal browser (corpo = il file)   [area mezzi]
+  POST /api/mezzi/carica      documentazione del mezzo in Viewpoint (solo admin)
   /api/confronto/... [U]      confronto documenti (confronto.py): ognuno vede i suoi confronti, l'admin tutti
     GET  stato | storico | jobs/<id> | jobs/<id>/report.(pdf|docx|xlsx) | jobs/<id>/page/<n>/<a|b>
     POST compare (multipart, fino a 200 MB) | jobs/<id>/cancel | jobs/<id>/revisione | jobs/<id>/delete
@@ -60,7 +64,7 @@ from collections import deque
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import Request, urlopen
 
 import ai_smistamento
@@ -72,6 +76,7 @@ import cassaforte
 import confronto
 import env_config
 import mail_send
+import mezzi
 import modelli_protetti
 import report_excel
 import vfp_mail
@@ -336,7 +341,8 @@ def api_save_config(body, user, token=""):
 
 def api_browse(query):
     raw = (query.get("path") or [""])[0].strip()
-    want_csv = (query.get("files") or [""])[0] == "csv"
+    want = (query.get("files") or [""])[0]
+    estensioni = {"csv": {".csv"}, "doc": mezzi.ESTENSIONI_DOC}.get(want, set())
     if not raw:
         if os.name == "nt":
             drives = [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").exists()]
@@ -353,7 +359,7 @@ def api_browse(query):
             try:
                 if p.is_dir():
                     dirs.append({"name": p.name, "path": str(p)})
-                elif want_csv and p.suffix.lower() == ".csv":
+                elif p.suffix.lower() in estensioni and not p.name.startswith("~$"):
                     files.append({"name": p.name, "path": str(p)})
             except OSError:
                 continue
@@ -733,6 +739,108 @@ def api_modelli_visto(body, sess):
     return api_modelli_avvisi()
 
 
+# --------------------------------------------------------------------------- mezzi a nolo (mezzi.py)
+
+def _mezzi():
+    s = env_config.load_settings()
+    return s, mezzi.carica_maschera(s), mezzi.pratiche(s)
+
+
+def _q(query, key):
+    return (query.get(key) or [""])[0].strip()
+
+
+def api_mezzi():
+    s, maschera, pr = _mezzi()
+    return {"maschera": maschera, "pratiche": pr.elenco()}
+
+
+def api_mezzi_pratica(query):
+    _, maschera, pr = _mezzi()
+    rec = pr.leggi(_q(query, "id"))
+    return {"pratica": rec, "documenti_mancanti": mezzi.documenti_mancanti(maschera, rec)}
+
+
+def api_mezzi_fornitore(query):
+    return _mezzi()[2].fornitore(_q(query, "piva"))
+
+
+def api_mezzi_modelli():
+    s, maschera, _ = _mezzi()
+    predefinito = maschera.get("contratto", {}).get("modello_predefinito", "")
+    try:
+        modelli = [m["rel"] for m in modelli_protetti.elenco_modelli(s) if m["gestito"]]
+    except modelli_protetti.ModelloError as e:
+        return {"modelli": [], "predefinito": predefinito, "errore": str(e)}
+    return {"modelli": modelli, "predefinito": predefinito, "errore": ""}
+
+
+def api_mezzi_salva(body, sess):
+    _, maschera, pr = _mezzi()
+    if sess["role"] != "admin":
+        # file presi dal disco di questo PC e cambio dei dati gia' registrati di una ditta (es. IBAN): solo l'admin
+        if any(isinstance(d, dict) and d.get("percorso") for d in body.get("documenti") or []):
+            raise ValueError("I file si caricano dal proprio computer con 'Scegli il file'")
+        if body.get("aggiorna_anagrafica"):
+            raise ValueError("Solo l'amministratore può cambiare i dati già registrati di una ditta")
+    rec = pr.salva(maschera, str(body.get("id") or ""), body.get("valori") or {}, body.get("documenti") or [],
+                   sess["user"], aggiorna_anagrafica=bool(body.get("aggiorna_anagrafica")))
+    attivita.record(sess["user"], "modifica", "Pratica mezzo salvata",
+                    f"{rec['id']} {rec['valori'].get('matricola', '')}", role=sess["role"])
+    if body.get("aggiorna_anagrafica"):
+        attivita.record(sess["user"], "modifica", "Anagrafica fornitore aggiornata da conferma esplicita",
+                        rec["valori"].get("piva", ""), role=sess["role"])
+    return api_mezzi_pratica({"id": [rec["id"]]})
+
+
+def api_mezzi_anteprima(body):
+    s, maschera, pr = _mezzi()
+    return mezzi.anteprima_contratto(s, maschera, pr.leggi(str(body.get("id") or "")), str(body.get("modello") or ""))
+
+
+def api_mezzi_contratto(body, sess):
+    s, _, pr = _mezzi()
+    rec = mezzi.compila_contratto(s, pr, str(body.get("id") or ""), str(body.get("modello") or ""),
+                                  body.get("aree") or {}, sess["user"])
+    attivita.record(sess["user"], "modifica", "Contratto del mezzo compilato",
+                    f"{rec['id']} {rec['contratto']['modello']}", role=sess["role"])
+    return api_mezzi_pratica({"id": [rec["id"]]})
+
+
+def api_mezzi_carica(body):
+    """Documentazione del mezzo in Viewpoint: stesso lavoro (e stessa pagina di avanzamento) del Trasferimento."""
+    s, maschera, pr = _mezzi()
+    rec_id, dry_run = str(body.get("id") or ""), bool(body.get("dry_run"))
+    cartella, manifest, righe = mezzi.prepara_caricamento(s, maschera, pr, rec_id)
+    api_start({"source": str(cartella), "manifest": str(manifest), "dry_run": dry_run})
+    if not dry_run:
+        pr.segna_invio(rec_id, len(righe))
+    return {"ok": True, "file": len(righe), "cartella": righe[0]["folder"] if righe else ""}
+
+
+def api_mezzi_dms(body, sess):
+    """Archivia nel DMS aziendale documenti, contratto e scheda del mezzo (cartella DMS_MEZZI_CARTELLA)."""
+    s, maschera, pr = _mezzi()
+    rec = mezzi.archivia_nel_dms(s, maschera, pr, str(body.get("id") or ""))
+    esiti = rec["dms"]["esiti"]
+    errori = sum(1 for e in esiti if e["esito"] == "errore")
+    attivita.record(sess["user"], "trasferimento", "Mezzo archiviato nel DMS",
+                    f"{rec['id']} {rec['valori'].get('matricola', '')}: {len(esiti) - errori} file, {errori} errori",
+                    "fallito" if errori else "ok", role=sess["role"])
+    return api_mezzi_pratica({"id": [rec["id"]]})
+
+
+def mezzi_contratto_docx(query):
+    _, _, pr = _mezzi()
+    rec = pr.leggi(_q(query, "id"))
+    info = rec.get("contratto")
+    if not info or not Path(info["file"]).is_file():
+        raise ValueError("Contratto non ancora compilato")
+    nome = mezzi.nome_vfp(f"Contratto {rec['valori'].get('marca', '')} {rec['valori'].get('modello', '')} "
+                          f"{rec['valori'].get('matricola', '')}") + ".docx"
+    return Path(info["file"]).read_bytes(), nome
+
+
 def _avvia_confronto():
     """Motore del confronto pronto prima che qualcuno apra la pagina (il primo avvio impiega qualche secondo)."""
     try:
@@ -854,10 +962,24 @@ class Handler(BaseHTTPRequestHandler):
             "/api/activity": ("admin", lambda: api_activity(q, self._token())),
             "/api/ai/status": ("admin", lambda: api_ai_status()),
             "/api/modelli/avvisi": ("admin", lambda: api_modelli_avvisi()),
+            "/api/mezzi": ("area:mezzi", lambda: api_mezzi()),
+            "/api/mezzi/pratica": ("area:mezzi", lambda: api_mezzi_pratica(q)),
+            "/api/mezzi/fornitore": ("area:mezzi", lambda: api_mezzi_fornitore(q)),
+            "/api/mezzi/modelli": ("area:mezzi", lambda: api_mezzi_modelli()),
         }
         if url.path in routes:
             role, fn = routes[url.path]
             return self._allowed(sess, role) and self._guard(fn)
+        if url.path == "/api/mezzi/contratto.docx":
+            if not self._allowed(sess, "area:mezzi"):
+                return
+            try:
+                data, nome = mezzi_contratto_docx(q)
+            except (ValueError, OSError) as e:
+                return self._send(404, {"error": str(e)})
+            attivita.record(sess["user"], "report", "Contratto del mezzo scaricato", nome, role=sess["role"])
+            return self._send(200, data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                              {"Content-Disposition": f"attachment; filename=\"contratto.docx\"; filename*=UTF-8''{quote(nome)}"})
         if url.path == "/api/report.xlsx":
             if not self._allowed(sess, "admin"):
                 return
@@ -921,6 +1043,9 @@ class Handler(BaseHTTPRequestHandler):
         if urlparse(self.path).path.startswith("/api/confronto/"):  # file fino a 200 MB: prima del limite JSON
             sess = self._session()
             return self._allowed(sess, "utente") and self._confronto_post(urlparse(self.path).path, sess)
+        if urlparse(self.path).path == "/api/mezzi/allega":  # documento del mezzo dal browser, anche lui oltre il limite JSON
+            sess = self._session()
+            return self._allowed(sess, "area:mezzi") and self._mezzi_allega(sess)
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -969,6 +1094,11 @@ class Handler(BaseHTTPRequestHandler):
             "/api/ai/start": ("admin", lambda: api_ai_start(body)),
             "/api/activity/session-close": ("admin", lambda: api_session_close(body, sess, self._token())),
             "/api/modelli/avvisi/visto": ("admin", lambda: api_modelli_visto(body, sess)),
+            "/api/mezzi/salva": ("area:mezzi", lambda: api_mezzi_salva(body, sess)),
+            "/api/mezzi/contratto/anteprima": ("area:mezzi", lambda: api_mezzi_anteprima(body)),
+            "/api/mezzi/contratto": ("area:mezzi", lambda: api_mezzi_contratto(body, sess)),
+            "/api/mezzi/dms": ("area:mezzi", lambda: api_mezzi_dms(body, sess)),
+            "/api/mezzi/carica": ("admin", lambda: api_mezzi_carica(body)),
         }
         if path not in routes:
             return self._send(404, {"error": "non trovato"})
@@ -991,6 +1121,40 @@ class Handler(BaseHTTPRequestHandler):
         attivita.record(auth.session(token)["user"], "accesso", "Accesso", "", role=role)
         cookie = f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict{'; Secure' if NET['tls'] else ''}"
         self._send(200, {"ok": True, "role": role}, extra={"Set-Cookie": cookie})
+
+    # ----------------------------------------------------------------------- documenti dei mezzi dal browser
+
+    def _mezzi_allega(self, sess):
+        """Corpo della richiesta = il file; id, tipo, nome e scadenza nell'indirizzo. Scritto a blocchi nella pratica."""
+        q = parse_qs(urlparse(self.path).query)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length <= 0 or length > mezzi.MAX_MB_DOC * 1024 * 1024:
+            self.close_connection = True
+            return self._send(413, {"error": f"File vuoto o oltre {mezzi.MAX_MB_DOC} MB"})
+        tmp = None
+        try:
+            _, maschera, pr = _mezzi()
+            tmp = pr.cartella_upload(_q(q, "id")) / f"{secrets.token_hex(8)}.part"
+            resto = length
+            with open(tmp, "wb") as f:
+                while resto > 0:
+                    blocco = self.rfile.read(min(resto, 1024 * 1024))
+                    if not blocco:
+                        raise ValueError("caricamento interrotto")
+                    f.write(blocco)
+                    resto -= len(blocco)
+            rec = pr.allega(maschera, _q(q, "id"), _q(q, "tipo"), _q(q, "nome"), tmp, _q(q, "scadenza"), sess["user"])
+        except (ValueError, OSError) as e:
+            self.close_connection = True  # il corpo non letto non deve finire nella richiesta successiva
+            if tmp is not None:
+                tmp.unlink(missing_ok=True)
+            return self._send(400, {"error": str(e)})
+        attivita.record(sess["user"], "modifica", "Documento del mezzo caricato", f"{rec['id']} {_q(q, 'nome')}",
+                        role=sess["role"])
+        return self._send(200, api_mezzi_pratica({"id": [rec["id"]]}))
 
     # ----------------------------------------------------------------------- confronto documenti (confronto.py)
 
@@ -1095,6 +1259,8 @@ def _post_event(path, body):
         "/api/mail/check": ("trasferimento", "Controllo posta manuale", ""),
         "/api/mail/test": ("modifica", "Prova di connessione a una casella", str(body.get("kind", ""))),
         "/api/notify/test": ("modifica", "Email di prova inviata", ""),
+        "/api/mezzi/carica": ("trasferimento", "Mezzo: prova di caricamento" if dry else "Mezzo: documentazione caricata in Viewpoint",
+                              str(body.get("id", ""))),
     }
     return events.get(path)
 

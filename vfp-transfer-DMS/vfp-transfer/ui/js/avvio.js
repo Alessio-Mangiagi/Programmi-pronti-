@@ -21,7 +21,8 @@
     toast(e.message, 'err', 10000);
     return;
   }
-  if (!isAdmin()) {  // utente: solo Panoramica
+  if (!isAdmin()) {  // utente: Panoramica e pagine della sua area; l'area Mezzi parte dalla pagina Mezzi
+    if (state.me.area === 'mezzi') { showView('mezzi'); return; }
     await loadMail();
     loadOverview();
     return;

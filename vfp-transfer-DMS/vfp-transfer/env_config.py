@@ -97,6 +97,8 @@ DEFAULTS = {
     "DMS_URL": "",
     "DMS_USER": "",
     "DMS_PASSWORD": "",
+    # id della cartella del DMS sotto cui la pagina Mezzi archivia (Mezzi/<commessa>/<mezzo>): l'unica scrittura nel DMS
+    "DMS_MEZZI_CARTELLA": "1",
     # ---- Microsoft 365 (Graph)
     "GRAPH_TENANT_ID": "",
     "GRAPH_CLIENT_ID": "",
@@ -223,6 +225,8 @@ def validate_settings(values, current):
         u = urlparse(values["DMS_URL"])
         if u.username or u.password or not (u.scheme == "https" or (u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost", "::1"))):
             raise ValueError("DMS_URL: serve https (http solo per un DMS di prova su questo PC)")
+    if values.get("DMS_MEZZI_CARTELLA") and not re.fullmatch(r"[1-9]\d{0,9}", values["DMS_MEZZI_CARTELLA"]):
+        raise ValueError("DMS_MEZZI_CARTELLA: numero (id) della cartella del DMS")
     for k in ("MODULI_DIR", "MODULI_ARCHIVIO", "MODELLI_LAVORO"):
         if k in values and (not re.fullmatch(r"[A-Za-z0-9 _.\-]{1,80}", values[k]) or values[k].startswith("..")):
             raise ValueError(f"{k}: solo il nome di una cartella dentro quella del programma")

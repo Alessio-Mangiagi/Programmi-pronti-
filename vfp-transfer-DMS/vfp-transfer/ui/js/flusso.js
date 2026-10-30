@@ -114,7 +114,7 @@ function openFlowDrawer(g) {
       <span class="att-acts">${badge(d.status)} ${docLink(d.doc_id) || `<span class="mono small muted">${esc(d.doc_id)}</span>`}</span></li>`).join('');
   const protRow = kind === 'pec' ? `<div><dt>Protocollo</dt><dd>
       <span id="flDProt">${x.protocol ? `<span class="mono">${esc(x.protocol)}</span>${x.protocol_source === 'manuale' ? ' <span class="muted small">(corretto a mano)</span>' : ''}` : '<span class="muted">non trovato</span>'}</span>
-      ${x.key ? '<button class="btn-link" type="button" id="flDProtEdit">Correggi</button>' : ''}</dd></div>` : '';
+      ${x.key && isAdmin() ? '<button class="btn-link" type="button" id="flDProtEdit">Correggi</button>' : ''}</dd></div>` : '';
   $('#flDBody').innerHTML = `<dl>
       <div><dt>Mittente</dt><dd>${esc(x.sender || '—')}</dd></div>
       ${protRow}

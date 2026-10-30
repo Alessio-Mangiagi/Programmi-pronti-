@@ -64,6 +64,7 @@
     <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 4 8.5 4.5L12 13 3.5 8.5z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9L17.5 7"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3.5v2.5h-7"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14.5 4.5h-8a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5h8M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/></symbol>
   </defs>
 </svg>
@@ -80,13 +81,15 @@
   <div class="area-switch" role="group" aria-label="Area di lavoro" data-admin>
     <button class="area-btn is-active" type="button" data-area="documenti" aria-pressed="true"><svg class="ic"><use href="#i-folder"/></svg>Documenti</button>
     <button class="area-btn" type="button" data-area="posta" aria-pressed="false"><svg class="ic"><use href="#i-mail"/></svg>Posta<span class="nav-count" id="areaMailCount" hidden>0</span></button>
+    <button class="area-btn" type="button" data-area="mezzi" aria-pressed="false"><svg class="ic"><use href="#i-truck"/></svg>Mezzi</button>
   </div>
   <nav class="nav" role="tablist" aria-label="Sezioni">
     <button class="tab is-active" role="tab" data-area="comune" data-tutti data-view="panoramica" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Panoramica</button>
     <button class="tab" role="tab" data-admin data-area="documenti" data-view="trasferimento" aria-selected="false"><svg class="ic"><use href="#i-swap"/></svg>Trasferimento</button>
     <button class="tab" role="tab" data-admin data-area="documenti" data-view="smistamento" aria-selected="false"><svg class="ic"><use href="#i-spark"/></svg>Smistamento AI</button>
+    <button class="tab" role="tab" data-utente data-area="mezzi" data-view="mezzi" aria-selected="false"><svg class="ic"><use href="#i-truck"/></svg>Mezzi</button>
     <button class="tab" role="tab" data-admin data-area="documenti" data-view="storico" aria-selected="false"><svg class="ic"><use href="#i-history"/></svg>Storico</button>
-    <button class="tab" role="tab" data-admin data-area="posta" data-view="flusso" aria-selected="false"><svg class="ic"><use href="#i-board"/></svg>Flusso posta<span class="nav-count" id="flCount" hidden>0</span></button>
+    <button class="tab" role="tab" data-utente data-area="posta" data-view="flusso" aria-selected="false"><svg class="ic"><use href="#i-board"/></svg>Flusso posta<span class="nav-count" id="flCount" hidden>0</span></button>
     <button class="tab" role="tab" data-admin data-area="posta" data-view="posta" aria-selected="false"><svg class="ic"><use href="#i-mail"/></svg>Caselle email<span class="tab-dot" id="mailDot" hidden></span></button>
     <p class="nav-sep">Strumenti</p>
     <button class="tab" role="tab" data-area="comune" data-tutti data-view="confronto" aria-selected="false"><svg class="ic"><use href="#i-compare"/></svg>Confronta documenti<span class="nav-count nav-count-run" id="cfRunCount" hidden>0</span></button>
@@ -237,7 +240,7 @@
           <button class="chip" data-f="imap">IMAP</button>
           <button class="chip" data-f="pec">PEC</button>
         </div>
-        <button class="btn btn-primary btn-sm" id="flCheck" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
+        <button class="btn btn-primary btn-sm" id="flCheck" type="button" data-admin><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
       </div>
     </div>
     <div class="board" id="flBoard"></div>
@@ -306,6 +309,94 @@
       </div>
       <p class="hint">La cartella si può correggere scrivendone una esistente (l'elenco si apre digitando). I file in "Da smistare" finiscono in quella cartella di Viewpoint, da sistemare a mano.</p>
     </article>
+  </section>
+
+  <!-- ======================================================= MEZZI -->
+  <section class="view" id="view-mezzi" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Contratti e documentazione</p>
+        <h1>Mezzi a nolo</h1>
+        <p class="lead">Scrivi una volta i dati del mezzo, della ditta proprietaria e del contratto: servono sia per compilare le aree gialle del contratto Word sia per archiviare in Viewpoint la documentazione del mezzo, con nomi e descrizioni già pronti.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-primary" id="mzNew" type="button"><svg class="ic"><use href="#i-truck"/></svg>Nuovo mezzo</button>
+      </div>
+    </div>
+
+    <div class="error-box" id="mzLoadError" hidden></div>
+
+    <!-- elenco dei mezzi -->
+    <article class="card" id="mzListCard">
+      <div class="card-head">
+        <div><h2>Mezzi registrati</h2><p class="muted small" id="mzListInfo"></p></div>
+        <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="mzSearch" placeholder="Cerca mezzo, matricola, ditta, commessa"></label>
+      </div>
+      <div class="table-wrap table-scroll">
+        <table class="data">
+          <thead><tr><th>Mezzo</th><th>Matricola / targa</th><th>Proprietaria</th><th>Commessa</th><th>Contratto</th><th>Documenti</th><th>DMS</th></tr></thead>
+          <tbody id="mzList"></tbody>
+        </table>
+        <div class="empty small" id="mzEmpty" hidden>Nessun mezzo ancora. Premi <strong>Nuovo mezzo</strong> per iniziare.</div>
+      </div>
+    </article>
+
+    <!-- maschera del mezzo -->
+    <div id="mzEditor" hidden>
+      <div class="mz-bar">
+        <button class="btn btn-ghost btn-sm" id="mzBack" type="button"><svg class="ic cf-flip"><use href="#i-chevron"/></svg>Tutti i mezzi</button>
+        <div class="mz-bar-title"><strong id="mzTitle">Nuovo mezzo</strong><span class="muted small" id="mzSub"></span></div>
+        <span class="muted small" id="mzSaveState"></span>
+        <button class="btn btn-primary" id="mzSave" type="button"><svg class="ic"><use href="#i-check"/></svg>Salva</button>
+      </div>
+
+      <div class="banner banner-warn" id="mzWarn" hidden><svg class="ic"><use href="#i-alert"/></svg><div id="mzWarnText"></div></div>
+
+      <div class="mz-steps">
+        <article class="card">
+          <div class="step-title"><span class="step-num">1</span><div><h2>Dati del mezzo e del contratto</h2><p class="muted">Con la partita IVA si ritrovano i dati della ditta già registrati. I campi con * sono obbligatori.</p></div></div>
+          <form id="mzForm" class="mz-form" autocomplete="off" novalidate></form>
+        </article>
+
+        <article class="card">
+          <div class="step-title"><span class="step-num">2</span><div><h2>Documentazione del mezzo</h2><p class="muted">Scegli i file dal PC o dalla rete: vengono copiati nella pratica e caricati in Viewpoint con nome e descrizione presi dai dati.</p></div></div>
+          <div id="mzDocs" class="mz-docs"></div>
+          <p class="hint" id="mzDocsHint"></p>
+        </article>
+
+        <article class="card">
+          <div class="step-title"><span class="step-num">3</span><div><h2>Contratto</h2><p class="muted">Si compilano solo le aree gialle del modello Word: l'originale nella cartella condivisa non viene mai modificato.</p></div></div>
+          <div class="field mz-model">
+            <label for="mzModel">Modello del contratto</label>
+            <div class="input-group">
+              <select id="mzModel"></select>
+              <button class="btn btn-secondary" id="mzPreview" type="button"><svg class="ic"><use href="#i-eye"/></svg>Prepara</button>
+            </div>
+            <p class="hint" id="mzModelHint"></p>
+          </div>
+          <div id="mzAreas" hidden>
+            <p class="muted small" id="mzAreasInfo"></p>
+            <div class="mz-areas" id="mzAreaList"></div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="mzCompile" type="button"><svg class="ic"><use href="#i-edit"/></svg>Compila contratto</button>
+            </div>
+          </div>
+          <div class="mz-done" id="mzContract" hidden></div>
+        </article>
+
+        <article class="card">
+          <div class="step-title"><span class="step-num">4</span><div><h2>Archivia nel DMS</h2><p class="muted">Documenti, contratto compilato e scheda del mezzo vanno nel DMS aziendale, nella cartella del mezzo. Se un documento c'è già, diventa una nuova versione.</p></div></div>
+          <p class="mz-dest" id="mzDest"></p>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="mzDms" type="button"><svg class="ic"><use href="#i-upload"/></svg>Archivia nel DMS</button>
+            <button class="btn btn-secondary" id="mzDry" type="button" data-admin><svg class="ic"><use href="#i-flask"/></svg>Prova Viewpoint</button>
+            <button class="btn btn-ghost" id="mzUpload" type="button" data-admin><svg class="ic"><use href="#i-swap"/></svg>Carica in Viewpoint</button>
+          </div>
+          <div class="mz-esiti" id="mzDmsEsito" hidden></div>
+          <input type="file" id="mzFile" hidden accept=".pdf,.p7m,.docx,.doc,.xlsx,.xls,.jpg,.jpeg,.png,.tif,.tiff,.zip">
+        </article>
+      </div>
+    </div>
   </section>
 
   <!-- ======================================================= TRASFERIMENTO -->
@@ -1297,7 +1388,7 @@
     <footer class="drawer-foot">
       <a href="#" class="btn btn-secondary btn-sm" data-goto="storico" data-close-drawer><svg class="ic"><use href="#i-history"/></svg>Storico</a>
       <button class="btn btn-secondary btn-sm" type="button" id="flDRetry" hidden><svg class="ic"><use href="#i-refresh"/></svg>Riprova adesso</button>
-      <button class="btn btn-primary btn-sm" type="button" id="flDCheck"><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
+      <button class="btn btn-primary btn-sm" type="button" id="flDCheck" data-admin><svg class="ic"><use href="#i-refresh"/></svg>Controlla ora</button>
     </footer>
   </aside>
 </div>
@@ -1445,6 +1536,7 @@
 <script src="js/registro-posta.js"></script>
 <script src="js/utenti.js"></script>
 <script src="js/smistamento.js"></script>
+<script src="js/mezzi.js"></script>
 <script src="js/protocolli.js"></script>
 <script src="js/ricerca.js"></script>
 <script src="js/confronto.js"></script>
