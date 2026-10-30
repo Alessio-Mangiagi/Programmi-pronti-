@@ -34,6 +34,7 @@ Le pagine stanno in ui/ (HTML, CSS, JS senza dipendenze); questo file espone una
   GET  /api/auth              stato del login Viewpoint
   POST /api/login | /api/logout | /api/state/reset
   GET  /api/mezzi | /api/mezzi/pratica?id= | /api/mezzi/fornitore?piva= | /api/mezzi/modelli | /api/mezzi/contratto.docx?id=
+  GET  /api/mezzi/commessa?codice= | /api/mezzi/commesse   dati della commessa da CPM/Alyante (ponte.py, sola lettura)
   POST /api/mezzi/salva | /api/mezzi/contratto/anteprima | /api/mezzi/contratto | /api/mezzi/dms   (mezzi.py, area mezzi)
   POST /api/mezzi/allega?id=&tipo=&nome=&scadenza=   file del mezzo dal browser (corpo = il file)   [area mezzi]
   POST /api/mezzi/carica      documentazione del mezzo in Viewpoint (solo admin)
@@ -78,6 +79,7 @@ import env_config
 import mail_send
 import mezzi
 import modelli_protetti
+import ponte
 import report_excel
 import vfp_mail
 import vfp_transfer as vt
@@ -752,7 +754,7 @@ def _q(query, key):
 
 def api_mezzi():
     s, maschera, pr = _mezzi()
-    return {"maschera": maschera, "pratiche": pr.elenco()}
+    return {"maschera": maschera, "pratiche": pr.elenco(), "gestionali": ponte.collegati(s)}
 
 
 def api_mezzi_pratica(query):
@@ -761,8 +763,35 @@ def api_mezzi_pratica(query):
     return {"pratica": rec, "documenti_mancanti": mezzi.documenti_mancanti(maschera, rec)}
 
 
+def _dal_gestionale(s, elenco, leggi, campi):
+    """Dati da CPM/Alyante per i soli campi indicati; None se nessun gestionale fornisce quell'elenco."""
+    if not ponte.collegati(s)[elenco]:
+        return None
+    try:
+        return ponte.solo_campi(leggi(), campi)
+    except ponte.PonteError as e:
+        return {"trovato": False, "valori": {}, "fonti": {}, "errori": [str(e)]}
+
+
 def api_mezzi_fornitore(query):
-    return _mezzi()[2].fornitore(_q(query, "piva"))
+    s, maschera, pr = _mezzi()
+    out = pr.fornitore(_q(query, "piva"))
+    campi = [c["id"] for c in maschera["campi"] if c.get("ambito") == "fornitore"]
+    out["gestionale"] = _dal_gestionale(s, "fornitori", lambda: ponte.ditta(s, out["chiave"]), campi)
+    return out
+
+
+def api_mezzi_commessa(query):
+    """Campi del mezzo (non della ditta) compilabili con i dati della commessa nei gestionali."""
+    s, maschera, _ = _mezzi()
+    campi = [c["id"] for c in maschera["campi"] if c.get("ambito", "documento") == "documento" and c["id"] != "commessa"]
+    return _dal_gestionale(s, "commesse", lambda: ponte.commessa(s, _q(query, "codice")), campi) or {
+        "trovato": False, "valori": {}, "fonti": {}, "errori": []}
+
+
+def api_mezzi_commesse():
+    s = env_config.load_settings()
+    return ponte.commesse(s) if ponte.collegati(s)["commesse"] else {"commesse": [], "errori": []}
 
 
 def api_mezzi_modelli():
@@ -965,6 +994,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/mezzi": ("area:mezzi", lambda: api_mezzi()),
             "/api/mezzi/pratica": ("area:mezzi", lambda: api_mezzi_pratica(q)),
             "/api/mezzi/fornitore": ("area:mezzi", lambda: api_mezzi_fornitore(q)),
+            "/api/mezzi/commessa": ("area:mezzi", lambda: api_mezzi_commessa(q)),
+            "/api/mezzi/commesse": ("area:mezzi", lambda: api_mezzi_commesse()),
             "/api/mezzi/modelli": ("area:mezzi", lambda: api_mezzi_modelli()),
         }
         if url.path in routes:

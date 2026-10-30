@@ -96,6 +96,11 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   del server e `aggiorna_anagrafica` solo admin (`api_mezzi_salva`). DMS: `mezzi.ScritturaDms` (client separato, rotte
   ammesse in `AMMESSE`, cartelle solo sotto `DMS_MEZZI_CARTELLA`), `archivia_nel_dms` usa le stesse righe di
   `righe_dms`; esito in `record["dms"]`. `report_excel.build_report`: un'area diversa da documenti/posta non riceve nulla.
+  Ponte CPM/Alyante (`ponte.py`, sola lettura): impostazioni `CPM_*`/`ALYANTE_*` convertite in `SQL_*` per riusare
+  `sorgente_sql.open_connection`; `ELENCHI` = vista, colonna chiave, ordine dei gestionali; valori cercati validati
+  (`_PIVA_RE`, `_CODICE_RE`) prima di finire nella SELECT. API `/api/mezzi/fornitore` (campo `gestionale`),
+  `/api/mezzi/commessa`, `/api/mezzi/commesse`; in `mezzi.js` `mzRiempi` compila i vuoti e segnala i diversi.
+  Nei test la connessione si passa con `connetti=` (o si sostituisce `ponte.apri`).
 - Modelli Word protetti (trasporti, contratti): `modelli_protetti.py` (logica + CLI, GUI da fare). Documento in
   "Limita modifica" sola lettura; le aree gialle sono le eccezioni `<w:permStart w:id>`...`<w:permEnd>`: si cambiano
   solo i `<w:t>` li' dentro (minima differenza, una riga per paragrafo o sostituzioni `[[da, a]]`), poi
@@ -141,7 +146,8 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Mezzi: format veri in `Programmi-pronti-\Contratti\Modelli Word\Mezzi\FORMAT CONTRATTUALI\<commessa>\` (fuori da
   git, = `MODELLI_SORGENTE` nel `.env` di sviluppo), 293 .doc + 8 .docx. Sostituzioni verificate sul nolo a freddo
   101-003 (16 aree su 21 dai dati); nolo a caldo e righe INPS/INAIL a puntini da provare/compilare a mano.
-  CPM e Alyante: servono documentazione e credenziali delle loro API.
+  CPM e Alyante: ponte (`ponte.py`) pronto ma provato solo con gestionali finti; servono dall'IT server, utente di
+  sola lettura e le viste fornitori/commesse. Come sorgente di documenti per i moduli restano `da_collegare`.
 - Credenziali API (client_id) da richiedere a Trimble/Viewpoint (support@4projects.com).
 - DMS di origine reale ancora da definire: `estrai_dms.py` provato solo contro SeedDMS di prova (hash identici
   all'archivio). Per il DMS vero serve il suo adattatore.

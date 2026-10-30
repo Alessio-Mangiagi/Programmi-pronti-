@@ -11,6 +11,8 @@ const mz = {
   modelli: null,
   anteprima: null,
   ditta: null,       // dati registrati della ditta per la partita IVA scritta
+  gestionali: null,  // {fornitori: ['Alyante'], commesse: ['CPM']}: gestionali collegati (ponte.py)
+  commesseGest: null, // commesse lette dai gestionali, per i suggerimenti del campo commessa
 };
 
 const mzCampi = () => Object.fromEntries(mz.maschera.campi.map((c) => [c.id, c]));
@@ -24,6 +26,7 @@ async function loadMezzi() {
     const d = await api('/api/mezzi');
     mz.maschera = d.maschera;
     mz.list = d.pratiche;
+    mz.gestionali = d.gestionali;
     $('#mzLoadError').hidden = true;
   } catch (e) {
     $('#mzLoadError').hidden = false;
@@ -187,25 +190,57 @@ $('#mzForm').addEventListener('change', async (e) => {
     return;
   }
   mz.ditta = d;
-  if (!d.registrato) { toast('Ditta nuova: i suoi dati verranno registrati al salvataggio.', 'info'); return; }
+  const g = d.gestionale;  // dati della ditta in CPM/Alyante (null se non collegati)
+  const riempiti = d.registrato ? mzRiempi(d.valori, () => 'Registrato', 'fornitore') : 0;
+  const daGest = g && g.trovato ? mzRiempi(g.valori, (k) => g.fonti[k], 'fornitore') : 0;
+  if (g && g.errori.length) toast(`Gestionale non raggiungibile: ${g.errori.join('; ')}`, 'err', 8000);
+  const nomi = g ? [...new Set(Object.values(g.fonti))].join(' e ') : '';
+  const dalGest = daGest ? ` ${daGest} campi compilati da ${nomi}.` : '';
+  if (d.registrato) {
+    toast(`Ditta già registrata: ${(d.nome || d.chiave).replace(/\.$/, '')}. ${riempiti ? `${riempiti} campi compilati dall'anagrafica.` : ''}${dalGest}`, 'ok');
+  } else if (g && g.trovato) {
+    toast(`Ditta trovata in ${nomi}.${dalGest} I suoi dati verranno registrati al salvataggio.`, 'ok');
+  } else {
+    toast('Ditta nuova: i suoi dati verranno registrati al salvataggio.', 'info');
+  }
+});
+
+// valori trovati (anagrafica, CPM, Alyante): riempiono i campi vuoti, quelli diversi dal gia' scritto vengono solo
+// segnalati con da(campo) = da dove viene. Restituisce quanti campi ha riempito.
+function mzRiempi(valori, da, ambito) {
   const campi = mzCampi();
   let riempiti = 0;
-  Object.entries(d.valori).forEach(([k, v]) => {
+  Object.entries(valori || {}).forEach(([k, v]) => {
     const el = $(`#mzf_${k}`);
-    if (!el || !v || campi[k].ambito !== 'fornitore') return;
+    if (!el || !v || !campi[k] || (campi[k].ambito || 'documento') !== ambito) return;
     const box = el.closest('.field');
-    const shown = campi[k].tipo === 'importo' || campi[k].tipo === 'numero' ? v.replace('.', ',') : v;
+    const shown = campi[k].tipo === 'importo' || campi[k].tipo === 'numero' ? String(v).replace('.', ',') : String(v);
     if (!el.value.trim()) {
       el.value = shown;
+      if (el.value !== shown) return;  // scelta non tra le opzioni: il campo resta vuoto
       box.classList.add('mz-from-anag');
+      if (da(k) !== 'Registrato') $('.mz-note', box).textContent = `Da ${da(k)}`;
       riempiti += 1;
-    } else if (el.value.replace(/\s/g, '').toUpperCase() !== String(v).replace(/\s/g, '').toUpperCase()) {
+    } else if (el.value.replace(/\s/g, '').toUpperCase() !== shown.replace(/\s/g, '').toUpperCase()) {
       box.classList.add('mz-differs');
-      $('.mz-note', box).textContent = `Registrato: ${shown}`;
+      $('.mz-note', box).textContent = `${da(k)}: ${shown}`;
     }
   });
   if (riempiti) setMzDirty(true);
-  toast(`Ditta già registrata: ${(d.nome || d.chiave).replace(/\.$/, '')}. ${riempiti ? `${riempiti} campi compilati dall'anagrafica.` : ''}`, 'ok');
+  return riempiti;
+}
+
+// commessa scritta o scelta: CUP, CIG, committente... dai gestionali (solo i campi vuoti)
+$('#mzForm').addEventListener('change', async (e) => {
+  if (e.target.name !== 'commessa' || !e.target.value.trim() || !(mz.gestionali && mz.gestionali.commesse.length)) return;
+  const testo = e.target.value.trim();
+  const codice = (testo.match(/\d{3}-\d{3}/) || [testo])[0];
+  let r;
+  try { r = await api(`/api/mezzi/commessa?codice=${encodeURIComponent(codice)}`); } catch (err) { toast(err.message, 'err'); return; }
+  if (r.errori.length) toast(`Gestionale non raggiungibile: ${r.errori.join('; ')}`, 'err', 8000);
+  if (!r.trovato) { if (!r.errori.length) toast(`Commessa ${codice} non trovata in ${mz.gestionali.commesse.join(' e ')}.`, 'info'); return; }
+  const n = mzRiempi(r.valori, (k) => r.fonti[k], 'documento');
+  toast(`Commessa ${codice}: ${n ? `${n} campi compilati da ${[...new Set(Object.values(r.fonti))].join(' e ')}` : 'nessun campo vuoto da compilare'}.`, 'ok');
 });
 
 // ------------------------------------------------------------------ documentazione
@@ -361,13 +396,19 @@ async function mzEnsureSaved() {
 // riletto a ogni apertura: i modelli nuovi messi nella cartella compaiono senza ricaricare la pagina
 async function loadMzModelli() {
   try { mz.modelli = await api('/api/mezzi/modelli'); } catch (e) { mz.modelli = { modelli: [], errore: e.message }; }
-  // il campo commessa suggerisce le cartelle dei format (una per commessa)
+  // il campo commessa suggerisce le cartelle dei format (una per commessa) e le commesse dei gestionali
   const cartelle = [...new Set(mz.modelli.modelli.map((r) => mzCartella(r)).filter(Boolean))].sort();
+  if (!mz.commesseGest && mz.gestionali && mz.gestionali.commesse.length) {
+    try { mz.commesseGest = (await api('/api/mezzi/commesse')).commesse; } catch { mz.commesseGest = null; }
+  }
+  const nota = cartelle.join(' ').toLowerCase();
+  const daGest = (mz.commesseGest || []).filter((c) => !nota.includes(c.codice.toLowerCase()))
+    .map((c) => `${c.codice}${c.descrizione ? ` ${c.descrizione}` : ''}`);
   const commessa = $('#mzf_commessa');
   if (commessa) {
     let dl = $('#mzCommesse');
     if (!dl) { dl = document.createElement('datalist'); dl.id = 'mzCommesse'; $('#mzForm').appendChild(dl); }
-    dl.innerHTML = cartelle.map((c) => `<option value="${esc(c)}"></option>`).join('');
+    dl.innerHTML = [...cartelle, ...daGest].map((c) => `<option value="${esc(c)}"></option>`).join('');
     commessa.setAttribute('list', 'mzCommesse');
   }
   renderMzModelli();

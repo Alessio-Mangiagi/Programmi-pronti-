@@ -94,6 +94,26 @@ class ApiTest(unittest.TestCase):
         code, body, _ = self.call("/api/mezzi/contratto.docx?id=20260101-000000-abcdef")
         self.assertEqual(code, 404)
 
+    def test_mezzi_dai_gestionali(self):
+        from tests.test_ponte import finto, impostazioni
+        import ponte
+
+        self.assertEqual(json.loads(self.call("/api/mezzi")[1])["gestionali"], {"fornitori": [], "commesse": []})
+        self.assertIsNone(json.loads(self.call("/api/mezzi/fornitore?piva=01234567897")[1])["gestionale"])
+        with mock.patch.dict(self.settings, impostazioni()), mock.patch.object(ponte, "apri", finto()):
+            d = json.loads(self.call("/api/mezzi/fornitore?piva=01234567897", cookie="mz")[1])
+            g = d["gestionale"]
+            self.assertEqual(g["valori"]["iban_dedicato"], "IT60X0542811101000000123456")
+            self.assertEqual(g["fonti"]["banca"], "CPM")
+            d = json.loads(self.call("/api/mezzi/commessa?codice=150-110", cookie="mz")[1])
+            self.assertEqual(d["valori"]["cup"], "J51B21000000001")
+            self.assertNotIn("descrizione", d["valori"])  # non e' un campo della maschera
+            d = json.loads(self.call("/api/mezzi/commesse", cookie="mz")[1])
+            self.assertEqual(len(d["commesse"]), 2)
+            code, body, _ = self.call("/api/mezzi/commessa?codice=x'%20OR%201=1--", cookie="mz")
+            self.assertEqual(json.loads(body)["errori"], ["codice della commessa non valido"])
+            self.assertEqual(self.call("/api/mezzi/commesse", cookie="posta")[0], 403)
+
     def test_utente_dei_mezzi(self):
         # vede solo i mezzi: niente trasferimenti, posta o funzioni dell'amministratore
         self.assertEqual(self.call("/api/mezzi", cookie="mz")[0], 200)

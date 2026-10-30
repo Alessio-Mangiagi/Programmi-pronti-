@@ -436,6 +436,42 @@ modifica letta sta in `stato_sql.json` e avanza solo se il giro finisce senza er
 riconosciuti da `stato_trasferimento.json`, lo stesso dell'interfaccia. Non lanciarlo mentre dall'interfaccia è in
 corso un trasferimento.
 
+## Ponte verso CPM e Alyante (sola lettura)
+
+`ponte.py` legge dai database SQL Server di **CPM** e **Alyante** i dati delle **ditte** (per partita IVA) e delle
+**commesse** (per codice) e li usa per compilare la maschera Mezzi. Come l'archivio SQL **non scrive mai**: solo
+`SELECT` su viste dal nome controllato, valori cercati con formato chiuso, connessione in sola lettura, utente SQL con
+solo `db_datareader`.
+
+Nella pagina Mezzi:
+- scritta la **partita IVA**, i campi vuoti della ditta (ragione sociale, sede, PEC, banca, IBAN...) si compilano dai
+  gestionali, con accanto da dove vengono (*Da Alyante*). Un dato diverso da quello già scritto o registrato in
+  anagrafica non viene sostituito ma **segnalato** (es. *Alyante: IT60X...*): utile come controllo dell'IBAN;
+- scritta o scelta la **commessa** (il campo suggerisce anche le commesse dei gestionali), si compilano CUP, CIG,
+  committente, oggetto e data dell'appalto...;
+- se un gestionale non risponde compare un avviso e la maschera funziona lo stesso.
+
+**Cosa chiedere all'IT**, per ciascun gestionale: server e nome del database, un utente di sola lettura (o accesso
+con l'utente Windows) e una o due **viste**:
+
+| vista | colonna obbligatoria | altre colonne (nomi dei campi della maschera) |
+|---|---|---|
+| `…_VISTA_FORNITORI` | `piva` (11 cifre, senza IT) | `ragione_sociale`, `sede`, `rappresentante`, `pec`, `banca`, `iban_dedicato`, `delegati`, `patente_crediti`... |
+| `…_VISTA_COMMESSE` | `commessa` (codice, es. `150-110`) | `descrizione`, `cup`, `cig`, `committente`, `oggetto_appalto`, `data_appalto`, `cuc`... |
+
+Le colonne che non corrispondono a un campo vengono ignorate. Per le ditte vale prima Alyante (contabilità) e poi
+CPM; per le commesse prima CPM e poi Alyante: il secondo completa i campi rimasti vuoti.
+
+**Impostazioni** nel `.env`, sezione *ponte verso CPM e Alyante*: `CPM_SERVER`, `CPM_DATABASE`, `CPM_AUTH`,
+`CPM_USER`, `CPM_PASSWORD`, `CPM_VISTA_FORNITORI`, `CPM_VISTA_COMMESSE` e le stesse con `ALYANTE_`. Utente e password
+vanno nella cassaforte cifrata; i server si cambiano solo con il codice inviato all'amministratore.
+
+```
+python ponte.py prova                         # collegamento, colonne e righe delle viste
+python ponte.py ditta --piva 01234567897      # cosa arriva per una ditta e da quale gestionale
+python ponte.py commessa --codice 150-110
+```
+
 ## Avvio in VS Code
 
 1. Installare Python da https://www.python.org/downloads/ (spuntare "Add python.exe to PATH").
