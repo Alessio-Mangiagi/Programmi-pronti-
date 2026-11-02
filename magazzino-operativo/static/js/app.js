@@ -118,9 +118,9 @@
     ['ubicazioni', 'Ubicazioni', 'pin'], ['sez', 'Strumenti'], ['importazioni', 'Importazioni', 'import'], ['etichette', 'Etichette', 'tag'], ['amministrazione', 'Amministrazione', 'utenti', 'admin'],
   ];
   function disegnaSidebar(attiva) {
-    $('#sidebar').innerHTML = VISTE.filter(([, , , solo]) => !solo || me.admin).map(([id, nome, icona]) =>
+    $('#sidebar').innerHTML = '<div class="sidebar-brand"><strong>Cosedil S.p.A.</strong><span>Costruiamo il tuo domani</span></div>' + VISTE.filter(([, , , solo]) => !solo || me.admin).map(([id, nome, icona]) =>
       id === 'sez' ? `<div class="sezione">${nome}</div>` :
-        `<a href="#${id}" class="${id === attiva ? 'attiva' : ''}">${ICONE[icona]}<span>${nome}</span></a>`).join('');
+        `<a href="#${id}" class="${id === attiva ? 'attiva' : ''}">${ICONE[icona]}<span>${nome}</span></a>`).join('') + '<div class="sidebar-piede">Suite Cosedil · Magazzino Operativo</div>';
   }
   $('#btn-menu').onclick = () => $('#sidebar').classList.toggle('aperta');
   $('#sidebar').addEventListener('click', () => $('#sidebar').classList.remove('aperta'));
@@ -974,7 +974,9 @@
   (async () => {
     try {
       me = await api('/api/me');
-      $('#testata-utente').textContent = (me.nome || me.username || '') + (me.admin ? ' · admin' : '');
+      const nomeUtente = me.nome || me.username || '';
+      const iniziali = nomeUtente.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?';
+      $('#testata-utente').innerHTML = `<span class="avatar">${h(iniziali)}</span><span>${h(nomeUtente)}${me.admin ? ' · admin' : ''}</span>`;
     } catch (_) { /* senza identità si lavora lo stesso */ }
     naviga();
     battito();
