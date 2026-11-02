@@ -42,7 +42,8 @@ log = logging.getLogger("magazzino")
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = config.UPLOAD_MAX_BYTE
 avvisi.collega_log("magazzino")
-cosedil_sso.init(app, app_id="magazzino")
+# /api/suite/: rotte per le altre app della suite, protette dal token di servizio (suite_rotte.py), non dal cookie.
+cosedil_sso.init(app, app_id="magazzino", percorsi_liberi=("/api/suite/",))
 
 TIPI_UBICAZIONE = ("deposito", "cantiere", "officina", "fornitore", "altro")
 STATI_MEZZO = ("disponibile", "in_uso", "manutenzione", "fermo", "restituito")
@@ -273,7 +274,7 @@ def dettaglio_articolo(c, id_):
 def dettaglio_mezzo(c, id_):
     m = c.execute(
         "SELECT m.*, u.nome AS ubicazione, u.indirizzo AS ubicazione_indirizzo, u.lat AS ubicazione_lat, "
-        "u.lng AS ubicazione_lng FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE m.id = ?",
+        "u.lng AS ubicazione_lng, u.commessa AS ubicazione_commessa FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE m.id = ?",
         (id_,)).fetchone()
     if not m:
         raise ApiError("Mezzo non trovato", 404)
@@ -1124,6 +1125,11 @@ def service_worker():
     r.headers["Service-Worker-Allowed"] = "/"
     return r
 
+
+# Avviato come script il modulo si chiama __main__: suite_rotte fa "from app import app" e
+# senza questa riga importerebbe una SECONDA copia di app.py (rotte su un'app mai servita).
+sys.modules.setdefault("app", sys.modules[__name__])
+import suite_rotte  # noqa: E402, F401  (dialogo con InCampo e SkyTower: usa le funzioni definite qui sopra)
 
 database.init_db()
 

@@ -331,6 +331,15 @@ td .mono, td.mono { white-space: nowrap; }
 .candidato:hover { background: var(--cosedil-blue); color: #fff; }
 .candidato:hover small { color: #e5e7eb; }
 
+/* ---------- dialogo con InCampo e SkyTower ---------- */
+.suite-pannelli { margin-top: 1.25rem; }
+.suite-pannello { border: 1px solid var(--cosedil-border); border-radius: 8px; padding: 0.9rem 1rem; background: #fff; min-width: 0; }
+.suite-pannello .card-testa { margin-bottom: 0.5rem; }
+.suite-pannello h4 { display: inline-flex; align-items: center; gap: 0.5rem; }
+.suite-marchio { font-family: var(--font-display); font-weight: 500; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; background: var(--cosedil-blue); padding: 0.15rem 0.45rem; border-radius: 4px; }
+.suite-pannello .elenco li { padding: 0.5rem 0; }
+.suite-pannello .chip { cursor: pointer; }
+
 /* ---------- mobile: barra tab, operatore, tabelle a schede ---------- */
 .tabbar { display: none; }
 .sidebar-velo { display: none; }

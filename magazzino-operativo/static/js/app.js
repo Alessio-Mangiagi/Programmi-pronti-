@@ -286,7 +286,18 @@
         ris.querySelectorAll('[data-gg]').forEach((b) => { b.onclick = () => caricaAndamento(d.articolo, +b.dataset.gg); });
         caricaAndamento(d.articolo, 90);
       }
-      if (d.tipo === 'mezzo') agganciaGalleria(ris, d.mezzo, () => cerca(d.mezzo.codice));
+      if (d.tipo === 'mezzo') {
+        agganciaGalleria(ris, d.mezzo, () => cerca(d.mezzo.codice));
+        const seg = ris.querySelector('[data-segnala]');
+        if (seg) seg.onclick = async () => {
+          const m = d.mezzo;
+          const nome = [m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' ');
+          let cantieri = [];
+          try { cantieri = (await api(`/api/incampo/commessa/${encodeURIComponent(m.ubicazione_commessa)}`)).cantieri || []; } catch (e) { toast(e.message, 'errore'); return; }
+          modaleSegnalaInCampo(m.ubicazione_commessa, { mezzo_id: m.id, cantieri, titolo: `${nome}${m.targa ? ' ' + m.targa : ''}: `, descrizione: `Segnalazione dal Magazzino sul mezzo ${nome} (${m.targa || m.codice}), ora in ${m.ubicazione || 'ubicazione non registrata'}.` });
+        };
+      }
+      if (d.tipo === 'ubicazione' && d.ubicazione.commessa) caricaPannelliSuite(ris, d.ubicazione.commessa, { ubicazione_id: d.ubicazione.id });
     }
 
     async function caricaAndamento(a, giorni) {
@@ -329,7 +340,7 @@
           <div><div class="totale-grande" style="font-size:1.6rem">${h(m.ubicazione || 'Ubicazione non registrata')}</div>
             <p>${badgeStato(m.stato)} <span class="badge">${m.proprieta === 'nolo' ? 'A nolo' : 'Di proprietà'}</span>${m.assegnato_a ? ` <span class="badge badge-blu">In uso da ${h(m.assegnato_a)}</span>` : ''}</p>
             <p class="muto">${m.targa ? 'Targa ' + h(m.targa) + ' · ' : ''}${m.matricola ? 'Matricola ' + h(m.matricola) : ''}${m.ditta ? '<br>' + h(m.ditta) : ''}${m.nolo_dal || m.nolo_al ? `<br>Nolo ${fmtData(m.nolo_dal)} – ${fmtData(m.nolo_al)}` : ''}${m.note ? '<br>' + h(m.note) : ''}</p>
-            <div class="azioni-rapide"><button class="btn" data-azione="sposta">Sposta / cambia stato</button>${urlMappa({ indirizzo: m.ubicazione_indirizzo, lat: m.ubicazione_lat, lng: m.ubicazione_lng }) ? `<a class="btn btn-sec" href="${h(urlMappa({ indirizzo: m.ubicazione_indirizzo, lat: m.ubicazione_lat, lng: m.ubicazione_lng }))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a>` : ''}</div></div>
+            <div class="azioni-rapide"><button class="btn" data-azione="sposta">Sposta / cambia stato</button>${urlMappa({ indirizzo: m.ubicazione_indirizzo, lat: m.ubicazione_lat, lng: m.ubicazione_lng }) ? `<a class="btn btn-sec" href="${h(urlMappa({ indirizzo: m.ubicazione_indirizzo, lat: m.ubicazione_lat, lng: m.ubicazione_lng }))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a>` : ''}${m.ubicazione_commessa ? `<button class="btn btn-sec" type="button" data-segnala title="Apre un task in InCampo sul cantiere ${h(m.ubicazione_commessa)}">Segnala in InCampo</button>` : ''}</div></div>
           <div><h4>Storico spostamenti</h4>${d.storico.length ? `<table><thead><tr><th>Data</th><th>Da</th><th>A</th><th>Stato</th><th>Chi</th></tr></thead><tbody>
             ${d.storico.map((s) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(s.ts)}</td><td>${h(s.da_nome || '—')}</td><td>${h(s.a_nome || '—')}</td><td>${s.stato ? badgeStato(s.stato) : ''}</td><td class="muto">${h(s.utente || '')}${s.note ? ` <span title="${h(s.note)}">·</span>` : ''}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessuno spostamento registrato.</p>'}</div>
@@ -348,7 +359,7 @@
           <div><h4>Mezzi (${d.mezzi.length})</h4>${d.mezzi.length ? `<table><thead><tr><th>Mezzo</th><th>Targa</th><th>Stato</th></tr></thead><tbody>
             ${d.mezzi.map((m) => `<tr class="riga-link" onclick="location.hash='#scansione/${h(m.codice)}'"><td>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</td><td class="mono">${h(m.targa || '')}</td><td>${badgeStato(m.stato)}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessun mezzo qui.</p>'}</div>
-        </div></div>`;
+        </div>${u.commessa ? pannelliSuite(u.commessa) : '<p class="muto" style="margin-top:1rem">Senza codice commessa l\'ubicazione non si collega a InCampo e SkyTower: aggiungilo in Modifica.</p>'}</div>`;
     }
 
     async function azioneRapida(tipo, d) {
@@ -631,8 +642,17 @@
   // ------------------------------------------------------------------ ubicazioni
   viste.ubicazioni = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Ubicazioni</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/etichette?tipo=ubicazioni" target="_blank">Stampa etichette</a><button class="btn" id="btn-nuovo">Nuova ubicazione</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="/etichette?tipo=ubicazioni" target="_blank">Stampa etichette</a><button class="btn btn-sec" id="btn-incampo" title="Crea un'ubicazione di tipo cantiere per ogni cantiere di InCampo, con codice commessa e indirizzo">Importa cantieri da InCampo</button><button class="btn" id="btn-nuovo">Nuova ubicazione</button></div></div>
       <div class="card" id="tab"></div>`;
+    $('#btn-incampo').onclick = async () => {
+      const b = $('#btn-incampo'); b.disabled = true;
+      try {
+        const r = await api('/api/incampo/importa-cantieri', { method: 'POST', body: {} });
+        toast(`InCampo: ${r.nuove} cantieri nuovi, ${r.aggiornate} aggiornati (${r.commesse} commesse)`, 'ok');
+        await carica();
+      } catch (e) { toast(e.message, 'errore'); }
+      b.disabled = false;
+    };
     const carica = async () => {
       const l = await api('/api/ubicazioni?tutte=1');
       ubicazioniCache = l.filter((u) => u.attivo);
@@ -1059,6 +1079,82 @@
         });
       });
     });
+  }
+
+  // ------------------------------------------------------------------ dialogo con InCampo e SkyTower
+  // Nella scheda di un'ubicazione con codice commessa: task e non conformità del cantiere (InCampo),
+  // documenti pubblicati (SkyTower), segnalazioni e invio del report giacenze. Le altre app possono
+  // essere spente: il pannello lo dice e basta, il resto della scheda funziona.
+  const MARCHIO = (n) => `<span class="suite-marchio">${h(n)}</span>`;
+  const fmtStatoTask = (s) => ({ open: 'Aperto', assigned: 'Assegnato', resolved: 'Risolto', verified: 'Verificato' }[s] || s);
+
+  function pannelliSuite(commessa) {
+    return `<div class="griglia griglia-2 suite-pannelli" data-commessa="${h(commessa)}">
+      <div class="suite-pannello" id="suite-incampo"><div class="card-testa"><h4>${MARCHIO('InCampo')} Cantiere</h4></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      <div class="suite-pannello" id="suite-skytower"><div class="card-testa"><h4>${MARCHIO('SkyTower')} Documenti pubblicati</h4></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    </div>`;
+  }
+
+  async function caricaPannelliSuite(box, commessa, contesto) {
+    const inc = $('#suite-incampo', box), sky = $('#suite-skytower', box);
+    if (!inc || !sky) return;
+    const errore = (el, e, nome) => { el.innerHTML = `<div class="card-testa"><h4>${MARCHIO(nome)}</h4></div><p class="muto">${h(e.message)}</p>`; };
+    api(`/api/incampo/commessa/${encodeURIComponent(commessa)}`).then((d) => {
+      const cant = d.cantieri || [];
+      inc.innerHTML = `<div class="card-testa"><h4>${MARCHIO('InCampo')} ${h(d.commessa && d.commessa.name || 'Cantiere')}</h4>
+          <div class="azioni"><button class="btn btn-piccolo" type="button" id="btn-segnala">Segnala in InCampo</button>${d.commessa && d.commessa.url ? `<a class="btn btn-sec btn-piccolo" href="${h(d.commessa.url)}" target="_blank" rel="noopener">Apri</a>` : ''}</div></div>
+        ${cant.length ? `<div class="chip-riga">${cant.map((c) => `<a class="chip" href="${h(c.url || '#')}" target="_blank" rel="noopener" title="${h(c.address || '')}">${h(c.name)} <b>${c.task_aperti}</b> task · <b>${c.nc_aperte}</b> NC</a>`).join('')}</div>` : '<p class="muto">Nessun cantiere InCampo con questa commessa.</p>'}
+        <h4 style="margin-top:.5rem">Task aperti (${(d.task || []).length})</h4>
+        ${(d.task || []).length ? `<ul class="elenco">${d.task.slice(0, 8).map((t) => `<li onclick="window.open('${h(t.url || '#')}','_blank')"><div class="testo"><strong>${h(t.title)}</strong><span>${fmtStatoTask(t.status)}${t.assigned_to_name ? ' · ' + h(t.assigned_to_name) : ''}${t.due_date ? ' · scade ' + fmtData(t.due_date) : ''}${t.plan_name ? ' · ' + h(t.plan_name) : ''}${t.pin_label ? ' / ' + h(t.pin_label) : ''}</span></div>${ICONE.freccia}</li>`).join('')}</ul>${d.task.length > 8 ? `<p class="muto">e altri ${d.task.length - 8}</p>` : ''}` : '<p class="muto">Nessun task aperto.</p>'}
+        <h4 style="margin-top:.75rem">Non conformità (${(d.nc || []).length})</h4>
+        ${(d.nc || []).length ? `<ul class="elenco">${d.nc.slice(0, 8).map((n) => `<li onclick="window.open('${h(n.url || '#')}','_blank')"><div class="testo"><strong>${h(n.template_name || 'Modulo')}${n.value ? ' · ' + h(n.value) : ''}</strong><span>${fmtData(n.created_at)}${n.plan_name ? ' · ' + h(n.plan_name) : ''}${n.pin_label ? ' / ' + h(n.pin_label) : ''}${n.submitted_by_name ? ' · ' + h(n.submitted_by_name) : ''}</span></div>${ICONE.freccia}</li>`).join('')}</ul>` : '<p class="muto">Nessuna non conformità aperta.</p>'}`;
+      $('#btn-segnala', inc).onclick = () => modaleSegnalaInCampo(commessa, Object.assign({ cantieri: cant }, contesto || {}));
+    }).catch((e) => errore(inc, e, 'InCampo'));
+    api(`/api/skytower/commessa/${encodeURIComponent(commessa)}/documenti`).then((d) => {
+      const voci = d.items || [];
+      sky.innerHTML = `<div class="card-testa"><h4>${MARCHIO('SkyTower')} ${h(d.project && d.project.name || 'Documenti pubblicati')}</h4>
+          <div class="azioni"><button class="btn btn-piccolo" type="button" id="btn-report">Invia report giacenze</button>${d.project && d.project.url ? `<a class="btn btn-sec btn-piccolo" href="${h(d.project.url)}" target="_blank" rel="noopener">Apri</a>` : ''}</div></div>
+        ${voci.length ? `<ul class="elenco">${voci.slice(0, 8).map((v) => `<li onclick="window.open('${h(v.url || '#')}','_blank')"><div class="testo"><strong>${h(v.title)}</strong><span class="mono">${h(v.identifier)} · ${h(v.revision_code || '')}${v.updated_at ? ' · ' + fmtData(v.updated_at) : ''}</span></div>${ICONE.freccia}</li>`).join('')}</ul>${voci.length > 8 ? `<p class="muto">e altri ${voci.length - 8}: aprili in SkyTower</p>` : ''}` : '<p class="muto">Nessun documento pubblicato per questa commessa.</p>'}`;
+      $('#btn-report', sky).onclick = () => inviaReportSkyTower(commessa, $('#btn-report', sky));
+    }).catch((e) => errore(sky, e, 'SkyTower'));
+  }
+
+  // Apre un task in InCampo sul cantiere della commessa (es. mezzo fermo, materiale finito).
+  function modaleSegnalaInCampo(commessa, pre) {
+    const cantieri = (pre && pre.cantieri) || [];
+    const html = `<form id="f" class="form">
+      ${cantieri.length > 1 ? campo('Cantiere', select('project_id', cantieri.map((c) => [c.id, c.name]), pre.project_id), 'pieno') : ''}
+      ${campo('Titolo', input('titolo', (pre && pre.titolo) || '', 'required maxlength="200"'), 'pieno')}
+      ${campo('Descrizione', `<textarea name="descrizione" rows="4">${h((pre && pre.descrizione) || '')}</textarea>`, 'pieno')}
+      <p class="muto pieno">Il task nasce in InCampo sul cantiere, aperto e non assegnato: chi segue il cantiere lo prende in carico da lì.</p>
+      <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Annulla</button><button class="btn" type="submit">Apri il task in InCampo</button></div></form>`;
+    modale(`Segnala in InCampo · ${commessa}`, html, (box) => {
+      $('#annulla', box).onclick = chiudiModale;
+      $('#f', box).onsubmit = async (e) => {
+        e.preventDefault();
+        const d = datiForm(e.target);
+        if (pre && pre.mezzo_id) d.mezzo_id = pre.mezzo_id;
+        if (pre && pre.ubicazione_id) d.ubicazione_id = pre.ubicazione_id;
+        if (!d.project_id && cantieri.length === 1) d.project_id = cantieri[0].id;
+        try {
+          const r = await api(`/api/incampo/commessa/${encodeURIComponent(commessa)}/task`, { method: 'POST', body: d });
+          toast(`Task aperto in InCampo: ${r.title || d.titolo}`, 'ok'); chiudiModale();
+          const pan = document.querySelector('.suite-pannelli');
+          if (pan) caricaPannelliSuite(pan.parentElement, commessa, pre);
+        } catch (err) { toast(err.message, 'errore'); }
+      };
+    });
+  }
+
+  async function inviaReportSkyTower(commessa, btn) {
+    if (!confirm(`Creare su SkyTower un documento PDF con giacenze e mezzi della commessa ${commessa}?`)) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
+    try {
+      const r = await api(`/api/skytower/commessa/${encodeURIComponent(commessa)}/report`, { method: 'POST', body: {} });
+      toast(`Report caricato su SkyTower: ${r.identifier || ''} (${r.revision_code || 'WIP'})`, 'ok');
+      if (r.url) window.open(r.url, '_blank');
+    } catch (e) { toast(e.message, 'errore'); }
+    if (btn) { btn.disabled = false; btn.textContent = 'Invia report giacenze'; }
   }
 
   // ------------------------------------------------------------------ etichette

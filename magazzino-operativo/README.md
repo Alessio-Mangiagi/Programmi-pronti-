@@ -166,6 +166,29 @@ su iPhone si usa Condividi → "Aggiungi alla schermata Home". Il service worker
 cache solo pagina e script (strategia "prima la rete"), le API mai: senza connessione la
 pagina si apre ma non registra, e lo dice.
 
+### Dialogo con InCampo e SkyTower
+
+La chiave è il **codice commessa** scritto sull'ubicazione (es. `101-003`): lo stesso
+che InCampo ha sulla commessa e SkyTower nella scheda *Suite Cosedil* del progetto.
+Nella scheda di un'ubicazione con commessa compaiono due pannelli:
+
+* **InCampo**: cantieri della commessa, task aperti e non conformità (con link), tasto
+  *Segnala in InCampo* che apre un task sul cantiere. Lo stesso tasto sta sulla scheda
+  del mezzo (titolo e descrizione già compilati col mezzo).
+* **SkyTower**: documenti pubblicati della commessa (con link) e tasto *Invia report
+  giacenze*: un PDF con materiale e mezzi della commessa (`pdf_semplice.py`, nessuna
+  dipendenza) caricato come documento WIP nella cartella «Suite Cosedil».
+
+Da *Ubicazioni → Importa cantieri da InCampo* si creano le ubicazioni-cantiere con
+nome, indirizzo e commessa (seconda volta: aggiorna, niente doppioni). InCampo, a sua
+volta, legge `GET /api/suite/commesse/<codice>/giacenze` per mostrare materiale e
+mezzi nella dashboard del cantiere.
+
+Le rotte `/api/suite/...` sono per le altre app (token di servizio, fuori dal gate
+SSO); `/api/incampo/...` e `/api/skytower/...` le chiama la pagina e passano dal
+portale come tutte le altre. Se un'app è spenta il pannello lo dice e il resto
+funziona. Tutto in `suite_rotte.py`; dettagli in `shared/suite/README.md`.
+
 ### Grafici
 
 Le quantità di articoli diversi non si sommano (m³ con kg con pezzi), quindi i grafici
@@ -221,6 +244,8 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `importa_mezzi.py` | lettura delle pratiche mezzi di VFP Transfer |
 | `statistiche.py` | dati per i grafici e stato delle importazioni |
 | `foto.py` | foto dei mezzi: raddrizzamento, riduzione, miniature |
+| `suite_rotte.py` | dialogo con InCampo e SkyTower (rotte `/api/suite`, `/api/incampo`, `/api/skytower`) |
+| `pdf_semplice.py` | PDF di tabelle senza dipendenze (report giacenze per SkyTower) |
 | `static/js/targa.js` | lettura della targa da foto (Tesseract.js + formati targhe italiane) |
 | `static/js/grafici.js` | grafici SVG (colonne impilate, linee, barre, flusso, sparkline) |
 | `static/js/sw.js`, `static/manifest.webmanifest`, `static/icone/` | installazione sul telefono (PWA) |

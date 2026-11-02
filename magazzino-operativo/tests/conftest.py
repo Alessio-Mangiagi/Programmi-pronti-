@@ -10,6 +10,7 @@ import pytest
 
 os.environ["COSEDIL_SSO"] = "off"
 os.environ["MAGAZZINO_IMPORT_SEC"] = "0"
+os.environ["SUITE_TOKEN"] = "token-di-prova"   # dialogo fra app: niente file .token condiviso nei test
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config  # noqa: E402
