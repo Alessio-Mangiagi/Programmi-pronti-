@@ -67,6 +67,9 @@ a { color: var(--cosedil-blue); }
 .task { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .t { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr) 28px; gap: 16px; align-items: center; width: 100%; background: #fff; border: 1px solid var(--linea); border-radius: 10px; padding: 20px; color: var(--ink); min-height: 104px; text-align: left; font: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
 .t:hover, .t:focus-visible { border-color: var(--cosedil-blue); box-shadow: 0 12px 30px -20px rgba(12, 69, 119, .5); }
+/* La scheda col suggerimento aperto sta sopra le altre: la nuvoletta delle schede grandi (InCampo, SkyTower)
+   esce verso il basso e altrimenti finirebbe sotto le schede che seguono. */
+.t:hover, .t:focus-visible, .t:focus-within { z-index: 10; }
 .t:hover .fr, .t:focus-visible .fr { color: var(--cosedil-blue); transform: translateX(3px); }
 .t[hidden] { display: none; }
 .t.busy { cursor: progress; }
