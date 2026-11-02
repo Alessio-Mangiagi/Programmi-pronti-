@@ -281,3 +281,6 @@ td .mono, td.mono { white-space: nowrap; }
 .tabella-mini td { padding: 0.4rem 0.5rem; font-size: 0.85rem; }
 .tabella-mini tbody tr:nth-child(even) { background: transparent; }
 @media (max-width: 768px) { .barre-riga { grid-template-columns: 100px 1fr; } }
+.link-mappa { color: var(--cosedil-blue); vertical-align: middle; }
+.link-mappa:hover { color: var(--cosedil-blue-hover); }
+.btn svg { vertical-align: -2px; }

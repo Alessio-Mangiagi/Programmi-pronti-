@@ -70,6 +70,16 @@ La scansione riconosce anche il **codice esterno** di un articolo (l'EAN del
 fornitore, se c'è), la **targa** e la **matricola** di un mezzo. Chi digita invece di
 scansionare ottiene dei suggerimenti.
 
+### Mappa del cantiere
+
+Ogni ubicazione ha un **indirizzo** e, se si vuole, **latitudine e longitudine**
+(scheda Ubicazioni > Modifica; il form mostra subito il link di verifica). Da lì
+compare il bottone **Mappa**, che apre Google Maps sul punto (le coordinate vincono
+sull'indirizzo); nella scheda dell'ubicazione c'è anche **Indicazioni** (percorso).
+Lo stesso bottone sta nella scheda del mezzo (dov'è adesso) e accanto a ogni
+ubicazione nel "Dove sta" dell'articolo. Le ubicazioni create dall'importazione DDT
+nascono senza indirizzo: va aggiunto una volta.
+
 ### Giacenze
 
 Non esiste una tabella delle giacenze: sono la **somma dei movimenti** per articolo

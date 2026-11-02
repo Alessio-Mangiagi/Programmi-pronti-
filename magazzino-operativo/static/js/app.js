@@ -82,6 +82,15 @@
     return `<span class="badge badge-${m[t] || ''}">${h(t)}</span>`;
   };
   const badgeOrigine = (o) => `<span class="badge">${h({ ddt: 'DDT', vfp: 'VFP', scansione: 'scansione', manuale: 'manuale' }[o] || o)}</span>`;
+  // Google Maps: coordinate se ci sono, altrimenti l'indirizzo; niente -> nessun link.
+  const urlMappa = (u, indicazioni) => {
+    if (!u) return null;
+    const q = u.lat != null && u.lng != null && u.lat !== '' ? `${u.lat},${u.lng}` : (u.indirizzo || '').trim();
+    if (!q) return null;
+    return indicazioni ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  };
+  const btnMappa = (u, cls) => { const url = urlMappa(u); return url ? `<a class="btn btn-sec ${cls || 'btn-piccolo'}" href="${h(url)}" target="_blank" rel="noopener" title="Apri su Google Maps">${ICONE_MAPPA} Mappa</a>` : `<span class="muto" title="Aggiungi indirizzo o coordinate all'ubicazione">senza indirizzo</span>`; };
+  const ICONE_MAPPA = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>';
   const ETICH_TIPO_UBI = { deposito: 'Deposito', cantiere: 'Cantiere', officina: 'Officina', fornitore: 'Fornitore', altro: 'Altro' };
 
   const ICONE = {
@@ -279,7 +288,7 @@
             <p class="muto">${a.categoria ? h(a.categoria) + ' · ' : ''}${a.fornitore ? 'Fornitore ' + h(a.fornitore) : ''}${a.scorta_minima != null ? ` · scorta minima ${fmtN(a.scorta_minima)}` : ''}</p>
             <div class="azioni-rapide"><button class="btn btn-verde" data-azione="carico">Carico</button><button class="btn" data-azione="scarico">Scarico</button><button class="btn btn-sec" data-azione="trasferimento">Trasferimento</button><button class="btn btn-sec" data-azione="inventario">Inventario</button></div></div>
           <div><h4>Dove sta</h4>${d.giacenze.length ? `<table><thead><tr><th>Ubicazione</th><th class="num">Quantità</th><th>Ultimo mov.</th></tr></thead><tbody>
-            ${d.giacenze.map((g) => `<tr><td>${h(g.ubicazione)} <span class="badge">${h(ETICH_TIPO_UBI[g.tipo] || g.tipo)}</span></td><td class="num"><strong>${fmtN(g.quantita)}</strong> ${h(a.um)}</td><td class="muto">${fmtData(g.ultimo_movimento)}</td></tr>`).join('')}
+            ${d.giacenze.map((g) => `<tr><td>${h(g.ubicazione)} <span class="badge">${h(ETICH_TIPO_UBI[g.tipo] || g.tipo)}</span>${urlMappa(g) ? ` <a href="${h(urlMappa(g))}" target="_blank" rel="noopener" title="Apri su Google Maps" class="link-mappa">${ICONE_MAPPA}</a>` : ''}</td><td class="num"><strong>${fmtN(g.quantita)}</strong> ${h(a.um)}</td><td class="muto">${fmtData(g.ultimo_movimento)}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessuna giacenza: registra un carico.</p>'}</div>
         </div>
         <div id="andamento" style="margin-top:1.25rem"><div class="card-testa"><h4>Andamento della giacenza</h4><div class="segmenti">${[[30, '30 gg'], [90, '90 gg'], [365, '1 anno']].map(([g, t]) => `<button type="button" data-gg="${g}">${t}</button>`).join('')}</div></div><div class="grafico" id="g-andamento"></div><div class="tabella-grafico" id="t-andamento"></div></div>
@@ -294,7 +303,7 @@
           <div><div class="totale-grande" style="font-size:1.6rem">${h(m.ubicazione || 'Ubicazione non registrata')}</div>
             <p>${badgeStato(m.stato)} <span class="badge">${m.proprieta === 'nolo' ? 'A nolo' : 'Di proprietà'}</span>${m.assegnato_a ? ` <span class="badge badge-blu">In uso da ${h(m.assegnato_a)}</span>` : ''}</p>
             <p class="muto">${m.targa ? 'Targa ' + h(m.targa) + ' · ' : ''}${m.matricola ? 'Matricola ' + h(m.matricola) : ''}${m.ditta ? '<br>' + h(m.ditta) : ''}${m.nolo_dal || m.nolo_al ? `<br>Nolo ${fmtData(m.nolo_dal)} – ${fmtData(m.nolo_al)}` : ''}${m.note ? '<br>' + h(m.note) : ''}</p>
-            <div class="azioni-rapide"><button class="btn" data-azione="sposta">Sposta / cambia stato</button></div></div>
+            <div class="azioni-rapide"><button class="btn" data-azione="sposta">Sposta / cambia stato</button>${urlMappa({ indirizzo: m.ubicazione_indirizzo, lat: m.ubicazione_lat, lng: m.ubicazione_lng }) ? `<a class="btn btn-sec" href="${h(urlMappa({ indirizzo: m.ubicazione_indirizzo, lat: m.ubicazione_lat, lng: m.ubicazione_lng }))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a>` : ''}</div></div>
           <div><h4>Storico spostamenti</h4>${d.storico.length ? `<table><thead><tr><th>Data</th><th>Da</th><th>A</th><th>Stato</th><th>Chi</th></tr></thead><tbody>
             ${d.storico.map((s) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(s.ts)}</td><td>${h(s.da_nome || '—')}</td><td>${h(s.a_nome || '—')}</td><td>${s.stato ? badgeStato(s.stato) : ''}</td><td class="muto">${h(s.utente || '')}${s.note ? ` <span title="${h(s.note)}">·</span>` : ''}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessuno spostamento registrato.</p>'}</div>
@@ -304,7 +313,8 @@
     function cardUbicazione(d) {
       const u = d.ubicazione;
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Ubicazione</span><h3>${h(u.nome)}</h3><span class="codice">${h(u.codice)}</span><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></div>
-          <div class="azioni"><a class="btn btn-sec btn-piccolo" href="/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni">${urlMappa(u) ? `<a class="btn btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
+        ${u.indirizzo ? `<p class="muto">${h(u.indirizzo)}</p>` : ''}
         <div class="griglia griglia-2">
           <div><h4>Materiale (${d.giacenze.length})</h4>${d.giacenze.length ? `<table><thead><tr><th>Articolo</th><th class="num">Quantità</th></tr></thead><tbody>
             ${d.giacenze.map((g) => `<tr class="riga-link" onclick="location.hash='#scansione/${h(g.codice)}'"><td>${h(g.descrizione)} <span class="muto mono">${h(g.codice)}</span></td><td class="num">${fmtN(g.quantita)} ${h(g.um)}</td></tr>`).join('')}
@@ -595,7 +605,7 @@
       ubicazioniCache = l.filter((u) => u.attivo);
       $('#tab').innerHTML = `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Nome</th><th>Tipo</th><th>Commessa</th><th class="num">Articoli</th><th class="num">Mezzi</th><th></th></tr></thead><tbody>
         ${l.map((u) => `<tr ${u.attivo ? '' : 'style="opacity:.55"'}><td class="mono"><a href="#scansione/${h(u.codice)}">${h(u.codice)}</a></td><td>${h(u.nome)}${u.indirizzo ? `<br><span class="muto">${h(u.indirizzo)}</span>` : ''}</td><td><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></td><td class="muto">${h(u.commessa || '')}</td><td class="num">${u.articoli}</td><td class="num">${u.mezzi}</td>
-          <td style="white-space:nowrap"><button class="btn btn-sec btn-piccolo" data-mod="${u.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${u.id}">Elimina</button>` : ''}</td></tr>`).join('')}
+          <td style="white-space:nowrap">${btnMappa(u)} <button class="btn btn-sec btn-piccolo" data-mod="${u.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${u.id}">Elimina</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>`;
       $('#tab').querySelectorAll('[data-mod]').forEach((b) => { b.onclick = () => formUbicazione(l.find((x) => x.id == b.dataset.mod), carica); });
       $('#tab').querySelectorAll('[data-del]').forEach((b) => {
@@ -612,12 +622,22 @@
       ${campo('Nome', input('nome', u.nome, 'required maxlength="120"'), 'pieno')}
       ${campo('Tipo', select('tipo', Object.entries(ETICH_TIPO_UBI), u.tipo || 'cantiere'))}
       ${campo('Commessa (cartella del Lettore DDT)', input('commessa', u.commessa))}
-      ${campo('Indirizzo', input('indirizzo', u.indirizzo), 'pieno')}
+      ${campo('Indirizzo (per Google Maps)', input('indirizzo', u.indirizzo, 'placeholder="es. Via Etnea 120, Catania"'), 'pieno')}
+      ${campo('Latitudine', input('lat', u.lat, 'type="number" step="any" min="-90" max="90" placeholder="37.5079"'))}
+      ${campo('Longitudine', input('lng', u.lng, 'type="number" step="any" min="-180" max="180" placeholder="15.0830"'))}
+      <div class="pieno muto" id="anteprima-mappa"></div>
       ${u.id ? campo('Attiva', select('attivo', [['1', 'Sì'], ['0', 'No']], u.attivo ? '1' : '0')) : ''}
       ${campo('Note', `<textarea name="note">${h(u.note || '')}</textarea>`, 'pieno')}
       <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Annulla</button><button class="btn" type="submit">Salva</button></div></form>`;
     modale(u.id ? `Modifica ${u.codice}` : 'Nuova ubicazione', html, (box) => {
       $('#annulla', box).onclick = chiudiModale;
+      const anteprima = () => {
+        const d = datiForm($('#f', box));
+        const url = urlMappa({ indirizzo: d.indirizzo, lat: d.lat, lng: d.lng });
+        $('#anteprima-mappa', box).innerHTML = url ? `Verifica: <a href="${h(url)}" target="_blank" rel="noopener">apri su Google Maps</a> (le coordinate, se ci sono, vincono sull'indirizzo)` : 'Con indirizzo o coordinate compare il bottone Mappa.';
+      };
+      ['indirizzo', 'lat', 'lng'].forEach((n) => { $(`[name="${n}"]`, box).oninput = anteprima; });
+      anteprima();
       $('#f', box).onsubmit = async (e) => {
         e.preventDefault();
         try {

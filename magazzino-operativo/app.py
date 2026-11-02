@@ -258,7 +258,7 @@ def dettaglio_articolo(c, id_):
     if not a:
         raise ApiError("Articolo non trovato", 404)
     giac = righe(c.execute(
-        "SELECT g.ubicazione_id, u.nome AS ubicazione, u.tipo, g.quantita, g.ultimo_movimento "
+        "SELECT g.ubicazione_id, u.nome AS ubicazione, u.tipo, u.indirizzo, u.lat, u.lng, g.quantita, g.ultimo_movimento "
         "FROM giacenze g JOIN ubicazioni u ON u.id = g.ubicazione_id WHERE g.articolo_id = ? AND g.quantita <> 0 "
         "ORDER BY g.quantita DESC", (id_,)))
     mov = righe(c.execute(
@@ -271,7 +271,8 @@ def dettaglio_articolo(c, id_):
 
 def dettaglio_mezzo(c, id_):
     m = c.execute(
-        "SELECT m.*, u.nome AS ubicazione FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE m.id = ?",
+        "SELECT m.*, u.nome AS ubicazione, u.indirizzo AS ubicazione_indirizzo, u.lat AS ubicazione_lat, "
+        "u.lng AS ubicazione_lng FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE m.id = ?",
         (id_,)).fetchone()
     if not m:
         raise ApiError("Mezzo non trovato", 404)
@@ -333,8 +334,14 @@ def api_ubicazioni():
 
 
 def _dati_ubicazione(d):
+    lat, lng = numero(d, "lat"), numero(d, "lng")
+    if (lat is None) != (lng is None):
+        raise ApiError("Latitudine e longitudine vanno insieme")
+    if lat is not None and not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise ApiError("Coordinate fuori intervallo")
     return {"nome": testo(d, "nome", True, 120), "tipo": scelta(d, "tipo", TIPI_UBICAZIONE, "cantiere"),
             "commessa": testo(d, "commessa", maxlen=80), "indirizzo": testo(d, "indirizzo"),
+            "lat": lat, "lng": lng,
             "note": testo(d, "note", maxlen=500), "attivo": 0 if d.get("attivo") in (0, False, "0") else 1}
 
 
@@ -343,8 +350,8 @@ def api_ubicazione_crea():
     d = _dati_ubicazione(corpo())
     c = db()
     d["codice"] = codici.prossimo_codice(c, "ubicazioni", config.PREFISSO_UBICAZIONE)
-    cur = c.execute("INSERT INTO ubicazioni (codice, nome, tipo, commessa, indirizzo, note, attivo) "
-                    "VALUES (:codice, :nome, :tipo, :commessa, :indirizzo, :note, :attivo)", d)
+    cur = c.execute("INSERT INTO ubicazioni (codice, nome, tipo, commessa, indirizzo, lat, lng, note, attivo) "
+                    "VALUES (:codice, :nome, :tipo, :commessa, :indirizzo, :lat, :lng, :note, :attivo)", d)
     registra("crea", "ubicazione", cur.lastrowid, d["nome"])
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM ubicazioni WHERE id = ?", (cur.lastrowid,)).fetchone())), 201
@@ -356,8 +363,8 @@ def api_ubicazione_aggiorna(id_):
     d = _dati_ubicazione(corpo())
     d["id"] = id_
     c = db()
-    c.execute("UPDATE ubicazioni SET nome=:nome, tipo=:tipo, commessa=:commessa, indirizzo=:indirizzo, note=:note, "
-              "attivo=:attivo WHERE id=:id", d)
+    c.execute("UPDATE ubicazioni SET nome=:nome, tipo=:tipo, commessa=:commessa, indirizzo=:indirizzo, lat=:lat, "
+              "lng=:lng, note=:note, attivo=:attivo WHERE id=:id", d)
     registra("modifica", "ubicazione", id_, d["nome"])
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM ubicazioni WHERE id = ?", (id_,)).fetchone()))

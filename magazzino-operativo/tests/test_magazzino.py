@@ -365,3 +365,25 @@ def test_area_admin_chiusa_ai_non_admin(client, monkeypatch):
     assert client.get("/api/admin/riepilogo").status_code == 403
     assert client.delete("/api/articoli/1").status_code == 403
     assert client.get("/api/dashboard").status_code == 200
+
+
+# --------------------------------------------------------------------------- ubicazioni: indirizzo e coordinate per la mappa
+
+def test_ubicazione_indirizzo_e_coordinate(client, conn):
+    r = client.post("/api/ubicazioni", json={"nome": "Cantiere Augusta", "indirizzo": "Via Marina 1, Augusta", "lat": "37.2312", "lng": "15.2198"})
+    assert r.status_code == 201 and r.json["lat"] == 37.2312 and r.json["lng"] == 15.2198
+    uid = r.json["id"]
+    # coordinate a metà o fuori intervallo: rifiutate
+    assert client.post("/api/ubicazioni", json={"nome": "X", "lat": "37"}).status_code == 400
+    assert client.post("/api/ubicazioni", json={"nome": "Y", "lat": "95", "lng": "10"}).status_code == 400
+    # modifica senza coordinate le azzera, l'indirizzo resta
+    r = client.put(f"/api/ubicazioni/{uid}", json={"nome": "Cantiere Augusta", "indirizzo": "Via Marina 1, Augusta"})
+    assert r.status_code == 200 and r.json["lat"] is None and r.json["indirizzo"] == "Via Marina 1, Augusta"
+    # la scheda del mezzo e la giacenza dell'articolo portano indirizzo e coordinate dell'ubicazione
+    client.put(f"/api/ubicazioni/{uid}", json={"nome": "Cantiere Augusta", "indirizzo": "Via Marina 1, Augusta", "lat": 37.2312, "lng": 15.2198})
+    m = client.post("/api/mezzi", json={"tipo_mezzo": "Terna", "ubicazione_id": uid}).json["mezzo"]
+    assert m["ubicazione_lat"] == 37.2312 and m["ubicazione_indirizzo"] == "Via Marina 1, Augusta"
+    client.post("/api/articoli", json={"descrizione": "Sabbia", "um": "ton"})
+    client.post("/api/movimenti", json={"tipo": "carico", "articolo_id": 1, "quantita": 5, "a_ubicazione_id": uid})
+    g = client.get("/api/scansione?codice=MAG-00001").json["giacenze"][0]
+    assert g["lat"] == 37.2312 and g["indirizzo"] == "Via Marina 1, Augusta"

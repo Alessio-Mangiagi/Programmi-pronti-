@@ -158,6 +158,11 @@ def init_db(path=None):
         colonne = {r[1] for r in conn.execute("PRAGMA table_info(mezzi)")}
         if "assegnato_a" not in colonne:
             conn.execute("ALTER TABLE mezzi ADD COLUMN assegnato_a TEXT")  # chi lo sta usando
+        colonne = {r[1] for r in conn.execute("PRAGMA table_info(ubicazioni)")}
+        if "lat" not in colonne:
+            # Coordinate per aprire la mappa: opzionali, basta anche l'indirizzo.
+            conn.execute("ALTER TABLE ubicazioni ADD COLUMN lat REAL")
+            conn.execute("ALTER TABLE ubicazioni ADD COLUMN lng REAL")
         # Un deposito c'è sempre: è dove finisce il materiale senza destinazione.
         conn.execute(
             "INSERT OR IGNORE INTO ubicazioni (codice, nome, tipo) VALUES (?, ?, 'deposito')",
