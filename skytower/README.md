@@ -66,6 +66,25 @@ Avvio con un doppio clic: `Torre di controllo - SkyTower\Avvia SkyTower.bat` ric
 API e worker, carica i documenti demo che mancano (`cde demo-contenuti`), crea o aggiorna l'account personale
 (`cde utente-dev`, password chiesta nascosta o da `CDE_NUOVA_PWD`, mai su file) e apre Firefox.
 
+## Suite Cosedil: dialogo con InCampo e Magazzino
+
+Le altre app della suite trovano il progetto dal **codice commessa aziendale**, che il
+Project Admin imposta nella scheda **Suite Cosedil** del progetto (`settings.commessa`;
+in mancanza vale il codice ISO). Rotte `/suite/...` (`apps/api/cde_api/modules/suite.py`),
+protette dal token di servizio di `shared/suite` (header `X-Suite-Token`), non dal JWT:
+
+| Rotta | Cosa fa |
+|---|---|
+| `GET /suite/commesse` | progetti con codice commessa |
+| `GET /suite/commesse/{codice}/documenti?area=PUBLISHED&q=` | documenti della commessa (default: pubblicati) con file e link |
+| `GET /suite/revisioni/{id}/file` | i byte di una revisione (InCampo ne fa una planimetria), stessi controlli del download |
+| `POST /suite/commesse/{codice}/documenti` | un file (corpo della richiesta, nome in `X-Suite-Nome-File`, metadati in query) diventa documento WIP nella cartella «Suite Cosedil» dell'organizzazione, nome a norma (rinomina automatica se attiva, altrimenti primo progressivo libero, tipo `RP`, ruolo `Z`) |
+
+Ogni chiamata gira come un utente SkyTower, perché RLS e permessi sono per utente:
+quello con l'email dell'utente del portale (`X-Suite-Utente`) se esiste, altrimenti
+l'utente tecnico `CDE_SUITE_USER_EMAIL`, altrimenti il primo platform admin (che vede
+solo i progetti di cui è membro). Chi non vede il progetto riceve 404.
+
 ## Test
 
 ```powershell

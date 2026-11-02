@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     webauthn_origins: list[str] = []
     web_base_url: str = "http://localhost:5195"
     cors_origins: list[str] = ["http://localhost:5195"]
+    # Suite Cosedil (InCampo, Magazzino): utente tecnico a cui attribuire le chiamate delle altre app quando
+    # l'utente del portale non ha un account SkyTower (vedi modules/suite.py). None = primo platform admin.
+    suite_user_email: str | None = None
 
     # Storage documenti (S3). s3_endpoint_url solo per emulatori (moto) in dev/test
     s3_bucket: str = "cde-dev-documents"

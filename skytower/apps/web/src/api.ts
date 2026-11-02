@@ -204,6 +204,8 @@ export interface Project {
   owner_name?: string;
   my_roles?: string[];
   my_permissions?: Record<Action, Record<Scope, boolean>>;
+  /** Impostazioni libere; `commessa` = codice commessa aziendale, la chiave con cui InCampo e Magazzino trovano il progetto. */
+  settings?: Record<string, unknown> & { commessa?: string };
 }
 
 export interface Container {

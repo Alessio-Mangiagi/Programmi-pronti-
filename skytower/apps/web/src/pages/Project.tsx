@@ -19,6 +19,7 @@ const MembersTab = lazy(() => import("./project/Members").then((m) => ({ default
 const OrganizationsTab = lazy(() => import("./project/Organizations").then((m) => ({ default: m.OrganizationsTab })));
 const RolesTab = lazy(() => import("./project/Roles").then((m) => ({ default: m.RolesTab })));
 const NamingTab = lazy(() => import("./project/Naming").then((m) => ({ default: m.NamingTab })));
+const SuiteTab = lazy(() => import("./project/Suite").then((m) => ({ default: m.SuiteTab })));
 
 const TABS = [
   { path: "cartelle", label: "Cartelle" },
@@ -31,6 +32,7 @@ const TABS = [
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
   { path: "naming", label: "Naming" },
+  { path: "suite", label: "Suite Cosedil" },
   { path: "cruscotto", label: "Cruscotto", adminOnly: true },
   { path: "registro", label: "Registro", adminOnly: true },
 ];
@@ -85,6 +87,7 @@ export function ProjectPage() {
         <Route path="organizzazioni" element={<OrganizationsTab project={project} canManage={isProjectAdmin} />} />
         <Route path="ruoli" element={<RolesTab project={project} canManage={isProjectAdmin} />} />
         <Route path="naming" element={<NamingTab project={project} canManage={isProjectAdmin} />} />
+        <Route path="suite" element={<SuiteTab project={project} canManage={isProjectAdmin} />} />
       </Routes>
       </Suspense>
     </Stack>
