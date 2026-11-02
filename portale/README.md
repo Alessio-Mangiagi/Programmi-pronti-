@@ -90,6 +90,8 @@ Sotto il cofano è il campo `apps` in `data/utenti.json` — l'elenco esatto dei
 
 Chi **non ha il campo** (utenti storici, import da Excel) segue il **default**: tutti i programmi tranne quelli riservati. Il campo è letto **da disco a ogni richiesta**, non dal cookie: una revoca vale subito, senza aspettare la scadenza della sessione né obbligare l'utente a rifare login (il gate SSO delle app ha però una cache di 30 secondi).
 
+**Programmi in evidenza.** Un'app con `principale: true` nel registro `APPS` (oggi **InCampo** e **SkyTower**) compare nella home degli utenti in alto, in una scheda grande e blu con nome, descrizione e pulsante "Apri", sopra la sezione "Tutti gli strumenti". SkyTower resta riservata: la scheda grande la vede solo chi vi ha accesso.
+
 **Programmi riservati.** Un'app con `riservata: true` nel registro `APPS` resta fuori dal default: la vedono gli admin e i soli utenti a cui è stata spuntata. Oggi lo è **Verifica Requisiti**, che tratta documenti contrattuali (DURC, visure, certificati). Nelle caselle è marcata *riservato*. Le app `adminOnly` (Trimble, Auguri) non hanno casella: seguono il ruolo e basta.
 
 Per chi non ha un programma, quel programma **non esiste**: sparisce dalle card e dallo stato, `avvia`/`apri` rispondono `404`, e l'assistente non ne parla. Chi ne conosce l'indirizzo e lo digita a mano non entra lo stesso: `GET /api/verify?app=<id>` risponde `403` e il gate SSO dell'app chiude la porta con "chiedi l'abilitazione a un amministratore". Nascondere la card senza chiudere il gate sarebbe stato un cartello, non una serratura.

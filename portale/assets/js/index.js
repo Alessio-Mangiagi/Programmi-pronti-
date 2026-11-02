@@ -16,6 +16,8 @@ const TRATTI = {
   requisiti: '<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/><path d="m8 11 2.2 2.2L14.5 9"/>',
   trimble: '<path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/>',
   incampo: '<path d="M3 7v13l6-2 6 2 6-2V5l-6 2-6-2-3 1"/><path d="M15 7v5"/><path d="M9 5v13"/><path d="M15 21v-2"/>',
+  skytower: '<path d="M9 21V9l3-6 3 6v12"/><path d="M9 13h6M9 17h6"/><path d="M4 21h16"/><path d="M5 21v-5l4-2M19 21v-5l-4-2"/>',
+  magazzino: '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   auguri: '<path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/>',
 };
 const icona = (id) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${TRATTI[id] || TRATTI.ddt}</svg>`;
@@ -31,14 +33,32 @@ const elVuoto = document.getElementById('vuoto');
 // Per il filtro: minuscolo e senza accenti ("attività" trova "attivita").
 const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-function render() {
-  elTask.innerHTML = apps.map((a) => `
+// Scheda normale: l'attività in grande, l'app in piccolo.
+const schedaHtml = (a) => `
     <button type="button" class="t" data-id="${esc(a.id)}" aria-describedby="tip-${esc(a.id)}">
       <span class="ic">${icona(a.id)}</span>
       <span><b>${esc(a.fai || a.nome)}</b><small>con <i>${esc(a.nome)}</i> · ${esc(a.sottotitolo)}</small></span>
       <span class="fr">${FRECCIA}</span>
       <span class="tip" role="tooltip" id="tip-${esc(a.id)}">${esc(a.guida || a.desc)}<em>Clic per aprire ${esc(a.nome)}. Se è spenta parte da sola in qualche secondo.</em></span>
-    </button>`).join('');
+    </button>`;
+
+// Scheda in evidenza (app principali: InCampo, SkyTower): grande, blu, con il
+// nome dell'app come titolo, la descrizione per esteso e il pulsante "Apri".
+const schedaGrandeHtml = (a) => `
+    <button type="button" class="t grande" data-id="${esc(a.id)}" aria-describedby="tip-${esc(a.id)}">
+      <span class="ic">${icona(a.id)}</span>
+      <span class="testo"><small class="sopra">${esc(a.fai || '')}</small><b>${esc(a.nome)}</b><span class="sotto">${esc(a.sottotitolo)}</span><span class="desc">${esc(a.desc)}</span></span>
+      <span class="apri-grande">Apri ${esc(a.nome)} ${FRECCIA}</span>
+      <span class="tip" role="tooltip" id="tip-${esc(a.id)}">${esc(a.guida || a.desc)}<em>Clic per aprire ${esc(a.nome)}. Se è spenta parte da sola in qualche secondo.</em></span>
+    </button>`;
+
+function render() {
+  const principali = apps.filter((a) => a.principale);
+  const altre = apps.filter((a) => !a.principale);
+  elTask.innerHTML =
+    (principali.length ? `<div class="principali" id="principali"><p class="sez">In evidenza</p>${principali.map(schedaGrandeHtml).join('')}</div>` : '') +
+    (principali.length && altre.length ? '<p class="sez" id="sezAltre">Tutti gli strumenti</p>' : '') +
+    altre.map(schedaHtml).join('');
   elTask.querySelectorAll('.t').forEach((b) => b.addEventListener('click', () => apriApp(b.dataset.id)));
 }
 
@@ -115,12 +135,18 @@ window.apriApp = apriApp;   // usata anche dai pulsanti dell'assistente (chat.js
 function filtra() {
   const q = norm(elQ.value).trim();
   let visibili = 0;
+  let visibiliGrandi = 0;
   for (const b of elTask.querySelectorAll('.t')) {
     const a = apps.find((x) => x.id === b.dataset.id);
     const ok = !q || norm([a.fai, a.nome, a.sottotitolo, a.desc, a.guida].join(' ')).includes(q);
     b.hidden = !ok;
-    if (ok) visibili++;
+    if (ok) { visibili++; if (b.classList.contains('grande')) visibiliGrandi++; }
   }
+  // Con un filtro attivo le intestazioni delle sezioni spariscono se la sezione è vuota.
+  const blocco = document.getElementById('principali');
+  if (blocco) blocco.hidden = visibiliGrandi === 0;
+  const sezAltre = document.getElementById('sezAltre');
+  if (sezAltre) sezAltre.hidden = !!q || visibili === visibiliGrandi;
   elVuoto.hidden = visibili > 0;
 }
 

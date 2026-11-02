@@ -76,6 +76,27 @@ a { color: var(--cosedil-blue); }
 .t b { display: block; font-weight: 500; font-size: 19px; line-height: 1.25; }
 .t small { color: var(--grigio); font-size: 13.5px; }
 .t small i { font-style: normal; color: var(--cosedil-green-text); font-weight: 600; }
+/* App principali (InCampo, SkyTower): schede grandi e blu sopra tutte le altre */
+.task .sez { grid-column: 1 / -1; margin: 6px 0 -4px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--cosedil-blue); display: flex; align-items: center; gap: 8px; }
+.task .sez::before { content: ""; width: 18px; height: 2px; background: var(--cosedil-green); border-radius: 2px; }
+.task .sez[hidden] { display: none; }
+.principali { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-bottom: 10px; }
+.principali[hidden] { display: none; }
+.principali .sez { margin-top: 0; }
+.t.grande { grid-template-columns: 84px minmax(0, 1fr); grid-template-rows: auto auto; gap: 8px 22px; align-items: start; min-height: 220px; padding: 26px 28px 24px; border: 0; border-radius: 14px; color: #fff; background: radial-gradient(circle at 94% 112%, rgba(101, 188, 123, .2) 0 130px, transparent 131px), linear-gradient(135deg, #0a3b66 0%, var(--cosedil-blue) 55%, #1261a3 100%); box-shadow: 0 18px 40px -22px rgba(12, 69, 119, .7); }
+.t.grande:hover, .t.grande:focus-visible { box-shadow: 0 24px 48px -20px rgba(12, 69, 119, .8); transform: translateY(-2px); }
+.t.grande .ic { width: 84px; height: 84px; grid-row: 1 / 3; background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .2); }
+.t.grande .ic svg { width: 42px; height: 42px; }
+.t.grande .testo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.t.grande .sopra { color: #a9d8b6; font-size: 12.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.t.grande b { font-size: 32px; line-height: 1.1; font-weight: 500; letter-spacing: -.01em; }
+.t.grande .sotto { font-size: 15px; color: rgba(255, 255, 255, .78); }
+.t.grande .desc { margin-top: 10px; font-size: 14px; line-height: 1.5; color: rgba(255, 255, 255, .88); max-width: 46ch; }
+.t.grande .apri-grande { grid-column: 2; justify-self: start; display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; min-height: 44px; padding: 0 20px; border-radius: 6px; background: #fff; color: var(--cosedil-blue); font-family: var(--font-display); font-weight: 500; font-size: 14px; letter-spacing: .04em; text-transform: uppercase; transition: background .15s, transform .15s; }
+.t.grande:hover .apri-grande { background: #e8f0f7; transform: translateX(3px); }
+.t.grande .tip { bottom: auto; top: calc(100% + 10px); }
+.t.grande .tip::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: var(--ink); }
+.t.grande.busy .apri-grande { animation: pulsa 1s ease-in-out infinite; }
 .fr { color: #9aa5b1; transition: transform .15s; }
 .vuoto { margin: 0; color: var(--grigio); }
 .vuoto[hidden] { display: none; }
@@ -115,6 +136,15 @@ a { color: var(--cosedil-blue); }
   .linee { margin-top: 8px; }
   .linee [data-tip]::after { display: none; }   /* su telefono non c'è hover: il testo del link basta */
   .lay { min-height: 0; }
+}
+@media (max-width: 720px) {
+  .principali { grid-template-columns: 1fr; }
+  .t.grande { grid-template-columns: 60px minmax(0, 1fr); padding: 20px; min-height: 0; gap: 6px 16px; }
+  .t.grande .ic { width: 60px; height: 60px; }
+  .t.grande .ic svg { width: 30px; height: 30px; }
+  .t.grande b { font-size: 24px; }
+  .t.grande .desc { display: none; }
+  .t.grande .apri-grande { grid-column: 1 / -1; justify-self: stretch; justify-content: center; }
 }
 @media (max-width: 420px) { .task { grid-template-columns: 1fr; } .invia { padding: 0 12px; } }
 @media (hover: none) { .t .tip, [data-tip]::after, .solo-mouse { display: none; } }

@@ -102,6 +102,8 @@ const LOGIN_LOCK_MS = 15 * 60 * 1000;
 //         è il titolo della scheda nella home degli utenti.
 // guida — due righe su cosa serve e cosa succede dentro l'app: il suggerimento
 //         che compare passando sopra la scheda.
+// principale — true per le app di punta (InCampo, SkyTower): nella home degli
+//         utenti stanno in alto, in grande, sopra tutte le altre.
 const APPS = [
   {
     id: 'ddt',
@@ -210,6 +212,7 @@ const APPS = [
     id: 'incampo',
     nome: 'InCampo',
     sottotitolo: 'Gestione cantiere',
+    principale: true,
     fai: 'Seguire il lavoro in cantiere',
     guida: 'Planimetrie con i pin, moduli di controllo, task e non conformità. Dentro si entra con il proprio account InCampo; c’è anche l’app per telefono, che funziona senza rete.',
     desc: 'Planimetrie con pin, moduli di controllo, task e non conformità dei cantieri, da web e da app mobile anche offline.',
@@ -229,6 +232,7 @@ const APPS = [
     id: 'skytower',
     nome: 'SkyTower',
     sottotitolo: 'Documenti di commessa (CDE ISO 19650)',
+    principale: true,
     fai: 'Condividere i documenti di progetto',
     guida: 'Carichi elaborati e revisioni con il nome ISO 19650, li porti da WIP a condiviso a pubblicato e segui approvazioni e RFI. Dentro si entra con il proprio account SkyTower.',
     desc: 'Ambiente di condivisione dati (CDE) secondo ISO 19650: documenti e revisioni, stati WIP/Shared/Published, approvazioni e RFI tra le aziende del cantiere.',
@@ -2020,6 +2024,7 @@ async function handle(req, res) {
         fai: a.fai, guida: a.guida,   // home utenti: l'attività e il suggerimento al passaggio del mouse
         porta: a.porta, tipo: a.tipo, url: appUrl(req, a),
         adminOnly: !!a.adminOnly,   // la home le raggruppa in "Area riservata"
+        principale: !!a.principale,   // home utenti: in alto e in grande
       })),
     });
   }
