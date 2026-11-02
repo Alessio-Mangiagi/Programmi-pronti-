@@ -26,6 +26,7 @@ import config
 import database
 import importa_ddt
 import importa_mezzi
+import statistiche
 
 # Codice condiviso della suite (cartelle sorelle, non pacchetti installati).
 _SHARED = os.path.join(config.SUITE_DIR, "shared")
@@ -642,18 +643,42 @@ def api_mezzo_elimina(id_):
 # --------------------------------------------------------------------------- importazioni
 
 _lock_import = threading.Lock()
+# Stato del ciclo di importazione, letto dalla pagina Importazioni (polling):
+# cosa sta girando adesso, quando è finito l'ultimo giro, quando parte il prossimo.
+_stato_import = {"in_corso": None, "ultimo_avvio": None, "ultimo_fine": None, "prossimo": None,
+                 "giri": 0, "ultimi_esiti": {}, "ultimo_errore": None}
+_lock_stato = threading.Lock()
+
+
+def _adesso():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _esegui_import(sorgente, forza=False):
     """Importazione con una connessione propria (gira anche nel thread di sfondo)."""
     with _lock_import:
+        with _lock_stato:
+            _stato_import["in_corso"] = sorgente
+            _stato_import["ultimo_avvio"] = _adesso()
         conn = database.get_db()
         try:
             if sorgente == "ddt":
-                return importa_ddt.importa_cartella(conn, forza=forza)
-            return importa_mezzi.importa_cartella(conn, forza=forza)
+                esiti = importa_ddt.importa_cartella(conn, forza=forza)
+            else:
+                esiti = importa_mezzi.importa_cartella(conn, forza=forza)
+            with _lock_stato:
+                _stato_import["ultimi_esiti"][sorgente] = {"quando": _adesso(), "voci": len(esiti),
+                                                           "errori": sum(1 for e in esiti if e.get("esito") == "errore")}
+            return esiti
+        except Exception as e:
+            with _lock_stato:
+                _stato_import["ultimo_errore"] = {"sorgente": sorgente, "quando": _adesso(), "testo": str(e)}
+            raise
         finally:
             conn.close()
+            with _lock_stato:
+                _stato_import["in_corso"] = None
+                _stato_import["ultimo_fine"] = _adesso()
 
 
 @app.get("/api/importazioni")
@@ -697,9 +722,31 @@ def api_importa_upload():
     return jsonify({"ok": True, "esiti": esiti})
 
 
+@app.get("/api/importazioni/stato")
+def api_importazioni_stato():
+    """Quadro vivo delle importazioni: ciclo di sfondo, export per commessa con il
+    loro stato (letto / da leggere / errore), pratiche mezzi, righe per giorno."""
+    c = db()
+    with _lock_stato:
+        ciclo = dict(_stato_import)
+        ciclo["ultimi_esiti"] = dict(ciclo["ultimi_esiti"])
+    ciclo["intervallo_sec"] = config.IMPORT_INTERVALLO_SEC
+    ciclo["attivo"] = config.IMPORT_INTERVALLO_SEC > 0
+    return jsonify({
+        "ciclo": ciclo,
+        "ddt": statistiche.stato_ddt(c),
+        "mezzi": statistiche.stato_mezzi(c),
+        "per_giorno": statistiche.importazioni_per_giorno(c, 14),
+        "errori": righe(c.execute(
+            "SELECT ts, sorgente, chiave, dettaglio FROM importazioni WHERE esito <> 'ok' ORDER BY id DESC LIMIT 10")),
+    })
+
+
 def _thread_importazioni():
     time.sleep(5)
     while True:
+        with _lock_stato:
+            _stato_import["giri"] += 1
         for sorgente in ("ddt", "mezzi"):
             try:
                 esiti = _esegui_import(sorgente)
@@ -707,7 +754,42 @@ def _thread_importazioni():
                     log.info("importazione %s: %d voci", sorgente, len(esiti))
             except Exception as e:  # il thread non deve morire
                 log.error("importazione automatica %s fallita: %s", sorgente, e)
+        with _lock_stato:
+            _stato_import["prossimo"] = time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(time.time() + config.IMPORT_INTERVALLO_SEC))
         time.sleep(config.IMPORT_INTERVALLO_SEC)
+
+
+# --------------------------------------------------------------------------- statistiche (grafici)
+
+def _periodo():
+    giorni = request.args.get("giorni", "30")
+    try:
+        giorni = max(1, min(int(giorni), 730))
+    except ValueError:
+        raise ApiError("giorni non valido")
+    ubi = request.args.get("ubicazione_id") or None
+    return giorni, (int(ubi) if ubi and str(ubi).isdigit() else None)
+
+
+@app.get("/api/statistiche")
+def api_statistiche():
+    giorni, ubi = _periodo()
+    c = db()
+    return jsonify({
+        "giorni": giorni, "ubicazione_id": ubi,
+        "totali": statistiche.totali_periodo(c, giorni, ubi),
+        "per_giorno": statistiche.movimenti_per_giorno(c, giorni, ubi),
+        "flussi": statistiche.flussi(c, giorni, ubi),
+        "ubicazioni": statistiche.ubicazioni_attive(c, giorni),
+    })
+
+
+@app.get("/api/articoli/<int:id_>/andamento")
+def api_articolo_andamento(id_):
+    esiste("articoli", id_)
+    giorni, _ = _periodo()
+    return jsonify(statistiche.andamento_articolo(db(), id_, giorni))
 
 
 def avvia_importazioni_di_sfondo():

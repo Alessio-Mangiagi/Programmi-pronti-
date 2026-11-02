@@ -92,6 +92,7 @@
     truck: '<svg viewBox="0 0 24 24"><path d="M1 6h13v10H1zM14 10h5l4 4v2h-9z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
     pin: '<svg viewBox="0 0 24 24"><path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
     swap: '<svg viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>',
+    flow: '<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6M20 15v-9"/></svg>',
     import: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/></svg>',
     tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
     vuoto: '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>',
@@ -102,7 +103,7 @@
   // ------------------------------------------------------------------ navigazione
   const VISTE = [
     ['dashboard', 'Riepilogo', 'home'], ['scansione', 'Scansione', 'scan'], ['giacenze', 'Giacenze', 'box'],
-    ['movimenti', 'Movimenti', 'swap'], ['sez', 'Anagrafiche'], ['articoli', 'Articoli', 'lista'], ['mezzi', 'Mezzi', 'truck'],
+    ['movimenti', 'Movimenti', 'swap'], ['flussi', 'Flussi', 'flow'], ['sez', 'Anagrafiche'], ['articoli', 'Articoli', 'lista'], ['mezzi', 'Mezzi', 'truck'],
     ['ubicazioni', 'Ubicazioni', 'pin'], ['sez', 'Strumenti'], ['importazioni', 'Importazioni', 'import'], ['etichette', 'Etichette', 'tag'],
   ];
   function disegnaSidebar(attiva) {
@@ -242,6 +243,25 @@
       ris.querySelectorAll('[data-azione]').forEach((b) => { b.onclick = () => azioneRapida(b.dataset.azione, d); });
       const mod = ris.querySelector('[data-modifica]');
       if (mod) mod.onclick = () => (d.tipo === 'articolo' ? formArticolo(d.articolo, () => cerca(d.articolo.codice)) : formMezzo(d.mezzo, () => cerca(d.mezzo.codice)));
+      if (d.tipo === 'articolo') {
+        ris.querySelectorAll('[data-gg]').forEach((b) => { b.onclick = () => caricaAndamento(d.articolo, +b.dataset.gg); });
+        caricaAndamento(d.articolo, 90);
+      }
+    }
+
+    async function caricaAndamento(a, giorni) {
+      const box = $('#andamento');
+      if (!box) return;
+      box.querySelectorAll('[data-gg]').forEach((b) => b.classList.toggle('attivo', +b.dataset.gg === giorni));
+      const g = $('#g-andamento');
+      g.style.opacity = '0.5';
+      try {
+        const d = await api(`/api/articoli/${a.id}/andamento?giorni=${giorni}`);
+        window.Grafici.linee(g, d.date, d.serie, { um: a.um, titolo: 'Andamento della giacenza' });
+        const t = $('#t-andamento');
+        t.innerHTML = d.serie.length ? `<table><thead><tr><th>Ubicazione</th><th class="num">Inizio periodo</th><th class="num">Oggi</th></tr></thead><tbody>${d.serie.map((s) => `<tr><td>${h(s.nome)}</td><td class="num">${fmtN(s.valori[0])} ${h(a.um)}</td><td class="num">${fmtN(s.finale)} ${h(a.um)}</td></tr>`).join('')}</tbody></table>` : '';
+      } catch (e) { g.innerHTML = `<div class="grafico-vuoto">${h(e.message)}</div>`; }
+      g.style.opacity = '1';
     }
 
     function cardArticolo(d) {
@@ -256,6 +276,7 @@
             ${d.giacenze.map((g) => `<tr><td>${h(g.ubicazione)} <span class="badge">${h(ETICH_TIPO_UBI[g.tipo] || g.tipo)}</span></td><td class="num"><strong>${fmtN(g.quantita)}</strong> ${h(a.um)}</td><td class="muto">${fmtData(g.ultimo_movimento)}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessuna giacenza: registra un carico.</p>'}</div>
         </div>
+        <div id="andamento" style="margin-top:1.25rem"><div class="card-testa"><h4>Andamento della giacenza</h4><div class="segmenti">${[[30, '30 gg'], [90, '90 gg'], [365, '1 anno']].map(([g, t]) => `<button type="button" data-gg="${g}">${t}</button>`).join('')}</div></div><div class="grafico" id="g-andamento"></div><div class="tabella-grafico" id="t-andamento"></div></div>
         <h4 style="margin-top:1.25rem">Ultimi movimenti</h4>${tabellaMovimenti(d.movimenti)}</div>`;
     }
 
@@ -600,42 +621,137 @@
     });
   }
 
-  // ------------------------------------------------------------------ importazioni
+  // ------------------------------------------------------------------ importazioni (quadro vivo)
+  let timerImport = null;
   viste.importazioni = async (cont) => {
-    const carica = async () => {
-      const d = await api('/api/importazioni');
-      cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Alimentazione automatica</div><h2>Importazioni</h2></div></div>
-        <div class="griglia griglia-2">
-          <div class="card"><div class="card-testa"><h3>DDT dal Lettore DDT</h3>${d.ddt_dir_ok ? '<span class="badge badge-verde">Cartella trovata</span>' : '<span class="badge badge-rosso">Cartella assente</span>'}</div>
-            <p class="muto mono" style="word-break:break-all">${h(d.ddt_dir)}</p>
-            <p class="muto">Commesse con registro consegne: ${d.commesse.length ? d.commesse.map((c) => `<span class="badge badge-blu">${h(c)}</span>`).join(' ') : 'nessuna'}.<br>Ogni ${d.intervallo_sec || '—'} secondi il server rilegge da solo i registri; qui si forza la lettura.</p>
-            <div class="azioni-rapide"><button class="btn" id="imp-ddt">Leggi adesso</button><button class="btn btn-sec" id="imp-ddt-forza">Rileggi tutto</button></div></div>
-          <div class="card"><div class="card-testa"><h3>Mezzi da VFP Transfer</h3>${d.mezzi_dir_ok ? '<span class="badge badge-verde">Cartella trovata</span>' : '<span class="badge badge-rosso">Cartella assente</span>'}</div>
-            <p class="muto mono" style="word-break:break-all">${h(d.mezzi_dir)}</p>
-            <p class="muto">Le pratiche dei mezzi a nolo (record.json) diventano mezzi del magazzino, nel cantiere della commessa del contratto.</p>
-            <div class="azioni-rapide"><button class="btn" id="imp-mezzi">Leggi adesso</button><button class="btn btn-sec" id="imp-mezzi-forza">Rileggi tutto</button></div></div>
-        </div>
-        <div style="height:1.25rem"></div>
+    clearInterval(timerImport);
+    const info = await api('/api/importazioni');
+    cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Alimentazione automatica</div><h2>Importazioni</h2></div>
+      <div class="azioni"><span class="stato-ciclo" id="stato-ciclo"><span class="punto punto-grigio"></span><span>…</span></span></div></div>
+      <div class="griglia griglia-4" id="kpi-import"></div>
+      <div style="height:1.25rem"></div>
+      <div class="griglia griglia-2">
+        <div class="card"><div class="card-testa"><h3>DDT dal Lettore DDT</h3>${info.ddt_dir_ok ? '<span class="badge badge-verde">Cartella trovata</span>' : '<span class="badge badge-rosso">Cartella assente</span>'}</div>
+          <p class="muto mono" style="word-break:break-all">${h(info.ddt_dir)}</p>
+          <div class="azioni-rapide"><button class="btn" id="imp-ddt">Leggi adesso</button><button class="btn btn-sec" id="imp-ddt-forza">Rileggi tutto</button></div>
+          <div id="commesse"></div></div>
+        <div class="card"><div class="card-testa"><h3>Mezzi da VFP Transfer</h3>${info.mezzi_dir_ok ? '<span class="badge badge-verde">Cartella trovata</span>' : '<span class="badge badge-rosso">Cartella assente</span>'}</div>
+          <p class="muto mono" style="word-break:break-all">${h(info.mezzi_dir)}</p>
+          <div class="azioni-rapide"><button class="btn" id="imp-mezzi">Leggi adesso</button><button class="btn btn-sec" id="imp-mezzi-forza">Rileggi tutto</button></div>
+          <div id="pratiche"></div></div>
+      </div>
+      <div style="height:1.25rem"></div>
+      <div class="griglia griglia-2">
         <div class="card"><h3>Carica un JSON a mano</h3><p class="muto">Accetta il <span class="mono">consegne.json</span> di una commessa oppure un export del Lettore DDT (<span class="mono">json_exports/*.json</span>).</p>
           <form id="f-up" class="form"><div class="campo"><label>File JSON</label><input type="file" name="file" accept=".json,application/json" required></div><div class="campo"><label>Commessa / cantiere (per gli export grezzi)</label><input name="commessa" placeholder="es. demo-augusta"></div>
           <div class="form-azioni"><button class="btn" type="submit">Importa</button></div></form><div id="esito-up"></div></div>
-        <div class="card"><h3>Storico importazioni</h3>${d.storico.length ? `<div class="tabella-wrap"><table><thead><tr><th>Quando</th><th>Sorgente</th><th>Chiave</th><th class="num">Righe</th><th class="num">Nuove</th><th>Esito</th></tr></thead><tbody>
-          ${d.storico.map((s) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(s.ts)}</td><td>${badgeOrigine(s.sorgente)}</td><td>${h(s.chiave || s.file)}${s.dettaglio ? `<br><span class="muto">${h(s.dettaglio)}</span>` : ''}</td><td class="num">${s.righe}</td><td class="num">${s.nuove}</td><td>${s.esito === 'ok' ? '<span class="badge badge-verde">ok</span>' : '<span class="badge badge-rosso">errore</span>'}</td></tr>`).join('')}
-          </tbody></table></div>` : '<p class="muto">Nessuna importazione ancora.</p>'}</div>`;
-      const lancia = (sorgente, forza) => async () => {
-        try { const r = await api('/api/importazioni/' + sorgente, { method: 'POST', body: { forza } }); toast(`${sorgente}: ${r.totale} voci lette`, 'ok'); ubicazioniCache = null; carica(); } catch (e) { toast(e.message, 'errore'); }
-      };
-      $('#imp-ddt').onclick = lancia('ddt', false); $('#imp-ddt-forza').onclick = lancia('ddt', true);
-      $('#imp-mezzi').onclick = lancia('mezzi', false); $('#imp-mezzi-forza').onclick = lancia('mezzi', true);
-      $('#f-up').onsubmit = async (e) => {
-        e.preventDefault();
-        try {
-          const r = await api('/api/importazioni/upload', { method: 'POST', body: new FormData(e.target) });
-          $('#esito-up').innerHTML = `<div class="avviso avviso-ok">${r.esiti.map((x) => `${h(x.export)}: ${x.righe} righe, ${x.nuove} nuove${x.scartate ? `, ${x.scartate} scartate` : ''}`).join('<br>')}</div>`;
-          ubicazioniCache = null; toast('Importato', 'ok');
-        } catch (err) { $('#esito-up').innerHTML = `<div class="avviso avviso-errore">${h(err.message)}</div>`; }
-      };
+        <div class="card"><div class="card-testa"><h3>Errori recenti</h3></div><div id="errori"></div></div>
+      </div>
+      <div class="card"><div class="card-testa"><h3>Storico importazioni</h3><button class="btn btn-sec btn-piccolo" id="mostra-storico">Mostra</button></div><div id="storico" hidden></div></div>`;
+
+    const badgeImp = (s) => ({ letto: '<span class="badge badge-verde">Letto</span>', da_leggere: '<span class="badge badge-ambra">Da leggere</span>', errore: '<span class="badge badge-rosso">Errore</span>' }[s] || `<span class="badge">${h(s)}</span>`);
+    let ultimoStato = null;
+
+    const disegna = (s) => {
+      ultimoStato = s;
+      const c = s.ciclo;
+      const ciclo = $('#stato-ciclo');
+      if (c.in_corso) ciclo.innerHTML = `<span class="punto"></span><span>Lettura ${h(c.in_corso)} in corso…</span>`;
+      else if (!c.attivo) ciclo.innerHTML = `<span class="punto punto-grigio"></span><span>Lettura automatica spenta (solo a mano)</span>`;
+      else ciclo.innerHTML = `<span class="punto"></span><span>In attesa · ogni ${c.intervallo_sec} s${c.ultimo_fine ? ` · ultimo giro ${fmtData(c.ultimo_fine)}` : ''}${c.prossimo ? ` · prossimo ${fmtData(c.prossimo)}` : ''}</span>`;
+      const nExp = s.ddt.reduce((n, co) => n + co.export.length, 0);
+      const daLeggere = s.ddt.reduce((n, co) => n + co.export.filter((e) => e.stato === 'da_leggere').length, 0) + s.mezzi.da_leggere;
+      const erroriN = s.ddt.reduce((n, co) => n + co.export.filter((e) => e.stato === 'errore').length, 0) + s.mezzi.errori + (s.ddt.filter((co) => co.errore).length);
+      const nuoveOggi = s.per_giorno.length ? s.per_giorno[s.per_giorno.length - 1].nuove : 0;
+      $('#kpi-import').innerHTML = `
+        <div class="card kpi"><div class="etichetta">Export DDT seguiti</div><div class="valore">${nExp}</div><div class="muto">${s.ddt.length} commesse</div></div>
+        <div class="card kpi"><div class="etichetta">Pratiche mezzi</div><div class="valore">${s.mezzi.pratiche}</div><div class="muto">${s.mezzi.importate} importate</div></div>
+        <div class="card kpi"><div class="etichetta">Da leggere</div><div class="valore" ${daLeggere ? 'style="color:var(--ambra)"' : ''}>${daLeggere}</div><div class="muto">${erroriN ? `<span style="color:var(--rosso)">${erroriN} in errore</span>` : 'nessun errore'}</div></div>
+        <div class="card kpi"><div class="etichetta">Righe nuove oggi</div><div class="valore">${nuoveOggi}</div><div class="kpi-trend">${window.Grafici.sparkline(s.per_giorno.map((g) => g.nuove), '#1477b8')}<span class="muto">ultimi 14 giorni</span></div></div>`;
+      $('#commesse').innerHTML = s.ddt.length ? s.ddt.map((co) => `<div class="commessa">
+          <div class="commessa-testa"><strong>${h(co.commessa)}</strong><span class="muto">registro del ${fmtData(co.modificato)}${co.ultima_lettura ? ` · letto ${fmtData(co.ultima_lettura)}` : ''}</span></div>
+          ${co.errore ? `<div class="avviso avviso-errore">${h(co.errore)}</div>` : ''}
+          ${co.export.length ? `<table class="tabella-mini"><tbody>${co.export.map((e) => `<tr><td>${h(e.export)}<br><span class="muto">salvato ${fmtData(e.salvato_il)} · ${e.righe_registro} righe nel registro</span>${e.dettaglio ? `<br><span class="muto" style="color:var(--ambra)">${h(e.dettaglio)}</span>` : ''}</td><td class="num">${e.importato_il ? `${e.righe} righe<br><span class="muto">${e.nuove} nuove</span>` : '—'}</td><td>${badgeImp(e.stato)}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun export nel registro.</p>'}
+        </div>`).join('') : '<p class="muto">Nessuna commessa con registro consegne.</p>';
+      $('#pratiche').innerHTML = s.mezzi.voci.length ? `<table class="tabella-mini"><tbody>${s.mezzi.voci.map((v) => `<tr><td>${v.mezzo ? `<a href="#scansione/${h(v.mezzo.codice)}">${h([v.mezzo.tipo_mezzo, v.mezzo.marca, v.mezzo.modello].filter(Boolean).join(' '))}</a>` : '<span class="muto">non ancora importato</span>'}<br><span class="muto mono">${h(v.pratica)}</span>${v.dettaglio ? `<br><span class="muto" style="color:var(--ambra)">${h(v.dettaglio)}</span>` : ''}</td><td class="muto">${v.importato_il ? fmtData(v.importato_il) : ''}</td><td>${badgeImp(v.stato)}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessuna pratica mezzi trovata.</p>';
+      $('#errori').innerHTML = s.errori.length ? `<table class="tabella-mini"><tbody>${s.errori.map((e) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(e.ts)}</td><td>${badgeOrigine(e.sorgente)} ${h(e.chiave || '')}<br><span class="muto">${h(e.dettaglio || '')}</span></td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun errore: tutte le letture sono andate a buon fine.</p>';
     };
+
+    const aggiorna = async () => {
+      try { disegna(await api('/api/importazioni/stato')); } catch (e) { $('#stato-ciclo').innerHTML = `<span class="punto punto-rosso"></span><span>${h(e.message)}</span>`; }
+    };
+    const lancia = (sorgente, forza) => async (ev) => {
+      const b = ev.currentTarget; b.disabled = true; b.textContent = 'Lettura…';
+      try { const r = await api('/api/importazioni/' + sorgente, { method: 'POST', body: { forza } }); toast(`${sorgente}: ${r.totale} voci lette`, 'ok'); ubicazioniCache = null; }
+      catch (e) { toast(e.message, 'errore'); }
+      b.disabled = false; b.textContent = forza ? 'Rileggi tutto' : 'Leggi adesso';
+      aggiorna();
+    };
+    $('#imp-ddt').onclick = lancia('ddt', false); $('#imp-ddt-forza').onclick = lancia('ddt', true);
+    $('#imp-mezzi').onclick = lancia('mezzi', false); $('#imp-mezzi-forza').onclick = lancia('mezzi', true);
+    $('#f-up').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const r = await api('/api/importazioni/upload', { method: 'POST', body: new FormData(e.target) });
+        $('#esito-up').innerHTML = `<div class="avviso avviso-ok">${r.esiti.map((x) => `${h(x.export)}: ${x.righe} righe, ${x.nuove} nuove${x.scartate ? `, ${x.scartate} scartate` : ''}`).join('<br>')}</div>`;
+        ubicazioniCache = null; toast('Importato', 'ok'); aggiorna();
+      } catch (err) { $('#esito-up').innerHTML = `<div class="avviso avviso-errore">${h(err.message)}</div>`; }
+    };
+    $('#mostra-storico').onclick = async (ev) => {
+      const box = $('#storico');
+      if (!box.hidden) { box.hidden = true; ev.currentTarget.textContent = 'Mostra'; return; }
+      const d = await api('/api/importazioni');
+      box.innerHTML = d.storico.length ? `<div class="tabella-wrap"><table><thead><tr><th>Quando</th><th>Sorgente</th><th>Chiave</th><th class="num">Righe</th><th class="num">Nuove</th><th>Esito</th></tr></thead><tbody>
+        ${d.storico.map((s) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(s.ts)}</td><td>${badgeOrigine(s.sorgente)}</td><td>${h(s.chiave || s.file)}${s.dettaglio ? `<br><span class="muto">${h(s.dettaglio)}</span>` : ''}</td><td class="num">${s.righe}</td><td class="num">${s.nuove}</td><td>${s.esito === 'ok' ? '<span class="badge badge-verde">ok</span>' : '<span class="badge badge-rosso">errore</span>'}</td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="muto">Nessuna importazione ancora.</p>';
+      box.hidden = false; ev.currentTarget.textContent = 'Nascondi';
+    };
+    await aggiorna();
+    // Polling finché la vista resta aperta: il ciclo di sfondo cambia stato da solo.
+    timerImport = setInterval(() => { if (location.hash.startsWith('#importazioni')) aggiorna(); else clearInterval(timerImport); }, 5000);
+  };
+
+  // ------------------------------------------------------------------ flussi (grafici dei movimenti)
+  viste.flussi = async (cont) => {
+    const lista = await ubicazioni();
+    const stato = { giorni: 30, ubi: '' };
+    try { Object.assign(stato, JSON.parse(localStorage.getItem('flussi-filtri') || '{}')); } catch (_) { /* niente */ }
+    cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Spostamenti del materiale</div><h2>Flussi</h2></div></div>
+      <div class="filtri" id="filtri">
+        <div class="segmenti" id="periodo">${[[7, '7 giorni'], [30, '30 giorni'], [90, '90 giorni'], [365, 'Un anno']].map(([g, t]) => `<button type="button" data-g="${g}" class="${g == stato.giorni ? 'attivo' : ''}">${t}</button>`).join('')}</div>
+        <select id="ubi">${opzioniUbicazioni(lista, stato.ubi, 'Tutte le ubicazioni')}</select>
+        <label class="muto"><input type="checkbox" id="tabelle"> mostra tabelle</label></div>
+      <div class="griglia griglia-4" id="kpi"></div>
+      <div style="height:1.25rem"></div>
+      <div class="card"><div class="card-testa"><div><h3>Movimenti per giorno</h3><p class="muto" style="margin:0">Quanti movimenti al giorno, per tipo. Le quantità non si sommano fra articoli diversi: qui si contano i movimenti.</p></div></div>
+        <div class="grafico" id="g-giorni"></div><div class="tabella-grafico" id="t-giorni" hidden></div></div>
+      <div class="card"><div class="card-testa"><div><h3>Da dove a dove</h3><p class="muto" style="margin:0">Fornitori → ubicazioni (carichi), fra ubicazioni (trasferimenti), ubicazioni → consumo (scarichi). Spessore = numero di movimenti.</p></div></div>
+          <div class="grafico" id="g-flusso"></div><div class="tabella-grafico" id="t-flusso" hidden></div></div>
+      <div class="card"><div class="card-testa"><div><h3>Ubicazioni più movimentate</h3><p class="muto" style="margin:0">Movimenti in entrata e in uscita per ubicazione.</p></div></div>
+          <div class="grafico" id="g-ubi"></div><div class="tabella-grafico" id="t-ubi" hidden></div></div>`;
+    const carica = async () => {
+      localStorage.setItem('flussi-filtri', JSON.stringify(stato));
+      cont.querySelectorAll('.grafico').forEach((g) => { g.style.opacity = '0.5'; });
+      const d = await api(`/api/statistiche?giorni=${stato.giorni}&ubicazione_id=${stato.ubi}`);
+      const t = d.totali;
+      $('#kpi').innerHTML = `
+        <div class="card kpi"><div class="etichetta">Movimenti</div><div class="valore">${t.totale}</div><div class="muto">${t.articoli_mossi} articoli mossi</div></div>
+        <div class="card kpi"><div class="etichetta">Carichi</div><div class="valore">${t.carico}</div><div class="kpi-trend">${window.Grafici.sparkline(d.per_giorno.slice(-14).map((g) => g.carico), window.Grafici.SERIE.carico.colore)}<span class="muto">ultimi 14 gg</span></div></div>
+        <div class="card kpi"><div class="etichetta">Scarichi</div><div class="valore">${t.scarico}</div><div class="kpi-trend">${window.Grafici.sparkline(d.per_giorno.slice(-14).map((g) => g.scarico), window.Grafici.SERIE.scarico.colore)}<span class="muto">ultimi 14 gg</span></div></div>
+        <div class="card kpi"><div class="etichetta">Trasferimenti</div><div class="valore">${t.trasferimento}</div><div class="muto">${t.rettifica + t.inventario} rettifiche e inventari</div></div>`;
+      window.Grafici.colonneImpilate($('#g-giorni'), d.per_giorno, ['carico', 'trasferimento', 'scarico', 'rettifica']);
+      window.Grafici.flusso($('#g-flusso'), d.flussi);
+      window.Grafici.barreEntrateUscite($('#g-ubi'), d.ubicazioni);
+      const conDati = d.per_giorno.filter((g) => g.carico || g.scarico || g.trasferimento || g.rettifica);
+      $('#t-giorni').innerHTML = conDati.length ? `<table><thead><tr><th>Giorno</th><th class="num">Carichi</th><th class="num">Trasferimenti</th><th class="num">Scarichi</th><th class="num">Rettifiche</th></tr></thead><tbody>${conDati.map((g) => `<tr><td>${fmtData(g.data)}</td><td class="num">${g.carico}</td><td class="num">${g.trasferimento}</td><td class="num">${g.scarico}</td><td class="num">${g.rettifica}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun dato.</p>';
+      $('#t-flusso').innerHTML = d.flussi.length ? `<table><thead><tr><th>Da</th><th>A</th><th>Tipo</th><th class="num">Movimenti</th><th>Articoli</th></tr></thead><tbody>${d.flussi.map((a) => `<tr><td>${h(a.da.nome)}</td><td>${h(a.a.nome)}</td><td>${badgeTipoMov(a.tipo)}</td><td class="num">${a.n}</td><td class="muto">${a.articoli.slice(0, 3).map((x) => `${h(x.nome)}: ${fmtN(x.quantita)}`).join('; ')}${a.articoli.length > 3 ? '…' : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun dato.</p>';
+      $('#t-ubi').innerHTML = d.ubicazioni.length ? `<table><thead><tr><th>Ubicazione</th><th class="num">In entrata</th><th class="num">In uscita</th></tr></thead><tbody>${d.ubicazioni.map((u) => `<tr><td><a href="#scansione/${u.id}:ubicazione">${h(u.nome)}</a></td><td class="num">${u.entrate}</td><td class="num">${u.uscite}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun dato.</p>';
+      cont.querySelectorAll('.grafico').forEach((g) => { g.style.opacity = '1'; });
+    };
+    $('#periodo').querySelectorAll('button').forEach((b) => { b.onclick = () => { stato.giorni = +b.dataset.g; $('#periodo').querySelectorAll('button').forEach((x) => x.classList.toggle('attivo', x === b)); carica(); }; });
+    $('#ubi').value = stato.ubi; $('#ubi').onchange = () => { stato.ubi = $('#ubi').value; carica(); };
+    $('#tabelle').onchange = () => { cont.querySelectorAll('.tabella-grafico').forEach((t) => { t.hidden = !$('#tabelle').checked; }); };
+    let ridisegna; window.addEventListener('resize', () => { if (!location.hash.startsWith('#flussi')) return; clearTimeout(ridisegna); ridisegna = setTimeout(carica, 300); });
     await carica();
   };
 

@@ -240,3 +240,44 @@ td .mono, td.mono { white-space: nowrap; }
   .contenuto { padding: 0; }
   .card { box-shadow: none; }
 }
+
+/* ---------- grafici (dataviz: marchi sottili, legenda, tooltip, tabella) ---------- */
+.grafico { position: relative; min-height: 120px; transition: opacity 0.3s; }
+.grafico svg { display: block; overflow: visible; }
+.grafico .marchio { transition: opacity 0.2s; }
+.grafico-vuoto { text-align: center; color: var(--cosedil-gray); padding: 2rem 1rem; font-size: 0.9rem; }
+.grafico-legenda { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; font-family: var(--font-ui); font-size: 0.78rem; color: var(--cosedil-gray); margin-bottom: 0.5rem; }
+.grafico-legenda span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.grafico-legenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.grafico-tip { position: fixed; z-index: 60; background: var(--cosedil-text-strong); color: #fff; padding: 0.5rem 0.7rem; border-radius: var(--radius-btn); font-size: 0.82rem; font-family: var(--font-body); box-shadow: var(--shadow-card-hover); pointer-events: none; max-width: 320px; }
+.grafico-tip .tip-titolo { font-family: var(--font-ui); font-weight: 600; margin-bottom: 0.3rem; color: #e5e7eb; }
+.grafico-tip .tip-riga { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.grafico-tip .tip-chiave { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.grafico-tip strong { font-variant-numeric: tabular-nums; }
+.tabella-grafico { margin-top: 0.75rem; }
+.tabella-grafico table { font-size: 0.85rem; }
+.kpi .muto { font-size: 0.78rem; }
+.kpi-trend { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.25rem; }
+.segmenti { display: inline-flex; border: 1px solid #d2d2d2; border-radius: var(--radius-btn); overflow: hidden; }
+.segmenti button { font-family: var(--font-ui); font-size: 0.8rem; font-weight: 500; padding: 0.4rem 0.75rem; border: 0; background: #fff; color: var(--cosedil-gray); cursor: pointer; border-right: 1px solid #e5e7eb; }
+.segmenti button:last-child { border-right: 0; }
+.segmenti button:hover { background: var(--cosedil-bg-alt); }
+.segmenti button.attivo { background: var(--cosedil-blue); color: #fff; }
+.barre { display: grid; gap: 0.45rem; }
+.barre-riga { display: grid; grid-template-columns: 150px 1fr; gap: 0.75rem; align-items: center; padding: 0.15rem 0; border-radius: 4px; }
+.barre-riga:hover { background: var(--cosedil-bg); }
+.barre-nome { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barre-corpo { display: grid; gap: 2px; }
+.barre-track { position: relative; height: 10px; display: flex; align-items: center; }
+.barre-fill { height: 10px; border-radius: 0 4px 4px 0; min-width: 2px; }
+.barre-val { font-family: var(--font-mono); font-size: 0.72rem; color: var(--cosedil-gray); margin-left: 0.4rem; }
+
+/* ---------- importazioni: quadro vivo ---------- */
+.stato-ciclo { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-ui); font-size: 0.85rem; color: var(--cosedil-gray); }
+.punto-grigio { background: #b8bcc3; animation: none; }
+.punto-rosso { background: var(--rosso); }
+.commessa { border-top: 1px solid var(--cosedil-border); padding: 0.75rem 0; }
+.commessa-testa { display: flex; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+.tabella-mini td { padding: 0.4rem 0.5rem; font-size: 0.85rem; }
+.tabella-mini tbody tr:nth-child(even) { background: transparent; }
+@media (max-width: 768px) { .barre-riga { grid-template-columns: 100px 1fr; } }

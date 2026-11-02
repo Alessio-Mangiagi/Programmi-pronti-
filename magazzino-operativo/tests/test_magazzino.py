@@ -252,3 +252,70 @@ def test_api_upload_json(client):
     assert client.get("/api/giacenze").json[0]["ubicazione"] == "Cantiere augusta"
     r = client.post("/api/importazioni/upload", data={"file": (io.BytesIO(b"{"), "x.json")}, content_type="multipart/form-data")
     assert r.status_code == 400
+
+
+# --------------------------------------------------------------------------- statistiche e stato importazioni
+
+def test_statistiche_per_giorno_flussi_e_ubicazioni(client, conn):
+    import statistiche
+    from datetime import date
+    oggi = date.today().isoformat()
+    importa_ddt.importa_righe(conn, [riga(dataIso=oggi, data=oggi), riga(ddt="119", quantita=16, dataIso=oggi, data=oggi)], "demo", "e.json")
+    conn.commit()
+    cantiere = conn.execute("SELECT id FROM ubicazioni WHERE commessa = 'demo'").fetchone()[0]
+    client.post("/api/movimenti", json={"tipo": "trasferimento", "articolo_id": 1, "quantita": 5, "da_ubicazione_id": cantiere, "a_ubicazione_id": 1})
+    client.post("/api/movimenti", json={"tipo": "scarico", "articolo_id": 1, "quantita": 2, "da_ubicazione_id": 1})
+    r = client.get("/api/statistiche?giorni=7")
+    assert r.status_code == 200
+    d = r.json
+    assert d["totali"]["carico"] == 2 and d["totali"]["trasferimento"] == 1 and d["totali"]["scarico"] == 1
+    assert len(d["per_giorno"]) == 7 and d["per_giorno"][-1]["carico"] == 2
+    tipi = {(a["da"]["tipo"], a["a"]["tipo"], a["tipo"]) for a in d["flussi"]}
+    assert tipi == {("fornitore", "ubicazione", "carico"), ("ubicazione", "ubicazione", "trasferimento"),
+                    ("ubicazione", "consumo", "scarico")}
+    carico = next(a for a in d["flussi"] if a["tipo"] == "carico")
+    assert carico["n"] == 2 and carico["articoli"][0]["quantita"] == 30
+    ubi = {u["id"]: u for u in d["ubicazioni"]}
+    assert ubi[cantiere]["entrate"] == 2 and ubi[cantiere]["uscite"] == 1 and ubi[1]["entrate"] == 1 and ubi[1]["uscite"] == 1
+    # filtro per ubicazione: solo i movimenti che la toccano
+    assert client.get(f"/api/statistiche?giorni=7&ubicazione_id={cantiere}").json["totali"]["totale"] == 3
+    assert client.get("/api/statistiche?giorni=abc").status_code == 400
+    assert statistiche.movimenti_per_giorno(conn, 1)[0]["carico"] == 2
+
+
+def test_andamento_articolo(client, conn):
+    from datetime import date, timedelta
+    ieri = (date.today() - timedelta(days=1)).isoformat()
+    vecchia = (date.today() - timedelta(days=400)).isoformat()
+    importa_ddt.importa_righe(conn, [riga(dataIso=vecchia, data=vecchia, quantita=100),
+                                     riga(ddt="119", quantita=16, dataIso=ieri, data=ieri)], "demo", "e.json")
+    conn.commit()
+    d = client.get("/api/articoli/1/andamento?giorni=30").json
+    assert len(d["date"]) == 30 and len(d["serie"]) == 1
+    s = d["serie"][0]
+    assert s["valori"][0] == 100            # lo storico prima del periodo entra nel punto iniziale
+    assert s["valori"][-2] == 116 and s["finale"] == 116
+    assert client.get("/api/articoli/99/andamento").status_code == 404
+
+
+def test_stato_importazioni(client, conn, cartella_tmp):
+    radice = config.DDT_DATA_DIR
+    os.makedirs(os.path.join(radice, "demo-b"), exist_ok=True)
+    with open(os.path.join(radice, "demo-b", "consegne.json"), "w", encoding="utf-8") as f:
+        json.dump(consegne([riga(commessa="demo-b")], salvato="2026-11-01T10:00:00Z", export="Nuovo.json"), f)
+    s = client.get("/api/importazioni/stato").json
+    co = next(c for c in s["ddt"] if c["commessa"] == "demo-b")
+    assert co["export"][0]["stato"] == "da_leggere" and co["export"][0]["righe_registro"] == 1
+    assert s["ciclo"]["attivo"] is False and s["ciclo"]["in_corso"] is None
+    r = client.post("/api/importazioni/ddt", json={})
+    assert r.status_code == 200
+    s = client.get("/api/importazioni/stato").json
+    co = next(c for c in s["ddt"] if c["commessa"] == "demo-b")
+    assert co["export"][0]["stato"] == "letto" and co["export"][0]["nuove"] == 1
+    assert s["ciclo"]["ultimi_esiti"]["ddt"]["voci"] >= 1 and s["ciclo"]["ultimo_fine"]
+    assert len(s["per_giorno"]) == 14 and s["per_giorno"][-1]["nuove"] >= 1
+    # il registro viene risalvato -> torna "da leggere"
+    with open(os.path.join(radice, "demo-b", "consegne.json"), "w", encoding="utf-8") as f:
+        json.dump(consegne([riga(commessa="demo-b")], salvato="2026-11-02T10:00:00Z", export="Nuovo.json"), f)
+    s = client.get("/api/importazioni/stato").json
+    assert next(c for c in s["ddt"] if c["commessa"] == "demo-b")["export"][0]["stato"] == "da_leggere"

@@ -13,6 +13,10 @@ stanno i mezzi**, scansionando un codice a barre.
 - **Alimentazione automatica**: i DDT estratti dal **Lettore DDT** diventano carichi
   nel cantiere della commessa; le pratiche dei mezzi a nolo di **VFP Transfer**
   diventano mezzi del magazzino.
+- **Flussi**: grafici dei movimenti (per giorno, da dove a dove, ubicazioni più
+  movimentate) e andamento della giacenza di ogni articolo nel tempo.
+- **Importazioni sotto controllo**: quadro vivo del ciclo automatico, stato di ogni
+  export DDT e di ogni pratica mezzi (letto / da leggere / errore), righe nuove per giorno.
 - **Etichette** con Code 128 + QR, stampate dal browser su fogli A4 adesivi (24 per
   foglio, 70×37 mm).
 
@@ -98,6 +102,14 @@ telefono quindi serve l'indirizzo https del portale (`SUITE_DOMINIO` + Caddy, ve
 README della suite); su `http://<ip>:5200` il bottone avvisa e non apre nulla. La
 libreria di lettura (`html5-qrcode`) viene scaricata dal CDN alla prima apertura.
 
+### Grafici
+
+Le quantità di articoli diversi non si sommano (m³ con kg con pezzi), quindi i grafici
+d'insieme **contano i movimenti**; le quantità compaiono solo nell'andamento di un
+articolo (una linea per ubicazione) e nei tooltip. Tutto è SVG disegnato dal server
+dei dati (`statistiche.py`) e dal browser (`static/js/grafici.js`), senza librerie
+esterne; ogni grafico ha legenda, tooltip e una vista tabella.
+
 ## Variabili d'ambiente
 
 | Variabile | Default | Effetto |
@@ -121,6 +133,9 @@ libreria di lettura (`html5-qrcode`) viene scaricata dal CDN alla prima apertura
 | `GET/POST/PUT/DELETE /api/articoli`, `/api/mezzi`, `/api/ubicazioni` | anagrafiche |
 | `POST /api/importazioni/ddt`, `/mezzi` | lettura delle cartelle (`{forza: true}` rilegge tutto) |
 | `POST /api/importazioni/upload` | JSON del Lettore DDT caricato a mano |
+| `GET /api/statistiche?giorni=30&ubicazione_id=` | totali, movimenti per giorno, flussi da→a, ubicazioni più movimentate |
+| `GET /api/articoli/<id>/andamento?giorni=90` | giacenza giorno per giorno, per ubicazione |
+| `GET /api/importazioni/stato` | ciclo di sfondo, stato di ogni export DDT e pratica mezzi, righe per giorno, errori |
 | `GET /etichette?tipo=articoli&ids=1,2` | foglio etichette da stampare |
 | `GET /api/codici/<codice>.svg?formato=code128\|qr` | il solo codice a barre |
 
@@ -133,6 +148,8 @@ libreria di lettura (`html5-qrcode`) viene scaricata dal CDN alla prima apertura
 | `codici.py` | Code 128 in SVG, QR (segno), codici progressivi, riconoscimento scansioni |
 | `importa_ddt.py` | lettura dei registri e degli export del Lettore DDT |
 | `importa_mezzi.py` | lettura delle pratiche mezzi di VFP Transfer |
+| `statistiche.py` | dati per i grafici e stato delle importazioni |
+| `static/js/grafici.js` | grafici SVG (colonne impilate, linee, barre, flusso, sparkline) |
 | `templates/index.html`, `static/` | pagina unica (stile Cosedil) |
 | `templates/etichette.html` | foglio etichette |
 | `tests/` | `python -m pytest tests/ -q` |
