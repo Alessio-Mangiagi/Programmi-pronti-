@@ -115,6 +115,19 @@ CREATE TABLE IF NOT EXISTS importazioni (
 );
 CREATE INDEX IF NOT EXISTS idx_imp_chiave ON importazioni(sorgente, chiave);
 
+CREATE TABLE IF NOT EXISTS attivita (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL DEFAULT (datetime('now')),
+  utente TEXT,
+  ip TEXT,
+  azione TEXT NOT NULL,                   -- scansione, movimento, crea, modifica, elimina, disattiva, sposta, importazione...
+  oggetto TEXT,                           -- articolo, mezzo, ubicazione, ddt, mezzi, upload
+  oggetto_id INTEGER,
+  descrizione TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_att_ts ON attivita(ts);
+CREATE INDEX IF NOT EXISTS idx_att_utente ON attivita(utente);
+
 CREATE VIEW IF NOT EXISTS giacenze AS
 SELECT articolo_id, ubicazione_id, SUM(qta) AS quantita, MAX(ts) AS ultimo_movimento
 FROM (
@@ -140,6 +153,11 @@ def init_db(path=None):
     conn = get_db(path)
     try:
         conn.executescript(SCHEMA_SQL)
+        # Colonne aggiunte dopo la prima versione: ALTER solo se mancano
+        # (SQLite non ha ADD COLUMN IF NOT EXISTS).
+        colonne = {r[1] for r in conn.execute("PRAGMA table_info(mezzi)")}
+        if "assegnato_a" not in colonne:
+            conn.execute("ALTER TABLE mezzi ADD COLUMN assegnato_a TEXT")  # chi lo sta usando
         # Un deposito c'è sempre: è dove finisce il materiale senza destinazione.
         conn.execute(
             "INSERT OR IGNORE INTO ubicazioni (codice, nome, tipo) VALUES (?, ?, 'deposito')",

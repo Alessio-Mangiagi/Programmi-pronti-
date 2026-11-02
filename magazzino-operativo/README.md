@@ -17,6 +17,9 @@ stanno i mezzi**, scansionando un codice a barre.
   movimentate) e andamento della giacenza di ogni articolo nel tempo.
 - **Importazioni sotto controllo**: quadro vivo del ciclo automatico, stato di ogni
   export DDT e di ogni pratica mezzi (letto / da leggere / errore), righe nuove per giorno.
+- **Amministrazione** (solo admin): chi è collegato adesso e su quale vista, chi sta
+  usando quale mezzo, chi ha caricato cosa (movimenti, scansioni, importazioni,
+  modifiche per utente) e il registro di ogni azione con utente e IP, esportabile in CSV.
 - **Etichette** con Code 128 + QR, stampate dal browser su fogli A4 adesivi (24 per
   foglio, 70×37 mm).
 
@@ -39,8 +42,17 @@ L'app monta il gate SSO del Portale (`shared/sso`): senza login nel portale non 
 entra. Per lo sviluppo in locale `COSEDIL_SSO=off` (utente admin fittizio).
 
 Gli **admin** dell'app nel portale (o gli username in `MAGAZZINO_ADMIN`) possono
-eliminare articoli, mezzi, ubicazioni e movimenti. Tutti gli altri registrano
-movimenti e aggiornano le anagrafiche.
+eliminare articoli, mezzi, ubicazioni e movimenti e vedono la vista
+**Amministrazione**. Tutti gli altri registrano movimenti e aggiornano le anagrafiche.
+
+### Registro attività e presenze
+
+Ogni azione (scansione, movimento, creazione/modifica/eliminazione di anagrafiche,
+spostamento di un mezzo, importazione) finisce nella tabella `attivita` con utente
+del portale, IP, oggetto e dettaglio. La pagina manda un battito ogni 30 secondi con
+la vista aperta: gli admin vedono chi è collegato (ultimi 2 minuti; in memoria, si
+azzera al riavvio). Sui mezzi in uso si registra **chi li sta usando** (`assegnato_a`),
+azzerato quando il mezzo torna disponibile.
 
 ## Come funziona
 
@@ -136,6 +148,9 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `GET /api/statistiche?giorni=30&ubicazione_id=` | totali, movimenti per giorno, flussi da→a, ubicazioni più movimentate |
 | `GET /api/articoli/<id>/andamento?giorni=90` | giacenza giorno per giorno, per ubicazione |
 | `GET /api/importazioni/stato` | ciclo di sfondo, stato di ogni export DDT e pratica mezzi, righe per giorno, errori |
+| `POST /api/presenza` | battito della pagina `{vista}` |
+| `GET /api/admin/riepilogo?giorni=` | per utente: movimenti per tipo, scansioni, importazioni, anagrafiche; mezzi in uso; collegati |
+| `GET /api/admin/attivita?giorni=&utente=&azione=&oggetto=&q=` | registro attività filtrabile |
 | `GET /etichette?tipo=articoli&ids=1,2` | foglio etichette da stampare |
 | `GET /api/codici/<codice>.svg?formato=code128\|qr` | il solo codice a barre |
 

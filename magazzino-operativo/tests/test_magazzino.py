@@ -319,3 +319,49 @@ def test_stato_importazioni(client, conn, cartella_tmp):
         json.dump(consegne([riga(commessa="demo-b")], salvato="2026-11-02T10:00:00Z", export="Nuovo.json"), f)
     s = client.get("/api/importazioni/stato").json
     assert next(c for c in s["ddt"] if c["commessa"] == "demo-b")["export"][0]["stato"] == "da_leggere"
+
+
+# --------------------------------------------------------------------------- registro attivita e amministrazione
+
+def test_registro_attivita_e_riepilogo_admin(client, conn):
+    importa_ddt.importa_righe(conn, [riga()], "demo", "e.json")
+    conn.commit()
+    cantiere = conn.execute("SELECT id FROM ubicazioni WHERE commessa = 'demo'").fetchone()[0]
+    assert client.get("/api/scansione?codice=MAG-00001").status_code == 200
+    assert client.post("/api/movimenti", json={"tipo": "scarico", "articolo_id": 1, "quantita": 3, "da_ubicazione_id": cantiere}).status_code == 201
+    r = client.post("/api/mezzi", json={"tipo_mezzo": "Terna", "targa": "AB123CD", "ubicazione_id": cantiere})
+    mid = r.json["mezzo"]["id"]
+    r = client.post(f"/api/mezzi/{mid}/sposta", json={"stato": "in_uso", "assegnato_a": "Geom. Restivo"})
+    assert r.status_code == 200 and r.json["mezzo"]["assegnato_a"] == "Geom. Restivo"
+    # solo l'operatore cambia: è un'azione valida
+    assert client.post(f"/api/mezzi/{mid}/sposta", json={"assegnato_a": "Squadra B"}).status_code == 200
+    # niente cambia: rifiutato
+    assert client.post(f"/api/mezzi/{mid}/sposta", json={"assegnato_a": "Squadra B"}).status_code == 400
+    # torna disponibile -> l'operatore si azzera
+    assert client.post(f"/api/mezzi/{mid}/sposta", json={"stato": "disponibile"}).json["mezzo"]["assegnato_a"] is None
+    assert client.post(f"/api/mezzi/{mid}/sposta", json={"stato": "in_uso", "assegnato_a": "Squadra C"}).status_code == 200
+    assert client.post("/api/importazioni/ddt", json={}).status_code == 200
+    assert client.post("/api/presenza", json={"vista": "scansione"}).status_code == 200
+
+    azioni = [r["azione"] for r in conn.execute("SELECT azione FROM attivita ORDER BY id")]
+    assert azioni[:3] == ["scansione", "movimento", "crea"] and "sposta" in azioni and azioni[-1] == "importazione"
+    assert all(r["utente"] == "sviluppo" for r in conn.execute("SELECT utente FROM attivita"))
+
+    d = client.get("/api/admin/riepilogo?giorni=7").json
+    u = d["utenti"][0]
+    assert u["utente"] == "sviluppo" and u["scarico"] == 1 and u["scansioni"] == 1 and u["importazioni"] == 1 and u["anagrafiche"] >= 4
+    assert d["mezzi_in_uso"][0]["assegnato_a"] == "Squadra C" and d["mezzi_in_uso"][0]["registrato_da"] == "sviluppo"
+    assert d["collegati"][0]["vista"] == "scansione" and d["attivita_oggi"] >= 7
+    reg = client.get("/api/admin/attivita?giorni=7&azione=sposta").json
+    assert len(reg) == 4 and reg[0]["oggetto_codice"] == "MEZ-00001" and "Squadra C" in reg[0]["descrizione"]
+    assert client.get("/api/admin/attivita?giorni=7&q=Restivo").json
+    # "importazione" è l'utente di sistema dei carichi letti dai DDT: compare anche lui
+    assert client.get("/api/admin/utenti").json == ["importazione", "sviluppo"]
+
+
+def test_area_admin_chiusa_ai_non_admin(client, monkeypatch):
+    import app as modulo_app
+    monkeypatch.setattr(modulo_app, "e_admin", lambda: False)
+    assert client.get("/api/admin/riepilogo").status_code == 403
+    assert client.delete("/api/articoli/1").status_code == 403
+    assert client.get("/api/dashboard").status_code == 200

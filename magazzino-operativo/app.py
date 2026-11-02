@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 import traceback
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Flask, Response, g, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
@@ -64,6 +64,20 @@ def nome_utente():
     return u.get("username") or u.get("nome") or "?"
 
 
+def registra(azione, oggetto=None, oggetto_id=None, descrizione=""):
+    """Una riga nel registro attività: chi (utente del portale, IP) ha fatto cosa.
+    Il commit lo fa chi chiama, dentro la stessa transazione dell'azione."""
+    db().execute(
+        "INSERT INTO attivita (utente, ip, azione, oggetto, oggetto_id, descrizione) VALUES (?, ?, ?, ?, ?, ?)",
+        (nome_utente(), (request.remote_addr or "")[:45], azione, oggetto, oggetto_id, (descrizione or "")[:300]))
+
+
+# Chi è collegato adesso: la pagina manda un battito ogni 30 s con la vista aperta.
+# In memoria e non su disco: vale solo finché il server gira.
+_presenze = {}
+_lock_presenze = threading.Lock()
+
+
 def e_admin():
     if not cosedil_sso.ENABLED:
         return True
@@ -75,7 +89,9 @@ def e_admin():
 
 @app.before_request
 def gate_admin():
-    if request.path.startswith("/api") and request.method == "DELETE" and not e_admin():
+    if not request.path.startswith("/api"):
+        return None
+    if (request.method == "DELETE" or request.path.startswith("/api/admin")) and not e_admin():
         return jsonify({"errore": "Operazione riservata all'amministratore del magazzino"}), 403
     return None
 
@@ -296,6 +312,8 @@ def api_scansione():
             "(tipo_mezzo LIKE ? OR targa LIKE ? OR matricola LIKE ? OR codice LIKE ?) ORDER BY tipo_mezzo LIMIT 8",
             (q, q, q, q)))
         return jsonify({"tipo": None, "codice": codice, "suggerimenti": {"articoli": art, "mezzi": mez}}), 404
+    registra("scansione", esito["tipo"], esito["id"], codici.normalizza_codice(codice))
+    c.commit()
     if esito["tipo"] == "articolo":
         return jsonify(dettaglio_articolo(c, esito["id"]))
     if esito["tipo"] == "mezzo":
@@ -327,6 +345,7 @@ def api_ubicazione_crea():
     d["codice"] = codici.prossimo_codice(c, "ubicazioni", config.PREFISSO_UBICAZIONE)
     cur = c.execute("INSERT INTO ubicazioni (codice, nome, tipo, commessa, indirizzo, note, attivo) "
                     "VALUES (:codice, :nome, :tipo, :commessa, :indirizzo, :note, :attivo)", d)
+    registra("crea", "ubicazione", cur.lastrowid, d["nome"])
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM ubicazioni WHERE id = ?", (cur.lastrowid,)).fetchone())), 201
 
@@ -339,6 +358,7 @@ def api_ubicazione_aggiorna(id_):
     c = db()
     c.execute("UPDATE ubicazioni SET nome=:nome, tipo=:tipo, commessa=:commessa, indirizzo=:indirizzo, note=:note, "
               "attivo=:attivo WHERE id=:id", d)
+    registra("modifica", "ubicazione", id_, d["nome"])
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM ubicazioni WHERE id = ?", (id_,)).fetchone()))
 
@@ -352,10 +372,12 @@ def api_ubicazione_elimina(id_):
                                                           (id_,)).fetchone()
     if usata:
         c.execute("UPDATE ubicazioni SET attivo = 0 WHERE id = ?", (id_,))
+        registra("disattiva", "ubicazione", id_)
         c.commit()
         return jsonify({"ok": True, "disattivata": True,
                         "messaggio": "Ubicazione con movimenti o mezzi: disattivata, non cancellata"})
     c.execute("DELETE FROM ubicazioni WHERE id = ?", (id_,))
+    registra("elimina", "ubicazione", id_)
     c.commit()
     return jsonify({"ok": True})
 
@@ -396,6 +418,7 @@ def api_articolo_crea():
         "INSERT INTO articoli (codice, codice_esterno, descrizione, descrizione_norm, um, categoria, fornitore, "
         "scorta_minima, note, attivo) VALUES (:codice, :codice_esterno, :descrizione, :descrizione_norm, :um, "
         ":categoria, :fornitore, :scorta_minima, :note, :attivo)", d)
+    registra("crea", "articolo", cur.lastrowid, d["descrizione"])
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM articoli WHERE id = ?", (cur.lastrowid,)).fetchone())), 201
 
@@ -409,6 +432,7 @@ def api_articolo_aggiorna(id_):
     c.execute("UPDATE articoli SET codice_esterno=:codice_esterno, descrizione=:descrizione, "
               "descrizione_norm=:descrizione_norm, um=:um, categoria=:categoria, fornitore=:fornitore, "
               "scorta_minima=:scorta_minima, note=:note, attivo=:attivo WHERE id=:id", d)
+    registra("modifica", "articolo", id_, d["descrizione"])
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM articoli WHERE id = ?", (id_,)).fetchone()))
 
@@ -419,9 +443,11 @@ def api_articolo_elimina(id_):
     c = db()
     if c.execute("SELECT 1 FROM movimenti WHERE articolo_id = ? LIMIT 1", (id_,)).fetchone():
         c.execute("UPDATE articoli SET attivo = 0 WHERE id = ?", (id_,))
+        registra("disattiva", "articolo", id_)
         c.commit()
         return jsonify({"ok": True, "disattivato": True, "messaggio": "Articolo con movimenti: disattivato"})
     c.execute("DELETE FROM articoli WHERE id = ?", (id_,))
+    registra("elimina", "articolo", id_)
     c.commit()
     return jsonify({"ok": True})
 
@@ -528,6 +554,9 @@ def api_movimento_crea():
         "fornitore, origine, utente, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (testo(d, "data", maxlen=10), tipo, art, qta, da, a, testo(d, "riferimento", maxlen=120),
          testo(d, "fornitore", maxlen=120), origine, nome_utente(), testo(d, "note", maxlen=500)))
+    nomi = {u["id"]: u["nome"] for u in c.execute("SELECT id, nome FROM ubicazioni WHERE id IN (?, ?)", (da or 0, a or 0))}
+    registra("movimento", "articolo", art,
+             f"{tipo} {qta:g} " + " ".join(x for x in (f"da {nomi.get(da)}" if da else "", f"a {nomi.get(a)}" if a else "") if x))
     c.commit()
     return jsonify({"ok": True, "id": cur.lastrowid, **dettaglio_articolo(c, art)}), 201
 
@@ -536,7 +565,9 @@ def api_movimento_crea():
 def api_movimento_elimina(id_):
     esiste("movimenti", id_)
     c = db()
+    m = c.execute("SELECT tipo, quantita, articolo_id FROM movimenti WHERE id = ?", (id_,)).fetchone()
     c.execute("DELETE FROM movimenti WHERE id = ?", (id_,))
+    registra("elimina_movimento", "articolo", m["articolo_id"], f"{m['tipo']} {m['quantita']:g} (movimento {id_})")
     c.commit()
     return jsonify({"ok": True})
 
@@ -587,6 +618,7 @@ def api_mezzo_crea():
     if d["ubicazione_id"]:
         c.execute("INSERT INTO movimenti_mezzi (mezzo_id, a_ubicazione_id, stato, utente, note) VALUES (?, ?, ?, ?, ?)",
                   (cur.lastrowid, d["ubicazione_id"], d["stato"], nome_utente(), "Registrazione in anagrafica"))
+    registra("crea", "mezzo", cur.lastrowid, d["tipo_mezzo"])
     c.commit()
     return jsonify(dettaglio_mezzo(c, cur.lastrowid)), 201
 
@@ -600,6 +632,7 @@ def api_mezzo_aggiorna(id_):
     c.execute("UPDATE mezzi SET tipo_mezzo=:tipo_mezzo, marca=:marca, modello=:modello, targa=:targa, "
               "matricola=:matricola, proprieta=:proprieta, ditta=:ditta, piva=:piva, nolo_dal=:nolo_dal, "
               "nolo_al=:nolo_al, note=:note, attivo=:attivo WHERE id=:id", d)
+    registra("modifica", "mezzo", id_, d["tipo_mezzo"])
     c.commit()
     return jsonify(dettaglio_mezzo(c, id_))
 
@@ -609,18 +642,28 @@ def api_mezzo_sposta(id_):
     esiste("mezzi", id_)
     d = corpo()
     c = db()
-    m = c.execute("SELECT ubicazione_id, stato FROM mezzi WHERE id = ?", (id_,)).fetchone()
+    m = c.execute("SELECT ubicazione_id, stato, assegnato_a FROM mezzi WHERE id = ?", (id_,)).fetchone()
     a = esiste("ubicazioni", intero(d, "a_ubicazione_id"))
     stato = scelta(d, "stato", STATI_MEZZO, m["stato"])
-    if a is None and stato == m["stato"]:
-        raise ApiError("Indicare una nuova ubicazione o un nuovo stato")
+    # "In uso da": chi ha il mezzo. Si azzera quando il mezzo non è più in uso.
+    assegnato = testo(d, "assegnato_a", maxlen=80) if "assegnato_a" in d else m["assegnato_a"]
+    if stato != "in_uso":
+        assegnato = None
+    if a is None and stato == m["stato"] and assegnato == m["assegnato_a"]:
+        raise ApiError("Indicare una nuova ubicazione, un nuovo stato o chi lo usa")
     nuova_ubi = a if a is not None else m["ubicazione_id"]
-    c.execute("UPDATE mezzi SET ubicazione_id = ?, stato = ? WHERE id = ?", (nuova_ubi, stato, id_))
+    c.execute("UPDATE mezzi SET ubicazione_id = ?, stato = ?, assegnato_a = ? WHERE id = ?",
+              (nuova_ubi, stato, assegnato, id_))
+    nota = testo(d, "note", maxlen=500)
+    if assegnato and assegnato != m["assegnato_a"]:
+        nota = f"in uso da {assegnato}" + (f" · {nota}" if nota else "")
     c.execute(
         "INSERT INTO movimenti_mezzi (mezzo_id, da_ubicazione_id, a_ubicazione_id, stato, origine, utente, note) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (id_, m["ubicazione_id"], nuova_ubi, stato, scelta(d, "origine", ("manuale", "scansione"), "manuale"),
-         nome_utente(), testo(d, "note", maxlen=500)))
+         nome_utente(), nota))
+    nome_ubi = c.execute("SELECT nome FROM ubicazioni WHERE id = ?", (nuova_ubi,)).fetchone()
+    registra("sposta", "mezzo", id_, f"{stato}" + (f" a {nome_ubi['nome']}" if nome_ubi else "") + (f", in uso da {assegnato}" if assegnato else ""))
     c.commit()
     return jsonify(dettaglio_mezzo(c, id_))
 
@@ -636,6 +679,7 @@ def api_mezzo_elimina(id_):
     c = db()
     c.execute("DELETE FROM movimenti_mezzi WHERE mezzo_id = ?", (id_,))
     c.execute("DELETE FROM mezzi WHERE id = ?", (id_,))
+    registra("elimina", "mezzo", id_)
     c.commit()
     return jsonify({"ok": True})
 
@@ -701,6 +745,8 @@ def api_importa(sorgente):
         raise ApiError("Sorgente sconosciuta", 404)
     forza = bool((request.get_json(silent=True) or {}).get("forza"))
     esiti = _esegui_import(sorgente, forza=forza)
+    registra("importazione", sorgente, None, f"{'rilettura completa' if forza else 'lettura'}: {len(esiti)} voci")
+    db().commit()
     return jsonify({"ok": True, "esiti": esiti, "totale": len(esiti)})
 
 
@@ -719,6 +765,8 @@ def api_importa_upload():
             esiti = importa_ddt.importa_json_caricato(db(), parsed, f.filename, commessa)
     except importa_ddt.ImportError_ as e:
         raise ApiError(str(e))
+    registra("importazione", "upload", None, f"{f.filename}: {sum(e.get('righe', 0) for e in esiti)} righe")
+    db().commit()
     return jsonify({"ok": True, "esiti": esiti})
 
 
@@ -795,6 +843,120 @@ def api_articolo_andamento(id_):
 def avvia_importazioni_di_sfondo():
     if config.IMPORT_INTERVALLO_SEC > 0:
         threading.Thread(target=_thread_importazioni, daemon=True, name="importazioni").start()
+
+
+# --------------------------------------------------------------------------- presenze e amministrazione
+
+PRESENZA_TIMEOUT_SEC = 120
+
+
+@app.post("/api/presenza")
+def api_presenza():
+    """Battito della pagina: chi è collegato e su quale vista."""
+    d = request.get_json(silent=True) or {}
+    u = utente_corrente() or {}
+    with _lock_presenze:
+        _presenze[nome_utente()] = {
+            "utente": nome_utente(), "nome": u.get("nome") or nome_utente(), "admin": bool(u.get("admin")),
+            "vista": str(d.get("vista") or "")[:40], "ip": (request.remote_addr or "")[:45],
+            "dal": _presenze.get(nome_utente(), {}).get("dal") or _adesso(), "ultimo": _adesso(),
+            "t": time.monotonic()}
+    return jsonify({"ok": True})
+
+
+def _presenze_attive():
+    adesso = time.monotonic()
+    with _lock_presenze:
+        for k in [k for k, v in _presenze.items() if adesso - v["t"] > PRESENZA_TIMEOUT_SEC]:
+            del _presenze[k]
+        return sorted(({k2: v2 for k2, v2 in v.items() if k2 != "t"} for v in _presenze.values()),
+                      key=lambda p: p["ultimo"], reverse=True)
+
+
+@app.get("/api/admin/riepilogo")
+def api_admin_riepilogo():
+    """Chi ha fatto cosa nel periodo: per utente, movimenti per tipo, scansioni,
+    importazioni, modifiche alle anagrafiche, ultima attività. Più i mezzi in uso."""
+    giorni, _ = _periodo()
+    dal = (date.today() - timedelta(days=giorni - 1)).isoformat()
+    c = db()
+    per_utente = {}
+    for r in c.execute(
+            "SELECT utente, tipo, origine, COUNT(*) AS n, MAX(ts) AS ultimo FROM movimenti "
+            "WHERE date(COALESCE(data, ts)) >= ? GROUP BY utente, tipo, origine", (dal,)):
+        u = per_utente.setdefault(r["utente"] or "?", {"utente": r["utente"] or "?", "carico": 0, "scarico": 0, "trasferimento": 0,
+                                                       "rettifica": 0, "movimenti": 0, "scansioni": 0, "importazioni": 0,
+                                                       "anagrafiche": 0, "ultima": None})
+        chiave = "rettifica" if r["tipo"] in ("rettifica", "inventario") else r["tipo"]
+        u[chiave] += r["n"]
+        u["movimenti"] += r["n"]
+        u["ultima"] = max(u["ultima"] or "", r["ultimo"])
+    for r in c.execute(
+            "SELECT utente, azione, COUNT(*) AS n, MAX(ts) AS ultimo FROM attivita WHERE date(ts) >= ? "
+            "GROUP BY utente, azione", (dal,)):
+        u = per_utente.setdefault(r["utente"] or "?", {"utente": r["utente"] or "?", "carico": 0, "scarico": 0, "trasferimento": 0,
+                                                       "rettifica": 0, "movimenti": 0, "scansioni": 0, "importazioni": 0,
+                                                       "anagrafiche": 0, "ultima": None})
+        if r["azione"] == "scansione":
+            u["scansioni"] += r["n"]
+        elif r["azione"] == "importazione":
+            u["importazioni"] += r["n"]
+        elif r["azione"] in ("crea", "modifica", "elimina", "disattiva", "sposta"):
+            u["anagrafiche"] += r["n"]
+        u["ultima"] = max(u["ultima"] or "", r["ultimo"])
+    utenti = sorted(per_utente.values(), key=lambda u: (u["ultima"] or ""), reverse=True)
+    mezzi_in_uso = righe(c.execute(
+        "SELECT m.id, m.codice, m.tipo_mezzo, m.marca, m.modello, m.targa, m.assegnato_a, m.stato, u.nome AS ubicazione, "
+        "(SELECT MAX(ts) FROM movimenti_mezzi s WHERE s.mezzo_id = m.id) AS dal, "
+        "(SELECT utente FROM movimenti_mezzi s WHERE s.mezzo_id = m.id ORDER BY s.id DESC LIMIT 1) AS registrato_da "
+        "FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE m.attivo = 1 AND m.stato = 'in_uso' "
+        "ORDER BY m.assegnato_a IS NULL, m.assegnato_a, m.tipo_mezzo"))
+    per_giorno = {}
+    for r in c.execute(
+            "SELECT date(ts) AS g, utente, COUNT(*) AS n FROM attivita WHERE date(ts) >= ? GROUP BY g, utente", (dal,)):
+        per_giorno.setdefault(r["g"], {})[r["utente"]] = r["n"]
+    return jsonify({
+        "giorni": giorni, "utenti": utenti, "mezzi_in_uso": mezzi_in_uso, "collegati": _presenze_attive(),
+        "attivita_oggi": c.execute("SELECT COUNT(*) FROM attivita WHERE date(ts) = date('now', 'localtime')").fetchone()[0],
+        "utenti_attivi": len(utenti), "per_giorno": [{"data": g, "utenti": v} for g, v in sorted(per_giorno.items())],
+    })
+
+
+@app.get("/api/admin/attivita")
+def api_admin_attivita():
+    """Registro attività filtrabile: utente, azione, oggetto, periodo."""
+    sql = ("SELECT a.*, CASE a.oggetto WHEN 'articolo' THEN (SELECT descrizione FROM articoli x WHERE x.id = a.oggetto_id) "
+           "WHEN 'mezzo' THEN (SELECT tipo_mezzo || ' ' || COALESCE(marca, '') || ' ' || COALESCE(targa, '') FROM mezzi x WHERE x.id = a.oggetto_id) "
+           "WHEN 'ubicazione' THEN (SELECT nome FROM ubicazioni x WHERE x.id = a.oggetto_id) END AS oggetto_nome, "
+           "CASE a.oggetto WHEN 'articolo' THEN (SELECT codice FROM articoli x WHERE x.id = a.oggetto_id) "
+           "WHEN 'mezzo' THEN (SELECT codice FROM mezzi x WHERE x.id = a.oggetto_id) "
+           "WHEN 'ubicazione' THEN (SELECT codice FROM ubicazioni x WHERE x.id = a.oggetto_id) END AS oggetto_codice "
+           "FROM attivita a WHERE 1=1 ")
+    p = []
+    giorni, _ = _periodo()
+    sql += "AND date(a.ts) >= ? "
+    p.append((date.today() - timedelta(days=giorni - 1)).isoformat())
+    for campo in ("utente", "azione", "oggetto"):
+        v = (request.args.get(campo) or "").strip()
+        if v:
+            sql += f"AND a.{campo} = ? "
+            p.append(v)
+    q = (request.args.get("q") or "").strip()
+    if q:
+        sql += "AND (a.descrizione LIKE ? OR a.utente LIKE ? OR a.ip LIKE ?) "
+        p += [f"%{q}%"] * 3
+    sql += "ORDER BY a.id DESC LIMIT ?"
+    p.append(min(int(request.args.get("limite") or 300), 5000))
+    return jsonify(righe(db().execute(sql, p)))
+
+
+@app.get("/api/admin/utenti")
+def api_admin_utenti():
+    """Gli utenti visti finora (per i filtri)."""
+    c = db()
+    nomi = {r[0] for r in c.execute("SELECT DISTINCT utente FROM attivita")} | \
+        {r[0] for r in c.execute("SELECT DISTINCT utente FROM movimenti WHERE utente IS NOT NULL")}
+    return jsonify(sorted(n for n in nomi if n))
 
 
 # --------------------------------------------------------------------------- codici a barre ed etichette

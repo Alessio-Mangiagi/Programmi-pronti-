@@ -95,6 +95,7 @@
     flow: '<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6M20 15v-9"/></svg>',
     import: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/></svg>',
     tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
+    utenti: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-5-6.3"/></svg>',
     vuoto: '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>',
   };
   const vuoto = (msg) => `<div class="vuoto">${ICONE.vuoto}<div>${h(msg)}</div></div>`;
@@ -104,10 +105,10 @@
   const VISTE = [
     ['dashboard', 'Riepilogo', 'home'], ['scansione', 'Scansione', 'scan'], ['giacenze', 'Giacenze', 'box'],
     ['movimenti', 'Movimenti', 'swap'], ['flussi', 'Flussi', 'flow'], ['sez', 'Anagrafiche'], ['articoli', 'Articoli', 'lista'], ['mezzi', 'Mezzi', 'truck'],
-    ['ubicazioni', 'Ubicazioni', 'pin'], ['sez', 'Strumenti'], ['importazioni', 'Importazioni', 'import'], ['etichette', 'Etichette', 'tag'],
+    ['ubicazioni', 'Ubicazioni', 'pin'], ['sez', 'Strumenti'], ['importazioni', 'Importazioni', 'import'], ['etichette', 'Etichette', 'tag'], ['amministrazione', 'Amministrazione', 'utenti', 'admin'],
   ];
   function disegnaSidebar(attiva) {
-    $('#sidebar').innerHTML = VISTE.map(([id, nome, icona]) =>
+    $('#sidebar').innerHTML = VISTE.filter(([, , , solo]) => !solo || me.admin).map(([id, nome, icona]) =>
       id === 'sez' ? `<div class="sezione">${nome}</div>` :
         `<a href="#${id}" class="${id === attiva ? 'attiva' : ''}">${ICONE[icona]}<span>${nome}</span></a>`).join('');
   }
@@ -129,6 +130,11 @@
     }
   }
   window.addEventListener('hashchange', naviga);
+
+  // Presenza: dice al server che la pagina è aperta e su quale vista (per gli admin).
+  const battito = () => { fetch('/api/presenza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vista: (location.hash.replace('#', '').split('/')[0] || 'dashboard') }) }).catch(() => {}); };
+  setInterval(battito, 30000);
+  window.addEventListener('hashchange', battito);
 
   const viste = {};
 
@@ -286,7 +292,7 @@
           <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/etichette?tipo=mezzi&ids=${m.id}" target="_blank">Etichetta</a></div></div>
         <div class="griglia griglia-2">
           <div><div class="totale-grande" style="font-size:1.6rem">${h(m.ubicazione || 'Ubicazione non registrata')}</div>
-            <p>${badgeStato(m.stato)} <span class="badge">${m.proprieta === 'nolo' ? 'A nolo' : 'Di proprietà'}</span></p>
+            <p>${badgeStato(m.stato)} <span class="badge">${m.proprieta === 'nolo' ? 'A nolo' : 'Di proprietà'}</span>${m.assegnato_a ? ` <span class="badge badge-blu">In uso da ${h(m.assegnato_a)}</span>` : ''}</p>
             <p class="muto">${m.targa ? 'Targa ' + h(m.targa) + ' · ' : ''}${m.matricola ? 'Matricola ' + h(m.matricola) : ''}${m.ditta ? '<br>' + h(m.ditta) : ''}${m.nolo_dal || m.nolo_al ? `<br>Nolo ${fmtData(m.nolo_dal)} – ${fmtData(m.nolo_al)}` : ''}${m.note ? '<br>' + h(m.note) : ''}</p>
             <div class="azioni-rapide"><button class="btn" data-azione="sposta">Sposta / cambia stato</button></div></div>
           <div><h4>Storico spostamenti</h4>${d.storico.length ? `<table><thead><tr><th>Data</th><th>Da</th><th>A</th><th>Stato</th><th>Chi</th></tr></thead><tbody>
@@ -391,6 +397,7 @@
       <div class="pieno"><strong>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</strong> <span class="muto mono">${h(m.targa || m.codice)}</span><br><span class="muto">Ora: ${h(m.ubicazione || '—')}</span></div>
       ${campo('Nuova ubicazione', `<select name="a_ubicazione_id">${opzioniUbicazioni(lista, m.ubicazione_id, 'Lascia dove sta')}</select>`)}
       ${campo('Stato', select('stato', [['disponibile', 'Disponibile'], ['in_uso', 'In uso'], ['manutenzione', 'In manutenzione'], ['fermo', 'Fermo'], ['restituito', 'Restituito al noleggiatore']], m.stato))}
+      ${campo('In uso da (operatore / squadra)', input('assegnato_a', m.assegnato_a || '', 'maxlength="80" placeholder="es. Geom. Restivo, squadra B"'), 'pieno')}
       ${campo('Note', input('note', ''), 'pieno')}
       <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Annulla</button><button class="btn" type="submit">Registra</button></div></form>`;
     modale('Sposta mezzo', html, (box) => {
@@ -530,7 +537,7 @@
       const l = await api(`/api/mezzi?q=${encodeURIComponent($('#q').value)}&stato=${$('#stato').value}&proprieta=${$('#prop').value}`);
       $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Nolo fino al</th><th></th></tr></thead><tbody>
         ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
-          <td>${m.proprieta === 'nolo' ? `<span class="badge badge-ambra">Nolo</span><br><span class="muto">${h(m.ditta || '')}</span>` : '<span class="badge badge-verde">Proprio</span>'}</td><td>${h(m.ubicazione || '—')}</td><td>${badgeStato(m.stato)}</td>
+          <td>${m.proprieta === 'nolo' ? `<span class="badge badge-ambra">Nolo</span><br><span class="muto">${h(m.ditta || '')}</span>` : '<span class="badge badge-verde">Proprio</span>'}</td><td>${h(m.ubicazione || '—')}</td><td>${badgeStato(m.stato)}${m.assegnato_a ? `<br><span class="muto">${h(m.assegnato_a)}</span>` : ''}</td>
           <td class="muto">${m.nolo_al ? fmtData(m.nolo_al) : ''}</td>
           <td style="white-space:nowrap"><button class="btn btn-piccolo" data-sposta="${m.id}">Sposta</button> <button class="btn btn-sec btn-piccolo" data-mod="${m.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${m.id}">Elimina</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : vuoto('Nessun mezzo. Importa le pratiche di nolo o registrane uno.');
@@ -755,6 +762,70 @@
     await carica();
   };
 
+  // ------------------------------------------------------------------ amministrazione (chi ha fatto cosa, chi usa cosa)
+  const AZIONI = { scansione: ['', 'Scansione'], movimento: ['verde', 'Movimento'], crea: ['blu', 'Creazione'], modifica: ['blu', 'Modifica'],
+    elimina: ['rosso', 'Eliminazione'], elimina_movimento: ['rosso', 'Movimento eliminato'], disattiva: ['ambra', 'Disattivazione'],
+    sposta: ['blu', 'Spostamento mezzo'], importazione: ['ambra', 'Importazione'] };
+  const badgeAzione = (a) => { const [c, t] = AZIONI[a] || ['', a]; return `<span class="badge ${c ? 'badge-' + c : ''}">${h(t)}</span>`; };
+  let timerAdmin = null;
+  viste.amministrazione = async (cont) => {
+    clearInterval(timerAdmin);
+    if (!me.admin) { cont.innerHTML = '<div class="avviso avviso-errore">Area riservata agli amministratori del magazzino.</div>'; return; }
+    const stato = { giorni: 30 };
+    const utentiNoti = await api('/api/admin/utenti');
+    cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Amministrazione</div><h2>Chi fa cosa</h2></div>
+      <div class="azioni"><span class="stato-ciclo" id="adm-live"><span class="punto"></span><span>aggiornamento ogni 15 s</span></span></div></div>
+      <div class="filtri"><div class="segmenti" id="adm-periodo">${[[1, 'Oggi'], [7, '7 giorni'], [30, '30 giorni'], [90, '90 giorni']].map(([g, t]) => `<button type="button" data-g="${g}" class="${g === stato.giorni ? 'attivo' : ''}">${t}</button>`).join('')}</div></div>
+      <div class="griglia griglia-4" id="adm-kpi"></div>
+      <div style="height:1.25rem"></div>
+      <div class="griglia griglia-2">
+        <div class="card"><div class="card-testa"><div><h3>Collegati adesso</h3><p class="muto" style="margin:0">Chi ha la pagina aperta e cosa sta guardando (ultimi 2 minuti).</p></div></div><div id="adm-presenze"></div></div>
+        <div class="card"><div class="card-testa"><div><h3>Chi sta usando i mezzi</h3><p class="muto" style="margin:0">Mezzi in stato "in uso": operatore, ubicazione, chi lo ha registrato.</p></div></div><div id="adm-mezzi"></div></div>
+      </div>
+      <div style="height:1.25rem"></div>
+      <div class="card"><div class="card-testa"><div><h3>Chi ha caricato cosa</h3><p class="muto" style="margin:0">Per utente, nel periodo: movimenti per tipo, scansioni, importazioni, modifiche alle anagrafiche.</p></div></div>
+        <div id="adm-utenti"></div></div>
+      <div class="card"><div class="card-testa"><div><h3>Registro attività</h3><p class="muto" style="margin:0">Ogni azione con utente, indirizzo IP, oggetto e dettaglio.</p></div>
+        <div class="azioni"><button class="btn btn-sec btn-piccolo" id="adm-csv">Esporta CSV</button></div></div>
+        <div class="filtri"><select id="adm-utente"><option value="">Tutti gli utenti</option>${utentiNoti.map((u) => `<option>${h(u)}</option>`).join('')}</select>
+          <select id="adm-azione"><option value="">Tutte le azioni</option>${Object.entries(AZIONI).map(([k, v]) => `<option value="${k}">${v[1]}</option>`).join('')}</select>
+          <select id="adm-oggetto"><option value="">Tutti gli oggetti</option><option value="articolo">Articoli</option><option value="mezzo">Mezzi</option><option value="ubicazione">Ubicazioni</option><option value="ddt">Import DDT</option><option value="mezzi">Import mezzi</option><option value="upload">Upload</option></select>
+          <input id="adm-q" placeholder="Cerca nel dettaglio, utente, IP..."></div>
+        <div id="adm-registro"></div></div>`;
+    let registro = [];
+    const caricaRiepilogo = async () => {
+      const d = await api(`/api/admin/riepilogo?giorni=${stato.giorni}`);
+      const top = d.utenti[0];
+      $('#adm-kpi').innerHTML = `
+        <div class="card kpi"><div class="etichetta">Collegati adesso</div><div class="valore">${d.collegati.length}</div><div class="muto">${d.collegati.map((p) => h(p.nome)).join(', ') || 'nessuno'}</div></div>
+        <div class="card kpi"><div class="etichetta">Utenti attivi</div><div class="valore">${d.utenti_attivi}</div><div class="muto">nel periodo</div></div>
+        <div class="card kpi"><div class="etichetta">Azioni oggi</div><div class="valore">${d.attivita_oggi}</div><div class="muto">registrate</div></div>
+        <div class="card kpi"><div class="etichetta">Più attivo</div><div class="valore" style="font-size:1.3rem">${top ? h(top.utente) : '—'}</div><div class="muto">${top ? `${top.movimenti} movimenti · ${top.scansioni} scansioni` : ''}</div></div>`;
+      $('#adm-presenze').innerHTML = d.collegati.length ? `<table class="tabella-mini"><thead><tr><th>Utente</th><th>Vista</th><th>IP</th><th>Dal</th></tr></thead><tbody>${d.collegati.map((p) => `<tr><td><strong>${h(p.nome)}</strong>${p.admin ? ' <span class="badge badge-blu">admin</span>' : ''}</td><td>${h(p.vista || '—')}</td><td class="mono muto">${h(p.ip)}</td><td class="muto">${fmtData(p.dal)}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun altro collegato in questo momento.</p>';
+      $('#adm-mezzi').innerHTML = d.mezzi_in_uso.length ? `<table class="tabella-mini"><thead><tr><th>Mezzo</th><th>In uso da</th><th>Dove</th><th>Registrato da</th></tr></thead><tbody>${d.mezzi_in_uso.map((m) => `<tr><td><a href="#scansione/${h(m.codice)}">${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</a><br><span class="muto mono">${h(m.targa || m.codice)}</span></td><td>${m.assegnato_a ? `<strong>${h(m.assegnato_a)}</strong>` : '<span class="badge badge-ambra">non indicato</span>'}</td><td>${h(m.ubicazione || '—')}</td><td class="muto">${h(m.registrato_da || '')}<br>${fmtData(m.dal)}</td></tr>`).join('')}</tbody></table>` : '<p class="muto">Nessun mezzo in uso.</p>';
+      $('#adm-utenti').innerHTML = d.utenti.length ? `<div class="tabella-wrap"><table><thead><tr><th>Utente</th><th class="num">Carichi</th><th class="num">Scarichi</th><th class="num">Trasferimenti</th><th class="num">Rettifiche</th><th class="num">Scansioni</th><th class="num">Importazioni</th><th class="num">Anagrafiche</th><th>Ultima attività</th><th></th></tr></thead><tbody>
+        ${d.utenti.map((u) => `<tr><td><strong>${h(u.utente)}</strong></td><td class="num">${u.carico}</td><td class="num">${u.scarico}</td><td class="num">${u.trasferimento}</td><td class="num">${u.rettifica}</td><td class="num">${u.scansioni}</td><td class="num">${u.importazioni}</td><td class="num">${u.anagrafiche}</td><td class="muto">${fmtData(u.ultima)}</td><td><button class="btn btn-sec btn-piccolo" data-utente="${h(u.utente)}">Dettaglio</button></td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="muto">Nessuna attività nel periodo.</p>';
+      $('#adm-utenti').querySelectorAll('[data-utente]').forEach((b) => { b.onclick = () => { $('#adm-utente').value = b.dataset.utente; caricaRegistro(); $('#adm-registro').scrollIntoView({ behavior: 'smooth' }); }; });
+    };
+    const caricaRegistro = async () => {
+      registro = await api(`/api/admin/attivita?giorni=${stato.giorni}&utente=${encodeURIComponent($('#adm-utente').value)}&azione=${$('#adm-azione').value}&oggetto=${$('#adm-oggetto').value}&q=${encodeURIComponent($('#adm-q').value)}`);
+      $('#adm-registro').innerHTML = registro.length ? `<div class="tabella-wrap"><table><thead><tr><th>Quando</th><th>Utente</th><th>IP</th><th>Azione</th><th>Oggetto</th><th>Dettaglio</th></tr></thead><tbody>
+        ${registro.map((a) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(a.ts)}</td><td><strong>${h(a.utente)}</strong></td><td class="mono muto">${h(a.ip || '')}</td><td>${badgeAzione(a.azione)}</td>
+          <td>${a.oggetto_codice ? `<a href="#scansione/${h(a.oggetto_codice)}">${h(a.oggetto_nome || a.oggetto_codice)}</a> <span class="muto mono">${h(a.oggetto_codice)}</span>` : h(a.oggetto || '')}</td><td class="muto">${h(a.descrizione || '')}</td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="muto">Nessuna attività con questi filtri.</p>';
+    };
+    $('#adm-periodo').querySelectorAll('button').forEach((b) => { b.onclick = () => { stato.giorni = +b.dataset.g; $('#adm-periodo').querySelectorAll('button').forEach((x) => x.classList.toggle('attivo', x === b)); caricaRiepilogo(); caricaRegistro(); }; });
+    ['adm-utente', 'adm-azione', 'adm-oggetto'].forEach((id) => { $('#' + id).onchange = caricaRegistro; });
+    let t; $('#adm-q').oninput = () => { clearTimeout(t); t = setTimeout(caricaRegistro, 250); };
+    $('#adm-csv').onclick = () => {
+      const csv = ['Quando;Utente;IP;Azione;Oggetto;Codice;Dettaglio', ...registro.map((a) => [a.ts, a.utente, a.ip, a.azione, a.oggetto_nome || a.oggetto || '', a.oggetto_codice || '', a.descrizione || ''].map((x) => `"${String(x == null ? '' : x).replace(/"/g, '""')}"`).join(';'))].join('\r\n');
+      const el = document.createElement('a'); el.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); el.download = 'registro-attivita.csv'; el.click();
+    };
+    await Promise.all([caricaRiepilogo(), caricaRegistro()]);
+    timerAdmin = setInterval(() => { if (location.hash.startsWith('#amministrazione')) caricaRiepilogo(); else clearInterval(timerAdmin); }, 15000);
+  };
+
   // ------------------------------------------------------------------ etichette
   viste.etichette = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Stampa</div><h2>Etichette</h2></div></div>
@@ -791,5 +862,6 @@
       $('#testata-utente').textContent = (me.nome || me.username || '') + (me.admin ? ' · admin' : '');
     } catch (_) { /* senza identità si lavora lo stesso */ }
     naviga();
+    battito();
   })();
 })();
