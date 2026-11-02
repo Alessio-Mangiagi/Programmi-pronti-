@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etichette {{ tipo }} — Magazzino Operativo Cosedil</title>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&family=Inter:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Foglio A4: 3 colonne x 8 righe di etichette 70x37 mm (formato comune dei fogli adesivi).
+       Il browser stampa, quindi niente PDF da generare lato server. */
+    :root { --blu: #0c4577; --testo: #212326; --grigio: #434549; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Inter', Arial, sans-serif; color: var(--testo); background: #f2f3f5; }
+    .barra { display: flex; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e5e7eb; font-size: 0.9rem; }
+    .barra button { font-family: 'Ubuntu', Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem; background: var(--blu); color: #fff; border: 0; border-radius: 4px; padding: 0.55rem 1.2rem; cursor: pointer; }
+    .barra a { color: var(--blu); }
+    .foglio { width: 210mm; margin: 1rem auto; background: #fff; padding: 10mm 5mm; display: grid; grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; }
+    .etichetta { border: 0.2mm dashed #cfd3da; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; page-break-inside: avoid; }
+    .riga { display: flex; gap: 2mm; align-items: center; }
+    .riga svg.qr { width: 16mm; height: 16mm; flex-shrink: 0; }
+    .titolo { font-weight: 600; font-size: 9.5pt; line-height: 1.2; max-height: 2.4em; overflow: hidden; }
+    .sotto { font-size: 7.5pt; color: var(--grigio); }
+    .code { width: 100%; height: 12mm; }
+    .code svg { width: 100%; height: 100%; }
+    .marchio { font-family: 'Ubuntu', Arial, sans-serif; font-weight: 700; font-size: 6.5pt; letter-spacing: 0.1em; color: var(--blu); }
+    .vuoto { padding: 3rem; text-align: center; color: var(--grigio); }
+    @media print {
+      body { background: #fff; }
+      .barra { display: none; }
+      .foglio { margin: 0; padding: 10mm 5mm; }
+      .etichetta { border-color: transparent; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="barra">
+    <button type="button" onclick="window.print()">Stampa</button>
+    <span>{{ voci|length }} etichette · {{ tipo }} · fogli A4 da 24 (70×37 mm)</span>
+    <span style="flex:1"></span>
+    <a href="/#etichette">Torna al magazzino</a>
+  </div>
+  {% if not voci %}
+    <p class="vuoto">Nessuna voce da stampare.</p>
+  {% else %}
+  <div class="foglio">
+    {% for v in voci %}
+    <div class="etichetta">
+      <div class="riga">
+        {% if v.qr %}{{ v.qr|safe }}{% endif %}
+        <div>
+          <div class="titolo">{{ v.titolo }}</div>
+          <div class="sotto">{{ v.sotto }}</div>
+        </div>
+      </div>
+      <div class="code">{{ v.code128|safe }}</div>
+      <div class="marchio">COSEDIL · MAGAZZINO</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</body>
+</html>
