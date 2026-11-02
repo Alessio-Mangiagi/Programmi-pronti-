@@ -72,6 +72,30 @@ npx eas-cli submit -p ios --profile store                 (invio a TestFlight / 
 L'APK si scarica dal link che stampa EAS e si installa sui telefoni Android
 (consentendo le "app da origini sconosciute"). Su iPhone si distribuisce con TestFlight.
 
+## Dialogo con Magazzino e SkyTower
+
+La chiave è il **codice della commessa** (`Commessa.code`, es. `101-003`): lo stesso
+codice sta sull'ubicazione del Magazzino e nella scheda *Suite Cosedil* del progetto
+SkyTower. Con il cantiere collegato a una commessa:
+
+* **Dashboard del cantiere** → riquadro *Materiale e mezzi in cantiere*: giacenze e
+  mezzi presenti secondo il Magazzino, con link alle schede.
+* **Nuova planimetria → Da SkyTower**: si sceglie una tavola **pubblicata** della
+  commessa; il server la scarica e la tratta come un caricamento (PDF → PNG).
+* **Dettaglio modulo → Invia a SkyTower**: il PDF del modulo (ispezione, non
+  conformità) diventa un documento WIP della commessa su SkyTower.
+* Il Magazzino, dalla scheda dell'ubicazione, vede task aperti e non conformità del
+  cantiere e può **aprire un task** qui (es. mezzo fermo); da *Ubicazioni → Importa
+  cantieri da InCampo* crea le ubicazioni-cantiere con nome, indirizzo e commessa.
+
+Le rotte `/api/suite/...` sono per le altre app (token di servizio di
+`shared/suite`, non JWT); quelle utente (`/api/projects/{id}/magazzino`,
+`/api/projects/{id}/skytower/documenti`, `POST /api/plans/da-skytower`,
+`POST /api/submissions/{id}/skytower`) passano dal JWT come tutto il resto. Un task
+aperto dal Magazzino è attribuito all'utente InCampo con la stessa email dell'utente
+del portale; se non c'è, resta senza autore e lo dice nella descrizione. Dettagli e
+variabili: `shared/suite/README.md`.
+
 ## Aggiornare dalla repository originale
 
 ```bat

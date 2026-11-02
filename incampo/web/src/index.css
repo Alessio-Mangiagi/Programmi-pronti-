@@ -172,6 +172,26 @@ input:focus, select:focus, textarea:focus {
 
 .empty { padding: 3rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); }
 
+/* Dialogo con la suite: Magazzino nel cruscotto, tavole da SkyTower nel form planimetria */
+.magazzino-card { margin-bottom: 1.25rem; }
+.magazzino-testa { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.magazzino-testa h2 { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; }
+.magazzino-colonne { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; margin-top: 0.75rem; }
+.magazzino-colonne h3 { font-size: 0.95rem; margin: 0 0 0.4rem; }
+.magazzino-tabella { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.magazzino-tabella th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--border); }
+.magazzino-tabella td { padding: 0.4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.magazzino-tabella .num, .magazzino-tabella th.num { text-align: right; white-space: nowrap; }
+.magazzino-mezzi { list-style: none; margin: 0; padding: 0; }
+.magazzino-mezzi li { padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.origine-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.sky-elenco { list-style: none; margin: 0.5rem 0 0; padding: 0; max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.sky-elenco li label { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0.7rem; cursor: pointer; border-bottom: 1px solid var(--border); }
+.sky-elenco li:last-child label { border-bottom: 0; }
+.sky-elenco li label.scelto { background: #eef4fa; }
+.sky-elenco input { margin-top: 0.3rem; }
+@media (max-width: 720px) { .magazzino-colonne { grid-template-columns: 1fr; } }
+
 .thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-alt); margin-bottom: 0.6rem; }
 .thumb-empty { display: grid; place-items: center; color: var(--muted); font-size: 0.85rem; }
 

@@ -5,6 +5,7 @@ import { api, errorMessage } from '../api/client'
 import type { components } from '../api/schema'
 import type { Plan, User } from '../api/types'
 import Loading from '../components/Loading'
+import MagazzinoCantiere from '../components/MagazzinoCantiere'
 import { TASK_STATUS_LABEL } from '../labels'
 import { useToast } from '../components/useToast'
 import { useProject } from '../hooks/useProject'
@@ -177,6 +178,8 @@ export default function DashboardPage() {
                 <span className="muted small">{stats.tasks_total} task in totale · {stats.pins_total} pin</span>
               </Link>
             </div>
+
+            <MagazzinoCantiere projectId={projectId} />
 
             {showTable ? (
               <StatsTable stats={stats} />

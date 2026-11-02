@@ -4299,6 +4299,215 @@
           }
         }
       }
+    },
+    "/projects/{project_id}/magazzino": {
+      "get": {
+        "summary": "Magazzino Del Cantiere",
+        "description": "Materiale e mezzi presenti nelle ubicazioni del Magazzino con il codice di questa commessa.",
+        "operationId": "magazzino_del_cantiere_projects__project_id__magazzino_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/skytower/documenti": {
+      "get": {
+        "summary": "Documenti Skytower",
+        "description": "Documenti (tavole) della commessa su SkyTower; di default solo quelli pubblicati.",
+        "operationId": "documenti_skytower_projects__project_id__skytower_documenti_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "PUBLISHED",
+              "title": "Area"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plans/da-skytower": {
+      "post": {
+        "summary": "Planimetria Da Skytower",
+        "description": "Scarica da SkyTower la revisione scelta (PDF o immagine) e la rende una planimetria del cantiere,\ncon la stessa pipeline del caricamento a mano (PDF → PNG prima pagina).",
+        "operationId": "planimetria_da_skytower_plans_da_skytower_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDaSkyTowerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/submissions/{submission_id}/skytower": {
+      "post": {
+        "summary": "Modulo Su Skytower",
+        "description": "Il PDF del modulo compilato (ispezione, non conformità) diventa un documento della commessa su SkyTower.",
+        "operationId": "modulo_su_skytower_submissions__submission_id__skytower_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvioSkyTowerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5398,6 +5607,36 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InvioSkyTowerIn": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "title": "InvioSkyTowerIn"
       },
       "InviteAccept": {
         "properties": {
@@ -6525,6 +6764,31 @@
           "name"
         ],
         "title": "PlanCreate"
+      },
+      "PlanDaSkyTowerIn": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "revision_id": {
+            "type": "string",
+            "title": "Revision Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "revision_id",
+          "name"
+        ],
+        "title": "PlanDaSkyTowerIn"
       },
       "PlanOut": {
         "properties": {

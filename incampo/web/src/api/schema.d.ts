@@ -1302,6 +1302,87 @@ export interface paths {
         patch: operations["update_support_message_support_messages__message_id__patch"];
         trace?: never;
     };
+    "/projects/{project_id}/magazzino": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Magazzino Del Cantiere
+         * @description Materiale e mezzi presenti nelle ubicazioni del Magazzino con il codice di questa commessa.
+         */
+        get: operations["magazzino_del_cantiere_projects__project_id__magazzino_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/skytower/documenti": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Documenti Skytower
+         * @description Documenti (tavole) della commessa su SkyTower; di default solo quelli pubblicati.
+         */
+        get: operations["documenti_skytower_projects__project_id__skytower_documenti_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/da-skytower": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Planimetria Da Skytower
+         * @description Scarica da SkyTower la revisione scelta (PDF o immagine) e la rende una planimetria del cantiere,
+         *     con la stessa pipeline del caricamento a mano (PDF → PNG prima pagina).
+         */
+        post: operations["planimetria_da_skytower_plans_da_skytower_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/skytower": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Modulo Su Skytower
+         * @description Il PDF del modulo compilato (ispezione, non conformità) diventa un documento della commessa su SkyTower.
+         */
+        post: operations["modulo_su_skytower_submissions__submission_id__skytower_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1670,6 +1751,13 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InvioSkyTowerIn */
+        InvioSkyTowerIn: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /** InviteAccept */
         InviteAccept: {
@@ -2085,6 +2173,15 @@ export interface components {
             width_px?: number | null;
             /** Height Px */
             height_px?: number | null;
+        };
+        /** PlanDaSkyTowerIn */
+        PlanDaSkyTowerIn: {
+            /** Project Id */
+            project_id: string;
+            /** Revision Id */
+            revision_id: string;
+            /** Name */
+            name: string;
         };
         /** PlanOut */
         PlanOut: {
@@ -5578,6 +5675,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupportMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    magazzino_del_cantiere_projects__project_id__magazzino_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    documenti_skytower_projects__project_id__skytower_documenti_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                area?: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    planimetria_da_skytower_plans_da_skytower_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDaSkyTowerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modulo_su_skytower_submissions__submission_id__skytower_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvioSkyTowerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

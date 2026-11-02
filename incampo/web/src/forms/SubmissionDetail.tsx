@@ -57,6 +57,27 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
       setDownloading(false)
     }
   }
+  /** Il PDF del modulo diventa un documento della commessa su SkyTower (stesso codice commessa). */
+  const [invioSky, setInvioSky] = useState(false)
+  async function inviaSkyTower() {
+    if (!confirm('Caricare il PDF di questo modulo su SkyTower come documento della commessa?')) return
+    setInvioSky(true)
+    try {
+      const r = await fetch(`/api/submissions/${encodeURIComponent(submission.id)}/skytower`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken() ?? ''}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const d = (await r.json().catch(() => ({}))) as { identifier?: string; revision_code?: string; url?: string; detail?: unknown }
+      if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : `Errore ${r.status}`)
+      toast.success(`Caricato su SkyTower: ${d.identifier ?? ''} ${d.revision_code ?? ''}`.trim())
+      if (d.url) window.open(d.url, '_blank', 'noopener')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'SkyTower non raggiungibile')
+    } finally {
+      setInvioSky(false)
+    }
+  }
   const schema = template.schema_def as FormSchema
   const data = submission.data_json as FormData
   const nc = findNonConformity(schema, data)
@@ -132,6 +153,9 @@ export default function SubmissionDetail({ submission: initial, template, pinId,
         )}
         <button type="button" className="btn" onClick={downloadPdf} disabled={downloading}>
           {downloading ? 'Preparo il PDF…' : 'Scarica PDF'}
+        </button>
+        <button type="button" className="btn" onClick={inviaSkyTower} disabled={invioSky} title="Il PDF del modulo diventa un documento della commessa su SkyTower">
+          {invioSky ? 'Invio a SkyTower…' : 'Invia a SkyTower'}
         </button>
         <button type="button" className="btn" onClick={onClose}>
           Chiudi
