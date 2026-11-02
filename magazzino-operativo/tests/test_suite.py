@@ -109,6 +109,15 @@ def test_importa_cantieri_da_incampo(client, cantiere, incampo_finto):
     assert r2["nuove"] == 0 and len(client.get("/api/ubicazioni").get_json()) == len(ubi)
 
 
+def test_commessa_con_spazi_nel_percorso(client, cantiere, incampo_finto):
+    """"101-003 SEDE ACIREALE" (import VFP): nel percorso verso l'altra app gli spazi vanno codificati."""
+    r = client.get("/api/incampo/commessa/101-003%20SEDE%20ACIREALE")
+    assert r.status_code == 200
+    assert incampo_finto[0][2] == "/suite/commesse/101-003%20SEDE%20ACIREALE/riepilogo"
+    r = client.get("/api/skytower/commessa/101-003%20SEDE/documenti")
+    assert r.status_code == 200 and incampo_finto[1][2] == "/suite/commesse/101-003%20SEDE/documenti"
+
+
 def test_incampo_spento(client, cantiere, monkeypatch):
     def giu(*a, **k):
         raise suite_rotte.suite_link.SuiteError("incampo", 503, "InCampo non raggiungibile")

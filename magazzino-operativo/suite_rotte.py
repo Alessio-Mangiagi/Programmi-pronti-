@@ -16,6 +16,7 @@ Importato in fondo ad app.py: usa le sue funzioni (db, registra, ...).
 import json
 import os
 import sys
+import urllib.parse
 from datetime import datetime
 
 from flask import g, jsonify, request
@@ -89,6 +90,11 @@ def _chiama(app_id, metodo, percorso, **kw):
         raise ApiError(e.messaggio, e.stato if e.stato in (400, 403, 404, 409, 422, 503) else 502)
 
 
+def _q(codice):
+    """Il codice commessa può avere spazi ("101-003 SEDE"): nel percorso va codificato."""
+    return urllib.parse.quote(str(codice or "").strip(), safe="")
+
+
 # --------------------------------------------------------------------------- offerto alle altre app
 
 @app.get("/api/suite/commesse")
@@ -135,7 +141,7 @@ def api_collegamenti():
 @app.get("/api/incampo/commessa/<codice>")
 def incampo_commessa(codice):
     """Cantieri, task aperti e non conformità della commessa, da InCampo."""
-    return jsonify(_chiama("incampo", "GET", f"/suite/commesse/{codice}/riepilogo"))
+    return jsonify(_chiama("incampo", "GET", f"/suite/commesse/{_q(codice)}/riepilogo"))
 
 
 @app.post("/api/incampo/commessa/<codice>/task")
@@ -150,7 +156,7 @@ def incampo_task(codice):
         if m:
             riga = " ".join(x for x in (m["tipo_mezzo"], m["marca"], m["modello"]) if x)
             dati["description"] = (dati["description"] or "") + f"\n\nMezzo: {riga} ({m['targa'] or m['codice']}) — {suite_link.url_pubblico('magazzino')}/#scansione/{m['codice']}"
-    r = _chiama("incampo", "POST", f"/suite/commesse/{codice}/task", dati=dati)
+    r = _chiama("incampo", "POST", f"/suite/commesse/{_q(codice)}/task", dati=dati)
     registra("segnalazione_incampo", "mezzo" if d.get("mezzo_id") else "ubicazione", d.get("mezzo_id") or d.get("ubicazione_id"),
              f"{codice}: {titolo}")
     db().commit()
@@ -197,7 +203,7 @@ def incampo_importa_cantieri():
 @app.get("/api/skytower/commessa/<codice>/documenti")
 def skytower_documenti(codice):
     """Documenti pubblicati su SkyTower per la commessa."""
-    return jsonify(_chiama("skytower", "GET", f"/suite/commesse/{codice}/documenti",
+    return jsonify(_chiama("skytower", "GET", f"/suite/commesse/{_q(codice)}/documenti",
                            parametri={"area": request.args.get("area", "PUBLISHED"), "q": request.args.get("q", "")}))
 
 
@@ -223,7 +229,7 @@ def skytower_report(codice):
          "larghezze": (1.1, 2.6, 1.4, 2, 1.1, 1.6)},
     ], piede=f"Generato da {nome_utente()}")
     titolo = f"Giacenze e mezzi {d['commessa']} {oggi:%d-%m-%Y}"
-    r = _chiama("skytower", "POST", f"/suite/commesse/{codice}/documenti",
+    r = _chiama("skytower", "POST", f"/suite/commesse/{_q(codice)}/documenti",
                 parametri={"title": titolo, "description": f"Report automatico del Magazzino Operativo: {len(righe_art)} righe di materiale, {len(righe_mezzi)} mezzi.",
                            "tipo": "RP", "attributes": json.dumps({"origine": "magazzino", "commessa": d["commessa"], "generato_il": oggi.isoformat(timespec="seconds")})},
                 corpo_file=(pdf, "application/pdf", f"giacenze-{suite_link.normalizza_commessa(codice).lower()}-{oggi:%Y%m%d-%H%M}.pdf"),

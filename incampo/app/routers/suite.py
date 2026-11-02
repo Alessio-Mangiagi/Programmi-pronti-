@@ -18,6 +18,7 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -244,7 +245,7 @@ def _commessa_del_cantiere(db: Session, user: models.User, project_id: str) -> t
 def magazzino_del_cantiere(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     """Materiale e mezzi presenti nelle ubicazioni del Magazzino con il codice di questa commessa."""
     project, commessa = _commessa_del_cantiere(db, user, project_id)
-    d = _chiama("magazzino", "GET", f"/suite/commesse/{commessa.code}/giacenze", user)
+    d = _chiama("magazzino", "GET", f"/suite/commesse/{quote(commessa.code, safe='')}/giacenze", user)
     d["commessa_code"] = commessa.code
     d["magazzino_url"] = suite_link.url_pubblico("magazzino")
     return d
@@ -257,7 +258,8 @@ def documenti_skytower(project_id: str, q: Optional[str] = None, area: str = "PU
                        user: models.User = Depends(current_user)):
     """Documenti (tavole) della commessa su SkyTower; di default solo quelli pubblicati."""
     _, commessa = _commessa_del_cantiere(db, user, project_id)
-    return _chiama("skytower", "GET", f"/suite/commesse/{commessa.code}/documenti", user, parametri={"q": q or "", "area": area})
+    return _chiama("skytower", "GET", f"/suite/commesse/{quote(commessa.code, safe='')}/documenti", user,
+                   parametri={"q": q or "", "area": area})
 
 
 class PlanDaSkyTowerIn(BaseModel):
@@ -327,7 +329,7 @@ def modulo_su_skytower(submission_id: str, payload: InvioSkyTowerIn, request: Re
     titolo = (payload.title or f"{'NC ' if nc else ''}{template.name if template else 'Modulo'} {project.name} {sub.created_at:%d-%m-%Y}").strip()[:300]
     descr = payload.description or (f"Modulo InCampo compilato il {sub.created_at:%d/%m/%Y %H:%M}"
                                     + (f" — non conformità: {nc['label']} = {nc['value']}" if nc else ""))
-    r = _chiama("skytower", "POST", f"/suite/commesse/{commessa.code}/documenti", user,
+    r = _chiama("skytower", "POST", f"/suite/commesse/{quote(commessa.code, safe='')}/documenti", user,
                 parametri={"title": titolo, "description": descr, "tipo": "RP",
                            "attributes": json.dumps({"origine": "incampo", "submission_id": sub.id, "project_id": project.id,
                                                      "non_conformita": bool(nc)})},
