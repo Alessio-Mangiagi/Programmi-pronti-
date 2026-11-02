@@ -163,8 +163,11 @@ def _chiuso_se_giu(fail_open):
     return not (FAIL_OPEN if fail_open is None else fail_open)
 
 
-def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None):
-    """Registra il gate sull'app Flask. No-op se COSEDIL_SSO=off."""
+def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None, percorsi_liberi=()):
+    """Registra il gate sull'app Flask. No-op se COSEDIL_SSO=off.
+
+    percorsi_liberi: prefissi che il gate non guarda (es. "/api/suite/", le rotte
+    fra app della suite protette dal token di servizio di shared/suite)."""
     if not ENABLED:
         return
     # Import qui e non in cima: le app ASGI (FastAPI) usano il modulo senza Flask.
@@ -176,7 +179,7 @@ def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None):
     def _cosedil_gate():
         v, rifiuto = decidi(request.path, request.headers.get("Accept", ""),
                             request.headers.get("Cookie", ""), app_id, admin_only,
-                            admin_paths, chiuso_se_giu)
+                            admin_paths, chiuso_se_giu, percorsi_liberi=percorsi_liberi)
         if v and v["ok"]:
             g.cosedil = v
         if rifiuto is None:

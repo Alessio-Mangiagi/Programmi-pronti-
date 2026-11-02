@@ -31,6 +31,7 @@ regole IP, avvio a caldo) e nel gate SSO.
 | `shared/sso/` | Il gate SSO montato da tutte le app (vedi `shared/sso/README.md`) |
 | `shared/node/` | Utilità comuni alle app Node: lock di istanza unica, configurazione di winston |
 | `shared/avvisi/` | Avvisi dei programmi per gli admin del Portale (vedi `shared/avvisi/README.md`) |
+| `shared/suite/` | Dialogo fra InCampo, SkyTower e Magazzino: token di servizio, chiamate, codice commessa (vedi `shared/suite/README.md`) |
 | `shared/avvia/` | Script di avvio condivisi |
 
 `shared/` **non ha un `node_modules` proprio**: quello che sta lì dentro usa solo
@@ -109,6 +110,17 @@ verifica il cookie di sessione contro `<portale>/api/verify`. Conseguenze pratic
   emulato in memoria, dati demo; vedi `skytower/README.md`).
 - **Auguri** è riservata agli admin del portale, e lo impone l'app stessa: il
   flag `adminOnly` nel registro del portale nasconde solo la card.
+
+## Dialogo fra InCampo, SkyTower e Magazzino
+
+Le tre app si parlano direttamente (chiamate HTTP sulle porte del registro, stesso
+server) con il modulo condiviso `shared/suite/suite_link.py`. La chiave comune è il
+**codice commessa aziendale** (es. `101-003`): InCampo lo ha sulla commessa,
+SkyTower nella scheda *Suite Cosedil* del progetto, il Magazzino sull'ubicazione.
+Le rotte riservate alle altre app (`/api/suite/...`) sono protette da un token di
+servizio: `SUITE_TOKEN` nell'ambiente, oppure il file `shared/suite/.token` creato
+da solo alla prima chiamata (fuori da git). Cosa si scambiano, utente a cui si
+attribuiscono le azioni e variabili: `shared/suite/README.md`.
 
 ## Indirizzi di ascolto
 
