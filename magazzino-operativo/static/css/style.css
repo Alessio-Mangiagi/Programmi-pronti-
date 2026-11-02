@@ -38,7 +38,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font-family: var(--font-body);
   font-size: 15px;
@@ -107,7 +107,7 @@ a:hover { color: var(--cosedil-blue-hover); }
 .sidebar .sezione { font-family: var(--font-ui); font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cosedil-muted); padding: 1rem 0.75rem 0.35rem; }
 .sidebar-piede { margin-top: auto; padding: 1rem 0.75rem 0; font-family: var(--font-ui); font-size: 0.7rem; color: var(--cosedil-muted); border-top: 1px solid var(--cosedil-border-soft); }
 
-.contenuto { flex: 1; min-width: 0; padding: clamp(1.25rem, 3vw, 2.25rem) clamp(1rem, 3vw, 2.5rem) 3rem; max-width: 1440px; }
+.contenuto { flex: 1; min-width: 0; width: 100%; margin-inline: auto; padding: clamp(1.25rem, 3vw, 2.25rem) clamp(1rem, 3vw, 2.5rem) 3rem; max-width: 1440px; }
 
 /* ---------- intestazione vista ---------- */
 .vista-testa { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
@@ -384,29 +384,62 @@ td .mono, td.mono { white-space: nowrap; }
 .installa-avviso .btn { margin-left: auto; flex-shrink: 0; }
 .installa-avviso > svg { width: 24px; height: 24px; stroke: var(--cosedil-blue); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 
-/* ---------- responsive ---------- */
+/* ---------- responsive ----------
+   Fasce: schermi grandi (>= 1800), desktop, tablet 769-1024 (menu a icone), telefono <= 768
+   (barra tab), telefono stretto <= 380, telefono in orizzontale (poca altezza), touch. */
+@media (min-width: 1800px) {
+  body { font-size: 16px; }
+  :root { --sidebar-w: 260px; }
+  .contenuto { padding-top: 2.5rem; }
+  .griglia { gap: 1.5rem; }
+}
 @media (max-width: 1100px) {
   .griglia-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 1024px) {
+  /* Tablet: la barra laterale resta ma solo con le icone; il bottone menu la allarga sopra il contenuto. */
+  :root { --sidebar-w: 64px; }
+  .testata-menu { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
+  .sidebar { padding: 0.75rem 0.5rem 1rem; overflow-x: hidden; transition: width 0.3s var(--ease-out), box-shadow 0.3s; }
+  .sidebar-brand, .sidebar-piede, .sidebar .sezione, .sidebar a span { display: none; }
+  .sidebar a { justify-content: center; padding: 0.7rem 0; margin-bottom: 4px; min-height: 44px; }
+  .sidebar a svg { width: 22px; height: 22px; }
+  .sidebar a.attiva::before { left: -0.5rem; }
+  .sidebar.aperta { width: 236px; position: fixed; left: 0; top: var(--testata-h); height: calc(100dvh - var(--testata-h)); z-index: 30; box-shadow: var(--shadow-pop); padding: 1rem 0.75rem 1.25rem; }
+  .sidebar.aperta .sidebar-brand, .sidebar.aperta .sidebar-piede, .sidebar.aperta .sidebar .sezione, .sidebar.aperta .sezione { display: block; }
+  .sidebar.aperta a { justify-content: flex-start; padding: 0.55rem 0.75rem; }
+  .sidebar.aperta a span { display: inline; }
+  .sidebar.aperta a svg { width: 18px; height: 18px; }
+  .sidebar.aperta a.attiva::before { left: -0.75rem; }
+  .sidebar-velo { display: block; position: fixed; inset: 0; top: var(--testata-h); background: rgba(9, 53, 89, 0.35); z-index: 29; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  body.menu-aperto .sidebar-velo { opacity: 1; pointer-events: auto; }
+  .contenuto { padding: 1.25rem 1.25rem 3rem; }
+  .filtri input, .filtri select { min-width: 150px; }
+}
 @media (max-width: 900px) {
-  .griglia { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .griglia, .griglia-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Le due colonne con tabelle dentro si stringono troppo: una sotto l'altra. */
+  .griglia-2:has(table) { grid-template-columns: minmax(0, 1fr); }
   .lista-check { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 768px) {
   :root { --testata-h: 54px; --tabbar-h: 62px; }
   .testata { min-height: var(--testata-h); padding-top: env(safe-area-inset-top); gap: 0.6rem; }
-  .testata-menu { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
   .testata-titolo { font-size: 0.95rem; }
   .testata-titolo small { display: none; }
   .testata-divisore { display: none; }
   .testata-utente span:not(.avatar) { display: none; }
   .testata-utente { padding-right: 0.3rem; }
   .logo { letter-spacing: 0.1em; font-size: 0.95rem; }
-  .sidebar { position: fixed; left: 0; top: var(--testata-h); height: calc(100dvh - var(--testata-h)); transform: translateX(-100%); transition: transform 0.3s var(--ease-out); z-index: 30; box-shadow: var(--shadow-pop); width: min(300px, 84vw); padding-bottom: calc(var(--tabbar-h) + 1rem); overflow-y: auto; }
-  .sidebar.aperta { transform: none; }
-  .sidebar a { min-height: 46px; font-size: 1rem; }
-  .sidebar-velo { display: block; position: fixed; inset: 0; top: var(--testata-h); background: rgba(9, 53, 89, 0.35); z-index: 29; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-  body.menu-aperto .sidebar-velo { opacity: 1; pointer-events: auto; }
+  /* Telefono: barra laterale nascosta del tutto, esce a scorrimento dal bottone menu o da "Altro". */
+  .sidebar { position: fixed; left: 0; top: var(--testata-h); height: calc(100dvh - var(--testata-h)); transform: translateX(-100%); transition: transform 0.3s var(--ease-out); z-index: 30; box-shadow: var(--shadow-pop); width: min(300px, 84vw); padding: 1rem 0.75rem calc(var(--tabbar-h) + 1rem); overflow-y: auto; }
+  .sidebar.aperta { transform: none; width: min(300px, 84vw); }
+  .sidebar-brand, .sidebar-piede, .sidebar .sezione { display: block; }
+  .sidebar a { justify-content: flex-start; padding: 0.55rem 0.75rem; min-height: 46px; font-size: 1rem; }
+  .sidebar a span { display: inline; }
+  .sidebar a svg { width: 20px; height: 20px; }
+  .sidebar a.attiva::before { left: -0.75rem; }
   .contenuto { padding: 1rem 1rem calc(var(--tabbar-h) + 1.5rem + env(safe-area-inset-bottom)); }
   .griglia, .griglia-2, .griglia-4, .form, .lista-check { grid-template-columns: minmax(0, 1fr); }
   .griglia-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
@@ -468,6 +501,50 @@ td .mono, td.mono { white-space: nowrap; }
   table.schede-mobile td.cella-azioni .btn { flex: 1; justify-content: center; }
   .tabella-wrap:has(> table.schede-mobile) { overflow: visible; margin: 0; padding: 0; }
   .tasti-grandi { gap: 0.6rem; }
+}
+@media (max-width: 380px) {
+  /* Telefoni stretti (iPhone SE, Android economici): una colonna quasi ovunque, testi un filo più piccoli. */
+  body { font-size: 14px; }
+  .contenuto { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .griglia-4 { grid-template-columns: minmax(0, 1fr); }
+  .tasti-grandi { grid-template-columns: minmax(0, 1fr); }
+  .tasto-grande { min-height: 0; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; padding: 0.8rem 0.9rem; }
+  .tasto-grande small { flex-basis: 100%; }
+  .tasto-grande.primario { min-height: 0; }
+  table.schede-mobile tr { grid-template-columns: minmax(0, 1fr); }
+  .azioni-rapide { grid-template-columns: minmax(0, 1fr); }
+  .scanner input { font-size: 1.1rem; }
+  .totale-grande { font-size: 1.9rem; }
+  .logo { font-size: 0.85rem; letter-spacing: 0.06em; }
+  .testata-titolo { display: none; }
+  .tabbar a span:last-child, .tabbar button span:last-child { font-size: 0.6rem; }
+}
+@media (max-height: 520px) and (orientation: landscape) and (max-width: 1024px) {
+  /* Telefono in orizzontale: poca altezza, si risparmia in testata e barra tab. */
+  :root { --testata-h: 46px; --tabbar-h: 48px; }
+  .tabbar a span:last-child, .tabbar button span:last-child { display: none; }
+  .tabbar .cerchio { width: 40px; height: 40px; margin-top: 0; border-width: 2px; }
+  .tabbar .cerchio svg { width: 20px; height: 20px; }
+  .tasti-grandi { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tasto-grande, .tasto-grande.primario { min-height: 0; grid-column: auto; }
+  .tasto-grande.primario::after { display: none; }
+  .operatore-saluto { margin-bottom: 0.5rem; }
+  .modale { max-height: 100dvh; border-radius: 0; }
+  #lettore-camera video { max-height: 55vh; object-fit: cover; }
+  .vista-testa { margin-bottom: 0.6rem; }
+  .contenuto { padding-top: 0.75rem; }
+}
+@media (pointer: coarse) {
+  /* Qualsiasi schermo touch (tablet compresi): bersagli da dito e righe più ariose. */
+  .btn { min-height: 44px; }
+  .btn-piccolo { min-height: 40px; }
+  .campo input, .campo select, .campo textarea, .filtri input, .filtri select { min-height: 44px; font-size: 16px; }
+  .sidebar a { min-height: 44px; }
+  td { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .segmenti button { min-height: 40px; padding-inline: 0.9rem; }
+  .btn-icona { min-width: 44px; min-height: 44px; }
+  .elenco li { padding: 0.85rem 0; }
+  .link-mappa { padding: 0.4rem; }
 }
 @keyframes sale { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 

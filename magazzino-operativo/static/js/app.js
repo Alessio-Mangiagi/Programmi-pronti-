@@ -127,12 +127,15 @@
   function disegnaSidebar(attiva) {
     $('#sidebar').innerHTML = '<div class="sidebar-brand"><strong>Cosedil S.p.A.</strong><span>Costruiamo il tuo domani</span></div>' + VISTE.filter(([, , , solo]) => !solo || me.admin).map(([id, nome, icona]) =>
       id === 'sez' ? `<div class="sezione">${nome}</div>` :
-        `<a href="#${id}" class="${id === attiva ? 'attiva' : ''}">${ICONE[icona]}<span>${nome}</span></a>`).join('') + '<div class="sidebar-piede">Suite Cosedil · Magazzino Operativo</div>';
+        `<a href="#${id}" class="${id === attiva ? 'attiva' : ''}" title="${nome}">${ICONE[icona]}<span>${nome}</span></a>`).join('') + '<div class="sidebar-piede">Suite Cosedil · Magazzino Operativo</div>';
   }
   const apriMenu = (aperto) => { $('#sidebar').classList.toggle('aperta', aperto); document.body.classList.toggle('menu-aperto', aperto); };
   $('#btn-menu').onclick = () => apriMenu(!$('#sidebar').classList.contains('aperta'));
   $('#sidebar').addEventListener('click', () => apriMenu(false));
   $('#sidebar-velo').onclick = () => apriMenu(false);
+  // Cambio di fascia (rotazione, finestra ridimensionata): il menu aperto si richiude.
+  MOBILE.addEventListener('change', () => apriMenu(false));
+  window.matchMedia('(max-width: 1024px)').addEventListener('change', () => apriMenu(false));
   const TAB = [['operatore', 'Inizio', 'operatore'], ['cerca', 'Cerca', 'cerca'], ['scansione', 'Scansiona', 'scan', true], ['mezzi', 'Mezzi', 'truck']];
   function disegnaTabbar(attiva) {
     $('#tabbar').innerHTML = TAB.map(([id, nome, icona, grande]) => `<a href="#${id}${grande ? '/camera' : ''}" class="${id === attiva ? 'attiva' : ''}">${grande ? `<span class="cerchio">${ICONE[icona]}</span>` : ICONE[icona]}<span>${nome}</span></a>`).join('')

@@ -281,5 +281,30 @@ window.Grafici = (function () {
     return `<svg viewBox="0 0 ${w} ${hh}" width="${w}" height="${hh}" aria-hidden="true"><path d="${d}" fill="none" stroke="#9aa0a8" stroke-width="2" stroke-linejoin="round"/><circle cx="${x(n - 1)}" cy="${y(ult)}" r="3.5" fill="${colore || '#1477b8'}" stroke="#fff" stroke-width="2"/></svg>`;
   }
 
-  return { SERIE, colonneImpilate, linee, barreEntrateUscite, flusso, sparkline, legenda };
+  // I grafici si disegnano sulla larghezza reale del contenitore: al cambio di dimensione
+  // (rotazione del telefono, finestra ridimensionata) ogni grafico si ridisegna con gli stessi dati.
+  function ridisegnabile(fn) {
+    return function (el, ...args) {
+      el._ridisegna = () => fn(el, ...args);
+      el._larghezza = el.clientWidth;
+      return fn(el, ...args);
+    };
+  }
+  let attesa = null;
+  function ridisegnaTutti() {
+    clearTimeout(attesa);
+    attesa = setTimeout(() => {
+      document.querySelectorAll('.grafico').forEach((el) => {
+        if (el._ridisegna && el.clientWidth && Math.abs(el.clientWidth - el._larghezza) > 8) el._ridisegna();
+      });
+    }, 150);
+  }
+  window.addEventListener('resize', ridisegnaTutti);
+  if (window.ResizeObserver) {
+    const oss = new ResizeObserver(ridisegnaTutti);
+    const cont = document.getElementById('contenuto');
+    if (cont) oss.observe(cont);
+  }
+
+  return { SERIE, colonneImpilate: ridisegnabile(colonneImpilate), linee: ridisegnabile(linee), barreEntrateUscite: ridisegnabile(barreEntrateUscite), flusso: ridisegnabile(flusso), sparkline, legenda };
 })();
