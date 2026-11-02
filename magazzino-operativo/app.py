@@ -18,12 +18,13 @@ import time
 import traceback
 from datetime import date, timedelta
 
-from flask import Flask, Response, g, jsonify, render_template, request
+from flask import Flask, Response, g, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 import codici
 import config
 import database
+import foto
 import importa_ddt
 import importa_mezzi
 import statistiche
@@ -280,7 +281,7 @@ def dettaglio_mezzo(c, id_):
         "SELECT s.*, ud.nome AS da_nome, ua.nome AS a_nome FROM movimenti_mezzi s "
         "LEFT JOIN ubicazioni ud ON ud.id = s.da_ubicazione_id LEFT JOIN ubicazioni ua ON ua.id = s.a_ubicazione_id "
         "WHERE s.mezzo_id = ? ORDER BY s.id DESC LIMIT 20", (id_,)))
-    return {"tipo": "mezzo", "mezzo": dict(m), "storico": storico}
+    return {"tipo": "mezzo", "mezzo": dict(m), "storico": storico, "foto": _foto_mezzo(c, id_)}
 
 
 def dettaglio_ubicazione(c, id_):
@@ -585,7 +586,10 @@ def api_movimento_elimina(id_):
 def api_mezzi():
     q = (request.args.get("q") or "").strip()
     tutti = request.args.get("tutti") == "1"
-    sql = "SELECT m.*, u.nome AS ubicazione FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE 1=1 "
+    sql = ("SELECT m.*, u.nome AS ubicazione, "
+           "(SELECT id FROM foto_mezzi f WHERE f.mezzo_id = m.id ORDER BY f.principale DESC, f.id DESC LIMIT 1) AS foto_id, "
+           "(SELECT COUNT(*) FROM foto_mezzi f WHERE f.mezzo_id = m.id) AS n_foto "
+           "FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id WHERE 1=1 ")
     p = []
     if not tutti:
         sql += "AND m.attivo = 1 "
@@ -685,10 +689,96 @@ def api_mezzo_elimina(id_):
     esiste("mezzi", id_)
     c = db()
     c.execute("DELETE FROM movimenti_mezzi WHERE mezzo_id = ?", (id_,))
+    c.execute("DELETE FROM foto_mezzi WHERE mezzo_id = ?", (id_,))
+    foto.elimina_tutte(id_)
     c.execute("DELETE FROM mezzi WHERE id = ?", (id_,))
     registra("elimina", "mezzo", id_)
     c.commit()
     return jsonify({"ok": True})
+
+
+# --------------------------------------------------------------------------- foto dei mezzi
+
+def _foto_mezzo(c, mezzo_id):
+    return righe(c.execute(
+        "SELECT id, mezzo_id, file, nome_originale, larghezza, altezza, byte, principale, nota, utente, caricato_il "
+        "FROM foto_mezzi WHERE mezzo_id = ? ORDER BY principale DESC, id DESC", (mezzo_id,)))
+
+
+@app.get("/api/mezzi/<int:id_>/foto")
+def api_mezzo_foto_lista(id_):
+    esiste("mezzi", id_)
+    return jsonify(_foto_mezzo(db(), id_))
+
+
+@app.post("/api/mezzi/<int:id_>/foto")
+def api_mezzo_foto_carica(id_):
+    """Una o più foto (campo multipart `foto`, ripetibile). Opzionale `nota`."""
+    esiste("mezzi", id_)
+    files = [f for f in request.files.getlist("foto") if f and f.filename]
+    if not files:
+        raise ApiError("Nessuna foto")
+    if len(files) > config.FOTO_MAX_PER_CARICO:
+        raise ApiError(f"Al massimo {config.FOTO_MAX_PER_CARICO} foto per volta")
+    nota = (request.form.get("nota") or "").strip()[:200] or None
+    c = db()
+    ha_principale = c.execute("SELECT 1 FROM foto_mezzi WHERE mezzo_id = ? AND principale = 1", (id_,)).fetchone()
+    salvate, errori = [], []
+    for f in files:
+        try:
+            info = foto.salva(id_, f.read(), f.filename)
+        except foto.FotoError as e:
+            errori.append({"file": f.filename, "errore": str(e)})
+            continue
+        principale = 0 if ha_principale else 1
+        ha_principale = True
+        cur = c.execute(
+            "INSERT INTO foto_mezzi (mezzo_id, file, nome_originale, larghezza, altezza, byte, principale, nota, utente) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (id_, info["file"], os.path.basename(f.filename)[:120], info["larghezza"], info["altezza"], info["byte"],
+             principale, nota, nome_utente()))
+        salvate.append(cur.lastrowid)
+    if salvate:
+        registra("foto", "mezzo", id_, f"{len(salvate)} foto caricate")
+    c.commit()
+    if not salvate:
+        raise ApiError("Nessuna foto salvata: " + "; ".join(f"{e['file']}: {e['errore']}" for e in errori))
+    return jsonify({"ok": True, "salvate": salvate, "errori": errori, "foto": _foto_mezzo(c, id_)}), 201
+
+
+@app.get("/api/mezzi/<int:id_>/foto/<int:fid>")
+def api_mezzo_foto_file(id_, fid):
+    r = db().execute("SELECT file FROM foto_mezzi WHERE id = ? AND mezzo_id = ?", (fid, id_)).fetchone()
+    p = r and foto.percorso(id_, r["file"], miniatura=request.args.get("dim") == "min")
+    if not p:
+        raise ApiError("Foto non trovata", 404)
+    return send_file(p, mimetype="image/jpeg", max_age=3600, conditional=True)
+
+
+@app.post("/api/mezzi/<int:id_>/foto/<int:fid>/principale")
+def api_mezzo_foto_principale(id_, fid):
+    c = db()
+    if not c.execute("SELECT 1 FROM foto_mezzi WHERE id = ? AND mezzo_id = ?", (fid, id_)).fetchone():
+        raise ApiError("Foto non trovata", 404)
+    c.execute("UPDATE foto_mezzi SET principale = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE mezzo_id = ?", (fid, id_))
+    c.commit()
+    return jsonify({"ok": True, "foto": _foto_mezzo(c, id_)})
+
+
+@app.delete("/api/mezzi/<int:id_>/foto/<int:fid>")
+def api_mezzo_foto_elimina(id_, fid):
+    c = db()
+    r = c.execute("SELECT file, principale FROM foto_mezzi WHERE id = ? AND mezzo_id = ?", (fid, id_)).fetchone()
+    if not r:
+        raise ApiError("Foto non trovata", 404)
+    c.execute("DELETE FROM foto_mezzi WHERE id = ?", (fid,))
+    foto.elimina(id_, r["file"])
+    if r["principale"]:
+        c.execute("UPDATE foto_mezzi SET principale = 1 WHERE id = (SELECT MAX(id) FROM foto_mezzi WHERE mezzo_id = ?)",
+                  (id_,))
+    registra("elimina_foto", "mezzo", id_, r["file"])
+    c.commit()
+    return jsonify({"ok": True, "foto": _foto_mezzo(c, id_)})
 
 
 # --------------------------------------------------------------------------- importazioni

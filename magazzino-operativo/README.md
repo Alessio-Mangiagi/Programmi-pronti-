@@ -17,6 +17,10 @@ stanno i mezzi**, scansionando un codice a barre.
   movimentate) e andamento della giacenza di ogni articolo nel tempo.
 - **Importazioni sotto controllo**: quadro vivo del ciclo automatico, stato di ogni
   export DDT e di ogni pratica mezzi (letto / da leggere / errore), righe nuove per giorno.
+- **Foto dei mezzi**: una o più foto per mezzo (dal telefono o da file), raddrizzate e
+  ridotte sul server, con miniatura nelle liste e foto principale. **Targa letta da una
+  foto** (OCR nel browser, l'utente conferma fra i candidati). Senza foto, un tasto cerca
+  il mezzo su internet (Google Immagini con marca, modello e tipo).
 - **Amministrazione** (solo admin): chi è collegato adesso e su quale vista, chi sta
   usando quale mezzo, chi ha caricato cosa (movimenti, scansioni, importazioni,
   modifiche per utente) e il registro di ogni azione con utente e IP, esportabile in CSV.
@@ -80,6 +84,26 @@ Lo stesso bottone sta nella scheda del mezzo (dov'è adesso) e accanto a ogni
 ubicazione nel "Dove sta" dell'articolo. Le ubicazioni create dall'importazione DDT
 nascono senza indirizzo: va aggiunto una volta.
 
+### Foto dei mezzi e lettura della targa
+
+Le foto si caricano dalla scheda del mezzo ("Aggiungi foto", anche più d'una; dal
+telefono apre direttamente la fotocamera). Il server le raddrizza (EXIF), le riduce a
+1600 px sul lato lungo e fa una miniatura di 320 px: stanno in `foto/mezzi/<id>/`
+(fuori da git, spostabile con `MAGAZZINO_FOTO_DIR`). La prima foto diventa la
+**principale** (miniatura nelle liste); si può cambiare, e cancellarle è da admin.
+Eliminando il mezzo spariscono anche le foto.
+
+**Leggi targa da foto** (scheda mezzo e form, accanto al campo Targa): la foto viene
+ridotta e messa in bianco e nero nel browser, poi letta da Tesseract.js (scaricato dal
+CDN la prima volta: serve internet, qualche secondo). Nel testo letto si cercano i
+formati delle targhe italiane (auto `AA123BB`, rimorchi, macchine operatrici e
+agricole, moto) correggendo le confusioni tipiche dell'OCR (O/0, B/8, S/5, I/1); i
+candidati si mostrano come bottoni e chi scansiona conferma, oppure scrive la targa a
+mano. Inquadrare la targa da vicino, dritta e ben illuminata.
+
+**Cerca su internet**: con marca, modello e tipo apre Google Immagini, utile quando
+il mezzo non ha ancora una foto.
+
 ### Giacenze
 
 Non esiste una tabella delle giacenze: sono la **somma dei movimenti** per articolo
@@ -141,6 +165,7 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `MAGAZZINO_DDT_DIR` | `../lettore-ddt/data` | cartella dati del Lettore DDT |
 | `MAGAZZINO_MEZZI_DIR` | `../vfp-transfer-DMS/vfp-transfer/moduli_compilati/mezzi` | pratiche mezzi |
 | `MAGAZZINO_IMPORT_SEC` | `120` | intervallo importazione automatica (0 = spenta) |
+| `MAGAZZINO_FOTO_DIR` | `foto/` | cartella delle foto dei mezzi |
 | `MAGAZZINO_ADMIN` | vuoto | username admin oltre agli admin del portale |
 | `COSEDIL_SSO`, `COSEDIL_PORTAL`, `COSEDIL_SSO_FAIL` | vedi `shared/sso` | gate SSO |
 
@@ -158,6 +183,9 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `GET /api/statistiche?giorni=30&ubicazione_id=` | totali, movimenti per giorno, flussi da→a, ubicazioni più movimentate |
 | `GET /api/articoli/<id>/andamento?giorni=90` | giacenza giorno per giorno, per ubicazione |
 | `GET /api/importazioni/stato` | ciclo di sfondo, stato di ogni export DDT e pratica mezzi, righe per giorno, errori |
+| `GET/POST /api/mezzi/<id>/foto` | elenco / carica (multipart `foto`, ripetibile, `nota`) |
+| `GET /api/mezzi/<id>/foto/<fid>?dim=min` | la foto (o la miniatura) |
+| `POST .../foto/<fid>/principale`, `DELETE .../foto/<fid>` | foto principale / eliminazione (admin) |
 | `POST /api/presenza` | battito della pagina `{vista}` |
 | `GET /api/admin/riepilogo?giorni=` | per utente: movimenti per tipo, scansioni, importazioni, anagrafiche; mezzi in uso; collegati |
 | `GET /api/admin/attivita?giorni=&utente=&azione=&oggetto=&q=` | registro attività filtrabile |
@@ -174,6 +202,8 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `importa_ddt.py` | lettura dei registri e degli export del Lettore DDT |
 | `importa_mezzi.py` | lettura delle pratiche mezzi di VFP Transfer |
 | `statistiche.py` | dati per i grafici e stato delle importazioni |
+| `foto.py` | foto dei mezzi: raddrizzamento, riduzione, miniature |
+| `static/js/targa.js` | lettura della targa da foto (Tesseract.js + formati targhe italiane) |
 | `static/js/grafici.js` | grafici SVG (colonne impilate, linee, barre, flusso, sparkline) |
 | `templates/index.html`, `static/` | pagina unica (stile Cosedil) |
 | `templates/etichette.html` | foglio etichette |

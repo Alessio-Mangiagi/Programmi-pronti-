@@ -90,6 +90,7 @@
     return indicazioni ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
   };
   const btnMappa = (u, cls) => { const url = urlMappa(u); return url ? `<a class="btn btn-sec ${cls || 'btn-piccolo'}" href="${h(url)}" target="_blank" rel="noopener" title="Apri su Google Maps">${ICONE_MAPPA} Mappa</a>` : `<span class="muto" title="Aggiungi indirizzo o coordinate all'ubicazione">senza indirizzo</span>`; };
+  const ICONE_FOTO = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
   const ICONE_MAPPA = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>';
   const ETICH_TIPO_UBI = { deposito: 'Deposito', cantiere: 'Cantiere', officina: 'Officina', fornitore: 'Fornitore', altro: 'Altro' };
 
@@ -262,6 +263,7 @@
         ris.querySelectorAll('[data-gg]').forEach((b) => { b.onclick = () => caricaAndamento(d.articolo, +b.dataset.gg); });
         caricaAndamento(d.articolo, 90);
       }
+      if (d.tipo === 'mezzo') agganciaGalleria(ris, d.mezzo, () => cerca(d.mezzo.codice));
     }
 
     async function caricaAndamento(a, giorni) {
@@ -297,7 +299,8 @@
 
     function cardMezzo(d) {
       const m = d.mezzo;
-      return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Mezzo</span><h3>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</h3><span class="codice">${h(m.codice)}</span></div>
+      const principale = (d.foto || []).find((f) => f.principale) || (d.foto || [])[0];
+      return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo">${principale ? `<a href="/api/mezzi/${m.id}/foto/${principale.id}" target="_blank" rel="noopener"><img class="foto-mini" src="/api/mezzi/${m.id}/foto/${principale.id}?dim=min" alt="foto del mezzo"></a>` : ''}<span class="badge badge-blu">Mezzo</span><h3>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</h3><span class="codice">${h(m.codice)}</span></div>
           <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/etichette?tipo=mezzi&ids=${m.id}" target="_blank">Etichetta</a></div></div>
         <div class="griglia griglia-2">
           <div><div class="totale-grande" style="font-size:1.6rem">${h(m.ubicazione || 'Ubicazione non registrata')}</div>
@@ -307,7 +310,7 @@
           <div><h4>Storico spostamenti</h4>${d.storico.length ? `<table><thead><tr><th>Data</th><th>Da</th><th>A</th><th>Stato</th><th>Chi</th></tr></thead><tbody>
             ${d.storico.map((s) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(s.ts)}</td><td>${h(s.da_nome || '—')}</td><td>${h(s.a_nome || '—')}</td><td>${s.stato ? badgeStato(s.stato) : ''}</td><td class="muto">${h(s.utente || '')}${s.note ? ` <span title="${h(s.note)}">·</span>` : ''}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessuno spostamento registrato.</p>'}</div>
-        </div></div>`;
+        </div>${galleriaMezzo(m, d.foto)}</div>`;
     }
 
     function cardUbicazione(d) {
@@ -546,7 +549,7 @@
     const carica = async () => {
       const l = await api(`/api/mezzi?q=${encodeURIComponent($('#q').value)}&stato=${$('#stato').value}&proprieta=${$('#prop').value}`);
       $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Nolo fino al</th><th></th></tr></thead><tbody>
-        ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
+        ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td><div style="display:flex;align-items:center;gap:.6rem">${m.foto_id ? `<img class="foto-mini" src="/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="" loading="lazy">` : `<a class="foto-mini foto-vuota" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Nessuna foto: cerca su internet">${ICONE_FOTO}</a>`}<span>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}${m.n_foto ? `<br><span class="muto">${m.n_foto} foto</span>` : ''}</span></div></td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
           <td>${m.proprieta === 'nolo' ? `<span class="badge badge-ambra">Nolo</span><br><span class="muto">${h(m.ditta || '')}</span>` : '<span class="badge badge-verde">Proprio</span>'}</td><td>${h(m.ubicazione || '—')}</td><td>${badgeStato(m.stato)}${m.assegnato_a ? `<br><span class="muto">${h(m.assegnato_a)}</span>` : ''}</td>
           <td class="muto">${m.nolo_al ? fmtData(m.nolo_al) : ''}</td>
           <td style="white-space:nowrap"><button class="btn btn-piccolo" data-sposta="${m.id}">Sposta</button> <button class="btn btn-sec btn-piccolo" data-mod="${m.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${m.id}">Elimina</button>` : ''}</td></tr>`).join('')}
@@ -572,7 +575,7 @@
       ${campo('Proprietà', select('proprieta', [['proprio', 'Di proprietà'], ['nolo', 'A nolo']], m.proprieta || 'proprio'))}
       ${campo('Marca', input('marca', m.marca))}
       ${campo('Modello', input('modello', m.modello))}
-      ${campo('Targa', input('targa', m.targa, 'style="text-transform:uppercase"'))}
+      ${campo('Targa', `<div style="display:flex;gap:.4rem">${input('targa', m.targa, 'style="text-transform:uppercase;flex:1"')}<button class="btn btn-sec btn-piccolo" type="button" id="btn-targa-foto" title="Leggi la targa da una foto">${ICONE_FOTO}</button></div>`)}
       ${campo('Matricola / n. di serie', input('matricola', m.matricola))}
       ${campo('Ditta proprietaria (nolo)', input('ditta', m.ditta))}
       ${campo('Partita IVA', input('piva', m.piva))}
@@ -584,6 +587,11 @@
       <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Annulla</button><button class="btn" type="submit">Salva</button></div></form>`;
     modale(m.id ? `Modifica ${m.codice}` : 'Nuovo mezzo', html, (box) => {
       $('#annulla', box).onclick = chiudiModale;
+      $('#btn-targa-foto', box).onclick = () => {
+        // La modale della targa sostituisce quella del form: alla scelta si riapre il form con la targa compilata.
+        const dati = datiForm($('#f', box));
+        modaleLeggiTarga((targa) => { chiudiModale(); formMezzo(Object.assign({}, m, dati, { targa }), dopo); }, null);
+      };
       $('#f', box).onsubmit = async (e) => {
         e.preventDefault();
         try {
@@ -845,6 +853,93 @@
     await Promise.all([caricaRiepilogo(), caricaRegistro()]);
     timerAdmin = setInterval(() => { if (location.hash.startsWith('#amministrazione')) caricaRiepilogo(); else clearInterval(timerAdmin); }, 15000);
   };
+
+  // ------------------------------------------------------------------ foto dei mezzi e lettura targa
+  const urlRicercaMezzo = (m) => `https://www.google.com/search?tbm=isch&q=${encodeURIComponent([m.marca, m.modello, m.tipo_mezzo].filter(Boolean).join(' '))}`;
+
+  function galleriaMezzo(m, foto) {
+    const lista = foto || [];
+    return `<div id="galleria" style="margin-top:1.25rem"><div class="card-testa"><h4>Foto del mezzo${lista.length ? ` (${lista.length})` : ''}</h4>
+        <div class="azioni"><label class="btn btn-sec btn-piccolo" style="cursor:pointer">${ICONE_FOTO} Aggiungi foto<input type="file" id="foto-input" accept="image/*" multiple hidden></label>
+          <button class="btn btn-sec btn-piccolo" type="button" data-leggi-targa>Leggi targa da foto</button>
+          <a class="btn ${lista.length ? 'btn-sec' : ''} btn-piccolo" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Cerca immagini di questo mezzo su internet">Cerca su internet</a></div></div>
+      ${lista.length ? `<div class="galleria">${lista.map((f) => `<figure class="foto ${f.principale ? 'principale' : ''}">
+          <a href="/api/mezzi/${m.id}/foto/${f.id}" target="_blank" rel="noopener"><img src="/api/mezzi/${m.id}/foto/${f.id}?dim=min" alt="${h(f.nota || f.nome_originale || 'foto')}" loading="lazy"></a>
+          <figcaption><span class="muto">${fmtData(f.caricato_il)}${f.utente ? ' · ' + h(f.utente) : ''}${f.nota ? '<br>' + h(f.nota) : ''}</span>
+            <span class="foto-azioni">${f.principale ? '<span class="badge badge-blu">Principale</span>' : `<button class="btn btn-sec btn-piccolo" data-foto-principale="${f.id}">Principale</button>`}${me.admin ? ` <button class="btn btn-rosso btn-piccolo" data-foto-elimina="${f.id}">Elimina</button>` : ''}</span></figcaption></figure>`).join('')}</div>`
+        : `<p class="muto">Nessuna foto: aggiungine una dal telefono oppure <a href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener">cerca il mezzo su internet</a> (${h([m.marca, m.modello, m.tipo_mezzo].filter(Boolean).join(' '))}).</p>`}
+      <div id="foto-esito"></div></div>`;
+  }
+
+  async function caricaFotoMezzo(mezzoId, files, nota) {
+    const fd = new FormData();
+    [...files].forEach((f) => fd.append('foto', f));
+    if (nota) fd.append('nota', nota);
+    return api(`/api/mezzi/${mezzoId}/foto`, { method: 'POST', body: fd });
+  }
+
+  function agganciaGalleria(box, m, dopo) {
+    const inp = $('#foto-input', box);
+    if (inp) inp.onchange = async () => {
+      if (!inp.files.length) return;
+      $('#foto-esito', box).innerHTML = '<div class="avviso">Caricamento foto…</div>';
+      try {
+        const r = await caricaFotoMezzo(m.id, inp.files);
+        toast(`${r.salvate.length} foto salvate`, 'ok');
+        if (r.errori.length) toast(r.errori.map((e) => `${e.file}: ${e.errore}`).join('; '), 'errore');
+        dopo();
+      } catch (e) { $('#foto-esito', box).innerHTML = `<div class="avviso avviso-errore">${h(e.message)}</div>`; }
+    };
+    box.querySelectorAll('[data-foto-principale]').forEach((b) => { b.onclick = async () => { try { await api(`/api/mezzi/${m.id}/foto/${b.dataset.fotoPrincipale}/principale`, { method: 'POST', body: {} }); dopo(); } catch (e) { toast(e.message, 'errore'); } }; });
+    box.querySelectorAll('[data-foto-elimina]').forEach((b) => { b.onclick = async () => { if (!confirm('Eliminare questa foto?')) return; try { await api(`/api/mezzi/${m.id}/foto/${b.dataset.fotoElimina}`, { method: 'DELETE' }); toast('Foto eliminata', 'ok'); dopo(); } catch (e) { toast(e.message, 'errore'); } }; });
+    const lt = box.querySelector('[data-leggi-targa]');
+    if (lt) lt.onclick = () => modaleLeggiTarga(async (targa, file, salvaFoto) => {
+      try {
+        const dati = Object.assign({}, m, { targa });
+        await api(`/api/mezzi/${m.id}`, { method: 'PUT', body: dati });
+        if (salvaFoto && file) await caricaFotoMezzo(m.id, [file], 'foto targa');
+        toast(`Targa ${targa} salvata`, 'ok'); chiudiModale(); dopo();
+      } catch (e) { toast(e.message, 'errore'); }
+    }, m);
+  }
+
+  // Modale: scegli/scatta una foto, l'OCR propone le targhe trovate, l'utente conferma.
+  function modaleLeggiTarga(onScelta, mezzo) {
+    const html = `<div class="form">
+      <div class="campo pieno"><label>Foto della targa (inquadrala da vicino, dritta e ben illuminata)</label><input type="file" id="targa-file" accept="image/*" capture="environment"></div>
+      <div class="pieno" id="targa-anteprima"></div>
+      <div class="pieno" id="targa-stato" class="muto">In attesa della foto.</div>
+      <div class="pieno" id="targa-candidati"></div>
+      <div class="campo pieno"><label>Oppure scrivila a mano</label><div style="display:flex;gap:.5rem"><input id="targa-manuale" placeholder="AA123BB" style="text-transform:uppercase;font-family:var(--font-mono)"><button class="btn btn-piccolo" type="button" id="targa-usa-manuale">Usa</button></div></div>
+      ${mezzo ? `<label class="pieno muto"><input type="checkbox" id="targa-salva-foto" checked> salva anche la foto fra quelle del mezzo</label>` : ''}
+    </div>`;
+    modale('Leggi la targa da una foto', html, (box) => {
+      let fileCorrente = null;
+      const scegli = (t) => onScelta(t, fileCorrente, mezzo ? $('#targa-salva-foto', box).checked : false);
+      $('#targa-usa-manuale', box).onclick = () => { const t = $('#targa-manuale', box).value.replace(/\s+/g, '').toUpperCase(); if (t) scegli(t); };
+      $('#targa-manuale', box).onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#targa-usa-manuale', box).click(); } };
+      $('#targa-file', box).onchange = async () => {
+        const f = $('#targa-file', box).files[0];
+        if (!f) return;
+        fileCorrente = f;
+        $('#targa-anteprima', box).innerHTML = `<img src="${URL.createObjectURL(f)}" alt="anteprima" style="max-width:100%;max-height:220px;border-radius:4px;border:1px solid var(--cosedil-border)">`;
+        const stato = $('#targa-stato', box);
+        stato.innerHTML = '<div class="avviso">Lettura in corso… <span id="targa-pct">0</span>% <span class="muto">(la prima volta scarica il lettore OCR, qualche secondo)</span></div>';
+        $('#targa-candidati', box).innerHTML = '';
+        try {
+          const r = await window.Targa.leggi(f, (p) => { const el = $('#targa-pct', box); if (el) el.textContent = p; });
+          if (r.candidati.length) {
+            stato.innerHTML = `<div class="avviso avviso-ok">Targhe trovate: scegli quella giusta.</div>`;
+            $('#targa-candidati', box).innerHTML = `<div class="candidati">${r.candidati.map((c) => `<button type="button" class="candidato" data-t="${h(c.targa)}"><span class="mono">${h(c.targa)}</span><small>${h(c.formato)}${c.corretta ? ' · corretta O/0, B/8…' : ''}</small></button>`).join('')}</div><details class="muto"><summary>Testo letto</summary><pre style="white-space:pre-wrap">${h(r.testo.trim() || '(vuoto)')}</pre></details>`;
+            box.querySelectorAll('.candidato').forEach((b) => { b.onclick = () => scegli(b.dataset.t); });
+            $('#targa-manuale', box).value = r.candidati[0].targa;
+          } else {
+            stato.innerHTML = `<div class="avviso">Nessuna targa riconosciuta: riprova più da vicino o scrivila a mano.</div>` + (r.testo.trim() ? `<details class="muto"><summary>Testo letto</summary><pre style="white-space:pre-wrap">${h(r.testo.trim())}</pre></details>` : '');
+          }
+        } catch (e) { stato.innerHTML = `<div class="avviso avviso-errore">${h(e.message)}</div>`; }
+      };
+    });
+  }
 
   // ------------------------------------------------------------------ etichette
   viste.etichette = async (cont) => {

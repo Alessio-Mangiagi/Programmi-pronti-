@@ -18,6 +18,7 @@ _cartella = tempfile.mkdtemp(prefix="magazzino_test_")
 config.DB_PATH = os.path.join(_cartella, "test.db")
 config.DDT_DATA_DIR = os.path.join(_cartella, "ddt")
 config.MEZZI_VFP_DIR = os.path.join(_cartella, "mezzi")
+config.FOTO_DIR = os.path.join(_cartella, "foto")
 os.environ["SUITE_AVVISI_DIR"] = os.path.join(_cartella, "avvisi")
 
 import database  # noqa: E402

@@ -115,6 +115,21 @@ CREATE TABLE IF NOT EXISTS importazioni (
 );
 CREATE INDEX IF NOT EXISTS idx_imp_chiave ON importazioni(sorgente, chiave);
 
+CREATE TABLE IF NOT EXISTS foto_mezzi (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mezzo_id INTEGER NOT NULL REFERENCES mezzi(id),
+  file TEXT NOT NULL,                     -- nome del file in FOTO_DIR/mezzi/<mezzo_id>/
+  nome_originale TEXT,
+  larghezza INTEGER,
+  altezza INTEGER,
+  byte INTEGER,
+  principale INTEGER NOT NULL DEFAULT 0,  -- quella mostrata nelle liste
+  nota TEXT,
+  utente TEXT,
+  caricato_il TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_foto_mezzo ON foto_mezzi(mezzo_id);
+
 CREATE TABLE IF NOT EXISTS attivita (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL DEFAULT (datetime('now')),

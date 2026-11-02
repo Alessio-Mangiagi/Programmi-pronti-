@@ -387,3 +387,67 @@ def test_ubicazione_indirizzo_e_coordinate(client, conn):
     client.post("/api/movimenti", json={"tipo": "carico", "articolo_id": 1, "quantita": 5, "a_ubicazione_id": uid})
     g = client.get("/api/scansione?codice=MAG-00001").json["giacenze"][0]
     assert g["lat"] == 37.2312 and g["indirizzo"] == "Via Marina 1, Augusta"
+
+
+# --------------------------------------------------------------------------- foto dei mezzi
+
+def _png(larghezza=1200, altezza=800, colore=(12, 69, 119)):
+    import io as _io
+    from PIL import Image
+    buf = _io.BytesIO()
+    Image.new("RGB", (larghezza, altezza), colore).save(buf, "PNG")
+    buf.seek(0)
+    return buf
+
+
+def test_foto_mezzo_carica_miniatura_principale_elimina(client, conn):
+    import io as _io
+    mid = client.post("/api/mezzi", json={"tipo_mezzo": "Autocarro", "targa": "AB123CD"}).json["mezzo"]["id"]
+    r = client.post(f"/api/mezzi/{mid}/foto", data={"foto": [(_png(), "fronte.jpg"), (_png(400, 300), "retro.png")], "nota": "consegna"},
+                    content_type="multipart/form-data")
+    assert r.status_code == 201 and len(r.json["salvate"]) == 2 and r.json["errori"] == []
+    foto_ = r.json["foto"]
+    assert foto_[0]["principale"] == 1 and foto_[1]["principale"] == 0 and foto_[0]["nota"] == "consegna"
+    assert foto_[0]["utente"] == "sviluppo"
+    # la foto grande e' stata ridotta a 1600 max (1200 resta 1200), la miniatura esiste
+    grande = next(f for f in foto_ if f["nome_originale"] == "fronte.jpg")
+    assert grande["larghezza"] == 1200 and grande["altezza"] == 800
+    assert client.get(f"/api/mezzi/{mid}/foto/{grande['id']}").status_code == 200
+    r = client.get(f"/api/mezzi/{mid}/foto/{grande['id']}?dim=min")
+    assert r.status_code == 200 and r.mimetype == "image/jpeg" and len(r.data) < 20000
+    # scheda del mezzo e elenco portano le foto
+    assert len(client.get("/api/scansione?codice=AB123CD").json["foto"]) == 2
+    lista = client.get("/api/mezzi").json
+    assert lista[0]["n_foto"] == 2 and lista[0]["foto_id"] == grande["id"]
+    # cambio principale, poi elimino la principale: la piu' recente eredita
+    altra = next(f for f in foto_ if f["id"] != grande["id"])
+    r = client.post(f"/api/mezzi/{mid}/foto/{altra['id']}/principale", json={})
+    assert [f["id"] for f in r.json["foto"] if f["principale"]] == [altra["id"]]
+    r = client.delete(f"/api/mezzi/{mid}/foto/{altra['id']}")
+    assert r.status_code == 200 and r.json["foto"][0]["id"] == grande["id"] and r.json["foto"][0]["principale"] == 1
+    assert client.get(f"/api/mezzi/{mid}/foto/{altra['id']}").status_code == 404
+    # file non immagine: rifiutato con messaggio
+    r = client.post(f"/api/mezzi/{mid}/foto", data={"foto": (_io.BytesIO(b"ciao"), "x.jpg")}, content_type="multipart/form-data")
+    assert r.status_code == 400 and "non leggibile" in r.json["errore"]
+    assert client.post(f"/api/mezzi/{mid}/foto", data={}, content_type="multipart/form-data").status_code == 400
+    # eliminando il mezzo spariscono anche le foto dal disco
+    cartella = os.path.join(config.FOTO_DIR, "mezzi", str(mid))
+    assert os.path.isdir(cartella)
+    assert client.delete(f"/api/mezzi/{mid}").status_code == 200
+    assert not os.path.exists(cartella)
+    azioni = [r["azione"] for r in conn.execute("SELECT azione FROM attivita")]
+    assert "foto" in azioni and "elimina_foto" in azioni
+
+
+def test_foto_exif_raddrizzata():
+    import io as _io
+    from PIL import Image
+    import foto as modulo_foto
+    img = Image.new("RGB", (400, 200), (10, 20, 30))
+    exif = img.getexif()
+    exif[0x0112] = 6  # ruotata di 90 gradi: va raddrizzata -> 200x400
+    buf = _io.BytesIO()
+    img.save(buf, "JPEG", exif=exif.tobytes())
+    info = modulo_foto.salva(999, buf.getvalue(), "ruotata.jpg")
+    assert (info["larghezza"], info["altezza"]) == (200, 400)
+    modulo_foto.elimina_tutte(999)

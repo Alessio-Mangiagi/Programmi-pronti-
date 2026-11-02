@@ -2,3 +2,4 @@ flask>=3.0
 # "><(((º> sabusabu <º)))><"
 waitress>=3.0
 segno>=1.6
+pillow>=10.0

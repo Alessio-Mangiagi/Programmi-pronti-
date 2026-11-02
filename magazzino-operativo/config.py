@@ -43,8 +43,15 @@ PREFISSO_UBICAZIONE = "UBI"
 # Ubicazione predefinita dove finisce il materiale senza destinazione leggibile
 UBICAZIONE_DEFAULT = "Deposito centrale"
 
-# Limite upload JSON (byte)
-UPLOAD_MAX_BYTE = 20 * 1024 * 1024
+# Limite upload (byte): JSON e foto
+UPLOAD_MAX_BYTE = 60 * 1024 * 1024
+
+# Foto dei mezzi: cartella su disco (in .gitignore), limiti e misure
+FOTO_DIR = os.environ.get("MAGAZZINO_FOTO_DIR", os.path.join(BASE_DIR, "foto"))
+FOTO_MAX_BYTE = 15 * 1024 * 1024        # per singola foto
+FOTO_MAX_PER_CARICO = 10
+FOTO_LATO_MAX = 1600                    # lato lungo della foto salvata
+FOTO_LATO_MINIATURA = 320
 
 # Utenti admin del magazzino oltre agli admin del portale: lista separata da
 # virgole (username). Vuota = basta essere admin dell'app nel portale.
