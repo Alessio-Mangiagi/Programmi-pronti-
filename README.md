@@ -16,6 +16,7 @@ Ogni cartella ha il nome dell'app, e sul server lo stesso nome diventa il suo in
 | `verifica-requisiti/` | Verifica Requisiti — ricerca e checklist sui documenti (riservata) | 5185 | Node.js + OCR |
 | `incampo/` | InCampo — gestione cantiere: planimetrie, moduli, task; web e app mobile | 5190 | Python + React |
 | `skytower/` | SkyTower — CDE ISO 19650: documenti e revisioni di commessa, approvazioni, RFI (riservata) | 5195 | Python + React |
+| `magazzino-operativo/` | Magazzino Operativo — giacenze materiali e posizione mezzi con codice a barre, alimentato dai DDT | 5200 | Python |
 | `ponte-trimble/` | Ponte Trimble — PCQ, computi e SAL da PDF a Trimble (solo admin) | 3011 | Node.js |
 | `auguri/` | Auguri — compleanni su WhatsApp (solo admin) | 3000 | Node.js |
 
@@ -58,6 +59,7 @@ reverse proxy, ogni app ha un indirizzo col proprio nome:
 | `https://verifica-requisiti.<dominio>` | Verifica Requisiti |
 | `https://incampo.<dominio>` | InCampo |
 | `https://skytower.<dominio>` | SkyTower |
+| `https://magazzino-operativo.<dominio>` | Magazzino Operativo |
 | `https://ponte-trimble.<dominio>` | Ponte Trimble |
 
 Si attiva con una sola variabile, letta dal portale e dal Caddyfile:
@@ -131,7 +133,7 @@ Ogni app si controlla da sola, e la CI le controlla tutte.
 | `.github/workflows/ci.yml` | `lettore-ddt` (type-check, lint, coverage, build, smoke e2e) |
 | `.github/workflows/ci-analista-dati.yml` | `analista-dati` (type-check, test, build, audit) |
 | `.github/workflows/ci-suite.yml` | portale, ocr, verifica-requisiti, auto-scan, Auguri |
-| `.github/workflows/ci-python.yml` | `confronta file` e `scadenzario` |
+| `.github/workflows/ci-python.yml` | `confronta file`, `scadenzario` e `magazzino-operativo` |
 | `.github/workflows/ci-incampo.yml` | `incampo` (pytest SQLite e Postgres, web e2e, mobile, Docker) |
 | `.github/workflows/ci-skytower.yml` | `skytower` (ruff, test isolamento su Postgres, naming 100%, build web, Semgrep, Terraform) |
 

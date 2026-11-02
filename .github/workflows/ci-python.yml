@@ -1,4 +1,4 @@
-# CI delle due app Python.
+# CI delle app Python.
 #
 # Non erano coperte da niente: "confronta file" aveva 21 test che nessuno
 # lanciava in automatico, "scadenzario" non ne aveva affatto.
@@ -10,6 +10,7 @@ on:
     paths:
       - 'confronto-documenti/**'
       - 'scadenzario/**'
+      - 'magazzino-operativo/**'
       - 'shared/**'
       - '.github/workflows/ci-python.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
     paths:
       - 'confronto-documenti/**'
       - 'scadenzario/**'
+      - 'magazzino-operativo/**'
       - 'shared/**'
       - '.github/workflows/ci-python.yml'
 
@@ -32,6 +34,8 @@ jobs:
             cartella: confronto-documenti
           - nome: scadenzario
             cartella: scadenzario
+          - nome: magazzino-operativo
+            cartella: magazzino-operativo
     name: ${{ matrix.nome }}
     defaults:
       run:

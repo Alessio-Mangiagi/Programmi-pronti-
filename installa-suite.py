@@ -221,6 +221,10 @@ def installa_scadenzario(d: Path) -> str:
     crea_venv(d)                                        # come installa.bat
     return "venv + requirements. Porta 5180 (avvia.bat esegue anche database.py)"
 
+def installa_magazzino(d: Path) -> str:
+    crea_venv(d)                                        # come installa.bat
+    return "venv + requirements. Porta 5200 (avvia.bat esegue anche database.py)"
+
 def installa_incampo(d: Path) -> str:
     vpy = crea_venv(d)                                  # come installa.bat
     richiedi_node("Il frontend di InCampo")
@@ -301,6 +305,7 @@ APPS = [
     ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)",     "verifica-requisiti",  installa_verifica),
     ("incampo",     "InCampo - gestione cantiere, web e app mobile (porta 5190)", "incampo",            installa_incampo),
     ("skytower",    "SkyTower - documenti di commessa CDE ISO 19650 (porta 5195)", "skytower",          installa_skytower),
+    ("magazzino",   "Magazzino Operativo - giacenze e mezzi con barcode (porta 5200)", "magazzino-operativo", installa_magazzino),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),
@@ -314,7 +319,7 @@ def stampa_prerequisiti() -> None:
     v = versione_node()
     say(f"  Node.js:   {v + (' OK' if node_ok() else f' TROPPO VECCHIO (serve >={NODE_MIN}, agente >=24)') if v else 'ASSENTE (serve per portale/ddt/agente/ocr/requisiti/auguri/trimble)'}")
     py = python_sistema()
-    say(f"  Python:    {output_di(py + ' --version') + ' OK' if py else 'ASSENTE 3.10+ (serve per confronta/scadenzario/ocr)'}")
+    say(f"  Python:    {output_di(py + ' --version') + ' OK' if py else 'ASSENTE 3.10+ (serve per confronta/scadenzario/magazzino/ocr)'}")
     say(f"  Ollama:    {'OK' if ha('ollama') else 'assente (serve a ocr; usato da agente)'}")
     say(f"  Tesseract: {'OK' if ha_tesseract() else 'assente (serve a confronta e requisiti)'}")
 

@@ -246,6 +246,22 @@ const APPS = [
     dettaglio: 'È l\'ambiente comune dei dati di commessa secondo la ISO 19650: committente, progettisti e subappaltatori caricano elaborati e revisioni con il nome a norma, li fanno passare da WIP a condiviso a pubblicato e gestiscono approvazioni, scadenze e RFI. Ogni azienda vede solo quello che le è condiviso. Dentro SkyTower si entra con il proprio account SkyTower.',
   },
   {
+    id: 'magazzino',
+    nome: 'Magazzino Operativo',
+    sottotitolo: 'Giacenze e mezzi con codice a barre',
+    fai: 'Trovare dove sta il materiale e i mezzi',
+    guida: 'Scansiona il codice a barre di un materiale o di un mezzo e vedi dove sta e quanto ce n\'è. I DDT del Lettore DDT entrano da soli come carichi.',
+    desc: 'Giacenze di materiale per cantiere e deposito, posizione e stato dei mezzi, scansione con lettore o fotocamera, etichette da stampare. Si alimenta dai DDT estratti e dalle pratiche dei mezzi a nolo.',
+    porta: 5200,
+    dir: 'magazzino-operativo',
+    launch: 'avvia.vbs',
+    tipo: 'Python',
+    kw: ['magazzino', 'magazzino operativo', 'giacenza', 'giacenze', 'scorta', 'scorte', 'codice a barre', 'barcode',
+      'qr', 'etichetta', 'etichette', 'scansione', 'scanner', 'materiale', 'materiali', 'mezzi', 'mezzo', 'nolo',
+      'deposito', 'inventario', 'carico', 'scarico', 'ubicazione'],
+    dettaglio: 'Dice dove sta il materiale e quanto ce n\'è, e dove stanno i mezzi, scansionando il codice a barre con un lettore o con la fotocamera del telefono. Il materiale entra da solo dai DDT estratti dal Lettore DDT; i mezzi a nolo dalle pratiche di VFP Transfer. Stampa le etichette con Code 128 e QR.',
+  },
+  {
     id: 'trimble',
     nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',
@@ -488,7 +504,7 @@ function ensureData() {
     // Solo "rules" è attivo. Gli "_esempi" servono da modello: copiali in "rules"
     // e sostituisci gli IP con quelli reali della tua rete. Vuoto = nessuna regola.
     const esempio = {
-      _leggimi: 'Regole IP -> admin per-app. app validi: ddt, agente, confronta, ocr, scadenzario, requisiti, trimble, auguri, portale. "*" = tutte. ip: esatto ("192.168.1.10"), CIDR ("192.168.1.0/24") o "*". Le modifiche valgono ai NUOVI accessi: chi è già loggato deve rifare login.',
+      _leggimi: 'Regole IP -> admin per-app. app validi: ddt, agente, confronta, ocr, scadenzario, requisiti, magazzino, trimble, auguri, portale. "*" = tutte. ip: esatto ("192.168.1.10"), CIDR ("192.168.1.0/24") o "*". Le modifiche valgono ai NUOVI accessi: chi è già loggato deve rifare login.',
       _esempi: [
         { ip: '192.168.1.50', apps: ['portale'], nota: 'PC direzione: admin del portale' },
         { ip: '192.168.1.0/24', apps: ['ddt', 'ocr'], nota: 'rete uffici: admin in DDT e OCR' },
@@ -500,7 +516,7 @@ function ensureData() {
   }
   if (!fs.existsSync(WARM_FILE)) {
     writeFileAtomic(WARM_FILE, JSON.stringify({
-      _leggimi: 'App da avviare "a caldo" all\'avvio del portale e tenere accese, così sono già pronte quando qualcuno le apre (id: ddt, agente, confronta, ocr, scadenzario, requisiti; "all" = tutte). Utile sul server centrale. Sovrascrivibile con la variabile d\'ambiente WARM_APPS (es. WARM_APPS=ocr,agente). Vuoto = nessun pre-avvio.',
+      _leggimi: 'App da avviare "a caldo" all\'avvio del portale e tenere accese, così sono già pronte quando qualcuno le apre (id: ddt, agente, confronta, ocr, scadenzario, requisiti, magazzino; "all" = tutte). Utile sul server centrale. Sovrascrivibile con la variabile d\'ambiente WARM_APPS (es. WARM_APPS=ocr,agente). Vuoto = nessun pre-avvio.',
       apps: [],
     }, null, 2));
   }
