@@ -3,11 +3,17 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Magazzino Operativo — Cosedil</title>
   <meta name="description" content="Magazzino Operativo Cosedil S.p.A. — giacenze materiali e posizione mezzi con codice a barre">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230c4577%27/%3E%3Cpath d=%27M16 6l9 5v10l-9 5-9-5V11z%27 fill=%27none%27 stroke=%27%2365bc7b%27 stroke-width=%272.2%27 stroke-linejoin=%27round%27/%3E%3Cpath d=%27M7 11l9 5 9-5M16 16v10%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%272%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
   <meta name="theme-color" content="#0c4577">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icone/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Magazzino">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Inter:wght@500;600&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -28,8 +34,10 @@
 
     <div class="corpo">
       <nav class="sidebar" id="sidebar" aria-label="Navigazione principale"></nav>
+      <div class="sidebar-velo" id="sidebar-velo"></div>
       <main class="contenuto" id="contenuto"></main>
     </div>
+    <nav class="tabbar" id="tabbar" aria-label="Navigazione mobile"></nav>
   </div>
 
   <div class="toast-contenitore" id="toast" aria-live="polite"></div>

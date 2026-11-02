@@ -451,3 +451,27 @@ def test_foto_exif_raddrizzata():
     info = modulo_foto.salva(999, buf.getvalue(), "ruotata.jpg")
     assert (info["larghezza"], info["altezza"]) == (200, 400)
     modulo_foto.elimina_tutte(999)
+
+
+def test_pwa_manifest_e_service_worker(client):
+    r = client.get("/manifest.webmanifest")
+    assert r.status_code == 200 and r.mimetype == "application/manifest+json"
+    m = r.get_json(force=True)
+    assert m["display"] == "standalone" and m["start_url"].startswith("/")
+    for icona in m["icons"]:
+        assert client.get(icona["src"]).status_code == 200, icona
+    sw = client.get("/sw.js")
+    assert sw.status_code == 200 and sw.headers["Service-Worker-Allowed"] == "/"
+    assert b"addEventListener('fetch'" in sw.data
+
+
+def test_movimenti_filtro_utente_e_data(client, conn):
+    conn.execute("INSERT INTO articoli (codice, descrizione, descrizione_norm, um) VALUES ('MAG-00001', 'Sabbia', 'sabbia', 'mc')")
+    conn.execute("INSERT INTO movimenti (ts, data, tipo, articolo_id, quantita, a_ubicazione_id, origine, utente) VALUES "
+                 "('2026-11-02 08:00:00', '2026-11-02', 'carico', 1, 3, 1, 'manuale', 'rossi'),"
+                 "('2026-11-02 09:00:00', '2026-11-02', 'carico', 1, 5, 1, 'manuale', 'bianchi'),"
+                 "('2026-11-01 09:00:00', '2026-11-01', 'carico', 1, 7, 1, 'manuale', 'rossi')")
+    conn.commit()
+    r = client.get("/api/movimenti?utente=rossi&data=2026-11-02").get_json()
+    assert [m["quantita"] for m in r] == [3]
+    assert len(client.get("/api/movimenti?utente=rossi").get_json()) == 2

@@ -492,7 +492,8 @@ def api_movimenti():
            "JOIN articoli a ON a.id = m.articolo_id LEFT JOIN ubicazioni ud ON ud.id = m.da_ubicazione_id "
            "LEFT JOIN ubicazioni ua ON ua.id = m.a_ubicazione_id WHERE 1=1 ")
     p = []
-    for campo, col in (("articolo_id", "m.articolo_id = ?"), ("tipo", "m.tipo = ?"), ("origine", "m.origine = ?")):
+    for campo, col in (("articolo_id", "m.articolo_id = ?"), ("tipo", "m.tipo = ?"), ("origine", "m.origine = ?"),
+                       ("utente", "m.utente = ?"), ("data", "m.data = ?")):
         v = request.args.get(campo)
         if v:
             sql += f"AND {col} "
@@ -1105,6 +1106,23 @@ def etichette():
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+# Installazione sul telefono (PWA): manifest e service worker vanno serviti dalla
+# radice, altrimenti il browser limita l'app alla cartella /static.
+@app.get("/manifest.webmanifest")
+def manifest():
+    r = send_file(os.path.join(config.BASE_DIR, "static", "manifest.webmanifest"), mimetype="application/manifest+json")
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+@app.get("/sw.js")
+def service_worker():
+    r = send_file(os.path.join(config.BASE_DIR, "static", "js", "sw.js"), mimetype="text/javascript")
+    r.headers["Cache-Control"] = "no-cache"
+    r.headers["Service-Worker-Allowed"] = "/"
+    return r
 
 
 database.init_db()

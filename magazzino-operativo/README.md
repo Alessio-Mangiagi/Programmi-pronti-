@@ -148,6 +148,24 @@ telefono quindi serve l'indirizzo https del portale (`SUITE_DOMINIO` + Caddy, ve
 README della suite); su `http://<ip>:5200` il bottone avvisa e non apre nulla. La
 libreria di lettura (`html5-qrcode`) viene scaricata dal CDN alla prima apertura.
 
+### Uso dal telefono
+
+Sotto i 768 px la pagina passa in **modalità telefono**: barra con le schede in basso
+(Inizio, Cerca, Scansiona al centro, Mezzi, Altro per il menu completo), tasti e campi
+alti almeno 44 px, moduli che si aprono come foglio dal basso, tabelle larghe mostrate
+come elenco di schede. La vista **Operatore** (`#operatore`, pagina di partenza sul
+telefono) ha i tasti grandi Scansiona / Cerca / Digita codice / Mezzi / Cantieri, le
+registrazioni fatte oggi dall'utente e "dove sta cosa"; **Cerca** (`#cerca`) trova in
+un colpo articoli, mezzi (anche per targa) e ubicazioni. `#scansione/camera` apre
+subito la fotocamera; sul telefono il campo codice non prende il fuoco da solo, così la
+tastiera non copre l'inquadratura.
+
+L'app è **installabile** (PWA): `manifest.webmanifest` + `sw.js` serviti dalla radice,
+icone in `static/icone/`. Su Android compare il tasto "Installa" nella vista Operatore;
+su iPhone si usa Condividi → "Aggiungi alla schermata Home". Il service worker tiene in
+cache solo pagina e script (strategia "prima la rete"), le API mai: senza connessione la
+pagina si apre ma non registra, e lo dice.
+
 ### Grafici
 
 Le quantità di articoli diversi non si sommano (m³ con kg con pezzi), quindi i grafici
@@ -205,6 +223,7 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `foto.py` | foto dei mezzi: raddrizzamento, riduzione, miniature |
 | `static/js/targa.js` | lettura della targa da foto (Tesseract.js + formati targhe italiane) |
 | `static/js/grafici.js` | grafici SVG (colonne impilate, linee, barre, flusso, sparkline) |
+| `static/js/sw.js`, `static/manifest.webmanifest`, `static/icone/` | installazione sul telefono (PWA) |
 | `templates/index.html`, `static/` | pagina unica (stile Cosedil) |
 | `templates/etichette.html` | foglio etichette |
 | `tests/` | `python -m pytest tests/ -q` |

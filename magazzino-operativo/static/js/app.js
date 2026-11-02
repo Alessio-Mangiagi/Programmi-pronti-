@@ -107,13 +107,20 @@
     tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
     utenti: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-5-6.3"/></svg>',
     vuoto: '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>',
+    camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    cerca: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+    operatore: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+    altro: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+    freccia: '<svg class="freccia" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
   };
+  // Sotto i 768 px la pagina lavora in modalità telefono: barra tab in basso, menu a scorrimento, tabelle a schede.
+  const MOBILE = window.matchMedia('(max-width: 768px)');
   const vuoto = (msg) => `<div class="vuoto">${ICONE.vuoto}<div>${h(msg)}</div></div>`;
   const skeleton = (n) => `<div class="card">${'<div class="skeleton"></div>'.repeat(n || 5)}</div>`;
 
   // ------------------------------------------------------------------ navigazione
   const VISTE = [
-    ['dashboard', 'Riepilogo', 'home'], ['scansione', 'Scansione', 'scan'], ['giacenze', 'Giacenze', 'box'],
+    ['operatore', 'Operatore', 'operatore'], ['dashboard', 'Riepilogo', 'home'], ['scansione', 'Scansione', 'scan'], ['cerca', 'Cerca', 'cerca'], ['giacenze', 'Giacenze', 'box'],
     ['movimenti', 'Movimenti', 'swap'], ['flussi', 'Flussi', 'flow'], ['sez', 'Anagrafiche'], ['articoli', 'Articoli', 'lista'], ['mezzi', 'Mezzi', 'truck'],
     ['ubicazioni', 'Ubicazioni', 'pin'], ['sez', 'Strumenti'], ['importazioni', 'Importazioni', 'import'], ['etichette', 'Etichette', 'tag'], ['amministrazione', 'Amministrazione', 'utenti', 'admin'],
   ];
@@ -122,18 +129,29 @@
       id === 'sez' ? `<div class="sezione">${nome}</div>` :
         `<a href="#${id}" class="${id === attiva ? 'attiva' : ''}">${ICONE[icona]}<span>${nome}</span></a>`).join('') + '<div class="sidebar-piede">Suite Cosedil · Magazzino Operativo</div>';
   }
-  $('#btn-menu').onclick = () => $('#sidebar').classList.toggle('aperta');
-  $('#sidebar').addEventListener('click', () => $('#sidebar').classList.remove('aperta'));
+  const apriMenu = (aperto) => { $('#sidebar').classList.toggle('aperta', aperto); document.body.classList.toggle('menu-aperto', aperto); };
+  $('#btn-menu').onclick = () => apriMenu(!$('#sidebar').classList.contains('aperta'));
+  $('#sidebar').addEventListener('click', () => apriMenu(false));
+  $('#sidebar-velo').onclick = () => apriMenu(false);
+  const TAB = [['operatore', 'Inizio', 'operatore'], ['cerca', 'Cerca', 'cerca'], ['scansione', 'Scansiona', 'scan', true], ['mezzi', 'Mezzi', 'truck']];
+  function disegnaTabbar(attiva) {
+    $('#tabbar').innerHTML = TAB.map(([id, nome, icona, grande]) => `<a href="#${id}${grande ? '/camera' : ''}" class="${id === attiva ? 'attiva' : ''}">${grande ? `<span class="cerchio">${ICONE[icona]}</span>` : ICONE[icona]}<span>${nome}</span></a>`).join('')
+      + `<button type="button" id="tab-altro" class="${TAB.some(([id]) => id === attiva) ? '' : 'attiva'}">${ICONE.altro}<span>Altro</span></button>`;
+    $('#tab-altro').onclick = () => apriMenu(true);
+  }
 
   async function naviga() {
     const [vista, arg] = location.hash.replace('#', '').split('/');
-    const nome = vista || 'dashboard';
+    const nome = vista || (MOBILE.matches ? 'operatore' : 'dashboard');
     disegnaSidebar(nome);
+    disegnaTabbar(nome);
+    apriMenu(false);
     const fn = viste[nome] || viste.dashboard;
     const cont = $('#contenuto');
     cont.innerHTML = skeleton(6);
     try {
       await fn(cont, arg);
+      adattaTabelle(cont);
       cont.classList.remove('reveal'); void cont.offsetWidth; cont.classList.add('reveal');
     } catch (e) {
       cont.innerHTML = `<div class="avviso avviso-errore">${h(e.message)}</div>`;
@@ -206,15 +224,17 @@
       </div>
       <div id="risultato"></div>`;
     const inp = $('#codice');
-    inp.focus();
+    // Sul telefono il fuoco automatico aprirebbe la tastiera sopra la fotocamera: lo si dà solo dal computer.
+    if (!MOBILE.matches) inp.focus();
     // Il lettore USB scrive come una tastiera: il campo deve restare a fuoco anche
     // dopo un click sulla pagina, a meno che l'utente non stia compilando un form.
     cont.addEventListener('click', (e) => {
-      if (!e.target.closest('input, select, textarea, button, a, .modale')) inp.focus();
+      if (!MOBILE.matches && !e.target.closest('input, select, textarea, button, a, .modale')) inp.focus();
     });
     $('#form-scan').onsubmit = (e) => { e.preventDefault(); cerca(inp.value); };
     $('#btn-camera').onclick = avviaCamera;
-    if (arg) {
+    if (arg === 'camera') avviaCamera();
+    else if (arg) {
       if (arg.endsWith(':ubicazione')) mostraUbicazione(parseInt(arg, 10));
       else { inp.value = arg; cerca(arg); }
     }
@@ -358,7 +378,9 @@
       lettoreCamera = new window.Html5Qrcode('camera-view');
       $('#btn-camera').textContent = 'Chiudi fotocamera';
       try {
-        await lettoreCamera.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 160 } },
+        // Riquadro di lettura proporzionato allo schermo: largo quasi tutto sul telefono.
+        const qrbox = (w, hh) => ({ width: Math.min(Math.round(w * 0.85), 360), height: Math.min(Math.round(hh * 0.5), 200) });
+        await lettoreCamera.start({ facingMode: 'environment' }, { fps: 10, qrbox, aspectRatio: MOBILE.matches ? 1.333 : 1.777 },
           (testo) => { inp.value = testo; cerca(testo); if (navigator.vibrate) navigator.vibrate(60); },
           () => { /* nessun codice nel frame */ });
         $('#scan-stato').textContent = 'Fotocamera attiva: inquadra il codice.';
@@ -941,6 +963,101 @@
     });
   }
 
+  // ------------------------------------------------------------------ mobile: operatore, cerca, installazione
+  // Pagina di partenza sul telefono: pochi tasti grandi, i movimenti di oggi dell'operatore
+  // e lo stato della connessione. Dal computer resta raggiungibile dal menu.
+  let promptInstallazione = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); promptInstallazione = e;
+    // Se la vista Operatore è già disegnata, il banner compare adesso con il suo tasto.
+    const b = $('#installa-avviso');
+    if (b) { b.hidden = false; if (!$('#btn-installa')) { b.insertAdjacentHTML('beforeend', '<button class="btn btn-piccolo" id="btn-installa" type="button">Installa</button>'); $('#btn-installa').onclick = installa; } }
+  });
+  async function installa() { const p = promptInstallazione; if (!p) return; p.prompt(); await p.userChoice; promptInstallazione = null; const b = $('#installa-avviso'); if (b) b.hidden = true; }
+
+  viste.operatore = async (cont) => {
+    const oggi = new Date().toISOString().slice(0, 10);
+    const [d, miei] = await Promise.all([api('/api/dashboard'), api(`/api/movimenti?utente=${encodeURIComponent(me.username || '')}&data=${oggi}&limite=20`).catch(() => [])]);
+    const nome = me.nome || me.username || 'Operatore';
+    const iniziali = nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?';
+    const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    cont.innerHTML = `
+      <div class="operatore-saluto"><span class="avatar">${h(iniziali)}</span><div><strong>Ciao, ${h(nome.split(/\s+/)[0])}</strong><span class="muto">${new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div></div>
+      <div class="chip-riga">
+        <span class="chip chip-stato ${navigator.onLine ? '' : 'offline'}" id="chip-rete">${navigator.onLine ? 'In linea' : 'Senza rete'}</span>
+        <a class="chip" href="#movimenti"><b>${d.movimenti_oggi}</b> movimenti oggi</a>
+        ${d.sotto_scorta.length ? `<a class="chip rosso" href="#dashboard"><b>${d.sotto_scorta.length}</b> sotto scorta</a>` : ''}
+      </div>
+      <div class="installa-avviso" id="installa-avviso" ${promptInstallazione || (iOS && !standalone) ? '' : 'hidden'}>
+        ${ICONE.scan}<span>${iOS && !promptInstallazione ? 'Per averla come app: Condividi, poi "Aggiungi alla schermata Home".' : 'Aggiungi il Magazzino alla schermata Home del telefono.'}</span>
+        ${promptInstallazione ? '<button class="btn btn-piccolo" id="btn-installa" type="button">Installa</button>' : ''}
+      </div>
+      <div class="tasti-grandi">
+        <a class="tasto-grande primario" href="#scansione/camera">${ICONE.camera}Scansiona<small>Inquadra il codice a barre o il QR con la fotocamera</small></a>
+        <a class="tasto-grande" href="#cerca">${ICONE.cerca}Cerca<small>Articolo, mezzo, targa o ubicazione</small></a>
+        <a class="tasto-grande" href="#scansione">${ICONE.scan}Digita codice<small>Lettore Bluetooth o codice a mano</small></a>
+        <a class="tasto-grande" href="#mezzi">${ICONE.truck}Mezzi<small>Dove sono e chi li usa</small></a>
+        <a class="tasto-grande" href="#ubicazioni">${ICONE.pin}Cantieri<small>Ubicazioni e mappa</small></a>
+      </div>
+      <div class="card"><div class="card-testa"><h3>Le tue registrazioni di oggi</h3><a href="#movimenti" class="muto">Tutte</a></div>
+        ${miei.length ? `<ul class="elenco">${miei.map((m) => `<li data-cod="${h(m.codice)}"><span class="icona-tipo">${ICONE.box}</span><div class="testo"><strong>${h(m.descrizione)}</strong><span>${h(m.tipo)} · ${h(m.a_nome || m.da_nome || m.fornitore || '')} · ${fmtData(m.ts).split(',')[1] || ''}</span></div><div class="destra">${fmtN(m.quantita)}<small>${h(m.um)}</small></div>${ICONE.freccia}</li>`).join('')}</ul>`
+          : '<p class="muto">Niente ancora: scansiona un codice e registra carico, scarico o spostamento.</p>'}</div>
+      <div style="height:1rem"></div>
+      <div class="card"><div class="card-testa"><h3>Dove sta cosa</h3><a href="#ubicazioni" class="muto">Tutte</a></div>
+        ${d.per_ubicazione.length ? `<ul class="elenco">${d.per_ubicazione.map((u) => `<li data-ubi="${u.id}"><span class="icona-tipo">${ICONE.pin}</span><div class="testo"><strong>${h(u.nome)}</strong><span>${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></div><div class="destra">${u.articoli}<small>articoli</small></div><div class="destra">${u.mezzi}<small>mezzi</small></div>${ICONE.freccia}</li>`).join('')}</ul>` : vuoto('Nessuna ubicazione')}</div>`;
+    cont.querySelectorAll('[data-cod]').forEach((li) => { li.onclick = () => { location.hash = '#scansione/' + li.dataset.cod; }; });
+    cont.querySelectorAll('[data-ubi]').forEach((li) => { li.onclick = () => { location.hash = `#scansione/${li.dataset.ubi}:ubicazione`; }; });
+    const bi = $('#btn-installa');
+    if (bi) bi.onclick = installa;
+  };
+
+  // Ricerca unica: articoli, mezzi e ubicazioni in un elenco da dito, tocchi e vai alla scheda.
+  viste.cerca = async (cont, arg) => {
+    cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Trova</div><h2>Cerca</h2></div></div>
+      <div class="cerca-grande">${ICONE.cerca}<input id="q" placeholder="Articolo, mezzo, targa, cantiere..." autocomplete="off" autocapitalize="off" value="${h(arg ? decodeURIComponent(arg) : '')}"></div>
+      <div id="esiti"></div>`;
+    const inp = $('#q');
+    const esiti = $('#esiti');
+    const riga = (cod, icona, titolo, sotto, destra) => `<li data-cod="${h(cod)}"><span class="icona-tipo">${icona}</span><div class="testo"><strong>${h(titolo)}</strong><span>${h(sotto)}</span></div>${destra ? `<div class="destra">${destra}</div>` : ''}${ICONE.freccia}</li>`;
+    const carica = async () => {
+      const q = inp.value.trim();
+      if (q.length < 2) { esiti.innerHTML = '<p class="muto">Scrivi almeno due lettere: descrizione, codice, targa, matricola o nome del cantiere.</p>'; return; }
+      esiti.innerHTML = skeleton(4);
+      const ql = q.toLowerCase();
+      const [arts, mezzi, ubi] = await Promise.all([api(`/api/articoli?q=${encodeURIComponent(q)}`), api(`/api/mezzi?q=${encodeURIComponent(q)}`), ubicazioni()]);
+      const u = ubi.filter((x) => [x.nome, x.codice, x.commessa, x.indirizzo].some((v) => v && String(v).toLowerCase().includes(ql)));
+      if (inp.value.trim() !== q) return;
+      if (!arts.length && !mezzi.length && !u.length) { esiti.innerHTML = vuoto(`Niente per "${q}"`); return; }
+      esiti.innerHTML = `<div class="card">
+        ${arts.length ? `<div class="cerca-sezione">Articoli (${arts.length})</div><ul class="elenco">${arts.slice(0, 30).map((a) => riga(a.codice, ICONE.box, a.descrizione, [a.codice, a.categoria, a.fornitore].filter(Boolean).join(' · '), a.totale != null ? `${fmtN(a.totale)}<small>${h(a.um)}</small>` : '')).join('')}</ul>` : ''}
+        ${mezzi.length ? `<div class="cerca-sezione">Mezzi (${mezzi.length})</div><ul class="elenco">${mezzi.slice(0, 30).map((m) => riga(m.codice, m.foto_id ? `<img src="/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="">` : ICONE.truck, [m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '), [m.targa, m.ubicazione, m.assegnato_a ? 'in uso da ' + m.assegnato_a : ''].filter(Boolean).join(' · '), badgeStato(m.stato))).join('')}</ul>` : ''}
+        ${u.length ? `<div class="cerca-sezione">Ubicazioni (${u.length})</div><ul class="elenco">${u.slice(0, 30).map((x) => riga(x.codice, ICONE.pin, x.nome, [ETICH_TIPO_UBI[x.tipo] || x.tipo, x.commessa, x.indirizzo].filter(Boolean).join(' · '))).join('')}</ul>` : ''}
+      </div>`;
+      esiti.querySelectorAll('[data-cod]').forEach((li) => { li.onclick = () => { location.hash = '#scansione/' + li.dataset.cod; }; });
+    };
+    let t; inp.oninput = () => { clearTimeout(t); t = setTimeout(carica, 250); };
+    inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(t); carica(); } };
+    if (!MOBILE.matches || arg) inp.focus();
+    await carica();
+  };
+
+  // Tabelle larghe sul telefono: ogni cella si porta dietro l'etichetta della colonna
+  // (il CSS a schede la mostra sopra il valore); l'ultima colonna di soli bottoni diventa la riga delle azioni.
+  function adattaTabelle(cont) {
+    cont.querySelectorAll('.tabella-wrap > table').forEach((t) => {
+      const th = [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim());
+      if (th.length < 4) return;
+      t.classList.add('schede-mobile');
+      t.querySelectorAll('tbody tr').forEach((tr) => {
+        [...tr.children].forEach((td, i) => {
+          td.dataset.l = th[i] || '';
+          if (!th[i] && td.children.length && [...td.children].every((c) => c.classList.contains('btn'))) td.classList.add('cella-azioni');
+        });
+      });
+    });
+  }
+
   // ------------------------------------------------------------------ etichette
   viste.etichette = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Stampa</div><h2>Etichette</h2></div></div>
@@ -980,5 +1097,9 @@
     } catch (_) { /* senza identità si lavora lo stesso */ }
     naviga();
     battito();
+    // Installabile sul telefono: il service worker tiene la pagina anche senza rete (le API no).
+    if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    const rete = () => { const c = $('#chip-rete'); if (c) { c.classList.toggle('offline', !navigator.onLine); c.textContent = navigator.onLine ? 'In linea' : 'Senza rete'; } if (!navigator.onLine) toast('Connessione assente: le registrazioni non partono finché non torna la rete.', 'errore'); };
+    window.addEventListener('online', rete); window.addEventListener('offline', rete);
   })();
 })();

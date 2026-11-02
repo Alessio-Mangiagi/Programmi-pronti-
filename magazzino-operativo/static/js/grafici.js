@@ -93,11 +93,12 @@ window.Grafici = (function () {
     const y = (v) => pad.t + ih - (v / yMax) * ih;
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" font-family="${FONT}" font-size="11" role="img" aria-label="${h(opz.titolo || 'Movimenti per giorno')}">`;
     tk.forEach((v) => { svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="${GRIGLIA}" stroke-width="1"/><text x="${pad.l - 6}" y="${y(v) + 4}" text-anchor="end" fill="${TESTO_MUTO}">${fmt(v)}</text>`; });
-    // etichette asse x: non più di ~10
-    const ogni = Math.ceil(dati.length / 10);
+    // etichette asse x: una ogni ~60 px; l'ultima solo se non si accavalla alla precedente
+    const ogni = Math.max(1, Math.ceil(dati.length / Math.max(2, Math.floor(iw / 60))));
+    const ultimaOk = (dati.length - 1) % ogni >= ogni / 2;
     dati.forEach((d, i) => {
       const x = pad.l + i * slot + (slot - bw) / 2;
-      if (i % ogni === 0 || i === dati.length - 1) svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" fill="${TESTO_MUTO}">${giornoBreve(d.data)}</text>`;
+      if (i % ogni === 0 || (ultimaOk && i === dati.length - 1)) svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" fill="${TESTO_MUTO}">${giornoBreve(d.data)}</text>`;
       let base = 0;
       chiavi.forEach((k, si) => {
         const v = d[k] || 0;
@@ -153,8 +154,9 @@ window.Grafici = (function () {
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" font-family="${FONT}" font-size="11" role="img" aria-label="${h(opz.titolo || 'Andamento')}">`;
     const tkTutti = yMin < 0 ? [...tk.slice(1).map((v) => -v).reverse(), ...tk] : tk;
     tkTutti.forEach((v) => { svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v === 0 ? '#c9cdd3' : GRIGLIA}" stroke-width="1"/><text x="${pad.l - 6}" y="${y(v) + 4}" text-anchor="end" fill="${TESTO_MUTO}">${fmt(v)}</text>`; });
-    const ogni = Math.ceil(date.length / 8);
-    date.forEach((d, i) => { if (i % ogni === 0 || i === date.length - 1) svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" fill="${TESTO_MUTO}">${giornoBreve(d)}</text>`; });
+    const ogni = Math.max(1, Math.ceil(date.length / Math.max(2, Math.floor(iw / 60))));
+    const ultimaOk = (date.length - 1) % ogni >= ogni / 2;
+    date.forEach((d, i) => { if (i % ogni === 0 || (ultimaOk && i === date.length - 1)) svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" fill="${TESTO_MUTO}">${giornoBreve(d)}</text>`; });
     vis.forEach((s) => {
       const d = s.valori.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
       svg += `<path d="${d}" fill="none" stroke="${s.colore}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
