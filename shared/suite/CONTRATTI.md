@@ -29,12 +29,25 @@ stesso host o stesso `SUITE_DOMINIO`) e lo verifica con
 * utente assente → lo **crea** attivo, senza password usabile, con nome ed email
   del portale e ruolo dal ruolo del portale:
   * InCampo: `admin` → `admin`, altrimenti `INCAMPO_RUOLO_PORTALE` (default `manager`);
-  * SkyTower: organizzazione `CDE_SUITE_ORG_ID` (altrimenti quella dell'utente
-    tecnico `CDE_SUITE_USER_EMAIL`, altrimenti quella del primo platform admin),
-    `admin` del portale → `is_org_admin`; membro di **tutti i progetti con codice
-    commessa** (`settings.commessa`) col ruolo `PROJECT_ADMIN` se admin del portale,
-    altrimenti `DESIGNER` (legge, scrive, scarica). Un utente già esistente che
-    non è membro di un progetto con commessa viene aggiunto allo stesso modo.
+  * SkyTower: organizzazione della suite `CDE_SUITE_ORG_ID` (altrimenti quella
+    dell'utente tecnico `CDE_SUITE_USER_EMAIL`, altrimenti quella del primo platform
+    admin), `admin` del portale → `is_org_admin`; membro dei **progetti di proprietà
+    di quell'organizzazione con codice commessa** (`settings.commessa`) col ruolo
+    `CDE_SUITE_RUOLO_PORTALE` (default `DESIGNER`: legge, scrive, scarica), **anche
+    se è admin del portale** (i ruoli forti li dà un Project Admin). Un utente già
+    esistente che non è membro di un progetto con commessa viene aggiunto allo stesso modo.
+* **Regole di sicurezza di SkyTower** (ADR-47, revisione del 03/11/2026):
+  * l'utente si cerca **solo per email esatta** e solo nell'organizzazione della suite:
+    niente ripiego sulla parte prima della `@` per agganciare un account esistente;
+  * non entrano da qui (403, entrano con la password): utenti di **altre organizzazioni**,
+    **platform admin**, utenti con **SSO obbligatorio**, account **bloccati o disattivati**;
+  * se l'utente ha un fattore MFA, o l'organizzazione lo pretende, la risposta è quella del
+    login con password (`mfa_required` / `mfa_enrollment_required` con `mfa_token`): il web
+    passa al login di sempre; il portale non sostituisce il secondo fattore;
+  * al portale va solo `sid=<valore>`, non l'intero header Cookie (che porta il refresh
+    token di SkyTower); limite 30 richieste/minuto per IP, esito in cache 30 s per `sid`;
+  * `settings.commessa` deve stare nel registro (§3) quando il registro c'è, ed è univoco
+    fra i progetti attivi della stessa organizzazione (migrazione 0038: altrimenti 409).
 * Il web dell'app, se non ha un token, chiama questa rotta **una volta** all'apertura:
   se risponde 200 entra senza chiedere niente, altrimenti mostra il login di sempre.
 
@@ -57,7 +70,18 @@ Magazzino `GET /api/commesse`.
 
 Ogni app espone `GET /api/suite/da-fare` (SkyTower `/suite/da-fare`), protetta dal
 token di servizio, con `X-Suite-Utente`, `X-Suite-Email`, `X-Suite-Nome` e, per sapere
-se è admin, il parametro `?admin=1`. Risposta:
+se è admin, il parametro `?admin=1`. Chi chiama manda anche `X-Suite-App: <id app>`
+(es. `portale`, `incampo`): SkyTower lo registra, con l'utente dichiarato, in un evento
+di sicurezza `SUITE_CALL` per ogni chiamata `/suite/*`.
+
+**SkyTower e il token di servizio** (ADR-47): l'utente dichiarato vale solo se è un
+utente attivo dell'organizzazione della suite e non un platform admin (email esatta da
+`X-Suite-Email`, oppure `X-Suite-Utente` come `<username>@CDE_SUITE_EMAIL_DOMINIO`);
+altrimenti si usa l'utente tecnico `CDE_SUITE_USER_EMAIL` con le stesse regole;
+altrimenti **403** `suite_user` (prima si ripiegava sul primo platform admin). Il token
+resta uno solo per tutte le app: un token per app è il passo successivo proposto.
+
+Risposta:
 
 ```json
 {"voci": [{"id": "task:12", "titolo": "Gru ferma", "testo": "Cantiere Augusta · scade 05/11",
