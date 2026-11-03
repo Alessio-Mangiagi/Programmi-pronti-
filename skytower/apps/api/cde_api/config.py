@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     ocr_max_pages: int = 30
     # IFC da questa dimensione in su: il worker prepara un derivato .glb per il viewer (G43, ADR-31)
     ifc_derivative_min_bytes: int = 100 * 1024 ** 2
+    # Disegni CAD: DWG → DXF con ODA File Converter (gratuito, da installare sul server), DXF → SVG con ezdxf
+    # (G44, ADR-41). None = cercato nel PATH e nella cartella predefinita su Windows; senza, i DWG restano solo
+    # scaricabili e i DXF si vedono comunque.
+    dwg_converter_cmd: str | None = None
     public_api_prefix: str = "/api"      # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
     # Modifica di Word/Excel/PowerPoint con OnlyOffice Docs (ADR-37). Senza URL la funzione è spenta.
     onlyoffice_url: str | None = None              # Document Server come lo raggiunge il browser

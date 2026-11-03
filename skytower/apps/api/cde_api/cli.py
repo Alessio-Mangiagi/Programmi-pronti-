@@ -8,6 +8,7 @@
   cde seed-demo      carica il dataset dimostrativo (CDE_DATABASE_URL_OWNER)
   cde utente-dev     account personale nell'ambiente dev (password da CDE_NUOVA_PWD, mai su file)
   cde genera-ifc     modello IFC4 complesso (padiglione di sei livelli) per provare il viewer BIM
+  cde genera-dxf     pianta DXF di prova (layer, blocchi, quote) per il viewer DWG
   cde genera-glb     modello glTF binario (come da Blender) per provare il viewer 3D
   cde genera-galleria  modello IFC4 di una galleria stradale (conci, impianti, imbocchi)
 """
@@ -171,6 +172,18 @@ def cmd_ifc(args) -> None:
     print(f"{args.file}: {len(data) / 1e6:.1f} MB, {elements} elementi, {args.padiglioni} padiglione/i")
 
 
+def cmd_dxf(args) -> None:
+    """Pianta DXF di prova (G44): con --svg fa anche la conversione del worker, per guardarla nel browser."""
+    from . import dxf2svg
+    from .tooling import dxf_sample
+
+    args.file.write_bytes(dxf_sample.build(1))
+    print(f"{args.file}: {args.file.stat().st_size / 1e3:.0f} kB")
+    if args.svg:
+        r = dxf2svg.convert(args.file, args.svg)
+        print(f"{args.svg}: {r.size_bytes / 1e3:.0f} kB, {r.entities} entità, layer: {', '.join(layer.name for layer in r.layers)}")
+
+
 def cmd_glb(args) -> None:
     from .tooling import glb_model
 
@@ -235,6 +248,10 @@ def main(argv: list[str] | None = None) -> None:
     glb = sub.add_parser("genera-glb", help="modello glTF binario di prova (oggetti come da Blender)")
     glb.add_argument("file", type=Path)
     glb.set_defaults(func=cmd_glb)
+    dxf = sub.add_parser("genera-dxf", help="pianta DXF di prova (layer, blocchi, quote) per il viewer DWG")
+    dxf.add_argument("file", type=Path)
+    dxf.add_argument("--svg", type=Path, help="scrive anche l'SVG come lo prepara il worker")
+    dxf.set_defaults(func=cmd_dxf)
     tunnel = sub.add_parser("genera-galleria", help="modello IFC4 di una galleria stradale per provare il viewer BIM")
     tunnel.add_argument("file", type=Path)
     tunnel.add_argument("--lunghezza", type=float, default=480., help="metri (conci da 12 m)")

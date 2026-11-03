@@ -2,7 +2,8 @@
 // Lettura di un documento in piattaforma su URL firmato a scadenza: PDF con PDF.js (pagine su canvas e
 // annotazioni sovrapposte) oppure nel visualizzatore del browser (ricerca, stampa); immagini con
 // annotazioni; modelli IFC e glTF/GLB (Blender) in 3D con annotazioni sugli elementi (gli IFC pesanti nella
-// versione .glb preparata dal worker, ADR-31, con l'originale a un clic); Word ed Excel in anteprima di sola lettura;
+// versione .glb preparata dal worker, ADR-31, con l'originale a un clic); disegni CAD (DWG/DXF) nell'SVG preparato
+// dal worker, con layer e misure (ADR-41); Word ed Excel in anteprima di sola lettura;
 // testo nel browser, modificabile: il salvataggio
 // crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -28,8 +29,10 @@ import { MarkupPanel } from "./markup/MarkupPanel";
 import { uploadFile } from "../upload";
 import { openDocument } from "../openDocument";
 import type { ModelPart } from "./markup/model3d";
+import type { DxfLayer } from "./markup/DxfView";
 
 const PdfView = lazy(() => import("./markup/PdfView"));
+const DxfView = lazy(() => import("./markup/DxfView"));
 const ModelView = lazy(() => import("./markup/ModelView"));
 const OfficeView = lazy(() => import("./OfficeView"));
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -39,10 +42,13 @@ const OFFICE_PREVIEW_MAX = 25 * 1024 * 1024;
 
 interface Rev { id: string; revision_code: string; suitability: string; state: string; original_filename: string; scan_status: string; size_bytes: number }
 interface Doc { id: string; project_id: string; identifier: string; title: string; container_id: string; my_actions: string[]; revisions: Rev[] }
-/** derivato .glb di un IFC pesante: con `parts` diviso per piano (indice in `url`, piani dal più basso) */
+/** derivato per il viewer: .glb di un IFC pesante (con `parts` diviso per piano: indice in `url`, piani dal più
+ * basso) oppure SVG di un disegno CAD (con `layers`; `detail` spiega un errore, es. ODA File Converter assente) */
 interface Derivative {
   status: "READY" | "PENDING" | "FAILED"; url: string | null; size_bytes: number | null;
   parts?: ModelPart[] | null;
+  layers?: DxfLayer[] | null;
+  detail?: string | null;
 }
 interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean; derivative?: Derivative | null }
 
@@ -122,17 +128,19 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const isImage = !!link?.content_type?.startsWith("image/");
   const model = link?.content_type === "application/x-step" ? "ifc" as const
     : link?.content_type === "model/gltf-binary" ? "glb" as const : link?.content_type === "model/gltf+json" ? "gltf" as const : null;
+  const isCad = link?.content_type === "image/vnd.dwg" || link?.content_type === "image/vnd.dxf";
+  const cad = isCad ? link?.derivative ?? null : null;      // SVG preparato dal worker (ADR-41)
   const isCsv = !!link?.filename?.toLowerCase().endsWith(".csv");
   const office = link?.content_type === DOCX ? "docx" : link?.content_type === XLSX ? "xlsx" : isCsv ? "csv" : null;
   const derivative = model === "ifc" ? link?.derivative ?? null : null;
   const optimized = derivative?.status === "READY" && !!derivative.url && !originalIfc;
-  const canDraw = (isPdf && !browserPdf) || isImage || !!model;
+  const canDraw = (isPdf && !browserPdf) || isImage || !!model || cad?.status === "READY";
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
   // Word ed Excel nell'editor OnlyOffice: solo l'ultima revisione, in WIP; il salvataggio crea la WIP successiva
   const canOffice = !!officeConfig?.enabled && (office === "docx" || office === "xlsx") && !!doc
     && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId && doc.revisions[0]?.state === "WIP";
-  const fill = (isPdf && !browserPdf) || !!model || !!office;
+  const fill = (isPdf && !browserPdf) || !!model || !!office || isCad;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
 
@@ -215,6 +223,11 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
               <Chip size="small" variant="outlined" label="Versione ottimizzata in preparazione" tabIndex={0} />
             </Tooltip>
           )}
+          {isCad && cad?.status === "READY" && (
+            <Tooltip title="Disegno convertito dal server (DWG → DXF → SVG): layer, misure e annotazioni; il file originale si scarica">
+              <Chip size="small" variant="outlined" label={`Vista del disegno · ${cad.layers?.length ?? 0} layer`} tabIndex={0} />
+            </Tooltip>
+          )}
           {canEdit && !editing && <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>Modifica</Button>}
           {canOffice && (
             <Button startIcon={<EditIcon />}
@@ -274,6 +287,30 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
                        onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer}
                        search={search} activeMatch={activeMatch} onMatches={setMatchCount} />
             </Suspense>
+          ) : isCad ? (
+            cad?.status === "READY" && cad.url ? (
+              <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
+                <DxfView key={cad.url} url={cad.url} layers={cad.layers ?? []} overlay={layer} drawing={drawing} />
+              </Suspense>
+            ) : (
+              <Stack alignItems="center" spacing={2} p={3} m="auto" bgcolor="background.paper" borderRadius={2} maxWidth={560}>
+                {cad?.status === "FAILED" ? (
+                  <>
+                    <Typography>Il disegno non si è potuto convertire per la visualizzazione.</Typography>
+                    {cad.detail && <Typography variant="body2" color="text.secondary">{cad.detail}</Typography>}
+                    <Typography variant="body2" color="text.secondary">
+                      I DWG richiedono ODA File Converter sul server; un DXF si vede sempre. Il file originale resta scaricabile.
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    <CircularProgress size={28} />
+                    <Typography>Il server sta preparando la vista del disegno: pochi secondi dopo la verifica antivirus.</Typography>
+                  </>
+                )}
+                <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => download.mutate()}>Scarica il file</Button>
+              </Stack>
+            )
           ) : model ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <ModelView key={optimized ? "glb" : "ifc"} url={optimized ? derivative!.url! : link.url} format={optimized ? "glb" : model}

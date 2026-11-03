@@ -36,6 +36,7 @@ dependencies = [
   "ifcopenshell>=0.8",          # derivato .glb degli IFC pesanti (worker, ADR-31)
   "numpy>=2.0",
   "pypdfium2>=4.30",             # pagine dei PDF scansionati in immagine per l'OCR (ADR-33)
+  "ezdxf>=1.3",                  # disegni CAD: DXF → SVG per il viewer DWG senza licenza (ADR-41)
   "iso19650",
 ]
 

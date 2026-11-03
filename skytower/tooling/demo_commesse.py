@@ -40,9 +40,11 @@ API_DIR = HERE.parent / "apps" / "api"
 sys.path.insert(0, str(API_DIR))
 
 from cde_api.tooling import demo_content as dc  # generatori e Loader riusati
+from cde_api.tooling import dxf_sample  # pianta DXF per il viewer DWG (ADR-41)
 
 TEMPLATE = "PRJ01"
 PDF, PNG, BIN, TXT = "application/pdf", "image/png", "application/octet-stream", "text/plain"
+DXF = "image/vnd.dxf"          # disegno CAD: il viewer apre l'SVG preparato dal worker (ADR-41)
 RUOLO_PERSONALE = "PROJECT_ADMIN"
 
 COMMESSE = [
@@ -543,6 +545,11 @@ class Demo:
             self.add(f"prosp{i}", "des_designer", "Prospetti e sezioni", "DES", "ZZ", "DR", "A", "pdf", PDF, titolo,
                      lambda c, r, v, i=i, t=titolo: tavola_pdf(30 + i, P, t, c, r, loc, "arch", v),
                      ["PUBLISHED", "SHARED"][i], "des_lead", seguito_da=("com_im",))
+        # tavola CAD (DXF): il worker la converte in SVG per il viewer senza licenza (G44, ADR-41)
+        self.add("cad0", "des_lead", "Piante", "DES", "00", "DR", "A", "dxf", DXF, "Pianta piano terra - file CAD (DXF)",
+                 lambda c, r, v: dxf_sample.build(7 + v, f"{P} - Pianta piano terra", loc[:5]),
+                 "PUBLISHED", "des_admin", attributi={"disciplina": "architettonico", "formato": "DXF", "livello": "00"},
+                 descrizione="Stesso disegno della pianta in PDF, nel formato CAD: nel viewer si accendono i layer e si misurano le distanze.")
         self.add("dett0", "des_lead", "Dettagli costruttivi", "DES", "ZZ", "DR", "A", "pdf", PDF, "Dettaglio serramento e davanzale",
                  lambda c, r, v: tavola_pdf(40, P, "Dettaglio serramento e davanzale", c, r, loc, "arch", v), "WIP", "des_admin")
         self.add("fond", "des_lead", "Progetto strutturale", "DES", "00", "DR", "S", "pdf", PDF, "Carpenteria fondazioni e pilastri",

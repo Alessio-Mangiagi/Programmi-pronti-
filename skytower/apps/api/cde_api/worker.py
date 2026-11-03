@@ -71,9 +71,11 @@ class _Tap:
 
 
 def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UUID, *,
-                derivative_min_bytes: int | None = None, ocr: ocr_mod.OcrConfig | None = None) -> VerifyOutcome | None:
+                derivative_min_bytes: int | None = None, ocr: ocr_mod.OcrConfig | None = None,
+                dwg_converter: str | None = None, cad: bool = True) -> VerifyOutcome | None:
     """Idempotente: un file già verificato viene ignorato. Nessun lock tenuto durante la scansione.
-    Con ``derivative_min_bytes`` un IFC verificato di almeno quella dimensione riceve subito il derivato .glb."""
+    Con ``derivative_min_bytes`` un IFC verificato di almeno quella dimensione riceve subito il derivato .glb.
+    Con ``cad`` (default) un DWG/DXF verificato riceve subito il derivato SVG per il viewer (G44, ADR-41)."""
     f = conn.execute(
         "SELECT id, project_id, storage_key, storage_version_id, size_bytes, content_type, sha256, scan_status "
         "FROM cde.file_objects WHERE id = %s", [file_id],
@@ -124,6 +126,11 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
                                       [file_id, derivative_min_bytes]).fetchone()["w"]
             if wanted:
                 make_derivatives(conn, storage)
+        if cad:
+            with conn.transaction():
+                wanted = conn.execute("SELECT cde.derivative_request_svg(%s) AS w", [file_id]).fetchone()["w"]
+            if wanted:
+                make_svg_derivatives(conn, storage, converter=dwg_converter)
     return outcome
 
 
@@ -142,6 +149,44 @@ def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2,
                 conn.execute("SELECT cde.derivative_done(%s, false, NULL, NULL, NULL, %s)",
                              [r["file_id"], f"{type(exc).__name__}: {exc}"])
     return len(rows)
+
+
+def make_svg_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2, stale: str = "30 minutes",
+                         converter: str | None = None) -> int:
+    """Disegni CAD in attesa di derivato SVG (G44, ADR-41): DWG → DXF (ODA File Converter) → SVG (ezdxf). Un errore
+    non blocca: dopo tre tentativi resta FAILED e il viewer propone il download; se manca ODA il motivo lo dice."""
+    with conn.transaction():
+        rows = conn.execute("SELECT * FROM cde.derivatives_claim_svg(%s, %s::interval)", [limit, stale]).fetchall()
+    for r in rows:
+        try:
+            _convert_svg(conn, storage, r, converter)
+        except Exception as exc:  # noqa: BLE001 - DWG protetti, DXF rotti o ODA assente: si registra il motivo
+            conn.rollback()
+            log.exception("derivato SVG del file %s non riuscito (tentativo %s)", r["file_id"], r["attempts"])
+            with conn.transaction():
+                conn.execute("SELECT cde.derivative_done_svg(%s, false, NULL, NULL, NULL, %s, NULL)",
+                             [r["file_id"], f"{type(exc).__name__}: {exc}"])
+    return len(rows)
+
+
+def _convert_svg(conn: psycopg.Connection, storage: Storage, r: dict, converter: str | None) -> None:
+    """DWG/DXF → SVG con un gruppo per layer; l'elenco dei layer finisce in ``parts`` per il viewer."""
+    from . import dxf2svg
+
+    ext = ".dwg" if (r["filename"] or "").lower().endswith(".dwg") else ".dxf"
+    key = f"projects/{r['project_id']}/derivatives/{r['file_id']}.svg"
+    with tempfile.TemporaryDirectory() as tmp:
+        src, dst = Path(tmp) / f"disegno{ext}", Path(tmp) / "disegno.svg"
+        with src.open("wb") as out:
+            for chunk in storage.iter_object(r["storage_key"], r["storage_version_id"]):
+                out.write(chunk)
+        result = dxf2svg.convert(src, dst, converter=converter)
+        version = storage.put_file(key, str(dst), "image/svg+xml")
+    detail = f"{result.entities} entità, {len(result.layers)} layer, unità {result.units or 'n.d.'}"
+    with conn.transaction():
+        conn.execute("SELECT cde.derivative_done_svg(%s, true, %s, %s, %s, %s, %s)",
+                     [r["file_id"], key, version, result.size_bytes, detail, Jsonb(result.layers_json())])
+    log.info("derivato SVG del file %s: %s, %s byte", r["file_id"], detail, result.size_bytes)
 
 
 def split_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 1) -> int:
@@ -248,6 +293,7 @@ def verify_file_task(file_id: str) -> None:
     storage, scanner, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         verify_file(conn, storage, scanner, UUID(file_id), derivative_min_bytes=settings.ifc_derivative_min_bytes,
+                    dwg_converter=settings.dwg_converter_cmd,
                     ocr=ocr_mod.config_from(settings))
 
 
@@ -311,6 +357,7 @@ def ifc_derivatives_task(timestamp: int) -> None:
     storage, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         make_derivatives(conn, storage, limit=4)
+        make_svg_derivatives(conn, storage, limit=4, converter=settings.dwg_converter_cmd)
         split_derivatives(conn, storage, limit=1)
 
 

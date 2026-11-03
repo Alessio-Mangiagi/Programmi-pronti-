@@ -213,11 +213,18 @@ def test_visualizzazione_in_piattaforma(client, api_world, as_user, worker):
     shown = httpx.get(r.json()["url"])
     assert shown.content == PDF and shown.headers["content-disposition"].startswith("inline")
     assert shown.headers["content-type"] == "application/pdf"
-    # un formato che il browser non mostra si scarica e basta
+    # un disegno CAD si guarda tramite il derivato SVG del worker (ADR-41): qui il DWG è finto e senza ODA,
+    # quindi il derivato non riesce ma la risposta resta 200 con il motivo; il download originale resta possibile
     dwg = upload(client, h, w.containers["des_arch"], des_name(ext="dwg"), b"AC1032" + os.urandom(512)).json()
     worker()
-    assert client.get(f"/revisions/{dwg['id']}/download", headers=h, params={"disposition": "inline"}).status_code == 415
+    r = client.get(f"/revisions/{dwg['id']}/download", headers=h, params={"disposition": "inline"})
+    assert r.status_code == 200 and r.json()["content_type"] == "image/vnd.dwg", r.text
+    assert r.json()["derivative"] is not None and r.json()["derivative"]["status"] != "READY"
     assert client.get(f"/revisions/{dwg['id']}/download", headers=h).status_code == 200
+    # un formato che il browser non mostra si scarica e basta
+    exe = upload(client, h, w.containers["des_arch"], des_name(ext="zip"), b"PK" + os.urandom(512)).json()
+    worker()
+    assert client.get(f"/revisions/{exe['id']}/download", headers=h, params={"disposition": "inline"}).status_code == 415
     # Word: anteprima convertita nel browser, servita col suo tipo (la SPA la mostra in un iframe sandbox)
     docx = upload(client, h, w.containers["des_arch"], des_name(ext="docx"), b"PK" + os.urandom(256)).json()
     worker()

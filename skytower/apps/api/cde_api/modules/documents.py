@@ -813,6 +813,9 @@ VIEWABLE = {
     "application/x-step": (".ifc",),                                 # modello BIM: lo legge il viewer 3D (web-ifc)
     "model/gltf-binary": (".glb",),                                  # modello 3D (es. da Blender): viewer 3D (three.js)
     "model/gltf+json": (".gltf",),                                   # solo se autonomo (buffer e texture incorporati)
+    # disegni CAD: il browser non li apre, il viewer mostra il derivato SVG preparato dal worker (G44, ADR-41)
+    "image/vnd.dwg": (".dwg",),
+    "image/vnd.dxf": (".dxf",),
     # Office: anteprima in sola lettura convertita nel browser (Word in iframe sandbox, Excel in tabella)
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (".docx",),
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (".xlsx",),
@@ -892,20 +895,34 @@ def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment",
            "watermark": watermark, "derivative": None}
     if inline_type == "application/x-step":
         out["derivative"] = _derivative(c, rev, ttl)
+    elif inline_type in ("image/vnd.dwg", "image/vnd.dxf"):
+        # disegno CAD: l'URL firmato dell'originale serve solo al download; si guarda il derivato SVG
+        out["derivative"] = _derivative(c, rev, ttl, kind="SVG")
     return out
 
 
-def _derivative(c: Ctx, rev: dict, ttl: int) -> dict | None:
-    """Derivato .glb di un IFC pesante (ADR-31): pronto, in preparazione o non riuscito. Diviso per piano (ADR-36):
-    ``url`` è l'indice e ``parts`` i piani, in ordine di quota, da caricare uno dopo l'altro."""
+def _derivative(c: Ctx, rev: dict, ttl: int, kind: str = "GLB") -> dict | None:
+    """Derivato di un file per il viewer: pronto, in preparazione o non riuscito.
+    ``GLB`` = IFC pesante (ADR-31), diviso per piano (ADR-36): ``url`` è l'indice e ``parts`` i piani, in ordine di
+    quota, da caricare uno dopo l'altro. ``SVG`` = disegno CAD (ADR-41): ``url`` è l'SVG e ``layers`` i layer del
+    disegno (nome, colore, visibile) per le spunte del viewer; ``detail`` spiega un eventuale errore (es. ODA assente)."""
     with c.tx() as conn:
-        d = conn.execute("SELECT status, storage_key, storage_version_id, size_bytes, parts FROM cde.file_derivatives "
-                         "WHERE file_object_id = %s AND kind = 'GLB'", [rev["file_id"]]).fetchone()
+        d = conn.execute("SELECT status, storage_key, storage_version_id, size_bytes, parts, detail FROM cde.file_derivatives "
+                         "WHERE file_object_id = %s AND kind = %s", [rev["file_id"], kind]).fetchone()
     if d is None:
         return None
     if d["status"] != "READY":
-        return {"status": d["status"], "url": None, "size_bytes": None, "parts": None}
+        out = {"status": d["status"], "url": None, "size_bytes": None, "parts": None}
+        if kind == "SVG":
+            out["layers"] = None
+            out["detail"] = d["detail"] if d["status"] == "FAILED" else None
+        return out
     storage = _storage(c)
+    if kind == "SVG":
+        url = storage.presign_get(d["storage_key"], d["storage_version_id"], f"{rev['identifier']}.svg", ttl,
+                                  inline_type="image/svg+xml")
+        return {"status": "READY", "url": url, "size_bytes": d["size_bytes"], "parts": None, "layers": d["parts"] or [],
+                "detail": None}
     url = storage.presign_get(d["storage_key"], d["storage_version_id"], f"{rev['identifier']}.glb", ttl,
                               inline_type="model/gltf-binary")
     parts = [{"name": p["name"], "elements": p["elements"], "size_bytes": p["size_bytes"],
