@@ -110,6 +110,10 @@ def _colonne(conn, vista):
 
 def _cerca(conn, vista, col, valore):
     """La riga della vista con col = valore (valore gia' validato), con le colonne in minuscolo; None se non c'e'."""
+    # il valore entra in una SELECT costruita per concatenazione (ODBC senza parametri): oltre all'escape
+    # dell'apice si pretende il formato chiuso, così una modifica a monte non apre la porta a SQL arbitrario
+    if not (_PIVA_RE if col == "piva" else _CODICE_RE).match(valore or ""):
+        raise PonteError(f"valore non ammesso per {col}: {valore!r}")
     disponibili = _colonne(conn, vista)
     if col not in disponibili:
         raise PonteError(f"nella vista {vista} manca la colonna '{col}'")

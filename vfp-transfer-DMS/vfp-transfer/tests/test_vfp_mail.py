@@ -49,7 +49,9 @@ class ControlliTest(unittest.TestCase):
         self.assertEqual(vfp_mail._safe_name('..\\..\\a:b?.pdf'), "_.._a_b_.pdf")
         self.assertEqual(vfp_mail._safe_name("CON.txt"), "_CON.txt")
         self.assertEqual(vfp_mail._classify("x.docm", {"pdf"}), "pericoloso")
-        self.assertEqual(vfp_mail._classify("x.zip", {"pdf"}), "estensione non ammessa")
+        # gli archivi sono bloccati come gli eseguibili (contenuto non ispezionabile se cifrati)
+        self.assertEqual(vfp_mail._classify("x.zip", {"pdf"}), "pericoloso")
+        self.assertEqual(vfp_mail._classify("x.dwg", {"pdf"}), "estensione non ammessa")
 
 
 class RegistroTest(unittest.TestCase):

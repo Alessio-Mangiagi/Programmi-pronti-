@@ -131,14 +131,14 @@ def mail_file(query):
         raise ValueError("Allegato non trovato")
     path = files[name]
     ext = path.suffix.lower()
-    download = _arg(query, "download") == "1" or ext not in PREVIEW_TYPES
+    # i PDF si scaricano sempre: in anteprima il lettore del browser girerebbe senza sandbox nell'origine
+    # dell'interfaccia (un PDF con JavaScript arrivato per posta non deve aprirsi lì)
+    download = _arg(query, "download") == "1" or ext not in PREVIEW_TYPES or ext == ".pdf"
     ctype = "application/octet-stream" if download else PREVIEW_TYPES[ext]
     quoted = name.replace('"', "_").encode("ascii", "replace").decode()
     disposition = f'{"attachment" if download else "inline"}; filename="{quoted}"'
     # l'anteprima non deve poter eseguire nulla nella pagina dell'interfaccia
     headers = {"Content-Disposition": disposition, "Content-Security-Policy": "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"}
-    if ext == ".pdf" and not download:
-        headers.pop("Content-Security-Policy")  # il lettore PDF del browser non funziona in sandbox
     return path.read_bytes(), ctype, headers
 
 

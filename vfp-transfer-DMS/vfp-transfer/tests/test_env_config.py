@@ -63,3 +63,27 @@ class FileEnvTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class SicurezzaPostaTest(unittest.TestCase):
+    """Revisione di sicurezza del 03/11/2026: mittenti autorizzati obbligatori, niente archivi né Office binario."""
+
+    def test_posta_attiva_richiede_mittenti_autorizzati(self):
+        s = dict(env_config.DEFAULTS)
+        s.update({"MAIL_ENABLED": "true", "MAIL_ALLOWED_SENDERS": "", "MAIL_SOURCE_IMAP": "true"})
+        self.assertTrue(any("MAIL_ALLOWED_SENDERS" in p for p in env_config.mail_problems(s)))
+        s["MAIL_ALLOWED_SENDERS"] = "@cosedilspa.com"
+        self.assertFalse(any("MAIL_ALLOWED_SENDERS" in p for p in env_config.mail_problems(s)))
+        with self.assertRaisesRegex(ValueError, "MAIL_ALLOWED_SENDERS"):
+            env_config.validate_settings({"MAIL_ENABLED": "true", "MAIL_ALLOWED_SENDERS": ""}, dict(env_config.DEFAULTS))
+        env_config.validate_settings({"MAIL_ENABLED": "true", "MAIL_ALLOWED_SENDERS": "@cosedilspa.com"},
+                                     dict(env_config.DEFAULTS))
+
+    def test_archivi_e_office_binario_mai_ammessi(self):
+        ammesse = env_config.DEFAULT_ALLOWED_EXT.split(",")
+        for ext in ("zip", "doc", "xls", "ppt"):
+            self.assertIn(ext, env_config.BLOCKED_EXT)
+            self.assertNotIn(ext, ammesse)
+        for ext in ("pdf", "docx", "xlsx", "p7m"):
+            self.assertIn(ext, ammesse)

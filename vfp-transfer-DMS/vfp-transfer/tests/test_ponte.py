@@ -159,3 +159,22 @@ class PonteTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class CercaFormatoChiusoTest(unittest.TestCase):
+    """_cerca costruisce la SELECT per concatenazione: accetta solo P.IVA di 11 cifre e codici chiusi
+    (revisione di sicurezza del 03/11/2026)."""
+
+    class ConnFinta:
+        def columns(self, sql):
+            return ["piva", "codice"]
+
+        def rows(self, sql):
+            raise AssertionError("la query non deve nemmeno partire: " + sql)
+
+    def test_cerca_rifiuta_valori_fuori_formato(self):
+        with self.assertRaisesRegex(ponte.PonteError, "non ammesso"):
+            ponte._cerca(self.ConnFinta(), "VISTA", "piva", "1234567890' OR 1=1 --")
+        with self.assertRaisesRegex(ponte.PonteError, "non ammesso"):
+            ponte._cerca(self.ConnFinta(), "VISTA", "codice", "x" * 60)

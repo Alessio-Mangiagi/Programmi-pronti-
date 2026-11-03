@@ -240,8 +240,12 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(d["documents_total"], 1)
 
     def test_anteprima_allegato(self):
+        # i PDF arrivati per posta si scaricano sempre, mai aperti nella pagina dell'interfaccia
+        # (revisione di sicurezza del 03/11/2026): niente lettore PDF del browser fuori sandbox
         code, body, headers = self.call("/api/mail/file?key=aaaaaaaaaa&name=verbale.pdf")
-        self.assertEqual((code, headers["Content-Type"]), (200, "application/pdf"))
+        self.assertEqual((code, headers["Content-Type"]), (200, "application/octet-stream"))
+        self.assertIn("attachment", headers["Content-Disposition"])
+        self.assertIn("sandbox", headers["Content-Security-Policy"])
         self.assertTrue(body.startswith(b"%PDF"))
         code, _, headers = self.call("/api/mail/file?key=aaaaaaaaaa&name=verbale.pdf&download=1")
         self.assertIn("attachment", headers["Content-Disposition"])

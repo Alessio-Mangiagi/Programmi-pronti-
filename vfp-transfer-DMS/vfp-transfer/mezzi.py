@@ -47,7 +47,8 @@ import suite_cosedil
 log = logging.getLogger("mezzi")
 
 MASCHERA = "mezzi_nolo"
-ESTENSIONI_DOC = {".pdf", ".p7m", ".docx", ".doc", ".xlsx", ".xls", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".zip"}
+# Niente .doc/.xls (macro) né .zip (contenuto non ispezionabile): i documenti del mezzo li riaprono i colleghi
+ESTENSIONI_DOC = {".pdf", ".p7m", ".docx", ".xlsx", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 MAX_MB_DOC = 200
 AUTOMATICI = ("contratto", "scheda")
 VARIABILI_DMS = {"documento", "scadenza"}  # valori del singolo documento, oltre ai campi della maschera

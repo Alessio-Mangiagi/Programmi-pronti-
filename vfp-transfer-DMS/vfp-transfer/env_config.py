@@ -20,10 +20,14 @@ ENV_PATH = BASE_DIR / ".env"
 LEGACY_JSON_PATH = BASE_DIR / "config.json"
 
 # estensioni ammesse per gli allegati email: elenco chiuso, quello che non c'e' non entra in VFP
-DEFAULT_ALLOWED_EXT = ("pdf,p7m,dwg,dxf,dwf,ifc,rvt,doc,docx,xls,xlsx,ppt,pptx,odt,ods,rtf,txt,csv,xml,"
-                       "jpg,jpeg,png,tif,tiff,zip")
-# mai ammesse, qualunque cosa dica MAIL_ALLOWED_EXT: eseguibili, script, pagine web, documenti con macro
+# Niente archivi (zip: contenuto non ispezionabile se cifrato) né Office binario (doc/xls/ppt: possono portare
+# macro e oggetti incorporati): solo i formati OOXML senza macro (revisione di sicurezza del 03/11/2026).
+DEFAULT_ALLOWED_EXT = ("pdf,p7m,dwg,dxf,dwf,ifc,rvt,docx,xlsx,pptx,odt,ods,rtf,txt,csv,xml,"
+                       "jpg,jpeg,png,tif,tiff")
+# mai ammesse, qualunque cosa dica MAIL_ALLOWED_EXT: eseguibili, script, pagine web, documenti con macro,
+# archivi e Office binario
 BLOCKED_EXT = {
+    "zip", "7z", "rar", "doc", "xls", "ppt", "dot", "xlt", "pot",
     "exe", "com", "scr", "pif", "bat", "cmd", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta",
     "msi", "msp", "dll", "cpl", "jar", "lnk", "reg", "inf", "url", "iso", "img", "vhd", "vhdx", "html", "htm",
     "svg", "xhtml", "mht", "chm", "docm", "dotm", "xlsm", "xltm", "xlam", "pptm", "potm", "ppam", "one",
@@ -211,6 +215,11 @@ def validate_settings(values, current):
     for k in ("IMAP_HOST", "PEC_HOST", "SMTP_HOST"):
         if values.get(k) and not _HOST_RE.match(values[k]):
             raise ValueError(f"{k}: nome del server non valido")
+    # posta attiva solo con i mittenti autorizzati: si controlla qui (salvataggio dall'interfaccia) e nel
+    # watcher (mail_problems), così non c'è modo di attivarla senza elenco
+    if as_bool(values.get("MAIL_ENABLED", current.get("MAIL_ENABLED"))) and \
+            not (values.get("MAIL_ALLOWED_SENDERS", current.get("MAIL_ALLOWED_SENDERS")) or "").strip():
+        raise ValueError("MAIL_ALLOWED_SENDERS: con la posta attiva serve l'elenco dei mittenti autorizzati")
     for k in ("IMAP_PORT", "PEC_PORT", "SMTP_PORT", "GUI_PORT", "MAIL_POLL_SECONDS", "MAIL_MAX_ATTEMPTS", "MAIL_MAX_MB"):
         if values.get(k) and not values[k].isdigit():
             raise ValueError(f"{k} deve essere un numero")
@@ -461,6 +470,11 @@ def mail_problems(s):
             problems.append(f"Casella {src.upper()}: mancano {', '.join(missing)}")
     if s.get("VFP_TARGET_TYPE") == "project" and not (s.get("MAIL_VFP_FOLDER") or "").strip("/ "):
         problems.append("Con destinazione 'progetto' serve la cartella VFP per gli allegati email")
+    # Senza elenco di mittenti chiunque scriva alla casella fa entrare i suoi allegati in Viewpoint (e in
+    # SkyTower con MAIL_SKYTOWER): non è un avvertimento, è un motivo per non far partire il controllo posta.
+    if not (s.get("MAIL_ALLOWED_SENDERS") or "").strip():
+        problems.append("MAIL_ALLOWED_SENDERS vuoto: con la posta attiva serve l'elenco dei mittenti "
+                        "autorizzati (indirizzi o domini), altrimenti chiunque fa entrare documenti")
     return problems
 
 
@@ -469,8 +483,6 @@ def mail_warnings(s):
     if not as_bool(s.get("MAIL_ENABLED")):
         return []
     warnings = []
-    if not (s.get("MAIL_ALLOWED_SENDERS") or "").strip():
-        warnings.append("nessun elenco di mittenti autorizzati: chiunque puo' far entrare documenti in Viewpoint")
     if not as_bool(s.get("MAIL_ANTIVIRUS")):
         warnings.append("controllo antivirus degli allegati disattivato")
     if not as_bool(s.get("MAIL_REQUIRE_AUTH")):
