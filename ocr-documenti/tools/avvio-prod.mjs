@@ -6,7 +6,9 @@
 // salvataggio di file — cose utili a chi sviluppa, non a chi usa il programma.
 //
 //   1. dist/ manca o è più vecchia dei sorgenti → `npm run build` (typecheck + vite);
-//      se la build fallisce si ripiega su `npm run dev`, così il programma parte comunque.
+//      se la build fallisce l'avvio SI FERMA con errore. Fino al 03/11/2026 ripiegava in
+//      silenzio su `npm run dev`: con HOST=0.0.0.0 il dev server di Vite esponeva in rete
+//      i file del progetto senza login. Meglio un'app che non parte di una che espone dati.
 //   2. `tsx server.ts` con NODE_ENV=production PORT=5179 (il portale e i link puntano lì).
 //   3. Apre il browser, salvo PORTALE_APRE_BROWSER=1 (il portale apre lui la scheda).
 //
@@ -33,20 +35,18 @@ const distIndex = join(ROOT, 'dist', 'index.html')
 const sorgenti = ['src', 'index.html', 'vite.config.ts', 'package.json', 'tsconfig.json'].map(f => join(ROOT, f)).filter(existsSync)
 const distVecchia = !existsSync(distIndex) || statSync(distIndex).mtimeMs < Math.max(...sorgenti.map(piuRecente))
 
-let produzione = true
 if (distVecchia) {
   console.log('[AVVIO] dist/ mancante o non aggiornata: compilo il frontend (npm run build)...')
   const r = spawnSync(`${NPM} run build`, opzioni)
   if (r.status !== 0) {
-    console.log('[AVVISO] Build fallita: parto in modalità sviluppo (npm run dev), più lenta ma funzionante.')
-    produzione = false
+    console.error('[ERRORE] Build del frontend fallita: OCR Documenti non parte. Correggere l\'errore qui sopra e rilanciare.')
+    console.error('         (Non si ripiega sul dev server: in rete esporrebbe i file del progetto senza login.)')
+    process.exit(r.status || 1)
   }
 }
 
-if (!produzione) {
-  const dev = spawn(`${NPM} run dev`, opzioni)
-  dev.on('exit', code => process.exit(code ?? 0))
-} else {
+// Avvio del backend in produzione: arriva qui solo con dist/ aggiornata.
+{
   // HOST=0.0.0.0 lo manda il portale quando è in ascolto in LAN (vedi launchApp):
   // in produzione è il backend a doversi legare lì, non Vite.
   const env = { ...process.env, NODE_ENV: 'production', PORT: PORTA }

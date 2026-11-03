@@ -23,6 +23,7 @@ import { normalizzaRisultatoAlyante } from './alyante.ts'
 import { confrontaTesti, type Confronto } from '../src/lib/confronto.ts'
 import { testoDaTextContent, type ItemPdfTesto } from '../src/lib/testo-nativo.ts'
 import { cleanMarkdown } from '../src/lib/markdown.ts'
+import { chiDa, puoVedere } from './accessoLavori.ts'
 
 export type FormatoLavoro = 'contratti' | 'contract' | 'md'
 export type StatoLavoro = 'attesa_file' | 'in_coda' | 'in_corso' | 'fatto' | 'errore' | 'annullato'
@@ -37,6 +38,7 @@ export interface RisultatoLavoro {
 }
 export interface Lavoro {
   id: string
+  utente?: string                    // username del portale di chi l'ha creato (vedi accessoLavori.ts)
   nome: string                       // nome del file nel browser
   chiaveFile: string                 // `${nome}|${size}|${lastModified}`: riaggancio dopo un reload
   formato: FormatoLavoro
@@ -102,9 +104,9 @@ export const caricaLavori = async (): Promise<void> => {
   void avanza()
 }
 
-export const creaLavoro = async (dati: { nome: string; chiaveFile: string; formato: FormatoLavoro; testoAllegati?: string; bozza?: { nome: string; testo: string } }): Promise<Lavoro> => {
+export const creaLavoro = async (dati: { nome: string; chiaveFile: string; formato: FormatoLavoro; testoAllegati?: string; bozza?: { nome: string; testo: string }; utente?: string }): Promise<Lavoro> => {
   const l: Lavoro = {
-    id: randomUUID(), nome: dati.nome, chiaveFile: dati.chiaveFile, formato: dati.formato,
+    id: randomUUID(), utente: dati.utente, nome: dati.nome, chiaveFile: dati.chiaveFile, formato: dati.formato,
     stato: 'attesa_file', fase: 'in attesa del file', pagina: 0, pagine: 0,
     creato: Date.now(), aggiornato: Date.now(),
     testoAllegati: dati.testoAllegati || undefined, bozza: dati.bozza,
@@ -308,8 +310,16 @@ const avanza = async (): Promise<void> => {
 
 // ── Rotte ────────────────────────────────────────────────────────────────────
 export const montaRotteLavori = (app: express.Express, raw: express.RequestHandler): void => {
-  app.get('/api/lavori', (_req, res) => {
-    res.json(elencoLavori().map(l => ({ ...pubblico(l, false), haRisultato: !!l.risultato })))
+  // Ogni rotta con un id passa da qui: un lavoro che non è tuo risponde 404 come se non
+  // esistesse (non si rivela che c'è). Admin dell'app e uso senza gate vedono tutto.
+  const mio = (req: express.Request): Lavoro | undefined => {
+    const l = lavori.get(String(req.params.id))
+    return l && puoVedere(l, chiDa(req)) ? l : undefined
+  }
+
+  app.get('/api/lavori', (req, res) => {
+    const chi = chiDa(req)
+    res.json(elencoLavori().filter(l => puoVedere(l, chi)).map(l => ({ ...pubblico(l, false), haRisultato: !!l.risultato })))
   })
 
   app.post('/api/lavori', async (req, res) => {
@@ -317,26 +327,27 @@ export const montaRotteLavori = (app: express.Express, raw: express.RequestHandl
     if (!b?.nome || !b.chiaveFile) return res.status(400).json({ error: 'nome e chiaveFile obbligatori' })
     const formato = (['contratti', 'contract', 'md'] as const).find(f => f === b.formato)
     if (!formato) return res.status(400).json({ error: `formato non gestito lato server: ${b.formato}` })
-    const l = await creaLavoro({ nome: b.nome, chiaveFile: b.chiaveFile, formato, testoAllegati: b.testoAllegati, bozza: b.bozza })
+    const l = await creaLavoro({ nome: b.nome, chiaveFile: b.chiaveFile, formato, testoAllegati: b.testoAllegati, bozza: b.bozza, utente: chiDa(req).utente })
     res.json({ id: l.id })
   })
 
   app.put('/api/lavori/:id/file', raw, async (req, res) => {
     const corpo = req.body as Buffer
     if (!Buffer.isBuffer(corpo) || !corpo.length) return res.status(400).json({ error: 'file vuoto' })
+    if (!mio(req)) return res.status(404).json({ error: 'lavoro non trovato o file già ricevuto' })
     const l = await ricevutoFile(String(req.params.id), corpo)
     if (!l) return res.status(404).json({ error: 'lavoro non trovato o file già ricevuto' })
     res.json(pubblico(l))
   })
 
   app.get('/api/lavori/:id', (req, res) => {
-    const l = lavori.get(String(req.params.id))
+    const l = mio(req)
     if (!l) return res.status(404).json({ error: 'lavoro non trovato' })
     res.json(pubblico(l))
   })
 
   app.get('/api/lavori/:id/file', (req, res) => {
-    const l = lavori.get(String(req.params.id))
+    const l = mio(req)
     const s = l && streamFile(l.id)
     if (!l || !s) return res.status(404).json({ error: 'file non trovato' })
     res.setHeader('Content-Type', 'application/pdf')
@@ -346,7 +357,7 @@ export const montaRotteLavori = (app: express.Express, raw: express.RequestHandl
 
   // SSE: stato subito, poi a ogni cambiamento; chiude quando il lavoro finisce.
   app.get('/api/lavori/:id/eventi', (req, res) => {
-    const l = lavori.get(String(req.params.id))
+    const l = mio(req)
     if (!l) return res.status(404).json({ error: 'lavoro non trovato' })
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
@@ -364,6 +375,7 @@ export const montaRotteLavori = (app: express.Express, raw: express.RequestHandl
   })
 
   app.delete('/api/lavori/:id', async (req, res) => {
+    if (!mio(req)) return res.status(404).json({ error: 'lavoro non trovato' })
     const ok = await annullaLavoro(String(req.params.id))
     if (!ok) return res.status(404).json({ error: 'lavoro non trovato' })
     res.json({ ok: true })

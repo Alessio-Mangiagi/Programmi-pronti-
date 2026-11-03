@@ -1,6 +1,10 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import ReactMarkdown from 'react-markdown'
+// HTML prodotto da mammoth da un .docx caricato (anche di un fornitore): va ripulito prima di
+// finire nella pagina, altrimenti un'immagine con onerror o un link javascript: eseguirebbe
+// codice nell'origine dell'app, con la sessione dell'utente (revisione del 03/11/2026).
+import DOMPurify from 'dompurify'
 import remarkGfm from 'remark-gfm'
 import readmeMd from '../README.md?raw'
 import guidaMd from '../GUIDA_UTILIZZO.md?raw'
@@ -326,7 +330,7 @@ export default function App() {
       const mammoth = (await import('mammoth')).default
       const buf = await f.arrayBuffer()
       const { value: html } = await mammoth.convertToHtml({ arrayBuffer: buf })
-      setDocxHtml(html)
+      setDocxHtml(DOMPurify.sanitize(html))
     }
 
     if (kind === 'text') {
@@ -483,7 +487,8 @@ export default function App() {
       w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${titolo}</title>`
         + '<style>body{font-family:"Open Sans",Arial,Helvetica,sans-serif;color:#333;line-height:1.7;max-width:860px;margin:32px auto;padding:0 24px}'
         + 'table{border-collapse:collapse}td,th{border:1px solid #d2d2d2;padding:4px 8px}img{max-width:100%}</style></head>'
-        + `<body>${value}</body></html>`)
+        // il popup è about:blank aperto da qui: stessa origine dell'app, stesso rischio
+        + `<body>${DOMPurify.sanitize(value)}</body></html>`)
       w.document.close()
     } catch (e: unknown) {
       w.close()

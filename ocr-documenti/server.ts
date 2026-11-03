@@ -1,5 +1,4 @@
 import express from 'express'
-import cors from 'cors'
 import path from 'path'
 import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -27,7 +26,39 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-app.use(cors())
+app.disable('x-powered-by')
+
+// Niente CORS: il frontend sta sulla stessa origine (proxy di Vite in sviluppo, dist/ servita
+// da qui in produzione) e le altre app della suite chiamano il backend lato server. Prima
+// `cors()` rispondeva Access-Control-Allow-Origin: * a qualunque pagina (revisione del 03/11/2026).
+
+// Header di sicurezza, scritti a mano come in Analista Dati (nessuna dipendenza in più).
+// CSP tarata sull'app: nessuno script inline (il bundle Vite è un file esterno), font da Google
+// Fonts, stili inline di React ('unsafe-inline' solo sugli stili), pdf.js con worker e anteprime
+// da blob:, 'wasm-unsafe-eval' per i decoder WebAssembly di pdf.js (non abilita eval di JS).
+// L'anteprima Word passa da DOMPurify: la CSP è la seconda barriera. CSP=off la spegne.
+const CSP = process.env.CSP === 'off' ? '' : (process.env.CSP || [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob:",
+  "connect-src 'self'",
+  "worker-src 'self' blob:",
+  "frame-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; '))
+app.use((_req, res, next) => {
+  if (CSP) res.setHeader('Content-Security-Policy', CSP)
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+  next()
+})
 
 const PORT = Number(process.env.PORT) || 3007
 // Solo loopback, sempre: a questo backend ci parla il proxy di Vite, che gira
@@ -41,15 +72,17 @@ const BIND_HOST = process.env.OCR_BIND_HOST || '127.0.0.1'
 const ESPOSTO = process.env.NODE_ENV === 'production' || !/^(127\.0\.0\.1|localhost|::1)$/.test(BIND_HOST)
 if (ESPOSTO) app.use(cosedilSSO({ app: 'ocr' }))
 
-// Limite del corpo JSON per rotta: le pagine in base64 passano solo da /api/ocr;
-// il resto (lavori: nome, testo della bozza) sta in pochi MB. Un limite unico a
-// 200 MB valeva anche per /api/normalizza e /api/lavori, che non ne hanno bisogno.
-const jsonPagine = express.json({ limit: '200mb' })
-const jsonNormale = express.json({ limit: '50mb' })
+// Limite del corpo per rotta: le pagine passano solo da /api/ocr (una pagina, o le sue
+// tessere, per richiesta); il resto (lavori: nome, testo della bozza) sta in pochi MB.
+// Dal 03/11/2026 il tetto è 60 MB (prima 200-300 MB: un utente poteva far allocare al
+// server centinaia di MB per richiesta). OCR_MAX_MB lo alza se servono PDF più grossi.
+const MAX_MB = `${Number(process.env.OCR_MAX_MB) || 60}mb`
+const jsonPagine = express.json({ limit: MAX_MB })
+const jsonNormale = express.json({ limit: '20mb' })
 app.use((req, res, next) => (req.path === '/api/ocr' ? jsonPagine : jsonNormale)(req, res, next))
 // Le pagine dal frontend arrivano in un corpo binario (PNG grezzi + meta, vedi
 // decodificaCorpoOcr): il JSON con base64 resta accettato per harness e chiamanti vecchi.
-const binarioPagine = express.raw({ type: 'application/octet-stream', limit: '200mb' })
+const binarioPagine = express.raw({ type: 'application/octet-stream', limit: MAX_MB })
 app.post('/api/ocr', binarioPagine, (req, res, next) => {
   if (!Buffer.isBuffer(req.body)) return next()
   try { req.body = decodificaCorpoOcr(req.body); next() } catch (e: unknown) {
@@ -238,7 +271,7 @@ let currentServer: ReturnType<typeof app.listen> | null = null
 
 // Lavori lato server (PDF caricato una volta, pipeline sul server, stato su disco).
 // Il PUT del file arriva come corpo grezzo, non JSON.
-montaRotteLavori(app, express.raw({ type: () => true, limit: '300mb' }))
+montaRotteLavori(app, express.raw({ type: () => true, limit: MAX_MB }))
 
 // Produzione (avvia.bat): nessun dev server Vite, il frontend compilato lo serve
 // questo processo. DOPO tutte le rotte /api: il catchall prende qualunque GET, e

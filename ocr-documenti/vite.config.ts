@@ -43,10 +43,15 @@ export default defineConfig({
     // (prima non si apriva niente: il .bat stampava solo l'URL). Si apre quando
     // Vite è in ascolto, senza attese a tempo fisso. Disattiva con: vite --no-open.
     open: true,
-    // node_modules e' una junction verso la app sibling (deps condivise): il worker pdfjs
-    // risolve a un path FUORI dalla root. Autorizziamo la cartella padre comune per @fs.
+    // Il dev server serve via /@fs/ solo i file sotto `allow`. Prima era '..', cioè l'intero
+    // monorepo: con HOST=0.0.0.0 da un altro PC si leggevano senza login il token di servizio
+    // della suite, le chiavi del Lettore DDT, gli utenti del portale (revisione del 03/11/2026).
+    // node_modules non è più una junction verso un'altra app: basta la cartella del progetto.
+    // `deny` SOSTITUISCE i divieti predefiniti di Vite: i primi quattro sono quelli, ripetuti.
     fs: {
-      allow: ['..']
+      allow: [import.meta.dirname],
+      deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '_lavori/**', '**/*.pdf', 'Elenchi/**',
+             '.ocr-cache/**', '.harness-cache/**', '_archivio/**', 'contratti/**', 'uploads/**'],
     },
     proxy: {
       '/api': 'http://localhost:3007'
