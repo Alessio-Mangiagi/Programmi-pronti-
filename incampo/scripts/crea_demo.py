@@ -25,6 +25,7 @@ import argparse
 import io
 import json
 import os
+import secrets
 import sys
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -39,7 +40,13 @@ from app.forms import validate_schema
 
 ROOT = Path(__file__).resolve().parent.parent
 DOMINIO = "demo.cosedil.local"
+# Password degli utenti demo. In sviluppo è quella scritta qui (comoda, pubblica nel repository).
+# Con APP_ENV=production, dove l'istanza può essere raggiunta da altri PC, vale INCAMPO_DEMO_PASSWORD
+# se impostata, altrimenti una password casuale stampata una sola volta a fine caricamento: così la
+# demo sull'istanza vera non apre un account admin con password nota a chiunque legga il repository.
 PASSWORD = "Cantiere-2026!"
+if os.getenv("APP_ENV", "dev").lower() == "production":
+    PASSWORD = os.getenv("INCAMPO_DEMO_PASSWORD") or (secrets.token_urlsafe(9) + "!")
 MARCA = "[DEMO]"
 
 # (email, nome, ruolo)

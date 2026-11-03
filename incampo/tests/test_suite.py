@@ -225,13 +225,25 @@ def test_login_portale_admin_e_username_senza_email(client, portale_finto, monke
     portale_finto["risposta"] = {"ok": True, "username": "g.verdi", "nome": "Giulia Verdi", "ruolo": "admin", "admin": True}
     d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"}).json()
     assert d["user"]["email"] == "g.verdi@cosedil.it" and d["user"]["role"] == "admin"
-    # utente già esistente con la parte prima della @ uguale allo username: lo ritrova, non ne crea un altro
+    # utente già esistente nel dominio della suite con la parte prima della @ uguale allo username: lo ritrova
     with client.session_factory() as s:
         from tests.conftest import make_user
-        make_user(s, "l.bianchi@altrodominio.it", "field", name="Luca")
+        make_user(s, "l.bianchi@cosedil.it", "field", name="Luca")
+        make_user(s, "m.rossi@altrodominio.it", "field", name="Mario")
+        make_user(s, "capo@cosedil.it", "admin", name="Capo")
     portale_finto["risposta"] = {"ok": True, "username": "l.bianchi", "nome": "Luca Bianchi", "ruolo": "utente"}
     d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=y"}).json()
-    assert d["user"]["email"] == "l.bianchi@altrodominio.it" and d["user"]["role"] == "field"
+    assert d["user"]["email"] == "l.bianchi@cosedil.it" and d["user"]["role"] == "field"
+    # stesso username ma account di un altro dominio: non lo aggancia, crea l'utente della suite
+    # (prima entrava come quell'account senza password: revisione di sicurezza del 03/11/2026)
+    portale_finto["risposta"] = {"ok": True, "username": "m.rossi", "nome": "Mario Rossi", "ruolo": "utente"}
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=z"}).json()
+    assert d["user"]["email"] == "m.rossi@cosedil.it"
+    # username uguale alla parte locale di un admin: mai agganciato per username
+    portale_finto["risposta"] = {"ok": True, "username": "capo", "nome": "Capo", "ruolo": "utente",
+                                 "email": "capo.cantiere@cosedil.it"}
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=w"}).json()
+    assert d["user"]["email"] == "capo.cantiere@cosedil.it" and d["user"]["role"] != "admin"
 
 
 def test_login_portale_rifiuti(client, portale_finto, monkeypatch):
@@ -273,8 +285,10 @@ def test_commesse_registro(client, monkeypatch, tmp_path):
 
 # --------------------------------------------------------------------------- da fare
 
-def test_suite_da_fare(client, commessa, users):
+def test_suite_da_fare(client, commessa, users, monkeypatch):
     """Task assegnati all'utente (scaduti prima), NC aperte per i manager, niente per chi non c'è."""
+    # X-Suite-Utente trova l'utente per parte locale solo nel dominio della suite: qui quello dei test
+    monkeypatch.setattr(suite_router, "EMAIL_DOMINIO", "test.local")
     pid = commessa["project_id"]
     field = users["field"]
     client.post("/tasks", json={"project_id": pid, "title": "Transenne da sistemare", "assigned_to": field["id"], "due_date": "2030-01-01T00:00:00"})

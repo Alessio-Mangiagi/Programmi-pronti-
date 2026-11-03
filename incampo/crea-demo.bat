@@ -5,8 +5,10 @@ REM sull'istanza in uso: cantieri, WBS, planimetrie con pin, moduli, non conform
 REM Perché un .bat: con APP_ENV=production lo script scripts/crea_demo.py si rifiuta di partire
 REM (crea utenti con password note) e va forzato a mano con SEED_ALLOW_PRODUCTION=1: qui lo fa
 REM chi clicca, consapevolmente. Si può rilanciare: i dati già presenti non vengono duplicati.
-REM Utenti demo: marta.colombo@demo.cosedil.local (admin), fabio.restivo@..., salvatore.grasso@...,
-REM password Cantiere-2026!. L'API di InCampo deve essere accesa (avvia.bat).
+REM Utenti demo: marta.colombo@demo.cosedil.local (admin), fabio.restivo@..., salvatore.grasso@...
+REM Password: con APP_ENV=production NON è quella del repository ma INCAMPO_DEMO_PASSWORD se impostata,
+REM altrimenti una casuale stampata qui sotto a fine caricamento (segnarla: non viene salvata da nessuna
+REM parte; rilanciando il .bat la demo la rimette e la stampa di nuovo). L'API di InCampo deve essere accesa.
 setlocal
 title InCampo - demo
 set "PY=%~dp0.venv\Scripts\python.exe"

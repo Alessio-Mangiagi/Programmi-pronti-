@@ -75,6 +75,9 @@ def register_push_token(payload: schemas.PushTokenIn, db: Session = Depends(get_
     if row is None:
         db.add(models.PushToken(token=payload.token, user_id=user.id, platform=payload.platform))
     else:
+        # voluto: il token Expo identifica il device, e su un tablet condiviso in cantiere le notifiche
+        # devono seguire chi ha fatto login per ultimo (la revisione del 03/11 lo segnala come rischio basso:
+        # per dirottarlo servirebbe conoscere il token del device di un collega)
         row.user_id, row.platform, row.last_seen_at = user.id, payload.platform or row.platform, utcnow()
     db.commit()
 
@@ -133,6 +136,12 @@ def list_users(include_inactive: bool = False, db: Session = Depends(get_db),
             raise HTTPException(403, "requires role admin")
     else:
         q = q.filter(models.User.is_active.is_(True))
+    if user.role == UserRole.field:
+        # chi lavora in campo vede solo i colleghi dei propri cantieri: l'elenco completo delle email
+        # servirebbe solo a chi vuole fare phishing o tentativi di login
+        miei = db.query(models.ProjectMember.project_id).filter_by(user_id=user.id).subquery()
+        colleghi = db.query(models.ProjectMember.user_id).filter(models.ProjectMember.project_id.in_(miei))
+        q = q.filter(models.User.id.in_(colleghi))
     return q.order_by(models.User.name).all()
 
 

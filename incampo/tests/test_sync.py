@@ -196,3 +196,52 @@ def test_pull_cursor_is_server_time_not_device_time(client, project):
     pull = client.get("/sync/pull", params={"project_id": pid, "since": since}).json()
     assert [p["id"] for p in pull["pins"]] == [pin_id]
     assert set(pull["pins"][0]["field_times"]) == {"x", "y", "label", "deleted_at"}
+
+
+def test_push_non_modifica_righe_di_altri_cantieri(client, project, pin, users):
+    """Revisione di sicurezza del 03/11/2026: il controllo di accesso del push guardava il pin dichiarato
+    dal device. Un utente del Cantiere B, mandando l'id di un task del Cantiere A col pin di un suo
+    cantiere, lo modificava o lo cancellava. Ora il genitore di una riga esistente deve essere quello vero."""
+    now = datetime.now(timezone.utc)
+    # task del Cantiere A (creato dall'admin del client di test)
+    task_a = str(uuid.uuid4())
+    r = client.post("/sync/push", json={"tasks": [{"id": task_a, "pin_id": pin, "title": "Ponteggio",
+                                                     "updated_at": iso(now)}]})
+    assert r.json()["tasks"]["inserted"] == 1
+    # l'outsider diventa membro del Cantiere B e ci mette un suo pin
+    other = client.post("/projects", json={"name": "Cantiere B"}).json()
+    plan_b = client.post("/plans", json={"project_id": other["id"], "name": "P1", "file_url": "s3://b.png",
+                                         "width_px": 10, "height_px": 10}).json()
+    assert client.post(f"/projects/{other['id']}/members", json={"user_id": users["outsider"]["id"]}).status_code == 201
+    pin_b = str(uuid.uuid4())
+    out = users["outsider"]["headers"]
+    r = client.post("/sync/push", headers=out, json={"pins": [{"id": pin_b, "plan_id": plan_b["id"], "x": 0, "y": 0,
+                                                               "updated_at": iso(now)}]})
+    assert r.json()["pins"]["inserted"] == 1
+    # attacco: id del task di A, pin di B, data nel futuro perché vinca il "last write wins"
+    futuro = iso(now + timedelta(days=3650))
+    r = client.post("/sync/push", headers=out, json={"tasks": [{
+        "id": task_a, "pin_id": pin_b, "title": "cancellato", "status": "verified",
+        "deleted_at": futuro, "updated_at": futuro}]})
+    assert r.status_code == 200, r.text
+    rejected = r.json()["tasks"]["rejected"]
+    assert [x["id"] for x in rejected] == [task_a] and "forbidden" in rejected[0]["reason"]
+    pull = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()
+    (t,) = [t for t in pull["tasks"] if t["id"] == task_a]
+    assert t["title"] == "Ponteggio" and t["deleted_at"] is None
+    # stesso trucco su un pin di A spostato sulla planimetria di B
+    r = client.post("/sync/push", headers=out, json={"pins": [{"id": pin, "plan_id": plan_b["id"], "x": 0.9, "y": 0.9,
+                                                               "deleted_at": futuro, "updated_at": futuro}]})
+    assert [x["id"] for x in r.json()["pins"]["rejected"]] == [pin]
+
+
+def test_push_created_by_deciso_dal_server(client, project, pin, users):
+    """All'insert il creatore è chi fa il push, non quello che il device dichiara."""
+    task_id = str(uuid.uuid4())
+    r = client.post("/sync/push", headers=users["field"]["headers"], json={"tasks": [{
+        "id": task_id, "pin_id": pin, "title": "A nome d'altri", "created_by": users["manager"]["id"],
+        "updated_at": iso(datetime.now(timezone.utc))}]})
+    assert r.json()["tasks"]["inserted"] == 1
+    with client.session_factory() as s:
+        from app import models
+        assert s.get(models.Task, task_id).created_by == users["field"]["id"]

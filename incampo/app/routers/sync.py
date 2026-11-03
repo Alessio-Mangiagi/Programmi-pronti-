@@ -19,14 +19,20 @@ router = APIRouter()
 # ---------- Sync offline-first (uso da app nativa) ----------
 
 def _upsert(db: Session, model, items, fk_checks: dict,
-            validate=None, defaults: Optional[dict] = None) -> schemas.SyncPushResult:
+            validate=None, defaults: Optional[dict] = None, parents: tuple = ()) -> schemas.SyncPushResult:
     """
     Upsert idempotente per id con "last write wins" PER CAMPO.
 
     fk_checks: {campo_fk: Model} — ogni FK viene verificata contro il DB
                (comprese le righe appena flushate nello stesso batch).
     validate:  fn(item) -> motivo di rifiuto (str) o None, eseguita dopo le FK.
-    defaults:  valori applicati all'insert quando il campo è nullo (es. created_by).
+    defaults:  valori imposti all'insert (es. created_by): vincono sempre sul valore mandato dal
+               device, perché dicono *chi* ha creato la riga e non possono essere scelti dal client.
+    parents:   campi che legano la riga al suo cantiere (plan_id, pin_id, submission_id, task_id).
+               Su una riga già esistente devono coincidere con quelli del server: `validate` controlla
+               l'accesso al cantiere a partire dal genitore dichiarato dal device, quindi se il device
+               potesse dichiararne uno suo potrebbe modificare o cancellare righe di cantieri altrui
+               conoscendone l'id (revisione di sicurezza del 03/11/2026).
 
     Campi aggiornabili = `model.SYNC_FIELDS`. Se il device manda `changed_fields`
     (i campi toccati offline) si confrontano solo quelli, ciascuno con l'ultima
@@ -55,11 +61,16 @@ def _upsert(db: Session, model, items, fk_checks: dict,
         if existing is None:
             values = item.model_dump(exclude={"changed_fields"})
             for k, v in (defaults or {}).items():
-                values[k] = values.get(k) or v
+                values[k] = v  # identità del creatore decisa dal server, mai dal device
             db.add(model(**values))
             res.inserted += 1
             continue
 
+        # la riga esiste: il genitore dichiarato deve essere quello vero, altrimenti il controllo di accesso
+        # fatto in `validate` sul genitore del device non dice nulla sulla riga che si sta per modificare
+        if any(getattr(item, f, None) != getattr(existing, f, None) for f in parents):
+            res.rejected.append(schemas.RejectedItem(id=item.id, reason="forbidden: parent mismatch"))
+            continue
         fields = [f for f in (item.changed_fields or model.SYNC_FIELDS) if f in model.SYNC_FIELDS]
         won = [f for f in fields if item.updated_at > existing.field_time(f)]
         lost = [f for f in fields if f not in won]
@@ -131,22 +142,22 @@ def sync_push(payload: schemas.SyncPushRequest, request: Request, db: Session = 
     pins = _upsert(
         db, models.Pin, payload.pins,
         fk_checks={"plan_id": models.Plan},
-        validate=check_pin, defaults={"created_by": user.id},
+        validate=check_pin, defaults={"created_by": user.id}, parents=("plan_id",),
     )
     submissions = _upsert(
         db, models.FormSubmission, payload.submissions,
         fk_checks={"template_id": models.FormTemplate, "pin_id": models.Pin},
-        validate=check_submission, defaults={"submitted_by": user.id},
+        validate=check_submission, defaults={"submitted_by": user.id}, parents=("pin_id",),
     )
     tasks = _upsert(
         db, models.Task, payload.tasks,
         fk_checks={"pin_id": models.Pin, "assigned_to": models.User, "created_by": models.User},
-        validate=check_task, defaults={"created_by": user.id},
+        validate=check_task, defaults={"created_by": user.id}, parents=("pin_id",),
     )
     attachments = _upsert(
         db, models.Attachment, payload.attachments,
         fk_checks={"submission_id": models.FormSubmission, "task_id": models.Task},
-        validate=check_attachment,
+        validate=check_attachment, parents=("submission_id", "task_id"),
     )
     # Eventi nella stessa transazione del push (solo righe accettate)
     rejected_subs = {r.id for r in submissions.rejected} | set(submissions.skipped_ids)

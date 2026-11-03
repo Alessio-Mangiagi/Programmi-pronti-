@@ -39,16 +39,19 @@ def test_login_lockout_after_repeated_failures(client, monkeypatch):
         assert client.post("/auth/login", json=bad).status_code == 401
     # bloccato anche con la password giusta, dallo stesso IP
     assert client.post("/auth/login", json=good).status_code == 429
-    # altro IP: ancora ammesso finché non si supera il limite per email
-    other_ip = {"X-Forwarded-For": "10.0.0.9"}
-    assert client.post("/auth/login", json=bad, headers=other_ip).status_code == 401
-    assert client.post("/auth/login", json=bad, headers=other_ip).status_code == 401
-    assert client.post("/auth/login", json=good, headers={"X-Forwarded-For": "10.0.0.10"}).status_code == 429
-    # voce iniziale falsificata dal client: conta l'IP aggiunto dal proxy (ultima voce)
+    # altro IP (un altro PC: client diverso, non un header): ancora ammesso finché non si supera il limite per email
+    from fastapi.testclient import TestClient
+    altro_pc = TestClient(client.app, client=("10.0.0.9", 50000))
+    terzo_pc = TestClient(client.app, client=("10.0.0.10", 50000))
+    assert altro_pc.post("/auth/login", json=bad).status_code == 401
+    assert altro_pc.post("/auth/login", json=bad).status_code == 401
+    assert terzo_pc.post("/auth/login", json=good).status_code == 429
+    # X-Forwarded-For mandato dal client non conta: l'IP lo decide uvicorn (--proxy-headers si fida solo
+    # del proxy su 127.0.0.1), altrimenti chi parla con la porta in LAN aggirerebbe il blocco cambiandolo
     from app import audit
     from starlette.requests import Request
-    req = Request({"type": "http", "headers": [(b"x-forwarded-for", b"6.6.6.6, 10.0.0.9")], "client": ("127.0.0.1", 1)})
-    assert audit._client_info(req)[0] == "10.0.0.9"
+    req = Request({"type": "http", "headers": [(b"x-forwarded-for", b"6.6.6.6, 10.0.0.9")], "client": ("192.168.1.7", 1)})
+    assert audit._client_info(req)[0] == "192.168.1.7"
     # altra email non toccata
     assert client.post("/auth/login", json={"email": "nobody@test.local", "password": "x"}).status_code == 401
     # finestra scaduta: di nuovo ammesso
@@ -78,9 +81,12 @@ def test_create_user_admin_only(client, users):
     assert client.post("/users", json={"email": "a@b.c", "name": "N", "password": "longenough", "role": "boss"}).status_code == 422
     assert client.post("/users", json={"email": "b@b.c", "name": "N", "password": "longenough"},
                        headers=users["manager"]["headers"]).status_code == 403
-    # chiunque legge l'elenco (serve per assegnare i task)
-    emails = {u["email"] for u in client.get("/users", headers=users["field"]["headers"]).json()}
+    # manager e admin leggono l'elenco completo (serve per assegnare i task)
+    emails = {u["email"] for u in client.get("/users", headers=users["manager"]["headers"]).json()}
     assert {"admin@test.local", "manager@test.local", "field@test.local", "new@test.local"} <= emails
+    # chi lavora in campo vede solo i colleghi dei propri cantieri (qui Cantiere A), non chi non c'è
+    visti = {u["email"] for u in client.get("/users", headers=users["field"]["headers"]).json()}
+    assert "manager@test.local" in visti and "field@test.local" in visti and "new@test.local" not in visti
     assert "password_hash" not in client.get("/users").json()[0]
 
 

@@ -69,7 +69,9 @@ def _utente_suite(db: Session, utente: Optional[str]) -> Optional[models.User]:
     u = utente.strip().lower()
     for user in db.query(models.User).filter(models.User.is_active.is_(True)).all():
         email = (user.email or "").lower()
-        if email == u or email.split("@")[0] == u:
+        # la parte prima della @ vale solo per le email del dominio della suite: altrimenti uno username del
+        # portale uguale alla parte locale di un altro account (demo, admin di un altro dominio) lo aggancerebbe
+        if email == u or (email.endswith("@" + EMAIL_DOMINIO) and email.split("@")[0] == u):
             return user
     return None
 
@@ -122,8 +124,12 @@ def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
     username = dati["username"]
     user = db.query(models.User).filter(models.User.email == email).first()
     if user is None:
+        # ripiego sullo username solo fra le email del dominio della suite e mai su un admin: altrimenti un
+        # utente del portale chiamato come la parte locale di un account admin (es. della demo) entrerebbe
+        # come quell'admin senza password (revisione di sicurezza del 03/11/2026)
         for u in db.query(models.User).all():
-            if (u.email or "").lower().split("@")[0] == username:
+            em = (u.email or "").lower()
+            if em.endswith("@" + EMAIL_DOMINIO) and em.split("@")[0] == username and u.role != UserRole.admin:
                 user = u
                 break
     if user is not None:
