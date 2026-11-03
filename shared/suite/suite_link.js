@@ -44,7 +44,7 @@ const APP = {
 const SALUTE = {
   incampo: '/healthz', skytower: '/health', magazzino: '/api/health', portale: '/api/verify',
   ddt: '/status', scadenzario: '/api/health', confronto: '/healthz', verifica: '/status',
-  analista: '/api/health', trimble: '/api/health', vfp: '/api/info',
+  analista: '/api/health', trimble: '/api/salute', vfp: '/api/info',
 };
 
 const HEADER_TOKEN = 'X-Suite-Token';
