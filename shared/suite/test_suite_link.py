@@ -147,3 +147,41 @@ def test_token_solo_in_memoria_se_cartella_non_scrivibile(monkeypatch, tmp_path)
     t = suite_link.token()
     assert os.environ.get("SUITE_TOKEN") == t
     monkeypatch.delenv("SUITE_TOKEN", raising=False)
+
+
+# --------------------------------------------------------------------------- registro commesse
+
+@pytest.fixture
+def registro_tmp(tmp_path, monkeypatch):
+    f = tmp_path / "commesse.json"
+    monkeypatch.setattr(suite_link, "FILE_COMMESSE", f)
+    return f
+
+
+def test_registro_commesse_salva_unisce_trova(registro_tmp):
+    out = suite_link.salva_commesse([
+        {"code": "101-003", "nome": "Porto di Augusta", "stato": "attiva"},
+        {"codice": " 101-003 ", "cliente": "Autorità portuale"},   # stesso codice (spazi attorno): si unisce
+        {"code": "C-2026-014", "nome": "Scuola Messina", "stato": "chiusa"},
+        {"code": "", "nome": "senza codice"},
+        {"code": "X-1", "stato": "boh"},                            # stato sconosciuto → attiva
+    ])
+    assert [c["code"] for c in out] == ["101-003", "C-2026-014", "X-1"]
+    assert out[0] == {"code": "101-003", "nome": "Porto di Augusta", "stato": "attiva", "cliente": "Autorità portuale", "indirizzo": "", "note": ""}
+    assert out[2]["stato"] == "attiva"
+    assert registro_tmp.exists() and json.loads(registro_tmp.read_text(encoding="utf-8"))["fonte"] == "manuale"
+    assert [c["code"] for c in suite_link.commesse(solo_attive=True)] == ["101-003", "X-1"]
+    assert suite_link.trova_commessa(" c-2026-014 ")["nome"] == "Scuola Messina"
+    assert suite_link.trova_commessa("999") is None and suite_link.trova_commessa("") is None
+
+
+def test_registro_assente_o_rotto(registro_tmp):
+    assert suite_link.commesse() == []
+    registro_tmp.write_text("{non json", encoding="utf-8")
+    assert suite_link.commesse() == []
+
+
+def test_url_api_tutte_le_app():
+    for app in suite_link.NOMI:
+        assert app in suite_link.URL_API and app in suite_link.SALUTE
+        assert suite_link.url_pubblico(app).startswith("http")

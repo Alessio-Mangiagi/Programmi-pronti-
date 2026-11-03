@@ -34,20 +34,38 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-NOMI = {"incampo": "InCampo", "skytower": "SkyTower", "magazzino": "Magazzino Operativo"}
-
-# API interne (dove si fanno le chiamate). SkyTower: l'API FastAPI sta sulla 8100,
-# la 5195 è il frontend che le inoltra sotto /api.
-URL_API = {
-    "incampo": os.environ.get("SUITE_URL_INCAMPO", "http://127.0.0.1:5190/api").rstrip("/"),
-    "skytower": os.environ.get("SUITE_URL_SKYTOWER", "http://127.0.0.1:8100").rstrip("/"),
-    "magazzino": os.environ.get("SUITE_URL_MAGAZZINO", "http://127.0.0.1:5200/api").rstrip("/"),
+NOMI = {
+    "incampo": "InCampo", "skytower": "SkyTower", "magazzino": "Magazzino Operativo",
+    "portale": "Portale", "ddt": "Lettore DDT", "scadenzario": "Scadenzario",
+    "confronto": "Confronto Documenti", "verifica": "Verifica Requisiti",
+    "analista": "Analista Dati", "trimble": "Ponte Trimble", "vfp": "VFP Transfer",
 }
+
+# (sottodominio dietro Caddy, porta pubblica, API interna di default)
+# SkyTower: l'API FastAPI sta sulla 8100, la 5195 è il frontend che le inoltra sotto /api.
+_APP = {
+    "incampo": ("incampo", 5190, "http://127.0.0.1:5190/api"),
+    "skytower": ("skytower", 5195, "http://127.0.0.1:8100"),
+    "magazzino": ("magazzino-operativo", 5200, "http://127.0.0.1:5200/api"),
+    "portale": ("portale", 8080, "http://127.0.0.1:8080/api"),
+    "ddt": ("lettore-ddt", 5050, "http://127.0.0.1:5050/api"),
+    "scadenzario": ("scadenzario", 5180, "http://127.0.0.1:5180/api"),
+    "confronto": ("confronto-documenti", 5001, "http://127.0.0.1:5001"),
+    "verifica": ("verifica-requisiti", 5185, "http://127.0.0.1:5185/api"),
+    "analista": ("analista-dati", 5173, "http://127.0.0.1:5173/api"),
+    "trimble": ("ponte-trimble", 3011, "http://127.0.0.1:3011/api"),
+    "vfp": ("vfp-transfer", 8770, "http://127.0.0.1:8770/api"),
+}
+
+# API interne (dove si fanno le chiamate): SUITE_URL_<APP> le cambia.
+URL_API = {app: os.environ.get(f"SUITE_URL_{app.upper()}", v[2]).rstrip("/") for app, v in _APP.items()}
 
 HEADER_TOKEN = "X-Suite-Token"
 HEADER_UTENTE = "X-Suite-Utente"
 HEADER_NOME = "X-Suite-Nome"
+HEADER_EMAIL = "X-Suite-Email"
 FILE_TOKEN = Path(__file__).resolve().parent / ".token"
+FILE_COMMESSE = Path(__file__).resolve().parent / "commesse.json"
 
 
 def url_pubblico(app):
@@ -56,11 +74,85 @@ def url_pubblico(app):
     if forzato:
         return forzato.rstrip("/")
     dominio = (os.environ.get("SUITE_DOMINIO") or "").strip()
+    sotto, porta, _ = _APP[app]
     if dominio:
-        sotto = {"incampo": "incampo", "skytower": "skytower", "magazzino": "magazzino-operativo"}[app]
         return f"https://{sotto}.{dominio}"
-    porta = {"incampo": 5190, "skytower": 5195, "magazzino": 5200}[app]
     return f"http://localhost:{porta}"
+
+
+# ----------------------------------------------------------------------------- registro commesse
+# Un'anagrafica sola per tutta la suite: ``shared/suite/commesse.json`` (fuori da git).
+# La cura il portale (pagina Commesse degli admin, importazione dalle app o da
+# CPM/Alyante via VFP Transfer); le app la leggono per offrire un menu a tendina
+# invece del testo libero, così il codice combacia davvero fra InCampo, SkyTower,
+# Magazzino, DDT e Scadenzario.
+STATI_COMMESSA = ("attiva", "sospesa", "chiusa")
+
+
+def _pulisci_commessa(c):
+    code = re.sub(r"\s+", " ", str(c.get("code") or c.get("codice") or "")).strip()
+    if not code:
+        return None
+    stato = str(c.get("stato") or "attiva").strip().lower()
+    return {
+        "code": code,
+        "nome": str(c.get("nome") or c.get("name") or "").strip()[:200],
+        "stato": stato if stato in STATI_COMMESSA else "attiva",
+        "cliente": str(c.get("cliente") or "").strip()[:200],
+        "indirizzo": str(c.get("indirizzo") or c.get("address") or "").strip()[:300],
+        "note": str(c.get("note") or "").strip()[:500],
+    }
+
+
+def commesse(solo_attive=False):
+    """Registro delle commesse (lista di dict code/nome/stato/cliente/indirizzo/note), ordinato per codice."""
+    try:
+        dati = json.loads(FILE_COMMESSE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    lista = dati.get("commesse", dati) if isinstance(dati, dict) else dati
+    out = []
+    for c in lista or []:
+        if isinstance(c, dict):
+            p = _pulisci_commessa(c)
+            if p and (not solo_attive or p["stato"] == "attiva"):
+                out.append(p)
+    out.sort(key=lambda c: c["code"])
+    return out
+
+
+def salva_commesse(lista, fonte="manuale"):
+    """Riscrive il registro (doppioni per codice normalizzato: vince l'ultimo). Ritorna la lista salvata."""
+    per_codice = {}
+    for c in lista or []:
+        p = _pulisci_commessa(c) if isinstance(c, dict) else None
+        if p:
+            k = normalizza_commessa(p["code"])
+            if k in per_codice:   # unisce: i campi vuoti del nuovo non cancellano i vecchi
+                vecchio = per_codice[k]
+                for campo, v in p.items():
+                    if v or campo == "stato":
+                        vecchio[campo] = v
+            else:
+                per_codice[k] = p
+    out = sorted(per_codice.values(), key=lambda c: c["code"])
+    from datetime import datetime
+    dati = {"aggiornato": datetime.now().isoformat(timespec="seconds"), "fonte": fonte, "commesse": out}
+    tmp = FILE_COMMESSE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(dati, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, FILE_COMMESSE)
+    return out
+
+
+def trova_commessa(codice):
+    """La commessa del registro con quel codice (confronto normalizzato), o None."""
+    k = normalizza_commessa(codice)
+    if not k:
+        return None
+    for c in commesse():
+        if normalizza_commessa(c["code"]) == k:
+            return c
+    return None
 
 
 def token():
@@ -107,12 +199,14 @@ class SuiteError(Exception):
         self.messaggio = messaggio
 
 
-def intestazioni(utente=None, nome=None):
+def intestazioni(utente=None, nome=None, email=None):
     h = {HEADER_TOKEN: token()}
     if utente:
         h[HEADER_UTENTE] = str(utente)[:120]
     if nome:
         h[HEADER_NOME] = str(nome)[:120].encode("latin-1", "replace").decode("latin-1")
+    if email:
+        h[HEADER_EMAIL] = str(email)[:160]
     return h
 
 
@@ -157,7 +251,7 @@ HEADER_NOME_FILE = "X-Suite-Nome-File"
 
 
 def chiama(app, metodo, percorso, dati=None, parametri=None, utente=None, nome=None, timeout=10,
-           file=None, corpo_file=None, grezzo=False):
+           file=None, corpo_file=None, grezzo=False, email=None):
     """Chiama un'altra app della suite.
 
     ``dati``: dict → JSON (o campi del multipart se c'è ``file``).
@@ -166,6 +260,7 @@ def chiama(app, metodo, percorso, dati=None, parametri=None, utente=None, nome=N
     (niente multipart: chi riceve non ha bisogno di python-multipart); il nome viaggia
     nell'header X-Suite-Nome-File, i metadati vanno in ``parametri``.
     ``grezzo``: ritorna (byte, content_type) invece del JSON decodificato.
+    ``email``: email dell'utente del portale (X-Suite-Email), per le app con utenti propri.
     Solleva SuiteError con lo stato HTTP; 503 se l'app non risponde.
     """
     if app not in URL_API:
@@ -173,7 +268,7 @@ def chiama(app, metodo, percorso, dati=None, parametri=None, utente=None, nome=N
     url = URL_API[app] + percorso
     if parametri:
         url += ("&" if "?" in url else "?") + urllib.parse.urlencode({k: v for k, v in parametri.items() if v not in (None, "")})
-    testata = intestazioni(utente, nome)
+    testata = intestazioni(utente, nome, email)
     corpo = None
     if corpo_file is not None:
         corpo, ctype, nome_file = corpo_file
@@ -205,7 +300,11 @@ def chiama(app, metodo, percorso, dati=None, parametri=None, utente=None, nome=N
         raise SuiteError(app, 502, f"{NOMI[app]}: risposta non in JSON") from None
 
 
-SALUTE = {"incampo": "/healthz", "skytower": "/health", "magazzino": "/api/health"}
+SALUTE = {
+    "incampo": "/healthz", "skytower": "/health", "magazzino": "/api/health", "portale": "/api/health",
+    "ddt": "/api/health", "scadenzario": "/api/health", "confronto": "/health", "verifica": "/api/health",
+    "analista": "/api/health", "trimble": "/api/health", "vfp": "/api/health",
+}
 
 
 def raggiungibile(app, timeout=2):
