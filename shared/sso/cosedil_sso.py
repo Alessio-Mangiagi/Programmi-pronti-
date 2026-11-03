@@ -90,7 +90,7 @@ def verifica_sessione(cookie_header, app_id=""):
         return hit[1]
 
     esito = {"ok": False, "reachable": True, "admin": False,
-             "username": None, "nome": None, "ruolo": None, "vietato": False}
+             "username": None, "nome": None, "ruolo": None, "email": None, "vietato": False}
     try:
         url = PORTAL + "/api/verify"
         if app_id:
@@ -106,6 +106,7 @@ def verifica_sessione(cookie_header, app_id=""):
             esito["username"] = dati.get("username")
             esito["nome"] = dati.get("nome")
             esito["ruolo"] = dati.get("ruolo")
+            esito["email"] = dati.get("email")   # per le app con utenti propri (InCampo, SkyTower)
     except urllib.error.HTTPError as errore:
         # 403: sessione valida ma app riservata a cui l’utente non ha accesso.
         # Rimandarlo al login non servirebbe: il login lo ha già fatto.

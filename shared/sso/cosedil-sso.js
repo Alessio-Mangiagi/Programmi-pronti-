@@ -83,9 +83,10 @@ async function verificaSessione(cookie, app) {
       // rimandarlo al login non servirebbe a niente, il login ce l'ha già fatto.
       vietato: r.status === 403,
       username: data.username || null, nome: data.nome || null, ruolo: data.ruolo || null,
+      email: data.email || null,   // per le app con utenti propri (InCampo, SkyTower)
     };
   } catch {
-    out = { ok: false, reachable: false, admin: false, username: null, nome: null, ruolo: null };
+    out = { ok: false, reachable: false, admin: false, username: null, nome: null, ruolo: null, email: null };
   }
   out.exp = now + (out.reachable ? CACHE_TTL : CACHE_TTL_IRRAGGIUNGIBILE);
   cache.set(key, out);
@@ -122,7 +123,7 @@ function cosedilSSO(opts = {}) {
 
       const v = await verificaSessione(req.headers.cookie, app);
       // Identità + admin per-app a disposizione dell'app (rotte, UI, log).
-      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, admin: v.admin };
+      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin };
 
       if (v.ok) {
         const rottaAdmin = adminOnly || adminPaths.some((pre) => url.startsWith(pre));
@@ -169,7 +170,7 @@ function cosedilSocketIO(opts = {}) {
       const v = await verificaSessione(socket.handshake.headers.cookie, app);
       if (v.ok) {
         if (adminOnly && !v.admin) return next(new Error(MSG_NON_ADMIN));
-        socket.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, admin: v.admin };
+        socket.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin };
         return next();
       }
       if (v.vietato) return next(new Error(MSG_NON_ABILITATO));

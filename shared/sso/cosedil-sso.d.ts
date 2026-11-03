@@ -7,6 +7,7 @@ export interface CosedilIdentity {
   username: string | null;
   nome: string | null;
   ruolo: string | null;
+  email: string | null;
   admin: boolean;
 }
 
@@ -31,6 +32,7 @@ export interface VerifyResult {
   username: string | null;
   nome: string | null;
   ruolo: string | null;
+  email: string | null;
   exp: number;
 }
 
