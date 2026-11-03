@@ -282,9 +282,9 @@ describe('Route /paniere', () => {
       path.join(commessaJsonFolder(TEST_COMMESSA), 'export-di-prova.json'),
       JSON.stringify(foglio('DDT', [['1']]))
     );
-    // requireAdmin risponde 401 (non 403) anche a chi è autenticato ma non admin.
+    // requireAdmin risponde 403 a chi è autenticato ma non admin (401 solo senza login).
     const res = await agent.post('/paniere/da-archivio').send({ names: ['export-di-prova.json'] });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     expect((await agent.get('/paniere')).body.items).toEqual([]);
   });
 });

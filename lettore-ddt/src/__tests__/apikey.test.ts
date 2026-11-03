@@ -145,10 +145,11 @@ describe('Route /admin/api/apikey', () => {
     expect((await request(app).delete('/admin/api/apikey')).status).toBe(401);
   });
 
-  it('utente non admin → 401 su tutte le operazioni', async () => {
-    expect((await userAgent.get('/admin/api/apikey')).status).toBe(401);
-    expect((await userAgent.post('/admin/api/apikey').send({ apiKey: KEY })).status).toBe(401);
-    expect((await userAgent.delete('/admin/api/apikey')).status).toBe(401);
+  // utente riconosciuto ma senza ruolo admin: 403 (non è un problema di login)
+  it('utente non admin → 403 su tutte le operazioni', async () => {
+    expect((await userAgent.get('/admin/api/apikey')).status).toBe(403);
+    expect((await userAgent.post('/admin/api/apikey').send({ apiKey: KEY })).status).toBe(403);
+    expect((await userAgent.delete('/admin/api/apikey')).status).toBe(403);
   });
 
   it('GET senza chiave → non configurata', async () => {

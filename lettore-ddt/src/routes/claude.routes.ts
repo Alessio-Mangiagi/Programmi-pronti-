@@ -203,7 +203,10 @@ router.post(
               : undefined;
           inviaDdtASkyTower({
             commessaId: req.commessaId!,
-            utente: req.session.username || '',
+            // identità del portale (gate SSO), non lo username DDT: se differiscono SkyTower attribuirebbe
+            // il documento a un omonimo o all'utente tecnico
+            utente: req.cosedil?.username || req.session.username || '',
+            email: req.cosedil?.email || undefined,
             pdfPath: pendente?.path,
             parsed,
             exportName: jsonFilename,

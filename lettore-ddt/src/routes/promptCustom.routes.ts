@@ -52,7 +52,7 @@ router.post(
         body.parametri && typeof body.parametri === 'object' && !Array.isArray(body.parametri)
           ? (body.parametri as Record<string, unknown>)
           : undefined,
-      utente: req.session.username || req.session.userId || 'sconosciuto',
+      utente: req.cosedil?.username || req.session.username || req.session.userId || 'sconosciuto',
     });
     if ('error' in esito) return res.status(400).json({ error: esito.error });
     res.json({ prompt: esito.prompt });

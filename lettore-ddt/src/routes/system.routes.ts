@@ -187,13 +187,12 @@ function staticGzip(root: string, cacheControl: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     // "><(((º> sabusabu <º)))><"
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-    let filePath: string;
-    try {
-      filePath = path.normalize(path.join(root, decodeURIComponent(req.path)));
-    } catch {
-      return next();
-    }
-    if (!filePath.startsWith(root)) return res.status(403).end();
+    // req.path è già decodificato da Express: una seconda decodeURIComponent trasformava %252F in /
+    // dopo il controllo. Il confine si verifica con path.relative, non con un prefisso di stringa
+    // ("static" sarebbe prefisso anche di "static-x").
+    const filePath = path.normalize(path.join(root, req.path));
+    const rel = path.relative(root, filePath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) return res.status(403).end();
     let st: fs.Stats;
     try {
       st = fs.statSync(filePath);

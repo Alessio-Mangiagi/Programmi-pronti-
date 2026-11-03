@@ -399,8 +399,8 @@ describe('rotte /fornitori', () => {
   });
 
   it('riservate agli admin', async () => {
-    expect((await utente.get('/fornitori')).status).toBe(401);
-    expect((await utente.get('/fornitori/excel')).status).toBe(401);
+    expect((await utente.get('/fornitori')).status).toBe(403);
+    expect((await utente.get('/fornitori/excel')).status).toBe(403);
   });
 
   it("elenco: ricostruito dall'archivio della commessa", async () => {

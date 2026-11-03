@@ -48,6 +48,22 @@ function aggiungiCartella(entries: ZipEntry[], dir: string, prefisso: string): n
   return bytes;
 }
 
+// batch.config.json può contenere apiKey in chiaro: nel backup va senza.
+function aggiungiBatchConfigSenzaChiave(entries: ZipEntry[]): number {
+  const assoluto = path.join(APP_DIR, 'batch.config.json');
+  try {
+    const st = fs.statSync(assoluto);
+    if (!st.isFile()) return 0;
+    const cfg = JSON.parse(fs.readFileSync(assoluto, 'utf8')) as Record<string, unknown>;
+    delete cfg.apiKey;
+    const data = Buffer.from(JSON.stringify(cfg, null, 2), 'utf8');
+    entries.push({ name: 'batch.config.json', data, date: st.mtime });
+    return data.length;
+  } catch {
+    return 0; // assente o non JSON: niente da salvare
+  }
+}
+
 function dataOggi(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -65,12 +81,14 @@ export async function eseguiBackupGiornaliero(): Promise<void> {
   const entries: ZipEntry[] = [];
   let bytes = 0;
 
-  // Archivio utenti cifrato + chiavi: senza le chiavi l'archivio è illeggibile,
-  // quindi viaggiano insieme. Lo zip finisce in backupDir: spostarlo su un
-  // disco diverso (config) è ciò che lo rende un backup vero.
-  for (const f of ['users.enc', '.users.key', '.session.key', 'config.json', 'batch.config.json']) {
+  // Archivio utenti cifrato e configurazioni. Le chiavi (.users.key, .session.key) NON entrano
+  // nello zip: con utenti e chiave nello stesso file chi legge il backup (condivisione, copia
+  // aziendale) decifra tutti gli account (revisione di sicurezza del 03/11/2026). Le chiavi si
+  // salvano a parte, a mano, in un posto diverso: senza, users.enc non si rilegge, ed è voluto.
+  for (const f of ['users.enc', 'config.json']) {
     bytes += aggiungiFile(entries, path.join(APP_DIR, f), f);
   }
+  bytes += aggiungiBatchConfigSenzaChiave(entries);
 
   // Dati per-commessa: solo ciò che non si rigenera.
   const dataRoot = path.join(APP_DIR, 'data');

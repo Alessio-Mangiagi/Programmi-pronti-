@@ -12,6 +12,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { loadBatchConfig } from '../batch/config';
+import { config as appCfg } from '../config';
 import { richiestaLocale } from '../utils/richiesta';
 
 export interface BrowseEntry {
@@ -48,7 +49,10 @@ export function dentroRadiciConsentite(target: string, roots: string[]): boolean
  *   utente potrebbe leggere tutti i dischi e scriverci dentro.
  */
 export function pathAllowed(req: Request, target: string): boolean {
-  if (isLoopback(req)) return true;
+  // In modalità server centrale (serverMode) le radici valgono per tutti, anche per chi è
+  // collegato dalla macchina stessa (RDP, processi locali con un cookie valido): un server
+  // condiviso non è il PC di chi lo usa (revisione di sicurezza del 03/11/2026).
+  if (isLoopback(req) && !appCfg.serverMode) return true;
   return dentroRadiciConsentite(target, loadBatchConfig().allowedRoots);
 }
 

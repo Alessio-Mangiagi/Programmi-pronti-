@@ -32,6 +32,8 @@ export interface InvioDdt {
   commessaId: string;
   /** Chi ha elaborato (username): va a SkyTower come utente del portale. */
   utente: string;
+  /** Email dell'utente nel portale (req.cosedil.email): SkyTower riconosce l'utente da questa. */
+  email?: string;
   /** PDF originale; se manca o non esiste non si manda niente. */
   pdfPath?: string;
   /** JSON estratto (summary, sheets). */
@@ -108,6 +110,7 @@ export async function inviaDdtASkyTower(o: InvioDdt): Promise<boolean> {
       parametri: { title: d.titolo, description: d.descrizione, tipo: tipoDocumento(), attributes: JSON.stringify(d.attributes) },
       corpoFile: { dati: pdf, tipo: 'application/pdf', nome: path.basename(o.pdfPath) },
       utente: o.utente,
+      email: o.email,
       timeout: 60000,
     });
     logger.info(`SkyTower: ${o.exportName} archiviato nella commessa ${codice} come ${(r && r.identifier) || 'documento'}`);

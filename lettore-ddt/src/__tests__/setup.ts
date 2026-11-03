@@ -9,6 +9,12 @@ import logger from '../utils/logger';
 // i piedi (es. batch.test.ts legge la chiave mentre apikey.test.ts la cancella).
 const worker = process.env.JEST_WORKER_ID || '0';
 
+// Gate SSO del portale spento nei test, come nelle altre app della suite: dal 03/11/2026 il gate protegge
+// ogni rotta che non sia un file statico (anche /auth/login e /batch, che non stanno sotto /api) e nei
+// test non c'è nessun portale a cui chiedere la sessione. Il comportamento col gate acceso lo provano
+// sicurezza.test.ts (identità del portale obbligatoria) e i test di shared/sso.
+if (!process.env.COSEDIL_SSO) process.env.COSEDIL_SSO = 'off';
+
 process.env.DDT_APIKEY_PATH = path.join(os.tmpdir(), `ddt-apikey-test-${worker}.enc`);
 
 // Archivio PDF pendenti/convalide e registro attività: senza override i test

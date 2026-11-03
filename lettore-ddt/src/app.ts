@@ -121,12 +121,6 @@ app.use(
 // Dietro reverse proxy/HTTPS (Nginx, Caddy, Render, ecc.) per cookie secure e req.ip corretti.
 if (appCfg.trustProxy) app.set('trust proxy', 1);
 
-// JSON fino a 50MB: estrazioni e versioni di progetto grosse. I PDF passano da
-// multer, e nessun client manda form urlencoded: lì basta poco, così un corpo
-// enorme non tiene occupato il parser.
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100kb' }));
-
 // Store sessioni persistente su file system. Le sessioni sopravvivono ai riavvii (single-process).
 // Per architetture multi-istanza usare store condiviso come Redis o Database.
 const FileStore = sessionFileStore(session);
@@ -161,6 +155,19 @@ app.use(
     },
   })
 );
+
+// Corpi JSON. Il limite normale è 1 MB: basta a login, paniere, versioni piccole, admin. Le rotte
+// che ricevono estrazioni o versioni di progetto grosse accettano fino a 50 MB, ma solo da chi ha
+// già una sessione: prima il parser da 50 MB stava davanti a tutto e chiunque raggiungesse la
+// porta poteva tenerlo occupato con corpi enormi (revisione di sicurezza del 03/11/2026).
+// La sessione sta sopra di proposito: il parser grande deve sapere se l'utente è autenticato.
+// I PDF passano da multer; nessun client manda form urlencoded: lì basta poco.
+const ROTTE_CORPO_GRANDE = ['/claude-to-excel', '/prepare-claude', '/versions', '/paniere', '/project',
+  '/json-exports', '/log-excel-validation', '/ddt-check-duplicates', '/batch', '/export'];
+const jsonGrande = express.json({ limit: '50mb' });
+app.use(ROTTE_CORPO_GRANDE, (req, res, next) => (req.session?.userId ? jsonGrande(req, res, next) : next()));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Middleware di telemetria che traccia latenza e metriche Prometheus
 app.use(metricsMiddleware);
