@@ -20,7 +20,8 @@ interface Kpi {
   step_times: { step_name: string; completed: number; avg_hours: number; median_hours: number; max_hours: number }[];
   bottlenecks: { step_name: string; organization_code: string; open: number; overdue: number; avg_age_hours: number }[];
   uploads: { week: string; organization_code: string; n: number }[];
-  overdue_tasks: { task_id: string; due_at: string; step_name: string; document_id: string; identifier: string; title: string; assignee_name: string; organization_code: string }[];
+  overdue_tasks: { task_id: string; due_at: string; step_name: string; document_id: string; identifier: string; title: string; assignee_name: string; organization_code: string;
+                   escalated_at: string | null; escalation_count: number; days_late: number | null }[];
   rfis: { open: number; answered: number; closed: number; overdue: number; avg_answer_hours: number | null };
   overdue_rfis: { id: string; code: string; subject: string; due_at: string; author_org_code: string }[];
   filters: { organizations: { id: string; code: string; name: string }[]; disciplines: string[] };
@@ -140,7 +141,7 @@ export function DashboardTab({ project }: { project: Project }) {
         <Card title="Scadenze superate" note="Compiti di revisione oltre la scadenza: apri il documento per i dettagli.">
           {d.overdue_tasks.length === 0 ? <Empty text="Nessuna scadenza superata." /> : (
             <Table size="small">
-              <TableHead><TableRow><TableCell>Scaduto il</TableCell><TableCell>Documento</TableCell><TableCell>Step</TableCell><TableCell>Incaricato</TableCell></TableRow></TableHead>
+              <TableHead><TableRow><TableCell>Scaduto il</TableCell><TableCell>Documento</TableCell><TableCell>Step</TableCell><TableCell>Incaricato</TableCell><TableCell>Sollecito</TableCell></TableRow></TableHead>
               <TableBody>
                 {d.overdue_tasks.map((t) => (
                   <TableRow key={t.task_id}>
@@ -151,6 +152,12 @@ export function DashboardTab({ project }: { project: Project }) {
                     </TableCell>
                     <TableCell>{t.step_name}</TableCell>
                     <TableCell>{t.assignee_name} ({t.organization_code})</TableCell>
+                    {/* Escalation automatica (G35): i responsabili sono avvisati alla scadenza e poi ogni 72 h */}
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {t.escalation_count > 0 && t.escalated_at
+                        ? <>n. {t.escalation_count} il {day(t.escalated_at)}{t.days_late ? <Typography variant="caption" display="block" color="text.secondary">{t.days_late} gg di ritardo</Typography> : null}</>
+                        : <Typography variant="caption" color="text.secondary">in arrivo</Typography>}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

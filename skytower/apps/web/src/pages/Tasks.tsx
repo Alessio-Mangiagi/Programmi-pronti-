@@ -31,6 +31,10 @@ interface Task {
   template_name: string;
   project_code: string;
   overdue: boolean;
+  // Escalation (G35): quando e quante volte i responsabili sono stati sollecitati, giorni di ritardo.
+  escalated_at: string | null;
+  escalation_count: number;
+  days_late: number | null;
 }
 
 const OUTCOME_LABEL: Record<string, string> = {
@@ -73,7 +77,16 @@ export function TasksPage() {
                   <TableCell>{t.project_code}</TableCell>
                   <TableCell>
                     {t.due_at ? new Date(t.due_at).toLocaleString("it-IT") : "—"}
-                    {t.overdue && <Chip size="small" color="error" label="Scaduto" sx={{ ml: 1 }} />}
+                    {t.overdue && (
+                      <Chip size="small" color="error" sx={{ ml: 1 }}
+                            label={t.days_late ? `In ritardo di ${t.days_late} ${t.days_late === 1 ? "giorno" : "giorni"}` : "Scaduto"} />
+                    )}
+                    {t.escalation_count > 0 && t.escalated_at && (
+                      <Typography variant="caption" display="block" color="error.main">
+                        Responsabili avvisati il {new Date(t.escalated_at).toLocaleString("it-IT")}
+                        {t.escalation_count > 1 ? ` (sollecito n. ${t.escalation_count})` : ""}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>{t.status === "DONE" ? OUTCOME_LABEL[t.outcome!] : t.status === "OPEN" ? <Chip size="small" color="warning" label="Da svolgere" /> : "Annullato"}</TableCell>
                 </TableRow>

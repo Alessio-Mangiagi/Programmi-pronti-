@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     # OCR delle pagine scansionate dei PDF (Tesseract): senza eseguibile si salta (ADR-33)
     ocr_enabled: bool = True
     tesseract_cmd: str | None = None      # None = cercato nel PATH (e nella cartella predefinita su Windows)
+    # Scadenze dei compiti (G35, ADR-44): un compito scaduto viene sollecitato di nuovo ai responsabili
+    # ogni tante ore finché resta aperto (0 = una sola escalation, come prima della migrazione 0036).
+    deadline_escalation_repeat_hours: int = 72
+
     ocr_languages: str = "ita+eng"
     ocr_max_pages: int = 30
     # IFC da questa dimensione in su: il worker prepara un derivato .glb per il viewer (G43, ADR-31)

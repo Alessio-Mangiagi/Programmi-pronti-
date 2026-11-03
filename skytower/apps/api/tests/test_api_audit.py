@@ -178,3 +178,26 @@ def test_codifica_rfc3161():
     assert "0609608648016503040201" in req.hex() and req.endswith(b"\x01\x01\xff")
     with pytest.raises(ValueError, match="rifiutata"):
         anchoring.timestamp_token(anchoring._seq(anchoring._seq(anchoring._int(2))))
+
+
+def test_verifica_firma_export(client, api_world, api_app, as_user, events):  # noqa: F811
+    """G49: la firma di un export si ricontrolla dal server (anche con il file in mano): autentica, di questa
+    commessa, file non alterato; firma rovinata, altra commessa o file diverso vengono distinti."""
+    _, w = api_world
+    r = client.get(f"/projects/{w.project_id}/audit/export.pdf", headers=as_user("com_admin"))
+    firma, sha = r.headers["x-cde-signature"], r.headers["x-cde-sha256"]
+    url = f"/projects/{w.project_id}/audit/export/verify"
+    ok = client.post(url, headers=as_user("com_admin"), json={"signature": firma, "sha256": sha}).json()
+    assert ok["valid"] is True and ok["file_matches"] is True and ok["claims"]["kind"] == "audit-pdf" and ok["issued_at"]
+    senza_file = client.post(url, headers=as_user("com_admin"), json={"signature": firma}).json()
+    assert senza_file["valid"] is True and senza_file["file_matches"] is None
+    diverso = client.post(url, headers=as_user("com_admin"), json={"signature": firma, "sha256": "0" * 64}).json()
+    assert diverso["valid"] is False and diverso["reason"] == "file_diverso"
+    rotta = client.post(url, headers=as_user("com_admin"), json={"signature": firma[:-6] + "abcdef"}).json()
+    assert rotta["valid"] is False and rotta["reason"] == "firma_non_valida"
+    altra = api_app.state.services.tokens.sign_export({"sub": str(uuid.uuid4()), "kind": "audit-csv", "sha256": "0" * 64, "rows": 0})
+    assert client.post(url, headers=as_user("com_admin"), json={"signature": altra}).json()["reason"] == "altra_commessa"
+    # un access token non è la firma di un export
+    accesso = as_user("com_admin")["Authorization"].split(" ", 1)[1]
+    assert client.post(url, headers=as_user("com_admin"), json={"signature": accesso}).json()["reason"] == "firma_non_valida"
+    assert client.post(url, headers=as_user("des_lead"), json={"signature": firma}).status_code == 403

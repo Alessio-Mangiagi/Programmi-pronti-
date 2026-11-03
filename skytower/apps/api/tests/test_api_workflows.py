@@ -409,3 +409,73 @@ def test_rfi_scadenza(client, api_world, as_user):  # noqa: F811
     des = notifications(client, as_user("des_lead"))
     assert any(n["kind"] == "RFI_REMINDER" and n["data"].get("rfi_id") == rfi["id"] for n in des)
     assert any(n["kind"] == "RFI_OVERDUE" and n["data"].get("rfi_id") == rfi["id"] for n in des)
+
+
+# ---------------------------------------------------------------------
+# Escalation ai Project Admin e solleciti ripetuti (G35, migrazione 0036, ADR-44)
+# ---------------------------------------------------------------------
+def test_escalation_ai_project_admin_e_ripetuta(client, api_world, as_user, shared):  # noqa: F811
+    """Senza escalation_user_id nel template, la scadenza superata avvisa i Project Admin e chi ha avviato il
+    workflow (mai l'incaricato) e si ripete ogni p_repeat_hours finché il compito resta aperto; inbox e cruscotto
+    mostrano quando e quante volte si è sollecitato."""
+    urls, w = api_world
+    steps = [{"name": "Revisione", "sla_hours": 24, "assignees": [{"type": "user", "id": str(w.users["des_designer"])}]}]
+    tpl = client.post(f"/projects/{w.project_id}/workflow-templates", headers=as_user("com_admin"),
+                      json={**template_body(w), "definition": {"steps": steps}}).json()
+    inst = client.post(f"/revisions/{shared['id']}/workflows", headers=as_user("des_lead"), json={"template_id": tpl["id"]}).json()
+    task_id = inst["steps"][0]["tasks"][0]["id"]
+    now = datetime.now(UTC)
+    h = {u: as_user(u) for u in ("com_admin", "des_lead", "des_designer")}   # un login per utente (freno anti brute force)
+
+    def run(hours, repeat=72):
+        with psycopg.connect(urls.worker, autocommit=True) as conn:
+            return conn.execute("SELECT cde.process_deadlines(%s, %s)", [now + timedelta(hours=hours), repeat]).fetchone()[0]
+
+    def esc(user):
+        return [n for n in notifications(client, h[user], "TASK_ESCALATED") if n["data"].get("task_id") == task_id]
+
+    def scaduti():
+        return [n for n in notifications(client, h["des_designer"], "TASK_OVERDUE") if n["data"].get("task_id") == task_id]
+
+    run(25)                                     # scaduto da 1 ora: incaricato avvisato, escalation n. 1
+    assert len(scaduti()) == 1
+    assert len(esc("com_admin")) == 1 and esc("com_admin")[0]["data"]["escalation"] == 1   # Project Admin
+    assert len(esc("des_lead")) == 1                                                       # chi ha avviato
+    assert esc("des_designer") == []                                                       # mai l'incaricato
+    assert "sollecito n. 1" in esc("com_admin")[0]["body"]
+    run(50)                                     # 26 h dopo la scadenza: prima dei 72 h → niente doppioni
+    assert len(esc("com_admin")) == 1
+    run(24 + 73)                                # 73 h dopo la scadenza: sollecito n. 2 con i giorni di ritardo
+    seconda = [n for n in esc("com_admin") if n["data"]["escalation"] == 2]
+    assert len(seconda) == 1 and seconda[0]["data"]["days_late"] == 3 and "3 giorni" in seconda[0]["body"]
+    assert len(scaduti()) == 1                  # l'incaricato riceve TASK_OVERDUE una volta sola
+    run(24 + 200, repeat=0)                     # ripetizione spenta: nessun sollecito in più
+    assert len(esc("com_admin")) == 2
+
+    # inbox e cruscotto ragionano con l'ora vera: si porta la scadenza a 3 giorni fa come farebbe il tempo
+    with psycopg.connect(urls.owner, autocommit=True) as conn:
+        conn.execute("UPDATE cde.tasks SET due_at = now() - interval '3 days 1 hour' WHERE id = %s", [task_id])
+    task = open_task(client, h["des_designer"], inst["id"])
+    assert task["escalation_count"] == 2 and task["escalated_at"] and task["overdue"] is True
+    assert task["days_late"] == 3
+    # cruscotto: i solleciti compaiono accanto al compito scaduto
+    kpi = client.get(f"/projects/{w.project_id}/dashboard", headers=h["com_admin"]).json()
+    riga = next(t for t in kpi["overdue_tasks"] if t["task_id"] == task_id)
+    assert riga["escalation_count"] == 2 and riga["escalated_at"] and riga["days_late"] == 3
+
+
+def test_escalation_user_id_del_template_esclude_gli_admin(client, api_world, as_user, shared):  # noqa: F811
+    """Con escalation_user_id nel template l'escalation va solo a quella persona (come nella 0007)."""
+    urls, w = api_world
+    steps = [{"name": "Revisione", "sla_hours": 24, "assignees": [{"type": "user", "id": str(w.users["des_designer"])}]}]
+    tpl = client.post(f"/projects/{w.project_id}/workflow-templates", headers=as_user("com_admin"),
+                      json={**template_body(w), "definition": {"steps": steps, "escalation_user_id": str(w.users["com_im"])}}).json()
+    inst = client.post(f"/revisions/{shared['id']}/workflows", headers=as_user("des_lead"), json={"template_id": tpl["id"]}).json()
+    task_id = inst["steps"][0]["tasks"][0]["id"]
+    with psycopg.connect(urls.worker, autocommit=True) as conn:
+        conn.execute("SELECT cde.process_deadlines(%s)", [datetime.now(UTC) + timedelta(hours=25)])
+
+    def mine(u):
+        return [n for n in notifications(client, as_user(u), "TASK_ESCALATED") if n["data"].get("task_id") == task_id]
+
+    assert len(mine("com_im")) == 1 and mine("com_admin") == [] and mine("des_lead") == []

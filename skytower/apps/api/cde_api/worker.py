@@ -317,10 +317,12 @@ def ifc_derivatives_task(timestamp: int) -> None:
 @app.periodic(cron="*/15 * * * *", periodic_id="deadlines")
 @app.task(name="cde.check_deadlines", queue="default")
 def check_deadlines(timestamp: int) -> None:
-    """Promemoria −48h/−24h, scadenze superate ed escalation (task e RFI)."""
+    """Promemoria −48h/−24h, scadenze superate ed escalation ai responsabili, ripetuta ogni
+    deadline_escalation_repeat_hours finché il compito resta aperto (task e RFI; migrazione 0036)."""
     _, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
-        n = conn.execute("SELECT cde.process_deadlines(to_timestamp(%s))", [timestamp]).fetchone()[0]
+        n = conn.execute("SELECT cde.process_deadlines(to_timestamp(%s), %s)",
+                         [timestamp, settings.deadline_escalation_repeat_hours]).fetchone()[0]
     log.info("scadenze elaborate: %s notifiche", n)
 
 

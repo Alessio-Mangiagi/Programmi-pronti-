@@ -292,3 +292,18 @@ def test_app_vicina_spenta(client, api_world, as_user, worker, monkeypatch):
     r = client.post(f"/revisions/{r1['id']}/verifica", headers=h, json={"set_id": "s1"})
     assert r.status_code == 503 and "non raggiungibile" in r.json()["error"]["message"]
     assert client.get("/suite/requisiti/set", headers=h).status_code == 503
+
+
+def test_da_fare_scadenze_in_cima(client, api_world, progetto_collegato):
+    """G35: scadenze superate ed escalation sono compiti (priorità 1), non avvisi, e stanno in cima al da-fare."""
+    import psycopg
+    urls, w = api_world
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("""INSERT INTO cde.notifications (user_id, project_id, kind, title, body, link)
+                        VALUES (%s, %s, 'TASK_ESCALATED', 'Escalation: PRJ-X', 'in ritardo di 3 giorni', '/compiti')""",
+                     [w.users["com_admin"], w.project_id])
+        conn.commit()
+    voci = client.get("/suite/da-fare", headers=come(w)).json()["voci"]
+    voce = next(v for v in voci if v["titolo"] == "Escalation: PRJ-X")
+    assert voce["tipo"] == "task" and voce["priorita"] == 1
+    assert [v["priorita"] for v in voci] == sorted(v["priorita"] for v in voci)

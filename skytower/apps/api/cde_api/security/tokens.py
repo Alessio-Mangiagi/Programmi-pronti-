@@ -83,6 +83,15 @@ class TokenService:
         p = self._decode(token, DOWNLOAD)
         return uuid.UUID(p["sub"]), uuid.UUID(p["rev"]), bool(p.get("inline"))
 
+    def decode_export(self, token: str) -> dict:
+        """Verifica la firma di un export (G49): RS256 con la chiave del server, ``typ`` export, nessuna
+        scadenza né audience. Solleva ``jwt.PyJWTError`` se la firma non regge o non è un export."""
+        payload = jwt.decode(token, self._public, algorithms=["RS256"], issuer=self.s.jwt_issuer,
+                             options={"verify_aud": False, "require": ["iss", "iat", "typ", "sha256"]})
+        if payload.get("typ") != "export":
+            raise jwt.InvalidTokenError("non è la firma di un export")
+        return payload
+
     def sign_export(self, claims: dict) -> str:
         """Firma RS256 di un export (es. registro attività), verificabile con la JWKS pubblica.
         Nessuna scadenza: la firma attesta il contenuto al momento dell'emissione."""

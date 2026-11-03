@@ -22,6 +22,8 @@ interface AuditEvent {
   hash: string | null;
 }
 interface Anchor { day: string; chain_seq: number; matches_chain: boolean; matches_s3: boolean | null; has_tsa: boolean; lock_mode: string | null; retain_until: string | null }
+// Esito della verifica di una firma di export (POST /audit/export/verify, G49)
+interface VerifyExport { valid: boolean; reason: string | null; claims?: Record<string, unknown>; file_matches?: boolean | null; issued_at?: string }
 interface Verify {
   ok: boolean; checked: number; first_broken_seq: number | null; head_seq: number | null; head_hash: string | null; unsealed: number;
   anchors_ok: boolean; anchors: Anchor[];
@@ -67,8 +69,24 @@ export function AuditTab({ project }: { project: Project }) {
     queryFn: () => api<AuditEvent[]>(`/projects/${project.id}/audit?limit=500${qs ? `&${qs}` : ""}`),
   });
   const verify = useMutation({ mutationFn: () => api<Verify>(`/projects/${project.id}/audit/verify`) });
+  // Dopo un export si mostrano firma e impronta del file: chi riceve il file le può ricontrollare qui sotto.
+  const [ultimoExport, setUltimoExport] = useState<{ signature: string; sha256: string; ext: string } | null>(null);
   const exportCsv = useMutation({
-    mutationFn: (ext: "csv" | "pdf") => apiDownload(`/projects/${project.id}/audit/export.${ext}${qs ? `?${qs}` : ""}`, `registro.${ext}`),
+    mutationFn: async (ext: "csv" | "pdf") => {
+      const res = await apiDownload(`/projects/${project.id}/audit/export.${ext}${qs ? `?${qs}` : ""}`, `registro.${ext}`);
+      const signature = res.headers.get("x-cde-signature") ?? "";
+      const sha256 = res.headers.get("x-cde-sha256") ?? "";
+      if (signature) setUltimoExport({ signature, sha256, ext });
+      return res;
+    },
+  });
+  // Verifica di una firma (anche di un export fatto da altri): firma obbligatoria, SHA-256 del file facoltativo.
+  const [firma, setFirma] = useState("");
+  const [impronta, setImpronta] = useState("");
+  const verificaFirma = useMutation({
+    mutationFn: () => api<VerifyExport>(`/projects/${project.id}/audit/export/verify`, {
+      method: "POST", json: { signature: firma.trim(), sha256: impronta.trim() || null },
+    }),
   });
 
   if (error) return <Alert severity="warning">{(error as ApiError).message}</Alert>;
@@ -109,6 +127,36 @@ export function AuditTab({ project }: { project: Project }) {
                 il registro è stato riscritto.</Alert>
       )}
       {(verify.error || exportCsv.error) && <Alert severity="error">{((verify.error || exportCsv.error) as ApiError).message}</Alert>}
+      {ultimoExport && (
+        <Alert severity="info" onClose={() => setUltimoExport(null)}>
+          Export {ultimoExport.ext.toUpperCase()} firmato. SHA-256 del file: <code>{ultimoExport.sha256}</code>.
+          <Button size="small" sx={{ ml: 1 }} onClick={() => { setFirma(ultimoExport.signature); setImpronta(ultimoExport.sha256); }}>
+            Copia nella verifica
+          </Button>
+        </Alert>
+      )}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Typography variant="subtitle2" gutterBottom>Verifica una firma</Typography>
+        <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+          Ogni export porta negli header X-CDE-Signature (firma RS256 del server) e X-CDE-SHA256 (impronta del file).
+          Incolla la firma e, se hai il file, la sua impronta: si controlla che l'export sia autentico, di questa commessa e non alterato.
+        </Typography>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "flex-start" }}>
+          <TextField size="small" label="Firma (X-CDE-Signature)" value={firma} onChange={(e) => setFirma(e.target.value)} fullWidth multiline maxRows={3} />
+          <TextField size="small" label="SHA-256 del file (facoltativo)" value={impronta} onChange={(e) => setImpronta(e.target.value)} sx={{ minWidth: 300 }} />
+          <Button variant="outlined" startIcon={<VerifiedIcon />} disabled={!firma.trim() || verificaFirma.isPending} onClick={() => verificaFirma.mutate()}>Verifica firma</Button>
+        </Stack>
+        {verificaFirma.data && (
+          verificaFirma.data.valid
+            ? <Alert severity="success" sx={{ mt: 1 }}>Firma autentica: export del {verificaFirma.data.issued_at ? new Date(verificaFirma.data.issued_at).toLocaleString("it-IT") : "—"},
+                {" "}{String(verificaFirma.data.claims?.rows ?? "?")} eventi, catena {verificaFirma.data.claims?.chain_ok ? "integra" : "NON integra"} al momento dell'export
+                {verificaFirma.data.file_matches === true ? "; il file corrisponde" : verificaFirma.data.file_matches === false ? "; il file NON corrisponde" : ""}.</Alert>
+            : <Alert severity="error" sx={{ mt: 1 }}>{verificaFirma.data.reason === "firma_non_valida" ? "Firma non valida: non è un export emesso da questo server."
+                : verificaFirma.data.reason === "altra_commessa" ? "La firma è autentica ma riguarda un'altra commessa."
+                : "Il file non corrisponde a quello firmato: è stato modificato o è un altro export."}</Alert>
+        )}
+        {verificaFirma.error && <Alert severity="error" sx={{ mt: 1 }}>{(verificaFirma.error as ApiError).message}</Alert>}
+      </Paper>
       <Paper variant="outlined" sx={{ overflowX: "auto" }}>
         {!isLoading && events.length === 0 ? (
           <Typography color="text.secondary" textAlign="center" py={5}>Nessun evento con questi filtri.</Typography>

@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query, Response
 from fpdf import FPDF
+from pydantic import BaseModel, Field
 
 from ..deps import Ctx, ctx, require_project
 from ..events import security_event
@@ -161,6 +162,10 @@ def _render_pdf(project, rows, chain, filters):
         ("Catena di hash", ("integra" if ok else f"ALTERATA dal record {chain['first_broken_seq']}")
          + f" - testa n. {chain['head_seq']}"),
         ("Hash di testa", chain["head_hash"] or "-"),
+        ("Firma", "questo PDF è firmato RS256 dal server: la firma (JWT) e lo SHA-256 del file viaggiano negli header "
+                  "X-CDE-Signature e X-CDE-SHA256 del download; per controllarli: scheda Registro attività > "
+                  "'Verifica una firma', oppure POST /projects/{id}/audit/export/verify, oppure la chiave pubblica in "
+                  "/.well-known/jwks.json"),
     ]:
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(32, 5.5, _t(label))
@@ -187,6 +192,38 @@ def export_csv(project_id: uuid.UUID, from_: datetime | None = Query(default=Non
                event_type: str | None = Query(default=None, max_length=60), obj: str | None = Query(default=None, alias="object", max_length=100),
                c: Ctx = Depends(ctx)):
     return _export(c, project_id, "audit-csv", _filters(from_, to, user_id, event_type, obj), 50000, _render_csv)
+
+
+class VerifyExportIn(BaseModel):
+    """Firma (header X-CDE-Signature) e, se si ha ancora il file, il suo SHA-256 (header X-CDE-SHA256 o calcolato)."""
+    signature: str = Field(min_length=20, max_length=8000)
+    sha256: str | None = Field(default=None, min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+
+
+@router.post("/projects/{project_id}/audit/export/verify")
+def verify_export(project_id: uuid.UUID, body: VerifyExportIn, c: Ctx = Depends(ctx)):
+    """Verifica la firma di un export (CSV o PDF) del registro di questa commessa (G49, ADR-45).
+
+    La firma è un JWT RS256 senza scadenza emesso con la chiave del server (vedi ``TokenService.sign_export``):
+    si controlla la firma, che sia un export (``typ`` export) di QUESTO progetto e, se il chiamante fornisce lo
+    SHA-256 del file che ha in mano, che il file sia quello firmato. Risposta sempre 200: ``valid`` dice l'esito,
+    ``reason`` perché no; chi può leggere il registro (ADMIN) può verificare.
+    """
+    with c.tx() as conn:
+        require_project(conn, project_id, "ADMIN", "PROJECT")
+    try:
+        claims = c.svc.tokens.decode_export(body.signature)
+    except Exception:  # firma non valida, chiave diversa, token rovinato: non è un export autentico
+        return {"valid": False, "reason": "firma_non_valida"}
+    if claims.get("sub") != str(project_id):
+        return {"valid": False, "reason": "altra_commessa", "claims": claims}
+    file_ok = None
+    if body.sha256:
+        file_ok = body.sha256.lower() == str(claims.get("sha256", "")).lower()
+        if not file_ok:
+            return {"valid": False, "reason": "file_diverso", "claims": claims, "file_matches": False}
+    return {"valid": True, "reason": None, "claims": claims, "file_matches": file_ok,
+            "issued_at": datetime.fromtimestamp(claims["iat"], UTC).isoformat()}
 
 
 @router.get("/projects/{project_id}/audit/export.pdf")

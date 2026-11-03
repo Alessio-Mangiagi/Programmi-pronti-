@@ -346,9 +346,15 @@ def suite_da_fare(c: Ctx = Depends(ctx_suite)):
                      "testo": f"{k['step_name']} · {k['project_code']} · {k['title']}" + (" · in ritardo" if k["overdue"] else ""),
                      "url": _url_web(c, "/compiti"), "tipo": "documento", "priorita": 1 if k["overdue"] else 2,
                      "data": _data_iso(k["due_at"])})
+    # Scadenze superate ed escalation (G35) sono compiti da sollecitare, non semplici avvisi:
+    # vanno in cima al "da fare" del portale con la data del compito, come chiede CONTRATTI.md §4.
+    URGENTI = {"TASK_OVERDUE", "TASK_ESCALATED", "RFI_OVERDUE"}
     for n in notifiche:
+        urgente = n["kind"] in URGENTI
         voci.append({"id": f"notifica:{n['id']}", "titolo": n["title"], "testo": (n["body"] or "")[:200],
-                     "url": _url_web(c, n["link"] or "/"), "tipo": "avviso", "priorita": 3, "data": _data_iso(n["created_at"])})
+                     "url": _url_web(c, n["link"] or "/"), "tipo": "task" if urgente else "avviso",
+                     "priorita": 1 if urgente else 3, "data": _data_iso(n["created_at"])})
+    voci.sort(key=lambda v: (v["priorita"], v["data"] or "9999"))
     return {"voci": voci[:50]}
 
 

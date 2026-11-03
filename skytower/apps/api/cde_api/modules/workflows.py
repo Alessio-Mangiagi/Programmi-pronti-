@@ -316,7 +316,11 @@ def my_tasks(status: Literal["OPEN", "DONE", "ALL"] = "OPEN", limit: int = Query
                       s.name AS step_name, s.step_index, i.status AS workflow_status, i.project_id, i.revision_id,
                       i.document_id, d.identifier, d.title, r.revision_code, r.suitability, r.state,
                       t.name AS template_name, p.code AS project_code,
-                      (k.due_at IS NOT NULL AND k.due_at < now() AND k.status = 'OPEN') AS overdue
+                      (k.due_at IS NOT NULL AND k.due_at < now() AND k.status = 'OPEN') AS overdue,
+                      -- escalation (migrazione 0036): quando e quante volte i responsabili sono stati avvisati
+                      k.escalated_at, k.escalation_count,
+                      CASE WHEN k.due_at IS NOT NULL AND k.due_at < now() AND k.status = 'OPEN'
+                           THEN floor(extract(epoch FROM now() - k.due_at) / 86400)::int END AS days_late
                FROM cde.tasks k
                JOIN cde.workflow_step_runs s ON s.id = k.step_run_id
                JOIN cde.workflow_instances i ON i.id = k.instance_id
