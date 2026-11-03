@@ -645,3 +645,106 @@ solo file: il viewer li apre, ma senza il caricamento un piano alla volta.
 - Durante la conversione e in caso di errore resta valido il derivato intero: lo stato non passa da `PENDING`
   e `derivative_done` si chiama solo a conversione riuscita. I tentativi sono contati insieme a quelli della prima
   conversione: a tre il file resta com'è.
+
+## ADR-41 — Viewer DWG senza licenza: DWG → DXF → SVG nel worker
+
+**Contesto.** Il piano (G44) prevedeva Autodesk APS (Model Derivative + APS Viewer, a consumo) per vedere i DWG
+nel browser; la licenza non è mai arrivata e i DWG restavano solo scaricabili. Il 03/11/2026 l'utente ha scelto
+la strada senza licenza.
+
+**Decisione.**
+- Stesso meccanismo dei derivati .glb degli IFC (ADR-31): tabella `cde.file_derivatives` con il nuovo `kind`
+  `SVG` (migrazione 0035, funzioni `derivative_request_svg`, `derivatives_claim_svg`, `derivative_done_svg`
+  solo per `cde_worker`), richiesto subito dopo la verifica antivirus di ogni `.dwg`/`.dxf` e ripreso dal job
+  periodico dei derivati. Nessuna soglia di dimensione: un DWG non si apre comunque nel browser.
+- **DWG → DXF** con ODA File Converter (gratuito, dell'Open Design Alliance; non ridistribuibile: si installa
+  sul server, `CDE_DWG_CONVERTER_CMD` o PATH o `C:\Program Files\ODA\...`). Senza, il derivato dei DWG fallisce
+  con il motivo scritto in `detail` e mostrato nel viewer; un **DXF** salta il passo e si vede sempre.
+- **DXF → SVG** con `ezdxf` (MIT), senza matplotlib: un `<g data-layer>` per layer (nascosto se spento, congelato
+  o `Defpoints`), blocchi/quote/leader scomposti (ciò che nel blocco sta sul layer `0` prende il layer
+  dell'INSERT, come in AutoCAD), testi come `<text>`, hatch con riempimento leggero, Y invertito, tratti
+  `non-scaling-stroke`, `viewBox` e `data-units` ($INSUNITS) nelle unità del disegno. L'elenco dei layer (nome,
+  colore, visibile, entità) finisce in `parts` e l'API lo dà al viewer con l'URL firmato dell'SVG.
+- Viewer (`DxfView`): l'SVG passa da DOMParser e si tengono solo gli elementi grafici (niente script, `on*`,
+  riferimenti esterni), pan e zoom, spunte dei layer, misura di una distanza con due clic nelle unità del
+  disegno, annotazioni della revisione in coordinate 0..1 sul riquadro del disegno (come per le immagini).
+- Limite: disegni oltre 400.000 entità non si convertono (l'SVG sarebbe ingestibile); i lineweight e i tipi di
+  linea non si riproducono; i font sono sostituiti da Arial.
+
+**Alternative scartate.** APS (costo per vista, dipendenza dal cloud Autodesk); LibreDWG (GPL, parser DWG
+meno affidabile sui file recenti); conversione nel browser (nessuna libreria DWG affidabile in JavaScript).
+
+## ADR-43 — Rilascio sul server aziendale con Docker Compose, senza AWS
+
+**Contesto.** L'infrastruttura Terraform (ADR precedenti) presuppone un account AWS che non c'è ancora;
+intanto i colleghi devono usare SkyTower dal server della suite come le altre app, con gli stessi
+vincoli di immutabilità dei documenti e del registro.
+
+**Decisione.**
+- `infra/docker/docker-compose.yml`: PostgreSQL 16, **MinIO con Object Lock** (bucket creato con il lock da
+  `minio-init`, retention di default GOVERNANCE, ancore del registro in COMPLIANCE), ClamAV per il worker,
+  API e worker dalla stessa immagine di produzione, Caddy con la SPA compilata (`Dockerfile.web`) e la
+  CSP di produzione, `pg_dump` giornaliero. Porte del registro del portale: 5195 web, 8100 API, 9100 S3.
+- `CDE_ENV=staging` e non `prod`: il codice in `prod` esige AWS KMS e vieta le chiavi su file. Le chiavi
+  (master Fernet, JWT RSA) vivono nel volume `segreti`, 0700, intestato all'utente non privilegiato del
+  container; `backup.*` le salva insieme a DB e documenti. Portare un provider KMS "file" ammesso in
+  `prod` resta un passo successivo se il server diventa l'ambiente definitivo.
+- Gli URL firmati di S3 portano l'host dell'endpoint: l'API usa lo stesso indirizzo pubblico che il
+  browser raggiunge (`S3_ENDPOINT_PUBBLICO`, risolto dentro i container verso il server con
+  `extra_hosts`). Con il Caddy della suite l'S3 diventa `s3-skytower.<dominio>` e l'API si fida della
+  CA interna (`AWS_CA_BUNDLE`); senza dominio si resta in HTTP nella LAN con cookie non `Secure`.
+- `shared/` della suite è montato in sola lettura in `/shared` (il codice lo importa da lì: `suite_link`,
+  `cosedil_sso`); il token di servizio arriva da `SUITE_TOKEN`, copiato da `shared/suite/.token`.
+- Password del primo admin e dell'account personale chieste a video dagli script e passate al container
+  solo come variabili d'ambiente del comando (`prepara_db.py`), mai su file.
+
+**Conseguenze.** Un solo nodo: niente alta disponibilità né PITR (RPO 24 h col dump, RTO ~1 h con
+`ripristina.*`); email solo nel log finché non c'è un invio SMTP; il portale vede la 5195 accesa e non
+avvia la copia di sviluppo. Il percorso AWS (ADR precedenti, runbook §1–§4) resta quello per il rilascio
+pubblico. Scenario UAT U48.
+
+## ADR-44 — Escalation dei compiti scaduti ai responsabili, ripetuta
+
+**Contesto.** Un compito di revisione scaduto (G35) produceva un solo avviso all'incaricato e una sola
+escalation a chi era indicato nel template o, in mancanza, a chi aveva avviato il workflow: spesso la stessa
+persona che aspettava l'approvazione. Dopo quel giorno nessuno veniva più avvisato, anche per settimane.
+
+**Decisione.**
+- `cde.process_deadlines(p_now, p_repeat_hours)` (migrazione 0036) manda l'escalation alla persona indicata nel
+  template (`escalation_user_id`) se c'è; altrimenti a **tutti i Project Admin** del progetto e a chi ha avviato
+  il workflow, mai all'incaricato (a lui arriva `TASK_OVERDUE`, una volta sola).
+- Finché il compito resta aperto l'escalation si **ripete** ogni `p_repeat_hours` (default 72; nel worker
+  `CDE_DEADLINE_ESCALATION_REPEAT_HOURS`, 0 = una sola volta). Il testo dice chi è in ritardo, su che step e
+  documento, da quanti giorni e il numero del sollecito; `data` porta `days_late`, `escalation`, `assignee_id`.
+- `tasks.escalated_at` e `tasks.escalation_count` dicono alla UI quando e quante volte si è sollecitato:
+  inbox compiti ("Responsabili avvisati il …, sollecito n."), colonna *Sollecito* nel cruscotto KPI, e nel
+  "da fare" del portale le notifiche `TASK_OVERDUE`/`TASK_ESCALATED`/`RFI_OVERDUE` sono compiti di priorità 1.
+- Le notifiche passano da `cde.notify`, quindi email secondo le preferenze dell'utente, come tutte le altre.
+
+**Conseguenze.** I responsabili vedono i ritardi senza aprire il cruscotto; un compito dimenticato torna a galla
+ogni tre giorni. Le RFI restano come prima (promemoria −24 h, scadenza superata una volta). Test con "time
+travel": `test_escalation_ai_project_admin_e_ripetuta`, `test_escalation_user_id_del_template_esclude_gli_admin`.
+
+**Alternative scartate.** Escalation al solo avviatore (è spesso l'autore del documento); ripetizione
+giornaliera (troppo rumore: 72 h è il ritmo delle revisioni); un job separato per i solleciti (basta il
+job `deadlines` ogni 15').
+
+## ADR-45 — Verifica della firma degli export del registro attività
+
+**Contesto.** CSV e PDF del registro (G49) escono firmati RS256 (`X-CDE-Signature`, `X-CDE-SHA256`), ma chi
+riceveva il file non aveva un modo semplice per controllare che fosse autentico e non alterato: serviva
+decodificare il JWT a mano con la chiave di `/.well-known/jwks.json`.
+
+**Decisione.**
+- `POST /projects/{id}/audit/export/verify {signature, sha256?}` (permesso ADMIN sulla commessa, come l'export)
+  verifica la firma con la chiave del server (`TokenService.decode_export`: RS256, `typ` export, `iss`),
+  che l'export sia di **quella** commessa (`sub`) e, se si manda lo SHA-256 del file in mano, che il file sia
+  quello firmato. Risposta sempre 200 con `valid` e `reason` (`firma_non_valida`, `altra_commessa`,
+  `file_diverso`), i claim (eventi, catena integra o no al momento dell'export) e la data di emissione.
+- Nella scheda *Registro attività* dopo un export compaiono firma e impronta ("Copia nella verifica") e una
+  sezione *Verifica una firma* dove incollarle; il PDF spiega nel riquadro iniziale dove stanno firma e
+  impronta e come controllarle. La firma resta nell'header (non dentro il file): un dato dentro il file non
+  può firmare il file che lo contiene.
+
+**Conseguenze.** Un export passato di mano in mano si può ricontrollare in piattaforma o fuori (JWKS pubblica).
+Test: `test_verifica_firma_export`.

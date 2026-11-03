@@ -97,3 +97,38 @@ Automatico: RDS Multi-AZ fa failover (1–2'), ECS ridistribuisce i task, NAT pe
 ### Prova di DR (semestrale, obbligatoria prima del go-live)
 Ripristino PITR su istanza temporanea + stack di prova puntato alla replica S3; misurare i tempi di ogni passo,
 eseguire la verifica del registro attività, allegare il verbale con RPO/RTO misurati al verbale UAT.
+
+## 5. Rilascio sul server aziendale senza AWS (Docker Compose)
+
+Alternativa a §1–§4 quando SkyTower gira sul server della suite (`infra/docker/`, ADR-43). Stessi
+obiettivi di immutabilità (Object Lock su MinIO, registro con hash chain e ancore WORM), RPO/RTO più
+modesti: **RPO 24 h** (dump giornaliero) se non si fa di meglio col backup aziendale, **RTO ~1 h**.
+
+| Componente | Dove stanno i dati | Protezione |
+|---|---|---|
+| PostgreSQL 16 (`db`) | volume `skytower_pgdata` | `backup` fa `pg_dump` ogni 24 h in `infra/docker/backup/` (30 gg); `backup.*` a richiesta |
+| Documenti (MinIO, `minio`) | volume `skytower_miniodata` | Object Lock (retention di default GOVERNANCE, ancore COMPLIANCE 10 anni); `backup.*` ne fa un tar |
+| Chiavi (Fernet, JWT) | volume `skytower_segreti` | `backup.*` ne fa un tar: **senza, i segreti MFA nel DB sono persi** |
+| Firme antivirus | volume `skytower_clamdb` | si riscaricano da sole |
+
+**Prima installazione**: `installa.ps1` / `installa.sh` (README § Rilascio sul server aziendale). Prerequisiti:
+Docker con il plugin compose, porte 5195/8100/9100 libere (registro del portale), 4 GB di RAM liberi
+(ClamAV ne usa ~1,5).
+
+**Aggiornamento**: `aggiorna.*` = `docker compose build --pull` → `backup.* -SoloDatabase` → `cde migrate`
+(con il codice vecchio ancora su: migrazioni compatibili, come in AWS) → `up -d api worker web` → health.
+Rollback del codice: `aggiorna.* <tag precedente>`. Rollback di una migrazione: dal backup
+(`ripristina.*`), perché le migrazioni non si annullano da sole.
+
+**Ripristino** (`ripristina.*`): ferma api/worker, ricrea `cde` dal dump, rimette documenti e chiavi
+dai tar **della stessa data**, riavvia. Prova di ripristino: una volta a trimestre su una copia
+(`docker compose -p skytower-prova` con un `.env` a parte e porte diverse), misurando il tempo.
+
+**Operazioni ricorrenti**: copiare `infra/docker/backup/` fuori dal server ogni giorno (NAS, backup
+aziendale); `docker compose logs --since 24h api worker` per gli errori; `docker compose exec db psql -U postgres cde`
+per interrogare il DB; rotazione password DB: nuovi valori nel `.env`, `docker compose --profile strumenti run --rm prepara`
+(aggiorna i ruoli), poi `up -d`.
+
+**Cosa non c'è rispetto ad AWS**: Multi-AZ e replica in DR, PITR, WAF, SES (email solo nel log finché non
+si collega un invio SMTP), KMS gestito (chiavi su volume). Per il rilascio pubblico su Internet si usa §1–§4.
+
