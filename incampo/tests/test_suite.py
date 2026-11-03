@@ -167,3 +167,129 @@ def test_modulo_su_skytower(client, commessa, altre_app):
     r2 = client.post(f"/submissions/{commessa['ok']['id']}/skytower", json={"title": "Ispezione pilastro 3"})
     assert r2.status_code == 201 and altre_app[1][3]["parametri"]["title"] == "Ispezione pilastro 3"
     assert json.loads(altre_app[1][3]["parametri"]["attributes"])["non_conformita"] is False
+
+
+# --------------------------------------------------------------------------- login automatico dal portale
+
+@pytest.fixture
+def portale_finto(monkeypatch):
+    """Il portale risponde a /api/verify con l'utente di `risposta` (dict), o con l'errore impostato."""
+    import urllib.error
+    import urllib.request
+    stato = {"risposta": {"ok": True, "username": "m.rossi", "nome": "Mario Rossi", "ruolo": "utente", "admin": False,
+                          "email": "mario.rossi@cosedilspa.com"}, "http": None, "giu": False, "chiamate": []}
+
+    class _Resp:
+        def __init__(self, dati):
+            self._d = json.dumps(dati).encode()
+
+        def read(self):
+            return self._d
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def urlopen(req, timeout=0):
+        stato["chiamate"].append((req.full_url, req.headers.get("Cookie")))
+        if stato["giu"]:
+            raise urllib.error.URLError("spento")
+        if stato["http"]:
+            raise urllib.error.HTTPError(req.full_url, stato["http"], "no", {}, None)
+        return _Resp(stato["risposta"])
+
+    monkeypatch.setattr(suite_router, "SSO_ATTIVO", True)
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    return stato
+
+
+def test_login_portale_crea_utente_e_entra(client, portale_finto):
+    r = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=abc.def"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["user"]["email"] == "mario.rossi@cosedilspa.com" and d["user"]["role"] == "manager" and d["user"]["name"] == "Mario Rossi"
+    assert portale_finto["chiamate"][0][0].endswith("/api/verify?app=incampo") and portale_finto["chiamate"][0][1] == "sid=abc.def"
+    # il token funziona e il secondo accesso ritrova lo stesso utente (nessun doppione)
+    me = client.get("/auth/me", headers={"Authorization": "Bearer " + d["access_token"]})
+    assert me.status_code == 200 and me.json()["id"] == d["user"]["id"]
+    r2 = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=abc.def"})
+    assert r2.json()["user"]["id"] == d["user"]["id"]
+    with client.session_factory() as s:
+        assert s.query(suite_router.models.User).filter_by(email="mario.rossi@cosedilspa.com").count() == 1
+
+
+def test_login_portale_admin_e_username_senza_email(client, portale_finto, monkeypatch):
+    monkeypatch.setattr(suite_router, "EMAIL_DOMINIO", "cosedil.it")
+    portale_finto["risposta"] = {"ok": True, "username": "g.verdi", "nome": "Giulia Verdi", "ruolo": "admin", "admin": True}
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"}).json()
+    assert d["user"]["email"] == "g.verdi@cosedil.it" and d["user"]["role"] == "admin"
+    # utente già esistente con la parte prima della @ uguale allo username: lo ritrova, non ne crea un altro
+    with client.session_factory() as s:
+        from tests.conftest import make_user
+        make_user(s, "l.bianchi@altrodominio.it", "field", name="Luca")
+    portale_finto["risposta"] = {"ok": True, "username": "l.bianchi", "nome": "Luca Bianchi", "ruolo": "utente"}
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=y"}).json()
+    assert d["user"]["email"] == "l.bianchi@altrodominio.it" and d["user"]["role"] == "field"
+
+
+def test_login_portale_rifiuti(client, portale_finto, monkeypatch):
+    assert client.post("/auth/portale", headers={"Authorization": ""}).status_code == 401          # niente cookie
+    portale_finto["http"] = 403
+    r = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"})
+    assert r.status_code == 401 and "abilitato" in r.json()["detail"]
+    portale_finto["http"] = 401
+    assert client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"}).status_code == 401
+    portale_finto["http"] = None
+    portale_finto["giu"] = True
+    r = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"})
+    assert r.status_code == 401 and "raggiungibile" in r.json()["detail"]
+    portale_finto["giu"] = False
+    monkeypatch.setattr(suite_router, "SSO_ATTIVO", False)
+    r = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"})
+    assert r.status_code == 401 and "COSEDIL_SSO" in r.json()["detail"]
+    # utente disattivato: niente accesso
+    monkeypatch.setattr(suite_router, "SSO_ATTIVO", True)
+    with client.session_factory() as s:
+        u = s.query(suite_router.models.User).filter_by(email="admin@test.local").one()
+        u.is_active = False
+        s.commit()
+    portale_finto["risposta"] = {"ok": True, "username": "admin", "nome": "Admin", "ruolo": "utente", "email": "admin@test.local"}
+    assert client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"}).status_code == 401
+
+
+# --------------------------------------------------------------------------- registro commesse
+
+def test_commesse_registro(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(suite_router.suite_link, "FILE_COMMESSE", tmp_path / "commesse.json")
+    assert client.get("/commesse/registro").json() == []
+    suite_router.suite_link.salva_commesse([{"code": "101-003", "nome": "Porto di Augusta"}, {"code": "C-1", "stato": "chiusa"}])
+    lista = client.get("/commesse/registro").json()
+    assert [c["code"] for c in lista] == ["101-003", "C-1"] and lista[0]["nome"] == "Porto di Augusta"
+    assert [c["code"] for c in client.get("/commesse/registro?solo_attive=true").json()] == ["101-003"]
+    assert client.get("/commesse/registro", headers={"Authorization": ""}).status_code == 401
+
+
+# --------------------------------------------------------------------------- da fare
+
+def test_suite_da_fare(client, commessa, users):
+    """Task assegnati all'utente (scaduti prima), NC aperte per i manager, niente per chi non c'è."""
+    pid = commessa["project_id"]
+    field = users["field"]
+    client.post("/tasks", json={"project_id": pid, "title": "Transenne da sistemare", "assigned_to": field["id"], "due_date": "2030-01-01T00:00:00"})
+    client.post("/tasks", json={"project_id": pid, "title": "Scaduto", "assigned_to": field["id"], "due_date": "2020-01-01T00:00:00"})
+    client.post("/tasks", json={"project_id": pid, "title": "Di un altro", "assigned_to": users["manager"]["id"]})
+    r = client.get("/suite/da-fare", headers={"X-Suite-Token": "token-di-prova", "X-Suite-Email": field["email"]})
+    assert r.status_code == 200, r.text
+    voci = r.json()["voci"]
+    assert [v["titolo"] for v in voci] == ["Scaduto", "Transenne da sistemare"]
+    assert voci[0]["priorita"] == 1 and "scaduto" in voci[0]["testo"] and voci[0]["tipo"] == "task"
+    assert voci[1]["data"] == "2030-01-01" and voci[1]["url"].endswith("/projects/" + pid + "/tasks") and "Cantiere A" in voci[1]["testo"]
+    # manager: il suo task + la NC aperta del cantiere
+    r = client.get("/suite/da-fare", headers={"X-Suite-Token": "token-di-prova", "X-Suite-Utente": "manager"})
+    tipi = [(v["tipo"], v["titolo"]) for v in r.json()["voci"]]
+    assert ("task", "Di un altro") in tipi and any(t == "nc" and "Non conforme" in titolo for t, titolo in tipi)
+    # sconosciuto: lista vuota, non errore; senza token 403
+    assert client.get("/suite/da-fare", headers={"X-Suite-Token": "token-di-prova", "X-Suite-Utente": "nessuno"}).json() == {"voci": []}
+    assert client.get("/suite/da-fare", headers={"X-Suite-Token": "no"}).status_code == 403

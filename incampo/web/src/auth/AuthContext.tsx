@@ -5,9 +5,12 @@ import { getToken, setToken, setUnauthorizedHandler } from './token'
 import { useToast } from '../components/useToast'
 import { AuthContext } from './useAuth'
 
+// "><(((º> sabusabu <º)))><"
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(!!getToken())
+  // All'avvio c'è sempre qualcosa da verificare: il token salvato, oppure la
+  // sessione del Portale Suite Cosedil (login automatico, senza altra password).
+  const [loading, setLoading] = useState(true)
   const toast = useToast()
 
   const logout = useCallback(() => {
@@ -23,14 +26,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [logout, toast])
 
-  // Al primo caricamento, se c'è un token salvato, verifica che sia ancora valido.
+  // Al primo caricamento: se c'è un token salvato verifica che sia ancora valido;
+  // altrimenti prova una volta a entrare con il cookie del portale (POST /auth/portale,
+  // credentials: il cookie `sid` arriva perché stesso host o stesso dominio della suite).
+  // 401 = nessuna sessione del portale: si mostra il login di sempre.
   useEffect(() => {
-    if (!getToken()) return
-    api.GET('/auth/me').then(({ data }) => {
-      if (data) setUser(data)
-      else logout()
-      setLoading(false)
-    })
+    let vivo = true
+    if (getToken()) {
+      api.GET('/auth/me').then(({ data }) => {
+        if (!vivo) return
+        if (data) setUser(data)
+        else logout()
+        setLoading(false)
+      })
+    } else {
+      api
+        .POST('/auth/portale', { credentials: 'include' })
+        .then(({ data }) => {
+          if (!vivo) return
+          if (data) {
+            setToken(data.access_token)
+            setUser(data.user)
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (vivo) setLoading(false)
+        })
+    }
+    return () => {
+      vivo = false
+    }
   }, [logout])
 
   const login = useCallback(async (email: string, password: string) => {

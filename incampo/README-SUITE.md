@@ -96,6 +96,34 @@ aperto dal Magazzino è attribuito all'utente InCampo con la stessa email dell'u
 del portale; se non c'è, resta senza autore e lo dice nella descrizione. Dettagli e
 variabili: `shared/suite/README.md`.
 
+### Login automatico dal portale
+
+Chi è già entrato nel Portale Suite Cosedil entra in InCampo **senza altra
+password**: il web, se non ha un token, chiama una volta `POST /api/auth/portale`,
+che legge il cookie `sid` del portale (stesso host, o stesso `SUITE_DOMINIO`) e lo
+verifica con `/api/verify?app=incampo`. L'utente InCampo è quello con la stessa
+email del portale (o lo username prima della `@`); se manca viene **creato** attivo,
+senza password usabile: admin del portale → `admin`, altrimenti
+`INCAMPO_RUOLO_PORTALE` (default `manager`). Senza email dal portale vale
+`<username>@<SUITE_EMAIL_DOMINIO>` (default `cosedilspa.com`). Con il portale
+spento, non loggati o `COSEDIL_SSO=off` risponde 401 e si vede il login di sempre.
+Variabili: `COSEDIL_PORTAL` (default `http://localhost:8080`), `COSEDIL_SSO`,
+`INCAMPO_RUOLO_PORTALE`, `SUITE_EMAIL_DOMINIO`.
+
+### Registro unico delle commesse
+
+`GET /api/commesse/registro` dà il registro della suite (`shared/suite/commesse.json`,
+curato dal portale): nel modulo *Nuova commessa* il codice si sceglie da un menu a
+tendina (solo attive; un codice già salvato resta valido), così combacia con SkyTower
+e Magazzino. Registro vuoto = testo libero come prima.
+
+### "Da fare" per la home del portale
+
+`GET /api/suite/da-fare` (token di servizio, `X-Suite-Email`/`X-Suite-Utente`) elenca
+per l'utente del portale i task assegnati a lui ancora aperti (scaduti prima) e, se è
+manager o admin, le non conformità aperte dei suoi cantieri, con link alla pagina.
+Formato in `shared/suite/CONTRATTI.md` § 4.
+
 ## Aggiornare dalla repository originale
 
 ```bat

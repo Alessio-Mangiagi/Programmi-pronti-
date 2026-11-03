@@ -14,7 +14,11 @@ Rotte in due direzioni, chiave comune = codice commessa (``Commessa.code``):
 """
 import json
 import os
+import secrets
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional
@@ -36,6 +40,11 @@ import suite_link  # noqa: E402
 
 router = APIRouter()
 APERTI = (TaskStatus.open, TaskStatus.assigned)
+
+# Portale della suite: stesso default di shared/sso/cosedil_sso.py.
+PORTALE = (os.environ.get("COSEDIL_PORTAL") or "http://localhost:8080").rstrip("/")
+SSO_ATTIVO = (os.environ.get("COSEDIL_SSO") or "").strip().lower() != "off"
+EMAIL_DOMINIO = (os.environ.get("SUITE_EMAIL_DOMINIO") or "cosedilspa.com").strip().lstrip("@")
 
 
 # --------------------------------------------------------------------------- utilità
@@ -70,11 +79,98 @@ def richiede_token(x_suite_token: Optional[str] = Header(default=None)):
         raise HTTPException(403, "Token di servizio della suite non valido")
 
 
+# --------------------------------------------------------------------------- login automatico dal portale
+
+def verifica_portale(cookie: str) -> dict:
+    """Chiede al portale chi è l'utente del cookie ``sid`` (``/api/verify?app=incampo``).
+
+    Come ``cosedil_sso.verifica_sessione`` ma tiene anche l'``email`` che il portale manda
+    (quella impostata dall'admin, altrimenti username@SUITE_EMAIL_DOMINIO). Ritorna sempre un
+    dict: ``ok`` False con ``errore`` spiegato (portale spento, non loggato, app non abilitata).
+    """
+    esito = {"ok": False, "errore": "Non sei collegato al portale", "username": None, "nome": None,
+             "ruolo": None, "admin": False, "email": None}
+    if not SSO_ATTIVO:
+        esito["errore"] = "Accesso dal portale disattivato (COSEDIL_SSO=off)"
+        return esito
+    if not cookie or "sid=" not in cookie:
+        return esito
+    req = urllib.request.Request(PORTALE + "/api/verify?" + urllib.parse.urlencode({"app": "incampo"}),
+                                 headers={"Cookie": cookie, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            dati = json.loads(resp.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        esito["errore"] = "InCampo non è abilitato per il tuo utente del portale" if e.code == 403 else "Non sei collegato al portale"
+        return esito
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        esito["errore"] = "Portale non raggiungibile"
+        return esito
+    username = str(dati.get("username") or "").strip().lower()
+    if not dati.get("ok") or not username:
+        return esito
+    email = str(dati.get("email") or "").strip().lower() or f"{username}@{EMAIL_DOMINIO}"
+    esito.update(ok=True, errore="", username=username, nome=(dati.get("nome") or username).strip(),
+                 ruolo=dati.get("ruolo"), admin=bool(dati.get("admin")), email=email)
+    return esito
+
+
+def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
+    """L'utente InCampo dell'utente del portale (email, poi parte prima della @ = username);
+    se non c'è lo crea attivo, senza password usabile. Ritorna (utente, creato)."""
+    email = dati["email"]
+    username = dati["username"]
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        for u in db.query(models.User).all():
+            if (u.email or "").lower().split("@")[0] == username:
+                user = u
+                break
+    if user is not None:
+        return user, False
+    if dati.get("admin") or dati.get("ruolo") == "admin":
+        ruolo = UserRole.admin
+    else:
+        try:
+            ruolo = UserRole((os.environ.get("INCAMPO_RUOLO_PORTALE") or "manager").strip().lower())
+        except ValueError:
+            ruolo = UserRole.manager
+    user = models.User(email=email, name=dati.get("nome") or username, role=ruolo,
+                       password_hash=auth.hash_password(secrets.token_urlsafe(32)))
+    db.add(user)
+    db.flush()
+    return user, True
+
+
+@router.post("/auth/portale", response_model=schemas.TokenResponse, responses={401: {"description": "Non collegato al portale"}})
+def login_dal_portale(request: Request, db: Session = Depends(get_db)):
+    """Entra con la sessione del Portale Suite Cosedil (cookie ``sid``), senza altra password.
+
+    L'utente InCampo è quello con la stessa email del portale (o lo username prima della @);
+    se manca viene creato: admin del portale → admin, altrimenti ``INCAMPO_RUOLO_PORTALE``
+    (default manager). 401 se il portale non risponde, non si è loggati o lo SSO è spento.
+    """
+    dati = verifica_portale(request.headers.get("cookie") or "")
+    if not dati["ok"]:
+        raise HTTPException(401, dati["errore"])
+    user, creato = _utente_dal_portale(db, dati)
+    if not user.is_active:
+        raise HTTPException(401, "Utente InCampo disattivato")
+    if creato:
+        audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
+                     details={"email": user.email, "role": user.role.value, "origine": "portale", "utente_portale": dati["username"]})
+    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request,
+                 details={"origine": "portale", "utente_portale": dati["username"]})
+    db.commit()
+    db.refresh(user)
+    return schemas.TokenResponse(access_token=auth.create_access_token(user), user=user)
+
+
 def _chiama(app_id: str, metodo: str, percorso: str, user: models.User, **kw):
     try:
         return suite_link.chiama(app_id, metodo, percorso, utente=user.email, nome=user.name, **kw)
     except suite_link.SuiteError as e:
-        raise HTTPException(e.stato if e.stato in (400, 403, 404, 409, 422, 503) else 502, e.messaggio)
+        raise HTTPException(e.stato if e.stato in (400, 403, 404, 422, 409, 503) else 502, e.messaggio)
 
 
 def _task_aperti(db: Session, project_ids: list[str]):
@@ -230,6 +326,69 @@ def suite_crea_task(codice: str, payload: TaskSuiteIn, request: Request, db: Ses
     db.refresh(task)
     return {"id": task.id, "title": task.title, "status": task.status.value, "project_id": project.id,
             "project_name": project.name, "url": f"{web_url()}/projects/{project.id}/tasks"}
+
+
+def _utente_suite_completo(db: Session, email: Optional[str], utente: Optional[str]) -> Optional[models.User]:
+    """Email del portale prima (X-Suite-Email), poi username (X-Suite-Utente) come in _utente_suite."""
+    if email:
+        u = db.query(models.User).filter(models.User.email == email.strip().lower(), models.User.is_active.is_(True)).first()
+        if u is not None:
+            return u
+    return _utente_suite(db, utente)
+
+
+@router.get("/suite/da-fare", dependencies=[Depends(richiede_token)], include_in_schema=False)
+def suite_da_fare(admin: int = 0, db: Session = Depends(get_db),
+                  x_suite_utente: Optional[str] = Header(default=None), x_suite_email: Optional[str] = Header(default=None)):
+    """Cosa aspetta l'utente del portale qui: i task assegnati a lui ancora aperti (scaduti prima) e,
+    se è manager/admin, le non conformità aperte dei suoi cantieri. Per la home del portale."""
+    user = _utente_suite_completo(db, x_suite_email, x_suite_utente)
+    if user is None:
+        return {"voci": []}
+    oggi = utcnow()
+    nomi = {}
+
+    def nome_cantiere(pid):
+        if pid not in nomi:
+            p = db.get(models.Project, pid) if pid else None
+            nomi[pid] = p.name if p else ""
+        return nomi[pid]
+
+    def project_of_task(t):
+        return t.pin.plan.project_id if t.pin is not None else t.project_id
+
+    voci = []
+    miei = (db.query(models.Task).filter(models.Task.assigned_to == user.id, models.Task.deleted_at.is_(None),
+                                        models.Task.status.in_(APERTI))
+            .options(selectinload(models.Task.pin).selectinload(models.Pin.plan)).all())
+    for t in miei:
+        pid = project_of_task(t)
+        scaduto = bool(t.due_date and t.due_date < oggi)
+        pezzi = [nome_cantiere(pid)]
+        if t.pin is not None and t.pin.label:
+            pezzi.append(t.pin.label)
+        if t.due_date:
+            pezzi.append(("scaduto il " if scaduto else "scade il ") + t.due_date.strftime("%d/%m"))
+        voci.append({"id": f"task:{t.id}", "titolo": t.title, "testo": " · ".join(p for p in pezzi if p),
+                     "url": _pin_url(t.pin, pid), "tipo": "task", "priorita": 1 if scaduto else 2,
+                     "data": t.due_date.date().isoformat() if t.due_date else None,
+                     "_ordine": (0 if scaduto else 1, t.due_date or oggi)})
+    if auth.is_manager(user):
+        ids = auth.accessible_project_ids(db, user)
+        if ids is None:   # admin: tutti i cantieri
+            ids = [r[0] for r in db.query(models.Project.id).all()]
+        for s, tpl, nc in _nc_aperte(db, list(ids)):
+            pid = auth.project_of_submission(s)
+            voci.append({"id": f"nc:{s.id}", "titolo": f"NC: {nc['label']} = {nc['value']}",
+                         "testo": " · ".join(p for p in (nome_cantiere(pid), tpl.name if tpl else None,
+                                                        s.created_at.strftime("%d/%m") if s.created_at else None) if p),
+                         "url": _pin_url(s.pin, pid), "tipo": "nc", "priorita": 2,
+                         "data": s.created_at.date().isoformat() if s.created_at else None,
+                         "_ordine": (1, s.created_at or oggi)})
+    voci.sort(key=lambda v: v["_ordine"])
+    for v in voci:
+        v.pop("_ordine", None)
+    return {"voci": voci[:50]}
 
 
 # --------------------------------------------------------------------------- verso il Magazzino

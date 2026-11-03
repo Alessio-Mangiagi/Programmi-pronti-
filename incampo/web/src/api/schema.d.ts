@@ -535,6 +535,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/commesse/registro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Commesse Registro
+         * @description Il registro unico delle commesse della suite, curato dal portale: i codici da scegliere quando si
+         *     crea una commessa qui, cosi' combaciano con SkyTower e Magazzino. Vuoto se il registro non c'e'.
+         *     Sta prima di /commesse/{commessa_id}, che altrimenti lo catturerebbe.
+         */
+        get: operations["commesse_registro_commesse_registro_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/commesse/{commessa_id}": {
         parameters: {
             query?: never;
@@ -1302,6 +1324,30 @@ export interface paths {
         patch: operations["update_support_message_support_messages__message_id__patch"];
         trace?: never;
     };
+    "/auth/portale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Dal Portale
+         * @description Entra con la sessione del Portale Suite Cosedil (cookie ``sid``), senza altra password.
+         *
+         *     L'utente InCampo è quello con la stessa email del portale (o lo username prima della @);
+         *     se manca viene creato: admin del portale → admin, altrimenti ``INCAMPO_RUOLO_PORTALE``
+         *     (default manager). 401 se il portale non risponde, non si è loggati o lo SSO è spento.
+         */
+        post: operations["login_dal_portale_auth_portale_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/magazzino": {
         parameters: {
             query?: never;
@@ -1612,6 +1658,39 @@ export interface components {
             multi?: boolean | null;
             /** Position */
             position?: number | null;
+        };
+        /**
+         * CommessaRegistroOut
+         * @description Una riga del registro unico delle commesse della suite (shared/suite/commesse.json).
+         */
+        CommessaRegistroOut: {
+            /** Code */
+            code: string;
+            /**
+             * Nome
+             * @default
+             */
+            nome: string;
+            /**
+             * Stato
+             * @default attiva
+             */
+            stato: string;
+            /**
+             * Cliente
+             * @default
+             */
+            cliente: string;
+            /**
+             * Indirizzo
+             * @default
+             */
+            indirizzo: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** CommessaUpdate */
         CommessaUpdate: {
@@ -4119,6 +4198,37 @@ export interface operations {
             };
         };
     };
+    commesse_registro_commesse_registro_get: {
+        parameters: {
+            query?: {
+                solo_attive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommessaRegistroOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_commessa_commesse__commessa_id__get: {
         parameters: {
             query?: never;
@@ -5685,6 +5795,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    login_dal_portale_auth_portale_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Non collegato al portale */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

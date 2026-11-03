@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+// "><(((º> sabusabu <º)))><"
+import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import { useToast } from '../components/useToast'
 import { type Commessa, type CommessaParam } from './CommesseContext'
@@ -36,6 +37,28 @@ export default function CommessaForm({ commessa, onDone }: { commessa?: Commessa
   const [values, setValues] = useState<Record<string, string[]>>(commessa?.params ?? {})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Registro unico delle commesse della suite (lo cura il portale): se c'è, il codice
+  // si sceglie da lì, così combacia con SkyTower e Magazzino. Vuoto = testo libero.
+  const [registro, setRegistro] = useState<{ code: string; nome: string; stato: string; cliente: string }[]>([])
+
+  useEffect(() => {
+    let vivo = true
+    api.GET('/commesse/registro').then(({ data }) => {
+      if (vivo && data) setRegistro(data)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  function scegliDalRegistro(codice: string) {
+    setCode(codice)
+    const voce = registro.find((r) => r.code === codice)
+    if (voce && !commessa) {
+      if (voce.nome && !name) setName(voce.nome)
+      if (voce.cliente && !client) setClient(voce.cliente)
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -66,7 +89,23 @@ export default function CommessaForm({ commessa, onDone }: { commessa?: Commessa
       <div className="form-grid">
         <div className="field">
           <label htmlFor="cf-code">Codice commessa</label>
-          <input id="cf-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="C-2026-014" required autoFocus />
+          {registro.length > 0 ? (
+            <select id="cf-code" value={code} onChange={(e) => scegliDalRegistro(e.target.value)} required autoFocus>
+              <option value="">— scegli dal registro della suite —</option>
+              {code && !registro.some((r) => r.code === code) && <option value={code}>{code} (non nel registro)</option>}
+              {registro
+                .filter((r) => r.stato === 'attiva' || r.code === code)
+                .map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.code}
+                    {r.nome ? ` · ${r.nome}` : ''}
+                    {r.stato !== 'attiva' ? ` (${r.stato})` : ''}
+                  </option>
+                ))}
+            </select>
+          ) : (
+            <input id="cf-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="C-2026-014" required autoFocus />
+          )}
         </div>
         <div className="field">
           <label htmlFor="cf-client">Committente</label>

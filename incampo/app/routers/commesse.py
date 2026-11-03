@@ -2,6 +2,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -182,6 +183,27 @@ def create_commessa(payload: schemas.CommessaCreate, request: Request, db: Sessi
     db.commit()
     db.refresh(c)
     return _commessa_out(c, auth.accessible_project_ids(db, user))
+
+
+# --------------------------------------------------------------------------- registro della suite
+
+class CommessaRegistroOut(BaseModel):
+    """Una riga del registro unico delle commesse della suite (shared/suite/commesse.json)."""
+    code: str
+    nome: str = ""
+    stato: str = "attiva"
+    cliente: str = ""
+    indirizzo: str = ""
+    note: str = ""
+
+
+@router.get("/commesse/registro", response_model=list[CommessaRegistroOut])
+def commesse_registro(solo_attive: bool = False, _: models.User = Depends(current_user)):
+    """Il registro unico delle commesse della suite, curato dal portale: i codici da scegliere quando si
+    crea una commessa qui, cosi' combaciano con SkyTower e Magazzino. Vuoto se il registro non c'e'.
+    Sta prima di /commesse/{commessa_id}, che altrimenti lo catturerebbe."""
+    from .suite import suite_link
+    return suite_link.commesse(solo_attive=solo_attive)
 
 
 @router.get("/commesse/{commessa_id}", response_model=schemas.CommessaOut)

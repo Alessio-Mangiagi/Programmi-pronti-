@@ -13,7 +13,8 @@ const authMiddleware: Middleware = {
   },
   onResponse({ response }) {
     // Token scaduto o revocato: torna al login invece di mostrare errori sparsi.
-    if (response.status === 401 && !response.url.endsWith('/auth/login')) onUnauthorized()
+    // (/auth/portale risponde 401 quando non c'è una sessione del portale: non è una scadenza)
+    if (response.status === 401 && !response.url.endsWith('/auth/login') && !response.url.endsWith('/auth/portale')) onUnauthorized()
     return response
   },
 }
