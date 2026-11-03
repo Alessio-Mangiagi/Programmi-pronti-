@@ -44,6 +44,7 @@ Verrà richiesto di **cambiare la password** al primo accesso.
 - `TLS_CERT` / `TLS_KEY` — percorsi di certificato e chiave: se ci sono entrambi il portale parla **HTTPS** e marca il cookie di sessione `Secure`. Se sono indicati ma illeggibili il portale **non parte** (meglio fermo che in chiaro per sbaglio).
 - `COOKIE_SECURE=1` — cookie `Secure` anche senza TLS_CERT, per quando è il reverse proxy a fare l'HTTPS.
 - `SUITE_AVVISI_DIR` — cartella di arrivo degli avvisi dei programmi (default `DATA_DIR/avvisi-in`). Il portale la passa alle app che avvia.
+- `SUITE_EMAIL_DOMINIO` — dominio con cui si deduce l'email di chi non ne ha una impostata (`<username>@<dominio>`, default `cosedilspa.com`): è l'identità con cui InCampo e SkyTower riconoscono o creano l'utente (vedi *Suite: un utente, una commessa, una lista di cose da fare*).
 - `ADMIN_EMAIL` — casella dell'amministratore (in alternativa `data/contatti.json` con `{"emailAdmin": "..."}`, riletto senza riavvio). L'assistente ci manda chi ha problemi di credenziali o password dimenticata e chi fa domande che non sa o troppo articolate; compare anche nel login ("Password dimenticata?") e nella home. Senza indirizzo si dice di rivolgersi a un amministratore.
 
 ## Test
@@ -97,6 +98,31 @@ Chi **non ha il campo** (utenti storici, import da Excel) segue il **default**: 
 Per chi non ha un programma, quel programma **non esiste**: sparisce dalle card e dallo stato, `avvia`/`apri` rispondono `404`, e l'assistente non ne parla. Chi ne conosce l'indirizzo e lo digita a mano non entra lo stesso: `GET /api/verify?app=<id>` risponde `403` e il gate SSO dell'app chiude la porta con "chiedi l'abilitazione a un amministratore". Nascondere la card senza chiudere il gate sarebbe stato un cartello, non una serratura.
 
 Ogni modifica finisce nel registro accessi con azione `abilita`: chi ha cambiato cosa, a chi, e quando.
+
+## Suite: un utente, una commessa, una lista di cose da fare
+
+Tre cose che il portale fa per far lavorare le app come una suite sola
+(contratto in `shared/suite/CONTRATTI.md`):
+
+- **Email dell'utente.** `/api/verify` e `/api/me` danno anche `email`: quella
+  impostata dall'admin nella pagina Utenti (colonna *Email*, `PUT /api/utenti/<u>/email`)
+  o, in mancanza, `<username>@SUITE_EMAIL_DOMINIO`. InCampo e SkyTower la usano
+  per riconoscere l'utente del portale e, se non esiste, crearlo al volo
+  (`POST /auth/portale` delle due app): chi entra nel portale entra anche lì,
+  senza un secondo login.
+- **Registro delle commesse.** Pagina *Commesse* (admin, `/commesse`): un elenco
+  solo per tutta la suite, salvato in `shared/suite/commesse.json` (fuori da git).
+  *Importa dalle app* legge le commesse già presenti in InCampo, SkyTower e
+  Magazzino e aggiunge quelle che mancano (quello scritto a mano vince). Le app
+  propongono questi codici nei menu a tendina invece del testo libero: è il
+  codice con cui si riconoscono la stessa commessa. API: `GET /api/commesse`
+  (tutti), `PUT /api/commesse` e `POST /api/commesse/importa` (admin).
+- **Da fare oggi.** In cima alla home: task InCampo assegnati, documenti SkyTower
+  da vedere, scadenze del Scadenzario, mezzi fermi del Magazzino, raggruppati per
+  app, clic → la pagina giusta. `GET /api/da-fare` chiede a ogni app
+  (`/suite/da-fare`, token di servizio di `shared/suite`) in parallelo, 3 s di
+  attesa, cache di 60 s per utente (`?aggiorna=1` la svuota); un'app spenta
+  compare come "non raggiungibile", mai come errore.
 
 ## Assistente della suite
 

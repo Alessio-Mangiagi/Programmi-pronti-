@@ -91,3 +91,8 @@
 @media (max-width: 560px) {
   .b { min-height: 44px; }
 }
+
+/* Colonna email: valore (dedotto se non impostato) e tasto piccolo per cambiarla. */
+.u-tab td.mail { font-size: 13px; }
+.u-tab td.mail .dedotta { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; background: #f2f3f5; color: var(--grey, #5b6573); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+.u-tab td.mail .b.mini { min-height: 26px; padding: 0 8px; font-size: 10px; margin-left: 8px; }

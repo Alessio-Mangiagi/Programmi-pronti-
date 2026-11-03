@@ -1,0 +1,24 @@
+/* "><(((º> sabusabu <º)))><" */
+/* Pagina Commesse (admin): tabella modificabile sul posto. Richiede
+   plancia.css e utenti.css (barra, tabella, pulsanti). */
+.c-tab td { padding: 4px 6px; vertical-align: middle; }
+.c-tab input, .c-tab select { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--linea, #dfe4ea); border-radius: 4px; padding: 7px 8px; font: inherit; font-size: 13.5px; background: #fff; color: inherit; }
+.c-tab input:focus, .c-tab select:focus { outline: 2px solid var(--cosedil-blue); outline-offset: -1px; border-color: var(--cosedil-blue); }
+.c-tab input.codice { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; text-transform: uppercase; }
+.c-tab input[aria-invalid="true"] { border-color: #c0392b; background: #fff5f3; }
+.c-tab tr.nuova td { background: #f2f8f3; }
+.c-tab tr.chiusa input, .c-tab tr.chiusa select { color: #6b7280; }
+.c-tab th:nth-child(1) { width: 130px; }
+.c-tab th:nth-child(3) { width: 110px; }
+.c-tab th:nth-child(6) { width: 16%; }
+.c-esito { margin: 10px 14px 0; padding: 9px 12px; border-radius: 6px; background: #eef4fa; color: var(--cosedil-blue); font-size: 13.5px; }
+.c-esito.err { background: #fdecea; color: #a93226; }
+.c-esito[hidden] { display: none; }
+.c-nota { padding: 10px 14px 14px; margin: 0; color: var(--grigio, #5b6573); font-size: 13px; }
+.c-nota code { font-family: var(--font-mono, ui-monospace, monospace); background: #f2f3f5; padding: 1px 5px; border-radius: 3px; }
+@media (max-width: 900px) {
+  .c-tab thead { display: none; }
+  .c-tab tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 6px; border-bottom: 1px solid var(--linea, #dfe4ea); }
+  .c-tab td { display: block; padding: 0; }
+  .c-tab td.az { grid-column: 1 / -1; text-align: right; }
+}

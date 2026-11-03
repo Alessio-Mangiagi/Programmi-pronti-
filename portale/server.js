@@ -16,6 +16,9 @@ const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const { spawn, execFile, execFileSync } = require('child_process');
+// Dialogo con le altre app della suite (token di servizio, registro commesse):
+// stesso modulo che usano Lettore DDT, Analista Dati e Ponte Trimble.
+const suite = require(path.join(__dirname, '..', 'shared', 'suite', 'suite_link.js'));
 
 const PORT = Number(process.env.PORT) || 8080;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -929,6 +932,135 @@ function vistaAvvisi(lista, nomeApp) {
 function hashPw(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
+// Email dell'utente per le app con utenti propri (InCampo, SkyTower): quella
+// impostata dall'admin, altrimenti <username>@<SUITE_EMAIL_DOMINIO>. Vale per
+// cercare/creare l'utente di là, non per mandare posta.
+const SUITE_EMAIL_DOMINIO = String(process.env.SUITE_EMAIL_DOMINIO || 'cosedilspa.com').trim().toLowerCase();
+function emailUtente(u) {
+  if (!u || !u.username) return '';
+  const e = String(u.email || '').trim().toLowerCase();
+  return e || `${u.username}@${SUITE_EMAIL_DOMINIO}`;
+}
+const emailValida = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || ''));
+
+// ---------------------------------------------------------------------------
+// Registro unico delle commesse (shared/suite/commesse.json): lo scrive solo il
+// portale, le app lo leggono per i menu a tendina del codice commessa.
+// ---------------------------------------------------------------------------
+function registroCommesse() {
+  let meta = {};
+  try { meta = JSON.parse(fs.readFileSync(suite.FILE_COMMESSE, 'utf8')) || {}; } catch { meta = {}; }
+  return { commesse: suite.commesse(), aggiornato: meta.aggiornato || '', fonte: meta.fonte || '' };
+}
+// Una commessa come la descrive un'altra app -> riga del registro. Ogni app ha
+// i suoi nomi di campo: InCampo {code,name,cantieri[{address}]}, SkyTower
+// {commessa|code, name|title}, Magazzino {commessa, ubicazioni[{nome,indirizzo}]}.
+function commessaDaApp(appId, x) {
+  if (!x || typeof x !== 'object') return null;
+  const code = String(x.commessa || x.code || x.codice || '').trim();
+  if (!code) return null;
+  const figli = Array.isArray(x.cantieri) ? x.cantieri : Array.isArray(x.ubicazioni) ? x.ubicazioni : Array.isArray(x.projects) ? x.projects : [];
+  const primo = figli.find((f) => f && typeof f === 'object') || null;
+  const nome = String(x.name || x.nome || x.title || x.descrizione || (primo && (primo.name || primo.nome)) || '').trim();
+  let indirizzo = String(x.address || x.indirizzo || '').trim();
+  if (!indirizzo) {
+    const c = figli.find((f) => f && (f.address || f.indirizzo));
+    if (c) indirizzo = String(c.address || c.indirizzo).trim();
+  }
+  return { code, nome, indirizzo, cliente: String(x.client || x.cliente || '').trim(), note: `da ${appId}` };
+}
+// Unione: quello che c'è nel registro resta (nome, stato, cliente scritti a mano
+// vincono), i codici nuovi si aggiungono, i campi vuoti si riempiono.
+function unisciRegistro(attuali, nuove) {
+  const per = new Map();
+  for (const c of attuali || []) per.set(suite.normalizzaCommessa(c.code), Object.assign({}, c));
+  let aggiunte = 0, completate = 0;
+  for (const n of nuove || []) {
+    if (!n) continue;
+    const k = suite.normalizzaCommessa(n.code);
+    if (!k) continue;
+    const v = per.get(k);
+    if (!v) { per.set(k, Object.assign({ stato: 'attiva' }, n)); aggiunte++; continue; }
+    let toccata = false;
+    for (const campo of ['nome', 'cliente', 'indirizzo']) {
+      if (!v[campo] && n[campo]) { v[campo] = n[campo]; toccata = true; }
+    }
+    if (toccata) completate++;
+  }
+  return { commesse: [...per.values()].sort((a, b) => a.code.localeCompare(b.code)), aggiunte, completate };
+}
+// App che sanno elencare le proprie commesse (rotta /suite/commesse col token).
+const FONTI_COMMESSE = ['incampo', 'skytower', 'magazzino'];
+async function importaCommesse(session, chiama = suite.chiama) {
+  const fonti = [];
+  const trovate = [];
+  await Promise.all(FONTI_COMMESSE.map(async (id) => {
+    try {
+      const r = await chiama(id, 'GET', '/suite/commesse', { utente: session.username, nome: session.nome, timeout: 5000 });
+      const lista = Array.isArray(r) ? r : (r && (r.items || r.commesse)) || [];
+      const righe = lista.map((x) => commessaDaApp(id, x)).filter(Boolean);
+      trovate.push(...righe);
+      fonti.push({ app: id, stato: 'ok', n: righe.length });
+    } catch (e) {
+      fonti.push({ app: id, stato: e && e.stato === 503 ? 'spenta' : 'errore', n: 0, errore: String((e && (e.messaggio || e.message)) || e) });
+    }
+  }));
+  const unione = unisciRegistro(registroCommesse().commesse, trovate);
+  const commesse = suite.salvaCommesse(unione.commesse, { fonte: 'app' });
+  return { ok: true, commesse, aggiunte: unione.aggiunte, completate: unione.completate, fonti };
+}
+
+// ---------------------------------------------------------------------------
+// "Da fare oggi": il portale chiede a ogni app cosa aspetta l'utente
+// (contratto in shared/suite/CONTRATTI.md § 4) e lo mostra in home.
+// ---------------------------------------------------------------------------
+const DA_FARE_APP = ['incampo', 'skytower', 'magazzino', 'scadenzario'];
+const DA_FARE_TIPI = ['task', 'nc', 'documento', 'scadenza', 'magazzino', 'avviso'];
+const DA_FARE_CACHE_MS = 60_000;
+const daFareCache = new Map();   // username -> { t, dati }
+function normalizzaVoci(voci) {
+  const out = [];
+  for (const v of Array.isArray(voci) ? voci : []) {
+    if (!v || typeof v !== 'object' || !v.titolo) continue;
+    const pr = Number(v.priorita);
+    out.push({
+      id: String(v.id || '').slice(0, 120),
+      titolo: String(v.titolo).slice(0, 160),
+      testo: String(v.testo || '').slice(0, 300),
+      url: /^https?:\/\//.test(String(v.url || '')) ? String(v.url).slice(0, 500) : '',
+      tipo: DA_FARE_TIPI.includes(v.tipo) ? v.tipo : 'avviso',
+      priorita: pr >= 1 && pr <= 3 ? Math.round(pr) : 2,
+      data: /^\d{4}-\d{2}-\d{2}/.test(String(v.data || '')) ? String(v.data).slice(0, 10) : '',
+    });
+  }
+  out.sort((a, b) => a.priorita - b.priorita || (a.data || '9999').localeCompare(b.data || '9999'));
+  return out.slice(0, 50);
+}
+async function daFare(session, admin, puoVedere, chiama = suite.chiama) {
+  const inCache = daFareCache.get(session.username);
+  if (inCache && Date.now() - inCache.t < DA_FARE_CACHE_MS) return inCache.dati;
+  const email = emailUtente(loadUtenti().find((x) => x.username === session.username) || { username: session.username });
+  const gruppi = [];
+  await Promise.all(DA_FARE_APP.map(async (id) => {
+    const app = APPS.find((a) => a.id === id);
+    if (!app || !puoVedere(app)) return;
+    const g = { app: id, nome: app.nome, stato: 'ok', voci: [] };
+    try {
+      const r = await chiama(id, 'GET', '/suite/da-fare', {
+        utente: session.username, nome: session.nome, email, parametri: admin ? { admin: 1 } : undefined, timeout: 3000,
+      });
+      g.voci = normalizzaVoci(r && r.voci);
+    } catch (e) {
+      g.stato = e && e.stato === 503 ? 'spenta' : 'errore';
+    }
+    gruppi.push(g);
+  }));
+  gruppi.sort((a, b) => DA_FARE_APP.indexOf(a.app) - DA_FARE_APP.indexOf(b.app));
+  const dati = { gruppi, totale: gruppi.reduce((n, g) => n + g.voci.length, 0), aggiornato: new Date().toISOString() };
+  daFareCache.set(session.username, { t: Date.now(), dati });
+  return dati;
+}
+
 function makeUser(username, nome, password, ruolo, mustChange) {
   const salt = crypto.randomBytes(16).toString('hex');
   return {
@@ -1943,6 +2075,7 @@ async function handle(req, res) {
     }
     return sendJson(res, 200, {
       ok: true, username: s.username, nome: s.nome, ruolo: s.ruolo,
+      email: emailUtente(loadUtenti().find((x) => x.username === s.username) || { username: s.username }),
       admin: appId ? isAdminForApp(s, appId) : (s.ruolo === 'admin'),
       appsAdmin: s.adm || [],
     }, cors);
@@ -1973,8 +2106,38 @@ async function handle(req, res) {
     const adminPortale = u.ruolo === 'admin' || appsAdmin.includes('*') || appsAdmin.includes('portale');
     return sendJson(res, 200, {
       username: u.username, nome: u.nome, ruolo: u.ruolo, mustChange: !!u.mustChange,
-      appsAdmin, adminPortale, apps: appsUtente(u.username),
+      email: emailUtente(u), appsAdmin, adminPortale, apps: appsUtente(u.username),
     });
+  }
+
+  // ---- Registro unico delle commesse (lettura: tutti; scrittura: admin) ----
+  if (p === '/api/commesse') {
+    if (req.method === 'GET') return sendJson(res, 200, registroCommesse());
+    if (req.method === 'PUT') {
+      if (!adminPortale) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+      const { commesse } = await readJsonBody(req, 4e6);
+      if (!Array.isArray(commesse)) return sendJson(res, 400, { ok: false, error: 'Serve un elenco di commesse' });
+      const out = suite.salvaCommesse(commesse, { fonte: 'manuale' });
+      daFareCache.clear();
+      logAccesso({ ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: 'portale', appNome: 'Portale (commesse)', azione: 'commesse', dettaglio: `${out.length} commesse nel registro` });
+      return sendJson(res, 200, { ok: true, commesse: out });
+    }
+  }
+  if (p === '/api/commesse/importa' && req.method === 'POST') {
+    if (!adminPortale) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const esito = await importaCommesse(session);
+    logAccesso({ ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: 'portale', appNome: 'Portale (commesse)', azione: 'commesse', dettaglio: `importate dalle app: +${esito.aggiunte}, completate ${esito.completate}` });
+    return sendJson(res, 200, esito);
+  }
+  if (p === '/commesse' || p === '/commesse.html') {
+    if (!adminPortale) { res.writeHead(302, { Location: '/' }); return res.end(); }
+    return sendFile(res, path.join(PAGES_DIR, 'commesse.html'), 'text/html');
+  }
+
+  // ---- "Da fare oggi": cosa aspetta l'utente nelle app (home) ----
+  if (p === '/api/da-fare') {
+    if (url.searchParams.get('aggiorna') === '1') daFareCache.delete(session.username);
+    return sendJson(res, 200, await daFare(session, adminPortale, (app) => accessoApp(app, session)));
   }
 
   // ---- Pagina cambio password (richiede sessione) ----
@@ -2248,6 +2411,7 @@ async function handle(req, res) {
       const predefinite = appsPredefinite();
       const list = loadUtenti().map((u) => ({
         username: u.username, nome: u.nome, ruolo: u.ruolo, creato: u.creato,
+        email: u.email || '', emailEffettiva: emailUtente(u),
         apps: Array.isArray(u.apps) ? u.apps : predefinite,
         attivo: !u.disattivato, mustChange: !!u.mustChange,
       }));
@@ -2255,9 +2419,11 @@ async function handle(req, res) {
       return sendJson(res, 200, { utenti: list, assegnabili: appAssegnabili() });
     }
     if (req.method === 'POST') {
-      const { username, nome, password, ruolo, apps } = await readJsonBody(req);
+      const { username, nome, password, ruolo, apps, email } = await readJsonBody(req);
       const uname = String(username || '').toLowerCase().trim();
       if (!uname || !nome || !password) return sendJson(res, 400, { ok: false, error: 'Dati mancanti' });
+      const mail = String(email || '').trim().toLowerCase();
+      if (mail && !emailValida(mail)) return sendJson(res, 400, { ok: false, error: 'Email non valida' });
       if (String(password).length < MIN_PW_LEN) return sendJson(res, 400, { ok: false, error: `La password deve avere almeno ${MIN_PW_LEN} caratteri` });
       const list = loadUtenti();
       if (list.some((u) => u.username === uname)) return sendJson(res, 409, { ok: false, error: 'Username già esistente' });
@@ -2266,6 +2432,7 @@ async function handle(req, res) {
       // apps assente = niente campo: quell'utente segue il default, e se un
       // domani il default cambia lo segue anche lui.
       if (Array.isArray(apps)) nuovo.apps = filtraApps(apps);
+      if (mail) nuovo.email = mail;
       list.push(nuovo);
       saveUtenti(list);
       return sendJson(res, 200, { ok: true });
@@ -2306,6 +2473,23 @@ async function handle(req, res) {
     }
     if (aggiunti.length) saveUtenti(list);
     return sendJson(res, 200, { ok: true, aggiunti: aggiunti.length, scartati });
+  }
+
+  // ---- Email di un utente (solo admin): serve a InCampo e SkyTower per
+  // riconoscerlo o crearlo; vuota = torna <username>@dominio ----
+  if (p.startsWith('/api/utenti/') && p.endsWith('/email') && req.method === 'PUT') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const uname = decodeURIComponent(p.slice('/api/utenti/'.length, -'/email'.length));
+    const { email } = await readJsonBody(req);
+    const mail = String(email || '').trim().toLowerCase();
+    if (mail && !emailValida(mail)) return sendJson(res, 400, { ok: false, error: 'Email non valida' });
+    const list = loadUtenti();
+    const u = list.find((x) => x.username === uname);
+    if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    if (mail) u.email = mail; else delete u.email;
+    saveUtenti(list);
+    daFareCache.delete(uname);
+    return sendJson(res, 200, { ok: true, email: u.email || '', emailEffettiva: emailUtente(u) });
   }
 
   // ---- Programmi visibili a un utente (solo admin) ----
@@ -2488,4 +2672,7 @@ module.exports = {
   motivoNoDisattiva,                               // utenti disattivati dagli admin
   segnaPresenza, chiudiPresenzeScadute, inUso, pulisciTestoEvento, PRESENZA_TIMEOUT_MS,   // presenza/azioni nelle app
   APPS, COOKIE_FLAGS, sottodominio,                 // indirizzi a sottodominio
+  emailUtente, emailValida, SUITE_EMAIL_DOMINIO,    // identità per le app con utenti propri
+  registroCommesse, commessaDaApp, unisciRegistro, importaCommesse,   // registro commesse
+  normalizzaVoci, daFare, daFareCache,              // "da fare oggi"
 };

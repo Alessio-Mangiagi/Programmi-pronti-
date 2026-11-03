@@ -300,20 +300,24 @@ def chiama(app, metodo, percorso, dati=None, parametri=None, utente=None, nome=N
         raise SuiteError(app, 502, f"{NOMI[app]}: risposta non in JSON") from None
 
 
+# Percorso di salute di ogni app (senza token né sessione). Basta che risponda:
+# anche un 401 dice che l'app è accesa.
 SALUTE = {
-    "incampo": "/healthz", "skytower": "/health", "magazzino": "/api/health", "portale": "/api/health",
-    "ddt": "/api/health", "scadenzario": "/api/health", "confronto": "/health", "verifica": "/api/health",
+    "incampo": "/healthz", "skytower": "/health", "magazzino": "/api/health", "portale": "/api/verify",
+    "ddt": "/status", "scadenzario": "/api/health", "confronto": "/healthz", "verifica": "/status",
     "analista": "/api/health", "trimble": "/api/health", "vfp": "/api/health",
 }
 
 
 def raggiungibile(app, timeout=2):
-    """True se l'app risponde al suo health check (senza token)."""
+    """True se l'app risponde (qualunque stato HTTP < 500: anche 401/403 vuol dire accesa)."""
     base = URL_API[app]
     if base.endswith("/api"):
         base = base[:-4]
     try:
         with urllib.request.urlopen(base + SALUTE[app], timeout=timeout) as r:
-            return 200 <= r.status < 300
+            return r.status < 500
+    except urllib.error.HTTPError as e:
+        return e.code < 500
     except Exception:
         return False

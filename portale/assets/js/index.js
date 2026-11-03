@@ -262,9 +262,47 @@ async function caricaContatti() {
   document.getElementById('aiutoTesto').textContent = 'Chiedi all’assistente, apri la guida o scrivi all’amministratore: ' + email + '.';
 }
 
+// ---------------------------------------------------------------- da fare oggi
+// Cosa aspetta l'utente nelle app (task InCampo, documenti SkyTower, scadenze,
+// magazzino): /api/da-fare le raccoglie col token di servizio. Clic → l'app
+// alla pagina giusta. Se non c'è niente la sezione resta nascosta.
+const ETICHETTE = { task: 'Task', nc: 'Non conformità', documento: 'Documento', scadenza: 'Scadenza', magazzino: 'Magazzino', avviso: 'Avviso' };
+const dataIt = (iso) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) : '';
+const oggiIso = () => new Date().toISOString().slice(0, 10);
+
+function voceHtml(v) {
+  const scaduta = v.data && v.data < oggiIso();
+  const tag = v.tipo ? `<i class="dafare-tipo ${esc(v.tipo)}">${ETICHETTE[v.tipo] || v.tipo}</i>` : '';
+  const quando = v.data ? `<time class="${scaduta ? 'scaduta' : ''}" datetime="${esc(v.data)}">${scaduta ? 'scaduta il ' : ''}${dataIt(v.data)}</time>` : '';
+  const dentro = `<span class="dafare-p p${v.priorita}" aria-hidden="true"></span><span class="dafare-testo"><b>${esc(v.titolo)}</b>${v.testo ? `<small>${esc(v.testo)}</small>` : ''}</span><span class="dafare-meta">${tag}${quando}</span>`;
+  return v.url ? `<a class="dafare-voce" href="${esc(v.url)}" target="_blank" rel="noopener">${dentro}</a>` : `<span class="dafare-voce">${dentro}</span>`;
+}
+
+function renderDaFare(d) {
+  const sez = document.getElementById('dafare');
+  const gruppi = (d && d.gruppi) || [];
+  const conVoci = gruppi.filter((g) => g.voci.length);
+  const spente = gruppi.filter((g) => g.stato !== 'ok');
+  if (!conVoci.length && !spente.length) { sez.hidden = true; return; }
+  document.getElementById('dafareN').textContent = d.totale ? `${d.totale}` : '';
+  document.getElementById('dafareGruppi').innerHTML =
+    conVoci.map((g) => `<div class="dafare-gruppo"><h4><span class="ic">${icona(g.app)}</span>${esc(g.nome)}<em>${g.voci.length}</em></h4>${g.voci.map(voceHtml).join('')}</div>`).join('') +
+    (spente.length ? `<p class="dafare-spente">Non raggiungibili ora: ${spente.map((g) => esc(g.nome)).join(', ')}. Si aggiornano da sole quando ripartono.</p>` : '');
+  sez.hidden = false;
+}
+
+async function caricaDaFare(aggiorna) {
+  try {
+    const r = await fetch('/api/da-fare' + (aggiorna ? '?aggiorna=1' : ''));
+    if (r.ok) renderDaFare(await r.json());
+  } catch { /* la home funziona anche senza */ }
+}
+document.getElementById('dafareAggiorna').addEventListener('click', () => caricaDaFare(true));
+
 async function init() {
   if (!(await loadMe())) return;
   caricaContatti();
+  caricaDaFare(false);
   const data = await (await fetch('/api/apps')).json();
   apps = data.apps || [];
   // Admin in "vista utente" (/?vista=utente dalla plancia): via le app solo

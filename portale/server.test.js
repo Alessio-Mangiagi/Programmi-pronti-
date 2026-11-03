@@ -697,3 +697,106 @@ test("motivoNoDisattiva: non se stessi, non l'ultimo admin attivo", () => {
   u[1].disattivato = false;
   assert.equal(motivoNoDisattiva(u, 'capo', 'vice'), '');
 });
+
+// ---------------------------------------------------------------------------
+// Suite: email degli utenti, registro commesse, "da fare oggi".
+// ---------------------------------------------------------------------------
+const suiteSrv = require('./server.js');
+
+test('emailUtente: quella impostata, altrimenti username@dominio', () => {
+  assert.strictEqual(suiteSrv.emailUtente({ username: 'mrossi' }), 'mrossi@' + suiteSrv.SUITE_EMAIL_DOMINIO);
+  assert.strictEqual(suiteSrv.emailUtente({ username: 'mrossi', email: ' Mario.Rossi@Cosedil.it ' }), 'mario.rossi@cosedil.it');
+  assert.strictEqual(suiteSrv.emailUtente(null), '');
+  assert.ok(suiteSrv.emailValida('a@b.it') && !suiteSrv.emailValida('senza-chiocciola'));
+});
+
+test('commessaDaApp: campi di InCampo, SkyTower e Magazzino', () => {
+  assert.deepStrictEqual(suiteSrv.commessaDaApp('incampo', { code: '101-003', name: 'Porto', cantieri: [{ name: 'A', address: 'Via del Porto 1' }] }),
+    { code: '101-003', nome: 'Porto', indirizzo: 'Via del Porto 1', cliente: '', note: 'da incampo' });
+  assert.deepStrictEqual(suiteSrv.commessaDaApp('skytower', { commessa: 'C-2026-014', name: 'Scuola' }).code, 'C-2026-014');
+  assert.strictEqual(suiteSrv.commessaDaApp('magazzino', { commessa: '102-001', ubicazioni: [{ nome: 'Cantiere Messina', indirizzo: 'Molo 3' }] }).nome, 'Cantiere Messina');
+  assert.strictEqual(suiteSrv.commessaDaApp('magazzino', { nome: 'senza codice' }), null);
+});
+
+test('unisciRegistro: i dati scritti a mano vincono, i codici nuovi si aggiungono', () => {
+  const r = suiteSrv.unisciRegistro(
+    [{ code: '101-003', nome: 'Porto di Augusta', stato: 'chiusa', cliente: '', indirizzo: '', note: '' }],
+    [{ code: ' 101-003', nome: 'Altro nome', cliente: 'AdSP', indirizzo: '' }, { code: '102-001', nome: 'Messina' }, null]);
+  assert.strictEqual(r.aggiunte, 1);
+  assert.strictEqual(r.completate, 1);
+  assert.deepStrictEqual(r.commesse.map((c) => c.code), ['101-003', '102-001']);
+  assert.strictEqual(r.commesse[0].nome, 'Porto di Augusta');
+  assert.strictEqual(r.commesse[0].stato, 'chiusa');
+  assert.strictEqual(r.commesse[0].cliente, 'AdSP');
+  assert.strictEqual(r.commesse[1].stato, 'attiva');
+});
+
+test('normalizzaVoci: pulisce, ordina per priorità e data, massimo 50', () => {
+  const v = suiteSrv.normalizzaVoci([
+    { titolo: 'B', priorita: 2, data: '2026-11-10', url: 'javascript:alert(1)', tipo: 'strano' },
+    { titolo: 'A', priorita: 1, data: '2026-11-20T10:00:00', url: 'http://localhost:5190/t/1', tipo: 'task' },
+    { titolo: 'C', priorita: 1, data: '2026-11-05' },
+    { senzaTitolo: true }, null,
+    ...Array.from({ length: 60 }, (_, i) => ({ titolo: 'x' + i, priorita: 3 })),
+  ]);
+  assert.strictEqual(v.length, 50);
+  assert.deepStrictEqual(v.slice(0, 3).map((x) => x.titolo), ['C', 'A', 'B']);
+  assert.strictEqual(v[1].url, 'http://localhost:5190/t/1');
+  assert.strictEqual(v[1].data, '2026-11-20');
+  assert.strictEqual(v[2].url, '');
+  assert.strictEqual(v[2].tipo, 'avviso');
+});
+
+test('daFare: raccoglie dalle app, app spenta = gruppo "spenta", cache per utente', async () => {
+  suiteSrv.daFareCache.clear();
+  const sessione = { username: 'mrossi', nome: 'Mario Rossi', ruolo: 'utente' };
+  const chiamate = [];
+  const chiama = async (app, metodo, percorso, opts) => {
+    chiamate.push([app, percorso, opts.utente, opts.email, opts.parametri]);
+    if (app === 'incampo') return { voci: [{ titolo: 'Gru ferma', priorita: 1, tipo: 'task', url: 'http://localhost:5190/x' }] };
+    if (app === 'skytower') { const e = new Error('giù'); e.stato = 503; throw e; }
+    return { voci: [] };
+  };
+  const d = await suiteSrv.daFare(sessione, false, () => true, chiama);
+  const perApp = Object.fromEntries(d.gruppi.map((g) => [g.app, g]));
+  assert.strictEqual(perApp.incampo.voci[0].titolo, 'Gru ferma');
+  assert.strictEqual(perApp.skytower.stato, 'spenta');
+  assert.strictEqual(d.totale, 1);
+  assert.strictEqual(chiamate[0][2], 'mrossi');
+  assert.strictEqual(chiamate[0][3], 'mrossi@' + suiteSrv.SUITE_EMAIL_DOMINIO);
+  assert.strictEqual(chiamate[0][4], undefined);
+  const n = chiamate.length;
+  await suiteSrv.daFare(sessione, false, () => true, chiama);
+  assert.strictEqual(chiamate.length, n, 'seconda chiamata entro 60 s: dalla cache');
+  suiteSrv.daFareCache.clear();
+  await suiteSrv.daFare({ username: 'admin', nome: 'A', ruolo: 'admin' }, true, (app) => app.id !== 'magazzino', chiama);
+  const ultime = chiamate.slice(n);
+  assert.ok(ultime.every((c) => c[1] === '/suite/da-fare' && c[4] && c[4].admin === 1));
+  assert.ok(!ultime.some((c) => c[0] === 'magazzino'), 'app non visibile all\'utente: non interrogata');
+});
+
+test('importaCommesse: unisce le fonti e salva nel registro', async () => {
+  const suiteLink = require('../shared/suite/suite_link.js');
+  const tmpReg = path.join(DATA_TMP, 'commesse-test.json');
+  const origFile = suiteLink.FILE_COMMESSE;
+  // il registro vero non va toccato dai test: si punta a un file temporaneo
+  Object.defineProperty(suiteLink, 'FILE_COMMESSE', { value: tmpReg, configurable: true, writable: true });
+  const origCommesse = suiteLink.commesse, origSalva = suiteLink.salvaCommesse;
+  suiteLink.commesse = (o) => origCommesse(Object.assign({ file: tmpReg }, o));
+  suiteLink.salvaCommesse = (l, o) => origSalva(l, Object.assign({ file: tmpReg }, o));
+  try {
+    const chiama = async (app) => {
+      if (app === 'incampo') return [{ code: '101-003', name: 'Porto di Augusta', cantieri: [{ address: 'Via del Porto 1' }] }];
+      if (app === 'magazzino') return [{ commessa: '101-003', ubicazioni: [] }, { commessa: '102-001', ubicazioni: [{ nome: 'Cantiere Messina' }] }];
+      const e = new Error('giù'); e.stato = 503; throw e;
+    };
+    const r = await suiteSrv.importaCommesse({ username: 'admin', nome: 'A' }, chiama);
+    assert.strictEqual(r.aggiunte, 2);
+    assert.deepStrictEqual(r.commesse.map((c) => [c.code, c.nome]), [['101-003', 'Porto di Augusta'], ['102-001', 'Cantiere Messina']]);
+    assert.deepStrictEqual(r.fonti.find((f) => f.app === 'skytower').stato, 'spenta');
+    assert.ok(fs.existsSync(tmpReg));
+  } finally {
+    suiteLink.commesse = origCommesse; suiteLink.salvaCommesse = origSalva;
+    Object.defineProperty(suiteLink, 'FILE_COMMESSE', { value: origFile, configurable: true, writable: true });
+  }
+});

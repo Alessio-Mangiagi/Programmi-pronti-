@@ -122,6 +122,38 @@ a { color: var(--cosedil-blue); }
 .linee [data-tip]::after { top: 50%; left: calc(100% + 14px); transform: translate(4px, -50%); }
 .linee [data-tip]:hover::after, .linee [data-tip]:focus-visible::after { transform: translate(0, -50%); }
 
+/* ---------------- da fare oggi ---------------- */
+.dafare { background: #fff; border: 1px solid var(--linea); border-left: 4px solid var(--cosedil-green); border-radius: 10px; padding: 14px 18px 8px; margin: 0 0 18px; }
+.dafare[hidden] { display: none; }
+.dafare-testa { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dafare h3 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 18px; }
+.dafare-n { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 11px; background: var(--cosedil-blue); color: #fff; font-size: 12px; line-height: 22px; text-align: center; vertical-align: 2px; }
+.dafare-n:empty { display: none; }
+.ghost.piccolo { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.dafare-gruppi { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 22px; margin-top: 8px; }
+.dafare-gruppo h4 { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; font-family: var(--font-ui); font-weight: 600; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--cosedil-blue); }
+.dafare-gruppo h4 .ic { width: 24px; height: 24px; border-radius: 50%; background: var(--tinta); display: grid; place-items: center; }
+.dafare-gruppo h4 .ic svg { width: 14px; height: 14px; }
+.dafare-gruppo h4 em { font-style: normal; color: var(--grigio); font-weight: 500; }
+.dafare-voce { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 6px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+a.dafare-voce:hover, a.dafare-voce:focus-visible { background: var(--tinta); }
+.dafare-p { width: 8px; height: 8px; border-radius: 50%; background: #b9c6d3; }
+.dafare-p.p1 { background: #c0392b; }
+.dafare-p.p2 { background: #e0a800; }
+.dafare-testo { min-width: 0; }
+.dafare-testo b { display: block; font-family: var(--font-ui); font-weight: 600; font-size: 14.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dafare-testo small { display: block; color: var(--grigio); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dafare-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--grigio); white-space: nowrap; }
+.dafare-tipo { font-style: normal; padding: 1px 7px; border-radius: 10px; background: #f2f3f5; font-size: 11.5px; }
+.dafare-tipo.nc { background: #fdecea; color: #a93226; }
+.dafare-tipo.scadenza { background: #fff4d6; color: #8a6100; }
+.dafare-meta time.scaduta { color: #c0392b; font-weight: 600; }
+.dafare-spente { grid-column: 1 / -1; margin: 6px 0 4px; font-size: 12.5px; color: var(--grigio); }
+@media (max-width: 600px) {
+  .dafare-voce { grid-template-columns: 8px minmax(0, 1fr); }
+  .dafare-meta { grid-column: 2; justify-content: flex-start; }
+}
+
 .aiuto { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: #fff; border: 1px dashed #b9c6d3; border-radius: 10px; padding: 18px 20px; }
 .aiuto b { font-weight: 500; }
 .aiuto-azioni { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -26,6 +26,7 @@
       <nav class="side-nav">
         <a href="/">Plancia</a>
         <a href="/utenti" aria-current="page">Utenti</a>
+        <a href="/commesse">Commesse</a>
         <a href="/admin">Registro accessi</a>
         <a href="/avvisi">Avvisi</a>
       </nav>
@@ -70,7 +71,7 @@
         <div class="u-wrap">
           <table class="u-tab">
             <thead>
-              <tr><th>Utente</th><th>Ruolo</th><th>Stato</th><th>Programmi</th><th>Creato</th><th class="az-h"><span class="sr-only">Azioni</span></th></tr>
+              <tr><th>Utente</th><th>Email</th><th>Ruolo</th><th>Stato</th><th>Programmi</th><th>Creato</th><th class="az-h"><span class="sr-only">Azioni</span></th></tr>
             </thead>
             <tbody id="righe"></tbody>
           </table>
@@ -88,6 +89,7 @@
       <div class="griglia2">
         <div class="fld"><label for="nNome">Nome e cognome</label><input id="nNome" required maxlength="80" /></div>
         <div class="fld"><label for="nUsername">Username</label><input id="nUsername" required maxlength="60" autocomplete="off" placeholder="es. mrossi" /></div>
+        <div class="fld"><label for="nEmail">Email <small>(facoltativa: la usano InCampo e SkyTower per riconoscerlo)</small></label><input id="nEmail" type="email" maxlength="160" autocomplete="off" placeholder="nome.cognome@cosedilspa.com" /></div>
         <div class="fld"><label for="nPassword">Password iniziale</label><input id="nPassword" type="text" required minlength="8" autocomplete="off" placeholder="min 8 caratteri" /></div>
         <div class="fld"><label for="nRuolo">Ruolo</label>
           <select id="nRuolo"><option value="utente">Utente</option><option value="admin">Amministratore</option></select>

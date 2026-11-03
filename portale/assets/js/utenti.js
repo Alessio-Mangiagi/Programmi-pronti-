@@ -74,6 +74,7 @@ function renderRighe() {
     const io = me && u.username === me.username;
     return `<tr class="${u.attivo ? '' : 'off'}">
       <td><div class="chi"><span class="u-av">${esc(iniz(u.nome))}</span><span><b>${esc(u.nome)}</b><small>${esc(u.username)}</small></span></div></td>
+      <td class="mail"><span title="${u.email ? 'Impostata dall’amministratore' : 'Non impostata: vale username@dominio'}">${esc(u.emailEffettiva || '')}</span>${u.email ? '' : '<small class="dedotta">dedotta</small>'}<button type="button" class="b mini" data-mail="${esc(u.username)}" title="Cambia l'email con cui InCampo e SkyTower riconoscono l'utente">Email</button></td>
       <td>${u.ruolo === 'admin' ? '<span class="st adm">Admin</span>' : 'Utente'}</td>
       <td>${stato(u)}</td>
       <td>${programmi(u)}</td>
@@ -93,7 +94,8 @@ $('fStato').addEventListener('change', renderRighe);
 $('righe').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  if (b.dataset.pw) apriPassword(b.dataset.pw);
+  if (b.dataset.mail) cambiaEmail(b.dataset.mail);
+  else if (b.dataset.pw) apriPassword(b.dataset.pw);
   else if (b.dataset.att) cambiaAttivo(b.dataset.att, b.dataset.attivo === '1');
   else if (b.dataset.del) elimina(b.dataset.del);
   else if (b.dataset.apps) apriProgrammi(b.dataset.apps);
@@ -103,6 +105,17 @@ $('righe').addEventListener('click', (e) => {
 document.querySelectorAll('[data-chiudi]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
 const trova = (username) => utenti.find((u) => u.username === username);
+
+// Email: una finestra semplice (prompt) basta, è un campo solo. Vuota = torna
+// quella dedotta username@dominio.
+async function cambiaEmail(username) {
+  const u = trova(username);
+  const nuova = prompt(`Email di ${u ? u.nome : username} (vuota = ${u && u.emailEffettiva ? u.emailEffettiva.replace(/^[^@]+/, 'username') : 'username@dominio'}):`, (u && u.email) || '');
+  if (nuova === null) return;
+  const d = await invia('PUT', `/api/utenti/${encodeURIComponent(username)}/email`, { email: nuova.trim() });
+  if (!d.ok) { alert(d.error || 'Non salvata'); return; }
+  await caricaUtenti();
+}
 
 function caselle(sel, attributo) {
   return assegnabili.map((a) => `
@@ -154,7 +167,7 @@ $('formNuovo').addEventListener('submit', async (e) => {
   e.preventDefault();
   const admin = $('nRuolo').value === 'admin';
   const d = await invia('POST', '/api/utenti', {
-    nome: $('nNome').value, username: $('nUsername').value, password: $('nPassword').value,
+    nome: $('nNome').value, username: $('nUsername').value, password: $('nPassword').value, email: $('nEmail').value,
     ruolo: $('nRuolo').value,
     apps: admin ? undefined : [...$('nApps').querySelectorAll('[data-n]:checked')].map((c) => c.dataset.n),
   });

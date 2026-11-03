@@ -69,6 +69,16 @@
       </p>
       <div class="risposta" id="risposta" hidden aria-live="polite"></div>
 
+      <!-- Cosa aspetta l'utente nelle app (task, documenti, scadenze, magazzino):
+           lo riempie index.js da /api/da-fare. Resta nascosto se non c'è niente. -->
+      <section class="dafare" id="dafare" hidden aria-labelledby="dafareT">
+        <div class="dafare-testa">
+          <h3 id="dafareT">Da fare oggi <span class="dafare-n" id="dafareN"></span></h3>
+          <button type="button" class="ghost piccolo" id="dafareAggiorna" title="Richiede alle app lo stato aggiornato">Aggiorna</button>
+        </div>
+        <div class="dafare-gruppi" id="dafareGruppi"></div>
+      </section>
+
       <div class="task" id="task"><!-- schede generate da index.js --></div>
       <p class="vuoto" id="vuoto" hidden>Nessuna attività corrisponde. Premi <b>Invio</b> per chiederlo all’assistente.</p>
 

@@ -39,9 +39,11 @@ const APP = {
   vfp: ['vfp-transfer', 8770, 'http://127.0.0.1:8770/api'],
 };
 
+// Percorso di salute di ogni app (senza token né sessione). Basta che risponda:
+// anche un 401 dice che l'app è accesa.
 const SALUTE = {
-  incampo: '/healthz', skytower: '/health', magazzino: '/api/health', portale: '/api/health',
-  ddt: '/api/health', scadenzario: '/api/health', confronto: '/health', verifica: '/api/health',
+  incampo: '/healthz', skytower: '/health', magazzino: '/api/health', portale: '/api/verify',
+  ddt: '/status', scadenzario: '/api/health', confronto: '/healthz', verifica: '/status',
   analista: '/api/health', trimble: '/api/health', vfp: '/api/health',
 };
 
@@ -177,13 +179,13 @@ async function chiama(app, metodo, percorso, { dati, parametri, utente, nome, em
   try { return JSON.parse(buf.toString('utf8')); } catch { throw new SuiteError(app, 502, `${NOMI[app]}: risposta non in JSON`); }
 }
 
-/** True se l'app risponde al suo health check (senza token). */
+/** True se l'app risponde (qualunque stato HTTP < 500: anche 401/403 vuol dire accesa). */
 async function raggiungibile(app, timeout = 2000) {
   let base = urlApi(app);
   if (base.endsWith('/api')) base = base.slice(0, -4);
   try {
     const r = await fetch(base + SALUTE[app], { signal: AbortSignal.timeout(timeout) });
-    return r.ok;
+    return r.status < 500;
   } catch { return false; }
 }
 
