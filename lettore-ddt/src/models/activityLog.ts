@@ -10,6 +10,7 @@ export type ActivityEvent = {
     | 'logout'
     | 'user_created'
     | 'user_deleted'
+    | 'user_updated'
     | 'login_locked'
     | 'password_changed'
     | 'password_reset'

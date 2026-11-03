@@ -12,6 +12,8 @@ export type UserRow = {
   displayName: string;
   isAdmin?: boolean;
   disabled?: boolean;
+  /** Codice commessa aziendale (es. "101-003"): con questo i DDT finiscono in SkyTower. */
+  codiceCommessa?: string;
 };
 
 interface UsersFile {
@@ -105,7 +107,8 @@ function createUser(
   password: string,
   commessaId: string,
   displayName: string,
-  isAdmin: boolean = false
+  isAdmin: boolean = false,
+  codiceCommessa: string = ''
 ): UserRow {
   const db = getUsersDb();
   if (!password || password.length < MIN_PASSWORD_LENGTH) {
@@ -122,6 +125,7 @@ function createUser(
     displayName,
     isAdmin,
   };
+  if (codiceCommessa.trim()) record.codiceCommessa = codiceCommessa.trim();
   db.users.push(record);
   persistUsersDb();
   return record;
@@ -166,7 +170,19 @@ function setUserDisabled(id: string, disabled: boolean): UserRow | null {
   return user;
 }
 
+/** Imposta (o toglie, con '') il codice commessa aziendale di un utente. */
+function setCodiceCommessa(id: string, codiceCommessa: string): UserRow | null {
+  const user = getUsersDb().users.find((u) => u.id === id);
+  if (!user) return null;
+  const c = String(codiceCommessa || '').trim();
+  if (c) user.codiceCommessa = c;
+  else delete user.codiceCommessa;
+  persistUsersDb();
+  return user;
+}
+
 export {
+  setCodiceCommessa,
   findUserByUsername,
   findUserById,
   verifyPassword,

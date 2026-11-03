@@ -11,6 +11,7 @@ import {
   findUserById,
   updatePassword,
   setUserDisabled,
+  setCodiceCommessa,
   MIN_PASSWORD_LENGTH,
 } from '../models/users';
 import { logActivity, getRecentActivity, getActiveAccounts } from '../models/activityLog';
@@ -39,7 +40,7 @@ router.get('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
 });
 
 router.post('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
-  const { username, password, commessaId, displayName, isAdmin } = req.body || {};
+  const { username, password, commessaId, displayName, isAdmin, codiceCommessa } = req.body || {};
   const ip = clientIp(req);
   if (!username || !password || !commessaId) {
     return res.status(400).json({ error: 'username, password e commessaId obbligatori' });
@@ -66,7 +67,8 @@ router.post('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
       String(password),
       String(commessaId).trim(),
       String(displayName || username).trim(),
-      !!isAdmin
+      !!isAdmin,
+      String(codiceCommessa || '')
     );
     logActivity('user_created', user.username, user.commessaId, ip);
     const { passwordHash, ...publicUser } = user;
@@ -91,6 +93,19 @@ router.delete('/admin/api/users/:id', requireAdmin, (req: Request, res: Response
   deleteUser(id);
   logActivity('user_deleted', target.username, target.commessaId, ip);
   res.json({ ok: true });
+});
+
+// Codice commessa aziendale (admin): con questo i DDT dell'utente vanno in SkyTower.
+router.post('/admin/api/users/:id/codice-commessa', requireAdmin, (req: Request, res: Response) => {
+  const id = param(req.params, 'id');
+  const { codiceCommessa } = req.body || {};
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
+  const c = String(codiceCommessa || '').trim();
+  if (c.length > 80) return res.status(400).json({ error: 'Codice commessa troppo lungo (max 80)' });
+  const user = setCodiceCommessa(id, c);
+  if (!user) return res.status(404).json({ error: 'Utente non trovato' });
+  logActivity('user_updated', user.username, user.commessaId, clientIp(req));
+  res.json({ ok: true, codiceCommessa: user.codiceCommessa || '' });
 });
 
 // Reset password di un utente (admin)

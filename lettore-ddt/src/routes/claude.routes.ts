@@ -11,7 +11,7 @@ import logger from '../utils/logger';
 import { pdfProcessingDuration } from '../utils/metrics';
 import { PdfService } from '../services/pdfService';
 import { ExcelService } from '../services/excelService';
-import { insertPendingPdf, cleanupOldPendingPdfs } from '../models/database';
+import { insertPendingPdf, cleanupOldPendingPdfs, getPendingPdf } from '../models/database';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import {
   appConfig,
@@ -28,6 +28,7 @@ import {
 import { insertDDTValidation } from '../models/database';
 import { extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
+import { inviaDdtASkyTower } from '../services/skytower';
 import { tuttiIPrompt } from '../batch/prompts';
 
 const router = express.Router();
@@ -128,7 +129,7 @@ router.post(
   '/claude-to-excel',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const { response: rawResponse, pdfFileName } = req.body || {};
+    const { response: rawResponse, pdfFileName, temp_id: tempId } = req.body || {};
     if (!rawResponse || !rawResponse.trim()) {
       return res.status(400).json({ error: 'Risposta di Claude mancante' });
     }
@@ -194,6 +195,19 @@ router.post(
           registraExport(path.dirname(jsonFolder), req.commessaId!, jsonFilename, parsed).catch(
             (e) => logger.error(`Registro consegne non aggiornato (${jsonFilename}): ${e.message}`)
           );
+          // Archivio unico della suite: il PDF caricato con /prepare-claude
+          // (temp_id) diventa un documento della commessa in SkyTower.
+          const pendente =
+            typeof tempId === 'string' && /^[0-9a-f-]{36}$/i.test(tempId)
+              ? getPendingPdf(tempId, req.commessaId!)
+              : undefined;
+          inviaDdtASkyTower({
+            commessaId: req.commessaId!,
+            utente: req.session.username || '',
+            pdfPath: pendente?.path,
+            parsed,
+            exportName: jsonFilename,
+          }).catch((e) => logger.warn(`SkyTower: invio ${jsonFilename} fallito: ${e.message}`));
           // Mantieni solo gli ultimi N export JSON per evitare accumulo su disco
           pruneFolder(jsonFolder, appConfig.maxJsonExports);
         })

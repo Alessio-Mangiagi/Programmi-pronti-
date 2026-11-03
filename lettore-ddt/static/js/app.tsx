@@ -208,6 +208,9 @@ export default function App({ user, onLogout }: AppProps = {}) {
   const [showExcelValidation, setShowExcelValidation] = useState(false);
   // Nome del PDF scansionato: persiste in localStorage così l'export mantiene
   // lo stesso nome anche se la pagina viene ricaricata durante il lavoro su Claude.ai
+  // temp_id del PDF caricato con /prepare-claude: con un solo PDF il server
+  // lo collega all'export e lo manda in SkyTower come documento della commessa.
+  const [pdfTempId, setPdfTempId] = useState<string>('');
   const [pdfFileName, setPdfFileName] = useState(() => {
     try { return localStorage.getItem('cosedil-last-pdf-name') || ""; } catch { return ""; }
   });
@@ -506,7 +509,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ response: claudeResponse, pdfFileName })
+        body: JSON.stringify({ response: claudeResponse, pdfFileName, temp_id: pdfTempId || undefined })
       });
       if (!res.ok) {
         const errData = await fetchJSON(res);
@@ -556,7 +559,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
     } finally {
       setClaudeLoading(false);
     }
-  }, [claudeResponse, pdfFileName]);
+  }, [claudeResponse, pdfFileName, pdfTempId]);
 
   // Mette l'estrazione in anteprima nel paniere invece di scaricarla subito:
   // serve quando i dati di più PDF devono finire in un unico Excel.
@@ -850,6 +853,8 @@ export default function App({ user, onLogout }: AppProps = {}) {
         setPdfFileName(exportName);
         try { localStorage.setItem('cosedil-last-pdf-name', exportName); } catch {}
       }
+      // Un solo PDF: il suo temp_id accompagna l'export (archivio SkyTower).
+      setPdfTempId(data.temp_id && files.length === 1 ? String(data.temp_id) : '');
       // Handle both single (backward compat) and multiple response
       if (data.results) {
         const invalid = data.results.filter((r: any) => r.error);

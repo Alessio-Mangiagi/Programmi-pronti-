@@ -41,6 +41,7 @@
     <label>Username<input type="text" id="username" required></label>
     <label>Password<input type="password" id="password" required minlength="8"></label>
     <label>Commessa<input type="text" id="commessaId" required></label>
+    <label>Codice commessa aziendale (SkyTower)<input type="text" id="codiceCommessa" placeholder="es. 101-003"></label>
     <label>Nome visualizzato<input type="text" id="displayName"></label>
     <label class="check"><input type="checkbox" id="isAdmin"> Admin</label>
     <button type="submit" class="btn-primary">Crea account</button>
@@ -49,7 +50,7 @@
   <button id="saveUsers" class="btn-primary" style="margin-bottom: 16px;">Salva lista (CSV)</button>
   <table>
     <thead>
-      <tr><th>Username</th><th>Nome</th><th>Commessa</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr>
+      <tr><th>Username</th><th>Nome</th><th>Commessa</th><th>Codice aziendale</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr>
     </thead>
     <tbody id="userRows"></tbody>
   </table>

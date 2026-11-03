@@ -204,9 +204,11 @@ async function loadUsers() {
       <td>${user}</td>
       <td>${esc(u.displayName)}</td>
       <td>${esc(u.commessaId)}</td>
+      <td>${esc(u.codiceCommessa || '—')}</td>
       <td>${role}</td>
       <td>${stato}</td>
       <td><div class="actions">
+        <button class="btn-neutral" data-act="codice" data-id="${id}" data-user="${user}" data-codice="${esc(u.codiceCommessa || '')}">Codice commessa</button>
         <button class="btn-warn" data-act="pwd" data-id="${id}" data-user="${user}">Reset password</button>
         <button class="btn-neutral" data-act="toggle" data-id="${id}" data-user="${user}" data-disabled="${u.disabled ? '1' : '0'}">${toggleLabel}</button>
         <button class="btn-danger" data-act="revoke" data-id="${id}" data-user="${user}">Revoca</button>
@@ -217,6 +219,7 @@ async function loadUsers() {
     btn.addEventListener('click', () => {
       const { act, id, user } = btn.dataset;
       if (act === 'revoke') revokeUser(id, user);
+      else if (act === 'codice') impostaCodiceCommessa(id, user, btn.dataset.codice || '');
       else if (act === 'pwd') resetPassword(id, user);
       else if (act === 'toggle') toggleDisabled(id, user, btn.dataset.disabled === '1');
     });
@@ -230,6 +233,22 @@ async function revokeUser(id, username) {
   if (!res.ok) { showErr(data.error || 'Errore durante la revoca'); return; }
   loadUsers();
   loadLogs();
+}
+
+// Codice commessa aziendale (es. 101-003): con questo i DDT dell'utente
+// finiscono anche in SkyTower, nella commessa giusta. Vuoto = non inviare.
+async function impostaCodiceCommessa(id, username, attuale) {
+  const codice = prompt(`Codice commessa aziendale per "${username}" (vuoto = nessun invio a SkyTower):`, attuale);
+  if (codice === null) return;
+  const res = await fetch('/admin/api/users/' + encodeURIComponent(id) + '/codice-commessa', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codiceCommessa: codice.trim() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { showErr(data.error || 'Errore aggiornamento codice commessa'); return; }
+  showErr('');
+  loadUsers();
 }
 
 async function resetPassword(id, username) {
@@ -275,6 +294,7 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
     username: document.getElementById('username').value.trim(),
     password: document.getElementById('password').value,
     commessaId: document.getElementById('commessaId').value.trim(),
+    codiceCommessa: (document.getElementById('codiceCommessa').value || '').trim(),
     displayName: document.getElementById('displayName').value.trim(),
     isAdmin: document.getElementById('isAdmin').checked,
   };

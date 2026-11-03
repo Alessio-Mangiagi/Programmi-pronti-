@@ -158,6 +158,7 @@ lettore-ddt/
 | DELETE | `/admin/api/users/:id` | Revoca (elimina) account |
 | POST | `/admin/api/users/:id/password` | Reset password account |
 | POST | `/admin/api/users/:id/disabled` | Abilita / disabilita account |
+| POST | `/admin/api/users/:id/codice-commessa` | Codice commessa aziendale dell'account (`{codiceCommessa}`, vuoto = nessun invio a SkyTower) |
 
 ### App / dati (richiedono login)
 | Metodo | Endpoint | Descrizione |
@@ -217,6 +218,28 @@ Il registro sta in `data/<commessa>/consegne.json`: si aggiorna a ogni export sa
 |---|---|
 | `DDT_USERS_KEY` | Chiave di cifratura archivio utenti. **Obbligatoria in hosting** con filesystem effimero, altrimenti gli account non sono più decifrabili dopo un redeploy. |
 | `SESSION_SECRET` | Segreto di firma delle sessioni; mantiene valide le sessioni tra deploy/istanze. |
+| `DDT_SKYTOWER` | `0` spegne l'invio dei DDT a SkyTower (default acceso). |
+| `DDT_SKYTOWER_TIPO` | Tipo documento ISO 19650 (2 lettere) con cui SkyTower nomina i DDT, default `RP`. |
+| `SUITE_TOKEN`, `SUITE_URL_SKYTOWER` | Token e indirizzo API di SkyTower (vedi `shared/suite`); senza, token dal file condiviso e `127.0.0.1:8100`. |
+
+---
+
+## Suite: i DDT finiscono in SkyTower
+
+Ogni DDT elaborato (flusso manuale con PDF caricato da *Carica PDF* e flusso
+batch) viene mandato anche a **SkyTower**, il CDE della suite, come documento WIP
+della commessa (`services/skytower.ts`, `POST /suite/commesse/<codice>/documenti`
+di `shared/suite`). Titolo = numeri DDT e fornitore; `attributes` =
+`{origine:"ddt", ddt:[…], fornitori, data_prima, data_ultima, righe}`.
+
+Il Lettore DDT conosce la commessa come `commessaId` dell'account (es.
+`demo-augusta`), che non è il **codice commessa aziendale** (`101-003`) con cui
+SkyTower e le altre app si riconoscono: l'admin lo imposta sull'account
+(pannello admin, colonna *Codice aziendale*). Senza, vale il `commessaId` se
+esiste nel registro della suite (`shared/suite/commesse.json`); altrimenti il
+DDT resta solo qui (riga nel log, nessun errore per l'utente). SkyTower spenta =
+riga nel log e basta. Nel flusso manuale il PDF viaggia solo se caricato con
+*Carica PDF* (un file per volta: il `temp_id` accompagna l'export).
 
 ---
 

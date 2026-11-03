@@ -27,6 +27,7 @@ import {
 } from '../routes/helpers';
 import { ddtIndexOfFolder, extractDdtNumbers } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
+import { inviaDdtASkyTower } from '../services/skytower';
 import { addToPaniere } from '../services/paniere';
 import { registraLavoro } from '../services/registroLavori';
 import { BatchConfig, loadBatchConfig, resolveApiKey } from './config';
@@ -606,6 +607,15 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
     registraExport(path.dirname(folder), job.commessaId, jsonName, parsed).catch((e) =>
       logger.error(`Registro consegne non aggiornato (${jsonName}): ${e.message}`)
     );
+    // Archivio unico della suite: il PDF originale (ancora in inputDir, lo
+    // spostamento in _elaborati avviene a lavoro finito) va in SkyTower.
+    inviaDdtASkyTower({
+      commessaId: job.commessaId,
+      utente: job.createdBy,
+      pdfPath: path.join(job.inputDir, f.pdfName),
+      parsed,
+      exportName: jsonName,
+    }).catch((e) => logger.warn(`SkyTower: invio ${jsonName} fallito: ${e.message}`));
     archiviati++;
   }
 
