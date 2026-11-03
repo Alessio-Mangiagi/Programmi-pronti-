@@ -17,6 +17,13 @@ Offerto:
   * GET  /suite/revisioni/{id}/file              i byte di una revisione (InCampo → planimetria)
   * POST /suite/commesse/{codice}/documenti      carica un file come nuovo documento WIP
     (report giacenze del Magazzino, PDF dei moduli e delle NC di InCampo)
+  * GET  /suite/da-fare                          cosa aspetta l'utente del portale (notifiche, approvazioni)
+Per il web di SkyTower (JWT):
+  * GET  /suite/registro                         registro unico delle commesse (shared/suite/commesse.json)
+  * GET  /suite/requisiti/set                    i set di Verifica Requisiti
+  * POST /revisions/{id}/confronta               confronta con la revisione precedente (Confronto Documenti)
+  * POST /revisions/{id}/verifica                checklist di Verifica Requisiti sul file
+Regole comuni in shared/suite/CONTRATTI.md.
 """
 from __future__ import annotations
 
@@ -25,15 +32,19 @@ import hashlib
 import json
 import mimetypes
 import sys
+import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import StreamingResponse
+from psycopg.types.json import Jsonb
+from pydantic import BaseModel, Field
 
-from ..deps import Ctx, Services, client_ip, require_container, require_project, services
+from ..deps import Ctx, Services, client_ip, ctx, require_container, require_project, services
 from ..errors import ApiError
 from ..events import security_event
 from ..security.tokens import AccessClaims
@@ -57,19 +68,20 @@ def richiede_token(x_suite_token: str | None = Header(default=None)) -> None:
         raise ApiError(403, "suite_token", "Token di servizio della suite non valido")
 
 
-def _utente(svc: Services, utente: str | None) -> dict:
-    """L'utente SkyTower a nome del quale gira la chiamata (vedi docstring del modulo)."""
-    candidati = [utente, svc.settings.suite_user_email]
+def _utente(svc: Services, utente: str | None, email: str | None = None) -> dict:
+    """L'utente SkyTower a nome del quale gira la chiamata (vedi docstring del modulo): prima l'email del portale
+    (X-Suite-Email), poi lo username (X-Suite-Utente, anche come parte prima della @), poi l'utente tecnico."""
+    candidati = [email, utente, svc.settings.suite_user_email]
     with svc.db.auth_tx() as conn:
-        for email in candidati:
-            if not email:
+        for chi in candidati:
+            if not chi:
                 continue
-            email = email.strip()
+            chi = chi.strip()
             row = conn.execute("SELECT id, organization_id, email FROM cde.users WHERE lower(email) = lower(%s) "
-                               "AND status = 'ACTIVE'", [email]).fetchone()
-            if row is None and "@" not in email:
+                               "AND status = 'ACTIVE'", [chi]).fetchone()
+            if row is None and "@" not in chi:
                 row = conn.execute("SELECT id, organization_id, email FROM cde.users WHERE lower(split_part(email, '@', 1)) = lower(%s) "
-                                   "AND status = 'ACTIVE' ORDER BY created_at LIMIT 1", [email]).fetchone()
+                                   "AND status = 'ACTIVE' ORDER BY created_at LIMIT 1", [chi]).fetchone()
             if row:
                 return row
         row = conn.execute("SELECT id, organization_id, email FROM cde.users WHERE is_platform_admin AND status = 'ACTIVE' "
@@ -81,8 +93,8 @@ def _utente(svc: Services, utente: str | None) -> dict:
 
 
 def ctx_suite(request: Request, svc: Services = Depends(services), _: None = Depends(richiede_token),
-              x_suite_utente: str | None = Header(default=None)) -> Ctx:
-    u = _utente(svc, x_suite_utente)
+              x_suite_utente: str | None = Header(default=None), x_suite_email: str | None = Header(default=None)) -> Ctx:
+    u = _utente(svc, x_suite_utente, x_suite_email)
     claims = AccessClaims(user_id=u["id"], org_id=u["organization_id"], mfa=True, amr=["suite"], jti=f"suite-{uuid.uuid4()}")
     return Ctx(svc, claims, client_ip(request), request.headers.get("user-agent"))
 
@@ -290,3 +302,207 @@ async def suite_carica(codice: str, request: Request, title: str = Query(..., mi
     return {"document_id": rev["document_id"], "revision_id": rev["id"], "identifier": avvio["identifier"],
             "filename": avvio["filename"], "revision_code": rev["revision_code"], "state": rev["state"],
             "container_id": cont["id"], "project_id": project["id"], "url": _url_documento(c, rev["document_id"])}
+
+
+# ---------------------------------------------------------------------
+# Registro commesse e "da fare" (CONTRATTI.md §3-4)
+# ---------------------------------------------------------------------
+@router.get("/registro")
+def suite_registro(solo_attive: bool = True, c: Ctx = Depends(ctx)):
+    """Il registro unico delle commesse della suite, per il menu a tendina della scheda Suite Cosedil."""
+    return {"commesse": suite_link.commesse(solo_attive=solo_attive)}
+
+
+def _url_web(c: Ctx, percorso: str) -> str:
+    if percorso.startswith("http"):
+        return percorso
+    return c.svc.settings.web_base_url.rstrip("/") + "/" + percorso.lstrip("/")
+
+
+def _data_iso(v) -> str | None:
+    if isinstance(v, datetime):
+        return v.date().isoformat()
+    return None
+
+
+@router.get("/da-fare")
+def suite_da_fare(c: Ctx = Depends(ctx_suite)):
+    """Cosa aspetta l'utente del portale in SkyTower: approvazioni assegnate (compiti aperti) e notifiche non lette."""
+    voci = []
+    with c.tx() as conn:
+        compiti = conn.execute(
+            """SELECT k.id, k.due_at, s.name AS step_name, d.identifier, d.title, r.revision_code, p.code AS project_code,
+                      (k.due_at IS NOT NULL AND k.due_at < now()) AS overdue
+               FROM cde.tasks k JOIN cde.workflow_step_runs s ON s.id = k.step_run_id
+               JOIN cde.workflow_instances i ON i.id = k.instance_id JOIN cde.documents d ON d.id = i.document_id
+               JOIN cde.document_revisions r ON r.id = i.revision_id JOIN cde.projects p ON p.id = i.project_id
+               WHERE k.assignee_id = cde.current_app_user() AND k.status = 'OPEN'
+               ORDER BY k.due_at NULLS LAST, k.created_at LIMIT 30""").fetchall()
+        notifiche = conn.execute(
+            """SELECT id, kind, title, body, link, created_at FROM cde.notifications
+               WHERE user_id = cde.current_app_user() AND read_at IS NULL ORDER BY id DESC LIMIT 30""").fetchall()
+    for k in compiti:
+        voci.append({"id": f"compito:{k['id']}", "titolo": f"Approvare {k['identifier']} {k['revision_code']}",
+                     "testo": f"{k['step_name']} · {k['project_code']} · {k['title']}" + (" · in ritardo" if k["overdue"] else ""),
+                     "url": _url_web(c, "/compiti"), "tipo": "documento", "priorita": 1 if k["overdue"] else 2,
+                     "data": _data_iso(k["due_at"])})
+    for n in notifiche:
+        voci.append({"id": f"notifica:{n['id']}", "titolo": n["title"], "testo": (n["body"] or "")[:200],
+                     "url": _url_web(c, n["link"] or "/"), "tipo": "avviso", "priorita": 3, "data": _data_iso(n["created_at"])})
+    return {"voci": voci[:50]}
+
+
+# ---------------------------------------------------------------------
+# Confronto Documenti e Verifica Requisiti su una revisione (CONTRATTI.md §7)
+# ---------------------------------------------------------------------
+revisioni = APIRouter(tags=["suite"])
+
+
+def _errore_suite(e: suite_link.SuiteError) -> ApiError:
+    return ApiError(503 if e.stato == 503 else 502, "suite_app", e.messaggio)
+
+
+def _revisione_scaricabile(conn, revision_id: uuid.UUID) -> tuple[dict, dict]:
+    """La revisione (scaricabile dall'utente) con ``sequence`` e ``document_id``, e il documento."""
+    rev = docs._downloadable(conn, revision_id)
+    riga = conn.execute("SELECT document_id, sequence FROM cde.document_revisions WHERE id = %s", [revision_id]).fetchone()
+    doc = conn.execute("SELECT id, project_id, container_id, identifier, title, attributes FROM cde.documents WHERE id = %s",
+                       [riga["document_id"]]).fetchone()
+    return {**rev, "sequence": riga["sequence"], "document_id": riga["document_id"]}, doc
+
+
+def _byte_revisione(c: Ctx, rev: dict) -> bytes:
+    return c.svc.storage.get_bytes(rev["storage_key"], rev["storage_version_id"])
+
+
+def _multipart_file(campi: dict, file: list[tuple[str, str, bytes, str]]) -> tuple[bytes, str]:
+    """multipart/form-data con più file (suite_link._multipart ne accetta uno solo)."""
+    confine = "----skytower" + uuid.uuid4().hex
+    corpo = bytearray()
+    for k, v in campi.items():
+        if v is None:
+            continue
+        corpo += f'--{confine}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n'.encode() + str(v).encode("utf-8") + b"\r\n"
+    for campo, nome, dati, ctype in file:
+        nome = nome.replace('"', "'")
+        corpo += (f'--{confine}\r\nContent-Disposition: form-data; name="{campo}"; filename="{nome}"\r\n'
+                  f"Content-Type: {ctype or 'application/octet-stream'}\r\n\r\n").encode() + dati + b"\r\n"
+    corpo += f"--{confine}--\r\n".encode()
+    return bytes(corpo), f"multipart/form-data; boundary={confine}"
+
+
+def _aggiungi_attributo(svc: Services, document_id: uuid.UUID, chiave: str, voce: dict) -> None:
+    """Appende ``voce`` a ``documents.attributes[chiave]`` fuori da RLS: chi legge il documento può annotarci
+    l'esito di un confronto o di una verifica, senza il permesso WRITE e senza lo schema dei metadati."""
+    with svc.db.auth_tx() as conn:
+        conn.execute("""UPDATE cde.documents SET attributes = attributes || jsonb_build_object(%s::text,
+                            coalesce(attributes -> %s::text, '[]'::jsonb) || %s::jsonb) WHERE id = %s""",
+                     [chiave, chiave, Jsonb([voce]), document_id])
+
+
+def _utente_portale(c: Ctx) -> tuple[str, str]:
+    with c.tx() as conn:
+        u = conn.execute("SELECT email, first_name || ' ' || last_name AS nome FROM cde.users WHERE id = %s", [c.user_id]).fetchone()
+    return (u["email"], u["nome"]) if u else ("", "")
+
+
+def _tipo_file(nome: str) -> str:
+    return mimetypes.guess_type(nome)[0] or "application/pdf"
+
+
+@revisioni.post("/revisions/{revision_id}/confronta", status_code=201)
+def confronta_revisione(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Manda questa revisione e la precedente dello stesso documento a Confronto Documenti; l'esito (job) resta
+    nei metadati del documento (``attributes.confronti``) e si apre con ``url``."""
+    with c.tx() as conn:
+        rev, doc = _revisione_scaricabile(conn, revision_id)
+        if rev["sequence"] <= 1:
+            raise ApiError(409, "prima_revisione", "È la prima revisione: non c'è niente con cui confrontarla")
+        prec_id = conn.execute("SELECT id FROM cde.document_revisions WHERE document_id = %s AND sequence = %s",
+                               [rev["document_id"], rev["sequence"] - 1]).fetchone()["id"]
+        prec = docs._downloadable(conn, prec_id)
+    corpo, ctype = _multipart_file({}, [("pdf1", prec["original_filename"], _byte_revisione(c, prec), _tipo_file(prec["original_filename"])),
+                                        ("pdf2", rev["original_filename"], _byte_revisione(c, rev), _tipo_file(rev["original_filename"]))])
+    email, nome = _utente_portale(c)
+    try:
+        esito = suite_link.chiama("confronto", "POST", "/api/compare", corpo_file=(corpo, ctype, "confronto"),
+                                  utente=email, nome=nome, email=email, timeout=60)
+    except suite_link.SuiteError as e:
+        raise _errore_suite(e) from None
+    job = (esito or {}).get("job_id")
+    if not job:
+        raise ApiError(502, "suite_app", "Confronto Documenti non ha restituito un job")
+    voce = {"revision_id": str(revision_id), "revision_code": rev["revision_code"], "precedente": str(prec_id),
+            "precedente_code": prec["revision_code"], "job_id": job,
+            "url": f"{suite_link.url_pubblico('confronto')}/?job={quote(str(job))}",
+            "data": datetime.now().isoformat(timespec="seconds"), "stato": "avviato", "utente": email}
+    _aggiungi_attributo(c.svc, doc["id"], "confronti", voce)
+    with c.tx() as conn:
+        security_event(conn, "REVISION_COMPARED", user_id=c.user_id, project_id=rev["project_id"], ip=c.ip,
+                       revision=revision_id, previous=prec_id, job=job)
+    return voce
+
+
+class VerificaIn(BaseModel):
+    set_id: str = Field(min_length=1, max_length=120)
+
+
+@revisioni.post("/revisions/{revision_id}/verifica", status_code=201)
+def verifica_revisione(revision_id: uuid.UUID, body: VerificaIn, c: Ctx = Depends(ctx)):
+    """Checklist di Verifica Requisiti sul file della revisione: carica, aspetta l'estrazione del testo, verifica;
+    l'esito resta in ``attributes.verifiche``."""
+    with c.tx() as conn:
+        rev, doc = _revisione_scaricabile(conn, revision_id)
+    dati = _byte_revisione(c, rev)
+    email, nome = _utente_portale(c)
+    chi = {"utente": email, "nome": nome, "email": email}
+    try:
+        caricato = suite_link.chiama("verifica", "POST", "/documenti", dati={},
+                                     file=("files", rev["original_filename"], dati, _tipo_file(rev["original_filename"])),
+                                     timeout=60, **chi)
+        documenti = (caricato or {}).get("documenti") or []
+        if not documenti:
+            raise ApiError(502, "suite_app", "Verifica Requisiti non ha accettato il file")
+        doc_id = documenti[0]["id"]
+        stato = documenti[0].get("stato")
+        for _ in range(60):                       # estrazione del testo asincrona: fino a 30 s
+            if stato == "pronto":
+                break
+            if stato in ("errore", "error"):
+                raise ApiError(502, "suite_app", "Verifica Requisiti non è riuscita a leggere il file")
+            time.sleep(0.5)
+            stato = (suite_link.chiama("verifica", "GET", f"/documenti/{quote(str(doc_id))}", **chi) or {}).get("stato")
+        else:
+            raise ApiError(504, "suite_app", "Verifica Requisiti sta ancora leggendo il file: riprovare tra poco")
+        esito = suite_link.chiama("verifica", "POST", "/verifiche", dati={"setId": body.set_id, "documentoIds": [doc_id]},
+                                  timeout=120, **chi)
+    except suite_link.SuiteError as e:
+        raise _errore_suite(e) from None
+    verifiche = (esito or {}).get("verifiche") or []
+    if not verifiche:
+        scarti = (esito or {}).get("scartati") or []
+        raise ApiError(502, "suite_app", "Verifica non eseguita: " + (scarti[0].get("motivo", "") if scarti else "nessun esito"))
+    v = verifiche[0]
+    risultati = v.get("risultati") or []
+    voce = {"revision_id": str(revision_id), "revision_code": rev["revision_code"], "set_id": body.set_id,
+            "nome_set": v.get("nomeSet") or body.set_id, "esito": v.get("esito"),
+            "ko": sum(1 for r in risultati if r.get("esito") == "ko"), "dubbi": sum(1 for r in risultati if r.get("esito") == "dubbio"),
+            "verifica_id": v.get("id"), "url": suite_link.url_pubblico("verifica"),
+            "data": datetime.now().isoformat(timespec="seconds"), "utente": email}
+    _aggiungi_attributo(c.svc, doc["id"], "verifiche", voce)
+    with c.tx() as conn:
+        security_event(conn, "REVISION_VERIFIED", user_id=c.user_id, project_id=rev["project_id"], ip=c.ip,
+                       revision=revision_id, set=body.set_id, esito=v.get("esito"))
+    return voce
+
+
+@router.get("/requisiti/set")
+def suite_requisiti_set(c: Ctx = Depends(ctx)):
+    """I set di Verifica Requisiti fra cui scegliere."""
+    email, nome = _utente_portale(c)
+    try:
+        r = suite_link.chiama("verifica", "GET", "/requisiti", utente=email, nome=nome, email=email)
+    except suite_link.SuiteError as e:
+        raise _errore_suite(e) from None
+    return {"set": [{"id": s["id"], "nome": s.get("nome") or s["id"], "descrizione": s.get("descrizione") or "",
+                     "requisiti": len(s.get("requisiti") or [])} for s in (r or {}).get("set") or []]}

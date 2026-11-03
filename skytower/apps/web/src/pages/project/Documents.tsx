@@ -19,6 +19,7 @@ import { openDocument } from "../../openDocument";
 import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowProgress";
 import { choosableFields, FieldValueInput, useFolderNaming } from "./Naming";
+import { SuiteDocumento } from "./SuiteDocumento";
 
 export interface DocumentRow {
   id: string;
@@ -37,6 +38,7 @@ export interface DocumentRow {
 
 interface Revision {
   id: string;
+  sequence?: number;
   revision_code: string;
   state: CdeState;
   transition_reason: string | null;
@@ -492,6 +494,10 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
               </ListItem>
             ))}
           </List>
+          {!doc.archived_at && documentId && (
+            <SuiteDocumento documentId={documentId} revisions={doc.revisions}
+                            attributes={(doc as { attributes?: Record<string, unknown> }).attributes} />
+          )}
           {history.length > 0 && (
             <>
               <Typography variant="subtitle2">Storico stati</Typography>

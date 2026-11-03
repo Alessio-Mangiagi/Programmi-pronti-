@@ -2,6 +2,7 @@
 """Rotte /suite: le altre app della suite Cosedil (InCampo, Magazzino) entrano col token di servizio,
 trovano il progetto dal codice commessa, leggono i documenti, scaricano un file e ne caricano uno.
 Ogni chiamata gira come un utente SkyTower (quello dell'header, o l'utente tecnico): RLS e permessi restano suoi."""
+import hashlib
 import os
 import uuid
 
@@ -151,3 +152,143 @@ def test_file_vuoto_e_attributi_non_validi(client, progetto_collegato):
     r = client.post(f"/suite/commesse/{COMMESSA}/documenti", headers={**come(w), "Content-Type": "application/pdf"},
                     content=b"%PDF", params={"title": "X", "attributes": "[1]", "filename": "x.pdf"})
     assert r.status_code == 422 and "attributes" in r.text
+
+
+
+# ---------------------------------------------------------------------
+# Registro commesse, "da fare", Confronto e Verifica (CONTRATTI.md §3-4, §7)
+# ---------------------------------------------------------------------
+def test_registro_commesse_per_il_web(client, as_user, tmp_path, monkeypatch):
+    from cde_api.modules import suite
+    monkeypatch.setattr(suite.suite_link, "FILE_COMMESSE", tmp_path / "commesse.json")
+    assert client.get("/suite/registro").status_code == 401                       # JWT, non token
+    assert client.get("/suite/registro", headers=as_user("des_lead")).json() == {"commesse": []}
+    suite.suite_link.salva_commesse([{"code": "101-003", "nome": "Porto di Augusta"}, {"code": "C-1", "stato": "chiusa"}])
+    r = client.get("/suite/registro", headers=as_user("des_lead"))
+    assert [c["code"] for c in r.json()["commesse"]] == ["101-003"]
+    assert len(client.get("/suite/registro", headers=as_user("des_lead"), params={"solo_attive": "false"}).json()["commesse"]) == 2
+
+
+def test_da_fare_notifiche_e_compiti(client, api_world, progetto_collegato):
+    import psycopg
+    urls, w = api_world
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("""INSERT INTO cde.notifications (user_id, project_id, kind, title, body, link)
+                        VALUES (%s, %s, 'suite', 'Prova da fare', 'corpo della notifica', '/documenti/x')""",
+                     [w.users["com_admin"], w.project_id])
+        conn.commit()
+    r = client.get("/suite/da-fare", headers=come(w))
+    assert r.status_code == 200, r.text
+    voce = next(v for v in r.json()["voci"] if v["titolo"] == "Prova da fare")
+    assert voce["tipo"] == "avviso" and voce["url"].endswith("/documenti/x") and voce["testo"] == "corpo della notifica"
+    assert voce["priorita"] == 3 and voce["data"]
+    # l'email del portale (X-Suite-Email) basta a trovare l'utente
+    r = client.get("/suite/da-fare", headers={**TOKEN, "X-Suite-Email": w.emails["com_admin"], "X-Suite-Utente": "sconosciuto"})
+    assert any(v["titolo"] == "Prova da fare" for v in r.json()["voci"])
+    assert client.get("/suite/da-fare").status_code == 403
+
+
+def _carica_revisione(client, headers, container_id, filename, data, expected=None):
+    """Upload completo (initiate → parti → complete) come in test_api_documents."""
+    import base64
+
+    import httpx
+    body = {"container_id": str(container_id), "filename": filename, "size_bytes": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(), "content_type": "application/pdf", "title": "Tavola"}
+    if expected:
+        body["expected_revision"] = expected
+    r = client.post("/uploads/initiate", headers=headers, json=body)
+    assert r.status_code == 201, r.text
+    up = r.json()
+    size = up["part_size"]
+    chunks = {i + 1: data[i * size:(i + 1) * size] for i in range(up["part_count"])}
+    req = [{"part_number": n, "checksum_sha256": base64.b64encode(hashlib.sha256(c).digest()).decode()} for n, c in chunks.items()]
+    r = client.post(f"/uploads/{up['upload_id']}/parts", headers=headers, json={"parts": req})
+    assert r.status_code == 200, r.text
+    with httpx.Client() as s3:
+        for p in r.json()["parts"]:
+            assert s3.put(p["url"], content=chunks[p["part_number"]], headers=p["headers"]).status_code == 200
+    r = client.post(f"/uploads/{up['upload_id']}/complete", headers=headers)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.fixture
+def app_vicine_finte(monkeypatch):
+    """Confronto Documenti e Verifica Requisiti finti: registrano le chiamate e rispondono come le app vere."""
+    from cde_api.modules import suite
+    chiamate = []
+
+    def chiama(app, metodo, percorso, **kw):
+        chiamate.append((app, metodo, percorso, kw))
+        if app == "confronto" and percorso == "/api/compare":
+            return {"job_id": "abc123"}
+        if app == "verifica" and percorso == "/documenti" and metodo == "POST":
+            return {"documenti": [{"id": "d1", "stato": "in_coda", "nomeFile": kw["file"][1]}], "inCoda": 1}
+        if app == "verifica" and percorso == "/documenti/d1":
+            return {"id": "d1", "stato": "pronto"}
+        if app == "verifica" and percorso == "/requisiti":
+            return {"set": [{"id": "s1", "nome": "POS", "descrizione": "Piano operativo", "requisiti": [1, 2, 3]}]}
+        if app == "verifica" and percorso == "/verifiche":
+            assert kw["dati"] == {"setId": "s1", "documentoIds": ["d1"]}
+            return {"verifiche": [{"id": "v1", "nomeSet": "POS", "esito": "ko",
+                                   "risultati": [{"esito": "ko"}, {"esito": "ok"}, {"esito": "dubbio"}]}], "scartati": []}
+        raise AssertionError((app, metodo, percorso))
+    monkeypatch.setattr(suite.suite_link, "chiama", chiama)
+    monkeypatch.setattr(suite.time, "sleep", lambda s: None)
+    return chiamate
+
+
+def test_confronta_e_verifica_revisione(client, api_world, as_user, worker, app_vicine_finte):
+    _, w = api_world
+    h = as_user("des_lead")
+    nome = f"PRJ01-DES-ZZ-01-DR-A-{uuid.uuid4().int % 9000 + 1000}.pdf"
+    r1 = _carica_revisione(client, h, w.containers["des_arch"], nome, PDF)
+    r2 = _carica_revisione(client, h, w.containers["des_arch"], nome, PDF + b"\n% seconda", expected=r1["revision_code"])
+    assert r2["document_id"] == r1["document_id"] and r2["sequence"] == 2
+    doc_id = r1["document_id"]
+
+    # prima dell'antivirus niente byte; la prima revisione non ha una precedente
+    assert client.post(f"/revisions/{r2['id']}/confronta", headers=h).status_code == 409
+    worker()
+    assert client.post(f"/revisions/{r1['id']}/confronta", headers=h).json()["error"]["code"] == "prima_revisione"
+
+    r = client.post(f"/revisions/{r2['id']}/confronta", headers=h)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["job_id"] == "abc123" and d["url"].endswith("/?job=abc123") and d["precedente"] == r1["id"]
+    kw = app_vicine_finte[0][3]
+    corpo, ctype, _ = kw["corpo_file"]
+    assert ctype.startswith("multipart/form-data; boundary=") and kw["email"] == w.emails["des_lead"]
+    assert b'name="pdf1"' in corpo and b'name="pdf2"' in corpo and corpo.count(nome.encode()) == 2 and b"% seconda" in corpo
+    doc = client.get(f"/documents/{doc_id}", headers=h).json()
+    assert [c["job_id"] for c in doc["attributes"]["confronti"]] == ["abc123"]
+    assert doc["revisions"][0]["sequence"] == 2
+
+    # verifica requisiti: upload, attesa "pronto", verifica, esito nei metadati
+    assert client.get("/suite/requisiti/set", headers=h).json()["set"] == [{"id": "s1", "nome": "POS", "descrizione": "Piano operativo", "requisiti": 3}]
+    r = client.post(f"/revisions/{r2['id']}/verifica", headers=h, json={"set_id": "s1"})
+    assert r.status_code == 201, r.text
+    v = r.json()
+    assert v["esito"] == "ko" and v["ko"] == 1 and v["dubbi"] == 1 and v["nome_set"] == "POS" and v["verifica_id"] == "v1"
+    percorsi = [(a, m, p) for a, m, p, _ in app_vicine_finte if a == "verifica"]
+    assert percorsi[-3:] == [("verifica", "POST", "/documenti"), ("verifica", "GET", "/documenti/d1"), ("verifica", "POST", "/verifiche")]
+    doc = client.get(f"/documents/{doc_id}", headers=h).json()
+    assert doc["attributes"]["verifiche"][0]["set_id"] == "s1" and doc["attributes"]["confronti"]   # i confronti restano
+    assert client.post(f"/revisions/{r2['id']}/verifica", headers=h, json={"set_id": ""}).status_code == 422
+
+
+def test_app_vicina_spenta(client, api_world, as_user, worker, monkeypatch):
+    from cde_api.modules import suite
+    _, w = api_world
+    h = as_user("des_lead")
+    nome = f"PRJ01-DES-ZZ-01-DR-A-{uuid.uuid4().int % 9000 + 1000}.pdf"
+    r1 = _carica_revisione(client, h, w.containers["des_arch"], nome, PDF)
+    worker()
+
+    def giu(*a, **k):
+        raise suite.suite_link.SuiteError("verifica", 503, "Verifica Requisiti non raggiungibile")
+    monkeypatch.setattr(suite.suite_link, "chiama", giu)
+    r = client.post(f"/revisions/{r1['id']}/verifica", headers=h, json={"set_id": "s1"})
+    assert r.status_code == 503 and "non raggiungibile" in r.json()["error"]["message"]
+    assert client.get("/suite/requisiti/set", headers=h).status_code == 503

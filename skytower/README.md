@@ -66,6 +66,48 @@ Avvio con un doppio clic: `Torre di controllo - SkyTower\Avvia SkyTower.bat` ric
 API e worker, carica i documenti demo che mancano (`cde demo-contenuti`), crea o aggiorna l'account personale
 (`cde utente-dev`, password chiesta nascosta o da `CDE_NUOVA_PWD`, mai su file) e apre Firefox.
 
+## Demo parlante: due commesse complete
+
+`tooling/demo_commesse.py` costruisce, passando dall'API come farebbero gli utenti, due commesse con
+tutto quello che il CDE sa fare: servono a capire come funziona e a far girare la suite con dati veri.
+
+| Commessa | Progetto | Cosa è |
+|---|---|---|
+| `101-003` Sede Acireale | `ACI003` | ristrutturazione uffici, Via Nazionale 120, Acireale (CT), cliente Cosedil S.p.A. |
+| `C-2024-015` Scuola Via Roma | `SCU015` | nuova scuola primaria, Via Roma 45, Catania, committente Comune di Catania |
+
+Sono gli stessi codici commessa del registro della suite, di InCampo e del Magazzino: InCampo prende le
+tavole pubblicate come planimetrie «da SkyTower», il Magazzino manda qui i report di giacenza, il Lettore
+DDT e VFP Transfer archiviano qui i loro documenti. Per ogni commessa:
+
+- progetto copiato dal template `PRJ01` (5 organizzazioni con il loro ruolo di parte, 14 persone con ruoli
+  diversi, cartelle, workflow), `settings.commessa` = codice, indirizzo, cliente, importo, filigrana sulle
+  revisioni condivise, schema di nomenclatura ISO 19650 con il codice del progetto;
+- 20 cartelle (piante, prospetti, dettagli, strutture, BIM, relazioni, computi, impianti, verbali, foto,
+  sicurezza, direzione lavori, area riservata «Contratti e offerte»);
+- 28-29 documenti con file veri: tavole architettoniche, strutturali e d'impianto con cartiglio, relazione
+  tecnica, relazione di calcolo, computo metrico, cronoprogramma, piano di sicurezza, capitolato, elenco
+  elaborati, modello IFC, foto di cantiere, verbali della DL (uno scansionato, per l'OCR), ordine di
+  servizio, contratto in area riservata; 65-68 revisioni in tutto (fino a P03.01), 18 pubblicate, 9-10
+  condivise, 1 in lavorazione, 1 archiviata con motivazione;
+- documenti seguiti dal committente (= notifiche a ogni passaggio di stato), annotazioni con risposte e
+  chiusura, 4 workflow di approvazione (uno appena avviato, uno a metà, uno approvato fino alla
+  pubblicazione automatica, uno respinto dalla DL con commento), RFI con risposte e chiusura, transmittal
+  con presa visione, due richieste di accesso all'area riservata (una decisa, una in attesa).
+
+```powershell
+.venv\Scripts\python tooling\demo_commesse.py                 # API su http://127.0.0.1:8100
+.venv\Scripts\python tooling\demo_commesse.py --solo 101-003
+.venv\Scripts\python tooling\demo_commesse.py --rimuovi       # archivia i progetti demo e li scollega
+```
+
+Si può rilanciare quante volte si vuole: trova quello che c'è (progetto per codice commessa, documento per
+nome) e aggiunge solo ciò che manca. Tutto è marcato (`settings.demo`, attributo `demo` sui documenti).
+Utenti: quelli del seed demo, password `Cantiere-2026!` (`com.admin@com.example` amministra, `com.dl@…`
+Direzione Lavori con i compiti del workflow, `com.im@…` Information Manager con le notifiche,
+`des.lead@des.example` progettista che carica e condivide, `sub1.user@sub1.example` impiantista). L'account
+personale (l'unica email non `.example`) viene aggiunto come Project Admin ai due progetti, mai modificato.
+
 ## Suite Cosedil: dialogo con InCampo e Magazzino
 
 Le altre app della suite trovano il progetto dal **codice commessa aziendale**, che il
@@ -80,10 +122,48 @@ protette dal token di servizio di `shared/suite` (header `X-Suite-Token`), non d
 | `GET /suite/revisioni/{id}/file` | i byte di una revisione (InCampo ne fa una planimetria), stessi controlli del download |
 | `POST /suite/commesse/{codice}/documenti` | un file (corpo della richiesta, nome in `X-Suite-Nome-File`, metadati in query) diventa documento WIP nella cartella «Suite Cosedil» dell'organizzazione, nome a norma (rinomina automatica se attiva, altrimenti primo progressivo libero, tipo `RP`, ruolo `Z`) |
 
+| `GET /suite/da-fare` | cosa aspetta l'utente del portale: approvazioni assegnate (compiti aperti) e notifiche non lette, nel formato della home del portale |
+
 Ogni chiamata gira come un utente SkyTower, perché RLS e permessi sono per utente:
-quello con l'email dell'utente del portale (`X-Suite-Utente`) se esiste, altrimenti
-l'utente tecnico `CDE_SUITE_USER_EMAIL`, altrimenti il primo platform admin (che vede
-solo i progetti di cui è membro). Chi non vede il progetto riceve 404.
+quello con l'email dell'utente del portale (`X-Suite-Email`, poi `X-Suite-Utente` anche
+come parte prima della `@`) se esiste, altrimenti l'utente tecnico `CDE_SUITE_USER_EMAIL`,
+altrimenti il primo platform admin (che vede solo i progetti di cui è membro). Chi non
+vede il progetto riceve 404. Regole comuni a tutte le app in `shared/suite/CONTRATTI.md`.
+
+### Login automatico dal portale
+
+`POST /auth/portale` (`modules/portale.py`): la SPA lo chiama una volta all'apertura se
+non ha una sessione. L'API gira il cookie `sid` del portale a `<COSEDIL_PORTAL>/api/verify`
+(`shared/sso`), trova l'utente SkyTower (email del portale, altrimenti parte prima della
+`@` = username) e apre la sessione come dopo il login (`amr = ["portale"]`). Se l'utente
+manca lo **crea**, attivo e senza password, e lo rende membro di tutti i progetti con
+codice commessa; un utente già esistente non membro viene aggiunto allo stesso modo.
+Con `COSEDIL_SSO=off` o portale spento risponde 401 e si vede il login di sempre.
+
+| Variabile | Default | Effetto |
+|---|---|---|
+| `CDE_SUITE_ORG_ID` | organizzazione di `CDE_SUITE_USER_EMAIL`, altrimenti del primo platform admin | dove nascono gli utenti creati dal portale |
+| `CDE_SUITE_RUOLO_PORTALE` | `DESIGNER` | ruolo di sistema sui progetti con commessa (admin del portale → `PROJECT_ADMIN` e org admin) |
+| `CDE_SUITE_EMAIL_DOMINIO` | `cosedilspa.com` | email di ripiego `<username>@<dominio>` quando il portale non la dà |
+| `COSEDIL_PORTAL` | `http://localhost:8080` | il portale da interrogare |
+
+La membership viene inserita a nome di un Project Admin del progetto (RLS); la migrazione
+`0034_suite_portale.sql` dà a `cde_auth` la lettura di progetti, ruoli e membership.
+
+### Confronto Documenti e Verifica Requisiti dal dettaglio documento
+
+Sezione «Suite Cosedil» del dettaglio documento (JWT):
+
+| Rotta | Cosa fa |
+|---|---|
+| `POST /revisions/{id}/confronta` | manda la revisione e la precedente dello stesso documento a Confronto Documenti (`/api/compare`, token di servizio); l'esito resta in `documents.attributes.confronti[]` con `url` (`…/?job=<id>`) |
+| `POST /revisions/{id}/verifica` `{set_id}` | carica il file in Verifica Requisiti, aspetta l'estrazione del testo, lancia la checklist; esito (`ok`/`ko`/`dubbio`, conteggi) in `attributes.verifiche[]` |
+| `GET /suite/requisiti/set` | i set di Verifica Requisiti |
+| `GET /suite/registro` | registro unico delle commesse (`shared/suite/commesse.json`) per il menu a tendina della scheda Suite Cosedil |
+
+Basta poter scaricare la revisione; l'annotazione sui metadati passa da `cde_auth` (niente permesso WRITE,
+niente schema dei metadati). App vicina spenta = 503 con messaggio, mai un errore generico.
+Indirizzi delle app con `SUITE_URL_CONFRONTO`, `SUITE_URL_VERIFICA` (default porte 5001 e 5185).
 
 ## Test
 
@@ -94,6 +174,8 @@ cd apps/api
 
 - `tests/test_db_isolation.py` — 113 casi direttamente sul database come `cde_app` (scenari T1–T10, matrice ruolo × azione, escalation, append-only).
 - `tests/test_api_auth.py` — login, lockout, rate limit, MFA TOTP/recovery, rotazione refresh e riuso (T9), inviti, reset.
+- `tests/test_api_portale.py` — login automatico dal portale: utente trovato per email o username, creato se manca, membro dei progetti con commessa.
+- `tests/test_api_suite.py` — rotte `/suite` per le altre app, registro commesse, da-fare, confronto e verifica di una revisione (app vicine finte).
 - `tests/test_api_admin.py` — isolamento via HTTP (404 vs 403), grant, membri, ruoli, flusso completo del Project Admin.
 - `tests/test_security_owasp.py` — OWASP API Top 10 su tutte le rotte dell'app (BOLA, token contraffatti, mass assignment, header); vedi `docs/pentest.md`.
 - `tests/test_api_naming_auto.py` — rinomina automatica, serie, numeri consecutivi, prenotazioni.

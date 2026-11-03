@@ -2,6 +2,7 @@
 """Configurazione da variabili d'ambiente (prefisso CDE_) o file .env."""
 from __future__ import annotations
 
+import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -61,6 +62,13 @@ class Settings(BaseSettings):
     # Suite Cosedil (InCampo, Magazzino): utente tecnico a cui attribuire le chiamate delle altre app quando
     # l'utente del portale non ha un account SkyTower (vedi modules/suite.py). None = primo platform admin.
     suite_user_email: str | None = None
+    # Login automatico dal portale (POST /auth/portale, vedi modules/portale.py): l'utente del portale che non
+    # ha un account SkyTower viene creato in questa organizzazione (None = quella dell'utente tecnico, altrimenti
+    # quella del primo platform admin), membro dei progetti con codice commessa con questo ruolo di sistema
+    # (admin del portale → PROJECT_ADMIN). Email di ripiego: <username>@<suite_email_dominio>.
+    suite_org_id: uuid.UUID | None = None
+    suite_ruolo_portale: str = "DESIGNER"
+    suite_email_dominio: str = "cosedilspa.com"
 
     # Storage documenti (S3). s3_endpoint_url solo per emulatori (moto) in dev/test
     s3_bucket: str = "cde-dev-documents"

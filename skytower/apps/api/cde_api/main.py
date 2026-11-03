@@ -29,13 +29,14 @@ from .modules import (
     office,
     organizations,
     passkeys,
+    portale,
     projects,
     reports,
     rfis,
     sessions,
     sso,
-    suite,
     states,
+    suite,
     transmittals,
     workflows,
 )
@@ -111,7 +112,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
                    rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles, bim,
-                   naming_profiles, office, suite):
+                   naming_profiles, office, suite, portale):
         app.include_router(module.router)
     app.include_router(passkeys.login_router)
+    app.include_router(suite.revisioni)
     return app
