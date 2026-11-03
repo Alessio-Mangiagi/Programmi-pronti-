@@ -263,3 +263,95 @@ class EstrazioneTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# --------------------------------------------------------------------------- SkyTower (CDE della suite)
+
+class FintoSkyTower:
+    """Le rotte /suite di SkyTower in memoria: due commesse, un documento pubblicato ciascuna."""
+
+    def __init__(self):
+        self.chiamate = []
+        self.docs = {"101-003": [{"id": "d1", "identifier": "PRJ-COS-ZZ-01-DR-A-0001", "title": "Pianta piano terra",
+                                  "revision_id": "r1", "revision_code": "C01", "state": "PUBLISHED", "filename": "pianta.pdf",
+                                  "size_bytes": 8, "updated_at": "2026-11-02T10:00:00"}],
+                     "102-001": [{"id": "d2", "identifier": "PRJ-COS-ZZ-ZZ-RP-Z-0001", "title": "Report", "revision_id": "r2",
+                                  "revision_code": "C01", "state": "PUBLISHED", "filename": "report.pdf", "size_bytes": 5,
+                                  "updated_at": "2026-11-01T10:00:00"}]}
+        self.file = {"r1": b"%PDF-1.4", "r2": b"%PDF-"}
+
+    def chiama(self, app, metodo, percorso, parametri=None, grezzo=False, **kw):
+        self.chiamate.append((app, metodo, percorso, parametri))
+        assert app == "skytower" and metodo == "GET"
+        if percorso == "/suite/commesse":
+            return [{"id": "p1", "code": "PRJ", "name": "Porto di Augusta", "commessa": "101-003"},
+                    {"id": "p2", "code": "SCU", "name": "Scuola Messina", "commessa": "102-001"}]
+        if percorso.startswith("/suite/commesse/"):
+            from urllib.parse import unquote
+            codice = unquote(percorso.split("/")[3])
+            return {"commessa": codice, "items": self.docs[codice]}
+        if percorso.startswith("/suite/revisioni/"):
+            return self.file[percorso.split("/")[3]], "application/pdf"
+        raise AssertionError(percorso)
+
+
+class SkyTowerTest(unittest.TestCase):
+    def setUp(self):
+        import suite_cosedil
+        self.finto = FintoSkyTower()
+        self.p = mock.patch.object(suite_cosedil.suite_link, "chiama", self.finto.chiama)
+        self.p.start()
+        self.tmp = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.p.stop()
+        self.tmp.cleanup()
+
+    def test_inventario_ed_estrazione(self):
+        sorgente = ed.SorgenteSkyTower(utente="mrossi")
+        sorgente.login("x", "y")  # nessuna credenziale: non chiama niente
+        self.assertEqual(sorgente.cartella(1)["name"], "SkyTower")
+        cartelle = sorgente.figli(1)
+        self.assertEqual([c[2] for c in cartelle], ["101-003 Porto di Augusta", "102-001 Scuola Messina"])
+        self.assertTrue(all(c[0] == "folder" and isinstance(c[1], int) and c[1] > 1 for c in cartelle))
+        voci = ed.inventario(sorgente, 1)
+        self.assertEqual([(v.cartella, v.nome, v.versione, v.byte) for v in voci],
+                         [(("101-003 Porto di Augusta",), "PRJ-COS-ZZ-01-DR-A-0001", 1, 8),
+                          (("102-001 Scuola Messina",), "PRJ-COS-ZZ-ZZ-RP-Z-0001", 1, 5)])
+        # gli id sono stabili: una seconda istanza li ricalcola uguali (stato_estrazione e percorsi su disco)
+        self.assertEqual([v.doc_id for v in ed.inventario(ed.SorgenteSkyTower(), 1)], [v.doc_id for v in voci])
+        conti = ed.Estrazione(sorgente, self.tmp.name).esegui(voci)
+        self.assertEqual(conti, {"scaricato": 2, "presente": 0, "errore": 0})
+        pianta = Path(self.tmp.name) / "file" / str(voci[0].doc_id) / "v1" / "pianta.pdf"
+        self.assertEqual(pianta.read_bytes(), b"%PDF-1.4")
+        righe = (Path(self.tmp.name) / "manifest.csv").read_text(encoding="utf-8-sig").splitlines()
+        self.assertEqual(len(righe), 3)
+        self.assertIn("101-003 Porto di Augusta", righe[1])
+        self.assertEqual(self.finto.chiamate[-1][2], "/suite/revisioni/r2/file")
+        # commesse con spazi: il codice viaggia codificato nel percorso
+        self.finto.docs["C 01"] = []
+        sorgente2 = ed.SorgenteSkyTower()
+        sorgente2._commesse = {77: {"code": "C 01", "name": "X"}}
+        self.assertEqual(sorgente2.figli(77), [])
+        self.assertEqual(self.finto.chiamate[-1][2], "/suite/commesse/C%2001/documenti")
+
+    def test_documento_diretto_e_errori(self):
+        import moduli
+        _, http, sorgente = moduli._dms({"DMS_TIPO": "skytower"}, utente="mrossi")
+        self.assertIs(http, sorgente)
+        doc_id = ed.inventario(ed.SorgenteSkyTower(), 1)[1].doc_id
+        # istanza nuova, senza aver letto le cartelle: trova il documento da solo (moduli.dms_scarica)
+        self.assertEqual(sorgente.versioni(doc_id)[0]["nome_file"], "report.pdf")
+        p = moduli.dms_scarica({"DMS_TIPO": "skytower"}, doc_id, self.tmp.name)
+        self.assertEqual(p.read_bytes(), b"%PDF-")
+        with self.assertRaisesRegex(ed.DmsErrore, "non trovato"):
+            sorgente.versioni(123)
+        with self.assertRaisesRegex(ed.DmsErrore, "non trovata"):
+            sorgente.figli(2)
+        import suite_cosedil
+
+        def giu(*a, **k):
+            raise suite_cosedil.suite_link.SuiteError("skytower", 503, "SkyTower non raggiungibile")
+        with mock.patch.object(suite_cosedil.suite_link, "chiama", giu):
+            with self.assertRaisesRegex(ed.DmsErrore, "non raggiungibile"):
+                ed.SorgenteSkyTower().figli(1)

@@ -130,3 +130,54 @@ class CsvTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SkyTowerPostaTest(unittest.TestCase):
+    """MAIL_SKYTOWER: gli allegati vanno su SkyTower se l'oggetto cita una commessa del registro della suite."""
+
+    def setUp(self):
+        import suite_cosedil
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.chiamate = []
+
+        def chiama(app, metodo, percorso, parametri=None, corpo_file=None, **kw):
+            self.chiamate.append((percorso, parametri, corpo_file))
+            if corpo_file[2] == "rotto.pdf":
+                raise suite_cosedil.suite_link.SuiteError("skytower", 422, "File vuoto")
+            return {"identifier": "PRJ-COS-ZZ-ZZ-RP-Z-0007", "url": "http://localhost:5195/documenti/x"}
+        self.patch = [mock.patch.object(suite_cosedil.suite_link, "chiama", chiama),
+                      mock.patch.object(suite_cosedil.suite_link, "FILE_COMMESSE", self.dir / "commesse.json")]
+        for p in self.patch:
+            p.start()
+        suite_cosedil.suite_link.salva_commesse([{"code": "101-003", "nome": "Porto di Augusta"}])
+
+    def tearDown(self):
+        for p in self.patch:
+            p.stop()
+        self.tmp.cleanup()
+
+    def messaggio(self, oggetto, allegati):
+        return vfp_mail.MailMessage("1:2", "2", "fornitore@esempio.it", oggetto, datetime(2026, 11, 3, 9, 30),
+                                    [vfp_mail.Attachment(n, d) for n, d in allegati], msg_id="<abc@esempio.it>")
+
+    def test_allegati_su_skytower(self):
+        (self.dir / "polizza.pdf").write_bytes(b"%PDF-1.4 polizza")
+        m = self.messaggio("Re: 101-003 SEDE ACIREALE - polizza mezzo", [("polizza.pdf", b"x"), ("daticert.xml", b"<x/>"), ("rotto.pdf", b"")])
+        esito = vfp_mail.invia_a_skytower({}, m, self.dir, utente="mrossi")
+        self.assertEqual(esito["commessa"], "101-003")
+        self.assertEqual([(v["nome"], v["esito"]) for v in esito["esiti"]], [("polizza.pdf", "creato"), ("rotto.pdf", "errore")])
+        percorso, parametri, corpo = self.chiamate[0]
+        self.assertEqual(percorso, "/suite/commesse/101-003/documenti")
+        self.assertEqual(corpo, (b"%PDF-1.4 polizza", "application/pdf", "polizza.pdf"))   # la copia su disco, non l'allegato grezzo
+        self.assertEqual(parametri["title"], "polizza")
+        import json
+        attr = json.loads(parametri["attributes"])
+        self.assertEqual((attr["origine"], attr["mittente"], attr["message_id"]), ("posta", "fornitore@esempio.it", "<abc@esempio.it>"))
+        self.assertIn("SkyTower 101-003: 1 documenti, 1 errori (rotto.pdf: File vuoto)", vfp_mail.riassunto_skytower(esito))
+
+    def test_senza_commessa_niente(self):
+        m = self.messaggio("Fattura di ottobre", [("fattura.pdf", b"x")])
+        self.assertIsNone(vfp_mail.invia_a_skytower({}, m, self.dir))
+        self.assertEqual(self.chiamate, [])
+        self.assertEqual(vfp_mail.riassunto_skytower(None), "")

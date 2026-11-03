@@ -68,6 +68,8 @@ DEFAULTS = {
     "MAIL_ALLOWED_SENDERS": "",
     "MAIL_REQUIRE_AUTH": "true",
     "MAIL_ANTIVIRUS": "true",
+    # allegati delle email con un codice commessa del registro della suite nell'oggetto -> documenti su SkyTower
+    "MAIL_SKYTOWER": "false",
     "MAIL_MAX_MB": "50",
     "MAIL_QUARANTINE_FOLDER": "Bloccate VFP",
     # ---- protocollo delle PEC: regola personalizzata (vuota = regole predefinite, vedi protocollo.py)
@@ -92,7 +94,7 @@ DEFAULTS = {
     # ---- modelli Word protetti (es. trasporti): cartella condivisa in sola lettura -> copie interne compilate
     "MODELLI_SORGENTE": "",
     "MODELLI_LAVORO": "modelli_compilati",
-    # ---- DMS di origine (sola lettura, vedi estrai_dms.py)
+    # ---- DMS di origine (sola lettura, vedi estrai_dms.py): seeddms (URL/utente/password) o skytower (la suite)
     "DMS_TIPO": "seeddms",
     "DMS_URL": "",
     "DMS_USER": "",
@@ -226,8 +228,8 @@ def validate_settings(values, current):
         raise ValueError("CLAUDE_MODEL: nome del modello non valido")
     if values.get("MODULI_AI", "conferma") not in ("no", "conferma", "auto"):
         raise ValueError("MODULI_AI: no, conferma oppure auto")
-    if values.get("DMS_TIPO", "seeddms") not in ("seeddms",):
-        raise ValueError("DMS_TIPO: per ora solo seeddms")
+    if values.get("DMS_TIPO", "seeddms") not in ("seeddms", "skytower"):
+        raise ValueError("DMS_TIPO: seeddms oppure skytower")
     if values.get("DMS_URL"):
         u = urlparse(values["DMS_URL"])
         if u.username or u.password or not (u.scheme == "https" or (u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost", "::1"))):

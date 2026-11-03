@@ -18,8 +18,10 @@ Integrita' e ripresa: download in .part, controllo della dimensione dichiarata d
 in stato_estrazione.json e nel manifest (vfp_transfer non carica un file cambiato); rilanciando si scaricano
 solo le versioni mancanti (anche quelle nuove). --verifica --dest D:\\estrazione ricontrolla gli SHA-256.
 
-Per ora c'e' l'adattatore per SeedDMS (SorgenteSeedDms): per un altro DMS basta una classe con gli stessi
-metodi (login, logout, figli, versioni, scarica).
+Adattatori: SeedDMS (SorgenteSeedDms) e SkyTower, il CDE della suite (SorgenteSkyTower, --tipo skytower o
+DMS_TIPO=skytower: le commesse sono le cartelle, i documenti pubblicati le voci, niente credenziali perche'
+usa il token di servizio della suite). Per un altro DMS basta una classe con gli stessi metodi
+(login, logout, cartella, figli, versioni, scarica).
 """
 
 import argparse
@@ -67,6 +69,14 @@ class DmsErrore(Exception):
     def __init__(self, resp):
         self.status = resp.status_code
         super().__init__(f"DMS {resp.status_code} su {urlparse(resp.url).path}: {resp.text[:200]}")
+
+
+class SkyTowerErrore(DmsErrore):
+    """Errore di SkyTower (rotte /suite): stesso tipo di DmsErrore per chi lo gestisce, messaggio gia' pronto."""
+
+    def __init__(self, messaggio, status=0):
+        Exception.__init__(self, messaggio)
+        self.status = status
 
 
 def controlla_url(url):
@@ -227,6 +237,129 @@ class SorgenteSeedDms:
 
     def scarica(self, doc_id, versione):
         return self.http.get(f"/document/{int(doc_id)}/version/{int(versione)}", stream=True)
+
+
+class _RispostaByte:
+    """Risposta gia' in memoria con la forma minima che Estrazione.scarica si aspetta (headers, iter_content, close)."""
+
+    def __init__(self, dati, tipo=""):
+        self.dati = dati
+        self.headers = {"Content-Length": str(len(dati)), "Content-Type": tipo}
+
+    def iter_content(self, n):
+        for i in range(0, len(self.dati), n):
+            yield self.dati[i:i + n]
+
+    def close(self):
+        pass
+
+
+def _id_stabile(testo):
+    """Intero stabile (9 cifre) da un identificativo testuale: gli id vanno nei percorsi su disco e nello stato."""
+    return int(hashlib.sha1(testo.encode("utf-8")).hexdigest()[:8], 16) % 900_000_000 + 100_000_000
+
+
+class SorgenteSkyTower:
+    """
+    SkyTower (CDE della suite) letto con le rotte /suite e il token di servizio di shared/suite.
+    Radice (id 1) = le commesse con codice; ogni commessa e' una cartella (id stabile dal codice); i documenti
+    pubblicati sono le voci (id stabile dall'id SkyTower), una versione = l'ultima revisione.
+    Nessun login: chi chiama e' l'utente del portale (X-Suite-Utente), se noto.
+    """
+    RADICE = 1
+
+    def __init__(self, utente=None, area="PUBLISHED", limite=200):
+        import suite_cosedil
+        self.suite = suite_cosedil
+        self.utente = utente
+        self.area = area
+        self.limite = limite
+        self.richieste = 0
+        self._commesse = None      # id cartella -> {"code", "name"}
+        self._documenti = {}       # id documento -> {"revision_id", "nome_file", "byte", "data", "commento", "commessa"}
+
+    def _chiama(self, percorso, parametri=None, grezzo=False):
+        self.richieste += 1
+        try:
+            return self.suite.suite_link.chiama("skytower", "GET", percorso, parametri=parametri, utente=self.utente,
+                                                grezzo=grezzo, timeout=120)
+        except self.suite.suite_link.SuiteError as e:
+            raise SkyTowerErrore(f"SkyTower: {e.messaggio}", e.stato) from None
+
+    def login(self, user=None, password=None):
+        pass
+
+    def logout(self):
+        pass
+
+    def close(self):
+        pass
+
+    def commesse(self):
+        if self._commesse is None:
+            self._commesse = {}
+            for p in self._chiama("/suite/commesse") or []:
+                code = p.get("commessa") or p.get("code") or ""
+                if code:
+                    self._commesse[_id_stabile("commessa:" + code)] = {"code": code, "name": p.get("name") or ""}
+        return self._commesse
+
+    def cartella(self, folder_id):
+        folder_id = int(folder_id)
+        if folder_id == self.RADICE:
+            return {"id": self.RADICE, "name": "SkyTower"}
+        c = self.commesse().get(folder_id)
+        if not c:
+            raise SkyTowerErrore(f"SkyTower: cartella {folder_id} non trovata", 404)
+        return {"id": folder_id, "name": f"{c['code']} {c['name']}".strip()}
+
+    def _documenti_di(self, folder_id):
+        c = self.commesse()[folder_id]
+        risposta = self._chiama(f"/suite/commesse/{self.suite.percorso_commessa(c['code'])}/documenti",
+                                parametri={"area": self.area, "limit": self.limite})
+        out = []
+        for d in (risposta or {}).get("items", []):
+            if not d.get("revision_id"):
+                continue
+            doc_id = _id_stabile("documento:" + str(d["id"]))
+            self._documenti[doc_id] = {"revision_id": d["revision_id"], "nome_file": d.get("filename") or d["identifier"],
+                                       "byte": int(d.get("size_bytes") or 0), "data": str(d.get("updated_at") or ""),
+                                       "commento": f"{d.get('revision_code') or ''} {d.get('state') or ''}".strip(),
+                                       "commessa": c["code"]}
+            out.append(("document", doc_id, d["identifier"], d.get("title") or ""))
+        return out
+
+    def figli(self, folder_id):
+        """[(tipo 'folder'|'document', id, nome, commento)]"""
+        folder_id = int(folder_id)
+        if folder_id == self.RADICE:
+            return [("folder", fid, f"{c['code']} {c['name']}".strip(), "")
+                    for fid, c in sorted(self.commesse().items(), key=lambda x: x[1]["code"])]
+        if folder_id not in self.commesse():
+            raise SkyTowerErrore(f"SkyTower: cartella {folder_id} non trovata", 404)
+        return self._documenti_di(folder_id)
+
+    def _documento(self, doc_id):
+        doc_id = int(doc_id)
+        if doc_id not in self._documenti:   # chiamata diretta (moduli.dms_scarica): si cercano tutte le commesse
+            for fid in list(self.commesse()):
+                self._documenti_di(fid)
+                if doc_id in self._documenti:
+                    break
+        d = self._documenti.get(doc_id)
+        if not d:
+            raise SkyTowerErrore(f"SkyTower: documento {doc_id} non trovato", 404)
+        return d
+
+    def versioni(self, doc_id):
+        """Una sola versione: l'ultima revisione disponibile nell'area scelta."""
+        d = self._documento(doc_id)
+        return [{"versione": 1, "commento": d["commento"], "nome_file": d["nome_file"], "byte": d["byte"], "data": d["data"]}]
+
+    def scarica(self, doc_id, versione):
+        d = self._documento(doc_id)
+        dati, tipo = self._chiama(f"/suite/revisioni/{d['revision_id']}/file", grezzo=True)
+        return _RispostaByte(dati, tipo)
 
 
 # --------------------------------------------------------------------------- estrazione
@@ -426,6 +559,8 @@ class Estrazione:
 
 def main():
     p = argparse.ArgumentParser(description="Estrae in sola lettura documenti e revisioni dal DMS di origine.")
+    p.add_argument("--tipo", choices=("seeddms", "skytower"), default=os.environ.get("DMS_TIPO") or "seeddms",
+                   help="DMS di origine: seeddms (--url e --user) oppure skytower (la suite, senza credenziali)")
     p.add_argument("--url", help="indirizzo delle API del DMS (es. https://dms/restapi/index.php)")
     p.add_argument("--user", help="utente del DMS, meglio un utente tecnico in sola lettura")
     p.add_argument("--cartella", type=int, default=1, help="ID della cartella da estrarre (es. una commessa); 1 = tutto")
@@ -447,20 +582,24 @@ def main():
         if problemi:
             sys.exit("Rilanciare l'estrazione per riscaricare i file segnalati (poi rifare il manifest).")
         return
-    if not args.url or not args.user:
-        p.error("--url e --user sono obbligatori (tranne con --verifica)")
+    if args.tipo == "seeddms" and (not args.url or not args.user):
+        p.error("--url e --user sono obbligatori (tranne con --verifica o --tipo skytower)")
     if not args.dry_run and not args.dest:
         p.error("--dest e' obbligatoria (oppure --dry-run)")
     if not 0 < args.richieste_al_secondo <= 20:
         p.error("--richieste-al-secondo deve essere tra 0 e 20")
 
-    try:
-        http = LetturaSicura(args.url, args.richieste_al_secondo, args.max_errori,
-                             orario=leggi_orario(args.orario) if args.orario else None)
-    except ValueError as e:
-        sys.exit(f"Errore: {e}")
-    password = os.environ.get("SEEDDMS_PASSWORD") or getpass.getpass(f"Password del DMS per {args.user}: ")
-    sorgente = SorgenteSeedDms(http)
+    if args.tipo == "skytower":
+        http = sorgente = SorgenteSkyTower(utente=os.environ.get("USERNAME"))
+        password = ""
+    else:
+        try:
+            http = LetturaSicura(args.url, args.richieste_al_secondo, args.max_errori,
+                                 orario=leggi_orario(args.orario) if args.orario else None)
+        except ValueError as e:
+            sys.exit(f"Errore: {e}")
+        password = os.environ.get("SEEDDMS_PASSWORD") or getpass.getpass(f"Password del DMS per {args.user}: ")
+        sorgente = SorgenteSeedDms(http)
     try:
         sorgente.login(args.user, password)
         radice = sorgente.cartella(args.cartella)

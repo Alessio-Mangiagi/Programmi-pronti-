@@ -850,10 +850,10 @@ def api_mezzi_carica(body):
 def api_mezzi_dms(body, sess):
     """Archivia nel DMS aziendale documenti, contratto e scheda del mezzo (cartella DMS_MEZZI_CARTELLA)."""
     s, maschera, pr = _mezzi()
-    rec = mezzi.archivia_nel_dms(s, maschera, pr, str(body.get("id") or ""))
+    rec = mezzi.archivia_nel_dms(s, maschera, pr, str(body.get("id") or ""), utente=sess.get("user"))
     esiti = rec["dms"]["esiti"]
     errori = sum(1 for e in esiti if e["esito"] == "errore")
-    attivita.record(sess["user"], "trasferimento", "Mezzo archiviato nel DMS",
+    attivita.record(sess["user"], "trasferimento", "Mezzo archiviato " + ("su SkyTower" if rec["dms"].get("dms") == "skytower" else "nel DMS"),
                     f"{rec['id']} {rec['valori'].get('matricola', '')}: {len(esiti) - errori} file, {errori} errori",
                     "fallito" if errori else "ok", role=sess["role"])
     return api_mezzi_pratica({"id": [rec["id"]]})

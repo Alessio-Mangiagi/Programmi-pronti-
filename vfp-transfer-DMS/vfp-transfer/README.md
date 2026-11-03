@@ -232,6 +232,12 @@ Per ogni email con allegati:
 
 Se un caricamento fallisce l'email resta dov'è e viene ritentata al giro successivo, ricaricando solo i file
 mancanti; dopo `MAIL_MAX_ATTEMPTS` tentativi viene spostata in `MAIL_ERROR_FOLDER` ("Errori VFP").
+Con `MAIL_SKYTOWER=true` (Impostazioni › Posta, "Archivia gli allegati anche su SkyTower") gli allegati delle
+email il cui **oggetto contiene un codice commessa** del registro della suite (`shared/suite/commesse.json`, anche
+dentro "101-003 SEDE ACIREALE") diventano anche documenti WIP della commessa su **SkyTower**, cartella «Suite
+Cosedil», con mittente, oggetto e Message-ID negli attributi. L'esito compare nel dettaglio dell'email e nel
+registro ("SkyTower 101-003: 2 documenti"); un errore di SkyTower non ferma il caricamento in VFP e lascia un
+avviso nel portale.
 Per la PEC i documenti vengono presi dalla busta `postacert.eml` (vedi *PEC: busta, firma, ricevute e
 protocollo*). Le email senza allegati utili (o con sole immagini della firma) restano nella casella e non
 vengono più riesaminate. Consigliata una casella dedicata (es. documenti@...): vengono elaborate tutte le
@@ -331,14 +337,28 @@ python vfp_transfer.py --source "D:\export_dms" --manifest manifest.csv
 
 `estrai_dms.py` scarica documenti e revisioni dal DMS di origine in una cartella locale con `manifest.csv`, da
 caricare poi con la modalità manifest. Il DMS viene letto **una sola volta per file**: se il caricamento su VFP va
-rifatto, si riparte dalla copia locale. Per ora c'è l'adattatore per **SeedDMS** (`SorgenteSeedDms`).
+rifatto, si riparte dalla copia locale. Adattatori: **SeedDMS** (`SorgenteSeedDms`) e **SkyTower**, il CDE della
+suite (`SorgenteSkyTower`).
 ```
 python estrai_dms.py --url https://dms/restapi/index.php --user lettore --cartella 12 --dry-run
 python estrai_dms.py --url https://dms/restapi/index.php --user lettore --cartella 12 --dest D:\estrazione
+python estrai_dms.py --tipo skytower --dry-run
+python estrai_dms.py --tipo skytower --cartella 1 --dest D:\estrazione
 python vfp_transfer.py --source D:\estrazione --manifest D:\estrazione\manifest.csv --dry-run
 ```
 La password si chiede a video (oppure variabile `SEEDDMS_PASSWORD`). `--cartella` è l'ID della cartella da estrarre
 (per esempio una commessa); le sue sottocartelle diventano le cartelle in VFP.
+
+**SkyTower come DMS** (`--tipo skytower`, oppure `DMS_TIPO=skytower` nel `.env` per le pagine Moduli e Mezzi):
+niente indirizzo, utente o password, si usa il token di servizio di `shared/suite`. La radice (id 1) sono le
+commesse di SkyTower che hanno il codice commessa (scheda *Suite Cosedil* del progetto); ogni commessa è una
+cartella, i documenti **pubblicati** sono le voci (una versione: l'ultima revisione), il file arriva da
+`/suite/revisioni/<id>/file`. Gli id delle cartelle e dei documenti sono numeri stabili ricavati dal codice e
+dall'id SkyTower, così `stato_estrazione.json` e le cartelle su disco restano validi fra un'estrazione e l'altra.
+Con `DMS_TIPO=skytower` la pagina **Mezzi** archivia su SkyTower: ogni file della pratica (documenti, contratto,
+scheda) diventa un documento WIP della commessa della pratica (il codice si legge dal campo *Commessa*, con il
+registro della suite se c'è), tipo `RP`, con pratica, mezzo, matricola, targa, ditta, scadenza e il percorso
+`Mezzi/<commessa>/<mezzo>` negli attributi; un file già mandato (stesso nome e SHA-256) non si rimanda.
 
 Protezioni per il DMS:
 - **solo lettura**: il programma blocca da sé ogni chiamata che non sia una lettura (l'unica eccezione è il login);

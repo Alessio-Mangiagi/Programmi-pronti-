@@ -42,6 +42,7 @@ from pathlib import Path
 import env_config
 import modelli_protetti
 import moduli
+import suite_cosedil
 
 log = logging.getLogger("mezzi")
 
@@ -709,34 +710,101 @@ class ScritturaDms:
         raise MezziError(f"DMS: {body.get('message') or f'HTTP {stato}'} ({nome})")
 
 
-def archivia_nel_dms(s, maschera, pr, rec_id, sessione=None):
-    """Documenti del mezzo, contratto compilato e scheda nel DMS aziendale, nella stessa struttura usata per Viewpoint."""
-    if not (s.get("DMS_URL") and s.get("DMS_USER") and s.get("DMS_PASSWORD")):
+class ScritturaSkyTower:
+    """
+    Archiviazione su SkyTower (CDE della suite) al posto di SeedDMS: ogni file diventa un documento WIP della
+    commessa della pratica (rotta /suite di SkyTower, token di servizio di shared/suite). Le "cartelle" sono solo
+    il percorso Mezzi/<commessa>/<mezzo> scritto negli attributi del documento: SkyTower sceglie la sua.
+    Stessa interfaccia di ScritturaDms (login, logout, cartella, archivia) per archivia_nel_dms.
+    """
+
+    def __init__(self, commessa, rec, utente=None, precedenti=()):
+        self.commessa = commessa
+        self.rec = rec
+        self.utente = utente
+        self.precedenti = {(p.get("nome"), p.get("sha256")): p for p in precedenti if p.get("sha256") and p.get("id")}
+
+    def login(self, utente=None, password=None):
+        pass
+
+    def logout(self):
+        pass
+
+    def cartella(self, percorso):
+        return percorso
+
+    def archivia(self, folder_id, nome, file, commento="", scadenza="", sha256=""):
+        """("creato" | "gia' presente", identificativo SkyTower). Il file gia' mandato (stesso nome e sha256) non si rimanda."""
+        gia = self.precedenti.get((nome, sha256))
+        if gia:
+            return "gia' presente", gia["id"]
+        file = Path(file)
+        import mimetypes
+        tipo = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
+        v = self.rec.get("valori", {})
+        attributi = {"origine": "vfp-mezzi", "pratica": self.rec.get("id", ""), "cartella": folder_id,
+                     "mezzo": " ".join(x for x in (v.get("tipo_mezzo"), v.get("marca"), v.get("modello")) if x).strip(),
+                     "matricola": v.get("matricola", ""), "targa": v.get("targa", ""), "ditta": v.get("ragione_sociale", ""),
+                     "scadenza": scadenza or ""}
+        try:
+            r = suite_cosedil.suite_link.chiama(
+                "skytower", "POST", f"/suite/commesse/{suite_cosedil.percorso_commessa(self.commessa)}/documenti",
+                parametri={"title": nome[:300], "description": (commento or "")[:4000], "tipo": "RP",
+                           "attributes": json.dumps(attributi, ensure_ascii=False)},
+                corpo_file=(file.read_bytes(), tipo, file.name), utente=self.utente, timeout=120)
+        except suite_cosedil.suite_link.SuiteError as e:
+            raise MezziError(f"SkyTower: {e.messaggio}") from None
+        self.url = (r or {}).get("url", "")
+        return "creato", (r or {}).get("identifier") or (r or {}).get("document_id") or ""
+
+
+def archivia_nel_dms(s, maschera, pr, rec_id, sessione=None, utente=None):
+    """Documenti del mezzo, contratto compilato e scheda nel DMS aziendale (SeedDMS, oppure SkyTower con
+    DMS_TIPO=skytower), nella stessa struttura usata per Viewpoint."""
+    skytower = (s.get("DMS_TIPO") or "seeddms") == "skytower"
+    if not skytower and not (s.get("DMS_URL") and s.get("DMS_USER") and s.get("DMS_PASSWORD")):
         raise MezziError("DMS non configurato: indirizzo, utente e password del DMS nelle impostazioni")
     rec = pr.leggi(rec_id)
     vuoti = mancanti(maschera, rec.get("valori", {}))
     if vuoti:
         raise MezziError("prima di archiviare completare: " + ", ".join(vuoti))
     righe = righe_dms(maschera, rec, pr._dir(rec_id))
-    dms = ScritturaDms(s["DMS_URL"], s.get("DMS_MEZZI_CARTELLA") or 1, session=sessione)
-    dms.login(s["DMS_USER"], s["DMS_PASSWORD"])
+    if skytower:
+        commessa = suite_cosedil.codice_commessa(rec.get("valori", {}).get("commessa", ""))
+        if not commessa:
+            raise MezziError("pratica senza commessa: SkyTower archivia per commessa")
+        dms = ScritturaSkyTower(commessa, rec, utente=utente, precedenti=(rec.get("dms") or {}).get("esiti", ()))
+    else:
+        dms = ScritturaDms(s["DMS_URL"], s.get("DMS_MEZZI_CARTELLA") or 1, session=sessione)
+    dms.login(s.get("DMS_USER"), s.get("DMS_PASSWORD"))
     esiti = []
     try:
         cartelle = {}
         for r in righe:
-            voce = {"nome": r["name"], "cartella": r["folder"], "file": Path(r["file"]).name}
+            voce = {"nome": r["name"], "cartella": r["folder"], "file": Path(r["file"]).name, "sha256": r["sha256"]}
             try:
                 if r["folder"] not in cartelle:
                     cartelle[r["folder"]] = dms.cartella(r["folder"])
-                voce["esito"], voce["id"] = dms.archivia(cartelle[r["folder"]], r["name"], r["file"], r["description"],
-                                                         r.get("scadenza", ""))
+                if skytower:
+                    voce["esito"], voce["id"] = dms.archivia(cartelle[r["folder"]], r["name"], r["file"], r["description"],
+                                                             r.get("scadenza", ""), sha256=r["sha256"])
+                    if voce["esito"] == "creato" and getattr(dms, "url", ""):
+                        voce["url"] = dms.url
+                else:
+                    voce["esito"], voce["id"] = dms.archivia(cartelle[r["folder"]], r["name"], r["file"], r["description"],
+                                                             r.get("scadenza", ""))
             except (MezziError, OSError) as e:
                 voce.update(esito="errore", errore=str(e))
             esiti.append(voce)
     finally:
         dms.logout()
-    log.info("Pratica mezzo %s nel DMS: %s", rec_id, ", ".join(f"{v['nome']}={v['esito']}" for v in esiti))
-    return pr.segna_dms(rec_id, {"data": datetime.now().isoformat(timespec="seconds"), "esiti": esiti})
+    log.info("Pratica mezzo %s nel DMS (%s): %s", rec_id, "SkyTower" if skytower else "SeedDMS",
+             ", ".join(f"{v['nome']}={v['esito']}" for v in esiti))
+    esito = {"data": datetime.now().isoformat(timespec="seconds"), "esiti": esiti}
+    if skytower:
+        esito["dms"] = "skytower"
+        esito["commessa"] = commessa
+    return pr.segna_dms(rec_id, esito)
 
 
 def documenti_mancanti(maschera, rec):

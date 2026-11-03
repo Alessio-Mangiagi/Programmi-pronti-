@@ -50,6 +50,7 @@ import requests
 import env_config
 import pec
 import protocollo
+import suite_cosedil
 import vfp_transfer as vt
 
 log = logging.getLogger("vfp_mail")
@@ -923,6 +924,8 @@ class MailWatcher(threading.Thread):
             self._quarantine(mbx, message, s, st, threat)
             return
         log.info("Email da %s (%s): %s allegati da trasferire", message.sender, message.subject, len(items))
+        # SkyTower (CDE della suite): copia degli allegati nella commessa citata nell'oggetto, se MAIL_SKYTOWER
+        skytower = invia_a_skytower(s, message, folder_dir) if env_config.as_bool(s.get("MAIL_SKYTOWER")) else None
         with self.lock:  # email in lavorazione, mostrata nella colonna "In caricamento"
             self.status["current"] = {"key": digest, "source": mbx.label, "kind": mbx.kind, "sender": message.sender,
                                       "subject": message.subject, "received": message.received.isoformat(timespec="minutes"),
@@ -963,10 +966,76 @@ class MailWatcher(threading.Thread):
             else:
                 st["attempts"][key] = attempts
                 outcome, detail = "riprovo", f"tentativo {attempts} di {max_attempts}. " + "; ".join(errors)
-        st["history"].append(self._entry(mbx, message, digest, outcome, detail, docs=docs))
+        if skytower:
+            detail = (detail + " " + riassunto_skytower(skytower)).strip()
+        voce = self._entry(mbx, message, digest, outcome, detail, docs=docs)
+        if skytower:
+            voce["skytower"] = skytower
+        st["history"].append(voce)
         self._save_state(st)
         self._log_message(mbx, message, outcome, detail, digest, docs)
         log.info("Email da %s: %s (%s)", message.sender, outcome, detail[:200])
+
+
+def invia_a_skytower(s, message, folder_dir, utente=None):
+    """Allegati dell'email su SkyTower, nella commessa il cui codice (registro della suite) compare nell'oggetto.
+    Nessun codice -> None. Mai un'eccezione: gli errori finiscono nel log, negli avvisi del portale e nell'esito."""
+    try:
+        commessa = suite_cosedil.codice_commessa(message.subject, solo_registro=True)
+    except Exception as e:  # registro illeggibile: non deve fermare la posta
+        log.warning("SkyTower: registro delle commesse non leggibile (%s)", e)
+        return None
+    if not commessa:
+        return None
+    import mimetypes
+    descrizione = f"Email da {message.sender}: {message.subject}"[:4000]
+    esiti = []
+    for att in message.attachments:
+        if att.name.lower() in PEC_SERVICE_FILES:
+            continue
+        path = Path(folder_dir) / att.name
+        dati = path.read_bytes() if path.is_file() else att.data
+        attributi = {"origine": "posta", "mittente": message.sender, "oggetto": message.subject[:500],
+                     "message_id": (message.msg_id or "")[:300], "ricevuta": message.received.isoformat(timespec="minutes")}
+        voce = {"nome": att.name}
+        try:
+            r = suite_cosedil.suite_link.chiama(
+                "skytower", "POST", f"/suite/commesse/{suite_cosedil.percorso_commessa(commessa)}/documenti",
+                parametri={"title": Path(att.name).stem[:300] or att.name, "description": descrizione, "tipo": "RP",
+                           "attributes": json.dumps(attributi, ensure_ascii=False)},
+                corpo_file=(dati, mimetypes.guess_type(att.name)[0] or "application/octet-stream", att.name),
+                utente=utente, timeout=120)
+            voce.update(esito="creato", id=(r or {}).get("identifier") or (r or {}).get("document_id") or "",
+                        url=(r or {}).get("url", ""))
+        except suite_cosedil.suite_link.SuiteError as e:
+            voce.update(esito="errore", errore=e.messaggio)
+            log.warning("SkyTower, allegato %s di %s: %s", att.name, message.sender, e.messaggio)
+        except Exception as e:  # file sparito, JSON strano...: la posta continua comunque
+            voce.update(esito="errore", errore=str(e)[:300])
+            log.warning("SkyTower, allegato %s di %s: %s", att.name, message.sender, e)
+        esiti.append(voce)
+    errori = [v for v in esiti if v.get("esito") == "errore"]
+    if errori:
+        try:
+            import avvisi_portale
+            avvisi_portale.segnala("Posta: allegati non archiviati su SkyTower",
+                                   f"Commessa {commessa}, email da {message.sender}: " + "; ".join(f"{v['nome']}: {v['errore']}" for v in errori),
+                                   "attenzione", chiave="posta-skytower")
+        except Exception:
+            pass
+    return {"commessa": commessa, "esiti": esiti}
+
+
+def riassunto_skytower(esito):
+    """Una frase per il registro: 'SkyTower 101-003: 2 documenti' oppure con gli errori."""
+    if not esito:
+        return ""
+    ok = sum(1 for v in esito["esiti"] if v.get("esito") == "creato")
+    errori = [v for v in esito["esiti"] if v.get("esito") == "errore"]
+    testo = f"SkyTower {esito['commessa']}: {ok} documenti"
+    if errori:
+        testo += ", " + f"{len(errori)} errori (" + "; ".join(f"{v['nome']}: {v['errore']}" for v in errori)[:300] + ")"
+    return testo + "."
 
 
 def archive_dir(s):

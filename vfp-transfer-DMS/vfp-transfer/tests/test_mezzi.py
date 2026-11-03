@@ -7,6 +7,7 @@ import stat
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests import ROOT
 import mezzi
@@ -316,3 +317,71 @@ class MezziTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SkyTowerMezziTest(unittest.TestCase):
+    """Archiviazione della pratica su SkyTower (DMS_TIPO=skytower) invece che su SeedDMS."""
+
+    def setUp(self):
+        MezziTest.setUp(self)
+        import suite_cosedil
+        self.chiamate = []
+        self.n = 0
+
+        def chiama(app, metodo, percorso, parametri=None, corpo_file=None, utente=None, **kw):
+            self.n += 1
+            self.chiamate.append((app, metodo, percorso, parametri, corpo_file, utente))
+            return {"document_id": f"doc{self.n}", "identifier": f"PRJ-COS-ZZ-ZZ-RP-Z-{self.n:04d}",
+                    "url": f"http://localhost:5195/documenti/doc{self.n}"}
+        self.patch = [mock.patch.object(suite_cosedil.suite_link, "chiama", chiama),
+                      mock.patch.object(suite_cosedil.suite_link, "FILE_COMMESSE", self.dir / "commesse.json")]
+        for p in self.patch:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patch:
+            p.stop()
+        MezziTest.tearDown(self)
+
+    def test_archiviazione_su_skytower(self):
+        rec = MezziTest.nuova(self, commessa="101-003 Residenze Acireale")
+        mezzi.compila_contratto(self.s, self.pr, rec["id"], "Mezzi/nolo.docx", {"3": "CAT305-0001"}, "prova")
+        s = {**self.s, "DMS_TIPO": "skytower"}   # niente DMS_URL/USER/PASSWORD: non servono
+        rec = mezzi.archivia_nel_dms(s, self.maschera, self.pr, rec["id"], utente="mrossi")
+        esiti = rec["dms"]["esiti"]
+        self.assertEqual(rec["dms"]["dms"], "skytower")
+        self.assertEqual(rec["dms"]["commessa"], "101-003")   # senza registro: il primo pezzo con cifre
+        self.assertEqual([e["esito"] for e in esiti], ["creato"] * 4)
+        self.assertTrue(all(e["id"].startswith("PRJ-") and e["url"] and e["sha256"] for e in esiti))
+        app, metodo, percorso, parametri, corpo, utente = self.chiamate[0]
+        self.assertEqual((app, metodo, percorso, utente), ("skytower", "POST", "/suite/commesse/101-003/documenti", "mrossi"))
+        self.assertEqual(parametri["tipo"], "RP")
+        attr = json.loads(parametri["attributes"])
+        self.assertEqual((attr["origine"], attr["pratica"], attr["matricola"]), ("vfp-mezzi", rec["id"], "CAT305-0001"))
+        self.assertTrue(attr["cartella"].startswith("Mezzi/"))
+        polizza = next(c for c in self.chiamate if c[3]["title"].startswith("Polizza"))
+        self.assertEqual(polizza[4][1], "application/pdf")
+        self.assertTrue(polizza[4][2].endswith(".pdf") and polizza[4][0].startswith(b"%PDF"))
+        self.assertEqual(json.loads(polizza[3]["attributes"])["scadenza"], "2026-12-31")
+        self.assertEqual(self.pr.elenco()[0]["archiviato"], rec["dms"]["data"])
+        # seconda volta, niente di cambiato (stesso nome e sha256): nessun doppione su SkyTower, nessuna chiamata
+        rec = mezzi.archivia_nel_dms(s, self.maschera, self.pr, rec["id"], utente="mrossi")
+        self.assertEqual([e["esito"] for e in rec["dms"]["esiti"]], ["gia' presente"] * 4)
+        self.assertEqual(len(self.chiamate), 4)
+        self.assertTrue(all(e["id"].startswith("PRJ-") for e in rec["dms"]["esiti"]))
+
+    def test_commessa_dal_registro_ed_errori(self):
+        import suite_cosedil
+        suite_cosedil.suite_link.salva_commesse([{"code": "101-006", "nome": "Residenze Acireale"}])
+        self.assertEqual(suite_cosedil.codice_commessa("pratica 101-006 Residenze Acireale"), "101-006")
+        self.assertEqual(suite_cosedil.codice_commessa("Residenze Acireale", solo_registro=True), "")
+        rec = MezziTest.nuova(self, commessa="")
+        s = {**self.s, "DMS_TIPO": "skytower"}
+        with self.assertRaisesRegex(mezzi.MezziError, "[Cc]ommessa"):
+            mezzi.archivia_nel_dms(s, self.maschera, self.pr, rec["id"])
+
+        def giu(*a, **k):
+            raise suite_cosedil.suite_link.SuiteError("skytower", 503, "SkyTower non raggiungibile: è spenta?")
+        with mock.patch.object(suite_cosedil.suite_link, "chiama", giu):
+            rec = mezzi.archivia_nel_dms(s, self.maschera, self.pr, MezziTest.nuova(self, commessa="101-006")["id"])
+        self.assertTrue(all(e["esito"] == "errore" and "non raggiungibile" in e["errore"] for e in rec["dms"]["esiti"]))

@@ -95,7 +95,10 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   `POST /api/mezzi/allega` (corpo = file, letto a blocchi prima del limite JSON, `Pratiche.allega`); `percorso` sul disco
   del server e `aggiorna_anagrafica` solo admin (`api_mezzi_salva`). DMS: `mezzi.ScritturaDms` (client separato, rotte
   ammesse in `AMMESSE`, cartelle solo sotto `DMS_MEZZI_CARTELLA`), `archivia_nel_dms` usa le stesse righe di
-  `righe_dms`; esito in `record["dms"]`. `report_excel.build_report`: un'area diversa da documenti/posta non riceve nulla.
+  `righe_dms`; esito in `record["dms"]`. Con `DMS_TIPO=skytower` al suo posto `mezzi.ScritturaSkyTower`
+  (stessa interfaccia: `POST /suite/commesse/<codice>/documenti` via `suite_cosedil.suite_link.chiama`, commessa da
+  `suite_cosedil.codice_commessa(valori.commessa)`, `precedenti` = esiti con sha256 -> "gia' presente");
+  `record["dms"]` ha anche `dms: "skytower"`, `commessa`, `url` per voce. `report_excel.build_report`: un'area diversa da documenti/posta non riceve nulla.
   Ponte CPM/Alyante (`ponte.py`, sola lettura): impostazioni `CPM_*`/`ALYANTE_*` convertite in `SQL_*` per riusare
   `sorgente_sql.open_connection`; `ELENCHI` = vista, colonna chiave, ordine dei gestionali; valori cercati validati
   (`_PIVA_RE`, `_CODICE_RE`) prima di finire nella SELECT. API `/api/mezzi/fornitore` (campo `gestionale`),
@@ -115,7 +118,11 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
 - Estrazione dal DMS di origine: `estrai_dms.py` (CLI separata). `LetturaSicura` ammette solo GET e `POST /login`
   (`ScritturaBloccata`), niente redirect, freno richieste/s (raddoppiato su 429), retry su 429/5xx/rete, `DmsSovraccarico`
   dopo N errori di fila, finestra `--orario`. Adattatore `SorgenteSeedDms` (login/logout/cartella/figli/versioni/scarica):
-  un altro DMS = un'altra classe con gli stessi metodi. Output: `file/<doc>/v<n>/<nome>`, `stato_estrazione.json`
+  un altro DMS = un'altra classe con gli stessi metodi. `SorgenteSkyTower` (`--tipo skytower`, `DMS_TIPO=skytower`,
+  `moduli._dms` lo sceglie da solo): radice 1 = commesse con codice da `GET /suite/commesse`, cartella = commessa
+  (`_id_stabile("commessa:"+code)`), documenti pubblicati = voci (`_id_stabile("documento:"+id)`, una versione),
+  byte da `/suite/revisioni/<id>/file` incartati in `_RispostaByte`; errori `SkyTowerErrore(DmsErrore)`.
+  `suite_cosedil.py` aggancia `shared/suite/suite_link.py` (token, registro commesse, `codice_commessa()`). Output: `file/<doc>/v<n>/<nome>`, `stato_estrazione.json`
   (SHA-256, ripresa), `report_estrazione.csv`, `manifest.csv` (valori con `csv_cell`; `items_from_manifest` applica `csv_plain`; colonna `sha256`: `Transfer.run`
   scarta i file cambiati dopo l'estrazione). `--verifica --dest` ricalcola gli SHA-256 e toglie dallo stato i file guasti.
   DMS di prova: SeedDMS 6 portabile fuori dal repo (`..\..\seeddms-prova`, porta 8780), dati finti con
@@ -152,8 +159,12 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   CPM e Alyante: ponte (`ponte.py`) pronto ma provato solo con gestionali finti; servono dall'IT server, utente di
   sola lettura e le viste fornitori/commesse. Come sorgente di documenti per i moduli restano `da_collegare`.
 - Credenziali API (client_id) da richiedere a Trimble/Viewpoint (support@4projects.com).
-- DMS di origine reale ancora da definire: `estrai_dms.py` provato solo contro SeedDMS di prova (hash identici
-  all'archivio). Per il DMS vero serve il suo adattatore.
+- DMS di origine: SeedDMS di prova (hash identici all'archivio) oppure **SkyTower** (`DMS_TIPO=skytower`,
+  `SorgenteSkyTower`/`ScritturaSkyTower`, 03/11/2026) provato solo con rotte /suite finte nei test: da provare contro
+  SkyTower acceso (serve il codice commessa nei progetti, scheda Suite Cosedil).
+- Posta -> SkyTower (`MAIL_SKYTOWER`, `vfp_mail.invia_a_skytower`): allegati nella commessa citata nell'oggetto
+  (registro `shared/suite/commesse.json`, `suite_cosedil.codice_commessa(..., solo_registro=True)`); esito in
+  `history[].skytower` e nel dettaglio del registro; errori -> log + avviso portale, mai eccezione.
 - `sorgente_sql.py` provato solo con dati finti e con il driver testo di Windows: in attesa dall'IT di driver ODBC 18,
   server/database, utente di sola lettura e vista. Il driver ODBC 18 richiede l'amministratore (winget annullato, 1602).
   Sul PC c'e' anche TeamSystem Knos (KnosClient + KnosAPI COM 32 bit) come possibile sorgente alternativa.

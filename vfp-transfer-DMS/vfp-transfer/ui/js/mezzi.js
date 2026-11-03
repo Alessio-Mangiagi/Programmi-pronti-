@@ -542,9 +542,10 @@ function renderMzDms() {
   $('#mzDmsEsito').hidden = !esito;
   if (!esito) return;
   const lbl = { creato: ['b-ok', 'Archiviato'], 'nuova versione': ['b-info', 'Nuova versione'], "gia' presente": ['b-mute', 'Già presente'], errore: ['b-err', 'Errore'] };
-  $('#mzDmsEsito').innerHTML = `<strong>Ultima archiviazione nel DMS:</strong> ${esc(fmtFull(esito.data))}
-    <ul>${esito.esiti.map((e) => { const [c, l] = lbl[e.esito] || ['b-mute', e.esito]; return `<li><span class="badge ${c}">${esc(l)}</span> ${esc(e.nome)}${e.id ? ` <span class="muted small mono">n. ${esc(e.id)}</span>` : ''}${e.errore ? ` <span class="field-error">${esc(e.errore)}</span>` : ''}</li>`; }).join('')}</ul>
-    <p class="muted small">Cartella nel DMS: ${esc((esito.esiti[0] || {}).cartella || '')}</p>`;
+  const sky = esito.dms === 'skytower';
+  $('#mzDmsEsito').innerHTML = `<strong>Ultima archiviazione ${sky ? 'su SkyTower' : 'nel DMS'}:</strong> ${esc(fmtFull(esito.data))}
+    <ul>${esito.esiti.map((e) => { const [c, l] = lbl[e.esito] || ['b-mute', e.esito]; const rif = e.id ? (e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener" class="small mono">${esc(e.id)}</a>` : `<span class="muted small mono">n. ${esc(e.id)}</span>`) : ''; return `<li><span class="badge ${c}">${esc(l)}</span> ${esc(e.nome)} ${rif}${e.errore ? ` <span class="field-error">${esc(e.errore)}</span>` : ''}</li>`; }).join('')}</ul>
+    <p class="muted small">${sky ? `Commessa SkyTower: ${esc(esito.commessa || '')} (documenti WIP, cartella «Suite Cosedil»)` : `Cartella nel DMS: ${esc((esito.esiti[0] || {}).cartella || '')}`}</p>`;
 }
 
 $('#mzDms').addEventListener('click', async () => {

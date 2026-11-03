@@ -595,8 +595,12 @@ def allegati_posta(s, max_file=500):
     return out
 
 
-def _dms(s):
+def _dms(s, utente=None):
     import estrai_dms
+    if (s.get("DMS_TIPO") or "seeddms") == "skytower":
+        # SkyTower, il CDE della suite: nessuna credenziale, token di servizio di shared/suite
+        sorgente = estrai_dms.SorgenteSkyTower(utente=utente)
+        return estrai_dms, sorgente, sorgente
     if not (s.get("DMS_URL") and s.get("DMS_USER") and s.get("DMS_PASSWORD")):
         raise ModuloError("DMS non configurato: indirizzo, utente e password nelle Impostazioni")
     http = estrai_dms.LetturaSicura(s["DMS_URL"])
