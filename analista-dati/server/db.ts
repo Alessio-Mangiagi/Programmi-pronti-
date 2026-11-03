@@ -790,6 +790,30 @@ const XLSX_ROOTS = (process.env.XLSX_ROOTS || '').split(/[;,]/).map(s => s.trim(
 /** True se i percorsi Excel su disco sono abilitati (per /api/health e la UI). */
 export function xlsxPathsEnabled(): boolean { return XLSX_ROOTS.length > 0 }
 
+// Cartelle da cui è lecito aprire un file SQLite indicato per PERCORSO (kind 'sqlite').
+// Stessa regola fail-closed degli Excel: senza allowlist un utente poteva far aprire
+// al server qualunque .db della macchina, a cominciare da app.db di questa stessa app
+// (utenti, storico chat di tutti, connessioni cifrate) e dai set documenti altrui
+// (revisione di sicurezza del 03/11/2026). I set documenti (kind 'docs') non passano
+// di qui: il percorso lo risolve il server.
+const SQLITE_ROOTS = (process.env.SQLITE_ROOTS || '').split(/[;,]/).map(s => s.trim()).filter(Boolean)
+
+/** True se i file SQLite su disco sono abilitati (per la UI). */
+export function sqlitePathsEnabled(): boolean { return SQLITE_ROOTS.length > 0 }
+
+/** Percorso di un file SQLite validato contro SQLITE_ROOTS (fail-closed). */
+export function resolveSqlitePath(p: string): string {
+  if (!SQLITE_ROOTS.length) throw new Error('File SQLite su disco disabilitati: imposta SQLITE_ROOTS nel .env')
+  const abs = path.resolve(p)
+  const inside = SQLITE_ROOTS.some(root => {
+    const rel = path.relative(path.resolve(root), abs)
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+  })
+  if (!inside) throw new Error(`Percorso non consentito: ${p} (fuori dalle cartelle SQLITE_ROOTS)`)
+  if (!fs.existsSync(abs)) throw new Error(`File non trovato: ${p}`)
+  return abs
+}
+
 /** Percorso .xlsx validato contro XLSX_ROOTS (fail-closed). */
 export function resolveXlsxPath(p: string): string {
   if (!XLSX_ROOTS.length) throw new Error('Percorsi Excel su disco disabilitati: imposta XLSX_ROOTS nel .env')

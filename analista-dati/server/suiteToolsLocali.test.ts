@@ -83,7 +83,7 @@ const ctx = () => ({ cookie: 'sid=abc', user: 'tester' })
 describe('apri_app', () => {
   it('è un tool locale: non richiede nessuna app accesa per essere invocato', () => {
     expect(suite.getTool('apri_app')?.app).toBe('locale')
-    expect(suite.getTool('apri_app')?.kind).toBe('read')
+    expect(suite.getTool('apri_app')?.kind).toBe('action') // avvia un processo: serve la conferma
   })
 
   it('app già online → link da aprire, nessun avvio', async () => {

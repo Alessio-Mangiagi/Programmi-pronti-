@@ -125,8 +125,8 @@ describe('tool di lettura', () => {
     expect(out.ok).toBe(true)
     expect(out.summary).toMatch(/2 scadute/)
   })
-  it('scadenzario_export_xlsx è tool di lettura, crea è azione', () => {
-    expect(suite.getTool('scadenzario_export_xlsx')?.kind).toBe('read')
+  it('scadenzario_export_xlsx produce un file: è azione con conferma, come crea', () => {
+    expect(suite.getTool('scadenzario_export_xlsx')?.kind).toBe('action')
     expect(suite.getTool('scadenzario_crea')?.kind).toBe('action')
   })
 })

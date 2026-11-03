@@ -6,7 +6,11 @@ import { connKeyFor } from './fewshot.ts'
 /**
  * Store di sessioni per-client: ogni PC/scheda ha la sua connessione e il suo
  * storico. Evita che un client sovrascriva la connessione di un altro.
- * Chiave = header X-Session-Id (il frontend genera un UUID e lo conserva).
+ * Chiave = utente + header X-Session-Id (il frontend genera un UUID e lo conserva).
+ *
+ * Dal 03/11/2026 la chiave porta anche l'id dell'utente autenticato: prima bastava
+ * conoscere (o indovinare: senza header valeva 'default') l'id di sessione di un
+ * collega per riusare la sua connessione già aperta e leggere il suo storico.
  *
  * Lo STORICO è persistito su app.db (chat_history) per sessione+DB: al
  * riavvio del server (o riconnessione allo stesso DB) i follow-up ritrovano
@@ -25,9 +29,26 @@ const MAX_HISTORY = 6
 const KEEP_PERSISTED = 50 // retention per sessione+DB su app.db
 const sessions = new Map<string, Session>()
 
-export function sessionId(req: { headers: Record<string, unknown> }): string {
+/** Errore con status HTTP: il middleware di errore di server.ts lo rende 400 e non 500. */
+export class ErroreSessione extends Error {
+  status = 400
+}
+
+/**
+ * Chiave della sessione interattiva: `<id utente>:<X-Session-Id>`.
+ * Senza header la richiesta è di un client non ufficiale (apiFetch lo mette
+ * sempre): si rifiuta con 400 invece di far confluire tutti in una sessione
+ * condivisa. Senza utente (AUTH_ENABLED=0) vale l'utente 'local' con id 0.
+ */
+export function sessionId(req: { headers: Record<string, unknown>; user?: { id: number } }): string {
   const id = req.headers['x-session-id']
-  return (typeof id === 'string' && id.trim()) ? id.trim().slice(0, 80) : 'default'
+  if (typeof id !== 'string' || !id.trim()) throw new ErroreSessione('Header X-Session-Id mancante')
+  return `${req.user?.id ?? 0}:${id.trim().slice(0, 80)}`
+}
+
+/** Come sessionId, ma senza errore: '' se manca l'header (per le rotte pubbliche come /api/health). */
+export function sessionIdSeC(req: { headers: Record<string, unknown>; user?: { id: number } }): string {
+  try { return sessionId(req) } catch { return '' }
 }
 
 export function getSession(id: string): Session | undefined {

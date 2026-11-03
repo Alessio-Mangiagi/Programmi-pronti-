@@ -9,7 +9,7 @@
  * restano fuori.
  */
 import { describe, it, expect } from 'vitest'
-import { corsAllowed, isSameOrigin, isAllowedOrigin } from './origin.ts'
+import { corsAllowed, isSameOrigin, isAllowedOrigin, isSuiteOrigin } from './origin.ts'
 
 const WHITELIST = ['http://localhost:5173', 'http://127.0.0.1:5173']
 
@@ -39,7 +39,7 @@ describe('same-origin', () => {
   })
 })
 
-describe('whitelist e LAN', () => {
+describe('whitelist e origini della suite', () => {
   it('ammette le origini in whitelist anche da host diverso', () => {
     expect(corsAllowed('127.0.0.1:3001', 'http://localhost:5173', WHITELIST, true)).toBe(true)
   })
@@ -48,16 +48,33 @@ describe('whitelist e LAN', () => {
     expect(isAllowedOrigin('http://192.168.1.50:5173', WHITELIST, true)).toBe(false)
   })
 
-  it('esposto in rete ammette la LAN privata', () => {
-    expect(isAllowedOrigin('http://192.168.1.50:5173', WHITELIST, false)).toBe(true)
-    expect(isAllowedOrigin('http://10.0.0.7:5173', WHITELIST, false)).toBe(true)
-    expect(isAllowedOrigin('http://172.16.4.2:5173', WHITELIST, false)).toBe(true)
+  it('esposto in rete NON ammette più una LAN qualsiasi: solo le app della suite sullo stesso server', () => {
+    // stesso host del server, porta del registro della suite → un'altra app della suite
+    expect(isAllowedOrigin('http://192.168.1.50:8080', WHITELIST, false, '192.168.1.50:5173')).toBe(true)
+    expect(isAllowedOrigin('http://192.168.1.50:5190', WHITELIST, false, '192.168.1.50:5173')).toBe(true)
+    // altro PC della LAN, anche con una porta "giusta": pagina ostile, fuori
+    expect(isAllowedOrigin('http://192.168.1.77:8080', WHITELIST, false, '192.168.1.50:5173')).toBe(false)
+    // stesso host ma porta non della suite: fuori
+    expect(isAllowedOrigin('http://192.168.1.50:9999', WHITELIST, false, '192.168.1.50:5173')).toBe(false)
+    // senza Host non si sa quale sia "lo stesso server"
+    expect(isAllowedOrigin('http://192.168.1.50:8080', WHITELIST, false)).toBe(false)
+  })
+
+  it('il portale passa sempre, loopback e localhost sono lo stesso server', () => {
+    expect(isSuiteOrigin('http://localhost:8080', '127.0.0.1:3001')).toBe(true)
+    expect(isSuiteOrigin('http://127.0.0.1:5180', 'localhost:3001')).toBe(true)
+  })
+
+  it('sottodomini di SUITE_DOMINIO (dietro Caddy) passano, un dominio simile no', () => {
+    expect(isSuiteOrigin('https://portale.suite.lan', 'agente.suite.lan', 'suite.lan')).toBe(true)
+    expect(isSuiteOrigin('https://skytower.suite.lan', 'agente.suite.lan', 'suite.lan')).toBe(true)
+    expect(isSuiteOrigin('https://suite.lan.evil.com', 'agente.suite.lan', 'suite.lan')).toBe(false)
+    expect(isSuiteOrigin('https://notsuite.lan', 'agente.suite.lan', 'suite.lan')).toBe(false)
   })
 
   it('esposto in rete rifiuta comunque le origini pubbliche', () => {
-    expect(isAllowedOrigin('http://evil.example.com', WHITELIST, false)).toBe(false)
-    // 172.32 e' fuori dal blocco privato 172.16-31
-    expect(isAllowedOrigin('http://172.32.0.1', WHITELIST, false)).toBe(false)
+    expect(isAllowedOrigin('http://evil.example.com', WHITELIST, false, '192.168.1.50:5173')).toBe(false)
+    expect(isAllowedOrigin('http://172.32.0.1', WHITELIST, false, '192.168.1.50:5173')).toBe(false)
   })
 })
 

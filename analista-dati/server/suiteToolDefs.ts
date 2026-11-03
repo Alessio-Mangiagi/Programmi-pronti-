@@ -76,7 +76,9 @@ registerTool({
 registerTool({
   name: 'scadenzario_export_xlsx',
   app: 'scadenzario',
-  kind: 'read',
+  // 'action' e non 'read': ha un effetto (avvia un'app, produce un file, interroga il DB): un testo
+  // letto da un documento o da un'altra app non deve poterlo far scattare senza che l'utente confermi.
+  kind: 'action',
   description: 'Esporta in Excel (.xlsx) le scadenze compliance secondo i filtri indicati. Usalo quando l\'utente vuole un file/estrazione delle scadenze.',
   input_schema: {
     type: 'object',
@@ -199,7 +201,9 @@ const CONFRONTA_POLL_MS = Number(process.env.SUITE_CONFRONTA_POLL_MS) || 200_000
 registerTool({
   name: 'confronta_documenti',
   app: 'confronta',
-  kind: 'read',
+  // 'action' e non 'read': ha un effetto (avvia un'app, produce un file, interroga il DB): un testo
+  // letto da un documento o da un'altra app non deve poterlo far scattare senza che l'utente confermi.
+  kind: 'action',
   description: 'Confronta due documenti ALLEGATI al messaggio (PDF/immagini/Word) evidenziando le differenze; produce un report Word scaricabile. Indica i numeri dei due allegati.',
   input_schema: {
     type: 'object',
@@ -291,7 +295,9 @@ registerTool({
 registerTool({
   name: 'apri_app',
   app: 'locale',
-  kind: 'read',
+  // 'action' e non 'read': ha un effetto (avvia un'app, produce un file, interroga il DB): un testo
+  // letto da un documento o da un'altra app non deve poterlo far scattare senza che l'utente confermi.
+  kind: 'action',
   description: 'Avvia un\'applicazione della suite aziendale (se spenta) e restituisce il link per aprirla. Usalo quando l\'utente chiede di "aprire", "avviare" o "lanciare" un programma della suite. App disponibili: ' + appIds().join(', ') + '.',
   input_schema: {
     type: 'object',
@@ -344,7 +350,9 @@ registerTool({
 registerTool({
   name: 'crea_report_excel',
   app: 'locale',
-  kind: 'read',
+  // 'action' e non 'read': ha un effetto (avvia un'app, produce un file, interroga il DB): un testo
+  // letto da un documento o da un'altra app non deve poterlo far scattare senza che l'utente confermi.
+  kind: 'action',
   description: 'Genera un report Excel multi-foglio sul database collegato: l\'AI pianifica più analisi su un tema (trend, top-N, aggregati, anomalie), le esegue e produce un file .xlsx scaricabile. Usalo quando l\'utente chiede un "report", un "riepilogo in Excel" o un\'analisi articolata su un argomento. Richiede un database connesso.',
   input_schema: {
     type: 'object',

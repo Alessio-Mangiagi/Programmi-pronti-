@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
-import { createConnectorAsync, multiSources, xlsxPathsEnabled, supportsPagination, paginateSql } from './server/db.ts'
+import { createConnectorAsync, multiSources, xlsxPathsEnabled, sqlitePathsEnabled, resolveSqlitePath, supportsPagination, paginateSql } from './server/db.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { corsAllowed } from './server/origin.ts'
 import { guardSelect } from './server/sqlGuard.ts'
@@ -17,7 +17,7 @@ import { generateReport, buildChatExport, pyreportHealth } from './server/report
 import { ollamaHealth, ensureOllama, localHealth, claudeAvailable, localConfigured, defaultProvider, llmQueueDepth, ollamaModelName, setClaudeApiKey } from './server/llm.ts'
 import { canPersistClaudeKey, saveClaudeKey } from './server/secrets.ts'
 import { log, ctxFromReq, readLogEntries, SERVER_HOST, SERVER_USER } from './server/logger.ts'
-import { sessionId, getSession, setSession, closeSession, closeAllSessions, pushHistory, activeCount } from './server/sessions.ts'
+import { sessionId, sessionIdSeC, getSession, setSession, closeSession, closeAllSessions, pushHistory, activeCount } from './server/sessions.ts'
 import {
   AUTH_ENABLED, bootstrapAdmin, requireAuth, requireAdmin, enforcePwChange,
   login, logout, sessionUser, mustChangePw, changePassword, defaultAdminPasswordInUse,
@@ -203,7 +203,11 @@ app.get('/api/whoami', (req, res) => {
 
 app.get('/api/health', asyncH(async (req, res) => {
   const [oll, loc, pyrep] = await Promise.all([ollamaHealth(), localHealth(), pyreportHealth()])
-  const me = AUTH_ENABLED ? sessionUser(parseCookies(req.headers.cookie)[COOKIE]) : { role: 'admin' }
+  const me = AUTH_ENABLED ? sessionUser(parseCookies(req.headers.cookie)[COOKIE]) : { id: 0, username: 'local', role: 'admin' as const }
+  // Senza login solo ciò che serve alla pagina di accesso: modelli, provider, budget e
+  // stato delle connessioni sono ricognizione gratuita per chi raggiunge la porta.
+  if (!me) return res.json({ authEnabled: AUTH_ENABLED, authed: false, ollama: oll.ollama, local: loc.local, claude: claudeAvailable() })
+  const sid = sessionIdSeC({ headers: req.headers, user: { id: me.id } })
   res.json({
     ollama: oll.ollama,
     ollamaModel: oll.model,
@@ -213,7 +217,7 @@ app.get('/api/health', asyncH(async (req, res) => {
     claude: claudeAvailable(),
     pyreport: pyrep, // worker Python per Excel con grafici
     defaultLlm: defaultProvider(),
-    connected: !!getSession(sessionId(req)),
+    connected: !!(sid && getSession(sid)),
     authEnabled: AUTH_ENABLED,
     authed: !!me,
     role: me?.role || null,
@@ -222,6 +226,7 @@ app.get('/api/health', asyncH(async (req, res) => {
     claudeDailyBudget: CLAUDE_DAILY_TOKEN_BUDGET,
     suiteTools: SUITE_ENABLED,
     xlsxPaths: xlsxPathsEnabled(), // multi-sorgente: Excel indicabili per percorso
+    sqlitePaths: sqlitePathsEnabled() && me.role === 'admin', // file SQLite per percorso: solo admin, dentro SQLITE_ROOTS
   })
 }))
 
@@ -328,8 +333,27 @@ app.post('/api/connect', jsonUpload, asyncH(async (req, res) => {
   const ctx = ctxFromReq(req)
   const sid = sessionId(req)
   let cfg: DbConfig
+  const isAdmin = req.user?.role === 'admin'
   try {
     cfg = body.connectionId ? getConnectionConfig(Number(body.connectionId)) : body
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: (e as Error).message })
+  }
+  // Un utente non amministratore non indica host, credenziali o file: usa le connessioni
+  // salvate dall'admin (connectionId). Con una config libera poteva far aprire al server
+  // qualunque file SQLite della macchina (app.db compreso) o farlo connettere a qualunque
+  // host della rete interna leggendo gli errori del driver (revisione del 03/11/2026).
+  const CONFIG_LIBERA_OK = new Set(['docs', 'xlsx'])
+  if (!isAdmin && !body.connectionId && !CONFIG_LIBERA_OK.has(cfg.kind) && cfg.kind !== 'multi') {
+    return res.status(403).json({ ok: false, error: 'Scegli una connessione salvata: le connessioni libere le configura un amministratore.' })
+  }
+  if (cfg.kind === 'multi' && !isAdmin && (cfg.sources || []).some(s => s.db)) {
+    return res.status(403).json({ ok: false, error: 'Nelle sorgenti multiple indica connessioni salvate (connectionId), non configurazioni libere.' })
+  }
+  // File SQLite per percorso: solo dentro SQLITE_ROOTS (fail-closed), anche per gli admin
+  // e anche per le connessioni salvate, così un .db fuori allowlist non si apre mai.
+  try {
+    if (cfg.kind === 'sqlite' && cfg.database) cfg = { ...cfg, database: resolveSqlitePath(cfg.database) }
   } catch (e) {
     return res.status(400).json({ ok: false, error: (e as Error).message })
   }
@@ -351,8 +375,12 @@ app.post('/api/connect', jsonUpload, asyncH(async (req, res) => {
     try {
       cfg = {
         ...cfg,
-        sources: (cfg.sources || []).map(s =>
-          s.connectionId ? { ...s, db: getConnectionConfig(Number(s.connectionId)), connectionId: undefined } : s),
+        sources: (cfg.sources || []).map(s => {
+          const src = s.connectionId ? { ...s, db: getConnectionConfig(Number(s.connectionId)), connectionId: undefined } : s
+          // stessa allowlist dei file SQLite anche dentro una sorgente multipla
+          if (src.db?.kind === 'sqlite' && src.db.database) src.db = { ...src.db, database: resolveSqlitePath(src.db.database) }
+          return src
+        }),
       }
     } catch (e) {
       return res.status(400).json({ ok: false, error: (e as Error).message })
@@ -389,7 +417,9 @@ app.post('/api/connect', jsonUpload, asyncH(async (req, res) => {
   } catch (e) {
     await closeSession(sid)
     log('db_connect_error', ctx, { kind: cfg.kind, error: (e as Error).message })
-    res.status(400).json({ ok: false, error: (e as Error).message })
+    // Il messaggio del driver (host raggiunto o no, banner, nome DB) va nel log; a chi non
+    // è admin arriva un esito generico, così la rotta non fa da scanner della rete.
+    res.status(400).json({ ok: false, error: isAdmin ? (e as Error).message : 'Connessione non riuscita: controlla la connessione salvata o chiedi a un amministratore.' })
   }
 }))
 
@@ -870,7 +900,10 @@ app.post('/api/agent/confirm', rateLimit, asyncH(async (req, res) => {
     return res.status(409).json({ error: taken.error })
   }
   try {
-    const out = await confirmAction(taken.action, suiteCtxFrom(req))
+    // allegati dell'azione = quelli del messaggio che l'ha generata (conservati dal registro)
+    const ctx = suiteCtxFrom(req)
+    if (taken.action.attachments?.length) ctx.attachments = taken.action.attachments
+    const out = await confirmAction(taken.action, ctx)
     log('agent_confirm', ctxFromReq(req), { tool: taken.action.name, ok: out.ok, user: req.user?.username })
     res.json(out)
   } catch (e) {
@@ -1126,7 +1159,10 @@ app.get('/api/logs/export.csv', requireAdmin, (req, res) => {
   })
   const cols = ['ts', 'event', 'user', 'clientIp', 'clientHost', 'serverHost'] as const
   const esc = (v: unknown) => {
-    const s = v == null ? '' : String(v)
+    let s = v == null ? '' : String(v)
+    // Excel esegue una cella che inizia con = + - @ (o tab/CR): il clientHost lo manda il
+    // client (header X-Client-Host), quindi un utente potrebbe farci arrivare una formula.
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
     return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const lines = [cols.join(';')]

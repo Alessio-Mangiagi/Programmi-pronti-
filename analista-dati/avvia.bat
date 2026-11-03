@@ -51,9 +51,10 @@ where ollama >nul 2>&1 && (
 :: Chiusura forzata, poi avvio pulito. Ollama (11434) non si tocca: e' condiviso.
 call "%~dp0..\shared\avvia\libera-porta.bat" 5173 3001
 
-:: Apri browser dopo ~5 secondi (ping -n 6 = 5 ping da 1s l'uno)
-echo Avvio server... il browser si apre tra 5 secondi.
 REM "><(((º> sabusabu <º)))><"
-start /b cmd /c "ping -n 6 127.0.0.1 >nul & start http://localhost:5173"
-
-call npm run dev
+:: Esercizio: frontend compilato (dist/) servito dal backend sulla 5173, niente dev
+:: server Vite (serviva i file dell'app, DB e log compresi, a chiunque in LAN).
+:: tools/avvio-prod.mjs ricompila dist/ se manca o e' vecchia, si FERMA se la build
+:: fallisce, eredita HOST dal portale e apre il browser quando la porta risponde.
+echo Avvio server... il browser si apre quando l'app e' pronta.
+node tools\avvio-prod.mjs
