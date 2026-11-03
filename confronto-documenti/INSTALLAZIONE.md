@@ -120,3 +120,14 @@ su file caricati e durata.
   già fatti; si pulisce da sola dopo 30 giorni.
 
 Backup: basta copiare la cartella dati (volume `/data` in Docker).
+
+## Chiamate dalle altre app della suite
+
+`POST /api/compare` e `GET/PUT/DELETE /api/jobs/...` accettano, al posto della
+sessione del portale, il **token di servizio** di `shared/suite` (header
+`X-Suite-Token`, con `X-Suite-Utente`/`X-Suite-Nome` per attribuire il confronto):
+così SkyTower confronta una revisione con la precedente senza cookie. Vale solo per
+quelle rotte (`PERCORSI_SUITE` in `server.py`); senza token resta il gate SSO di
+sempre (401 se non loggati, 503 portale spento) e, se impostata, la
+`CONFRONTO_PASSWORD`. Con `COSEDIL_SSO=off` non cambia niente. Il confronto fatto
+si apre nell'interfaccia con `/?job=<job_id>#results`.

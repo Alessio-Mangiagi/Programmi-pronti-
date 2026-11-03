@@ -76,8 +76,50 @@ except ImportError as err:
     cosedil_sso = None       # login spento: l'app gira anche fuori dalla suite (Docker)
 # COSEDIL_SSO=off per lo sviluppo in locale o fuori dalla suite;
 # COSEDIL_SSO_FAIL=open per tornare a usare l'app da sola quando il portale è spento.
+# Le API del confronto (/api/compare, /api/jobs/...) le usano anche le altre app
+# della suite (SkyTower: "confronta con la revisione precedente") col token di
+# servizio di shared/suite, che non ha il cookie del portale: il gate SSO non le
+# guarda (percorsi_liberi) e ci pensa _suite_gate qui sotto, che accetta o il
+# token o una sessione valida del portale.
+PERCORSI_SUITE = ("/api/compare", "/api/jobs/")
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared" / "suite"))
+try:
+    import suite_link
+except ImportError:
+    suite_link = None       # fuori dalla suite: nessun token, valgono solo sessione/password
+
 if cosedil_sso is not None:
-    cosedil_sso.init(app, app_id="confronta")
+    cosedil_sso.init(app, app_id="confronta", percorsi_liberi=PERCORSI_SUITE if suite_link else ())
+
+
+def _token_suite_valido():
+    return suite_link is not None and suite_link.verifica(request.headers.get("X-Suite-Token"))
+
+
+if cosedil_sso is not None and suite_link is not None and getattr(cosedil_sso, "ENABLED", True):
+    from flask import g
+
+    @app.before_request
+    def _suite_gate():
+        if not request.path.startswith(PERCORSI_SUITE):
+            return None
+        if _token_suite_valido():
+            g.cosedil = {"ok": True, "suite": True, "admin": False,
+                         "username": request.headers.get("X-Suite-Utente") or "suite",
+                         "nome": request.headers.get("X-Suite-Nome") or "Suite Cosedil", "ruolo": "suite"}
+            return None
+        v = cosedil_sso.verifica_sessione(request.headers.get("Cookie", ""), "confronta")
+        if v["ok"]:
+            g.cosedil = v
+            return None
+        if v.get("vietato"):
+            return jsonify(ok=False, error=cosedil_sso.MSG_NON_ABILITATO), 403
+        if not v["reachable"]:
+            if cosedil_sso.FAIL_OPEN:
+                return None
+            return jsonify(ok=False, error=cosedil_sso.MSG_PORTALE_GIU), 503
+        return jsonify(ok=False, error=cosedil_sso.MSG_NON_LOGGATO), 401
 
 # Password semplice per l'uso fuori dall'ufficio (Docker / cloud, sempre dietro
 # HTTPS): con CONFRONTO_PASSWORD impostata ogni richiesta chiede utente e
@@ -91,6 +133,8 @@ if _PASSWORD:
     def _password_gate():
         if request.path == "/healthz":          # controllo di salute del container
             return None
+        if request.path.startswith(PERCORSI_SUITE) and _token_suite_valido():
+            return None                          # chiamata di un'altra app della suite
         auth = request.authorization
         if (auth and hmac.compare_digest(auth.username or "", _UTENTE)
                 and hmac.compare_digest(auth.password or "", _PASSWORD)):
