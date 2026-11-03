@@ -132,6 +132,23 @@ test('asset statici passano anche senza login', async () => {
   await chiudi(appServer);
 });
 
+test('fail-closed: rotte fuori da /api e /API maiuscolo richiedono il login', async () => {
+  // Prima passava tutto ciò che non era HTML o "/api": una rotta con dati fuori da /api
+  // (Lettore DDT: /claude-to-excel) o "/API/x" (Express non distingue le maiuscole) rispondeva senza login.
+  await avviaApp({ app: 'test' });
+  for (const path of ['/claude-to-excel', '/API/dati', '/batch/jobs', '/@fs/C:/segreti/.token', '/dati.db']) {
+    const r = await richiesta(path);
+    assert.equal(r.status, 401, path);
+  }
+  for (const path of ['/assets/app.js', '/static/logo.png', '/@vite/client', '/favicon.ico']) {
+    const r = await richiesta(path);
+    assert.equal(r.status, 200, path);   // asset: passano senza sessione
+  }
+  const ok = await richiesta('/claude-to-excel', { cookie: COOKIE_OK });
+  assert.equal(ok.status, 200);
+  await chiudi(appServer);
+});
+
 test('adminOnly: utente normale 403, admin passa', async () => {
   await avviaApp({ app: 'test', adminOnly: true });
   const no = await richiesta('/api/dati', { cookie: COOKIE_OK });

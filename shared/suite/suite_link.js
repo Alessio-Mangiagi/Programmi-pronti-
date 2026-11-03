@@ -191,7 +191,8 @@ async function raggiungibile(app, timeout = 2000) {
 
 // ----------------------------------------------------------------------------- registro commesse
 function pulisciCommessa(c) {
-  const code = String(c.code || c.codice || '').replace(/\s+/g, ' ').trim();
+  // max 40 caratteri: il registro lo leggono tutte le app a ogni tendina, un codice da megabyte le fermerebbe
+  const code = String(c.code || c.codice || '').replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!code) return null;
   const stato = String(c.stato || 'attiva').trim().toLowerCase();
   return {

@@ -90,7 +90,8 @@ STATI_COMMESSA = ("attiva", "sospesa", "chiusa")
 
 
 def _pulisci_commessa(c):
-    code = re.sub(r"\s+", " ", str(c.get("code") or c.get("codice") or "")).strip()
+    # max 40 caratteri: il registro lo leggono tutte le app a ogni tendina, un codice da megabyte le fermerebbe
+    code = re.sub(r"\s+", " ", str(c.get("code") or c.get("codice") or "")).strip()[:40]
     if not code:
         return None
     stato = str(c.get("stato") or "attiva").strip().lower()
@@ -181,7 +182,9 @@ def token():
 
 def verifica(valore):
     """True se ``valore`` (header X-Suite-Token) è il token di servizio."""
-    return bool(valore) and hmac.compare_digest(str(valore).strip(), token())
+    # confronto in byte: con str, un header con caratteri non ASCII fa sollevare TypeError (500 invece di 401)
+    return bool(valore) and hmac.compare_digest(str(valore).strip().encode("utf-8", "replace"),
+                                                token().encode("utf-8"))
 
 
 def normalizza_commessa(codice):

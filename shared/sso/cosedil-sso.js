@@ -49,6 +49,20 @@ const FAIL_OPEN = (process.env.COSEDIL_SSO_FAIL || 'closed').toLowerCase() === '
 const CACHE_TTL = 30_000;
 const CACHE_TTL_IRRAGGIUNGIBILE = 3_000;
 const cache = new Map();   // `${sid}|${app}` -> { exp, ok, reachable, admin, username, nome, ruolo }
+const CACHE_MAX = 5000;    // oltre: via le voci scadute (e tutte, se non basta): niente crescita infinita
+
+// Estensioni e prefissi che il gate lascia passare senza guardare la sessione: file statici, HMR di Vite.
+// Tutto il resto (pagine, API con qualunque nome o maiuscole, download, websocket) richiede il login dal
+// portale: prima si proteggevano solo le navigazioni HTML e i percorsi "/api", e una rotta con dati fuori
+// da /api (o "/API" maiuscolo, che Express instrada lo stesso) rispondeva senza login (revisione del 03/11/2026).
+const ESTENSIONI_ASSET = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|webmanifest|txt)$/i;
+const PREFISSI_ASSET = ['/static/', '/assets/', '/@vite', '/@react-refresh', '/node_modules/', '/favicon'];
+
+// True se il percorso è un file statico che non porta dati dell'utente.
+function eAsset(url) {
+  const path = (url || '/').split('?')[0].toLowerCase();
+  return PREFISSI_ASSET.some((p) => path.startsWith(p)) || ESTENSIONI_ASSET.test(path);
+}
 
 const MSG_NON_LOGGATO = 'Accesso riservato: accedi dal Portale Suite Cosedil';
 const MSG_PORTALE_GIU = 'Portale Suite Cosedil non raggiungibile: impossibile verificare l\'accesso. '
@@ -89,6 +103,11 @@ async function verificaSessione(cookie, app) {
     out = { ok: false, reachable: false, admin: false, username: null, nome: null, ruolo: null, email: null };
   }
   out.exp = now + (out.reachable ? CACHE_TTL : CACHE_TTL_IRRAGGIUNGIBILE);
+  if (cache.size >= CACHE_MAX) {
+    // un client che manda cookie sempre diversi non deve far crescere la memoria per sempre
+    for (const [k, v] of cache) if (v.exp <= now) cache.delete(k);
+    if (cache.size >= CACHE_MAX) cache.clear();
+  }
   cache.set(key, out);
   return out;
 }
@@ -116,10 +135,9 @@ function cosedilSSO(opts = {}) {
       if (!ENABLED) return next();
       const url = req.url || '/';
       const isDoc = (req.headers.accept || '').includes('text/html');
-      const isApi = url.startsWith('/api');
-      // Gate solo su navigazioni (pagine) e chiamate API: gli asset statici,
-      // l'HMR di Vite e simili passano sempre.
-      if (!isDoc && !isApi) return next();
+      // Fail-closed: passano solo gli asset statici (e l'HMR di Vite); tutto il resto richiede la
+      // sessione del portale, qualunque sia il nome della rotta.
+      if (!isDoc && eAsset(url)) return next();
 
       const v = await verificaSessione(req.headers.cookie, app);
       // Identità + admin per-app a disposizione dell'app (rotte, UI, log).

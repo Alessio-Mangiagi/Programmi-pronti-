@@ -118,6 +118,17 @@ importlib.reload(cosedil_sso)
 r = get(c, "/static/stile.css", headers={})   # né HTML né /api: 404 di Flask, non 401 del gate
 controlla("asset statici non gattati", r.status_code == 404)
 
+# Fail-closed: una rotta con dati fuori da /api (o scritta con le maiuscole) non passa più senza login;
+# gli asset per estensione/prefisso sì (404 di Flask, non 401 del gate).
+c = crea_app(app_id="test")
+for percorso in ("/etichette", "/API/dati", "/batch/jobs", "/@fs/C:/segreti/.token", "/dati.db"):
+    r = get(c, percorso, headers={})
+    controlla(f"fail-closed senza login: {percorso} -> 401", r.status_code == 401)
+for percorso in ("/assets/app.js", "/static/logo.png", "/@vite/client", "/favicon.ico"):
+    r = get(c, percorso, headers={})
+    controlla(f"asset senza login: {percorso} non gattato", r.status_code == 404)
+r = get(c, "/etichette", COOKIE_OK, headers={})
+controlla("fail-closed: con la sessione la rotta fuori da /api risponde (404 di Flask)", r.status_code == 404)
 c = crea_app(app_id="test", admin_only=True)
 r = get(c, "/api/dati", COOKIE_OK)
 controlla("admin_only: utente normale 403", r.status_code == 403)

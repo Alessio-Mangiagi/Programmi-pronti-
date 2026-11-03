@@ -59,6 +59,21 @@ FAIL_OPEN = os.environ.get("COSEDIL_SSO_FAIL", "closed").lower() == "open"
 CACHE_TTL = 30.0
 CACHE_TTL_IRRAGGIUNGIBILE = 3.0
 _cache = {}   # (sid, app_id) -> (scadenza, esito dict)
+CACHE_MAX = 5000  # oltre questo si buttano le voci scadute (e tutto, se non basta): niente crescita infinita
+
+# Estensioni e prefissi che il gate lascia passare senza guardare la sessione: file statici, HMR di Vite.
+# Tutto il resto (pagine, API con qualunque nome, download, websocket) richiede il login dal portale:
+# prima si proteggevano solo le navigazioni HTML e i percorsi /api, e una rotta con dati fuori da /api
+# (o /API in maiuscolo su Express) rispondeva senza login (revisione di sicurezza del 03/11/2026).
+ESTENSIONI_ASSET = (".css", ".js", ".mjs", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+                    ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".txt")
+PREFISSI_ASSET = ("/static/", "/assets/", "/@vite", "/@react-refresh", "/node_modules/", "/favicon")
+
+
+def e_asset(path):
+    """True se il percorso è un file statico che non porta dati dell'utente."""
+    solo_path = (path or "/").split("?", 1)[0].lower()
+    return solo_path.startswith(PREFISSI_ASSET) or solo_path.endswith(ESTENSIONI_ASSET)
 
 MSG_NON_LOGGATO = "Accesso riservato: accedi dal Portale Suite Cosedil"
 MSG_PORTALE_GIU = ("Portale Suite Cosedil non raggiungibile: impossibile verificare "
@@ -115,6 +130,12 @@ def verifica_sessione(cookie_header, app_id=""):
         esito["reachable"] = False  # portale spento / irraggiungibile
 
     ttl = CACHE_TTL if esito["reachable"] else CACHE_TTL_IRRAGGIUNGIBILE
+    if len(_cache) >= CACHE_MAX:
+        # un client che manda cookie sempre diversi non deve far crescere la memoria per sempre
+        for k in [k for k, (scad, _) in _cache.items() if scad <= now]:
+            del _cache[k]
+        if len(_cache) >= CACHE_MAX:
+            _cache.clear()
     _cache[key] = (now + ttl, esito)
     return esito
 
@@ -128,13 +149,15 @@ def decidi(path, accept, cookie, app_id="", admin_only=False, admin_paths=(),
     richiesta non è stata nemmeno guardata: asset, percorsi liberi).
     """
     is_doc = "text/html" in (accept or "")
-    is_api = path.startswith("/api")
-    # Gate solo su navigazioni e chiamate API: gli asset statici passano.
-    # solo_pagine: le API le protegge l'app da sola (es. JWT per l'app mobile,
-    # che il cookie del portale non ce l'ha).
-    if not is_doc and (solo_pagine or not is_api):
-        return None, None
+    # Fail-closed: passano solo gli asset statici e i percorsi liberi dichiarati dall'app; tutto il resto
+    # (pagine, API con qualunque nome o maiuscole, download) richiede la sessione del portale.
+    # solo_pagine: le API le protegge l'app da sola (es. JWT per l'app mobile, che il cookie del portale
+    # non ce l'ha): il gate guarda solo le navigazioni HTML.
     if percorsi_liberi and path.startswith(tuple(percorsi_liberi)):
+        return None, None
+    if e_asset(path) and not is_doc:
+        return None, None
+    if solo_pagine and not is_doc:
         return None, None
 
     v = verifica_sessione(cookie, app_id)
