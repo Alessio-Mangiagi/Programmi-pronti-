@@ -9,6 +9,7 @@ import {
   ensureOnline, appInfo, appIds,
   type ToolResult, type SuiteCtx, type AppId,
 } from './suiteTools.ts'
+import { suite } from './suiteLink.ts'
 
 function qs(params: Record<string, unknown>): string {
   const p = new URLSearchParams()
@@ -373,5 +374,155 @@ registerTool({
       data: { filename: out.filename, sections: out.sections, engine: out.engine },
       file: { name: out.filename, base64: out.base64 },
     }
+  },
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUITE COSEDIL — commesse, cantiere, magazzino, documenti, scadenze: dati vivi
+// delle altre app via token di servizio (shared/suite), con l'utente del
+// portale negli header. Solo lettura. App spenta = messaggio, mai errore.
+// ─────────────────────────────────────────────────────────────────────────────
+const EMAIL_DOMINIO = (process.env.SUITE_EMAIL_DOMINIO || 'cosedilspa.com').trim()
+
+function intestazioniUtente(ctx: SuiteCtx): { utente?: string; email?: string } {
+  const u = (ctx.user || '').trim()
+  if (!u || u === 'local') return {}
+  return { utente: u, email: u.includes('@') ? u : `${u}@${EMAIL_DOMINIO}` }
+}
+
+/** Chiamata con token a un'app della suite: l'errore diventa un ToolResult, non un'eccezione. */
+async function chiamaSuite(app: string, percorso: string, ctx: SuiteCtx, parametri?: Record<string, unknown>): Promise<{ ok: true; data: any } | { ok: false; summary: string; error: string }> {
+  try {
+    const data = await suite.chiama(app, 'GET', percorso, { parametri, ...intestazioniUtente(ctx), timeout: 15_000 })
+    return { ok: true, data }
+  } catch (e) {
+    const err = e as { stato?: number; messaggio?: string; message?: string }
+    const testo = err.messaggio || err.message || 'errore'
+    return { ok: false, summary: testo, error: err.stato === 503 ? 'app_offline' : `http_${err.stato || 0}` }
+  }
+}
+
+const cod = (c: string) => encodeURIComponent(String(c || '').trim())
+
+registerTool({
+  name: 'commesse_registro',
+  app: 'locale',
+  kind: 'read',
+  description: 'Elenco delle commesse aziendali dal registro unico della suite (codice, nome, stato, cliente, indirizzo). Usalo per sapere quali commesse esistono o per trovare il codice da una descrizione, prima di interrogare magazzino, cantiere o documenti.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      q: { type: 'string', description: 'Testo da cercare in codice, nome, cliente, indirizzo' },
+      solo_attive: { type: 'boolean', description: 'Solo commesse attive (default true)' },
+    },
+  },
+  async run(args): Promise<ToolResult> {
+    const soloAttive = args.solo_attive !== false
+    const q = String(args.q || '').trim().toLowerCase()
+    let lista = suite.commesse({ soloAttive })
+    if (q) lista = lista.filter(c => [c.code, c.nome, c.cliente, c.indirizzo].join(' ').toLowerCase().includes(q))
+    if (!lista.length) {
+      return { ok: true, summary: q ? `Nessuna commessa corrisponde a «${q}».` : 'Il registro delle commesse è vuoto: lo compila l\'amministratore dal Portale (pagina Commesse).', data: [] }
+    }
+    const righe = lista.slice(0, 30).map(c => `${c.code} — ${c.nome || '(senza nome)'}${c.cliente ? ` · ${c.cliente}` : ''}${c.stato !== 'attiva' ? ` [${c.stato}]` : ''}`)
+    return { ok: true, summary: `${lista.length} commesse:\n- ${righe.join('\n- ')}${lista.length > 30 ? `\n… e altre ${lista.length - 30}` : ''}`, data: lista }
+  },
+})
+
+registerTool({
+  name: 'magazzino_giacenze',
+  app: 'magazzino',
+  kind: 'read',
+  description: 'Giacenze del Magazzino Operativo per una commessa: articoli con quantità, mezzi presenti (targa, stato, in uso), ubicazioni. Usalo per "quanto materiale c\'è in cantiere", "quali mezzi sono a X", "mezzi fermi nella commessa Y".',
+  input_schema: {
+    type: 'object',
+    properties: { commessa: { type: 'string', description: 'Codice commessa aziendale (es. 101-003)' } },
+    required: ['commessa'],
+  },
+  async run(args, ctx: SuiteCtx): Promise<ToolResult> {
+    const r = await chiamaSuite('magazzino', `/suite/commesse/${cod(args.commessa)}/giacenze`, ctx)
+    if (!r.ok) return { ok: false, summary: `Magazzino: ${r.summary}`, error: r.error }
+    const d = r.data || {}
+    const tot = d.totali || {}
+    const articoli = (d.articoli || []).slice(0, 15).map((a: any) => `${a.descrizione || a.codice}: ${a.quantita ?? '?'} ${a.um || ''}`.trim())
+    const mezzi = (d.mezzi || []).slice(0, 15).map((m: any) => `${[m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' ')}${m.targa ? ` (${m.targa})` : ''} — ${m.stato || ''}`)
+    const summary = `Commessa ${d.commessa || args.commessa}: ${tot.articoli ?? articoli.length} articoli, ${tot.mezzi ?? mezzi.length} mezzi (${tot.mezzi_in_uso ?? '?'} in uso), ${(d.ubicazioni || []).length} ubicazioni.` +
+      (articoli.length ? `\nMateriale:\n- ${articoli.join('\n- ')}` : '') + (mezzi.length ? `\nMezzi:\n- ${mezzi.join('\n- ')}` : '')
+    return { ok: true, summary, data: d, openUrl: { label: 'Apri nel Magazzino', url: suite.urlPubblico('magazzino') } }
+  },
+})
+
+registerTool({
+  name: 'incampo_riepilogo',
+  app: 'incampo',
+  kind: 'read',
+  description: 'Riepilogo InCampo di una commessa: cantieri, task aperti (titolo, assegnatario, scadenza) e non conformità aperte. Usalo per "cosa c\'è da fare nel cantiere X", "task aperti della commessa Y", "ci sono non conformità".',
+  input_schema: {
+    type: 'object',
+    properties: { commessa: { type: 'string', description: 'Codice commessa aziendale (es. 101-003)' } },
+    required: ['commessa'],
+  },
+  async run(args, ctx: SuiteCtx): Promise<ToolResult> {
+    const r = await chiamaSuite('incampo', `/suite/commesse/${cod(args.commessa)}/riepilogo`, ctx)
+    if (!r.ok) return { ok: false, summary: `InCampo: ${r.summary}`, error: r.error }
+    const d = r.data || {}
+    const task = (d.task || []).slice(0, 15).map((t: any) => `${t.title}${t.status ? ` [${t.status}]` : ''}${t.assigned_to_name || t.assigned_to ? ` → ${t.assigned_to_name || t.assigned_to}` : ''}${t.due_date ? ` entro ${t.due_date}` : ''}`)
+    const nc = (d.nc || []).slice(0, 10).map((n: any) => n.title || n.titolo || n.id)
+    const cantieri = (d.cantieri || []).map((c: any) => c.name).filter(Boolean)
+    const summary = `Commessa ${d.commessa?.code || args.commessa}${d.commessa?.name ? ` (${d.commessa.name})` : ''}: ${cantieri.length} cantieri${cantieri.length ? ` (${cantieri.join(', ')})` : ''}, ${(d.task || []).length} task aperti, ${(d.nc || []).length} non conformità aperte.` +
+      (task.length ? `\nTask:\n- ${task.join('\n- ')}` : '') + (nc.length ? `\nNon conformità:\n- ${nc.join('\n- ')}` : '')
+    return { ok: true, summary, data: d, openUrl: { label: 'Apri InCampo', url: suite.urlPubblico('incampo') } }
+  },
+})
+
+registerTool({
+  name: 'skytower_documenti',
+  app: 'skytower',
+  kind: 'read',
+  description: 'Documenti pubblicati in SkyTower (il CDE) per una commessa, con ricerca per testo: codice ISO 19650, titolo, revisione, file. Usalo per "quali tavole/documenti ci sono per la commessa X", "trova il computo di Y".',
+  input_schema: {
+    type: 'object',
+    properties: {
+      commessa: { type: 'string', description: 'Codice commessa aziendale (es. 101-003)' },
+      q: { type: 'string', description: 'Testo da cercare (titolo, codice)' },
+      area: { type: 'string', enum: ['PUBLISHED', 'SHARED', 'WIP'], description: 'Area del CDE (default PUBLISHED)' },
+    },
+    required: ['commessa'],
+  },
+  async run(args, ctx: SuiteCtx): Promise<ToolResult> {
+    const r = await chiamaSuite('skytower', `/suite/commesse/${cod(args.commessa)}/documenti`, ctx, { area: args.area || 'PUBLISHED', q: args.q, limit: 50 })
+    if (!r.ok) return { ok: false, summary: `SkyTower: ${r.summary}`, error: r.error }
+    const items: any[] = r.data?.items || []
+    const righe = items.slice(0, 20).map(d => `${d.identifier || ''} — ${d.title || ''}${d.revision_code ? ` (rev. ${d.revision_code})` : ''}${d.filename ? ` · ${d.filename}` : ''}`)
+    const summary = items.length
+      ? `${items.length} documenti nella commessa ${args.commessa}:\n- ${righe.join('\n- ')}${items.length > 20 ? `\n… e altri ${items.length - 20}` : ''}`
+      : `Nessun documento ${args.area || 'pubblicato'} per la commessa ${args.commessa}${args.q ? ` con «${args.q}»` : ''}.`
+    return { ok: true, summary, data: items, openUrl: { label: 'Apri SkyTower', url: suite.urlPubblico('skytower') } }
+  },
+})
+
+registerTool({
+  name: 'scadenzario_prossime',
+  app: 'scadenzario',
+  kind: 'read',
+  description: 'Scadenze aperte dello Scadenzario entro N giorni (scadute comprese), lette con il token della suite: titolo, soggetto, data. Usalo per "cosa scade questa settimana/questo mese", "scadenze in ritardo".',
+  input_schema: {
+    type: 'object',
+    properties: { giorni: { type: 'integer', description: 'Orizzonte in giorni (default 30)' } },
+  },
+  async run(args, ctx: SuiteCtx): Promise<ToolResult> {
+    const giorni = Math.max(0, Math.min(365, Number(args.giorni) || 30))
+    const r = await chiamaSuite('scadenzario', '/suite/da-fare', ctx, { admin: 1 })
+    if (!r.ok) return { ok: false, summary: `Scadenzario: ${r.summary}`, error: r.error }
+    const limite = new Date(Date.now() + giorni * 86_400_000).toISOString().slice(0, 10)
+    const oggi = new Date().toISOString().slice(0, 10)
+    const voci: any[] = (r.data?.voci || []).filter((v: any) => !v.data || String(v.data).slice(0, 10) <= limite)
+    voci.sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')))
+    const scadute = voci.filter(v => v.data && String(v.data).slice(0, 10) < oggi).length
+    const righe = voci.slice(0, 20).map(v => `${v.data ? String(v.data).slice(0, 10) + ' · ' : ''}${v.titolo}${v.testo ? ` — ${v.testo}` : ''}`)
+    const summary = voci.length
+      ? `${voci.length} scadenze entro ${giorni} giorni (${scadute} già scadute):\n- ${righe.join('\n- ')}${voci.length > 20 ? `\n… e altre ${voci.length - 20}` : ''}`
+      : `Nessuna scadenza entro ${giorni} giorni.`
+    return { ok: true, summary, data: voci, openUrl: { label: 'Apri lo Scadenzario', url: suite.urlPubblico('scadenzario') } }
   },
 })

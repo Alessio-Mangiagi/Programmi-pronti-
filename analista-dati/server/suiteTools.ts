@@ -27,7 +27,7 @@ const PORTAL_URL = (process.env.COSEDIL_PORTAL || 'http://localhost:8080').repla
 const CALL_TIMEOUT_MS = Number(process.env.SUITE_CALL_TIMEOUT_MS) || 60_000
 const LAUNCH_WAIT_MS = Number(process.env.SUITE_LAUNCH_WAIT_MS) || 25_000
 
-export type AppId = 'scadenzario' | 'ocr' | 'confronta' | 'ddt'
+export type AppId = 'scadenzario' | 'ocr' | 'confronta' | 'ddt' | 'incampo' | 'skytower' | 'magazzino'
 
 interface SuiteApp {
   id: AppId
@@ -47,6 +47,12 @@ const APPS: Record<AppId, SuiteApp> = {
   ocr:         { id: 'ocr', nome: 'OCR Documenti', base: appBase('ocr', 5179), health: '/api/ping', launchId: 'ocr' },
   confronta:   { id: 'confronta', nome: 'Confronto Documenti', base: appBase('confronta', 5001), health: '/api/models', launchId: 'confronta' },
   ddt:         { id: 'ddt', nome: 'Lettore DDT', base: appBase('ddt', 5050), health: '/status', launchId: 'ddt' },
+  // Le tre app del cantiere si interrogano col token di servizio (suiteLink.ts),
+  // non col cookie: qui servono solo per il check "online" e l'avvio dal portale.
+  // SkyTower: l'API sta sulla 8100 (la 5195 è il frontend).
+  incampo:     { id: 'incampo', nome: 'InCampo', base: appBase('incampo', 5190), health: '/healthz', launchId: 'incampo' },
+  skytower:    { id: 'skytower', nome: 'SkyTower', base: appBase('skytower', 8100), health: '/health', launchId: 'skytower' },
+  magazzino:   { id: 'magazzino', nome: 'Magazzino Operativo', base: appBase('magazzino', 5200), health: '/api/health', launchId: 'magazzino' },
 }
 
 // ── Contesto di esecuzione (identità dell'utente + allegati del messaggio) ───
