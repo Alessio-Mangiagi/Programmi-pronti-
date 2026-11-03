@@ -91,6 +91,12 @@ una scansione con OCR incerto un `ko` automatico manderebbe indietro un fornitor
 | GET | `/api/verifiche/:id/report.xlsx` | report Excel |
 | GET | `/status`, `/metrics` | health check e metriche Prometheus |
 
+Le rotte `/api/documenti*`, `/api/verifiche*` e `/api/requisiti` accettano anche
+il **token di servizio** della suite (`X-Suite-Token`, `shared/suite`) al posto
+della sessione del portale: così SkyTower manda un file, aspetta `pronto` e
+lancia una verifica. Chi entra col token è l'utente `suite` (o quello di
+`X-Suite-Utente`), mai admin (`src/middleware/suiteToken.ts`).
+
 ## Dati
 
 Tutto sotto `data/` (mai versionato):

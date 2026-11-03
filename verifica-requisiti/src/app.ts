@@ -10,6 +10,7 @@ import routes from './routes';
 // del progetto). A runtime sia src/ sia dist/ stanno un livello sotto la radice
 // dell'app, quindi lo stesso path relativo risolve in sviluppo e in build.
 import cosedilSSO from '../../shared/sso/cosedil-sso';
+import { conTokenSuite } from './middleware/suiteToken';
 import { errorHandler } from './utils/errorHandler';
 import { metricsMiddleware } from './utils/metrics';
 import logger from './utils/logger';
@@ -37,7 +38,9 @@ const app = express();
 // Gate SSO: richiede il login del Portale Suite. Portale giù = accesso chiuso
 // (COSEDIL_SSO_FAIL=open per il vecchio comportamento; COSEDIL_SSO=off per
 // disattivare in sviluppo). Deve stare prima di tutto il resto.
-app.use(cosedilSSO({ app: 'requisiti' }));
+// Le altre app della suite (SkyTower) chiamano le API col token di servizio di
+// shared/suite: con quello si entra senza passare dal gate (suiteToken.ts).
+app.use(conTokenSuite(cosedilSSO({ app: 'requisiti' })));
 
 if (appCfg.trustProxy) app.set('trust proxy', 1);
 
