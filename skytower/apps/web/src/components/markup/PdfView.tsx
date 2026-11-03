@@ -119,8 +119,10 @@ export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onF
     return <Box p={6} textAlign="center"><CircularProgress sx={{ color: "#fff" }} /></Box>;
   }
   const comparing = !!compareUrl && !!cmp;
+  // "safe center": una pagina più larga dello spazio (zoom alto, tablet con pannello aperto) resta
+  // raggiungibile con lo scroll invece di finire tagliata a sinistra (U23)
   return (
-    <Box ref={container} sx={{ py: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+    <Box ref={container} sx={{ py: 2, display: "flex", flexDirection: "column", alignItems: "safe center", gap: 2 }}>
       {cmpError && <Alert severity="warning">Revisione di confronto non leggibile: {cmpError}</Alert>}
       {comparing && (
         <Alert severity="info" icon={false} sx={{ py: 0 }}>

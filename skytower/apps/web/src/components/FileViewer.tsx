@@ -256,7 +256,10 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
       </AppBar>
       <Box display="flex" flexGrow={1} minHeight={0}>
         <Box data-pdf-scroll tabIndex={0} role="region" aria-label="Contenuto del documento" flexGrow={1} bgcolor="#525659" overflow="auto" minWidth={0} display="flex" flexDirection="column"
-             alignItems={fill ? "stretch" : "center"} justifyContent={fill ? "flex-start" : "center"}>
+             // "safe center": se il contenuto è più largo o più alto dello spazio (tablet con il pannello annotazioni
+             // aperto, U23) il centramento normale lo taglia a sinistra/in alto senza poter scorrere; con "safe"
+             // il browser lo allinea all'inizio e lo scroll arriva ovunque
+             alignItems={fill ? "stretch" : "safe center"} justifyContent={fill ? "flex-start" : "safe center"}>
           {rev && rev.scan_status !== "CLEAN" && (
             <Alert severity={rev.scan_status === "PENDING" ? "info" : "error"}>
               {rev.scan_status === "PENDING" ? "Verifica antivirus in corso: riprova tra poco." : "File in quarantena: non visualizzabile."}
@@ -337,8 +340,9 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
             <Box component="iframe" src={link.url} title={doc?.title ?? "Documento"} sx={{ border: 0, width: "100%", flexGrow: 1, alignSelf: "stretch", bgcolor: "#fff" }} />
           ))}
         </Box>
+        {/* sotto i 900 px (tablet in verticale, U23) il pannello si stringe per lasciare spazio alla tavola */}
         {panel && revisionId && (
-          <Box width={{ xs: "100%", sm: 360 }} flexShrink={0} borderLeft={1} borderColor="divider" bgcolor="background.paper"
+          <Box width={{ xs: "100%", sm: 300, md: 360 }} flexShrink={0} borderLeft={1} borderColor="divider" bgcolor="background.paper"
                position={{ xs: "absolute", sm: "static" }} top={{ xs: 64 }} bottom={0} right={0} zIndex={1}>
             <MarkupPanel revisionId={revisionId} taskId={taskId} markups={markups} numbers={numbers} selectedId={selectedId}
                          draft={draft} onClearDraft={() => setDraft(null)}
