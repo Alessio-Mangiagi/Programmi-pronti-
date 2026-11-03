@@ -1,7 +1,7 @@
 # "><(((º> sabusabu <º)))><"
 <#
 Ripristino di SkyTower da un backup (Windows), da questa cartella:
-    .\ripristina.ps1 -Database .\backup\cde-20261103-0300.sql.gz [-Documenti .\backup\documenti-....tar] [-Segreti .\backup\segreti-....tar]
+    .\ripristina.ps1 -Database .\backup\cde-20261103-0300.sql.gz [-Documenti .\backup\documenti-....tar] [-Segreti .\backup\chiavi\CHIAVI-SEGRETE-....tar]
 
 ATTENZIONE: sostituisce il database (e, se indicati, documenti e chiavi) con il contenuto del backup.
 Ferma API e worker, ricrea il database `cde` dal dump, rimette i file nel volume miniodata e le chiavi

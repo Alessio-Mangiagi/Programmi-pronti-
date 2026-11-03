@@ -56,7 +56,8 @@ def _organizzazione(conn: psycopg.Connection, codice: str, nome: str):
     if riga:
         return riga[0]
     org = conn.execute(
-        "INSERT INTO cde.organizations (legal_name, code, mfa_required) VALUES (%s, %s, false) RETURNING id",
+        # MFA obbligatoria: l'organizzazione aziendale ha il platform admin e l'account personale (B10)
+        "INSERT INTO cde.organizations (legal_name, code, mfa_required) VALUES (%s, %s, true) RETURNING id",
         [nome, codice]).fetchone()[0]
     print(f"Organizzazione {codice} ({nome}) creata")
     return org

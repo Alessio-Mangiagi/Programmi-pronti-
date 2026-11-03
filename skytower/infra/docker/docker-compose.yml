@@ -170,8 +170,11 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+    # Solo sul server stesso (M4): le app della suite girano lì, i browser passano dal web (Caddy, 5195).
+    # Pubblicata su tutte le interfacce, chiunque in LAN parlerebbe con l'API saltando Caddy e potrebbe
+    # scegliersi l'IP con X-Forwarded-For (CDE_CLIENT_IP_HEADER) per aggirare i limiti dei tentativi.
     ports:
-      - "${API_PORTA:-8100}:8000"
+      - "127.0.0.1:${API_PORTA:-8100}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 15s
