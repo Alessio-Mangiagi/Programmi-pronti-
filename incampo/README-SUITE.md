@@ -124,6 +124,40 @@ per l'utente del portale i task assegnati a lui ancora aperti (scaduti prima) e,
 manager o admin, le non conformità aperte dei suoi cantieri, con link alla pagina.
 Formato in `shared/suite/CONTRATTI.md` § 4.
 
+## Demo parlante
+
+Due commesse complete per capire come funziona InCampo e vedere i collegamenti con
+Magazzino e SkyTower (stessi codici del registro della suite):
+
+```bat
+.venv\Scripts\python -m scripts.crea_demo            REM crea; rilanciarlo non duplica
+.venv\Scripts\python -m scripts.crea_demo --rimuovi  REM toglie solo la demo
+```
+
+Con `APP_ENV=production` nel `.env` serve `SEED_ALLOW_PRODUCTION=1` (gli utenti demo
+hanno una password nota). Lo script passa dalle API vere (client in-process sullo
+stesso DB e storage dell'istanza accesa), quindi eventi, notifiche, audit e
+transizioni dei task sono quelli reali.
+
+| Commessa | Cantieri | Cosa c'è |
+|---|---|---|
+| `101-003` Sede Acireale (ristrutturazione uffici, Cosedil S.p.A.) | *Uffici* (Via Nazionale 120, Acireale), *Deposito e officina* | planimetrie Piano terra, Piano primo, Capannone; WBS a 4 capitoli; ispezione sicurezza non conforme sul quadro elettrico con task scaduto; verifica getto conforme con task risolto e verificato; punch list serramento con task risolto da verificare; non conformità alta sul controsoffitto con task aperto; diario giornaliero sulla voce WBS 02.01; NC sul compressore in officina |
+| `C-2024-015` Scuola Via Roma (nuova costruzione, Comune di Catania) | *Corpo aule* (Via Roma 45, Catania), *Palestra* | planimetrie Fondazioni, Piano terra, Pianta palestra; WBS; verifiche getto plinti (una conforme chiusa, una con nido di ghiaia non conforme); ispezione scavo senza parapetto con task in scadenza oggi; punch list tamponatura; diario con autogru e pompa; task di cantiere per DL e manager |
+
+Utenti (password `Cantiere-2026!`): `marta.colombo@demo.cosedil.local` (admin, Ing. Marta
+Colombo), `fabio.restivo@…` (manager, Geom. Fabio Restivo), `lucia.patane@…` (manager,
+Arch. Lucia Patanè, DL), `salvatore.grasso@…` (field, capocantiere),
+`giuseppe.lopresti@…` (field, operaio). Più tre etichette d'invito (Direzione lavori,
+Capocantiere, Operaio di cantiere), due inviti in attesa e una richiesta di supporto.
+
+Ogni modulo ha foto e firma caricate davvero (immagini generate), posizione GPS del
+cantiere e genera eventi e notifiche come dal telefono. Se SkyTower è acceso e ha un
+progetto con lo stesso codice commessa, lo script prende anche una tavola pubblicata
+come planimetria («Da SkyTower: …») e manda una verifica getto a SkyTower; se non c'è,
+lo dice e va avanti. Le rotte della suite rispondono subito con dati veri:
+`/api/suite/commesse/101-003/riepilogo` (task aperti, non conformità) e
+`/api/suite/da-fare` (es. per `salvatore.grasso@…`: il task scaduto in priorità 1).
+
 ## Aggiornare dalla repository originale
 
 ```bat
