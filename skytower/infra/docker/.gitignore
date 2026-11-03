@@ -1,0 +1,4 @@
+# Segreti e dati del server: mai nel repository
+.env
+backup/
+certs/

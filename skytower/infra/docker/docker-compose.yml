@@ -1,0 +1,276 @@
+# "><(((º> sabusabu <º)))><"
+#
+# SkyTower sul server aziendale, senza AWS (ADR-43).
+#
+# Cosa gira:
+#   db          PostgreSQL 16 vero (volume pgdata), ruoli cde_owner/app/auth/worker creati da prepara_db.py
+#   minio       S3 compatibile con Object Lock (volume miniodata): documenti e ancore del registro
+#   minio-init  una tantum: bucket con lock, retention di default, utente dedicato dell'app
+#   clamav      antivirus clamd usato dal worker (CDE_SCANNER=clamd), firme nel volume clamdb
+#   api         FastAPI (immagine apps/api/Dockerfile), pubblicata anche sulla 8100 per le altre app della suite
+#   worker      stessa immagine, coda Procrastinate (verifica file, notifiche, derivati IFC, ancore)
+#   web         Caddy con la SPA compilata e /api → api (immagine infra/docker/Dockerfile.web), porta 5195
+#   backup      pg_dump giornaliero compresso in ./backup, tenuto 30 giorni
+#   prepara     (profilo "strumenti") prima installazione: ruoli DB, migrazioni, organizzazione, primo admin
+#   migrate     (profilo "strumenti") solo migrazioni, usato da aggiorna.*
+#
+# Tutte le variabili vengono dal file .env accanto (vedi .env.esempio): lo scrive installa.* con i
+# segreti generati, non va mai nel repository. Lanciare sempre da questa cartella (docker compose
+# legge .env da qui). Le porte pubblicate sono quelle del registro del portale: 5195 web, 8100 API,
+# 9100 S3. Il Caddy della suite (deploy/Caddyfile) manda skytower.<dominio> sulla 5195.
+
+name: skytower
+
+x-api-base: &api-base
+  # Immagine unica per API, worker, migrazioni (apps/api/Dockerfile, contesto = cartella skytower/)
+  build:
+    context: ../..
+    dockerfile: apps/api/Dockerfile
+  image: skytower-api:${SKYTOWER_VERSIONE:-locale}
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    # "staging" e non "prod": in prod il codice pretende AWS KMS e ClamAV; qui le chiavi stanno nel
+    # volume segreti (solo root e l'utente 10001 del container) e l'antivirus c'è lo stesso.
+    CDE_ENV: staging
+    CDE_KMS_PROVIDER: local
+    CDE_LOCAL_SECRETS_DIR: /segreti
+    CDE_DATABASE_URL_APP: postgresql://cde_app:${DB_PWD_APP}@db:5432/cde
+    CDE_DATABASE_URL_AUTH: postgresql://cde_auth:${DB_PWD_AUTH}@db:5432/cde
+    CDE_DATABASE_URL_WORKER: postgresql://cde_worker:${DB_PWD_WORKER}@db:5432/cde
+    CDE_DATABASE_URL_OWNER: postgresql://cde_owner:${DB_PWD_OWNER}@db:5432/cde
+    # S3: l'API usa lo stesso indirizzo che poi finisce negli URL firmati per il browser, perché la firma
+    # include l'host. host.docker.internal = il server stesso, dove la 9100 è pubblicata.
+    CDE_S3_BUCKET: ${S3_BUCKET:-cde-documenti}
+    CDE_S3_ENDPOINT_URL: ${S3_ENDPOINT_PUBBLICO}
+    AWS_ACCESS_KEY_ID: ${S3_UTENTE}
+    AWS_SECRET_ACCESS_KEY: ${S3_SEGRETO}
+    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-south-1}
+    # Certificati di cui l'API si fida chiamando l'S3: quelli di sistema, oppure root.crt del Caddy della suite
+    AWS_CA_BUNDLE: ${AWS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}
+    CDE_WEB_BASE_URL: ${WEB_ORIGIN}
+    CDE_CORS_ORIGINS: '["${WEB_ORIGIN}"]'
+    CDE_COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    # IP del client: lo mette Caddy (web) in X-Forwarded-For; l'API non è raggiungibile da fuori se non
+    # dalla 8100, riservata alla LAN del server (firewall-suite.ps1).
+    CDE_CLIENT_IP_HEADER: x-forwarded-for
+    CDE_PUBLIC_API_PREFIX: /api
+    CDE_MAILER: console
+    CDE_SCANNER: clamd
+    CDE_CLAMD_HOST: clamav
+    CDE_CLAMD_PORT: "3310"
+    CDE_AUDIT_LOCK_MODE: ${AUDIT_LOCK_MODE:-COMPLIANCE}
+    # Suite Cosedil: token di servizio e indirizzi delle altre app (sul server, fuori dai container)
+    SUITE_TOKEN: ${SUITE_TOKEN}
+    SUITE_DOMINIO: ${SUITE_DOMINIO:-}
+    COSEDIL_PORTAL: ${COSEDIL_PORTAL:-http://host.docker.internal:8080}
+    SUITE_URL_INCAMPO: ${SUITE_URL_INCAMPO:-http://host.docker.internal:5190/api}
+    SUITE_URL_MAGAZZINO: ${SUITE_URL_MAGAZZINO:-http://host.docker.internal:5200/api}
+    SUITE_URL_CONFRONTO: ${SUITE_URL_CONFRONTO:-http://host.docker.internal:5001}
+    SUITE_URL_VERIFICA: ${SUITE_URL_VERIFICA:-http://host.docker.internal:5185/api}
+    SUITE_URL_SCADENZARIO: ${SUITE_URL_SCADENZARIO:-http://host.docker.internal:5180/api}
+    SUITE_URL_PORTALE: ${SUITE_URL_PORTALE:-http://host.docker.internal:8080/api}
+  volumes:
+    # shared/ della suite (suite_link, cosedil_sso): l'API li importa da /shared, in sola lettura
+    - ../../../shared:/shared:ro
+    - segreti:/segreti
+    - ${AWS_CA_BUNDLE_HOST:-./certs}:/certs:ro
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    # Con SUITE_DOMINIO i nomi pubblici (skytower.<dominio>, s3-skytower.<dominio>) devono risolvere
+    # anche dentro il container: puntano al server (installa.* li scrive in .env)
+    - "${SKYTOWER_HOST_PUBBLICO:-skytower.localhost}:host-gateway"
+    - "${S3_HOST_PUBBLICO:-s3-skytower.localhost}:host-gateway"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      # it_IT non è nell'immagine alpine: collation C, più veloce e stabile per gli ordinamenti dell'app
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Non pubblicata: ci arrivano solo i container. Per pgAdmin dal server: docker compose exec db psql
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Il browser carica e scarica direttamente da qui con URL firmati: deve essere ammessa l'origine della SPA
+      MINIO_API_CORS_ALLOW_ORIGIN: ${WEB_ORIGIN}
+      MINIO_BROWSER: ${MINIO_CONSOLE:-off}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "${S3_PORTA:-9100}:9000"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio-init:
+    # Una tantum (ma idempotente): bucket con Object Lock, retention di default, utente dedicato dell'app.
+    # Il bucket DEVE nascere con il lock: non si può aggiungere dopo.
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-cde-documenti}
+      S3_UTENTE: ${S3_UTENTE}
+      S3_SEGRETO: ${S3_SEGRETO}
+      LOCK_GIORNI: ${S3_LOCK_GIORNI:-1}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set locale http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --with-lock --ignore-existing "locale/$$S3_BUCKET"
+        mc retention set --default GOVERNANCE "$${LOCK_GIORNI}d" "locale/$$S3_BUCKET"
+        mc admin user add locale "$$S3_UTENTE" "$$S3_SEGRETO" || true
+        mc admin policy attach locale readwrite --user "$$S3_UTENTE" || true
+        echo "MinIO pronto: bucket $$S3_BUCKET con Object Lock, utente $$S3_UTENTE"
+
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_MILTERD: "true"
+    volumes:
+      - clamdb:/var/lib/clamav
+    healthcheck:
+      # Al primo avvio scarica le firme (qualche minuto): finché non è sano il worker aspetta
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 40
+      start_period: 300s
+
+  api:
+    <<: *api-base
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "${API_PORTA:-8100}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    <<: *api-base
+    command: ["cde", "worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    image: skytower-web:${SKYTOWER_VERSIONE:-locale}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Nella Content-Security-Policy della SPA: da dove il browser carica/scarica (S3) e l'editor OnlyOffice
+      S3_PUBBLICO: ${S3_ENDPOINT_PUBBLICO}
+      ONLYOFFICE_URL: ${CDE_ONLYOFFICE_URL:-}
+    ports:
+      - "${WEB_PORTA:-5195}:80"
+
+  backup:
+    # pg_dump ogni 24 ore in ./backup (cartella del server, da includere nel backup aziendale insieme al
+    # volume miniodata: vedi backup.*), rotazione a 30 giorni.
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      GIORNI: ${BACKUP_GIORNI:-30}
+    volumes:
+      - ${BACKUP_DIR:-./backup}:/backup
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f="/backup/cde-$$(date +%Y%m%d-%H%M).sql.gz"
+          pg_dump -h db -U postgres -d cde --no-owner | gzip > "$$f" && echo "backup scritto: $$f"
+          find /backup -name 'cde-*.sql.gz' -mtime +$$GIORNI -delete
+          sleep 86400
+        done
+
+  prepara:
+    # Prima installazione (e dopo ogni aggiornamento è innocuo): ruoli, migrazioni, organizzazione,
+    # primo platform admin e account personale. Gira come root solo per dare il volume dei segreti
+    # all'utente 10001 del container; il resto è SQL con le credenziali dell'owner.
+    <<: *api-base
+    profiles: ["strumenti"]
+    restart: "no"
+    user: "0:0"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CDE_DB_SUPERUSER_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      DB_PWD_OWNER: ${DB_PWD_OWNER}
+      DB_PWD_APP: ${DB_PWD_APP}
+      DB_PWD_AUTH: ${DB_PWD_AUTH}
+      DB_PWD_WORKER: ${DB_PWD_WORKER}
+      ORG_CODICE: ${ORG_CODICE:-COS}
+      ORG_NOME: ${ORG_NOME:-Cosedil S.p.A.}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_NOME: ${ADMIN_NOME:-Amministratore}
+      ADMIN_COGNOME: ${ADMIN_COGNOME:-SkyTower}
+      ACCOUNT_PERSONALE_EMAIL: ${ACCOUNT_PERSONALE_EMAIL:-}
+      ACCOUNT_PERSONALE_NOME: ${ACCOUNT_PERSONALE_NOME:-}
+      ACCOUNT_PERSONALE_COGNOME: ${ACCOUNT_PERSONALE_COGNOME:-}
+      # CDE_NUOVA_PWD e CDE_PWD_PERSONALE arrivano da installa.* (chieste nascoste), mai dal .env
+      CDE_NUOVA_PWD: ${CDE_NUOVA_PWD:-}
+      CDE_PWD_PERSONALE: ${CDE_PWD_PERSONALE:-}
+      CDE_PASSWORD_MIN_LENGTH: ${CDE_PASSWORD_MIN_LENGTH:-12}
+    volumes:
+      - ../../../shared:/shared:ro
+      - segreti:/segreti
+      - ./strumenti:/strumenti:ro
+    command: ["python", "/strumenti/prepara_db.py"]
+
+  migrate:
+    <<: *api-base
+    profiles: ["strumenti"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["cde", "migrate"]
+
+volumes:
+  pgdata:
+  miniodata:
+  clamdb:
+  segreti:

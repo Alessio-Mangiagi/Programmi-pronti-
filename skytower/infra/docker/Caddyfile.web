@@ -1,0 +1,57 @@
+# "><(((º> sabusabu <º)))><"
+# Caddy del container "web": serve la SPA compilata e inoltra /api all'API (stesso origin,
+# come fanno il proxy di Vite in sviluppo e CloudFront in AWS). Niente TLS qui: davanti c'è il
+# Caddy della suite (skytower.<dominio>, tls internal) oppure si resta in HTTP nella LAN.
+#
+# S3_PUBBLICO e ONLYOFFICE_URL arrivano dall'ambiente del container (docker-compose.yml) e finiscono
+# nella Content-Security-Policy: sono gli unici origin esterni da cui il browser carica qualcosa
+# (upload/download diretti su MinIO con URL firmati; editor OnlyOffice in iframe).
+
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	encode gzip
+
+	# L'API riceve solo richieste piccole (i file vanno su S3 con URL firmati) tranne i download con
+	# filigrana e i PDF per l'OCR/OnlyOffice: il tetto vero lo mette l'API (CDE_WATERMARK_MAX_BYTES).
+	request_body {
+		max_size 512MB
+	}
+
+	# /api/... → api:8000/... (prefisso tolto, come il proxy di Vite). X-Forwarded-For è l'IP del client:
+	# l'API lo legge da CDE_CLIENT_IP_HEADER per rate limit e registro attività.
+	handle_path /api/* {
+		reverse_proxy api:8000 {
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			# SSE delle notifiche: niente buffering, timeout lungo
+			flush_interval -1
+			transport http {
+				read_timeout 10m
+				write_timeout 10m
+			}
+		}
+	}
+
+	# SPA: ogni percorso sconosciuto torna a index.html (routing lato client). Gli asset con hash nel
+	# nome si possono tenere in cache a lungo; index.html mai.
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-cache"
+		# Stessa CSP della produzione AWS (infra/terraform/modules/cde-platform/edge.tf, local.spa_csp)
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' {$ONLYOFFICE_URL}; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {$S3_PUBBLICO}; font-src 'self' data:; connect-src 'self' {$S3_PUBBLICO}; frame-src 'self' blob: {$S3_PUBBLICO} {$ONLYOFFICE_URL}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+			-Server
+		}
+		try_files {path} /index.html
+		file_server
+	}
+}
