@@ -1,8 +1,20 @@
 <!-- "><(((º> sabusabu <º)))><" -->
-# Dialogo fra le app della suite (InCampo, SkyTower, Magazzino)
+# Dialogo fra le app della suite
 
-`suite_link.py` è il modulo condiviso con cui le tre app si parlano. Niente
-dipendenze (solo libreria standard), come `shared/sso`.
+`suite_link.py` (Python) e `suite_link.js` (Node, CommonJS) sono i moduli condivisi
+con cui le app si parlano. Niente dipendenze (libreria standard; `fetch` di Node),
+come `shared/sso`. Le regole comuni (identità dell'utente, login automatico dal
+portale, registro delle commesse, "da fare", SkyTower come archivio) sono in
+**`CONTRATTI.md`**; qui le basi e cosa si scambiano InCampo, SkyTower e Magazzino.
+
+## Registro delle commesse
+
+`commesse.json` in questa cartella (fuori da git) è l'anagrafica unica: lista di
+`{code, nome, stato, cliente, indirizzo, note}`. La scrive il portale (pagina
+*Commesse*, `salva_commesse`/`salvaCommesse`); le app la leggono con
+`commesse(solo_attive=False)` / `commesse({soloAttive})` e cercano un codice con
+`trova_commessa(codice)` / `trovaCommessa(codice)` (confronto senza spazi e
+maiuscole). Registro assente o rotto = lista vuota, mai un errore.
 
 ## La chiave: il codice commessa aziendale
 
@@ -34,11 +46,14 @@ SkyTower, se non lo trova, usa l'utente tecnico `CDE_SUITE_USER_EMAIL`
 
 ## Indirizzi
 
-Stesso server, porte del registro del portale: InCampo `127.0.0.1:5190/api`,
-SkyTower API `127.0.0.1:8100`, Magazzino `127.0.0.1:5200/api`. Si cambiano con
-`SUITE_URL_INCAMPO`, `SUITE_URL_SKYTOWER`, `SUITE_URL_MAGAZZINO`. I link mostrati
-all'utente usano `url_pubblico()`: sottodomini di `SUITE_DOMINIO` dietro Caddy,
-altrimenti `localhost:<porta>`.
+Stesso server, porte del registro del portale. Id e API interne di default:
+`incampo` 5190/api, `skytower` 8100 (API; 5195 è il web), `magazzino` 5200/api,
+`portale` 8080/api, `ddt` 5050/api, `scadenzario` 5180/api, `confronto` 5001,
+`verifica` 5185/api, `analista` 5173/api, `trimble` 3011/api, `vfp` 8770/api.
+Si cambiano con `SUITE_URL_<ID>`. I link mostrati all'utente usano
+`url_pubblico(id)` / `urlPubblico(id)`: sottodomini di `SUITE_DOMINIO` dietro Caddy,
+altrimenti `localhost:<porta>`. `raggiungibile(id)` dice se l'app è accesa
+(qualunque risposta HTTP < 500 conta).
 
 ## Cosa si scambiano
 
@@ -61,7 +76,7 @@ automatica se attiva, altrimenti primo progressivo libero; tipo `RP`, ruolo `Z`)
 
 ```python
 import suite_link
-dati = suite_link.chiama("incampo", "GET", "/suite/commesse/101-003/riepilogo", utente="mrossi", nome="Mario Rossi")
+dati = suite_link.chiama("incampo", "GET", "/suite/commesse/101-003/riepilogo", utente="mrossi", nome="Mario Rossi", email="m.rossi@cosedilspa.com")
 suite_link.chiama("skytower", "POST", "/suite/commesse/101-003/documenti",
                   parametri={"title": "Report", "tipo": "RP", "attributes": '{"origine": "magazzino"}'},
                   corpo_file=(pdf_bytes, "application/pdf", "report.pdf"))
@@ -73,9 +88,19 @@ byte, tipo = suite_link.chiama("skytower", "GET", f"/suite/revisioni/{id}/file",
 come corpo della richiesta (niente multipart, niente `python-multipart`): nome in
 `X-Suite-Nome-File`, metadati nella query.
 
-Lato ricevente: `suite_link.verifica(request.headers["X-Suite-Token"])`.
+Node (CommonJS; in ESM `createRequire(import.meta.url)`):
+
+```js
+const suite = require('../shared/suite/suite_link.js');
+const r = await suite.chiama('skytower', 'POST', '/suite/commesse/101-003/documenti',
+  { parametri: { title: 'DDT 123', tipo: 'RP' }, corpoFile: { dati: pdfBuffer, tipo: 'application/pdf', nome: 'ddt-123.pdf' }, utente: 'mrossi' });
+const { dati, tipo } = await suite.chiama('skytower', 'GET', `/suite/revisioni/${id}/file`, { grezzo: true });
+```
+`chiama()` lancia `SuiteError` con `stato` e `messaggio` (503 = app spenta).
+
+Lato ricevente: `suite_link.verifica(request.headers["X-Suite-Token"])` (`verifica(valore)` in Node).
 Flask: `cosedil_sso.init(app, app_id=..., percorsi_liberi=("/api/suite/",))`.
 FastAPI con `cosedil_sso.asgi(..., solo_pagine=True)`: le API JSON non passano
 dal gate, quindi basta la dipendenza sul token.
 
-Test: `python -m pytest shared/suite/test_suite_link.py`.
+Test: `python -m pytest shared/suite/test_suite_link.py` e `node --test shared/suite/suite_link.test.js`.
