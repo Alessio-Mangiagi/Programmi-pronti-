@@ -19,8 +19,9 @@ DB_PATH = os.path.join(BASE_DIR, "scadenzario.db")
 # Cartella per i file allegati alle scadenze (evidenze/documenti), in .gitignore
 ALLEGATI_DIR = os.path.join(BASE_DIR, "allegati")
 # Estensioni consentite per gli allegati e dimensione massima (byte)
-ALLEGATI_ESTENSIONI = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg",
-                       ".jpeg", ".txt", ".csv", ".eml", ".msg", ".p7m", ".zip")
+# Solo formati che non trasportano codice: niente archivi (zip), posta (eml/msg) né Office binario
+# (doc/xls, possibili macro); il .p7m serve per le pratiche firmate digitalmente.
+ALLEGATI_ESTENSIONI = (".pdf", ".png", ".jpg", ".jpeg", ".docx", ".xlsx", ".p7m")
 ALLEGATI_MAX_BYTE = 20 * 1024 * 1024  # 20 MB
 
 # Preavviso di default (giorni) per i tipi scadenza senza valore specifico
@@ -47,11 +48,12 @@ EMAIL_A = tuple(x.strip() for x in os.environ.get("EMAIL_A", "").split(",") if x
 
 # Amministratori dello Scadenzario: solo questi username del portale (oltre a
 # essere admin per l'app nel portale) vedono la pagina Amministrazione e possono
-# eliminare dati o gestire le utenze. Separati da virgola; vuoto = basta essere
-# admin del portale per l'app.
+# eliminare dati, esportare e gestire le utenze. Separati da virgola; vuoto (default)
+# = basta essere admin del portale per l'app. Nessun nome personale nel codice:
+# l'elenco, se serve, sta nella variabile d'ambiente (vedi avvia.bat).
 ADMIN_UTENTI = tuple(
     x.strip().lower()
-    for x in os.environ.get("SCADENZARIO_ADMIN", "a.mangiagi").split(",") if x.strip())
+    for x in os.environ.get("SCADENZARIO_ADMIN", "").split(",") if x.strip())
 
 # Spegnimento automatico: il server esce quando la SPA smette di inviare
 # heartbeat (ultima scheda chiusa). Il timeout deve restare ampiamente sopra

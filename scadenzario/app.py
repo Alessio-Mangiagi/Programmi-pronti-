@@ -88,9 +88,14 @@ def gate_admin():
     Flask esegue i before_request in ordine, quindi g.cosedil è già valorizzato."""
     if not request.path.startswith("/api"):
         return None
-    if request.method == "DELETE" or request.path.startswith("/api/admin"):
-        if not e_admin():
-            return jsonify({"errore": "Operazione riservata all'amministratore dello Scadenzario"}), 403
+    # Riservate agli admin anche le esportazioni e i download degli allegati: contengono dati personali
+    # (codici fiscali, visite mediche, contatti) di tutta l'anagrafica, non solo la riga che si sta guardando
+    # (revisione di sicurezza del 03/11/2026). Il modello vuoto del calendario corsi resta libero.
+    riservata = (request.method == "DELETE" or request.path.startswith("/api/admin")
+                 or (request.path.startswith("/api/export/") and "modello" not in request.path)
+                 or (request.path.startswith("/api/allegati/") and request.path.endswith("/download")))
+    if riservata and not e_admin():
+        return jsonify({"errore": "Operazione riservata all'amministratore dello Scadenzario"}), 403
     return None
 
 

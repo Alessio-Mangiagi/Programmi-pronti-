@@ -1142,7 +1142,9 @@ async function modaleDettaglioScadenza(scadenza, ricarica) {
       }
       boxAllegati.innerHTML = '<ul class="lista-allegati">' + allegati.map((a) =>
         '<li data-id="' + a.id + '">' + icona('foglio', 15) +
-          '<a href="/api/allegati/' + a.id + '/download" data-scarica>' + esc(a.nome_file) + '</a>' +
+          // il download è riservato agli admin (dati personali nelle evidenze): agli altri solo il nome
+          (utente.admin ? '<a href="/api/allegati/' + a.id + '/download" data-scarica>' + esc(a.nome_file) + '</a>'
+                        : '<span>' + esc(a.nome_file) + '</span>') +
           '<span class="muted voce-data">' + esc(fmtBytes(a.dimensione)) + ' · ' + fmtDataOra(a.caricato_il) + '</span>' +
           (utente.admin ? '<button type="button" class="btn-icona pericolo" data-del title="Elimina allegato" aria-label="Elimina allegato">' + icona('cestino', 15) + '</button>' : '') +
         '</li>').join('') + '</ul>';

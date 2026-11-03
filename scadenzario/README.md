@@ -60,11 +60,14 @@ l'utente è un admin fittizio ("Sviluppo locale").
 
 Le operazioni distruttive sono riservate all'amministratore:
 
-- **tutte le eliminazioni** (`DELETE` su qualsiasi `/api/...`) e tutta l'area `/api/admin/*`
-  rispondono **403** a chi non è admin;
-- è admin chi è **admin per l'app `scadenzario` nel portale** *e* compare in
-  `SCADENZARIO_ADMIN` (variabile d'ambiente, username separati da virgola,
-  default `a.mangiagi`). Con `SCADENZARIO_ADMIN` vuota basta essere admin nel portale.
+- **tutte le eliminazioni** (`DELETE` su qualsiasi `/api/...`), tutta l'area `/api/admin/*`,
+  le **esportazioni** (`/api/export/scadenze.xlsx`, `.ics`, `ai_act.xlsx`: contengono codici fiscali,
+  visite mediche e contatti di tutta l'anagrafica) e il **download degli allegati**
+  (`/api/allegati/<id>/download`) rispondono **403** a chi non è admin; il modello vuoto del
+  calendario corsi resta scaricabile da tutti;
+- è admin chi è **admin per l'app `scadenzario` nel portale** *e*, se la variabile è valorizzata,
+  compare in `SCADENZARIO_ADMIN` (username separati da virgola; `avvia.bat` la imposta se manca).
+  Con `SCADENZARIO_ADMIN` vuota basta essere admin nel portale.
 
 Gli altri utenti possono consultare, inserire, modificare, rinnovare e importare, ma non
 cancellare: i pulsanti di eliminazione non compaiono nelle loro viste.

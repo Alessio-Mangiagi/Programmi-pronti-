@@ -38,6 +38,9 @@ echo.
 if not defined PORTALE_APRE_BROWSER (
     start "" /b cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:5180"
 )
+REM Amministratori dello Scadenzario (username del portale, separati da virgola): qui e non nel
+REM codice. Vuoto = basta essere admin per l'app nel portale.
+if not defined SCADENZARIO_ADMIN set "SCADENZARIO_ADMIN=a.mangiagi"
 REM Istanza precedente rimasta appesa sulla porta? Chiusura forzata, avvio pulito.
 call "%~dp0..\shared\avvia\libera-porta.bat" 5180
 python app.py

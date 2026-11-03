@@ -166,3 +166,22 @@ def test_allegato_troppo_grande_rifiutato(client, monkeypatch):
                     data={"file": (io.BytesIO(b"x" * 4096), "a.pdf")},
                     content_type="multipart/form-data")
     assert r.status_code == 413
+
+
+def test_export_e_download_allegati_solo_admin(client, monkeypatch):
+    """Revisione di sicurezza del 03/11/2026: esportazioni e download degli allegati portano dati personali
+    di tutta l'anagrafica, quindi sono riservati agli admin; il modello vuoto del calendario resta libero."""
+    import app as modulo_app
+    monkeypatch.setattr(modulo_app, "e_admin", lambda: False)
+    assert client.get("/api/export/scadenze.xlsx").status_code == 403
+    assert client.get("/api/export/scadenze.ics").status_code == 403
+    assert client.get("/api/export/ai_act.xlsx").status_code == 403
+    assert client.get("/api/allegati/1/download").status_code == 403
+    assert client.get("/api/export/calendario_modello.xlsx").status_code == 200
+
+
+def test_allegato_zip_rifiutato(client):
+    """Archivi e formati Office binari non si caricano più come evidenze: possono trasportare codice."""
+    import config
+    assert ".zip" not in config.ALLEGATI_ESTENSIONI and ".doc" not in config.ALLEGATI_ESTENSIONI
+    assert ".p7m" in config.ALLEGATI_ESTENSIONI and ".pdf" in config.ALLEGATI_ESTENSIONI
