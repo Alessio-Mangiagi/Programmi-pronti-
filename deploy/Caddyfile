@@ -20,6 +20,13 @@
 (suite) {
 	tls internal
 	encode gzip
+	# Difese valide per tutta la suite: HSTS (un anno) perche' il browser non
+	# riprovi mai in chiaro, nosniff perche' un file caricato non venga eseguito
+	# come script se il tipo e' sbagliato. Le app aggiungono le proprie (CSP ecc.).
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+	}
 	# Upload grossi (PDF scansionati, archivi DDT): niente limite lato proxy,
 	# ogni app ha gia' il suo.
 	request_body {
