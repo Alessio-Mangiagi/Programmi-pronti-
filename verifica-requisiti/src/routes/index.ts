@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
 import logger from '../utils/logger';
+import { ipReale, richiestaLocale } from '../utils/richiesta';
 import documentiRoutes from './documenti.routes';
 import ricercaRoutes from './ricerca.routes';
 import requisitiRoutes from './requisiti.routes';
@@ -25,13 +26,13 @@ const router = express.Router();
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: (req) => {
-    // Socket TCP reale: il boost locale non si ottiene falsificando X-Forwarded-For.
-    const ip = req.socket.remoteAddress || '';
-    return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' ? 10000 : 60;
+    // Boost solo per chi sta sulla macchina: dietro il reverse proxy il socket è sempre 127.0.0.1
+    // (ma con gli header di inoltro), e senza questo controllo nessuno avrebbe un limite.
+    return richiestaLocale(req) ? 10000 : 60;
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || 'unknown',
+  keyGenerator: (req) => ipReale(req),
   handler: (req, res) => {
     res.status(429).json({ error: 'Troppe richieste. Attendi qualche secondo e riprova.' });
   },
@@ -49,7 +50,7 @@ router.use((req, res, next) => {
   const inizio = Date.now();
   res.on('finish', () => {
     logger.info(
-      `${req.method} ${req.path} ${res.statusCode} ${Date.now() - inizio}ms da ${req.ip}`
+      `${req.method} ${req.path} ${res.statusCode} ${Date.now() - inizio}ms da ${ipReale(req)}`
     );
   });
   next();

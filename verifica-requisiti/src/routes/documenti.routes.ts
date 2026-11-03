@@ -11,6 +11,7 @@ import path from 'path';
 import { asyncHandler } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { requireAuth, utenteDi } from '../middleware/auth';
+import { visibileAlToken } from '../middleware/suiteToken';
 import {
   creaDocumento,
   elencaDocumenti,
@@ -141,7 +142,8 @@ router.get('/api/documenti', requireAuth, (req: Request, res: Response) => {
 router.get('/api/documenti/:id', requireAuth, (req: Request, res: Response) => {
   // "><(((º> sabusabu <º)))><"
   const doc = trovaDocumento(param(req.params, 'id'));
-  if (!doc) return res.status(404).json({ error: 'Documento non trovato' });
+  // col token di servizio si vedono solo i documenti caricati dalla suite
+  if (!doc || !visibileAlToken(req, doc.caricatoDa)) return res.status(404).json({ error: 'Documento non trovato' });
   res.json({ documento: sintesi(doc) });
 });
 
@@ -159,6 +161,12 @@ router.get('/api/documenti/:id/file', requireAuth, (req: Request, res: Response)
   if (!fs.existsSync(doc.percorso)) {
     return res.status(410).json({ error: 'File non più presente in archivio' });
   }
+  // L'originale arriva da un collega: un PDF con JavaScript aperto dal viewer del browser girerebbe
+  // nell'origine dell'app. La CSP "sandbox" lo isola (niente script, niente stessa origine) e lascia
+  // la rilettura a schermo; nosniff impedisce di interpretarlo come altro.
+  res.setHeader('Content-Security-Policy', 'sandbox');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.nomeFile)}`);
   res.type(doc.mime).sendFile(doc.percorso);
 });
 

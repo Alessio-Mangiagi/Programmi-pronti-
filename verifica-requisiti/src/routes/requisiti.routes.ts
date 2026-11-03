@@ -33,14 +33,32 @@ function erroriRequisito(r: Requisito, i: number): string[] {
     if (!pattern) {
       errori.push(`${dove}: la regola "${tipo}" vuole un pattern.`);
     } else {
-      try {
-        new RegExp(pattern);
-      } catch (e) {
-        errori.push(`${dove}: pattern non valido — ${(e as Error).message}`);
-      }
+      const motivo = motivoPatternRifiutato(pattern);
+      if (motivo) errori.push(`${dove}: ${motivo}`);
     }
   }
   return errori;
+}
+
+/**
+ * Il pattern viene da un form e gira (new RegExp) su tutto il testo OCR di ogni documento verificato:
+ * un'espressione con backtracking catastrofico ("(a+)+") bloccherebbe il processo per minuti, per
+ * tutti (revisione di sicurezza del 03/11/2026). Si rifiutano: lunghezza oltre 100, quantificatori
+ * annidati (gruppo quantificato seguito da un altro quantificatore), backreference, lookaround.
+ * Ritorna il motivo in italiano, o null se il pattern va bene.
+ */
+export function motivoPatternRifiutato(pattern: string): string | null {
+  if (pattern.length > 100) return 'pattern troppo lungo (massimo 100 caratteri).';
+  if (/\\[1-9]/.test(pattern)) return 'pattern non ammesso: i riferimenti a gruppi (\\1) non sono consentiti.';
+  if (/\(\?<?[=!]/.test(pattern)) return 'pattern non ammesso: lookahead e lookbehind non sono consentiti.';
+  // "(x+)+", "(x*){2,}", "(x{1,3})*": un quantificatore subito dentro la chiusura di un gruppo e uno subito fuori
+  if (/[+*}?]\)[+*{]/.test(pattern)) return 'pattern non ammesso: quantificatori annidati (es. "(a+)+") sono consentiti solo senza ripetizione del gruppo.';
+  try {
+    new RegExp(pattern);
+  } catch (e) {
+    return `pattern non valido — ${(e as Error).message}`;
+  }
+  return null;
 }
 
 function validaSet(body: { nome?: string; requisiti?: Requisito[] }): string[] {

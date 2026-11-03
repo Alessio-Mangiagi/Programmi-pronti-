@@ -25,9 +25,15 @@ declare global {
   }
 }
 
-/** Chi ha fatto l'azione, per i campi caricatoDa/eseguitaDa e per i log. */
+/**
+ * Chi ha fatto l'azione, per i campi caricatoDa/eseguitaDa e per i log. Via token di servizio
+ * (ruolo 'suite') il nome dichiarato negli header non è verificato da nessuno: resta visibile,
+ * ma con il prefisso "suite:" che lo distingue da un utente entrato dal portale e che marca le
+ * risorse su cui il token può poi agire (vedi suiteToken.ts).
+ */
 export function utenteDi(req: Request): string {
-  return req.cosedil?.username || req.cosedil?.nome || 'anonimo';
+  const nome = req.cosedil?.username || req.cosedil?.nome || 'anonimo';
+  return req.cosedil?.ruolo === 'suite' ? `suite:${nome}` : nome;
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {

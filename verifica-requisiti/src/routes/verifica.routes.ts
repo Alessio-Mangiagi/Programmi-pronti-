@@ -6,6 +6,7 @@ import { asyncHandler } from '../utils/errorHandler';
 import { param } from './helpers';
 import logger from '../utils/logger';
 import { requireAuth, utenteDi } from '../middleware/auth';
+import { visibileAlToken } from '../middleware/suiteToken';
 import { verificheEseguite } from '../utils/metrics';
 import { trovaDocumento } from '../models/archivio';
 import { trovaSet } from '../models/requisiti';
@@ -40,7 +41,8 @@ router.post(
 
     for (const id of ids) {
       const doc = trovaDocumento(id);
-      if (!doc) {
+      // col token di servizio si verificano solo i documenti caricati dalla suite
+      if (!doc || !visibileAlToken(req, doc.caricatoDa)) {
         scartati.push({ documentoId: id, motivo: 'Documento non trovato' });
         continue;
       }
@@ -140,7 +142,8 @@ router.get('/api/verifiche', requireAuth, (req: Request, res: Response) => {
 // ── GET /api/verifiche/:id ──────────────────────────────────────────────────
 router.get('/api/verifiche/:id', requireAuth, (req: Request, res: Response) => {
   const verifica = trovaVerifica(param(req.params, 'id'));
-  if (!verifica) return res.status(404).json({ error: 'Verifica non trovata' });
+  // col token di servizio si leggono solo le verifiche eseguite dalla suite
+  if (!verifica || !visibileAlToken(req, verifica.eseguitaDa)) return res.status(404).json({ error: 'Verifica non trovata' });
   res.json({ verifica });
 });
 

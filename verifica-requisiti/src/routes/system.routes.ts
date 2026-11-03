@@ -1,7 +1,8 @@
 /**
  * system.routes.ts — ping, stato, metriche, file statici e frontend.
  */
-import express, { Request, Response } from 'express';
+import { richiestaLocale } from '../utils/richiesta';
+import express, { NextFunction, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { register } from '../utils/metrics';
@@ -47,8 +48,20 @@ router.post('/ping', (req: Request, res: Response) => {
 });
 
 // ── GET /status — health check ──────────────────────────────────────────────
+// Stato e metriche raccontano motori, conteggi e volumi dell'archivio riservato: li legge il
+// monitoraggio sulla macchina, non la LAN. Dietro Caddy ogni richiesta viene dal loopback ma con
+// gli header di inoltro, e richiestaLocale la riconosce come remota.
+function soloLocale(req: Request, res: Response, next: NextFunction): void {
+  if (!richiestaLocale(req)) {
+    res.status(403).json({ error: 'Disponibile solo dalla macchina che ospita l\'app' });
+    return;
+  }
+  next();
+}
+
 router.get(
   '/status',
+  soloLocale,
   asyncHandler(async (req: Request, res: Response) => {
     const checks: Record<string, 'ok' | 'error'> = {};
 
@@ -100,6 +113,7 @@ router.get(
 
 router.get(
   '/metrics',
+  soloLocale,
   asyncHandler(async (req: Request, res: Response) => {
     res.set('Content-Type', register.contentType);
     res.end(await register.metrics());
