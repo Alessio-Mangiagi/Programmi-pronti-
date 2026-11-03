@@ -475,3 +475,23 @@ def test_movimenti_filtro_utente_e_data(client, conn):
     r = client.get("/api/movimenti?utente=rossi&data=2026-11-02").get_json()
     assert [m["quantita"] for m in r] == [3]
     assert len(client.get("/api/movimenti?utente=rossi").get_json()) == 2
+
+
+def test_importa_mezzo_commessa_con_descrizione_usa_il_codice(conn, monkeypatch):
+    """"101-003 SEDE ACIREALE" (pratica VFP) → ubicazione con commessa "101-003", come InCampo e SkyTower."""
+    monkeypatch.setattr(importa_mezzi.suite_link, "commesse", lambda **k: [{"code": "101-003"}, {"code": "101-003-BIS"}])
+    assert importa_mezzi.codice_commessa("101-003 SEDE ACIREALE") == "101-003"
+    assert importa_mezzi.codice_commessa("Lavori 101-003-bis lotto 2") == "101-003-BIS"
+    monkeypatch.setattr(importa_mezzi.suite_link, "commesse", lambda **k: [])
+    assert importa_mezzi.codice_commessa("C-2024-015 SCUOLA VIA ROMA") == "C-2024-015"   # senza registro: primo pezzo con cifre
+    rec = record_mezzo()
+    rec["valori"]["commessa"] = "C-2024-015 SCUOLA VIA ROMA"
+    importa_mezzi.importa_record(conn, rec)
+    ubi = conn.execute("SELECT nome, commessa FROM ubicazioni WHERE commessa = 'C-2024-015'").fetchall()
+    assert len(ubi) == 1 and ubi[0]["nome"] == "C-2024-015 SCUOLA VIA ROMA"
+    # seconda pratica con lo stesso codice scritto diversamente: stessa ubicazione, niente doppioni
+    rec2 = record_mezzo(targa="CT999ZZ")
+    rec2["id"] = "pratica-2"
+    rec2["valori"]["commessa"] = "c-2024-015"
+    importa_mezzi.importa_record(conn, rec2)
+    assert conn.execute("SELECT COUNT(*) FROM ubicazioni WHERE commessa LIKE 'C-2024-015%'").fetchone()[0] == 1

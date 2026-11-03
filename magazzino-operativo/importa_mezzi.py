@@ -13,25 +13,52 @@ DOVREBBE stare al primo arrivo, non dove sta oggi.
 import json
 import logging
 import os
+import sys
 
 import config
 from codici import prossimo_codice
 
+sys.path.insert(0, os.path.join(config.SUITE_DIR, "shared", "suite"))
+import suite_link
+
 log = logging.getLogger("magazzino.mezzi")
 
 
+def codice_commessa(testo):
+    """Il codice commessa aziendale dentro il campo Commessa della pratica.
+
+    Nelle pratiche VFP il campo è "101-003 SEDE ACIREALE": il codice è quello del
+    registro della suite contenuto nel testo (il più lungo), altrimenti il primo
+    pezzo con una cifra. Così l'ubicazione ha lo stesso codice di InCampo e SkyTower.
+    """
+    testo = (testo or "").strip()
+    if not testo:
+        return ""
+    norm = suite_link.normalizza_commessa(testo)
+    trovati = [c["code"] for c in suite_link.commesse()
+               if suite_link.normalizza_commessa(c["code"]) and suite_link.normalizza_commessa(c["code"]) in norm]
+    if trovati:
+        return max(trovati, key=len)
+    for pezzo in testo.split():
+        if any(ch.isdigit() for ch in pezzo):
+            return pezzo
+    return testo
+
+
 def _ubicazione_commessa(conn, commessa):
-    commessa = (commessa or "").strip()
-    if not commessa:
+    testo = (commessa or "").strip()
+    if not testo:
         return None
-    r = conn.execute("SELECT id FROM ubicazioni WHERE commessa = ? OR lower(nome) = lower(?)",
-                     (commessa, commessa)).fetchone()
-    if r:
-        return r["id"]
-    codice = prossimo_codice(conn, "ubicazioni", config.PREFISSO_UBICAZIONE)
+    codice = codice_commessa(testo)
+    k = suite_link.normalizza_commessa(codice)
+    for r in conn.execute("SELECT id, commessa, nome FROM ubicazioni").fetchall():
+        if (suite_link.normalizza_commessa(r["commessa"]) in (k, suite_link.normalizza_commessa(testo))
+                or (r["nome"] or "").strip().lower() == testo.lower()):
+            return r["id"]
+    nuovo = prossimo_codice(conn, "ubicazioni", config.PREFISSO_UBICAZIONE)
     cur = conn.execute(
         "INSERT INTO ubicazioni (codice, nome, tipo, commessa, note) VALUES (?, ?, 'cantiere', ?, ?)",
-        (codice, commessa, commessa, "Creata dall'importazione mezzi"))
+        (nuovo, testo, codice, "Creata dall'importazione mezzi"))
     return cur.lastrowid
 
 
