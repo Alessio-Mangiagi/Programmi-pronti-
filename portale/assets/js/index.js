@@ -272,7 +272,7 @@ const oggiIso = () => new Date().toISOString().slice(0, 10);
 
 function voceHtml(v) {
   const scaduta = v.data && v.data < oggiIso();
-  const tag = v.tipo ? `<i class="dafare-tipo ${esc(v.tipo)}">${ETICHETTE[v.tipo] || v.tipo}</i>` : '';
+  const tag = v.tipo ? `<i class="dafare-tipo tipo-${esc(v.tipo)}">${ETICHETTE[v.tipo] || v.tipo}</i>` : '';
   const quando = v.data ? `<time class="${scaduta ? 'scaduta' : ''}" datetime="${esc(v.data)}">${scaduta ? 'scaduta il ' : ''}${dataIt(v.data)}</time>` : '';
   const dentro = `<span class="dafare-p p${v.priorita}" aria-hidden="true"></span><span class="dafare-testo"><b>${esc(v.titolo)}</b>${v.testo ? `<small>${esc(v.testo)}</small>` : ''}</span><span class="dafare-meta">${tag}${quando}</span>`;
   return v.url ? `<a class="dafare-voce" href="${esc(v.url)}" target="_blank" rel="noopener">${dentro}</a>` : `<span class="dafare-voce">${dentro}</span>`;
