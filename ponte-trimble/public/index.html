@@ -46,6 +46,19 @@
         <input type="file" id="scelta" accept="application/pdf" multiple hidden>
       </div>
 
+      <!-- I PCQ e i computi stanno gia' in SkyTower: si prendono da li', senza
+           scaricare e ricaricare. Commessa dal registro della suite. -->
+      <details id="daSkyTower" class="da-skytower">
+        <summary>Oppure prendi un documento da SkyTower</summary>
+        <div class="sky-riga">
+          <label>Commessa <select id="skyCommessa"><option value="">— scegli —</option></select></label>
+          <input type="search" id="skyCerca" placeholder="Cerca nel titolo o nel codice" aria-label="Cerca documento in SkyTower">
+          <button type="button" id="skyAggiorna" class="piatto">Cerca</button>
+        </div>
+        <p id="skyMessaggio" class="sottile"></p>
+        <ul id="skyDocumenti" class="sky-lista"></ul>
+      </details>
+
       <div id="coda" class="coda" hidden>
         <div class="coda-testa">
           <strong id="codaTitolo">In invio</strong>

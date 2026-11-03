@@ -314,3 +314,11 @@ button.pericolo:hover:not([disabled]) { background: var(--rosso-tenue); color: v
 
 table.anteprima { min-width: 640px; font-size: 13px; }
 table.anteprima td { max-width: 340px; }
+
+/* Documenti da SkyTower (sotto la zona di drop) */
+.da-skytower { margin-top: .75rem; border: 1px solid var(--bordo, #e5e7eb); border-radius: 8px; padding: .5rem .75rem; }
+.da-skytower summary { cursor: pointer; font-weight: 600; }
+.sky-riga { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .5rem; }
+.sky-riga select, .sky-riga input { min-width: 12rem; }
+.sky-lista { list-style: none; margin: .5rem 0 0; padding: 0; }
+.sky-lista li { display: flex; justify-content: space-between; gap: .5rem; align-items: center; padding: .3rem 0; border-top: 1px solid var(--bordo, #e5e7eb); }

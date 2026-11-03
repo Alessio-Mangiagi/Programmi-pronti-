@@ -529,3 +529,81 @@ for (const el of ['#selTraduttore', '#selFormato']) {
 caricaOpzioni().catch((e) => avvisa(e.message, true));
 statoDestinazione();
 aggiornaLavori();
+
+
+// ── documenti da SkyTower ─────────────────────────────────────────────────
+// Stessa pipeline dell'upload: il server scarica i byte dal CDE e crea il lavoro.
+const skyCommessa = $('#skyCommessa');
+const skyDocumenti = $('#skyDocumenti');
+const skyMessaggio = $('#skyMessaggio');
+let skyCommesseCaricate = false;
+
+async function caricaCommesseSky() {
+  if (skyCommesseCaricate) return;
+  skyMessaggio.textContent = 'Carico le commesse…';
+  try {
+    const dati = await api('/api/skytower/commesse');
+    skyCommesseCaricate = true;
+    for (const c of dati.commesse) {
+      const o = document.createElement('option');
+      o.value = c.code;
+      o.textContent = c.code + (c.nome ? ' — ' + c.nome : '') + (c.skytower ? '' : ' (non in SkyTower)');
+      skyCommessa.append(o);
+    }
+    skyMessaggio.textContent = dati.commesse.length
+      ? (dati.avviso ? 'SkyTower: ' + dati.avviso + ' (elenco dal solo registro)' : '')
+      : 'Nessuna commessa: il registro della suite è vuoto e SkyTower non risponde.';
+  } catch (e) {
+    skyMessaggio.textContent = e.message;
+  }
+}
+
+async function cercaDocumentiSky() {
+  const commessa = skyCommessa.value;
+  skyDocumenti.innerHTML = '';
+  if (!commessa) { skyMessaggio.textContent = 'Scegli una commessa.'; return; }
+  skyMessaggio.textContent = 'Cerco…';
+  try {
+    const dati = await api('/api/skytower/documenti?commessa=' + encodeURIComponent(commessa) + '&q=' + encodeURIComponent($('#skyCerca').value.trim()));
+    const pdf = dati.documenti.filter((d) => d.pdf);
+    skyMessaggio.textContent = pdf.length
+      ? pdf.length + ' PDF pubblicati' + (dati.documenti.length > pdf.length ? ' (' + (dati.documenti.length - pdf.length) + ' altri file non PDF esclusi)' : '')
+      : 'Nessun PDF pubblicato per questa commessa.';
+    for (const d of pdf) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="nome">' + esc(d.identifier || '') + ' — ' + esc(d.title || '') +
+        ' <span class="peso">' + esc(d.revision_code || '') + (d.size_bytes ? ' · ' + peso(d.size_bytes) : '') + '</span></span>' +
+        '<button type="button" class="piatto">Elabora</button>';
+      li.querySelector('button').addEventListener('click', (ev) => elaboraDaSky(d, ev.currentTarget));
+      skyDocumenti.append(li);
+    }
+  } catch (e) {
+    skyMessaggio.textContent = e.message;
+  }
+}
+
+async function elaboraDaSky(doc, bottone) {
+  bottone.disabled = true;
+  bottone.textContent = 'in invio…';
+  try {
+    await api('/api/lavori/da-skytower', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        revision_id: doc.revision_id, revision_code: doc.revision_code, identifier: doc.identifier,
+        filename: doc.filename, traduttore: $('#selTraduttore').value, formato: $('#selFormato').value,
+      }),
+    });
+    bottone.textContent = 'accodato';
+    riprendiPolling();
+  } catch (e) {
+    bottone.disabled = false;
+    bottone.textContent = 'Elabora';
+    avvisa(e.message, true);
+  }
+}
+
+$('#daSkyTower').addEventListener('toggle', () => { if ($('#daSkyTower').open) caricaCommesseSky(); });
+$('#skyAggiorna').addEventListener('click', cercaDocumentiSky);
+skyCommessa.addEventListener('change', cercaDocumentiSky);
+$('#skyCerca').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); cercaDocumentiSky(); } });

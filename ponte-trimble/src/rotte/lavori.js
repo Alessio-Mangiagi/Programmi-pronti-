@@ -9,14 +9,9 @@ import { elencaTraduttori, prendiTraduttore, caricaTraduttori } from '../pipelin
 import { FORMATI, formatiDisponibili } from '../pipeline/rendi.js';
 import { consegna, statoDestinazione } from '../destinazione.js';
 import { log } from '../log.js';
+import { ErroreRichiesta } from './errori.js';
 
-export class ErroreRichiesta extends Error {
-  constructor(messaggio, stato = 400) {
-    super(messaggio);
-    this.name = 'ErroreRichiesta';
-    this.stato = stato;
-  }
-}
+export { ErroreRichiesta };
 
 export const rotteLavori = express.Router();
 

@@ -12,6 +12,7 @@ import { accoda, statoCoda } from './src/coda.js';
 import { caricaTraduttori } from './src/pipeline/traduci.js';
 import { rotteLavori, ErroreRichiesta } from './src/rotte/lavori.js';
 import { rotteTrimble } from './src/rotte/trimble.js';
+import { rotteSkyTower } from './src/rotte/skytower.js';
 import { ErroreTrimble } from './src/trimble/client.js';
 import { ErroreFieldView } from './src/trimble/fieldview.js';
 import { statoDestinazione } from './src/destinazione.js';
@@ -39,6 +40,7 @@ app.get('/api/salute', (req, res) => {
 
 app.use('/api', rotteLavori);
 app.use('/api', rotteTrimble);
+app.use('/api', rotteSkyTower);     // documenti presi da SkyTower (shared/suite)
 
 app.use('/api', (req, res) => res.status(404).json({ errore: 'rotta inesistente: ' + req.method + ' ' + req.originalUrl }));
 

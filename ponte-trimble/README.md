@@ -187,6 +187,9 @@ credenziali Trimble. Senza credenziali l'app converte comunque, e il caricamento
 | `GET` | `/api/fieldview/operazioni` | operazioni SOAP note di Field View |
 | `GET` | `/api/trimble/stato` | credenziali Connect valide o no, senza caricare niente |
 | `GET` | `/api/trimble/progetti` · `/api/trimble/cartelle` | destinazioni per la UI |
+| `GET` | `/api/skytower/commesse` | commesse del registro della suite unite a quelle di SkyTower (`skytower: true/false`, `avviso` se SkyTower non risponde) |
+| `GET` | `/api/skytower/documenti?commessa=&q=&area=` | documenti pubblicati della commessa in SkyTower, con `pdf: true/false` |
+| `POST` | `/api/lavori/da-skytower` | JSON `{revision_id, traduttore?, formato?, opzioni?, filename?, revision_code?, identifier?}`: scarica il file della revisione da SkyTower e crea il lavoro come con l'upload → `202` |
 
 Esempio:
 
@@ -201,6 +204,17 @@ curl -X POST -H "content-type: application/json" -d "{}" \
 Errori: sempre `{ "errore": "...", "dettaglio"?: "..." }`. `400` richiesta sbagliata,
 `404` lavoro inesistente, `409` stato incompatibile (file non pronto, già caricato),
 `413` PDF troppo grande, `502` errore restituito da Trimble, `503` destinazione non configurata.
+
+## Documenti da SkyTower
+
+I PCQ e i computi stanno già nel CDE della suite: nella pagina, sotto la zona di
+trascinamento, *«Oppure prendi un documento da SkyTower»* elenca le commesse
+(registro `shared/suite/commesse.json` + progetti SkyTower con codice commessa),
+i PDF pubblicati di quella scelta, e *Elabora* li manda nella stessa pipeline
+dell'upload. Le chiamate usano il token di servizio di `shared/suite`
+(`suite_link.js`, `SUITE_TOKEN` / `shared/suite/.token`, `SUITE_URL_SKYTOWER`);
+il lavoro ricorda `skytower.revision_id`. SkyTower spenta = elenco dal solo
+registro e un avviso, mai un errore 500 (`src/rotte/skytower.js`).
 
 ## Dove si mette mano
 
