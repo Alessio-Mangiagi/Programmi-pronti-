@@ -82,7 +82,7 @@ function renderLog() {
 ['fUtente', 'fApp', 'fAzione'].forEach(id => document.getElementById(id).addEventListener('change', renderLog));
 
 document.getElementById('logout').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   window.location.href = '/login';
 });
 

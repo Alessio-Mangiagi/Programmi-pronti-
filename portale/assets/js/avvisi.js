@@ -123,7 +123,7 @@ document.getElementById('tuttiVisti').addEventListener('click', (e) => {
   segnaVisto({ tutti: true }, e.currentTarget);
 });
 document.getElementById('logout').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   window.location.href = '/login';
 });
 

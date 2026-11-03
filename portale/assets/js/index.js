@@ -110,7 +110,7 @@ async function apriApp(id) {
   if (win) { try { win.document.write(`<title>Avvio…</title><body style="font:16px/1.5 system-ui;padding:2rem;color:#334">Sto aprendo <b>${esc(app.nome)}</b>… la pagina si apre da sola appena è pronta.</body>`); } catch { /* scheda già navigata */ } }
   toast(`${app.nome} si sta avviando: si apre da sola appena è pronta.`);
   try {
-    const r = await fetch('/api/launch/' + encodeURIComponent(id), { method: 'POST' });
+    const r = await fetch('/api/launch/' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     const data = await r.json();
     if (!data.ok) { if (win) win.close(); toast('Non riesco ad aprire ' + app.nome + ': ' + (data.error || 'riprova tra poco')); return; }
     if (await attendiPronta(id)) {
@@ -243,7 +243,7 @@ async function loadMe() {
 }
 
 document.getElementById('logout').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   window.location.href = '/login';
 });
 

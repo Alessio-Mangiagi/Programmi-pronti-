@@ -127,7 +127,7 @@ $('importa').addEventListener('click', async () => {
   if (sporco && !confirm('Ci sono modifiche non salvate: l\'importazione le scarta. Continuo?')) return;
   $('importa').disabled = true;
   esito('Chiedo le commesse a InCampo, SkyTower e Magazzino…');
-  const r = await fetch('/api/commesse/importa', { method: 'POST' });
+  const r = await fetch('/api/commesse/importa', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   const d = await json(r);
   $('importa').disabled = false;
   if (!r.ok) { esito(d.error || 'Importazione non riuscita', true); return; }
@@ -136,7 +136,7 @@ $('importa').addEventListener('click', async () => {
   await carica();
 });
 
-$('logout').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; });
+$('logout').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } }); window.location.href = '/login'; });
 window.addEventListener('beforeunload', (e) => { if (sporco) { e.preventDefault(); e.returnValue = ''; } });
 
 (async () => { if (await loadMe()) await carica(); })();

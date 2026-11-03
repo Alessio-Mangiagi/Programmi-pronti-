@@ -800,3 +800,100 @@ test('importaCommesse: unisce le fonti e salva nel registro', async () => {
     Object.defineProperty(suiteLink, 'FILE_COMMESSE', { value: origFile, configurable: true, writable: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Difese aggiunte con la revisione di sicurezza del 03/11/2026.
+// ---------------------------------------------------------------------------
+const {
+  motivoCsrf, decisioneAvvio, usernameValido, NOME_MAX,
+  HEADER_PAGINA, HEADER_COMUNI, makeSessionCookie, getSession, chiudiSessioni, loadSecret, SECRET_FILE,
+} = require('./server.js');
+
+const reqMut = (method, headers = {}) => ({ method, headers: Object.assign({ host: 'localhost:8080' }, headers), socket: {} });
+
+test('csrf: GET e rotte esenti passano sempre', () => {
+  assert.equal(motivoCsrf(reqMut('GET'), '/api/me'), '');
+  assert.equal(motivoCsrf(reqMut('POST', { 'x-cosedil-app': '1' }), '/api/presenza'), '', 'presenza: la chiama il backend delle app');
+  assert.equal(motivoCsrf(reqMut('POST'), '/api/evento'), '');
+});
+
+test('csrf: un form (text/plain) o un POST senza Content-Type JSON viene rifiutato', () => {
+  assert.equal(motivoCsrf(reqMut('POST'), '/api/utenti'), 'Content-Type non JSON');
+  assert.equal(motivoCsrf(reqMut('POST', { 'content-type': 'text/plain' }), '/api/utenti'), 'Content-Type non JSON');
+  assert.equal(motivoCsrf(reqMut('PUT', { 'content-type': 'application/x-www-form-urlencoded' }), '/api/commesse'), 'Content-Type non JSON');
+});
+
+test('csrf: JSON dalla stessa origine passa, da un altro sito no', () => {
+  const ok = reqMut('POST', { 'content-type': 'application/json; charset=utf-8', origin: 'http://localhost:8080', 'sec-fetch-site': 'same-origin' });
+  assert.equal(motivoCsrf(ok, '/api/utenti'), '');
+  assert.equal(motivoCsrf(reqMut('DELETE', { 'content-type': 'application/json' }), '/api/utenti/x'), '', 'senza Origin (chiamata dal backend) passa');
+  const altraPorta = reqMut('POST', { 'content-type': 'application/json', origin: 'http://localhost:5050' });
+  assert.equal(motivoCsrf(altraPorta, '/api/utenti'), 'Origin estranea', 'un\'app della suite su altra porta è same-site ma non same-origin');
+  const estraneo = reqMut('POST', { 'content-type': 'application/json', origin: 'https://evil.example' });
+  assert.equal(motivoCsrf(estraneo, '/api/utenti'), 'Origin estranea');
+  const crossSite = reqMut('POST', { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
+  assert.equal(motivoCsrf(crossSite, '/api/utenti'), 'richiesta da un altro sito');
+});
+
+test('avvio app: già accesa non si rilancia; riavvio forzato solo admin', () => {
+  assert.equal(decisioneAvvio({ accesa: false, forza: false, admin: false }), 'avvia');
+  assert.equal(decisioneAvvio({ accesa: true, forza: false, admin: false }), 'gia-accesa');
+  assert.equal(decisioneAvvio({ accesa: true, forza: true, admin: false }), 'vietato');
+  assert.equal(decisioneAvvio({ accesa: true, forza: true, admin: true }), 'riavvia');
+});
+
+test('username: solo minuscole, numeri, . _ - e max 40; mai * o /', () => {
+  assert.ok(usernameValido('m.rossi'));
+  assert.ok(usernameValido('a_b-1'));
+  assert.ok(!usernameValido('*'));
+  assert.ok(!usernameValido('Mario'));
+  assert.ok(!usernameValido('a/b'));
+  assert.ok(!usernameValido('m rossi'));
+  assert.ok(!usernameValido('a'.repeat(41)));
+  assert.ok(!usernameValido(''));
+  assert.equal(NOME_MAX, 80);
+});
+
+test('logout: i cookie emessi prima non valgono più, quelli nuovi sì', async () => {
+  const utenti = JSON.parse(fs.readFileSync(path.join(DATA_TMP, 'utenti.json'), 'utf8'));
+  const u = utenti.find((x) => x.username === 'gverdi');
+  const cookie = makeSessionCookie(u, []).split(';')[0];
+  const req = { headers: { cookie } };
+  assert.equal(getSession(req).username, 'gverdi');
+  await new Promise((r) => setTimeout(r, 5));   // il logout deve essere DOPO l'emissione del cookie
+  chiudiSessioni('gverdi');
+  assert.equal(getSession(req), null, 'cookie di prima del logout');
+  await new Promise((r) => setTimeout(r, 5));
+  const dopo = JSON.parse(fs.readFileSync(path.join(DATA_TMP, 'utenti.json'), 'utf8')).find((x) => x.username === 'gverdi');
+  assert.ok(dopo.sessioniDa > 0);
+  const nuovo = makeSessionCookie(dopo, []).split(';')[0];
+  assert.equal(getSession({ headers: { cookie: nuovo } }).username, 'gverdi', 'nuovo login dopo il logout');
+});
+
+test('header di difesa: CSP, niente iframe, nosniff', () => {
+  assert.match(HEADER_PAGINA['Content-Security-Policy'], /default-src 'self'/);
+  assert.match(HEADER_PAGINA['Content-Security-Policy'], /frame-ancestors 'none'/);
+  assert.match(HEADER_PAGINA['Content-Security-Policy'], /script-src 'self'(;|$)/, 'niente script inline');
+  assert.equal(HEADER_PAGINA['X-Frame-Options'], 'DENY');
+  assert.equal(HEADER_PAGINA['Referrer-Policy'], 'same-origin');
+  assert.equal(HEADER_COMUNI['X-Content-Type-Options'], 'nosniff');
+  assert.equal(HEADER_PAGINA['X-Content-Type-Options'], 'nosniff');
+});
+
+test('segreto di sessione: un file troncato viene rigenerato', () => {
+  fs.writeFileSync(SECRET_FILE, Buffer.alloc(10, 1));
+  const s = loadSecret();
+  assert.ok(s.length >= 32);
+  assert.ok(fs.readFileSync(SECRET_FILE).length >= 32);
+  assert.ok(!fs.readFileSync(SECRET_FILE).equals(Buffer.alloc(10, 1)));
+});
+
+test('freno al login: lo stato finisce su file (condiviso fra 8080 e 8090)', () => {
+  const key = loginKey('condiviso', '10.0.0.9');
+  clearLoginFails(key);
+  noteLoginFail(key);
+  const j = JSON.parse(fs.readFileSync(path.join(DATA_TMP, 'login-fails.json'), 'utf8'));
+  assert.equal(j[key].n, 1);
+  clearLoginFails(key);
+  assert.ok(!JSON.parse(fs.readFileSync(path.join(DATA_TMP, 'login-fails.json'), 'utf8'))[key]);
+});

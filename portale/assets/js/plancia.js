@@ -120,7 +120,7 @@ async function launch(id, btn) {
   btn.disabled = true;
   setBusy(id, true, 'Avvio…');
   try {
-    const r = await fetch('/api/launch/' + id, { method: 'POST' });
+    const r = await fetch('/api/launch/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     const data = await r.json();
     if (!data.ok) { if (win) win.close(); toast('Errore: ' + (data.error || 'avvio non riuscito')); return; }
 
@@ -152,7 +152,7 @@ async function stop(id, btn) {
   btn.disabled = true;
   setBusy(id, true, 'Arresto…');
   try {
-    const r = await fetch('/api/stop/' + encodeURIComponent(id), { method: 'POST' });
+    const r = await fetch('/api/stop/' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     const data = await r.json();
     if (data.ok) { online[id] = false; toast(app.nome + ' fermato.'); aggiornaPlancia(); }
     else toast('Errore: ' + (data.error || 'chiusura non riuscita'));
@@ -249,7 +249,7 @@ async function gestisciRichiesta(id, azione, btn) {
   if (azione === 'reimposta' && !confirm(`Reimpostare la password di ${nome}?\n\nLa password attuale smette di funzionare e le sue sessioni aperte si chiudono. Riceverai una password temporanea da comunicargli.`)) return;
   li.querySelectorAll('button').forEach((b) => { b.disabled = true; });
   try {
-    const res = await fetch(`/api/richieste/${encodeURIComponent(id)}/${azione}`, { method: 'POST' });
+    const res = await fetch(`/api/richieste/${encodeURIComponent(id)}/${azione}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     const data = await res.json();
     if (!data.ok) { toast(data.error || 'Operazione non riuscita'); li.querySelectorAll('button').forEach((b) => { b.disabled = false; }); return; }
     if (data.password) {
@@ -565,7 +565,7 @@ document.getElementById('avvisiDlgDopo').addEventListener('click', () => {
 });
 
 document.getElementById('logout').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   window.location.href = '/login';
 });
 

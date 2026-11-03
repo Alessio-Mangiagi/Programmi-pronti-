@@ -286,7 +286,7 @@ $('formApps').addEventListener('submit', async (e) => {
 });
 
 $('logout').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   window.location.href = '/login';
 });
 

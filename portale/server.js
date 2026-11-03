@@ -551,12 +551,17 @@ function ensureData() {
 }
 
 function loadSecret() {
-  try { return fs.readFileSync(SECRET_FILE); }
-  catch {
-    const s = crypto.randomBytes(32);
-    try { writeFileAtomic(SECRET_FILE, s); } catch (e) { logError('scrittura secret', e); }
-    return s;
-  }
+  // Un file vuoto o troncato (disco pieno, copia a metà) darebbe una chiave HMAC
+  // vuota e i cookie di sessione sarebbero falsificabili da chiunque: sotto i
+  // 32 byte il segreto viene rigenerato (le sessioni aperte decadono, meglio così).
+  try {
+    const s = fs.readFileSync(SECRET_FILE);
+    if (s.length >= 32) return s;
+    logError('secret', new Error(`${SECRET_FILE} ha ${s.length} byte: rigenerato`));
+  } catch { /* manca: si crea qui sotto */ }
+  const s = crypto.randomBytes(32);
+  try { writeFileAtomic(SECRET_FILE, s); } catch (e) { logError('scrittura secret', e); }
+  return s;
 }
 
 function loadUtenti() {
@@ -1096,9 +1101,15 @@ function verifyPw(user, password) {
 // Sessioni stateless: cookie firmato HMAC-SHA256 (base64url(payload).mac).
 // Nessuno stato in RAM: niente memory leak, sopravvive ai riavvii.
 // ---------------------------------------------------------------------------
+// La chiave arriva da ensureData() all'avvio; importato come modulo (test) la si
+// carica alla prima firma, così makeSessionCookie/getSession si provano da soli.
+function chiaveSessioni() {
+  if (!SECRET) SECRET = loadSecret();
+  return SECRET;
+}
 function signSession(payload) {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const mac = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+  const mac = crypto.createHmac('sha256', chiaveSessioni()).update(body).digest('base64url');
   return `${body}.${mac}`;
 }
 // Con i sottodomini il cookie va emesso per tutto il dominio: e' il browser a
@@ -1109,6 +1120,7 @@ function makeSessionCookie(user, adm) {
   const payload = {
     u: user.username, n: user.nome, r: user.ruolo,
     v: user.sv || 1,                          // versione di sessione (vedi makeUser)
+    iat: Date.now(),                          // emissione: il logout invalida i cookie emessi prima (sessioniDa)
     exp: Date.now() + SESSION_MS,
   };
   if (adm && adm.length) payload.a = adm;   // app in cui l'IP eleva l'utente ad admin
@@ -1124,7 +1136,7 @@ function getSession(req) {
   if (i < 0) return null;
   const body = token.slice(0, i);
   const mac = token.slice(i + 1);
-  const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+  const expected = crypto.createHmac('sha256', chiaveSessioni()).update(body).digest('base64url');
   const a = Buffer.from(mac);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
@@ -1139,6 +1151,10 @@ function getSession(req) {
   // richiesta è trascurabile rispetto alla verifica HMAC appena fatta.
   const u = loadUtenti().find((x) => x.username === s.username);
   if (!u || u.disattivato || (u.sv || 1) !== (p.v || 1)) return null;
+  // Logout: l'utente ha chiuso le sessioni in un certo istante (sessioniDa) e i
+  // cookie emessi prima — anche uno copiato da un PC condiviso o da un'app che
+  // lo ha visto passare — non valgono più. Senza iat (cookie vecchio) idem.
+  if (u.sessioniDa && (!p.iat || p.iat < u.sessioniDa)) return null;
   return s;
 }
 
@@ -1148,18 +1164,54 @@ function getSession(req) {
 // utente+IP, così un PC che sbaglia non blocca l'account agli altri.
 // Stato in RAM: si azzera al riavvio, e va bene (il riavvio lo fa un admin).
 // ---------------------------------------------------------------------------
-const loginFails = new Map();   // "user|ip" -> { n, until }
+const loginFails = new Map();   // "user|ip" -> { n, until, ts }
+// Lo stato sta anche su file, condiviso fra il portale utenti (8080) e la
+// plancia admin (8090): due processi con gli stessi utenti darebbero altrimenti
+// un doppio budget di tentativi. Il file si rilegge solo se è cambiato
+// (mtime), quindi il costo per login è una stat().
+const LOGIN_FAILS_FILE = path.join(DATA_DIR, 'login-fails.json');
+let loginFailsMtime = 0;
+function ricaricaLoginFails() {
+  let st;
+  try { st = fs.statSync(LOGIN_FAILS_FILE); } catch { return; }
+  if (st.mtimeMs === loginFailsMtime) return;
+  try {
+    const j = JSON.parse(fs.readFileSync(LOGIN_FAILS_FILE, 'utf8'));
+    loginFails.clear();
+    for (const [k, e] of Object.entries(j || {})) if (e && typeof e === 'object') loginFails.set(k, e);
+    loginFailsMtime = st.mtimeMs;
+  } catch (e) { logError('lettura login-fails', e); }
+}
+function salvaLoginFails() {
+  try {
+    writeFileAtomic(LOGIN_FAILS_FILE, JSON.stringify(Object.fromEntries(loginFails)));
+    loginFailsMtime = fs.statSync(LOGIN_FAILS_FILE).mtimeMs;
+  } catch (e) { logError('scrittura login-fails', e); }
+}
+// Logout: da questo istante i cookie emessi prima non valgono più (vedi getSession).
+function chiudiSessioni(username) {
+  const list = loadUtenti();
+  const u = list.find((x) => x.username === username);
+  if (!u) return;
+  u.sessioniDa = Date.now();
+  saveUtenti(list);
+}
+// Salt fisso per lo scrypt "a vuoto" quando lo username non esiste: il tempo di
+// risposta del login non deve dire quali account ci sono.
+const SALT_FINTO = 'a3f1c9e2b7d4085e6f2a1c0b9d8e7f61';
 
 function loginKey(username, ip) {
   return `${String(username || '').toLowerCase().trim()}|${ip}`;
 }
 // Millisecondi di blocco residui (0 = può provare).
 function loginBlockedMs(key, now = Date.now()) {
+  ricaricaLoginFails();
   const e = loginFails.get(key);
   if (!e || !e.until) return 0;
   return e.until > now ? e.until - now : 0;
 }
 function noteLoginFail(key, now = Date.now(), maxFail = LOGIN_MAX_FAIL) {
+  ricaricaLoginFails();
   const e = loginFails.get(key) || { n: 0, until: 0, ts: now };
   if (e.until && e.until <= now) e.n = 0;    // blocco scaduto: riparte da zero
   e.n++;
@@ -1167,15 +1219,19 @@ function noteLoginFail(key, now = Date.now(), maxFail = LOGIN_MAX_FAIL) {
   if (e.n >= maxFail) { e.until = now + LOGIN_LOCK_MS; e.n = 0; }
   loginFails.set(key, e);
   pruneLoginFails(now);
+  salvaLoginFails();
 }
 function clearLoginFails(key) {
-  loginFails.delete(key);
+  ricaricaLoginFails();
+  if (loginFails.delete(key)) salvaLoginFails();
 }
 // Sblocco di un account da parte di un admin: via i blocchi di quell'utente da
 // QUALUNQUE PC (le chiavi sono "utente|ip").
 function sbloccaUtente(username) {
   const pre = String(username || '').toLowerCase().trim() + '|';
+  ricaricaLoginFails();
   for (const k of [...loginFails.keys()]) if (k.startsWith(pre)) loginFails.delete(k);
+  salvaLoginFails();
 }
 
 // ---------------------------------------------------------------------------
@@ -1265,19 +1321,23 @@ function loadIpAdmin() {
   } catch { return []; }
 }
 
-// IP reale del client. Dietro reverse proxy (nginx/IIS) impostare TRUST_PROXY=1
-// per leggere il primo hop di X-Forwarded-For; senza proxy si usa l'IP del
-// socket (l'header sarebbe falsificabile). Normalizza IPv4-mapped IPv6 e ::1.
+// IP reale del client. Dietro reverse proxy (nginx/IIS/Caddy) impostare
+// TRUST_PROXY=1 per leggere X-Forwarded-For; senza proxy si usa l'IP del socket
+// (l'header sarebbe falsificabile). Normalizza IPv4-mapped IPv6 e ::1.
+// Dell'header si prende l'ULTIMO elemento: è quello aggiunto dal proxy che ha
+// davvero visto il client; i precedenti li scrive il client stesso e con il
+// primo chiunque sceglierebbe il proprio IP (regole IP -> admin, blocchi login).
 function clientIp(req) {
   let ip = '';
   // Con SUITE_DOMINIO davanti c'e' il reverse proxy sulla stessa macchina: tutto
-  // arriva da 127.0.0.1, e senza l'header ogni utente sembrerebbe "locale"
-  // (regole IP -> admin, blocco dei login). Ci si fida dell'header solo se la
-  // connessione viene davvero dal loopback: da un altro PC non si falsifica.
+  // arriva da 127.0.0.1, e senza l'header ogni utente sembrerebbe "locale".
+  // Ci si fida dell'header solo se il portale ascolta SOLO sul loopback e la
+  // connessione viene da lì: altrimenti ogni processo locale (o, con HOST in
+  // LAN, un PC della rete) potrebbe scriverlo.
   const remoto = String((req.socket && req.socket.remoteAddress) || '');
   const daLoopback = /^(127\.|::1$|::ffff:127\.)/.test(remoto);
-  if (process.env.TRUST_PROXY === '1' || (SUITE_DOMINIO && daLoopback)) {
-    ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  if (process.env.TRUST_PROXY === '1' || (SUITE_DOMINIO && HOST === '127.0.0.1' && daLoopback)) {
+    ip = String(req.headers['x-forwarded-for'] || '').split(',').pop().trim();
   }
   if (!ip) ip = (req.socket && req.socket.remoteAddress) || '';
   if (ip.startsWith('::ffff:')) ip = ip.slice(7);   // IPv4 mappato in IPv6
@@ -1441,17 +1501,28 @@ function filtraApps(apps) {
 // ---------------------------------------------------------------------------
 // Utility HTTP.
 // ---------------------------------------------------------------------------
+// Header di difesa. Le pagine del portale non hanno script inline (tutto in
+// assets/js) né risorse esterne: la CSP può essere stretta a costo zero; resta
+// 'unsafe-inline' solo per gli stili perché due pagine usano style="display:none".
+// frame-ancestors 'none' + X-Frame-Options: la plancia non si incornicia da un
+// altro sito (clickjacking); nosniff su tutto; HSTS lo mette Caddy (deploy/Caddyfile).
+const HEADER_COMUNI = { 'X-Content-Type-Options': 'nosniff' };
+const HEADER_PAGINA = Object.assign({
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'same-origin',
+}, HEADER_COMUNI);
 function sendJson(res, code, obj, headers) {
   res.writeHead(code, Object.assign({
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
-  }, headers || {}));
+  }, HEADER_COMUNI, headers || {}));
   res.end(JSON.stringify(obj));
 }
 function sendFile(res, file, type) {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(500); return res.end('Errore lettura ' + path.basename(file)); }
-    res.writeHead(200, { 'Content-Type': type + '; charset=utf-8' });
+    res.writeHead(200, Object.assign({ 'Content-Type': type + '; charset=utf-8' }, type === 'text/html' ? HEADER_PAGINA : HEADER_COMUNI));
     res.end(data);
   });
 }
@@ -1480,13 +1551,63 @@ function sendAsset(res, urlPath) {
     const cache = ext === '.woff2' || ext === '.woff'
       ? 'public, max-age=31536000, immutable'
       : 'no-cache';
-    res.writeHead(200, {
+    res.writeHead(200, Object.assign({
       'Content-Type': TEXT_EXT.has(ext) ? type + '; charset=utf-8' : type,
       'Cache-Control': cache,
-    });
+    }, HEADER_COMUNI));
     res.end(data);
   });
 }
+// Origine del portale come la vede il browser: il nome pubblico dietro il
+// proxy, altrimenti l'host con cui è stata fatta la richiesta.
+function originePortale(req) {
+  if (PORTALE_PUBBLICO) return PORTALE_PUBBLICO;
+  const host = String((req.headers && req.headers.host) || '').trim();
+  return host ? `${TLS_ON ? 'https' : 'http'}://${host}` : '';
+}
+// Difesa CSRF per le rotte che modificano qualcosa (POST/PUT/DELETE dopo il login).
+// SameSite=Lax sul cookie non basta: le app della suite sullo stesso host (altra
+// porta) o sotto *.<dominio> sono "same-site", e un <form enctype=text/plain> da
+// una pagina ostile servita da una di loro manderebbe il cookie dell'admin con un
+// corpo che JSON.parse accetta. Tre controlli, tutti puri (testati):
+//  - Content-Type application/json: un form non può impostarlo, e un fetch
+//    cross-origin con quel tipo richiede un preflight CORS che il portale non concede;
+//  - Origin, se presente, deve essere quella del portale;
+//  - Sec-Fetch-Site, se il browser lo manda, deve essere same-origin (o none).
+// /api/presenza e /api/evento restano esenti: li chiama il backend delle app con
+// l'header X-Cosedil-App, già controllato lì.
+const CSRF_ESENTI = new Set(['/api/presenza', '/api/evento']);
+function motivoCsrf(req, pathname) {
+  const m = req.method;
+  if (m !== 'POST' && m !== 'PUT' && m !== 'DELETE') return '';
+  if (CSRF_ESENTI.has(pathname)) return '';
+  const h = req.headers || {};
+  const ct = String(h['content-type'] || '').toLowerCase();
+  if (!ct.startsWith('application/json')) return 'Content-Type non JSON';
+  const origin = h.origin;
+  if (origin) {
+    const mia = originePortale(req);
+    if (!mia || String(origin).toLowerCase() !== mia.toLowerCase()) return 'Origin estranea';
+  }
+  const sfs = h['sec-fetch-site'];
+  if (sfs && sfs !== 'same-origin' && sfs !== 'none') return 'richiesta da un altro sito';
+  return '';
+}
+// Cosa fare quando un utente preme "Avvia" (pura, testata). Un'app già accesa
+// non si rilancia: avvia.bat chiama libera-porta.bat, che UCCIDE il processo in
+// ascolto, e i colleghi perderebbero il lavoro in corso. Il riavvio forzato
+// (?forza=1) è riservato agli admin e finisce nel registro come 'riavvia'.
+function decisioneAvvio({ accesa, forza, admin }) {
+  if (!accesa) return 'avvia';
+  if (!forza) return 'gia-accesa';
+  return admin ? 'riavvia' : 'vietato';
+}
+// Username ammessi: minuscole, numeri, punto, trattino, underscore, max 40.
+// Niente spazi, '/', caratteri di controllo o '*' (che collide con la chiave
+// del contatore per IP del login). Nome visualizzato: max 80 (finisce nel cookie).
+const USERNAME_RE = /^[a-z0-9._-]{1,40}$/;
+function usernameValido(u) { return USERNAME_RE.test(String(u || '')); }
+const NOME_MAX = 80;
 function readJsonBody(req, maxBytes = 1e6) {
   return new Promise((resolve) => {
     let body = '';
@@ -2003,7 +2124,10 @@ async function handle(req, res) {
     }
 
     const user = loadUtenti().find((u) => u.username === String(username || '').toLowerCase().trim());
-    if (!user || !verifyPw(user, String(password || ''))) {
+    // Utente inesistente: scrypt a vuoto con salt fisso, così la risposta ha lo
+    // stesso tempo di una password sbagliata e lo username non si indovina dal cronometro.
+    const pwOk = user ? verifyPw(user, String(password || '')) : (hashPw(String(password || ''), SALT_FINTO), false);
+    if (!pwOk) {
       noteLoginFail(key);
       noteLoginFail(keyIp, Date.now(), LOGIN_MAX_FAIL_IP);
       return sendJson(res, 401, { ok: false, error: 'Credenziali non valide' });
@@ -2038,6 +2162,9 @@ async function handle(req, res) {
         ts: new Date().toISOString(), username: chiEsce.username, nome: chiEsce.nome,
         appId: null, appNome: null, azione: 'logout', ip: clientIp(req),
       });
+      // Chiusura di TUTTE le sessioni dell'utente solo se la richiesta viene davvero dal portale:
+      // altrimenti una pagina ostile same-site potrebbe scollegarlo ovunque con un form.
+      if (!motivoCsrf(req, p)) chiudiSessioni(chiEsce.username);
     }
     return sendJson(res, 200, { ok: true }, { 'Set-Cookie': CLEAR_COOKIE });
   }
@@ -2088,6 +2215,11 @@ async function handle(req, res) {
   if (!session) {
     if (wantsHtml) { res.writeHead(302, { Location: '/login' }); return res.end(); }
     return sendJson(res, 401, { ok: false, error: 'Non autenticato' });
+  }
+  const csrf = motivoCsrf(req, p);
+  if (csrf) {
+    console.log(`  [CSRF] ${req.method} ${p} rifiutata (${csrf}) per ${session.username} da ${clientIp(req)}`);
+    return sendJson(res, 403, { ok: false, error: 'Richiesta rifiutata: ' + csrf });
   }
 
   // admin "vero" (utenti.json) OPPURE elevato dall'IP per l'app "portale".
@@ -2163,7 +2295,19 @@ async function handle(req, res) {
     const list = loadUtenti();
     const u = list.find((x) => x.username === session.username);
     if (!u) return sendJson(res, 401, { ok: false, error: 'Sessione non valida' }, { 'Set-Cookie': CLEAR_COOKIE });
-    if (!verifyPw(u, String(attuale || ''))) return sendJson(res, 403, { ok: false, error: 'Password attuale errata' });
+    // Stesso freno del login: con una sessione rubata non si deve poter provare
+    // la password attuale a raffica per scoprirla e cambiarla.
+    const keyPw = loginKey(session.username, clientIp(req));
+    const bloccoPw = loginBlockedMs(keyPw);
+    if (bloccoPw > 0) {
+      return sendJson(res, 429, { ok: false, error: `Troppi tentativi falliti. Riprova tra ${Math.ceil(bloccoPw / 60000)} minuti.` },
+        { 'Retry-After': String(Math.ceil(bloccoPw / 1000)) });
+    }
+    if (!verifyPw(u, String(attuale || ''))) {
+      noteLoginFail(keyPw);
+      return sendJson(res, 403, { ok: false, error: 'Password attuale errata' });
+    }
+    clearLoginFails(keyPw);
     const nuovaPw = String(nuova || '');
     if (nuovaPw.length < MIN_PW_LEN) return sendJson(res, 400, { ok: false, error: `La nuova password deve avere almeno ${MIN_PW_LEN} caratteri` });
     if (verifyPw(u, nuovaPw)) return sendJson(res, 400, { ok: false, error: 'La nuova password deve essere diversa da quella attuale' });
@@ -2218,12 +2362,15 @@ async function handle(req, res) {
   if (p.startsWith('/api/launch/') && req.method === 'POST') {
     const app = APPS.find((a) => a.id === p.split('/').pop());
     if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
+    const decisione = decisioneAvvio({ accesa: await checkPort(app.porta), forza: url.searchParams.get('forza') === '1', admin: adminPortale });
+    if (decisione === 'gia-accesa') return sendJson(res, 200, { ok: true, giaAccesa: true });
+    if (decisione === 'vietato') return sendJson(res, 403, { ok: false, error: 'È già accesa: il riavvio è riservato agli amministratori' });
     const r = launchApp(app);
     if (r.ok) {
       spenteAMano.delete(app.id);   // riavviata di proposito: il keep-alive può riprenderla
       logAccesso({
         ts: new Date().toISOString(), username: session.username, nome: session.nome,
-        appId: app.id, appNome: app.nome, azione: 'avvia',
+        appId: app.id, appNome: app.nome, azione: decisione,   // 'avvia' o 'riavvia'
       });
     }
     return sendJson(res, r.ok ? 200 : 500, r);
@@ -2422,13 +2569,14 @@ async function handle(req, res) {
       const { username, nome, password, ruolo, apps, email } = await readJsonBody(req);
       const uname = String(username || '').toLowerCase().trim();
       if (!uname || !nome || !password) return sendJson(res, 400, { ok: false, error: 'Dati mancanti' });
+      if (!usernameValido(uname)) return sendJson(res, 400, { ok: false, error: 'Username non valido: lettere minuscole, numeri, punto, trattino e underscore (max 40)' });
       const mail = String(email || '').trim().toLowerCase();
       if (mail && !emailValida(mail)) return sendJson(res, 400, { ok: false, error: 'Email non valida' });
       if (String(password).length < MIN_PW_LEN) return sendJson(res, 400, { ok: false, error: `La password deve avere almeno ${MIN_PW_LEN} caratteri` });
       const list = loadUtenti();
       if (list.some((u) => u.username === uname)) return sendJson(res, 409, { ok: false, error: 'Username già esistente' });
       // mustChange: il nuovo utente dovrà impostare una propria password al primo accesso.
-      const nuovo = makeUser(uname, String(nome).trim(), String(password), ruolo === 'admin' ? 'admin' : 'utente', true);
+      const nuovo = makeUser(uname, String(nome).trim().slice(0, NOME_MAX), String(password), ruolo === 'admin' ? 'admin' : 'utente', true);
       // apps assente = niente campo: quell'utente segue il default, e se un
       // domani il default cambia lo segue anche lui.
       if (Array.isArray(apps)) nuovo.apps = filtraApps(apps);
@@ -2465,6 +2613,7 @@ async function handle(req, res) {
       if (!pw) pw = defPw;
       const ruolo = /^admin/i.test(String(r.ruolo || '').trim()) ? 'admin' : 'utente';
       if (!uname || !nome) { scartati.push({ riga: r.riga, username: uname, motivo: 'username o nome mancante' }); continue; }
+      if (!usernameValido(uname)) { scartati.push({ riga: r.riga, username: uname, motivo: 'username non valido (minuscole, numeri, . _ -, max 40)' }); continue; }
       if (pw.length < MIN_PW_LEN) { scartati.push({ riga: r.riga, username: uname, motivo: `password assente o < ${MIN_PW_LEN} caratteri` }); continue; }
       if (noti.has(uname)) { scartati.push({ riga: r.riga, username: uname, motivo: 'username già esistente' }); continue; }
       list.push(makeUser(uname, nome, pw, ruolo, true));
@@ -2486,8 +2635,19 @@ async function handle(req, res) {
     const list = loadUtenti();
     const u = list.find((x) => x.username === uname);
     if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    // L'email è la chiave con cui InCampo e SkyTower aprono la sessione senza
+    // password: due utenti del portale con la stessa email sarebbero la stessa
+    // persona di là. E ogni cambio resta nel registro accessi, con chi l'ha fatto.
+    if (mail && list.some((x) => x.username !== uname && String(x.email || '').toLowerCase() === mail)) {
+      return sendJson(res, 409, { ok: false, error: 'Email già usata da un altro utente' });
+    }
+    const prima = u.email || '';
     if (mail) u.email = mail; else delete u.email;
     saveUtenti(list);
+    logAccesso({
+      ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: 'email-utente', ip: clientIp(req), utente: uname, da: prima, a: mail,
+    });
     daFareCache.delete(uname);
     return sendJson(res, 200, { ok: true, email: u.email || '', emailEffettiva: emailUtente(u) });
   }
@@ -2675,4 +2835,6 @@ module.exports = {
   emailUtente, emailValida, SUITE_EMAIL_DOMINIO,    // identità per le app con utenti propri
   registroCommesse, commessaDaApp, unisciRegistro, importaCommesse,   // registro commesse
   normalizzaVoci, daFare, daFareCache,              // "da fare oggi"
+  motivoCsrf, originePortale, decisioneAvvio, usernameValido, NOME_MAX,   // difese (revisione 03/11/2026)
+  HEADER_PAGINA, HEADER_COMUNI, makeSessionCookie, getSession, chiudiSessioni, loadSecret, SECRET_FILE,
 };
