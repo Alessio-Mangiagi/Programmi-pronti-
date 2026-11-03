@@ -3,9 +3,8 @@
 (InCampo/SkyTower finti con monkeypatch su suite_link.chiama)."""
 import json
 
-import pytest
-
 import pdf_semplice
+import pytest
 import suite_rotte
 
 TOKEN = {"X-Suite-Token": "token-di-prova", "X-Suite-Utente": "mrossi", "X-Suite-Nome": "Mario Rossi"}
@@ -162,3 +161,33 @@ def test_pdf_semplice_struttura_e_pagine():
     # parentesi e caratteri accentati non rompono le stringhe PDF
     pdf2 = pdf_semplice.tabella_pdf("Prova (è)", ["A"], [["x(y) à"]])
     assert b"Prova \\(\\xe8\\)" in pdf2 or b"Prova \\(" in pdf2
+
+
+# --------------------------------------------------------------------------- da fare (home del portale) e registro
+
+def test_da_fare_mezzi_fermi_e_voci_admin(client, cantiere, monkeypatch, tmp_path):
+    m = cantiere["mezzo"]
+    r = client.post(f"/api/mezzi/{m['id']}/sposta", json={"stato": "fermo", "note": "perde olio"})
+    assert r.status_code == 200, r.get_json()
+    client.post("/api/ubicazioni", json={"nome": "Cantiere senza codice", "tipo": "cantiere"})
+    assert client.get("/api/suite/da-fare").status_code == 403
+    r = client.get("/api/suite/da-fare", headers=TOKEN)
+    assert r.status_code == 200, r.get_json()
+    voci = r.get_json()["voci"]
+    fermo = [v for v in voci if v["id"] == f"mezzo:{m['id']}"]
+    assert fermo and fermo[0]["titolo"].startswith("Mezzo fermo: Escavatore") and "AB123CD" in fermo[0]["testo"]
+    assert fermo[0]["url"].endswith("#scansione/" + m["codice"]) and fermo[0]["priorita"] == 2 and fermo[0]["tipo"] == "magazzino"
+    assert not [v for v in voci if v["id"] == "ubicazioni-senza-commessa"]   # non admin: niente voci di amministrazione
+    voci = client.get("/api/suite/da-fare?admin=1", headers=TOKEN).get_json()["voci"]
+    senza = [v for v in voci if v["id"] == "ubicazioni-senza-commessa"]
+    assert senza and senza[0]["titolo"] == "1 cantieri senza codice commessa" and "Cantiere senza codice" in senza[0]["testo"]
+    assert [v["priorita"] for v in voci] == sorted(v["priorita"] for v in voci)
+
+
+def test_registro_commesse_per_la_pagina(client, monkeypatch, tmp_path):
+    f = tmp_path / "commesse.json"
+    monkeypatch.setattr(suite_rotte.suite_link, "FILE_COMMESSE", f)
+    assert client.get("/api/commesse").get_json() == []
+    suite_rotte.suite_link.salva_commesse([{"code": "101-003", "nome": "Porto di Augusta"}, {"code": "C-1", "stato": "chiusa"}])
+    assert [c["code"] for c in client.get("/api/commesse").get_json()] == ["101-003"]
+    assert [c["code"] for c in client.get("/api/commesse?tutte=1").get_json()] == ["101-003", "C-1"]

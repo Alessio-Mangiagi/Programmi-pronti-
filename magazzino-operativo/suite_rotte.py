@@ -19,17 +19,25 @@ import sys
 import urllib.parse
 from datetime import datetime
 
-from flask import g, jsonify, request
-
 import config
 import pdf_semplice
-from app import ApiError, _dati_ubicazione, app, corpo, db, nome_utente, registra, righe, testo, utente_corrente
+from app import (
+    ApiError,
+    _dati_ubicazione,
+    app,
+    corpo,
+    db,
+    nome_utente,
+    registra,
+    righe,
+    testo,
+    utente_corrente,
+)
+from flask import g, jsonify, request
 
 sys.path.insert(0, os.path.join(config.SUITE_DIR, "shared", "suite"))
-import suite_link  # noqa: E402
-
-import codici  # noqa: E402
-
+import codici
+import suite_link
 
 # --------------------------------------------------------------------------- utilità
 
@@ -125,6 +133,65 @@ def suite_giacenze(codice):
     if d is None:
         raise ApiError(f"Nessuna ubicazione del Magazzino ha il codice commessa {codice}", 404)
     return jsonify(d)
+
+
+ETICH_STATO_MEZZO = {"fermo": "Mezzo fermo", "manutenzione": "Mezzo in manutenzione"}
+
+
+def _da_fare(c, admin):
+    """Cose da fare nel Magazzino per la home del portale (shared/suite/CONTRATTI.md § 4)."""
+    base = suite_link.url_pubblico("magazzino")
+    voci = []
+    for m in righe(c.execute(
+            "SELECT m.id, m.codice, m.tipo_mezzo, m.marca, m.modello, m.targa, m.stato, u.nome AS ubicazione, "
+            "(SELECT MAX(ts) FROM movimenti_mezzi mm WHERE mm.mezzo_id = m.id) AS dal "
+            "FROM mezzi m LEFT JOIN ubicazioni u ON u.id = m.ubicazione_id "
+            "WHERE m.attivo = 1 AND m.stato IN ('fermo', 'manutenzione') ORDER BY m.stato, dal")):
+        nome = " ".join(x for x in (m["tipo_mezzo"], m["marca"], m["modello"]) if x)
+        dettagli = [m["ubicazione"] or "ubicazione non registrata"]
+        if m["targa"]:
+            dettagli.insert(0, m["targa"])
+        if m["dal"]:
+            dettagli.append("dal " + str(m["dal"])[:10])
+        voci.append({"id": f"mezzo:{m['id']}", "titolo": f"{ETICH_STATO_MEZZO[m['stato']]}: {nome}",
+                     "testo": " · ".join(dettagli), "url": f"{base}/#scansione/{m['codice']}", "tipo": "magazzino",
+                     "priorita": 2 if m["stato"] == "fermo" else 3, "data": (m["dal"] or "")[:10] or None})
+    if admin:
+        for i in righe(c.execute(
+                "SELECT sorgente, chiave, MAX(ts) AS ts, dettaglio FROM importazioni WHERE esito = 'errore' "
+                "AND ts >= datetime('now', '-7 days') GROUP BY sorgente, chiave ORDER BY ts DESC LIMIT 10")):
+            cosa = "DDT" if i["sorgente"] == "ddt" else "pratica mezzi"
+            voci.append({"id": f"import:{i['sorgente']}:{i['chiave']}", "titolo": f"Importazione {cosa} fallita: {i['chiave']}",
+                         "testo": (i["dettaglio"] or "")[:160], "url": f"{base}/#importazioni", "tipo": "avviso",
+                         "priorita": 2, "data": (i["ts"] or "")[:10] or None})
+        senza = righe(c.execute(
+            "SELECT id, codice, nome FROM ubicazioni WHERE attivo = 1 AND tipo = 'cantiere' "
+            "AND (commessa IS NULL OR commessa = '') ORDER BY nome"))
+        if senza:
+            nomi = ", ".join(u["nome"] for u in senza[:4]) + (f" e altre {len(senza) - 4}" if len(senza) > 4 else "")
+            voci.append({"id": "ubicazioni-senza-commessa", "titolo": f"{len(senza)} cantieri senza codice commessa",
+                         "testo": f"{nomi}: senza codice non si collegano a InCampo e SkyTower",
+                         "url": f"{base}/#ubicazioni", "tipo": "avviso", "priorita": 3, "data": None})
+    voci.sort(key=lambda v: (v["priorita"], v["data"] or "9999"))
+    return voci[:50]
+
+
+@app.get("/api/suite/da-fare")
+def suite_da_fare():
+    """Le cose da fare per l'utente del portale (home del portale, sezione "Da fare oggi")."""
+    _richiede_token()
+    admin = request.args.get("admin") in ("1", "true")
+    return jsonify({"voci": _da_fare(db(), admin)})
+
+
+# --------------------------------------------------------------------------- registro commesse (per la pagina)
+
+@app.get("/api/commesse")
+def api_commesse():
+    """Il registro unico delle commesse della suite (shared/suite/commesse.json, lo cura il portale):
+    la pagina lo usa come menu a tendina del codice commessa dell'ubicazione."""
+    solo_attive = request.args.get("tutte") not in ("1", "true")
+    return jsonify(suite_link.commesse(solo_attive=solo_attive))
 
 
 # --------------------------------------------------------------------------- stato dei collegamenti

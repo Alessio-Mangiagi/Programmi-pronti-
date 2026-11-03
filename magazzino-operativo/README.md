@@ -187,7 +187,20 @@ mezzi nella dashboard del cantiere.
 Le rotte `/api/suite/...` sono per le altre app (token di servizio, fuori dal gate
 SSO); `/api/incampo/...` e `/api/skytower/...` le chiama la pagina e passano dal
 portale come tutte le altre. Se un'app è spenta il pannello lo dice e il resto
-funziona. Tutto in `suite_rotte.py`; dettagli in `shared/suite/README.md`.
+funziona. Tutto in `suite_rotte.py`; dettagli in `shared/suite/README.md` e
+`shared/suite/CONTRATTI.md`.
+
+**Registro delle commesse.** Il codice commessa dell'ubicazione si sceglie da un menu a
+tendina preso dal registro unico della suite (`shared/suite/commesse.json`, lo cura il
+portale nella pagina *Commesse*): così combacia davvero con InCampo e SkyTower. Se il
+registro è vuoto resta il campo di testo. La pagina lo legge da `GET /api/commesse`
+(`?tutte=1` anche le chiuse); un codice già salvato ma non più nel registro resta
+selezionabile, segnato "(non nel registro)".
+
+**Da fare oggi (home del portale).** `GET /api/suite/da-fare` (token di servizio,
+`?admin=1` per le voci di amministrazione) elenca: mezzi fermi o in manutenzione (con
+ubicazione e da quando), importazioni DDT/mezzi fallite negli ultimi 7 giorni e cantieri
+senza codice commessa (solo admin). Ogni voce ha il link alla vista giusta.
 
 ### Grafici
 

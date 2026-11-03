@@ -669,12 +669,29 @@
     await carica();
   };
 
-  function formUbicazione(u, dopo) {
+  // Registro unico delle commesse della suite (lo cura il portale): se c'è, il codice si
+  // sceglie da un menu e combacia con InCampo e SkyTower; se è vuoto resta il testo libero.
+  let registroCommesse = null;
+  async function caricaRegistroCommesse() {
+    if (registroCommesse) return registroCommesse;
+    try { registroCommesse = await api('/api/commesse'); } catch (e) { registroCommesse = []; }
+    return registroCommesse;
+  }
+  function campoCommessa(valore) {
+    const reg = registroCommesse || [];
+    if (!reg.length) return campo('Commessa (codice commessa aziendale)', input('commessa', valore, 'placeholder="es. 101-003"'));
+    const opzioni = [['', '— nessuna —']].concat(reg.map((c) => [c.code, c.nome ? `${c.code} · ${c.nome}` : c.code]));
+    if (valore && !reg.some((c) => c.code === valore)) opzioni.push([valore, `${valore} (non nel registro)`]);
+    return campo('Commessa (dal registro della suite)', select('commessa', opzioni, valore || ''));
+  }
+
+  async function formUbicazione(u, dopo) {
     u = u || {};
+    await caricaRegistroCommesse();
     const html = `<form id="f" class="form">
       ${campo('Nome', input('nome', u.nome, 'required maxlength="120"'), 'pieno')}
       ${campo('Tipo', select('tipo', Object.entries(ETICH_TIPO_UBI), u.tipo || 'cantiere'))}
-      ${campo('Commessa (cartella del Lettore DDT)', input('commessa', u.commessa))}
+      ${campoCommessa(u.commessa)}
       ${campo('Indirizzo (per Google Maps)', input('indirizzo', u.indirizzo, 'placeholder="es. Via Etnea 120, Catania"'), 'pieno')}
       ${campo('Latitudine', input('lat', u.lat, 'type="number" step="any" min="-90" max="90" placeholder="37.5079"'))}
       ${campo('Longitudine', input('lng', u.lng, 'type="number" step="any" min="-180" max="180" placeholder="15.0830"'))}
