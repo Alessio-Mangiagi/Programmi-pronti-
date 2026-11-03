@@ -18,7 +18,7 @@ import time
 import traceback
 from datetime import date, timedelta
 
-from flask import Flask, Response, g, jsonify, render_template, request, send_file
+from flask import Flask, Response, g, jsonify, render_template, request, send_file, redirect
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 import codici
@@ -44,6 +44,14 @@ app.config["MAX_CONTENT_LENGTH"] = config.UPLOAD_MAX_BYTE
 avvisi.collega_log("magazzino")
 # /api/suite/: rotte per le altre app della suite, protette dal token di servizio (suite_rotte.py), non dal cookie.
 cosedil_sso.init(app, app_id="magazzino", percorsi_liberi=("/api/suite/",))
+if not cosedil_sso.ENABLED:
+    # senza gate ogni richiesta è "sviluppo" e admin: va bene sul PC di chi sviluppa, mai su un server
+    log.warning("COSEDIL_SSO=off: Magazzino senza login, tutti amministratori. Solo per sviluppo locale.")
+if os.environ.get("SUITE_DOMINIO", "").strip():
+    # dietro il Caddy della suite l'IP vero del client sta in X-Forwarded-For (un solo proxy davanti);
+    # senza proxy l'header lo scriverebbe il client e non va creduto, quindi il ProxyFix resta spento
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 TIPI_UBICAZIONE = ("deposito", "cantiere", "officina", "fornitore", "altro")
 STATI_MEZZO = ("disponibile", "in_uso", "manutenzione", "fermo", "restituito")
@@ -93,7 +101,10 @@ def e_admin():
 def gate_admin():
     if not request.path.startswith("/api"):
         return None
-    if (request.method == "DELETE" or request.path.startswith("/api/admin")) and not e_admin():
+    # l'upload di un JSON di importazione riscrive giacenze e anagrafiche: solo l'amministratore
+    riservata = (request.method == "DELETE" or request.path.startswith("/api/admin")
+                 or request.path == "/api/importazioni/upload")
+    if riservata and not e_admin():
         return jsonify({"errore": "Operazione riservata all'amministratore del magazzino"}), 403
     return None
 
@@ -827,9 +838,14 @@ def _esegui_import(sorgente, forza=False):
 @app.get("/api/importazioni")
 def api_importazioni():
     c = db()
+    # i percorsi assoluti del server li vede solo l'amministratore (dicono com'è fatto il disco del server);
+    # agli altri basta sapere se la cartella c'è e come si chiama
+    admin = e_admin()
     return jsonify({
-        "ddt_dir": config.DDT_DATA_DIR, "ddt_dir_ok": os.path.isdir(config.DDT_DATA_DIR),
-        "mezzi_dir": config.MEZZI_VFP_DIR, "mezzi_dir_ok": os.path.isdir(config.MEZZI_VFP_DIR),
+        "ddt_dir": config.DDT_DATA_DIR if admin else os.path.basename(config.DDT_DATA_DIR.rstrip("\\/")),
+        "ddt_dir_ok": os.path.isdir(config.DDT_DATA_DIR),
+        "mezzi_dir": config.MEZZI_VFP_DIR if admin else os.path.basename(config.MEZZI_VFP_DIR.rstrip("\\/")),
+        "mezzi_dir_ok": os.path.isdir(config.MEZZI_VFP_DIR),
         "intervallo_sec": config.IMPORT_INTERVALLO_SEC,
         "commesse": [n for n in (sorted(os.listdir(config.DDT_DATA_DIR)) if os.path.isdir(config.DDT_DATA_DIR) else [])
                      if n not in config.COMMESSE_IGNORATE
@@ -1073,8 +1089,17 @@ def api_codice_svg(testo_codice):
 
 
 @app.get("/etichette")
+def etichette_vecchia():
+    """Vecchio indirizzo del foglio etichette: rimanda a /api/etichette. Stava fuori da /api e il gate SSO
+    lo lasciava passare a chi mandava un Accept diverso da text/html (revisione di sicurezza del 03/11/2026):
+    l'elenco completo di articoli, mezzi (targhe, matricole) e ubicazioni usciva senza login."""
+    return redirect("/api/etichette" + ("?" + request.query_string.decode() if request.query_string else ""), 302)
+
+
+@app.get("/api/etichette")
 def etichette():
-    """Foglio etichette da stampare: ?tipo=articoli|mezzi|ubicazioni&ids=1,2,3 (senza ids: tutti gli attivi)."""
+    """Foglio etichette da stampare: ?tipo=articoli|mezzi|ubicazioni&ids=1,2,3 (senza ids: tutti gli attivi).
+    Sta sotto /api perché il gate SSO protegge sempre quel prefisso, qualunque sia l'Accept del client."""
     tipo = request.args.get("tipo", "articoli")
     if tipo not in ("articoli", "mezzi", "ubicazioni"):
         raise ApiError("tipo non valido")

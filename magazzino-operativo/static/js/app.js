@@ -318,7 +318,7 @@
     function cardArticolo(d) {
       const a = d.articolo;
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Articolo</span><h3>${h(a.descrizione)}</h3><span class="codice">${h(a.codice)}</span>${a.codice_esterno ? `<span class="muto mono">EAN ${h(a.codice_esterno)}</span>` : ''}</div>
-          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/etichette?tipo=articoli&ids=${a.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/api/etichette?tipo=articoli&ids=${a.id}" target="_blank">Etichetta</a></div></div>
         <div class="griglia griglia-2">
           <div><div class="totale-grande">${fmtN(d.totale)} <small>${h(a.um)} in totale</small></div>
             <p class="muto">${a.categoria ? h(a.categoria) + ' · ' : ''}${a.fornitore ? 'Fornitore ' + h(a.fornitore) : ''}${a.scorta_minima != null ? ` · scorta minima ${fmtN(a.scorta_minima)}` : ''}</p>
@@ -335,7 +335,7 @@
       const m = d.mezzo;
       const principale = (d.foto || []).find((f) => f.principale) || (d.foto || [])[0];
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo">${principale ? `<a href="/api/mezzi/${m.id}/foto/${principale.id}" target="_blank" rel="noopener"><img class="foto-mini" src="/api/mezzi/${m.id}/foto/${principale.id}?dim=min" alt="foto del mezzo"></a>` : ''}<span class="badge badge-blu">Mezzo</span><h3>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</h3><span class="codice">${h(m.codice)}</span></div>
-          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/etichette?tipo=mezzi&ids=${m.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/api/etichette?tipo=mezzi&ids=${m.id}" target="_blank">Etichetta</a></div></div>
         <div class="griglia griglia-2">
           <div><div class="totale-grande" style="font-size:1.6rem">${h(m.ubicazione || 'Ubicazione non registrata')}</div>
             <p>${badgeStato(m.stato)} <span class="badge">${m.proprieta === 'nolo' ? 'A nolo' : 'Di proprietà'}</span>${m.assegnato_a ? ` <span class="badge badge-blu">In uso da ${h(m.assegnato_a)}</span>` : ''}</p>
@@ -350,7 +350,7 @@
     function cardUbicazione(d) {
       const u = d.ubicazione;
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Ubicazione</span><h3>${h(u.nome)}</h3><span class="codice">${h(u.codice)}</span><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></div>
-          <div class="azioni">${urlMappa(u) ? `<a class="btn btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni">${urlMappa(u) ? `<a class="btn btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="/api/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
         ${u.indirizzo ? `<p class="muto">${h(u.indirizzo)}</p>` : ''}
         <div class="griglia griglia-2">
           <div><h4>Materiale (${d.giacenze.length})</h4>${d.giacenze.length ? `<table><thead><tr><th>Articolo</th><th class="num">Quantità</th></tr></thead><tbody>
@@ -529,7 +529,7 @@
   // ------------------------------------------------------------------ articoli
   viste.articoli = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Articoli</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/etichette?tipo=articoli" target="_blank">Stampa tutte le etichette</a><button class="btn" id="btn-nuovo">Nuovo articolo</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="/api/etichette?tipo=articoli" target="_blank">Stampa tutte le etichette</a><button class="btn" id="btn-nuovo">Nuovo articolo</button></div></div>
       <div class="filtri"><input id="q" placeholder="Cerca per descrizione, codice, categoria..."><label class="muto"><input type="checkbox" id="tutti"> anche disattivati</label></div>
       <div class="card" id="tab"></div>`;
     const carica = async () => {
@@ -578,7 +578,7 @@
   // ------------------------------------------------------------------ mezzi
   viste.mezzi = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Mezzi</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/etichette?tipo=mezzi" target="_blank">Stampa tutte le etichette</a><button class="btn btn-sec" id="btn-vfp">Importa da VFP Transfer</button><button class="btn" id="btn-nuovo">Nuovo mezzo</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="/api/etichette?tipo=mezzi" target="_blank">Stampa tutte le etichette</a><button class="btn btn-sec" id="btn-vfp">Importa da VFP Transfer</button><button class="btn" id="btn-nuovo">Nuovo mezzo</button></div></div>
       <div class="filtri"><input id="q" placeholder="Cerca tipo, marca, targa, matricola, ditta..."><select id="stato"><option value="">Tutti gli stati</option>${['disponibile', 'in_uso', 'manutenzione', 'fermo', 'restituito'].map((s) => `<option value="${s}">${s.replace('_', ' ')}</option>`).join('')}</select>
       <select id="prop"><option value="">Proprietà e nolo</option><option value="proprio">Di proprietà</option><option value="nolo">A nolo</option></select></div>
       <div class="card" id="tab"></div>`;
@@ -642,7 +642,7 @@
   // ------------------------------------------------------------------ ubicazioni
   viste.ubicazioni = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Ubicazioni</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/etichette?tipo=ubicazioni" target="_blank">Stampa etichette</a><button class="btn btn-sec" id="btn-incampo" title="Crea un'ubicazione di tipo cantiere per ogni cantiere di InCampo, con codice commessa e indirizzo">Importa cantieri da InCampo</button><button class="btn" id="btn-nuovo">Nuova ubicazione</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="/api/etichette?tipo=ubicazioni" target="_blank">Stampa etichette</a><button class="btn btn-sec" id="btn-incampo" title="Crea un'ubicazione di tipo cantiere per ogni cantiere di InCampo, con codice commessa e indirizzo">Importa cantieri da InCampo</button><button class="btn" id="btn-nuovo">Nuova ubicazione</button></div></div>
       <div class="card" id="tab"></div>`;
     $('#btn-incampo').onclick = async () => {
       const b = $('#btn-incampo'); b.disabled = true;

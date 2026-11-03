@@ -238,7 +238,7 @@ def test_api_articolo_validazione_ed_etichette(client):
     assert client.post("/api/articoli", json={"descrizione": "sacchi  cemento 25 KG", "um": "sacchi"}).status_code == 409
     d = client.get("/api/dashboard").json
     assert d["sotto_scorta"][0]["codice"] == "MAG-00001"
-    r = client.get("/etichette?tipo=articoli&ids=1")
+    r = client.get("/api/etichette?tipo=articoli&ids=1")
     assert r.status_code == 200 and b"MAG-00001" in r.data and b"<rect" in r.data
     r = client.get("/api/codici/MAG-00001.svg")
     assert r.status_code == 200 and r.mimetype == "image/svg+xml"
@@ -495,3 +495,55 @@ def test_importa_mezzo_commessa_con_descrizione_usa_il_codice(conn, monkeypatch)
     rec2["valori"]["commessa"] = "c-2024-015"
     importa_mezzi.importa_record(conn, rec2)
     assert conn.execute("SELECT COUNT(*) FROM ubicazioni WHERE commessa LIKE 'C-2024-015%'").fetchone()[0] == 1
+
+
+def test_etichette_sotto_api_e_vecchio_indirizzo_rimanda(client):
+    """Revisione di sicurezza del 03/11/2026: il foglio etichette stava fuori da /api e usciva senza login
+    a chi mandava un Accept diverso da text/html. Ora vive sotto /api; il vecchio indirizzo rimanda lì."""
+    client.post("/api/articoli", json={"descrizione": "Guanti nitrile", "um": "paia"})
+    r = client.get("/etichette?tipo=articoli&ids=1", headers={"Accept": "*/*"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/api/etichette?tipo=articoli&ids=1")
+    assert b"Guanti nitrile" in client.get("/api/etichette?tipo=articoli&ids=1").data
+
+
+def test_importazioni_percorsi_e_upload_solo_admin(client, monkeypatch):
+    """I percorsi assoluti del server li vede solo l'amministratore; l'upload di un JSON di importazione è
+    riservato (riscrive giacenze e anagrafiche)."""
+    import app as modulo_app
+    assert client.get("/api/importazioni").json["ddt_dir"] == modulo_app.config.DDT_DATA_DIR
+    monkeypatch.setattr(modulo_app, "e_admin", lambda: False)
+    d = client.get("/api/importazioni").json
+    assert d["ddt_dir"] == "ddt" and d["mezzi_dir"] == "mezzi" and "ddt_dir_ok" in d
+    r = client.post("/api/importazioni/upload", data={"file": (__import__("io").BytesIO(b"[]"), "x.json")})
+    assert r.status_code == 403
+
+
+def test_foto_troppo_grande_rifiutata():
+    """Una PNG che dichiara 30000x30000 pixel non viene decodificata (bomba di decompressione)."""
+    import struct, zlib
+    import foto
+    import pytest
+    def png(w, h):
+        def chunk(t, dati):
+            return struct.pack(">I", len(dati)) + t + dati + struct.pack(">I", zlib.crc32(t + dati) & 0xffffffff)
+        firma = bytes.fromhex("89504e470d0a1a0a")  # intestazione PNG
+        return (firma + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(bytes(10))) + chunk(b"IEND", b""))
+    with pytest.raises(foto.FotoError, match="troppo grande"):
+        foto._apri(png(30000, 30000))
+
+
+def test_gate_sso_protegge_le_etichette_con_qualunque_accept(monkeypatch):
+    """Il gate fail-closed di shared/sso (commit 23ab99e) chiede la sessione del portale anche per il vecchio
+    indirizzo /etichette e per /api/etichette quando il client non manda Accept: text/html; i file statici
+    e le rotte /api/suite/ (token di servizio) restano fuori dal gate."""
+    import app  # noqa: F401 - mette shared/sso nel sys.path
+    import cosedil_sso
+    monkeypatch.setattr(cosedil_sso, "verifica_sessione",
+                        lambda cookie, app_id="": {"ok": False, "reachable": True, "admin": False})
+    for percorso in ("/etichette", "/api/etichette", "/ETICHETTE"):
+        _, rifiuto = cosedil_sso.decidi(percorso, "*/*", "", app_id="magazzino", percorsi_liberi=("/api/suite/",))
+        assert rifiuto is not None and rifiuto[0] == 401, percorso
+    assert cosedil_sso.decidi("/static/js/app.js", "*/*", "", app_id="magazzino")[1] is None
+    assert cosedil_sso.decidi("/api/suite/da-fare", "*/*", "", app_id="magazzino",
+                              percorsi_liberi=("/api/suite/",))[1] is None

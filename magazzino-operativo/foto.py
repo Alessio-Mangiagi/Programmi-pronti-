@@ -14,6 +14,10 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 import config
 
+# Tetto ai pixel di un'immagine: un PNG di pochi KB può dichiarare 20000x20000 pixel e far esplodere la
+# memoria in decodifica ("decompression bomb"); oltre questo limite Pillow rifiuta di aprirla.
+Image.MAX_IMAGE_PIXELS = 50_000_000
+
 ESTENSIONI = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif"}
 
 
@@ -30,7 +34,12 @@ def cartella_mezzo(mezzo_id):
 def _apri(dati):
     try:
         img = Image.open(io.BytesIO(dati))
+        # dimensioni lette dall'intestazione prima di decodificare: niente decodifica di immagini assurde
+        if img.size[0] * img.size[1] > Image.MAX_IMAGE_PIXELS:
+            raise FotoError(f"immagine troppo grande: {img.size[0]}x{img.size[1]} pixel")
         img.load()
+    except Image.DecompressionBombError as e:
+        raise FotoError(f"immagine troppo grande: {e}")
     except (UnidentifiedImageError, OSError, ValueError) as e:
         raise FotoError(f"immagine non leggibile: {e}")
     img = ImageOps.exif_transpose(img)  # raddrizza le foto del telefono
