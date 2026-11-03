@@ -134,6 +134,20 @@ Mentre il server è acceso, ogni 15 minuti:
   email di riepilogo** per giro. `NOTIFICHE_AUTOMATICHE=0` spegne il giro automatico.
 - **Backup**: uno al giorno in `backup/scadenzario_AAAA-MM-GG.zip` (database + allegati),
   si tengono gli ultimi `BACKUP_DA_TENERE` (default 14).
+- **Scadenze dai mezzi a nolo** (`importa_mezzi.py`): ogni `SCADENZARIO_IMPORT_SEC` secondi
+  (default 900, `0` = mai) legge le pratiche di VFP Transfer in `MEZZI_VFP_DIR` (default
+  `../vfp-transfer-DMS/vfp-transfer/moduli_compilati/mezzi`, una cartella con `record.json`
+  per pratica) e crea o aggiorna da sola: **fine nolo** (`data_fine`), **assicurazione** e
+  **verifiche periodiche** (scadenze dei documenti allegati, vince la più recente), **white
+  list antimafia** del noleggiatore (`white_list_dal` + 12 mesi). Il mezzo diventa
+  un'attrezzatura (tipo marca modello, matricola o targa, cantiere = commessa, nota
+  `[VFP:<id pratica>]`), il noleggiatore un subappaltatore (per P.IVA); i tipi di scadenza
+  mancanti vengono creati. La chiave è `documento_rif = VFP:<id pratica>:<tipo>` (white list:
+  `VFP:ditta:<P.IVA>:white_list`, una per noleggiatore): niente
+  doppioni, la data si aggiorna se la pratica cambia, una scadenza **chiusa a mano resta
+  chiusa**. A mano: `POST /api/scadenze/importa-mezzi` (risponde con pratiche, nuove,
+  aggiornate, invariate, chiuse, errori). Le pratiche illeggibili finiscono negli Avvisi del
+  portale, le altre si importano lo stesso.
 
 Spegnimento automatico alla chiusura dell'ultima scheda: attivo solo in locale
 (`HOST=127.0.0.1`). In LAN resta acceso; `SPEGNIMENTO_AUTOMATICO=0/1` forza la scelta.
@@ -231,6 +245,14 @@ Un nuovo import **svuota e ricarica** l'elenco delle sessioni (re-import sicuro 
 
 ---
 
+## Dialogo con la suite
+
+`GET /api/suite/da-fare` (token di servizio `X-Suite-Token` di `shared/suite`, fuori dal
+gate SSO) dà al portale le scadenze aperte entro il preavviso per la sezione **Da fare
+oggi** della home: scadute prima (priorità 1), poi entro 7 giorni (2), poi le altre in
+preavviso (3); soggetti disattivati esclusi; link alla vista Scadenze filtrata. Contratto
+in `shared/suite/CONTRATTI.md`.
+
 ## Roadmap
 
 - **Email ai singoli referenti** — oggi il riepilogo va ai destinatari fissi `EMAIL_A`
@@ -251,6 +273,7 @@ scadenzario/
 ├── app.py                   # API REST + serving frontend + area admin
 ├── scadenze.py              # query scadenze arricchite + calcolo stato (condiviso)
 ├── importer.py              # import xlsx Calendario Corsi + CSV dipendenti
+├── importa_mezzi.py         # scadenze automatiche dalle pratiche mezzi a nolo (VFP Transfer)
 ├── notifiche.py             # motore notifiche (giro giornaliero, email riepilogo)
 ├── backup.py                # backup zip di database e allegati
 ├── tests/                   # pytest (pip install -r requirements-dev.txt)

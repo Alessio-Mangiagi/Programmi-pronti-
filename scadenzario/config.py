@@ -74,5 +74,12 @@ NOTIFICHE_ORA = int(os.environ.get("NOTIFICHE_ORA", "7"))
 BACKUP_DIR = os.path.join(BASE_DIR, "backup")
 BACKUP_DA_TENERE = int(os.environ.get("BACKUP_DA_TENERE", "14"))
 
+# Scadenze automatiche dalle pratiche dei mezzi a nolo di VFP Transfer
+# (importa_mezzi.py): cartella delle pratiche e ogni quanti secondi rileggerla
+# (0 = mai; a mano con POST /api/scadenze/importa-mezzi).
+MEZZI_VFP_DIR = os.path.abspath(os.environ.get(
+    "MEZZI_VFP_DIR", os.path.join(BASE_DIR, "..", "vfp-transfer-DMS", "vfp-transfer", "moduli_compilati", "mezzi")))
+IMPORT_MEZZI_SEC = int(os.environ.get("SCADENZARIO_IMPORT_SEC", "900"))
+
 # Versione applicazione (esposta da /api/health)
 VERSIONE = "1.4.0"

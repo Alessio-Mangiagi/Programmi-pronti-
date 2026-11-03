@@ -37,6 +37,12 @@ import scadenze
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared", "sso"))
 import cosedil_sso  # noqa: E402  (import dopo il sys.path: è l'unico modo di trovarlo)
 
+# Dialogo con le altre app della suite (token di servizio, registro commesse): shared/suite.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared", "suite"))
+import suite_link
+
+import importa_mezzi
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 # Eccezioni nelle richieste (Flask le logga) anche agli admin del portale.
 notifiche.avvisi.collega_log("scadenzario")
@@ -46,7 +52,9 @@ app.config["MAX_CONTENT_LENGTH"] = config.ALLEGATI_MAX_BYTE + 1024 * 1024
 
 # Qui ci sono dati personali dei dipendenti (codici fiscali, visite mediche):
 # senza login non entra nessuno. COSEDIL_SSO=off solo per lo sviluppo in locale.
-cosedil_sso.init(app, app_id="scadenzario")
+# Le rotte /api/suite/ sono per le altre app della suite e il portale: le protegge
+# il token di servizio (suite_link), non il cookie.
+cosedil_sso.init(app, app_id="scadenzario", percorsi_liberi=("/api/suite/",))
 
 
 # ---------------------------------------------------------------------------
@@ -1006,6 +1014,63 @@ def scadenze_crea():
     return jsonify(carica_scadenza_arricchita(cur.lastrowid)), 201
 
 
+# ---------------------------------------------------------------------------
+# Scadenze automatiche dai mezzi a nolo (VFP Transfer) e dialogo con la suite
+# ---------------------------------------------------------------------------
+
+def importa_scadenze_mezzi() -> dict:
+    """Allinea le scadenze alle pratiche mezzi (importa_mezzi.py) con una connessione propria:
+    lo chiama il lavoro di sfondo (fuori da una richiesta) e la rotta qui sotto."""
+    conn = database.get_db()
+    try:
+        return importa_mezzi.importa(conn)
+    finally:
+        conn.close()
+
+
+@app.post("/api/scadenze/importa-mezzi")
+def scadenze_importa_mezzi():
+    """Rilegge subito le pratiche dei mezzi a nolo (la stessa cosa che il server fa da solo ogni
+    SCADENZARIO_IMPORT_SEC) e dice cosa ha trovato."""
+    esito = importa_scadenze_mezzi()
+    if esito["errori"]:
+        notifiche.avvisi.segnala("scadenzario", "Pratiche mezzi non leggibili", "; ".join(esito["errori"])[:1000],
+                                 livello="attenzione", chiave="import-mezzi-pratiche")
+    return jsonify(esito)
+
+
+def _richiede_token_suite():
+    if not suite_link.verifica(request.headers.get(suite_link.HEADER_TOKEN)):
+        raise ErroreApi("Token di servizio della suite non valido", 403)
+
+
+@app.get("/api/suite/da-fare")
+def suite_da_fare():
+    """Le scadenze aperte entro il preavviso (scadute prima), per la home del portale:
+    shared/suite/CONTRATTI.md § 4. Token di servizio al posto del cookie."""
+    _richiede_token_suite()
+    base = suite_link.url_pubblico("scadenzario")
+    voci = []
+    for s in carica_scadenze_arricchite("s.chiusa = 0"):
+        if s["stato"] not in ("scaduta", "in_scadenza") or not s["soggetto_attivo"]:
+            continue
+        giorni = s["giorni_rimanenti"]
+        if giorni < 0:
+            quando, priorita = f"scaduta da {-giorni} giorni" if giorni < -1 else "scaduta ieri", 1
+        elif giorni == 0:
+            quando, priorita = "scade oggi", 1
+        else:
+            quando, priorita = f"scade il {date.fromisoformat(s['data_scadenza']).strftime('%d/%m/%Y')} ({giorni} giorni)", 2 if giorni <= 7 else 3
+        dettagli = [s["soggetto_nome"], quando]
+        if s.get("cantiere"):
+            dettagli.insert(1, s["cantiere"])
+        voci.append({"id": f"scadenza:{s['id']}", "titolo": s["tipo_nome"], "testo": " · ".join(dettagli),
+                     "url": f"{base}/#/scadenze?stato={s['stato']}&q={urllib.parse.quote(s['soggetto_nome'])}",
+                     "tipo": "scadenza", "priorita": priorita, "data": s["data_scadenza"]})
+    voci.sort(key=lambda v: (v["priorita"], v["data"]))
+    return jsonify({"voci": voci[:50]})
+
+
 def leggi_scadenza_grezza(scadenza_id: int) -> dict:
     riga = db().execute("SELECT * FROM scadenze WHERE id = ?", (scadenza_id,)).fetchone()
     if riga is None:
@@ -1903,9 +1968,21 @@ def _giro_notifiche_dovuto(adesso: datetime) -> bool:
 
 def _lavori_di_sfondo():
     time.sleep(30)  # lascia finire l'avvio prima del primo giro
+    ultimo_import = 0.0
     while True:
-        # Due lavori, due try: un backup rotto non deve saltare le notifiche.
+        # Tre lavori, tre try: un backup rotto non deve saltare le notifiche.
         # Ogni errore arriva anche agli admin del Portale (pagina Avvisi).
+        try:
+            if config.IMPORT_MEZZI_SEC > 0 and time.time() - ultimo_import >= config.IMPORT_MEZZI_SEC:
+                ultimo_import = time.time()
+                esito = importa_scadenze_mezzi()
+                if esito["nuove"] or esito["aggiornate"] or esito["errori"]:
+                    print(f"Scadenze dai mezzi a nolo: {esito['nuove']} nuove, {esito['aggiornate']} aggiornate, "
+                          f"{len(esito['errori'])} errori.", flush=True)
+        except Exception as exc:
+            traceback.print_exc()
+            notifiche.avvisi.segnala("scadenzario", "Importazione scadenze dai mezzi a nolo fallita", repr(exc),
+                                     livello="errore", chiave="import-mezzi")
         try:
             if config.NOTIFICHE_AUTOMATICHE and _giro_notifiche_dovuto(datetime.now()):
                 esito = notifiche.esegui_notifiche()
