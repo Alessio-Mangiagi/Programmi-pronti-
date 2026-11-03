@@ -163,9 +163,13 @@ def make_svg_derivatives(conn: psycopg.Connection, storage: Storage, limit: int 
         except Exception as exc:  # noqa: BLE001 - DWG protetti, DXF rotti o ODA assente: si registra il motivo
             conn.rollback()
             log.exception("derivato SVG del file %s non riuscito (tentativo %s)", r["file_id"], r["attempts"])
+            # senza ODA File Converter ritentare non serve: FAILED subito, cosi' il viewer mostra il motivo e il
+            # download invece di "in preparazione" per tre giri del job (UAT U45, migrazione 0037)
+            from .dxf2svg import DwgConverterMissing
+            definitivo = isinstance(exc, DwgConverterMissing)
             with conn.transaction():
-                conn.execute("SELECT cde.derivative_done_svg(%s, false, NULL, NULL, NULL, %s, NULL)",
-                             [r["file_id"], f"{type(exc).__name__}: {exc}"])
+                conn.execute("SELECT cde.derivative_done_svg(%s, false, NULL, NULL, NULL, %s, NULL, %s)",
+                             [r["file_id"], f"{type(exc).__name__}: {exc}", definitivo])
     return len(rows)
 
 

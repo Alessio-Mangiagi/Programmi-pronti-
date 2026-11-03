@@ -132,7 +132,8 @@ def test_dxf_caricato_pronto_per_il_viewer(client, api_app, api_world, as_user):
 
 
 def test_dwg_senza_convertitore_resta_scaricabile(client, api_app, api_world, as_user, monkeypatch):  # noqa: F811
-    """Senza ODA File Converter il derivato fallisce con il motivo; dopo tre tentativi è FAILED e il viewer lo dice."""
+    """Senza ODA File Converter il derivato fallisce subito con il motivo (FAILED al primo tentativo, migrazione 0037):
+    ritentare non servirebbe e il viewer deve mostrare il motivo e il download, non "in preparazione"."""
     urls, w = api_world
     monkeypatch.setattr(dxf2svg, "find_oda_converter", lambda configured=None: None)
     h = as_user("des_lead")
@@ -140,13 +141,13 @@ def test_dwg_senza_convertitore_resta_scaricabile(client, api_app, api_world, as
     _verify(urls, api_app)
     link = client.get(f"/revisions/{rev['id']}/download?disposition=inline", headers=h).json()
     assert link["content_type"] == "image/vnd.dwg" and link["url"]
-    assert link["derivative"]["status"] == "PENDING" and link["derivative"]["url"] is None    # riprova il job periodico
+    # la verifica prova subito il derivato: senza ODA e' FAILED al primo colpo e il job periodico non lo riprende
+    assert link["derivative"]["status"] == "FAILED" and link["derivative"]["url"] is None
     storage = api_app.state.services.storage
     with psycopg.connect(urls.worker, row_factory=dict_row) as worker:
-        for _ in range(3):
-            make_svg_derivatives(worker, storage, limit=20, stale="0 seconds")
+        make_svg_derivatives(worker, storage, limit=20, stale="0 seconds")
     with psycopg.connect(urls.owner, row_factory=dict_row) as conn:
         row = _derivative_row(conn, rev["id"])
-    assert row["status"] == "FAILED" and row["attempts"] == 3 and "ODA File Converter" in row["detail"]
+    assert row["status"] == "FAILED" and row["attempts"] == 1 and "ODA File Converter" in row["detail"]
     d = client.get(f"/revisions/{rev['id']}/download?disposition=inline", headers=h).json()["derivative"]
     assert d["status"] == "FAILED" and "ODA File Converter" in d["detail"]

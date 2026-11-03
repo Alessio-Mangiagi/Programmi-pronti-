@@ -479,3 +479,38 @@ def test_escalation_user_id_del_template_esclude_gli_admin(client, api_world, as
         return [n for n in notifications(client, as_user(u), "TASK_ESCALATED") if n["data"].get("task_id") == task_id]
 
     assert len(mine("com_im")) == 1 and mine("com_admin") == [] and mine("des_lead") == []
+
+
+def test_esito_del_workflow_anche_a_chi_ha_caricato(client, api_world, as_user, shared, worker):  # noqa: F811
+    """UAT U08/U09 (migrazione 0037): se il workflow lo avvia il BIM Manager, chi ha caricato la revisione riceve
+    comunque il rifiuto (con l'avviso che il documento accetta di nuovo revisioni) e l'approvazione finale."""
+    _, w = api_world
+    admin, dl, author = as_user("com_admin"), as_user("com_dl"), as_user("des_lead")
+    steps = [{"name": "Verifica DL", "assignees": [{"type": "user", "id": str(w.users["com_dl"])}], "quorum": "ALL"}]
+    tpl = client.post(f"/projects/{w.project_id}/workflow-templates", headers=admin,
+                      json=template_body(w, steps=steps, on_approved={"to_state": "PUBLISHED", "suitability": "A1"})).json()
+    inst = client.post(f"/revisions/{shared['id']}/workflows", headers=admin, json={"template_id": tpl["id"]}).json()
+    t1 = open_task(client, dl, inst["id"])
+    res = client.post(f"/tasks/{t1['id']}/complete", headers=dl, json={"outcome": "REJECTED", "comment": "Quota errata"}).json()
+    assert res["workflow_status"] == "REJECTED"
+    for who in (author, admin):
+        rej = [n for n in notifications(client, who, "WORKFLOW_REJECTED") if n["data"].get("instance_id") == inst["id"]]
+        assert rej and "Quota errata" in rej[0]["body"], who
+    assert "accetta di nuovo revisioni" in [n for n in notifications(client, author, "WORKFLOW_REJECTED")
+                                            if n["data"].get("instance_id") == inst["id"]][0]["body"]
+    # seconda tornata: approvata fino alla pubblicazione, avvisato anche l'autore
+    inst2 = client.post(f"/revisions/{shared['id']}/workflows", headers=admin, json={"template_id": tpl["id"]}).json()
+    t2 = open_task(client, dl, inst2["id"])
+    res = client.post(f"/tasks/{t2['id']}/complete", headers=dl, json={"outcome": "APPROVED"}).json()
+    assert res["workflow_status"] == "APPROVED"
+    for who in (author, admin):
+        ok = [n for n in notifications(client, who, "WORKFLOW_APPROVED") if n["data"].get("instance_id") == inst2["id"]]
+        assert ok and "published" in ok[0]["body"], who
+    # chi avvia e carica insieme riceve una sola notifica, non due
+    rev2 = upload(client, author, w.containers["des_arch"], des_name(), PDF, title="Pianta bis").json()
+    worker()
+    rev2 = transition(client, author, rev2["id"], "SHARED", "S4").json()
+    inst3 = client.post(f"/revisions/{rev2['id']}/workflows", headers=author, json={"template_id": tpl["id"]}).json()
+    t3 = open_task(client, dl, inst3["id"])
+    client.post(f"/tasks/{t3['id']}/complete", headers=dl, json={"outcome": "REJECTED", "comment": "Manca il nord"})
+    assert len([n for n in notifications(client, author, "WORKFLOW_REJECTED") if n["data"].get("instance_id") == inst3["id"]]) == 1

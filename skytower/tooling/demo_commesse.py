@@ -367,8 +367,11 @@ class Demo:
     def progetto(self):
         ld, s = self.ld, self.s
         progetti = _lista(ld.call("com_admin", "GET", "/projects"))
-        mio = next((p for p in progetti if (p.get("settings") or {}).get("commessa") == s["commessa"]
-                    or p["code"] == s["codice"]), None)
+        # Prima il codice progetto (ACI003/SCU015), che e' unico; il codice commessa nei settings viene copiato
+        # anche nei progetti creati "a partire da" quello demo (U43), quindi da solo non basta a riconoscerlo.
+        attivi = [p for p in progetti if p.get("status") != "ARCHIVED"]
+        mio = next((p for p in attivi if p["code"] == s["codice"]), None)             or next((p for p in attivi if (p.get("settings") or {}).get("commessa") == s["commessa"]
+                     and (p.get("settings") or {}).get("demo")), None)
         if mio is None:
             tpl = next((p for p in progetti if p["code"] == TEMPLATE), None)
             body = {"code": s["codice"], "name": self.progetto_nome, "description": s["descrizione"],
@@ -459,10 +462,14 @@ class Demo:
             self.f[nome] = c
 
     def _nomenclatura(self):
-        """Schema ISO 19650 della commessa: se il template non l'ha copiato, quello di PRJ01 con il codice nuovo."""
+        """Schema ISO 19650 della commessa: se il template non l'ha copiato, quello di PRJ01 con il codice nuovo.
+        Poi accende la numerazione automatica (progressivo sul campo "number", serie per originatore/tipo/ruolo),
+        senza la quale "Rinomina con progressivo", le prenotazioni e gli schemi per cartella non si possono provare
+        (scenari U02, U03, U19b, U35): l'API risponde 409 auto_number_off."""
         ld = self.ld
         mio = ld.call("com_admin", "GET", f"/projects/{self.pid}/document-settings") or {}
         if mio.get("naming_scheme"):
+            self._numerazione(mio)
             return
         tpl = next((p for p in _lista(ld.call("com_admin", "GET", "/projects")) if p["code"] == TEMPLATE), None)
         base = ld.call("com_admin", "GET", f"/projects/{tpl['id']}/document-settings") if tpl else None
@@ -474,6 +481,18 @@ class Demo:
                 campo["value"] = self.s["codice"]
         ld.call("com_admin", "PUT", f"/projects/{self.pid}/document-settings",
                 json={"naming_scheme": schema, "auto_number": base.get("auto_number"), "metadata_schema": base.get("metadata_schema") or {"type": "object", "additionalProperties": True}})
+        self._numerazione(ld.call("com_admin", "GET", f"/projects/{self.pid}/document-settings") or {})
+
+    def _numerazione(self, imp):
+        """Numerazione automatica accesa se manca: il progressivo riparte dal massimo gia' usato nella serie
+        (funzione naming_series_max della migrazione 0015), quindi start=1 non crea conflitti con i documenti demo."""
+        if imp.get("auto_number") or not imp.get("naming_scheme"):
+            return
+        self.ld.call("com_admin", "PUT", f"/projects/{self.pid}/document-settings",
+                     json={"naming_scheme": imp["naming_scheme"],
+                           "auto_number": {"field": "number", "start": 1, "series": ["originator", "type", "role"],
+                                           "defaults": {"volume": "ZZ"}, "reservation_days": 30},
+                           "metadata_schema": imp.get("metadata_schema") or {"type": "object", "additionalProperties": True}})
 
     # ---- documenti ------------------------------------------------------------------------------------
     def _nome(self, org, level, typ, role, ext):
@@ -489,17 +508,25 @@ class Demo:
         if folder not in self.f:
             ld.log.append(f"cartella mancante: {folder}")
             return
-        filename = self._nome(org, level, typ, role, ext)
-        code = filename.rsplit(".", 1)[0]
-        check = ld.call(user, "POST", f"/projects/{self.pid}/naming/validate", json={"name": filename})
-        if check and check.get("existing_document_id"):
-            doc = ld.call(user, "GET", f"/documents/{check['existing_document_id']}")
-            if doc and doc.get("revisions"):
-                ultima = dict(doc["revisions"][0], document_id=doc["id"])
-                self.docs[key] = ultima
-                if ultima.get("state") != "WIP":
-                    self._segui(doc["id"], seguito_da)
+        # Idempotenza per TITOLO e cartella, non per numero: i numeri progressivi dipendono dall'ordine delle
+        # chiamate ad add(), quindi basta inserire un documento in mezzo alla lista (com'e' successo con la pianta
+        # DXF il 03/11/2026) per far slittare tutti i nomi successivi e ricreare i documenti al secondo giro.
+        esistente = self._per_titolo(user, folder, org, title)
+        if esistente:
+            self.docs[key] = esistente
+            if esistente.get("state") != "WIP":
+                self._segui(esistente["document_id"], seguito_da)
             return
+        # Numero libero: se il nome e' gia' preso da un documento con un altro titolo si passa al successivo
+        for _ in range(60):
+            filename = self._nome(org, level, typ, role, ext)
+            check = ld.call(user, "POST", f"/projects/{self.pid}/naming/validate", json={"name": filename})
+            if not (check and check.get("existing_document_id")):
+                break
+        else:
+            ld.log.append(f"nessun numero libero per {title}")
+            return
+        code = filename.rsplit(".", 1)[0]
         rev = ld.upload(user, self.f[folder]["id"], filename, make(code, "P01.01", 0), ctype, title,
                         attributes=attributi, description=descrizione)
         if not rev or not ld.wait_clean(user, rev["id"]):
@@ -532,6 +559,31 @@ class Demo:
                         rev = ld.transition(who, n3["id"], "SHARED", "S4") or n3
         rev.setdefault("document_id", rev.get("document_id"))
         self.docs[key] = rev
+
+    def _per_titolo(self, user, folder, org, title):
+        """L'ultima revisione del documento con questo titolo nella cartella (stesso originatore), o None.
+        Legge l'elenco del progetto una volta sola (a pagine) e lo tiene in cache per il giro."""
+        ld = self.ld
+        # cache per utente: ognuno vede i WIP della propria organizzazione e le aree riservate a cui ha accesso,
+        # quindi l'elenco letto come progettista non basta per il contratto del committente o le tavole di SUB1
+        elenchi = self.__dict__.setdefault("_elenchi", {})
+        if user not in elenchi:
+            elenco, cursore = [], None
+            while True:
+                pagina = ld.call(user, "GET", f"/projects/{self.pid}/documents",
+                                 params={"limit": 200, **({"after": cursore} if cursore else {})}) or {}
+                elenco.extend(_lista(pagina))
+                cursore = pagina.get("next_cursor") if isinstance(pagina, dict) else None
+                if not cursore:
+                    break
+            elenchi[user] = elenco
+        cid = self.f[folder]["id"]
+        for d in elenchi[user]:
+            if d.get("title") == title and d.get("container_id") == cid and d.get("originator_code") == org                     and not d.get("archived_at"):
+                doc = ld.call(user, "GET", f"/documents/{d['id']}")
+                if doc and doc.get("revisions"):
+                    return dict(doc["revisions"][0], document_id=doc["id"])
+        return None
 
     def documenti(self):
         s, P = self.s, self.progetto_nome
@@ -780,7 +832,7 @@ class Demo:
         if ld.call("com_im", "GET", f"/projects/{self.pid}/naming/reservations"):
             return
         imp = ld.call("com_admin", "GET", f"/projects/{self.pid}/document-settings") or {}
-        if not (imp.get("auto_number") or {}).get("enabled"):
+        if not imp.get("auto_number"):
             return          # prenotazioni solo con la numerazione automatica (scelta del Project Admin)
         ld.call("des_lead", "POST", f"/projects/{self.pid}/naming/reservations",
                 json={"fields": {"originator": "DES", "volume": "ZZ", "level": "02", "type": "DR", "role": "A"}, "count": 3,
