@@ -2,6 +2,9 @@
 """Cifratura dei segreti (envelope encryption) e chiave di firma JWT.
 
 * LocalKms: chiave master Fernet e chiave RSA su file in `local_secrets_dir` (solo dev/test).
+* FileKms:  le stesse chiavi su file, ammesse anche in produzione (ADR-46) perché la cartella è un volume
+            riservato del server (rilascio Docker senza AWS): all'avvio controlla che nessun altro utente
+            del sistema possa leggerla e stringe i permessi dei file che crea.
 * AwsKms:   data key generata da AWS KMS (GenerateDataKey), payload cifrato con Fernet;
             chiave privata JWT letta da Secrets Manager (cifrata a riposo con KMS).
 Formato del blob: [2 byte lunghezza data key cifrata][data key cifrata][token Fernet].
@@ -9,9 +12,14 @@ Formato del blob: [2 byte lunghezza data key cifrata][data key cifrata][token Fe
 from __future__ import annotations
 
 import base64
+import logging
+import os
+import stat
 import struct
 from pathlib import Path
 from typing import Protocol
+
+log = logging.getLogger("cde.kms")
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import serialization
@@ -63,6 +71,38 @@ class LocalKms:
         return self._load_or_create("jwt_private.pem", generate)
 
 
+class FileKms(LocalKms):
+    """Chiavi su file ammesse in produzione (ADR-46): stesso formato di LocalKms, più i controlli sulla cartella.
+
+    Sul server le chiavi stanno in un volume riservato (``/segreti`` nel rilascio Docker, intestato all'utente
+    non privilegiato del container). Qui si pretende che la cartella esista già (la crea l'installazione, non
+    l'API: un percorso sbagliato non deve produrre chiavi nuove in silenzio e rendere illeggibili i segreti
+    cifrati con quelle vecchie) e, dove il sistema ha i permessi POSIX, che gruppo e altri non possano leggerla.
+    I file creati qui nascono con permessi 0600.
+    """
+
+    def __init__(self, secrets_dir: Path):
+        if not secrets_dir.is_dir():
+            raise RuntimeError(f"CDE_KMS_PROVIDER=file: la cartella delle chiavi {secrets_dir} non esiste")
+        if os.name == "posix":
+            mode = stat.S_IMODE(secrets_dir.stat().st_mode)
+            if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                raise RuntimeError(f"CDE_KMS_PROVIDER=file: {secrets_dir} è leggibile da gruppo o altri "
+                                   f"(permessi {mode:o}, attesi 700)")
+        super().__init__(secrets_dir)
+        log.info("chiavi su file in %s", secrets_dir)
+
+    def _load_or_create(self, name: str, factory) -> bytes:
+        path = self.dir / name
+        if not path.exists():
+            # creato con 0600 fin dal primo byte: niente finestra in cui il file è leggibile da altri
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as f:
+                f.write(factory())
+            log.info("chiave %s creata", name)
+        return path.read_bytes()
+
+
 class AwsKms:  # pragma: no cover - richiede AWS
     def __init__(self, settings: Settings):
         import boto3
@@ -87,8 +127,11 @@ class AwsKms:  # pragma: no cover - richiede AWS
 
 
 def build_kms(settings: Settings) -> Kms:
+    """Il provider scelto in ``Settings.kms_provider``; in produzione solo ``aws`` o ``file`` (ADR-46)."""
     if settings.kms_provider == "aws":
         return AwsKms(settings)
+    if settings.kms_provider == "file":
+        return FileKms(settings.local_secrets_dir)
     if settings.env == "prod":
-        raise RuntimeError("LocalKms non ammesso in produzione")
+        raise RuntimeError("LocalKms non ammesso in produzione: usare CDE_KMS_PROVIDER=file o aws")
     return LocalKms(settings.local_secrets_dir)

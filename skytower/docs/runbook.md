@@ -129,6 +129,8 @@ aziendale); `docker compose logs --since 24h api worker` per gli errori; `docker
 per interrogare il DB; rotazione password DB: nuovi valori nel `.env`, `docker compose --profile strumenti run --rm prepara`
 (aggiorna i ruoli), poi `up -d`.
 
-**Cosa non c'è rispetto ad AWS**: Multi-AZ e replica in DR, PITR, WAF, SES (email solo nel log finché non
-si collega un invio SMTP), KMS gestito (chiavi su volume). Per il rilascio pubblico su Internet si usa §1–§4.
+**Cosa non c'è rispetto ad AWS**: Multi-AZ e replica in DR, PITR, WAF, SES (al suo posto il server SMTP
+aziendale con `CDE_MAILER=smtp` e le variabili `CDE_SMTP_*`, ADR-46), KMS gestito (chiavi sul volume
+`segreti` con `CDE_KMS_PROVIDER=file`: il backup del volume è il backup delle chiavi, senza non si
+leggono i segreti MFA né si firmano i token). Per il rilascio pubblico su Internet si usa §1–§4.
 

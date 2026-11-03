@@ -748,3 +748,34 @@ decodificare il JWT a mano con la chiave di `/.well-known/jwks.json`.
 
 **Conseguenze.** Un export passato di mano in mano si può ricontrollare in piattaforma o fuori (JWKS pubblica).
 Test: `test_verifica_firma_export`.
+
+## ADR-46 — Email via SMTP aziendale e chiavi su file ammesse in produzione
+
+**Contesto.** Il rilascio sul server aziendale (ADR-43) girava con `CDE_ENV=staging` perché in `prod` il codice
+pretendeva AWS KMS, e con `CDE_MAILER=console`: inviti, reset password, avvisi di sicurezza e notifiche dei
+workflow finivano solo nel log. Per usare SkyTower davvero dal server servivano email vere e le guardie di
+produzione (documentazione API spenta, antivirus obbligatorio) senza un account AWS.
+
+**Decisione.**
+- `SmtpMailer` (`cde_api/mail.py`): `CDE_MAILER=smtp` con `CDE_SMTP_HOST`, `CDE_SMTP_PORT` (587),
+  `CDE_SMTP_SECURITY` (`starttls` di default, `ssl` per la 465, `none` solo verso un relay in LAN),
+  `CDE_SMTP_USER`/`CDE_SMTP_PASSWORD` facoltativi (relay che autenticano per IP). Certificato del server
+  verificato con il contesto TLS di sistema. Una connessione per messaggio: i volumi sono di poche decine di
+  email al giorno. Un invio fallito è registrato nel log (senza il corpo, che può contenere link di reset) e
+  **non fa fallire l'operazione** che lo ha causato: l'invito o il reset restano validi e si possono rimandare.
+  Un valore sconosciuto di `CDE_MAILER` è un errore all'avvio, non un ripiego silenzioso su console.
+- `FileKms` (`cde_api/security/kms.py`): `CDE_KMS_PROVIDER=file`, ammesso anche in `prod`. Stesso formato
+  di `LocalKms` (master Fernet + chiave RSA del JWT su file), ma la cartella deve **esistere già** (un percorso
+  sbagliato non deve creare chiavi nuove in silenzio, che renderebbero illeggibili i segreti cifrati prima) e,
+  dove i permessi POSIX esistono, non essere leggibile da gruppo e altri; i file nascono con 0600.
+  `local` resta vietato in `prod`. Il rilascio Docker passa a `CDE_ENV=prod` + `file`; `prepara_db.py`
+  intesta il volume `segreti` all'utente 10001 con permessi 700.
+
+**Alternative scartate.** SES anche sul server (richiede AWS); un mailer che rilancia l'errore (un server di
+posta giù bloccherebbe inviti e approvazioni); chiavi in variabili d'ambiente (finirebbero in `docker inspect`
+e nei log di compose).
+
+**Conseguenze.** `backup.*` salva il volume delle chiavi insieme al database: senza quelle chiavi i segreti
+MFA non si decifrano e i token non si firmano. Test: `tests/test_mail_kms.py` (SMTP finto: STARTTLS, SSL,
+relay senza credenziali, errore che non blocca e non logga il corpo; FileKms in prod, cartella mancante o
+aperta rifiutata, chiavi rilette al secondo avvio).

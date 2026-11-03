@@ -30,10 +30,11 @@ x-api-base: &api-base
   restart: unless-stopped
   env_file: .env
   environment:
-    # "staging" e non "prod": in prod il codice pretende AWS KMS e ClamAV; qui le chiavi stanno nel
-    # volume segreti (solo root e l'utente 10001 del container) e l'antivirus c'è lo stesso.
-    CDE_ENV: staging
-    CDE_KMS_PROVIDER: local
+    # Produzione vera: documentazione API spenta, antivirus ClamAV obbligatorio, chiavi su file ammesse
+    # solo col provider "file" (ADR-46), che pretende il volume segreti esistente e con permessi 700
+    # (lo prepara prepara_db.py: intestato all'utente 10001 del container).
+    CDE_ENV: prod
+    CDE_KMS_PROVIDER: file
     CDE_LOCAL_SECRETS_DIR: /segreti
     CDE_DATABASE_URL_APP: postgresql://cde_app:${DB_PWD_APP}@db:5432/cde
     CDE_DATABASE_URL_AUTH: postgresql://cde_auth:${DB_PWD_AUTH}@db:5432/cde
@@ -55,7 +56,8 @@ x-api-base: &api-base
     # dalla 8100, riservata alla LAN del server (firewall-suite.ps1).
     CDE_CLIENT_IP_HEADER: x-forwarded-for
     CDE_PUBLIC_API_PREFIX: /api
-    CDE_MAILER: console
+    # Email: "smtp" con le variabili CDE_SMTP_* del .env (ADR-46); "console" = solo nel log dell'API
+    CDE_MAILER: ${CDE_MAILER:-console}
     CDE_SCANNER: clamd
     CDE_CLAMD_HOST: clamav
     CDE_CLAMD_PORT: "3310"

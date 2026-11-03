@@ -104,9 +104,13 @@ con le password chieste a video, mai su file) e poi tutto il resto, con `infra/s
 - Le altre app della suite restano fuori dai container e si raggiungono via `host.docker.internal`
   (`SUITE_URL_*` nel `.env`); il **portale** vede la 5195 accesa e non lancia `avvia.vbs`: nel registro
   `APPS` di `portale/server.js` la voce `skytower` non cambia.
-- `CDE_ENV=staging`: in `prod` il codice pretende AWS KMS; qui le chiavi (Fernet e JWT) vivono nel volume
-  `segreti`, leggibile solo dall'utente del container. `CDE_MAILER=console`: le email (inviti, reset)
-  finiscono in `docker compose logs api` finché non c'è un invio SMTP/SES.
+- `CDE_ENV=prod` con `CDE_KMS_PROVIDER=file` (ADR-46): le chiavi (Fernet e JWT) vivono nel volume `segreti`,
+  che l'API accetta solo se esiste già e ha permessi 700 (lo prepara `prepara_db.py`); documentazione API
+  spenta, antivirus obbligatorio.
+- Email: `CDE_MAILER=smtp` con `CDE_SMTP_HOST`, `CDE_SMTP_PORT` (587), `CDE_SMTP_SECURITY` (`starttls` | `ssl`
+  | `none`), `CDE_SMTP_USER`/`CDE_SMTP_PASSWORD` (vuoti se il relay autentica per IP) nel `.env`: inviti,
+  reset, avvisi e notifiche partono davvero (ADR-46). Con `console` restano in `docker compose logs api`.
+  Un invio fallito finisce nel log e non blocca l'operazione (l'invito resta valido).
 
 Operazioni: `aggiorna.*` (nuove immagini dal commit corrente, backup, migrazioni, riavvio; `aggiorna.* <tag>`
 per tornare indietro), `backup.*` (dump + volumi documenti e chiavi, da copiare fuori dal server),

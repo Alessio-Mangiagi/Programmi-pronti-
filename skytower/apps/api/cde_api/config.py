@@ -30,8 +30,9 @@ class Settings(BaseSettings):
     refresh_cookie_path: str = "/auth"
     cookie_secure: bool = True
 
-    # KMS: "local" (chiavi su file, solo dev/test) | "aws"
-    kms_provider: str = "local"
+    # KMS: "local" (chiavi su file, solo dev/test) | "file" (chiavi su file ammesse anche in prod, su un volume
+    # riservato: rilascio Docker sul server aziendale, ADR-46) | "aws" (KMS + Secrets Manager)
+    kms_provider: Literal["local", "file", "aws"] = "local"
     local_secrets_dir: Path = Path(".secrets")
     aws_region: str = "eu-south-1"
     aws_kms_key_id: str | None = None                  # chiave simmetrica per i segreti MFA
@@ -115,9 +116,17 @@ class Settings(BaseSettings):
     clamd_host: str = "127.0.0.1"
     clamd_port: int = 3310
 
-    # Email: "console" (log) | "ses"
+    # Email: "console" (log, dev/test) | "smtp" (server aziendale o provider, ADR-46) | "ses" (AWS)
     mailer: str = "console"
     mail_from: str = "CDE <no-reply@cde.local>"
+    # SMTP (solo con mailer=smtp): host obbligatorio; utente/password facoltativi (i relay aziendali spesso
+    # autenticano per IP); security = starttls (587, default) | ssl (465) | none (25, solo relay in LAN)
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+    smtp_timeout_seconds: int = 20
 
 
 @lru_cache
