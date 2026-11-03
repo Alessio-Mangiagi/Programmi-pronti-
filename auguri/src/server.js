@@ -22,7 +22,14 @@ const HOST = process.env.HOST || '127.0.0.1';
 // navigare l'intero disco del server (C:\Windows, cartelle di altri utenti...).
 // Default: la home dell'utente che esegue l'app — dove sta già l'Excel dei
 // compleanni (vedi DEFAULTS in logica.js). Altrove: AUGURI_ROOT=D:\Condivisa.
-const BROWSE_ROOT = path.resolve(process.env.AUGURI_ROOT || os.homedir());
+const BROWSE_ROOT = percorsoReale(path.resolve(process.env.AUGURI_ROOT || os.homedir()));
+
+// Percorso reale (junction e symlink risolti) se esiste, altrimenti quello risolto: il confronto con
+// la radice si fa sui percorsi veri, così una junction dentro la home che punta fuori non apre il
+// resto del disco (revisione di sicurezza del 03/11/2026).
+function percorsoReale(p) {
+    try { return fs.realpathSync.native(p); } catch { return path.resolve(p); }
+}
 
 // Cartella log nella radice dell'app (creata se manca).
 const LOG_DIR = path.join(L.ROOT, 'log');
@@ -46,6 +53,18 @@ const io = new Server(server);
 // portale è adminOnly, ma quel flag nasconde solo la card: la porta va chiusa
 // qui). Prima di ogni altra cosa, static compreso.
 app.use(cosedilSSO({ app: 'auguri', adminOnly: true }));
+// Header di sicurezza scritti a mano (niente dipendenza nuova). Script solo dalla stessa origine
+// (la logica della pagina sta in public/app.js), stili inline ammessi per i pochi style="" e il
+// blocco <style>, font da Google Fonts; connect-src 'self' copre anche il websocket di socket.io.
+app.use((req, res, next) => {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; "
+        + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
+        + "img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+});
 // I websocket non passano dal middleware HTTP: senza questo gate chiunque
 // aprisse un socket comanderebbe l'invio dei messaggi senza aver fatto login.
 io.use(cosedilSocketIO({ app: 'auguri', adminOnly: true }));
@@ -73,7 +92,7 @@ let stato = {
 // Vero se `p` è BROWSE_ROOT o sta dentro. Confronto sui path risolti, col
 // separatore in coda: senza, "C:\Users\aless-altro" passerebbe per "C:\Users\aless".
 function dentroRadice(p) {
-    const r = path.resolve(p);
+    const r = percorsoReale(path.resolve(p));
     return r === BROWSE_ROOT || r.startsWith(BROWSE_ROOT + path.sep);
 }
 
@@ -853,12 +872,31 @@ function configPubblica() {
     };
 }
 
+// Il gate dei socket (cosedilSocketIO) guarda la sessione del portale solo all'apertura: un socket
+// aperto restava operativo anche dopo logout o revoca nel portale, finché la scheda restava aperta.
+// Prima delle azioni che contano (invio nel gruppo, cambio configurazione) si richiede di nuovo al
+// portale, con la cache di 30 s del gate (revisione di sicurezza del 03/11/2026).
+async function sessioneAncoraValida(socket) {
+    if ((process.env.COSEDIL_SSO || 'on').toLowerCase() === 'off') return true;
+    try {
+        const v = await cosedilSSO.verificaSessione(socket.handshake.headers.cookie, 'auguri');
+        return !!(v && v.ok && v.admin);
+    } catch {
+        return false;
+    }
+}
+
 io.on('connection', (socket) => {
     socket.emit('stato', stato);
     socket.emit('config', configPubblica());
     logBuffer.forEach(r => socket.emit('log', r));
 
     socket.on('invia', async () => {
+        if (!(await sessioneAncoraValida(socket))) {
+            socket.emit('risultatoInvio', { ok: false, msg: 'Sessione del portale scaduta: rientra dal Portale Suite Cosedil' });
+            socket.disconnect(true);
+            return;
+        }
         // Stesso lucchetto dell'invio automatico: un clic mentre quello e' in
         // corso mandava il messaggio due volte nel gruppo.
         if (invioInCorso) {
@@ -886,6 +924,11 @@ io.on('connection', (socket) => {
 
     // Salvataggio configurazione dalla pagina web → persiste su config.json e applica subito.
     socket.on('salvaConfig', async (patch) => {
+        if (!(await sessioneAncoraValida(socket))) {
+            socket.emit('configSalvata', { ok: false, msg: 'Sessione del portale scaduta: rientra dal Portale Suite Cosedil' });
+            socket.disconnect(true);
+            return;
+        }
         try {
             // EXCEL_FILE arriva dal client: senza questo controllo il file browser
             // sarebbe confinato alla radice ma basterebbe scrivere a mano un
