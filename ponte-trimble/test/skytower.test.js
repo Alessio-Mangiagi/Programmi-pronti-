@@ -94,7 +94,7 @@ test('documenti: elenco pubblicato con flag pdf, commessa codificata nel percors
 test('da-skytower: i byte della revisione diventano un lavoro pronto', async () => {
   const res = await fetch(base + '/api/lavori/da-skytower', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ revision_id: REV, filename: 'computo.pdf', revision_code: 'C01', identifier: 'PRJ-COS-ZZ-01-RP-Z-0001', traduttore: 'pcq-econ', formato: 'xlsx' }),
+    body: JSON.stringify({ revision_id: REV, commessa: '101-003', filename: 'computo.pdf', revision_code: 'C01', identifier: 'PRJ-COS-ZZ-01-RP-Z-0001', traduttore: 'pcq-econ', formato: 'xlsx' }),
   });
   assert.equal(res.status, 202);
   const { lavoro } = await res.json();
@@ -107,10 +107,35 @@ test('da-skytower: i byte della revisione diventano un lavoro pronto', async () 
   assert.equal(chiamate.at(-1).opz.grezzo, true);
 });
 
-test('da-skytower: revisione inesistente e corpo incompleto', async () => {
-  const r1 = await fetch(base + '/api/lavori/da-skytower', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision_id: '00000000-0000-0000-0000-000000000000', traduttore: 'pcq-econ', formato: 'xlsx' }) });
+test('da-skytower: revisione fuori commessa, commessa mancante e corpo incompleto', async () => {
+  // una revisione che non sta fra i documenti della commessa non viene nemmeno scaricata
+  const prima = chiamate.length;
+  const r1 = await fetch(base + '/api/lavori/da-skytower', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision_id: '00000000-0000-0000-0000-000000000000', commessa: '101-003', traduttore: 'pcq-econ', formato: 'xlsx' }) });
   assert.equal(r1.status, 404);
-  assert.match((await r1.json()).errore, /non trovata/);
+  assert.match((await r1.json()).errore, /non appartiene alla commessa/);
+  assert.ok(!chiamate.slice(prima).some((c) => c.percorso.startsWith('/suite/revisioni/')), 'nessun download fuori commessa');
+  // senza commessa: rifiutata prima di toccare SkyTower
+  const r0 = await fetch(base + '/api/lavori/da-skytower', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision_id: REV, traduttore: 'pcq-econ', formato: 'xlsx' }) });
+  assert.equal(r0.status, 400);
+  assert.match((await r0.json()).errore, /commessa/);
   const r2 = await fetch(base + '/api/lavori/da-skytower', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
   assert.equal(r2.status, 400);
+});
+
+// Revisione di sicurezza del 03/11/2026: header della pagina e CSV senza formule.
+test('header di sicurezza sulle risposte', async () => {
+  const res = await fetch(base + '/');
+  assert.match(res.headers.get('content-security-policy') || '', /script-src 'self'/);
+  assert.equal(res.headers.get('x-frame-options'), 'DENY');
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('CSV: il testo che Excel leggerebbe come formula prende un apostrofo, i numeri no', async () => {
+  const { FORMATI } = await import('../src/pipeline/rendi.js');
+  const colonne = [{ chiave: 'd', titolo: 'Descrizione' }, { chiave: 'q', titolo: 'Quantità' }];
+  const record = [{ d: '=HYPERLINK("http://x";"apri")', q: -3.5 }, { d: '@SOMMA(A1)', q: 2 }, { d: 'Scavo', q: 1 }];
+  const csv = FORMATI.csv.rendi({ record, colonne }).toString('utf8');
+  assert.match(csv, /"'=HYPERLINK\(""http:\/\/x"";""apri""\)";-3,5/);
+  assert.match(csv, /'@SOMMA\(A1\);2/);
+  assert.ok(csv.split('\r\n').includes('Scavo;1'), "il testo normale resta com'era");
 });

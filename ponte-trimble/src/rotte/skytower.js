@@ -25,8 +25,10 @@ export const dipendenze = {
 
 export const rotteSkyTower = express.Router();
 
+// Chi è l'utente del portale, per SkyTower: username, nome ed email (SkyTower riconosce l'utente
+// dall'email; senza, cadrebbe sull'utente tecnico).
 function utente(req) {
-  return { utente: req.cosedil?.username || undefined, nome: req.cosedil?.nome || undefined };
+  return { utente: req.cosedil?.username || undefined, nome: req.cosedil?.nome || undefined, email: req.cosedil?.email || undefined };
 }
 
 /** Un SuiteError diventa una risposta chiara: 503 app spenta, altrimenti il suo stato. */
@@ -86,11 +88,19 @@ rotteSkyTower.get('/skytower/documenti', async (req, res, next) => {
 // Un documento di SkyTower diventa un lavoro, come un PDF caricato a mano.
 rotteSkyTower.post('/lavori/da-skytower', async (req, res, next) => {
   try {
-    const { revision_id: revisionId, traduttore = CONFIG.traduttoreDefault, formato = CONFIG.formatoDefault, opzioni = {} } = req.body || {};
+    const { revision_id: revisionId, commessa, traduttore = CONFIG.traduttoreDefault, formato = CONFIG.formatoDefault, opzioni = {} } = req.body || {};
     if (!revisionId || !/^[0-9a-f-]{20,40}$/i.test(String(revisionId))) throw new ErroreRichiesta('manca revision_id');
+    if (!commessa || !String(commessa).trim()) throw new ErroreRichiesta('manca la commessa');
     if (!await prendiTraduttore(traduttore)) throw new ErroreRichiesta('traduttore sconosciuto: ' + traduttore);
     if (!FORMATI[formato]) throw new ErroreRichiesta('formato sconosciuto: ' + formato);
     if (opzioni && typeof opzioni !== 'object') throw new ErroreRichiesta('campo "opzioni" non valido');
+
+    // La revisione deve stare fra i documenti della commessa scelta: il download usa il token di
+    // servizio, che in SkyTower vede tutti i progetti, quindi senza questo controllo un UUID preso
+    // altrove (link, log, altra organizzazione) farebbe uscire il testo di qualunque documento
+    // (revisione di sicurezza del 03/11/2026). L'elenco è lo stesso che la pagina mostra.
+    const voce = await revisioneDellaCommessa(String(commessa).trim(), String(revisionId), req);
+    if (!voce) throw new ErroreRichiesta('il documento non appartiene alla commessa ' + String(commessa).trim(), 404);
 
     const { dati, tipo, intestazioni } = await scarica(revisionId, req);
     const nomeFile = String(req.body.nomeFile || intestazioni.nome || 'skytower-' + String(revisionId).slice(0, 8) + '.pdf');
@@ -110,6 +120,17 @@ rotteSkyTower.post('/lavori/da-skytower', async (req, res, next) => {
     next(inoltra(e));
   }
 });
+
+/** La voce dell'elenco documenti della commessa con quella revisione, o null (cerca in tutte le aree). */
+async function revisioneDellaCommessa(commessa, revisionId, req) {
+  for (const area of ['PUBLISHED', 'SHARED']) {
+    const dati = await dipendenze.chiama('skytower', 'GET', '/suite/commesse/' + encodeURIComponent(commessa) + '/documenti',
+      { parametri: { area, limit: 500 }, ...utente(req), timeout: 10000 });
+    const voce = (dati?.items || []).find((d) => String(d.revision_id) === revisionId);
+    if (voce) return voce;
+  }
+  return null;
+}
 
 async function scarica(revisionId, req) {
   const r = await dipendenze.chiama('skytower', 'GET', '/suite/revisioni/' + encodeURIComponent(revisionId) + '/file',

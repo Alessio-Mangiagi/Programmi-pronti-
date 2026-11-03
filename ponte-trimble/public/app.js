@@ -590,7 +590,8 @@ async function elaboraDaSky(doc, bottone) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        revision_id: doc.revision_id, revision_code: doc.revision_code, identifier: doc.identifier,
+        // la commessa serve al server per controllare che la revisione sia davvero di questa commessa
+        revision_id: doc.revision_id, commessa: skyCommessa.value, revision_code: doc.revision_code, identifier: doc.identifier,
         filename: doc.filename, traduttore: $('#selTraduttore').value, formato: $('#selFormato').value,
       }),
     });

@@ -20,6 +20,17 @@ import { statoDestinazione } from './src/destinazione.js';
 export const app = express();
 
 app.disable('x-powered-by');
+// Header di sicurezza scritti a mano (niente dipendenza nuova): la pagina carica solo app.js e
+// stile.css dalla stessa origine, senza script né stili inline, quindi la CSP può essere stretta.
+// frame-ancestors/X-Frame-Options: la UI admin non si incornicia in altre pagine (clickjacking).
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
+    + "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 // adminOnly: l'app usa le credenziali Trimble aziendali e scrive sul tenant, quindi
 // e' riservata agli admin del portale — che la nascondano o no le card della home,
@@ -53,7 +64,10 @@ app.use((err, req, res, next) => {
   if (err instanceof ErroreRichiesta) stato = err.stato;
   else if (err instanceof ErroreTrimble || err instanceof ErroreFieldView) {
     stato = 502;                       // l'errore e' a monte: distinguerlo dai nostri 500
-    dettaglio = err.corpo || undefined;
+    // il corpo della risposta di Trimble/Field View (tenant, endpoint, dettagli interni) va nel
+    // log, non al browser: al client basta sapere che il servizio a monte ha risposto male
+    dettaglio = undefined;
+    if (err.corpo) log.avviso('risposta a monte: ' + String(err.corpo).slice(0, 600));
   } else if (err instanceof multer.MulterError) {
     stato = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
   }

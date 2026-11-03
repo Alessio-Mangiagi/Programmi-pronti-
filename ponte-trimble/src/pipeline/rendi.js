@@ -28,7 +28,11 @@ export const FORMATI = {
     mime: 'text/csv',
     rendi: ({ record, colonne }) => {
       const cella = (v) => {
-        const s = typeof v === 'number' ? String(v).replace('.', ',') : testo(v);
+        let s = typeof v === 'number' ? String(v).replace('.', ',') : testo(v);
+        // Testo che Excel leggerebbe come formula (=, +, -, @, tab, a capo all'inizio): prefisso
+        // apostrofo. Il testo viene dai PDF, anche da SkyTower: una voce "=HYPERLINK(...)" o
+        // "=cmd|..." non deve diventare una formula sul PC di chi apre il file. I numeri restano numeri.
+        if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
         return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
       const righe = [colonne.map((c) => cella(c.titolo)).join(';')];
