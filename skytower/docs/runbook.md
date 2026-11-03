@@ -108,7 +108,20 @@ modesti: **RPO 24 h** (dump giornaliero) se non si fa di meglio col backup azien
 |---|---|---|
 | PostgreSQL 16 (`db`) | volume `skytower_pgdata` | `backup` fa `pg_dump` ogni 24 h in `infra/docker/backup/` (30 gg); `backup.*` a richiesta |
 | Documenti (MinIO, `minio`) | volume `skytower_miniodata` | Object Lock (retention di default GOVERNANCE, ancore COMPLIANCE 10 anni); `backup.*` ne fa un tar |
-| Chiavi (Fernet, JWT) | volume `skytower_segreti` | `backup.*` ne fa un tar: **senza, i segreti MFA nel DB sono persi** |
+| Chiavi (Fernet, JWT) | volume `skytower_segreti` | `backup.*` ne fa un tar a parte in `backup/chiavi/CHIAVI-SEGRETE-<data>.tar`: **senza, i segreti MFA nel DB sono persi**; **insieme al dump permettono di firmare token per chiunque** |
+
+**Chiavi nel backup (M6).** La cartella `backup/` nasce con permessi 700/600 (Linux) o con ACL ristretta a chi
+lancia lo script, SYSTEM e Administrators (Windows). Prima di copiarla fuori dal server, cifrare le chiavi e
+tenerle lontane dal dump, per esempio con [age](https://age-encryption.org) e una chiave pubblica custodita
+dall'IT fuori dal server:
+
+```bash
+age -r age1...chiave-pubblica... -o CHIAVI-SEGRETE-<data>.tar.age backup/chiavi/CHIAVI-SEGRETE-<data>.tar
+shred -u backup/chiavi/CHIAVI-SEGRETE-<data>.tar     # sul server resta solo la copia cifrata
+```
+
+Dopo un ripristino da un backup uscito dal controllo dell'IT, ruotare la chiave JWT (nuovo `jwt_private.pem`
+nel volume `segreti`: tutti rifanno il login).
 | Firme antivirus | volume `skytower_clamdb` | si riscaricano da sole |
 
 **Prima installazione**: `installa.ps1` / `installa.sh` (README § Rilascio sul server aziendale). Prerequisiti:

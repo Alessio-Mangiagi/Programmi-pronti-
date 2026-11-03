@@ -779,3 +779,41 @@ e nei log di compose).
 MFA non si decifrano e i token non si firmano. Test: `tests/test_mail_kms.py` (SMTP finto: STARTTLS, SSL,
 relay senza credenziali, errore che non blocca e non logga il corpo; FileKms in prod, cartella mancante o
 aperta rifiutata, chiavi rilette al secondo avvio).
+
+## ADR-47 — Login dal portale e token di servizio ristretti all'organizzazione della suite
+
+**Contesto.** La revisione di sicurezza del 03/11/2026 ha trovato tre falle alte nel collegamento con la suite.
+`POST /auth/portale` cercava l'utente per email e, in subordine, per la parte prima della `@` **su tutte le
+organizzazioni**, e apriva una sessione completa saltando MFA, SSO obbligatorio e blocco dell'account: chi
+amministra il portale poteva entrare come qualunque utente, anche come platform admin o in un altro tenant.
+Il token di servizio della suite (uno solo, condiviso da tutte le app) permetteva di dichiarare qualunque
+utente con `X-Suite-Email`/`X-Suite-Utente` e ripiegava sul primo platform admin. Il login dal portale iscriveva
+l'utente a **tutti** i progetti con un codice commessa, di qualunque proprietario, e da PROJECT_ADMIN se era
+admin del portale; il codice commessa era un campo libero.
+
+**Decisione.** Il portale rappresenta una sola organizzazione, quella della suite (`CDE_SUITE_ORG_ID`, altrimenti
+quella dell'utente tecnico, altrimenti quella del primo platform admin).
+- `POST /auth/portale`: utente solo per **email esatta** e solo in quell'organizzazione (la parte prima della `@`
+  serve solo a comporre l'email di un utente nuovo); 403 per altre organizzazioni, platform admin, SSO
+  obbligatorio, account bloccati o disattivati; con un fattore MFA o `mfa_required` la risposta è
+  `mfa_required`/`mfa_enrollment_required` come il login con password; nessun azzeramento di `locked_until`;
+  al portale va solo `sid=<valore>` (non il refresh token di SkyTower); 30 richieste/minuto per IP e cache di
+  30 s dell'esito per `sid`.
+- Iscrizione automatica solo ai progetti **di proprietà** dell'organizzazione della suite, sempre col ruolo
+  `CDE_SUITE_RUOLO_PORTALE` (default DESIGNER, PROJECT_ADMIN rifiutato).
+- `settings.commessa` deve stare nel registro della suite quando c'è (422 `commessa_sconosciuta`) ed è univoco
+  fra i progetti attivi della stessa organizzazione (trigger della migrazione 0038, 409); a parità di codice la
+  suite usa il progetto dell'organizzazione della suite.
+- Rotte `/suite/*`: l'utente dichiarato vale solo se attivo, dell'organizzazione della suite e non platform
+  admin; poi l'utente tecnico con le stesse regole; altrimenti 403. Ogni chiamata lascia un evento
+  `SUITE_CALL` con l'app dichiarata (`X-Suite-App`), l'utente dichiarato e la rotta.
+
+**Alternative scartate.** Asserzione firmata dal portale (HMAC per app) al posto del JSON di `/api/verify`: più
+solida, ma cambia portale e tutte le app; resta il passo successivo insieme a **un token di servizio per app**
+(`SUITE_TOKEN_<APP>`), così un'app compromessa non agisce a nome delle altre. Indice univoco sul codice commessa:
+fallirebbe su installazioni con doppioni già presenti; il trigger blocca solo i nuovi.
+
+**Conseguenze.** L'account personale del platform admin non entra più dal portale: entra con password e secondo
+fattore. Gli utenti di altre organizzazioni (consulenti, imprese) entrano solo con le loro credenziali. Un
+progetto di un altro committente in cui l'azienda partecipa non riceve più membri dal portale: li invita il suo
+Project Admin. Test: `test_api_portale.py`, `test_api_suite.py` (impersonazione ristretta, eventi), `test_security_fix.py`.
