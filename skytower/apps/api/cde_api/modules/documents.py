@@ -212,6 +212,26 @@ def auto_name(conn, project: dict, filename: str, chosen: dict[str, str], *, res
     return scheme.compose(values, _extension(filename)), number
 
 
+# Chiavi dei metadati scritte solo dall'API (esiti di Confronto Documenti e Verifica Requisiti, suite.py): se un utente
+# potesse scriverle metterebbe nel dettaglio documento link credibili verso siti esterni, o valori che rompono la
+# pagina (revisione di sicurezza del 03/11/2026, M2).
+ATTRIBUTI_RISERVATI = ("confronti", "verifiche")
+
+
+def controlla_pattern(scheme: NamingScheme | None) -> None:
+    """422 se lo schema di naming che si sta salvando ha un'espressione regolare rischiosa (ReDoS, M9)."""
+    problemi = scheme.pattern_non_ammessi() if scheme else []
+    if problemi:
+        raise ApiError(422, "unsafe_pattern", "Espressione regolare non ammessa: " + "; ".join(problemi))
+
+
+def rifiuta_attributi_riservati(attributes: dict | None) -> None:
+    """422 se ``attributes`` contiene una chiave riservata all'API."""
+    presenti = sorted(k for k in (attributes or {}) if k in ATTRIBUTI_RISERVATI)
+    if presenti:
+        raise ApiError(422, "reserved_attributes", "Metadati riservati a SkyTower, non modificabili: " + ", ".join(presenti))
+
+
 def _validate_attributes(schema: dict, attributes: dict) -> None:
     errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(attributes), key=lambda e: list(e.path))
     if errors:
@@ -252,6 +272,7 @@ def get_document_settings(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
 
 @router.put("/projects/{project_id}/document-settings")
 def put_document_settings(project_id: uuid.UUID, body: DocumentSettingsIn, c: Ctx = Depends(ctx)):
+    controlla_pattern(body.naming_scheme)
     with c.tx() as conn:
         project = require_project(conn, project_id, "ADMIN", "PROJECT")
         if body.auto_number:
@@ -523,6 +544,7 @@ def initiate_upload(body: UploadInitIn, c: Ctx = Depends(ctx)):
             raise ApiError(422, "title_required", "Titolo obbligatorio per un nuovo documento")
 
         _, metadata_schema, _ = load_settings(conn, project)
+        rifiuta_attributi_riservati(body.attributes)
         _validate_attributes(metadata_schema, body.attributes)
 
         part_size, part_count = plan_parts(body.size_bytes, settings.upload_part_size)
@@ -782,8 +804,15 @@ def update_document(document_id: uuid.UUID, body: DocumentPatch, c: Ctx = Depend
         if "attributes" in changes:
             project = require_project(conn, doc["project_id"])
             _, metadata_schema, _ = load_settings(conn, project)
-            _validate_attributes(metadata_schema, changes["attributes"] or {})
-            changes["attributes"] = Jsonb(changes["attributes"] or {})
+            nuovi = changes["attributes"] or {}
+            rifiuta_attributi_riservati(nuovi)
+            _validate_attributes(metadata_schema, nuovi)
+            # gli esiti già registrati dall'API restano: il PATCH sostituisce gli attributi, non deve cancellarli
+            attuali = conn.execute("SELECT attributes FROM cde.documents WHERE id = %s", [document_id]).fetchone()
+            for k in ATTRIBUTI_RISERVATI:
+                if attuali and k in (attuali["attributes"] or {}):
+                    nuovi[k] = attuali["attributes"][k]
+            changes["attributes"] = Jsonb(nuovi)
         if changes:
             n = conn.execute("UPDATE cde.documents SET " + ", ".join(f"{k} = %({k})s" for k in changes)
                              + " WHERE id = %(_key)s", {**changes, "_key": document_id}).rowcount

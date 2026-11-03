@@ -88,18 +88,37 @@ def test_commesse_e_progetto_per_codice(client, progetto_collegato):
 def test_utente_sconosciuto_ripiega_sull_utente_tecnico(client, progetto_collegato, monkeypatch):
     w = progetto_collegato
     settings = client.app.state.services.settings
-    # senza utente tecnico: si ripiega sul platform admin, che non è membro del progetto e quindi non lo vede
+    # senza utente tecnico: nessuno a cui attribuire la chiamata → 403 (prima si ripiegava sul platform admin, ADR-47)
     monkeypatch.setattr(settings, "suite_user_email", None)
     r = client.get("/suite/commesse", headers={**TOKEN, "X-Suite-Utente": "mrossi"})
-    assert r.status_code == 200 and COMMESSA not in [v["commessa"] for v in r.json()]
+    assert r.status_code == 403 and r.json()["error"]["code"] == "suite_user", r.text
     # con l'utente tecnico (membro del progetto) la commessa si trova
     monkeypatch.setattr(settings, "suite_user_email", w.emails["com_admin"])
     r = client.get("/suite/commesse", headers={**TOKEN, "X-Suite-Utente": "mrossi"})
     assert r.status_code == 200 and COMMESSA in [v["commessa"] for v in r.json()]
-    # lo username senza dominio trova l'utente con quella parte locale dell'email
+    # lo username senza dominio vale come <username>@CDE_SUITE_EMAIL_DOMINIO: "com.admin" non è com.admin@com.example,
+    # quindi si usa l'utente tecnico (che qui vede il progetto)
     locale = w.emails["com_admin"].split("@")[0]
     r = client.get(f"/suite/commesse/{COMMESSA}/documenti", headers={**TOKEN, "X-Suite-Utente": locale})
     assert r.status_code == 200
+
+
+def test_token_non_impersona_altre_organizzazioni_ne_platform_admin(client, api_world, progetto_collegato, monkeypatch):
+    """Con il token della suite non si agisce a nome di utenti di altri tenant né del platform admin (A1)."""
+    import psycopg
+    urls, w = api_world
+    settings = client.app.state.services.settings
+    monkeypatch.setattr(settings, "suite_user_email", None)
+    for chi in ("des_lead", "platform", "out_user"):
+        r = client.get("/suite/da-fare", headers={**TOKEN, "X-Suite-Email": w.emails[chi]})
+        assert r.status_code == 403, (chi, r.text)
+    # la chiamata buona lascia la traccia dell'app e dell'utente dichiarato
+    r = client.get("/suite/da-fare", headers={**TOKEN, "X-Suite-Email": w.emails["com_admin"], "X-Suite-App": "incampo"})
+    assert r.status_code == 200, r.text
+    with psycopg.connect(urls.owner) as conn:
+        ev = conn.execute("""SELECT details FROM cde.security_events WHERE event_type = 'SUITE_CALL'
+                             ORDER BY occurred_at DESC LIMIT 1""").fetchone()[0]
+    assert ev["app"] == "incampo" and ev["utente"] == w.emails["com_admin"] and ev["path"] == "/suite/da-fare"
 
 
 def test_carica_elenca_e_scarica(client, progetto_collegato, as_user, worker):

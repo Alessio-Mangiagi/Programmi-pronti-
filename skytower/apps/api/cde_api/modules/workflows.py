@@ -102,6 +102,11 @@ def create_template(project_id: uuid.UUID, body: TemplateIn, c: Ctx = Depends(ct
     """Stesso codice ⇒ nuova versione; le versioni precedenti vengono disattivate."""
     with c.tx() as conn:
         require_project(conn, project_id, "ADMIN", "PROJECT")
+        esc = body.definition.escalation_user_id
+        if esc and conn.execute("SELECT 1 FROM cde.project_memberships WHERE project_id = %s AND user_id = %s",
+                                [project_id, esc]).fetchone() is None:
+            # l'escalation porta identificativi e nomi: solo verso chi è nel progetto (B1)
+            raise ApiError(422, "escalation_not_member", "La persona per l'escalation deve essere membro del progetto")
         version = conn.execute("SELECT coalesce(max(version), 0) + 1 AS v FROM cde.workflow_templates "
                                "WHERE project_id = %s AND code = %s", [project_id, body.code]).fetchone()["v"]
         conn.execute("UPDATE cde.workflow_templates SET is_active = false WHERE project_id = %s AND code = %s",

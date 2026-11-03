@@ -33,12 +33,23 @@ class Mail:
 
 
 class ConsoleMailer:
-    def __init__(self):
+    """Niente invio: il messaggio resta in ``outbox`` (i test leggono da lì) e va nel log.
+
+    Il corpo finisce nel log solo con ``log_corpo`` (dev e test): inviti e reset password contengono un link con
+    un token valido, e in staging/produzione i log li legge anche chi non deve poter entrare al posto di un
+    utente (revisione di sicurezza del 03/11/2026, M5). Lì si usa ``smtp``; con ``console`` si vede solo a chi
+    è partito cosa."""
+
+    def __init__(self, log_corpo: bool = True):
         self.outbox: list[Mail] = []
+        self.log_corpo = log_corpo
 
     def send(self, to: str, subject: str, body: str) -> None:
         self.outbox.append(Mail(to, subject, body))
-        log.info("EMAIL a %s — %s\n%s", to, subject, body)
+        if self.log_corpo:
+            log.info("EMAIL a %s — %s\n%s", to, subject, body)
+        else:
+            log.info("EMAIL a %s — %s (corpo non registrato: CDE_MAILER=smtp per inviarla davvero)", to, subject)
 
 
 def _messaggio(sender: str, to: str, subject: str, body: str) -> EmailMessage:
@@ -113,5 +124,5 @@ def build_mailer(settings: Settings):
     if settings.mailer == "smtp":
         return SmtpMailer(settings)
     if settings.mailer == "console":
-        return ConsoleMailer()
+        return ConsoleMailer(log_corpo=settings.env in ("dev", "test"))
     raise RuntimeError(f"CDE_MAILER={settings.mailer!r} sconosciuto: console, smtp o ses")

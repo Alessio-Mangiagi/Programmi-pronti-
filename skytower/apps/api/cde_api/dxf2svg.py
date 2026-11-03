@@ -38,8 +38,14 @@ UNITS = {0: "", 1: "in", 2: "ft", 4: "mm", 5: "cm", 6: "m", 7: "km", 14: "dm"}
 # Distanza di appiattimento delle curve (archi, spline) in unità del disegno: un centesimo del lato maggiore
 # del disegno, con un minimo per non esplodere il numero di vertici sui disegni enormi
 FLATTEN_FRACTION = 1e-3
+MAX_NODI = 1_600_000            # entità visitate scomponendo i blocchi (anche quelle che non si disegnano)
 MAX_ENTITIES = 400_000          # oltre, l'SVG diventerebbe ingestibile nel browser: si ferma con errore chiaro
 ODA_WINDOWS_GLOB = r"C:\Program Files\ODA\ODAFileConverter*\ODAFileConverter.exe"
+
+
+class DisegnoTroppoGrande(RuntimeError):
+    """Il disegno supera i limiti del viewer (entità o blocchi annidati): ritentare non serve, il derivato resta
+    FAILED subito e il file si scarica (revisione di sicurezza del 03/11/2026, M8)."""
 
 
 class DwgConverterMissing(RuntimeError):
@@ -183,10 +189,15 @@ def convert(src: Path, dst: Path, *, converter: str | None = None) -> Result:
         visible = layer.is_on() and not layer.is_frozen() and layer.dxf.name.lower() != "defpoints"
         layers[layer.dxf.name] = Layer(layer.dxf.name, _aci(abs(layer.color), "#000000"), visible)
 
-    # primo giro: dimensione del disegno (serve per decidere quanto appiattire le curve)
-    entities = list(_flatten(msp))
-    if len(entities) > MAX_ENTITIES:
-        raise RuntimeError(f"disegno con {len(entities)} entità: troppo grande per il viewer (massimo {MAX_ENTITIES})")
+    # primo giro: dimensione del disegno (serve per decidere quanto appiattire le curve). Si conta mentre si
+    # scompongono i blocchi, non dopo: un DXF di pochi kB con blocchi che si inseriscono a vicenda centinaia di
+    # volte esploderebbe in miliardi di entità prima del controllo e bloccherebbe il worker (M8)
+    entities = []
+    budget = {"nodi": 0}
+    for e in _flatten(msp, budget=budget):
+        entities.append(e)
+        if len(entities) > MAX_ENTITIES:
+            raise DisegnoTroppoGrande(f"disegno con oltre {MAX_ENTITIES} entità: troppo grande per il viewer")
     extent = _extent(entities)
     flatten = max((extent or 1.0) * FLATTEN_FRACTION, 1e-6)
 
@@ -243,11 +254,18 @@ def convert(src: Path, dst: Path, *, converter: str | None = None) -> Result:
     return Result(len(data), drawn, used, units, (minx, miny, maxx, maxy))
 
 
-def _flatten(entities, parent_layer: str | None = None, depth: int = 0):
+def _flatten(entities, parent_layer: str | None = None, depth: int = 0, budget: dict | None = None):
     """Scompone blocchi (INSERT), quote, leader e simili nelle entità elementari. Regola di AutoCAD: ciò che
     dentro un blocco sta sul layer "0" prende il layer dell'INSERT che lo usa (così le quote restano sul layer
-    QUOTE e non finiscono tutte su "0")."""
+    QUOTE e non finiscono tutte su "0").
+
+    ``budget["nodi"]`` conta ogni entità visitata, blocchi compresi: oltre ``MAX_NODI`` si ferma con
+    ``DisegnoTroppoGrande`` anche se i blocchi non producono entità disegnabili (M8)."""
+    budget = budget if budget is not None else {"nodi": 0}
     for e in entities:
+        budget["nodi"] += 1
+        if budget["nodi"] > MAX_NODI:
+            raise DisegnoTroppoGrande(f"disegno con oltre {MAX_NODI} elementi (blocchi annidati): troppo grande per il viewer")
         layer = e.dxf.get("layer", "0") or "0"
         if parent_layer and layer == "0":
             layer = parent_layer
@@ -261,7 +279,7 @@ def _flatten(entities, parent_layer: str | None = None, depth: int = 0):
             except Exception:      # noqa: BLE001 - blocco rotto: si disegna quel che si può
                 children = []
             if children:
-                yield from _flatten(children, layer, depth + 1)
+                yield from _flatten(children, layer, depth + 1, budget)
                 continue
         yield e
 

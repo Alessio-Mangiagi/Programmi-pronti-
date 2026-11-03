@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, field_validator
 from ..deps import Ctx, ctx, require_project
 from ..errors import ApiError, not_found
 from ..events import security_event
-from .documents import load_auto_number, load_settings
+from .documents import controlla_pattern, load_auto_number, load_settings
 
 router = APIRouter(tags=["naming"])
 
@@ -86,6 +86,7 @@ def list_profiles(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
 
 @router.post("/projects/{project_id}/naming-profiles", status_code=201)
 def create_profile(project_id: uuid.UUID, body: ProfileIn, c: Ctx = Depends(ctx)):
+    controlla_pattern(body.naming_scheme)        # ReDoS: pattern rischiosi rifiutati al salvataggio (M9)
     with c.tx() as conn:
         project = require_project(conn, project_id, "ADMIN", "PROJECT")
         _name_taken(conn, project_id, body.name)
@@ -109,6 +110,7 @@ def create_profile(project_id: uuid.UUID, body: ProfileIn, c: Ctx = Depends(ctx)
 
 @router.put("/naming-profiles/{profile_id}")
 def update_profile(profile_id: uuid.UUID, body: ProfileIn, c: Ctx = Depends(ctx)):
+    controlla_pattern(body.naming_scheme)        # ReDoS: pattern rischiosi rifiutati al salvataggio (M9)
     with c.tx() as conn:
         current = _profile(conn, profile_id)
         require_project(conn, current["project_id"], "ADMIN", "PROJECT")

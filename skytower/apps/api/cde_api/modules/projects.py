@@ -2,8 +2,10 @@
 """Progetti, organizzazioni partecipanti, membri e ruoli (matrice ruolo × azione × scope)."""
 from __future__ import annotations
 
+import sys
 import uuid
 from datetime import date, datetime
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Response
@@ -13,6 +15,12 @@ from pydantic import BaseModel, Field
 from ..deps import ACTIONS, Ctx, ctx, require_project
 from ..errors import ApiError, forbidden, not_found
 from ..events import security_event
+
+_SHARED = Path(__file__).resolve().parents[5] / "shared" / "suite"
+if str(_SHARED) not in sys.path:
+    sys.path.insert(0, str(_SHARED))
+import suite_link  # percorso della suite aggiunto qui sopra
+
 from .organizations import patch_sql
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -143,10 +151,26 @@ def get_project(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
                                               for r in perms}}
 
 
+def _controlla_commessa(settings: dict | None) -> None:
+    """Il codice commessa (``settings.commessa``) collega il progetto alle altre app della suite: deve stare nel
+    registro unico (``shared/suite/commesse.json``) quando il registro c'è, così un Project Admin non può
+    inventarne uno qualunque o prendere quello di un'altra commessa per ricevere i suoi documenti (A3, ADR-47).
+    Senza registro (installazione fuori dalla suite) qualunque codice è ammesso. Il doppione nella stessa
+    organizzazione lo ferma il database (migrazione 0038)."""
+    codice = str((settings or {}).get("commessa") or "").strip()
+    if not codice:
+        return
+    registro = suite_link.commesse()
+    if registro and suite_link.normalizza_commessa(codice) not in {suite_link.normalizza_commessa(r["code"]) for r in registro}:
+        raise ApiError(422, "commessa_sconosciuta", f"Codice commessa {codice} assente dal registro della suite: "
+                                                    "sceglierlo dall'elenco o farlo aggiungere nella pagina Commesse del portale")
+
+
 @router.patch("/{project_id}")
 def update_project(project_id: uuid.UUID, body: ProjectPatch, c: Ctx = Depends(ctx)):
     changes = body.model_dump(exclude_unset=True)
     if "settings" in changes:
+        _controlla_commessa(changes["settings"])
         changes["settings"] = Jsonb(changes["settings"] or {})
     with c.tx() as conn:
         require_project(conn, project_id, "ADMIN", "PROJECT")

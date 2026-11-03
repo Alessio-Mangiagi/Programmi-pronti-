@@ -7,9 +7,13 @@ il **codice commessa aziendale**, che per SkyTower sta in ``projects.settings.co
 (scheda "Suite" del progetto); in mancanza vale anche il ``code`` ISO del progetto.
 
 Ogni chiamata gira comunque come un utente SkyTower, perché RLS e permessi sono
-per utente: quello con l'email dell'utente del portale (header X-Suite-Utente), se
-esiste; altrimenti l'utente tecnico ``CDE_SUITE_USER_EMAIL``; altrimenti il primo
-platform admin attivo. Chi non vede il progetto non lo trova (404), come sempre.
+per utente: quello con l'email dell'utente del portale (header X-Suite-Email, oppure
+X-Suite-Utente come ``<username>@CDE_SUITE_EMAIL_DOMINIO``), **purché sia un utente attivo
+dell'organizzazione della suite e non un platform admin** (ADR-47); altrimenti l'utente
+tecnico ``CDE_SUITE_USER_EMAIL`` (stesse regole); altrimenti 403. Il token di servizio è
+condiviso fra le app: non deve poter impersonare tutti i tenant. Ogni chiamata lascia un
+evento di sicurezza con l'app chiamante (X-Suite-App) e l'utente dichiarato.
+Chi non vede il progetto non lo trova (404), come sempre.
 
 Offerto:
   * GET  /suite/commesse                         progetti collegati a una commessa
@@ -69,34 +73,49 @@ def richiede_token(x_suite_token: str | None = Header(default=None)) -> None:
 
 
 def _utente(svc: Services, utente: str | None, email: str | None = None) -> dict:
-    """L'utente SkyTower a nome del quale gira la chiamata (vedi docstring del modulo): prima l'email del portale
-    (X-Suite-Email), poi lo username (X-Suite-Utente, anche come parte prima della @), poi l'utente tecnico."""
-    candidati = [email, utente, svc.settings.suite_user_email]
+    """L'utente SkyTower a nome del quale gira la chiamata (vedi docstring del modulo).
+
+    Candidati, in ordine: l'email del portale (X-Suite-Email); lo username (X-Suite-Utente) come email esatta se
+    contiene la ``@``, altrimenti ``<username>@CDE_SUITE_EMAIL_DOMINIO``; l'utente tecnico ``CDE_SUITE_USER_EMAIL``.
+    Ognuno vale solo se è attivo, dell'organizzazione della suite e non platform admin (ADR-47): il token è
+    condiviso fra le app e chi lo ha non deve poter agire a nome di utenti di altri tenant. Nessun candidato → 403."""
+    from .portale import organizzazione_suite
+
+    dominio = svc.settings.suite_email_dominio
+    candidati = []
+    for chi in (email, utente):
+        chi = (chi or "").strip().lower()
+        if chi:
+            candidati.append(chi if "@" in chi else f"{chi}@{dominio}")
+    if svc.settings.suite_user_email:
+        candidati.append(svc.settings.suite_user_email.strip().lower())
     with svc.db.auth_tx() as conn:
+        org = organizzazione_suite(svc, conn)
         for chi in candidati:
-            if not chi:
+            row = conn.execute("""SELECT id, organization_id, email, is_platform_admin FROM cde.users
+                                  WHERE lower(email) = %s AND status = 'ACTIVE'""", [chi]).fetchone()
+            if row is None:
                 continue
-            chi = chi.strip()
-            row = conn.execute("SELECT id, organization_id, email FROM cde.users WHERE lower(email) = lower(%s) "
-                               "AND status = 'ACTIVE'", [chi]).fetchone()
-            if row is None and "@" not in chi:
-                row = conn.execute("SELECT id, organization_id, email FROM cde.users WHERE lower(split_part(email, '@', 1)) = lower(%s) "
-                                   "AND status = 'ACTIVE' ORDER BY created_at LIMIT 1", [chi]).fetchone()
-            if row:
-                return row
-        row = conn.execute("SELECT id, organization_id, email FROM cde.users WHERE is_platform_admin AND status = 'ACTIVE' "
-                           "ORDER BY created_at LIMIT 1").fetchone()
-    if row is None:
-        raise ApiError(403, "suite_user", "Nessun utente SkyTower a cui attribuire l'azione: invitare l'utente del portale "
-                                          "oppure impostare CDE_SUITE_USER_EMAIL")
-    return row
+            if row["organization_id"] != org or row["is_platform_admin"]:
+                # un utente di un altro tenant (o il platform admin) non si impersona da un'app della suite
+                continue
+            return row
+    raise ApiError(403, "suite_user", "Nessun utente SkyTower dell'organizzazione della suite a cui attribuire l'azione: "
+                                      "invitare l'utente del portale oppure impostare CDE_SUITE_USER_EMAIL")
 
 
 def ctx_suite(request: Request, svc: Services = Depends(services), _: None = Depends(richiede_token),
-              x_suite_utente: str | None = Header(default=None), x_suite_email: str | None = Header(default=None)) -> Ctx:
+              x_suite_utente: str | None = Header(default=None), x_suite_email: str | None = Header(default=None),
+              x_suite_app: str | None = Header(default=None)) -> Ctx:
     u = _utente(svc, x_suite_utente, x_suite_email)
+    ip = client_ip(request)
+    with svc.db.auth_tx() as conn:
+        # traccia di chi ha usato il token condiviso: app dichiarata, utente dichiarato, rotta (ADR-47)
+        security_event(conn, "SUITE_CALL", user_id=u["id"], organization_id=u["organization_id"], ip=ip,
+                       app=(x_suite_app or "")[:40] or None, utente=(x_suite_email or x_suite_utente or "")[:120] or None,
+                       method=request.method, path=request.url.path[:200])
     claims = AccessClaims(user_id=u["id"], org_id=u["organization_id"], mfa=True, amr=["suite"], jti=f"suite-{uuid.uuid4()}")
-    return Ctx(svc, claims, client_ip(request), request.headers.get("user-agent"))
+    return Ctx(svc, claims, ip, request.headers.get("user-agent"))
 
 
 # ---------------------------------------------------------------------
@@ -107,13 +126,19 @@ def codice_commessa(project: dict) -> str | None:
     return (s.get("commessa") or "").strip() or None
 
 
-def progetto_per_commessa(conn, codice: str) -> dict:
+def progetto_per_commessa(conn, codice: str, org_suite: uuid.UUID | None = None) -> dict:
+    """Il progetto con quel codice commessa (o codice ISO). A parità, vince quello di proprietà dell'organizzazione
+    della suite (``org_suite``): un Project Admin di un altro tenant non può dirottare i documenti della suite
+    mettendo lo stesso codice sul proprio progetto (A3)."""
     chiave = suite_link.normalizza_commessa(codice)
     if not chiave:
         raise ApiError(404, "not_found", "Codice commessa vuoto")
-    for p in conn.execute("SELECT * FROM cde.projects WHERE status <> 'ARCHIVED' ORDER BY created_at").fetchall():
-        if suite_link.normalizza_commessa(codice_commessa(p)) == chiave or suite_link.normalizza_commessa(p["code"]) == chiave:
-            return p
+    trovati = [p for p in conn.execute("SELECT * FROM cde.projects WHERE status <> 'ARCHIVED' ORDER BY created_at").fetchall()
+               if suite_link.normalizza_commessa(codice_commessa(p)) == chiave or suite_link.normalizza_commessa(p["code"]) == chiave]
+    if trovati:
+        if org_suite is not None:
+            trovati.sort(key=lambda p: p["owner_organization_id"] != org_suite)
+        return trovati[0]
     raise ApiError(404, "not_found", f"Nessun progetto SkyTower collegato alla commessa {codice}: "
                                      "il Project Admin lo imposta nella scheda Suite del progetto")
 
@@ -148,7 +173,7 @@ def suite_documenti(codice: str, area: Literal["WIP", "SHARED", "PUBLISHED", "AR
                     c: Ctx = Depends(ctx_suite)):
     """Documenti della commessa, di default solo quelli PUBBLICATI (ultima revisione), con il nome del file e il link."""
     with c.tx() as conn:
-        project = progetto_per_commessa(conn, codice)
+        project = progetto_per_commessa(conn, codice, c.user.org_id)
         where, params = ["d.project_id = %(p)s"], {"p": project["id"], "limit": limit}
         if area == "ARCHIVED":
             where.append("d.archived_at IS NOT NULL")
@@ -254,7 +279,13 @@ async def suite_carica(codice: str, request: Request, title: str = Query(..., mi
     altrimenti primo progressivo libero), cartella "Suite Cosedil" dell'organizzazione di chi carica.
     Il file è il corpo della richiesta (Content-Type = tipo del file), il nome nell'header X-Suite-Nome-File
     o in ?filename=; i metadati nella query. Niente multipart: nessuna dipendenza in più."""
-    dati = await request.body()
+    limite = c.svc.settings.suite_upload_max_bytes
+    dati = bytearray()
+    async for pezzo in request.stream():           # anche senza Content-Length: ci si ferma al tetto (B12)
+        dati += pezzo
+        if len(dati) > limite:
+            raise ApiError(413, "too_large", f"File oltre {limite // 1024 ** 2} MB: caricarlo da SkyTower")
+    dati = bytes(dati)
     if not dati:
         raise ApiError(422, "empty_file", "File vuoto")
     nome_file = (filename or unquote(x_suite_nome_file or "") or "documento.pdf").strip()
@@ -268,12 +299,13 @@ async def suite_carica(codice: str, request: Request, title: str = Query(..., mi
         raise ApiError(422, "attributes", "attributes deve essere un oggetto JSON") from None
     if not isinstance(attr, dict):
         raise ApiError(422, "attributes", "attributes deve essere un oggetto JSON")
+    docs.rifiuta_attributi_riservati(attr)
     attr.setdefault("origine_suite", request.headers.get(suite_link.HEADER_UTENTE) or "suite")
     tipo = (tipo or "RP").strip().upper()[:2]
     sha = hashlib.sha256(dati).hexdigest()
 
     with c.tx() as conn:
-        project = progetto_per_commessa(conn, codice)
+        project = progetto_per_commessa(conn, codice, c.user.org_id)
         cont = _cartella(conn, c, project, container_id, (cartella or CARTELLA_SUITE).strip()[:120])
     base = {"container_id": cont["id"], "size_bytes": len(dati), "sha256": sha, "content_type": ctype, "title": title,
             "description": description, "attributes": attr, "comment": "Caricato dalla suite Cosedil"}
@@ -284,7 +316,7 @@ async def suite_carica(codice: str, request: Request, title: str = Query(..., mi
         if e.code != "auto_number_off":
             raise
         with c.tx() as conn:
-            project = progetto_per_commessa(conn, codice)
+            project = progetto_per_commessa(conn, codice, c.user.org_id)
             nome = _nome_manuale(conn, project, nome_file, tipo, cont["id"])
         avvio = docs.initiate_upload(docs.UploadInitIn(filename=nome, **base), c)
 
@@ -381,6 +413,20 @@ def _byte_revisione(c: Ctx, rev: dict) -> bytes:
     return c.svc.storage.get_bytes(rev["storage_key"], rev["storage_version_id"])
 
 
+def _controlla_dimensione(c: Ctx, rev: dict) -> None:
+    """Confronto e verifica leggono il file intero in memoria per mandarlo all'altra app: vale lo stesso tetto della
+    filigrana (``watermark_max_bytes``), altrimenti un file da gigabyte manda in OOM l'API per tutti (M7)."""
+    limite = c.svc.settings.watermark_max_bytes
+    if rev["size_bytes"] > limite:
+        raise ApiError(413, "too_large", f"File oltre {limite // 1024 ** 2} MB: confronto e verifica si fanno in locale")
+
+
+def _limite_per_utente(c: Ctx, cosa: str) -> None:
+    """Poche chiamate al minuto per utente: ognuna tiene occupato un thread dell'API e l'app vicina."""
+    if not c.svc.limiter.hit("10/minute", f"suite-{cosa}", str(c.user_id)):
+        raise ApiError(429, "rate_limited", "Troppe richieste: riprovare tra un minuto", {"Retry-After": "60"})
+
+
 def _multipart_file(campi: dict, file: list[tuple[str, str, bytes, str]]) -> tuple[bytes, str]:
     """multipart/form-data con più file (suite_link._multipart ne accetta uno solo)."""
     confine = "----skytower" + uuid.uuid4().hex
@@ -420,6 +466,7 @@ def _tipo_file(nome: str) -> str:
 def confronta_revisione(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
     """Manda questa revisione e la precedente dello stesso documento a Confronto Documenti; l'esito (job) resta
     nei metadati del documento (``attributes.confronti``) e si apre con ``url``."""
+    _limite_per_utente(c, "confronto")
     with c.tx() as conn:
         rev, doc = _revisione_scaricabile(conn, revision_id)
         if rev["sequence"] <= 1:
@@ -427,6 +474,8 @@ def confronta_revisione(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
         prec_id = conn.execute("SELECT id FROM cde.document_revisions WHERE document_id = %s AND sequence = %s",
                                [rev["document_id"], rev["sequence"] - 1]).fetchone()["id"]
         prec = docs._downloadable(conn, prec_id)
+        _controlla_dimensione(c, rev)
+        _controlla_dimensione(c, prec)
     corpo, ctype = _multipart_file({}, [("pdf1", prec["original_filename"], _byte_revisione(c, prec), _tipo_file(prec["original_filename"])),
                                         ("pdf2", rev["original_filename"], _byte_revisione(c, rev), _tipo_file(rev["original_filename"]))])
     email, nome = _utente_portale(c)
@@ -457,8 +506,10 @@ class VerificaIn(BaseModel):
 def verifica_revisione(revision_id: uuid.UUID, body: VerificaIn, c: Ctx = Depends(ctx)):
     """Checklist di Verifica Requisiti sul file della revisione: carica, aspetta l'estrazione del testo, verifica;
     l'esito resta in ``attributes.verifiche``."""
+    _limite_per_utente(c, "verifica")
     with c.tx() as conn:
         rev, doc = _revisione_scaricabile(conn, revision_id)
+        _controlla_dimensione(c, rev)
     dati = _byte_revisione(c, rev)
     email, nome = _utente_portale(c)
     chi = {"utente": email, "nome": nome, "email": email}

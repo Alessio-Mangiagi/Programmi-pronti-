@@ -24,6 +24,7 @@ from ..deps import Ctx, client_ip, ctx, require_project
 from ..errors import ApiError
 from ..events import security_event
 from ..watermark import WatermarkError, stamp
+from .audit import _cell
 from .documents import _downloadable, _watermarked
 
 router = APIRouter(tags=["documents"])
@@ -120,8 +121,9 @@ def download_zip(project_id: uuid.UUID, body: ZipIn, request: Request, c: Ctx = 
                     for chunk in data:
                         f.write(chunk)
                         yield pipe.take()
-                out.writerow([name, rev["identifier"], m["title"], rev["revision_code"], rev["state"],
-                              m["suitability"], rev["size_bytes"], m["sha256"], "si" if wm else "no"])
+                # titolo e nomi li sceglie chi carica: niente formule eseguibili quando il DL apre elenco.csv (M10)
+                out.writerow([_cell(x) for x in (name, rev["identifier"], m["title"], rev["revision_code"], rev["state"],
+                                                 m["suitability"], rev["size_bytes"], m["sha256"], "si" if wm else "no")])
                 yield pipe.take()
             zf.writestr(zipfile.ZipInfo("elenco.csv", date_time=when.timetuple()[:6]),
                         "﻿" + manifest.getvalue())         # BOM: Excel legge gli accenti

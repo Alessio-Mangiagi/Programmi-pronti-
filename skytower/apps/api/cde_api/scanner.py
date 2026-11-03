@@ -67,6 +67,7 @@ class ClamdScanner:  # pragma: no cover - richiede un demone clamd
 def build_scanner(settings: Settings):
     if settings.scanner == "clamd":
         return ClamdScanner(settings.clamd_host, settings.clamd_port)
-    if settings.env == "prod":
-        raise RuntimeError("Scanner EICAR non ammesso in produzione")
+    if settings.env not in ("dev", "test"):
+        # lo scanner finto riconosce solo il file di prova EICAR: fuori da sviluppo e test serve ClamAV (B2)
+        raise RuntimeError("Scanner EICAR ammesso solo in sviluppo e test: impostare CDE_SCANNER=clamd")
     return EicarScanner()

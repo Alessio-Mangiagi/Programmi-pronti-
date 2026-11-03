@@ -19,6 +19,21 @@ const ESITO: Record<string, { label: string; color: "success" | "error" | "warni
   "non-applicabile": { label: "Non applicabile", color: "info" },
 };
 
+/** Un attributo che dovrebbe essere un elenco di oggetti: qualsiasi altra cosa vale come elenco vuoto. */
+function elenco<T>(v: unknown): T[] {
+  return Array.isArray(v) ? (v.filter((x) => x && typeof x === "object") as T[]) : [];
+}
+
+/** Solo indirizzi http(s): un "javascript:" o un "data:" salvato nei metadati non diventa un link cliccabile. */
+function linkSicuro(url: unknown): string | undefined {
+  try {
+    const u = new URL(String(url));
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Sezione «Suite Cosedil» nel dettaglio documento: confronta una revisione con la precedente
  * (Confronto Documenti) e lancia una checklist di Verifica Requisiti; gli esiti restano nei
@@ -32,12 +47,14 @@ export function SuiteDocumento({ documentId, revisions, attributes }: {
   const qc = useQueryClient();
   const [verifica, setVerifica] = useState<{ id: string; code: string } | null>(null);
   const [setId, setSetId] = useState("");
-  const confronti = ((attributes?.confronti as Confronto[] | undefined) ?? []).slice().reverse();
-  const verifiche = ((attributes?.verifiche as Verifica[] | undefined) ?? []).slice().reverse();
+  // gli esiti li scrive solo l'API (chiavi riservate), ma i metadati arrivano dal server come JSON libero:
+  // un valore che non è un elenco non deve rompere la pagina, un link che non è http(s) non si mostra (M2)
+  const confronti = elenco<Confronto>(attributes?.confronti).slice().reverse();
+  const verifiche = elenco<Verifica>(attributes?.verifiche).slice().reverse();
   const invalida = () => qc.invalidateQueries({ queryKey: ["document", documentId] });
   const confronta = useMutation({
     mutationFn: (revisionId: string) => api<Confronto>(`/revisions/${revisionId}/confronta`, { method: "POST" }),
-    onSuccess: (c) => { invalida(); window.open(c.url, "_blank", "noopener"); },
+    onSuccess: (c) => { invalida(); const u = linkSicuro(c.url); if (u) window.open(u, "_blank", "noopener"); },
   });
   const set = useQuery({
     queryKey: ["suite-requisiti-set"], enabled: !!verifica,
@@ -74,14 +91,14 @@ export function SuiteDocumento({ documentId, revisions, attributes }: {
           {confronti.map((c) => (
             <ListItem key={c.job_id} divider>
               <ListItemText
-                primary={<Link href={c.url} target="_blank" rel="noopener">Confronto {c.precedente_code} → {c.revision_code}</Link>}
+                primary={<Link href={linkSicuro(c.url)} target="_blank" rel="noopener noreferrer">Confronto {c.precedente_code} → {c.revision_code}</Link>}
                 secondary={`${new Date(c.data).toLocaleString("it-IT")} · ${c.utente}`} />
             </ListItem>
           ))}
           {verifiche.map((v, i) => (
             <ListItem key={`${v.revision_id}-${i}`} divider>
               <ListItemText
-                primary={<><Link href={v.url} target="_blank" rel="noopener">Verifica «{v.nome_set}» su {v.revision_code}</Link>
+                primary={<><Link href={linkSicuro(v.url)} target="_blank" rel="noopener noreferrer">Verifica «{v.nome_set}» su {v.revision_code}</Link>
                   {" · "}<Typography component="span" variant="body2" color={`${ESITO[v.esito]?.color ?? "info"}.main`}>
                     {ESITO[v.esito]?.label ?? v.esito}{v.ko ? ` (${v.ko} ko` : ""}{v.ko && v.dubbi ? `, ${v.dubbi} dubbi)` : v.ko ? ")" : v.dubbi ? ` (${v.dubbi} dubbi)` : ""}
                   </Typography></>}

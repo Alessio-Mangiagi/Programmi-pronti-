@@ -90,7 +90,7 @@ def office_session(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
         raise ApiError(413, "too_large", f"File oltre {s.office_edit_max_bytes // 1024 ** 2} MB: modificarlo in locale")
     ext, document_type, _ = kind
     base = _callback_base(s)
-    ticket = c.svc.tokens.issue_download_ticket(c.user_id, revision_id, inline=False)
+    ticket = c.svc.tokens.issue_office_ticket(c.user_id, revision_id)
     config = {
         "documentType": document_type,
         "document": {
@@ -112,9 +112,12 @@ def office_session(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
 
 @router.get("/office/files/{revision_id}")
 def office_file(revision_id: uuid.UUID, ticket: str, svc: Services = Depends(services)):
-    """Il file per il Document Server: il ticket è quello emesso con la sessione, per quell'utente e revisione."""
+    """Il file per il Document Server: vale solo il ticket ``office`` emesso con la sessione dell'editor, per
+    quell'utente e quella revisione (non quello dei download filigranati), e solo con OnlyOffice attivo (M1)."""
+    if not enabled(svc.settings):
+        raise ApiError(404, "office_disabled", "Modifica in piattaforma non attiva in questa installazione")
     try:
-        user_id, ticket_revision, _ = svc.tokens.decode_download_ticket(ticket)
+        user_id, ticket_revision = svc.tokens.decode_office_ticket(ticket)
     except jwt.InvalidTokenError:
         raise unauthorized("Link scaduto: riaprire l'editor") from None
     if ticket_revision != revision_id:

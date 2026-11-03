@@ -1,6 +1,10 @@
 # "><(((º> sabusabu <º)))><"
 """Login automatico dal portale della suite (POST /auth/portale): sessione del portale → sessione SkyTower,
-utente creato se manca, membro dei progetti con codice commessa (CONTRATTI.md §1-2). Il portale è finto."""
+utente creato se manca, membro dei progetti con codice commessa (CONTRATTI.md §1-2). Il portale è finto.
+
+Regole di ADR-47 (revisione di sicurezza del 03/11/2026): solo email esatta e solo nell'organizzazione della
+suite (nei test: COM, quella del platform admin del seed); niente platform admin, altre organizzazioni, account
+bloccati; MFA come nel login con password; mai PROJECT_ADMIN automatico; solo progetti dell'organizzazione."""
 import uuid
 
 import pytest
@@ -63,6 +67,7 @@ def portale_finto(monkeypatch, api_world):
 
 
 def _entra(client, cookie="sid=abc"):
+    client.app.state.services.limiter.reset()       # 30/minuto per IP: qui tutte le chiamate vengono da testclient
     return client.post("/auth/portale", headers={"Cookie": cookie})
 
 
@@ -87,12 +92,93 @@ def test_utente_esistente_entra_per_email(client, api_world, portale_finto):
     assert "cde_rt=" in (r.headers.get("set-cookie") or "")      # cookie di refresh come dopo il login
 
 
-def test_utente_esistente_per_parte_prima_della_chiocciola(client, api_world, portale_finto):
+def test_parte_prima_della_chiocciola_non_aggancia_account_esistenti(client, api_world, portale_finto):
+    """Lo username del portale "des.designer" non diventa l'utente des.designer@des.example (altra organizzazione):
+    si crea un utente nuovo dell'organizzazione della suite con l'email <username>@dominio (A2)."""
     _, w = api_world
-    portale_finto["loggato"]("des.designer")          # nessuna email dal portale: username = parte locale
+    portale_finto["loggato"]("des.designer")          # nessuna email dal portale
     r = _entra(client)
     assert r.status_code == 200, r.text
-    assert r.json()["creato"] is False and r.json()["email"] == w.emails["des_designer"]
+    assert r.json()["creato"] is True and r.json()["email"] == "des.designer@cosedilspa.com"
+    assert r.json()["email"] != w.emails["des_designer"]
+
+
+def test_altre_organizzazioni_e_platform_admin_non_entrano(client, api_world, portale_finto):
+    _, w = api_world
+    portale_finto["loggato"]("des.designer", email=w.emails["des_designer"])   # utente di DES, non della suite
+    r = _entra(client)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "portale_altra_organizzazione", r.text
+    portale_finto["loggato"]("platform", email=w.emails["platform"])          # platform admin della suite
+    r = _entra(client)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "portale_platform_admin", r.text
+    assert "access_token" not in r.json()
+
+
+def test_account_bloccato_non_entra_e_il_blocco_resta(client, api_world, portale_finto):
+    import psycopg
+    urls, w = api_world
+    portale_finto["loggato"]("com.dl", email=w.emails["com_dl"])
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("UPDATE cde.users SET locked_until = now() + interval '10 minutes', failed_login_count = 7 "
+                     "WHERE email = %s", [w.emails["com_dl"]])
+    try:
+        r = _entra(client)
+        assert r.status_code == 403 and r.json()["error"]["code"] == "portale_bloccato", r.text
+        with psycopg.connect(urls.owner) as conn:
+            fails = conn.execute("SELECT failed_login_count FROM cde.users WHERE email = %s", [w.emails["com_dl"]]).fetchone()[0]
+        assert fails == 7, "il portale non azzera i tentativi falliti"
+    finally:
+        with psycopg.connect(urls.owner) as conn:
+            conn.execute("UPDATE cde.users SET locked_until = NULL, failed_login_count = 0 WHERE email = %s", [w.emails["com_dl"]])
+
+
+def test_mfa_richiesta_come_nel_login(client, api_world, portale_finto):
+    """Organizzazione con MFA obbligatoria: dal portale arriva il token parziale, non la sessione."""
+    import psycopg
+    urls, w = api_world
+    utente = "m.neri" + uuid.uuid4().hex[:4]
+    portale_finto["loggato"](utente, nome="Marco Neri")
+    assert _entra(client).status_code == 200                       # creato senza MFA obbligatoria
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("UPDATE cde.organizations SET mfa_required = true WHERE id = %s", [w.orgs["COM"]])
+    try:
+        r = _entra(client)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["status"] == "mfa_enrollment_required" and d["mfa_token"] and "access_token" not in d
+        assert "cde_rt=" not in (r.headers.get("set-cookie") or "")
+    finally:
+        with psycopg.connect(urls.owner) as conn:
+            conn.execute("UPDATE cde.organizations SET mfa_required = false WHERE id = %s", [w.orgs["COM"]])
+
+
+def test_al_portale_va_solo_il_sid(monkeypatch):
+    """Il refresh token di SkyTower (cde_rt) e gli altri cookie non escono verso il portale (M3); esito in cache."""
+    from cde_api.modules import portale as mod
+
+    inviati = []
+
+    class Risposta:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"username": "x", "email": "x@cosedilspa.com"}'
+
+    def urlopen(req, timeout=None):
+        inviati.append(req.get_header("Cookie"))
+        return Risposta()
+    monkeypatch.setattr(mod.cosedil_sso, "ENABLED", True)
+    monkeypatch.setattr(mod.urllib.request, "urlopen", urlopen)
+    mod._cache.clear()
+    sid = "sid-" + uuid.uuid4().hex
+    cookie = f"cde_rt=SEGRETO; altro=1; sid={sid}"
+    assert mod.verifica_portale(cookie)["username"] == "x"
+    assert mod.verifica_portale(cookie)["username"] == "x"          # seconda volta dalla cache
+    assert inviati == [f"sid={sid}"]
 
 
 def test_utente_nuovo_creato_e_membro_dei_progetti_con_commessa(client, progetto_collegato, portale_finto, as_user):
@@ -123,7 +209,8 @@ def test_utente_nuovo_creato_e_membro_dei_progetti_con_commessa(client, progetto
     assert client.post("/auth/login", json={"email": d["email"], "password": "qualunque-cosa"}).status_code == 401
 
 
-def test_admin_del_portale_diventa_project_admin(client, progetto_collegato, portale_finto):
+def test_admin_del_portale_non_diventa_project_admin(client, progetto_collegato, portale_finto):
+    """Admin del portale → org admin dell'organizzazione della suite, ma nei progetti DESIGNER come tutti (A3)."""
     w = progetto_collegato
     utente = "a.bianchi" + uuid.uuid4().hex[:4]
     portale_finto["loggato"](utente, nome="Anna Bianchi", admin=True)
@@ -131,4 +218,26 @@ def test_admin_del_portale_diventa_project_admin(client, progetto_collegato, por
     assert r.status_code == 200, r.text
     h = {"Authorization": f"Bearer {r.json()['access_token']}"}
     assert client.get("/me", headers=h).json()["is_org_admin"] is True
-    assert client.get(f"/projects/{w.project_id}", headers=h).json()["my_permissions"]["ADMIN"]["PROJECT"] is True
+    perm = client.get(f"/projects/{w.project_id}", headers=h).json()["my_permissions"]
+    assert perm["ADMIN"]["PROJECT"] is False and (perm["READ"]["PROJECT"] or perm["READ"]["OWN_ORGANIZATION"])
+
+
+def test_progetti_di_altri_committenti_non_ricevono_membri(client, api_world, portale_finto):
+    """Un progetto di un'altra organizzazione con codice commessa non riceve gli utenti del portale (A3)."""
+    import psycopg
+    urls, w = api_world
+    codice = "EXT-" + uuid.uuid4().hex[:5].upper()
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("UPDATE cde.projects SET settings = settings || jsonb_build_object('commessa', %s::text) WHERE id = %s",
+                     [codice, w.project2_id])
+    try:
+        utente = "e.galli" + uuid.uuid4().hex[:4]
+        portale_finto["loggato"](utente, nome="Elena Galli")
+        r = _entra(client)
+        assert r.status_code == 200, r.text
+        assert "EXT01" not in r.json()["progetti_aggiunti"]
+        h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        assert client.get(f"/projects/{w.project2_id}", headers=h).status_code in (403, 404)
+    finally:
+        with psycopg.connect(urls.owner) as conn:
+            conn.execute("UPDATE cde.projects SET settings = settings - 'commessa' WHERE id = %s", [w.project2_id])

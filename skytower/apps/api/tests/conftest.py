@@ -122,3 +122,19 @@ def client(api_app):
 
 def act_as(conn, user_id) -> None:
     conn.execute("SELECT set_config('app.user_id', %s, true)", [str(user_id) if user_id else ""])
+
+
+@pytest.fixture(autouse=True)
+def registro_commesse_vuoto(monkeypatch, tmp_path):
+    """Il registro delle commesse della suite (shared/suite/commesse.json) è quello del PC su cui girano i test:
+    qui si parte sempre da un registro vuoto, così i codici casuali dei test sono ammessi (ADR-47). Chi vuole
+    provare il controllo scrive il suo registro in ``suite_link.FILE_COMMESSE``."""
+    import sys
+    from pathlib import Path
+
+    cartella = str(Path(__file__).resolve().parents[4] / "shared" / "suite")
+    if cartella not in sys.path:
+        sys.path.insert(0, cartella)
+    import suite_link
+
+    monkeypatch.setattr(suite_link, "FILE_COMMESSE", tmp_path / "commesse.json")

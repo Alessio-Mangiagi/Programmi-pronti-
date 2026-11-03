@@ -83,6 +83,17 @@ class TokenService:
         p = self._decode(token, DOWNLOAD)
         return uuid.UUID(p["sub"]), uuid.UUID(p["rev"]), bool(p.get("inline"))
 
+    def issue_office_ticket(self, user_id: uuid.UUID, revision_id: uuid.UUID) -> str:
+        """Ticket di 5' con cui il Document Server di OnlyOffice scarica il file da modificare.
+
+        È un tipo a parte rispetto al ticket di download: quello porta a ``/watermarked`` e, se valesse anche
+        su ``/office/files``, darebbe l'originale senza filigrana a chi ha solo il permesso di scaricare (M1)."""
+        return self._encode({"typ": OFFICE, "sub": str(user_id), "rev": str(revision_id)}, 300)
+
+    def decode_office_ticket(self, token: str) -> tuple[uuid.UUID, uuid.UUID]:
+        p = self._decode(token, OFFICE)
+        return uuid.UUID(p["sub"]), uuid.UUID(p["rev"])
+
     def decode_export(self, token: str) -> dict:
         """Verifica la firma di un export (G49): RS256 con la chiave del server, ``typ`` export, nessuna
         scadenza né audience. Solleva ``jwt.PyJWTError`` se la firma non regge o non è un export."""
@@ -102,6 +113,7 @@ class TokenService:
 
 SSE = "sse"
 DOWNLOAD = "download"
+OFFICE = "office"            # ticket per il Document Server di OnlyOffice: vale solo su /office/files (M1)
 
 
 def new_opaque_token() -> tuple[str, bytes]:

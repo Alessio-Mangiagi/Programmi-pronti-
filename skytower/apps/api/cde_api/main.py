@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import __version__, errors
 from .config import Settings, get_settings
@@ -72,6 +74,9 @@ def build_services(settings: Settings) -> Services:
     )
 
 
+_SUITE_UPLOAD = re.compile(r"^/suite/commesse/[^/]+/documenti$")
+
+
 def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
     settings = settings or get_settings()
     svc = services or build_services(settings)
@@ -84,12 +89,29 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         svc.db.close()
 
     app = FastAPI(title="CDE ISO 19650 API", version=__version__, lifespan=lifespan,
-                  docs_url=None if settings.env == "prod" else "/docs", redoc_url=None)
+                  # documentazione interattiva solo in sviluppo: in staging e produzione (server della suite)
+                  # lo schema completo dell'API non serve a nessuno e carica script da una CDN (B2)
+                  docs_url="/docs" if settings.env in ("dev", "test") else None, redoc_url=None,
+                  openapi_url="/openapi.json" if settings.env in ("dev", "test") else None)
     app.state.services = svc
     errors.install(app)
 
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
                        allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"])
+
+    @app.middleware("http")
+    async def body_limit(request: Request, call_next):
+        """413 prima di leggere un corpo troppo grande (Content-Length dichiarato): Starlette lo terrebbe tutto in
+        memoria. Il tetto è ``request_max_bytes``, tranne il caricamento dalla suite (``suite_upload_max_bytes``).
+        Vale anche per chi parla direttamente con l'API saltando il limite di Caddy (M4, B12)."""
+        dichiarato = request.headers.get("content-length")
+        if dichiarato and dichiarato.isdigit():
+            suite = request.method == "POST" and _SUITE_UPLOAD.match(request.url.path)
+            limite = settings.suite_upload_max_bytes if suite else settings.request_max_bytes
+            if int(dichiarato) > limite:
+                return JSONResponse({"error": {"code": "too_large",
+                                               "message": f"Richiesta oltre {limite // 1024 ** 2} MB"}}, status_code=413)
+        return await call_next(request)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):

@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     upload_session_ttl_hours: int = 24
     # Filigrana: i PDF passano dall'API (non dall'URL firmato di S3), quindi c'è un tetto alla dimensione
     watermark_max_bytes: int = 200 * 1024 ** 2
+    # Corpo massimo di una richiesta all'API (M4): i file vanno su S3 con URL firmati, all'API arrivano solo JSON.
+    # Fa eccezione il caricamento dalla suite (POST /suite/commesse/{codice}/documenti), col suo tetto (B12):
+    # quel corpo si legge tutto in memoria per mandarlo a S3, non deve poter essere da gigabyte.
+    request_max_bytes: int = 16 * 1024 ** 2
+    suite_upload_max_bytes: int = 200 * 1024 ** 2
     zip_max_bytes: int = 2 * 1024 ** 3      # download multiplo: oltre si scarica in più parti
     # OCR delle pagine scansionate dei PDF (Tesseract): senza eseguibile si salta (ADR-33)
     ocr_enabled: bool = True

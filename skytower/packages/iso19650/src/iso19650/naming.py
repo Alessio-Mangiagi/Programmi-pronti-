@@ -50,6 +50,25 @@ class FieldSpec(BaseModel):
         return self
 
 
+# Espressioni dei campi "regex" scelte dal Project Admin e applicate ai nomi file di tutti: niente costrutti che
+# possono far lavorare il motore per minuti su un nome costruito ad arte (ReDoS) e lunghezza contenuta. Si controlla
+# al salvataggio dello schema, non al caricamento: gli schemi già salvati restano leggibili (M9).
+PATTERN_MAX = 60
+_ANNIDATI = re.compile(r"\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)\s*[+*{]")
+_BACKREF = re.compile(r"\\[1-9]|\(\?P=|\\g<|\\k<")
+
+
+def pattern_insicuro(pattern: str) -> str | None:
+    """Motivo per cui ``pattern`` non è ammesso in uno schema di naming, o None se va bene."""
+    if len(pattern) > PATTERN_MAX:
+        return f"espressione di {len(pattern)} caratteri: massimo {PATTERN_MAX}"
+    if _BACKREF.search(pattern):
+        return "riferimenti all'indietro (\\1, (?P=...)) non ammessi"
+    if _ANNIDATI.search(pattern):
+        return "quantificatori annidati come (a+)+ non ammessi: rallenterebbero ogni caricamento"
+    return None
+
+
 class FieldError(BaseModel):
     field: str
     label: str
@@ -84,6 +103,15 @@ class AutoNumbering(BaseModel):
 class NamingScheme(BaseModel):
     separator: str = Field(default="-", min_length=1, max_length=1, pattern=r"^[-_.]$")
     fields: list[FieldSpec] = Field(min_length=2, max_length=12)
+
+    def pattern_non_ammessi(self) -> list[str]:
+        """Campi regex con un'espressione rischiosa (vedi ``pattern_insicuro``): da controllare prima di salvare."""
+        out = []
+        for f in self.fields:
+            motivo = pattern_insicuro(f.pattern) if f.kind == "regex" and f.pattern else None
+            if motivo:
+                out.append(f"{f.label}: {motivo}")
+        return out
 
     @model_validator(mode="after")
     def _unique_keys(self) -> NamingScheme:

@@ -35,7 +35,10 @@ class OidcError(Exception):
 def _public_host(url: str) -> None:
     """SSRF: l'issuer lo sceglie l'admin di un'organizzazione, quindi fuori da dev/test niente indirizzi interni
     (metadati AWS 169.254.x, VPC, loopback). Resta il rischio di DNS rebinding tra risoluzione e connessione."""
-    if os.environ.get("CDE_ENV", "dev") in ("dev", "test"):
+    # l'ambiente dalla variabile di processo se c'è, altrimenti dalle impostazioni (che leggono anche il file .env):
+    # prima, con CDE_ENV scritta solo nel .env, la guardia restava spenta (M11)
+    from ..config import get_settings
+    if (os.environ.get("CDE_ENV") or get_settings().env) in ("dev", "test"):
         return
     host = urllib.parse.urlparse(url).hostname or ""
     try:
@@ -48,18 +51,30 @@ def _public_host(url: str) -> None:
             raise OidcError("idp_error", f"indirizzo non pubblico {ip} per {host}")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Un redirect dall'IdP è un errore: discovery, JWKS e token endpoint rispondono sempre direttamente."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect non ammesso", headers, fp)
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def fetch_json(url: str, form: dict | None = None, *, basic: tuple[str, str] | None = None) -> dict:
     """GET (o POST application/x-www-form-urlencoded) di un documento JSON, timeout 10"."""
     if not url.startswith(("https://", "http://")):
         raise OidcError("idp_error", "URL non HTTP")
     _public_host(url)
     data = urllib.parse.urlencode(form).encode() if form is not None else None
-    req = urllib.request.Request(url, data=data, headers={"Accept": "application/json"})  # noqa: S310
+    req = urllib.request.Request(url, data=data, headers={"Accept": "application/json"})
     if basic:
         token = base64.b64encode(f"{urllib.parse.quote(basic[0])}:{urllib.parse.quote(basic[1])}".encode()).decode()
         req.add_header("Authorization", f"Basic {token}")
     try:
-        with urllib.request.urlopen(req, timeout=10) as res:  # noqa: S310 - schema controllato sopra
+        # nessun redirect seguito: un issuer pubblico che risponde 302 verso un indirizzo interno (metadati cloud,
+        # database, MinIO, portale) aggirerebbe il controllo fatto qui sopra sull'host (M11)
+        with _OPENER.open(req, timeout=10) as res:
             return json.loads(res.read(1024 * 1024))
     except urllib.error.HTTPError as exc:
         raise OidcError("idp_error", f"HTTP {exc.code}") from None

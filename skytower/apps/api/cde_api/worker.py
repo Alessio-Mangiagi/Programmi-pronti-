@@ -165,8 +165,9 @@ def make_svg_derivatives(conn: psycopg.Connection, storage: Storage, limit: int 
             log.exception("derivato SVG del file %s non riuscito (tentativo %s)", r["file_id"], r["attempts"])
             # senza ODA File Converter ritentare non serve: FAILED subito, cosi' il viewer mostra il motivo e il
             # download invece di "in preparazione" per tre giri del job (UAT U45, migrazione 0037)
-            from .dxf2svg import DwgConverterMissing
-            definitivo = isinstance(exc, DwgConverterMissing)
+            # idem per un disegno oltre i limiti del viewer: rifarlo darebbe lo stesso esito (M8)
+            from .dxf2svg import DisegnoTroppoGrande, DwgConverterMissing
+            definitivo = isinstance(exc, (DwgConverterMissing, DisegnoTroppoGrande))
             with conn.transaction():
                 conn.execute("SELECT cde.derivative_done_svg(%s, false, NULL, NULL, NULL, %s, NULL, %s)",
                              [r["file_id"], f"{type(exc).__name__}: {exc}", definitivo])
