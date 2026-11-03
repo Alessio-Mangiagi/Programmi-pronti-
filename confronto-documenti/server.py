@@ -121,6 +121,60 @@ if cosedil_sso is not None and suite_link is not None and getattr(cosedil_sso, "
             return jsonify(ok=False, error=cosedil_sso.MSG_PORTALE_GIU), 503
         return jsonify(ok=False, error=cosedil_sso.MSG_NON_LOGGATO), 401
 
+# ---------------------------------------------------------------------------
+# Chi sta chiamando e cosa può fare sui confronti (revisione di sicurezza del 03/11/2026).
+# Prima chiunque avesse una sessione poteva annullare, cancellare o annotare qualunque confronto
+# conoscendone l'id (passa negli URL e nei report): ora ogni job ricorda il proprietario.
+
+from flask import g  # noqa: E402 - usato dalle funzioni qui sotto anche quando il gate suite non è montato
+
+CODA_MAX_PER_UTENTE = max(1, int(os.environ.get("CONFRONTO_CODA_MAX_PER_UTENTE", "3")))
+
+
+def _identita() -> tuple[str, bool]:
+    """(username, è admin) di chi chiama.
+
+    - token di servizio della suite (altre app, es. SkyTower): username dichiarato nell'header, admin;
+    - sessione del portale: username e flag admin del portale;
+    - password HTTP Basic o SSO spento (uso da solo, Docker, sviluppo): un solo utente, admin.
+    """
+    v = g.get("cosedil") if hasattr(g, "get") else None
+    if v and v.get("ok"):
+        if v.get("suite"):
+            return (v.get("username") or "suite"), True
+        return (v.get("username") or ""), bool(v.get("admin"))
+    return (_UTENTE if _PASSWORD else "locale"), True
+
+
+def _puo_gestire(job: dict | None) -> bool:
+    """Annullare, eliminare o annotare un confronto può farlo chi l'ha avviato o un admin.
+    I confronti fatti prima di questa regola non hanno proprietario: restano gestibili da tutti,
+    come prima, finché scadono dallo storico (CONFRONTO_STORICO_GIORNI)."""
+    if job is None:
+        return False
+    username, admin = _identita()
+    proprietario = job.get("proprietario")
+    return admin or not proprietario or proprietario == username
+
+
+def _coda_piena(username: str) -> bool:
+    """Più di CODA_MAX_PER_UTENTE confronti in coda per lo stesso utente: si aspetta che finiscano.
+    Senza questo tetto un utente intasa il motore (OCR su file da 200 MB) per tutti gli altri."""
+    with JOBS_LOCK:
+        in_coda = sum(1 for j in JOBS.values()
+                      if j.get("status") == "queued" and j.get("proprietario") == username)
+    return in_coda >= CODA_MAX_PER_UTENTE
+
+
+def _controlla_esposizione(host: str, sso_spento: bool, password: str) -> None:
+    """In ascolto sulla rete (HOST diverso da loopback) senza alcun login l'app sarebbe aperta a
+    chiunque in LAN: upload, storico e cancellazioni. Meglio non partire che partire così."""
+    if host not in ("127.0.0.1", "localhost", "::1") and sso_spento and not password:
+        raise SystemExit(
+            f"HOST={host}: l'app sarebbe raggiungibile dalla rete senza login. Impostare CONFRONTO_PASSWORD "
+            "oppure lasciare attivo il gate del portale (COSEDIL_SSO non a off), o ascoltare solo su 127.0.0.1.")
+
+
 # Password semplice per l'uso fuori dall'ufficio (Docker / cloud, sempre dietro
 # HTTPS): con CONFRONTO_PASSWORD impostata ogni richiesta chiede utente e
 # password (HTTP Basic). Utente: CONFRONTO_UTENTE, default "cosedil".
@@ -998,6 +1052,9 @@ def _save_upload(f, tmp_dir: Path, job_id: str, side: str) -> Path | None:
 
 @app.post("/api/compare")
 def compare():
+    username, _ = _identita()
+    if _coda_piena(username):
+        return jsonify({"error": f"Hai già {CODA_MAX_PER_UTENTE} confronti in coda: aspetta che finiscano."}), 429
     f1 = request.files.get("pdf1")
     f2 = request.files.get("pdf2")
     if not f1 or not f2:
@@ -1028,6 +1085,7 @@ def compare():
         JOBS[job_id] = {
             "id": job_id, "creato": datetime.now().isoformat(timespec="seconds"),
             "status": "queued", "message": "In coda...", "cancel": False,
+            "proprietario": username,   # chi può annullarlo, eliminarlo, annotarlo (oltre agli admin)
             "name_a": f1.filename, "name_b": f2.filename,
             "total_pages": 0, "current_page": 0, "results": [],
         }
@@ -1047,6 +1105,8 @@ def cancel_job(job_id: str):
     with JOBS_LOCK:
         if job_id not in JOBS:
             return jsonify({"error": "Job non trovato."}), 404
+        if not _puo_gestire(JOBS[job_id]):
+            return jsonify({"error": "Puoi annullare solo i confronti che hai avviato tu."}), 403
         JOBS[job_id]["cancel"] = True
     return jsonify({"ok": True})
 
@@ -1123,7 +1183,9 @@ def job_status(job_id: str):
 
 @app.delete("/api/jobs/<job_id>")
 def job_delete(job_id: str):
-    """Elimina un confronto dallo storico (e dalla RAM se finito)."""
+    """Elimina un confronto dallo storico (e dalla RAM se finito): solo chi l'ha avviato o un admin."""
+    if not _puo_gestire(get_job(job_id)):
+        return jsonify({"error": "Puoi eliminare solo i confronti che hai avviato tu."}), 403
     with JOBS_LOCK:
         job = JOBS.get(job_id)
         if job and job.get("status") not in ("done", "error", "cancelled"):
@@ -1155,6 +1217,8 @@ def job_revisione(job_id: str):
     job = get_job(job_id)
     if job is None or job.get("status") != "done":
         return jsonify({"error": "Confronto non trovato."}), 404
+    if not _puo_gestire(job):
+        return jsonify({"error": "Puoi annotare solo i confronti che hai avviato tu."}), 403
     rev = dict(job.get("revisione") or {})
     if stato or nota:
         rev[chiave] = {"stato": stato, "nota": nota}
@@ -1172,6 +1236,7 @@ if __name__ == "__main__":
     # che avvia, così i PC della rete raggiungono l'app invece di trovarsi un
     # link morto. L'accesso resta protetto dal gate SSO.
     HOST = os.environ.get("HOST", "127.0.0.1")
+    _controlla_esposizione(HOST, SSO_SPENTO, _PASSWORD)
     PORT = int(os.environ.get("PORT", "5001"))
     indirizzo = f"http://{'localhost' if HOST == '0.0.0.0' else HOST}:{PORT}"
     print(f"Confronta documenti — {indirizzo}" + (" (e in LAN)" if HOST == "0.0.0.0" else ""))
