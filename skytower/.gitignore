@@ -36,3 +36,6 @@ backend.hcl
 .idea/
 Thumbs.db
 .DS_Store
+
+# Modello del .env per il rilascio Docker: segreti vuoti, serve a installa.* per creare il .env vero
+!infra/docker/.env.esempio
