@@ -131,6 +131,14 @@ scrive `modulo.txt` accanto ad `alyante.json`.
 `npm run moduli` ([tools/verifica_moduli.ts](tools/verifica_moduli.ts)) rilegge i moduli
 compilati in `contratti/moduli/` con la stessa filiera della route (`risultatoDaModulo`),
 senza OCR né AI, e scrive per ognuno `<nome>_Import_Contratti.xlsx`.
+`npm run confronta-moduli` ([tools/confronta_moduli.ts](tools/confronta_moduli.ts)) mette
+quei moduli, scritti a mano, accanto a quello che il programma estrae da solo dagli stessi
+PDF (`npm run harness`): testata colonna per colonna, voci una per una.
+
+**GPU RTX serie 50**: paddlepaddle-gpu cu126 non le supporta e legge le pagine vuote senza
+errori. Il worker se ne accorge all'avvio (`prova_lettura` in `ocr_worker.py`) e passa alla
+CPU, più lenta (~35 s/pagina). Per tornare alla GPU serve un paddle per CUDA 12.8 o
+successivo (indice `cu129`).
 
 ## Export Import_Contratti (regole)
 

@@ -200,6 +200,21 @@ quattro su cinque con somma delle voci = importo dell'Art. 4 al centesimo. Il su
 Ticopter no (193.416,80 contro 234.636,80): la differenza è nel documento, non nel modulo,
 ed è segnata `# DA VERIFICARE`.
 
+### Scansione del programma contro modulo: `npm run confronta-moduli`
+
+[`tools/confronta_moduli.ts`](../tools/confronta_moduli.ts) usa i moduli compilati a mano
+come **valore giusto** e li mette accanto a quello che il programma estrae da solo
+(`npm run harness`, output in `tests/out/<pdf>/alyante.json`). Il PDF d'origine si ricava
+dal commento `# Modulo compilato a mano leggendo "…pdf"` in testa al modulo. Entrambi
+passano da `buildImportContrattiRowsFromAlyante`, quindi si confrontano le celle che vanno
+in Alyante:
+- **testata**: DITTA, CODICE CONTRATTO, PROGETTO, FORNITORE, DIVISIONE, DATA, anticipi,
+  oneri, COND.PAG, OGGETTO (somiglianza ≥ 60% delle parole = "simile"), CIG, CUP, RG, RI;
+- **voci**: tre passate su tutto l'elenco: esatte (codice + quantità + prezzo), poi stesso
+  codice con valori diversi, poi stessi valori con codice diverso; il resto è mancante o
+  in più.
+Scrive `_confronto.md` e `_confronto.json` accanto ai moduli (cartella non versionata).
+
 Regole di compilazione emerse (anche in GUIDA_UTILIZZO.md):
 - **RG e RI insieme**: `ritenuteRgRi` restituisce i codici scritti se ce n'è almeno uno, e
   non ricava più RG dalla percentuale. Con `CODICE RI: R005` va scritto anche `CODICE RG`.
