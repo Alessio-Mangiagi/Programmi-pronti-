@@ -82,6 +82,13 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     svc = services or build_services(settings)
     logging.basicConfig(level=logging.INFO)
 
+    if settings.insecure_cookies:
+        # B8 (revisione di sicurezza del 03/11/2026): HTTP in LAN è una scelta temporanea, la strada giusta è
+        # SUITE_DOMINIO + Caddy con TLS. Intanto il refresh dura poco (vedi Settings._refresh_breve_in_http).
+        logging.getLogger("cde.security").warning(
+            "ATTENZIONE: cookie di sessione senza Secure (CDE_COOKIE_SECURE=false) in ambiente %s: il refresh "
+            "token viaggia in chiaro sulla rete. Durata della sessione ridotta a %s ore. Configurare HTTPS "
+            "(SUITE_DOMINIO + Caddy) appena possibile.", settings.env, settings.refresh_token_ttl_s // 3600)
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         svc.db.open()

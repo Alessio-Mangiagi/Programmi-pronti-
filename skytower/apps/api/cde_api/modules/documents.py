@@ -29,7 +29,9 @@ from pydantic import BaseModel, Field, field_validator
 from ..deps import Ctx, Services, client_ip, ctx, require_container, require_project, services
 from ..errors import ApiError, forbidden, not_found, unauthorized
 from ..events import security_event
+from ..security.tokens import DOWNLOAD_MAX_USES_ATTACHMENT, DOWNLOAD_MAX_USES_INLINE
 from ..storage import Storage, plan_parts
+from ..validation import JsonObject
 from ..watermark import WatermarkError, stamp
 
 router = APIRouter(tags=["documents"])
@@ -43,7 +45,8 @@ Suitability = Literal["S0", "S1", "S2", "S3", "S4", "A1", "A2", "A3", "A4", "A5"
 class DocumentSettingsIn(BaseModel):
     naming_scheme: NamingScheme | None = None
     auto_number: AutoNumbering | None = None    # rinomina automatica in caricamento (None = disattivata)
-    metadata_schema: dict = Field(default_factory=lambda: {"type": "object", "additionalProperties": True})
+    # B5 (revisione di sicurezza del 03/11/2026): JSON liberi con tetto in byte, vedi validation.py
+    metadata_schema: JsonObject = Field(default_factory=lambda: {"type": "object", "additionalProperties": True})
 
     @field_validator("metadata_schema")
     @classmethod
@@ -96,7 +99,7 @@ class UploadInitIn(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     suitability: Literal["S0"] = "S0"          # in WIP sempre S0 (gli altri codici col cambio di stato, Sprint 3)
     comment: str | None = Field(default=None, max_length=2000)
-    attributes: dict = Field(default_factory=dict)
+    attributes: JsonObject = Field(default_factory=dict)       # tetto 64 KB (B5)
     expected_revision: str | None = None       # lock ottimistico: ultima revisione vista dal client
     auto_name: AutoNameIn | None = None        # rinomina secondo la naming convention (filename = nome originale)
 
@@ -123,7 +126,7 @@ class PartsIn(BaseModel):
 class DocumentPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     description: str | None = Field(default=None, max_length=4000)
-    attributes: dict | None = None
+    attributes: JsonObject | None = None                       # tetto 64 KB (B5)
 
 
 # ---------------------------------------------------------------------
@@ -966,10 +969,11 @@ def _derivative(c: Ctx, rev: dict, ttl: int, kind: str = "GLB") -> dict | None:
 def watermarked_revision(revision_id: uuid.UUID, ticket: str, request: Request, svc: Services = Depends(services)):
     """Il PDF timbrato per l'utente del ticket. I permessi si ricontrollano: il ticket non sopravvive a una revoca."""
     try:
-        user_id, ticket_revision, inline = svc.tokens.decode_download_ticket(ticket)
+        t = svc.tokens.download_ticket(ticket)
     except jwt.InvalidTokenError:
         raise unauthorized("Link scaduto: riaprire il documento") from None
-    if ticket_revision != revision_id:
+    user_id, inline = t.user_id, t.inline
+    if t.revision_id != revision_id or not t.jti:
         raise unauthorized("Link non valido")
     with svc.db.app_tx(user_id) as conn:
         who = conn.execute(
@@ -984,6 +988,12 @@ def watermarked_revision(revision_id: uuid.UUID, ticket: str, request: Request, 
             raise ApiError(409, "watermark_off", "Filigrana non più richiesta: riaprire il documento")
     if rev["size_bytes"] > svc.settings.watermark_max_bytes:
         raise _too_large(svc.settings, rev)
+    # B6 (revisione di sicurezza del 03/11/2026): il link non si riusa a piacere fino alla scadenza. Si conta
+    # qui, dopo i controlli, così un tentativo respinto (utente disattivato, filigrana tolta) non lo consuma.
+    # Allegato: monouso; visualizzatore: pochi usi dallo stesso IP del primo (vedi RateLimiter.use_ticket).
+    max_uses = DOWNLOAD_MAX_USES_INLINE if inline else DOWNLOAD_MAX_USES_ATTACHMENT
+    if not svc.limiter.use_ticket(t.jti, t.ttl_left, ip=client_ip(request), max_uses=max_uses):
+        raise unauthorized("Link già usato: riaprire il documento")
     data = b"".join(svc.storage.iter_object(rev["storage_key"], rev["storage_version_id"]))
     when = datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC")
     footer = [f"Scaricato da {who['name']} <{who['email']}> - {who['org']} - {when} - IP {client_ip(request) or 'n/d'}",

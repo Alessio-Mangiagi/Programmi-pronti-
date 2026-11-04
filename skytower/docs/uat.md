@@ -64,6 +64,7 @@ servono soprattutto a giudicare chiarezza e usabilità, non a cercare regression
 | U49 | `test_api_portale.py`, `test_api_suite.py`, `test_security_fix.py` |
 | U50 | `test_workflow_grafo.py` (validazione per nodo e arco, conversione dalla versione 1) |
 | U51 | `test_workflow_grafo.py` (rami paralleli, riunioni, ritorno indietro, processo RdA completo) |
+| U53 | `test_security_bassi.py` (ricerca organizzazione, inviti generici, verifica registro incrementale, JSON con tetto, ticket monouso, refresh breve in HTTP, domini SSO, stream SSE) |
 
 Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiarezza, usabilità e resa visiva
 (in particolare del modello IFC e del confronto tra revisioni), non a cercare regressioni.
@@ -124,6 +125,7 @@ Tutti gli scenari hanno un test automatico: il collaudo serve a giudicare chiare
 | U49 | Amministratore del portale | Dal portale apre SkyTower con un utente normale, poi con il proprio account personale (platform admin); da InCampo chiede i documenti di una commessa dichiarando l'email di un utente di un'altra organizzazione | L'utente normale entra senza password ed è DESIGNER solo nei progetti dell'azienda con codice commessa; il platform admin vede «entra con password e secondo fattore»; la chiamata con l'utente dell'altra organizzazione risponde 403 e il registro di sicurezza mostra l'evento SUITE_CALL con l'app | |
 | U50 | Project Admin | Nella scheda Workflow apre «Nuovo workflow», sceglie «Processo», mette sul foglio a scacchiera avvio, due decisioni con esiti propri (un esito giallo e uno rosso), un'attività, una notifica e due stati finali; collega ogni esito trascinandolo sul nodo di arrivo; prova a salvare con un esito scollegato, poi lo collega e salva | I nodi si agganciano alle caselle; il salvataggio con l'esito scollegato è rifiutato e il nodo è evidenziato con «L'esito … non porta da nessuna parte»; dopo la correzione il modello è salvato come versione nuova e i workflow già in corso non cambiano | |
 | U51 | Buyer / Project Admin | Nella commessa Galleria Fortolese apre il processo «[PROVA] RdA – Galleria Fortolese» (caricato con `cde workflow-rda --progetto GALFOR`), completa la selezione imprese di due buyer, poi apre la vista finale | Lo schema è quello della RdA → gara → affidamento: approvazione PM e scelta procedura verdi con «In valutazione ✓» e «In gara ✓» sugli archi, le due selezioni fatte, le altre gialle (attive), le offerte e le autorizzazioni grigie; cliccando un nodo si vedono compiti, esiti, commenti e date | |
+| U53 | Admin dell'organizzazione | Invita un collega con un'email già registrata in un'altra organizzazione, poi uno nuovo; apre un PDF con filigrana nel visualizzatore, lo chiude e lo riapre; copia il link del PDF in un altro PC della rete e lo apre | Per entrambi gli inviti compare lo stesso messaggio «invito inviato»; solo il collega nuovo riceve l'email e compare nell'elenco; il PDF si riapre senza errori dallo stesso PC, il link aperto dall'altro PC risponde «Link già usato: riaprire il documento» (ADR-49) | |
 
 ## Verbale
 

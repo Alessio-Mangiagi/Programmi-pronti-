@@ -21,6 +21,21 @@ MFA_PENDING = "mfa_pending"
 
 
 @dataclass(frozen=True)
+class Ticket:
+    """Ticket da link (SSE, download filigranato) già verificato: chi, cosa, e i dati per contarne gli usi (B6)."""
+    user_id: uuid.UUID
+    jti: str
+    exp: int
+    revision_id: uuid.UUID | None = None
+    inline: bool = False
+
+    @property
+    def ttl_left(self) -> int:
+        """Secondi di validità rimasti: tanto devono vivere i contatori d'uso del ticket."""
+        return max(self.exp - int(time.time()), 0)
+
+
+@dataclass(frozen=True)
 class AccessClaims:
     user_id: uuid.UUID
     org_id: uuid.UUID
@@ -73,15 +88,26 @@ class TokenService:
         return self._encode({"typ": SSE, "sub": str(user_id)}, 60)
 
     def decode_sse_ticket(self, token: str) -> uuid.UUID:
-        return uuid.UUID(self._decode(token, SSE)["sub"])
+        return self.sse_ticket(token).user_id
+
+    def sse_ticket(self, token: str) -> Ticket:
+        """Ticket SSE verificato, con ``jti`` ed ``exp`` per renderlo monouso (B6)."""
+        p = self._decode(token, SSE)
+        return Ticket(uuid.UUID(p["sub"]), str(p.get("jti") or ""), int(p["exp"]))
 
     def issue_download_ticket(self, user_id: uuid.UUID, revision_id: uuid.UUID, *, inline: bool) -> str:
         """Ticket di 5' per scaricare un PDF filigranato: il browser apre l'URL senza header Authorization."""
         return self._encode({"typ": DOWNLOAD, "sub": str(user_id), "rev": str(revision_id), "inline": inline}, 300)
 
     def decode_download_ticket(self, token: str) -> tuple[uuid.UUID, uuid.UUID, bool]:
+        t = self.download_ticket(token)
+        return t.user_id, t.revision_id, t.inline
+
+    def download_ticket(self, token: str) -> Ticket:
+        """Ticket di download verificato, con ``jti`` ed ``exp`` per contarne gli usi (B6)."""
         p = self._decode(token, DOWNLOAD)
-        return uuid.UUID(p["sub"]), uuid.UUID(p["rev"]), bool(p.get("inline"))
+        return Ticket(uuid.UUID(p["sub"]), str(p.get("jti") or ""), int(p["exp"]), uuid.UUID(p["rev"]),
+                      bool(p.get("inline")))
 
     def issue_office_ticket(self, user_id: uuid.UUID, revision_id: uuid.UUID) -> str:
         """Ticket di 5' con cui il Document Server di OnlyOffice scarica il file da modificare.
@@ -113,6 +139,12 @@ class TokenService:
 
 SSE = "sse"
 DOWNLOAD = "download"
+# Usi ammessi di un ticket di download (B6, revisione di sicurezza del 03/11/2026). Come allegato il browser apre
+# il link una volta sola (il pulsante "Scarica" chiede ogni volta un link nuovo): monouso. Nel visualizzatore il
+# frontend tiene il link in cache 4' e lo riapre a ogni apertura del documento (e due volte in sviluppo, React
+# StrictMode): fino a 10 usi, tutti dallo stesso IP del primo.
+DOWNLOAD_MAX_USES_ATTACHMENT = 1
+DOWNLOAD_MAX_USES_INLINE = 10
 OFFICE = "office"            # ticket per il Document Server di OnlyOffice: vale solo su /office/files (M1)
 
 

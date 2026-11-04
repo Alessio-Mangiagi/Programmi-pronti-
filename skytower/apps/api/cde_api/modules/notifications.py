@@ -10,9 +10,10 @@ import jwt
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
+from starlette.background import BackgroundTask
 
-from ..deps import Ctx, Services, ctx, services
-from ..errors import unauthorized
+from ..deps import Ctx, Services, client_ip, ctx, services
+from ..errors import ApiError, unauthorized
 
 router = APIRouter(tags=["notifications"])
 
@@ -86,11 +87,33 @@ def stream_ticket(c: Ctx = Depends(ctx)):
 
 @router.get("/notifications/stream")
 async def stream(request: Request, ticket: str, last_id: int = 0, svc: Services = Depends(services)):
-    """Server-Sent Events: nuove notifiche dell'utente (polling leggero lato server ogni 3")."""
+    """Server-Sent Events: nuove notifiche dell'utente (polling leggero lato server ogni 3").
+
+    Revisione di sicurezza del 03/11/2026:
+      * B6: il ticket è monouso. Il frontend (NotificationBell) ne chiede uno nuovo a ogni connessione e, se lo
+        stream cade, chiude l'EventSource e ricomincia da POST /notifications/stream-ticket: la riconnessione
+        automatica del browser con lo stesso URL non serve e un URL finito in un log non riapre lo stream.
+      * B11: al massimo ``sse_max_streams_per_user`` stream aperti insieme per utente, oltre → 429. Il posto si
+        libera quando lo stream finisce (generatore chiuso) o, se non è mai partito, a risposta conclusa."""
     try:
-        user_id = svc.tokens.decode_sse_ticket(ticket)
+        t = svc.tokens.sse_ticket(ticket)
     except jwt.InvalidTokenError:
         raise unauthorized("Ticket non valido o scaduto") from None
+    user_id = t.user_id
+    if not t.jti or not svc.limiter.use_ticket(t.jti, t.ttl_left, ip=client_ip(request), max_uses=1):
+        raise unauthorized("Ticket già usato: chiederne uno nuovo")
+    slot = str(user_id)
+    if not svc.limiter.streams.acquire(slot, svc.settings.sse_max_streams_per_user):
+        raise ApiError(429, "too_many_streams", "Troppe schede aperte con le notifiche in tempo reale",
+                       {"Retry-After": "30"})
+    released = False
+
+    def release() -> None:
+        # chiamata sia dal finally del generatore sia dal task di fine risposta: il posto si rende una volta
+        nonlocal released
+        if not released:
+            released = True
+            svc.limiter.streams.release(slot)
 
     def fetch(after: int) -> list[dict]:
         with svc.db.app_tx(user_id) as conn:
@@ -99,12 +122,15 @@ async def stream(request: Request, ticket: str, last_id: int = 0, svc: Services 
 
     async def events():
         cursor = last_id
-        while not await request.is_disconnected():
-            rows = await asyncio.to_thread(fetch, cursor)
-            for row in rows:
-                cursor = row["id"]
-                yield {"event": "notification", "id": str(row["id"]),
-                       "data": json.dumps(row, default=str)}
-            await asyncio.sleep(3)
+        try:
+            while not await request.is_disconnected():
+                rows = await asyncio.to_thread(fetch, cursor)
+                for row in rows:
+                    cursor = row["id"]
+                    yield {"event": "notification", "id": str(row["id"]),
+                           "data": json.dumps(row, default=str)}
+                await asyncio.sleep(3)
+        finally:
+            release()
 
-    return EventSourceResponse(events(), ping=15)
+    return EventSourceResponse(events(), ping=15, background=BackgroundTask(release))

@@ -853,3 +853,48 @@ non avrebbe permesso i rami per esito né i ritorni dello schema RdA. Join ALL "
 <codice>` (27 nodi, `cde_api/tooling/workflow_rda.py`). Le notifiche nuove sono `WORKFLOW_NOTIFICATION` e
 `WORKFLOW_CANCELLED`. Le schermate (editor a scacchiera, vista finale, scheda Processi) seguono il contratto.
 Test: `tests/test_workflow_grafo.py`; scenari U50 e U51.
+
+## ADR-49 — Falle "basse" della revisione di sicurezza del 03/11/2026
+
+**Contesto.** La revisione del 03/11/2026 (ADR-47 per le falle alte e medie) aveva rimandato sette punti bassi:
+enumerazione di organizzazioni ed email (B3), verifica completa del registro a ogni richiesta (B4), JSON liberi
+senza tetto (B5), ticket dei link riutilizzabili (B6), refresh token in chiaro con l'installazione in HTTP (B8),
+domini del single sign-on presi da chiunque (B9), stream SSE illimitati (B11).
+
+**Decisione.**
+- **B3** `GET /organizations/lookup/{code}` risponde solo a platform admin, admin di organizzazione e Project
+  Admin di almeno una commessa (filtro in `cde.lookup_organization`, migrazione 0040; gli altri hanno 404) e con
+  un tetto per utente (`CDE_ORG_LOOKUP_RATE_LIMIT`, 30/ora). `POST /organizations/{id}/users` risponde sempre
+  **202** `{"status": "INVITATION_SENT", "email", "message"}`: un'email già di un altro tenant non crea nulla, non
+  manda email e lascia `USER_INVITE_CONFLICT` nel registro (escluso dal registro di sicurezza dell'organizzazione
+  che invita). 409 solo per un'email già nella stessa organizzazione. Tetto `CDE_INVITE_RATE_LIMIT` (60/ora).
+- **B4** La verifica completa della hash chain la fa il worker ogni ora (job `audit-verify`,
+  `cde.audit_verify_full`) e ne salva l'esito in `cde.audit_chain_status`; `GET /audit/verify` e gli export
+  leggono l'esito con `cde.audit_verify_latest()`, che ricontrolla la testa già verificata e solo gli eventi
+  sigillati dopo. Esito più vecchio di `CDE_AUDIT_VERIFY_MAX_AGE_MINUTES` (120) → la richiesta rifà la verifica
+  completa, una sola alla volta (advisory lock). L'API non può più eseguire `cde.audit_verify()`. Tetto per utente
+  `CDE_AUDIT_VERIFY_RATE_LIMIT` (10/minuto) su verifica ed export. Risposta e firma degli export riportano
+  `verified_at` / `chain_verified_at`.
+- **B5** `attributes` (caricamento e modifica dei documenti, caricamento dalla suite), `settings` dei progetti e
+  `metadata_schema`: al massimo 64 KB di JSON compatto (`cde_api/validation.py`), oltre 422.
+- **B6** Ticket SSE monouso (il frontend ne chiede già uno a ogni connessione). Ticket di download filigranato:
+  come allegato monouso; nel visualizzatore fino a 10 usi nei 5', tutti dallo stesso IP del primo (il frontend
+  tiene il link in cache 4' e React StrictMode lo apre due volte); un uso da un altro IP lo invalida per tutti.
+  L'uso si conta dopo i controlli dei permessi. Contatori nello storage del rate limit (memoria o Redis).
+- **B8** Con `CDE_COOKIE_SECURE=false` fuori da dev/test il refresh dura `CDE_INSECURE_REFRESH_TOKEN_TTL_S`
+  (12 ore) invece di 14 giorni e all'avvio l'API scrive un avviso. HTTP in LAN resta una scelta temporanea: la
+  strada è `SUITE_DOMINIO` + Caddy con TLS (`installa.*` lo ricorda).
+- **B9** Un dominio nuovo del single sign-on si registra solo se l'organizzazione ha un utente ATTIVO con email
+  in quel dominio (`cde.org_has_email_domain`); quelli già registrati restano. Niente verifica DNS.
+- **B11** Al massimo `CDE_SSE_MAX_STREAMS_PER_USER` (5) stream SSE insieme per utente, contatore in memoria del
+  processo rilasciato alla chiusura dello stream; oltre → 429.
+
+**Alternative scartate.** Ticket di download monouso anche nel visualizzatore: romperebbe la riapertura di un
+documento dalla cache del frontend. Verifica DNS (record TXT) per i domini SSO: più robusta ma richiede all'impresa
+di toccare il DNS; rimandata. Verifica incrementale pura senza giro completo: non scoprirebbe la manomissione di un
+evento vecchio.
+
+**Conseguenze.** Una manomissione di un evento vecchio del registro emerge al giro orario successivo del worker
+(o subito, se tocca la testa già verificata). Con l'API su più processi (oggi uno) il tetto degli stream vale per
+processo. Chi invita non vede più i dati dell'utente nella risposta (la SPA non li usava). Test:
+`tests/test_security_bassi.py`; scenario U53.

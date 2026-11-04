@@ -55,6 +55,9 @@ else
     scrivi SKYTOWER_HOST_PUBBLICO skytower.localhost
     scrivi S3_HOST_PUBBLICO s3-skytower.localhost
     scrivi AWS_CA_BUNDLE /etc/ssl/certs/ca-certificates.crt
+    # B8 (revisione di sicurezza del 03/11/2026, ADR-49): in HTTP il cookie di sessione viaggia in chiaro
+    echo "ATTENZIONE: installazione in HTTP sulla LAN (scelta temporanea). Le sessioni durano 12 ore invece di 14 giorni;"
+    echo "            appena possibile reinstallare con SUITE_DOMINIO (Caddy con TLS)."
 fi
 
 # ---- 3. Token di servizio della suite ----

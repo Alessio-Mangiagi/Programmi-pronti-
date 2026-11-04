@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,10 @@ class Settings(BaseSettings):
     # SPA e API sullo stesso origin: in dev (proxy Vite) e prod (CloudFront) l'API è sotto /api
     refresh_cookie_path: str = "/auth"
     cookie_secure: bool = True
+    # Installazione in HTTP sulla LAN (COOKIE_SECURE=false, senza SUITE_DOMINIO e Caddy): il cookie di refresh
+    # viaggia in chiaro e chi lo intercetta in rete apre una sessione. Fuori da dev/test la sua durata scende
+    # da sola a questo valore (12 ore) e all'avvio compare un avviso (revisione di sicurezza del 03/11/2026, B8).
+    insecure_refresh_token_ttl_s: int = 12 * 3600
 
     # KMS: "local" (chiavi su file, solo dev/test) | "file" (chiavi su file ammesse anche in prod, su un volume
     # riservato: rilascio Docker sul server aziendale, ADR-46) | "aws" (KMS + Secrets Manager)
@@ -44,6 +49,15 @@ class Settings(BaseSettings):
     # Solo se l'origin non è raggiungibile direttamente: altrimenti chiunque potrebbe falsificarlo.
     client_ip_header: str | None = None
     login_rate_limit: str = "5/minute"
+    # Revisione di sicurezza del 03/11/2026: limiti per utente sulle chiamate che si prestano ad abusi
+    org_lookup_rate_limit: str = "30/hour"        # ricerca organizzazione per codice (B3: enumerazione)
+    invite_rate_limit: str = "60/hour"            # inviti di utenti (B3: enumerazione delle email)
+    audit_verify_rate_limit: str = "10/minute"    # verifica ed export del registro (B4)
+    # Verifica completa della catena del registro: la fa il worker ogni ora; se l'ultima è più vecchia di
+    # così (worker fermo, installazione nuova) la rifà l'API alla prima richiesta, una sola alla volta (B4)
+    audit_verify_max_age_minutes: int = 120
+    # Stream SSE delle notifiche aperti insieme dallo stesso utente (una scheda = uno stream), oltre → 429 (B11)
+    sse_max_streams_per_user: int = 5
 
     # Lockout progressivo
     lockout_threshold: int = 5
@@ -132,6 +146,19 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
     smtp_timeout_seconds: int = 20
+
+    @property
+    def insecure_cookies(self) -> bool:
+        """Cookie di sessione senza Secure fuori da dev/test: installazione in HTTP sulla LAN (B8)."""
+        return not self.cookie_secure and self.env not in ("dev", "test")
+
+    @model_validator(mode="after")
+    def _refresh_breve_in_http(self) -> Settings:
+        # B8: in HTTP il refresh token (cookie) si può intercettare in rete; vale 12 ore invece di 14 giorni,
+        # così un furto apre al massimo mezza giornata. L'avviso all'avvio lo scrive main.create_app.
+        if self.insecure_cookies and self.refresh_token_ttl_s > self.insecure_refresh_token_ttl_s:
+            self.refresh_token_ttl_s = self.insecure_refresh_token_ttl_s
+        return self
 
 
 @lru_cache

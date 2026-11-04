@@ -52,6 +52,7 @@ from ..deps import Ctx, Services, client_ip, ctx, require_container, require_pro
 from ..errors import ApiError
 from ..events import security_event
 from ..security.tokens import AccessClaims
+from ..validation import check_json_size
 from . import documents as docs
 
 _SHARED = Path(__file__).resolve().parents[5] / "shared" / "suite"
@@ -299,6 +300,10 @@ async def suite_carica(codice: str, request: Request, title: str = Query(..., mi
         raise ApiError(422, "attributes", "attributes deve essere un oggetto JSON") from None
     if not isinstance(attr, dict):
         raise ApiError(422, "attributes", "attributes deve essere un oggetto JSON")
+    try:   # stesso tetto dei metadati caricati da SkyTower (revisione di sicurezza del 03/11/2026, B5)
+        check_json_size(attr)
+    except ValueError as exc:
+        raise ApiError(422, "attributes", str(exc)) from None
     docs.rifiuta_attributi_riservati(attr)
     attr.setdefault("origine_suite", request.headers.get(suite_link.HEADER_UTENTE) or "suite")
     tipo = (tipo or "RP").strip().upper()[:2]

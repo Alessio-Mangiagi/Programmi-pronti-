@@ -73,6 +73,8 @@ if ($dominio) {
     ScriviEnv 'SKYTOWER_HOST_PUBBLICO' 'skytower.localhost'
     ScriviEnv 'S3_HOST_PUBBLICO' 's3-skytower.localhost'
     ScriviEnv 'AWS_CA_BUNDLE' '/etc/ssl/certs/ca-certificates.crt'
+    # B8 (revisione di sicurezza del 03/11/2026, ADR-49): in HTTP il cookie di sessione viaggia in chiaro
+    Write-Warning "Installazione in HTTP sulla LAN (scelta temporanea): le sessioni durano 12 ore invece di 14 giorni. Appena possibile reinstallare con SUITE_DOMINIO (Caddy con TLS)."
 }
 
 # ---- 3. Token di servizio della suite -----------------------------------------------------------------

@@ -6,7 +6,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
+from psycopg import errors as pg
 from pydantic import BaseModel, EmailStr, Field
 
 from ..deps import Ctx, ctx
@@ -67,7 +68,16 @@ def list_organizations(c: Ctx = Depends(ctx)):
 
 
 @router.get("/lookup/{code}")
-def lookup_organization(code: str, c: Ctx = Depends(ctx)):
+def lookup_organization(code: str = Path(max_length=16), c: Ctx = Depends(ctx)):
+    """Codice originatore → (id, ragione sociale), per invitare un'organizzazione in una commessa.
+
+    Revisione di sicurezza del 03/11/2026, B3: i codici sono corti (3-6 caratteri) e si possono provare tutti.
+    Ora la ricerca risponde solo a chi può invitare (platform admin, admin di un'organizzazione, Project Admin
+    di almeno una commessa: il filtro sta in ``cde.lookup_organization``, migrazione 0040) e con un tetto per
+    utente (``CDE_ORG_LOOKUP_RATE_LIMIT``). Gli altri ricevono 404 come per un codice inesistente."""
+    if not c.svc.limiter.hit(c.svc.settings.org_lookup_rate_limit, "org-lookup", str(c.user_id)):
+        raise ApiError(429, "rate_limited", "Troppe ricerche di organizzazioni: riprovare più tardi",
+                       {"Retry-After": "600"})
     with c.tx() as conn:
         row = conn.execute("SELECT * FROM cde.lookup_organization(%s)", [code]).fetchone()
     if row is None:
@@ -141,19 +151,43 @@ def _send_invitation(c: Ctx, conn, user_id: uuid.UUID, email: str, org_name: str
     )
 
 
-@router.post("/{org_id}/users", status_code=201)
+@router.post("/{org_id}/users", status_code=202)
 def invite_user(org_id: uuid.UUID, body: UserIn, c: Ctx = Depends(ctx)):
+    """Invita un utente nell'organizzazione: crea l'account INVITED e manda il link per la password.
+
+    Revisione di sicurezza del 03/11/2026, B3: l'email è unica in tutta la piattaforma, quindi un'email già
+    registrata in un'ALTRA organizzazione faceva fallire l'inserimento con 409 e rivelava chi è cliente di
+    SkyTower. Ora la risposta è sempre la stessa (202 "invito inviato", nessun dato dell'utente): se l'email è
+    di un altro tenant non si crea nulla, non parte nessuna email e resta un evento USER_INVITE_CONFLICT nel
+    registro di sicurezza. Il 409 resta solo per un'email già presente nella STESSA organizzazione, che
+    l'admin vede comunque nell'elenco utenti. Tetto per admin: ``CDE_INVITE_RATE_LIMIT``."""
+    if not c.svc.limiter.hit(c.svc.settings.invite_rate_limit, "invite", str(c.user_id)):
+        raise ApiError(429, "rate_limited", "Troppi inviti: riprovare più tardi", {"Retry-After": "600"})
     user_id = uuid.uuid4()
+    email = body.email.lower()
     with c.tx() as conn:
         org = _get_org(conn, org_id)
-        conn.execute(
-            """INSERT INTO cde.users (id, organization_id, email, first_name, last_name, is_org_admin, status)
-               VALUES (%s, %s, %s, %s, %s, %s, 'INVITED')""",
-            [user_id, org_id, body.email.lower(), body.first_name, body.last_name, body.is_org_admin],
-        )
-        _send_invitation(c, conn, user_id, body.email.lower(), org["legal_name"])
+        try:
+            with conn.transaction():          # savepoint: il doppione non deve annullare tutta la transazione
+                conn.execute(
+                    """INSERT INTO cde.users (id, organization_id, email, first_name, last_name, is_org_admin, status)
+                       VALUES (%s, %s, %s, %s, %s, %s, 'INVITED')""",
+                    [user_id, org_id, email, body.first_name, body.last_name, body.is_org_admin],
+                )
+        except pg.UniqueViolation:
+            if conn.execute("SELECT 1 FROM cde.users WHERE email = %s AND organization_id = %s",
+                            [email, org_id]).fetchone():
+                raise ApiError(409, "conflict", "Utente già presente nell'organizzazione") from None
+            security_event(conn, "USER_INVITE_CONFLICT", user_id=c.user_id, organization_id=org_id, ip=c.ip)
+            return INVITO_INVIATO | {"email": email}
+        _send_invitation(c, conn, user_id, email, org["legal_name"])
         security_event(conn, "USER_INVITED", user_id=c.user_id, organization_id=org_id, ip=c.ip, target=user_id)
-        return conn.execute(f"SELECT {USER_COLUMNS} FROM cde.users u WHERE u.id = %s", [user_id]).fetchone()
+    return INVITO_INVIATO | {"email": email}
+
+
+# Risposta unica dell'invito (B3): uguale che l'utente sia stato creato o che l'email fosse di un altro tenant
+INVITO_INVIATO = {"status": "INVITATION_SENT",
+                  "message": "Invito inviato: se l'indirizzo è valido riceverà il link per impostare la password"}
 
 
 @router.post("/{org_id}/users/{user_id}/invitation", status_code=204)

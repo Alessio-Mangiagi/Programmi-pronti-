@@ -75,6 +75,14 @@ precedenti nel bucket (versioning attivo) e nuova invalidazione.
   `docker run -d -p 8085:80 -e JWT_SECRET=<segreto> onlyoffice/documentserver` e nell'API
   `CDE_ONLYOFFICE_URL=http://localhost:8085`, `CDE_ONLYOFFICE_JWT_SECRET=<segreto>`,
   `CDE_ONLYOFFICE_CALLBACK_URL=http://host.docker.internal:8100`.
+- **Limiti contro gli abusi** (revisione di sicurezza del 03/11/2026, ADR-49), tutti con un default sensato:
+  `CDE_ORG_LOOKUP_RATE_LIMIT` (30/hour, ricerca organizzazione per codice), `CDE_INVITE_RATE_LIMIT` (60/hour,
+  inviti per admin), `CDE_AUDIT_VERIFY_RATE_LIMIT` (10/minute, verifica ed export del registro),
+  `CDE_SSE_MAX_STREAMS_PER_USER` (5, schede con le notifiche in tempo reale), `CDE_AUDIT_VERIFY_MAX_AGE_MINUTES`
+  (120: oltre, la verifica completa della catena la rifà l'API; di norma la fa il worker ogni ora, job
+  `audit-verify`; se nel log del worker compare "hash chain ALTERATA" seguire la procedura di incidente),
+  `CDE_INSECURE_REFRESH_TOKEN_TTL_S` (43200: durata delle sessioni quando `CDE_COOKIE_SECURE=false` fuori da
+  dev/test; all'avvio l'API lo segnala nel log).
 - **Allarmi** (SNS → `alert_emails`): 5xx, p95 > 500 ms, task non sani, worker fermo, CPU/memoria/spazio DB,
   CPU Redis, latenza di replica S3 > 15', errori nei log.
 

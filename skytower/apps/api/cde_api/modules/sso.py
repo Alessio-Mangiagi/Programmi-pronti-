@@ -88,8 +88,19 @@ def put_sso(org_id: uuid.UUID, body: SsoIn, c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         if not conn.execute("SELECT cde.can_manage_org(%s) ok", [org_id]).fetchone()["ok"]:
             raise not_found("Organizzazione")
-        old = conn.execute("SELECT client_secret_encrypted FROM cde.organization_sso WHERE organization_id = %s",
-                           [org_id]).fetchone()
+        old = conn.execute("SELECT client_secret_encrypted, email_domains FROM cde.organization_sso "
+                           "WHERE organization_id = %s", [org_id]).fetchone()
+        # B9 (revisione di sicurezza del 03/11/2026): un dominio NUOVO si registra solo se l'organizzazione ha
+        # già almeno un utente attivo con email in quel dominio. Senza questa prova un admin poteva prendersi il
+        # dominio di un'altra impresa (uno per organizzazione, trigger della 0021) e bloccarne il login.
+        # I domini già registrati restano anche se oggi non hanno utenti attivi.
+        gia = set(old["email_domains"] or []) if old else set()
+        estranei = [d for d in body.email_domains if d not in gia and not conn.execute(
+            "SELECT cde.org_has_email_domain(%s, %s) ok", [org_id, d]).fetchone()["ok"]]
+        if estranei:
+            raise ApiError(422, "sso_domain_not_owned",
+                           "Dominio non ammesso: " + ", ".join(estranei) + ". Si possono indicare solo i domini "
+                           "delle email di utenti attivi dell'organizzazione")
         secret = (c.svc.kms.encrypt(body.client_secret.encode()) if body.client_secret
                   else old["client_secret_encrypted"] if old else None)
         conn.execute(

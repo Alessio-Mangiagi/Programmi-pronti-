@@ -13,13 +13,14 @@ import io
 import json
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Response
 from fpdf import FPDF
 from pydantic import BaseModel, Field
 
 from ..deps import Ctx, ctx, require_project
+from ..errors import ApiError
 from ..events import security_event
 from .transmittals import HEADING, _t, _when
 
@@ -48,11 +49,39 @@ def list_events(project_id: uuid.UUID, from_: datetime | None = Query(default=No
                        limit=limit, before=before)
 
 
+def _rate_limit(c: Ctx) -> None:
+    """Tetto per utente su verifica ed export del registro (B4, revisione di sicurezza del 03/11/2026)."""
+    if not c.svc.limiter.hit(c.svc.settings.audit_verify_rate_limit, "audit-verify", str(c.user_id)):
+        raise ApiError(429, "rate_limited", "Troppe verifiche del registro: riprovare tra un minuto",
+                       {"Retry-After": "60"})
+
+
+def chain_status(c: Ctx, conn) -> dict:
+    """Stato della hash chain senza ricalcolarla tutta a ogni richiesta (B4, migrazione 0040).
+
+    Prima ogni GET /audit/verify e ogni export lanciava ``cde.audit_verify()`` su tutti gli eventi di tutti i
+    tenant: un Project Admin in un ciclo teneva occupato il database. Ora si parte dall'esito dell'ultima
+    verifica completa (il worker la rifà ogni ora, job ``audit-verify``) e si controllano solo gli eventi
+    sigillati dopo. Se l'esito manca o è più vecchio di ``audit_verify_max_age_minutes`` (worker fermo,
+    installazione nuova) la verifica completa la fa questa richiesta, una sola alla volta in tutto il sistema.
+    Nella risposta ``verified_at`` dice quando è stata fatta l'ultima verifica completa."""
+    max_age = timedelta(minutes=c.svc.settings.audit_verify_max_age_minutes)
+    row = conn.execute("SELECT * FROM cde.audit_verify_latest()").fetchone()
+    if row is None or row["verified_at"] < datetime.now(UTC) - max_age:
+        conn.execute("SELECT cde.audit_verify_full(%s)", [max_age])
+        row = conn.execute("SELECT * FROM cde.audit_verify_latest()").fetchone()
+    if row is None:      # prima verifica in assoluto, già in corso in un'altra richiesta
+        raise ApiError(503, "audit_verify_running", "Verifica del registro in corso: riprovare tra poco",
+                       {"Retry-After": "30"})
+    return row
+
+
 @router.get("/projects/{project_id}/audit/verify")
 def verify(project_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    _rate_limit(c)
     with c.tx() as conn:
         require_project(conn, project_id, "ADMIN", "PROJECT")
-        result = conn.execute("SELECT * FROM cde.audit_verify()").fetchone()
+        result = chain_status(c, conn)
         anchors = conn.execute("SELECT * FROM cde.audit_anchor_check(14)").fetchall()
     for a in anchors:
         a["matches_chain"] = a["current_hash"] == a["anchored_hash"]
@@ -79,17 +108,19 @@ def _cell(value) -> str:
 
 def _export(c: Ctx, project_id: uuid.UUID, kind: str, filters: dict, limit: int, render) -> Response:
     """Export firmato: render(project, rows, chain, filters) -> (byte, media type, estensione)."""
+    _rate_limit(c)
     with c.tx() as conn:
         project = require_project(conn, project_id, "ADMIN", "PROJECT")
         rows = _events(conn, project_id, from_=filters["from"], to=filters["to"], user_id=filters["user_id"],
                        event_type=filters["event_type"], obj=filters["object"], limit=limit, before=None)
-        chain = conn.execute("SELECT * FROM cde.audit_verify()").fetchone()
+        chain = chain_status(c, conn)
         body, media_type, ext = render(project, rows, chain, filters)
         digest = hashlib.sha256(body).hexdigest()
         signature = c.svc.tokens.sign_export({
             "sub": str(project_id), "kind": kind, "sha256": digest, "rows": len(rows),
             "chain_head_seq": chain["head_seq"], "chain_head_hash": chain["head_hash"],
             "chain_ok": chain["first_broken_seq"] is None, "exported_by": str(c.user_id),
+            "chain_verified_at": chain["verified_at"].isoformat(),     # ultima verifica completa (B4)
             "filters": {k: (v.isoformat() if isinstance(v, datetime) else str(v) if v else None)
                         for k, v in filters.items()},
         })
@@ -162,6 +193,8 @@ def _render_pdf(project, rows, chain, filters):
         ("Catena di hash", ("integra" if ok else f"ALTERATA dal record {chain['first_broken_seq']}")
          + f" - testa n. {chain['head_seq']}"),
         ("Hash di testa", chain["head_hash"] or "-"),
+        # B4: la verifica di tutta la catena si fa a intervalli (worker), gli eventi successivi a ogni stampa
+        ("Verifica completa", f"{_when(chain['verified_at'])} (eventi successivi verificati alla stampa)"),
         ("Firma", "questo PDF è firmato RS256 dal server: la firma (JWT) e lo SHA-256 del file viaggiano negli header "
                   "X-CDE-Signature e X-CDE-SHA256 del download; per controllarli: scheda Registro attività > "
                   "'Verifica una firma', oppure POST /projects/{id}/audit/export/verify, oppure la chiave pubblica in "

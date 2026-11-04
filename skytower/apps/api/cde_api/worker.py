@@ -412,6 +412,24 @@ def audit_publish_anchors(timestamp: int) -> None:
         log.info("registro: %s ancore pubblicate su S3", n)
 
 
+@app.periodic(cron="20 * * * *", periodic_id="audit-verify")
+@app.task(name="cde.audit_verify", queue="default")
+def audit_verify(timestamp: int) -> None:
+    """Verifica completa della hash chain del registro e salvataggio dell'esito (migrazione 0040).
+
+    Revisione di sicurezza del 03/11/2026, B4: la verifica di tutta la catena (tutti i tenant) si fa qui, una
+    volta l'ora, e non più a ogni GET /audit/verify o export: l'API legge l'esito e controlla solo gli eventi
+    arrivati dopo. Una manomissione di un evento vecchio emerge al giro successivo."""
+    _, _, settings, _ = _runtime()
+    with psycopg.connect(settings.database_url_worker, autocommit=True, row_factory=dict_row) as conn:
+        conn.execute("SELECT cde.audit_verify_full()")
+        row = conn.execute("SELECT * FROM cde.audit_verify_latest()").fetchone()
+    if row and row["first_broken_seq"] is not None:
+        log.error("registro: hash chain ALTERATA dall'evento %s", row["first_broken_seq"])
+    elif row:
+        log.info("registro: catena integra fino all'evento %s", row["head_seq"])
+
+
 @app.periodic(cron="40 2 * * *", periodic_id="naming-reservations-expiry")
 @app.task(name="cde.naming_release_expired", queue="default")
 def naming_release_expired(timestamp: int) -> None:

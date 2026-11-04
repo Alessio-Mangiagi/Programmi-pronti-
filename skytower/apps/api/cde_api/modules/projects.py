@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from ..deps import ACTIONS, Ctx, ctx, require_project
 from ..errors import ApiError, forbidden, not_found
 from ..events import security_event
+from ..validation import JsonObject
 
 _SHARED = Path(__file__).resolve().parents[5] / "shared" / "suite"
 if str(_SHARED) not in sys.path:
@@ -51,7 +52,7 @@ class ProjectPatch(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     timezone: str | None = None
-    settings: dict | None = None
+    settings: JsonObject | None = None     # tetto 64 KB sul JSON (revisione di sicurezza del 03/11/2026, B5)
 
 
 class ProjectOrgIn(BaseModel):

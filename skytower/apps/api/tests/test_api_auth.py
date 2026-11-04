@@ -225,8 +225,9 @@ def test_invito_utente_e_attivazione(client, api_world):
     admin = login(client, w.emails["sub1_admin"]).json()["access_token"]
     r = client.post(f"/organizations/{w.orgs['SUB1']}/users", headers=bearer(admin),
                     json={"email": "Nuovo.Elettricista@sub1.example", "first_name": "Nuovo", "last_name": "Tecnico"})
-    assert r.status_code == 201, r.text
-    assert r.json()["status"] == "INVITED" and r.json()["email"] == "nuovo.elettricista@sub1.example"
+    # risposta generica (B3, revisione di sicurezza del 03/11/2026): nessun dato dell'utente creato
+    assert r.status_code == 202, r.text
+    assert r.json()["status"] == "INVITATION_SENT" and r.json()["email"] == "nuovo.elettricista@sub1.example"
     mail, token = _token_from_outbox(client, "/invito")
     assert mail.to == "nuovo.elettricista@sub1.example"
 

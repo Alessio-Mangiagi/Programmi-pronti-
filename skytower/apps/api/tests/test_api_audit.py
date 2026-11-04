@@ -19,6 +19,12 @@ def seal(urls) -> int:
         return conn.execute("SELECT cde.audit_seal()").fetchone()[0]
 
 
+def full_verify(urls) -> bool:
+    """Il giro orario del worker (job audit-verify): verifica completa della catena e salvataggio dell'esito (B4)."""
+    with psycopg.connect(urls.worker, autocommit=True) as conn:
+        return conn.execute("SELECT cde.audit_verify_full()").fetchone()[0]
+
+
 @pytest.fixture
 def events(client, api_world, as_user):  # noqa: F811
     """Qualche evento sulla commessa demo, già sigillato."""
@@ -60,6 +66,8 @@ def test_catena_integra_e_manomissione_rilevata(client, api_world, as_user, even
                      [target["id"]])
         conn.commit()
         try:
+            # B4: un evento già verificato lo ricontrolla la verifica completa del worker (ogni ora), non la GET
+            assert full_verify(urls)
             broken = client.get(f"/projects/{w.project_id}/audit/verify", headers=admin).json()
             assert not broken["ok"] and broken["first_broken_seq"] == target["chain_seq"]
         finally:
@@ -67,6 +75,7 @@ def test_catena_integra_e_manomissione_rilevata(client, api_world, as_user, even
                          [psycopg.types.json.Jsonb(target["details"]), target["id"]])
             conn.execute("ALTER TABLE cde.security_events ENABLE TRIGGER trg_security_events_guard")
             conn.commit()
+    assert full_verify(urls)
     assert client.get(f"/projects/{w.project_id}/audit/verify", headers=admin).json()["ok"]
 
 
