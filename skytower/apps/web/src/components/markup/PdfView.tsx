@@ -23,6 +23,8 @@ export interface PdfViewProps {
   search?: string;                     // testo da cercare (almeno 2 caratteri), senza distinzione maiuscole
   activeMatch?: number;                // indice dell'occorrenza corrente: la pagina scorre fin lì
   onMatches?: (count: number) => void;
+  /** il file non si è aperto: ``status`` HTTP se il server ha risposto (401 = link filigranato già usato o scaduto) */
+  onLoadError?: (status: number | null) => void;
 }
 
 /** Occorrenza in coordinate CSS a zoom 1, relative alla pagina. */
@@ -51,22 +53,28 @@ async function findMatches(pdf: PDFDocumentProxy, query: string, alive: () => bo
   return out;
 }
 
-function useDocument(url: string | null | undefined) {
+function useDocument(url: string | null | undefined, onError?: (status: number | null) => void) {
   const [state, setState] = useState<{ doc: PDFDocumentProxy | null; error: string | null }>({ doc: null, error: null });
+  const errorRef = useRef(onError);
+  errorRef.current = onError;
   useEffect(() => {
     setState({ doc: null, error: null });
     if (!url) return;
     let alive = true;
     const task = pdfjs.getDocument({ url, isEvalSupported: false });
     task.promise.then((doc) => alive && setState({ doc, error: null }))
-      .catch((e: Error) => alive && setState({ doc: null, error: e.message }));
+      .catch((e: Error & { status?: number }) => {
+        if (!alive) return;
+        setState({ doc: null, error: e.message });
+        errorRef.current?.(typeof e.status === "number" ? e.status : null);   // pdf.js: ResponseException.status
+      });
     return () => { alive = false; task.destroy(); };
   }, [url]);
   return state;
 }
 
-export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onFit, overlay, search, activeMatch, onMatches }: PdfViewProps) {
-  const { doc: pdf, error } = useDocument(url);
+export default function PdfView({ url, compareUrl, zoom, focusPage, onPages, onFit, overlay, search, activeMatch, onMatches, onLoadError }: PdfViewProps) {
+  const { doc: pdf, error } = useDocument(url, onLoadError);
   const { doc: cmp, error: cmpError } = useDocument(compareUrl);
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);

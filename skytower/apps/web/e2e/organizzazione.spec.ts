@@ -28,7 +28,8 @@ test("l'admin gestisce gli utenti della propria organizzazione", async ({ page, 
   await dialog.getByLabel(/^Nome/).fill("Giulia");
   await dialog.getByLabel("Cognome").fill("Verdi");
   await dialog.getByRole("button", { name: "Invia invito" }).click();
-  await expect(page.getByText("Invito inviato a nuova.collega@des.example")).toBeVisible();
+  // messaggio neutro: l'API risponde sempre 202 e non dice se l'indirizzo era già registrato (ADR-49, B3)
+  await expect(page.getByText("Invito inviato se l'indirizzo è valido (nuova.collega@des.example)")).toBeVisible();
   const row = users.getByRole("row", { name: /nuova\.collega@des\.example/ });
   await expect(row.getByText("Invitato")).toBeVisible();
   await row.getByRole("button", { name: "Reinvia invito" }).click();

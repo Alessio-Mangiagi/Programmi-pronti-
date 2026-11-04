@@ -12,6 +12,7 @@ import { ProjectPage } from "./pages/Project";
 import { SecurityPage } from "./pages/Security";
 import { OrganizationPage } from "./pages/Organization";
 import { LibreriaWorkflowPage } from "./pages/LibreriaWorkflow";
+import { ModelliCommessaPage } from "./pages/ModelliCommessa";
 import { TasksPage } from "./pages/Tasks";
 import { DocumentPage } from "./pages/DocumentPage";
 import { OfficeEditorPage } from "./pages/OfficeEditorPage";
@@ -68,6 +69,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/organizzazione" element={<Protected><OrganizationPage /></Protected>} />
               {/* libreria dei workflow dell'organizzazione, valida in tutte le sue commesse (ADR-50) */}
               <Route path="/organizzazione/workflow" element={<Protected><LibreriaWorkflowPage /></Protected>} />
+              {/* modelli di commessa dell'organizzazione: struttura pronta per le commesse nuove (ADR-52) */}
+              <Route path="/organizzazione/modelli" element={<Protected><ModelliCommessaPage /></Protected>} />
               <Route path="/compiti" element={<Protected><TasksPage /></Protected>} />
               {/* vista finale di un workflow a grafo (documento o processo) */}
               <Route path="/istanze/:instanceId" element={<Protected><IstanzaWorkflowPage /></Protected>} />

@@ -75,8 +75,9 @@ function InviteOrgDialog({ project, onClose }: { project: Project; onClose: () =
     setFound(null);
     try {
       setFound(await api(`/organizations/lookup/${encodeURIComponent(code)}`));
-    } catch {
-      setLookupError("Nessuna organizzazione attiva con questo codice");
+    } catch (e) {
+      // 429: troppe ricerche (tetto per utente, ADR-49 B3): il messaggio dell'API dice di riprovare più tardi
+      setLookupError(e instanceof ApiError && e.status === 429 ? e.message : "Nessuna organizzazione attiva con questo codice");
     }
   };
   return (

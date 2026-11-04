@@ -8,6 +8,7 @@ import {
   FormControlLabel, ListItemIcon, Menu, MenuItem, Stack, Switch, TextField, Typography,
 } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
+import DashboardCustomizeIcon from "@mui/icons-material/DashboardCustomize";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import LockIcon from "@mui/icons-material/Lock";
@@ -68,6 +69,12 @@ export function ProfileMenu() {
         <MenuItem component={RouterLink} to="/organizzazione/workflow" onClick={() => setAnchor(null)}>
           <ListItemIcon><LibraryBooksIcon fontSize="small" /></ListItemIcon>Libreria workflow
         </MenuItem>
+        {/* modelli di commessa (ADR-52): li creano e li usano gli amministratori dell'organizzazione */}
+        {me.is_org_admin && (
+          <MenuItem component={RouterLink} to="/organizzazione/modelli" onClick={() => setAnchor(null)}>
+            <ListItemIcon><DashboardCustomizeIcon fontSize="small" /></ListItemIcon>Modelli di commessa
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem sx={{ color: "error.main" }} onClick={async () => { setAnchor(null); await logout(); navigate("/login"); }}>
           <ListItemIcon><LogoutIcon fontSize="small" color="error" /></ListItemIcon>Esci

@@ -76,6 +76,15 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
     staleTime: 4 * 60_000,          // l'URL firmato vale 5'
     retry: false,
   });
+  // Il link filigranato in cache può essere già esaurito (ticket a usi contati, ADR-49 B6): se il PDF risponde 401
+  // ("Link già usato" o scaduto) si scarta il link dalla cache e se ne chiede uno nuovo, una volta sola per revisione.
+  const qc = useQueryClient();
+  const [relinked, setRelinked] = useState<string | null>(null);
+  const onPdfError = (status: number | null) => {
+    if (status !== 401 || !revisionId || relinked === revisionId) return;
+    setRelinked(revisionId);
+    qc.resetQueries({ queryKey: ["view-link", revisionId], exact: true });
+  };
   const [compareId, setCompareId] = useState("");
   const { data: compareLink } = useQuery({
     queryKey: ["view-link", compareId],
@@ -286,7 +295,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
                         onSaved={(id) => { setEditing(false); setRevisionId(id); }} />
           ) : isPdf && !browserPdf ? (
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
-              <PdfView key={link.url} url={link.url}
+              <PdfView key={link.url} url={link.url} onLoadError={onPdfError}
                        onFit={(z) => setZoom(Math.min(1.5, Math.max(ZOOMS[0], Math.round(z * 100) / 100)))} compareUrl={compareId ? compareLink?.url ?? null : null} zoom={zoom} focusPage={focusPage} onPages={setPages} overlay={layer}
                        search={search} activeMatch={activeMatch} onMatches={setMatchCount} />
             </Suspense>

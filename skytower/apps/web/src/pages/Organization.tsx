@@ -46,6 +46,8 @@ export function OrganizationPage() {
         <Button component={RouterLink} to={orgId && me.is_platform_admin ? `/organizzazione/workflow?org=${orgId}` : "/organizzazione/workflow"}>
           Libreria workflow
         </Button>
+        {/* modelli di commessa della propria organizzazione (ADR-52) */}
+        {me.is_org_admin && <Button component={RouterLink} to="/organizzazione/modelli">Modelli di commessa</Button>}
         {me.is_platform_admin && (
           <>
             <TextField select size="small" label="Organizzazione da gestire" value={orgId} sx={{ minWidth: 280 }}
@@ -193,7 +195,7 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
         </Dialog>
       )}
       {inviting && <InviteDialog org={org} onClose={() => setInviting(false)}
-                                 onInvited={(email) => { setInviting(false); setNotice(`Invito inviato a ${email}`); refresh(); }} />}
+                                 onInvited={(email) => { setInviting(false); setNotice(`Invito inviato se l'indirizzo è valido (${email})`); refresh(); }} />}
     </>
   );
 }

@@ -210,6 +210,19 @@ export interface Project {
 
 export interface Container {
   id: string;
+  /** Modello di commessa dell'organizzazione (ADR-52): struttura da cui aprire commesse nuove, senza funzioni operative */
+  is_model?: boolean;
+  model_source_id?: string | null;
+}
+
+/** Modello di commessa nell'elenco "Modelli di commessa" (GET /organizations/{id}/project-models) */
+export interface ProjectModel {
+  id: string; code: string; name: string; description: string | null; status: string; created_at: string; updated_at: string;
+  model_source_id: string | null; source_name: string | null; source_code: string | null; created_by_name: string | null;
+  folders: number; naming_profiles: number; workflows: number; roles: number; organizations: number; people: number;
+  documents: number;
+  /** cose non copiate o adattate (risposta di creazione, import) */
+  changes?: string[];
   project_id: string;
   parent_id: string | null;
   owner_organization_id: string;

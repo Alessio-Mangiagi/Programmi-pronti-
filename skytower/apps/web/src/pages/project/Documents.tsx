@@ -20,6 +20,7 @@ import { StartWorkflowDialog } from "../../components/StartWorkflowDialog";
 import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowProgress";
 import { choosableFields, FieldValueInput, useFolderNaming } from "./Naming";
 import { SuiteDocumento } from "./SuiteDocumento";
+import { ModelDocumentToggle } from "../../components/ProjectModels";
 
 export interface DocumentRow {
   id: string;
@@ -447,6 +448,8 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
           </Stack>
           {doc.description && <Typography variant="body2">{doc.description}</Typography>}
           <Typography variant="body2" color="text.secondary">Originatore: {doc.originator_code}</Typography>
+          {/* documento "di modello": si copia nei modelli di commessa e nelle commesse che ne nascono (ADR-52) */}
+          {documentId && <ModelDocumentToggle projectId={projectId} documentId={documentId} />}
           {doc.archived_at && <Alert severity="info">Archiviato il {new Date(doc.archived_at).toLocaleDateString("it-IT")}: {doc.archive_reason}</Alert>}
           {download.error && <Alert severity="error">{(download.error as ApiError).message}</Alert>}
           {actions.length > 0 && (
