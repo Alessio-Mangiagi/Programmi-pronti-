@@ -166,7 +166,10 @@ def cmd_workflow_rda(args) -> None:
     """Modello di processo "RdA → gara → affidamento" (ADR-48) e processo di prova in un progetto, via API."""
     from .tooling import workflow_rda
 
-    workflow_rda.carica(args.api, args.password, args.progetto, args.rimuovi)
+    if args.in_libreria:   # copia nella libreria dell'organizzazione proprietaria (ADR-50)
+        workflow_rda.in_libreria(args.api, args.password, args.progetto)
+    else:
+        workflow_rda.carica(args.api, args.password, args.progetto, args.rimuovi)
 
 
 def cmd_ifc(args) -> None:
@@ -269,6 +272,8 @@ def main(argv: list[str] | None = None) -> None:
     rda.add_argument("--api", default="http://127.0.0.1:8100")
     rda.add_argument("--password", default="Cantiere-2026!", help="password dell'utente che carica (com_admin)")
     rda.add_argument("--rimuovi", action="store_true", help="annulla il processo di prova e disattiva il modello")
+    rda.add_argument("--in-libreria", action="store_true",
+                     help="copia il modello della commessa nella libreria dell'organizzazione proprietaria (ADR-50)")
     rda.set_defaults(func=cmd_workflow_rda)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")

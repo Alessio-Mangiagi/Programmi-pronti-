@@ -56,7 +56,8 @@ def test_import_adattato_al_progetto(client, api_world, as_user):  # noqa: F811
     other = client.post(f"/projects/{target}/workflow-templates/import", headers=admin,
                         json={"template_id": item["id"], "code": code + "_B", "name": "Copia"}).json()
     assert other["code"] == code + "_B" and other["version"] == 1
-    active = client.get(f"/projects/{target}/workflow-templates", headers=admin).json()
+    active = [t for t in client.get(f"/projects/{target}/workflow-templates", headers=admin).json()
+              if t.get("scope") != "LIBRARY"]      # la libreria dell'organizzazione (ADR-50) non conta qui
     assert {(t["code"], t["version"]) for t in active} == {(code, 2), (code + "_B", 1)}
 
 

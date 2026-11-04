@@ -122,12 +122,16 @@ def _save_template(conn, project_id: uuid.UUID, code: str, name: str, definition
 @router.get("/projects/{project_id}/workflow-templates")
 def list_templates(project_id: uuid.UUID, include_inactive: bool = False,
                    subject: Literal["DOCUMENT", "PROCESS"] | None = None, c: Ctx = Depends(ctx)):
+    from .workflow_library import library_for_project  # import locale: evita il ciclo fra i due moduli
+
     with c.tx() as conn:
-        require_project(conn, project_id)
-        return conn.execute(
+        project = require_project(conn, project_id)
+        rows = conn.execute(
             f"SELECT {TEMPLATE_COLS} FROM cde.workflow_templates WHERE project_id = %(p)s"
             + ("" if include_inactive else " AND is_active") + (" AND subject = %(s)s" if subject else "")
             + " ORDER BY code, version DESC", {"p": project_id, "s": subject}).fetchall()
+        # ADR-50: in coda i modelli attivi della libreria dell'organizzazione proprietaria (scope LIBRARY)
+        return [{**r, "scope": "PROJECT"} for r in rows] + library_for_project(conn, project, subject)
 
 
 @router.post("/projects/{project_id}/workflow-templates", status_code=201)
@@ -302,9 +306,12 @@ API_STATUS = {"RUNNING": "RUNNING", "APPROVED": "COMPLETED", "REJECTED": "COMPLE
 
 
 def _runs_and_tasks(conn, instance_id: uuid.UUID) -> tuple[list[dict], list[dict]]:
+    # l'avvio e i primi nodi hanno lo stesso activated_at (stessa transazione): l'avvio sempre per primo,
+    # altrimenti l'ordine fra i due dipendeva dall'id casuale
     runs = conn.execute(
         """SELECT id, node_id, node_type, name, round, status, outcome, required, activated_at, due_at, completed_at
-           FROM cde.workflow_node_runs WHERE instance_id = %s ORDER BY activated_at, id""", [instance_id]).fetchall()
+           FROM cde.workflow_node_runs WHERE instance_id = %s
+           ORDER BY activated_at, node_type <> 'start', id""", [instance_id]).fetchall()
     tasks = conn.execute(
         """SELECT k.id, k.node_run_id, k.assignee_id, k.status, k.outcome, k.comment, k.due_at, k.completed_at,
                   u.first_name || ' ' || u.last_name AS assignee_name
@@ -372,7 +379,19 @@ def _graph(conn, instance_id: uuid.UUID) -> dict:
 
 @router.post("/revisions/{revision_id}/workflows", status_code=201)
 def start_workflow(revision_id: uuid.UUID, body: StartIn, c: Ctx = Depends(ctx)):
+    from .workflow_library import check_library_roles  # import locale: evita il ciclo fra i due moduli
+
     with c.tx() as conn:
+        # ADR-50: modello della libreria dell'organizzazione proprietaria? ogni compito deve avere qualcuno nella
+        # commessa, altrimenti 422 con i nodi (il database ripete il controllo e cerca il modello anche lì)
+        lib = conn.execute(
+            """SELECT t.id, t.name, t.organization_id, t.definition, r.project_id, d.originator_organization_id
+               FROM cde.document_revisions r JOIN cde.documents d ON d.id = r.document_id
+               JOIN cde.projects p ON p.id = r.project_id
+               JOIN cde.workflow_templates t ON t.id = %s AND t.organization_id = p.owner_organization_id
+               WHERE r.id = %s""", [body.template_id, revision_id]).fetchone()
+        if lib:
+            check_library_roles(conn, lib, lib["project_id"], lib["originator_organization_id"])
         iid = conn.execute("SELECT cde.workflow_start(%s, %s, %s) AS id",
                            [body.template_id, revision_id, body.comment]).fetchone()["id"]
         inst = _instance(conn, iid)
@@ -430,13 +449,20 @@ def document_workflows(document_id: uuid.UUID, c: Ctx = Depends(ctx)):
 # ---------------------------------------------------------------------
 @router.post("/projects/{project_id}/processes", status_code=201)
 def start_process(project_id: uuid.UUID, body: ProcessIn, c: Ctx = Depends(ctx)):
+    from .workflow_library import check_library_roles, library_template  # import locale: evita il ciclo
+
     with c.tx() as conn:
-        require_project(conn, project_id)
+        project = require_project(conn, project_id)
         t = conn.execute("SELECT project_id FROM cde.workflow_templates WHERE id = %s", [body.template_id]).fetchone()
-        if t is None or t["project_id"] != project_id:
+        # ADR-50: oltre ai modelli della commessa, quelli della libreria dell'organizzazione proprietaria
+        lib = library_template(conn, body.template_id, project) if t is not None and t["project_id"] is None else None
+        if t is None or (t["project_id"] != project_id and lib is None):
             raise not_found("Modello di workflow")
-        iid = conn.execute("SELECT cde.workflow_start_process(%s, %s, %s, %s::uuid[]) AS id",
-                           [body.template_id, body.title, body.description, body.document_ids]).fetchone()["id"]
+        if lib:
+            check_library_roles(conn, lib, project_id, conn.execute("SELECT cde.current_app_org() AS o").fetchone()["o"])
+        iid = conn.execute("SELECT cde.workflow_start_process(%s, %s, %s, %s::uuid[], %s) AS id",
+                           [body.template_id, body.title, body.description, body.document_ids,
+                            project_id]).fetchone()["id"]
         security_event(conn, "PROCESS_STARTED", user_id=c.user_id, project_id=project_id, ip=c.ip,
                        instance=iid, template=body.template_id, documents=len(body.document_ids))
         return _graph(conn, iid)

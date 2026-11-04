@@ -40,6 +40,7 @@ from .modules import (
     states,
     suite,
     transmittals,
+    workflow_library,
     workflows,
 )
 from .security.kms import build_kms
@@ -81,7 +82,6 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     settings = settings or get_settings()
     svc = services or build_services(settings)
     logging.basicConfig(level=logging.INFO)
-
     if settings.insecure_cookies:
         # B8 (revisione di sicurezza del 03/11/2026): HTTP in LAN è una scelta temporanea, la strada giusta è
         # SUITE_DOMINIO + Caddy con TLS. Intanto il refresh dura poco (vedi Settings._refresh_breve_in_http).
@@ -89,6 +89,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             "ATTENZIONE: cookie di sessione senza Secure (CDE_COOKIE_SECURE=false) in ambiente %s: il refresh "
             "token viaggia in chiaro sulla rete. Durata della sessione ridotta a %s ore. Configurare HTTPS "
             "(SUITE_DOMINIO + Caddy) appena possibile.", settings.env, settings.refresh_token_ttl_s // 3600)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         svc.db.open()
@@ -141,7 +142,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
                    rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles, bim,
-                   naming_profiles, office, suite, portale):
+                   naming_profiles, office, suite, portale, workflow_library):   # libreria workflow (ADR-50)
         app.include_router(module.router)
     app.include_router(passkeys.login_router)
     app.include_router(suite.revisioni)

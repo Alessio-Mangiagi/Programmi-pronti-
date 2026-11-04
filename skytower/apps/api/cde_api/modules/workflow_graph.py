@@ -10,6 +10,7 @@ Il motore che esegue il grafo è nel database (migrazione 0039): la conversione 
 """
 from __future__ import annotations
 
+import re
 import uuid
 from collections import deque
 from typing import Any, Literal
@@ -184,13 +185,93 @@ def _pyd_message(e: dict) -> str:
     return f"{loc}: {msg}" if loc else msg
 
 
+def _node_message(raw: Any, e: dict) -> str:
+    """Errore di Pydantic su un nodo detto come lo direbbe chi disegna: «Nome»: cosa manca.
+
+    Prima arrivava il messaggio tecnico ("assignees.0.code: String should match pattern…") e l'editor lo
+    traduceva; ora la frase giusta parte già dall'API (ADR-50), riferita al nodo."""
+    name = raw.get("name") if isinstance(raw, dict) else None
+    label = f"«{name}»" if isinstance(name, str) and name.strip() else f"Il nodo {raw.get('id') if isinstance(raw, dict) else ''}".strip()
+    loc = [x for x in e.get("loc", ()) if x != "__root__"]
+    msg = str(e.get("msg", "valore non valido")).removeprefix("Value error, ")
+    if loc and loc[0] in ("assignees", "recipients") and len(loc) >= 2 and isinstance(loc[1], int):
+        chi = "dell'assegnatario" if loc[0] == "assignees" else "del destinatario"
+        numero = f" n. {loc[1] + 1}" if loc[1] else ""
+        campo = loc[2] if len(loc) > 2 else ("code" if "indicare code" in msg else "id" if "indicare id" in msg else None)
+        if campo == "code":
+            return f"{label}: scegliere il ruolo {chi}{numero}"
+        if campo == "id":
+            return f"{label}: scegliere la persona {chi}{numero}"
+        return f"{label}: {'assegnatario' if loc[0] == 'assignees' else 'destinatario'}{numero} non valido ({msg})"
+    if loc and loc[0] == "outcomes" and len(loc) >= 3 and isinstance(loc[1], int):
+        cosa = {"label": "manca l'etichetta", "code": "codice non valido", "color": "colore non valido"}.get(str(loc[2]), msg)
+        return f"{label}: esito n. {loc[1] + 1}, {cosa}"
+    if loc == ["name"]:
+        return f"{label}: il nome va da 2 a 100 caratteri"
+    if not loc:
+        return f"{label}: {msg}"
+    return f"{label}: {'.'.join(str(x) for x in loc)}: {msg}"
+
+
+def _placeholder(raw: Any) -> Node | None:
+    """Segnaposto per un nodo che non ha passato la validazione (es. ruolo non scelto).
+
+    Senza, il nodo sparirebbe dal grafo e porterebbe con sé errori a cascata ("arco verso un nodo inesistente",
+    "nodo non raggiungibile") che nascondono quello vero. Il segnaposto tiene id, tipo, casella ed esiti validi,
+    così gli archi e la raggiungibilità si controllano lo stesso; non finisce mai in una definizione salvata
+    (c'è già un errore)."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("id"), str) or not re.match(NODE_ID, raw["id"]):
+        return None
+    if raw.get("type") not in ("start", "decision", "activity", "notification", "end"):
+        return None
+    try:
+        cell = Cell.model_validate(raw.get("cell"))
+    except ValidationError:
+        cell = Cell.model_construct(col=-1, row=-1)   # fuori griglia: nessun conflitto di casella
+    outcomes = []
+    for o in raw.get("outcomes") or []:
+        try:
+            outcomes.append(Outcome.model_validate(o))
+        except ValidationError:
+            if isinstance(o, dict) and isinstance(o.get("code"), str) and re.match(OUTCOME_CODE, o["code"]):
+                outcomes.append(Outcome.model_construct(code=o["code"], label=str(o.get("label") or o["code"]),
+                                                        color=o.get("color") or "green"))
+    return Node.model_construct(id=raw["id"], type=raw["type"], name=str(raw.get("name") or raw["id"]), cell=cell,
+                                join=raw.get("join") if raw.get("join") in ("ANY", "ALL") else None,
+                                outcomes=outcomes or None, assignees=None, recipients=None, quorum=None,
+                                sla_hours=None, message=None, result=raw.get("result"))
+
+
+def library_errors(nodes: list[Node], escalation_user_id: Any = None) -> list[dict]:
+    """Regole dei modelli della libreria dell'organizzazione (ADR-50): assegnatari e destinatari solo per ruolo.
+
+    Le persone cambiano da commessa a commessa: un modello di libreria dice "il Project Admin", "il Lead
+    Designer", mai "Mario Rossi"; e un ruolo non si limita a un'organizzazione, che in un'altra commessa
+    potrebbe non partecipare. Niente escalation verso una persona: se un compito scade sono avvisati i Project
+    Admin della commessa e chi ha avviato."""
+    errors: list[dict] = []
+    for n in nodes:
+        for key, chi in (("assignees", "gli assegnatari"), ("recipients", "i destinatari")):
+            values = getattr(n, key) or []
+            if any(a.type == "user" for a in values):
+                errors.append(err(f"«{n.name}»: nella libreria {chi} si indicano per ruolo, non per persona", node=n.id))
+            if any(a.type != "user" and a.organization_id for a in values):
+                errors.append(err(f"«{n.name}»: nella libreria un ruolo non può essere limitato a un'organizzazione",
+                                  node=n.id))
+    if escalation_user_id:
+        errors.append(err("Nella libreria niente escalation verso una persona: se un compito scade sono avvisati "
+                          "i Project Admin della commessa"))
+    return errors
+
+
 # ---------------------------------------------------------------------
 # Validazione
 # ---------------------------------------------------------------------
-def normalize(definition: dict, subject: str | None = None) -> dict:
+def normalize(definition: dict, subject: str | None = None, library: bool = False) -> dict:
     """La definizione in versione 2, validata e ripulita; ``GraphInvalid`` con l'elenco degli errori.
 
-    Accetta anche la versione 1 (``steps``), che converte. ``subject`` (se dato) prevale su quello nel JSON."""
+    Accetta anche la versione 1 (``steps``), che converte. ``subject`` (se dato) prevale su quello nel JSON.
+    ``library``: modello della libreria dell'organizzazione, con in più le regole di ``library_errors``."""
     if not isinstance(definition, dict):
         raise GraphInvalid([err("La definizione deve essere un oggetto JSON")])
     if "steps" in definition and "nodes" not in definition:
@@ -214,18 +295,23 @@ def normalize(definition: dict, subject: str | None = None) -> dict:
 
     nodes: dict[str, Node] = {}
     cells: dict[tuple[int, int], str] = {}
+    valid: list[Node] = []          # nodi passati dalla validazione (per le regole della libreria)
     for raw in raw_nodes:
         nid = raw.get("id") if isinstance(raw, dict) else None
         try:
             node = Node.model_validate(raw)
+            valid.append(node)
         except ValidationError as exc:
-            errors += [err(_pyd_message(e), node=nid) for e in exc.errors()]
-            continue
+            msgs = list(dict.fromkeys(_node_message(raw, e) for e in exc.errors()))   # senza doppioni
+            errors += [err(m, node=nid) for m in msgs]
+            node = _placeholder(raw)   # resta nel grafo: niente errori a cascata su archi e raggiungibilità
+            if node is None:
+                continue
         if node.id in nodes:
             errors.append(err(f"Id «{node.id}» ripetuto", node=node.id))
             continue
         cell = (node.cell.col, node.cell.row)
-        if cell in cells:
+        if cell in cells and cell != (-1, -1):
             errors.append(err(f"Casella {cell[0]},{cell[1]} già occupata da «{cells[cell]}»", node=node.id))
         cells[cell] = node.id
         codes = [o["code"] for o in node.outcome_list()]
@@ -308,6 +394,8 @@ def normalize(definition: dict, subject: str | None = None) -> dict:
             esc = str(uuid.UUID(str(esc)))
         except ValueError:
             errors.append(err("escalation_user_id non valido"))
+    if library:
+        errors += library_errors(valid, esc)
 
     if errors:
         raise GraphInvalid(errors)

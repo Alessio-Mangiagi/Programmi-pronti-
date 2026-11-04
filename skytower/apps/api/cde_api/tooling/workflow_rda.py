@@ -11,6 +11,9 @@ Gli assegnatari sono il ruolo PROJECT_ADMIN con quorum ANY: le persone stanno ne
 riassegnano dall'editor. Lo usano:
 - ``cde workflow-rda --progetto GALFOR [--rimuovi]`` (modello completo, 7 buyer e 5 autorizzazioni, più un
   processo di prova portato fino alla fase dei buyer);
+- ``cde workflow-rda --progetto GALFOR --in-libreria``: copia il modello della commessa nella libreria
+  dell'organizzazione proprietaria (ADR-50), così tutte le sue commesse lo avviano; il modello e il processo di
+  prova della commessa restano dove sono;
 - la demo ``tooling/demo_commesse.py`` (versione ridotta sulla commessa 101-003).
 Tutto passa dall'API come un utente qualunque; rilanciarlo non duplica nulla.
 """
@@ -178,6 +181,39 @@ def carica(api: str, password: str, codice_progetto: str, rimuovi: bool = False,
             "processo": g["id"] if g else None}
 
 
+def in_libreria(api: str, password: str, codice_progetto: str, utente: str = "com_admin") -> dict:
+    """Copia il modello RdA della commessa nella libreria dell'organizzazione proprietaria (ADR-50).
+
+    Passa da ``POST /organizations/{id}/workflow-library/from-project`` come farebbe l'amministratore
+    dell'organizzazione dalla scheda Workflow. Idempotente: se in libreria c'è già un modello attivo con lo stesso
+    codice e lo stesso grafo non fa nulla. Un solo login (``utente``), per non consumare i tentativi."""
+    from .demo_content import Loader
+
+    ld = Loader(api, password)
+    p = progetto(ld, utente, codice_progetto)
+    pid, org = str(p["id"]), str(p["owner_organization_id"])
+    src = next((t for t in ld.call(utente, "GET", f"/projects/{pid}/workflow-templates?subject=PROCESS") or []
+                if t["code"] == CODICE and t.get("is_active") and t.get("scope", "PROJECT") == "PROJECT"), None)
+    if src is None:
+        raise SystemExit(f"Nel progetto {p['code']} non c'è un modello {CODICE} attivo: prima cde workflow-rda "
+                         f"--progetto {codice_progetto}")
+    lib = ld.call(utente, "GET", f"/organizations/{org}/workflow-library?subject=PROCESS")
+    if lib is None:
+        raise SystemExit("Libreria non leggibile: " + "; ".join(ld.log))
+    attuale = next((t for t in lib if t["code"] == CODICE and t.get("is_active")), None)
+    if attuale and _uguale(attuale["definition"], src["definition"]):
+        print(f"libreria: modello {attuale['id']} v{attuale['version']} già uguale a quello di {p['code']}")
+        return {"modello": attuale["id"], "versione": attuale["version"], "nuovo": False}
+    out = ld.call(utente, "POST", f"/organizations/{org}/workflow-library/from-project",
+                  json={"template_id": src["id"]})
+    if not out:
+        raise SystemExit("Copia in libreria non riuscita: " + "; ".join(ld.log))
+    print(f"libreria: modello {out['id']} v{out['version']} copiato da {p['code']} ({src['id']})")
+    for nota in out.get("changes") or []:
+        print("  modifica:", nota)
+    return {"modello": out["id"], "versione": out["version"], "nuovo": True}
+
+
 def main(argv=None) -> None:
     import argparse
 
@@ -186,9 +222,14 @@ def main(argv=None) -> None:
     ap.add_argument("--api", default="http://127.0.0.1:8100")
     ap.add_argument("--password", default="Cantiere-2026!", help="password dell'utente che carica (com_admin)")
     ap.add_argument("--rimuovi", action="store_true", help="annulla il processo di prova e disattiva il modello")
+    ap.add_argument("--in-libreria", action="store_true",
+                    help="copia il modello della commessa nella libreria dell'organizzazione proprietaria (ADR-50)")
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(errors="replace")
-    carica(args.api, args.password, args.progetto, args.rimuovi)
+    if args.in_libreria:
+        in_libreria(args.api, args.password, args.progetto)
+    else:
+        carica(args.api, args.password, args.progetto, args.rimuovi)
 
 
 if __name__ == "__main__":
