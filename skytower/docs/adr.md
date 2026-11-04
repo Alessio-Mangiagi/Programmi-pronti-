@@ -898,3 +898,50 @@ evento vecchio.
 (o subito, se tocca la testa già verificata). Con l'API su più processi (oggi uno) il tetto degli stream vale per
 processo. Chi invita non vede più i dati dell'utente nella risposta (la SPA non li usava). Test:
 `tests/test_security_bassi.py`; scenario U53.
+
+## ADR-50 — Libreria dei workflow dell'organizzazione, con collegamento vivo alle commesse
+
+**Contesto.** Fino al 04/11/2026 un modello di workflow viveva solo dentro una commessa; per riusarlo si importava
+(ADR-39) o si partiva da una commessa modello (ADR-43), ottenendo copie che poi divergono. L'utente chiede che "i
+workflow si creino ad alto livello e si possano usare come template su tutte le commesse caricate".
+
+**Decisione.** Scelte dell'utente:
+- **libreria per organizzazione**: `workflow_templates` ha `project_id` *oppure* `organization_id` (vincolo
+  `workflow_templates_scope`, migrazione 0041); un modello di libreria è visibile in tutte le commesse di cui
+  l'organizzazione è proprietaria (`projects.owner_organization_id`) e a chi è dell'organizzazione; le altre
+  organizzazioni non lo vedono (RLS con `cde.my_library_orgs()`);
+- **collegamento vivo**: `GET /projects/{id}/workflow-templates` restituisce anche i modelli attivi della libreria
+  (`scope: "LIBRARY"`, `organization_name`); la commessa li avvia direttamente, da Processi e da "Avvia approvazione".
+  Una nuova versione in libreria vale per gli avvii successivi; le istanze in corso restano sul `template_id` con cui
+  sono partite. Una variante locale si fa con "Copia nella commessa" (`POST …/workflow-templates/from-library`,
+  stessa logica di adattamento dell'import), che ricorda la provenienza in `source_template_id`;
+- **solo l'amministratore dell'organizzazione** (`cde.can_manage_org`: org admin o platform admin) crea, versiona,
+  disattiva e pubblica in libreria (`/organizations/{id}/workflow-library`, `…/from-project`,
+  `PATCH /workflow-library/{id}`); Project Admin e chi avvia i workflow li vedono e li usano;
+- **solo ruoli**: in libreria assegnatari e destinatari sono `role` / `originator_role`, senza persone, senza ruoli
+  limitati a un'organizzazione e senza `escalation_user_id` (le persone cambiano da commessa a commessa); lo
+  controllano l'API (errori per nodo) e un CHECK nel database. All'avvio in una commessa ogni decisione e attività
+  deve avere qualcuno con quel ruolo: altrimenti 422 `roles_missing` con l'elenco dei nodi (lo ripetono
+  `cde.workflow_start` e `cde.workflow_start_process` con `cde.wf_check_library_roles`), perché un compito senza
+  assegnatari bloccherebbe il flusso a metà;
+- il modello RdA → gara → affidamento della Galleria Fortolese è **copiato** in libreria della COM
+  (`cde workflow-rda --progetto GALFOR --in-libreria`); quello della commessa e il processo di prova restano.
+
+Il motore non cambia: tutte le sue funzioni usano già `i.project_id` dell'istanza; cambiano i due avvii (il modello
+si cerca anche nella libreria dell'organizzazione proprietaria; `workflow_start_process` riceve il progetto). Gli
+errori di validazione sugli assegnatari ora partono dall'API già riferiti al nodo ("«Verifica»: scegliere il ruolo
+dell'assegnatario") e un nodo incompleto resta nel grafo come segnaposto, così non genera errori a cascata.
+
+**Alternative scartate.** Libreria della piattaforma, comune a tutte le organizzazioni: i workflow sono il modo di
+lavorare di un'impresa, non vanno mostrati alle altre. Copia automatica in ogni commessa (collegamento "morto"):
+le copie divergono e una correzione andrebbe ripetuta commessa per commessa. Persone nei modelli di libreria con
+sostituzione all'avvio: in ogni commessa sono altre, e un nome sbagliato darebbe un compito (e l'accesso al
+documento) a chi non c'entra. Avvisare invece di bloccare quando un ruolo non ha nessuno: il processo si fermerebbe
+al nodo senza assegnatari, più avanti e con un errore meno chiaro.
+
+**Conseguenze.** Disattivare una versione in libreria la toglie da tutte le commesse insieme; i processi già partiti
+proseguono. Un'istanza di libreria si legge con la definizione del modello: chi vede l'istanza (membro della
+commessa) vede anche il modello, tramite `my_library_orgs`. La pagina è "Libreria workflow" (`/organizzazione/workflow`,
+dal menu del profilo e dalla pagina Organizzazione); nella scheda Workflow della commessa la sezione "Dalla libreria
+dell'organizzazione". Contratto in `docs/workflow-grafo.md` §5; test `tests/test_workflow_libreria.py`,
+`e2e/workflow-libreria.spec.ts`; scenario U52.

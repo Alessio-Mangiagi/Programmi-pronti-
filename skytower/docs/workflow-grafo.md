@@ -164,6 +164,10 @@ Dettagli fissati dal motore (04/11/2026):
 - link delle notifiche di un processo: `/progetti/{project_id}/processi/{instance_id}` (fine OK/KO, nodi
   notifica, interruzione); i compiti restano su `/compiti?instance=…`;
 - il commento è obbligatorio per gli esiti rossi (e per `APPROVED_WITH_COMMENTS`, come prima);
+- errori di Pydantic su un nodo (04/11/2026, ADR-50): il messaggio parte già riferito al nodo e in italiano
+  («Verifica»: scegliere il ruolo dell'assegnatario; … la persona del destinatario n. 2; … il nome va da 2 a 100
+  caratteri); il nodo incompleto resta nel grafo come segnaposto, quindi niente errori a cascata su archi e
+  raggiungibilità;
 - `/workflows/{id}` resta con la forma a passi (`steps` in ordine di attivazione) per le pagine di oggi.
 
 ## 4. Schermate
@@ -181,3 +185,47 @@ Dettagli fissati dal motore (04/11/2026):
   date. Se ci sono più giri lo dice sul nodo ("2 giri").
 - **Processi**: nuova scheda del progetto con elenco, filtri per stato e "Nuovo processo" (scegli modello,
   titolo, descrizione, documenti allegati).
+
+## 5. Libreria dell'organizzazione (ADR-50, migrazione 0041)
+
+Decisione dell'utente del 04/11/2026: i workflow si disegnano "ad alto livello" e valgono in tutte le commesse.
+
+- **Dove stanno**: un modello ha `project_id` (modello della commessa, come prima) *oppure* `organization_id`
+  (modello della libreria di quell'organizzazione). La libreria si vede nelle commesse di cui l'organizzazione è
+  proprietaria (`projects.owner_organization_id`) e da chi è dell'organizzazione; le altre non la vedono.
+- **Collegamento vivo**: le commesse avviano i modelli **attivi** della libreria così come sono. Salvare con lo
+  stesso codice crea una nuova versione (la precedente si disattiva) che vale per gli avvii successivi; le istanze
+  già partite restano sul loro `template_id`. Disattivare una versione la toglie da tutte le commesse.
+- **Chi**: crea, versiona, disattiva e pubblica l'amministratore dell'organizzazione (`cde.can_manage_org`: org admin
+  della stessa organizzazione o platform admin). Gli altri dell'organizzazione consultano; nelle commesse chiunque
+  può avviare (stesse regole dei modelli della commessa).
+- **Solo ruoli**: in libreria `assignees` e `recipients` sono `role` / `originator_role` senza `organization_id`;
+  niente `user` e niente `escalation_user_id` (se un compito scade sono avvisati i Project Admin della commessa e chi
+  ha avviato). Errori per nodo: «X»: nella libreria gli assegnatari si indicano per ruolo, non per persona.
+- **Avvio**: se una decisione o un'attività non ha nessuno con quel ruolo nella commessa (ruolo inesistente o senza
+  persone), l'avvio è rifiutato con `422`:
+  `{"error": {"code": "roles_missing", "message": "Il modello di libreria «…» non si può avviare in questa commessa: nessuno ha il ruolo richiesto per «Nodo» (RUOLO), …", "errors": [{node, edge: null, message}]}}`.
+- **Copia nella commessa**: diventa un modello del progetto (modificabile, non segue più la libreria), adattato
+  come l'import (ruoli che nella commessa non esistono segnalati in `changes`); `source_template_id` ricorda
+  l'origine. Stesso codice di un modello già nella commessa ⇒ ne diventa la nuova versione.
+- **Pubblica in libreria** (da un modello di commessa): copia con persone, limiti di organizzazione ed escalation
+  tolti e segnalati in `changes`; se un nodo resterebbe senza assegnatari → `422 step_without_assignees` col nodo.
+
+| Metodo e rotta | Cosa fa |
+|---|---|
+| `GET /organizations/{id}/workflow-library?include_inactive=&subject=` | elenco (chi è dell'organizzazione; altrimenti 404) |
+| `POST /organizations/{id}/workflow-library` | salva `{code, name, subject, definition}`; stesso codice ⇒ nuova versione; 422 `invalid_workflow` come in §3 |
+| `POST /organizations/{id}/workflow-library/validate` | validazione con le regole della libreria, senza salvare: `{ok, errors}` |
+| `GET /organizations/{id}/workflow-library/roles` | ruoli per l'editor: di sistema e personalizzati delle commesse dell'organizzazione |
+| `POST /organizations/{id}/workflow-library/from-project` | `{template_id, code?, name?}`: pubblica la copia di un modello di commessa; risponde con `changes` |
+| `PATCH /workflow-library/{template_id}` | `{name?, is_active?}` |
+| `POST /projects/{id}/workflow-templates/from-library` | `{template_id, code?, name?}`: copia locale (Project Admin); risponde con `changes` |
+| `GET /projects/{id}/workflow-templates` | in più, in coda, i modelli attivi della libreria: `scope: "LIBRARY"`, `organization_name`; quelli della commessa hanno `scope: "PROJECT"` |
+| `POST /projects/{id}/processes`, `POST /revisions/{id}/workflows` | accettano anche un modello della libreria dell'organizzazione proprietaria della commessa |
+
+Ogni modello ha in più `organization_id` e `source_template_id`. Schermate: pagina **Libreria workflow**
+(`/organizzazione/workflow`, dal menu del profilo e dalla pagina Organizzazione) con lo stesso editor a
+scacchiera, dove il tipo di assegnatario non offre la persona; nella scheda Workflow della commessa la sezione
+**Dalla libreria dell'organizzazione** (bollino Libreria, apertura in sola lettura, "Copia nella commessa"; per
+l'amministratore dell'organizzazione anche "Pubblica in libreria" sui modelli della commessa); in Processi e nel
+dialogo "Avvia approvazione" i modelli di libreria hanno il bollino **Libreria**.
