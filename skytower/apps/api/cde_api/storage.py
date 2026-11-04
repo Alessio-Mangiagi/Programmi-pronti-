@@ -121,6 +121,23 @@ class Storage:
         self.client.upload_file(path, self.bucket, key, ExtraArgs={"ContentType": content_type, "ChecksumAlgorithm": "SHA256"})
         return self.client.head_object(Bucket=self.bucket, Key=key).get("VersionId")
 
+    def copy_object(self, source_key: str, source_version: str | None, key: str, content_type: str) -> str | None:
+        """Copia con una chiave nuova (documenti di modello, ADR-52): i file non sono mai condivisi fra progetti.
+        Si rilegge e si ricarica in streaming (in più parti se grande) invece di CopyObject: con l'Object Lock
+        alcuni S3 compatibili (moto, MinIO) vogliono sulla copia intestazioni di checksum che CopyObject non manda."""
+        params = {"Bucket": self.bucket, "Key": source_key, **({"VersionId": source_version} if source_version else {})}
+        body = self.client.get_object(**params)["Body"]
+        try:
+            return self.put_fileobj(key, body, content_type)
+        finally:
+            body.close()
+
+    def put_fileobj(self, key: str, fileobj, content_type: str) -> str | None:
+        """Carica uno stream (documento di un file di modello importato), in più parti se grande."""
+        self.client.upload_fileobj(fileobj, self.bucket, key,
+                                   ExtraArgs={"ContentType": content_type, "ChecksumAlgorithm": "SHA256"})
+        return self.client.head_object(Bucket=self.bucket, Key=key).get("VersionId")
+
     def get_bytes(self, key: str, version_id: str | None) -> bytes:
         params = {"Bucket": self.bucket, "Key": key, **({"VersionId": version_id} if version_id else {})}
         return self.client.get_object(**params)["Body"].read()

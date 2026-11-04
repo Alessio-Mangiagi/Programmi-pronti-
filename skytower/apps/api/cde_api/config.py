@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     request_max_bytes: int = 16 * 1024 ** 2
     suite_upload_max_bytes: int = 200 * 1024 ** 2
     zip_max_bytes: int = 2 * 1024 ** 3      # download multiplo: oltre si scarica in più parti
+    # File di un modello di commessa (.cdemodello, ADR-52): tetto del file caricato con "Carica un modello da file"
+    # e della somma dei documenti di modello esportati (oltre, il file non si potrebbe ricaricare)
+    model_file_max_bytes: int = 200 * 1024 ** 2
     # OCR delle pagine scansionate dei PDF (Tesseract): senza eseguibile si salta (ADR-33)
     ocr_enabled: bool = True
     tesseract_cmd: str | None = None      # None = cercato nel PATH (e nella cartella predefinita su Windows)

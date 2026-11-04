@@ -60,6 +60,7 @@ def my_projects(c: Ctx = Depends(ctx)):
                       ON pm.project_id = p.id AND pm.user_id = cde.current_app_user()
                      AND (pm.expires_at IS NULL OR pm.expires_at > now())
                LEFT JOIN cde.roles r ON r.id = pm.role_id
+               WHERE NOT p.is_model      -- i modelli di commessa hanno la loro pagina (ADR-52)
                GROUP BY p.id, o.legal_name
                ORDER BY p.name"""
         ).fetchall()

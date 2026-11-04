@@ -99,8 +99,9 @@ def create_project(body: ProjectIn, c: Ctx = Depends(ctx)):
     if (body.with_organizations or body.with_members) and body.template_id is None:
         raise ApiError(422, "template_required", "Organizzazioni e persone si copiano solo da una commessa template")
     with c.tx() as conn:
-        if conn.execute("SELECT 1 FROM cde.projects WHERE owner_organization_id = cde.current_app_org() AND code = %s",
-                        [body.code]).fetchone():
+        # i modelli di commessa (ADR-52) possono avere lo stesso codice: il codice è univoco fra le commesse
+        if conn.execute("SELECT 1 FROM cde.projects WHERE owner_organization_id = cde.current_app_org() AND code = %s "
+                        "AND NOT is_model", [body.code]).fetchone():
             raise ApiError(409, "code_taken", f"La tua organizzazione ha già una commessa con codice {body.code}")
         args = [body.code, body.name, body.description, body.start_date, body.end_date, body.timezone]
         if body.template_id is None:
@@ -118,12 +119,14 @@ def create_project(body: ProjectIn, c: Ctx = Depends(ctx)):
 @router.get("")
 def list_projects(c: Ctx = Depends(ctx)):
     with c.tx() as conn:
-        return conn.execute("SELECT * FROM cde.projects ORDER BY name").fetchall()
+        # i modelli di commessa non sono commesse: stanno in "Modelli di commessa" (ADR-52)
+        return conn.execute("SELECT * FROM cde.projects WHERE NOT is_model ORDER BY name").fetchall()
 
 
 @router.get("/templates")
 def list_templates(c: Ctx = Depends(ctx)):
-    """Commesse utilizzabili come template: quelle di cui si è Project Admin, con cosa contengono."""
+    """Commesse utilizzabili come template: quelle di cui si è Project Admin, con cosa contengono. I modelli di
+    commessa (ADR-52) hanno il loro elenco, ``GET /organizations/{id}/project-models``."""
     with c.tx() as conn:
         return conn.execute(
             """SELECT p.id, p.code, p.name, p.status,
@@ -133,7 +136,7 @@ def list_templates(c: Ctx = Depends(ctx)):
                         WHERE w.project_id = p.id AND w.is_active) AS workflows,
                       (SELECT count(*) FROM cde.project_organizations o WHERE o.project_id = p.id) AS organizations
                FROM cde.projects p
-               WHERE cde.has_project_permission(cde.current_app_user(), p.id, 'ADMIN', 'PROJECT')
+               WHERE cde.has_project_permission(cde.current_app_user(), p.id, 'ADMIN', 'PROJECT') AND NOT p.is_model
                ORDER BY p.name""").fetchall()
 
 
@@ -174,7 +177,10 @@ def update_project(project_id: uuid.UUID, body: ProjectPatch, c: Ctx = Depends(c
         _controlla_commessa(changes["settings"])
         changes["settings"] = Jsonb(changes["settings"] or {})
     with c.tx() as conn:
-        require_project(conn, project_id, "ADMIN", "PROJECT")
+        project = require_project(conn, project_id, "ADMIN", "PROJECT")
+        if project.get("is_model") and (body.settings or {}).get("commessa"):
+            # un modello non è collegato alla suite: il codice commessa lo prende la commessa creata dal modello
+            raise ApiError(422, "model_without_commessa", "Un modello di commessa non ha codice commessa della suite")
         if changes:
             conn.execute(patch_sql("cde.projects", changes), {**changes, "_key": project_id})
             security_event(conn, "PROJECT_UPDATED", user_id=c.user_id, project_id=project_id, ip=c.ip,

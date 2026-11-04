@@ -32,6 +32,7 @@ from .modules import (
     organizations,
     passkeys,
     portale,
+    project_models,
     projects,
     reports,
     rfis,
@@ -76,6 +77,7 @@ def build_services(settings: Settings) -> Services:
 
 
 _SUITE_UPLOAD = re.compile(r"^/suite/commesse/[^/]+/documenti$")
+_MODEL_IMPORT = re.compile(r"^/organizations/[^/]+/project-models/import$")   # file .cdemodello (ADR-52)
 
 
 def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
@@ -115,7 +117,9 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         dichiarato = request.headers.get("content-length")
         if dichiarato and dichiarato.isdigit():
             suite = request.method == "POST" and _SUITE_UPLOAD.match(request.url.path)
-            limite = settings.suite_upload_max_bytes if suite else settings.request_max_bytes
+            modello = request.method == "POST" and _MODEL_IMPORT.match(request.url.path)
+            limite = (settings.suite_upload_max_bytes if suite else settings.model_file_max_bytes if modello
+                      else settings.request_max_bytes)
             if int(dichiarato) > limite:
                 return JSONResponse({"error": {"code": "too_large",
                                                "message": f"Richiesta oltre {limite // 1024 ** 2} MB"}}, status_code=413)
@@ -142,7 +146,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     for module in (auth, me, organizations, projects, containers, access, documents, states, workflows, notifications,
                    rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles, bim,
-                   naming_profiles, office, suite, portale, workflow_library):   # libreria workflow (ADR-50)
+                   naming_profiles, office, suite, portale, workflow_library,   # libreria workflow (ADR-50)
+                   project_models):                                              # modelli di commessa (ADR-52)
         app.include_router(module.router)
     app.include_router(passkeys.login_router)
     app.include_router(suite.revisioni)

@@ -134,7 +134,9 @@ def progetto_per_commessa(conn, codice: str, org_suite: uuid.UUID | None = None)
     chiave = suite_link.normalizza_commessa(codice)
     if not chiave:
         raise ApiError(404, "not_found", "Codice commessa vuoto")
-    trovati = [p for p in conn.execute("SELECT * FROM cde.projects WHERE status <> 'ARCHIVED' ORDER BY created_at").fetchall()
+    # i modelli di commessa (ADR-52) non ricevono mai documenti dalla suite, nemmeno a parità di codice ISO
+    trovati = [p for p in conn.execute("SELECT * FROM cde.projects WHERE status <> 'ARCHIVED' AND NOT is_model "
+                                       "ORDER BY created_at").fetchall()
                if suite_link.normalizza_commessa(codice_commessa(p)) == chiave or suite_link.normalizza_commessa(p["code"]) == chiave]
     if trovati:
         if org_suite is not None:
@@ -164,7 +166,7 @@ def _voce_progetto(c: Ctx, p: dict) -> dict:
 def suite_commesse(c: Ctx = Depends(ctx_suite)):
     """Progetti visibili all'utente, con il codice commessa (solo quelli che ce l'hanno)."""
     with c.tx() as conn:
-        rows = conn.execute("SELECT * FROM cde.projects WHERE status <> 'ARCHIVED' ORDER BY code").fetchall()
+        rows = conn.execute("SELECT * FROM cde.projects WHERE status <> 'ARCHIVED' AND NOT is_model ORDER BY code").fetchall()
     return [_voce_progetto(c, p) for p in rows if codice_commessa(p)]
 
 
