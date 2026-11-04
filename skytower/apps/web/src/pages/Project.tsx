@@ -15,6 +15,8 @@ const DashboardTab = lazy(() => import("./project/Dashboard").then((m) => ({ def
 const RfisTab = lazy(() => import("./project/Rfis").then((m) => ({ default: m.RfisTab })));
 const TransmittalsTab = lazy(() => import("./project/Transmittals").then((m) => ({ default: m.TransmittalsTab })));
 const WorkflowsTab = lazy(() => import("./project/Workflows").then((m) => ({ default: m.WorkflowsTab })));
+// Processi: workflow a grafo che partono senza documento (docs/workflow-grafo.md §2)
+const ProcessiTab = lazy(() => import("./project/Processi").then((m) => ({ default: m.ProcessiTab })));
 const MembersTab = lazy(() => import("./project/Members").then((m) => ({ default: m.MembersTab })));
 const OrganizationsTab = lazy(() => import("./project/Organizations").then((m) => ({ default: m.OrganizationsTab })));
 const RolesTab = lazy(() => import("./project/Roles").then((m) => ({ default: m.RolesTab })));
@@ -28,6 +30,7 @@ const TABS = [
   { path: "rfi", label: "RFI" },
   { path: "transmittal", label: "Transmittal" },
   { path: "workflow", label: "Workflow" },
+  { path: "processi", label: "Processi" },
   { path: "membri", label: "Membri" },
   { path: "organizzazioni", label: "Organizzazioni" },
   { path: "ruoli", label: "Ruoli e permessi" },
@@ -81,6 +84,7 @@ export function ProjectPage() {
         <Route path="transmittal" element={<TransmittalsTab project={project} />} />
         <Route path="transmittal/:transmittalId" element={<TransmittalsTab project={project} />} />
         <Route path="workflow" element={<WorkflowsTab project={project} canManage={isProjectAdmin} />} />
+        <Route path="processi" element={<ProcessiTab project={project} />} />
         <Route path="cruscotto" element={<DashboardTab project={project} />} />
         <Route path="registro" element={<AuditTab project={project} />} />
         <Route path="membri" element={<MembersTab project={project} canManage={isAnyAdmin} />} />

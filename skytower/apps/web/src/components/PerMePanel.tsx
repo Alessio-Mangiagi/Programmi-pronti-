@@ -112,14 +112,14 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
         {empty && <Typography variant="body2" color="text.secondary">Niente da fare. Ottimo lavoro.</Typography>}
         {show("TASKS") && urgent.length > 0 && <Section title="In scadenza" color="error.main" />}
         {show("TASKS") && urgent.map((t) => (
-          <Item key={t.id} tone="urgent" kicker={`Revisione · ${t.overdue ? "scaduto" : "scade"} ${when(t.due_at)}`}
-                title={`${t.title} ${t.revision_code}`} detail={`${t.project_code} · ${t.step_name}`}
+          <Item key={t.id} tone="urgent" kicker={`${tipoCompito(t)} · ${t.overdue ? "scaduto" : "scade"} ${when(t.due_at)}`}
+                title={titoloCompito(t)} detail={`${t.project_code} · ${t.step_name}`}
                 onClick={() => go(`/compiti?instance=${t.instance_id}`)} />
         ))}
-        {show("TASKS") && normal.length > 0 && <Section title="Compiti di revisione" />}
+        {show("TASKS") && normal.length > 0 && <Section title="Compiti" />}
         {show("TASKS") && normal.map((t) => (
-          <Item key={t.id} kicker={`Revisione${t.due_at ? ` · entro ${when(t.due_at)}` : ""}`}
-                title={`${t.title} ${t.revision_code}`} detail={`${t.project_code} · ${t.step_name} · ${t.template_name}`}
+          <Item key={t.id} kicker={`${tipoCompito(t)}${t.due_at ? ` · entro ${when(t.due_at)}` : ""}`}
+                title={titoloCompito(t)} detail={`${t.project_code} · ${t.step_name} · ${t.template_name}`}
                 onClick={() => go(`/compiti?instance=${t.instance_id}`)} />
         ))}
         {show("TASKS") && transmittals.length > 0 && <Section title="Trasmissioni da confermare" />}
@@ -184,4 +184,12 @@ function Item({ kicker, title, detail, tone, onClick }: { kicker: string; title:
       <Typography variant="caption" color="text.secondary">{detail}</Typography>
     </ButtonBase>
   );
+}
+
+/** Compiti dei workflow a grafo: un processo (RdA, gara…) non ha documento né revisione da mostrare. */
+function tipoCompito(t: { revision_code?: string | null }) {
+  return t.revision_code ? "Revisione" : "Processo";
+}
+function titoloCompito(t: { title: string; revision_code?: string | null }) {
+  return t.revision_code ? `${t.title} ${t.revision_code}` : t.title;
 }

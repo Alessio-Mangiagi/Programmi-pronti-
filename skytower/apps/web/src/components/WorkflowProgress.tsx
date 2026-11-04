@@ -1,74 +1,65 @@
 // "><(((º> sabusabu <º)))><"
-// Avanzamento di un workflow: step con assegnatari, esiti, scadenze.
+// Riassunto di un workflow avviato, nel dettaglio documento e nella finestra del compito: modello, stato, nodi
+// in corso e fatti, link alla vista finale con lo schema a grafo (/istanze/:id). I dati vengono da
+// GET /workflow-instances/{id} (docs/workflow-grafo.md §3).
+import { useMemo } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Box, Chip, Stack, Step, StepContent, StepLabel, Stepper, Typography } from "@mui/material";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import { api } from "../api";
+import { Istanza, comeGrafo, statiDaIstanza } from "./workflow/modello";
 
+/** Riga dell'elenco dei workflow di un documento (GET /documents/{id}/workflows): basta id e stato. */
 export interface WorkflowInstance {
   id: string;
-  status: "RUNNING" | "APPROVED" | "REJECTED" | "CANCELLED";
-  template_name: string;
-  template_version: number;
-  step_count: number;
-  current_step: number;
-  started_by_name: string;
-  started_by: string;
-  started_at: string;
-  outcome_comment: string | null;
-  steps: {
-    id: string;
-    step_index: number;
-    name: string;
-    required: number;
-    status: string;
-    due_at: string | null;
-    tasks: { id: string; assignee_name: string; status: string; outcome: string | null; comment: string | null; completed_at: string | null }[];
-  }[];
+  status: string;
+  template_name?: string;
+  template_version?: number;
+  started_at?: string;
 }
 
-const WF_STATUS: Record<string, { label: string; color: "warning" | "success" | "error" | "default" }> = {
+const STATO: Record<string, { label: string; color: "warning" | "success" | "error" | "default" }> = {
   RUNNING: { label: "In corso", color: "warning" },
+  COMPLETED: { label: "Concluso", color: "success" },
   APPROVED: { label: "Approvato", color: "success" },
   REJECTED: { label: "Rifiutato", color: "error" },
   CANCELLED: { label: "Annullato", color: "default" },
 };
-const OUTCOME: Record<string, string> = { APPROVED: "✔ approvato", APPROVED_WITH_COMMENTS: "✔ con commenti", REJECTED: "✖ rifiutato" };
 
-export function WorkflowProgress({ instanceId, instance }: { instanceId?: string; instance?: WorkflowInstance }) {
-  const { data } = useQuery({
-    queryKey: ["workflow", instanceId],
-    queryFn: () => api<WorkflowInstance>(`/workflows/${instanceId}`),
-    enabled: !!instanceId && !instance,
+export function WorkflowProgress({ instanceId }: { instanceId: string }) {
+  const { data: ist } = useQuery({
+    queryKey: ["workflow-instance", instanceId],
+    queryFn: () => api<Istanza>(`/workflow-instances/${instanceId}`),
   });
-  const wf = instance ?? data;
-  if (!wf) return null;
+  const riassunto = useMemo(() => {
+    if (!ist) return null;
+    const def = comeGrafo(ist.definition);
+    const stati = statiDaIstanza(ist);
+    const compiti = def.nodes.filter((n) => n.type === "decision" || n.type === "activity");
+    const fine = def.nodes.find((n) => n.type === "end" && (stati.get(n.id)?.stato === "ok" || stati.get(n.id)?.stato === "ko"));
+    return {
+      attivi: compiti.filter((n) => stati.get(n.id)?.stato === "attivo").map((n) => n.name),
+      fatti: compiti.filter((n) => stati.get(n.id)?.stato === "fatto").length,
+      totale: compiti.length,
+      fine,
+    };
+  }, [ist]);
+  if (!ist || !riassunto) return null;
+  const stato = ist.result === "KO" ? STATO.REJECTED : STATO[ist.status] ?? { label: ist.status, color: "default" as const };
   return (
-    <Box>
-      <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-        <Typography fontWeight={600}>{wf.template_name} v{wf.template_version}</Typography>
-        <Chip size="small" {...WF_STATUS[wf.status]} />
-        <Typography variant="caption" color="text.secondary">avviato da {wf.started_by_name}</Typography>
+    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, p: 1.25 }}>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Typography fontWeight={600}>{ist.template ? `${ist.template.name} v${ist.template.version}` : ist.title ?? "Workflow"}</Typography>
+        <Chip size="small" color={stato.color} label={riassunto.fine ? riassunto.fine.name : stato.label} />
+        {ist.started_by?.name && <Typography variant="caption" color="text.secondary">avviato da {ist.started_by.name}</Typography>}
+        <Box flexGrow={1} />
+        <Button size="small" startIcon={<AccountTreeIcon />} component={RouterLink} to={`/istanze/${ist.id}`}>Apri lo schema</Button>
       </Stack>
-      {wf.outcome_comment && <Typography variant="body2" mb={1}>“{wf.outcome_comment}”</Typography>}
-      <Stepper orientation="vertical" activeStep={wf.status === "RUNNING" ? wf.current_step : wf.steps.length}>
-        {wf.steps.map((s) => (
-          <Step key={s.id} expanded completed={s.status === "APPROVED"}>
-            <StepLabel error={s.status === "REJECTED"}>
-              {s.name} <Typography component="span" variant="caption" color="text.secondary">
-                (quorum {s.required}/{s.tasks.length}{s.due_at ? `, scadenza ${new Date(s.due_at).toLocaleString("it-IT")}` : ""})
-              </Typography>
-            </StepLabel>
-            <StepContent>
-              {s.tasks.map((t) => (
-                <Typography key={t.id} variant="body2">
-                  {t.assignee_name}: {t.status === "DONE" ? OUTCOME[t.outcome!] : t.status === "OPEN" ? "in attesa" : "non necessario"}
-                  {t.comment && <> — <i>{t.comment}</i></>}
-                </Typography>
-              ))}
-            </StepContent>
-          </Step>
-        ))}
-      </Stepper>
+      <Typography variant="body2" color="text.secondary" mt={0.5}>
+        {riassunto.fatti} di {riassunto.totale} compiti svolti
+        {riassunto.attivi.length ? ` · in corso: ${riassunto.attivi.join(", ")}` : ""}
+      </Typography>
     </Box>
   );
 }

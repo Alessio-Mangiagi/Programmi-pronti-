@@ -6,7 +6,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { api, ApiError } from "../api";
 
-interface Template { id: string; code: string; version: number; name: string; is_active: boolean }
+// subject: i modelli per i processi (workflow a grafo) non si avviano su un documento
+interface Template { id: string; code: string; version: number; name: string; is_active: boolean; subject?: "DOCUMENT" | "PROCESS" }
 
 export function StartWorkflowDialog({ projectId, revisionId, label, onClose }: {
   projectId: string; revisionId: string; label: string; onClose: () => void;
@@ -35,7 +36,7 @@ export function StartWorkflowDialog({ projectId, revisionId, label, onClose }: {
             ? <Alert severity="info">Nessun workflow configurato per la commessa: lo crea il Project Admin nella scheda Workflow.</Alert>
             : (
               <TextField select label="Workflow" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                {templates.filter((t) => t.is_active).map((t) => <MenuItem key={t.id} value={t.id}>{t.name} (v{t.version})</MenuItem>)}
+                {templates.filter((t) => t.is_active && t.subject !== "PROCESS").map((t) => <MenuItem key={t.id} value={t.id}>{t.name} (v{t.version})</MenuItem>)}
               </TextField>
             )}
           <TextField label="Nota per i revisori" multiline minRows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
