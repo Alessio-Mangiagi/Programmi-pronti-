@@ -2,6 +2,7 @@
 // PNG per l'OCR, testo dal layer nativo, Word → testo, miniature e firma del contenuto.
 import { apriPdf, type PDFDocumentProxy } from './pdf'
 import { docxHtmlATesto, testoDaTextContent, type ItemPdfTesto } from './testo-nativo'
+import { eModulo } from './modulo-contratto'
 import type { FileKind } from './formati'
 
 // Miniatura della prima pagina e numero di pagine: colonna «Pagine» della coda e
@@ -143,6 +144,10 @@ export const docxATesto = async (f: File): Promise<string> => {
   const buf = await f.arrayBuffer()
   const { value: html } = await mammoth.convertToHtml({ arrayBuffer: buf })
   const testo = docxHtmlATesto(html)
+  // MODULO CONTRATTO in Word: le tabelle (etichetta | valore, elenco prezzi) vanno
+  // riconvertite con le celle separate da "|", vuote comprese — è quello che legge
+  // leggiModulo. Sui contratti veri resta lo spazio, come per l'OCR.
+  if (eModulo(testo)) return docxHtmlATesto(html, ' | ')
   if (testo.trim()) return testo
   // documento senza struttura riconoscibile: il testo grezzo è comunque meglio di niente
   return (await mammoth.extractRawText({ arrayBuffer: buf })).value

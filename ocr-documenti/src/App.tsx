@@ -21,7 +21,8 @@ import { confrontaTesti, type Confronto } from './lib/confronto'
 import { notaCella, contaNote, type Incerta } from './lib/note-celle'
 import { salvaSessione, leggiSessione, cancellaSessione, type Sessione } from './lib/sessione'
 import { TUTTI_I_FORMATI, type Format, type FileKind } from './lib/formati'
-import { supportaCartella, chiediCartella, salvaFile, xlsxBlob, csvEscape, type DirHandle } from './lib/salvataggio'
+import { supportaCartella, chiediCartella, salvaFile, downloadBlob, xlsxBlob, csvEscape, type DirHandle } from './lib/salvataggio'
+import { eModulo, moduloVuoto, NOME_FILE_MODULO } from './lib/modulo-contratto'
 import { caricaElenchi, getElenchi } from './lib/elenchi-client'
 import { contenutiSimili, runPool, imageFileToPng, renderPdfPage, testoDaLayerPdf, docxATesto, detectKind, chiaveFile, nomiSimili, miniaturaFile, type MetaFile } from './lib/file-input'
 import { CONTRACT_COLUMNS, contractJsonToRow, contractJsonToMarkdown } from './lib/export-contratto'
@@ -334,10 +335,18 @@ export default function App() {
     }
 
     if (kind === 'text') {
+      const text = await f.text()
+      // MODULO CONTRATTO compilato (.txt/.md con la riga di riconoscimento): non è un
+      // risultato già pronto ma un documento da elaborare in IMPORT P6, come un PDF.
+      // Lo legge il server alla lettera (src/lib/modulo-contratto.ts).
+      if (eModulo(text)) {
+        // forma funzionale: loadPreview è memorizzata e non dipende dal formato corrente
+        setFormat(f => (f === 'md' || f === 'json' ? 'contratti' : f))
+        return
+      }
       // .md/.txt salvato in precedenza → carica il testo come risultato (formato MD).
       // Da qui "⤓ Compila Excel" struttura e genera Import_Contratti.xlsx.
       setFormat('md')
-      const text = await f.text()
       setQueue(q => {
         if (!q[idx] || q[idx].result) return q
         const copy = q.slice()
@@ -1209,6 +1218,17 @@ export default function App() {
       return joinParts(parts.filter(Boolean), fmt)
     }
 
+    if (fileKind === 'text') {
+      // .txt/.md: un MODULO CONTRATTO va al server, che lo legge alla lettera (niente
+      // OCR, niente assist); un testo qualsiasi è già il risultato (formato MD).
+      const raw = await file!.text()
+      const text = (fmt === 'contratti' || fmt === 'contract') && eModulo(raw)
+        ? timbraRighe(await postOcr({ text: raw, format: fmt, origine: 'nativo' }), { origine_lettura: 'nativo' })
+        : raw
+      setResult(text)
+      return text
+    }
+
     // image
     const text = await ocrBatch(await imageFileToPng(file!), 2, fmt, motore)
     setResult(text)
@@ -1347,7 +1367,12 @@ export default function App() {
   // e distrutto localmente, progress per-pagina condiviso).
   const ocrFile = async (f: File, fmt: Format = format, allegati = '', raccolta?: Incerta[]): Promise<string> => {
     const kind = detectKind(f)
-    if (kind === 'text') return f.text()
+    if (kind === 'text') {
+      // MODULO CONTRATTO: al server alla lettera; altro testo: è già il risultato
+      const raw = await f.text()
+      if ((fmt === 'contratti' || fmt === 'contract') && eModulo(raw)) return postOcr({ text: raw, format: fmt, origine: 'nativo' })
+      return raw
+    }
     if (kind === 'docx') {
       const raw = await docxATesto(f)
       if (fmt === 'contract' || fmt === 'contratti') return postOcr({ text: raw, format: fmt, origine: 'nativo', ...(allegati ? { testoAllegati: allegati } : {}) })
@@ -2215,8 +2240,10 @@ export default function App() {
       />
 
       {/* ── Error bar ── */}
+      {/* pre-line: i messaggi su più righe (errori del modulo contratto, uno per riga del
+          file) restano uno sotto l'altro; oltre 30% dello schermo il banner scorre */}
       {error && (
-        <div role="alert" style={{ padding: '8px 20px', background: `${C.red}12`, borderBottom: `1px solid ${C.red}`, borderLeft: `3px solid ${C.red}`, color: C.red, fontSize: 12, flexShrink: 0, letterSpacing: '0.02em', fontWeight: 600 }}>
+        <div role="alert" style={{ padding: '8px 20px', background: `${C.red}12`, borderBottom: `1px solid ${C.red}`, borderLeft: `3px solid ${C.red}`, color: C.red, fontSize: 12, flexShrink: 0, letterSpacing: '0.02em', fontWeight: 600, whiteSpace: 'pre-line', maxHeight: '30vh', overflowY: 'auto' }}>
           ⚠ {error}
         </div>
       )}
@@ -3283,6 +3310,19 @@ export default function App() {
                 style={{ ...bottone('secondario', C.accent, !loading), height: 50, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 14.5 }}
               >
                 <IconUpload size={18} /> Aggiungi documenti
+              </button>
+              {/* MODULO CONTRATTO: struttura fissa da compilare a mano quando il documento
+                  non si lascia leggere. Il programma la legge alla lettera, senza OCR né
+                  AI, e la valida (src/lib/modulo-contratto.ts). Download puro: è un
+                  modello, non un export della coda. */}
+              <button
+                type="button"
+                onClick={() => downloadBlob(new Blob(['﻿' + moduloVuoto()], { type: 'text/plain;charset=utf-8' }), `${NOME_FILE_MODULO}.txt`)}
+                disabled={loading}
+                title="Scarica il modulo contratto vuoto (.txt): si compila a mano e si carica qui come un documento. Letto alla lettera, senza OCR né AI; i valori fuori formato vengono segnalati con la riga."
+                style={{ ...bottone('secondario', C.muted, !loading), height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13 }}
+              >
+                <IconDoc size={15} /> Modulo contratto vuoto
               </button>
               {queue.length > 0 && (
                 <span style={{ fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
