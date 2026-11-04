@@ -22,7 +22,7 @@ import { notaCella, contaNote, type Incerta } from './lib/note-celle'
 import { salvaSessione, leggiSessione, cancellaSessione, type Sessione } from './lib/sessione'
 import { TUTTI_I_FORMATI, type Format, type FileKind } from './lib/formati'
 import { supportaCartella, chiediCartella, salvaFile, downloadBlob, xlsxBlob, csvEscape, type DirHandle } from './lib/salvataggio'
-import { eModulo, moduloVuoto, NOME_FILE_MODULO } from './lib/modulo-contratto'
+import { descriviErrori, eModulo, moduloDaRisultato, moduloVuoto, NOME_FILE_MODULO } from './lib/modulo-contratto'
 import { caricaElenchi, getElenchi } from './lib/elenchi-client'
 import { contenutiSimili, runPool, imageFileToPng, renderPdfPage, testoDaLayerPdf, docxATesto, detectKind, chiaveFile, nomiSimili, miniaturaFile, type MetaFile } from './lib/file-input'
 import { CONTRACT_COLUMNS, contractJsonToRow, contractJsonToMarkdown } from './lib/export-contratto'
@@ -115,6 +115,8 @@ export default function App() {
   const [contrattoFirmato, setContrattoFirmato] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // esito positivo di un'azione (es. modulo contratto salvato): banner verde, si chiude a mano
+  const [notizia, setNotizia] = useState('')
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   // istante d'inizio della scansione in corso, per stimare il tempo che manca
   const [inizioScan, setInizioScan] = useState(0)
@@ -1825,6 +1827,57 @@ export default function App() {
     }
   }
 
+  // DOCUMENTO → MODULO CONTRATTO (moduloDaRisultato in src/lib/modulo-contratto.ts).
+  // Il documento si legge con la filiera di sempre (PDF nativo/OCR, Word, immagine →
+  // JSON formato IMPORT P6), poi si riscrive come modulo compilato e si salva
+  // <nome>_modulo.txt. Il modulo si rilegge alla lettera: niente OCR né euristiche.
+  // Risultato già in formato IMPORT P6 (anche corretto in revisione) → si usa quello,
+  // senza ripassare il documento. Altrimenti si estrae ora: dal testo già letto se la
+  // voce ce l'ha (es. ripiego a CONTRATTO), sennò si scansiona. Su una voce ancora vuota
+  // il risultato resta in coda, così la scansione non va sprecata.
+  const convertiInModulo = async (i: number) => {
+    const voce = queue[i]
+    if (!voce || loading) return
+    const f = voce.file
+    const base = f.name.replace(/\.[^.]+$/, '')
+    setError('')
+    setNotizia('')
+    let json = voce.result && (voce.formato ?? format) === 'contratti' ? voce.result : ''
+    if (!json) {
+      setActiveIdx(i)
+      loadPreview(f, i)
+      setLoading(true)
+      try {
+        const allegati = await testoAllegatiExcel(f)
+        const testo = voce.testo || await ocrFile(f, 'md')
+        if (!testo.trim()) throw new Error('scansione vuota, nessun testo riconosciuto')
+        json = await postOcr({ text: testo, format: 'contratti', ...(allegati ? { testoAllegati: allegati } : {}) })
+        if (!voce.result) setQueue(q => q.map(v => chiaveFile(v.file) === chiaveFile(f) ? { ...v, result: json, testo, formato: 'contratti', motore: 'ocr' } : v))
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name !== 'AbortError') setError(`"${f.name}": ${err.message}`)
+        return
+      } finally {
+        setLoading(false)
+        setProgress({ current: 0, total: 0 })
+      }
+    }
+    try {
+      const { testo, avvisi, errori } = moduloDaRisultato(json, { origine: f.name, generato: new Date().toLocaleDateString('it-IT') })
+      const nome = `${base}_modulo.txt`
+      // BOM: il Blocco note di Windows apre l'UTF-8 senza BOM come ANSI (accenti rotti)
+      await salvaFile(new Blob(['﻿' + testo], { type: 'text/plain;charset=utf-8' }), nome, outDir)
+      // `errori` = cosa il programma rifiuterebbe ricaricando il modulo: si mostrano con
+      // la riga, così si corregge il .txt e lo si rimette in coda
+      if (errori.length) {
+        setError(`${nome} salvato, ma prima di ricaricarlo va completato (${errori.length} ${errori.length === 1 ? 'punto' : 'punti'}, segnati "# DA VERIFICARE" nel file):\n${descriviErrori(errori)}`)
+      } else {
+        setNotizia(`${nome} salvato: il programma lo rilegge senza errori.${avvisi.length ? ` Ricontrolla ${avvisi.length === 1 ? 'il punto segnato' : `i ${avvisi.length} punti segnati`} "# DA VERIFICARE".` : ''} Rimettilo in coda per ottenere l'Excel dal modulo.`)
+      }
+    } catch (err: unknown) {
+      setError(`"${f.name}": ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   // Export in blocco dei file spuntati (tutti quelli pronti se nessuno è spuntato)
   const esportaSelezionati = async () => {
     for (let i = 0; i < queue.length; i++) if (queue[i].result && inSelezione(queue[i].file)) await esportaRiga(i)
@@ -2245,6 +2298,12 @@ export default function App() {
       {error && (
         <div role="alert" style={{ padding: '8px 20px', background: `${C.red}12`, borderBottom: `1px solid ${C.red}`, borderLeft: `3px solid ${C.red}`, color: C.red, fontSize: 12, flexShrink: 0, letterSpacing: '0.02em', fontWeight: 600, whiteSpace: 'pre-line', maxHeight: '30vh', overflowY: 'auto' }}>
           ⚠ {error}
+        </div>
+      )}
+      {notizia && !error && (
+        <div role="status" style={{ padding: '8px 12px 8px 20px', background: `${C.green}14`, borderBottom: `1px solid ${C.green}`, borderLeft: `3px solid ${C.green}`, color: C.green, fontSize: 12, flexShrink: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ flex: 1 }}>✓ {notizia}</span>
+          <button type="button" onClick={() => setNotizia('')} aria-label="Chiudi il messaggio" style={{ ...bottone('silenzioso', C.green), width: 'auto', padding: '2px 8px' }}>✕</button>
         </div>
       )}
 
@@ -3437,6 +3496,14 @@ export default function App() {
                 {idx !== activeIdx && (
                   <button type="button" role="menuitem" disabled={loading} onClick={() => { chiudi(); selectFile(idx) }} title="Mostra il file (e il suo risultato) nel pannello">
                     <IconDoc size={14} /> Mostra nel pannello
+                  </button>
+                )}
+                {/* documento → modulo contratto compilato: non per gli allegati Excel e le bozze
+                    Word abbinate a un PDF (daElaborare); un file di testo (modulo o risultato
+                    ricaricato) solo se ha già un risultato IMPORT P6 da riscrivere */}
+                {daElaborare(f) && (detectKind(f) !== 'text' || ((queue[idx].formato ?? format) === 'contratti' && !!queue[idx].result)) && (
+                  <button type="button" role="menuitem" disabled={loading} onClick={() => { chiudi(); void convertiInModulo(idx) }} title="Legge il documento e lo salva come modulo contratto compilato (.txt), che il programma rilegge alla lettera senza OCR">
+                    <IconDoc size={14} /> Converti in modulo contratto
                   </button>
                 )}
                 <button type="button" role="menuitem" onClick={() => { chiudi(); void apriInFinestra(f) }} title={detectKind(f) === 'excel' ? 'Il browser non mostra i fogli Excel: il file viene scaricato' : detectKind(f) === 'pdf' ? 'Apre il PDF in una nuova scheda del browser, per consultarlo' : 'Apre il file com’è in una nuova scheda del browser'}>
