@@ -52,6 +52,8 @@ interface Health { tesseract: boolean; ocrErrore?: string; ollama?: boolean; vis
 type Motore = 'ocr' | 'claude'
 // `excelDaClaude`: su IMPORT P6 l'Import_Contratti.xlsx lo crea Claude nella sua finestra
 // e l'utente lo scarica da lì: l'app non ha un risultato, ma il documento è fatto.
+// Esito di «documento → modulo + Excel» su una voce (moduloEExcel): msg vuoto = annullato.
+interface EsitoRigaModulo { ok: boolean; msg: string }
 interface VoceCoda { file: File; result: string; testo?: string; formato?: Format; confronto?: Confronto & { bozza: string }; incerte?: Incerta[]; lavoroId?: string; faseServer?: string; motore?: Motore; excelDaClaude?: boolean }
 
 // Lavoro lato server (vedi server/lavori.ts): stato e risultato come li manda il server.
@@ -1835,13 +1837,15 @@ export default function App() {
   // senza ripassare il documento. Altrimenti si estrae ora: dal testo già letto se la
   // voce ce l'ha (es. ripiego a CONTRATTO), sennò si scansiona. Su una voce ancora vuota
   // il risultato resta in coda, così la scansione non va sprecata.
-  const convertiInModulo = async (i: number) => {
+  //
+  // Poi, se il modulo si rilegge senza errori, l'EXCEL si fa DAL MODULO (vedi sotto).
+  // Nucleo condiviso fra la voce di menu della riga e il pulsante in blocco: non scrive
+  // banner, restituisce l'esito (ok + messaggio; messaggio vuoto = annullato dall'utente).
+  const moduloEExcel = async (i: number): Promise<EsitoRigaModulo> => {
     const voce = queue[i]
-    if (!voce || loading) return
+    if (!voce) return { ok: false, msg: '' }
     const f = voce.file
     const base = f.name.replace(/\.[^.]+$/, '')
-    setError('')
-    setNotizia('')
     let json = voce.result && (voce.formato ?? format) === 'contratti' ? voce.result : ''
     if (!json) {
       setActiveIdx(i)
@@ -1854,8 +1858,8 @@ export default function App() {
         json = await postOcr({ text: testo, format: 'contratti', ...(allegati ? { testoAllegati: allegati } : {}) })
         if (!voce.result) setQueue(q => q.map(v => chiaveFile(v.file) === chiaveFile(f) ? { ...v, result: json, testo, formato: 'contratti', motore: 'ocr' } : v))
       } catch (err: unknown) {
-        if (err instanceof Error && err.name !== 'AbortError') setError(`"${f.name}": ${err.message}`)
-        return
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false, msg: '' }
+        return { ok: false, msg: `"${f.name}": ${err instanceof Error ? err.message : String(err)}` }
       } finally {
         setLoading(false)
         setProgress({ current: 0, total: 0 })
@@ -1867,15 +1871,67 @@ export default function App() {
       // BOM: il Blocco note di Windows apre l'UTF-8 senza BOM come ANSI (accenti rotti)
       await salvaFile(new Blob(['﻿' + testo], { type: 'text/plain;charset=utf-8' }), nome, outDir)
       // `errori` = cosa il programma rifiuterebbe ricaricando il modulo: si mostrano con
-      // la riga, così si corregge il .txt e lo si rimette in coda
+      // la riga, così si corregge il .txt e lo si rimette in coda. Niente Excel: uscirebbe
+      // da dati che il modulo non accetta, cioè incoerente col modulo salvato.
       if (errori.length) {
-        setError(`${nome} salvato, ma prima di ricaricarlo va completato (${errori.length} ${errori.length === 1 ? 'punto' : 'punti'}, segnati "# DA VERIFICARE" nel file):\n${descriviErrori(errori)}`)
-      } else {
-        setNotizia(`${nome} salvato: il programma lo rilegge senza errori.${avvisi.length ? ` Ricontrolla ${avvisi.length === 1 ? 'il punto segnato' : `i ${avvisi.length} punti segnati`} "# DA VERIFICARE".` : ''} Rimettilo in coda per ottenere l'Excel dal modulo.`)
+        return { ok: false, msg: `${nome} salvato, ma prima di ricaricarlo va completato (${errori.length} ${errori.length === 1 ? 'punto' : 'punti'}, segnati "# DA VERIFICARE" nel file):\n${descriviErrori(errori)}\nL'Excel si ottiene rimettendo in coda il modulo corretto.` }
       }
+      // EXCEL DAL MODULO: il testo appena scritto torna al server come un modulo caricato a
+      // mano (ramo risultatoDaModulo di /api/ocr: lettura alla lettera, `fedele`, elenchi,
+      // nessun assist AI). Così l'Excel contiene ESATTAMENTE i valori del modulo salvato,
+      // non quelli grezzi dell'estrazione (dedup, commessa indovinata, riparazioni OCR).
+      // Il risultato diventa quello della voce: «↓ Excel» sulla riga e il pannello restano
+      // allineati al modulo.
+      setLoading(true)
+      let daModulo: string
+      try {
+        daModulo = await postOcr({ text: testo, format: 'contratti', origine: 'nativo' })
+      } finally {
+        setLoading(false)
+      }
+      const rows = buildImportContrattiRowsFromAlyante(daModulo)
+      if (!rowsHaveData(rows)) return { ok: false, msg: `${nome} salvato, ma il modulo non ha dati da esportare in Excel.` }
+      await writeImportContrattiXlsx(rows!, `${base}_modulo`)
+      setQueue(q => q.map(v => chiaveFile(v.file) === chiaveFile(f) ? { ...v, result: daModulo, formato: 'contratti', motore: 'ocr', excelDaClaude: false } : v))
+      return { ok: true, msg: `${nome} e ${base}_modulo_Import_Contratti.xlsx salvati: l'Excel è compilato dai valori del modulo (${rows!.length} ${rows!.length === 1 ? 'riga' : 'righe'}).${avvisi.length ? ` Ricontrolla ${avvisi.length === 1 ? 'il punto segnato' : `i ${avvisi.length} punti segnati`} "# DA VERIFICARE" nel modulo: se correggi, rimetti in coda il .txt per rifare l'Excel.` : ''}` }
     } catch (err: unknown) {
-      setError(`"${f.name}": ${err instanceof Error ? err.message : String(err)}`)
+      return { ok: false, msg: `"${f.name}": ${err instanceof Error ? err.message : String(err)}` }
     }
+  }
+
+  // Menu ⋮ della riga: un documento → modulo + Excel, esito nel banner verde o rosso.
+  const convertiInModulo = async (i: number) => {
+    if (loading) return
+    setError('')
+    setNotizia('')
+    const esito = await moduloEExcel(i)
+    if (esito.ok) setNotizia(esito.msg)
+    else if (esito.msg) setError(esito.msg)
+  }
+
+  // Voci che possono diventare modulo: stessa regola della voce di menu (niente allegati
+  // Excel o bozze Word abbinate; un file di testo solo se ha già un risultato IMPORT P6).
+  const convertibileInModulo = (v: VoceCoda) =>
+    daElaborare(v.file) && (detectKind(v.file) !== 'text' || ((v.formato ?? format) === 'contratti' && !!v.result))
+
+  // In blocco: modulo + Excel per ogni voce spuntata (tutte le convertibili se nessuna è
+  // spuntata), una dopo l'altra. Un errore su un documento non ferma gli altri: alla fine
+  // un riepilogo con quanti Excel sono usciti e, per i mancati, il motivo con la riga.
+  const convertiSelezionatiInModulo = async () => {
+    if (loading) return
+    setError('')
+    setNotizia('')
+    const indici = queue.map((v, i) => (convertibileInModulo(v) && inSelezione(v.file) ? i : -1)).filter(i => i >= 0)
+    const mancati: string[] = []
+    let fatti = 0
+    for (const i of indici) {
+      const esito = await moduloEExcel(i)
+      if (esito.ok) fatti++
+      else if (esito.msg) mancati.push(esito.msg)
+      else break                                   // annullato dall'utente: si ferma tutto
+    }
+    if (fatti) setNotizia(`${fatti} di ${indici.length} ${indici.length === 1 ? 'documento convertito' : 'documenti convertiti'} in modulo + Excel (file <nome>_modulo.txt e <nome>_modulo_Import_Contratti.xlsx).`)
+    if (mancati.length) setError(mancati.join('\n\n'))
   }
 
   // Export in blocco dei file spuntati (tutti quelli pronti se nessuno è spuntato)
@@ -2075,6 +2131,8 @@ export default function App() {
   // file spuntati ancora in coda, e quanti di loro hanno un risultato da esportare
   const selezionatiCount = queue.filter(q => selezione.has(chiaveFile(q.file))).length
   const esportabiliCount = queue.filter(q => q.result && inSelezione(q.file)).length
+  // voci su cui «Modulo + Excel» in blocco lavorerebbe (stessa regola del menu ⋮)
+  const modulabiliCount = queue.filter(q => convertibileInModulo(q) && inSelezione(q.file)).length
   const progressLabel = (batch ? `File ${batch.current}/${batch.total} — ` : '') + (faseLavoro
     ? `${faseLavoro}${progress.total > 0 && !/\d+\/\d+/.test(faseLavoro) ? ` — pag. ${progress.current}/${progress.total}` : ''}…`
     : progress.total > 0
@@ -3473,6 +3531,16 @@ export default function App() {
                   ↓ Esporta {esportabiliCount === 1 ? '1 pronto' : `${esportabiliCount} pronti`}{selezionatiCount ? ' (selezionati)' : ''}
                 </button>
               )}
+              {/* documento → modulo compilato → Excel dal modulo, per tutti (o gli spuntati) */}
+              {!loading && formatoContratto && modulabiliCount > 0 && (
+                <button
+                  onClick={() => void convertiSelezionatiInModulo()}
+                  title="Per ogni documento (solo quelli spuntati, se ce ne sono): compila il modulo contratto, lo salva come .txt e salva l’Excel Import_Contratti compilato dai valori del modulo, senza AI"
+                  style={{ ...bottone('secondario', C.accent), height: 48, fontSize: 14.5 }}
+                >
+                  ⇄ Modulo + Excel {modulabiliCount === 1 ? '(1)' : `(${modulabiliCount})`}{selezionatiCount ? ' selezionati' : ''}
+                </button>
+              )}
             </div>
           </aside>
         )}
@@ -3501,9 +3569,9 @@ export default function App() {
                 {/* documento → modulo contratto compilato: non per gli allegati Excel e le bozze
                     Word abbinate a un PDF (daElaborare); un file di testo (modulo o risultato
                     ricaricato) solo se ha già un risultato IMPORT P6 da riscrivere */}
-                {daElaborare(f) && (detectKind(f) !== 'text' || ((queue[idx].formato ?? format) === 'contratti' && !!queue[idx].result)) && (
-                  <button type="button" role="menuitem" disabled={loading} onClick={() => { chiudi(); void convertiInModulo(idx) }} title="Legge il documento e lo salva come modulo contratto compilato (.txt), che il programma rilegge alla lettera senza OCR">
-                    <IconDoc size={14} /> Converti in modulo contratto
+                {convertibileInModulo(queue[idx]) && (
+                  <button type="button" role="menuitem" disabled={loading} onClick={() => { chiudi(); void convertiInModulo(idx) }} title="Legge il documento, lo salva come modulo contratto compilato (.txt) e dal modulo, riletto alla lettera senza OCR né AI, salva l'Excel Import_Contratti">
+                    <IconDoc size={14} /> Converti in modulo contratto + Excel
                   </button>
                 )}
                 <button type="button" role="menuitem" onClick={() => { chiudi(); void apriInFinestra(f) }} title={detectKind(f) === 'excel' ? 'Il browser non mostra i fogli Excel: il file viene scaricato' : detectKind(f) === 'pdf' ? 'Apre il PDF in una nuova scheda del browser, per consultarlo' : 'Apre il file com’è in una nuova scheda del browser'}>
