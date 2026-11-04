@@ -2414,6 +2414,11 @@ async function handle(req, res) {
   // di chi la apre.
   if ((p === '/api/presenza' || p === '/api/evento') && req.method === 'POST') {
     if (!req.headers['x-cosedil-app']) return sendJson(res, 400, { ok: false, error: 'Header X-Cosedil-App mancante' });
+    // Solo il backend di un'app ha il token di servizio della suite: senza, un
+    // utente potrebbe chiamare questa rotta dal browser col proprio cookie e
+    // scrivere nel registro azioni mai fatte o presenze in app mai aperte
+    // (revisione di sicurezza del 03/11/2026, punto 15).
+    if (!suite.verifica(req.headers['x-suite-token'])) return sendJson(res, 403, { ok: false, error: 'Token della suite mancante o errato' });
     const body = await readJsonBody(req);
     const app = APPS.find((a) => a.id === (body && body.appId));
     if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false });
