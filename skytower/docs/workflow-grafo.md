@@ -229,3 +229,90 @@ scacchiera, dove il tipo di assegnatario non offre la persona; nella scheda Work
 **Dalla libreria dell'organizzazione** (bollino Libreria, apertura in sola lettura, "Copia nella commessa"; per
 l'amministratore dell'organizzazione anche "Pubblica in libreria" sui modelli della commessa); in Processi e nel
 dialogo "Avvia approvazione" i modelli di libreria hanno il bollino **Libreria**.
+
+## 6. Tornare indietro da ogni nodo (ADR-51, migrazione 0042)
+
+Richiesta dell'utente del 04/11/2026: "in tutti i nodi deve essere possibile tornare indietro per richiedere chiarimenti
+o modifiche ai file". Vale per ogni compito di una `decision` o di una `activity`, in qualunque modello (della commessa
+o della libreria), senza cambiare le definizioni: non sono archi del grafo, sono azioni del compito.
+
+**Destinazione.** Chi ha il compito sceglie fra i nodi **già fatti del suo ramo**: si risale dal suo giro all'arco
+percorso che lo ha attivato, al giro del nodo di partenza, e così via (un giro riaperto risale al giro già fatto da cui
+è ripartito); per ogni nodo vale il giro più vicino. Proposto il più vicino (il passo subito prima). In più
+**"Chi ha avviato"** (`ORIGINATOR`): l'originator del processo o del workflow sul documento.
+
+**Chiedi chiarimento** (`kind = CLARIFICATION`), commento obbligatorio:
+- le persone interpellate sono chi ha deciso nel giro scelto (se nessuno ha votato, tutti i suoi assegnatari) oppure chi
+  ha avviato; chi chiede è escluso (se resta nessuno: `422` «Nessun altro a cui chiedere…»);
+- ognuna riceve un compito di chiarimento (`tasks.kind = 'CLARIFICATION'`, sul giro di chi chiede, senza scadenza) e la
+  notifica `WORKFLOW_CLARIFICATION_REQUESTED`; risponde con un commento; la prima risposta chiude la richiesta (gli altri
+  compiti di chiarimento si annullano «Ha già risposto …»), chi ha chiesto riceve `WORKFLOW_CLARIFICATION_ANSWERED`;
+- intanto il compito di chi ha chiesto è **in attesa di chiarimento** (`waiting_send_back_id`): non si completa, non si
+  rimanda, promemoria/scadenze/escalation sono sospesi; alla risposta la scadenza si sposta avanti del tempo passato in
+  attesa. Nulla si rifà, il flusso non si sposta. Se il giro viene deciso da un altro assegnatario (quorum) o
+  l'istanza finisce, i chiarimenti aperti si chiudono (stato `CLOSED`).
+
+**Richiedi modifiche** (`kind = CHANGES`), commento obbligatorio:
+- il giro di chi chiede e i giri **ancora attivi dello stesso ramo** fra il nodo scelto e lui (raggiungibili dal nodo
+  scelto, da cui si arriva a chi chiede, che non stanno dopo di lui) si annullano: compiti `CANCELLED` con
+  `cancel_reason` «Rimandato indietro a «Nodo» da Nome»; gli altri rami continuano;
+- il nodo scelto si riapre in un **nuovo giro** con il motore di sempre (stessi assegnatari secondo la definizione, conta
+  nei 20 giri: oltre, l'istanza si interrompe col motivo); l'avviso è `WORKFLOW_CHANGES_REQUESTED` con il commento;
+  un nodo con un giro già in corso non si riapre (`422`, si può solo chiedere un chiarimento);
+- per **chi ha avviato** si riapre il nodo `start` con un compito per lui, unico esito `FATTO` «Modifiche fatte»;
+- chi ha il giro riaperto modifica i file e lo completa scegliendo di nuovo un esito; da lì il flusso riprende seguendo
+  gli archi, rifacendo i nodi intermedi in nuovi giri, fino a tornare al nodo che ha chiesto.
+
+**Regola delle biforcazioni.** Un giro riaperto, e ogni giro che si attiva sul cammino verso chi ha chiesto
+(`workflow_node_runs.send_back_id`), quando si completa percorre **solo gli archi dell'esito scelto che portano verso
+il nodo che ha chiesto** (l'arco arriva lì o da lì lo si raggiunge). Se nessun arco dell'esito porta lì (es. ora
+«Respinto»), segue tutti gli archi di quell'esito come sempre. Così riaprire «Scelta procedura», da cui partono 7 buyer,
+riattiva solo il ramo del buyer che ha chiesto. Il nodo che ha chiesto, riattivato, è un giro normale.
+
+**Join ALL.** Per la regola di raggiungibilità (§1) un giro "diretto" conta solo verso i nodi sul cammino fino al nodo
+che ha chiesto, quel nodo e quelli dopo (`cde.wf_reaches_toward`): la riunione QdR aspetta il ramo tornato indietro, un
+join interno a un altro ramo no. Un compito in attesa di chiarimento tiene attivo il suo giro, quindi i join lo aspettano.
+
+**File.**
+- *Workflow su documento*: mentre ha il compito riaperto (o rifatto), quella persona — e solo lei — può caricare una
+  **nuova revisione** dello stesso documento con il caricamento di sempre (`cde.assert_can_add_revision` nel controllo
+  delle revisioni: per gli altri il documento resta bloccato, `423`). Quando completa il compito, se c'è una revisione
+  più recente di quella in esame il workflow passa su di lei: se il workflow era su una revisione condivisa (SHARED) e la
+  nuova è WIP, la si condivide con la stessa idoneità (serve il file verificato, altrimenti `422` «ancora in verifica»);
+  l'istanza punta alla nuova (`revision_id`), il blocco resta sul documento, il passaggio di stato finale
+  (`on_completed`) si applica alla nuova e deve restare valido; la vecchia resta nello storico. La richiesta registra
+  `revision_from_*` → `revision_to_*`. Senza revisione nuova si prosegue su quella di prima.
+- *Processo*: chi ha il compito riaperto sostituisce o aggiunge gli allegati (`PUT /processes/{id}/documents`); gli
+  allegati che non può vedere restano; la richiesta registra prima/dopo.
+
+| Metodo e rotta | Cosa fa |
+|---|---|
+| `GET /tasks/{id}/send-back-targets` | dal proprio compito: `[{target, node_id, name, node_type, depth, people, active, default}]`, nodi del ramo dal più vicino, poi `ORIGINATOR`; 404 se il compito non è proprio |
+| `POST /tasks/{id}/clarification` | `{target, comment}` → `{send_back, workflow}` (grafo dell'istanza) |
+| `POST /tasks/{id}/clarification/answer` | sul compito di chiarimento: `{comment}` → `{send_back, workflow}` |
+| `POST /tasks/{id}/request-changes` | `{target, comment}` → `{send_back, workflow}` |
+| `PUT /processes/{id}/documents` | `{document_ids}`: solo chi ha un compito aperto su un giro riaperto/rifatto (altrimenti 403) |
+| `POST /tasks/{id}/complete` | invariato; `422` se il compito è in attesa di chiarimento o è un chiarimento |
+
+`target`: id di un nodo già fatto del ramo, oppure `ORIGINATOR`; altro → `422` «Si può tornare solo a un passo già
+fatto su questo ramo». Solo chi ha il compito, aperto, di una decisione o attività attiva (altrimenti 404/422).
+
+`GET /workflow-instances/{id}` ha in più `send_backs` (in ordine di richiesta):
+`{id, kind, status, from {node_id, name, round, task_id}, target {node_id, originator, name, round, reopened_round},
+comment, asked_by {id, name}, created_at, recipients [nomi], answer, answered_by, answered_at,
+revision {from_id, from_code, to_id, to_code} | null, documents_changed_at, documents_before, documents_after}`;
+`status`: chiarimento `OPEN` / `ANSWERED` / `CLOSED`, modifiche `OPEN` (in rifacimento) / `RETURNED` (il flusso è
+tornato al nodo che ha chiesto) / `CLOSED`. Ogni giro ha `send_back_id`; i compiti hanno `cancel_reason` e `waiting`;
+i compiti di chiarimento non stanno fra i voti dei giri.
+`/me/tasks` ha in più `kind`, `can_send_back`, `clarification` (la domanda, per i compiti di chiarimento),
+`waiting_for` (il chiarimento atteso), `changes_request` (la richiesta che ha riaperto o fa rifare il giro),
+`clarifications` (chiesti da questo compito, con le risposte), `cancel_reason`, `container_id`, `new_revision`
+(revisione caricata durante le modifiche); i link delle notifiche sono `/compiti?instance=…&task=…`.
+
+**Schermate.** Nel dialogo del compito (posta "Compiti") i pulsanti **Chiedi chiarimento** e **Richiedi modifiche**
+aprono un dialogo con «Dove rimandare» (nodi del ramo con le persone, il passo precedente proposto, "Chi ha avviato")
+e il commento obbligatorio. Un compito in attesa mostra la domanda e ha esiti e pulsanti disattivati; un compito
+riaperto mostra la richiesta col commento e **Carica nuova revisione** (documento) o gli **Allegati del processo**; un
+compito di chiarimento si apre con la domanda e **Invia risposta**. Nella vista finale: frecce tratteggiate dal nodo che
+ha chiesto al nodo interpellato (blu, «?») o riaperto (arancio, «↩»), legenda, elenco **Chiarimenti e modifiche** e, nel
+pannello del nodo, per ogni giro chi ha chiesto cosa.

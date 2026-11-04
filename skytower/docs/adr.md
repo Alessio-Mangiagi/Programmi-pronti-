@@ -948,6 +948,49 @@ dal menu del profilo e dalla pagina Organizzazione); nella scheda Workflow della
 dell'organizzazione". Contratto in `docs/workflow-grafo.md` §5; test `tests/test_workflow_libreria.py`,
 `e2e/workflow-libreria.spec.ts`; scenario U52.
 
+## ADR-51 — Tornare indietro da ogni nodo: chiarimenti e richieste di modifiche
+
+**Contesto.** Il 04/11/2026 l'utente chiede che "in tutti i nodi" si possa tornare indietro "per richiedere chiarimenti
+o modifiche ai file". Fino ad allora un ritorno era solo un arco disegnato nel modello (ADR-48): chi non lo aveva
+previsto non poteva fermarsi a chiedere, né far rifare un passo precedente senza respingere tutto.
+
+**Decisione.** Due azioni su ogni compito di decisione o attività, sempre con un commento, verso un nodo **già fatto
+del ramo** (risalendo gli archi percorsi dell'istanza; proposto il passo subito prima) o verso **chi ha avviato**
+(migrazione 0042, contratto §6):
+- **Chiedi chiarimento**: compito di chiarimento (`tasks.kind = 'CLARIFICATION'`) a chi ha deciso nel giro scelto (o a
+  chi ha avviato), risposta con un commento; il compito di chi chiede è "in attesa di chiarimento": non si completa e
+  scadenze/escalation sono sospese, alla risposta la scadenza scorre avanti del tempo di attesa. Il flusso non si sposta.
+- **Richiedi modifiche**: il nodo scelto si riapre in un nuovo giro (motore di sempre: stessi assegnatari, 20 giri al
+  massimo); si annullano il giro di chi chiede e quelli ancora aperti dello stesso ramo fra i due ("rimandato
+  indietro"); completato, il flusso riprende seguendo gli archi e rifà i nodi intermedi fino a chi ha chiesto. Per chi
+  ha avviato si riapre il nodo di avvio con un compito per lui ("Modifiche fatte").
+- **Biforcazioni**: un giro riaperto o rifatto per una richiesta (`workflow_node_runs.send_back_id`) segue solo gli
+  archi dell'esito che portano verso il nodo che ha chiesto; se nessuno ci porta (esito diverso, es. "Respinto") segue
+  tutti gli archi di quell'esito. Riaprire "Scelta procedura" non riattiva gli altri buyer. Nella regola del join ALL
+  un giro "diretto" conta solo verso il cammino fino a chi ha chiesto e oltre (`cde.wf_reaches_toward`): la riunione
+  QdR aspetta il ramo tornato indietro, i join interni agli altri rami no.
+- **File**: nei workflow su documento chi ha il compito riaperto (solo lui) può caricare una nuova revisione nonostante
+  il blocco; completando, il workflow passa su di lei (se era su una SHARED e la nuova è WIP, la si condivide con la
+  stessa idoneità), il blocco resta sul documento, il passaggio di stato finale va sulla nuova, la vecchia resta nello
+  storico e la richiesta registra il passaggio fra le due. Nei processi chi ha il compito riaperto cambia gli allegati.
+- Notifiche `WORKFLOW_CLARIFICATION_REQUESTED`, `WORKFLOW_CLARIFICATION_ANSWERED`, `WORKFLOW_CHANGES_REQUESTED` (in
+  piattaforma ed email, sezione "Approvazioni e compiti" del riepilogo).
+
+**Alternative scartate.** Archi di ritorno disegnati automaticamente verso ogni nodo: grafi illeggibili e nessun posto
+per il commento o la risposta. Riaprire il nodo scelto e lasciare che segua tutti i suoi archi: da "Scelta procedura"
+ripartirebbero tutti e 7 i buyer, rifacendo lavoro già fatto. Chiarimento come RFI separata: il compito non saprebbe di
+essere in attesa e la scadenza continuerebbe a correre. Nuova revisione caricata da chiunque durante il workflow: il
+blocco del documento (0007) serve proprio a non cambiare il file sotto chi lo sta esaminando; l'eccezione vale solo per
+chi ha ricevuto la richiesta, e la revisione entra nel workflow solo quando lui completa. Contare i ritorni a parte: i
+20 giri per nodo bastano già a fermare un rimpallo senza fine.
+
+**Conseguenze.** Un compito di chiarimento sta sul giro di chi chiede (stesso `node_run_id`) ma non vota: il motore
+filtra `kind = 'WORKFLOW'`; l'unicità per giro e assegnatario vale solo per i compiti del workflow. Il completamento
+(`cde.workflow_complete_task`), i join (`cde.wf_check_joins`), le scadenze (`cde.process_deadlines`) e il controllo
+delle revisioni (`cde.check_revision`) sono riscritti nella 0042 a partire dalla 0039/0007. I nodi già fatti si
+ricostruiscono dagli archi percorsi (`cde.wf_upstream`), senza nuove colonne sugli archi. Contratto in
+`docs/workflow-grafo.md` §6; test `tests/test_workflow_ritorno.py`, `e2e/workflow-ritorno.spec.ts`; scenario U54.
+
 ## ADR-52 — Modelli di commessa dell'organizzazione, scaricabili in un file
 
 **Contesto.** Il 04/11/2026 l'utente chiede di "rendere i progetti trasformabili in template per poterci copiare e
