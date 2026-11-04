@@ -134,6 +134,38 @@ Modulo .docx ─────► docxATesto: celle a "|" ─┘                  
   valori slittati. FAM/SFAM scritte sulla riga vincono sul classificatore a parole chiave
   e vengono comunque validate sull'elenco ufficiale.
 
+### Il giro inverso: documento → modulo
+
+```
+Documento in coda ──► menu ⋮ «Converti in modulo contratto» (App.tsx: convertiInModulo)
+   risultato IMPORT P6 già in coda? ── sì ──► si usa quello (anche corretto in Modifica)
+                                    └─ no ──► voce.testo || ocrFile(f,'md') → POST /api/ocr contratti
+                                                       │
+                                                       ▼
+                 moduloDaRisultato(json) → { testo, avvisi, errori } → <nome>_modulo.txt
+```
+
+`moduloDaRisultato` ([src/lib/modulo-contratto.ts](../src/lib/modulo-contratto.ts)) è
+una funzione pura, condivisa: la usano l'app e `tools/harness.ts`, che scrive
+`modulo.txt`. Regole:
+
+- **Cambia la forma, non il valore.** Numeri inglesi o `number` JSON diventano
+  `1.234,56`, date `G/M/AA`, `GG.MM.AAAA` e ISO diventano `GG/MM/AAAA`, DIVISIONE `3`
+  diventa `03`. Spazi e a-capo diventano uno spazio, il `|` dentro un testo diventa `/`
+  perché è il separatore.
+- **Mai aggiustato.** Un valore che `validaValore` respingerebbe lascia il campo vuoto e
+  finisce in `# DA VERIFICARE` sopra di esso. Una voce con `importo ≠ qta × prezzo` resta
+  com'è e viene segnata. Una voce senza articolo né descrizione resta in commento.
+- **Tabella con cornice** `| … |`: una voce con codice `#14` non diventa un commento.
+  Le colonne CONTO/FAM/SFAM compaiono solo se usate. FAM/SFAM vengono dalle
+  `anagrafiche_articoli`.
+- **Controllo finale.** Il testo prodotto ripassa da `leggiModulo`. Gli `errori` sono
+  esattamente ciò che il programma rifiuterebbe ricaricandolo, e l'app li mostra con la
+  riga. Gli `avvisi` puntano alla riga del campo o della voce, non al commento.
+- **Campi senza posto nel modulo**: le chiavi estratte non previste restano in un blocco
+  di commento promemoria. Fanno eccezione quelle che il programma ricava da solo,
+  come `elenco_prezzi` e `famiglia_contratto`.
+
 ## 4. Limiti e scelte
 
 - **Un modulo = una richiesta.** Il modulo non va stampato e scansionato: come PDF le

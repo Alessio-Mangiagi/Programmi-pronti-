@@ -119,6 +119,13 @@ rifiuta con l'elenco degli errori per riga. Specifica e lettore in
 pulsante **Modulo contratto vuoto** o in [docs/modulo/](docs/modulo/) (`.txt` e `.docx`,
 rigenerati con `npx tsx tools/genera_modulo.ts`).
 
+Il giro inverso: **Converti in modulo contratto** (menu ⋮ della riga in coda) legge un
+documento qualsiasi con la filiera normale e lo riscrive come modulo compilato
+(`moduloDaRisultato`, stesso file). I valori fuori formato non vengono aggiustati:
+campo vuoto e valore letto in una riga `# DA VERIFICARE`. Il modulo prodotto ripassa da
+`leggiModulo` e l'app dice subito se si rilegge senza errori. Anche `npm run harness`
+scrive `modulo.txt` accanto ad `alyante.json`.
+
 ## Export Import_Contratti (regole)
 
 - Gold di riferimento: **`Import_Contratti (2).xls`** nella root → colonne, tipi (date serial,

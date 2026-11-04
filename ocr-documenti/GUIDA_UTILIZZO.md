@@ -194,6 +194,9 @@ nella coda e si preme **Elabora → Excel**. Esiste anche in Word (`docs/modulo/
 - Numeri `1.234,56`, date `GG/MM/AAAA`, tipologia dall'elenco, P.IVA 11 cifre.
 - Obbligatori: codice contratto, tipologia, data contratto, oggetto, fornitore.
 - Un errore blocca l'Excel: il riquadro rosso li elenca **con il numero di riga**.
+- **Converti in modulo contratto** (menu ⋮ della riga) compila il modulo da un documento
+  qualsiasi: lo legge, salva `<nome>_modulo.txt` e segna `# DA VERIFICARE` ciò che non
+  ha potuto riportare così come letto. Si controlla, si corregge e si rimette in coda.
 
 ---
 
