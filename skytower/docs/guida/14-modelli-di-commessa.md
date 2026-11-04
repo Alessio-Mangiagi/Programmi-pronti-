@@ -16,8 +16,8 @@ disponibili in tutte le commesse dell'azienda (vedi [capitolo 6](06-workflow-e-p
 Modelli e file dei modelli li gestiscono solo gli **amministratori dell'organizzazione**. Tutti gli
 amministratori dell'organizzazione possono usarli per aprire commesse nuove; le altre imprese non li vedono.
 
-> Le schermate di questo capitolo vengono da una commessa di prova: i nomi che vedi ("Modello e2e…") cambiano,
-> i pulsanti e i passaggi sono quelli veri.
+> Le schermate mostrano il "Modello – Infrastrutture COM", salvato dalla commessa Galleria Fortolese; quella
+> delle persone del modello viene da un modello di prova.
 
 ## 14.1 Salvare una commessa come modello
 
@@ -92,7 +92,7 @@ anche su un'altra installazione di SkyTower.
 
 SkyTower controlla che il file sia integro: se è rovinato o modificato a mano lo rifiuta. Poi mostra l'elenco
 delle cose adattate, per esempio persone che in questa installazione non esistono e quindi non sono state
-aggiunte. Se il file torna nella stessa organizzazione da cui è uscito, l'elenco dice "Nessun adattamento".
+aggiunte, o workflow della libreria che c'erano già e sono stati lasciati com'erano.
 
 ![Adattamenti dopo il caricamento](img/14-adattamenti-dopo-il-caricamento.png)
 
