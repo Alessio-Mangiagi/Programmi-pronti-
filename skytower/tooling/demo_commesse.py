@@ -41,6 +41,7 @@ sys.path.insert(0, str(API_DIR))
 
 from cde_api.tooling import demo_content as dc  # generatori e Loader riusati
 from cde_api.tooling import dxf_sample  # pianta DXF per il viewer DWG (ADR-41)
+from cde_api.tooling import workflow_rda as wr  # processo RdA → gara → affidamento (ADR-48)
 
 TEMPLATE = "PRJ01"
 PDF, PNG, BIN, TXT = "application/pdf", "image/png", "application/octet-stream", "text/plain"
@@ -761,6 +762,29 @@ class Demo:
         avvia("capit", [("des_lead", "APPROVED", "Ok dal coordinamento."),
                         ("com_dl", "REJECTED", "Mancano le voci dei collaudi impiantistici: integrare e riemettere.")])
 
+    def processi(self):
+        """Processo "RdA → gara → affidamento" (workflow a grafo, ADR-48) in versione ridotta, portato a metà.
+
+        Solo sulla 101-003: tre buyer e due autorizzazioni; approvazione del PM e scelta della procedura fatte,
+        il buyer Capizzi ha già le offerte (aspetta gli altri nella redazione del QdR), Di Paola le sta
+        raccogliendo, Strano deve ancora selezionare le imprese. Così la vista finale mostra nodi fatti,
+        attivi e non ancora raggiunti."""
+        if self.s["commessa"] != "101-003":
+            return
+        ld = self.ld
+        tpl = wr.modello(ld, "com_admin", self.pid, wr.definizione(["Capizzi", "Di Paola", "Strano"], ["DC", "AD"]))
+        if not tpl:
+            return
+        g = wr.processo(ld, "com_admin", self.pid, tpl, "RdA 2026/118 – Ponteggi Sede Acireale",
+                        "Noleggio e montaggio ponteggi per il rifacimento dei prospetti (lotto 1).",
+                        [("approvazione_pm", "IN_VALUTAZIONE", "RdA completa: importo in linea col budget."),
+                         ("scelta_procedura", "IN_GARA", "Gara a inviti fra tre buyer."),
+                         ("sel_capizzi", "IN_GARA", "Inviate le RDO a 4 imprese."),
+                         ("off_capizzi", "IN_GARA", "Ricevute 3 offerte, QdR pronto."),
+                         ("sel_di_paola", "IN_GARA", "Inviate le RDO a 3 imprese.")])
+        if g:
+            self.numeri["processi"] = self.numeri.get("processi", 0) + 1
+
     def rfi(self):
         ld, o = self.ld, self.orgs
         if ld.call("des_lead", "GET", f"/projects/{self.pid}/rfis"):
@@ -854,6 +878,7 @@ class Demo:
         self.documenti()
         self.annotazioni()
         self.workflow()
+        self.processi()
         self.rfi()
         self.transmittal()
         self.accessi()

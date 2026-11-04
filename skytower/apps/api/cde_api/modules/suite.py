@@ -363,18 +363,23 @@ def suite_da_fare(c: Ctx = Depends(ctx_suite)):
     voci = []
     with c.tx() as conn:
         compiti = conn.execute(
-            """SELECT k.id, k.due_at, s.name AS step_name, d.identifier, d.title, r.revision_code, p.code AS project_code,
+            # compiti dei nodi del workflow a grafo (0039): su un documento o su un processo (senza documento)
+            """SELECT k.id, k.due_at, s.name AS step_name, coalesce(d.identifier, i.title) AS identifier,
+                      coalesce(d.title, i.title) AS title, r.revision_code, p.code AS project_code,
+                      i.document_id IS NULL AS processo,
                       (k.due_at IS NOT NULL AND k.due_at < now()) AS overdue
-               FROM cde.tasks k JOIN cde.workflow_step_runs s ON s.id = k.step_run_id
-               JOIN cde.workflow_instances i ON i.id = k.instance_id JOIN cde.documents d ON d.id = i.document_id
-               JOIN cde.document_revisions r ON r.id = i.revision_id JOIN cde.projects p ON p.id = i.project_id
+               FROM cde.tasks k JOIN cde.workflow_node_runs s ON s.id = k.node_run_id
+               JOIN cde.workflow_instances i ON i.id = k.instance_id LEFT JOIN cde.documents d ON d.id = i.document_id
+               LEFT JOIN cde.document_revisions r ON r.id = i.revision_id JOIN cde.projects p ON p.id = i.project_id
                WHERE k.assignee_id = cde.current_app_user() AND k.status = 'OPEN'
                ORDER BY k.due_at NULLS LAST, k.created_at LIMIT 30""").fetchall()
         notifiche = conn.execute(
             """SELECT id, kind, title, body, link, created_at FROM cde.notifications
                WHERE user_id = cde.current_app_user() AND read_at IS NULL ORDER BY id DESC LIMIT 30""").fetchall()
     for k in compiti:
-        voci.append({"id": f"compito:{k['id']}", "titolo": f"Approvare {k['identifier']} {k['revision_code']}",
+        titolo = (f"{k['step_name']}: {k['identifier']}" if k["processo"]
+                  else f"Approvare {k['identifier']} {k['revision_code']}")
+        voci.append({"id": f"compito:{k['id']}", "titolo": titolo,
                      "testo": f"{k['step_name']} · {k['project_code']} · {k['title']}" + (" · in ritardo" if k["overdue"] else ""),
                      "url": _url_web(c, "/compiti"), "tipo": "documento", "priorita": 1 if k["overdue"] else 2,
                      "data": _data_iso(k["due_at"])})

@@ -15,7 +15,9 @@ _env = Environment(loader=PackageLoader("cde_api", "templates"), undefined=Stric
 DIGEST_SUBJECT = {"it": "Riepilogo giornaliero CDE", "en": "CDE daily digest"}
 # sezioni del riepilogo, nell'ordine in cui compaiono (i tipi non elencati finiscono in "Altro")
 SECTIONS = [
-    ({"TASK_ASSIGNED", "TASK_REMINDER", "TASK_OVERDUE", "TASK_ESCALATED", "WORKFLOW_APPROVED", "WORKFLOW_REJECTED"},
+    # WORKFLOW_NOTIFICATION / WORKFLOW_CANCELLED: nodi "notifica" e interruzioni dei workflow a grafo (0039)
+    ({"TASK_ASSIGNED", "TASK_REMINDER", "TASK_OVERDUE", "TASK_ESCALATED", "WORKFLOW_APPROVED", "WORKFLOW_REJECTED",
+      "WORKFLOW_NOTIFICATION", "WORKFLOW_CANCELLED"},
      {"it": "Approvazioni e compiti", "en": "Approvals and tasks"}),
     ({"RFI_CREATED", "RFI_REMINDER", "RFI_OVERDUE"}, {"it": "RFI", "en": "RFIs"}),
     ({"TRANSMITTAL_RECEIVED", "TRANSMITTAL_ACKNOWLEDGED"}, {"it": "Transmittal", "en": "Transmittals"}),

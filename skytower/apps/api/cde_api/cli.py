@@ -9,6 +9,7 @@
   cde utente-dev     account personale nell'ambiente dev (password da CDE_NUOVA_PWD, mai su file)
   cde genera-ifc     modello IFC4 complesso (padiglione di sei livelli) per provare il viewer BIM
   cde genera-dxf     pianta DXF di prova (layer, blocchi, quote) per il viewer DWG
+  cde workflow-rda   processo RdA → gara → affidamento in un progetto (--progetto GALFOR)
   cde genera-glb     modello glTF binario (come da Blender) per provare il viewer 3D
   cde genera-galleria  modello IFC4 di una galleria stradale (conci, impianti, imbocchi)
 """
@@ -161,6 +162,13 @@ def cmd_dev_user(args) -> None:
     print(f"Account {email} pronto ({'creato' if created else 'password aggiornata'}), anche dopo i reset")
 
 
+def cmd_workflow_rda(args) -> None:
+    """Modello di processo "RdA → gara → affidamento" (ADR-48) e processo di prova in un progetto, via API."""
+    from .tooling import workflow_rda
+
+    workflow_rda.carica(args.api, args.password, args.progetto, args.rimuovi)
+
+
 def cmd_ifc(args) -> None:
     from .tooling import ifc_complex
 
@@ -256,6 +264,12 @@ def main(argv: list[str] | None = None) -> None:
     tunnel.add_argument("file", type=Path)
     tunnel.add_argument("--lunghezza", type=float, default=480., help="metri (conci da 12 m)")
     tunnel.set_defaults(func=cmd_tunnel)
+    rda = sub.add_parser("workflow-rda", help="processo RdA → gara → affidamento (workflow a grafo) in un progetto")
+    rda.add_argument("--progetto", required=True, help="codice (es. GALFOR) o id del progetto")
+    rda.add_argument("--api", default="http://127.0.0.1:8100")
+    rda.add_argument("--password", default="Cantiere-2026!", help="password dell'utente che carica (com_admin)")
+    rda.add_argument("--rimuovi", action="store_true", help="annulla il processo di prova e disattiva il modello")
+    rda.set_defaults(func=cmd_workflow_rda)
     demo = sub.add_parser("demo-contenuti", help="cartelle e documenti demo realistici, caricati via API")
     demo.add_argument("--api", default="http://127.0.0.1:8100")
     demo.add_argument("--password", default="Cantiere-2026!", help="password degli utenti demo")

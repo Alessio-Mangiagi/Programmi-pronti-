@@ -41,9 +41,11 @@ def test_import_adattato_al_progetto(client, api_world, as_user):  # noqa: F811
     assert r.status_code == 201, r.text
     out = r.json()
     assert out["code"] == code and out["version"] == 1 and out["project_id"] == target
-    steps = out["definition"]["steps"]
-    assert steps[1]["assignees"] == [{"type": "role", "code": "DIRETTORE_LAVORI", "id": None, "organization_id": None}]
-    assert out["definition"]["escalation_user_id"] is None
+    # il modello è salvato come grafo (ADR-48): il secondo passo è il nodo "passo_2"
+    assert out["definition"]["version"] == 2 and out["subject"] == "DOCUMENT"
+    passo2 = next(n for n in out["definition"]["nodes"] if n["id"] == "passo_2")
+    assert passo2["assignees"] == [{"type": "role", "code": "DIRETTORE_LAVORI"}]
+    assert out["definition"].get("escalation_user_id") is None
     assert any("non è in questo progetto" in n for n in out["changes"])
     assert any(f"Creato il ruolo {role}" in n for n in out["changes"])
     assert role in {x["code"] for x in client.get(f"/projects/{target}/roles", headers=admin).json()}

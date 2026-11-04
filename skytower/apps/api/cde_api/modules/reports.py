@@ -119,27 +119,36 @@ def _documents(conn, project_id) -> tuple[list[Column], list[list]]:
 
 def _approvals(conn, project_id) -> tuple[list[Column], list[list]]:
     rows = conn.execute(
-        """SELECT d.identifier, d.title, r.revision_code, t.name AS template_name, i.status, s.name AS step_name,
-                  i.current_step, jsonb_array_length(t.definition -> 'steps') AS step_count, s.due_at,
-                  (SELECT string_agg(u2.first_name || ' ' || u2.last_name, ', ' ORDER BY u2.last_name)
+        # workflow a grafo (0039): più nodi possono essere attivi insieme (rami paralleli); i processi senza
+        # documento compaiono col loro titolo. Avanzamento = nodi con compiti raggiunti (conclusi o attivi) / totale,
+        # come il vecchio "passo corrente / passi".
+        """SELECT coalesce(d.identifier, '—') AS identifier, coalesce(d.title, i.title) AS title, r.revision_code,
+                  t.name AS template_name, i.status,
+                  (SELECT string_agg(s.name, ', ' ORDER BY s.activated_at) FROM cde.workflow_node_runs s
+                     WHERE s.instance_id = i.id AND s.status = 'ACTIVE') AS step_name,
+                  (SELECT count(DISTINCT s.node_id) FROM cde.workflow_node_runs s WHERE s.instance_id = i.id
+                     AND s.status IN ('DONE', 'ACTIVE') AND s.node_type IN ('decision', 'activity')) AS steps_done,
+                  (SELECT count(*) FROM jsonb_array_elements(t.definition -> 'nodes') n
+                     WHERE n ->> 'type' IN ('decision', 'activity')) AS step_count,
+                  (SELECT min(s.due_at) FROM cde.workflow_node_runs s WHERE s.instance_id = i.id AND s.status = 'ACTIVE') AS due_at,
+                  (SELECT string_agg(DISTINCT u2.first_name || ' ' || u2.last_name, ', ')
                      FROM cde.tasks k JOIN cde.users u2 ON u2.id = k.assignee_id
-                     WHERE k.step_run_id = s.id AND k.status = 'OPEN') AS waiting_for,
+                     WHERE k.instance_id = i.id AND k.status = 'OPEN') AS waiting_for,
                   u.first_name || ' ' || u.last_name AS started_by, i.started_at, i.finished_at,
-                  (s.due_at IS NOT NULL AND s.due_at < now()) AS overdue
+                  EXISTS (SELECT 1 FROM cde.workflow_node_runs s WHERE s.instance_id = i.id AND s.status = 'ACTIVE'
+                            AND s.due_at < now()) AS overdue
            FROM cde.workflow_instances i
            JOIN cde.workflow_templates t ON t.id = i.template_id
-           JOIN cde.documents d ON d.id = i.document_id
-           JOIN cde.document_revisions r ON r.id = i.revision_id
+           LEFT JOIN cde.documents d ON d.id = i.document_id
+           LEFT JOIN cde.document_revisions r ON r.id = i.revision_id
            LEFT JOIN cde.users u ON u.id = i.started_by
-           LEFT JOIN cde.workflow_step_runs s ON s.instance_id = i.id AND s.step_index = i.current_step
-                                              AND i.status = 'RUNNING'
            WHERE i.project_id = %s ORDER BY i.started_at DESC LIMIT %s""", [project_id, MAX_ROWS + 1]).fetchall()
     cols = [("Identificativo", 34), ("Titolo", 40), ("Revisione", 10), ("Workflow", 26), ("Stato", 12),
             ("Step corrente", 26), ("Avanzamento", 12), ("In attesa di", 32), ("Scadenza step", 17), ("Scaduto", 9),
             ("Avviato da", 22), ("Avviato il", 17), ("Concluso il", 17)]
     return cols, [[r["identifier"], r["title"], r["revision_code"], r["template_name"],
                    WF_STATUS.get(r["status"], r["status"]), r["step_name"],
-                   f"{r['current_step'] + 1}/{r['step_count']}" if r["status"] == "RUNNING" else "",
+                   f"{r['steps_done']}/{r['step_count']}" if r["status"] == "RUNNING" else "",
                    r["waiting_for"], r["due_at"], "Sì" if r["overdue"] else "", r["started_by"], r["started_at"],
                    r["finished_at"]] for r in rows]
 

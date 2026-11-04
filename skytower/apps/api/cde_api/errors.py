@@ -15,8 +15,9 @@ log = logging.getLogger("cde.errors")
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, headers: dict | None = None):
-        self.status, self.code, self.message, self.headers = status, code, message, headers
+    def __init__(self, status: int, code: str, message: str, headers: dict | None = None, extra: dict | None = None):
+        # extra: campi in più dentro "error" (es. "errors": [...] della validazione dei workflow a grafo)
+        self.status, self.code, self.message, self.headers, self.extra = status, code, message, headers, extra
 
 
 def not_found(what: str = "Risorsa") -> ApiError:
@@ -31,14 +32,14 @@ def unauthorized(message: str = "Autenticazione richiesta") -> ApiError:
     return ApiError(401, "unauthorized", message, {"WWW-Authenticate": "Bearer"})
 
 
-def _body(code: str, message: str) -> dict:
-    return {"error": {"code": code, "message": message}}
+def _body(code: str, message: str, extra: dict | None = None) -> dict:
+    return {"error": {"code": code, "message": message, **(extra or {})}}
 
 
 def install(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError):
-        return JSONResponse(_body(exc.code, exc.message), status_code=exc.status, headers=exc.headers)
+        return JSONResponse(_body(exc.code, exc.message, exc.extra), status_code=exc.status, headers=exc.headers)
 
     @app.exception_handler(pg.InsufficientPrivilege)
     async def _denied(_: Request, exc: pg.InsufficientPrivilege):
