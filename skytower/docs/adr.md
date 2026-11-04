@@ -817,3 +817,39 @@ fallirebbe su installazioni con doppioni già presenti; il trigger blocca solo i
 fattore. Gli utenti di altre organizzazioni (consulenti, imprese) entrano solo con le loro credenziali. Un
 progetto di un altro committente in cui l'azienda partecipa non riceve più membri dal portale: li invita il suo
 Project Admin. Test: `test_api_portale.py`, `test_api_suite.py` (impersonazione ristretta, eventi), `test_security_fix.py`.
+
+## ADR-48 — Workflow a grafo su foglio a scacchiera, per documenti e processi
+
+**Contesto.** I workflow erano una lista di passi in fila (fino a 20), sempre su una revisione di documento, con
+tre esiti fissi; un rifiuto tornava all'autore. L'utente usa per gli acquisti uno schema diverso (RdA → gara →
+affidamento): un passo si apre su più rami paralleli (un ramo per buyer), ogni esito porta a un nodo diverso,
+i rami si riuniscono, un "Respinto" passa da una conformità e finisce in "Fallito", c'è una notifica automatica.
+Il 03/11/2026 ha scelto: grafo vero, documenti e processi, esiti liberi per nodo, nodi su una griglia a scacchiera.
+
+**Decisione.** Definizione versione 2 (`docs/workflow-grafo.md`): nodi `start`, `decision`, `activity`,
+`notification`, `end` in caselle della griglia; esiti con codice, etichetta e colore (un esito **rosso decide
+subito**, gli altri al quorum; senza quorum vince il più votato); archi per esito, più archi con lo stesso esito
+sono rami paralleli, gli archi all'indietro sono ritorni (massimo 20 giri per nodo, poi l'istanza si interrompe
+col motivo). Riunione dei rami: `ANY` al primo arrivo; `ALL` (predefinito, tranne per gli stati finali che sono
+`ANY`) quando nessun nodo attivo — né un'altra riunione in attesa — può ancora raggiungerla: aspetta i rami in
+corso ma non un ramo mai partito. Il primo stato finale raggiunto chiude l'istanza e annulla i compiti aperti;
+per i documenti `on_completed` applica il passaggio di stato CDE (OK), il KO sblocca il documento. Un modello
+`PROCESS` si avvia senza documento (`POST /projects/{id}/processes`) con titolo, descrizione e documenti allegati
+(visibili solo a chi può vederli); i processi li vede ogni membro del progetto.
+
+Il motore resta nel database (migrazione 0039, funzioni `wf_*` SECURITY DEFINER con lock dell'istanza): ogni
+completamento, con i rami che fa partire e le riunioni che sblocca, è una sola transazione. I giri dei nodi
+(`workflow_node_runs`) sostituiscono i passi; gli archi percorsi (`workflow_edges_taken`) servono alla vista finale
+e, non ancora consumati, sono gli arrivi che una riunione `ALL` sta aspettando. La versione 1 è convertita dalla
+migrazione (modelli e istanze in corso, stessi id) e l'API la accetta ancora in ingresso; `/workflows/{id}`
+mantiene la forma a passi per le pagine esistenti, `/workflow-instances/{id}` dà il grafo completo.
+
+**Alternative scartate.** Motore BPMN esterno (Camunda/Flowable): un servizio in più da gestire e i permessi
+(RLS) andrebbero rifatti fuori dal database. Disegnare la lista di passi come grafo senza cambiare il motore:
+non avrebbe permesso i rami per esito né i ritorni dello schema RdA. Join ALL "su tutti gli archi in entrata"
+(gateway parallelo BPMN): resterebbe bloccato quando un ramo non parte, come i buyer non coinvolti.
+
+**Conseguenze.** Il modello RdA → gara → affidamento dell'utente si carica con `cde workflow-rda --progetto
+<codice>` (27 nodi, `cde_api/tooling/workflow_rda.py`). Le notifiche nuove sono `WORKFLOW_NOTIFICATION` e
+`WORKFLOW_CANCELLED`. Le schermate (editor a scacchiera, vista finale, scheda Processi) seguono il contratto.
+Test: `tests/test_workflow_grafo.py`; scenari U50 e U51.
