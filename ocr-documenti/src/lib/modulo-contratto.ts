@@ -123,7 +123,8 @@ const RE_MARCATORE = /^[#*_\s]*MODULO\s+CONTRATTO\s+OCR\s+v1[*_\s]*$/i
 const RE_SEZIONE = /^\[\s*(TESTATA|IMPORTI|RIGHE|FINE)\s*\]$/i
 // separatore delle tabelle Markdown ("|---|:--:|"): non è una riga di dati
 const RE_SEP_MD = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/
-const RE_NUM_IT = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/
+// segno meno ammesso: negli elenchi prezzi ci sono detrazioni e sconti a importo negativo
+const RE_NUM_IT = /^-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/
 const RE_DATA = /^(\d{2})\/(\d{2})\/(\d{4})$/
 
 /** Vero se il testo è un modulo contratto (riga di riconoscimento in testa). */
@@ -379,3 +380,252 @@ export const moduloVuoto = (): string => {
 }
 
 export const NOME_FILE_MODULO = 'Modulo_contratto_OCR'
+
+// ── Documento → modulo ──────────────────────────────────────────────────────
+//
+// Il giro inverso del lettore: il risultato che il programma ha già estratto da un
+// documento qualsiasi (PDF, scansione, Word: JSON formato ALYANTE, anche corretto a
+// mano in revisione) viene riscritto come MODULO CONTRATTO compilato. Il modulo poi si
+// rilegge alla lettera, senza OCR né euristiche: è la copia "pulita" del contratto,
+// da archiviare, far controllare o ricaricare quando il documento originale dà noie.
+//
+// Regole della conversione:
+// - i valori si riscrivono come letti; cambia solo la FORMA quando il modulo la chiede
+//   (numeri all'italiana, date GG/MM/AAAA, spazi e a-capo ridotti a uno spazio);
+// - un valore che il modulo non accetterebbe NON si aggiusta: il campo resta vuoto e il
+//   valore letto finisce in una riga "# DA VERIFICARE" subito sopra, così non si perde;
+// - una voce con IMPORTO ≠ QUANTITA × PREZZO resta com'è, segnata "# DA VERIFICARE":
+//   quale dei tre numeri sia sbagliato lo decide chi ha il documento davanti;
+// - alla fine il modulo prodotto passa da leggiModulo: gli `errori` dicono esattamente
+//   cosa il programma rifiuterebbe ricaricandolo (vuoto = si rilegge senza problemi).
+
+/** Esito di moduloDaRisultato: il modulo, i punti da verificare, il controllo finale. */
+export interface EsitoConversione {
+  testo: string               // il modulo compilato, pronto da salvare come .txt
+  avvisi: ErroreModulo[]      // valori non riportabili così come letti (riga del modulo e motivo)
+  errori: ErroreModulo[]      // cosa leggiModulo rifiuterebbe nel modulo prodotto
+}
+
+export interface OpzioniConversione {
+  origine?: string            // nome del documento di partenza, scritto in testa al modulo
+  generato?: string           // data della conversione (la passa il chiamante: funzione pura)
+}
+
+// Chiavi del risultato che il modulo non riporta perché le ricava il programma:
+// elenco_prezzi = commessa (regola maschera), famiglia_contratto = maschera che ha
+// lavorato, ditta_codice = codice DITTA dall'elenco, campi_assist_ai = diagnostica.
+const CHIAVI_DERIVATE = new Set(['famiglia_contratto', 'elenco_prezzi', 'ditta_codice', 'campi_assist_ai', 'progressivo'])
+
+const unaRiga = (v: unknown): string => (v == null ? '' : String(v)).replace(/\s+/g, ' ').trim()
+
+/**
+ * Numero letto → forma del modulo ("1.234,56"). Accetta la forma italiana (lasciata
+ * com'è), quella inglese ("1,234.56", "157200.00") e i number di JSON. Toglie €, spazi
+ * e apostrofi delle migliaia. '' = vuoto, null = non è un numero.
+ * "12.500" resta "12.500" (dodicimilacinquecento, come in un contratto italiano).
+ */
+export const numeroPerModulo = (v: unknown): string | null => {
+  if (typeof v === 'number') return isFinite(v) ? String(v).replace('.', ',') : null
+  let s = unaRiga(v).replace(/[€\s']/g, '').replace(/^\+/, '')
+  if (!s) return ''
+  const meno = s.startsWith('-') ? '-' : ''
+  if (meno) s = s.slice(1)
+  if (RE_NUM_IT.test(s)) return meno + s
+  // inglese con migliaia: "1,234.56" → "1.234,56"
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(s)) return meno + s.replace(/,/g, '§').replace('.', ',').replace(/§/g, '.')
+  // punto decimale: "157200.00" → "157200,00" (le migliaia col punto le ha già prese RE_NUM_IT)
+  if (/^\d+\.\d+$/.test(s)) return meno + s.replace('.', ',')
+  return null
+}
+
+// Data letta → GG/MM/AAAA. Accetta G/M/AAAA, separatori "-" e ".", anno a 2 cifre
+// (20xx) e la forma ISO AAAA-MM-GG. La validità del giorno la controlla validaValore.
+const dataPerModulo = (v: unknown): string | null => {
+  const s = unaRiga(v)
+  if (!s) return ''
+  let m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})$/.exec(s)
+  if (m) return `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3].length === 2 ? `20${m[3]}` : m[3]}`
+  m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(s)
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  return null
+}
+
+// Valore letto → forma del modulo, per tipo di campo. null = forma non riconosciuta.
+const formaPerModulo = (v: unknown, tipo: Tipo | 'testo' | 'numero'): string | null => {
+  switch (tipo) {
+    case 'numero': return numeroPerModulo(v)
+    case 'data': return dataPerModulo(v)
+    case 'percento': {
+      const s = unaRiga(v).replace(/\s*%$/, '')
+      return s ? numeroPerModulo(s) : ''
+    }
+    case 'divisione': {
+      const s = unaRiga(v)
+      return /^\d$/.test(s) ? `0${s}` : s          // "3" → "03": la divisione è un codice a 2 cifre
+    }
+    // codici: gli spazi in mezzo sono quasi sempre un artefatto di lettura ("IT 0123…")
+    case 'cig': case 'cup': case 'piva': case 'rg': case 'ri':
+      return unaRiga(v).replace(/\s+/g, '')
+    default: return unaRiga(v)
+  }
+}
+
+// Il "|" è il separatore del modulo: dentro un valore spezzerebbe la riga in due celle.
+const senzaPipe = (s: string): [string, boolean] => (s.includes('|') ? [s.replace(/\|/g, '/'), true] : [s, false])
+
+type RisultatoUnito = {
+  testata: Record<string, unknown>
+  importi: Record<string, unknown>
+  righe: Record<string, unknown>[]
+  anagrafiche: Record<string, unknown>[]
+}
+
+// Risultato JSON (stringa o oggetto; array = più pagine) → un oggetto solo, come fa
+// parseAlyante in import-contratti.ts: testata/importi dal primo che li ha, righe e
+// anagrafiche in fila.
+const unisciRisultato = (r: unknown): RisultatoUnito => {
+  const parsed: unknown = typeof r === 'string' ? JSON.parse(r) : r
+  const pagine = (Array.isArray(parsed) ? parsed : [parsed]) as unknown[]
+  const out: RisultatoUnito = { testata: {}, importi: {}, righe: [], anagrafiche: [] }
+  const oggetto = (o: unknown) => (o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, unknown>) : {})
+  for (const pag of pagine) {
+    const p = oggetto(pag)
+    for (const [k, v] of Object.entries(oggetto(p.testata))) if (unaRiga(v) && !unaRiga(out.testata[k])) out.testata[k] = v
+    for (const [k, v] of Object.entries(oggetto(p.importi))) if (unaRiga(v) && !unaRiga(out.importi[k])) out.importi[k] = v
+    if (Array.isArray(p.righe)) out.righe.push(...p.righe.map(oggetto))
+    if (Array.isArray(p.anagrafiche_articoli)) out.anagrafiche.push(...p.anagrafiche_articoli.map(oggetto))
+  }
+  return out
+}
+
+/**
+ * Risultato estratto da un documento (JSON formato ALYANTE: {testata, importi, righe,
+ * anagrafiche_articoli}, stringa o oggetto) → MODULO CONTRATTO compilato.
+ * Solleva un Error se il risultato non è JSON o non contiene alcun dato.
+ */
+export const moduloDaRisultato = (risultato: unknown, opz: OpzioniConversione = {}): EsitoConversione => {
+  let r: RisultatoUnito
+  try { r = unisciRisultato(risultato) } catch { throw new Error('il risultato non è JSON: serve quello del formato IMPORT P6 (Alyante)') }
+  if (!Object.keys(r.testata).length && !Object.keys(r.importi).length && !r.righe.length) {
+    throw new Error('nessun dato estratto da riportare nel modulo')
+  }
+
+  const out: string[] = [MODULO_VERSIONE]
+  const avvisi: ErroreModulo[] = []
+  // l'avviso segue il commento "# DA VERIFICARE" che lo spiega: il numero di riga vero
+  // (quella del campo o della voce) si fissa in fondo, a modulo finito
+  const daVerificare = (testo: string) => {
+    out.push(`# DA VERIFICARE: ${testo}`)
+    avvisi.push({ riga: out.length, testo })
+  }
+
+  out.push(
+    `# Modulo compilato dal programma${opz.origine ? ` leggendo "${unaRiga(opz.origine)}"` : ''}${opz.generato ? ` il ${unaRiga(opz.generato)}` : ''}.`,
+    '# Controlla i valori col documento originale e correggi qui: il programma rilegge il',
+    '# modulo alla lettera. Le righe "# DA VERIFICARE" segnano ciò che non è stato possibile',
+    '# riportare così come letto (valore fuori formato, conti che non tornano).',
+    '# Le righe che iniziano con # sono spiegazioni e vengono ignorate.',
+    '',
+  )
+
+  // ── campi di testata e importi
+  const campi = (lista: CampoModulo[], valori: Record<string, unknown>) => {
+    for (const c of lista) {
+      out.push(`# ${c.aiuto}${c.obbligatorio ? ' — OBBLIGATORIO' : ''}`)
+      const letto = valori[c.chiave]
+      const forma = formaPerModulo(letto, c.tipo)
+      let valore = ''
+      let segnalato = false
+      if (forma === null) { daVerificare(`${c.etichetta}: letto "${unaRiga(letto)}", non è nella forma richiesta`); segnalato = true }
+      else if (forma) {
+        const ok = validaValore(forma, c.tipo)
+        if (ok.startsWith('!')) { daVerificare(`${c.etichetta}: ${ok.slice(1)}`); segnalato = true }
+        else {
+          const [v, tolto] = senzaPipe(ok)
+          if (tolto) daVerificare(`${c.etichetta}: il carattere "|" è stato sostituito con "/"`)
+          valore = v
+        }
+      }
+      if (!valore && c.obbligatorio && !segnalato) daVerificare(`${c.etichetta} non trovato nel documento: va compilato`)
+      out.push(`${c.etichetta}: ${valore}`)
+    }
+  }
+  out.push('[TESTATA]')
+  campi(CAMPI_TESTATA, r.testata)
+  out.push('', '[IMPORTI]')
+  campi(CAMPI_IMPORTI, r.importi)
+
+  // valori estratti che il modulo non ha dove mettere: in commento, non persi in silenzio
+  const previste = new Set([...CAMPI_TESTATA, ...CAMPI_IMPORTI].map(c => c.chiave))
+  const extra = [...Object.entries(r.testata), ...Object.entries(r.importi)]
+    .filter(([k, v]) => !previste.has(k) && !CHIAVI_DERIVATE.has(k) && unaRiga(v))
+  if (extra.length) {
+    out.push('# Altri valori letti dal documento che il modulo non prevede (solo promemoria):')
+    for (const [k, v] of extra) out.push(`#   ${k}: ${unaRiga(v)}`)
+  }
+
+  // ── righe dell'elenco prezzi
+  // FAM/SFAM stanno nelle anagrafiche, una per codice articolo (o descrizione se manca il
+  // codice: stessa chiave che usa strutturaAlyante quando le crea)
+  const anag = new Map<string, Record<string, unknown>>()
+  for (const a of r.anagrafiche) {
+    const k = unaRiga(a.codice_articolo) || unaRiga(a.descrizione)
+    if (k && !anag.has(k)) anag.set(k, a)
+  }
+  const valoreColonna = (riga: Record<string, unknown>, chiave: string): unknown => {
+    if (chiave !== 'famiglia' && chiave !== 'sottofamiglia') return riga[chiave]
+    return riga[chiave] ?? anag.get(unaRiga(riga.codice_epu) || unaRiga(riga.descrizione))?.[chiave]
+  }
+  // colonne facoltative solo se almeno una voce le usa: il modulo resta leggibile
+  const colonne = COLONNE_RIGHE.filter(c => c.obbligatoria || r.righe.some(x => unaRiga(valoreColonna(x, c.chiave))))
+
+  out.push(
+    '',
+    '[RIGHE]',
+    '# Elenco prezzi: una voce per riga, celle separate da "|", anche quando sono vuote.',
+    // tabella Markdown con cornice: una voce non inizia mai con "#" (sarebbe un commento)
+    // anche se il codice articolo lo fa, e il file si vede come tabella negli editor
+    `| ${colonne.map(c => c.etichetta).join(' | ')} |`,
+    `|${colonne.map(() => '---').join('|')}|`,
+  )
+  r.righe.forEach((riga, k) => {
+    const voce = `voce ${k + 1}${unaRiga(riga.codice_epu) ? ` (${unaRiga(riga.codice_epu)})` : ''}`
+    const note: string[] = []
+    const valori: Record<string, string> = {}
+    const celleRiga = colonne.map(c => {
+      const letto = valoreColonna(riga, c.chiave)
+      const forma = formaPerModulo(letto, c.tipo)
+      if (forma === null) { note.push(`${c.etichetta} letto "${unaRiga(letto)}" non è un numero: cella lasciata vuota`); return '' }
+      const [v, tolto] = senzaPipe(forma)
+      if (tolto) note.push(`in ${c.etichetta} il carattere "|" è stato sostituito con "/"`)
+      valori[c.chiave] = v
+      return v
+    })
+    if (!valori.codice_epu && !valori.descrizione) {
+      // senza articolo né descrizione il lettore la rifiuterebbe: resta in commento
+      daVerificare(`${voce} senza articolo né descrizione, tenuta qui sotto in commento: completala e togli il "#"`)
+      out.push(`# | ${celleRiga.join(' | ')} |`)
+      return
+    }
+    const { quantita: q, prezzo_lordo: p, importo: im } = valori
+    if (q && p && im) {
+      const qn = numIt(q), pn = numIt(p), imn = numIt(im)
+      if (imn !== 0 && Math.abs(qn * pn - imn) / Math.abs(imn) > 0.01) {
+        note.push(`IMPORTO ${im} ≠ QUANTITA × PREZZO (${itStr(qn * pn)}): correggi il valore sbagliato`)
+      }
+    }
+    for (const n of note) daVerificare(`${voce}: ${n}`)
+    out.push(`| ${celleRiga.join(' | ')} |`)
+  })
+  out.push('', '[FINE]', '')
+
+  // ogni avviso punta alla prima riga NON di commento dopo il suo "# DA VERIFICARE":
+  // il campo o la voce da correggere (la voce in commento punta a sé stessa)
+  for (const a of avvisi) {
+    let n = a.riga + 1
+    while (n <= out.length && out[n - 1].startsWith('#') && !out[n - 1].startsWith('# |')) n++
+    a.riga = n
+  }
+  const testo = out.join('\n')
+  return { testo, avvisi, errori: leggiModulo(testo).errori }
+}

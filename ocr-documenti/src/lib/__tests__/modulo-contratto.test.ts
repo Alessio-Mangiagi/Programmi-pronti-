@@ -5,9 +5,11 @@
  * Due cose contano: che i valori escano ALLA LETTERA (è la promessa del modulo) e che
  * ogni scostamento dal formato venga respinto con il numero di riga giusto. Il modulo
  * vuoto generato dalla specifica deve essere a sua volta un modulo leggibile.
+ * La conversione documento → modulo (moduloDaRisultato) deve produrre un modulo che il
+ * lettore riprende identico, e segnare "DA VERIFICARE" tutto ciò che non può riportare.
  */
 import { describe, it, expect } from 'vitest'
-import { CAMPI_IMPORTI, CAMPI_TESTATA, MODULO_VERSIONE, descriviErrori, eModulo, leggiModulo, moduloVuoto, normEtichetta } from '../modulo-contratto'
+import { CAMPI_IMPORTI, CAMPI_TESTATA, MODULO_VERSIONE, descriviErrori, eModulo, leggiModulo, moduloDaRisultato, moduloVuoto, normEtichetta, numeroPerModulo } from '../modulo-contratto'
 import { docxHtmlATesto } from '../testo-nativo'
 
 const MODULO_OK = `MODULO CONTRATTO OCR v1
@@ -211,5 +213,114 @@ describe('leggiModulo: nessun errore doppio', () => {
     const { errori } = leggiModulo('MODULO CONTRATTO OCR v1\n[TESTATA]\nCODICE CONTRATTO: X\nPARTITA IVA FORNITORE: 123\nTIPOLOGIA: Cottimo\nDATA CONTRATTO: 2026-03-12\nOGGETTO: O')
     expect(errori.map(e => e.riga)).toEqual([4, 5, 6])
     expect(descriviErrori(errori)).not.toMatch(/manca/)
+  })
+})
+
+// Risultato come lo produce il programma da un PDF (formato ALYANTE, già normalizzato
+// sugli elenchi ufficiali): è l'ingresso della conversione documento → modulo.
+const RISULTATO = {
+  testata: {
+    codice: '208-148_042/2026', codice_progetto: '193-136_6', elenco_prezzi: '193-136_6',
+    fornitore: 'Edil Rossi S.r.l.', fornitore_piva: '01234567890', tipologia_contratto: 'Subappalto',
+    data_contratto: '12/03/2026', cond_pagamento: 'DA', oggetto: 'Opere in c.a.\ndel viadotto  Morello',
+    divisione: '03', famiglia_contratto: 'subappalto',
+  },
+  importi: { importo_lavori: '157.200,00', ritenuta_garanzia_percent: '5', importo_oneri_sicurezza: '3.144,00' },
+  righe: [
+    { progressivo: '1', codice_epu: 'B.03.025.a', descrizione: 'Conglomerato C25/30', udm: 'mc', quantita: '120,00', prezzo_lordo: '95,50', importo: '11.460,00', conto: '101' },
+    { progressivo: '2', codice_epu: '#14', descrizione: 'Acciaio B450C', udm: 'kg', quantita: '1.000', prezzo_lordo: '1,25', importo: '1.250,00' },
+  ],
+  anagrafiche_articoli: [
+    { codice_articolo: 'B.03.025.a', descrizione: 'Conglomerato C25/30', famiglia: 'A', sottofamiglia: 'A408' },
+    { codice_articolo: '#14', descrizione: 'Acciaio B450C', famiglia: 'A', sottofamiglia: 'A401' },
+  ],
+}
+
+describe('moduloDaRisultato: documento estratto → modulo', () => {
+  it('produce un modulo che il lettore riprende identico, senza errori né avvisi', () => {
+    const { testo, avvisi, errori } = moduloDaRisultato(JSON.stringify(RISULTATO), { origine: 'contratto.pdf', generato: '04/11/2026' })
+    expect(eModulo(testo)).toBe(true)
+    expect(testo).toContain('leggendo "contratto.pdf" il 04/11/2026')
+    expect(avvisi).toEqual([])
+    expect(errori).toEqual([])
+    const { estratto } = leggiModulo(testo)
+    expect(estratto.testata).toMatchObject({
+      codice: '208-148_042/2026', codice_progetto: '193-136_6', fornitore_piva: '01234567890',
+      tipologia_contratto: 'Subappalto', cond_pagamento: 'DA', divisione: '03',
+      oggetto: 'Opere in c.a. del viadotto Morello',          // a-capo e doppi spazi → uno spazio
+    })
+    expect(estratto.importi).toEqual({ importo_lavori: '157.200,00', ritenuta_garanzia_percent: '5', importo_oneri_sicurezza: '3.144,00' })
+    expect(estratto.righe).toHaveLength(2)
+    expect(estratto.righe[0]).toMatchObject({ codice_epu: 'B.03.025.a', quantita: '120,00', importo: '11.460,00', conto: '101', famiglia: 'A', sottofamiglia: 'A408' })
+    // il codice che inizia con "#" non diventa un commento: la tabella ha la cornice
+    expect(estratto.righe[1]).toMatchObject({ codice_epu: '#14', sottofamiglia: 'A401' })
+  })
+
+  it('riporta in forma di modulo numeri inglesi, number JSON e date ISO', () => {
+    expect(numeroPerModulo('157200.00')).toBe('157200,00')
+    expect(numeroPerModulo('1,234.56')).toBe('1.234,56')
+    expect(numeroPerModulo('€ 1.234,56')).toBe('1.234,56')
+    expect(numeroPerModulo('12.500')).toBe('12.500')
+    expect(numeroPerModulo(-3.5)).toBe('-3,5')
+    expect(numeroPerModulo('circa 10')).toBeNull()
+    const { estratto } = leggiModulo(moduloDaRisultato({
+      testata: { codice: 'X', tipologia_contratto: 'nolo a freddo', data_contratto: '2026-03-02', oggetto: 'O', fornitore: 'F', divisione: '3' },
+      importi: { importo_lavori: 1500.5, ritenuta_garanzia_percent: '5.5%' },
+      righe: [{ codice_epu: 'N1', descrizione: 'Nolo escavatore', udm: 'H', quantita: 10, prezzo_lordo: '45.00', importo: '450.00' }],
+    }).testo)
+    expect(estratto.testata).toMatchObject({ data_contratto: '02/03/2026', tipologia_contratto: 'Nolo a freddo', divisione: '03' })
+    expect(estratto.importi).toMatchObject({ importo_lavori: '1500,5', ritenuta_garanzia_percent: '5,5' })
+    expect(estratto.righe[0]).toMatchObject({ quantita: '10', prezzo_lordo: '45,00', importo: '450,00', udm: 'h' })
+  })
+
+  it('non aggiusta i valori fuori formato: campo vuoto, valore letto in "# DA VERIFICARE"', () => {
+    const { testo, avvisi, errori } = moduloDaRisultato({
+      testata: { codice: 'X', tipologia_contratto: 'Cottimo', data_contratto: '31/02/2026', fornitore_piva: '123', fornitore: 'F' },
+      righe: [{ codice_epu: 'A1', descrizione: 'Voce | con pipe', udm: 'mq', quantita: '10,00', prezzo_lordo: '5,00', importo: '60,00' }],
+    })
+    const linee = testo.split('\n')
+    const riga = (etichetta: string) => linee.findIndex(l => l.startsWith(etichetta)) + 1
+    expect(linee[riga('TIPOLOGIA:') - 1]).toBe('TIPOLOGIA: ')
+    expect(linee[riga('TIPOLOGIA:') - 2]).toMatch(/^# DA VERIFICARE: TIPOLOGIA: tipologia "Cottimo" non ammessa/)
+    expect(testo).toContain('Voce / con pipe')
+    // ogni avviso punta alla riga del campo o della voce, non al commento
+    expect(avvisi.map(a => a.riga)).toEqual(expect.arrayContaining([riga('TIPOLOGIA:'), riga('DATA CONTRATTO:'), riga('PARTITA IVA FORNITORE:'), riga('OGGETTO:')]))
+    const rigaVoce = linee.findIndex(l => l.startsWith('| A1 |')) + 1
+    const suVoce = avvisi.filter(a => a.riga === rigaVoce).map(a => a.testo).join('\n')
+    expect(suVoce).toContain('"|" è stato sostituito')
+    expect(suVoce).toContain('IMPORTO 60,00 ≠ QUANTITA × PREZZO (50,00)')
+    // il controllo finale dice cosa il lettore rifiuterebbe: obbligatori vuoti e conti che non tornano
+    expect(errori.some(e => e.riga === rigaVoce)).toBe(true)
+    expect(descriviErrori(errori)).toMatch(/manca TIPOLOGIA[\s\S]*manca DATA CONTRATTO[\s\S]*manca OGGETTO/)
+  })
+
+  it('una voce senza articolo né descrizione resta in commento, non sparisce', () => {
+    const { testo, avvisi, errori } = moduloDaRisultato({
+      testata: { codice: 'X', tipologia_contratto: 'Subappalto', data_contratto: '01/01/2026', oggetto: 'O', fornitore: 'F' },
+      righe: [{ codice_epu: '', descrizione: '', udm: 'mc', quantita: '2', prezzo_lordo: '3,00', importo: '6,00' }],
+    })
+    expect(testo).toContain('# |  |  | mc | 2 | 3,00 | 6,00 |')
+    expect(avvisi).toHaveLength(1)
+    expect(errori).toEqual([])
+  })
+
+  it('unisce i risultati a più pagine e respinge ciò che non è un risultato', () => {
+    const { estratto } = leggiModulo(moduloDaRisultato([
+      { testata: { codice: 'X', oggetto: 'O' }, righe: [{ codice_epu: 'A', descrizione: 'a', udm: 'n', quantita: '1', prezzo_lordo: '1,00', importo: '1,00' }] },
+      { testata: { codice: 'Y', fornitore: 'F' }, righe: [{ codice_epu: 'B', descrizione: 'b', udm: 'n', quantita: '2', prezzo_lordo: '1,00', importo: '2,00' }] },
+    ]).testo)
+    expect(estratto.testata).toMatchObject({ codice: 'X', fornitore: 'F' })   // vince la prima pagina
+    expect(estratto.righe.map(r => r.codice_epu)).toEqual(['A', 'B'])
+    expect(() => moduloDaRisultato('# non json')).toThrow(/non è JSON/)
+    expect(() => moduloDaRisultato({})).toThrow(/nessun dato/)
+  })
+
+  it('il lettore accetta importi negativi (detrazioni, sconti)', () => {
+    const { estratto, errori } = leggiModulo(moduloDaRisultato({
+      testata: { codice: 'X', tipologia_contratto: 'Subappalto', data_contratto: '01/01/2026', oggetto: 'O', fornitore: 'F' },
+      righe: [{ codice_epu: 'S1', descrizione: 'Sconto', udm: 'a corpo', quantita: '1', prezzo_lordo: '-500,00', importo: '-500,00' }],
+    }).testo)
+    expect(errori).toEqual([])
+    expect(estratto.righe[0].importo).toBe('-500,00')
   })
 })
