@@ -14,7 +14,8 @@
     "test": "vitest run",
     "baseline:aggiorna": "cross-env AGGIORNA_BASELINE=1 vitest run server/__tests__/baseline.test.ts",
     "lint": "eslint .",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "moduli": "tsx tools/verifica_moduli.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
