@@ -81,6 +81,37 @@ def rileva_device():
     return "cpu"
 
 
+def prova_lettura(ocr):
+    """Prova di lettura su un'immagine generata qui (testo nero su bianco, ben leggibile).
+    False = il motore non ha trovato NESSUN testo.
+
+    Perché: su GPU troppo nuove per i kernel del paddle installato (es. RTX serie 50,
+    compute capability 12.0, con paddle CUDA 12.6) l'inferenza non solleva errori ma il
+    rilevamento restituisce zero box: ogni pagina usciva vuota ("txt:0ch blocchi:0") e il
+    contratto risultava senza dati, in silenzio. Con questa prova il worker se ne accorge
+    all'avvio e ripiega sulla CPU. Se la prova stessa non si può fare (PIL o font
+    mancanti, errore imprevisto) si risponde True: meglio non bloccare un motore buono."""
+    try:
+        import tempfile
+        from PIL import Image, ImageDraw, ImageFont
+        try:
+            font = ImageFont.truetype("arial.ttf", 72)
+        except OSError:
+            return True              # senza un font vero il testo sarebbe troppo piccolo
+        img = Image.new("RGB", (1200, 240), "white")
+        ImageDraw.Draw(img).text((40, 70), "CONTRATTO 2026 PROVA", fill="black", font=font)
+        fd, png = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        try:
+            img.save(png)
+            return len(ocr_pagina(ocr, png)) > 0
+        finally:
+            os.remove(png)
+    except Exception as e:
+        print(f"[worker] prova di lettura non eseguita: {e}", file=sys.stderr)
+        return True
+
+
 def costruisci_ocr():
     """PaddleOCR 3.x (PP-OCRv5) se disponibile, altrimenti 2.x (PP-OCRv4)."""
     from paddleocr import PaddleOCR
@@ -127,6 +158,11 @@ def costruisci_ocr():
                 device=device,
                 **extra,
             )
+            # GPU che "funziona" ma non legge nulla (vedi prova_lettura) → si passa alla CPU
+            if device != "cpu" and not prova_lettura(ocr):
+                print(f"[worker] device {device}: nessun testo sull'immagine di prova "
+                      f"(GPU non supportata da questo paddle?) — passo alla CPU", file=sys.stderr)
+                continue
             return ocr, f"PaddleOCR {versione} ({det.split('_')[0]}, {device.upper()})"
         except TypeError:
             if extra:
@@ -139,6 +175,9 @@ def costruisci_ocr():
                         enable_mkldnn=False,
                         device=device,
                     )
+                    if device != "cpu" and not prova_lettura(ocr):
+                        print(f"[worker] device {device}: nessun testo sull'immagine di prova — passo alla CPU", file=sys.stderr)
+                        continue
                     return ocr, f"PaddleOCR {versione} ({det.split('_')[0]}, {device.upper()})"
                 except TypeError:
                     break   # firma 3.x assente → prova le API vecchie

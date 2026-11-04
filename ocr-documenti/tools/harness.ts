@@ -84,12 +84,16 @@ const rendiPagine = (pdf: string): Promise<string[]> => new Promise((resolve, re
 const ocrConCache = async (png: string): Promise<string> => {
   const key = sha1(await fs.readFile(png))
   const cache = path.join(DIR_CACHE, 'blocchi', `${key}.json`)
-  if (!noCache && existsSync(cache)) return componiTesto(JSON.parse(await fs.readFile(cache, 'utf8')))
-  let blocchi: unknown = null
+  if (!noCache && existsSync(cache)) {
+    const inCache = JSON.parse(await fs.readFile(cache, 'utf8'))
+    // "[]" = pagina che il motore non ha letto (GPU non supportata): si rifà, come in server/ocr.ts
+    if (Array.isArray(inCache) && inCache.length) return componiTesto(inCache)
+  }
+  let blocchi: unknown[] | null = null
   setDumpBlocchi(b => { blocchi = b })
   const testo = await ocrPaddle((await fs.readFile(png)).toString('base64'))
   setDumpBlocchi(null)
-  if (blocchi) {
+  if (blocchi && (blocchi as unknown[]).length) {
     await fs.mkdir(path.dirname(cache), { recursive: true })
     await fs.writeFile(cache, JSON.stringify(blocchi), 'utf8')
   }

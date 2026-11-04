@@ -195,10 +195,19 @@ const leggiCache = async (chiave: string): Promise<BloccoOcr[] | null> => {
   if (!OCR_CACHE_DIR) return null
   const f = path.join(OCR_CACHE_DIR, `${chiave}.json`)
   if (!existsSync(f)) return null
-  try { return JSON.parse(await fs.readFile(f, 'utf8')) as BloccoOcr[] } catch { return null }
+  try {
+    const b = JSON.parse(await fs.readFile(f, 'utf8')) as BloccoOcr[]
+    // lettura vuota = cache non valida, si rifà l'OCR: vedi scriviCache
+    return Array.isArray(b) && b.length ? b : null
+  } catch { return null }
 }
+// Una pagina senza NESSUN blocco non si salva. Una pagina vera di contratto non è mai
+// vuota: zero blocchi vuol dire che il motore non ha letto, ad esempio la GPU RTX
+// serie 50 non supportata da paddle CUDA 12.6 (vedi prova_lettura in ocr_worker.py).
+// Salvarla la congelava: anche col motore riparato la pagina restava vuota per sempre
+// (04/11/2026: 129 pagine su 131 in cache erano "[]").
 const scriviCache = async (chiave: string, blocchi: BloccoOcr[]): Promise<void> => {
-  if (!OCR_CACHE_DIR) return
+  if (!OCR_CACHE_DIR || !blocchi.length) return
   await fs.mkdir(OCR_CACHE_DIR, { recursive: true }).catch(() => {})
   await fs.writeFile(path.join(OCR_CACHE_DIR, `${chiave}.json`), JSON.stringify(blocchi)).catch(() => {})
 }
