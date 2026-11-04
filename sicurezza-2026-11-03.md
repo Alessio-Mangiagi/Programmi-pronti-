@@ -29,10 +29,10 @@ Ogni correzione ha i suoi test; i commit sono sul branch `feat/estrazione-dms`.
 | App | Commit | Corretto | Rimandato |
 |---|---|---|---|
 | Moduli condivisi | 23ab99e | controllo d'accesso fail-closed, memoria con tetto, confronto del token | — |
-| Portale | 13cf75c | richieste forgiate, IP del proxy, app accese non più spente, logout che chiude le sessioni, freno ai tentativi, header, nomi utente | secondo cookie per l'area admin; token obbligatorio su `/api/evento` |
+| Portale | 13cf75c, 80bcd89 | richieste forgiate, IP del proxy, app accese non più spente, logout che chiude le sessioni, freno ai tentativi, header, nomi utente; dal 04/11 presenze ed eventi solo col token della suite | secondo cookie per l'area admin |
 | Caddy | 2287428 | HSTS e nosniff | — |
 | InCampo | aac0bac | sync sui cantieri altrui, login dal portale, IP non falsificabile, elenco utenti, credenziali nel repository, password della demo | ruolo predefinito dal portale (`manager`) |
-| SkyTower | 6255b19, 104a6dd | login dal portale e token ristretti, iscrizione automatica, OnlyOffice e filigrana, link nei metadati, limiti di dimensione, DXF e regex che bloccavano il server, log delle email, backup e API in Docker | enumerazione delle organizzazioni, verifica del registro in loop, dimensione dei metadati, ticket monouso, domini SSO, stream di notifiche |
+| SkyTower | 6255b19, 104a6dd, 96cb534 | login dal portale e token ristretti, iscrizione automatica, OnlyOffice e filigrana, link nei metadati, limiti di dimensione, DXF e regex che bloccavano il server, log delle email, backup e API in Docker; dal 04/11 anche enumerazione delle organizzazioni e degli inviti, verifica del registro fatta dal worker, tetto sui metadati, ticket monouso o legati all'IP, sessione breve in HTTP, domini SSO verificati, massimo 5 stream di notifiche per utente | nessuna verifica DNS dei domini SSO; tetti degli stream per singolo processo |
 | Magazzino | b786402 | etichette senza login, importazioni e percorsi solo admin, foto enormi | ruolo di sola lettura |
 | Scadenzario | 199358a | export dell'anagrafica solo admin, estensioni degli allegati | — |
 | Confronto documenti | db361b1 | proprietario dei confronti, coda per utente, avvio in rete senza login | — |
@@ -54,6 +54,10 @@ Documenti collegati: `skytower/docs/adr.md` (ADR-47), `shared/suite/CONTRATTI.md
 - **Un token per ogni app** invece di uno unico per tutta la suite. Più sicuro, ma tocca tutte le app.
 
 ## Azioni manuali
+
+- **App Node avviate prima del 04/11** (Lettore DDT, Verifica requisiti, Analista Dati, OCR Documenti, Auguri):
+  finché non ripartono non registrano presenze e azioni nella plancia, perché il portale ora chiede il token
+  della suite. Basta riavviarle dal portale.
 
 - **Auguri** sulla porta 3000 gira dalla copia in `Documents\suite cosedil\whatss'app_web_Compleanni`, non dal
   repository: le correzioni lì non sono attive finché non la si sostituisce.
