@@ -3,6 +3,8 @@
 // documento (es. RdA → gara → affidamento), con documenti del progetto allegati. Elenco con stato, esito, data
 // e chi l'ha avviato, filtri per stato; "Nuovo processo" sceglie un modello di tipo Processi, titolo,
 // descrizione e documenti. Un processo si apre nella vista finale (/istanze/:id).
+// I modelli della libreria dell'organizzazione proprietaria (ADR-50) compaiono nello stesso elenco col bollino
+// "Libreria": l'API li restituisce già con scope LIBRARY e li avvia in questa commessa.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +14,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { api, ApiError, Project } from "../../api";
-import { Modello } from "../../components/workflow/modello";
+import { Modello, diLibreria } from "../../components/workflow/modello";
 
 interface Processo {
   id: string;
@@ -108,7 +110,10 @@ function NuovoProcessoDialog({ project, onClose }: { project: Project; onClose: 
     queryKey: ["workflow-templates", project.id],
     queryFn: () => api<Modello[]>(`/projects/${project.id}/workflow-templates`),
   });
-  const perProcessi = modelli.filter((m) => m.is_active && m.subject === "PROCESS");
+  // prima i modelli della commessa, poi quelli della libreria dell'organizzazione
+  const perProcessi = modelli.filter((m) => m.is_active && m.subject === "PROCESS")
+    .sort((a, b) => Number(diLibreria(a)) - Number(diLibreria(b)) || a.name.localeCompare(b.name));
+  const scelto = perProcessi.find((m) => m.id === templateId);
   // documenti del progetto da allegare: ricerca per identificativo o titolo, fra quelli che l'utente vede
   const { data: trovati = [] } = useQuery({
     queryKey: ["documenti-da-allegare", project.id, cerca],
@@ -128,10 +133,18 @@ function NuovoProcessoDialog({ project, onClose }: { project: Project; onClose: 
         <Stack spacing={2} mt={1}>
           {avvia.error && <Alert severity="error">{(avvia.error as ApiError).message}</Alert>}
           {perProcessi.length === 0
-            ? <Alert severity="info">Nessun modello di tipo Processi: lo disegna il Project Admin nella scheda Workflow.</Alert>
+            ? <Alert severity="info">Nessun modello di tipo Processi: lo disegna il Project Admin nella scheda Workflow, oppure l'amministratore dell'organizzazione nella libreria.</Alert>
             : (
-              <TextField select label="Modello" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                {perProcessi.map((m) => <MenuItem key={m.id} value={m.id}>{m.name} (v{m.version})</MenuItem>)}
+              <TextField select label="Modello" value={templateId} onChange={(e) => setTemplateId(e.target.value)}
+                         helperText={scelto && diLibreria(scelto)
+                           ? `Dalla libreria di ${scelto.organization_name ?? "organizzazione"}: vale in tutte le sue commesse, sempre nell'ultima versione`
+                           : " "}>
+                {perProcessi.map((m) => (
+                  <MenuItem key={m.id} value={m.id}>
+                    {m.name} (v{m.version})
+                    {diLibreria(m) && <Chip size="small" color="primary" label="Libreria" sx={{ ml: 1, height: 20 }} />}
+                  </MenuItem>
+                ))}
               </TextField>
             )}
           <TextField label="Titolo" value={title} onChange={(e) => setTitle(e.target.value)} inputProps={{ maxLength: 200 }}

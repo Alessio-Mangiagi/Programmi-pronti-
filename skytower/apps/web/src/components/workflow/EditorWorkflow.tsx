@@ -4,7 +4,10 @@
 // selezionato. La validazione vera è dell'API (POST .../workflow-templates/validate), chiamata mentre si
 // disegna; gli errori si vedono sul nodo/arco e in elenco. Salvare crea una nuova versione del modello.
 // Un modello esistente si apre in sola lettura; "Nuova versione" lo rende modificabile come copia.
-import { KeyboardEvent, useEffect, useMemo, useState } from "react";
+// Lo stesso editor serve la libreria dell'organizzazione (ADR-50, prop `libreria`): valida e salva sulle rotte della
+// libreria e gli assegnatari si scelgono solo per ruolo (le persone cambiano da commessa a commessa). Un modello di
+// libreria aperto da una commessa è solo da consultare (`solaLettura`), con le azioni passate in `azioni`.
+import { KeyboardEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert, AppBar, Autocomplete, Box, Button, Chip, Dialog, Divider, IconButton, List, ListItemButton, ListItemText,
@@ -34,15 +37,28 @@ const SUITABILITY: Record<"SHARED" | "PUBLISHED", string[]> = {
 };
 const TIPI: TipoNodo[] = ["start", "decision", "activity", "notification", "end"];
 
-export function EditorWorkflow({ project, base, nuovo, onClose }: {
-  project: Project;
+/** Ruolo da scegliere fra gli assegnatari: quelli della commessa o, per la libreria, quelli dell'organizzazione. */
+type RuoloScelta = Pick<Role, "id" | "code" | "name">;
+
+export function EditorWorkflow({ project, libreria, base, nuovo, solaLettura, azioni, onClose }: {
+  /** Commessa del modello (editor della scheda Workflow). */
+  project?: Project;
+  /** Editor della libreria dell'organizzazione (ADR-50): salva lì e gli assegnatari sono solo ruoli. */
+  libreria?: { orgId: string };
   /** Modello da aprire (sola lettura finché non si sceglie "Nuova versione"); null = nuovo workflow. */
   base: Modello | null;
   /** Apre direttamente in modifica (nuova versione del modello `base`). */
   nuovo?: boolean;
+  /** Solo consultazione, senza "Nuova versione" (es. modello di libreria aperto da una commessa). */
+  solaLettura?: boolean;
+  /** Pulsanti in più nella barra in sola lettura (es. "Copia nella commessa"). */
+  azioni?: ReactNode;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  // rotte di validazione e salvataggio: libreria dell'organizzazione o modelli della commessa
+  const radice = libreria ? `/organizations/${libreria.orgId}/workflow-library` : `/projects/${project?.id}/workflow-templates`;
+  const soloRuoli = !!libreria || base?.scope === "LIBRARY";
   const [modifica, setModifica] = useState(!base || !!nuovo);
   const [code, setCode] = useState(base?.code ?? "");
   const [name, setName] = useState(base?.name ?? "");
@@ -63,8 +79,15 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
     setAdattato(true);
   }, [foglio, adattato]);
 
-  const { data: roles = [] } = useQuery({ queryKey: ["roles", project.id], queryFn: () => api<Role[]>(`/projects/${project.id}/roles`) });
-  const { data: members = [] } = useQuery({ queryKey: ["members", project.id], queryFn: () => api<Member[]>(`/projects/${project.id}/members`) });
+  const { data: roles = [] } = useQuery({
+    queryKey: libreria ? ["workflow-library-roles", libreria.orgId] : ["roles", project?.id],
+    queryFn: () => api<RuoloScelta[]>(libreria ? `${radice}/roles` : `/projects/${project?.id}/roles`),
+  });
+  // persone solo per i modelli della commessa: in libreria non si indicano
+  const { data: members = [] } = useQuery({
+    queryKey: ["members", project?.id], enabled: !!project && !libreria,
+    queryFn: () => api<Member[]>(`/projects/${project?.id}/members`),
+  });
   const persone = useMemo(() => [...new Map(members.map((m) => [m.user_id, m])).values()], [members]);
 
   // Validazione dell'API mentre si disegna (attesa di 700 ms dopo l'ultima modifica). Se la rotta non c'è
@@ -72,12 +95,12 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
   useEffect(() => {
     if (!modifica) return;
     const t = setTimeout(() => {
-      api<{ ok: boolean; errors: ErroreGrafo[] }>(`/projects/${project.id}/workflow-templates/validate`, {
-        method: "POST", json: { code: code || "BOZZA", name: name || "Bozza", subject, definition: pulisci(def, subject) },
+      api<{ ok: boolean; errors: ErroreGrafo[] }>(`${radice}/validate`, {
+        method: "POST", json: { code: code || "BOZZA", name: name || "Bozza", subject, definition: pulisci(def, subject, soloRuoli) },
       }).then((r) => setErroriApi(r.errors ?? [])).catch((e: ApiError) => setErroriApi(e.status === 404 ? null : [{ message: e.message }]));
     }, 700);
     return () => clearTimeout(t);
-  }, [def, code, name, subject, modifica, project.id]);
+  }, [def, code, name, subject, modifica, radice]);
 
   const errori = useMemo(() => (erroriApi ? erroriLeggibili(def, erroriApi) : controlliRapidi(def)), [erroriApi, def]);
   const conErrori = useMemo(() => ({
@@ -86,10 +109,13 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
   }), [errori, def]);
 
   const salva = useMutation({
-    mutationFn: () => api<Modello>(`/projects/${project.id}/workflow-templates`, {
-      method: "POST", json: { code, name, subject, definition: pulisci(def, subject) },
+    mutationFn: () => api<Modello>(radice, {
+      method: "POST", json: { code, name, subject, definition: pulisci(def, subject, soloRuoli) },
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["workflow-templates", project.id] }); onClose(); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: libreria ? ["workflow-library", libreria.orgId] : ["workflow-templates", project?.id] });
+      onClose();
+    },
   });
 
   // ---------------------------------------------------------------- operazioni sul grafo
@@ -167,7 +193,8 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
         <Toolbar sx={{ gap: 1.5, flexWrap: "wrap", py: 1 }}>
           <IconButton edge="start" onClick={onClose} aria-label="Chiudi l'editor"><CloseIcon /></IconButton>
           <Typography id="titolo-editor-workflow" variant="h6" component="h2" fontWeight={600} sx={{ mr: 1 }}>
-            {!base ? "Nuovo workflow" : modifica ? `Nuova versione di ${base.code}` : `${base.name} · v${base.version}`}
+            {!base ? (libreria ? "Nuovo workflow di libreria" : "Nuovo workflow")
+              : modifica ? `Nuova versione di ${base.code}` : `${base.name} · v${base.version}`}
           </Typography>
           {modifica ? (
             <>
@@ -183,6 +210,7 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
             <Stack direction="row" spacing={1} flexGrow={1}>
               <Chip size="small" variant="outlined" label={`${base?.code} · v${base?.version}`} sx={{ fontFamily: "monospace" }} />
               <Chip size="small" label={subject === "PROCESS" ? "Processi" : "Documenti"} />
+              {soloRuoli && <Chip size="small" color="primary" label="Libreria" />}
             </Stack>
           )}
           <Stack direction="row">
@@ -194,6 +222,8 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
             <Button variant="contained" disabled={!valido || salva.isPending} onClick={() => salva.mutate()}>
               {base ? `Salva come v${base.version + 1}` : "Salva"}
             </Button>
+          ) : solaLettura ? (
+            azioni ?? null
           ) : (
             <Button variant="contained" onClick={() => setModifica(true)}>Nuova versione</Button>
           )}
@@ -231,13 +261,13 @@ export function EditorWorkflow({ project, base, nuovo, onClose }: {
         <Box component="aside" aria-label="Proprietà" sx={{ width: 340, flexShrink: 0, borderLeft: 1, borderColor: "divider", p: 2, overflowY: "auto" }}>
           {salva.error && <Alert severity="error" sx={{ mb: 2 }}>{(salva.error as ApiError).message}</Alert>}
           {selNodo ? (
-            <PannelloNodo key={selNodo.id} n={selNodo} def={def} modifica={modifica} roles={roles} persone={persone}
+            <PannelloNodo key={selNodo.id} n={selNodo} def={def} modifica={modifica} roles={roles} persone={persone} soloRuoli={soloRuoli}
                           aggiorna={(patch) => aggiornaNodo(selNodo.id, patch)}
                           setDef={setDef} elimina={() => eliminaNodo(selNodo.id)} collega={collega} />
           ) : selArco && sel?.tipo === "arco" ? (
             <PannelloArco a={selArco} indice={sel.indice} def={def} modifica={modifica} setDef={setDef} elimina={() => eliminaArco(sel.indice)} />
           ) : (
-            <PannelloModello def={def} setDef={setDef} subject={subject} modifica={modifica} persone={persone} />
+            <PannelloModello def={def} setDef={setDef} subject={subject} modifica={modifica} persone={persone} soloRuoli={soloRuoli} />
           )}
           {modifica && (
             <>
@@ -272,8 +302,9 @@ function indiceArco(def: Definizione, edge: ErroreGrafo["edge"]): number | null 
   return i < 0 ? null : i;
 }
 
-/** Definizione da mandare all'API: niente campi che non c'entrano col tipo, `on_completed` solo per i documenti. */
-function pulisci(def: Definizione, subject: Oggetto): Definizione {
+/** Definizione da mandare all'API: niente campi che non c'entrano col tipo, `on_completed` solo per i documenti;
+ *  per la libreria (`soloRuoli`) niente escalation verso una persona. */
+function pulisci(def: Definizione, subject: Oggetto, soloRuoli = false): Definizione {
   const nodes = def.nodes.map((n) => {
     const base: Nodo = { id: n.id, type: n.type, name: n.name.trim(), cell: n.cell };
     if (n.join && def.edges.filter((a) => a.to === n.id).length > 1) base.join = n.join;
@@ -286,13 +317,14 @@ function pulisci(def: Definizione, subject: Oggetto): Definizione {
   return {
     version: 2, nodes, edges: def.edges,
     on_completed: subject === "DOCUMENT" ? def.on_completed ?? null : null,
-    escalation_user_id: def.escalation_user_id ?? null,
+    escalation_user_id: soloRuoli ? null : def.escalation_user_id ?? null,
   };
 }
 
 // ---------------------------------------------------------------- pannelli delle proprietà
-function PannelloModello({ def, setDef, subject, modifica, persone }: {
+function PannelloModello({ def, setDef, subject, modifica, persone, soloRuoli }: {
   def: Definizione; setDef: (f: (d: Definizione) => Definizione) => void; subject: Oggetto; modifica: boolean; persone: Member[];
+  soloRuoli: boolean;
 }) {
   const oc = def.on_completed ?? null;
   return (
@@ -321,11 +353,18 @@ function PannelloModello({ def, setDef, subject, modifica, persone }: {
           )}
         </Stack>
       )}
-      <Autocomplete size="small" options={persone} disabled={!modifica}
-                    value={persone.find((p) => p.user_id === def.escalation_user_id) ?? null}
-                    getOptionLabel={(m) => `${m.first_name} ${m.last_name} (${m.organization_code})`}
-                    onChange={(_, m) => setDef((d) => ({ ...d, escalation_user_id: m?.user_id ?? null }))}
-                    renderInput={(p) => <TextField {...p} label="Escalation se un compito scade (facoltativo)" />} />
+      {soloRuoli ? (
+        <Alert severity="info" variant="outlined">
+          Modello della libreria dell'organizzazione: vale in tutte le sue commesse, quindi assegnatari e destinatari
+          si scelgono per ruolo. Se un compito scade sono avvisati i Project Admin della commessa.
+        </Alert>
+      ) : (
+        <Autocomplete size="small" options={persone} disabled={!modifica}
+                      value={persone.find((p) => p.user_id === def.escalation_user_id) ?? null}
+                      getOptionLabel={(m) => `${m.first_name} ${m.last_name} (${m.organization_code})`}
+                      onChange={(_, m) => setDef((d) => ({ ...d, escalation_user_id: m?.user_id ?? null }))}
+                      renderInput={(p) => <TextField {...p} label="Escalation se un compito scade (facoltativo)" />} />
+      )}
       <Typography variant="caption" color="text.secondary">
         {def.nodes.length} nodi, {def.edges.length} archi.
       </Typography>
@@ -353,8 +392,8 @@ function PannelloArco({ a, indice, def, modifica, setDef, elimina }: {
   );
 }
 
-function PannelloNodo({ n, def, modifica, roles, persone, aggiorna, setDef, elimina, collega }: {
-  n: Nodo; def: Definizione; modifica: boolean; roles: Role[]; persone: Member[];
+function PannelloNodo({ n, def, modifica, roles, persone, soloRuoli, aggiorna, setDef, elimina, collega }: {
+  n: Nodo; def: Definizione; modifica: boolean; roles: RuoloScelta[]; persone: Member[]; soloRuoli: boolean;
   aggiorna: (patch: Partial<Nodo>) => void; setDef: (f: (d: Definizione) => Definizione) => void; elimina: () => void;
   collega: (from: string, outcome: string | undefined, to: string) => void;
 }) {
@@ -416,7 +455,7 @@ function PannelloNodo({ n, def, modifica, roles, persone, aggiorna, setDef, elim
 
       {(n.type === "decision" || n.type === "activity") && (
         <>
-          <Assegnatari titolo="Assegnatari" valore={n.assignees ?? []} modifica={modifica} roles={roles} persone={persone}
+          <Assegnatari titolo="Assegnatari" valore={n.assignees ?? []} modifica={modifica} roles={roles} persone={persone} soloRuoli={soloRuoli}
                        onChange={(assignees) => aggiorna({ assignees })} />
           <Stack direction="row" spacing={1}>
             <TextField select size="small" label="Decidono" sx={{ minWidth: 140 }} disabled={!modifica}
@@ -469,7 +508,7 @@ function PannelloNodo({ n, def, modifica, roles, persone, aggiorna, setDef, elim
 
       {n.type === "notification" && (
         <>
-          <Assegnatari titolo="Destinatari" valore={n.recipients ?? []} modifica={modifica} roles={roles} persone={persone}
+          <Assegnatari titolo="Destinatari" valore={n.recipients ?? []} modifica={modifica} roles={roles} persone={persone} soloRuoli={soloRuoli}
                        onChange={(recipients) => aggiorna({ recipients })} />
           <TextField size="small" label="Messaggio" multiline minRows={2} disabled={!modifica} value={n.message ?? ""}
                      onChange={(e) => aggiorna({ message: e.target.value })}
@@ -502,11 +541,14 @@ function PannelloNodo({ n, def, modifica, roles, persone, aggiorna, setDef, elim
   );
 }
 
-/** Selettore degli assegnatari (o dei destinatari di una notifica): stesso modello della versione 1. */
-function Assegnatari({ titolo, valore, modifica, roles, persone, onChange }: {
-  titolo: string; valore: Assegnatario[]; modifica: boolean; roles: Role[]; persone: Member[]; onChange: (v: Assegnatario[]) => void;
+/** Selettore degli assegnatari (o dei destinatari di una notifica): stesso modello della versione 1.
+ *  In libreria (`soloRuoli`) la persona non si può scegliere: solo ruolo nella commessa o nell'organizzazione autrice. */
+function Assegnatari({ titolo, valore, modifica, roles, persone, soloRuoli, onChange }: {
+  titolo: string; valore: Assegnatario[]; modifica: boolean; roles: RuoloScelta[]; persone: Member[]; soloRuoli: boolean;
+  onChange: (v: Assegnatario[]) => void;
 }) {
   const cambia = (k: number, a: Assegnatario) => onChange(valore.map((x, j) => (j === k ? a : x)));
+  const tipi = (Object.keys(NOME_ASSEGNATARIO) as TipoAssegnatario[]).filter((t) => !soloRuoli || t !== "user");
   return (
     <Stack spacing={1}>
       <Typography variant="caption" color="text.secondary">{titolo}</Typography>
@@ -515,7 +557,7 @@ function Assegnatari({ titolo, valore, modifica, roles, persone, onChange }: {
           <Stack direction="row" spacing={0.5} alignItems="center">
             <TextField select size="small" label="Tipo" value={a.type} disabled={!modifica} fullWidth
                        onChange={(e) => cambia(k, { type: e.target.value as TipoAssegnatario })}>
-              {(Object.keys(NOME_ASSEGNATARIO) as TipoAssegnatario[]).map((t) => <MenuItem key={t} value={t}>{NOME_ASSEGNATARIO[t]}</MenuItem>)}
+              {tipi.map((t) => <MenuItem key={t} value={t}>{NOME_ASSEGNATARIO[t]}</MenuItem>)}
             </TextField>
             {modifica && (
               <IconButton size="small" aria-label={`Togli ${titolo.toLowerCase()} ${k + 1}`} disabled={valore.length === 1}

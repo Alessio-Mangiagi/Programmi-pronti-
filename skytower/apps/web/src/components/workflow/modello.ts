@@ -46,6 +46,19 @@ export interface Modello {
   id: string; code: string; version: number; name: string; is_active: boolean; created_at: string;
   subject?: Oggetto;
   definition: Definizione;
+  /** ADR-50: modello della commessa (PROJECT) o della libreria dell'organizzazione proprietaria (LIBRARY). */
+  scope?: "PROJECT" | "LIBRARY";
+  project_id?: string | null;
+  organization_id?: string | null;
+  /** Nome dell'organizzazione della libreria (solo per i modelli LIBRARY nell'elenco della commessa). */
+  organization_name?: string | null;
+  /** Da quale modello è stato copiato (pubblicazione in libreria o copia nella commessa). */
+  source_template_id?: string | null;
+}
+
+/** True se il modello viene dalla libreria dell'organizzazione (si avvia in ogni sua commessa, ADR-50). */
+export function diLibreria(m: Pick<Modello, "scope">): boolean {
+  return m.scope === "LIBRARY";
 }
 
 /** Errore di validazione dell'API: riferito a un nodo, a un arco (indice o terna) o a tutto il modello. */

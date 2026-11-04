@@ -2,7 +2,7 @@
 // La mia organizzazione (org admin): dati, policy MFA, utenti — inviti, reinvio, disattivazione, ruolo di admin.
 // Il platform admin sceglie l'organizzazione da gestire e ne crea di nuove. Single sign-on OpenID Connect (SsoPanel).
 import { FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack,
@@ -42,6 +42,10 @@ export function OrganizationPage() {
     <Stack spacing={2} maxWidth={1000}>
       <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
         <Typography variant="h4" fontWeight={600} flexGrow={1}>Organizzazione</Typography>
+        {/* libreria dei workflow validi in tutte le commesse dell'organizzazione (ADR-50) */}
+        <Button component={RouterLink} to={orgId && me.is_platform_admin ? `/organizzazione/workflow?org=${orgId}` : "/organizzazione/workflow"}>
+          Libreria workflow
+        </Button>
         {me.is_platform_admin && (
           <>
             <TextField select size="small" label="Organizzazione da gestire" value={orgId} sx={{ minWidth: 280 }}

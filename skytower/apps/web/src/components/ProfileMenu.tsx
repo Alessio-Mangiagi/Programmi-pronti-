@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import LockIcon from "@mui/icons-material/Lock";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PersonIcon from "@mui/icons-material/Person";
@@ -63,6 +64,10 @@ export function ProfileMenu() {
             {me.is_platform_admin ? "Organizzazioni e utenti" : "La mia organizzazione e gli utenti"}
           </MenuItem>
         )}
+        {/* libreria dei workflow dell'organizzazione (ADR-50): la gestisce l'admin, gli altri la consultano */}
+        <MenuItem component={RouterLink} to="/organizzazione/workflow" onClick={() => setAnchor(null)}>
+          <ListItemIcon><LibraryBooksIcon fontSize="small" /></ListItemIcon>Libreria workflow
+        </MenuItem>
         <Divider />
         <MenuItem sx={{ color: "error.main" }} onClick={async () => { setAnchor(null); await logout(); navigate("/login"); }}>
           <ListItemIcon><LogoutIcon fontSize="small" color="error" /></ListItemIcon>Esci
