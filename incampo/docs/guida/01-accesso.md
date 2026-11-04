@@ -1,0 +1,77 @@
+<!-- "><(((º> sabusabu <º)))>< -->
+# 1. Entrare in InCampo
+
+[Indice](README.md) · Capitolo successivo: [Commesse e cantieri](02-commesse-e-cantieri.md)
+
+## Dal Portale (il modo normale)
+
+In azienda InCampo si apre dal **Portale** della suite Cosedil: si entra nel Portale
+con il proprio utente e si clicca sul riquadro **InCampo**. Come si entra nel Portale,
+e cosa fare se la password non va, è spiegato nella
+[guida del Portale](../../../portale/docs/guida/README.md).
+
+Se apri un indirizzo di InCampo senza essere entrato nel Portale, vieni riportato
+alla pagina di login del Portale: prima il Portale, poi InCampo.
+
+Quando arrivi dal Portale succede una di queste due cose:
+
+1. **Entri subito, senza altra password.** InCampo chiede al Portale chi sei e cerca
+   l'account InCampo con **la stessa email** del tuo utente del Portale. L'email deve
+   essere identica: se in InCampo sei registrato con un'altra email, non ti riconosce.
+   - Se l'account InCampo non c'è ancora, viene creato in quel momento con il tuo nome:
+     chi è amministratore del Portale entra come **Amministratore**, tutti gli altri
+     come **Ufficio**. L'amministratore di InCampo può poi cambiare il ruolo.
+   - Un account creato così **non ha una password che conosci**: per usare l'app sul
+     telefono chiedi all'amministratore di impostartene una (capitolo 10, pulsante *Password*).
+2. **Vedi la pagina di login di InCampo.** Succede se il Portale non risponde, se
+   InCampo non è abilitato per il tuo utente del Portale o se il tuo account InCampo
+   è stato disattivato. In questo caso entri con email e password di InCampo, come
+   spiegato qui sotto.
+
+## La pagina di login
+
+![Pagina di login di InCampo](img/01-login.png)
+
+1. In **Email o utente** scrivi la tua email (es. `salvatore.grasso@...`).
+2. In **Password** scrivi la password di InCampo.
+3. Clicca **Accedi**. Mentre controlla, il pulsante diventa *Accesso…*.
+
+Se email o password sono sbagliate compare in rosso **Email o password errati**:
+
+![Errore di login](img/01-login-errore.png)
+
+Controlla le maiuscole e riprova. Se non ricordi la password, chiedila
+all'amministratore di InCampo: non c'è un pulsante "password dimenticata" e
+non c'è una pagina per cambiarsi la password da soli.
+
+## Primo accesso con un invito
+
+Spesso il primo accesso arriva con un **link d'invito** (per email o mandato da un
+collega). Il link si apre anche senza essere entrati nel Portale.
+
+![Pagina dell'invito](img/01-invito-accetta.png)
+
+- In alto vedi la tua email, l'etichetta dell'invito (es. *Operaio di cantiere*), il
+  **ruolo** e quanti **cantieri** ti vengono assegnati.
+- Scrivi **Il tuo nome**, scegli una password (**almeno 8 caratteri**) e ripetila.
+- Clicca **Entra in InCampo**: sei già dentro, con i cantieri giusti.
+
+Il link vale **una volta sola** e **scade dopo 7 giorni**. Se compare *Invito non
+valido*, il link è già stato usato, è scaduto o è stato revocato: chiedi a chi ti ha
+invitato di rimandarlo.
+
+## La schermata principale
+
+![Schermata principale con il menu a sinistra](img/01-schermata-iniziale.png)
+
+- **A sinistra** c'è il menu. Sempre presenti: **Progetti** (l'elenco di commesse e
+  cantieri) e **+ Compila modulo**. Chi è *Ufficio* vede anche **Moduli** e **Inviti**;
+  l'*Amministratore* vede in più la sezione **Amministrazione**.
+- Quando apri un cantiere, sotto il suo nome compaiono le sue pagine: **Dashboard**,
+  **Planimetrie**, **WBS**, **Moduli compilati**, **PCQ** (solo Ufficio), **Task**, **I miei task**.
+- **In basso a sinistra** ci sono il tuo nome, il ruolo (*Cantiere*, *Ufficio*,
+  *Amministratore*), il pulsante **Contatta l'amministratore** (per segnalare un problema,
+  vedi capitolo 12) ed **Esci**.
+- **In alto** c'è la barra **Commessa / Cantiere**, spiegata nel capitolo successivo.
+
+Per uscire clicca **Esci** in basso a sinistra.
