@@ -615,6 +615,8 @@ per cartelle, filigrana, ruoli, workflow. Richiesta dell'utente: usare i progett
 - Mai copiati: documenti e revisioni, contatori e prenotazioni del naming, grant espliciti, RFI, transmittal,
   registro. Gli assegnatari "utente" dei workflow restano: se quella persona non è nel progetto nuovo, il
   workflow va rivisto.
+- Vedi ADR-52: i **modelli di commessa** dell'organizzazione (struttura separata dalla commessa, con
+  persone e documenti di modello, scaricabile in un file) sono la via consigliata per le commesse nuove.
 
 ## ADR-39 — Import dei workflow da un altro progetto
 
@@ -945,3 +947,59 @@ commessa) vede anche il modello, tramite `my_library_orgs`. La pagina è "Librer
 dal menu del profilo e dalla pagina Organizzazione); nella scheda Workflow della commessa la sezione "Dalla libreria
 dell'organizzazione". Contratto in `docs/workflow-grafo.md` §5; test `tests/test_workflow_libreria.py`,
 `e2e/workflow-libreria.spec.ts`; scenario U52.
+
+## ADR-52 — Modelli di commessa dell'organizzazione, scaricabili in un file
+
+**Contesto.** Il 04/11/2026 l'utente chiede di "rendere i progetti trasformabili in template per poterci copiare e
+avere la struttura pronta per una nuova commessa della stessa azienda". Fino ad allora c'era solo "Parti da" una
+commessa di cui si è Project Admin (ADR-38): la commessa di partenza continua a vivere e a cambiare, e non porta con
+sé né persone del modello né documenti tipo.
+
+**Decisione.** Scelte dell'utente:
+- **"Salva come modello" crea un modello di commessa separato** (la commessa resta com'è), elencato nella pagina
+  "Modelli di commessa" (`/organizzazione/modelli`). Il modello è un progetto con `projects.is_model` (migrazione
+  0043): si apre e si ritocca con le stesse pagine di una commessa (cartelle, naming, metadati, ruoli, filigrana,
+  workflow, organizzazioni, persone, documenti di modello), con una barra "Modello di commessa" e senza le schede
+  operative. Non entra negli elenchi (`/me/projects`, `/projects`, `/projects/templates`, rotte della suite) e il
+  database rifiuta workflow avviati, RFI e transmittal (trigger `forbid_in_model`, 422 col motivo) e non scrive
+  notifiche. Non ha mai un codice commessa della suite (CHECK); il codice ISO è un segnaposto e può coincidere con
+  quello di una commessa (l'unicità per organizzazione vale solo fra le commesse, indice parziale).
+- **Li usano, li creano e li modificano gli amministratori dell'organizzazione proprietaria**: aprendo l'elenco
+  (`cde.model_join`) diventano Project Admin dei modelli attivi, e chi non è più admin ne esce. Altre organizzazioni:
+  404 (RLS di progetto). Nel dialog "Nuovo progetto" → "Parti da" prima i modelli dell'organizzazione, poi i progetti
+  di cui si è Project Admin.
+- **Contenuto**: tutto ciò che copia `create_project_from_template` (funzione comune `cde.copy_project_structure`)
+  più le **organizzazioni partecipanti** e le **persone con i ruoli**, che nel modello stanno in
+  `project_model_people` e *non* sono membri (non vedono il modello: un consulente di un'altra organizzazione non
+  deve vederlo); all'uso restano opzionali come in ADR-38. Più i **documenti di modello**: un Project Admin li marca
+  (`model_documents`, interruttore "Documento di modello" nel pannello del documento); si copiano come prima revisione
+  WIP (P01.01) nella cartella corrispondente, con naming rigenerato col codice nuovo e un file nuovo su S3
+  (`cde.model_insert_document`, solo nel progetto appena creato da chi chiama). I workflow della libreria non si
+  copiano: sono già vivi in ogni commessa (ADR-50).
+- **File "per sicurezza"**: "Scarica il modello" (da un modello o da una commessa, `GET /projects/{id}/model-file`)
+  produce un `.cdemodello`: ZIP con `modello.json` (formato `cdemodello`, versione 1: progetto, impostazioni,
+  schemi per cartelle, cartelle, ruoli, organizzazioni, persone per email, workflow, documenti, persone e
+  organizzazioni citate nei workflow, e in appendice i workflow della libreria dell'organizzazione), `files/…`,
+  `LEGGIMI.txt` e `manifest.json` con lo SHA-256 di ogni file. "Carica un modello da file"
+  (`POST /organizations/{id}/project-models/import`, solo admin) controlla zip, percorsi, tetti (200 MB,
+  `CDE_MODEL_FILE_MAX_BYTES`; 600 voci; JSON 8 MB e profondità 64; compressione oltre 200:1), impronte, versione e
+  ogni campo (modelli pydantic con tetti, gli stessi controlli di naming, metadati e filigrana delle pagine), poi
+  ricrea il modello rimappando gli id: organizzazioni per codice, persone per email solo se della propria
+  organizzazione o di un'organizzazione del modello, ruoli per codice, workflow riportati e ri-validati col
+  validatore del grafo (persona assente tolta; nodo rimasto vuoto al ruolo Project Admin), workflow di libreria
+  mancanti aggiunti. Restituisce l'elenco degli adattamenti.
+- Il **codice commessa della suite** della commessa nuova si sceglie dopo, dal registro, come per ogni commessa
+  (ADR-47).
+
+**Alternative scartate.** Modello come JSON in una tabella a parte: niente pagine per ritoccarlo, si sarebbe dovuto
+rifare ogni editor. Persone del modello come membri veri: vedrebbero il modello (e le altre organizzazioni con
+loro). `has_project_permission` esteso agli admin dell'organizzazione sui modelli: tocca la funzione più usata dalla
+RLS; l'ingresso esplicito (`model_join`) ha lo stesso effetto senza costi sulle altre query. Firma HMAC del file:
+non si potrebbe ricaricare in un'altra installazione; lo SHA-256 nel manifest basta ad accorgersi di un file rovinato
+e l'import ricontrolla comunque tutto. `CopyObject` per i file: con l'Object Lock alcuni S3 compatibili vogliono
+intestazioni che la copia non manda; si rilegge e si ricarica in streaming.
+
+**Conseguenze.** Un modello archiviato sparisce da elenco e "Parti da"; le commesse già create non cambiano. I file
+dei documenti di modello sono copie: cancellarli o cambiarli nel modello non tocca le commesse. Un `.cdemodello`
+contiene nomi ed email delle persone: va conservato come un documento riservato. Rotte nel modulo
+`project_models.py`; test `tests/test_modelli_commessa.py`, `e2e/modelli-commessa.spec.ts`; scenario U55.
