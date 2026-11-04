@@ -12,7 +12,10 @@ Rotte:
   nodi con i compiti, archi percorsi, documenti allegati); ``/workflows/{id}`` resta con la forma di prima
   (``steps``) per le pagine che la usano;
 - processi: avvio ed elenco per progetto;
-- compiti: ``/me/tasks`` (con gli esiti del nodo per i pulsanti) e completamento con l'esito scelto.
+- compiti: ``/me/tasks`` (con gli esiti del nodo per i pulsanti) e completamento con l'esito scelto;
+- tornare indietro (ADR-51, contratto §6, migrazione 0042): da ogni decisione o attività si chiede un chiarimento o
+  si richiedono modifiche a un nodo già fatto del ramo o a chi ha avviato; risposta ai chiarimenti; allegati del
+  processo cambiati da chi ha ricevuto le modifiche (la revisione nuova di un documento si carica come sempre).
 """
 from __future__ import annotations
 
@@ -83,6 +86,21 @@ class CompleteIn(BaseModel):
 
 class CancelIn(BaseModel):
     reason: str = Field(min_length=3, max_length=2000)
+
+
+class SendBackIn(BaseModel):
+    """Chiarimento o richiesta di modifiche: dove (id di un nodo già fatto del ramo, o ``ORIGINATOR`` = chi ha avviato)
+    e il commento, obbligatorio."""
+    target: str = Field(pattern=r"^(ORIGINATOR|[a-z][a-z0-9_]{0,39})$")
+    comment: str = Field(min_length=1, max_length=4000)
+
+
+class AnswerIn(BaseModel):
+    comment: str = Field(min_length=1, max_length=4000)
+
+
+class DocumentsIn(BaseModel):
+    document_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
 
 
 TEMPLATE_COLS = "id, project_id, code, version, name, subject, definition, is_active, created_at"
@@ -309,15 +327,81 @@ def _runs_and_tasks(conn, instance_id: uuid.UUID) -> tuple[list[dict], list[dict
     # l'avvio e i primi nodi hanno lo stesso activated_at (stessa transazione): l'avvio sempre per primo,
     # altrimenti l'ordine fra i due dipendeva dall'id casuale
     runs = conn.execute(
-        """SELECT id, node_id, node_type, name, round, status, outcome, required, activated_at, due_at, completed_at
+        """SELECT id, node_id, node_type, name, round, status, outcome, required, activated_at, due_at, completed_at,
+                  send_back_id
            FROM cde.workflow_node_runs WHERE instance_id = %s
            ORDER BY activated_at, node_type <> 'start', id""", [instance_id]).fetchall()
+    # solo i compiti del workflow: quelli di chiarimento (0042) stanno nelle richieste (send_backs), non nei voti
     tasks = conn.execute(
         """SELECT k.id, k.node_run_id, k.assignee_id, k.status, k.outcome, k.comment, k.due_at, k.completed_at,
+                  k.cancel_reason, k.waiting_send_back_id IS NOT NULL AS waiting,
                   u.first_name || ' ' || u.last_name AS assignee_name
            FROM cde.tasks k LEFT JOIN cde.users u ON u.id = k.assignee_id
-           WHERE k.instance_id = %s ORDER BY k.created_at, u.last_name""", [instance_id]).fetchall()
+           WHERE k.instance_id = %s AND k.kind = 'WORKFLOW' ORDER BY k.created_at, u.last_name""", [instance_id]).fetchall()
     return runs, tasks
+
+
+SEND_BACK_SQL = """
+    SELECT b.id, b.instance_id, b.kind, b.from_node, fr.name AS from_name, fr.round AS from_round, b.from_task_id,
+           b.target_node, b.target_originator, coalesce(tr.name, b.target_node) AS target_name,
+           tr.round AS target_round, rr.round AS reopened_round, b.reopened_run_id, b.comment,
+           b.asked_by, ua.first_name || ' ' || ua.last_name AS asked_by_name, b.created_at,
+           b.answer, b.answered_by, ub.first_name || ' ' || ub.last_name AS answered_by_name, b.answered_at,
+           b.revision_from_id, b.revision_from_code, b.revision_to_id, b.revision_to_code,
+           b.documents_before, b.documents_after, b.documents_changed_at,
+           uo.first_name || ' ' || uo.last_name AS originator_name,
+           (SELECT coalesce(array_agg(us.first_name || ' ' || us.last_name ORDER BY us.last_name), '{}')
+              FROM cde.tasks x JOIN cde.users us ON us.id = x.assignee_id
+             WHERE x.send_back_id = b.id AND x.kind = 'CLARIFICATION') AS recipients,
+           EXISTS (SELECT 1 FROM cde.tasks x WHERE x.send_back_id = b.id AND x.kind = 'CLARIFICATION'
+                     AND x.status = 'OPEN') AS clarification_open,
+           -- modifiche: il flusso è tornato al nodo che le ha chieste (un suo giro attivato dopo la richiesta)
+           EXISTS (SELECT 1 FROM cde.workflow_node_runs a WHERE a.instance_id = b.instance_id AND a.node_id = b.from_node
+                     AND a.activated_at > b.created_at) AS returned,
+           EXISTS (SELECT 1 FROM cde.workflow_node_runs a WHERE a.send_back_id = b.id AND a.status = 'ACTIVE') AS reworking
+    FROM cde.workflow_send_backs b
+    JOIN cde.workflow_node_runs fr ON fr.id = b.from_run_id
+    JOIN cde.workflow_instances i ON i.id = b.instance_id
+    LEFT JOIN cde.workflow_node_runs tr ON tr.id = b.target_run_id
+    LEFT JOIN cde.workflow_node_runs rr ON rr.id = b.reopened_run_id
+    LEFT JOIN cde.users ua ON ua.id = b.asked_by
+    LEFT JOIN cde.users ub ON ub.id = b.answered_by
+    LEFT JOIN cde.users uo ON uo.id = i.started_by"""
+
+
+def _send_back_status(b: dict) -> str:
+    """Stato di una richiesta per le schermate: chiarimento aperto / con risposta / chiuso senza risposta (passo deciso
+    da altri, workflow finito); modifiche in corso / tornate al nodo che le ha chieste / chiuse (il flusso ha preso
+    un'altra strada, o il workflow è finito)."""
+    if b["kind"] == "CLARIFICATION":
+        return "ANSWERED" if b["answered_at"] else "OPEN" if b["clarification_open"] else "CLOSED"
+    return "RETURNED" if b["returned"] else "OPEN" if b["reworking"] else "CLOSED"
+
+
+def _send_backs(conn, instance_ids: list) -> list[dict]:
+    """Richieste di chiarimento e di modifiche delle istanze, nell'ordine in cui sono state fatte (contratto §6)."""
+    if not instance_ids:
+        return []
+    rows = conn.execute(SEND_BACK_SQL + " WHERE b.instance_id = ANY(%s) ORDER BY b.created_at, b.id",
+                        [list(instance_ids)]).fetchall()
+    out = []
+    for b in rows:
+        out.append({
+            "id": b["id"], "instance_id": b["instance_id"], "kind": b["kind"], "status": _send_back_status(b),
+            "from": {"node_id": b["from_node"], "name": b["from_name"], "round": b["from_round"], "task_id": b["from_task_id"]},
+            "target": {"node_id": b["target_node"], "originator": b["target_originator"],
+                       "name": f"Chi ha avviato ({b['originator_name']})" if b["target_originator"] else b["target_name"],
+                       "round": b["target_round"], "reopened_round": b["reopened_round"]},
+            "comment": b["comment"], "asked_by": {"id": b["asked_by"], "name": b["asked_by_name"]}, "created_at": b["created_at"],
+            "recipients": b["recipients"],
+            "answer": b["answer"], "answered_by": b["answered_by"] and {"id": b["answered_by"], "name": b["answered_by_name"]},
+            "answered_at": b["answered_at"],
+            "revision": b["revision_to_id"] and {"from_id": b["revision_from_id"], "from_code": b["revision_from_code"],
+                                                 "to_id": b["revision_to_id"], "to_code": b["revision_to_code"]},
+            "documents_changed_at": b["documents_changed_at"],
+            "documents_before": b["documents_before"], "documents_after": b["documents_after"],
+        })
+    return out
 
 
 def _instance(conn, instance_id: uuid.UUID) -> dict:
@@ -358,9 +442,12 @@ def _graph(conn, instance_id: uuid.UUID) -> dict:
         "id": r["id"], "node_id": r["node_id"], "node_type": r["node_type"], "name": r["name"], "round": r["round"],
         "status": r["status"], "outcome": r["outcome"], "required": r["required"],
         "activated_at": r["activated_at"], "completed_at": r["completed_at"], "due_at": r["due_at"],
+        # 0042: giro riaperto o rifatto per una richiesta di modifiche (vedi send_backs)
+        "send_back_id": r["send_back_id"],
         "tasks": [{"id": t["id"], "assignee": {"id": t["assignee_id"], "name": t["assignee_name"]},
                    "status": t["status"], "outcome": t["outcome"], "comment": t["comment"],
-                   "due_at": t["due_at"], "completed_at": t["completed_at"]}
+                   "due_at": t["due_at"], "completed_at": t["completed_at"],
+                   "cancel_reason": t["cancel_reason"], "waiting": t["waiting"]}
                   for t in tasks if t["node_run_id"] == r["id"]]} for r in runs]
     title = inst["process_title"] or " – ".join(x for x in (inst["identifier"], inst["title"]) if x)
     return {
@@ -374,6 +461,8 @@ def _graph(conn, instance_id: uuid.UUID) -> dict:
             "revision_id": inst["revision_id"], "revision_code": inst["revision_code"],
             "final_revision_id": inst["final_revision_id"]},
         "definition": inst["definition"], "node_runs": node_runs, "edges_taken": edges, "documents": docs,
+        # 0042: chiarimenti (con le risposte) e richieste di modifiche (con revisione nuova o allegati cambiati)
+        "send_backs": _send_backs(conn, [instance_id]),
     }
 
 
@@ -510,7 +599,13 @@ def my_tasks(status: Literal["OPEN", "DONE", "ALL"] = "OPEN", limit: int = Query
                       -- escalation (migrazione 0036): quando e quante volte i responsabili sono stati avvisati
                       k.escalated_at, k.escalation_count,
                       CASE WHEN k.due_at IS NOT NULL AND k.due_at < now() AND k.status = 'OPEN'
-                           THEN floor(extract(epoch FROM now() - k.due_at) / 86400)::int END AS days_late
+                           THEN floor(extract(epoch FROM now() - k.due_at) / 86400)::int END AS days_late,
+                      -- tornare indietro (0042): tipo di compito, attesa di chiarimento, giro riaperto per modifiche
+                      k.kind, k.send_back_id, k.waiting_send_back_id, k.cancel_reason,
+                      s.send_back_id AS run_send_back_id, d.container_id,
+                      (SELECT jsonb_build_object('id', lr.id, 'revision_code', lr.revision_code, 'state', lr.state)
+                         FROM cde.document_revisions lr WHERE lr.document_id = i.document_id
+                          AND lr.sequence > r.sequence ORDER BY lr.sequence DESC LIMIT 1) AS new_revision
                FROM cde.tasks k
                JOIN cde.workflow_node_runs s ON s.id = k.node_run_id
                JOIN cde.workflow_instances i ON i.id = k.instance_id
@@ -521,9 +616,28 @@ def my_tasks(status: Literal["OPEN", "DONE", "ALL"] = "OPEN", limit: int = Query
                WHERE k.assignee_id = cde.current_app_user()"""
             + ("" if status == "ALL" else " AND k.status = %(s)s")
             + " ORDER BY k.due_at NULLS LAST, k.created_at LIMIT %(l)s", {"s": status, "l": limit}).fetchall()
+        richieste = {b["id"]: b for b in _send_backs(conn, {r["instance_id"] for r in rows})}
         for r in rows:
             # esiti del nodo per i pulsanti del compito (etichetta e colore scelti da chi ha disegnato il workflow)
-            r["outcomes"] = wg.outcomes_of(wg.node_of(r.pop("definition"), r["node_id"]))
+            definition = r.pop("definition")
+            if r["kind"] == "CLARIFICATION":
+                r["outcomes"] = []                       # un chiarimento si chiude rispondendo con un commento
+            elif r["node_type"] == "start":
+                # nodo di avvio riaperto per "chi ha avviato": un solo esito (stesso codice del motore)
+                r["outcomes"] = [{"code": "FATTO", "label": "Modifiche fatte", "color": "green"}]
+            else:
+                r["outcomes"] = wg.outcomes_of(wg.node_of(definition, r["node_id"]))
+            r["can_send_back"] = (r["kind"] == "WORKFLOW" and r["node_type"] in ("decision", "activity")
+                                  and r["status"] == "OPEN")
+            # la domanda a cui rispondere (compito di chiarimento), il chiarimento atteso, le modifiche richieste
+            r["clarification"] = richieste.get(r.pop("send_back_id"))
+            r["waiting_for"] = richieste.get(r.pop("waiting_send_back_id"))
+            changes = richieste.get(r.pop("run_send_back_id"))
+            r["changes_request"] = changes if changes and changes["kind"] == "CHANGES" else None
+            r["clarifications"] = [b for b in richieste.values()
+                                   if b["kind"] == "CLARIFICATION" and b["from"]["task_id"] == r["id"]]
+            if not (r["changes_request"] and r["subject"] == "DOCUMENT"):
+                r["new_revision"] = None
         return rows
 
 
@@ -538,3 +652,70 @@ def complete_task(task_id: uuid.UUID, body: CompleteIn, c: Ctx = Depends(ctx)):
         security_event(conn, "TASK_COMPLETED", user_id=c.user_id, project_id=task["project_id"], ip=c.ip,
                        task=task_id, outcome=body.outcome, workflow_status=status)
         return {"workflow_status": status, "workflow": _instance(conn, task["instance_id"])}
+
+
+# ---------------------------------------------------------------------
+# Tornare indietro (ADR-51, contratto §6, migrazione 0042)
+# ---------------------------------------------------------------------
+@router.get("/tasks/{task_id}/send-back-targets")
+def send_back_targets(task_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """Dove si può tornare dal proprio compito: i nodi già fatti del ramo (il più vicino per primo, proposto) e
+    "Chi ha avviato". ``active``: il nodo ha già un giro in corso, si può solo chiedere un chiarimento."""
+    with c.tx() as conn:
+        rows = conn.execute("SELECT * FROM cde.workflow_send_back_targets(%s)", [task_id]).fetchall()
+    if not rows:
+        raise not_found("Compito")
+    default = next((r["target"] for r in rows if r["target"] != "ORIGINATOR"), "ORIGINATOR")
+    return [{**r, "default": r["target"] == default} for r in rows]
+
+
+def _sent_back(conn, c: Ctx, task_id: uuid.UUID, event: str, sb_id: uuid.UUID, **extra) -> dict:
+    """Risposta comune alle azioni del ritorno: la richiesta e il grafo aggiornato dell'istanza."""
+    task = conn.execute("SELECT instance_id, project_id FROM cde.tasks WHERE id = %s", [task_id]).fetchone()
+    if task is None:
+        raise ApiError(500, "internal", "Compito non rileggibile")
+    security_event(conn, event, user_id=c.user_id, project_id=task["project_id"], ip=c.ip, task=task_id,
+                   send_back=sb_id, **extra)
+    graph = _graph(conn, task["instance_id"])
+    return {"send_back": next((b for b in graph["send_backs"] if b["id"] == sb_id), None), "workflow": graph}
+
+
+@router.post("/tasks/{task_id}/clarification")
+def request_clarification(task_id: uuid.UUID, body: SendBackIn, c: Ctx = Depends(ctx)):
+    """Chiedi chiarimento: compito di chiarimento a chi ha svolto il nodo scelto (o a chi ha avviato); il proprio
+    compito resta in attesa (non completabile, scadenza sospesa) finché arriva la risposta."""
+    with c.tx() as conn:
+        sb = conn.execute("SELECT cde.workflow_request_clarification(%s, %s, %s) AS id",
+                          [task_id, body.target, body.comment]).fetchone()["id"]
+        return _sent_back(conn, c, task_id, "WORKFLOW_CLARIFICATION_REQUESTED", sb, target=body.target)
+
+
+@router.post("/tasks/{task_id}/clarification/answer")
+def answer_clarification(task_id: uuid.UUID, body: AnswerIn, c: Ctx = Depends(ctx)):
+    """Risposta a un compito di chiarimento: il compito di chi ha chiesto torna attivo."""
+    with c.tx() as conn:
+        sb = conn.execute("SELECT cde.workflow_answer_clarification(%s, %s) AS id",
+                          [task_id, body.comment]).fetchone()["id"]
+        return _sent_back(conn, c, task_id, "WORKFLOW_CLARIFICATION_ANSWERED", sb)
+
+
+@router.post("/tasks/{task_id}/request-changes")
+def request_changes(task_id: uuid.UUID, body: SendBackIn, c: Ctx = Depends(ctx)):
+    """Richiedi modifiche: il nodo scelto si riapre in un nuovo giro (o il nodo di avvio, per chi ha avviato); il
+    proprio giro e quelli aperti dello stesso ramo fino a lì si annullano; gli altri rami continuano."""
+    with c.tx() as conn:
+        sb = conn.execute("SELECT cde.workflow_request_changes(%s, %s, %s) AS id",
+                          [task_id, body.target, body.comment]).fetchone()["id"]
+        return _sent_back(conn, c, task_id, "WORKFLOW_CHANGES_REQUESTED", sb, target=body.target)
+
+
+@router.put("/processes/{instance_id}/documents")
+def set_process_documents(instance_id: uuid.UUID, body: DocumentsIn, c: Ctx = Depends(ctx)):
+    """Allegati di un processo durante una richiesta di modifiche: li sostituisce chi ha il compito riaperto (gli
+    allegati che non può vedere restano)."""
+    with c.tx() as conn:
+        conn.execute("SELECT cde.workflow_set_documents(%s, %s::uuid[])", [instance_id, body.document_ids])
+        graph = _graph(conn, instance_id)
+        security_event(conn, "PROCESS_DOCUMENTS_CHANGED", user_id=c.user_id, project_id=graph["project_id"], ip=c.ip,
+                       instance=instance_id, documents=len(body.document_ids))
+        return graph

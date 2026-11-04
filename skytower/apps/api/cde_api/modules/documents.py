@@ -530,7 +530,8 @@ def initiate_upload(body: UploadInitIn, c: Ctx = Depends(ctx)):
         if doc and doc["archived_at"]:
             raise ApiError(409, "archived", "Documento archiviato: non accetta nuove revisioni")
         if doc:
-            conn.execute("SELECT cde.assert_not_in_review(%s)", [doc["id"]])   # 423 se in revisione
+            # 423 se in revisione; durante una richiesta di modifiche (0042) chi ha il compito riaperto può caricare
+            conn.execute("SELECT cde.assert_can_add_revision(%s)", [doc["id"]])
         if doc is None and conn.execute("SELECT cde.document_identifier_taken(%s, %s) AS t",
                                         [project["id"], result.identifier]).fetchone()["t"]:
             # esiste in un container che non vedo: l'identificativo è comunque univoco nel progetto
