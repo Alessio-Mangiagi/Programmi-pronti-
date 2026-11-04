@@ -17,6 +17,7 @@
  *   ocr.txt          testo OCR completo (input esatto dei parser)
  *   alyante.json     JSON formato ALYANTE (quello che alimenta l'export xlsx)
  *   contratto.json   JSON formato CONTRATTO
+ *   modulo.txt       MODULO CONTRATTO compilato dal JSON ALYANTE (moduloDaRisultato)
  * più tests/out/_report.json + tabella riassuntiva a video.
  */
 process.env.OCR_LIB_MODE = '1'                 // il server non deve mettersi in ascolto
@@ -49,6 +50,8 @@ const filtri = process.argv.slice(2).filter(a => !a.startsWith('--'))
 
 const { ocrPaddle, componiTesto, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio } =
   await import('../server.ts')
+
+const { moduloDaRisultato } = await import('../src/lib/modulo-contratto.ts')
 
 const sha1 = (b: Buffer | string) => createHash('sha1').update(b).digest('hex')
 
@@ -191,6 +194,12 @@ const analizza = async (documento: string): Promise<Esito> => {
     await fs.writeFile(path.join(dir, 'ocr.txt'), full, 'utf8')
     await fs.writeFile(path.join(dir, 'alyante.json'), alyante, 'utf8')
     await fs.writeFile(path.join(dir, 'contratto.json'), contratto, 'utf8')
+    // lo stesso giro del menu ⋮ «Converti in modulo contratto»: si vede subito che cosa il
+    // modulo riporterebbe e che cosa resterebbe "# DA VERIFICARE". Un'estrazione vuota non
+    // d\u00E0 modulo: il file manca, ma l'esito del documento resta quello dell'estrazione.
+    try {
+      await fs.writeFile(path.join(dir, 'modulo.txt'), '\uFEFF' + moduloDaRisultato(alyante, { origine: path.basename(documento) }).testo, 'utf8')
+    } catch { /* nessun dato estratto: niente modulo */ }
   } catch (err) {
     esito.errore = err instanceof Error ? err.message : String(err)
   }
