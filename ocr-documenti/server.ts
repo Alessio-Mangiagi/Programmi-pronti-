@@ -15,7 +15,7 @@ import { ASSIST_MODEL, OLLAMA_BASE, modelloAttivo, ocrVisionPagina, ollamaAttivo
 import { TIPOLOGIE_VALIDE, estraiAssistito } from './server/assist.ts'
 import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
-import { descriviErrori, eModulo, leggiModulo } from './src/lib/modulo-contratto.ts'
+import { descriviErrori, eModulo, leggiModulo, type ErroreModulo } from './src/lib/modulo-contratto.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
 
@@ -165,6 +165,22 @@ const commessaComeScritta = (json: string, scritta?: string): string => {
   } catch { return json }
 }
 
+/**
+ * MODULO CONTRATTO → risultato JSON, senza OCR, parser euristici né assist AI.
+ * È il ramo modulo della route /api/ocr tirato fuori in una funzione sola, così
+ * tools/verifica_moduli.ts rilegge i moduli compilati con la STESSA filiera dell'app
+ * (lettura alla lettera, strutturaAlyante `fedele`, elenchi ufficiali, commessa scritta).
+ * Con `errori` non vuoto il modulo va respinto e `result` è assente.
+ */
+const risultatoDaModulo = (text: string, format: 'contratti' | 'contract'): { result?: string; errori: ErroreModulo[] } => {
+  const { estratto: e, errori } = leggiModulo(text)
+  console.log(`[OCR] modulo contratto: format=${format} righe:${e.righe.length} errori:${errori.length}`)
+  if (errori.length) return { errori }
+  let result = format === 'contratti' ? strutturaAlyante(e, { fedele: true }) : strutturaContratto(e, text, { fedele: true })
+  if (format === 'contratti') result = commessaComeScritta(normalizzaRisultatoAlyante(result), e.testata.codice_progetto)
+  return { result, errori }
+}
+
 app.post('/api/ocr', async (req, res) => {
   // `origine` distingue due testi che il campo `text` non separa: quello NATIVO (layer
   // PDF, .docx) e quello che è già uscito da un OCR (il banco di prova rigioca da lì le
@@ -218,14 +234,11 @@ app.post('/api/ocr', async (req, res) => {
   // Arriva da .txt/.md (App.tsx: ocrFile/runScan) e da .docx (docxATesto con le celle
   // separate da "|"); restano gli elenchi ufficiali, che agganciano i codici Alyante.
   if (text && (format === 'contratti' || format === 'contract') && eModulo(text)) {
-    const { estratto: e, errori } = leggiModulo(text)
-    console.log(`[OCR] modulo contratto: format=${format} righe:${e.righe.length} errori:${errori.length}`)
-    if (errori.length) {
-      return res.status(400).json({ error: `Modulo contratto non valido (${errori.length} ${errori.length === 1 ? 'errore' : 'errori'}):\n${descriviErrori(errori)}` })
-    }
     try {
-      let result = format === 'contratti' ? strutturaAlyante(e, { fedele: true }) : strutturaContratto(e, text, { fedele: true })
-      if (format === 'contratti') result = commessaComeScritta(normalizzaRisultatoAlyante(result), e.testata.codice_progetto)
+      const { result, errori } = risultatoDaModulo(text, format)
+      if (errori.length) {
+        return res.status(400).json({ error: `Modulo contratto non valido (${errori.length} ${errori.length === 1 ? 'errore' : 'errori'}):\n${descriviErrori(errori)}` })
+      }
       return res.json({ result })
     } catch (err: unknown) {
       return res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' })
@@ -369,4 +382,5 @@ if (!process.env.OCR_LIB_MODE) { startServer(); void caricaLavori() }
 
 // Superficie pubblica per il banco di prova offline (tools/harness.ts): stesse
 // funzioni che usa la route /api/ocr, così l'harness misura la pipeline REALE.
-export { ocrPaddle, componiTesto, setDumpBlocchi, estrai, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, tabellaDaTsv, unisciMigliaiaSpazio }
+// risultatoDaModulo + ELENCHI servono a tools/verifica_moduli.ts (moduli compilati → Excel).
+export { ocrPaddle, componiTesto, setDumpBlocchi, estrai, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, tabellaDaTsv, unisciMigliaiaSpazio, risultatoDaModulo, ELENCHI }
