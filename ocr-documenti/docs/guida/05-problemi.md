@@ -11,6 +11,8 @@
 | Excel con poche righe o righe mancanti | Elabora in formato **.MD** e guarda in fondo la sezione *TABELLA ARTICOLI (ricostruita dalla scansione)*: se è incompleta, quel modello di contratto non è ancora "tarato" — segnalalo con il PDF. Nel frattempo correggi in **Modifica**. |
 | Celle rosse su PROGETTO/EPU | Commessa non nell'elenco ufficiale: correggi il codice o chiedi di aggiornare l'elenco. |
 | Riquadro giallo con *somma righe ≠ importo lavori* | Mancano righe o l'importo di testata è diverso: controlla l'originale e correggi in **Modifica**. |
+| *Modulo contratto non valido (N errori)* | Il modulo compilato a mano ha valori fuori formato: ogni errore dice la **riga** del file. Correggi, salva e premi **Scansiona** (vedi [4.4](04-formati-e-claude.md#44-modulo-contratto-i-dati-scritti-a-mano-letti-alla-lettera)). |
+| Un modulo `.txt` viene mostrato come testo invece di essere elaborato | La prima riga del file deve essere esattamente `MODULO CONTRATTO OCR v1`: parti dal modulo vuoto scaricato. |
 | *«Manca l'altro file»* | Hai una bozza Word senza PDF o viceversa: **Aggiungi l'altro file** o **Procedi senza**. |
 | La scheda **Originale** è vuota | Il browser non riesce a mostrare il PDF dentro la pagina: usa **⋮ → Apri in un'altra finestra**. |
 | Un contratto della coda è in rosso | Leggi il motivo sulla riga; gli altri vanno avanti. Rifallo con **Scansiona**. |

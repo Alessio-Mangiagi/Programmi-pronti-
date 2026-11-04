@@ -182,6 +182,21 @@ sono l'azione da premere. Tutto il resto sta nel pannello di destra, sotto
 
 ---
 
+## Modulo contratto — dati scritti a mano, letti alla lettera
+
+Per i contratti che non si leggono (o i dati già pronti): **Modulo contratto vuoto**
+(sotto *Aggiungi documenti*) scarica `Modulo_contratto_OCR.txt`. Si compila dopo i due
+punti, l'elenco prezzi va in **[RIGHE]** con le celle separate da `|`
+(`ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO`), poi si trascina il file
+nella coda e si preme **Elabora → Excel**. Esiste anche in Word (`docs/modulo/`).
+
+- Niente OCR e niente AI: ogni valore passa **così come è scritto** (etichetta *maschera: modulo*).
+- Numeri `1.234,56`, date `GG/MM/AAAA`, tipologia dall'elenco, P.IVA 11 cifre.
+- Obbligatori: codice contratto, tipologia, data contratto, oggetto, fornitore.
+- Un errore blocca l'Excel: il riquadro rosso li elenca **con il numero di riga**.
+
+---
+
 ## Dopo la scansione: leggere l'esito
 
 Nella **riga della coda** compaiono subito le etichette essenziali (quante voci, quante

@@ -27,7 +27,7 @@ Dal **Portale** della suite Cosedil, scheda *OCR Documenti* (vedi la
 1. [La schermata e gli indicatori](01-schermata.md)
 2. [Da contratto a Import_Contratti.xlsx](02-contratto-excel.md) — il flusso principale, più contratti, bozza Word + PDF firmato
 3. [Controllare e correggere il risultato](03-controllo-e-modifica.md) — controlli pre-import, celle rosse, scheda Modifica, altre azioni
-4. [Formati di uscita e modalità Claude](04-formati-e-claude.md)
+4. [Formati di uscita, modalità Claude e modulo contratto](04-formati-e-claude.md) — il modulo da compilare a mano quando il contratto non si legge
 5. [Se qualcosa non va](05-problemi.md)
 6. [Per l'amministratore di sistema](06-amministratore.md)
 

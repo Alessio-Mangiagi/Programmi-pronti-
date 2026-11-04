@@ -13,6 +13,8 @@
 | [src/VistaConfronto.tsx](../src/VistaConfronto.tsx) | Scheda «Confronto» del pannello risultato. |
 | [src/App.tsx](../src/App.tsx) | Componente principale (~1790 righe). Tutta la UI: drag-drop upload, preview PDF/immagine/Word/Excel, OCR singolo/batch/range, quattro modalita' output (MD, JSON, Contratto, Alyante), export xlsx/docx/csv/xml, editing inline Alyante, riprocessa, template Primavera P6, schede Documento/JSON/Modifica/Originale, barra progress, coda di lavoro a tabella (stato, esito, azioni per riga, anteprima in hover), pannello risultato a destra. La libreria `docx` e' caricata con import dinamico solo negli handler di export. |
 | [src/lib/testo-nativo.ts](../src/lib/testo-nativo.ts) | Percorso NATIVO: layer di testo dei PDF digitali e tabelle dei .docx ridotti allo stesso testo a righe che il server riceve dall'OCR, cosi' i parser non cambiano. Frammenti pdf.js raggruppati in righe con tolleranza legata al corpo del carattere; HTML di mammoth letto con un tokenizzatore senza DOM (gira anche in node) che espande colspan/rowspan. `layerUtile` scarta i layer che sono OCR di qualcun altro. CONDIVISO con tools/harness.ts: le euristiche stanno scritte una volta sola. |
+| [src/lib/modulo-contratto.ts](../src/lib/modulo-contratto.ts) | MODULO CONTRATTO: specifica dei campi, modulo vuoto (`moduloVuoto`), lettore e validatore alla lettera (`leggiModulo`, errori con numero di riga). CONDIVISO fra server (route /api/ocr) e browser (pulsante del modulo vuoto, riconoscimento dei file). Test in `src/lib/__tests__/modulo-contratto.test.ts`. |
+| [tools/genera_modulo.ts](../tools/genera_modulo.ts) | Rigenera `docs/modulo/Modulo_contratto_OCR.txt` e `.docx` dalla specifica. |
 | [src/index.css](../src/index.css) | Stile globale tema terminale scuro. Scanline overlay CRT. Scrollbar custom. Stili Markdown per il pannello output (titoli neon, tabelle, codice, blockquote). Range input senza frecce native. |
 
 ---
@@ -57,6 +59,7 @@
 | [PIPELINE_ESTRAZIONE_CONTRATTI.md](PIPELINE_ESTRAZIONE_CONTRATTI.md) | Maschere di estrazione per famiglia di contratto (subappalto, subaffidamento, fornitura, fornitura e posa, nolo a caldo/freddo, incarico): riconoscimento del modello dalla sigla in calce, griglia dell'Art. 5 elenco prezzi, computo metrico "SOMMANO", tariffe in prosa, allegati Excel. |
 | [PIPELINE_ESTRAZIONE_ARTICOLI.md](PIPELINE_ESTRAZIONE_ARTICOLI.md) | Catalogo articoli ANAS per opera d'arte (contratti a voci di tariffa senza prezzi). |
 | [PIPELINE_ESTRAZIONE_PRESTAZIONI.md](PIPELINE_ESTRAZIONE_PRESTAZIONI.md) | Prestazioni in elenco a lettere degli incarichi/servizi professionali. |
+| [PIPELINE_MODULO_CONTRATTO.md](PIPELINE_MODULO_CONTRATTO.md) | Modulo contratto a struttura fissa, compilato a mano e letto alla lettera senza OCR né AI: campi, validazione, flusso, estensione. |
 | [CHAT_LOG.md](CHAT_LOG.md) | Log storico della conversazione di progettazione (giugno 2026). |
 
 ---

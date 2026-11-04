@@ -107,6 +107,18 @@ Multi-file: si possono trascinare più file insieme, ognuno tiene il proprio ris
 6. **Assist Ollama** (opzionale): riempie solo i campi vuoti; sostituisce le righe solo se ne
    trova di più.
 
+## Modulo contratto (struttura fissa, senza OCR né AI)
+
+Quando il contratto non si lascia leggere, i dati si scrivono a mano nel **modulo
+contratto** (`MODULO CONTRATTO OCR v1`, sezioni `[TESTATA]` `[IMPORTI]` `[RIGHE]` `[FINE]`)
+e il programma lo legge **alla lettera**: niente parser euristici, niente assist, niente
+riparazioni dei valori. Lo valida (formati, obbligatori, `qta × prezzo = importo`) e lo
+rifiuta con l'elenco degli errori per riga. Specifica e lettore in
+[src/lib/modulo-contratto.ts](src/lib/modulo-contratto.ts), dettagli in
+[docs/PIPELINE_MODULO_CONTRATTO.md](docs/PIPELINE_MODULO_CONTRATTO.md). Modulo vuoto dal
+pulsante **Modulo contratto vuoto** o in [docs/modulo/](docs/modulo/) (`.txt` e `.docx`,
+rigenerati con `npx tsx tools/genera_modulo.ts`).
+
 ## Export Import_Contratti (regole)
 
 - Gold di riferimento: **`Import_Contratti (2).xls`** nella root → colonne, tipi (date serial,
