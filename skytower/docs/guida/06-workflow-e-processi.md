@@ -247,3 +247,64 @@ Dalla scheda **Workflow** di una commessa:
   commessa: le persone indicate nel modello vengono tolte e segnalate; il modello della commessa resta com'è.
 
   ![Pubblica in libreria](img/06-pubblica-in-libreria.png)
+
+## 6.11 Tornare indietro: chiarimenti e richieste di modifiche
+
+Da ogni compito di **decisione** o di **attività** (pagina **I miei compiti**) si può tornare indietro. In basso
+nel compito ci sono due pulsanti, accanto a **Conferma esito**.
+
+### Chiedi chiarimento
+
+Serve quando ti manca un'informazione ma non c'è niente da rifare.
+
+1. Premi **Chiedi chiarimento**.
+2. In **Dove rimandare** scegli a chi chiedere. È proposto il passo subito prima; puoi scegliere un altro passo
+   già fatto del tuo ramo oppure **Chi ha avviato** il processo o il documento.
+3. Scrivi la domanda (obbligatoria) e premi **Invia la domanda**.
+
+Il tuo compito resta **in attesa di chiarimento**: non lo puoi completare e la scadenza è sospesa. Quando arriva
+la risposta, la scadenza si sposta avanti del tempo che hai aspettato.
+
+![Compito in attesa di chiarimento](img/06-ritorno-compito-in-attesa-di-chiarimento.png)
+
+La persona interpellata riceve un compito **Chiarimento da dare**, legge la domanda e risponde con un commento.
+La risposta compare nel tuo compito, che torna attivo. Il flusso non si sposta.
+
+![Risposta al chiarimento](img/06-ritorno-risposta-al-chiarimento.png)
+
+### Richiedi modifiche
+
+Serve quando un passo precedente va rifatto, per esempio perché un file va corretto.
+
+1. Premi **Richiedi modifiche**.
+2. In **Dove rimandare** scegli il passo da rifare (o **Chi ha avviato**) e scrivi cosa va modificato.
+3. Premi **Rimanda indietro**.
+
+![Richiedi modifiche: scelta del passo](img/06-ritorno-richiedi-modifiche-scelta-destinazione.png)
+
+Il passo scelto si riapre per chi lo aveva in carico, con la tua richiesta in evidenza:
+
+- in un'**approvazione di documento** usa **Carica nuova revisione** (stesso nome del file): il workflow
+  continua sulla revisione nuova, la vecchia resta nello storico;
+- in un **processo** cambia gli **Allegati del processo** e premi **Salva allegati**.
+
+Poi sceglie di nuovo l'esito. Il flusso riparte da lì, rifà i passi intermedi e torna a te. Il tuo compito di
+prima si chiude e ne riceverai uno nuovo.
+
+**Rami paralleli**: torna indietro solo il tuo ramo. Se per esempio un buyer su sette rimanda indietro la scelta
+della procedura, gli altri sei continuano il loro lavoro; la riunione che li raccoglie aspetta anche il ramo
+tornato indietro.
+
+### Nella vista finale
+
+Nello schema del processo le frecce tratteggiate mostrano i ritorni: **arancio** per le modifiche, **blu** per i
+chiarimenti. L'elenco **Chiarimenti e modifiche** riporta domande, risposte e revisioni caricate.
+
+![Vista finale con un ritorno e un chiarimento](img/06-ritorno-vista-finale-ritorno-e-chiarimento.png)
+
+Cliccando un passo vedi, giro per giro, chi ha chiesto cosa e quando.
+
+![Giri del nodo](img/06-ritorno-vista-finale-giri-del-nodo.png)
+
+Un passo può essere rifatto al massimo 20 volte nello stesso processo: oltre, il processo si ferma e chi l'ha
+avviato riceve un avviso.
