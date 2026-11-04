@@ -198,6 +198,24 @@ nella coda e si preme **Elabora → Excel**. Esiste anche in Word (`docs/modulo/
   qualsiasi: lo legge, salva `<nome>_modulo.txt` e segna `# DA VERIFICARE` ciò che non
   ha potuto riportare così come letto. Si controlla, si corregge e si rimette in coda.
 
+**Come si compila un contratto vero** (regole usate sui moduli di esempio):
+
+| Nel contratto | Nel modulo |
+|---|---|
+| Sigla in calce `FORGEN`/`FORFERR` (fornitura) | `TIPOLOGIA: Fornitura e posa` |
+| Sigla `SUBAFF` (subaffidamento) | `TIPOLOGIA: Passivo a Misura` e `DIVISIONE: 08`, altrimenti la divisione esce vuota |
+| Ritenuta 0,50% enti previdenziali + 5% garanzia | `CODICE RG: RG05` **e** `CODICE RI: R005`: con un codice scritto, l'altro non si ricava più dalla percentuale |
+| Solo ritenuta 5% | `RITENUTA GARANZIA %: 5` (esce RG05) |
+| Colonne *Art.* + *Sub* | un articolo per voce: `A.01.010.1`, `A.01.010.2`… |
+| P.U. lavori e P.U. oneri separati | `PREZZO` = somma dei due, `IMPORTO` = somma dei due importi |
+| P.U. stampato arrotondato (l'importo non torna oltre l'1%) | prezzo = importo / quantità, con una riga `# DA VERIFICARE` sopra |
+| Voce senza codice ("VOCE OPZIONALE", "Trasporto") | `ARTICOLO` vuoto, la dicitura nella descrizione |
+
+Per provare uno o più moduli senza aprire l'app: `npm run moduli` (cartella
+`contratti/moduli/`, oppure `npm run moduli -- file.txt`). Dice per ogni modulo gli errori con
+la riga, se la somma delle voci torna con l'importo e i codici agganciati (PROGETTO, DITTA,
+DIVISIONE, COND.PAG, RG/RI), e scrive accanto `<nome>_Import_Contratti.xlsx`.
+
 ---
 
 ## Dopo la scansione: leggere l'esito

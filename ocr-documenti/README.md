@@ -126,6 +126,10 @@ campo vuoto e valore letto in una riga `# DA VERIFICARE`. Il modulo prodotto rip
 `leggiModulo` e l'app dice subito se si rilegge senza errori. Anche `npm run harness`
 scrive `modulo.txt` accanto ad `alyante.json`.
 
+`npm run moduli` ([tools/verifica_moduli.ts](tools/verifica_moduli.ts)) rilegge i moduli
+compilati in `contratti/moduli/` con la stessa filiera della route (`risultatoDaModulo`),
+senza OCR né AI, e scrive per ognuno `<nome>_Import_Contratti.xlsx`.
+
 ## Export Import_Contratti (regole)
 
 - Gold di riferimento: **`Import_Contratti (2).xls`** nella root → colonne, tipi (date serial,

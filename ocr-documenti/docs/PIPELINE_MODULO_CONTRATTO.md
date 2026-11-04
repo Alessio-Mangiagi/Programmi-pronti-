@@ -166,6 +166,33 @@ una funzione pura, condivisa: la usano l'app e `tools/harness.ts`, che scrive
   di commento promemoria. Fanno eccezione quelle che il programma ricava da solo,
   come `elenco_prezzi` e `famiglia_contratto`.
 
+### Verifica offline: `npm run moduli`
+
+[`tools/verifica_moduli.ts`](../tools/verifica_moduli.ts) rilegge i moduli compilati
+(default `contratti/moduli/`, cartella ignorata da git perché contiene dati aziendali) con
+**la stessa funzione della route**: `risultatoDaModulo(text, format)` in
+[server.ts](../server.ts), da cui ora passa anche `/api/ocr`. Ollama è puntato su una porta
+morta: se qualcosa chiamasse l'AI fallirebbe. Per ogni modulo scrive `<nome>.alyante.json` e
+`<nome>_Import_Contratti.xlsx` (righe di `buildImportContrattiRowsFromAlyante`, elenchi
+passati con `impostaElenchi` di `src/lib/elenchi-client.ts`) e stampa somma delle voci contro
+`IMPORTO LAVORI` e codici agganciati. Esce con 1 se un modulo è respinto.
+
+Prima prova (04/11/2026), cinque contratti compilati a mano dai PDF: fornitura e subappalto
+Ticopter (193-136_2), subappalto GFM Impianti (159-115, 108 voci), subaffidamento TMT
+Trasporti (177-125), subappalto Progetto Costruzioni (195-137_6). Tutti letti senza errori;
+quattro su cinque con somma delle voci = importo dell'Art. 4 al centesimo. Il subappalto
+Ticopter no (193.416,80 contro 234.636,80): la differenza è nel documento, non nel modulo,
+ed è segnata `# DA VERIFICARE`.
+
+Regole di compilazione emerse (anche in GUIDA_UTILIZZO.md):
+- **RG e RI insieme**: `ritenuteRgRi` restituisce i codici scritti se ce n'è almeno uno, e
+  non ricava più RG dalla percentuale. Con `CODICE RI: R005` va scritto anche `CODICE RG`.
+- **Subaffidamento**: tipologia `Passivo a Misura` non porta a nessuna DIVISIONE in
+  `divisioneFromTipo`: scrivere `DIVISIONE: 08`.
+- **Prezzi stampati arrotondati**: se `quantità × prezzo` scarta oltre l'1% dall'importo, il
+  modulo viene respinto; si scrive il prezzo che dà l'importo (es. 1.947,00 / 6.600 = 0,295)
+  e lo si dichiara in commento.
+
 ## 4. Limiti e scelte
 
 - **Un modulo = una richiesta.** Il modulo non va stampato e scansionato: come PDF le
