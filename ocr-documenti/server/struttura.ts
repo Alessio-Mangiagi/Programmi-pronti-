@@ -131,16 +131,23 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
   }
 }
 
-export const strutturaAlyante = (e: Estratto): string => {
+// `fedele`: i valori vengono da un MODULO CONTRATTO compilato a mano (src/lib/modulo-contratto.ts),
+// non dall'OCR. Le riparazioni pensate per gli errori di lettura — codici ricostruiti,
+// valori slittati, righe doppie — lì sarebbero alterazioni: tre voci identiche nel modulo
+// sono tre voci volute, un codice "14,01" è scritto così. Con `fedele` le righe passano
+// com'erano; restano anagrafiche, elenchi ufficiali e numerazione.
+export interface OpzioniStruttura { fedele?: boolean }
+
+export const strutturaAlyante = (e: Estratto, opz: OpzioniStruttura = {}): string => {
   const { testata, importi } = e
-  recuperaCodiciRighe(e.righe)
+  if (!opz.fedele) recuperaCodiciRighe(e.righe)
   // Scarta le righe "vuote" (solo codice, o né descrizione né valori): capitano
   // quando l'OCR spezza una cella articolo — nell'Excel diventerebbero righe inutili.
-  const filtrate = e.righe.filter(r =>
+  const filtrate = opz.fedele ? e.righe : e.righe.filter(r =>
     (r.descrizione ?? '').trim().length >= 3 || r.quantita || r.prezzo_lordo || r.importo)
   // Dedup: stessa pagina scansionata in più tile → stessi articoli due volte
   const visti = new Set<string>()
-  const righe = filtrate.filter(r => {
+  const righe = opz.fedele ? filtrate : filtrate.filter(r => {
     const k = [r.codice_epu, r.udm, r.quantita, r.prezzo_lordo, r.importo, (r.descrizione ?? '').slice(0, 60)].join('|')
     if (visti.has(k)) return false
     visti.add(k)
@@ -149,7 +156,7 @@ export const strutturaAlyante = (e: Estratto): string => {
   // QTA persa dall'OCR → i numeri slittano: [prezzo, importo] finiscono in [qta, prezzo].
   // Ripara solo quando i conti tornano ESATTI: importo = qta × prezzo.
   const itNum = (s?: string) => s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : NaN
-  for (const r of righe) {
+  for (const r of opz.fedele ? [] : righe) {
     if (r.importo || !r.quantita || !r.prezzo_lordo) continue
     const a = itNum(r.quantita), b = itNum(r.prezzo_lordo)
     if (!isFinite(a) || !isFinite(b) || a <= 0 || b <= 0) continue
@@ -177,7 +184,11 @@ export const strutturaAlyante = (e: Estratto): string => {
     const k = r.codice_epu || r.descrizione
     if (!k || seen.has(k)) continue
     seen.add(k)
-    const [fam, sfam] = classifyFamSfam(testata.tipologia_contratto, r.descrizione, testata.oggetto)
+    // FAM/SFAM scritte sulla riga (colonne facoltative del modulo contratto) vincono sul
+    // classificatore a parole chiave; normalizzaConElenchi poi le valida sull'elenco ufficiale.
+    const [fam, sfam] = r.famiglia || r.sottofamiglia
+      ? [r.famiglia ?? '', r.sottofamiglia ?? '']
+      : classifyFamSfam(testata.tipologia_contratto, r.descrizione, testata.oggetto)
     anag.push({ codice_articolo: r.codice_epu, descrizione: r.descrizione, udm: r.udm, tipo_articolo: 'Articolo generico', descrizione_breve: '', descrizione_estesa: '', famiglia: fam, sottofamiglia: sfam })
   }
   const out: Record<string, unknown> = { testata, righe, anagrafiche_articoli: anag, importi }
@@ -186,11 +197,11 @@ export const strutturaAlyante = (e: Estratto): string => {
 }
 
 // Estratto → JSON formato CONTRATTO (schema piatto usato dal frontend giallo).
-export const strutturaContratto = (e: Estratto, full: string): string => {
+export const strutturaContratto = (e: Estratto, full: string, opz: OpzioniStruttura = {}): string => {
   const t = e.testata
   const imp = e.importi
   const righe = e.righe
-  recuperaCodiciRighe(righe)
+  if (!opz.fedele) recuperaCodiciRighe(righe)
   const r0 = righe[0]
   const c: Record<string, unknown> = {
     numero_contratto: t.codice ?? '',
@@ -203,7 +214,10 @@ export const strutturaContratto = (e: Estratto, full: string): string => {
     // committente = DITTA del gruppo che stipula (consortile quando è lei a firmare)
     committente: { nome: t.ditta || 'COSEDIL S.p.A.', codice: t.ditta_codice ?? '' },
     // commessa validata sull'elenco ufficiale (stesso aggancio del formato verde)
-    progetto_p6: { codice_progetto: (ELENCHI.commesse.length ? matchCommessa(t) : '') || t.codice_progetto || '' },
+    // con `fedele` (modulo contratto) la commessa scritta resta com'è: matchCommessa può
+    // ripiegare su un aggancio approssimato dall'oggetto, cioè sostituirla; l'export
+    // (lookupProgetto) la aggancia comunque all'elenco per codice esatto o per prefisso
+    progetto_p6: { codice_progetto: opz.fedele ? (t.codice_progetto ?? '') : (ELENCHI.commesse.length ? matchCommessa(t) : '') || t.codice_progetto || '' },
     importi: {
       quantita: r0?.quantita ?? '',
       prezzo_unitario: r0?.prezzo_lordo ?? '',

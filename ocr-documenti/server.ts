@@ -15,6 +15,7 @@ import { ASSIST_MODEL, OLLAMA_BASE, modelloAttivo, ocrVisionPagina, ollamaAttivo
 import { TIPOLOGIE_VALIDE, estraiAssistito } from './server/assist.ts'
 import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
+import { descriviErrori, eModulo, leggiModulo } from './src/lib/modulo-contratto.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
 
@@ -144,6 +145,26 @@ app.get('/api/health', async (_req, res) => {
 })
 
 
+// Commessa di un MODULO CONTRATTO dopo l'aggancio agli elenchi. Sui contratti letti
+// dall'OCR normalizzaConElenchi svuota una commessa fuori elenco senza forma NNN-NNN
+// (era la sigla del modello o rumore di scansione) e, se non trova nulla, ne indovina
+// una dall'oggetto. Nel modulo la commessa l'ha scritta una persona: si accetta solo
+// l'aggancio all'elenco che PARTE da quanto scritto (codice esatto o base "193-136" di
+// "193-136_6"); altrimenti resta il valore scritto, e l'export lo colora di rosso.
+const commessaComeScritta = (json: string, scritta?: string): string => {
+  if (!scritta) return json
+  try {
+    const a = JSON.parse(json) as { testata?: Record<string, string> }
+    const t = a.testata
+    if (!t) return json
+    const agganciata = String(t.codice_progetto ?? '')
+    if (agganciata && scritta.toUpperCase().startsWith(agganciata.toUpperCase())) return json
+    t.codice_progetto = scritta
+    t.elenco_prezzi = scritta                // regola maschera: EPU = PROGETTO
+    return JSON.stringify(a, null, 2)
+  } catch { return json }
+}
+
 app.post('/api/ocr', async (req, res) => {
   // `origine` distingue due testi che il campo `text` non separa: quello NATIVO (layer
   // PDF, .docx) e quello che è già uscito da un OCR (il banco di prova rigioca da lì le
@@ -188,6 +209,27 @@ app.post('/api/ocr', async (req, res) => {
 
   if (!images?.length && !text) {
     return res.status(400).json({ error: 'No images or text provided' })
+  }
+
+  // MODULO CONTRATTO (src/lib/modulo-contratto.ts): testo con la riga di riconoscimento
+  // in testa. I valori si leggono alla lettera: niente parser euristici, niente assist
+  // AI, niente riparazioni OCR (`fedele`). Un modulo con errori di struttura o di formato
+  // viene respinto con l'elenco completo (riga e motivo), così si corregge in un giro.
+  // Arriva da .txt/.md (App.tsx: ocrFile/runScan) e da .docx (docxATesto con le celle
+  // separate da "|"); restano gli elenchi ufficiali, che agganciano i codici Alyante.
+  if (text && (format === 'contratti' || format === 'contract') && eModulo(text)) {
+    const { estratto: e, errori } = leggiModulo(text)
+    console.log(`[OCR] modulo contratto: format=${format} righe:${e.righe.length} errori:${errori.length}`)
+    if (errori.length) {
+      return res.status(400).json({ error: `Modulo contratto non valido (${errori.length} ${errori.length === 1 ? 'errore' : 'errori'}):\n${descriviErrori(errori)}` })
+    }
+    try {
+      let result = format === 'contratti' ? strutturaAlyante(e, { fedele: true }) : strutturaContratto(e, text, { fedele: true })
+      if (format === 'contratti') result = commessaComeScritta(normalizzaRisultatoAlyante(result), e.testata.codice_progetto)
+      return res.json({ result })
+    } catch (err: unknown) {
+      return res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' })
+    }
   }
   console.log(`[OCR] richiesta: format=${format} ${text ? `testo:${text.length}ch` : `immagini:${images!.length}`}`)
 
