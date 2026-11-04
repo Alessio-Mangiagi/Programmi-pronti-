@@ -222,10 +222,26 @@ const EVENTI = (process.env.COSEDIL_EVENTI || PORTAL).replace(/\/+$/, '');
 const PRESENZA_OGNI = 60_000;
 const ultimaPresenza = new Map();   // `${sid}|${app}` -> ms dell'ultimo segnale
 
+// Token di servizio della suite (shared/suite/suite_link.js), letto una volta.
+// Il portale accetta presenza ed eventi solo con questo token: il cookie da solo
+// non basta, perché un utente potrebbe chiamare /api/evento dal proprio browser e
+// scrivere righe a piacere nel suo storico (revisione di sicurezza del
+// 03/11/2026, portale punto 15). Il browser il token non lo ha, il backend sì.
+let tokenSuite = null;
+function leggiTokenSuite() {
+  if (tokenSuite === null) {
+    try { tokenSuite = require('../suite/suite_link.js').token(); } catch { tokenSuite = ''; }
+  }
+  return tokenSuite;
+}
+
 function inviaAlPortale(percorso, cookie, corpo) {
   return fetch(EVENTI + percorso, {
     method: 'POST',
-    headers: { Cookie: cookie || '', 'Content-Type': 'application/json', 'X-Cosedil-App': corpo.appId },
+    headers: {
+      Cookie: cookie || '', 'Content-Type': 'application/json', 'X-Cosedil-App': corpo.appId,
+      'X-Suite-Token': leggiTokenSuite(),
+    },
     body: JSON.stringify(corpo),
     signal: AbortSignal.timeout(5000),
   }).then((r) => r.ok, () => false);

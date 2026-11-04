@@ -11,6 +11,7 @@ const assert = require('node:assert');
 const http = require('http');
 
 process.env.COSEDIL_SSO = 'on';
+process.env.SUITE_TOKEN = 'token-di-prova-attivita';   // niente file .token creato dai test
 
 let fintoPortale;
 let ricevuti = [];
@@ -47,7 +48,10 @@ before(async () => {
     let b = '';
     req.on('data', (c) => { b += c; });
     req.on('end', () => {
-      ricevuti.push({ path: req.url, cookie: req.headers.cookie, header: req.headers['x-cosedil-app'], corpo: JSON.parse(b || '{}') });
+      ricevuti.push({
+        path: req.url, cookie: req.headers.cookie, header: req.headers['x-cosedil-app'],
+        token: req.headers['x-suite-token'], corpo: JSON.parse(b || '{}'),
+      });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end('{"ok":true}');
     });
@@ -113,6 +117,8 @@ test('evento: rotta elencata e andata a buon fine finisce nel registro col detta
   const ev = ricevuti.find((r) => r.path === '/api/evento');
   assert.deepEqual(ev.corpo, { appId: 'ddt', azione: 'DDT convertito', dettaglio: 'bolla-123.pdf' });
   assert.equal(ev.header, 'ddt');
+  // il portale accetta l'evento solo col token di servizio della suite (punto 15)
+  assert.equal(ev.token, 'token-di-prova-attivita');
 });
 
 test('evento: percorso RegExp e metodo diverso da POST', async () => {
