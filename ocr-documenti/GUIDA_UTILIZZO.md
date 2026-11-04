@@ -194,9 +194,12 @@ nella coda e si preme **Elabora → Excel**. Esiste anche in Word (`docs/modulo/
 - Numeri `1.234,56`, date `GG/MM/AAAA`, tipologia dall'elenco, P.IVA 11 cifre.
 - Obbligatori: codice contratto, tipologia, data contratto, oggetto, fornitore.
 - Un errore blocca l'Excel: il riquadro rosso li elenca **con il numero di riga**.
-- **Converti in modulo contratto** (menu ⋮ della riga) compila il modulo da un documento
-  qualsiasi: lo legge, salva `<nome>_modulo.txt` e segna `# DA VERIFICARE` ciò che non
-  ha potuto riportare così come letto. Si controlla, si corregge e si rimette in coda.
+- **Converti in modulo contratto + Excel** (menu ⋮ della riga) o **⇄ Modulo + Excel**
+  (colonna destra, tutti o gli spuntati) compila il modulo da un documento qualsiasi: lo
+  legge, salva `<nome>_modulo.txt` (segnando `# DA VERIFICARE` ciò che non ha potuto
+  riportare così come letto) e subito dopo `<nome>_modulo_Import_Contratti.xlsx`,
+  compilato rileggendo il modulo alla lettera, senza AI: Excel e modulo coincidono. Se il
+  modulo ha errori l'Excel non si fa; se correggi il `.txt`, rimettilo in coda.
 
 **Come si compila un contratto vero** (regole usate sui moduli di esempio):
 

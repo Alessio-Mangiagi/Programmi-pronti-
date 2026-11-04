@@ -107,15 +107,24 @@ scritte a parole vengono tradotte nel codice Alyante (es. *60 gg DFFM bonifico* 
 Il modulo non va per forza scritto da zero: il programma può **compilarlo da solo**
 partendo da un contratto qualsiasi in coda (PDF, scansione, Word).
 
-1. Passa col mouse sui **⋮** della riga del documento e scegli **Converti in modulo
-   contratto**.
+1. Per un documento: passa col mouse sui **⋮** della riga e scegli **Converti in modulo
+   contratto + Excel**. Per tutti (o solo quelli spuntati): pulsante **⇄ Modulo + Excel**
+   nella colonna di destra, sotto *Esporta*.
 2. Il programma legge il documento come sempre. Se l'hai già elaborato in IMPORT P6,
-   anche corretto in *Modifica*, usa quei dati senza rileggerlo. Poi salva
-   `<nome>_modulo.txt` nella cartella scelta in *Salva i file in*.
-3. Apri il file e **confrontalo col documento**: i valori sono quelli letti, già nel
-   formato del modulo, con date `GG/MM/AAAA` e numeri `1.234,56`. Correggi dove la
-   lettura ha sbagliato.
-4. Rimetti il file in coda e premi **Scansiona**: l'Excel esce dal modulo, alla lettera.
+   anche corretto in *Modifica*, usa quei dati senza rileggerlo.
+3. Salva **due file** nella cartella scelta in *Salva i file in*:
+   - `<nome>_modulo.txt`, il modulo compilato;
+   - `<nome>_modulo_Import_Contratti.xlsx`, l'Excel **compilato dai valori del modulo**:
+     il programma rilegge il modulo appena scritto alla lettera, senza OCR né AI, quindi
+     Excel e modulo dicono la stessa cosa riga per riga. Anche il pannello e **↓ Excel**
+     sulla riga passano a quei dati (etichetta *maschera: modulo*).
+4. Apri il modulo e **confrontalo col documento**, soprattutto le righe `# DA VERIFICARE`.
+   Se correggi qualcosa, rimetti il `.txt` in coda e premi **Scansiona**: l'Excel si rifà
+   dal modulo corretto.
+
+Se il modulo ha un errore che il programma non accetterebbe (per esempio manca la data
+del contratto) l'Excel **non** viene fatto: uscirebbe diverso dal modulo. Il riquadro rosso
+dice cosa completare; dopo, si rimette in coda il `.txt`.
 
 ![Il menu ⋮ con la voce Converti in modulo contratto](img/13-converti-menu.png)
 
@@ -127,9 +136,9 @@ lo segnala, così non si perde nulla:
 - una voce con importo diverso da quantità × prezzo resta com'è, segnata `# DA VERIFICARE`;
 - una voce senza articolo né descrizione resta nel file come commento.
 
-Il riquadro **verde** dice che il modulo si rilegge senza errori. Il riquadro
+Il riquadro **verde** dice quanti documenti sono diventati modulo + Excel. Il riquadro
 **rosso** elenca, con il numero di riga, cosa va completato prima di ricaricarlo.
 
-![Modulo salvato: il programma lo rilegge senza errori](img/14-converti-esito.png)
+![Modulo + Excel salvati: riquadro verde, pulsante ⇄ Modulo + Excel a destra, pannello con maschera: modulo](img/14-converti-esito.png)
 
 [← Controllare e correggere](03-controllo-e-modifica.md) · [Avanti: Se qualcosa non va →](05-problemi.md)

@@ -143,7 +143,23 @@ Documento in coda ──► menu ⋮ «Converti in modulo contratto» (App.tsx: 
                                                        │
                                                        ▼
                  moduloDaRisultato(json) → { testo, avvisi, errori } → <nome>_modulo.txt
+                                                       │ errori? ── sì ──► stop, niente Excel (banner rosso)
+                                                       ▼ no
+                 POST /api/ocr { text: modulo, contratti, nativo } → risultatoDaModulo (alla lettera, no AI)
+                                                       │
+                                                       ▼
+            buildImportContrattiRowsFromAlyante → <nome>_modulo_Import_Contratti.xlsx
+            + il risultato della voce in coda diventa quello del modulo (pannello, «↓ Excel»)
 ```
+
+Nell'app il nucleo è `moduloEExcel(i)` in [App.tsx](../src/App.tsx), che restituisce
+l'esito senza scrivere banner. Lo chiamano la voce del menu ⋮ (`convertiInModulo`) e il
+pulsante **⇄ Modulo + Excel** in colonna destra (`convertiSelezionatiInModulo`: tutte le
+voci convertibili o solo le spuntate, una dopo l'altra, riepilogo finale). L'Excel nasce
+dal modulo e non dal JSON dell'estrazione: dedup, commessa indovinata e riparazioni OCR
+non ci sono, quindi Excel e `.txt` coincidono voce per voce. Prova dal vivo (Edge
+headless, nolo Ulma): 16 voci nel modulo, 16 righe nell'Excel, articolo, quantità e
+prezzo uguali.
 
 `moduloDaRisultato` ([src/lib/modulo-contratto.ts](../src/lib/modulo-contratto.ts)) è
 una funzione pura, condivisa: la usano l'app e `tools/harness.ts`, che scrive

@@ -123,7 +123,9 @@ Il giro inverso: **Converti in modulo contratto** (menu ⋮ della riga in coda) 
 documento qualsiasi con la filiera normale e lo riscrive come modulo compilato
 (`moduloDaRisultato`, stesso file). I valori fuori formato non vengono aggiustati:
 campo vuoto e valore letto in una riga `# DA VERIFICARE`. Il modulo prodotto ripassa da
-`leggiModulo` e l'app dice subito se si rilegge senza errori. Anche `npm run harness`
+`leggiModulo`; se si rilegge senza errori l'app lo rimanda al server (`risultatoDaModulo`,
+niente AI) e salva `<nome>_modulo_Import_Contratti.xlsx` compilato dai valori del modulo.
+Stesso giro in blocco col pulsante **⇄ Modulo + Excel**. Anche `npm run harness`
 scrive `modulo.txt` accanto ad `alyante.json`.
 
 `npm run moduli` ([tools/verifica_moduli.ts](tools/verifica_moduli.ts)) rilegge i moduli
