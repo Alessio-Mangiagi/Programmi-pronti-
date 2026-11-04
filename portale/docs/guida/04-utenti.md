@@ -1,0 +1,128 @@
+<!-- "><(((º> sabusabu <º)))>< -->
+# 4. Utenti e abilitazioni (amministratori)
+
+[← La plancia](03-plancia.md) · [Indice](README.md) · [Le commesse della suite →](05-commesse.md)
+
+Dalla plancia, nella colonna di sinistra, premi **Gestione → Utenti**. Qui crei le utenze,
+scegli quali programmi vede ognuno, reimposti le password e disattivi chi non deve più
+entrare.
+
+![La pagina Utenti](img/30-utenti.png)
+
+In alto quattro numeri: **Utenti** (e quanti sono amministratori), **Attivi**, **Password
+da cambiare** al prossimo accesso, **Disattivati**.
+
+Nella tabella, per ogni persona:
+
+| Colonna | Cosa contiene |
+|---|---|
+| **Utente** | Nome e cognome, sotto lo username |
+| **Email** | L'email con cui InCampo e SkyTower riconoscono la persona. Se c'è scritto *dedotta* non è stata impostata e vale `username@cosedilspa.com`. Il pulsante **Email** la cambia. |
+| **Ruolo** | *Utente* oppure *Admin* |
+| **Stato** | *Attivo*, *Password da cambiare* (deve ancora scegliere la sua) o *Disattivato* |
+| **Programmi** | Quanti programmi vede; clic per vederli e cambiarli. Per gli amministratori *Tutti (admin)*. |
+| **Creato** | Data di creazione |
+| (azioni) | **Password**, **Disattiva** / **Riattiva**, **Elimina**. Sulla tua riga c'è scritto *Sei tu*. |
+
+Per trovare qualcuno usa **Cerca per nome o username**; il menu accanto filtra **Attivi**,
+**Password da cambiare**, **Disattivati** o **Amministratori**.
+
+## 4.1 Creare un utente
+
+1. Premi **+ Nuovo utente**.
+2. Compila **Nome e cognome**, **Username** (solo lettere minuscole, numeri, punto,
+   trattino e trattino basso, per esempio `r.spina`) e una **Password iniziale** di almeno 8
+   caratteri.
+3. **Email** è facoltativa ma consigliata se la persona userà InCampo o SkyTower: deve
+   essere **esattamente** quella del suo account in quei programmi.
+4. Scegli il **Ruolo**: *Utente* oppure *Amministratore* (vede tutto e gestisce il Portale).
+5. In **Programmi visibili** spunta i programmi che deve vedere. All'apertura sono già
+   spuntati tutti quelli non riservati: togli quelli che non servono.
+6. Premi **Crea utente**. Compare *Utente creato*.
+
+![Il modulo «Nuovo utente»](img/31-nuovo-utente.png)
+
+Comunica tu username e password iniziale alla persona: al primo accesso dovrà sceglierne
+una sua.
+
+Possibili messaggi: *Username già esistente*, *Username non valido: lettere minuscole,
+numeri, punto, trattino e underscore (max 40)*, *Email non valida*, *La password deve
+avere almeno 8 caratteri*.
+
+## 4.2 Scegliere i programmi di una persona
+
+Nella colonna **Programmi** fai clic su *N programmi*. Si apre **Programmi visibili**:
+spunta per abilitare, togli la spunta per revocare, poi **Salva** (compare *Programmi
+salvati*).
+
+![La scelta dei programmi visibili](img/32-programmi-visibili.png)
+
+Cosa sapere:
+
+- La modifica vale **subito**: il programma tolto sparisce dalla pagina iniziale della
+  persona, e se prova ad aprirlo dall'indirizzo il programma le dice di chiedere
+  l'abilitazione (al massimo dopo mezzo minuto).
+- I programmi segnati **riservato** (Verifica Requisiti, SkyTower) non si danno per
+  abitudine: solo a chi ci lavora davvero.
+- Ponte Trimble e Auguri non hanno caselle: li vedono solo gli amministratori.
+- Ogni modifica resta scritta nel [Registro accessi](06-registro-e-avvisi.md) come
+  *Abilitazioni*, con chi l'ha fatta e quando.
+
+## 4.3 Reimpostare la password di una persona
+
+Premi **Password** sulla sua riga. Scegli:
+
+- **Generane una temporanea** (consigliato), oppure
+- **La scelgo io** e scrivi una password di almeno 8 caratteri.
+
+Premi **Imposta password**.
+
+![La finestra «Nuova password»](img/33-password-utente.png)
+
+Con la password temporanea, il Portale la mostra **una volta sola**: copiala e comunicala
+alla persona prima di premere **Chiudi**.
+
+![La password temporanea generata](img/34-password-temporanea.png)
+
+Reimpostare la password **sblocca** anche chi era bloccato per troppi tentativi e lo
+**scollega** dai computer dove era entrato. Al primo accesso dovrà sceglierne una nuova.
+
+## 4.4 Disattivare, riattivare, eliminare
+
+- **Disattiva**: la persona non può più entrare né nel Portale né nei programmi, e viene
+  scollegata subito. Il suo storico e i suoi programmi restano. È la scelta giusta per chi
+  lascia l'azienda o va in pausa lunga.
+- **Riattiva**: la rimette com'era.
+- **Elimina**: cancella l'account per sempre (il Portale chiede conferma e suggerisce di
+  usare *Disattiva* se basta impedire l'accesso).
+
+Non puoi disattivare te stesso né l'ultimo amministratore attivo: il Portale resterebbe
+senza nessuno che lo possa gestire.
+
+![Il filtro sugli utenti disattivati](img/36-utenti-disattivati.png)
+
+## 4.5 Importare il personale da Excel
+
+Per caricare molte persone insieme premi **Importa da Excel**.
+
+![La finestra «Importa da Excel»](img/35-importa-excel.png)
+
+1. Premi **Scarica il modello** per avere un file già impostato.
+2. Compila un foglio `.xlsx` o `.csv` con le colonne **username** e **nome** (facoltative
+   **password** e **ruolo**).
+3. Scegli il **File** e scrivi una **Password predefinita** (almeno 8 caratteri) per chi non
+   ce l'ha nel foglio.
+4. Premi **Importa**.
+
+Il Portale dice quanti utenti ha aggiunto e quali righe ha scartato e perché (username
+mancante o non valido, password troppo corta, username già esistente). Tutti gli importati
+dovranno cambiare la password al primo accesso e partono con i programmi predefiniti (tutti
+tranne i riservati): sistemali poi con il pulsante *N programmi*.
+
+## 4.6 L'email per InCampo e SkyTower
+
+InCampo e SkyTower riconoscono chi arriva dal Portale **solo se l'email coincide
+esattamente** con quella del loro account. Se una persona entra nel Portale ma InCampo o
+SkyTower le chiedono di nuovo le credenziali, controlla la colonna **Email**: premi
+**Email** sulla sua riga e scrivi l'indirizzo giusto (lasciando vuoto torna
+`username@cosedilspa.com`).
