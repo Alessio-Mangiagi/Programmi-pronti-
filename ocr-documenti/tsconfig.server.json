@@ -19,6 +19,7 @@
   },
   "include": [
     "server.ts", "server/**/*.ts", "tools/**/*.ts",
-    "src/lib/confronto.ts", "src/lib/testo-nativo.ts", "src/lib/markdown.ts", "src/lib/elenchi.ts"
+    "src/lib/confronto.ts", "src/lib/testo-nativo.ts", "src/lib/markdown.ts", "src/lib/elenchi.ts",
+    "src/lib/modulo-contratto.ts"
   ]
 }

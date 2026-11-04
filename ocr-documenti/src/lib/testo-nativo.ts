@@ -122,7 +122,11 @@ interface CellaHtml { testo: string; cs: number; rs: number }
  * contiene, e senza espansione ogni riga successiva slitta a sinistra di una colonna —
  * le quantità finirebbero sotto i prezzi.
  */
-const righeDaGriglia = (righe: CellaHtml[][]): string[] => {
+// `separatore`: con lo spazio (default) le celle vuote spariscono e la riga è lo stesso
+// testo scorrevole che darebbe l'OCR. Con " | " (MODULO CONTRATTO) ogni cella resta al
+// suo posto, vuote comprese: lì le colonne hanno un significato fisso e una cella vuota
+// saltata farebbe slittare quantità e prezzi.
+const righeDaGriglia = (righe: CellaHtml[][], separatore = ' '): string[] => {
   const griglia: string[][] = righe.map(() => [])
   righe.forEach((celle, r) => {
     let c = 0
@@ -136,6 +140,9 @@ const righeDaGriglia = (righe: CellaHtml[][]): string[] => {
       c += cella.cs
     }
   })
+  if (separatore !== ' ') {
+    return griglia.map(r => r.map(c => (c ?? '').replace(/\s+/g, ' ').trim()).join(separatore)).filter(r => /\S/.test(r.replace(/\|/g, '')))
+  }
   return griglia.map(r => r.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()).filter(Boolean)
 }
 
@@ -182,7 +189,7 @@ const attrNum = (grezzo: string, nome: string): number => {
  * e prevedibile: p, h1-h6, ul/ol/li, table/tr/td/th, strong/em/a/img/br/sup/sub, con le
  * entità già escapate.
  */
-export const docxHtmlATesto = (html: string): string => {
+export const docxHtmlATesto = (html: string, separatoreCelle = ' '): string => {
   const out: string[] = []
   let buffer = ''
   let livelloTabella = 0
@@ -222,7 +229,7 @@ export const docxHtmlATesto = (html: string): string => {
         livelloTabella++
       } else if (livelloTabella > 0) {
         livelloTabella--
-        if (livelloTabella === 0) { chiudiRiga(); out.push(...righeDaGriglia(righeTab)); righeTab = [] }
+        if (livelloTabella === 0) { chiudiRiga(); out.push(...righeDaGriglia(righeTab, separatoreCelle)); righeTab = [] }
       }
       continue
     }
@@ -247,7 +254,7 @@ export const docxHtmlATesto = (html: string): string => {
     if (TAG_BLOCCO.has(tag)) { if (cella) aggiungi(' '); else scarica() }
   }
   aggiungi(decodifica(html.slice(pos)))
-  if (livelloTabella > 0) { chiudiRiga(); out.push(...righeDaGriglia(righeTab)) }
+  if (livelloTabella > 0) { chiudiRiga(); out.push(...righeDaGriglia(righeTab, separatoreCelle)) }
   scarica()
   // "><(((º> sabusabu <º)))><"
   return out.join('\n')
