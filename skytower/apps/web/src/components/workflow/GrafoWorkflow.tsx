@@ -10,7 +10,10 @@ import { KeyboardEvent, PointerEvent, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import { aCapo, casellaDaPunto, caselleOccupate, disponi, larghezzaTesto, percorsoSvg } from "./griglia";
 import type { Disposizione, Punto } from "./griglia";
-import { Casella, Colore, Definizione, NOME_TIPO, Nodo, esitiDi } from "./modello";
+import { Casella, Colore, Definizione, FrecciaRitorno, NOME_TIPO, Nodo, esitiDi } from "./modello";
+
+/** Colori delle frecce di ritorno (§6): arancio le richieste di modifiche, blu i chiarimenti. */
+export const COLORE_RITORNO = { modifiche: "#d9822b", chiarimento: "#1f6fb2" } as const;
 
 export type StatoNodo = "fatto" | "attivo" | "non_raggiunto" | "ok" | "ko" | "annullato";
 export type Selezione = { tipo: "nodo"; id: string } | { tipo: "arco"; indice: number } | null;
@@ -54,6 +57,8 @@ export interface PropsGrafo {
   solaLettura?: boolean;
   /** Altezza massima del riquadro con lo scorrimento (predefinita 74vh; "none" = tutto il foglio). */
   altezzaMax?: string;
+  /** Vista: frecce tratteggiate dei ritorni (chiarimenti e richieste di modifiche) dal nodo che ha chiesto. */
+  ritorni?: FrecciaRitorno[];
 }
 
 export const chiaveArco = (from: string, outcome: string | null | undefined, to: string) => `${from}|${outcome ?? ""}|${to}`;
@@ -143,6 +148,11 @@ export function GrafoWorkflow(p: PropsGrafo) {
           <marker id="freccia-chiara" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto">
             <path d="M0,0 L8,4 L0,8 z" fill="#b8bec6" />
           </marker>
+          {(Object.keys(COLORE_RITORNO) as (keyof typeof COLORE_RITORNO)[]).map((t) => (
+            <marker key={t} id={`freccia-${t}`} viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0,0 L8,4 L0,8 z" fill={COLORE_RITORNO[t]} />
+            </marker>
+          ))}
         </defs>
 
         {/* archi: prima quelli non percorsi (sotto), poi i percorsi e il selezionato (sopra) */}
@@ -228,6 +238,31 @@ export function GrafoWorkflow(p: PropsGrafo) {
                   </circle>
                 );
               })}
+            </g>
+          );
+        })}
+
+        {/* ritorni (§6): archi tratteggiati sopra le schede, dal bordo alto del nodo che ha chiesto a quello del nodo
+            interpellato o riaperto; un bollino a metà dice il tipo (↩ modifiche, ? chiarimento) */}
+        {modo === "vista" && (p.ritorni ?? []).map((r, k) => {
+          const a = d.nodi.get(r.from), b = d.nodi.get(r.to);
+          if (!a || !b) return null;
+          const scarto = (k % 3) * 8 - 8;                      // più ritorni fra gli stessi nodi non si sovrappongono
+          const x1 = a.x + a.w / 2 + scarto, y1 = a.y;
+          const x2 = b.x + b.w / 2 - scarto, y2 = b.y;
+          const alto = Math.max(4, Math.min(y1, y2) - 30 - (k % 3) * 6);
+          const colore = COLORE_RITORNO[r.tipo];
+          const mx = (x1 + x2) / 2, my = 0.125 * (y1 + y2) + 0.75 * alto;     // metà della curva di Bézier
+          return (
+            <g key={`${r.from}-${r.to}-${r.tipo}`} aria-label={r.titolo} role="img">
+              <title>{r.titolo}</title>
+              <path d={`M${x1},${y1} C${x1},${alto} ${x2},${alto} ${x2},${y2 - 2}`} fill="none" stroke={colore}
+                    strokeWidth={r.aperta ? 2.8 : 2} strokeDasharray="7 5" markerEnd={`url(#freccia-${r.tipo})`}
+                    opacity={r.aperta ? 1 : 0.8} />
+              <circle cx={mx} cy={my} r={8} fill="#fff" stroke={colore} strokeWidth={1.5} />
+              <text x={mx} y={my + 3.5} textAnchor="middle" fontSize={10} fontWeight={700} fill={colore}>
+                {r.tipo === "modifiche" ? "↩" : "?"}
+              </text>
             </g>
           );
         })}

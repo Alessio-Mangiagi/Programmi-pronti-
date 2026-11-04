@@ -148,3 +148,26 @@ test("errori dell'API leggibili: ruolo mancante tradotto, errori a cascata nasco
   ]);
   assert.deepEqual(out.map((e) => e.message), ["«Nuova decisione»: scegli il ruolo dell'assegnatario 1", "Serve almeno un nodo Fine"]);
 });
+
+test("frecce di ritorno: una per coppia di nodi e tipo, contate, aperte se una richiesta è in corso", async () => {
+  const { ritorniDaIstanza } = await import("../src/components/workflow/modello.ts");
+  const richiesta = (kind: "CHANGES" | "CLARIFICATION", from: string, to: string, status: string) => ({
+    id: `${kind}${from}${to}${status}`, kind, status,
+    from: { node_id: from, name: `Nodo ${from}`, round: 1, task_id: "t" },
+    target: { node_id: to, originator: false, name: `Nodo ${to}`, round: 1, reopened_round: 2 },
+    comment: "c", asked_by: { id: "u", name: "U" }, created_at: "", recipients: [], answer: null, answered_by: null,
+    answered_at: null, revision: null, documents_changed_at: null,
+  });
+  const frecce = ritorniDaIstanza({ send_backs: [
+    richiesta("CHANGES", "off_uno", "scelta", "RETURNED"), richiesta("CHANGES", "off_uno", "scelta", "OPEN"),
+    richiesta("CLARIFICATION", "off_uno", "sel_uno", "ANSWERED"),
+  ] as never });
+  assert.equal(frecce.length, 2);
+  const modifiche = frecce.find((f) => f.tipo === "modifiche")!;
+  assert.equal(modifiche.aperta, true);
+  assert.match(modifiche.titolo, /Modifiche richieste \(2 volte\): «Nodo off_uno» → «Nodo scelta»/);
+  assert.deepEqual(frecce.find((f) => f.tipo === "chiarimento"), {
+    from: "off_uno", to: "sel_uno", tipo: "chiarimento", aperta: false,
+    titolo: "Chiarimento chiesto: «Nodo off_uno» → «Nodo sel_uno»" });
+  assert.deepEqual(ritorniDaIstanza({}), []);
+});

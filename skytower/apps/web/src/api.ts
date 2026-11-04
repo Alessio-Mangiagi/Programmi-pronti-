@@ -134,6 +134,10 @@ export interface MyTask {
   project_id: string;
   project_code: string;
   overdue: boolean;
+  /** Tornare indietro (0042): compito di chiarimento da dare, compito fermo in attesa di chiarimento, modifiche ricevute. */
+  kind?: "WORKFLOW" | "CLARIFICATION";
+  waiting_for?: { comment: string } | null;
+  changes_request?: { comment: string } | null;
 }
 
 export interface Rfi {
@@ -206,10 +210,6 @@ export interface Project {
   my_permissions?: Record<Action, Record<Scope, boolean>>;
   /** Impostazioni libere; `commessa` = codice commessa aziendale, la chiave con cui InCampo e Magazzino trovano il progetto. */
   settings?: Record<string, unknown> & { commessa?: string };
-}
-
-export interface Container {
-  id: string;
   /** Modello di commessa dell'organizzazione (ADR-52): struttura da cui aprire commesse nuove, senza funzioni operative */
   is_model?: boolean;
   model_source_id?: string | null;
@@ -223,6 +223,10 @@ export interface ProjectModel {
   documents: number;
   /** cose non copiate o adattate (risposta di creazione, import) */
   changes?: string[];
+}
+
+export interface Container {
+  id: string;
   project_id: string;
   parent_id: string | null;
   owner_organization_id: string;

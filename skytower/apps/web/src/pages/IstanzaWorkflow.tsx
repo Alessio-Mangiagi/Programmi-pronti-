@@ -4,6 +4,9 @@
 // la spunta sugli esiti percorsi e "N giri" sui nodi ripassati. Clic su un nodo → giri, compiti, commenti, date.
 // Si aggiorna ogni 15 secondi finché il workflow è in corso. Ci si arriva dal documento, dalla scheda Processi
 // e dalla posta dei compiti (rotta /istanze/:instanceId).
+// Tornare indietro (§6, ADR-51): frecce tratteggiate dal nodo che ha chiesto al nodo interpellato (blu, chiarimento)
+// o riaperto (arancio, modifiche), elenco "Chiarimenti e modifiche" con domande, risposte e revisioni, e nel pannello
+// del nodo, giro per giro, chi ha chiesto cosa.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,9 +18,12 @@ import FitScreenIcon from "@mui/icons-material/FitScreen";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import { api, ApiError } from "../api";
-import { COLORE_ESITO, GrafoWorkflow, Selezione } from "../components/workflow/GrafoWorkflow";
+import { COLORE_ESITO, COLORE_RITORNO, GrafoWorkflow, Selezione } from "../components/workflow/GrafoWorkflow";
 import { zoomAdatto } from "../components/workflow/griglia";
-import { Istanza, NOME_TIPO, comeGrafo, esitiDi, percorsiDaIstanza, statiDaIstanza } from "../components/workflow/modello";
+import {
+  Istanza, NOME_TIPO, comeGrafo, esitiDi, percorsiDaIstanza, ritorniDaIstanza, statiDaIstanza,
+} from "../components/workflow/modello";
+import { ElencoRitorni, VoceRitorno } from "../components/workflow/Ritorni";
 
 const STATO_ISTANZA: Record<Istanza["status"], { label: string; color: "warning" | "success" | "default" }> = {
   RUNNING: { label: "In corso", color: "warning" }, COMPLETED: { label: "Concluso", color: "success" }, CANCELLED: { label: "Annullato", color: "default" },
@@ -35,17 +41,21 @@ export function IstanzaWorkflowPage() {
   });
   const { data: miei = [] } = useQuery({
     queryKey: ["my-tasks", "OPEN"],
-    queryFn: () => api<{ id: string; instance_id: string }[]>(`/me/tasks?status=OPEN`),
+    queryFn: () => api<{ id: string; instance_id: string; kind?: string }[]>(`/me/tasks?status=OPEN`),
   });
   if (error) return <Alert severity="error">{(error as ApiError).status === 404 ? "Workflow non trovato o non visibile" : (error as Error).message}</Alert>;
   if (!ist) return null;
-  return <VistaIstanza ist={ist} hoCompito={miei.some((t) => t.instance_id === ist.id)} />;
+  const mio = miei.find((t) => t.instance_id === ist.id);
+  return <VistaIstanza ist={ist} hoCompito={!!mio} compitoId={mio?.id} chiarimento={mio?.kind === "CLARIFICATION"} />;
 }
 
-export function VistaIstanza({ ist, hoCompito }: { ist: Istanza; hoCompito?: boolean }) {
+export function VistaIstanza({ ist, hoCompito, compitoId, chiarimento }: {
+  ist: Istanza; hoCompito?: boolean; compitoId?: string; chiarimento?: boolean;
+}) {
   const def = useMemo(() => comeGrafo(ist.definition), [ist.definition]);
   const stati = useMemo(() => statiDaIstanza(ist), [ist]);
   const percorsi = useMemo(() => percorsiDaIstanza(ist), [ist]);
+  const ritorni = useMemo(() => ritorniDaIstanza(ist), [ist]);
   const [sel, setSel] = useState<Selezione>(null);
   const [zoom, setZoom] = useState(1);
   // all'apertura il foglio si adatta alla larghezza della pagina (gli schemi grandi, come la RdA con 7 buyer,
@@ -74,7 +84,12 @@ export function VistaIstanza({ ist, hoCompito }: { ist: Istanza; hoCompito?: boo
         <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
           <Chip {...STATO_ISTANZA[ist.status]} />
           {ist.result && <Chip color={ist.result === "OK" ? "success" : "error"} label={fine ? fine.name : ist.result === "OK" ? "Concluso" : "Fallito"} />}
-          {hoCompito && <Button variant="contained" component={RouterLink} to={`/compiti?instance=${ist.id}`}>Svolgi il tuo compito</Button>}
+          {hoCompito && (
+            <Button variant="contained" component={RouterLink}
+                    to={`/compiti?instance=${ist.id}${compitoId ? `&task=${compitoId}` : ""}`}>
+              {chiarimento ? "Rispondi al chiarimento" : "Svolgi il tuo compito"}
+            </Button>
+          )}
         </Stack>
       </Stack>
       {ist.description && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{ist.description}</Typography>}
@@ -99,6 +114,10 @@ export function VistaIstanza({ ist, hoCompito }: { ist: Istanza; hoCompito?: boo
         <Legenda colore="#fff6d1" bordo="#e0a800" testo="In corso" />
         <Legenda colore="#f4f5f7" bordo="#c6cbd2" testo="Non raggiunto" />
         <Legenda colore="#fde8e7" bordo="#d93025" testo="Finito male" />
+        {ritorni.length > 0 && <>
+          <LegendaRitorno colore={COLORE_RITORNO.modifiche} testo="Modifiche richieste" />
+          <LegendaRitorno colore={COLORE_RITORNO.chiarimento} testo="Chiarimento" />
+        </>}
         <Typography variant="caption" color="text.secondary">Il segno di spunta indica l'esito scelto.</Typography>
         <Box flexGrow={1} />
         <Tooltip title="Riduci"><IconButton aria-label="Riduci" onClick={() => setZoom((z) => Math.max(0.35, z - 0.1))}><ZoomOutIcon /></IconButton></Tooltip>
@@ -114,7 +133,7 @@ export function VistaIstanza({ ist, hoCompito }: { ist: Istanza; hoCompito?: boo
         <Box ref={contenitore} flexGrow={1} minWidth={0} width="100%">
           <GrafoWorkflow definizione={def} modo="vista" zoom={zoom} etichetta={`Schema di ${titolo}`}
                          selezione={sel} onSeleziona={setSel} stati={stati}
-                         archiPercorsi={percorsi.archi} gruppiPercorsi={percorsi.gruppi} />
+                         archiPercorsi={percorsi.archi} gruppiPercorsi={percorsi.gruppi} ritorni={ritorni} />
         </Box>
         {nodoSel && (
           <Paper variant="outlined" component="aside" aria-label="Dettaglio del nodo" sx={{ p: 2, width: { xs: "100%", lg: 380 }, flexShrink: 0 }}>
@@ -129,6 +148,18 @@ export function VistaIstanza({ ist, hoCompito }: { ist: Istanza; hoCompito?: boo
           </Paper>
         )}
       </Stack>
+      <ElencoRitorni ist={ist} />
+    </Stack>
+  );
+}
+
+function LegendaRitorno({ colore, testo }: { colore: string; testo: string }) {
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center">
+      <Box component="svg" width={22} height={10} aria-hidden="true">
+        <line x1={1} y1={5} x2={21} y2={5} stroke={colore} strokeWidth={2.4} strokeDasharray="5 3" />
+      </Box>
+      <Typography variant="caption">{testo}</Typography>
     </Stack>
   );
 }
@@ -189,7 +220,10 @@ function DettaglioNodo({ ist, nodoId }: { ist: Istanza; nodoId: string }) {
                   <TableRow key={t.id ?? i}>
                     <TableCell>{t.assignee?.name}</TableCell>
                     <TableCell>
-                      {t.status === "DONE" ? etichettaEsito(t.outcome) : STATO_COMPITO[t.status] ?? t.status}
+                      {t.status === "DONE" ? etichettaEsito(t.outcome)
+                        : t.waiting ? "In attesa di chiarimento"
+                        : t.status === "CANCELLED" && t.cancel_reason ? t.cancel_reason
+                        : STATO_COMPITO[t.status] ?? t.status}
                       {t.comment && <Typography variant="caption" display="block" fontStyle="italic">“{t.comment}”</Typography>}
                       {t.completed_at && <Typography variant="caption" display="block" color="text.secondary">{data(t.completed_at)}</Typography>}
                     </TableCell>
@@ -198,8 +232,36 @@ function DettaglioNodo({ ist, nodoId }: { ist: Istanza; nodoId: string }) {
               </TableBody>
             </Table>
           )}
+          <RitorniDelGiro ist={ist} nodoId={nodoId} round={g.round} sendBackId={g.send_back_id} />
         </Box>
       ))}
+    </Stack>
+  );
+}
+
+/**
+ * Storico dei ritorni di un giro (§6): perché il giro è stato riaperto o rifatto, cosa ha chiesto da qui chi lo
+ * aveva in carico (chiarimenti con la risposta, modifiche), e i chiarimenti chiesti a chi lo ha svolto.
+ */
+function RitorniDelGiro({ ist, nodoId, round, sendBackId }: { ist: Istanza; nodoId: string; round: number; sendBackId?: string | null }) {
+  const tutte = ist.send_backs ?? [];
+  const origine = sendBackId ? tutte.find((b) => b.id === sendBackId) : undefined;
+  const daQui = tutte.filter((b) => b.from.node_id === nodoId && b.from.round === round);
+  const aQui = tutte.filter((b) => b.kind === "CLARIFICATION" && b.target.node_id === nodoId && b.target.round === round);
+  if (!origine && !daQui.length && !aQui.length) return null;
+  const riaperto = origine && origine.target.node_id === nodoId && origine.target.reopened_round === round;
+  return (
+    <Stack spacing={0.75} mt={1}>
+      {origine && (
+        <Typography variant="caption" color="text.secondary">
+          {riaperto ? "Riaperto per la richiesta di modifiche:" : `Rifatto mentre il flusso tornava a «${origine.from.name}»:`}
+        </Typography>
+      )}
+      {origine && <VoceRitorno b={origine} compatta />}
+      {daQui.length > 0 && <Typography variant="caption" color="text.secondary">Chiesto da questo passo:</Typography>}
+      {daQui.map((b) => <VoceRitorno key={b.id} b={b} compatta />)}
+      {aQui.length > 0 && <Typography variant="caption" color="text.secondary">Chiarimenti chiesti a chi ha svolto questo passo:</Typography>}
+      {aQui.map((b) => <VoceRitorno key={b.id} b={b} compatta />)}
     </Stack>
   );
 }

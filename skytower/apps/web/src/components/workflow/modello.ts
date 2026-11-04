@@ -71,11 +71,34 @@ export interface CompitoGiro {
   assignee: { id: string; name: string };
   status: "OPEN" | "DONE" | "CANCELLED";
   outcome: string | null; comment: string | null; completed_at: string | null;
+  /** Tornare indietro (§6): perché è stato annullato ("Rimandato indietro a …"), in attesa di un chiarimento. */
+  cancel_reason?: string | null; waiting?: boolean;
 }
 export interface Giro {
   node_id: string; round: number; status: StatoGiro; outcome: string | null;
   activated_at: string | null; completed_at: string | null; due_at: string | null;
   tasks: CompitoGiro[];
+  /** Giro riaperto o rifatto per una richiesta di modifiche (id della richiesta in `send_backs`). */
+  send_back_id?: string | null;
+}
+
+/**
+ * Richiesta di chiarimento o di modifiche fatta da un nodo verso un nodo già fatto del ramo, o verso chi ha avviato
+ * (contratto §6). Stato: chiarimento OPEN / ANSWERED / CLOSED; modifiche OPEN (si sta rifacendo) / RETURNED (il flusso
+ * è tornato al nodo che le ha chieste) / CLOSED (ha preso un'altra strada o il workflow è finito).
+ */
+export interface RichiestaRitorno {
+  id: string; instance_id?: string;
+  kind: "CLARIFICATION" | "CHANGES";
+  status: "OPEN" | "ANSWERED" | "RETURNED" | "CLOSED";
+  from: { node_id: string; name: string; round: number; task_id: string };
+  target: { node_id: string; originator: boolean; name: string; round: number | null; reopened_round: number | null };
+  comment: string; asked_by: { id: string; name: string }; created_at: string;
+  recipients: string[];
+  answer: string | null; answered_by: { id: string; name: string } | null; answered_at: string | null;
+  revision: { from_id: string; from_code: string | null; to_id: string; to_code: string | null } | null;
+  documents_changed_at: string | null;
+  documents_before?: string[] | null; documents_after?: string[] | null;
 }
 export interface ArcoPercorso { from: string; outcome?: string | null; to: string; round: number; at: string }
 export interface Istanza {
@@ -91,6 +114,8 @@ export interface Istanza {
   node_runs: Giro[];
   edges_taken: ArcoPercorso[];
   documents?: { id: string; identifier: string; title: string }[];
+  /** Chiarimenti e richieste di modifiche, nell'ordine in cui sono stati fatti (§6). */
+  send_backs?: RichiestaRitorno[];
 }
 
 // ---------------------------------------------------------------- etichette e valori predefiniti
@@ -276,6 +301,30 @@ export function percorsiDaIstanza(ist: Pick<Istanza, "edges_taken">): { archi: S
     archi: new Set(ist.edges_taken.map((a) => `${a.from}|${a.outcome ?? ""}|${a.to}`)),
     gruppi: new Set(ist.edges_taken.map((a) => `${a.from}|${a.outcome ?? ""}`)),
   };
+}
+
+/** Freccia di ritorno della vista finale: dal nodo che ha chiesto al nodo interpellato o riaperto. */
+export interface FrecciaRitorno { from: string; to: string; tipo: "modifiche" | "chiarimento"; titolo: string; aperta: boolean }
+
+/**
+ * Frecce tratteggiate dei ritorni (§6): una per coppia di nodi e tipo, con il numero di richieste nel titolo; per
+ * "chi ha avviato" la freccia va al nodo di avvio. Le richieste ancora in corso la rendono "aperta" (più marcata).
+ */
+export function ritorniDaIstanza(ist: Pick<Istanza, "send_backs">): FrecciaRitorno[] {
+  const out = new Map<string, FrecciaRitorno & { n: number }>();
+  for (const b of ist.send_backs ?? []) {
+    const tipo = b.kind === "CHANGES" ? "modifiche" : "chiarimento";
+    const chiave = `${b.from.node_id}|${b.target.node_id}|${tipo}`;
+    const aperta = b.status === "OPEN";
+    const prima = out.get(chiave);
+    if (prima) { prima.n += 1; prima.aperta ||= aperta; continue; }
+    out.set(chiave, { from: b.from.node_id, to: b.target.node_id, tipo, aperta, n: 1, titolo: "" });
+  }
+  return [...out.values()].map(({ n, ...f }) => {
+    const r = (ist.send_backs ?? []).find((b) => b.from.node_id === f.from && b.target.node_id === f.to);
+    const cosa = f.tipo === "modifiche" ? "Modifiche richieste" : "Chiarimento chiesto";
+    return { ...f, titolo: `${cosa}${n > 1 ? ` (${n} volte)` : ""}: «${r?.from.name ?? f.from}» → «${r?.target.name ?? f.to}»` };
+  });
 }
 
 /**

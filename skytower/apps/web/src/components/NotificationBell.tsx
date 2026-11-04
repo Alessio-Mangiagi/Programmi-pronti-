@@ -22,7 +22,9 @@ interface Notification {
 
 // tipi raggruppati come nel riepilogo giornaliero (notifier.py)
 const GROUPS: { key: string; label: string; kinds: string[] }[] = [
-  { key: "task", label: "Compiti", kinds: ["TASK_ASSIGNED", "TASK_REMINDER", "TASK_OVERDUE", "TASK_ESCALATED", "WORKFLOW_APPROVED", "WORKFLOW_REJECTED"] },
+  // WORKFLOW_CLARIFICATION_* / WORKFLOW_CHANGES_REQUESTED: tornare indietro da un nodo (0042, ADR-51)
+  { key: "task", label: "Compiti", kinds: ["TASK_ASSIGNED", "TASK_REMINDER", "TASK_OVERDUE", "TASK_ESCALATED", "WORKFLOW_APPROVED", "WORKFLOW_REJECTED",
+    "WORKFLOW_CLARIFICATION_REQUESTED", "WORKFLOW_CLARIFICATION_ANSWERED", "WORKFLOW_CHANGES_REQUESTED"] },
   { key: "rfi", label: "RFI", kinds: ["RFI_CREATED", "RFI_REMINDER", "RFI_OVERDUE"] },
   { key: "transmittal", label: "Transmittal", kinds: ["TRANSMITTAL_RECEIVED", "TRANSMITTAL_ACKNOWLEDGED"] },
   { key: "follow", label: "Documenti seguiti", kinds: ["DOCUMENT_FOLLOWED"] },

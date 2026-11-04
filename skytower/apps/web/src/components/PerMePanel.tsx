@@ -114,13 +114,13 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
         {show("TASKS") && urgent.map((t) => (
           <Item key={t.id} tone="urgent" kicker={`${tipoCompito(t)} · ${t.overdue ? "scaduto" : "scade"} ${when(t.due_at)}`}
                 title={titoloCompito(t)} detail={`${t.project_code} · ${t.step_name}`}
-                onClick={() => go(`/compiti?instance=${t.instance_id}`)} />
+                onClick={() => go(`/compiti?instance=${t.instance_id}&task=${t.id}`)} />
         ))}
         {show("TASKS") && normal.length > 0 && <Section title="Compiti" />}
         {show("TASKS") && normal.map((t) => (
           <Item key={t.id} kicker={`${tipoCompito(t)}${t.due_at ? ` · entro ${when(t.due_at)}` : ""}`}
                 title={titoloCompito(t)} detail={`${t.project_code} · ${t.step_name} · ${t.template_name}`}
-                onClick={() => go(`/compiti?instance=${t.instance_id}`)} />
+                onClick={() => go(`/compiti?instance=${t.instance_id}&task=${t.id}`)} />
         ))}
         {show("TASKS") && transmittals.length > 0 && <Section title="Trasmissioni da confermare" />}
         {show("TASKS") && transmittals.map((t) => (
@@ -186,9 +186,14 @@ function Item({ kicker, title, detail, tone, onClick }: { kicker: string; title:
   );
 }
 
-/** Compiti dei workflow a grafo: un processo (RdA, gara…) non ha documento né revisione da mostrare. */
-function tipoCompito(t: { revision_code?: string | null }) {
-  return t.revision_code ? "Revisione" : "Processo";
+/** Compiti dei workflow a grafo: un processo (RdA, gara…) non ha documento né revisione da mostrare. Tornare indietro
+ *  (0042): un chiarimento da dare, un compito fermo in attesa di chiarimento, modifiche ricevute. */
+function tipoCompito(t: Pick<MyTask, "revision_code" | "kind" | "waiting_for" | "changes_request">) {
+  if (t.kind === "CLARIFICATION") return "Chiarimento da dare";
+  const base = t.revision_code ? "Revisione" : "Processo";
+  if (t.waiting_for) return `${base} · in attesa di chiarimento`;
+  if (t.changes_request) return `${base} · modifiche richieste`;
+  return base;
 }
 function titoloCompito(t: { title: string; revision_code?: string | null }) {
   return t.revision_code ? `${t.title} ${t.revision_code}` : t.title;
