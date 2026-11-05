@@ -13,6 +13,7 @@
 | Riquadro giallo con *somma righe ≠ importo lavori* | Mancano righe o l'importo di testata è diverso: controlla l'originale e correggi in **Modifica**. |
 | *Modulo contratto non valido (N errori)* | Il modulo compilato a mano ha valori fuori formato: ogni errore dice la **riga** del file. Correggi, salva e premi **Scansiona** (vedi [4.4](04-formati-e-claude.md#44-modulo-contratto-i-dati-scritti-a-mano-letti-alla-lettera)). |
 | Dopo *Converti in modulo contratto + Excel* il riquadro rosso dice che il modulo va completato, e l'Excel non c'è | Il documento non riportava un dato obbligatorio, o un valore letto era fuori formato: l'Excel non si fa finché il modulo non è valido. Apri `<nome>_modulo.txt`, cerca le righe `# DA VERIFICARE`, compila i campi indicati e rimetti il file in coda: l'Excel esce dal modulo corretto. |
+| Un modulo **scansionato** viene respinto con *la riga ha N celle, l'intestazione 6* | L'OCR ha perso un `\|` in una voce che non ha l'importo, quindi il programma non può verificarla. Correggi quella voce nel modulo (o scrivi l'importo) e ristampa, oppure usa il file di testo. |
 | Un modulo `.txt` viene mostrato come testo invece di essere elaborato | La prima riga del file deve essere esattamente `MODULO CONTRATTO OCR v1`: parti dal modulo vuoto scaricato. |
 | *«Manca l'altro file»* | Hai una bozza Word senza PDF o viceversa: **Aggiungi l'altro file** o **Procedi senza**. |
 | La scheda **Originale** è vuota | Il browser non riesce a mostrare il PDF dentro la pagina: usa **⋮ → Apri in un'altra finestra**. |

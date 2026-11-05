@@ -134,6 +134,11 @@ senza OCR né AI, e scrive per ognuno `<nome>_Import_Contratti.xlsx`.
 `npm run confronta-moduli` ([tools/confronta_moduli.ts](tools/confronta_moduli.ts)) mette
 quei moduli, scritti a mano, accanto a quello che il programma estrae da solo dagli stessi
 PDF (`npm run harness`): testata colonna per colonna, voci una per una.
+Il modulo si legge anche **impaginato in PDF o scansionato** (`leggiModulo(…, { aCapo: true })`,
+route con `impaginato`, lavori lato server): righe a capo ricucite, voci con `|` persi
+ricostruite solo se `qta × prezzo = importo`. `npm run modulo-in-pdf`
+([tools/modulo_in_pdf.ts](tools/modulo_in_pdf.ts)) ne fa il PDF e la scansione simulata,
+`npm run confronta-moduli -- --variante formattato` misura la lettura.
 
 **GPU RTX serie 50**: paddlepaddle-gpu cu126 non le supporta e legge le pagine vuote senza
 errori. Il worker se ne accorge all'avvio (`prova_lettura` in `ocr_worker.py`) e passa alla

@@ -109,6 +109,8 @@ percentuali viene tolto, i codici RG/RI vanno in maiuscolo, l'unità di misura i
 ```
 Modulo .txt/.md ──► App.tsx (eModulo) ──► POST /api/ocr { text, format:'contratti', origine:'nativo' }
 Modulo .docx ─────► docxATesto: celle a "|" ─┘                       │
+Modulo in PDF ────► testo di TUTTE le pagine (layer o OCR) ─► { …, impaginato: true }
+  (stampato o scansionato; lavori lato server: server/lavori.ts, stessa funzione)
                                                                      ▼
                                     server.ts: eModulo(text) → leggiModulo(text)
                                         errori → 400 "Modulo contratto non valido (N errori): riga …"
@@ -133,6 +135,38 @@ Modulo .docx ─────► docxATesto: celle a "|" ─┘                  
   `recuperaCodiciRighe`, lo scarto delle righe corte, la deduplica e la riparazione dei
   valori slittati. FAM/SFAM scritte sulla riga vincono sul classificatore a parole chiave
   e vengono comunque validate sull'elenco ufficiale.
+
+### Modulo impaginato: PDF stampato o scansione
+
+Il modulo si può anche **stampare in PDF, firmare e scansionare**: il programma lo
+riconosce dalla riga di versione in testa alla prima pagina e lo legge **tutto insieme**,
+non pagina per pagina (nel browser `runScan` controlla la prima pagina prima di partire;
+sul server `server/lavori.ts` controlla il testo unito). Il testo arriva con
+`impaginato: true` e `leggiModulo(testo, { aCapo: true })` ([src/lib/modulo-contratto.ts](../src/lib/modulo-contratto.ts)):
+
+- **righe a capo ricucite** (`ricuciACapo`): in `[TESTATA]`/`[IMPORTI]` una riga senza
+  etichetta conosciuta continua il campo precedente; in `[RIGHE]` una riga senza `|`
+  continua la DESCRIZIONE della voce sopra (dopo un trattino attaccato si riattacca senza
+  spazio: `CEI 92-` + `1`). Una continuazione dopo una nota `#` resta un errore;
+- **intestazione della tabella ripetuta** su ogni pagina e **separatori `---`** spariscono;
+  il piè di pagina si scrive come nota (`# Pagina 1 di 3`) e il lettore lo salta;
+- **intestazione con un `|` perso** (`UM QUANTITA`): la cella fatta solo di etichette si divide;
+- **voce con `|` persi o letti come `1`** dalla scansione (`voceRicostruita`): si rilegge
+  dalla coda — ultimo numero = IMPORTO, QUANTITA e PREZZO = la coppia prima di lui con
+  `quantità × prezzo = importo` (1%), poi UM, codice (prima parola con cifre, `.` o `_`) e
+  descrizione. **È l'aritmetica a rendere sicura la ricostruzione**: una voce senza
+  importo, o che non torna, resta respinta con l'errore della lettura alla lettera;
+- la **TABELLA ARTICOLI ricostruita** che l'OCR accoda a ogni pagina scansionata
+  (`senzaTabellaRicostruita`, in [server/modulo.ts](../server/modulo.ts)) viene tolta:
+  nel modulo la tabella c'è già.
+
+Su un `.txt` o un Word queste indulgenze **non** valgono: lì una riga senza etichetta o
+senza `|` è un errore di battitura e va segnalata.
+
+Il PDF si ottiene con `npm run modulo-in-pdf` ([tools/modulo_in_pdf.ts](../tools/modulo_in_pdf.ts),
+Edge headless): per ogni `*_modulo.txt` scrive in `contratti/formattati/` il PDF col testo
+e la sua versione "scansionata" (200 DPI, scala di grigi, sfocatura e rumore,
+[tools/pdf_come_scansione.py](../tools/pdf_come_scansione.py)).
 
 ### Il giro inverso: documento → modulo
 
@@ -215,6 +249,22 @@ in Alyante:
   in più.
 Scrive `_confronto.md` e `_confronto.json` accanto ai moduli (cartella non versionata).
 
+Con `--variante formattato` (o `formattato_scansione`) il confronto si fa invece sul PDF
+ricavato dal modulo stesso (`npm run modulo-in-pdf`, poi
+`npm run harness -- --cartella contratti/formattati`) ed esce in `_confronto_<variante>.md`.
+Misura del 05/11/2026 sui 5 contratti di prova (colonne di testata giuste · voci esatte):
+
+| Contratto | PDF originale | Modulo in PDF | Modulo in PDF scansionato |
+|---|---|---|---|
+| GFM Impianti | 12/15 · 58/108 | 15/15 · 108/108 | 15/15 · 108/108 |
+| TMT Trasporti | 8/14 · 2/5 | 14/14 · 5/5 | respinto: 1 voce senza quantità né importo con un `\|` perso |
+| Ticopter fornitura | 11/14 · 1/4 | 14/14 · 4/4 | 14/14 · 4/4 |
+| Ticopter subappalto | 10/15 · 0/13 | 15/15 · 13/13 | 15/15 · 13/13 |
+| Progetto Costruzioni | 9/15 · 0/4 | 15/15 · 4/4 | 15/15 · 4/4 |
+
+Sulle scansioni restano gli errori dell'OCR nel testo libero (119 descrizioni identiche su
+129, `S.r.l.` letto `S.r.I.`): codici, quantità, prezzi e importi tornano tutti.
+
 Regole di compilazione emerse (anche in GUIDA_UTILIZZO.md):
 - **RG e RI insieme**: `ritenuteRgRi` restituisce i codici scritti se ce n'è almeno uno, e
   non ricava più RG dalla percentuale. Con `CODICE RI: R005` va scritto anche `CODICE RG`.
@@ -226,9 +276,10 @@ Regole di compilazione emerse (anche in GUIDA_UTILIZZO.md):
 
 ## 4. Limiti e scelte
 
-- **Un modulo = una richiesta.** Il modulo non va stampato e scansionato: come PDF le
-  pagine partirebbero una per volta e la seconda non avrebbe la riga di riconoscimento.
-  Si carica il file di testo o il Word.
+- **Un modulo = una richiesta.** Anche in PDF il modulo si legge tutto insieme (vedi
+  *Modulo impaginato*). La forma più sicura resta il file di testo o il Word: in una
+  scansione una voce a cui manca l'importo non si può verificare, e se l'OCR perde un
+  `|` proprio lì il modulo viene respinto.
 - **Righe identiche restano.** Tre voci uguali nel modulo sono tre voci volute: con
   `fedele` nessuna deduplica (nei contratti letti dall'OCR, al contrario, vengono unite).
 - **Gli elenchi ufficiali comandano ancora.** Condizioni di pagamento, DIVISIONE, conto,

@@ -102,6 +102,28 @@ come le hai scritte. La commessa scritta resta quella; se non è nell'elenco uff
 la cella esce rossa nell'Excel, come per ogni contratto. Le condizioni di pagamento
 scritte a parole vengono tradotte nel codice Alyante (es. *60 gg DFFM bonifico* → `DA`).
 
+### Il modulo stampato in PDF o scansionato
+
+Il modulo può arrivare anche **come PDF**: stampato dal computer, oppure stampato,
+firmato e passato dallo scanner. Si mette in coda come un contratto qualsiasi e si preme
+**Elabora → Excel**: il programma riconosce la riga `MODULO CONTRATTO OCR v1` in testa
+alla prima pagina e legge **tutto il documento insieme**, alla lettera come il file di testo.
+
+![Un modulo impaginato in PDF e passato dallo scanner](img/15-modulo-impaginato.png)
+
+- Le righe lunghe che vanno a capo (l'oggetto, le descrizioni delle voci) vengono
+  **ricucite** da sole.
+- L'elenco prezzi tiene le celle separate da `|`, anche stampate. L'intestazione della
+  tabella può ripetersi in cima a ogni pagina.
+- Il numero di pagina si scrive come nota: `# Pagina 1 di 3`.
+- Nelle **scansioni** l'OCR a volte perde un `|` o lo legge come `1`: il programma
+  ricostruisce la voce **solo se quantità × prezzo torna con l'importo**. Una voce senza
+  importo che ha perso un `|` non si può verificare: il riquadro rosso indica la riga, e
+  quella voce va corretta.
+- Codici, quantità e importi sono controllati dai conti; le **descrizioni** e i nomi
+  restano come li ha letti l'OCR (per esempio `S.r.I.` invece di `S.r.l.`): se servono
+  esatti, meglio il file di testo o il Word.
+
 ### Da un documento al modulo compilato
 
 Il modulo non va per forza scritto da zero: il programma può **compilarlo da solo**

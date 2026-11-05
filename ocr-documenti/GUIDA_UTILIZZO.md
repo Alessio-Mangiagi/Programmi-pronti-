@@ -194,6 +194,11 @@ nella coda e si preme **Elabora → Excel**. Esiste anche in Word (`docs/modulo/
 - Numeri `1.234,56`, date `GG/MM/AAAA`, tipologia dall'elenco, P.IVA 11 cifre.
 - Obbligatori: codice contratto, tipologia, data contratto, oggetto, fornitore.
 - Un errore blocca l'Excel: il riquadro rosso li elenca **con il numero di riga**.
+- Il modulo si può anche **stampare in PDF** (o stampare, firmare e **scansionare**) e
+  mettere in coda come un contratto: il programma lo riconosce dalla prima riga e lo legge
+  tutto insieme, ricucendo le righe andate a capo. Nelle scansioni una voce a cui l'OCR ha
+  perso un `|` viene ricostruita solo se quantità × prezzo torna con l'importo. Il piè di
+  pagina va scritto come nota (`# Pagina 1 di 3`).
 - **Converti in modulo contratto + Excel** (menu ⋮ della riga) o **⇄ Modulo + Excel**
   (colonna destra, tutti o gli spuntati) compila il modulo da un documento qualsiasi: lo
   legge, salva `<nome>_modulo.txt` (segnando `# DA VERIFICARE` ciò che non ha potuto
@@ -218,6 +223,9 @@ Per provare uno o più moduli senza aprire l'app: `npm run moduli` (cartella
 `contratti/moduli/`, oppure `npm run moduli -- file.txt`). Dice per ogni modulo gli errori con
 la riga, se la somma delle voci torna con l'importo e i codici agganciati (PROGETTO, DITTA,
 DIVISIONE, COND.PAG, RG/RI), e scrive accanto `<nome>_Import_Contratti.xlsx`.
+`npm run modulo-in-pdf` impagina i moduli in PDF (testo e scansione simulata, cartella
+`contratti/formattati/`); con `npm run harness -- --cartella contratti/formattati` e
+`npm run confronta-moduli -- --variante formattato` si misura quanto il programma ne legge.
 
 ---
 
