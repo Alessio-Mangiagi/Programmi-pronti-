@@ -15,6 +15,13 @@
  * Il PDF d'origine si ricava dal commento in testa al modulo:
  *   # Modulo compilato a mano leggendo "Contratto_fornitura.pdf" ...
  * Scrive accanto ai moduli _confronto.md (dettaglio leggibile) e _confronto.json.
+ *
+ * --variante <nome>: invece del PDF d'origine si confronta il documento ricavato dal
+ * modulo stesso, <modulo senza _modulo.txt>_<nome>.pdf (tools/modulo_in_pdf.ts:
+ * "formattato" = PDF nativo, "formattato_scansione" = lo stesso passato da scanner).
+ * Esce in _confronto_<nome>.md/.json, senza toccare il confronto con gli originali.
+ *   npm run harness -- --cartella contratti/formattati
+ *   npm run confronta-moduli -- --variante formattato
  */
 process.env.OCR_LIB_MODE = '1'
 process.env.OLLAMA_BASE = 'http://127.0.0.1:1'
@@ -116,11 +123,17 @@ const confrontaVoci = (rif: Voce[], prg: Voce[]): ConfrontoVoce[] => {
   return out
 }
 
+// --variante <nome>: vedi intestazione
+const iVar = process.argv.indexOf('--variante')
+const variante = iVar > 0 ? (process.argv[iVar + 1] ?? '') : ''
+
 const confronta = (file: string): Esito | null => {
   const txt = readFileSync(file, 'utf8')
   if (!eModulo(txt)) return null
   const m = /leggendo\s+"([^"]+)"/i.exec(txt)
-  const documento = m?.[1] ?? ''
+  const documento = variante
+    ? `${path.basename(file).replace(/_modulo\.(txt|md)$/i, '')}_${variante}.pdf`
+    : m?.[1] ?? ''
   const esito: Esito = { modulo: path.basename(file), documento, scansionato: false, campi: [], voci: [], totaleRif: 0, totalePrg: 0, importoRif: '', importoPrg: '' }
   const { result: rifJson, errori } = risultatoDaModulo(txt, 'contratti')
   if (errori.length || !rifJson) throw new Error(`${esito.modulo}: il modulo di riferimento ha errori, correggilo prima (npm run moduli)`)
@@ -151,7 +164,7 @@ const confronta = (file: string): Esito | null => {
 }
 
 // ── esecuzione ──────────────────────────────────────────────────────────────
-const args = process.argv.slice(2)
+const args = process.argv.slice(2).filter((a, k, tutti) => a !== '--variante' && tutti[k - 1] !== '--variante')
 const files: string[] = []
 for (const a of args.length ? args : [DIR_DEFAULT]) {
   const p = path.resolve(a)
@@ -163,7 +176,9 @@ for (const a of args.length ? args : [DIR_DEFAULT]) {
 const esiti = files.map(confronta).filter((e): e is Esito => !!e)
 const conta = <T extends string>(xs: { esito: T }[], k: T) => xs.filter(x => x.esito === k).length
 const md: string[] = ['# Scansione del programma ↔ modulo compilato a mano', '',
-  'Riferimento = modulo contratto scritto leggendo il PDF; programma = `npm run harness` (assist AI spento).',
+  variante
+    ? `Riferimento = modulo contratto scritto leggendo il PDF; programma = \`npm run harness\` sul documento ricavato dal modulo (\`${variante}\`, tools/modulo_in_pdf.ts).`
+    : 'Riferimento = modulo contratto scritto leggendo il PDF; programma = `npm run harness` (assist AI spento).',
   'Confronto sulle celle dell\'Excel Import_Contratti.', '']
 
 console.log('')
@@ -191,7 +206,8 @@ for (const e of esiti) {
     ...e.voci.map(v => `| ${v.esito} | ${v.rif?.articolo || '—'} | ${v.prog?.articolo || '—'} | ${v.rif ? v.rif.qta : '—'} / ${v.prog ? v.prog.qta : '—'} | ${v.rif ? v.rif.prezzo : '—'} / ${v.prog ? v.prog.prezzo : '—'} | ${v.note} |`), '')
 }
 const dirOut = files.length ? path.dirname(files[0]) : DIR_DEFAULT
-writeFileSync(path.join(dirOut, '_confronto.md'), md.join('\n'), 'utf8')
-writeFileSync(path.join(dirOut, '_confronto.json'), JSON.stringify(esiti, null, 2), 'utf8')
-console.log(`\nDettaglio → ${path.relative(ROOT, path.join(dirOut, '_confronto.md'))}`)
+const suffisso = variante ? `_${variante}` : ''
+writeFileSync(path.join(dirOut, `_confronto${suffisso}.md`), md.join('\n'), 'utf8')
+writeFileSync(path.join(dirOut, `_confronto${suffisso}.json`), JSON.stringify(esiti, null, 2), 'utf8')
+console.log(`\nDettaglio → ${path.relative(ROOT, path.join(dirOut, `_confronto${suffisso}.md`))}`)
 process.exit(0)

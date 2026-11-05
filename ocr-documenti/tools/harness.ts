@@ -12,6 +12,11 @@
  *   npm run harness -- --no-cache   # rifà l'OCR ignorando la cache
  *   npm run harness -- --no-nativo  # ignora il layer di testo: tutto all'OCR (confronto)
  *   npm run harness -- --assist     # abilita l'assist LLM (default: spento, non deterministico)
+ *   npm run harness -- --cartella contratti/formattati   # PDF da un'altra cartella
+ *
+ * Un documento che è un MODULO CONTRATTO stampato (riga di riconoscimento in testa) si
+ * legge come fanno i lavori lato server: alla lettera, righe a capo ricucite, niente
+ * parser euristici (server/modulo.ts). Un modulo con errori finisce come errore del file.
  *
  * Output in tests/out/<nome>/:
  *   ocr.txt          testo OCR completo (input esatto dei parser)
@@ -33,7 +38,12 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
-const DIR_CONTRATTI = path.join(ROOT, 'contratti')
+// --cartella <dir>: i PDF da provare stanno altrove (es. i contratti riscritti nel
+// formato del modulo, tools/modulo_in_pdf.ts). Default: contratti/.
+const iCartella = process.argv.indexOf('--cartella')
+const DIR_CONTRATTI = iCartella > 0 && process.argv[iCartella + 1]
+  ? path.resolve(process.argv[iCartella + 1])
+  : path.join(ROOT, 'contratti')
 const DIR_CACHE = path.join(ROOT, '.harness-cache')
 const DIR_PAGINE = path.join(DIR_CACHE, 'pagine')
 const DIR_OUT = path.join(ROOT, 'tests', 'out')
@@ -46,12 +56,12 @@ const noCache = process.argv.includes('--no-cache')
 // Misura di controllo: forza all'OCR anche le pagine native, così il prima/dopo del
 // percorso nativo si legge sullo STESSO harness e sugli stessi parser.
 const noNativo = process.argv.includes('--no-nativo')
-const filtri = process.argv.slice(2).filter(a => !a.startsWith('--'))
+const filtri = process.argv.slice(2).filter((a, k, tutti) => !a.startsWith('--') && tutti[k - 1] !== '--cartella')
 
-const { ocrPaddle, componiTesto, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio } =
+const { ocrPaddle, componiTesto, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo } =
   await import('../server.ts')
 
-const { moduloDaRisultato } = await import('../src/lib/modulo-contratto.ts')
+const { moduloDaRisultato, eModulo, descriviErrori } = await import('../src/lib/modulo-contratto.ts')
 
 const sha1 = (b: Buffer | string) => createHash('sha1').update(b).digest('hex')
 
@@ -138,6 +148,7 @@ interface Esito {
   righeSenzaImporto: number
   testataVuota: string[]    // campi di testata rimasti vuoti
   importiVuoti: string[]
+  modulo?: boolean          // letto come MODULO CONTRATTO (alla lettera), non dai parser
   errore?: string
 }
 
@@ -179,17 +190,39 @@ const analizza = async (documento: string): Promise<Esito> => {
     }
     esito.caratteri = full.length
 
-    const e = await estraiAssistito(full)
-    const alyante = normalizzaRisultatoAlyante(strutturaAlyante(e))
-    const contratto = strutturaContratto(e, full)
+    // Modulo contratto stampato: lettura alla lettera (stessa strada di server/lavori.ts)
+    let alyante: string, contratto: string
+    // voci contate: quelle estratte dai parser; per il modulo quelle del JSON (le stesse)
+    let voci: Record<string, string>[] | null = null
+    const modulo = eModulo(full)
+    if (modulo) {
+      const a = risultatoDaModulo(full, 'contratti', { aCapo: true })
+      const c = risultatoDaModulo(full, 'contract', { aCapo: true })
+      if (a.errori.length || !a.result || !c.result) {
+        // il testo letto resta su disco: è lì che si vede perché il modulo non torna
+        const dir = path.join(DIR_OUT, nome)
+        await fs.mkdir(dir, { recursive: true })
+        await fs.writeFile(path.join(dir, 'ocr.txt'), full, 'utf8')
+        throw new Error(`modulo contratto non valido:\n${descriviErrori(a.errori)}`)
+      }
+      alyante = a.result
+      contratto = c.result
+    } else {
+      const e = await estraiAssistito(full)
+      voci = e.righe as Record<string, string>[]
+      alyante = normalizzaRisultatoAlyante(strutturaAlyante(e))
+      contratto = strutturaContratto(e, full)
+    }
 
     // i campi si contano sul JSON FINALE: la normalizzazione sugli elenchi ufficiali
     // riempie ancora campi (commessa, divisione…), quindi leggerli prima dava per
     // mancanti campi che nell'export ci sono
-    const fin = JSON.parse(alyante) as { testata: Record<string, string>; importi: Record<string, string> }
-    esito.righe = e.righe.length
-    esito.righeSenzaCodice = e.righe.filter(r => !String(r.codice_epu ?? '').trim()).length
-    esito.righeSenzaImporto = e.righe.filter(r => !String(r.importo ?? '').trim()).length
+    const fin = JSON.parse(alyante) as { testata: Record<string, string>; importi: Record<string, string>; righe?: Record<string, string>[] }
+    const righe = voci ?? fin.righe ?? []
+    esito.modulo = modulo
+    esito.righe = righe.length
+    esito.righeSenzaCodice = righe.filter(r => !String(r.codice_epu ?? '').trim()).length
+    esito.righeSenzaImporto = righe.filter(r => !String(r.importo ?? '').trim()).length
     esito.testataVuota = CAMPI_TESTATA.filter(k => !String(fin.testata?.[k] ?? '').trim())
     esito.importiVuoti = CAMPI_IMPORTI.filter(k => !String(fin.importi?.[k] ?? '').trim())
 
@@ -228,7 +261,7 @@ for (const documento of documenti) {
   process.stdout.write('\r' + ' '.repeat(70) + '\r')
   console.log(e.errore
     ? `✗ ${e.file} — ${e.errore}`
-    : `✓ ${e.file} — ${e.pagine}pp${e.pagineNative ? ` (${e.pagineNative} native)` : ''}${e.paginePerse ? ` (${e.paginePerse} illeggibili)` : ''}, ${e.righe} righe, testata mancante: ${e.testataVuota.join(',') || '—'}, importi mancanti: ${e.importiVuoti.join(',') || '—'}`)
+    : `✓ ${e.file}${e.modulo ? ' [modulo]' : ''} — ${e.pagine}pp${e.pagineNative ? ` (${e.pagineNative} native)` : ''}${e.paginePerse ? ` (${e.paginePerse} illeggibili)` : ''}, ${e.righe} righe, testata mancante: ${e.testataVuota.join(',') || '—'}, importi mancanti: ${e.importiVuoti.join(',') || '—'}`)
 }
 
 await fs.mkdir(DIR_OUT, { recursive: true })
