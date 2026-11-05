@@ -160,6 +160,13 @@ sul server `server/lavori.ts` controlla il testo unito). Il testo arriva con
   (`senzaTabellaRicostruita`, in [server/modulo.ts](../server/modulo.ts)) viene tolta:
   nel modulo la tabella c'è già.
 
+Nell'interfaccia: gli errori di un modulo impaginato riportano anche il testo letto
+della riga (`ErroreModulo.letta`, in `descriviErrori`: il numero di riga è quello del
+testo estratto, che sul PDF non si vede); le voci ricostruite hanno `ricostruita:
+'scansione'` e l'etichetta *N voci ricostruite dalla scansione* (non contano fra le righe
+da rivedere: su GFM erano 64 su 108, tutte giuste); un PDF col testo che è un modulo si
+riconosce già in coda (`MetaFile.modulo`, da `miniaturaFile`) e non chiede la bozza Word.
+
 Su un `.txt` o un Word queste indulgenze **non** valgono: lì una riga senza etichetta o
 senza `|` è un errore di battitura e va segnalata.
 

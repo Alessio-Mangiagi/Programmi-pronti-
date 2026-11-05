@@ -111,15 +111,21 @@ alla prima pagina e legge **tutto il documento insieme**, alla lettera come il f
 
 ![Un modulo impaginato in PDF e passato dallo scanner](img/15-modulo-impaginato.png)
 
+- In coda un modulo in PDF col testo si riconosce subito: la riga dice **In attesa ·
+  modulo contratto** e il programma non chiede la bozza Word. Un modulo **scansionato**
+  si riconosce solo dopo la lettura: la domanda sulla bozza compare come per ogni PDF,
+  si risponde **Elabora comunque**.
 - Le righe lunghe che vanno a capo (l'oggetto, le descrizioni delle voci) vengono
   **ricucite** da sole.
 - L'elenco prezzi tiene le celle separate da `|`, anche stampate. L'intestazione della
   tabella può ripetersi in cima a ogni pagina.
 - Il numero di pagina si scrive come nota: `# Pagina 1 di 3`.
 - Nelle **scansioni** l'OCR a volte perde un `|` o lo legge come `1`: il programma
-  ricostruisce la voce **solo se quantità × prezzo torna con l'importo**. Una voce senza
-  importo che ha perso un `|` non si può verificare: il riquadro rosso indica la riga, e
-  quella voce va corretta.
+  ricostruisce la voce **solo se quantità × prezzo torna con l'importo**; l'etichetta
+  azzurra **N voci ricostruite dalla scansione** dice quante. Una voce senza importo che
+  ha perso un `|` non si può verificare: il riquadro rosso riporta **il testo letto** di
+  quella riga (es. `riga 32 «A.01.010.2 | Trasporto … | t/km 0,19 |»`), e quella voce va
+  corretta.
 - Codici, quantità e importi sono controllati dai conti; le **descrizioni** e i nomi
   restano come li ha letti l'OCR (per esempio `S.r.I.` invece di `S.r.l.`): se servono
   esatti, meglio il file di testo o il Word.
