@@ -137,7 +137,10 @@ export const eModulo = (testo: string): boolean => {
   return false
 }
 
-export interface ErroreModulo { riga: number; testo: string }   // riga 0 = modulo nel suo insieme
+// riga 0 = modulo nel suo insieme. `letta`: il testo della riga, solo per un modulo
+// impaginato (PDF, scansione) — lì il numero di riga è quello del testo estratto, che
+// l'utente non vede: per trovare la voce da correggere serve sapere che cosa c'era scritto.
+export interface ErroreModulo { riga: number; testo: string; letta?: string }
 export interface EstrattoModulo {
   testata: Record<string, string>
   importi: Record<string, string>
@@ -231,8 +234,9 @@ const unisciACapo = (a: string, b: string): string => (/\S-$/.test(a) ? a + b : 
  * testo letto. Le continuazioni di una voce NON entrano nella riga ma in `seguiti`
  * (indice della voce → testo): se la scansione ha perso un "|" non si sa quale cella è
  * la descrizione finché la voce non è letta, e attaccarle alla cella sbagliata rovinava
- * proprio i numeri. leggiModulo le aggiunge alla DESCRIZIONE della voce letta. Una continuazione dopo una nota "#" non si attacca a niente e resta
- * errore: meglio respinta che appesa al campo sbagliato.
+ * proprio i numeri. leggiModulo le aggiunge alla DESCRIZIONE della voce letta.
+ * Una continuazione dopo una nota "#" non si attacca a niente e resta errore: meglio
+ * respinta che appesa al campo sbagliato.
  * Solo su richiesta (`aCapo`): in un .txt scritto a mano una riga senza etichetta o senza
  * "|" è un errore di battitura da segnalare, non un a capo.
  */
@@ -383,7 +387,12 @@ const voceRicostruita = (l: string, colonne: (ColonnaModulo | null)[], bordi: bo
   const codice = !senzaCodice && RE_CODICE.test(prime[0]) ? prime.shift()! : ''
   const descrizione = [prime.join(' '), ...testa.slice(1)].filter(Boolean).join(' ')
   if (!um || (!codice && !descrizione)) return null
-  return { ...VOCE_VUOTA(), codice_epu: codice, descrizione, udm: um.toLowerCase(), quantita: tok[coppia[0]], prezzo_lordo: tok[coppia[1]], importo: tok[num[num.length - 1]] }
+  // `ricostruita`: i numeri li conferma l'aritmetica, la divisione fra codice, descrizione
+  // e UM l'ha decisa questa funzione. L'interfaccia lo dice con un'etichetta (App.tsx,
+  // calcolaEsito) ma NON la conta fra le righe da rivedere: sui 5 contratti di prova le
+  // 64 voci ricostruite di GFM erano tutte giuste, e 64 falsi allarmi nascondono quelli
+  // veri. L'export Excel ignora la chiave.
+  return { ...VOCE_VUOTA(), codice_epu: codice, descrizione, udm: um.toLowerCase(), quantita: tok[coppia[0]], prezzo_lordo: tok[coppia[1]], importo: tok[num[num.length - 1]], ricostruita: 'scansione' }
 }
 
 export interface OpzioniLettura {
@@ -400,7 +409,12 @@ export const leggiModulo = (testo: string, opz: OpzioniLettura = {}): EsitoModul
   const testata: Record<string, string> = {}
   const importi: Record<string, string> = {}
   const righe: Record<string, string>[] = []
-  const err = (riga: number, t: string) => errori.push({ riga, testo: t })
+  const err = (riga: number, t: string) => {
+    const letta = opz.aCapo && riga ? righeTesto[riga - 1]?.trim() : ''
+    // riga lunga: inizio (il codice, per trovare la voce) e fine (le celle, dove di solito
+    // sta il problema), il centro della descrizione si può saltare
+    errori.push(letta ? { riga, testo: t, letta: letta.length > 100 ? `${letta.slice(0, 50)} … ${letta.slice(-45)}` : letta } : { riga, testo: t })
+  }
 
   let sezione: Sezione = 'inizio'
   let marcatore = false
@@ -501,7 +515,7 @@ export const leggiModulo = (testo: string, opz: OpzioniLettura = {}): EsitoModul
 
 /** Errori → testo per l'utente (uno per riga, con il numero di riga del modulo). */
 export const descriviErrori = (errori: ErroreModulo[]): string =>
-  errori.map(e => (e.riga ? `riga ${e.riga}: ${e.testo}` : e.testo)).join('\n')
+  errori.map(e => (!e.riga ? e.testo : e.letta ? `riga ${e.riga} «${e.letta}»: ${e.testo}` : `riga ${e.riga}: ${e.testo}`)).join('\n')
 
 // ── Modulo vuoto ────────────────────────────────────────────────────────────
 

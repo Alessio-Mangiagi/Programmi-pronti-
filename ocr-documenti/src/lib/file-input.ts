@@ -10,7 +10,11 @@ import type { FileKind } from './formati'
 // `firma`: i token con cifre (codici, importi, date, P.IVA) delle prime pagine. Serve ad
 // abbinare bozza Word e PDF quando i nomi non si somigliano: due documenti dello
 // stesso contratto condividono quei numeri, due contratti diversi dallo stesso modello no.
-export interface MetaFile { pagine?: number; miniatura?: string; firma?: string[] }
+// `modulo`: PDF col testo che è un MODULO CONTRATTO stampato (riga di riconoscimento in
+// testa alla prima pagina). Non ha una bozza Word da confrontare: l'app non la chiede e
+// la riga in coda lo dice. Una SCANSIONE di modulo non ha testo e qui non si riconosce:
+// lo riconosce il server dopo l'OCR.
+export interface MetaFile { pagine?: number; miniatura?: string; firma?: string[]; modulo?: boolean }
 
 export const firmaDelTesto = (testo: string): string[] => {
   const out = new Set<string>()
@@ -211,13 +215,18 @@ export const miniaturaFile = async (f: File): Promise<MetaFile> => {
         // firma del contenuto dalle prime due pagine (solo layer di testo: le scansioni
         // non ne hanno, e lì l'abbinamento resta per nome o a mano)
         let testo = ''
+        let modulo = false
         for (let n = 1; n <= Math.min(2, pdf.numPages); n++) {
           const pg = n === 1 ? page : await pdf.getPage(n)
-          try { testo += ' ' + (testoDaTextContent((await pg.getTextContent()).items as ItemPdfTesto[]) ?? '') } catch { /* pagina senza testo */ }
+          try {
+            const t = testoDaTextContent((await pg.getTextContent()).items as ItemPdfTesto[]) ?? ''
+            if (n === 1) modulo = eModulo(t)
+            testo += ' ' + t
+          } catch { /* pagina senza testo */ }
           if (n !== 1) pg.cleanup()
         }
         page.cleanup()
-        return { pagine: pdf.numPages, miniatura: canvas.toDataURL('image/jpeg', 0.82), firma: firmaDelTesto(testo) }
+        return { pagine: pdf.numPages, miniatura: canvas.toDataURL('image/jpeg', 0.82), firma: firmaDelTesto(testo), ...(modulo ? { modulo } : {}) }
       } finally {
         pdf.destroy()
       }

@@ -569,13 +569,14 @@ export default function App() {
   // Cosa manca a un documento perché il confronto bozza ↔ firmato possa avvenire: la
   // bozza Word a un PDF, il PDF firmato a un Word. Niente in .JSON (lì il confronto
   // non c'è) e per gli altri tipi di file.
+  // Un modulo contratto in PDF (metaFile.modulo) non ha bozza: non si chiede.
   const fileMancante = useCallback((f: File): 'word' | 'pdf' | null => {
     if (format === 'json') return null
     const k = detectKind(f)
-    if (k === 'pdf' && !bozzaWordPer(f)) return 'word'
+    if (k === 'pdf' && !bozzaWordPer(f) && !metaFile[chiaveFile(f)]?.modulo) return 'word'
     if (k === 'docx' && !pdfDellaBozza(f)) return 'pdf'
     return null
-  }, [format, bozzaWordPer, pdfDellaBozza])
+  }, [format, bozzaWordPer, pdfDellaBozza, metaFile])
   // true = fermarsi, la domanda è aperta; `poi` riparte se l'utente procede lo stesso.
   // Si chiede sempre: aggiungere il file dopo vorrebbe dire riscansionare.
   const chiediCoppia = (indici: number[], poi: () => void): boolean => {
@@ -1068,6 +1069,9 @@ export default function App() {
       !daOcr ? { testo: 'tutte da testo nativo', colore: C.green, aiuto: 'Voci lette dal testo del documento, non dalla scansione: i valori sono esatti carattere per carattere' }
       : !nativi ? { testo: 'tutte da OCR', colore: C.muted, aiuto: 'Voci lette dalla scansione: i valori sono un’ipotesi e vanno confermati' }
       : { testo: `${nativi} da testo nativo · ${daOcr} da OCR`, colore: C.blue, aiuto: 'Le voci da testo nativo sono esatte; quelle da OCR vanno confermate. Il numero di pagina nella tabella dice quali sono quali.' })
+    // modulo contratto scansionato: voci rimesse insieme dopo un "|" perso dall'OCR
+    const ricostruite = righe.filter(r => r.ricostruita).length
+    if (ricostruite) badge.push({ testo: `${ricostruite} voc${ricostruite === 1 ? 'e ricostruita' : 'i ricostruite'} dalla scansione`, colore: C.blue, aiuto: 'Modulo contratto scansionato: in queste voci l’OCR aveva perso un separatore «|» e il programma le ha rimesse insieme. Quantità, prezzo e importo sono confermati dai conti (quantità × prezzo = importo); codice, descrizione e unità di misura sono divisi dal programma: se qualcosa non torna, si corregge in «Modifica».' })
     if (vuoti) badge.push({ testo: `testata: ${vuoti} campi vuoti`, colore: C.yellow, aiuto: 'Campi della testata rimasti senza valore: da completare in modifica' })
     if (assist) badge.push({ testo: `${assist} campi dall’assist AI`, colore: C.blue, aiuto: 'Campi completati dal modello locale e verificati contro il testo OCR' })
     // Dove guardare: righe con un valore letto sotto soglia di confidenza dall'OCR, righe
@@ -2577,6 +2581,9 @@ export default function App() {
                             ) : (
                               <span style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap', display: 'inline-flex', gap: 4, alignItems: 'baseline', minWidth: 0 }}>
                                 In attesa
+                                {kind === 'pdf' && metaFile[chiaveFile(item.file)]?.modulo && (
+                                  <span title="Modulo contratto stampato in PDF: si legge alla lettera, senza AI e senza bozza Word" style={{ color: C.accent }}>· modulo contratto</span>
+                                )}
                                 {kind === 'pdf' && bozzaWordPer(item.file) && (
                                   <span title="Bozza Word abbinata: si confronta prima dell’estrazione, vale il PDF. Per cambiarla: menu ⋮ → Bozza Word" style={{ display: 'inline-flex', gap: 3, minWidth: 0 }}>· bozza <NomeFile nome={bozzaWordPer(item.file)!.name} style={{ maxWidth: 120, color: C.text }} /></span>
                                 )}
@@ -3463,7 +3470,7 @@ export default function App() {
                 type="button"
                 onClick={() => downloadBlob(new Blob(['﻿' + moduloVuoto()], { type: 'text/plain;charset=utf-8' }), `${NOME_FILE_MODULO}.txt`)}
                 disabled={loading}
-                title="Scarica il modulo contratto vuoto (.txt): si compila a mano e si carica qui come un documento. Letto alla lettera, senza OCR né AI; i valori fuori formato vengono segnalati con la riga."
+                title="Scarica il modulo contratto vuoto (.txt): si compila a mano e si carica qui come un documento, anche stampato in PDF o scansionato. Letto alla lettera, senza AI; i valori fuori formato vengono segnalati con la riga."
                 style={{ ...bottone('secondario', C.muted, !loading), height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13 }}
               >
                 <IconDoc size={15} /> Modulo contratto vuoto

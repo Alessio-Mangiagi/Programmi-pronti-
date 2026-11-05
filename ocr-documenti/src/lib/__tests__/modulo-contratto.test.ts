@@ -429,3 +429,18 @@ describe('leggiModulo: intestazione e descrizioni di una scansione (aCapo)', () 
     expect(leggiModulo(t).errori.some(e => /colonne sconosciute "UM QUANTITA"/.test(e.testo))).toBe(true)
   })
 })
+
+describe('modulo impaginato: cosa vede l\'interfaccia', () => {
+  const base = ['MODULO CONTRATTO OCR v1', '[TESTATA]', 'CODICE CONTRATTO: X', 'FORNITORE: F', 'TIPOLOGIA: Subappalto',
+    'DATA CONTRATTO: 01/01/2026', 'OGGETTO: O', '[RIGHE]', 'ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO']
+
+  it('l\'errore riporta il testo letto: in un PDF il numero di riga non si vede', () => {
+    const { errori } = leggiModulo([...base, 'A.01 | Trasporto | t/km 0,19 |'].join('\n'), { aCapo: true })
+    expect(descriviErrori(errori)).toMatch(/^riga 10 «A\.01 \| Trasporto \| t\/km 0,19 \|»: la riga ha 4 celle/)
+  })
+
+  it('la voce ricostruita è marcata, quella letta cella per cella no', () => {
+    const { estratto } = leggiModulo([...base, 'B.01 Scavo mc 2,00 3,00 6,00', 'B.02 | Rinterro | mc | 1,00 | 2,00 | 2,00'].join('\n'), { aCapo: true })
+    expect(estratto.righe.map(r => r.ricostruita)).toEqual(['scansione', undefined])
+  })
+})
