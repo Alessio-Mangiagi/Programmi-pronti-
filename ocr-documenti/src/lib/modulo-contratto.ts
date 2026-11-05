@@ -208,12 +208,194 @@ const itStr = (n: number): string => {
   return `${n < 0 ? '-' : ''}${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`
 }
 
+// Unione di un pezzo andato a capo: la stampa va a capo DOPO un trattino attaccato
+// ("Ticopter-" + "Sistra", "CEI 92-" + "1") e lì si riattacca senza spazio; un trattino
+// staccato ("A -") e tutto il resto si riuniscono con uno spazio.
+const unisciACapo = (a: string, b: string): string => (/\S-$/.test(a) ? a + b : `${a} ${b}`)
+
+/**
+ * MODULO IMPAGINATO (PDF stampato dal computer o scansione di un modulo stampato): le
+ * righe lunghe vanno a capo e il testo estratto arriva spezzato — l'OGGETTO su tre righe,
+ * la DESCRIZIONE di una voce sotto la riga con le celle. Qui si ricuciono:
+ * - in [TESTATA]/[IMPORTI] una riga che non è "ETICHETTA: valore" con un'etichetta
+ *   conosciuta continua il campo precedente;
+ * - in [RIGHE] una riga senza "|" continua la DESCRIZIONE della voce precedente (nella
+ *   pagina le altre celle stanno su una riga sola, è la descrizione che va a capo) —
+ *   a meno che non finisca con quantità, prezzo e importo che tornano: allora è una
+ *   voce a cui la scansione ha mangiato tutti i "|" (vedi voceRicostruita);
+ * - l'intestazione delle colonne RIPETUTA in cima a ogni pagina (la stampa delle tabelle
+ *   lunghe la ripete) sparisce: letta come voce sarebbe tutta fuori formato;
+ * - le righe di soli trattini (separatore di pagina "---" dell'app) spariscono.
+ * Ritorna lo STESSO numero di righe: la riga ricucita resta al posto della prima e le
+ * continuazioni diventano vuote, così i numeri di riga degli errori restano quelli del
+ * testo letto. Le continuazioni di una voce NON entrano nella riga ma in `seguiti`
+ * (indice della voce → testo): se la scansione ha perso un "|" non si sa quale cella è
+ * la descrizione finché la voce non è letta, e attaccarle alla cella sbagliata rovinava
+ * proprio i numeri. leggiModulo le aggiunge alla DESCRIZIONE della voce letta. Una continuazione dopo una nota "#" non si attacca a niente e resta
+ * errore: meglio respinta che appesa al campo sbagliato.
+ * Solo su richiesta (`aCapo`): in un .txt scritto a mano una riga senza etichetta o senza
+ * "|" è un errore di battitura da segnalare, non un a capo.
+ */
+const ricuciACapo = (righe: string[]): { righe: string[]; seguiti: Map<number, string> } => {
+  const out = [...righe]
+  const seguiti = new Map<number, string>()
+  let sezione: Sezione = 'inizio'
+  let ultima = -1               // indice della riga che una continuazione allunga
+  let intestazione = false      // intestazione di [RIGHE] già letta
+  let bordi = false
+  let colonne: (ColonnaModulo | null)[] = []
+  let chiaveIntestazione = ''   // l'intestazione normalizzata, per riconoscerla ripetuta
+  const chiaveCelle = (l: string) => celleIntestazione(l, l.startsWith('|'), true).map(normEtichetta).join('|')
+  for (let i = 0; i < out.length; i++) {
+    const l = out[i].trim()
+    if (!l) continue
+    if (/^-{3,}$/.test(l)) { out[i] = ''; continue }
+    if (l.startsWith('#') || l.startsWith('//')) { ultima = -1; continue }
+    if (RE_MARCATORE.test(l)) continue
+    const sez = RE_SEZIONE.exec(l)
+    if (sez) {
+      sezione = sez[1].toLowerCase() as Sezione
+      ultima = -1
+      if (sezione === 'righe') intestazione = false
+      continue
+    }
+    if (sezione === 'testata' || sezione === 'importi') {
+      const campo = campoDaRiga(l)
+      const conosciuta = campo && (IDX_TESTATA.has(normEtichetta(campo[0])) || IDX_IMPORTI.has(normEtichetta(campo[0])))
+      if (conosciuta) ultima = i
+      else if (ultima >= 0) { out[ultima] = unisciACapo(out[ultima].trim(), l); out[i] = '' }
+      continue
+    }
+    if (sezione !== 'righe' || RE_SEP_MD.test(l)) continue
+    if (!intestazione) {
+      intestazione = true
+      bordi = l.startsWith('|')
+      colonne = celleIntestazione(l, bordi, true).map(x => IDX_COLONNE.get(normEtichetta(x)) ?? null)
+      chiaveIntestazione = chiaveCelle(l)
+      continue
+    }
+    if (l.includes('|') && chiaveCelle(l) === chiaveIntestazione) { out[i] = ''; ultima = -1; continue }
+    if (l.includes('|') || voceRicostruita(l, colonne, bordi)) { ultima = i; continue }
+    if (ultima >= 0) {
+      const prima = seguiti.get(ultima)
+      seguiti.set(ultima, prima ? unisciACapo(prima, l) : l)
+      out[i] = ''
+    }
+  }
+  return { righe: out, seguiti }
+}
+
+// Celle dell'intestazione di [RIGHE]. In un modulo impaginato (scansione) un "|" fra due
+// etichette può sparire ("UM QUANTITA"): una cella che non è un'etichetta ma è fatta solo
+// di etichette di una parola si divide. Nel .txt scritto a mano resta un errore.
+const celleIntestazione = (l: string, bordi: boolean, aCapo: boolean): string[] =>
+  celle(l, bordi).flatMap(x => {
+    if (!aCapo || !x || IDX_COLONNE.has(normEtichetta(x))) return [x]
+    const parti = x.split(/\s+/)
+    return parti.length > 1 && parti.every(p => IDX_COLONNE.has(normEtichetta(p))) ? parti : [x]
+  })
+
+const VOCE_VUOTA = (): Record<string, string> => ({ progressivo: '', codice_epu: '', descrizione: '', udm: '', quantita: '', prezzo_lordo: '', importo: '' })
+
+// L'importo è l'unica colonna verificabile: se c'è deve essere quantità × prezzo
+// (1% di tolleranza per gli arrotondamenti dei prezzari).
+const importoTorna = (q: number, p: number, im: number): boolean => im === 0 || Math.abs(q * p - im) / Math.abs(im) <= 0.01
+
+/**
+ * Celle di una voce di [RIGHE] → voce, oppure gli errori che la respingono (senza numero
+ * di riga: lo aggiunge il chiamante). È la lettura ALLA LETTERA, cella per cella.
+ */
+const voceDaCelle = (c: string[], colonne: (ColonnaModulo | null)[]): { voce?: Record<string, string>; errori: string[] } => {
+  if (c.length !== colonne.length) {
+    return { errori: [`la riga ha ${c.length} celle, l'intestazione ${colonne.length}: ogni voce deve avere lo stesso numero di celle (anche vuote) separate da "|"`] }
+  }
+  const r = VOCE_VUOTA()
+  const errori: string[] = []
+  c.forEach((v, k) => {
+    const col = colonne[k]
+    if (!col || !v) return
+    const val = validaValore(v, col.tipo)
+    if (val.startsWith('!')) errori.push(`${col.etichetta}: ${val.slice(1)}`)
+    else r[col.chiave] = val
+  })
+  if (errori.length) return { errori }
+  if (!r.descrizione && !r.codice_epu) return { errori: ['voce senza ARTICOLO né DESCRIZIONE'] }
+  if (r.quantita && r.prezzo_lordo && r.importo && !importoTorna(numIt(r.quantita), numIt(r.prezzo_lordo), numIt(r.importo))) {
+    return { errori: [`IMPORTO ${r.importo} ≠ QUANTITA × PREZZO (${itStr(numIt(r.quantita) * numIt(r.prezzo_lordo))})`] }
+  }
+  r.udm = r.udm.toLowerCase()
+  return { voce: r, errori: [] }
+}
+
+// Le sei colonne obbligatorie nell'ordine del modulo: la ricostruzione sa leggere solo questa forma.
+const ORDINE_STANDARD = ['codice_epu', 'descrizione', 'udm', 'quantita', 'prezzo_lordo', 'importo'].join()
+// Un codice articolo ha almeno una cifra, un punto o un "_" ("B.07.115.A", "NPYY_G.03.030.a"):
+// una parola qualunque in testa alla riga è l'inizio della descrizione di una voce senza codice.
+const RE_CODICE = /^[^\s|]*[\d._][^\s|]*$/
+
+/**
+ * Voce di una SCANSIONE di modulo stampato che la lettura cella per cella respinge: l'OCR
+ * ha perso un "|" ("bordo ml 295,00") o l'ha letto come "1" ("| 1 120,00"). Si ricostruisce
+ * dalla coda, che ha la forma più rigida:
+ * - in fondo alla riga c'è una sequenza di numeri: l'ultimo è l'IMPORTO, e QUANTITA e
+ *   PREZZO sono la coppia di numeri prima di lui con quantità × prezzo = importo (1%).
+ *   È questo controllo a rendere sicura la ricostruzione: senza importo, o se nessuna
+ *   coppia torna, la voce resta respinta con gli errori della lettura alla lettera;
+ * - prima dei numeri c'è l'UM (l'ultima cella, o l'ultima parola se il "|" è sparito);
+ * - in testa il codice (prima parola, se ha la forma di un codice) e poi la descrizione.
+ * Solo con le sei colonne standard nell'ordine del modulo; altrimenti null.
+ */
+const voceRicostruita = (l: string, colonne: (ColonnaModulo | null)[], bordi: boolean): Record<string, string> | null => {
+  if (colonne.map(c => c?.chiave).join() !== ORDINE_STANDARD) return null
+  const riga = bordi ? l.replace(/^\|/, '').replace(/\|\s*$/, '') : l
+  const tok = riga.split(/(\|)|\s+/).filter((t): t is string => !!t)
+  // coda numerica: numeri (e "|") dalla fine fino alla prima parola
+  const num: number[] = []                 // indici in tok
+  let k = tok.length
+  while (k > 0 && (tok[k - 1] === '|' || RE_NUM_IT.test(tok[k - 1]))) {
+    k--
+    if (tok[k] !== '|') num.unshift(k)
+  }
+  if (num.length < 3) return null
+  const im = numIt(tok[num[num.length - 1]])
+  if (!im) return null
+  let coppia: [number, number] | null = null
+  for (let b = num.length - 2; b >= 1 && !coppia; b--) {
+    for (let a = b - 1; a >= 0; a--) {
+      if (importoTorna(numIt(tok[num[a]]), numIt(tok[num[b]]), im)) { coppia = [num[a], num[b]]; break }
+    }
+  }
+  if (!coppia) return null
+  // tutto ciò che sta prima della quantità è codice, descrizione e UM
+  const celleTesta = tok.slice(0, coppia[0]).join(' ').split('|').map(x => x.trim())
+  while (celleTesta.length && !celleTesta[celleTesta.length - 1]) celleTesta.pop()
+  if (celleTesta.length < 2 && !(celleTesta[0] ?? '').includes(' ')) return null
+  let um = celleTesta.pop()!
+  if (um.split(' ').length > 2 || um.length > 12) {     // "|" prima dell'UM sparito
+    const parole = um.split(' ')
+    um = parole.pop()!
+    celleTesta.push(parole.join(' '))
+  }
+  um = um.replace(/^[^\p{L}\d]+|[^\p{L}\d²³]+$/gu, '')
+  const senzaCodice = celleTesta[0] === ''              // "| descrizione | …": articolo vuoto
+  const testa = celleTesta.filter(Boolean)
+  const prime = (testa[0] ?? '').split(' ')
+  const codice = !senzaCodice && RE_CODICE.test(prime[0]) ? prime.shift()! : ''
+  const descrizione = [prime.join(' '), ...testa.slice(1)].filter(Boolean).join(' ')
+  if (!um || (!codice && !descrizione)) return null
+  return { ...VOCE_VUOTA(), codice_epu: codice, descrizione, udm: um.toLowerCase(), quantita: tok[coppia[0]], prezzo_lordo: tok[coppia[1]], importo: tok[num[num.length - 1]] }
+}
+
+export interface OpzioniLettura {
+  aCapo?: boolean    // testo da un documento impaginato (PDF, scansione): vedi ricuciACapo
+}
+
 /**
  * Modulo compilato → Estratto + elenco degli errori (riga e motivo).
  * Con errori l'Estratto non va usato: la route rifiuta il modulo e li mostra tutti,
  * così si correggono in un giro solo.
  */
-export const leggiModulo = (testo: string): EsitoModulo => {
+export const leggiModulo = (testo: string, opz: OpzioniLettura = {}): EsitoModulo => {
   const errori: ErroreModulo[] = []
   const testata: Record<string, string> = {}
   const importi: Record<string, string> = {}
@@ -227,7 +409,8 @@ export const leggiModulo = (testo: string): EsitoModulo => {
   const visti = new Set<string>()
   const errati = new Set<string>()                       // campi presenti ma respinti dalla validazione
 
-  const righeTesto = testo.split(/\r?\n/)
+  const divise = testo.split(/\r?\n/)
+  const { righe: righeTesto, seguiti } = opz.aCapo ? ricuciACapo(divise) : { righe: divise, seguiti: new Map<number, string>() }
   for (let i = 0; i < righeTesto.length; i++) {
     const n = i + 1
     const l = righeTesto[i].trim()
@@ -272,7 +455,7 @@ export const leggiModulo = (testo: string): EsitoModulo => {
     if (RE_SEP_MD.test(l)) continue
     // intestazione con il pipe in testa = tabella Markdown con cornice (vedi celle())
     if (!colonne) bordi = l.startsWith('|')
-    const c = celle(l, bordi)
+    const c: string[] = colonne ? celle(l, bordi) : celleIntestazione(l, bordi, !!opz.aCapo)
     if (!colonne) {
       const trovate = c.map(x => (x ? IDX_COLONNE.get(normEtichetta(x)) ?? null : null))
       const sconosciute = c.filter((x, k) => x && !trovate[k])
@@ -289,31 +472,13 @@ export const leggiModulo = (testo: string): EsitoModulo => {
       continue
     }
     if (!c.some(Boolean)) continue        // riga di sole celle vuote (modulo vuoto, tabella Word)
-    if (c.length !== colonne.length) {
-      err(n, `la riga ha ${c.length} celle, l'intestazione ${colonne.length}: ogni voce deve avere lo stesso numero di celle (anche vuote) separate da "|"`)
-      continue
-    }
-    const r: Record<string, string> = { progressivo: '', codice_epu: '', descrizione: '', udm: '', quantita: '', prezzo_lordo: '', importo: '' }
-    let ok = true
-    c.forEach((v, k) => {
-      const col = colonne![k]
-      if (!col || !v) return
-      const val = validaValore(v, col.tipo)
-      if (val.startsWith('!')) { err(n, `${col.etichetta}: ${val.slice(1)}`); ok = false; return }
-      r[col.chiave] = val
-    })
-    if (!ok) continue
-    if (!r.descrizione && !r.codice_epu) { err(n, 'voce senza ARTICOLO né DESCRIZIONE'); continue }
-    // L'importo è l'unica colonna verificabile: se c'è deve essere quantità × prezzo
-    // (1% di tolleranza per gli arrotondamenti dei prezzari).
-    if (r.quantita && r.prezzo_lordo && r.importo) {
-      const q = numIt(r.quantita), p = numIt(r.prezzo_lordo), im = numIt(r.importo)
-      if (im !== 0 && Math.abs(q * p - im) / Math.abs(im) > 0.01) {
-        err(n, `IMPORTO ${r.importo} ≠ QUANTITA × PREZZO (${itStr(q * p)})`)
-        continue
-      }
-    }
-    r.udm = r.udm.toLowerCase()
+    const letta = voceDaCelle(c, colonne)
+    // Modulo impaginato: nella scansione il "|" a volte sparisce o diventa un "1".
+    // Si riprova a ricostruire la voce, accettata solo se l'aritmetica la conferma.
+    const r = letta.voce ?? (opz.aCapo ? voceRicostruita(l, colonne, bordi) : null)
+    if (!r) { for (const t of letta.errori) err(n, t); continue }
+    const seguito = seguiti.get(i)            // descrizione andata a capo (ricuciACapo)
+    if (seguito) r.descrizione = r.descrizione ? unisciACapo(r.descrizione, seguito) : seguito
     r.progressivo = String(righe.length + 1)
     righe.push(r)
   }

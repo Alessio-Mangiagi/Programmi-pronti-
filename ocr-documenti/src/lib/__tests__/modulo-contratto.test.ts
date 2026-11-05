@@ -324,3 +324,108 @@ describe('moduloDaRisultato: documento estratto → modulo', () => {
     expect(estratto.righe[0].importo).toBe('-500,00')
   })
 })
+
+// Modulo IMPAGINATO (PDF stampato dal computer o scansione): il testo estratto arriva con
+// le righe lunghe spezzate, il piè di pagina come nota e l'intestazione della tabella
+// ripetuta in cima alla pagina nuova. È il testo che tools/modulo_in_pdf.ts produce.
+describe('leggiModulo: modulo impaginato (aCapo)', () => {
+  const IMPAGINATO = [
+    'MODULO CONTRATTO OCR v1',
+    '[TESTATA]',
+    'CODICE CONTRATTO: 177-125_284/2026',
+    'FORNITORE: RTI Ticopter-',
+    'Sistra S.r.l.',
+    'TIPOLOGIA: Subappalto',
+    'DATA CONTRATTO: 20/07/2026',
+    'OGGETTO: Servizio di trasporto di materiale proveniente dagli scavi',
+    'a discariche autorizzate',
+    '[RIGHE]',
+    'ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO',
+    'A.01 | Alimentatore conforme CEI 92- | cad | 2,00 | 10,00 | 20,00',
+    '1, max 100 mA',
+    '# Pagina 1 di 2',
+    '---',
+    'ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO',
+    'A.02 | Scavo | mc | 1,00 | 5,00 | 5,00',
+    '[FINE]',
+  ].join('\n')
+
+  it('ricuce campi e descrizioni andati a capo e salta intestazione ripetuta e piè di pagina', () => {
+    const { estratto, errori } = leggiModulo(IMPAGINATO, { aCapo: true })
+    expect(errori).toEqual([])
+    expect(estratto.testata.fornitore).toBe('RTI Ticopter-Sistra S.r.l.')
+    expect(estratto.testata.oggetto).toBe('Servizio di trasporto di materiale proveniente dagli scavi a discariche autorizzate')
+    expect(estratto.righe.map(r => r.descrizione)).toEqual(['Alimentatore conforme CEI 92-1, max 100 mA', 'Scavo'])
+  })
+
+  it('senza aCapo (modulo .txt scritto a mano) le stesse righe restano errori', () => {
+    const righe = leggiModulo(IMPAGINATO).errori.map(e => e.riga)
+    expect(righe).toEqual(expect.arrayContaining([5, 9, 13, 16]))
+  })
+
+  it('una continuazione dopo una nota non si attacca al campo prima della nota', () => {
+    const t = 'MODULO CONTRATTO OCR v1\n[TESTATA]\nCODICE CONTRATTO: X\nFORNITORE: F\n# nota\nriga orfana\nTIPOLOGIA: Subappalto\nDATA CONTRATTO: 01/01/2026\nOGGETTO: O'
+    const { estratto, errori } = leggiModulo(t, { aCapo: true })
+    expect(estratto.testata.fornitore).toBe('F')
+    expect(errori.map(e => e.riga)).toEqual([6])
+  })
+})
+
+// Scansione di un modulo stampato: righe vere uscite dall'OCR (tests/out/*_scansione).
+describe('leggiModulo: voci di una scansione con "|" persi o letti male (aCapo)', () => {
+  const modulo = (...voci: string[]) => ['MODULO CONTRATTO OCR v1', '[TESTATA]', 'CODICE CONTRATTO: X', 'FORNITORE: F',
+    'TIPOLOGIA: Subappalto', 'DATA CONTRATTO: 01/01/2026', 'OGGETTO: O', '[RIGHE]',
+    'ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO', ...voci].join('\n')
+
+  it('ricostruisce le voci quando quantità × prezzo torna con l\'importo', () => {
+    const { estratto, errori } = leggiModulo(modulo(
+      'B.07.115.A | SOLO FORNITURA ringhiere | ml| 294,00 | 1 120,00 | 35.280,00',        // "|" letto come "1"
+      'B.07.115.A  SOLO FORNITURA pista ciclabile - |ml 3,00 | 120,00 | 360,00',          // due "|" persi
+      'G.02.005.C Barriere stradali classe H4 - bordo ml 295,00 231,00 | 68.145,00',      // UM attaccata alla descrizione
+      'G.02.005.D Barriere stradali classe H2 ml 10,00 5,00 50,00',                        // nessun "|"
+      '| Sovrapprezzo per la staffa posteriore | ml 305,20 10,00 | 3.052,00',             // voce senza codice
+    ), { aCapo: true })
+    expect(errori).toEqual([])
+    expect(estratto.righe.map(r => [r.codice_epu, r.udm, r.quantita, r.prezzo_lordo, r.importo])).toEqual([
+      ['B.07.115.A', 'ml', '294,00', '120,00', '35.280,00'],
+      ['B.07.115.A', 'ml', '3,00', '120,00', '360,00'],
+      ['G.02.005.C', 'ml', '295,00', '231,00', '68.145,00'],
+      ['G.02.005.D', 'ml', '10,00', '5,00', '50,00'],
+      ['', 'ml', '305,20', '10,00', '3.052,00'],
+    ])
+    expect(estratto.righe[1].descrizione).toBe('SOLO FORNITURA pista ciclabile -')
+    expect(estratto.righe[4].descrizione).toBe('Sovrapprezzo per la staffa posteriore')
+  })
+
+  it('senza importo che confermi i numeri la voce resta respinta', () => {
+    const { errori } = leggiModulo(modulo('A.01 | Trasporto | t/km 0,19 |'), { aCapo: true })
+    expect(errori.map(e => e.riga)).toEqual([10])
+    expect(leggiModulo(modulo('A.01 | Scavo | mc 2,00 | 3,00 | 7,00'), { aCapo: true }).errori).toHaveLength(1)
+  })
+
+  it('nel .txt scritto a mano (senza aCapo) niente ricostruzione', () => {
+    expect(leggiModulo(modulo('G.02.005.D Barriere ml 10,00 5,00 50,00')).errori).toHaveLength(1)
+  })
+})
+
+describe('leggiModulo: intestazione e descrizioni di una scansione (aCapo)', () => {
+  const t = ['MODULO CONTRATTO OCR v1', '[TESTATA]', 'CODICE CONTRATTO: X', 'FORNITORE: F', 'TIPOLOGIA: Subappalto',
+    'DATA CONTRATTO: 01/01/2026', 'OGGETTO: O', '[RIGHE]',
+    'ARTICOLO | DESCRIZIONE |UM QUANTITA | PREZZO | IMPORTO',                          // "|" perso fra due etichette
+    'B.04.004.a  Armatura per casseri orizzontali - | mq 286,23 32,00 | 9.159,20',      // "|" persi nella voce…
+    'luce da m 2,01 a 10,00 (metallica o in legname)',                                  // …e descrizione a capo
+  ].join('\n')
+
+  it('divide l\'intestazione e attacca la descrizione a capo alla voce ricostruita, non ai numeri', () => {
+    const { estratto, errori } = leggiModulo(t, { aCapo: true })
+    expect(errori).toEqual([])
+    expect(estratto.righe[0]).toMatchObject({
+      codice_epu: 'B.04.004.a', udm: 'mq', quantita: '286,23', prezzo_lordo: '32,00', importo: '9.159,20',
+      descrizione: 'Armatura per casseri orizzontali - luce da m 2,01 a 10,00 (metallica o in legname)',
+    })
+  })
+
+  it('nel .txt l\'intestazione con le etichette attaccate resta un errore', () => {
+    expect(leggiModulo(t).errori.some(e => /colonne sconosciute "UM QUANTITA"/.test(e.testo))).toBe(true)
+  })
+})
