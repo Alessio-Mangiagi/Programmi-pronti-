@@ -135,6 +135,23 @@ Nessuna cella rossa = tutti i codici verificati contro le liste ufficiali.
   (importo ≠ qta × prezzo, somma righe ≠ importo lavori, CIG/CUP/data malformati, righe senza
   codice o prezzo). Sistemare con **Modifica** prima dell'import.
 
+### Scansione automatica di una cartella — ⚙ Impostazioni
+
+Solo in **Chrome** o **Edge** (Firefox non permette di leggere e scrivere in una cartella
+del PC). Da **⚙ Impostazioni** in alto:
+
+- **Cartella dei contratti** e **cartella di destinazione** (*Scegli…*);
+- **quando avviare**: a mano (*Scansiona la cartella ora*), **a un orario** (ora e giorni)
+  o **all'arrivo di un file** (controllo ogni N minuti);
+- **Salva**: il browser chiede il permesso sulle cartelle (*Consenti a ogni visita*).
+
+A ogni scansione i contratti della cartella passano dal giro di **Elabora → Excel**; nella
+destinazione vanno `<nome>_Import_Contratti.xlsx`, `<nome>_modulo.txt` e
+`registro_scansioni.csv`; gli originali finiscono in `elaborati` o, se respinti, in
+`da controllare` (motivo nel registro). La scansione automatica parte solo con la scheda
+aperta; in alto *Cartella · prossima …* dice quando, *Cartella · in pausa* che serve
+**Riattiva**. Impostazioni personali, una per utente del Portale.
+
 ---
 
 ## Formato di uscita (barra)

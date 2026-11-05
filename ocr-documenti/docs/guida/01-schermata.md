@@ -10,8 +10,10 @@
 | Elemento | Cosa indica |
 |---|---|
 | **OCR** / **CLAUDE** | chi legge i documenti: **OCR** = il motore aziendale (normale); **CLAUDE** = lettura fatta da Claude su claude.ai (vedi [capitolo 4](04-formati-e-claude.md)) |
+| **⚙ Impostazioni** | cartella dei contratti, cartella di destinazione e quando avviare la scansione da sola (vedi [7](07-scansione-cartella.md)) |
 | **README**, **Guida** | documentazione tecnica e guida rapida dentro il programma |
 | **PaddleOCR pronto** (verde) | il motore per leggere le **scansioni** è attivo. Se compare **PaddleOCR non trovato** o **PaddleOCR bloccato** (rosso), le scansioni non si possono leggere; i PDF con testo, i Word e gli Excel funzionano lo stesso. Il motivo è scritto passando il mouse sull'indicatore: avvisa l'amministratore |
+| **Cartella · prossima …** | compare solo con la scansione automatica attiva: quando parte la prossima. *Cartella · in pausa* = il browser vuole di nuovo il permesso sulle cartelle (⚙ Impostazioni → Riattiva) |
 | **Assist AI** | aiuto facoltativo che riempie i campi che il programma non ha trovato. *Assist AI spento — opzionale* (giallo) è normale: il programma funziona comunque |
 
 La **Guida** integrata è un riassunto rapido; in alcuni punti descrive ancora

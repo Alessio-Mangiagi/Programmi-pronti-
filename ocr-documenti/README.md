@@ -140,6 +140,26 @@ ricostruite solo se `qta × prezzo = importo`. `npm run modulo-in-pdf`
 ([tools/modulo_in_pdf.ts](tools/modulo_in_pdf.ts)) ne fa il PDF e la scansione simulata,
 `npm run confronta-moduli -- --variante formattato` misura la lettura.
 
+## Scansione automatica di una cartella (⚙ Impostazioni)
+
+Nel browser, con la File System Access API (**solo Chrome/Edge**): l'utente sceglie la
+cartella dei contratti e quella di destinazione sul suo PC e il modo di avvio (a mano, a
+un orario nei giorni scelti, all'arrivo di un file con controllo ogni N minuti). Regole,
+accesso alle cartelle e memoria in [src/lib/scansione-cartella.ts](src/lib/scansione-cartella.ts)
+(test in `src/lib/__tests__/scansione-cartella.test.ts`), finestra in
+[src/ImpostazioniScansione.tsx](src/ImpostazioniScansione.tsx), esecuzione in `App.tsx`
+(`avviaScansioneCartella` → coda → `eseguiScansioneCartella` con `elaboraDocumento`).
+- Impostazioni **per utente** in IndexedDB (`ocr-impostazioni`, chiave = utente da
+  `GET /api/utente`, «locale» senza SSO); le cartelle si salvano come handle e il
+  permesso si richiede con **Riattiva** quando il browser lo dimentica.
+- Uscita in destinazione: `<nome>_Import_Contratti.xlsx`, `<nome>_modulo.txt`,
+  `registro_scansioni.csv` (`;`, BOM). Originali spostati (copia + `removeEntry`) in
+  `elaborati` / `da controllare`, senza sovrascrivere (`nomeLibero`).
+- Timer ogni 30 s (`deveAvviare`); solo a scheda aperta. All'orario, se la pagina era
+  chiusa, parte alla riapertura lo stesso giorno; «all'arrivo» salta i file più giovani di
+  un minuto (copia in corso). Provato dal vivo in Edge con cartelle OPFS al posto del
+  selettore: a mano, all'arrivo (preso dopo 120 s), all'orario (dopo 33 s).
+
 **GPU RTX serie 50**: paddlepaddle-gpu cu126 non le supporta e legge le pagine vuote senza
 errori. Il worker se ne accorge all'avvio (`prova_lettura` in `ocr_worker.py`) e passa alla
 CPU, più lenta (~35 s/pagina). Per tornare alla GPU serve un paddle per CUDA 12.8 o

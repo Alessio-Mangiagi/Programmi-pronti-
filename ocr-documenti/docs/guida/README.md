@@ -30,6 +30,7 @@ Dal **Portale** della suite Cosedil, scheda *OCR Documenti* (vedi la
 4. [Formati di uscita, modalità Claude e modulo contratto](04-formati-e-claude.md) — il modulo da compilare a mano quando il contratto non si legge
 5. [Se qualcosa non va](05-problemi.md)
 6. [Per l'amministratore di sistema](06-amministratore.md)
+7. [Scansione automatica di una cartella](07-scansione-cartella.md) — pulsante ⚙ Impostazioni: cartella dei contratti, destinazione, a mano / a un orario / all'arrivo di un file (Chrome o Edge)
 
 ## Il flusso in tre passi
 
