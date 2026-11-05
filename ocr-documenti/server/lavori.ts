@@ -24,6 +24,8 @@ import { confrontaTesti, type Confronto } from '../src/lib/confronto.ts'
 import { testoDaTextContent, type ItemPdfTesto } from '../src/lib/testo-nativo.ts'
 import { cleanMarkdown } from '../src/lib/markdown.ts'
 import { chiDa, puoVedere } from './accessoLavori.ts'
+import { risultatoDaModulo } from './modulo.ts'
+import { descriviErrori, eModulo } from '../src/lib/modulo-contratto.ts'
 
 export type FormatoLavoro = 'contratti' | 'contract' | 'md'
 export type StatoLavoro = 'attesa_file' | 'in_coda' | 'in_corso' | 'fatto' | 'errore' | 'annullato'
@@ -261,16 +263,28 @@ const esegui = async (l: Lavoro): Promise<void> => {
   let formato: FormatoLavoro = l.formato
   if (l.formato === 'contratti' || l.formato === 'contract') {
     const joined = [splitPageTiles(testo).join('\n\n'), l.testoAllegati?.trim()].filter(Boolean).join('\n\n')
-    const e = await estraiAssistito(joined)
-    controlla()
-    if (l.formato === 'contratti') {
-      json = normalizzaRisultatoAlyante(strutturaAlyante(e))
-      // nessuna voce d'elenco prezzi → almeno la testata, come una riga contratto
-      let righe = 0
-      try { righe = ((JSON.parse(json) as { righe?: unknown[] }).righe ?? []).length } catch { /* json non parsabile: si tiene */ }
-      if (!righe) { json = strutturaContratto(e, joined); formato = 'contract' }
+    // PDF che è un MODULO CONTRATTO stampato (riga di riconoscimento in testa alla prima
+    // pagina): si legge alla lettera, documento intero e righe a capo ricucite, come fa
+    // /api/ocr con `impaginato`. Un modulo con errori ferma il lavoro con l'elenco (riga
+    // e motivo) invece di finire nei parser euristici, che lo leggerebbero male.
+    const modulo = eModulo(joined) ? risultatoDaModulo(joined, l.formato, { aCapo: true }) : null
+    if (modulo && (modulo.errori.length || !modulo.result)) {
+      throw new Error(`Modulo contratto non valido (${modulo.errori.length} ${modulo.errori.length === 1 ? 'errore' : 'errori'}):\n${descriviErrori(modulo.errori)}`)
+    }
+    if (modulo) {
+      json = modulo.result!
     } else {
-      json = strutturaContratto(e, joined)
+      const e = await estraiAssistito(joined)
+      controlla()
+      if (l.formato === 'contratti') {
+        json = normalizzaRisultatoAlyante(strutturaAlyante(e))
+        // nessuna voce d'elenco prezzi → almeno la testata, come una riga contratto
+        let righe = 0
+        try { righe = ((JSON.parse(json) as { righe?: unknown[] }).righe ?? []).length } catch { /* json non parsabile: si tiene */ }
+        if (!righe) { json = strutturaContratto(e, joined); formato = 'contract' }
+      } else {
+        json = strutturaContratto(e, joined)
+      }
     }
   }
   await aggiorna(l, {

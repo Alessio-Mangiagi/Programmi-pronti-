@@ -15,7 +15,8 @@ import { ASSIST_MODEL, OLLAMA_BASE, modelloAttivo, ocrVisionPagina, ollamaAttivo
 import { TIPOLOGIE_VALIDE, estraiAssistito } from './server/assist.ts'
 import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
-import { descriviErrori, eModulo, leggiModulo, type ErroreModulo } from './src/lib/modulo-contratto.ts'
+import { descriviErrori, eModulo } from './src/lib/modulo-contratto.ts'
+import { risultatoDaModulo } from './server/modulo.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
 
@@ -145,41 +146,6 @@ app.get('/api/health', async (_req, res) => {
 })
 
 
-// Commessa di un MODULO CONTRATTO dopo l'aggancio agli elenchi. Sui contratti letti
-// dall'OCR normalizzaConElenchi svuota una commessa fuori elenco senza forma NNN-NNN
-// (era la sigla del modello o rumore di scansione) e, se non trova nulla, ne indovina
-// una dall'oggetto. Nel modulo la commessa l'ha scritta una persona: si accetta solo
-// l'aggancio all'elenco che PARTE da quanto scritto (codice esatto o base "193-136" di
-// "193-136_6"); altrimenti resta il valore scritto, e l'export lo colora di rosso.
-const commessaComeScritta = (json: string, scritta?: string): string => {
-  if (!scritta) return json
-  try {
-    const a = JSON.parse(json) as { testata?: Record<string, string> }
-    const t = a.testata
-    if (!t) return json
-    const agganciata = String(t.codice_progetto ?? '')
-    if (agganciata && scritta.toUpperCase().startsWith(agganciata.toUpperCase())) return json
-    t.codice_progetto = scritta
-    t.elenco_prezzi = scritta                // regola maschera: EPU = PROGETTO
-    return JSON.stringify(a, null, 2)
-  } catch { return json }
-}
-
-/**
- * MODULO CONTRATTO → risultato JSON, senza OCR, parser euristici né assist AI.
- * È il ramo modulo della route /api/ocr tirato fuori in una funzione sola, così
- * tools/verifica_moduli.ts rilegge i moduli compilati con la STESSA filiera dell'app
- * (lettura alla lettera, strutturaAlyante `fedele`, elenchi ufficiali, commessa scritta).
- * Con `errori` non vuoto il modulo va respinto e `result` è assente.
- */
-const risultatoDaModulo = (text: string, format: 'contratti' | 'contract'): { result?: string; errori: ErroreModulo[] } => {
-  const { estratto: e, errori } = leggiModulo(text)
-  console.log(`[OCR] modulo contratto: format=${format} righe:${e.righe.length} errori:${errori.length}`)
-  if (errori.length) return { errori }
-  let result = format === 'contratti' ? strutturaAlyante(e, { fedele: true }) : strutturaContratto(e, text, { fedele: true })
-  if (format === 'contratti') result = commessaComeScritta(normalizzaRisultatoAlyante(result), e.testata.codice_progetto)
-  return { result, errori }
-}
 
 app.post('/api/ocr', async (req, res) => {
   // `origine` distingue due testi che il campo `text` non separa: quello NATIVO (layer
@@ -190,7 +156,9 @@ app.post('/api/ocr', async (req, res) => {
   // {testata, importi, righe}; qui si salta OCR e parser e si va dritti alla
   // strutturazione (codici articolo, dedup, FAM/SFAM, elenchi ufficiali), che resta
   // la stessa del percorso OCR.
-  const { images, format, text, motore, testoAllegati, dumpId, origine, estratto } = req.body as { images?: ImmagineOcr[], format: 'md' | 'json' | 'contract' | 'contratti', text?: string, motore?: 'paddle' | 'ai', testoAllegati?: string, dumpId?: string, origine?: 'nativo' | 'ocr', estratto?: Partial<Estratto> }
+  // `impaginato`: il testo viene da un PDF o da una scansione (pagine impaginate, righe
+  // lunghe andate a capo). Conta solo per il MODULO CONTRATTO: vedi risultatoDaModulo.
+  const { images, format, text, motore, testoAllegati, dumpId, origine, estratto, impaginato } = req.body as { images?: ImmagineOcr[], format: 'md' | 'json' | 'contract' | 'contratti', text?: string, motore?: 'paddle' | 'ai', testoAllegati?: string, dumpId?: string, origine?: 'nativo' | 'ocr', estratto?: Partial<Estratto>, impaginato?: boolean }
 
   if (estratto && (format === 'contratti' || format === 'contract')) {
     const str = (o: unknown): Record<string, string> => {
@@ -232,10 +200,12 @@ app.post('/api/ocr', async (req, res) => {
   // AI, niente riparazioni OCR (`fedele`). Un modulo con errori di struttura o di formato
   // viene respinto con l'elenco completo (riga e motivo), così si corregge in un giro.
   // Arriva da .txt/.md (App.tsx: ocrFile/runScan) e da .docx (docxATesto con le celle
-  // separate da "|"); restano gli elenchi ufficiali, che agganciano i codici Alyante.
+  // separate da "|"), e da PDF/scansioni di un modulo stampato (`impaginato`: App.tsx
+  // manda il documento intero, non pagina per pagina, e le righe a capo si ricuciono).
+  // Restano gli elenchi ufficiali, che agganciano i codici Alyante.
   if (text && (format === 'contratti' || format === 'contract') && eModulo(text)) {
     try {
-      const { result, errori } = risultatoDaModulo(text, format)
+      const { result, errori } = risultatoDaModulo(text, format, { aCapo: !!impaginato })
       if (errori.length) {
         return res.status(400).json({ error: `Modulo contratto non valido (${errori.length} ${errori.length === 1 ? 'errore' : 'errori'}):\n${descriviErrori(errori)}` })
       }

@@ -632,7 +632,7 @@ export default function App() {
     const metaBytes = new TextEncoder().encode(JSON.stringify(meta))
     return new Blob([u32(metaBytes.length), metaBytes, ...images.flatMap(img => [u32(img.size), img])])
   }
-  const postOcrDettagli = async (body: { images?: Blob[]; text?: string; format: Format; motore?: 'paddle' | 'ai'; testoAllegati?: string; origine?: 'nativo'; estratto?: Estratto }): Promise<RispostaOcr> => {
+  const postOcrDettagli = async (body: { images?: Blob[]; text?: string; format: Format; motore?: 'paddle' | 'ai'; testoAllegati?: string; origine?: 'nativo'; estratto?: Estratto; impaginato?: boolean }): Promise<RispostaOcr> => {
     abortRef.current = new AbortController()
     const { images, ...meta } = body
     const response = await fetch('/api/ocr', {
@@ -1105,14 +1105,18 @@ export default function App() {
   // Restituisce anche il JSON da cui è uscito l'Excel e in quale formato: la coda lo
   // tiene come risultato della voce, così il pannello mostra il documento strutturato
   // (non il testo grezzo) e «↓ Excel» sulla riga lo riesporta senza riscansionare.
-  const compileExcelFromText = async (text: string, nomeBase?: string, dir?: DirHandle | null, allegati?: string): Promise<{ json: string; formato: Format }> => {
+  // `impaginato`: il testo viene da un PDF o da un'immagine. Se è un MODULO CONTRATTO
+  // stampato, il server ricuce le righe andate a capo (server/modulo.ts); su un .txt o un
+  // Word il modulo resta letto riga per riga, senza indulgenze.
+  const compileExcelFromText = async (text: string, nomeBase?: string, dir?: DirHandle | null, allegati?: string, impaginato = false): Promise<{ json: string; formato: Format }> => {
+    const extra = { ...(allegati ? { testoAllegati: allegati } : {}), ...(impaginato ? { impaginato } : {}) }
     // 1) Elenco prezzi multi-riga (come il gold Import_Contratti_COMPILATO).
-    const alyJson = await postOcr({ text, format: 'contratti', ...(allegati ? { testoAllegati: allegati } : {}) })
+    const alyJson = await postOcr({ text, format: 'contratti', ...extra })
     let rows = buildImportContrattiRowsFromAlyante(alyJson)
     let esito = { json: alyJson, formato: 'contratti' as Format }
     // 2) Fallback: nessuna voce elenco prezzi → almeno la testata come una riga contratto.
     if (!rowsHaveData(rows)) {
-      const cJson = await postOcr({ text, format: 'contract', ...(allegati ? { testoAllegati: allegati } : {}) })
+      const cJson = await postOcr({ text, format: 'contract', ...extra })
       const cRows = buildImportContrattiRowsFromContract(cJson)
       if (rowsHaveData(cRows)) { rows = cRows; esito = { json: cJson, formato: 'contract' } }
     }
@@ -1147,7 +1151,7 @@ export default function App() {
     setLoading(true)
     setError('')
     try {
-      await compileExcelFromText(result, undefined, undefined, await testoAllegatiExcel())
+      await compileExcelFromText(result, undefined, undefined, await testoAllegatiExcel(), fileKind === 'pdf' || fileKind === 'image')
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') setError(err.message)
     } finally {
@@ -1187,6 +1191,28 @@ export default function App() {
       const pdf = pdfRef.current!
       const total = pdf.numPages
       setProgress({ current: 0, total })
+      // MODULO CONTRATTO stampato in PDF: pagina per pagina il server riconoscerebbe il
+      // modulo solo nella prima (la riga di riconoscimento sta lì) e le voci delle altre
+      // finirebbero nei parser euristici. Se la prima pagina è un modulo si raccoglie il
+      // testo di TUTTE le pagine (layer nativo, o OCR in formato testo) e lo si manda una
+      // volta sola con `impaginato`, così il server ricuce le righe andate a capo. La
+      // prima pagina letta qui per controllo non costa un secondo OCR: server/ocr.ts tiene
+      // in cache le letture per immagine.
+      if ((fmt === 'contratti' || fmt === 'contract') && motore !== 'ai') {
+        const testoPagina = async (n: number) => (await testoDaLayerPdf(pdf, n)) ?? await ocrBatch(await renderPdfPage(pdf, n), 2, 'md')
+        const prima = await testoPagina(1)
+        if (eModulo(prima)) {
+          const pagine = [prima]
+          setProgress({ current: 1, total })
+          for (let n = 2; n <= total; n++) {
+            pagine.push(await testoPagina(n))
+            setProgress({ current: n, total })
+          }
+          const text = await postOcr({ text: pagine.join('\n\n'), format: fmt, impaginato: true })
+          setResult(text)
+          return text
+        }
+      }
       const parts: string[] = new Array(total)
       let done = 0
       let failedPage = 0
@@ -1616,7 +1642,8 @@ export default function App() {
       // con la bozza Word in coda l'estrazione parte dal testo unito, non dall'OCR nudo
       const { testo, confronto } = await confrontaConBozza(f, grezzo)
       scrivi({ testo, confronto, incerte })
-      const { json, formato } = await compileExcelFromText(testo, f.name.replace(/\.[^.]+$/, ''), dir, allegati)
+      const kind = detectKind(f)
+      const { json, formato } = await compileExcelFromText(testo, f.name.replace(/\.[^.]+$/, ''), dir, allegati, kind === 'pdf' || kind === 'image')
       scrivi({ result: json, testo, formato, incerte, motore: 'ocr' })
       if (formato !== format) setFormat(formato)     // ripiego a CONTRATTO: la barra lo segue
     } else {
