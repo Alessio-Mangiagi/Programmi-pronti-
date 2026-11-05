@@ -17,6 +17,7 @@ import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
 import { descriviErrori, eModulo } from './src/lib/modulo-contratto.ts'
 import { risultatoDaModulo } from './server/modulo.ts'
+import { chiDa } from './server/accessoLavori.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
 
@@ -270,6 +271,12 @@ app.post('/api/ocr', async (req, res) => {
     res.status(500).json({ error: msg })
   }
 })
+
+// Chi sta usando l'app, per le impostazioni PERSONALI della scansione di una cartella
+// (src/lib/scansione-cartella.ts: chiave in IndexedDB). L'identità la mette il gate SSO
+// del Portale; senza gate (sviluppo, COSEDIL_SSO=off) `utente` è null e il browser usa
+// le impostazioni «locale».
+app.get('/api/utente', (req, res) => res.json({ utente: chiDa(req).utente ?? null }))
 
 // Elenchi ufficiali per il frontend: colonne DITTA (codice numerico), PROGETTO
 // (validazione commessa), FAM/SFAM (validazione codici) del template Import_Contratti.
