@@ -21,7 +21,7 @@ import { confrontaTesti, type Confronto } from './lib/confronto'
 import { notaCella, contaNote, type Incerta } from './lib/note-celle'
 import { salvaSessione, leggiSessione, cancellaSessione, type Sessione } from './lib/sessione'
 import { TUTTI_I_FORMATI, type Format, type FileKind } from './lib/formati'
-import { supportaCartella, chiediCartella, salvaFile, downloadBlob, xlsxBlob, csvEscape, type DirHandle } from './lib/salvataggio'
+import { supportaCartella, chiediCartella, salvaFile, downloadBlob, xlsxBlob, csvEscape, nomeFileSicuro, type DirHandle } from './lib/salvataggio'
 import { descriviErrori, eModulo, moduloDaRisultato, moduloVuoto, NOME_FILE_MODULO } from './lib/modulo-contratto'
 import { caricaElenchi, getElenchi } from './lib/elenchi-client'
 import { contenutiSimili, runPool, imageFileToPng, renderPdfPage, testoDaLayerPdf, docxATesto, detectKind, chiaveFile, nomiSimili, miniaturaFile, type MetaFile } from './lib/file-input'
@@ -30,6 +30,12 @@ import { ALY_TESTATA_COLS, ALY_RIGHE_COLS, ALY_IMPORTI_COLS, ALY_TESTATA_KEYS, A
 import { parseAlyante, IMPORT_CONTRATTI_COLS, buildImportContrattiRowsFromContract, buildImportContrattiRowsFromAlyante, problemiRiga, diagnostica, validateAlyanteImport, cellaCsv, scriviImportContrattiXlsx, rowsHaveData, type CellaImport, type Avviso } from './lib/import-contratti'
 
 import { VistaConfronto } from './VistaConfronto'
+import { ImpostazioniScansione } from './ImpostazioniScansione'
+import {
+  IMPOSTAZIONI_INIZIALI, ETA_MINIMA_MS, SOTTOCARTELLA_FATTI, SOTTOCARTELLA_RESPINTI,
+  aggiungiAlRegistro, deveAvviare, elencaFile, leggiImpostazioni, permesso, permessoCartelle, prossimoAvvio,
+  rigaRegistro, salvaImpostazioni, scriviTesto, sposta, type Cartella, type Impostazioni,
+} from './lib/scansione-cartella'
 // Pagina «Claude»: prompt pronto per claude.ai e lettura della risposta incollata.
 import { promptClaude, urlClaude, leggiEstratto, leggiTrascrizioneJson, leggiTrascrizioneMd, type Estratto } from './lib/claude'
 
@@ -1495,11 +1501,12 @@ export default function App() {
   // Risultato del lavoro → voce della coda ed Excel, come farebbe elaboraDocumento.
   // `senzaExcel`: dopo un reload il risultato torna in coda senza scrivere file (l'Excel
   // si salva poi con «↓ Excel», nella cartella che si sceglie in quel momento).
-  const applicaLavoro = async (f: File, l: Lavoro, dir: DirHandle | null, scrivi: (v: Partial<VoceCoda>) => void, allegati = '', senzaExcel = false) => {
+  // Restituisce il JSON finale (o il testo, in .MD): lo usa la scansione della cartella.
+  const applicaLavoro = async (f: File, l: Lavoro, dir: DirHandle | null, scrivi: (v: Partial<VoceCoda>) => void, allegati = '', senzaExcel = false): Promise<string> => {
     const r = l.risultato
     if (!r) throw new Error('lavoro senza risultato')
     scrivi({ testo: r.testo, confronto: r.confronto, incerte: r.incerte, lavoroId: l.id, faseServer: undefined })
-    if (r.formato === 'md') { scrivi({ result: r.json, formato: 'md', motore: 'ocr' }); return }
+    if (r.formato === 'md') { scrivi({ result: r.json, formato: 'md', motore: 'ocr' }); return r.json }
     let json = r.json
     let formato: Format = r.formato
     let rows = formato === 'contratti' ? buildImportContrattiRowsFromAlyante(json) : buildImportContrattiRowsFromContract(json)
@@ -1514,6 +1521,7 @@ export default function App() {
     if (!senzaExcel) await writeImportContrattiXlsx(rows!, f.name.replace(/\.[^.]+$/, ''), dir)
     scrivi({ result: json, testo: r.testo, formato, motore: 'ocr' })
     if (formato !== format) setFormat(formato)
+    return json
   }
 
   // Dopo un reload: la voce ha un lavoro sul server e nessun risultato. Si chiede lo
@@ -1542,7 +1550,7 @@ export default function App() {
     setQueue(q => q.map(v => chiaveFile(v.file) === chiave ? { ...v, faseServer: undefined, lavoroId: undefined } : v))
   }
 
-  const elaboraSulServer = async (i: number, dir: DirHandle | null, scrivi: (v: Partial<VoceCoda>) => void) => {
+  const elaboraSulServer = async (i: number, dir: DirHandle | null, scrivi: (v: Partial<VoceCoda>) => void): Promise<string> => {
     const f = queue[i].file
     abortRef.current = new AbortController()
     const signal = abortRef.current.signal
@@ -1572,7 +1580,7 @@ export default function App() {
     } finally {
       setFaseLavoro('')
     }
-    await applicaLavoro(f, lavoro, dir, scrivi, allegati)
+    return applicaLavoro(f, lavoro, dir, scrivi, allegati)
   }
 
   // ── Sessione: IndexedDB ricorda coda e risultati fra un'apertura e l'altra ──
@@ -1621,8 +1629,10 @@ export default function App() {
   // compilazione e salvataggio dell'Import_Contratti.xlsx col nome del file, nella
   // cartella scelta; il JSON compilato diventa il risultato della voce. Sugli altri
   // formati: solo l'OCR nel formato scelto. Non tocca lo stato di caricamento: ci
-  // pensano i chiamanti (una voce sola / tutta la coda).
-  const elaboraDocumento = async (i: number, dir: DirHandle | null) => {
+  // pensano i chiamanti (una voce sola / tutta la coda). Restituisce il risultato della
+  // voce (JSON nei formati contratto, testo negli altri): la scansione della cartella lo
+  // usa per scrivere anche il modulo contratto accanto all'Excel.
+  const elaboraDocumento = async (i: number, dir: DirHandle | null): Promise<string> => {
     const f = queue[i].file
     setActiveIdx(i)
     loadPreview(f, i)                       // il pannello segue il file in lavorazione
@@ -1635,8 +1645,7 @@ export default function App() {
     })
     // PDF nei formati contratto/testo: sul server, se il server lo sa fare
     if (health?.lavori && detectKind(f) === 'pdf' && (format === 'contratti' || format === 'contract' || format === 'md')) {
-      await elaboraSulServer(i, dir, scrivi)
-      return
+      return elaboraSulServer(i, dir, scrivi)
     }
     const incerte: Incerta[] = []
     if (format === 'contratti' || format === 'contract') {
@@ -1650,11 +1659,13 @@ export default function App() {
       const { json, formato } = await compileExcelFromText(testo, f.name.replace(/\.[^.]+$/, ''), dir, allegati, kind === 'pdf' || kind === 'image')
       scrivi({ result: json, testo, formato, incerte, motore: 'ocr' })
       if (formato !== format) setFormat(formato)     // ripiego a CONTRATTO: la barra lo segue
+      return json
     } else {
       let text = await ocrFile(f, format, '', incerte)
       let confronto: VoceCoda['confronto'] = undefined
       if (format === 'md') ({ testo: text, confronto } = await confrontaConBozza(f, text))
       scrivi({ result: text, testo: undefined, formato: format, confronto, incerte, motore: 'ocr' })
+      return text
     }
   }
 
@@ -1728,6 +1739,226 @@ export default function App() {
       setProgress({ current: 0, total: 0 })
       setBatch(null)
     }
+  }
+
+
+  // ── SCANSIONE DI UNA CARTELLA DEL PC (⚙ Impostazioni) ───────────────────────
+  // L'utente sceglie la cartella dei contratti, quella di destinazione e quando partire
+  // (lib/scansione-cartella.ts). La scansione mette in coda i contratti trovati e li
+  // elabora come «Elabora → Excel» (elaboraDocumento, Excel nella destinazione), scrive
+  // accanto il modulo contratto e il registro, poi sposta gli originali in «elaborati» o
+  // «da controllare». Solo Chrome/Edge (File System Access API) e solo a scheda aperta.
+  // Impostazioni per utente: chiave = utente del Portale (/api/utente) o «locale».
+  const [impostazioni, setImpostazioni] = useState<Impostazioni>(IMPOSTAZIONI_INIZIALI)
+  const impRef = useRef<Impostazioni>(IMPOSTAZIONI_INIZIALI)       // ultima versione, per il timer
+  const [utenteImp, setUtenteImp] = useState('locale')
+  const [mostraImpostazioni, setMostraImpostazioni] = useState(false)
+  const [permessoOk, setPermessoOk] = useState(false)
+  const [richiestaCartella, setRichiestaCartella] = useState<{ chiavi: string[]; origini: Record<string, string> } | null>(null)
+  const cartellaInCorso = useRef(false)
+  const ultimoControllo = useRef(0)            // 'arrivo': ultimo sguardo alla cartella (0 = al primo giro)
+  // file già passati da una scansione in questa pagina: se lo spostamento non è riuscito
+  // restano nella cartella, e la scansione automatica non deve rifarli a ogni giro
+  const giaScansionati = useRef(new Set<string>())
+  const [orologio, setOrologio] = useState(() => Date.now())      // ridisegna «prossimo avvio»
+
+  const applicaImpostazioni = async (n: Impostazioni, utente = utenteImp) => {
+    impRef.current = n
+    setImpostazioni(n)
+    await salvaImpostazioni(utente, n)
+  }
+
+  // All'avvio: chi è l'utente, le sue impostazioni, e se il browser ricorda il permesso
+  // sulle cartelle (senza chiederlo: fuori da un clic il browser rifiuterebbe).
+  useEffect(() => {
+    let vivo = true
+    ;(async () => {
+      let utente = 'locale'
+      try {
+        const r = await fetch('/api/utente')
+        if (r.ok) utente = ((await r.json()) as { utente?: string | null }).utente || 'locale'
+      } catch { /* server senza la rotta: impostazioni di questo browser */ }
+      const imp = await leggiImpostazioni(utente)
+      if (!vivo) return
+      impRef.current = imp
+      setUtenteImp(utente)
+      setImpostazioni(imp)
+      const ok = supportaCartella() && await permessoCartelle(imp, false)
+      if (!vivo) return
+      setPermessoOk(ok)
+      // la destinazione vale anche per gli export fatti a mano, se non se n'è scelta un'altra
+      if (ok && imp.destinazione) setOutDir(d => d ?? imp.destinazione)
+    })()
+    return () => { vivo = false }
+  }, [])
+
+  // Fase 1: guarda la cartella e mette in coda i contratti. L'elaborazione parte dalla
+  // fase 2 (effetto qui sotto) quando la coda aggiornata è visibile: elaboraDocumento
+  // legge `queue` dal render in cui viene chiamata.
+  const avviaScansioneCartella = async (automatica: boolean, imp: Impostazioni = impRef.current) => {
+    if (cartellaInCorso.current || loading || richiestaCartella) return
+    const { contratti, destinazione } = imp
+    if (!supportaCartella() || !contratti || !destinazione) {
+      if (!automatica) setError('Per scansionare una cartella scegli in ⚙ Impostazioni la cartella dei contratti e quella di destinazione (solo in Chrome o Edge).')
+      return
+    }
+    if (!(await permessoCartelle(imp, !automatica))) {
+      setPermessoOk(false)
+      if (!automatica) setError('Il browser non ha dato il permesso sulle cartelle: riprova da ⚙ Impostazioni → Riattiva.')
+      return
+    }
+    setPermessoOk(true)
+    ultimoControllo.current = Date.now()
+    let trovati: { nome: string; file: File }[]
+    try {
+      trovati = await elencaFile(contratti)
+    } catch (err) {
+      setError(`Cartella dei contratti «${contratti.name}» non leggibile: ${err instanceof Error ? err.message : String(err)}`)
+      return
+    }
+    const ora = Date.now()
+    const candidati: { nome: string; file: File }[] = []
+    for (const t of trovati) {
+      // un .txt/.md entra solo se è un modulo contratto: un appunto qualunque resta dov'è
+      if (/\.(txt|md)$/i.test(t.nome) && !eModulo(await t.file.text())) continue
+      if (automatica && giaScansionati.current.has(chiaveFile(t.file))) continue
+      // solo «all'arrivo»: un file appena comparso può essere ancora in copia, si prende al
+      // giro dopo. All'orario no: rimandarlo vorrebbe dire rimandarlo a domani.
+      if (automatica && imp.avvio === 'arrivo' && ora - t.file.lastModified < ETA_MINIMA_MS) continue
+      candidati.push(t)
+    }
+    const documenti = candidati.filter(t => detectKind(t.file) !== 'excel')
+    if (!documenti.length) {
+      // all'orario si segna lo stesso: altrimenti ripartirebbe a ogni controllo del timer
+      if (automatica && imp.avvio === 'orario') await applicaImpostazioni({ ...impRef.current, ultimaScansione: ora, ultimoEsito: `${new Date(ora).toLocaleString('it-IT')} — nessun contratto nuovo` })
+      if (!automatica) setNotizia(`Nessun contratto da scansionare nella cartella «${contratti.name}».`)
+      return
+    }
+    await applicaImpostazioni({ ...impRef.current, ultimaScansione: ora })
+    const presenti = new Set(queue.map(q => chiaveFile(q.file)))
+    const nuovi = candidati.filter(t => !presenti.has(chiaveFile(t.file))).map(t => t.file)
+    if (nuovi.length) setQueue(q => [...q, ...nuovi.map(f => ({ file: f, result: '' }))])
+    setFormat('contratti')                       // l'uscita della cartella è l'Import_Contratti
+    setSessionePrecedente(null)
+    decisioneSessione.current = true
+    setRichiestaCartella({ chiavi: documenti.map(t => chiaveFile(t.file)), origini: Object.fromEntries(candidati.map(t => [chiaveFile(t.file), t.nome])) })
+  }
+
+  // Fase 2: un contratto alla volta, come «Elabora tutti», poi originale (e i suoi
+  // allegati Excel / bozza Word, se venivano dalla cartella) in «elaborati» o «da
+  // controllare». Un errore su un file non ferma gli altri; «Annulla» ferma tutto.
+  const eseguiScansioneCartella = async (r: { chiavi: string[]; origini: Record<string, string> }, indici: number[]) => {
+    const { contratti, destinazione } = impRef.current
+    if (!contratti || !destinazione) return
+    cartellaInCorso.current = true
+    setLoading(true)
+    setError('')
+    setBatchLog([])
+    setBatch({ current: 0, total: indici.length })
+    const righe: string[] = []
+    const esiti: { nome: string; ok: boolean; msg?: string }[] = []
+    let annullata = false
+    try {
+      for (let k = 0; k < indici.length; k++) {
+        const i = indici[k]
+        const f = queue[i].file
+        setBatch({ current: k + 1, total: indici.length })
+        let ok = false
+        let voci: number | undefined
+        let nota = ''
+        try {
+          const json = await elaboraDocumento(i, destinazione)
+          ok = true
+          const a = parseAlyante(json)
+          if (a && Array.isArray(a.righe)) {
+            voci = a.righe.length
+            // il modulo contratto accanto all'Excel: lo stesso che fa «Converti in modulo»
+            try {
+              const m = moduloDaRisultato(json, { origine: f.name, generato: new Date().toLocaleDateString('it-IT') })
+              await scriviTesto(destinazione, `${nomeFileSicuro(f.name.replace(/\.[^.]+$/, ''))}_modulo.txt`, '﻿' + m.testo)
+            } catch { /* modulo non scrivibile: l'Excel c'è, basta quello */ }
+          }
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') { annullata = true; break }
+          nota = err instanceof Error ? err.message : String(err)
+        }
+        const compagni = [...allegatiPerDocumento(f), bozzaWordPer(f)].filter((x): x is File => !!x && !!r.origini[chiaveFile(x)])
+        for (const x of [f, ...compagni]) {
+          giaScansionati.current.add(chiaveFile(x))
+          try {
+            await sposta(contratti, r.origini[chiaveFile(x)], x, ok ? SOTTOCARTELLA_FATTI : SOTTOCARTELLA_RESPINTI)
+          } catch (err) {
+            nota = `${nota ? `${nota} · ` : ''}${x.name} non spostato: ${err instanceof Error ? err.message : String(err)}`
+          }
+        }
+        righe.push(rigaRegistro({ quando: new Date(), file: r.origini[chiaveFile(f)] ?? f.name, esito: ok ? 'elaborato' : 'da controllare', voci, note: nota }))
+        esiti.push({ nome: f.name, ok, ...(nota ? { msg: nota } : {}) })
+        setBatchLog(esiti.slice())
+      }
+    } finally {
+      try { await aggiungiAlRegistro(destinazione, righe) } catch { /* registro non scrivibile: l'esito resta nella coda */ }
+      const fatti = esiti.filter(e => e.ok).length
+      const respinti = esiti.length - fatti
+      const riassunto = `${fatti} elaborat${fatti === 1 ? 'o' : 'i'}, ${respinti} da controllare${annullata ? ' (interrotta)' : ''}`
+      await applicaImpostazioni({ ...impRef.current, ultimoEsito: `${new Date().toLocaleString('it-IT')} — ${riassunto}` })
+      // con un errore il banner verde non si vede (App mostra il rosso al suo posto): il
+      // rosso porta allora anche il riepilogo, così l'esito della scansione resta leggibile
+      const riepilogo = `Scansione della cartella «${contratti.name}»: ${riassunto}. Excel, moduli e registro_scansioni.csv in «${destinazione.name}».`
+      if (respinti) setError(`${riepilogo} ${respinti === 1 ? 'Il contratto respinto è' : `I ${respinti} contratti respinti sono`} in «${contratti.name}/${SOTTOCARTELLA_RESPINTI}»: il motivo è nella colonna Esito e nel registro.`)
+      else setNotizia(riepilogo)
+      setLoading(false)
+      setProgress({ current: 0, total: 0 })
+      setBatch(null)
+      cartellaInCorso.current = false
+    }
+  }
+  const eseguiCartellaRef = useRef(eseguiScansioneCartella)
+  eseguiCartellaRef.current = eseguiScansioneCartella
+  useEffect(() => {
+    if (!richiestaCartella || format !== 'contratti') return
+    const indici = richiestaCartella.chiavi.map(k => queue.findIndex(q => chiaveFile(q.file) === k))
+    if (indici.some(i => i < 0)) return                 // la coda nuova non è ancora qui
+    const r = richiestaCartella
+    setRichiestaCartella(null)
+    // la bozza Word di un PDF della cartella non si elabora da sola: va col suo PDF
+    void eseguiCartellaRef.current(r, indici.filter(i => daElaborare(queue[i].file)))
+  }, [richiestaCartella, queue, format, daElaborare])
+
+  // Timer delle scansioni automatiche: ogni 30 s si chiede a deveAvviare se è ora. Se
+  // l'app sta già lavorando si riprova al giro dopo (avviaScansioneCartella esce subito).
+  const avviaCartellaRef = useRef(avviaScansioneCartella)
+  avviaCartellaRef.current = avviaScansioneCartella
+  useEffect(() => {
+    if (impostazioni.avvio === 'mano' || !permessoOk) return
+    const t = window.setInterval(() => {
+      setOrologio(Date.now())
+      if (deveAvviare(impRef.current, new Date(), ultimoControllo.current)) void avviaCartellaRef.current(true)
+    }, 30_000)
+    return () => window.clearInterval(t)
+  }, [impostazioni.avvio, permessoOk])
+  const prossimaScansione = prossimoAvvio(impostazioni, new Date(orologio), ultimoControllo.current)
+
+  // Pulsanti della finestra
+  const salvaDaFinestra = async (n: Impostazioni) => {
+    await applicaImpostazioni(n)
+    const ok = await permessoCartelle(n, true)      // dentro il clic: il browser può chiedere
+    setPermessoOk(ok)
+    if (ok && n.destinazione) setOutDir(n.destinazione)
+    ultimoControllo.current = 0
+    setOrologio(Date.now())
+    setMostraImpostazioni(false)
+    setNotizia(n.avvio === 'mano' ? 'Impostazioni salvate: la cartella si scansiona a mano.' : `Impostazioni salvate: scansione automatica ${n.avvio === 'orario' ? `alle ${n.orario}` : `ogni ${n.ogniMinuti} minuti, se arriva un file`}.`)
+  }
+  const scansionaOraDaFinestra = async (n: Impostazioni) => {
+    await applicaImpostazioni(n)
+    if (n.destinazione && await permesso(n.destinazione, true)) setOutDir(n.destinazione)
+    setMostraImpostazioni(false)
+    await avviaScansioneCartella(false, n)
+  }
+  const riattivaPermesso = async () => {
+    const ok = await permessoCartelle(impRef.current, true)
+    setPermessoOk(ok)
+    if (ok && impRef.current.destinazione) setOutDir(d => d ?? impRef.current.destinazione)
   }
 
   // ── Pagina Claude ──────────────────────────────────────────────────────────
@@ -2244,6 +2475,13 @@ export default function App() {
         </span>
         <div className="ocr-header-azioni" style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', fontSize: 11.5 }}>
           <button
+            onClick={() => setMostraImpostazioni(true)}
+            title="Cartella dei contratti, cartella di destinazione e quando avviare la scansione"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, letterSpacing: '0.02em', fontFamily: 'inherit' }}
+          >
+            <span aria-hidden="true">⚙</span> Impostazioni
+          </button>
+          <button
             onClick={() => setDocModal('readme')}
             title="Note tecniche (README)"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, letterSpacing: '0.02em', fontFamily: 'inherit' }}
@@ -2264,6 +2502,10 @@ export default function App() {
                 // "bloccato" e non "non trovato", col motivo intero nel tooltip.
                 { dot: health.tesseract ? '#7ede9b' : '#ffb3ab', label: `PaddleOCR ${health.tesseract ? 'pronto' : health.ocrErrore ? 'bloccato' : 'non trovato'}`, title: health.ocrErrore },
                 { dot: health.ollama ? '#7ede9b' : '#ffe082', label: health.ollama ? `Assist AI · ${health.model ?? 'Ollama'}` : 'Assist AI spento — opzionale' },
+                // scansione automatica della cartella: si vede che è attiva, o ferma per il permesso
+                ...(impostazioni.avvio === 'mano' ? [] : [permessoOk
+                  ? { dot: '#7ede9b', label: `Cartella · ${prossimaScansione ? `prossima ${prossimaScansione.toLocaleString('it-IT', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : 'automatica'}`, title: `Scansione automatica di «${impostazioni.contratti?.name ?? ''}»: ⚙ Impostazioni per cambiarla` }
+                  : { dot: '#ffe082', label: 'Cartella · in pausa', title: 'Il browser chiede di nuovo il permesso sulle cartelle: ⚙ Impostazioni → Riattiva' }]),
               ]
           ).map(s => (
             <span key={s.label} title={'title' in s ? s.title : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 11px', borderRadius: 999, background: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.92)', letterSpacing: '0.02em', whiteSpace: 'nowrap', cursor: 'title' in s && s.title ? 'help' : undefined }}>
@@ -2273,6 +2515,22 @@ export default function App() {
           ))}
         </div>
       </header>
+
+      {mostraImpostazioni && (
+        <ImpostazioniScansione
+          impostazioni={impostazioni}
+          utente={utenteImp}
+          supportata={supportaCartella()}
+          permessoOk={permessoOk}
+          occupato={loading}
+          prossimo={prossimaScansione}
+          onChiudi={() => setMostraImpostazioni(false)}
+          onSalva={salvaDaFinestra}
+          onScegliCartella={async () => (await chiediCartella()) as Cartella | null}
+          onScansionaOra={scansionaOraDaFinestra}
+          onRiattiva={riattivaPermesso}
+        />
+      )}
 
       {/* ── Modal documentazione (README / Guida) ── */}
       {docModal && (
