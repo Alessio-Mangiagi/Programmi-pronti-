@@ -210,7 +210,7 @@ def _password_del_portale(email: str, password: str, ip: str | None):
     Ritorna _PasswordDelPortale se il portale la riconosce; ApiError 403 se è giusta ma il portale nega l'accesso
     (account disattivato, password temporanea da cambiare, SkyTower non fra i suoi programmi); None altrimenti
     (sbagliata anche lì, portale spento, COSEDIL_SSO=off): il login fallisce come prima."""
-    from . import portale   # import qui: portale importa auth
+    from . import portale  # import qui: portale importa auth
     v = portale.verifica_password_portale(email, password, ip)
     if v.get("ok") and v.get("username"):
         return _PasswordDelPortale(v)
