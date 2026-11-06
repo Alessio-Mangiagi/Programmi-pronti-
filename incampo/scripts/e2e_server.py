@@ -45,6 +45,20 @@ def main():
     from scripts import seed
     seed.main()
 
+    # Registro commesse della suite tutto suo: il form commessa ne fa un menu a tendina (da 1d3351c) e il
+    # registro vero (shared/suite/commesse.json) cambia con il lavoro dell'ufficio. Qui c'è solo la voce che
+    # l'e2e «commessa in alto» sceglie; il file vero non viene letto né toccato.
+    import json
+
+    from app.routers.suite import suite_link
+
+    registro = e2e_dir / "commesse.json"
+    registro.write_text(json.dumps({"fonte": "e2e", "commesse": [
+        {"code": "C-2026-030", "nome": "Nuovo asilo", "stato": "attiva", "cliente": "Comune di Milano"},
+        {"code": "C-2020-001", "nome": "Commessa chiusa", "stato": "chiusa"},
+    ]}), encoding="utf-8")
+    suite_link.FILE_COMMESSE = registro
+
     import uvicorn
     from app.server import app, DIST
 

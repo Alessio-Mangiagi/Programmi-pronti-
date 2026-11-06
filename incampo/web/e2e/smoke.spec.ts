@@ -514,8 +514,13 @@ test('commessa in alto: selezione, sottomenù cantieri, nuova commessa con param
   await page.goto('/projects')
   await page.getByRole('button', { name: '+ Nuova commessa' }).click()
   const cm = page.getByRole('dialog')
-  await cm.getByLabel('Codice commessa').fill('C-2026-030')
-  await cm.getByLabel('Oggetto').fill('Nuovo asilo')
+  // il codice si sceglie dal registro della suite (menu a tendina da 1d3351c; registro di prova scritto da
+  // scripts/e2e_server.py): oggetto e committente arrivano dal registro, le commesse chiuse non si propongono
+  const codice = cm.getByLabel('Codice commessa')
+  await expect(codice.locator('option', { hasText: 'Commessa chiusa' })).toHaveCount(0)
+  await codice.selectOption('C-2026-030')
+  await expect(cm.getByLabel('Oggetto')).toHaveValue('Nuovo asilo')
+  await expect(cm.getByLabel('Committente')).toHaveValue('Comune di Milano')
   await cm.getByRole('group', { name: 'Zona' }).getByRole('button', { name: 'Nord' }).click()
   await cm.getByRole('group', { name: 'Tipologia lavori' }).getByRole('button', { name: 'Restauro' }).click()
   await cm.getByRole('button', { name: 'Crea commessa' }).click()

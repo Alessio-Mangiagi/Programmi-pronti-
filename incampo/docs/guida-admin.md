@@ -1,4 +1,13 @@
-# Field View — guida amministratore
+<!-- "><(((º> sabusabu <º)))>< -->
+# InCampo — scheda tecnica per l'amministratore
+
+Il titolo "Field View" era quello del prototipo; il programma si chiama InCampo (allineato il 06/11/2026).
+Per l'uso quotidiano c'è la guida con le immagini in **[docs/guida/](guida/README.md)**:
+[10. Amministrazione](guida/10-amministrazione.md) (utenti, segnalazioni, registro, parametri, etichette),
+[9. Inviti](guida/09-inviti.md), [8. Modelli di modulo](guida/08-modelli-di-modulo.md),
+[2. Commesse e cantieri](guida/02-commesse-e-cantieri.md) (anche la pagina «Persone») e
+[13. Amministratore di sistema](guida/13-amministratore-di-sistema.md). Questa pagina resta il riferimento
+tecnico: rotte API, installazione Docker, storage S3, backup, aggiornamenti e diagnostica.
 
 ## Ruoli
 | Ruolo | Può |
@@ -26,8 +35,11 @@
 - API equivalenti: `POST/GET/PATCH /users`, `GET /users/activity`, `GET /audit`, `GET /audit/actions`,
   `POST/GET /support/messages`, `PATCH /support/messages/{id}`.
 
-Membri di progetto: `POST /projects/{id}/members` con `user_id`. Preferenze notifica
-per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).
+Membri di progetto: pagina **Persone** del cantiere (`/projects/:id/persone`, admin o manager iscritto) oppure
+`POST /projects/{id}/members` con `user_id` (utente disattivato → 409; nel registro «Membro aggiunto/rimosso»).
+Password: almeno 12 caratteri (`schemas.PASSWORD_MIN`, anche `scripts/create_admin.py`); ognuno la cambia da
+**Cambia password** (`POST /auth/me/password`, chiede quella attuale) e dal 06/11/2026 vale anche la password
+del Portale. Preferenze notifica per utente: `PATCH /auth/me/preferences` (`notify_email`, `notify_push`).
 
 - **Parametri commessa** (`/admin/parametri`): campi a scelta multipla (o singola) personalizzati,
   es. "Tipologia lavori: Edilizia civile / Stradale / Impianti". Ogni commessa li valorizza;
@@ -73,7 +85,8 @@ API: `GET/POST/PATCH /commesse`, `PATCH /projects/{id}` (`commessa_id`), `GET/PO
    dopo 7 giorni; "Rimanda" ne genera uno nuovo (il vecchio muore), "Revoca" lo
    spegne subito. Chi accetta sceglie nome e password ed è già dentro col profilo
    dell'etichetta.
-5. Aggiungere eventuali membri in più; gli operai fanno login dall'app e sincronizzano.
+5. Aggiungere eventuali membri in più dalla pagina **Persone** del cantiere (utenti già registrati);
+   gli operai fanno login dall'app e sincronizzano.
 
 ## Operatività quotidiana (ufficio)
 - **Dashboard**: aperti, scaduti, chiusi negli ultimi 7 giorni, trend; click su un
