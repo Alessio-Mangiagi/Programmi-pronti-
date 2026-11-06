@@ -8,6 +8,7 @@ import calendar
 import io
 import json
 import os
+import re
 import sqlite3
 import sys
 import tempfile
@@ -755,8 +756,9 @@ def normalizza_tipo(dati: dict, esistente: dict | None = None) -> dict:
     base = dict(esistente) if esistente else {
         "nome": None, "categoria": None, "soggetto": None,
         "validita_mesi": None, "preavviso_giorni": config.DEFAULT_PREAVVISO_GIORNI,
+        "referente_email": None,
     }
-    for campo in ("nome", "categoria", "soggetto", "validita_mesi", "preavviso_giorni"):
+    for campo in ("nome", "categoria", "soggetto", "validita_mesi", "preavviso_giorni", "referente_email"):
         if campo in dati:
             base[campo] = dati[campo]
 
@@ -777,7 +779,9 @@ def normalizza_tipo(dati: dict, esistente: dict | None = None) -> dict:
         preavviso = config.DEFAULT_PREAVVISO_GIORNI
     preavviso = valida_intero(preavviso, "preavviso_giorni", minimo=0)
     return {"nome": nome, "categoria": base["categoria"], "soggetto": base["soggetto"],
-            "validita_mesi": validita, "preavviso_giorni": preavviso}
+            "validita_mesi": validita, "preavviso_giorni": preavviso,
+            # chi riceve gli avvisi delle scadenze di questo tipo senza un referente proprio (notifiche.destinatari)
+            "referente_email": email_o_none(base.get("referente_email"))}
 
 
 def leggi_tipo(tipo_id: int, status: int = 404) -> dict:
@@ -804,10 +808,10 @@ def tipi_crea():
     conn = db()
     try:
         cur = conn.execute(
-            "INSERT INTO tipi_scadenza (nome, categoria, soggetto, validita_mesi, preavviso_giorni) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO tipi_scadenza (nome, categoria, soggetto, validita_mesi, preavviso_giorni, "
+            "referente_email) VALUES (?, ?, ?, ?, ?, ?)",
             (valori["nome"], valori["categoria"], valori["soggetto"],
-             valori["validita_mesi"], valori["preavviso_giorni"]))
+             valori["validita_mesi"], valori["preavviso_giorni"], valori["referente_email"]))
         conn.commit()
     except sqlite3.IntegrityError:
         raise ErroreApi("Esiste già un tipo scadenza con questo nome", 409)
@@ -822,9 +826,9 @@ def tipi_aggiorna(tipo_id: int):
     try:
         conn.execute(
             "UPDATE tipi_scadenza SET nome = ?, categoria = ?, soggetto = ?, "
-            "validita_mesi = ?, preavviso_giorni = ? WHERE id = ?",
+            "validita_mesi = ?, preavviso_giorni = ?, referente_email = ? WHERE id = ?",
             (valori["nome"], valori["categoria"], valori["soggetto"],
-             valori["validita_mesi"], valori["preavviso_giorni"], tipo_id))
+             valori["validita_mesi"], valori["preavviso_giorni"], valori["referente_email"], tipo_id))
         conn.commit()
     except sqlite3.IntegrityError:
         raise ErroreApi("Esiste già un tipo scadenza con questo nome", 409)
@@ -837,6 +841,7 @@ IMPORT_CAMPI_TIPI = [
     ("soggetto", "Soggetto [" + "/".join(SOGGETTI) + "]", "dipendente"),
     ("validita_mesi", "Validità (mesi, vuoto = manuale)", 12),
     ("preavviso_giorni", "Preavviso (giorni)", 45),
+    ("referente_email", "Email referente (riceve gli avvisi)", ""),
 ]
 
 
@@ -871,10 +876,10 @@ def tipi_import():
         try:
             valori = normalizza_tipo(dati)
             conn.execute(
-                "INSERT INTO tipi_scadenza (nome, categoria, soggetto, validita_mesi, preavviso_giorni) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO tipi_scadenza (nome, categoria, soggetto, validita_mesi, preavviso_giorni, "
+                "referente_email) VALUES (?, ?, ?, ?, ?, ?)",
                 (valori["nome"], valori["categoria"], valori["soggetto"],
-                 valori["validita_mesi"], valori["preavviso_giorni"]))
+                 valori["validita_mesi"], valori["preavviso_giorni"], valori["referente_email"]))
             importati += 1
         except sqlite3.IntegrityError:
             saltati += 1  # nome già esistente
@@ -957,6 +962,20 @@ def testo_o_none(valore):
     return testo or None
 
 
+def email_o_none(valore, campo: str = "referente_email"):
+    """Uno o più indirizzi email (separati da virgola, punto e virgola o spazio) normalizzati in
+    "a@x.it, b@y.it"; None se vuoto. Un pezzo che non è un'email è un errore 400: un refuso qui vorrebbe dire
+    un referente che non riceve mai gli avvisi senza che nessuno se ne accorga."""
+    testo = testo_o_none(valore)
+    if testo is None:
+        return None
+    pezzi = [x for x in re.split(r"[,;\s]+", testo) if x]
+    sbagliati = [x for x in pezzi if not notifiche.EMAIL_RE.fullmatch(x)]
+    if sbagliati:
+        raise ErroreApi(f"Email non valida nel campo '{campo}': {', '.join(sbagliati)}")
+    return ", ".join(dict.fromkeys(x.lower() for x in pezzi))
+
+
 def leggi_filtri_scadenze() -> tuple:
     """Legge e valida dalla query string i filtri comuni a GET /api/scadenze
     e a GET /api/export/scadenze.xlsx (l'export riflette la vista).
@@ -1013,13 +1032,14 @@ def scadenze_crea():
         dati.get("soggetto_tipo"), dati.get("soggetto_id"), tipo)
     rilascio, scadenza = risolvi_date_scadenza(dati, tipo)
 
+    referente_email = email_o_none(dati.get("referente_email"))
     conn = db()
     cur = conn.execute(
         "INSERT INTO scadenze (tipo_id, soggetto_tipo, soggetto_id, data_rilascio, "
-        "data_scadenza, documento_rif, referente, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "data_scadenza, documento_rif, referente, referente_email, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (tipo_id, soggetto_tipo, soggetto_id, rilascio, scadenza,
          testo_o_none(dati.get("documento_rif")), testo_o_none(dati.get("referente")),
-         testo_o_none(dati.get("note"))))
+         referente_email, testo_o_none(dati.get("note"))))
     conn.commit()
     return jsonify(carica_scadenza_arricchita(cur.lastrowid)), 201
 
@@ -1109,6 +1129,8 @@ def scadenze_aggiorna(scadenza_id: int):
                      if "documento_rif" in dati else esistente["documento_rif"])
     referente = (testo_o_none(dati.get("referente"))
                  if "referente" in dati else esistente["referente"])
+    referente_email = (email_o_none(dati.get("referente_email"))
+                       if "referente_email" in dati else esistente.get("referente_email"))
     note = testo_o_none(dati.get("note")) if "note" in dati else esistente["note"]
     chiusa = (valida_flag(dati["chiusa"], "chiusa")
               if "chiusa" in dati else esistente["chiusa"])
@@ -1116,10 +1138,10 @@ def scadenze_aggiorna(scadenza_id: int):
     conn = db()
     conn.execute(
         "UPDATE scadenze SET tipo_id = ?, soggetto_tipo = ?, soggetto_id = ?, "
-        "data_rilascio = ?, data_scadenza = ?, documento_rif = ?, referente = ?, note = ?, chiusa = ? "
-        "WHERE id = ?",
+        "data_rilascio = ?, data_scadenza = ?, documento_rif = ?, referente = ?, referente_email = ?, "
+        "note = ?, chiusa = ? WHERE id = ?",
         (tipo_id, soggetto_tipo, soggetto_id, rilascio, scadenza,
-         documento_rif, referente, note, chiusa, scadenza_id))
+         documento_rif, referente, referente_email, note, chiusa, scadenza_id))
     conn.commit()
     return jsonify(carica_scadenza_arricchita(scadenza_id))
 
@@ -1151,10 +1173,10 @@ def scadenze_rinnova(scadenza_id: int):
     conn.execute("UPDATE scadenze SET chiusa = 1 WHERE id = ?", (scadenza_id,))
     cur = conn.execute(
         "INSERT INTO scadenze (tipo_id, soggetto_tipo, soggetto_id, data_rilascio, "
-        "data_scadenza, documento_rif, referente, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "data_scadenza, documento_rif, referente, referente_email, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (corrente["tipo_id"], corrente["soggetto_tipo"], corrente["soggetto_id"],
          rilascio, scadenza, testo_o_none(dati.get("documento_rif")),
-         corrente["referente"], testo_o_none(dati.get("note"))))
+         corrente["referente"], corrente.get("referente_email"), testo_o_none(dati.get("note"))))
     conn.commit()
     return jsonify(carica_scadenza_arricchita(cur.lastrowid)), 201
 
@@ -1191,6 +1213,7 @@ IMPORT_CAMPI_SCADENZE = [
     ("data_scadenza", "Data scadenza (gg/mm/aaaa, vuoto = calcolata)", ""),
     ("documento_rif", "Documento rif.", ""),
     ("referente", "Referente", ""),
+    ("referente_email", "Email referente (riceve gli avvisi)", ""),
     ("note", "Note", ""),
 ]
 
@@ -1285,6 +1308,7 @@ def scadenze_import():
 
             rilascio = _parse_data_import(dati.get("data_rilascio"))
             scadenza = _parse_data_import(dati.get("data_scadenza"))
+            referente_email = email_o_none(dati.get("referente_email"))
             if not scadenza:
                 if rilascio and tipo["validita_mesi"]:
                     scadenza = aggiungi_mesi(rilascio, tipo["validita_mesi"])
@@ -1301,10 +1325,10 @@ def scadenze_import():
         gia_presenti.add(chiave)
         conn.execute(
             "INSERT INTO scadenze (tipo_id, soggetto_tipo, soggetto_id, data_rilascio, "
-            "data_scadenza, documento_rif, referente, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "data_scadenza, documento_rif, referente, referente_email, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (tipo["id"], soggetto_tipo, soggetto_id, rilascio, scadenza,
              testo_o_none(dati.get("documento_rif")), testo_o_none(dati.get("referente")),
-             testo_o_none(dati.get("note"))))
+             referente_email, testo_o_none(dati.get("note"))))
         importati += 1
 
     conn.commit()
@@ -1661,6 +1685,7 @@ COLONNE_EXPORT = [
     ("data_scadenza", "Data scadenza"),
     ("documento_rif", "Documento rif."),
     ("referente", "Referente"),
+    ("referente_email", "Email referente"),
     ("note", "Note"),
     ("chiusa", "Chiusa"),
     ("stato", "Stato"),
@@ -1831,7 +1856,14 @@ def export_scadenze_ics():
 
 @app.get("/api/notifiche/riepilogo")
 def notifiche_riepilogo():
-    return jsonify({"da_notificare": notifiche.scadenze_da_notificare()})
+    """Scadenze da notificare con l'anteprima di chi riceverebbe l'email (email_a) e lo stato del canale
+    email, così la pagina Impostazioni mostra a chi andrà ogni avviso prima di premere "Esegui notifiche"."""
+    da_notificare = notifiche.scadenze_da_notificare()
+    for s in da_notificare:
+        s["email_a"] = notifiche.anteprima_destinatari(s)
+    return jsonify({"da_notificare": da_notificare,
+                    "email": {"attiva": notifiche.email_attiva(), "fissi": list(config.EMAIL_A),
+                              "fissi_ricevono": config.EMAIL_A_RICEVE}})
 
 
 @app.post("/api/notifiche/esegui")
@@ -1845,7 +1877,7 @@ def notifiche_log():
     limite = min(limite, 500)
     righe = db().execute(
         """
-        SELECT nl.id, nl.scadenza_id, nl.canale, nl.messaggio, nl.esito, nl.inviata_il,
+        SELECT nl.id, nl.scadenza_id, nl.canale, nl.messaggio, nl.esito, nl.inviata_il, nl.destinatario,
                t.nome AS tipo_nome, s.data_scadenza
         FROM notifiche_log nl
         LEFT JOIN scadenze s ON s.id = nl.scadenza_id

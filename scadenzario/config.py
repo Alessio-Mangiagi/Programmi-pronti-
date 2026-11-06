@@ -46,6 +46,13 @@ SMTP_STARTTLS = os.environ.get("SMTP_STARTTLS", "1") in ("1", "true", "True")
 EMAIL_DA = os.environ.get("EMAIL_DA", SMTP_USER)
 # Destinatari fissi delle notifiche (compliance/DPO), separati da virgola
 EMAIL_A = tuple(x.strip() for x in os.environ.get("EMAIL_A", "").split(",") if x.strip())
+# Dal 06/11/2026 ogni scadenza va anche al suo referente (email sulla scadenza o predefinita del tipo, vedi
+# notifiche.destinatari). EMAIL_A_RICEVE decide cosa ricevono i destinatari fissi:
+#   "tutte" (default)       = il riepilogo completo come prima, in copia a tutto;
+#   "senza_referente"       = solo le scadenze che non hanno un referente con email (ripiego).
+EMAIL_A_RICEVE = os.environ.get("EMAIL_A_RICEVE", "tutte").strip().lower()
+if EMAIL_A_RICEVE not in ("tutte", "senza_referente"):
+    EMAIL_A_RICEVE = "tutte"
 
 # Amministratori dello Scadenzario: solo questi username del portale (oltre a
 # essere admin per l'app nel portale) vedono la pagina Amministrazione e possono

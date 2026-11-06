@@ -840,6 +840,11 @@ async function modaleScadenza(scadenza, ricarica) {
       '<div class="campo"><label class="etichetta" for="sc-referente">Referente / responsabile</label>' +
         '<input type="text" id="sc-referente" placeholder="Es. DPO, RSPP, ufficio…" value="' + esc(scadenza && scadenza.referente || '') + '"></div>' +
     '</div>' +
+    // Email del referente (06/11/2026): chi riceve gli avvisi di questa scadenza. Vuota = vale l'email
+    // predefinita del tipo (Impostazioni › Tipi di scadenza), altrimenti solo i destinatari fissi.
+    '<div class="campo"><label class="etichetta" for="sc-referente-email">Email del referente (riceve gli avvisi)</label>' +
+      '<input type="text" id="sc-referente-email" inputmode="email" autocomplete="off" placeholder="nome@cosedilspa.com — più indirizzi separati da virgola" value="' + esc(scadenza && scadenza.referente_email || '') + '">' +
+      '<span class="suggerimento-campo" id="sc-referente-email-aiuto"></span></div>' +
     '<div class="campo"><label class="etichetta" for="sc-note">Note</label>' +
       '<textarea id="sc-note">' + esc(scadenza && scadenza.note || '') + '</textarea></div>' +
     '<div class="campo"><label class="etichetta" for="sc-allegati">' + (scadenza ? 'Aggiungi allegati' : 'Allegati') + '</label>' +
@@ -874,6 +879,10 @@ async function modaleScadenza(scadenza, ricarica) {
         infoTipo.textContent = t
           ? (t.validita_mesi ? 'Validità tipica: ' + t.validita_mesi + ' mesi · preavviso ' + t.preavviso_giorni + ' giorni' : 'Preavviso ' + t.preavviso_giorni + ' giorni')
           : '';
+        // chi riceve gli avvisi se l'email del referente resta vuota: il predefinito del tipo, se c'è
+        overlay.querySelector('#sc-referente-email-aiuto').textContent = t && t.referente_email
+          ? 'Vuota = avvisi a ' + t.referente_email + ' (referente predefinito del tipo).'
+          : 'Vuota = avvisi solo ai destinatari fissi dello Scadenzario.';
         if (!t || t.soggetto === 'azienda') {
           blocco.style.display = 'none';
           selSoggetto.innerHTML = '<option value="">' + esc(NOME_AZIENDA) + '</option>';
@@ -943,6 +952,7 @@ async function modaleScadenza(scadenza, ricarica) {
         data_scadenza: dataScadenza,
         documento_rif: overlay.querySelector('#sc-doc').value.trim() || null,
         referente: overlay.querySelector('#sc-referente').value.trim() || null,
+        referente_email: overlay.querySelector('#sc-referente-email').value.trim() || null,
         note: overlay.querySelector('#sc-note').value.trim() || null,
       };
 
@@ -1051,7 +1061,10 @@ async function modaleDettaglioScadenza(scadenza, ricarica) {
   const corpo =
     '<p style="font-size:14px;margin-bottom:4px;"><strong>' + esc(scadenza.tipo_nome) + '</strong></p>' +
     '<p class="suggerimento-campo" style="margin-bottom:18px;">' + esc(SOGGETTI[scadenza.soggetto_tipo] || scadenza.soggetto_tipo) + ': ' + esc(scadenza.soggetto_nome) +
-      ' · scadenza ' + fmtData(scadenza.data_scadenza) + (scadenza.referente ? ' · referente ' + esc(scadenza.referente) : '') + '</p>' +
+      ' · scadenza ' + fmtData(scadenza.data_scadenza) + (scadenza.referente ? ' · referente ' + esc(scadenza.referente) : '') +
+      (scadenza.referente_email || scadenza.tipo_referente_email
+        ? ' · avvisi a ' + esc(scadenza.referente_email || scadenza.tipo_referente_email) + (scadenza.referente_email ? '' : ' (dal tipo)')
+        : '') + '</p>' +
 
     '<div class="sezione-dettaglio">' +
       '<div class="sezione-testata">' + icona('lista', 16) + '<h4>Checklist adempimenti</h4><span id="dt-chk-conta" class="muted"></span></div>' +
@@ -1615,6 +1628,7 @@ async function vistaImpostazioni() {
         '<td>' + esc(SOGGETTI[t.soggetto] || t.soggetto) + '</td>' +
         '<td class="num">' + (t.validita_mesi ? esc(t.validita_mesi) + ' mesi' : '<span class="muted">—</span>') + '</td>' +
         '<td class="num">' + esc(t.preavviso_giorni) + ' gg</td>' +
+        '<td>' + (t.referente_email ? esc(t.referente_email) : '<span class="muted">—</span>') + '</td>' +
         '<td class="azioni">' +
           '<button type="button" class="btn-icona" data-azione="modifica" title="Modifica" aria-label="Modifica tipo">' + icona('matita', 17) + '</button>' +
         '</td>' +
@@ -1626,7 +1640,7 @@ async function vistaImpostazioni() {
         '<button type="button" class="btn btn-secondario" id="btn-nuovo-tipo">' + icona('piu', 16) + 'Nuovo tipo</button></div>' +
       (tipi.length
         ? '<div class="tabella-contenitore"><table class="tabella"><thead><tr>' +
-          '<th>Nome</th><th>Categoria</th><th>Soggetto</th><th class="num">Validità</th><th class="num">Preavviso</th><th class="azioni">Azioni</th>' +
+          '<th>Nome</th><th>Categoria</th><th>Soggetto</th><th class="num">Validità</th><th class="num">Preavviso</th><th>Avvisi a</th><th class="azioni">Azioni</th>' +
           '</tr></thead><tbody>' + righe + '</tbody></table></div>'
         : htmlVuoto('archivio', 'Nessun tipo configurato', 'Crea il primo tipo di scadenza per iniziare a registrare le scadenze.'));
 
@@ -1657,6 +1671,11 @@ async function vistaImpostazioni() {
     }
 
     const daNotificare = riepilogo.da_notificare || [];
+    // Anteprima (06/11/2026): a chi partirebbe l'email di ogni scadenza al prossimo giro, senza inviare nulla
+    const posta = riepilogo.email || { attiva: false, fissi: [] };
+    const cellaDestinatari = (s) => (s.email_a && s.email_a.length
+      ? esc(s.email_a.join(', '))
+      : '<span class="muted">' + (posta.attiva ? 'nessuno: manca il referente' : 'solo in-app') + '</span>');
     const righeRiepilogo = daNotificare.map((s) =>
       '<tr>' +
         '<td class="principale">' + esc(s.tipo_nome) + '</td>' +
@@ -1664,7 +1683,14 @@ async function vistaImpostazioni() {
         '<td class="num">' + fmtData(s.data_scadenza) + '</td>' +
         '<td class="num">' + cellaGiorni(s) + '</td>' +
         '<td>' + badgeStato(s.stato) + '</td>' +
+        '<td class="log-messaggio">' + cellaDestinatari(s) + '</td>' +
       '</tr>').join('');
+    const statoPosta = posta.attiva
+      ? 'Email attiva: ogni referente riceve un riepilogo con le sue scadenze' +
+        (posta.fissi && posta.fissi.length
+          ? '; ' + esc(posta.fissi.join(', ')) + (posta.fissi_ricevono === 'senza_referente' ? ' riceve le scadenze senza referente.' : ' riceve in copia tutte le scadenze.')
+          : '.')
+      : 'Email non configurata: gli avvisi restano nel registro qui sotto e negli avvisi del Portale.';
 
     const badgeEsito = (esito) => {
       if (esito === 'ok') return '<span class="badge badge-valida"><span class="punto"></span>OK</span>';
@@ -1675,7 +1701,7 @@ async function vistaImpostazioni() {
     const righeLog = (log || []).map((r) =>
       '<tr>' +
         '<td class="num" style="white-space:nowrap;">' + fmtDataOra(r.inviata_il) + '</td>' +
-        '<td>' + esc(CANALI[r.canale] || r.canale) + '</td>' +
+        '<td>' + esc(CANALI[r.canale] || r.canale) + (r.destinatario ? '<br><span class="muted">' + esc(r.destinatario) + '</span>' : '') + '</td>' +
         '<td class="log-messaggio" title="' + esc(r.messaggio || '') + '">' + esc(r.messaggio || '—') + '</td>' +
         '<td>' + badgeEsito(r.esito) + '</td>' +
       '</tr>').join('');
@@ -1684,10 +1710,11 @@ async function vistaImpostazioni() {
       '<div class="pannello-testata">' + icona('campana') + '<h2>Notifiche</h2>' +
         '<button type="button" class="btn btn-primario" id="btn-esegui-notifiche">' + icona('campana', 16) + 'Esegui notifiche ora</button></div>' +
       '<div class="pannello-corpo">' +
+        '<p class="suggerimento-campo" id="stato-posta" style="margin-bottom:12px;">' + statoPosta + '</p>' +
         '<h3 style="font-size:14px;font-weight:500;color:var(--cosedil-navy);margin-bottom:10px;">Da notificare (' + daNotificare.length + ')</h3>' +
         (daNotificare.length
           ? '<div class="tabella-contenitore" style="border:1px solid var(--cosedil-border);border-radius:8px;margin-bottom:24px;"><table class="tabella"><thead><tr>' +
-            '<th>Tipo</th><th>Soggetto</th><th class="num">Scadenza</th><th class="num">Giorni</th><th>Stato</th>' +
+            '<th>Tipo</th><th>Soggetto</th><th class="num">Scadenza</th><th class="num">Giorni</th><th>Stato</th><th>Email a</th>' +
             '</tr></thead><tbody>' + righeRiepilogo + '</tbody></table></div>'
           : '<div style="margin-bottom:24px;">' + htmlVuoto('spuntaCerchio', 'Niente da notificare', 'Nessuna scadenza scaduta o in scadenza da segnalare.') + '</div>') +
         '<h3 style="font-size:14px;font-weight:500;color:var(--cosedil-navy);margin-bottom:10px;">Registro notifiche (ultime 50)</h3>' +
@@ -1703,7 +1730,8 @@ async function vistaImpostazioni() {
       btn.disabled = true;
       try {
         const esito = await api('/notifiche/esegui', { method: 'POST' });
-        notifica('Notifiche eseguite: ' + (esito.inviate || 0) + ' inviate.');
+        notifica('Notifiche eseguite: ' + (esito.inviate || 0) + ' nuove' +
+          (esito.email_inviate ? ', ' + esito.email_inviate + ' email partite.' : '.'));
         aggiornaNotifiche();
       } catch (err) {
         notifica(err.message, 'errore');
@@ -1737,7 +1765,10 @@ function modaleTipo(tipo, ricarica) {
         '<span class="suggerimento-campo">Vuoto = data scadenza sempre manuale.</span></div>' +
       '<div class="campo"><label class="etichetta" for="tp-preavviso">Preavviso (giorni) *</label>' +
         '<input type="number" id="tp-preavviso" min="0" step="1" value="' + esc(tipo ? tipo.preavviso_giorni : 30) + '"></div>' +
-    '</div>';
+    '</div>' +
+    '<div class="campo"><label class="etichetta" for="tp-referente-email">Email del referente predefinito</label>' +
+      '<input type="text" id="tp-referente-email" inputmode="email" autocomplete="off" placeholder="es. medico.competente@cosedilspa.com" value="' + esc(tipo && tipo.referente_email || '') + '">' +
+      '<span class="suggerimento-campo">Riceve gli avvisi delle scadenze di questo tipo che non hanno un referente con email proprio.</span></div>';
 
   apriModale({
     titolo: tipo ? 'Modifica tipo scadenza' : 'Nuovo tipo scadenza',
@@ -1755,6 +1786,7 @@ function modaleTipo(tipo, ricarica) {
         soggetto: overlay.querySelector('#tp-soggetto').value,
         validita_mesi: validita === '' ? null : Number(validita),
         preavviso_giorni: Number(preavviso),
+        referente_email: overlay.querySelector('#tp-referente-email').value.trim() || null,
       };
       if (tipo) {
         await api('/tipi/' + tipo.id, { method: 'PUT', body });

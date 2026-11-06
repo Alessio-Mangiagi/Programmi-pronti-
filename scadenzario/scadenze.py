@@ -41,6 +41,8 @@ SELECT
     ELSE 1
   END AS soggetto_attivo,
   s.data_rilascio, s.data_scadenza, s.documento_rif, s.referente, s.note, s.chiusa,
+  -- email per gli avvisi: quella della scadenza, altrimenti quella predefinita del tipo (notifiche.destinatari)
+  s.referente_email, t.referente_email AS tipo_referente_email,
   t.preavviso_giorni,
   (SELECT COUNT(*) FROM adempimenti ad WHERE ad.scadenza_id = s.id) AS adempimenti_totali,
   (SELECT COUNT(*) FROM adempimenti ad WHERE ad.scadenza_id = s.id AND ad.fatto = 1) AS adempimenti_fatti,

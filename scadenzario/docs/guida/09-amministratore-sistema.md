@@ -59,9 +59,14 @@ cartella del programma.
 
 ## Email
 
-Per inviare il riepilogo via email impostare `EMAIL_ABILITATA=1`, `SMTP_HOST`,
-`SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_DA` ed `EMAIL_A` (destinatari separati
-da virgola). Senza configurazione il canale resta "Disabilitato".
+Per inviare gli avvisi via email impostare `EMAIL_ABILITATA=1`, `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_DA` ed `EMAIL_A` (destinatari fissi
+separati da virgola). Senza configurazione il canale resta "Disabilitato".
+
+Ogni referente (email sulla scadenza o predefinita del tipo) riceve le sue scadenze;
+`EMAIL_A_RICEVE` decide cosa ricevono i destinatari fissi: `tutte` (predefinito, il
+riepilogo completo in copia) oppure `senza_referente` (solo le scadenze che non hanno un
+referente con email). Si imposta in `impostazioni-locali.bat` come le altre variabili.
 
 ## Ripristino
 

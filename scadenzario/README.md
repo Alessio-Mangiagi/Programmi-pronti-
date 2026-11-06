@@ -200,11 +200,11 @@ Le milestone **già in vigore** sono precaricate come *chiuse* (non generano ale
 ### Strumenti di conformità (v1.3)
 
 - **Registro Sistemi IA** (`#/sistemi_ia`): inventario dei sistemi di IA usati in azienda, con **classe di rischio** (vietato / alto rischio / limitato / minimo / GPAI / da valutare), **ruolo** (deployer/provider/…), **stato di conformità** e referente. È la base della conformità AI Act: una volta censiti, i sistemi diventano il "soggetto" a cui agganciare le scadenze (es. valutazioni di conformità, FRIA).
-- **Referente per scadenza**: ogni scadenza può avere un responsabile (DPO, RSPP, ufficio…), riportato anche nel dossier e nell'email.
+- **Referente per scadenza**: ogni scadenza può avere un responsabile (DPO, RSPP, ufficio…), riportato anche nel dossier e nell'email, e l'**email del referente** (`scadenze.referente_email`, anche più indirizzi) che riceve gli avvisi. Ogni tipo di scadenza può avere un **referente predefinito** (`tipi_scadenza.referente_email`, es. medico competente per le visite, ufficio acquisti per i DURC) valido per le scadenze senza referente proprio.
 - **Checklist adempimenti**: dalla vista Scadenze, l'azione *Checklist e allegati* apre una checklist spuntabile di sotto-attività. Le scadenze "Divieto pratiche vietate (art. 5)" e "Applicazione generale" arrivano **precaricate** con le voci-chiave (pratiche vietate; obblighi del deployer: sorveglianza umana, log, informativa, FRIA/DPIA…).
 - **Allegati (evidenze)**: alla stessa scadenza si allegano i documenti di prova (informativa lavoratori, FRIA, contratto fornitore con clausole IA…). File salvati in `allegati/` (non versionata).
 - **Preavviso multi-step**: gli avvisi non arrivano una volta sola ma a più soglie (180/90/60/30/14/7/1/0 giorni) man mano che la scadenza si avvicina, e ogni giorno finché resta scaduta.
-- **Notifiche email reali** (opzionali): impostando le variabili d'ambiente `EMAIL_ABILITATA=1`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_DA`, `EMAIL_A` (destinatari separati da virgola), il canale email invia davvero al compliance/DPO. Senza configurazione resta disattivato (log `disabilitato`).
+- **Notifiche email reali** (opzionali): impostando le variabili d'ambiente `EMAIL_ABILITATA=1`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_DA`, `EMAIL_A` (destinatari fissi separati da virgola), il canale email invia davvero. Dal 06/11/2026 **ogni referente riceve una sola email con le sue scadenze** nuove del giro (email della scadenza, altrimenti un'email scritta nel campo Referente, altrimenti il referente predefinito del tipo: `notifiche.destinatari`); i destinatari fissi `EMAIL_A` ricevono il riepilogo completo in copia (`EMAIL_A_RICEVE=tutte`, default) oppure solo le scadenze senza referente (`EMAIL_A_RICEVE=senza_referente`). La stessa scadenza non parte due volte verso la stessa persona nello stesso giorno (`notifiche_log.destinatario`); un indirizzo respinto dal server non ferma gli altri e diventa un avviso nel Portale. In **Impostazioni › Notifiche** la colonna *Email a* mostra in anteprima a chi andrà ogni avviso. Senza configurazione resta disattivato (log `disabilitato`), senza errori.
 - **Dossier AI Act**: bottone *Dossier AI Act* nella vista Scadenze → file Excel a 3 fogli (scadenze normative, registro sistemi IA, checklist) pronto per audit interno o richiesta dell'autorità.
 - **Alfabetizzazione IA per lavoratore**: tipo scadenza dedicato (soggetto *dipendente*) per tracciare chi ha svolto la formazione sull'IA (art. 4), con validità 24 mesi.
 
@@ -263,7 +263,7 @@ in `shared/suite/CONTRATTI.md`.
 
 ## Roadmap
 
-- **Email ai singoli referenti** — oggi il riepilogo va ai destinatari fissi `EMAIL_A`
+- ~~**Email ai singoli referenti**~~ — fatto il 06/11/2026 (email del referente su scadenza e tipo, `EMAIL_A` in copia o come ripiego)
 - **Notifiche WhatsApp reali** — integrazione con provider di messaggistica (oggi stub disattivato)
 - **OCR attestati** — lettura automatica di attestati/certificati scansionati per precompilare tipo, date e soggetto della scadenza (riuso della pipeline Tesseract già in uso negli altri tool Cosedil)
 

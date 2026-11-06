@@ -15,3 +15,6 @@ REM Posta per le notifiche (vedi README, "Notifiche").
 REM set "EMAIL_ABILITATA=1"
 REM set "SMTP_HOST=smtp.cosedilspa.com"
 REM set "EMAIL_A=sicurezza@cosedilspa.com"
+REM Destinatari fissi: "tutte" = in copia a ogni avviso (default), "senza_referente" = solo le scadenze
+REM senza email del referente (ognuno riceve comunque le sue: vedi Impostazioni > Notifiche).
+REM set "EMAIL_A_RICEVE=senza_referente"

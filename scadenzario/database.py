@@ -435,6 +435,21 @@ def migra_ai_act(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def migra_referenti_email(conn: sqlite3.Connection) -> None:
+    """Email dei referenti per le notifiche (roadmap "email ai singoli referenti", 06/11/2026). Idempotente.
+
+    - scadenze.referente_email: chi riceve gli avvisi di quella scadenza (una o più email separate da virgola);
+    - tipi_scadenza.referente_email: destinatario predefinito per tutte le scadenze del tipo senza un referente
+      proprio (es. tutte le visite mediche al medico competente, tutti i DURC all'ufficio acquisti);
+    - notifiche_log.destinatario: a chi è partita ogni email, per non mandare due volte la stessa scadenza alla
+      stessa persona nello stesso giorno.
+    Va eseguita DOPO migra_ai_act: quella può ricreare la tabella scadenze con le sole colonne della v1.3.
+    """
+    _assicura_colonna(conn, "scadenze", "referente_email", "TEXT")
+    _assicura_colonna(conn, "tipi_scadenza", "referente_email", "TEXT")
+    _assicura_colonna(conn, "notifiche_log", "destinatario", "TEXT")
+
+
 def init_db() -> None:
     """Crea/aggiorna lo schema e inserisce il seed dei tipi scadenza se la tabella è vuota."""
     conn = get_db()
@@ -450,6 +465,7 @@ def init_db() -> None:
         conn.commit()
         # Adempimenti AI Act: idempotente, va eseguito anche sui DB già esistenti.
         migra_ai_act(conn)
+        migra_referenti_email(conn)
         conn.executescript(INDICI_SQL)
     finally:
         conn.close()

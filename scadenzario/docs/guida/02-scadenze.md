@@ -53,7 +53,11 @@ Grasso*; la **×** toglie il filtro.
 4. Inserisci la **Data rilascio**: se il tipo ha una validità in mesi, la **Data
    scadenza** si compila da sola (puoi correggerla).
 5. Facoltativi: **Documento di riferimento** (n. attestato, certificato…),
-   **Referente / responsabile** (RSPP, medico competente, ufficio…), **Note**.
+   **Referente / responsabile** (RSPP, medico competente, ufficio…), **Email del
+   referente**, **Note**. L'email del referente (anche più indirizzi separati da virgola)
+   è chi riceve gli avvisi di questa scadenza; vuota, vale l'email predefinita del tipo
+   (lo dice la riga sotto il campo) e, se manca anche quella, gli avvisi vanno solo ai
+   destinatari fissi dello Scadenzario. Un indirizzo scritto male non si salva.
 6. **Allegati**: puoi già allegare uno o più file (max 20 MB l'uno, stessi formati della
    finestra *Checklist e allegati* qui sotto). Un file troppo grande o di un formato non
    ammesso compare in rosso nell'elenco e la scadenza non si salva finché non lo togli.

@@ -166,7 +166,7 @@ def _avvisi_lasciati():
 def test_scadenze_nuove_diventano_un_avviso_per_il_portale():
     _avvisi_lasciati()
     notifiche._avvisa_portale([({}, "Visita medica scade", "soglia_30"),
-                               ({}, "DURC scaduto", "scaduta")], "ok", "")
+                               ({}, "DURC scaduto", "scaduta")], [])
     (a,) = _avvisi_lasciati()
     assert a["app"] == "scadenzario" and a["chiave"] == "scadenze"
     assert a["livello"] == "errore"  # c'è una scaduta
@@ -176,7 +176,8 @@ def test_scadenze_nuove_diventano_un_avviso_per_il_portale():
 
 def test_email_non_partita_e_un_avviso_a_parte():
     _avvisi_lasciati()
-    notifiche._avvisa_portale([({}, "Visita medica scade", "soglia_30")], "errore", "[invio email fallito: timeout]")
+    # dal 06/11 gli errori sono uno per destinatario (email ai singoli referenti)
+    notifiche._avvisa_portale([({}, "Visita medica scade", "soglia_30")], ["[invio email fallito: timeout]"])
     titoli = {(a["livello"], a["chiave"]) for a in _avvisi_lasciati()}
     assert titoli == {("attenzione", "scadenze"), ("errore", "email")}
 
