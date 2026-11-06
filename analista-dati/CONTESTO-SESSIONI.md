@@ -42,7 +42,8 @@ Con toggle **🛠️ Azioni suite** (o entrando "senza DB"), l'agente usa strume
   crea, rinnova, invia notifiche = **azioni**), **OCR** (estrai_testo), **Confronto Documenti**
   (confronta_documenti = multipart→poll→report Word), **DDT** (statistiche).
   ⚠️ Importato per **side-effect da `agent.ts`**, MAI da `suiteTools.ts` (romperebbe un ciclo di import).
-- `server/agent.ts` — orchestrazione: `runSuiteAgent`, `runSuiteAgentStream` (SSE: passi live), `confirmAction`.
+- `server/agent.ts` — orchestrazione: `runSuiteAgent`, `runSuiteAgentStream` (SSE: passi live e, con Claude, token
+  della risposta: eventi `status`/`delta`/`reset`/`done`), `confirmAction`.
 - `server/llm.ts` — `completeAgent`: loop tool-use generico (Claude nativo + Ollama function-calling).
 - Frontend: allegati in chat 📎 (referenziati per numero, base64 mai nel prompt), card conferma, passi live.
 - Endpoint: `/api/agent`, `/api/agent/stream`, `/api/agent/confirm`, `/api/agent/tools`.
@@ -111,17 +112,21 @@ Bloccato → risposta con `scopeMessage()` (nessun errore). Config `SCOPE_GUARD=
 
 - ✅ **Corretto**: bypass credenziali nella cache schema (la chiave ora include un hash di password/uri:
   un cache-hit salta l'introspezione = l'autenticazione DB, quindi deve legarsi alle credenziali esatte).
-- 🟠 **Aperto**: `xlsx` (SheetJS) ha un avviso **ReDoS high** (GHSA-5pgg-2g8v-p4x9), **nessun fix su npm**.
-  Il server parsa Excel caricati da utenti (autenticati). Da decidere: migrare alla build ufficiale
-  SheetJS (CDN) o aggiungere limiti difensivi.
+- ✅ **Chiuso (06/11/2026)**: ReDoS di `xlsx` (GHSA-5pgg-2g8v-p4x9). `package.json` usa già la build
+  ufficiale SheetJS **0.20.3** da cdn.sheetjs.com (corretta dalla 0.20.2, anche il prototype pollution
+  GHSA-4r6h-8v6p-xvw6); `npm audit --omit=dev` = 0. In più limiti difensivi in `server/excel.ts`
+  (`leggiExcel`: `EXCEL_MAX_MB` 30, `EXCEL_MAX_RIGHE` 500.000 per foglio con `sheetRows`), usato da
+  connettore Excel, DB + Excel e documenti; `excel.test.ts` controlla anche la versione installata.
 - Note di design (non falle): azioni suite eseguibili da ogni utente autenticato (scelta); errori di
   connessione DB mostrati all'utente autenticato (debug).
 
 ## Prossimi passi / idee aperte
 
-1. **ReDoS `xlsx`**: migrazione build ufficiale o limiti dimensione/tempo sui parse.
+1. ~~ReDoS `xlsx`~~ chiuso il 06/11/2026 (build CDN 0.20.3 + `server/excel.ts`).
 2. Perf zero-codice: alzare `LLM_CONCURRENCY` con Claude; modello coder piccolo per l'SQL su Ollama.
-3. Streaming dei **token** della risposta finale dell'agente (ora arrivano solo i *passi*).
+3. ~~Streaming dei token~~ fatto il 06/11/2026 con Claude (`AgentHooks.onText/onTextReset` in `llm.ts`,
+   eventi `delta`/`reset` di `/api/agent/stream`). Resta: streaming anche con Ollama/AI locale (oggi il loop
+   con strumenti non è in streaming: servirebbe ricomporre i tool_calls a pezzi).
 4. DDT: il tool `statistiche` è stateless (l'app non conserva dati) → utile solo con dati passati.
 5. Eventuale gating admin-only sulle azioni di scrittura, se cambia la policy.
 6. **Tuning filtro pertinenza** (`scope.ts`): oggi conservativo (parole come "lista" contano come
@@ -135,6 +140,7 @@ server.ts                 endpoint HTTP + gate auth + cache schema + wiring
 server/llm.ts             provider LLM, completeAgent (tool loop), vision, setClaudeApiKey
 server/analysis.ts        pipeline NL→SQL (runAnalysis, runChat, relevantSchema)
 server/db.ts              connettori DB (pg/mysql/mssql/sqlite/redis/mongo/excel/docs)
+server/excel.ts           lettura degli Excel caricati con i limiti (EXCEL_MAX_MB, EXCEL_MAX_RIGHE)
 server/report.ts          report Excel multi-foglio (sezioni in parallelo)
 server/docs.ts            acquisizione documenti + DocStore + FTS
 server/embeddings.ts      ricerca semantica + RAG (Ollama)

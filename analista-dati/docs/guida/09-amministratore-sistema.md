@@ -21,7 +21,8 @@ password predefinita è ancora attiva.
 salvate e della chiave Claude), `SQLITE_ROOTS` e `XLSX_ROOTS` (cartelle da cui
 si possono aprire file per percorso; vuote = disattivato), `DOCS_WATCH_DIR`
 (cartella sorvegliata per l'archivio `@sorvegliati`), `SUITE_TOOLS`
-(agente operativo).
+(agente operativo), `EXCEL_MAX_MB` (default 30) ed `EXCEL_MAX_RIGHE` (default
+500.000 per foglio): oltre, un Excel caricato viene rifiutato con un messaggio.
 
 **Sicurezza dei dati.** Collegare i database con un **utente di sola lettura**:
 il controllo del programma è il secondo livello, non l'unico. Le colonne

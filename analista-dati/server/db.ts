@@ -13,6 +13,8 @@ import path from 'node:path'
 import Redis from 'ioredis'
 import { MongoClient, type Db } from 'mongodb'
 import * as XLSX from 'xlsx'
+// lettura degli Excel caricati con i limiti di dimensione e righe (server/excel.ts)
+import { leggiExcel } from './excel.ts'
 import type {
   DbConfig, QueryResult, SchemaInfo, TableInfo, ColumnInfo, Relation, QueryLang, MultiSource,
 } from './types.ts'
@@ -579,7 +581,7 @@ class ExcelConnector implements Connector {
 
   constructor(base64: string) {
     const buf = Buffer.from(base64, 'base64')
-    const wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
+    const wb = leggiExcel(buf)
     this.db = new DatabaseSync(':memory:')
 
     for (const sheetName of wb.SheetNames) {
@@ -1013,7 +1015,7 @@ class MultiConnector implements Connector {
       : fs.readFileSync(resolveXlsxPath(src.path!))
     // raw:true (a differenza del connettore 'excel'): numeri e date restano tali
     // invece di diventare stringhe formattate — necessario per SUM e per i JOIN.
-    const wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
+    const wb = leggiExcel(buf)
     const only = includeSet(src.include)
     for (const sheetName of wb.SheetNames) {
       if (only && !only.has(sheetName.toLowerCase())) continue

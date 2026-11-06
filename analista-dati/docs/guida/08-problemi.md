@@ -12,6 +12,7 @@
 | *«Nessun DB connesso»* | Collega prima una sorgente ([capitolo 2](02-sorgenti.md)). |
 | La domanda viene rifiutata come fuori ambito | Il programma risponde solo su dati, documenti e app della suite. |
 | Il numero non torna | Guarda **SQL GENERATO** e la tabella: spesso il periodo o il raggruppamento non è quello che intendevi. Premi 👎 e riformula. |
+| *«Il foglio … ha … righe: il limite è …»* o *«File Excel di … MB: il limite è …»* | L'Excel è troppo grande per essere letto in sicurezza. Dividilo o filtra i dati prima di caricarlo, oppure chiedi all'amministratore di alzare il limite. |
 | *Dati parziali* in cima alla pagina | Con **DB + Excel** una tabella superava il limite di righe ed è stata troncata: i totali sono parziali. |
 | PDF scansionati non letti nei Documenti | Serve Claude configurato (vedi l'avviso nel modulo). |
 | Il report Excel non ha grafici | Il servizio dei grafici è spento: il report contiene comunque tutte le tabelle. |

@@ -46,7 +46,16 @@ npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
 
 Non e' un dettaglio estetico: il parser riceve file .xlsx **caricati dagli
 utenti** (documenti, sorgente Excel, sorgente multipla). Chi aggiorna deve
-prendere la versione dal CDN, non da npm. `npm audit --omit=dev` deve dare 0.
+prendere la versione dal CDN, non da npm. `npm audit --omit=dev` deve dare 0
+(verificato il 06/11/2026) e `server/excel.test.ts` fallisce se la versione
+installata torna sotto la 0.20.2.
+
+In piu', difesa in profondita': il server legge gli Excel solo da
+`server/excel.ts` (`leggiExcel`), con un tetto di dimensione (`EXCEL_MAX_MB`,
+default 30) e di righe per foglio (`EXCEL_MAX_RIGHE`, default 500.000; SheetJS
+smette di leggere oltre con `sheetRows` e il file viene rifiutato con un
+messaggio, invece di analizzare un foglio tagliato). L'import utenti dell'admin
+legge l'Excel nel browser e non passa da li'.
 
 ## Sorgente multipla: DB + Excel
 
@@ -109,7 +118,7 @@ Garanzie di sicurezza:
 
 Oltre a interrogare i database, l'agente può **compiere azioni sulle app sorelle** della suite Cosedil. Attiva il toggle **🛠️ Azioni suite** in alto nella chat, **oppure** entra direttamente nella modalità agente dalla schermata di connessione con *«Usa l'agente operativo (senza connettere un database)»* — non serve un DB per usare le app della suite.
 
-- **Come funziona**: l'agente ha degli *strumenti* (uno per capacità) e, col tool-use del modello (Claude nativo o Ollama function-calling), li usa in sequenza per rispondere. I **passi arrivano in streaming** (SSE): vedi in tempo reale «Uso scadenzario_dashboard…». Le chiamate alle app **inoltrano il cookie di sessione del Portale** (`sid`): l'azione è compiuta **con l'identità dell'utente** (audit corretto). Se un'app è spenta ed è registrata nel Portale, viene **avviata on-demand** (`POST <portale>/api/launch/<id>`).
+- **Come funziona**: l'agente ha degli *strumenti* (uno per capacità) e, col tool-use del modello (Claude nativo o Ollama function-calling), li usa in sequenza per rispondere. I **passi arrivano in streaming** (SSE): vedi in tempo reale «Uso scadenzario_dashboard…». Con Claude arrivano in streaming anche i **token della risposta** (eventi `delta`; `reset` ritira il testo di un passo che poi usa strumenti; `done` porta la risposta definitiva, che sostituisce quella accumulata). Con Ollama/AI locale il loop non è in streaming: la risposta arriva intera in `done`. Le chiamate alle app **inoltrano il cookie di sessione del Portale** (`sid`): l'azione è compiuta **con l'identità dell'utente** (audit corretto). Se un'app è spenta ed è registrata nel Portale, viene **avviata on-demand** (`POST <portale>/api/launch/<id>`).
 - **Strumenti disponibili**:
   - *Scadenzario compliance*: panoramica, elenco scadenze filtrato, export Excel (lettura); creazione/rinnovo scadenza, invio notifiche (**azioni**).
   - *PaddleOCR*: estrazione testo da immagini/scansioni.

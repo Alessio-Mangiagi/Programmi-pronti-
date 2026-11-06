@@ -24,6 +24,8 @@ import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 import * as XLSX from 'xlsx'
+// lettura degli Excel caricati con i limiti di dimensione e righe (server/excel.ts)
+import { leggiExcel } from './excel.ts'
 import { complete, extractDocumentText, isVisionMedia, claudeAvailable } from './llm.ts'
 import { embed, embeddingsEnabled, toBlob } from './embeddings.ts'
 import { REPORTS_DIR } from './appdb.ts'
@@ -140,7 +142,7 @@ export function needsVision(filename: string): boolean {
 
 /** Excel → testo tabellare (una sezione per foglio), per l'indicizzazione. */
 function xlsxToText(buf: Buffer): { text: string; pages: number } {
-  const wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
+  const wb = leggiExcel(buf)
   const parts: string[] = []
   for (const name of wb.SheetNames) {
     const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name])
