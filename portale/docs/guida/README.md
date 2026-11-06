@@ -12,7 +12,7 @@ Scadenzario, Lettore DDT e gli altri strumenti senza dover rifare l'accesso in o
 **Per tutti**
 
 1. [Entrare nel Portale](01-entrare.md): accesso, primo accesso, password dimenticata,
-   account bloccato, cambio password, uscita
+   account bloccato, cambio password, uscita, una password per tutti i programmi
 2. [La pagina iniziale](02-pagina-iniziale.md): *Da fare oggi*, aprire un programma, cercare
    e chiedere all'assistente
 

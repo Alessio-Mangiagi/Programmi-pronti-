@@ -26,7 +26,9 @@ l'[appendice](08-amministratore-di-sistema.md)):
 Altre azioni che puoi incontrare: *reset-password* (password reimpostata da un
 amministratore), *richiesta-aiuto* (richiesta dal login), *login-bloccato* (troppi
 tentativi), *disattiva* / *riattiva*, *commesse* (modifica del registro commesse), *evento*
-(un'azione fatta dentro un programma), *chiudi* (fine dell'uso di un programma).
+(un'azione fatta dentro un programma), *chiudi* (fine dell'uso di un programma),
+*login-app* (accesso a SkyTower, InCampo o VFP Transfer con la password del Portale: nella
+colonna Programma c'è quale; vedi [1.8](01-entrare.md#18-una-password-per-tutti-i-programmi)).
 
 Per gli utenti e le password si torna alla pagina **Utenti** con il collegamento in fondo.
 

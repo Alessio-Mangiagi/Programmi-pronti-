@@ -103,12 +103,40 @@ l'accesso.
 
 Una volta entrato nel Portale, i programmi ti riconoscono da soli:
 
-- **Lettore DDT, Scadenzario, Magazzino, Confronto Documenti** e gli altri strumenti si
+- **Scadenzario, Magazzino, Confronto Documenti, Timbri per VFP** e gli altri strumenti si
   aprono già con il tuo nome, senza un secondo accesso.
+- **Analista Dati** ti fa entrare con l'utente che ha il tuo stesso username; la prima
+  volta lo crea da solo.
+- **Lettore DDT** ti fa entrare da solo se c'è un utente DDT con il tuo stesso username.
+  Gli utenti DDT li crea l'amministratore, perché ognuno lavora su una commessa: se non
+  ce n'è uno col tuo nome, entri con l'utente della commessa che ti hanno dato.
 - **InCampo** e **SkyTower** hanno utenti propri. Ti riconoscono dall'**email** che
   l'amministratore ha associato al tuo utente del Portale (oppure da
   `username@cosedilspa.com`). Se l'email non coincide esattamente, ti chiedono di entrare
-  con le credenziali di InCampo o di SkyTower.
+  (vedi sotto: vale anche la password del Portale).
 - Per sicurezza, gli account con i privilegi più alti (per esempio l'amministratore di
   piattaforma di SkyTower) e chi ha attivato il secondo fattore non entrano in automatico
   dal Portale: usano la loro password (e il codice del secondo fattore).
+
+## 1.8 Una password per tutti i programmi
+
+La tua password del Portale vale anche dove un programma ti chiede di entrare:
+
+- **SkyTower** e **InCampo** (anche l'app **InCampo sul telefono**): scrivi la tua
+  **email** e la **password del Portale**.
+- **VFP Transfer**: scrivi il tuo **username del Portale** (o l'email) e la password del
+  Portale. Serve comunque un utente in VFP Transfer con il tuo stesso nome o la tua email:
+  lo crea l'amministratore di VFP Transfer.
+
+Cosa sapere:
+
+- La password che avevi già in quei programmi **continua a funzionare**: puoi usare l'una
+  o l'altra.
+- Valgono le stesse regole del Portale: dopo troppi tentativi sbagliati il Portale blocca
+  per 15 minuti anche questi accessi; con l'account disattivato non entri.
+- Se l'amministratore ti ha appena dato una password temporanea, prima entra nel Portale e
+  scegli la tua (paragrafo 1.4): la password temporanea non apre gli altri programmi.
+- Se il programma risponde *«... non è fra i tuoi programmi del Portale»*, la password è
+  giusta ma quel programma non ti è stato abilitato: chiedilo a un amministratore.
+- Ogni accesso fatto così resta nel Registro accessi come *Accesso con la password del
+  Portale*, con il nome del programma.
