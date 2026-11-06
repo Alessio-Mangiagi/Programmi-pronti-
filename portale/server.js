@@ -1651,6 +1651,27 @@ function descriviAbilitazioni(utente, prima, dopo) {
   return { aggiunte, tolte, dettaglio: `${utente}: ${parti.join('; ') || 'nessun cambiamento'}` };
 }
 
+// Chi è un utente in una riga, per il registro accessi (azioni "crea-utente" ed "elimina-utente"):
+// username, nome, ruolo, email scritta a mano e — se ha un elenco suo — i programmi.
+// Mai password né hash. Prima del 06/11/2026 creazione ed eliminazione non lasciavano traccia.
+function descriviUtente(u) {
+  const nomeDi = (id) => (APPS.find((a) => a.id === id) || {}).nome || id;
+  const parti = [`${u.username} (${u.nome || 'senza nome'})`, u.ruolo === 'admin' ? 'amministratore' : 'utente'];
+  if (u.email) parti.push(`email ${u.email}`);
+  if (Array.isArray(u.apps)) parti.push('programmi: ' + (u.apps.map(nomeDi).join(', ') || 'nessuno'));
+  return parti.join(', ');
+}
+
+// Riga del registro per l'import massivo (azione "importa-utenti"): quanti, i primi nomi, le righe scartate.
+// I nomi si fermano a IMPORT_NOMI_MAX per non scrivere righe enormi con fogli da centinaia di utenti.
+const IMPORT_NOMI_MAX = 10;
+function descriviImport(aggiunti, scartati) {
+  const nomi = aggiunti.slice(0, IMPORT_NOMI_MAX).join(', ') + (aggiunti.length > IMPORT_NOMI_MAX ? ', …' : '');
+  const testa = aggiunti.length ? `${aggiunti.length} ${aggiunti.length === 1 ? 'utente creato' : 'utenti creati'}: ${nomi}` : 'nessun utente creato';
+  const n = (scartati || []).length;
+  return testa + (n ? ` · ${n} ${n === 1 ? 'riga scartata' : 'righe scartate'}` : '');
+}
+
 // ---------------------------------------------------------------------------
 // Utility HTTP.
 // ---------------------------------------------------------------------------
@@ -2785,6 +2806,11 @@ async function handle(req, res) {
       if (mail) nuovo.email = mail;
       list.push(nuovo);
       saveUtenti(list);
+      // nel registro: chi l'ha creato (username) e chi è il nuovo utente (per + Dettaglio)
+      logAccesso({
+        ts: nuovo.creato, username: session.username, nome: session.nome, appId: null, appNome: null,
+        azione: 'crea-utente', per: uname, ruolo: nuovo.ruolo, ip: clientIp(req), dettaglio: descriviUtente(nuovo),
+      });
       return sendJson(res, 200, { ok: true });
     }
   }
@@ -2823,6 +2849,12 @@ async function handle(req, res) {
       aggiunti.push(uname);
     }
     if (aggiunti.length) saveUtenti(list);
+    // una riga sola per tutto il foglio, anche se non è entrato nessuno (resta la traccia del tentativo)
+    logAccesso({
+      ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: 'importa-utenti', aggiunti: aggiunti.slice(0, 200), scartati: scartati.length, ip: clientIp(req),
+      dettaglio: descriviImport(aggiunti, scartati),
+    });
     return sendJson(res, 200, { ok: true, aggiunti: aggiunti.length, scartati });
   }
 
@@ -2944,10 +2976,15 @@ async function handle(req, res) {
     const uname = decodeURIComponent(p.split('/').pop());
     if (uname === session.username) return sendJson(res, 400, { ok: false, error: 'Non puoi eliminare te stesso' });
     let list = loadUtenti();
-    const before = list.length;
+    const eliminato = list.find((u) => u.username === uname);
+    if (!eliminato) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
     list = list.filter((u) => u.username !== uname);
-    if (list.length === before) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
     saveUtenti(list);
+    // l'utente non esiste più: il registro tiene chi era (nome, ruolo, programmi) e chi l'ha eliminato
+    logAccesso({
+      ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: 'elimina-utente', per: uname, ruolo: eliminato.ruolo, ip: clientIp(req), dettaglio: descriviUtente(eliminato),
+    });
     return sendJson(res, 200, { ok: true });
   }
 
@@ -3029,7 +3066,7 @@ module.exports = {
   loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
   verificaPasswordApp, trovaUtentePerLogin, ipValido,   // password del portale negli altri programmi
   fileDocumentazione,                              // guida e README per /doc
-  descriviAbilitazioni,                            // dettaglio delle abilitazioni nel registro
+  descriviAbilitazioni, descriviUtente, descriviImport,   // dettaglio di abilitazioni e utenti nel registro
   parseNetstatPid,                                 // spegnimento app
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente

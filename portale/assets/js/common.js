@@ -66,6 +66,8 @@ const AZIONI_PORTALE = {
   'richiesta-aiuto': 'Richiesta di aiuto', 'richiesta-gestita': 'Richiesta gestita',
   'reset-password': 'Password reimpostata', disattiva: 'Disattivazione', riattiva: 'Riattivazione',
   abilita: 'Abilitazioni', 'email-utente': 'Cambio email', commesse: 'Registro commesse',
+  // gestione utenti (dal 06/11/2026 anche creazione, import ed eliminazione lasciano traccia)
+  'crea-utente': 'Nuovo utente', 'importa-utenti': 'Importazione utenti', 'elimina-utente': 'Utente eliminato',
 };
 const nomeAzione = (azione) => AZIONI_PORTALE[azione] || azione;
 

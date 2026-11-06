@@ -48,11 +48,13 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.off { background: rgba(192,57,43,0.10); color: #c0392b; }
 .badge.off .dot { background: #c0392b; }
 /* accessi rifiutati e utenti disattivati: rosso come .off */
-.badge.login-bloccato, .badge.login-disattivato, .badge.disattiva { background: rgba(192,57,43,0.10); color: #c0392b; }
-.badge.login-bloccato .dot, .badge.login-disattivato .dot, .badge.disattiva .dot { background: #c0392b; }
+.badge.login-bloccato, .badge.login-disattivato, .badge.disattiva, .badge.elimina-utente { background: rgba(192,57,43,0.10); color: #c0392b; }
+.badge.login-bloccato .dot, .badge.login-disattivato .dot, .badge.disattiva .dot, .badge.elimina-utente .dot { background: #c0392b; }
 /* gestione degli utenti (password, email, riattivazione, richieste): azzurro come le abilitazioni */
-.badge.reset-password, .badge.email-utente, .badge.riattiva, .badge.richiesta-gestita, .badge.richiesta-aiuto { background: rgba(25,143,217,0.12); color: var(--cosedil-blue-light); }
-.badge.reset-password .dot, .badge.email-utente .dot, .badge.riattiva .dot, .badge.richiesta-gestita .dot, .badge.richiesta-aiuto .dot { background: var(--cosedil-blue-light); }
+.badge.reset-password, .badge.email-utente, .badge.riattiva, .badge.richiesta-gestita, .badge.richiesta-aiuto,
+.badge.crea-utente, .badge.importa-utenti { background: rgba(25,143,217,0.12); color: var(--cosedil-blue-light); }
+.badge.reset-password .dot, .badge.email-utente .dot, .badge.riattiva .dot, .badge.richiesta-gestita .dot, .badge.richiesta-aiuto .dot,
+.badge.crea-utente .dot, .badge.importa-utenti .dot { background: var(--cosedil-blue-light); }
 /* colonna Dettaglio del registro: a chi, cosa è cambiato, da quale PC */
 td.dett { font-size: 0.82rem; color: var(--cosedil-gray); max-width: 42ch; }
 .muted { color: var(--cosedil-gray); }

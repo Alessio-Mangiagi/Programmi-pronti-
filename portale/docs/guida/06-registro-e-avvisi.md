@@ -35,6 +35,7 @@ Le azioni che puoi incontrare:
 | *Richiesta di aiuto*, *Richiesta gestita* | Richiesta mandata dalla pagina di accesso e la sua gestione da parte di un amministratore. |
 | *Password reimpostata*, *Disattivazione*, *Riattivazione*, *Cambio email* | Cambi fatti da un amministratore nella pagina Utenti, con l'utente interessato. |
 | *Abilitazioni* | Programmi visibili cambiati: nel dettaglio quali sono stati aggiunti e tolti. |
+| *Nuovo utente*, *Importazione utenti*, *Utente eliminato* | Utenti creati (uno alla volta o da foglio Excel/CSV) o eliminati nella pagina Utenti: nel dettaglio username, nome, ruolo e programmi; per l'importazione quanti utenti sono entrati e quante righe sono state scartate. Dal 06/11/2026. |
 | *Registro commesse* | Modifica o importazione dell'elenco delle commesse. |
 
 Per gli utenti e le password si torna alla pagina **Utenti** con il collegamento in fondo.

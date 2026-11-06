@@ -416,7 +416,7 @@ function testoRiga(e, app) {
   if (e.azione === 'logout') return 'Uscita dal Portale';
   // azioni di amministrazione (abilitazioni, password, email, commesse): con il dettaglio di common.js
   const det = dettaglioAzione(e);
-  if (/^(abilita|reset-password|richiesta-gestita|disattiva|riattiva|email-utente|commesse)$/.test(e.azione)) {
+  if (/^(abilita|reset-password|richiesta-gestita|disattiva|riattiva|email-utente|commesse|crea-utente|importa-utenti|elimina-utente)$/.test(e.azione)) {
     return esc(AZIONI[e.azione] || e.azione) + (det ? ` <small>${esc(det)}</small>` : '');
   }
   return nomeB || esc(AZIONI[e.azione] || e.azione);

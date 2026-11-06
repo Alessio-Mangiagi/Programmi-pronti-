@@ -1044,3 +1044,26 @@ test('descriviAbilitazioni: aggiunti, tolti, nessun cambiamento', () => {
   // id sconosciuto: resta l'id, la riga non si perde
   assert.match(descriviAbilitazioni('x', [], ['boh']).dettaglio, /aggiunti boh/);
 });
+
+// Registro accessi: creazione, import ed eliminazione di utenti (prima non lasciavano traccia).
+// Il dettaglio dice chi è l'utente (nome, ruolo, programmi) e non contiene mai password o hash.
+test('descriviUtente: nome, ruolo, email e programmi, senza segreti', () => {
+  const { descriviUtente } = require('./server.js');
+  const u = { username: 'mrossi', nome: 'Mario Rossi', ruolo: 'admin', email: 'm.rossi@esempio.it',
+    apps: ['ddt', 'skytower'], salt: 'abc', hash: 'segreto' };
+  const d = descriviUtente(u);
+  assert.equal(d, 'mrossi (Mario Rossi), amministratore, email m.rossi@esempio.it, programmi: Lettore DDT, SkyTower');
+  assert.doesNotMatch(d, /segreto|abc/);
+  // senza elenco proprio (segue il default) e senza email: solo chi è
+  assert.equal(descriviUtente({ username: 'gverdi', nome: 'Gino Verdi', ruolo: 'utente' }), 'gverdi (Gino Verdi), utente');
+  assert.match(descriviUtente({ username: 'x', nome: 'X', apps: [] }), /programmi: nessuno$/);
+});
+
+test('descriviImport: quanti utenti, i primi nomi, righe scartate', () => {
+  const { descriviImport } = require('./server.js');
+  assert.equal(descriviImport(['a.b'], []), '1 utente creato: a.b');
+  assert.equal(descriviImport(['a', 'b'], [{ riga: 3 }]), '2 utenti creati: a, b · 1 riga scartata');
+  assert.equal(descriviImport([], [{}, {}]), 'nessun utente creato · 2 righe scartate');
+  const tanti = Array.from({ length: 12 }, (_, i) => 'u' + i);
+  assert.match(descriviImport(tanti, []), /^12 utenti creati: u0, u1, .*u9, …$/);
+});
