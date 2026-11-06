@@ -11,8 +11,10 @@ Nella **Panoramica** c'è il riquadro **Invia il report via email**:
 2. scegli il **Periodo**: *Oggi*, *7 giorni*, *30 giorni*, *Tutto*;
 3. clicca **INVIA REPORT**.
 
-Il report Excel (email ricevute e documenti trasferiti, solo della tua area) arriva a quell'indirizzo e, in
-copia, all'amministratore. Non viene scaricato sul PC. Se compare *"Invio non ancora configurato
+Il report Excel arriva a quell'indirizzo e, in copia, all'amministratore, con i soli dati della tua area:
+documenti trasferiti (area Documenti), email ricevute (area Posta) o pratiche dei mezzi a nolo (area Mezzi:
+il riquadro sta in fondo alla pagina **Mezzi**, vedi [capitolo 4](04-mezzi.md#report-delle-pratiche-via-email)).
+Quello dell'amministratore contiene tutto. Non viene scaricato sul PC. Se compare *"Invio non ancora configurato
 dall'amministratore"*, l'invio email non è ancora impostato: avvisa l'amministratore. Dopo troppi invii
 ravvicinati compare *"Troppi invii ravvicinati: riprovare tra qualche minuto"*.
 

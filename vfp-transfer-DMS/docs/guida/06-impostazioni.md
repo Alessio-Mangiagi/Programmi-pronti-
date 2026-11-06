@@ -64,8 +64,8 @@ niente:
 
 - **Mittenti autorizzati**: indirizzi completi o domini (`@fornitore.it`), separati da virgola. **Dal 4 novembre
   2026 è obbligatorio** con la posta attiva: vuoto, il controllo della posta non parte e il salvataggio viene
-  rifiutato con *"con la posta attiva serve l'elenco dei mittenti autorizzati"* (il suggerimento sotto il campo,
-  "Vuoto = chiunque", è superato);
+  rifiutato con *"con la posta attiva serve l'elenco dei mittenti autorizzati"*, come ricorda anche la nota sotto il
+  campo;
 - **Estensioni ammesse**: archivi (zip, 7z, rar), Office binario (doc, xls, ppt), eseguibili, script, pagine web e
   file con macro sono **sempre** bloccati, qualunque cosa ci sia scritto qui;
 - dimensione massima, cartella di quarantena, antivirus (Windows Defender), blocco dei mittenti falsificati
@@ -103,8 +103,8 @@ password iniziale di almeno 8 caratteri) con **AGGIUNGI**. Chi cambia ruolo o pa
 
 ![Utenti](img/36-imp-utenti.png)
 
-> Nel modulo *Nuovo utente* la tendina **Area** offre solo Documenti e Posta: per un utente dell'area **Mezzi**,
-> crealo e poi cambia l'area nella sua riga.
+Nel modulo *Nuovo utente* la tendina **Area** offre **Documenti**, **Posta** e **Mezzi** (per l'amministratore
+l'area non conta: vede tutto).
 
 **Stato del programma** — *Tutto regolare* oppure l'elenco dei problemi; stato del controllo posta, ultimo giro,
 trasferimento in corso, versione. **Aggiorna** per ricontrollare. Se il controllo della posta si blocca, il

@@ -301,6 +301,27 @@ def nome_vfp(testo, ripiego="senza nome"):
     return t[:120] or ripiego
 
 
+def prossima_scadenza(rec, oggi=None):
+    """La scadenza piu' vicina, da oggi in avanti, fra la fine del nolo e le scadenze dei documenti del mezzo
+    (polizza, verifiche...), come "gg/mm/aaaa (cosa)"; "" se non ce ne sono. Le date sono nel formato dei moduli
+    (gg/mm/aaaa); quelle illeggibili si ignorano. Serve al report Excel dell'area Mezzi."""
+    oggi = oggi or date.today()
+    candidati = [((rec.get("valori") or {}).get("data_fine", ""), "fine nolo")]
+    candidati += [(d.get("scadenza", ""), d.get("tipo", "documento")) for d in rec.get("documenti") or []]
+    futuri = []
+    for testo, cosa in candidati:
+        try:
+            giorno = datetime.strptime(testo or "", "%d/%m/%Y").date()
+        except ValueError:
+            continue
+        if giorno >= oggi:
+            futuri.append((giorno, cosa))
+    if not futuri:
+        return ""
+    giorno, cosa = min(futuri)
+    return f"{giorno:%d/%m/%Y} ({cosa})"
+
+
 class Pratiche:
     """Un mezzo per cartella: <base>/<id>/record.json + documenti/ + scheda_mezzo.pdf + manifest.csv."""
 
@@ -335,7 +356,10 @@ class Pratiche:
                         "matricola": v.get("matricola", ""), "targa": v.get("targa", ""),
                         "proprietaria": v.get("ragione_sociale", ""), "commessa": v.get("commessa", ""),
                         "contratto": bool(r.get("contratto")), "documenti": len(r.get("documenti", [])),
-                        "inviato": (r.get("invio") or {}).get("data", ""), "archiviato": (r.get("dms") or {}).get("data", "")})
+                        "inviato": (r.get("invio") or {}).get("data", ""), "archiviato": (r.get("dms") or {}).get("data", ""),
+                        # per il report Excel dell'area Mezzi (report_excel.build_report, foglio "Mezzi")
+                        "nolo_dal": v.get("data_inizio", ""), "nolo_al": v.get("data_fine", ""),
+                        "mancanti": len(r.get("mancanti") or []), "prossima_scadenza": prossima_scadenza(r)})
         return out
 
     def fornitore(self, piva):

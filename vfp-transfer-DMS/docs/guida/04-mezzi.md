@@ -79,4 +79,16 @@ documento già presente diventa una nuova versione, un file identico non viene r
 
 L'amministratore ha anche **PROVA VIEWPOINT** (simulazione) e **Carica in Viewpoint**.
 
+## Report delle pratiche via email
+
+In fondo alla pagina **Mezzi**, sotto l'elenco, l'utente dell'area Mezzi trova il riquadro **Invia il report via
+email** (l'amministratore lo ha nella Panoramica): scrivi l'indirizzo, scegli il periodo e premi **INVIA REPORT**.
+
+![Report delle pratiche dalla pagina Mezzi](img/40-mezzi-report.png)
+
+Nell'Excel il **Riepilogo** conta le pratiche aggiornate nel periodo, quelle con il contratto compilato, inviate a
+Viewpoint, archiviate nel DMS e con dati obbligatori mancanti; il foglio **Mezzi** ha una riga per pratica (mezzo,
+matricola e targa, ditta, commessa, nolo dal/al, **prossima scadenza** fra fine nolo e documenti, contratto, numero
+di documenti, date di invio e archiviazione, utente).
+
 [← Posta](03-posta.md) · [Avanti: Confronta documenti e Attività →](05-confronto-e-attivita.md)

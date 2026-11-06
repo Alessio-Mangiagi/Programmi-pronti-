@@ -13,6 +13,23 @@ async function loadSession() {
   let saved = '';
   try { saved = localStorage.getItem('vfp.sendTo') || ''; } catch { /* storage non disponibile */ }
   $('#sendTo').value = saved || state.me.email || '';
+  sistemaRiquadroReport();
+}
+
+// Cosa contiene il report via email: lo decide il server per area (vfp_gui.REPORT_PER_AREA, report_excel.build_report)
+const REPORT_CONTENUTO = {
+  admin: 'le email ricevute, i documenti trasferiti e le pratiche dei mezzi a nolo',
+  documenti: 'i documenti trasferiti in Viewpoint',
+  posta: 'le email ricevute e trasferite in Viewpoint',
+  mezzi: 'le pratiche dei mezzi a nolo (dati, contratto, documenti, prossime scadenze)',
+};
+
+function sistemaRiquadroReport() {
+  const chi = isAdmin() ? 'admin' : state.me.area;
+  $('#sendIntroText').textContent = `Il report Excel con ${REPORT_CONTENUTO[chi] || REPORT_CONTENUTO.documenti} arriva `
+    + 'all’indirizzo che scrivi qui e, in copia, all’amministratore. Non viene scaricato su questo PC.';
+  // l'utente dei mezzi non vede la Panoramica (showView lo porta sui Mezzi): il riquadro va nella sua pagina
+  if (!isAdmin() && state.me.area === 'mezzi') $('#mzSendSlot').appendChild($('#sendCard'));
 }
 
 $('#btnSignOut').addEventListener('click', async () => {
@@ -195,6 +212,11 @@ async function loadUsers() {
 
 function renderUsers(d) {
   state.users = d.users;
+  // le aree del modulo "Nuovo utente" vengono dal server (auth.AREE): prima la tendina scritta nell'HTML
+  // non aveva Mezzi e un utente dei mezzi andava creato e poi spostato
+  const scelta = $('#uaArea').value;
+  $('#uaArea').innerHTML = Object.entries(d.areas).map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('');
+  if (d.areas[scelta]) $('#uaArea').value = scelta;
   $('#usersHint').textContent = `Password di almeno ${d.min_password} caratteri. Chi cambia ruolo o password deve rientrare.`;
   $('#usersBody').innerHTML = d.users.map((u) => {
     const me = u.name === state.me.user;

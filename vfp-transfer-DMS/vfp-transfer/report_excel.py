@@ -6,6 +6,8 @@ Fogli:
   Riepilogo      numeri del periodo e conteggi per casella
   Email          una riga per email ricevuta (ultimo tentativo), da registro_posta.csv
   Trasferimenti  una riga per file caricato/saltato/in errore, da report_trasferimento.csv
+  Mezzi          una riga per pratica dei mezzi a nolo aggiornata nel periodo (mezzi.Pratiche.elenco)
+Ogni area riceve solo i suoi fogli (build_report, parametro area).
 """
 
 import csv
@@ -167,44 +169,65 @@ def _read_report(path):
         return [{k: vt.csv_plain(v) for k, v in r.items()} for r in csv.DictReader(f, delimiter=";")]
 
 
-def build_report(mail_log_path, report_path, archive_dir, dal=None, al=None, casella=None, area=None):
+# titolo del riepilogo per area di chi chiede il report (None = amministratore, vede tutto)
+TITOLI = {None: "Report di VFP Transfer: email, trasferimenti verso Viewpoint For Projects e mezzi a nolo",
+          "documenti": "Report dei documenti trasferiti in Viewpoint For Projects",
+          "posta": "Report delle email ricevute e trasferite in Viewpoint For Projects",
+          "mezzi": "Report delle pratiche dei mezzi a nolo"}
+
+
+def build_report(mail_log_path, report_path, archive_dir, dal=None, al=None, casella=None, area=None, mezzi=None):
     """
     dal/al: date (estremi inclusi) o None; casella: etichetta della casella o None per tutte.
-    area: None = tutto (amministratore), "documenti" = senza email, "posta" = senza trasferimenti; qualsiasi altra
-    area (es. "mezzi") = ne' email ne' trasferimenti.
+    area: None = tutto (amministratore), "documenti" = solo trasferimenti, "posta" = solo email, "mezzi" = solo le
+    pratiche dei mezzi a nolo. Il riepilogo e i fogli sono solo quelli dell'area: prima un utente dei mezzi
+    riceveva un Excel con le sole sezioni email e documenti, vuote.
+    mezzi: righe di mezzi.Pratiche.elenco() (None = non lette, niente foglio Mezzi); valgono quelle aggiornate nel
+    periodo.
     """
+    con_posta = area in (None, "posta")
+    con_documenti = area in (None, "documenti")
+    con_mezzi = area in (None, "mezzi") and mezzi is not None
     emails = [e for e in vfp_mail.group_mail_log(vfp_mail.read_mail_log(mail_log_path))
-              if _in_period(e.get("data"), dal, al) and (not casella or e.get("casella") == casella)]
-    transfers = [t for t in _read_report(report_path) if _in_period(t.get("data"), dal, al)]
-    if area is not None and area != "posta":
-        emails = []
-    if area is not None and area != "documenti":
-        transfers = []
+              if _in_period(e.get("data"), dal, al) and (not casella or e.get("casella") == casella)] if con_posta else []
+    transfers = [t for t in _read_report(report_path) if _in_period(t.get("data"), dal, al)] if con_documenti else []
+    pratiche = [m for m in mezzi if _in_period(m.get("aggiornato"), dal, al)] if con_mezzi else []
     archive = str(Path(archive_dir).resolve()).lower()
 
     # ---- Riepilogo
     periodo = f"{dal.strftime('%d/%m/%Y') if dal else 'inizio'} – {al.strftime('%d/%m/%Y') if al else 'oggi'}"
     count = lambda rows, key, val: sum(1 for r in rows if r.get(key) == val)
     summary = Sheet("Riepilogo", widths=[38, 16, 16, 16, 16, 16, 16], header_rows=(1,), autofilter=False, freeze=False)
-    summary.add(["Report email e trasferimenti verso Viewpoint For Projects", ""])
+    summary.add([TITOLI.get(area, TITOLI[None]), ""])
     summary.add(["Generato il", datetime.now()])
     summary.add(["Periodo", periodo])
-    summary.add(["Casella", casella or "tutte"])
-    summary.add([])
-    summary.add(["Email", "Numero"], 4)
-    for code, label in vfp_mail.OUTCOME_LABELS.items():
-        summary.add([label, count(emails, "esito", code)])
-    summary.add(["Totale email ricevute", len(emails)], 4)
-    summary.add([])
-    summary.add(["Documenti", "Numero"], 4)
-    for code, label in (("caricato", "Caricati"), ("saltato", "Saltati"), ("errore", "In errore")):
-        summary.add([label, count(transfers, "esito", code)])
-    summary.add([])
-    summary.add(["Casella", "Ricevute", "Trasferite", "Nuovo tentativo", "Errore", "Bloccate", "Senza allegati"], 4)
-    for name in sorted({e.get("casella", "") for e in emails}):
-        rows = [e for e in emails if e.get("casella") == name]
-        summary.add([name, len(rows), count(rows, "esito", "trasferita"), count(rows, "esito", "riprovo"),
-                     count(rows, "esito", "errore"), count(rows, "esito", "bloccata"), count(rows, "esito", "ignorata")])
+    if con_posta:
+        summary.add(["Casella", casella or "tutte"])
+        summary.add([])
+        summary.add(["Email", "Numero"], 4)
+        for code, label in vfp_mail.OUTCOME_LABELS.items():
+            summary.add([label, count(emails, "esito", code)])
+        summary.add(["Totale email ricevute", len(emails)], 4)
+    if con_documenti:
+        summary.add([])
+        summary.add(["Documenti", "Numero"], 4)
+        for code, label in (("caricato", "Caricati"), ("saltato", "Saltati"), ("errore", "In errore")):
+            summary.add([label, count(transfers, "esito", code)])
+    if con_mezzi:
+        summary.add([])
+        summary.add(["Mezzi a nolo", "Numero"], 4)
+        summary.add(["Pratiche aggiornate nel periodo", len(pratiche)])
+        summary.add(["Con il contratto compilato", sum(1 for m in pratiche if m.get("contratto"))])
+        summary.add(["Inviate a Viewpoint", sum(1 for m in pratiche if m.get("inviato"))])
+        summary.add(["Archiviate nel DMS", sum(1 for m in pratiche if m.get("archiviato"))])
+        summary.add(["Con dati obbligatori mancanti", sum(1 for m in pratiche if m.get("mancanti"))])
+    if con_posta:
+        summary.add([])
+        summary.add(["Casella", "Ricevute", "Trasferite", "Nuovo tentativo", "Errore", "Bloccate", "Senza allegati"], 4)
+        for name in sorted({e.get("casella", "") for e in emails}):
+            rows = [e for e in emails if e.get("casella") == name]
+            summary.add([name, len(rows), count(rows, "esito", "trasferita"), count(rows, "esito", "riprovo"),
+                         count(rows, "esito", "errore"), count(rows, "esito", "bloccata"), count(rows, "esito", "ignorata")])
 
     # ---- Email
     sheet_mail = Sheet("Email", widths=[17, 17, 14, 30, 32, 44, 20, 10, 48, 22, 10, 60, 22, 16, 44, 40])
@@ -233,7 +256,20 @@ def build_report(mail_log_path, report_path, archive_dir, dal=None, al=None, cas
                       {"caricato": "Caricato", "saltato": "Saltato", "errore": "Errore"}.get(t.get("esito"), t.get("esito")),
                       t.get("id_documento"), t.get("messaggio")], 3)
 
-    return write_xlsx([summary, sheet_mail, sheet_tr])
+    # ---- Mezzi a nolo (una riga per pratica, la piu' recente prima: e' l'ordine di Pratiche.elenco)
+    sheet_mz = Sheet("Mezzi", widths=[17, 34, 18, 12, 34, 22, 12, 12, 30, 11, 11, 12, 17, 17, 18, 24])
+    sheet_mz.add(["Aggiornata", "Mezzo", "Matricola", "Targa", "Ditta proprietaria", "Commessa", "Nolo dal", "Nolo al",
+                  "Prossima scadenza", "Contratto", "Documenti", "Dati mancanti", "Inviata a Viewpoint",
+                  "Archiviata nel DMS", "Utente", "ID pratica"])
+    for m in pratiche:
+        sheet_mz.add([_dt(m.get("aggiornato")), m.get("mezzo"), m.get("matricola"), m.get("targa"), m.get("proprietaria"),
+                      m.get("commessa"), m.get("nolo_dal"), m.get("nolo_al"), m.get("prossima_scadenza"),
+                      "Compilato" if m.get("contratto") else "Da fare", m.get("documenti"), m.get("mancanti"),
+                      _dt(m.get("inviato")), _dt(m.get("archiviato")), m.get("utente"), m.get("id")], 3)
+
+    fogli = [summary] + ([sheet_mail] if con_posta else []) + ([sheet_tr] if con_documenti else []) \
+        + ([sheet_mz] if con_mezzi else [])
+    return write_xlsx(fogli)
 
 
 def build_protocol_register(mail_log_path, year=None):

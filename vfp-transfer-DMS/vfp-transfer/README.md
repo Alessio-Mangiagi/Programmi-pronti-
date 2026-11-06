@@ -67,14 +67,16 @@ Due ruoli:
 
 | Ruolo | Cosa vede e fa |
 |---|---|
-| **Amministratore** | Tutto, in entrambe le aree (Documenti e Posta): impostazioni, trasferimenti, posta, storico, download dei report, gestione utenti |
-| **Utente** | La Panoramica **della sua area**, la richiesta del report (indica l'indirizzo email e il report Excel arriva lì e, in copia, all'amministratore: non viene scaricato) e **Confronta documenti** |
+| **Amministratore** | Tutto, nelle tre aree (Documenti, Posta e Mezzi): impostazioni, trasferimenti, posta, mezzi, storico, download dei report, gestione utenti |
+| **Utente** | La Panoramica **della sua area** (per l'area Mezzi la pagina Mezzi), la richiesta del report (indica l'indirizzo email e il report Excel arriva lì e, in copia, all'amministratore: non viene scaricato) e **Confronta documenti** |
 
-**Aree.** Il programma ha due aree: **Documenti** (trasferimento, smistamento, storico, moduli) e **Posta** (flusso
-posta, caselle email). L'amministratore passa dall'una all'altra con il selettore in alto a sinistra. Ogni utente
+**Aree.** Il programma ha tre aree: **Documenti** (trasferimento, smistamento, storico, moduli), **Posta** (flusso
+posta, caselle email) e **Mezzi** (mezzi a nolo: scheda, contratto, documentazione). L'amministratore passa dall'una all'altra con il selettore in alto a sinistra. Ogni utente
 normale ha **una sola area**, scelta dall'amministratore (*Impostazioni > Utenti*, colonna *Area*): vede solo quella,
-senza selettore, e il programma gli rifiuta i dati dell'altra area anche se li chiede direttamente. Anche il report
-che riceve via email contiene solo la sua area. Gli utenti creati prima delle aree hanno l'area Documenti.
+senza selettore, e il programma gli rifiuta i dati delle altre aree anche se li chiede direttamente. Anche il report
+che riceve via email contiene solo la sua area: per l'area Mezzi le pratiche dei mezzi (il riquadro *Invia il report
+via email* sta in fondo alla pagina Mezzi). Gli utenti creati prima delle aree hanno l'area Documenti. Nel modulo
+*Nuovo utente* si sceglie fra le tre aree.
 
 - Gli utenti stanno nella cassaforte cifrata, con la password ridotta a impronta irreversibile (PBKDF2).
   Creare, eliminare un utente o cambiarne password o ruolo richiede il codice inviato all'amministratore.
@@ -82,7 +84,7 @@ che riceve via email contiene solo la sua area. Gli utenti creati prima delle ar
   ```
   python auth.py aggiungi nome.cognome --ruolo admin
   ```
-  Un utente normale con la sua area: `python auth.py aggiungi nome.cognome --area posta` (oppure `documenti`).
+  Un utente normale con la sua area: `python auth.py aggiungi nome.cognome --area posta` (oppure `documenti`, `mezzi`).
   Altri comandi: `python auth.py password NOME`, `python auth.py elimina NOME`, `python auth.py elenco`.
   Gli altri utenti si creano anche dall'interfaccia (*Impostazioni > Utenti*).
 - Dopo 5 password sbagliate l'utente viene bloccato per 15 minuti. La sessione scade dopo un'ora di inattività
@@ -256,7 +258,8 @@ Prima di caricare qualunque cosa ogni email viene controllata. Se non supera i c
 VFP**: l'email viene spostata nella cartella `MAIL_QUARANTINE_FOLDER` ("Bloccate VFP") della casella, compare come
 *Bloccata* con il motivo, e va controllata a mano. Motivi di blocco:
 
-- mittente non presente in `MAIL_ALLOWED_SENDERS` (indirizzi o domini; se vuoto si accetta chiunque: sconsigliato);
+- mittente non presente in `MAIL_ALLOWED_SENDERS` (indirizzi o domini). Con la posta attiva l'elenco è **obbligatorio**
+  (revisione di sicurezza del 03/11/2026): vuoto, il controllo posta non parte e l'interfaccia non salva;
 - mittente segnato come falsificato dal server di posta (SPF/DKIM/DMARC, `MAIL_REQUIRE_AUTH`); per la PEC
   l'identità è garantita dal gestore e il mittente considerato è quello dentro la busta;
 - allegato pericoloso: eseguibili, script, pagine web, documenti con macro (sempre, qualunque cosa dica
@@ -525,8 +528,10 @@ python ponte.py commessa --codice 150-110
   precedente viene riscritto da solo con le colonne nuove.
 - `protocolli_manuali.json`: protocolli corretti a mano.
 - **Report Excel** (`/api/report.xlsx`, dai pulsanti dell'interfaccia): fogli *Riepilogo*, *Email* (una riga per
-  email, con tentativi) e *Trasferimenti* (una riga per file, con origine Email o Cartella), con filtri e date
-  ordinabili. Generato senza librerie aggiuntive; rispetta periodo e casella scelti nell'elenco.
+  email, con tentativi), *Trasferimenti* (una riga per file, con origine Email o Cartella) e *Mezzi* (una riga per
+  pratica aggiornata nel periodo: mezzo, ditta, commessa, nolo, prossima scadenza, contratto, invio e archiviazione;
+  assente se si filtra una casella), con filtri e date ordinabili. Generato senza librerie aggiuntive; rispetta
+  periodo e casella scelti nell'elenco. Il report via email di un utente ha solo i fogli della sua area.
 
 ## Sicurezza: cosa configurare fuori dal programma
 

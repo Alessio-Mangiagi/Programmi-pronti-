@@ -315,6 +315,21 @@ class MezziTest(unittest.TestCase):
         self.assertEqual(mezzi.nome_vfp("  ..  "), "senza nome")
 
 
+
+class ProssimaScadenzaTest(unittest.TestCase):
+    """Scadenza piu' vicina di una pratica, per il foglio Mezzi del report (mezzi.prossima_scadenza)."""
+
+    def test_la_piu_vicina_da_oggi(self):
+        from datetime import date
+        rec = {"valori": {"data_fine": "30/11/2026"},
+               "documenti": [{"tipo": "assicurazione", "scadenza": "15/11/2026"},
+                             {"tipo": "verifiche", "scadenza": "01/10/2026"},   # gia' passata: non conta
+                             {"tipo": "ce", "scadenza": ""}, {"tipo": "x", "scadenza": "31/02/2026"}]}
+        self.assertEqual(mezzi.prossima_scadenza(rec, date(2026, 11, 6)), "15/11/2026 (assicurazione)")
+        self.assertEqual(mezzi.prossima_scadenza(rec, date(2026, 11, 20)), "30/11/2026 (fine nolo)")
+        self.assertEqual(mezzi.prossima_scadenza(rec, date(2026, 12, 1)), "")
+        self.assertEqual(mezzi.prossima_scadenza({}), "")
+
 if __name__ == "__main__":
     unittest.main()
 

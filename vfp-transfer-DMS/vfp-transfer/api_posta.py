@@ -89,10 +89,20 @@ def _haystack(e):
 
 
 def report_xlsx(query):
+    """Excel scaricato dall'amministratore ("Scarica il report", Registro posta). Senza filtro sulla casella
+    contiene anche il foglio Mezzi; con una casella scelta riguarda solo la posta."""
     dal, al = report_excel.parse_day(_arg(query, "dal")), report_excel.parse_day(_arg(query, "al"))
     settings = env_config.load_settings()
+    casella = _arg(query, "casella") or None
+    righe_mezzi = None
+    if not casella:
+        import mezzi  # qui e non in testa: mezzi importa moduli e modelli, che servono solo a questo report
+        try:
+            righe_mezzi = mezzi.pratiche(settings).elenco(limite=100000)
+        except (OSError, ValueError) as e:
+            log.warning("Pratiche dei mezzi non lette per il report: %s", e)
     return report_excel.build_report(PATHS["mail_log"], PATHS["report"], vfp_mail.archive_dir(settings),
-                                     dal, al, _arg(query, "casella") or None)
+                                     dal, al, casella, mezzi=righe_mezzi)
 
 
 def mail_check():

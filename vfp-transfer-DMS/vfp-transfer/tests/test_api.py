@@ -190,6 +190,71 @@ class ApiTest(unittest.TestCase):
         self.assertIn("ente@pec.it", testo(solo_posta))
         self.assertNotIn("DOC-1", testo(solo_posta))
 
+    @staticmethod
+    def fogli_e_testo(xlsx):
+        """Nomi dei fogli e testo di tutte le celle di un .xlsx scritto da report_excel."""
+        import io
+        import re
+        import zipfile
+        with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+            fogli = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
+            testo = " ".join(z.read(n).decode("utf-8", "replace") for n in z.namelist() if n.endswith(".xml"))
+        return fogli, testo
+
+    def test_report_area_mezzi(self):
+        # l'area Mezzi riceve il suo foglio (prima: un Excel con le sole sezioni email e documenti, vuote)
+        import report_excel
+        p = api_posta.PATHS
+        righe = [{"id": "20261104-100000-abcdef", "aggiornato": "2026-11-04T10:00:00", "utente": "officina",
+                  "mezzo": "Piattaforma aerea Haulotte HA16", "matricola": "HA16-001", "targa": "", "proprietaria": "Noli Etna srl",
+                  "commessa": "101-003", "contratto": True, "documenti": 3, "inviato": "", "archiviato": "2026-11-04T11:00:00",
+                  "nolo_dal": "01/11/2026", "nolo_al": "30/11/2026", "mancanti": 0, "prossima_scadenza": "30/11/2026 (fine nolo)"}]
+        arch = self.settings["MAIL_ARCHIVE_DIR"]
+        fogli, testo = self.fogli_e_testo(report_excel.build_report(p["mail_log"], p["report"], arch, area="mezzi", mezzi=righe))
+        self.assertEqual(fogli, ["Riepilogo", "Mezzi"])
+        self.assertIn("Haulotte HA16", testo)
+        self.assertIn("Report delle pratiche dei mezzi a nolo", testo)
+        self.assertNotIn("ente@pec.it", testo)
+        self.assertNotIn("DOC-1", testo)
+        # l'amministratore ha tutto; le altre aree non vedono i mezzi nemmeno se l'elenco viene passato
+        fogli, testo = self.fogli_e_testo(report_excel.build_report(p["mail_log"], p["report"], arch, mezzi=righe))
+        self.assertEqual(fogli, ["Riepilogo", "Email", "Trasferimenti", "Mezzi"])
+        fogli, testo = self.fogli_e_testo(report_excel.build_report(p["mail_log"], p["report"], arch, area="documenti", mezzi=righe))
+        self.assertEqual(fogli, ["Riepilogo", "Trasferimenti"])
+        self.assertNotIn("Haulotte", testo)
+
+    def test_invio_report_utente_dei_mezzi(self):
+        import mail_send
+        valori = {"tipo_mezzo": "Gru", "marca": "Liebherr", "modello": "LTM 1050", "matricola": "LTM-77"}
+        self.assertEqual(self.call("/api/mezzi/salva", {"valori": valori, "documenti": []}, cookie="mz")[0], 200)
+        inviati = []
+        with mock.patch.object(mail_send, "send_problems", lambda s: []), \
+                mock.patch.object(mail_send, "check_recipient", lambda a, s: a), \
+                mock.patch.object(mail_send, "send", lambda s, to, subj, body, att=(): inviati.append((subj, body, att))), \
+                mock.patch.dict(self.settings, {"ADMIN_EMAIL": "admin@cosedil.example"}), \
+                mock.patch.object(vfp_gui, "_SEND_LOG", {}):
+            code, body, _ = self.call("/api/report/send", {"email": "officina@cosedil.example", "days": "0"}, cookie="mz")
+        self.assertEqual(code, 200, body)
+        oggetto, testo_mail, allegati = inviati[0]
+        self.assertTrue(oggetto.startswith("Report mezzi a nolo"))
+        self.assertIn("pratiche dei mezzi a nolo", testo_mail)
+        fogli, testo = self.fogli_e_testo(allegati[0][1])
+        self.assertEqual(fogli, ["Riepilogo", "Mezzi"])
+        self.assertIn("LTM-77", testo)
+
+    def test_interfaccia_aree_e_testi(self):
+        # il modulo "Nuovo utente" offre tutte le aree (prima mancava Mezzi); la tendina la riempie poi /api/users
+        html = (Path(vfp_gui.__file__).parent / "ui" / "index.html").read_text(encoding="utf-8")
+        import re
+        tendina = re.search(r'<select id="uaArea">(.*?)</select>', html).group(1)
+        self.assertEqual(set(re.findall(r'value="([a-z]+)"', tendina)), set(auth.AREE))
+        self.assertIn("areas", json.loads(self.call("/api/users")[1]))
+        # testi superati dopo la revisione di sicurezza del 03/11: mittenti obbligatori, niente zip
+        self.assertNotIn("Vuoto = chiunque", html)
+        import mezzi
+        accetta = re.search(r'id="mzFile" hidden accept="([^"]+)"', html).group(1)
+        self.assertEqual(set(accetta.split(",")), mezzi.ESTENSIONI_DOC)
+
     def test_area_utente_valida(self):
         self.assertEqual(auth.area_di({"area": "posta"}), "posta")
         self.assertEqual(auth.area_di({}), "documenti")  # utenti creati prima delle aree

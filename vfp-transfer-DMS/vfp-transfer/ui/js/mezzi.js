@@ -86,6 +86,7 @@ $('#mzBack').addEventListener('click', async () => {
   mz.dirty = false;
   $('#mzEditor').hidden = true;
   $('#mzListCard').hidden = false;
+  $('#mzSendSlot').hidden = false;  // riquadro del report (solo per l'utente dei mezzi, vedi utenti.js)
   loadMezzi();
 });
 
@@ -100,6 +101,7 @@ function showEditor(valori, docMancanti, { stesso = false } = {}) {
   if (!stesso) mz.anteprima = null;
   mz.ditta = null;
   $('#mzListCard').hidden = true;
+  $('#mzSendSlot').hidden = true;
   $('#mzEditor').hidden = false;
   buildMzForm(valori);
   renderMzDocs();

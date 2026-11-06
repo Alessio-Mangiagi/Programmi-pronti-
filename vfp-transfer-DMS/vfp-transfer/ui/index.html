@@ -161,7 +161,7 @@
         <span class="qi"><svg class="ic"><use href="#i-send"/></svg></span>
         <div>
           <h2>Invia il report via email</h2>
-          <p class="muted small">Il report Excel con le email ricevute e i documenti trasferiti arriva all'indirizzo che scrivi qui e, in copia, all'amministratore. Non viene scaricato su questo PC.</p>
+          <p class="muted small" id="sendIntroText">Il report Excel con le email ricevute e i documenti trasferiti arriva all'indirizzo che scrivi qui e, in copia, all'amministratore. Non viene scaricato su questo PC.</p>
         </div>
       </div>
       <form class="send-form" id="sendForm" novalidate>
@@ -341,6 +341,10 @@
       </div>
     </article>
 
+    <!-- qui utenti.js sposta il riquadro "Invia il report via email" per l'utente dell'area Mezzi, che non vede la
+         Panoramica; nascosto mentre la maschera del mezzo è aperta (mezzi.js) -->
+    <div id="mzSendSlot"></div>
+
     <!-- maschera del mezzo -->
     <div id="mzEditor" hidden>
       <div class="mz-bar">
@@ -393,7 +397,7 @@
             <button class="btn btn-ghost" id="mzUpload" type="button" data-admin><svg class="ic"><use href="#i-swap"/></svg>Carica in Viewpoint</button>
           </div>
           <div class="mz-esiti" id="mzDmsEsito" hidden></div>
-          <input type="file" id="mzFile" hidden accept=".pdf,.p7m,.docx,.doc,.xlsx,.xls,.jpg,.jpeg,.png,.tif,.tiff,.zip">
+          <input type="file" id="mzFile" hidden accept=".pdf,.p7m,.docx,.xlsx,.jpg,.jpeg,.png,.tif,.tiff">
         </article>
       </div>
     </div>
@@ -1177,12 +1181,12 @@
           <div class="field">
             <label for="secSenders">Mittenti autorizzati</label>
             <textarea id="secSenders" data-env="MAIL_ALLOWED_SENDERS" data-list rows="3" class="mono" spellcheck="false" placeholder="@fornitore.it, progettista@studio.it"></textarea>
-            <p class="hint">Indirizzi completi o domini (<code>@dominio.it</code>), separati da virgola. Vuoto = chiunque: sconsigliato.</p>
+            <p class="hint">Indirizzi completi o domini (<code>@dominio.it</code>), separati da virgola. <strong>Obbligatorio con la posta attiva</strong>: senza elenco il controllo della posta non parte e le impostazioni non si salvano.</p>
           </div>
           <div class="field">
             <label for="secExt">Estensioni ammesse</label>
             <input id="secExt" data-env="MAIL_ALLOWED_EXT" type="text" class="mono" spellcheck="false" placeholder="elenco predefinito">
-            <p class="hint">Vuoto = elenco predefinito (pdf, dwg, documenti Office senza macro, immagini, zip…). Eseguibili, script, pagine web e file con macro sono sempre bloccati.</p>
+            <p class="hint">Vuoto = elenco predefinito (pdf, dwg, docx/xlsx/pptx senza macro, immagini…). Archivi (zip, 7z, rar), Office del vecchio formato (doc, xls, ppt), eseguibili, script, pagine web e file con macro sono sempre bloccati.</p>
           </div>
           <div class="field-grid">
             <div class="field"><label for="secMax">Dimensione massima email (MB)</label><input id="secMax" data-env="MAIL_MAX_MB" type="text" inputmode="numeric" class="mono"></div>
@@ -1319,7 +1323,7 @@
           <form class="user-add" id="userAdd" novalidate>
             <div class="field"><label for="uaName">Nuovo utente</label><input id="uaName" type="text" autocomplete="off" spellcheck="false" placeholder="nome.cognome"></div>
             <div class="field"><label for="uaRole">Ruolo</label><select id="uaRole"><option value="utente">Utente</option><option value="admin">Amministratore</option></select></div>
-            <div class="field" id="uaAreaField"><label for="uaArea">Area</label><select id="uaArea"><option value="documenti">Documenti</option><option value="posta">Posta</option></select></div>
+            <div class="field" id="uaAreaField"><label for="uaArea">Area</label><select id="uaArea"><option value="documenti">Documenti</option><option value="posta">Posta</option><option value="mezzi">Mezzi</option></select></div>
             <div class="field"><label for="uaEmail">Email <span class="muted">(facoltativa)</span></label><input id="uaEmail" type="email" autocomplete="off" spellcheck="false"></div>
             <div class="field"><label for="uaPass">Password iniziale</label><input id="uaPass" type="password" autocomplete="new-password"></div>
             <button class="btn btn-primary" type="submit"><svg class="ic"><use href="#i-check"/></svg>Aggiungi</button>

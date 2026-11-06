@@ -651,6 +651,27 @@ def api_users_save(body, sess, token=""):
     return api_users()
 
 
+# Report via email: cosa contiene e oggetto del messaggio, per area di chi lo chiede (None = amministratore)
+REPORT_PER_AREA = {
+    None: ("delle email ricevute, dei documenti trasferiti in Viewpoint e dei mezzi a nolo", "Report documenti Viewpoint"),
+    "documenti": ("dei documenti trasferiti in Viewpoint", "Report documenti Viewpoint"),
+    "posta": ("delle email ricevute e trasferite in Viewpoint", "Report posta Viewpoint"),
+    "mezzi": ("delle pratiche dei mezzi a nolo", "Report mezzi a nolo"),
+}
+
+
+def _mezzi_per_report(settings, area):
+    """Pratiche dei mezzi per il foglio "Mezzi" del report, solo per l'amministratore e l'area Mezzi.
+    None se non servono o se l'archivio delle pratiche non si legge: il report parte lo stesso, senza quel foglio."""
+    if area not in (None, "mezzi"):
+        return None
+    try:
+        return mezzi.pratiche(settings).elenco(limite=100000)
+    except (OSError, ValueError) as e:
+        log.warning("Pratiche dei mezzi non lette per il report: %s", e)
+        return None
+
+
 def api_report_send(body, sess):
     """Report Excel via email: sempre all'amministratore, piu' l'indirizzo scritto da chi lo chiede."""
     settings = env_config.load_settings()
@@ -673,14 +694,15 @@ def api_report_send(body, sess):
         dal = date.today() - timedelta(days=int(days) - 1)
     area = None if sess["role"] == "admin" else sess.get("area")  # l'utente riceve solo la sua area
     data = report_excel.build_report(MAIL_LOG_PATH, REPORT_PATH, env_config.resolve_path(settings["MAIL_ARCHIVE_DIR"]),
-                                     dal, None, None, area=area)
+                                     dal, None, None, area=area, mezzi=_mezzi_per_report(settings, area))
     period = {"0": "tutto il periodo", "1": "oggi", "7": "ultimi 7 giorni", "30": "ultimi 30 giorni"}[days]
     name = f"report_vfp_{time.strftime('%Y%m%d_%H%M')}.xlsx"
-    body_text = (f"In allegato il report delle email ricevute e dei documenti trasferiti in Viewpoint ({period}).\n\n"
+    contenuto, oggetto = REPORT_PER_AREA.get(area, REPORT_PER_AREA[None])
+    body_text = (f"In allegato il report {contenuto} ({period}).\n\n"
                  f"Richiesto da: {sess['user']}\nInviato a: {recipient}\nCopia all'amministratore: {settings['ADMIN_EMAIL']}\n"
                  f"Generato il {time.strftime('%d/%m/%Y alle %H:%M')}.\n\n"
                  "Messaggio automatico del programma di trasferimento documenti verso Viewpoint For Projects.")
-    mail_send.send(settings, [settings["ADMIN_EMAIL"], recipient], f"Report documenti Viewpoint - {period}", body_text,
+    mail_send.send(settings, [settings["ADMIN_EMAIL"], recipient], f"{oggetto} - {period}", body_text,
                    [(name, data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")])
     log.warning("Report (%s) inviato da %s a %s e all'amministratore", period, sess["user"], recipient)
     attivita.record(sess["user"], "report", "Report inviato via email", f"{period}, a {recipient}", role=sess["role"])
