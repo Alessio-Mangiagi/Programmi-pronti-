@@ -13,6 +13,12 @@ Chiave del documento = id della revisione: chi apre la stessa revisione modifica
 ogni salvataggio crea una revisione nuova, quindi una chiave nuova. La callback non ha sessione utente: vale solo
 con il JWT del segreto condiviso, e la revisione nasce con i permessi (RLS) dell'ultimo utente che ha modificato.
 Il file salvato si scarica solo dal Document Server configurato (niente SSRF verso altri indirizzi).
+
+Richiesta di modifiche in un workflow su documento (ADR-51, migrazione 0042): il documento resta bloccato, ma chi ha
+il compito riaperto può modificarlo qui come potrebbe caricarne una revisione nuova (`cde.assert_can_add_revision`),
+anche partendo dalla revisione condivisa su cui sta il workflow. Il salvataggio crea la WIP successiva (P01 → P02.01)
+e il workflow la prende quando lui completa il compito. In quel caso l'editor ha anche il pulsante "Salva"
+(forcesave): la revisione nasce subito, senza aspettare che l'editor venga chiuso, e il compito si può completare.
 """
 from __future__ import annotations
 
@@ -78,10 +84,15 @@ def office_session(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
                            "JOIN cde.documents d ON d.id = r.document_id WHERE r.id = %s", [revision_id]).fetchone()
         latest = conn.execute("SELECT id FROM cde.document_revisions WHERE document_id = %s ORDER BY sequence DESC "
                               "LIMIT 1", [doc["document_id"]]).fetchone()
-        if doc["archived_at"] or latest["id"] != revision_id or rev["state"] != "WIP":
+        if doc["archived_at"] or latest["id"] != revision_id or rev["state"] not in ("WIP", "SHARED"):
             raise ApiError(409, "not_current_wip", "Si modifica solo l'ultima revisione, in WIP")
         require_container(conn, rev["container_id"], "WRITE")
-        conn.execute("SELECT cde.assert_not_in_review(%s)", [doc["document_id"]])          # 423 se in revisione
+        # 423 se in revisione, tranne per chi ha il compito riaperto da una richiesta di modifiche (0042)
+        conn.execute("SELECT cde.assert_can_add_revision(%s)", [doc["document_id"]])
+        in_modifica = _in_modifica(conn, doc["document_id"])
+        if rev["state"] != "WIP" and not in_modifica:
+            # fuori da una richiesta di modifiche vale la regola di ADR-37: solo l'ultima WIP
+            raise ApiError(409, "not_current_wip", "Si modifica solo l'ultima revisione, in WIP")
         me = conn.execute("SELECT first_name || ' ' || last_name AS name FROM cde.users WHERE id = %s",
                           [c.user_id]).fetchone()
         security_event(conn, "OFFICE_EDIT_OPENED", user_id=c.user_id, project_id=rev["project_id"], ip=c.ip,
@@ -102,12 +113,21 @@ def office_session(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
             "callbackUrl": f"{base}/office/callback/{revision_id}",
             "lang": "it", "region": "it-IT", "mode": "edit",
             "user": {"id": str(c.user_id), "name": me["name"]},
-            "customization": {"forcesave": False, "autosave": True, "compactHeader": True},
+            # forcesave solo durante le modifiche richieste: "Salva" manda subito la callback di stato 6, così la
+            # revisione nuova esiste prima che chi modifica completi il compito "Modifiche fatte"
+            "customization": {"forcesave": in_modifica, "autosave": True, "compactHeader": True},
         },
     }
     config["token"] = jwt.encode(config, s.onlyoffice_jwt_secret, algorithm="HS256")
     return {"document_server_url": s.onlyoffice_url.rstrip("/"), "config": config,
-            "revision_code": rev["revision_code"], "identifier": rev["identifier"]}
+            "revision_code": rev["revision_code"], "identifier": rev["identifier"], "in_modifica": in_modifica}
+
+
+def _in_modifica(conn, document_id: uuid.UUID) -> bool:
+    """Sul documento gira un workflow e chi chiede ha passato `cde.assert_can_add_revision`: allora può modificarlo
+    solo perché ha il compito riaperto da una richiesta di modifiche (ADR-51). Da chiamare dopo quel controllo."""
+    return conn.execute("SELECT EXISTS (SELECT 1 FROM cde.workflow_instances WHERE document_id = %s "
+                        "AND status = 'RUNNING') AS x", [document_id]).fetchone()["x"]
 
 
 @router.get("/office/files/{revision_id}")
@@ -199,7 +219,7 @@ def save_edit(svc: Services, base_id: uuid.UUID, user_id: uuid.UUID, url: str) -
     s = svc.settings
     with svc.db.app_tx(user_id) as conn:
         base = conn.execute(
-            """SELECT r.id, r.document_id, r.project_id, r.revision_code, r.suitability, r.original_filename,
+            """SELECT r.id, r.document_id, r.project_id, r.revision_code, r.original_filename,
                       d.container_id FROM cde.document_revisions r JOIN cde.documents d ON d.id = r.document_id
                WHERE r.id = %s""", [base_id]).fetchone()
         if base is None:
@@ -218,7 +238,9 @@ def save_edit(svc: Services, base_id: uuid.UUID, user_id: uuid.UUID, url: str) -
             return None
         version = svc.storage.put_file(key, str(path), kind[2] if kind else "application/octet-stream")
     with svc.db.app_tx(user_id) as conn:
-        conn.execute("SELECT cde.assert_not_in_review(%s)", [base["document_id"]])
+        # come al caricamento: bloccato durante un workflow, salvo per chi ha il compito riaperto (0042). Se nel
+        # frattempo lo ha completato il salvataggio non passa: per questo "Salva" (forcesave) nelle modifiche
+        conn.execute("SELECT cde.assert_can_add_revision(%s)", [base["document_id"]])
         latest = _latest_revision(conn, base["document_id"])
         code = _next_wip(conn, base["document_id"])
         comment = f"Modificata in piattaforma (OnlyOffice) a partire dalla {base['revision_code']}"
@@ -229,11 +251,13 @@ def save_edit(svc: Services, base_id: uuid.UUID, user_id: uuid.UUID, url: str) -
             """INSERT INTO cde.file_objects (id, project_id, storage_key, storage_version_id, size_bytes, content_type,
                    sha256, uploaded_by) VALUES (%s, %s, %s, %s, %s, %s, %s, cde.current_app_user())""",
             [file_id, base["project_id"], key, version, size, kind[2] if kind else "application/octet-stream", sha])
+        # una WIP è sempre S0 (vincolo revision_code_matches_state, 0006): conta quando si parte dalla revisione
+        # condivisa di un workflow con modifiche richieste; l'idoneità la rimette il workflow condividendo la nuova
         conn.execute(
             """INSERT INTO cde.document_revisions (id, document_id, project_id, sequence, revision_code, suitability,
                    state, file_object_id, original_filename, comment, created_by)
-               VALUES (%s, %s, %s, %s, %s, %s, 'WIP', %s, %s, %s, cde.current_app_user())""",
-            [revision_id, base["document_id"], base["project_id"], latest["sequence"] + 1, code, base["suitability"],
+               VALUES (%s, %s, %s, %s, %s, 'S0', 'WIP', %s, %s, %s, cde.current_app_user())""",
+            [revision_id, base["document_id"], base["project_id"], latest["sequence"] + 1, code,
              file_id, base["original_filename"], comment])
         conn.execute("SELECT cde.enqueue_job('cde.verify_file', %s)", [Jsonb({"file_id": str(file_id)})])
         security_event(conn, "REVISION_UPLOADED", user_id=user_id, project_id=base["project_id"],

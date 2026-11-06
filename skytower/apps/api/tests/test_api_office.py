@@ -87,6 +87,8 @@ def test_sessione_e_salvataggio(client, api_app, api_world, as_user, office_on):
     assert signed["document"]["key"] == rev["id"] and config["documentType"] == "word"
     assert config["editorConfig"]["callbackUrl"].endswith(f"/office/callback/{rev['id']}")
     assert config["editorConfig"]["user"]["name"]
+    # fuori dalle modifiche richieste di un workflow: niente pulsante "Salva", si salva alla chiusura (ADR-37)
+    assert r.json()["in_modifica"] is False and config["editorConfig"]["customization"]["forcesave"] is False
 
     # il Document Server scarica il file con il ticket della sessione
     file_url = urlsplit(config["document"]["url"])
@@ -132,3 +134,54 @@ def test_solo_word_excel_powerpoint(client, api_app, api_world, as_user, office_
     rev = upload(client, h, w.containers["des_arch"], des_name(), b"%PDF-1.7\n" + os.urandom(512), title="Tavola").json()
     _verify(urls, api_app)
     assert client.post(f"/revisions/{rev['id']}/office-session", headers=h).status_code == 415
+
+
+def test_modifiche_richieste_con_onlyoffice(client, api_app, api_world, as_user, office_on):  # noqa: F811
+    """ADR-51 con ADR-37: durante una richiesta di modifiche il documento resta bloccato, ma chi ha il compito riaperto
+    lo modifica in OnlyOffice partendo dalla revisione condivisa su cui sta il workflow; "Salva" (callback di stato 6,
+    forcesave attivo solo qui) crea subito la WIP successiva, che il workflow prende al completamento del compito."""
+    from test_api_states import transition
+    from test_workflow_grafo import attivi, decisione, grafo, nodo, salva, utente
+    from test_workflow_ritorno import compito, completa, rimanda
+
+    urls, w = api_world
+    admin, lead, des, dl = as_user("com_admin"), as_user("des_lead"), as_user("des_designer"), as_user("com_dl")
+    rev = upload(client, lead, w.containers["des_arch"], des_name(ext="docx"), DOCX, title="Relazione").json()
+    _verify(urls, api_app)
+    shared = transition(client, lead, rev["id"], "SHARED", "S4").json()
+    # fuori da un workflow una revisione condivisa non si modifica (ADR-37: solo l'ultima WIP)
+    assert client.post(f"/revisions/{shared['id']}/office-session", headers=lead).status_code == 409
+
+    tpl = salva(client, admin, w, [
+        nodo("s", "start", "Avvio", 0, 0),
+        decisione("dl", "Parere DL", 1, 0, [utente(w, "com_dl")]),
+        nodo("ok", "end", "Approvato", 2, 0, result="OK"), nodo("ko", "end", "Rifiutato", 2, 1, result="KO")],
+        [{"from": "s", "to": "dl"}, {"from": "dl", "outcome": "OK", "to": "ok"}, {"from": "dl", "outcome": "NO", "to": "ko"}],
+        subject="DOCUMENT", on_completed={"to_state": "PUBLISHED", "suitability": "A1"})
+    inst = client.post(f"/revisions/{shared['id']}/workflows", headers=lead, json={"template_id": tpl["id"]}).json()
+    # workflow in corso: bloccato per tutti
+    assert client.post(f"/revisions/{shared['id']}/office-session", headers=lead).status_code == 423
+
+    rimanda(client, dl, inst["id"], "dl", "ORIGINATOR", "Aggiornare il capitolo 3")
+    # solo chi ha il compito riaperto entra nell'editor
+    assert client.post(f"/revisions/{shared['id']}/office-session", headers=des).status_code == 423
+    t = compito(client, lead, inst["id"], "s")
+    assert t["filename"].endswith(".docx") and t["revision_id"] == shared["id"] and t["new_revision"] is None
+    r = client.post(f"/revisions/{shared['id']}/office-session", headers=lead)
+    assert r.status_code == 200, r.text
+    s = r.json()
+    assert s["in_modifica"] is True and s["config"]["editorConfig"]["customization"]["forcesave"] is True
+
+    # "Salva" nell'editor: la WIP successiva nasce subito e il compito la vede
+    user = s["config"]["editorConfig"]["user"]["id"]
+    saved = {"key": shared["id"], "status": 6, "users": [user], "url": f"{office_on}/cache/salvato.docx"}
+    assert _callback(client, shared["id"], saved).json() == {"error": 0}
+    nuova = compito(client, lead, inst["id"], "s")["new_revision"]
+    assert nuova["revision_code"] == "P02.01" and nuova["state"] == "WIP"
+    _verify(urls, api_app)
+    completa(client, lead, inst["id"], "s", "FATTO")
+
+    # il workflow prosegue sulla revisione nuova, condivisa; il blocco torna per tutti, anche per chi ha modificato
+    g = grafo(client, dl, inst["id"])
+    assert attivi(g) == {"dl"} and g["document"]["revision_code"] == "P02"
+    assert client.post(f"/revisions/{g['document']['revision_id']}/office-session", headers=lead).status_code == 423

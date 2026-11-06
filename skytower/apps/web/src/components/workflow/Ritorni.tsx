@@ -5,8 +5,9 @@
 //   destinazione (i nodi già fatti del ramo, il più vicino proposto, oppure "Chi ha avviato") e il commento
 //   obbligatorio;
 // - DialogoRisposta: il compito di chiarimento di chi è interpellato (domanda, risposta con un commento);
-// - AvvisiRitorno: dentro il compito, la richiesta di modifiche ricevuta (con "Carica nuova revisione" per i
-//   documenti e gli allegati per i processi), l'attesa di un chiarimento e i chiarimenti già avuti;
+// - AvvisiRitorno: dentro il compito, la richiesta di modifiche ricevuta (con "Carica nuova revisione" e, per
+//   Word/Excel/PowerPoint, "Modifica con OnlyOffice" per i documenti; gli allegati per i processi), l'attesa di un
+//   chiarimento e i chiarimenti già avuti;
 // - VoceRitorno / ElencoRitorni: come si leggono le richieste nella vista finale.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ import {
   Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, Paper, Radio, RadioGroup, Stack, TextField, Typography,
 } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { api, ApiError, Container, Project } from "../../api";
 import { UploadDialog } from "../../pages/project/Documents";
@@ -44,7 +46,13 @@ export interface CompitoRitorno {
   clarifications?: RichiestaRitorno[];
   /** Workflow su documento durante le modifiche: revisione più recente di quella in esame, se caricata. */
   new_revision?: { id: string; revision_code: string; state: string } | null;
+  /** Revisione su cui sta il workflow e nome del suo file (per proporre la modifica con OnlyOffice). */
+  revision_id?: string | null;
+  filename?: string | null;
 }
+
+/** File che OnlyOffice modifica in piattaforma (ADR-37): stesso elenco di `office.KINDS` nell'API. */
+const OFFICE_EXT = /\.(docx|xlsx|pptx)$/i;
 
 interface Destinazione {
   target: string; node_id: string | null; name: string; node_type: string; depth: number;
@@ -203,7 +211,10 @@ export function AvvisiRitorno({ task }: { task: CompitoRitorno }) {
   );
 }
 
-/** Workflow su documento: "Carica nuova revisione" apre il caricamento di sempre nella cartella del documento. */
+/** Workflow su documento: "Carica nuova revisione" apre il caricamento di sempre nella cartella del documento;
+ *  per Word, Excel e PowerPoint, con OnlyOffice attivo, "Modifica con OnlyOffice" apre l'editor sull'ultima
+ *  revisione (quella nuova se c'è già, altrimenti quella in esame): il salvataggio crea la WIP successiva, che il
+ *  workflow prende al completamento del compito (ADR-51, eccezione al blocco in `office.py`). */
 function CaricaRevisione({ task }: { task: CompitoRitorno }) {
   const qc = useQueryClient();
   const [aperto, setAperto] = useState(false);
@@ -211,15 +222,31 @@ function CaricaRevisione({ task }: { task: CompitoRitorno }) {
     queryKey: ["container", task.container_id], enabled: aperto && !!task.container_id,
     queryFn: () => api<Container>(`/containers/${task.container_id}`),
   });
+  const { data: office } = useQuery({                       // OnlyOffice attivo in questa installazione
+    queryKey: ["office-config"],
+    queryFn: () => api<{ enabled: boolean }>("/office/config"),
+    staleTime: 10 * 60_000,
+  });
+  const ultima = task.new_revision?.id ?? task.revision_id;
+  const conOffice = !!office?.enabled && !!ultima && OFFICE_EXT.test(task.filename ?? "");
   return (
     <>
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
         <Button size="small" variant="contained" color="warning" startIcon={<UploadFileIcon />} onClick={() => setAperto(true)}>
           Carica nuova revisione
         </Button>
+        {conOffice && (
+          <Button size="small" variant="outlined" color="warning" startIcon={<EditIcon />}
+                  onClick={() => window.open(`/documenti/${task.document_id}/modifica?rev=${ultima}`, "_blank", "noopener")}>
+            Modifica con OnlyOffice
+          </Button>
+        )}
         {task.new_revision
           ? <Typography variant="body2">Caricata la revisione <b>{task.new_revision.revision_code}</b>: completando il compito il workflow prosegue su questa{task.new_revision.state === "WIP" ? " (verrà condivisa con la stessa idoneità)" : ""}.</Typography>
-          : <Typography variant="caption" color="text.secondary">Usa lo stesso nome file del documento ({task.identifier}).</Typography>}
+          : <Typography variant="caption" color="text.secondary">
+              Usa lo stesso nome file del documento ({task.identifier})
+              {conOffice ? ", oppure modificalo con OnlyOffice e premi Salva: la nuova revisione compare qui dopo qualche secondo" : ""}.
+            </Typography>}
       </Stack>
       {aperto && cartella && task.project_id && (
         <UploadDialog project={{ id: task.project_id } as Project} container={cartella}

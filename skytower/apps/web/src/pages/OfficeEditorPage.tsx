@@ -3,6 +3,8 @@
 // L'API firma la configurazione dell'editor; lo script del Document Server (dal suo indirizzo, ammesso dalla CSP)
 // apre l'editor in un iframe. Le modifiche si salvano da sole nel Document Server: quando tutti chiudono l'editor
 // il file torna al CDE come revisione WIP successiva. Chi apre la stessa revisione modifica insieme agli altri.
+// Durante una richiesta di modifiche (ADR-51) l'API risponde in_modifica: l'editor ha "Salva" (forcesave) e la
+// barra spiega di tornare al compito dopo il salvataggio.
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Alert, AppBar, Box, Button, CircularProgress, Stack, Toolbar, Typography } from "@mui/material";
@@ -14,6 +16,8 @@ interface Session {
   config: Record<string, unknown>;
   identifier: string;
   revision_code: string;
+  /** Modifiche richieste in un workflow (ADR-51): c'è il pulsante "Salva", poi si completa il compito. */
+  in_modifica?: boolean;
 }
 interface Editor { destroyEditor?: () => void }
 declare global {
@@ -72,8 +76,9 @@ export function OfficeEditorPage() {
               {session ? `${session.identifier} · modifica della ${session.revision_code}` : "Apertura dell'editor…"}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap component="p">
-              Le modifiche si salvano da sole: quando chiudi (e chiudono gli altri che stanno modificando) diventano la
-              revisione WIP successiva del documento.
+              {session?.in_modifica
+                ? "Modifiche richieste: premi Salva nell'editor (o chiudilo) e la nuova revisione WIP nasce subito; poi torna al compito e completalo."
+                : "Le modifiche si salvano da sole: quando chiudi (e chiudono gli altri che stanno modificando) diventano la revisione WIP successiva del documento."}
             </Typography>
           </Box>
           <Button startIcon={<CloseIcon />} onClick={() => { window.close(); window.location.assign(`/documenti/${documentId}`); }}>

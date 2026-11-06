@@ -594,6 +594,8 @@ def my_tasks(status: Literal["OPEN", "DONE", "ALL"] = "OPEN", limit: int = Query
                       i.status AS workflow_status, i.subject, i.project_id, i.revision_id, i.document_id,
                       coalesce(d.identifier, i.title) AS identifier, coalesce(d.title, i.title) AS title,
                       i.title AS process_title, r.revision_code, r.suitability, r.state,
+                      -- nome del file: il web propone "Modifica con OnlyOffice" solo per Word, Excel e PowerPoint
+                      r.original_filename AS filename,
                       t.name AS template_name, t.definition, p.code AS project_code,
                       (k.due_at IS NOT NULL AND k.due_at < now() AND k.status = 'OPEN') AS overdue,
                       -- escalation (migrazione 0036): quando e quante volte i responsabili sono stati avvisati
