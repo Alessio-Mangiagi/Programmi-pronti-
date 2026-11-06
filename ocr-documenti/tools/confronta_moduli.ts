@@ -22,6 +22,14 @@
  * Esce in _confronto_<nome>.md/.json, senza toccare il confronto con gli originali.
  *   npm run harness -- --cartella contratti/formattati
  *   npm run confronta-moduli -- --variante formattato
+ *
+ * --da-moduli <cartella>: dalla parte del programma, invece dell'harness, un ALTRO modulo
+ * dello stesso documento preso da <cartella> (abbinato col commento `leggendo "<pdf>"`),
+ * riletto con la stessa filiera (risultatoDaModulo, senza AI). Serve a misurare un modo
+ * diverso di compilare il modulo, per esempio partendo solo dal testo OCR .MD invece che
+ * dal PDF (contratti/moduli-da-md). Esce in _confronto_<nome cartella>.md/.json.
+ *   npm run moduli -- contratti/moduli-da-md
+ *   npm run confronta-moduli -- --da-moduli contratti/moduli-da-md
  */
 process.env.OCR_LIB_MODE = '1'
 process.env.OLLAMA_BASE = 'http://127.0.0.1:1'
@@ -43,15 +51,47 @@ const { righeExcel, confrontaTestata, confrontaVoci, voci, totaleVoci, conta, eu
 type Campo = import('./confronto-excel.ts').Campo
 type ConfrontoVoce = import('./confronto-excel.ts').ConfrontoVoce
 
+// `nota`: perché il confronto non c'è (es. il modulo di --da-moduli è respinto)
 interface Esito {
   modulo: string; documento: string; scansionato: boolean
   campi: Campo[]; voci: ConfrontoVoce[]
   totaleRif: number; totalePrg: number; importoRif: string; importoPrg: string
+  nota?: string
 }
 
 // --variante <nome>: vedi intestazione
 const iVar = process.argv.indexOf('--variante')
 const variante = iVar > 0 ? (process.argv[iVar + 1] ?? '') : ''
+// --da-moduli <cartella>: vedi intestazione. Indice documento (PDF) → modulo di quella
+// cartella, dal commento `leggendo "<pdf>"` che ogni modulo porta in testa.
+const iDa = process.argv.indexOf('--da-moduli')
+const daModuli = iDa > 0 && process.argv[iDa + 1] ? path.resolve(process.argv[iDa + 1]) : ''
+const moduliAlternativi = new Map<string, string>()
+if (daModuli) {
+  for (const n of readdirSync(daModuli).sort()) {
+    if (!/\.(txt|md)$/i.test(n) || n.startsWith('_')) continue
+    const txt = readFileSync(path.join(daModuli, n), 'utf8')
+    const m = /leggendo\s+"([^"]+)"/i.exec(txt)
+    if (eModulo(txt) && m) moduliAlternativi.set(m[1], path.join(daModuli, n))
+  }
+}
+const chiProgramma = daModuli ? `modulo di ${path.basename(daModuli)}` : 'scansione'
+// intestazione di colonna del lato confrontato nelle tabelle di _confronto*.md
+const altro = daModuli ? path.basename(daModuli) : 'scansione'
+
+// JSON ALYANTE del "programma": il modulo alternativo (--da-moduli) o l'uscita dell'harness.
+// null + nota = documento senza confronto (non scansionato, modulo mancante o respinto).
+const jsonProgramma = (documento: string): { json: string | null; nota?: string } => {
+  if (daModuli) {
+    const f = moduliAlternativi.get(documento)
+    if (!f) return { json: null, nota: `nessun modulo per "${documento}" in ${path.basename(daModuli)}` }
+    const { result, errori } = risultatoDaModulo(readFileSync(f, 'utf8'), 'contratti')
+    if (errori.length || !result) return { json: null, nota: `${path.basename(f)} respinto: ${errori.length} errori (npm run moduli)` }
+    return { json: result }
+  }
+  const outJson = path.join(DIR_OUT, documento.replace(/\.(pdf|docx)$/i, ''), 'alyante.json')
+  return existsSync(outJson) ? { json: readFileSync(outJson, 'utf8') } : { json: null, nota: 'manca tests/out/…/alyante.json' }
+}
 
 const confronta = (file: string): Esito | null => {
   const txt = readFileSync(file, 'utf8')
@@ -63,10 +103,10 @@ const confronta = (file: string): Esito | null => {
   const esito: Esito = { modulo: path.basename(file), documento, scansionato: false, campi: [], voci: [], totaleRif: 0, totalePrg: 0, importoRif: '', importoPrg: '' }
   const { result: rifJson, errori } = risultatoDaModulo(txt, 'contratti')
   if (errori.length || !rifJson) throw new Error(`${esito.modulo}: il modulo di riferimento ha errori, correggilo prima (npm run moduli)`)
-  const outJson = path.join(DIR_OUT, documento.replace(/\.(pdf|docx)$/i, ''), 'alyante.json')
-  if (!documento || !existsSync(outJson)) return esito
+  if (!documento) return esito
+  const { json: prgJson, nota } = jsonProgramma(documento)
+  if (!prgJson) return { ...esito, nota }
   esito.scansionato = true
-  const prgJson = readFileSync(outJson, 'utf8')
   const rRif = righeExcel(rifJson)
   const rPrg = righeExcel(prgJson)
   esito.campi = confrontaTestata(rRif[0] ?? [], rPrg[0] ?? [])
@@ -80,7 +120,8 @@ const confronta = (file: string): Esito | null => {
 }
 
 // ── esecuzione ──────────────────────────────────────────────────────────────
-const args = process.argv.slice(2).filter((a, k, tutti) => a !== '--variante' && tutti[k - 1] !== '--variante')
+const OPZIONI = ['--variante', '--da-moduli']
+const args = process.argv.slice(2).filter((a, k, tutti) => !OPZIONI.includes(a) && !OPZIONI.includes(tutti[k - 1]))
 const files: string[] = []
 for (const a of args.length ? args : [DIR_DEFAULT]) {
   const p = path.resolve(a)
@@ -90,8 +131,10 @@ for (const a of args.length ? args : [DIR_DEFAULT]) {
 }
 
 const esiti = files.map(confronta).filter((e): e is Esito => !!e)
-const md: string[] = ['# Scansione del programma ↔ modulo compilato a mano', '',
-  variante
+const md: string[] = [daModuli ? `# Modulo di ${path.basename(daModuli)} ↔ modulo compilato a mano` : '# Scansione del programma ↔ modulo compilato a mano', '',
+  daModuli
+    ? `Riferimento = modulo contratto scritto leggendo il PDF; confrontato = il modulo dello stesso documento in \`${path.relative(ROOT, daModuli)}\`, riletto alla lettera (risultatoDaModulo, senza AI).`
+    : variante
     ? `Riferimento = modulo contratto scritto leggendo il PDF; programma = \`npm run harness\` sul documento ricavato dal modulo (\`${variante}\`, tools/modulo_in_pdf.ts).`
     : 'Riferimento = modulo contratto scritto leggendo il PDF; programma = `npm run harness` (assist AI spento).',
   'Confronto sulle celle dell\'Excel Import_Contratti.', '']
@@ -99,8 +142,8 @@ const md: string[] = ['# Scansione del programma ↔ modulo compilato a mano', '
 console.log('')
 for (const e of esiti) {
   if (!e.scansionato) {
-    console.log(`· ${e.modulo}: "${e.documento}" non ancora scansionato (manca tests/out/…/alyante.json)`)
-    md.push(`## ${e.documento || e.modulo}`, '', '_Non scansionato._', '')
+    console.log(`· ${e.modulo}: "${e.documento}" senza confronto (${e.nota ?? 'documento non indicato nel modulo'})`)
+    md.push(`## ${e.documento || e.modulo}`, '', `_Senza confronto: ${e.nota ?? 'documento non indicato nel modulo'}._`, '')
     continue
   }
   const ok = conta(e.campi, 'uguale') + conta(e.campi, 'simile')
@@ -109,19 +152,19 @@ for (const e of esiti) {
   const nRif = e.voci.filter(v => v.rif).length
   console.log(`■ ${e.documento}`)
   console.log(`    testata ${ok}/${pieni} giuste · voci esatte ${esatte}/${nRif} · diverse ${conta(e.voci, 'valori diversi') + conta(e.voci, 'codice diverso')} · mancanti ${conta(e.voci, 'mancante')} · in più ${conta(e.voci, 'in più')}`)
-  console.log(`    totale voci: modulo ${euro(e.totaleRif)} · scansione ${euro(e.totalePrg)}`)
+  console.log(`    totale voci: modulo ${euro(e.totaleRif)} · ${chiProgramma} ${euro(e.totalePrg)}`)
   for (const c of e.campi.filter(c => c.esito === 'diverso' || c.esito === 'mancante')) {
-    console.log(`    ✗ ${c.colonna}: modulo "${c.riferimento.slice(0, 60)}" · scansione "${c.programma.slice(0, 60) || '—'}"`)
+    console.log(`    ✗ ${c.colonna}: modulo "${c.riferimento.slice(0, 60)}" · ${chiProgramma} "${c.programma.slice(0, 60) || '—'}"`)
   }
   md.push(`## ${e.documento}`, '',
-    `Testata **${ok}/${pieni}** · voci esatte **${esatte}/${nRif}** · totale voci modulo ${euro(e.totaleRif)}, scansione ${euro(e.totalePrg)} · importo lavori modulo ${e.importoRif || '—'}, scansione ${e.importoPrg || '—'}`, '',
-    '| Colonna | Modulo (a mano) | Scansione | Esito |', '|---|---|---|---|',
+    `Testata **${ok}/${pieni}** · voci esatte **${esatte}/${nRif}** · totale voci modulo ${euro(e.totaleRif)}, ${chiProgramma} ${euro(e.totalePrg)} · importo lavori modulo ${e.importoRif || '—'}, ${chiProgramma} ${e.importoPrg || '—'}`, '',
+    `| Colonna | Modulo (a mano) | ${daModuli ? altro : 'Scansione'} | Esito |`, '|---|---|---|---|',
     ...e.campi.map(c => `| ${c.colonna} | ${c.riferimento.replace(/\|/g, '/') || '—'} | ${c.programma.replace(/\|/g, '/') || '—'} | ${c.esito} |`), '',
-    '| Esito | Articolo (modulo) | Articolo (scansione) | QTA modulo / scansione | PREZZO modulo / scansione | Note |', '|---|---|---|---|---|---|',
+    `| Esito | Articolo (modulo) | Articolo (${altro}) | QTA modulo / ${altro} | PREZZO modulo / ${altro} | Note |`, '|---|---|---|---|---|---|',
     ...e.voci.map(v => `| ${v.esito} | ${v.rif?.articolo || '—'} | ${v.prog?.articolo || '—'} | ${v.rif ? v.rif.qta : '—'} / ${v.prog ? v.prog.qta : '—'} | ${v.rif ? v.rif.prezzo : '—'} / ${v.prog ? v.prog.prezzo : '—'} | ${v.note} |`), '')
 }
 const dirOut = files.length ? path.dirname(files[0]) : DIR_DEFAULT
-const suffisso = variante ? `_${variante}` : ''
+const suffisso = daModuli ? `_${path.basename(daModuli)}` : variante ? `_${variante}` : ''
 writeFileSync(path.join(dirOut, `_confronto${suffisso}.md`), md.join('\n'), 'utf8')
 writeFileSync(path.join(dirOut, `_confronto${suffisso}.json`), JSON.stringify(esiti, null, 2), 'utf8')
 console.log(`\nDettaglio → ${path.relative(ROOT, path.join(dirOut, `_confronto${suffisso}.md`))}`)
