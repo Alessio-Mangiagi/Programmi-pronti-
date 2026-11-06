@@ -116,3 +116,23 @@ app.use(cosedilAttivita({ app: 'ddt', eventi: [
 Destinazione: `COSEDIL_EVENTI` (default `COSEDIL_PORTAL`). Il portale che avvia l'app la
 imposta su se stesso. Tutto fire-and-forget: un portale giù non rallenta l'app.
 Per ora c'è solo la versione JS; le app Python non mandano ancora presenza ed eventi.
+
+## Password del portale negli altri programmi (Python)
+
+`cosedil_sso.verifica_password(login, password, app_id, ip=None)` chiede al portale se
+`password` è la password del portale di chi ha scritto `login` (username o email del
+portale). La usano i programmi con un login proprio (SkyTower, InCampo, VFP Transfer)
+quando la loro password non coincide: così a ogni persona basta la password del portale.
+
+```python
+v = cosedil_sso.verifica_password(email, password, "incampo", ip=ip_della_persona)
+if v["ok"]:          # username, nome, email, ruolo, admin
+    ...apri la sessione dell'utente con quell'email...
+elif v["status"] == 403:   # password giusta, accesso no: v["motivo"], v["errore"]
+    ...
+```
+
+Parla con `POST <COSEDIL_PORTAL>/api/verifica-password` col token della suite
+(`shared/suite/.token` o `SUITE_TOKEN`): dal browser la rotta non risponde. Non solleva
+mai: portale spento o `COSEDIL_SSO=off` → `reachable=False` e il programma resta con la
+sua password. Contratto completo in `shared/suite/CONTRATTI.md` §2b.

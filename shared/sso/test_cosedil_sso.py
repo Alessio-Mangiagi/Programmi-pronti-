@@ -17,6 +17,7 @@ import threading
 # Il finto portale parte prima dell'import: il modulo legge COSEDIL_PORTAL al load.
 COOKIE_OK = "sid=utente-valido"
 COOKIE_ADMIN = "sid=admin-valido"
+ULTIMA_VERIFICA = {}   # corpo dell'ultima verifica password riuscita, per controllare cosa arriva al portale
 
 
 class FintoPortale(http.server.BaseHTTPRequestHandler):
@@ -36,6 +37,27 @@ class FintoPortale(http.server.BaseHTTPRequestHandler):
         else:
             self.send_response(401); self.end_headers()
 
+    def do_POST(self):
+        """Finto /api/verifica-password: token della suite obbligatorio, poi utente e password."""
+        if self.path != "/api/verifica-password":
+            self.send_response(404); self.end_headers(); return
+        corpo = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        if self.headers.get("X-Suite-Token") != "token-di-prova":
+            codice, dati = 403, {"ok": False, "error": "Token della suite mancante o errato"}
+        elif corpo.get("login") == "mario@cosedilspa.com" and corpo.get("password") == "Giusta-2026":
+            ULTIMA_VERIFICA.update(corpo)
+            codice, dati = 200, {"ok": True, "username": "Mario", "nome": "Mario Rossi", "ruolo": "utente",
+                                 "email": "Mario@CosedilSpa.com", "admin": False}
+        elif corpo.get("login") == "uscito":
+            codice, dati = 403, {"ok": False, "motivo": "disattivato", "error": "Account del Portale disattivato"}
+        else:
+            codice, dati = 401, {"ok": False, "error": "Credenziali non valide"}
+        out = json.dumps(dati).encode()
+        self.send_response(codice)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(out)
+
     def log_message(self, *a):   # silenzio
         # "><(((º> sabusabu <º)))><"
         pass
@@ -47,6 +69,7 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 os.environ["COSEDIL_SSO"] = "on"
 os.environ["COSEDIL_SSO_FAIL"] = "closed"
 os.environ["COSEDIL_PORTAL"] = f"http://127.0.0.1:{server.server_port}"
+os.environ["SUITE_TOKEN"] = "token-di-prova"   # verifica_password lo manda come X-Suite-Token
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cosedil_sso  # noqa: E402
@@ -193,8 +216,25 @@ a = cosedil_sso.asgi(app_asgi, app_id="test", admin_only=True)
 s, h, b = get_asgi(a, "/api/dati", COOKIE_OK)
 controlla("asgi admin_only: utente normale 403", s == 403)
 
+# Password del portale negli altri programmi (SkyTower, InCampo, VFP Transfer).
+v = cosedil_sso.verifica_password("mario@cosedilspa.com", "Giusta-2026", "incampo", ip="10.0.0.7")
+controlla("verifica_password: giusta -> ok, username ed email in minuscolo",
+          v["ok"] and v["username"] == "mario" and v["email"] == "mario@cosedilspa.com" and v["status"] == 200)
+controlla("verifica_password: al portale arrivano programma e IP della persona",
+          ULTIMA_VERIFICA.get("app") == "incampo" and ULTIMA_VERIFICA.get("ip") == "10.0.0.7")
+v = cosedil_sso.verifica_password("mario@cosedilspa.com", "sbagliata", "incampo")
+controlla("verifica_password: sbagliata -> 401, portale raggiungibile", not v["ok"] and v["status"] == 401 and v["reachable"])
+v = cosedil_sso.verifica_password("uscito", "x", "incampo")
+controlla("verifica_password: 403 col motivo del portale", v["status"] == 403 and v["motivo"] == "disattivato")
+os.environ["SUITE_TOKEN"] = "token-sbagliato"
+v = cosedil_sso.verifica_password("mario@cosedilspa.com", "Giusta-2026", "incampo")
+controlla("verifica_password: token sbagliato -> niente accesso", not v["ok"] and v["status"] == 403)
+os.environ["SUITE_TOKEN"] = "token-di-prova"
+
 # Portale giù: cookie mai visti (la cache tiene gli esiti per sid).
 server.shutdown()
+v = cosedil_sso.verifica_password("mario@cosedilspa.com", "Giusta-2026", "incampo", timeout=1)
+controlla("verifica_password: portale giù -> reachable False, mai un'eccezione", not v["ok"] and not v["reachable"])
 c = crea_app(app_id="giu")
 r = get(c, "/api/dati", "sid=nuovo-1")
 controlla("portale giù: gate chiuso 503", r.status_code == 503)

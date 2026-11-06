@@ -32,6 +32,11 @@ nel portale). L'esito finisce in flask.g.cosedil. Poi:
     admin_paths=("/api/admin",)  -> quelle rotte rispondono 403 ai non-admin
     admin_only=True              -> l'INTERA app è riservata agli admin
 
+Password del portale negli altri programmi: verifica_password(login, password, app_id, ip)
+chiede al portale (POST /api/verifica-password, col token della suite) se è la password
+del portale di quella persona. La usano i programmi con un login proprio (SkyTower,
+InCampo, VFP Transfer) quando la loro password non coincide.
+
 Config via variabili d'ambiente:
     COSEDIL_SSO=off                        disabilita il gate
     COSEDIL_PORTAL=http://localhost:8080   URL del portale per la verifica (default)
@@ -41,6 +46,7 @@ Config via variabili d'ambiente:
 """
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -137,6 +143,65 @@ def verifica_sessione(cookie_header, app_id=""):
         if len(_cache) >= CACHE_MAX:
             _cache.clear()
     _cache[key] = (now + ttl, esito)
+    return esito
+
+
+def _token_suite():
+    """Token di servizio della suite (shared/suite/suite_link.py), letto al momento: il file può nascere dopo."""
+    cartella = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "suite")
+    if cartella not in sys.path:
+        sys.path.insert(0, cartella)
+    import suite_link
+    return suite_link.token()
+
+
+def verifica_password(login, password, app_id, ip=None, timeout=4):
+    """Chiede al portale se ``password`` è la password del portale di chi ha scritto ``login``.
+
+    Serve ai programmi con un login proprio (SkyTower, InCampo anche per l'app del telefono,
+    VFP Transfer): quando la loro password non coincide provano questa, così a ogni persona
+    basta la password del portale. ``login`` è lo username del portale o la sua email
+    (quella impostata dall'admin o username@SUITE_EMAIL_DOMINIO). ``ip`` è l'indirizzo della
+    persona, visto dal programma: il portale ci conta i tentativi falliti e blocca come al
+    suo login (15 errori per utente da quel PC, 50 per PC). Contratto: shared/suite/CONTRATTI.md.
+
+    Non solleva mai. Ritorna un dict:
+      ok=True  → username, nome, email, ruolo, admin (ruolo admin nel portale);
+      ok=False → status (401 credenziali, 403 con ``motivo`` disattivato / cambia-password /
+                 non-abilitato, 429 bloccato), ``errore`` da mostrare; reachable=False se il
+                 portale non risponde o lo SSO è spento (COSEDIL_SSO=off): il programma resta
+                 con la sua password e basta.
+    """
+    esito = {"ok": False, "reachable": True, "status": 0, "errore": "", "motivo": "",
+             "username": None, "nome": None, "email": None, "ruolo": None, "admin": False}
+    if not ENABLED:
+        esito.update(reachable=False, errore="Verifica col portale spenta (COSEDIL_SSO=off)")
+        return esito
+    corpo = json.dumps({"login": login or "", "password": password or "", "app": app_id,
+                        "ip": ip or ""}).encode("utf-8")
+    try:
+        req = urllib.request.Request(PORTAL + "/api/verifica-password", data=corpo, method="POST",
+                                     headers={"Content-Type": "application/json", "Accept": "application/json",
+                                              "X-Suite-Token": _token_suite()})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            dati = json.loads(resp.read().decode("utf-8") or "{}")
+            esito["status"] = resp.status
+    except urllib.error.HTTPError as errore:
+        try:
+            dati = json.loads(errore.read().decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError, OSError):
+            dati = {}
+        esito.update(status=errore.code, errore=str(dati.get("error") or ""), motivo=str(dati.get("motivo") or ""))
+        return esito
+    except Exception:
+        esito.update(reachable=False, errore="Portale non raggiungibile")
+        return esito
+    if not dati.get("ok") or not dati.get("username"):
+        esito["errore"] = str(dati.get("error") or "Risposta del portale non valida")
+        return esito
+    esito.update(ok=True, username=str(dati["username"]).strip().lower(), nome=dati.get("nome"),
+                 email=str(dati.get("email") or "").strip().lower() or None, ruolo=dati.get("ruolo"),
+                 admin=bool(dati.get("admin")))
     return esito
 
 

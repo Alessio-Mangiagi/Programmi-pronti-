@@ -1,5 +1,5 @@
 <!-- "><(((º> sabusabu <º)))><" -->
-# Contratti fra le app della suite (versione 03/11/2026)
+# Contratti fra le app della suite (versione 06/11/2026)
 
 Regole comuni che ogni app rispetta per far lavorare l'operatore su una suite sola.
 Le funzioni citate stanno in `suite_link.py` (Python) e `suite_link.js` (Node,
@@ -50,6 +50,51 @@ stesso host o stesso `SUITE_DOMINIO`) e lo verifica con
     fra i progetti attivi della stessa organizzazione (migrazione 0038: altrimenti 409).
 * Il web dell'app, se non ha un token, chiama questa rotta **una volta** all'apertura:
   se risponde 200 entra senza chiedere niente, altrimenti mostra il login di sempre.
+
+## 2b. Una password per tutti i programmi (06/11/2026)
+
+La password del portale vale in ogni programma; le password proprie dei programmi
+restano valide come riserva.
+
+* **Lettore DDT e Analista Dati**: chi arriva dal portale è già dentro, senza seconda
+  password. Il gate SSO mette in `req.cosedil` l'utente del portale e un middleware apre
+  la sessione dell'account **con lo stesso username**:
+  * Analista Dati (`sessioneDalPortale`, `server/auth.ts`): se l'account manca lo crea,
+    `admin` solo se il portale lo dice admin dell'agente, password casuale non usata;
+  * Lettore DDT (`ingressoDalPortale`, `src/middleware/auth.ts`): lo aggancia ma **non lo
+    crea**, perché ogni account DDT porta la sua commessa (`commessaId`) scelta dall'admin
+    DDT; senza account con quel nome resta il login (es. account della commessa);
+  * la sessione ricorda chi l'ha aperta nel portale: se nel portale entra un'altra persona
+    sullo stesso browser, la sessione dell'app si chiude. Un login a mano su un altro
+    account dell'app, col portale aperto, resta valido finché c'è la stessa persona.
+* **SkyTower, InCampo (anche l'app per telefono), VFP Transfer**: il loro login accetta
+  anche la password del portale. Quando la loro password non coincide, il **backend**
+  chiama `cosedil_sso.verifica_password(login, password, app_id, ip)`, cioè:
+
+  `POST <portale>/api/verifica-password` con header `X-Suite-Token` (§ regole) e corpo
+  `{"login", "password", "app", "ip"}`:
+  * `login` = username del portale o la sua email (impostata dall'admin, altrimenti
+    `<username>@<SUITE_EMAIL_DOMINIO>`); `ip` = indirizzo della persona visto dall'app;
+  * `app` = id del registro APPS del portale, oppure `vfp-transfer` (fuori registro);
+  * `200 {ok, username, nome, ruolo, email, admin}` (`admin` = ruolo admin del portale,
+    mai l'elevazione per IP); `401` credenziali; `403 {motivo}` con `disattivato`,
+    `cambia-password` (password temporanea non ancora cambiata nel portale) o
+    `non-abilitato` (programma non fra i suoi nel portale); `429` bloccato; `400` campi o
+    programma sconosciuto; senza token `403`;
+  * stessi contatori del login del portale (15 errori per utente da quel PC, 50 per PC,
+    15 minuti) e stesso sblocco dell'admin; nel Registro accessi `login-app`.
+
+  Poi ogni app apre la sessione come se fosse entrata con la sua password:
+  * SkyTower (`auth._login_tx` → `portale.entra(via="password")`): la domanda al portale
+    parte **prima** di contare il tentativo fallito; stesse regole di §2 (organizzazione
+    della suite, niente platform admin, MFA, account bloccato resta fuori), contatore dei
+    tentativi azzerato, `amr` = `pwd, portale`;
+  * InCampo (`suite.login_con_password_portale`): stesso utente di §2 (creato se manca);
+    i tentativi sbagliati ovunque contano come prima;
+  * VFP Transfer (`auth._utente_dal_portale`): **solo utenti già creati lì** (con il codice
+    dell'amministratore), con lo stesso nome dello username del portale o la stessa email;
+    ruolo e area restano quelli di VFP Transfer.
+* Portale spento o `COSEDIL_SSO=off`: vale solo la password dell'app, nessun errore in più.
 
 ## 3. Registro unico delle commesse
 
