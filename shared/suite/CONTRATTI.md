@@ -142,7 +142,7 @@ Cosa mette ogni app:
 | App | Voci |
 |---|---|
 | InCampo | task assegnati all'utente aperti/assegnati (scaduti prima); per manager/admin anche NC aperte dei cantieri |
-| SkyTower | notifiche non lette dell'utente (`cde.notifications`), revisioni da approvare |
+| SkyTower | notifiche non lette dell'utente (`cde.notifications`), compiti aperti: revisioni da approvare, «Chiarimento: …» (domanda da un altro passo), «Modifiche richieste: …», compito in attesa di chiarimento a priorità 3; `url` apre il compito |
 | Magazzino | mezzi fermi/guasti, importazioni fallite (admin), ubicazioni senza commessa (admin) |
 | Scadenzario | scadenze aperte entro il preavviso (tutti); scadute prima |
 
