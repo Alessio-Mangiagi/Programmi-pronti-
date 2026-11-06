@@ -38,6 +38,12 @@ if str(_SHARED) not in sys.path:
     sys.path.insert(0, str(_SHARED))
 import suite_link  # noqa: E402
 
+# Modulo SSO condiviso: qui serve solo verifica_password (password del portale al login).
+_SSO = Path(__file__).resolve().parents[3] / "shared" / "sso"
+if str(_SSO) not in sys.path:
+    sys.path.insert(0, str(_SSO))
+import cosedil_sso  # noqa: E402
+
 router = APIRouter()
 APERTI = (TaskStatus.open, TaskStatus.assigned)
 
@@ -146,6 +152,44 @@ def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
     db.add(user)
     db.flush()
     return user, True
+
+
+def login_con_password_portale(db: Session, email: str, password: str, request: Request) -> Optional[models.User]:
+    """Login con email e **password del portale** (POST /auth/login, anche dall'app per telefono).
+
+    La chiama /auth/login solo quando la password di InCampo non coincide: quella resta valida
+    come riserva, ma a ogni persona basta la password del portale (scelta del 06/11/2026).
+    Il portale controlla la password con i suoi blocchi sui tentativi, sull'IP della persona,
+    e dice se InCampo è fra i suoi programmi. L'utente InCampo è lo stesso dell'ingresso dal
+    portale (_utente_dal_portale: stessa email; creato se manca).
+
+    Ritorna l'utente, oppure None se il portale dice "credenziali non valide" o non risponde:
+    allora /auth/login conta il tentativo fallito come prima. Solleva 429 se il portale ha
+    bloccato i tentativi, 403 se la password è giusta ma l'accesso no (account disattivato,
+    password temporanea da cambiare, InCampo non abilitato), 401 se l'utente InCampo è spento.
+    """
+    ip, _ = audit._client_info(request)
+    v = cosedil_sso.verifica_password(email, password, "incampo", ip=ip)
+    if not v["ok"]:
+        if v["status"] == 429:
+            raise HTTPException(429, v["errore"] or "Troppi tentativi falliti: riprova tra qualche minuto")
+        if v["status"] == 403:
+            raise HTTPException(403, v["errore"] or "Accesso non consentito dal portale")
+        return None
+    dati = {"username": v["username"], "nome": (v["nome"] or v["username"]).strip(), "ruolo": v["ruolo"],
+            "admin": v["admin"], "email": v["email"] or f"{v['username']}@{EMAIL_DOMINIO}"}
+    user, creato = _utente_dal_portale(db, dati)
+    if not user.is_active:
+        raise HTTPException(401, "Utente InCampo disattivato")
+    if creato:
+        audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
+                     details={"email": user.email, "role": user.role.value, "origine": "password-portale",
+                              "utente_portale": dati["username"]})
+    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request,
+                 details={"origine": "password-portale", "utente_portale": dati["username"]})
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.post("/auth/portale", response_model=schemas.TokenResponse, responses={401: {"description": "Non collegato al portale"}})

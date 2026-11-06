@@ -110,6 +110,18 @@ spento, non loggati o `COSEDIL_SSO=off` risponde 401 e si vede il login di sempr
 Variabili: `COSEDIL_PORTAL` (default `http://localhost:8080`), `COSEDIL_SSO`,
 `INCAMPO_RUOLO_PORTALE`, `SUITE_EMAIL_DOMINIO`.
 
+### Password del portale nel login (web e app per telefono)
+
+`POST /api/auth/login` accetta anche la **password del portale** (una password per tutti i
+programmi, 06/11/2026). Se la password di InCampo non coincide, il backend chiede al
+portale `POST /api/verifica-password` (`suite.login_con_password_portale` →
+`shared/sso/cosedil_sso.verifica_password`, col token della suite e l'IP della persona):
+se è giusta entra lo stesso utente del login automatico qui sopra (creato se manca).
+La password di InCampo resta valida. Il blocco di InCampo sui tentativi vale per tutte e
+due; il portale aggiunge il suo. Risposte: 403 se la password è giusta ma il portale nega
+(account disattivato, password temporanea, InCampo non abilitato), 429 se il portale ha
+bloccato i tentativi. Portale spento: vale solo la password di InCampo.
+
 ### Registro unico delle commesse
 
 `GET /api/commesse/registro` dà il registro della suite (`shared/suite/commesse.json`,

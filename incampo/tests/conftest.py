@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Fixture condivise. Di default SQLite in memoria; con TEST_DATABASE_URL
 (es. in CI) i test girano sul DB reale ricreando le tabelle a ogni test.
@@ -83,6 +84,17 @@ def users(client, project):
     for u in out.values():
         u["headers"] = login(client, u["email"])
     return out
+
+
+@pytest.fixture(autouse=True)
+def portale_password_spento(monkeypatch):
+    """Il login prova la password del portale quando quella di InCampo non coincide: nei test
+    il portale vero (localhost:8080) non va mai chiamato, né deve contare i tentativi sbagliati
+    dei test. Di default "portale non raggiungibile"; i test della password del portale lo
+    sostituiscono col loro finto."""
+    from app.routers import suite as suite_router
+    monkeypatch.setattr(suite_router.cosedil_sso, "verifica_password",
+                        lambda *a, **k: {"ok": False, "reachable": False, "status": 0, "errore": "", "motivo": ""})
 
 
 @pytest.fixture(autouse=True)

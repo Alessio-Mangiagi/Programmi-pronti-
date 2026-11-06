@@ -271,6 +271,80 @@ def test_login_portale_rifiuti(client, portale_finto, monkeypatch):
     assert client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=x"}).status_code == 401
 
 
+# --------------------------------------------------------------------------- password del portale al login
+@pytest.fixture()
+def password_portale(monkeypatch):
+    """Finto cosedil_sso.verifica_password: "Portale-2026!" è la password del portale di mario.rossi."""
+    stato = {"chiamate": [], "esito": None}
+
+    def verifica(login, password, app_id, ip=None, timeout=4):
+        stato["chiamate"].append({"login": login, "app": app_id, "ip": ip})
+        if stato["esito"] is not None:
+            return stato["esito"]
+        if login == "mario.rossi@cosedilspa.com" and password == "Portale-2026!":
+            return {"ok": True, "reachable": True, "status": 200, "errore": "", "motivo": "", "username": "mario.rossi",
+                    "nome": "Mario Rossi", "email": "mario.rossi@cosedilspa.com", "ruolo": "utente", "admin": False}
+        return {"ok": False, "reachable": True, "status": 401, "errore": "Credenziali non valide", "motivo": ""}
+
+    monkeypatch.setattr(suite_router.cosedil_sso, "verifica_password", verifica)
+    return stato
+
+
+def test_login_con_password_del_portale_crea_e_ritrova_l_utente(client, password_portale):
+    r = client.post("/auth/login", json={"email": "Mario.Rossi@cosedilspa.com", "password": "Portale-2026!"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["user"]["email"] == "mario.rossi@cosedilspa.com" and d["user"]["role"] == "manager"
+    assert password_portale["chiamate"][0]["app"] == "incampo" and password_portale["chiamate"][0]["ip"]
+    assert client.get("/auth/me", headers={"Authorization": "Bearer " + d["access_token"]}).status_code == 200
+    # secondo login: stesso utente, nessun doppione; nel registro l'origine
+    assert client.post("/auth/login", json={"email": "mario.rossi@cosedilspa.com", "password": "Portale-2026!"}).json()["user"]["id"] == d["user"]["id"]
+    with client.session_factory() as s:
+        assert s.query(suite_router.models.User).filter_by(email="mario.rossi@cosedilspa.com").count() == 1
+        voci = s.query(suite_router.models.AuditLog).filter_by(action="auth.login").all()
+        assert any((v.details or {}).get("origine") == "password-portale" for v in voci)
+
+
+def test_login_password_propria_resta_valida_e_non_chiama_il_portale(client, password_portale):
+    from tests.conftest import PASSWORD
+    assert client.post("/auth/login", json={"email": "admin@test.local", "password": PASSWORD}).status_code == 200
+    assert password_portale["chiamate"] == [], "con la password di InCampo il portale non serve"
+
+
+def test_login_password_sbagliata_ovunque_conta_come_errore(client, password_portale, monkeypatch):
+    from app.routers import users as users_router
+    monkeypatch.setattr(users_router, "LOGIN_MAX_FAILS_PER_IP", 2)
+    bad = {"email": "mario.rossi@cosedilspa.com", "password": "sbagliata"}
+    assert client.post("/auth/login", json=bad).status_code == 401
+    assert client.post("/auth/login", json=bad).status_code == 401
+    # il blocco di InCampo vale anche per la password del portale
+    good = {"email": "mario.rossi@cosedilspa.com", "password": "Portale-2026!"}
+    assert client.post("/auth/login", json=good).status_code == 429
+
+
+def test_login_password_portale_rifiuti_del_portale(client, password_portale):
+    password_portale["esito"] = {"ok": False, "reachable": True, "status": 403, "motivo": "non-abilitato",
+                                 "errore": "InCampo non è fra i tuoi programmi del Portale"}
+    r = client.post("/auth/login", json={"email": "mario.rossi@cosedilspa.com", "password": "Portale-2026!"})
+    assert r.status_code == 403 and "programmi" in r.json()["detail"]
+    password_portale["esito"] = {"ok": False, "reachable": True, "status": 429, "motivo": "",
+                                 "errore": "Troppi tentativi falliti. Riprova tra 15 minuti."}
+    assert client.post("/auth/login", json={"email": "x@y.it", "password": "z"}).status_code == 429
+    # portale spento: resta la password di InCampo, l'errore è quello solito
+    password_portale["esito"] = {"ok": False, "reachable": False, "status": 0, "motivo": "", "errore": ""}
+    r = client.post("/auth/login", json={"email": "mario.rossi@cosedilspa.com", "password": "Portale-2026!"})
+    assert r.status_code == 401 and r.json()["detail"] == "Email o password errati"
+    # utente InCampo disattivato: la password del portale non lo riaccende
+    password_portale["esito"] = None
+    with client.session_factory() as s:
+        from tests.conftest import make_user
+        u = make_user(s, "mario.rossi@cosedilspa.com", "field")
+        u.is_active = False
+        s.commit()
+    r = client.post("/auth/login", json={"email": "mario.rossi@cosedilspa.com", "password": "Portale-2026!"})
+    assert r.status_code == 401 and "disattivato" in r.json()["detail"]
+
+
 # --------------------------------------------------------------------------- registro commesse
 
 def test_commesse_registro(client, monkeypatch, tmp_path):

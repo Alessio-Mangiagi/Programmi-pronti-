@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """Login (con blocco anti brute force), profilo, token push, notifiche, eventi e utenti."""
 import os
 from datetime import timedelta
@@ -42,6 +43,12 @@ def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends
         raise HTTPException(429, "Troppi tentativi falliti: riprova tra qualche minuto")
     user = db.query(models.User).filter(models.User.email == email).first()
     if user is None or not user.is_active or not auth.verify_password(payload.password, user.password_hash):
+        # Non è la password di InCampo: può essere quella del portale (una password per tutti i
+        # programmi). Se il portale la riconosce si entra senza contare un errore.
+        from .suite import login_con_password_portale
+        dal_portale = login_con_password_portale(db, email, payload.password, request)
+        if dal_portale is not None:
+            return schemas.TokenResponse(access_token=auth.create_access_token(dal_portale), user=dal_portale)
         # Traccia anche i tentativi falliti (email tentata, IP): utile per capire abusi e lockout.
         audit.record(db, "auth.login_failed", actor_email=email, request=request,
                      details={"reason": "inactive" if user is not None and not user.is_active else "invalid"})
