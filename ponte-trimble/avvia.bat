@@ -39,7 +39,15 @@ if not exist "node_modules" (
     echo  [OK] Dipendenze presenti
 )
 
-rem -- 4. Avvio ------------------------------------------------
+rem -- 4. Firma digitale -----------------------------------------
+rem PDF firmati .p7m (shared\firma, CONTRATTI 10): il motore si installa una volta sola, in sottofondo,
+rem cosi' l'avvio non aspetta pip. Finche' non e' pronto un .p7m da' "componente non installato".
+if not exist "%~dp0..\shared\firma\.venv\Scripts\python.exe" (
+    echo  [SETUP] Motore della firma digitale in installazione in sottofondo...
+    start "" /b cmd /c call "%~dp0..\shared\firma\installa.bat" ^>nul 2^>^&1
+)
+
+rem -- 5. Avvio ------------------------------------------------
 echo.
 echo ============================================================
 REM "><(((º> sabusabu <º)))><"

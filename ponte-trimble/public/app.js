@@ -148,9 +148,10 @@ function accodaFile(elenco) {
   const file = [...(elenco || [])];
   if (!file.length) return;
 
-  const pdf = file.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+  // anche i PDF firmati in busta .p7m: il server apre la busta e verifica la firma
+  const pdf = file.filter((f) => f.type === 'application/pdf' || /\.(pdf|p7m)$/i.test(f.name));
   const scartati = file.length - pdf.length;
-  avvisa(scartati ? scartati + (scartati === 1 ? ' file ignorato: solo PDF' : ' file ignorati: solo PDF') : '', Boolean(scartati));
+  avvisa(scartati ? scartati + (scartati === 1 ? ' file ignorato: solo PDF' : ' file ignorati: solo PDF') + ' (anche firmati .p7m)' : '', Boolean(scartati));
   if (!pdf.length) return;
 
   $('#coda').hidden = false;
@@ -221,11 +222,27 @@ function aggiornaTitoloCoda(quanti) {
 const CLASSE_STATO = { pronto: 'badge-ok', in_corso: 'badge-corso', in_coda: 'badge-neutro', errore: 'badge-errore' };
 const PASSI = ['estrazione', 'traduzione', 'rendering'];
 
+// PDF firmati .p7m: esito della verifica fatta da shared/firma (catena, revoca, marca temporale).
+const FIRMA = {
+  valida: ['badge-ok', 'firma valida'],
+  'non valida': ['badge-errore', 'firma NON valida'],
+  'da verificare': ['badge-ambra', 'firma da verificare'],
+};
+
+/** Bollino e riga della firma sotto il nome del file (solo per i lavori nati da una busta .p7m). */
+function cellaFirma(l) {
+  if (!l.busta) return '';
+  const [classe, testo] = l.firma ? (FIRMA[l.firma.esito] || ['badge-neutro', 'firmato']) : ['badge-neutro', 'firmato .p7m'];
+  return '<span class="riga-file"><span class="badge ' + classe + '" title="' + esc(l.firma?.riepilogo || 'verifica della firma in corso') +
+    '">' + esc(testo) + '</span>' + (l.firma ? ' ' + esc(l.firma.riepilogo) : '') + '</span>';
+}
+
 function cellaStato(l) {
   const badge = '<span class="badge ' + (CLASSE_STATO[l.stato] || 'badge-neutro') + '">' + esc(l.stato.replace('_', ' ')) + '</span>';
   // A che punto e' la pipeline: i dati stanno gia' nel record, mostrarli evita
   // la domanda "e' bloccato?" su un documento lungo.
-  const segmenti = PASSI.map((nome) => {
+  // un .p7m ha un passo in più in testa: l'apertura della busta con la verifica della firma
+  const segmenti = (l.busta ? ['firma', ...PASSI] : PASSI).map((nome) => {
     const p = l.passi?.find((x) => x.nome === nome);
     const classe = p?.stato === 'ok' ? 'ok' : p?.stato === 'errore' ? 'ko' : p ? 'corso' : '';
     return '<i class="' + classe + '" title="' + nome + (p?.ms != null ? ' · ' + p.ms + ' ms' : '') + '"></i>';
@@ -275,7 +292,7 @@ function contenutoRiga(l) {
   return '<td><button class="nome-file" data-anteprima="' + l.id + '">' + esc(l.nomeFile) + '</button>' +
       '<span class="riga-file">' + esc(l.traduttore) + ' → ' + esc(l.formato) +
       ' · ' + esc(quando(l.creato)) + (l.utente ? ' · ' + esc(l.utente) : '') +
-      (l.rielaboraDa ? ' · rielaborato' : '') + '</span></td>' +
+      (l.rielaboraDa ? ' · rielaborato' : '') + '</span>' + cellaFirma(l) + '</td>' +
     '<td>' + cellaStato(l) + '</td>' +
     '<td class="num">' + (l.risultato?.righe ?? '—') + '</td>' +
     '<td class="num">' + cellaPagine(l) + '</td>' +
@@ -572,7 +589,8 @@ async function cercaDocumentiSky() {
     for (const d of pdf) {
       const li = document.createElement('li');
       li.innerHTML = '<span class="nome">' + esc(d.identifier || '') + ' — ' + esc(d.title || '') +
-        ' <span class="peso">' + esc(d.revision_code || '') + (d.size_bytes ? ' · ' + peso(d.size_bytes) : '') + '</span></span>' +
+        ' <span class="peso">' + esc(d.revision_code || '') + (d.size_bytes ? ' · ' + peso(d.size_bytes) : '') +
+        (d.firmato ? ' · firmato .p7m' : '') + '</span></span>' +
         '<button type="button" class="piatto">Elabora</button>';
       li.querySelector('button').addEventListener('click', (ev) => elaboraDaSky(d, ev.currentTarget));
       skyDocumenti.append(li);

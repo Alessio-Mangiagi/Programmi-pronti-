@@ -2,7 +2,8 @@
 // Niente database: i lavori sono pochi, il file e' l'artefatto e lo stato deve
 // sopravvivere al riavvio del server (la coda in RAM no, e li' riparte da 'in_coda').
 //
-//   data/lavori/<id>/origine.pdf     il PDF caricato
+//   data/lavori/<id>/origine.pdf     il PDF caricato (per un .p7m: quello estratto dal passo "firma")
+//                   /origine.p7m     solo per i PDF firmati: la busta CAdES così come è arrivata
 //                   /stato.json      il record del lavoro (questo modulo)
 //                   /estratto.json   uscita dell'estrazione (diagnostica)
 //                   /esito.<ext>     il file da caricare su Trimble
@@ -68,11 +69,15 @@ function inFila(id, azione) {
   return prossima;
 }
 
-/** Crea la cartella del lavoro, ci salva il PDF e ne restituisce il record iniziale. */
-export async function creaLavoro({ nomeFile, contenuto, traduttore, formato, opzioni = {}, utente = null }) {
+/**
+ * Crea la cartella del lavoro, ci salva il PDF e ne restituisce il record iniziale.
+ * busta=true: `contenuto` è una busta firmata .p7m; si salva come origine.p7m e il PDF lo scrive la pipeline
+ * nel passo "firma" dopo averla aperta e verificata (src/firma.js).
+ */
+export async function creaLavoro({ nomeFile, contenuto, traduttore, formato, opzioni = {}, utente = null, busta = false }) {
   const id = nuovoId();
   await fsp.mkdir(cartellaDi(id), { recursive: true });
-  await fsp.writeFile(fileDi(id, 'origine.pdf'), contenuto);
+  await fsp.writeFile(fileDi(id, busta ? 'origine.p7m' : 'origine.pdf'), contenuto);
 
   const ora = new Date().toISOString();
   const lavoro = {
@@ -90,6 +95,8 @@ export async function creaLavoro({ nomeFile, contenuto, traduttore, formato, opz
     risultato: null,        // { file, ext, righe, avvisi[] }
     trimble: null,          // { stato, fileId, versionId, caricatoIl, errore }
     errore: null,
+    busta: busta ? { nome: nomeFile, byte: contenuto.length } : null,   // PDF firmato .p7m
+    firma: null,            // esito della verifica della firma (src/firma.js), solo per le buste
   };
   await salva(lavoro);
   return lavoro;

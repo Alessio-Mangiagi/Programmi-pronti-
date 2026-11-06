@@ -11,6 +11,7 @@ import { prendiTraduttore } from '../pipeline/traduci.js';
 import { FORMATI } from '../pipeline/rendi.js';
 import { CONFIG } from '../config.js';
 import { log } from '../log.js';
+import { eBustaFirmata } from '../firma.js';
 import { ErroreRichiesta } from './errori.js';
 
 const require = createRequire(import.meta.url);
@@ -77,7 +78,9 @@ rotteSkyTower.get('/skytower/documenti', async (req, res, next) => {
     const documenti = (dati?.items || []).map((d) => ({
       revision_id: d.revision_id, document_id: d.id, identifier: d.identifier, title: d.title,
       revision_code: d.revision_code, filename: d.filename, content_type: d.content_type, size_bytes: d.size_bytes,
-      pdf: /pdf/i.test(d.content_type || '') || /\.pdf$/i.test(d.filename || ''),
+      // i PDF firmati .p7m contano come PDF: la pipeline apre la busta e verifica la firma
+      firmato: /\.p7m$/i.test(d.filename || '') || /pkcs7/i.test(d.content_type || ''),
+      pdf: /pdf|pkcs7/i.test(d.content_type || '') || /\.(pdf|p7m)$/i.test(d.filename || ''),
     }));
     res.json({ documenti, commessa });
   } catch (e) {
@@ -104,13 +107,15 @@ rotteSkyTower.post('/lavori/da-skytower', async (req, res, next) => {
 
     const { dati, tipo, intestazioni } = await scarica(revisionId, req);
     const nomeFile = String(req.body.nomeFile || intestazioni.nome || 'skytower-' + String(revisionId).slice(0, 8) + '.pdf');
-    if (!(/pdf/i.test(tipo) || /\.pdf$/i.test(nomeFile) || dati.subarray(0, 5).toString() === '%PDF-')) {
+    // SkyTower conserva i PDF firmati come busta .p7m (valore legale): qui si accettano e la pipeline la apre
+    const busta = eBustaFirmata(dati, nomeFile);
+    if (!busta && !(/pdf/i.test(tipo) || /\.pdf$/i.test(nomeFile) || dati.subarray(0, 5).toString() === '%PDF-')) {
       throw new ErroreRichiesta('il documento di SkyTower non è un PDF (' + (tipo || 'tipo ignoto') + ')', 415);
     }
     if (dati.length > CONFIG.maxPdfByte) throw new ErroreRichiesta('PDF troppo grande', 413);
 
     const lavoro = await archivio.creaLavoro({
-      nomeFile, contenuto: dati, traduttore, formato, opzioni, utente: req.cosedil?.username ?? null,
+      nomeFile, contenuto: dati, traduttore, formato, opzioni, utente: req.cosedil?.username ?? null, busta,
     });
     await archivio.aggiorna(lavoro.id, { skytower: { revision_id: revisionId, revision_code: intestazioni.revisione || null, identifier: req.body.identifier || null } });
     accoda(lavoro.id);

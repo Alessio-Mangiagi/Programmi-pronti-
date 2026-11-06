@@ -6,6 +6,7 @@ import { estrai } from './estrai.js';
 import { traduci } from './traduci.js';
 import { rendi, nomeArtefatto } from './rendi.js';
 import * as archivio from '../archivio.js';
+import { apriBusta } from '../firma.js';
 import { log } from '../log.js';
 
 export async function eseguiPipeline(id) {
@@ -27,6 +28,19 @@ export async function eseguiPipeline(id) {
   };
 
   try {
+    // PDF firmato .p7m: si apre la busta e si verifica la firma (shared/firma), poi il PDF estratto segue la
+    // strada di sempre. Firma non valida = segnalazione nel lavoro, non errore.
+    let nomePdf = lavoro.nomeFile;
+    if (lavoro.busta) {
+      nomePdf = await passo('firma', async () => {
+        const aperta = await apriBusta(await fsp.readFile(archivio.fileDi(id, 'origine.p7m')), lavoro.nomeFile);
+        await archivio.scriviArtefatto(id, 'origine.pdf', aperta.pdf);
+        await archivio.aggiorna(id, { firma: aperta.firma });
+        log.info(`lavoro ${id}: ${aperta.firma.riepilogo}`);
+        return aperta.nomePdf;
+      });
+    }
+
     const estratto = await passo('estrazione', async () => {
       const pdf = await fsp.readFile(archivio.fileDi(id, 'origine.pdf'));
       const e = await estrai(pdf, lavoro.opzioni);
@@ -57,9 +71,10 @@ export async function eseguiPipeline(id) {
     const artefatto = await passo('rendering', async () => {
       const { contenuto, ext, mime } = rendi(lavoro.formato, {
         ...tradotto,
-        meta: { ...estratto.meta, origine: lavoro.nomeFile, traduttore: lavoro.traduttore },
+        meta: { ...estratto.meta, origine: nomePdf, traduttore: lavoro.traduttore },
       });
-      const nome = nomeArtefatto(lavoro.nomeFile, lavoro.traduttore, ext);
+      // per un .p7m il nome è quello del PDF contenuto ("offerta.pdf.p7m" -> "offerta__pcq-econ.xlsx")
+      const nome = nomeArtefatto(nomePdf, lavoro.traduttore, ext);
       await archivio.scriviArtefatto(id, `esito.${ext}`, contenuto);
       return { file: `esito.${ext}`, nome, ext, mime, byte: contenuto.length };
     });

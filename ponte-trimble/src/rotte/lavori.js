@@ -9,6 +9,7 @@ import { elencaTraduttori, prendiTraduttore, caricaTraduttori } from '../pipelin
 import { FORMATI, formatiDisponibili } from '../pipeline/rendi.js';
 import { consegna, statoDestinazione } from '../destinazione.js';
 import { log } from '../log.js';
+import { eBustaFirmata } from '../firma.js';
 import { ErroreRichiesta } from './errori.js';
 
 export { ErroreRichiesta };
@@ -21,8 +22,9 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: CONFIG.maxPdfByte, files: CONFIG.maxFile },
   fileFilter: (req, file, cb) => {
-    const ok = file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname);
-    cb(ok ? null : new ErroreRichiesta('sono accettati solo file PDF'), ok);
+    // anche i PDF firmati in busta .p7m: i programmi di firma li mandano con mime diversi, conta l'estensione
+    const ok = file.mimetype === 'application/pdf' || /\.(pdf|p7m)$/i.test(file.originalname);
+    cb(ok ? null : new ErroreRichiesta('sono accettati solo file PDF (anche firmati .p7m)'), ok);
   },
 });
 
@@ -69,6 +71,8 @@ rotteLavori.post('/lavori', upload.array('pdf', CONFIG.maxFile), async (req, res
         formato,
         opzioni,
         utente: req.cosedil?.username ?? null,
+        // .p7m per estensione o per contenuto: la pipeline la apre e verifica la firma (passo "firma")
+        busta: eBustaFirmata(f.buffer, f.originalname),
       });
       accoda(lavoro.id);
       lavori.push(lavoro);
@@ -138,7 +142,8 @@ rotteLavori.post('/lavori/:id/rielabora', async (req, res, next) => {
     if (!await prendiTraduttore(traduttore)) throw new ErroreRichiesta('traduttore sconosciuto: ' + traduttore);
     if (!FORMATI[formato]) throw new ErroreRichiesta('formato sconosciuto: ' + formato);
 
-    const contenuto = await fsp.readFile(archivio.fileDi(vecchio.id, 'origine.pdf'));
+    // un PDF firmato riparte dalla busta: la firma si riverifica (revoca, elenchi aggiornati)
+    const contenuto = await fsp.readFile(archivio.fileDi(vecchio.id, vecchio.busta ? 'origine.p7m' : 'origine.pdf'));
     const lavoro = await archivio.creaLavoro({
       nomeFile: vecchio.nomeFile,
       contenuto,
@@ -146,6 +151,7 @@ rotteLavori.post('/lavori/:id/rielabora', async (req, res, next) => {
       formato,
       opzioni: req.body?.opzioni ?? vecchio.opzioni,
       utente: req.cosedil?.username ?? null,
+      busta: Boolean(vecchio.busta),
     });
     await archivio.aggiorna(lavoro.id, { rielaboraDa: vecchio.id });
     accoda(lavoro.id);

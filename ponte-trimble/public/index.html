@@ -42,8 +42,9 @@
           <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
         </svg>
         <p class="zona-titolo">Trascina qui i PDF</p>
-        <p class="zona-nota">anche più file o un'intera cartella — oppure <span class="finto-link">scegli dal computer</span></p>
-        <input type="file" id="scelta" accept="application/pdf" multiple hidden>
+        <!-- anche firmati digitalmente (.p7m): la firma viene verificata e l'esito compare nella riga del lavoro -->
+        <p class="zona-nota">anche firmati (.p7m), più file o un'intera cartella — oppure <span class="finto-link">scegli dal computer</span></p>
+        <input type="file" id="scelta" accept="application/pdf,.pdf,.p7m" multiple hidden>
       </div>
 
       <!-- I PCQ e i computi stanno gia' in SkyTower: si prendono da li', senza

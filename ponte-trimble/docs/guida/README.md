@@ -52,8 +52,9 @@ prodotto. Se riporta *«— manca … in .env»* la consegna automatica a Trimbl
    Le scelte restano memorizzate per la volta dopo.
 2. **Trascina i PDF** nel riquadro tratteggiato **Trascina qui i PDF** — anche
    più file o un'intera cartella — oppure clicca **scegli dal computer**.
-   Solo i PDF vengono accettati; gli altri file sono ignorati con il messaggio
-   *«N file ignorati: solo PDF»*.
+   Solo i PDF vengono accettati, anche quelli **firmati digitalmente** (file
+   `.p7m`, vedi sotto); gli altri file sono ignorati con il messaggio
+   *«N file ignorati: solo PDF (anche firmati .p7m)»*.
 3. Sotto compare l'elenco **In invio / Inviati** con una barra per file:
    **accodato** (verde) vuol dire che il file è arrivato ed è in lavorazione.
    **Pulisci** toglie dall'elenco le righe finite.
@@ -62,6 +63,27 @@ prodotto. Se riporta *«— manca … in .env»* la consegna automatica a Trimbl
 
 Se un file non passa, al posto di *accodato* compare il motivo in rosso (es.
 PDF troppo grande: il limite è 40 MB; al massimo 25 file per volta).
+
+### PDF firmati digitalmente (.p7m)
+
+Un PCQ o un SAL firmato dal direttore lavori arriva spesso come file `.p7m`: una
+"busta" con dentro il PDF e la firma. Mandalo come un PDF qualunque: il
+programma apre la busta, **verifica la firma** (documento non modificato,
+certificato di un ente riconosciuto negli elenchi ufficiali europei e di AgID,
+non revocato né scaduto, eventuale marca temporale) e poi legge il PDF come
+sempre. Nella riga del lavoro c'è un passo in più (quattro trattini invece di
+tre) e, sotto il nome, un bollino:
+
+| Bollino | Significato |
+|---|---|
+| **firma valida** (verde) | tutto in regola |
+| **firma NON valida** (rosso) | documento modificato dopo la firma, certificato revocato o scaduto…: il lavoro va avanti, ma **controlla prima di consegnare** |
+| **firma da verificare** (giallo) | controllo non completato (per esempio manca la rete per la revoca): **Rielabora** lo ripete |
+
+Accanto al bollino si legge chi ha firmato, con quale ente e quando. Il file
+prodotto prende il nome del PDF contenuto (`sal.pdf.p7m` → `sal__pcq-econ.xlsx`).
+
+![Due SAL firmati: uno valido, uno modificato dopo la firma](img/10-pdf-firmati.png)
 
 ## 3. Prendere un documento da SkyTower
 
@@ -72,7 +94,9 @@ I PCQ di solito sono già in **SkyTower**: non serve scaricarli e ricaricarli.
    *«(non in SkyTower)»* indica una commessa che in SkyTower non ha ancora un progetto).
 3. Se vuoi, scrivi una parola in **Cerca nel titolo o nel codice** e premi **Cerca**.
 4. Compaiono i **PDF pubblicati** della commessa, con codice, titolo, revisione e
-   peso; i file non PDF (disegni, ecc.) sono esclusi e contati a parte.
+   peso; i file non PDF (disegni, ecc.) sono esclusi e contati a parte. I PDF
+   firmati sono segnati *«firmato .p7m»* e si elaborano come gli altri, con la
+   verifica della firma.
 5. Premi **Elabora** sul documento: il pulsante diventa **accodato** e il lavoro
    compare nella tabella **Lavori**, con il traduttore e il formato scelti in alto.
 
@@ -93,7 +117,7 @@ sopra c'è il riepilogo (*«4 lavori · 4 pronti · 0 in errore · 0 in lavorazi
 | Colonna | Cosa dice |
 |---|---|
 | **Documento** | nome del file (clic = anteprima); sotto, traduttore → formato, data, utente |
-| **Stato** | *in coda*, *in corso*, **pronto** o **errore**; i tre trattini sono i passi (lettura, traduzione, creazione del file): verdi = fatti |
+| **Stato** | *in coda*, *in corso*, **pronto** o **errore**; i tre trattini sono i passi (lettura, traduzione, creazione del file): verdi = fatti. Per un PDF firmato `.p7m` i trattini sono quattro: il primo è l'apertura della busta con la verifica della firma |
 | **Righe** | quanti controlli sono stati estratti |
 | **Pagine** | pagine del PDF; l'etichetta **N scan** indica pagine scansionate, senza testo leggibile |
 | **Avvisi** | cosa una persona deve controllare prima di portare il risultato in Field View |
@@ -158,7 +182,9 @@ sotto lo stato).
 | Cosa succede | Cosa fare |
 |---|---|
 | Non trovo Ponte Trimble nel Portale | È riservato agli amministratori del Portale. |
-| *«N file ignorati: solo PDF»* | Hai trascinato file non PDF: vengono saltati, i PDF partono comunque. |
+| *«N file ignorati: solo PDF (anche firmati .p7m)»* | Hai trascinato file non PDF: vengono saltati, i PDF partono comunque. |
+| Errore *«componente firma digitale non installato»* | Il motore della firma della suite non è ancora pronto: l'amministratore lancia `shared\firma\installa.bat` (lo fa da solo `avvia.bat` al primo avvio), poi **Rielabora**. |
+| Errore *«la busta firmata contiene …: serve un PDF»* | Dentro il `.p7m` c'è un altro tipo di file (Word, Excel): serve il PDF. |
 | Il lavoro va in **errore** | Leggi il motivo sotto lo stato; prova **Rielabora** o un altro traduttore. |
 | **0 righe** e avviso di scansione | Il PDF è una scansione: serve il PDF originale con testo. |
 | **Consegna** è grigio | La destinazione non è configurata (etichetta in alto a destra): scarica il file con **Scarica**. |
@@ -182,6 +208,9 @@ sotto lo stato).
   cartella `TRADUTTORI_DIR`; si collauda con `npm run verifica-traduttore -- <file.js> [pdf]`
   e compare nel menu dopo il riavvio.
 - **Dati**: cartella `data/` (o `DATA_DIR`): `lavori/` con, per ogni lavoro, il
-  PDF, lo stato e il file prodotto; log in `data/app.log`. Al riavvio i lavori
-  rimasti a metà ripartono da soli.
+  PDF (per i firmati anche la busta `origine.p7m`), lo stato e il file prodotto;
+  log in `data/app.log`. Al riavvio i lavori rimasti a metà ripartono da soli.
+- **Firma digitale**: il motore comune `shared\firma` (ambiente Python proprio,
+  elenchi ufficiali scaricati e aggiornati da soli). `avvia.bat` lo installa in
+  sottofondo se manca.
 - **Backup**: copiare `data/` a programma fermo.

@@ -177,7 +177,7 @@ credenziali Trimble. Senza credenziali l'app converte comunque, e il caricamento
 | `GET` | `/api/salute` | stato del servizio, coda, Trimble configurato |
 | `GET` | `/api/traduttori` | traduttori caricati, colonne, ed `errori` dei file scartati |
 | `GET` | `/api/formati` | formati di uscita disponibili |
-| `POST` | `/api/lavori` | multipart: uno o piu' campi `pdf`, + `traduttore?`, `formato?`, `opzioni?` (JSON) → `202` con `{lavoro, lavori[]}` — un lavoro per file |
+| `POST` | `/api/lavori` | multipart: uno o piu' campi `pdf` (PDF o busta firmata `.p7m`), + `traduttore?`, `formato?`, `opzioni?` (JSON) → `202` con `{lavoro, lavori[]}` — un lavoro per file |
 | `GET` | `/api/lavori` | ultimi lavori + stato della coda |
 | `GET` | `/api/lavori/:id` | record del lavoro (stato, passi, avvisi, esito) |
 | `GET` | `/api/lavori/:id/estratto` | uscita grezza dell'estrazione (diagnostica) |
@@ -188,7 +188,7 @@ credenziali Trimble. Senza credenziali l'app converte comunque, e il caricamento
 | `GET` | `/api/trimble/stato` | credenziali Connect valide o no, senza caricare niente |
 | `GET` | `/api/trimble/progetti` · `/api/trimble/cartelle` | destinazioni per la UI |
 | `GET` | `/api/skytower/commesse` | commesse del registro della suite unite a quelle di SkyTower (`skytower: true/false`, `avviso` se SkyTower non risponde) |
-| `GET` | `/api/skytower/documenti?commessa=&q=&area=` | documenti pubblicati della commessa in SkyTower, con `pdf: true/false` |
+| `GET` | `/api/skytower/documenti?commessa=&q=&area=` | documenti pubblicati della commessa in SkyTower, con `pdf: true/false` e `firmato` (busta `.p7m`, conta come PDF) |
 | `POST` | `/api/lavori/da-skytower` | JSON `{revision_id, traduttore?, formato?, opzioni?, filename?, revision_code?, identifier?}`: scarica il file della revisione da SkyTower e crea il lavoro come con l'upload → `202` |
 
 Esempio:
@@ -216,6 +216,19 @@ dell'upload. Le chiamate usano il token di servizio di `shared/suite`
 il lavoro ricorda `skytower.revision_id`. SkyTower spenta = elenco dal solo
 registro e un avviso, mai un errore 500 (`src/rotte/skytower.js`).
 
+## PDF firmati digitalmente (.p7m)
+
+Dal 06/11/2026 l'upload e "Da SkyTower" accettano le buste CAdES `.p7m` (per estensione o
+per contenuto). Il lavoro nasce con `busta: {nome, byte}` e il file `origine.p7m`; la
+pipeline ha un passo `firma` prima dell'estrazione (`src/firma.js` → motore comune
+`shared/firma`, CONTRATTI §10): apre la busta, verifica la firma (catena fino agli enti
+qualificati eIDAS, revoca, marca temporale), scrive `origine.pdf` e salva la sintesi in
+`firma` (`esito` valida / non valida / da verificare, `riepilogo`, `firme[]`). Il resto
+della pipeline non cambia; l'artefatto prende il nome del PDF contenuto. Firma non valida
+= segnalazione nella riga, non errore. Motore assente o busta rotta = lavoro in errore
+con un messaggio leggibile. «Rielabora» riparte dalla busta e rifà la verifica.
+`avvia.bat` installa `shared\firma` in sottofondo se manca `shared\firma\.venv`.
+
 ## Dove si mette mano
 
 | Serve | File |
@@ -242,7 +255,8 @@ src/pipeline/traduttori/ PUNTO DI INNESTO: un file = un traduttore (_modello.js 
 src/pipeline/formati/    uscite dedicate (fieldview = spec template Field View)
 tools/verifica-traduttore.mjs  collaudo di un traduttore consegnato
 src/pipeline/rendi.js  record -> file (xlsx, csv, json)
-src/pipeline/index.js  i tre passi, con lo stato aggiornato dopo ciascuno
+src/pipeline/index.js  i tre passi (quattro con "firma" per i .p7m), con lo stato aggiornato dopo ciascuno
+src/firma.js           PDF firmati .p7m: ponte verso shared/firma (apre la busta, verifica la firma)
 src/destinazione.js    dove va il file: fieldview | connect | nessuna
 src/trimble/fieldview.js  client SOAP di Field View (operazioni dichiarate)
 src/trimble/client.js  Trimble Connect: OAuth2 + chiamate + upload
@@ -260,7 +274,7 @@ rinomina fallisce se qualcuno tiene il file aperto anche solo in lettura (EPERM)
 ## Test
 
 ```
-npm test                             # node --test: 50 test
+npm test                             # node --test: 73 test (6 sui PDF firmati, test/firma.test.js)
 npm run verifica-traduttore -- <file.js> [pdf]   # collaudo di un traduttore consegnato
 ```
 
