@@ -237,3 +237,16 @@ def test_progressivo_su_campo_non_numerico():
     ])
     with pytest.raises(ValueError, match="non accetta numeri progressivi"):
         scheme.check_auto_numbering(AutoNumbering(field="code"))
+
+
+def test_estensione_di_busta_firmata():
+    """ADR-55 di SkyTower: ".p7m" (anche ripetuto) fa parte dell'estensione, l'identificativo resta lo stesso."""
+    from iso19650 import split_extension
+    assert split_extension("PRJ01-DES-ZZ-01-DR-A-0001.pdf.p7m") == ("PRJ01-DES-ZZ-01-DR-A-0001", "pdf.p7m")
+    assert split_extension("X-0001.Pdf.P7M.p7m") == ("X-0001", "pdf.p7m.p7m")
+    assert split_extension("X-0001.p7m") == ("X-0001", "p7m")
+    assert split_extension("X-0001") == ("X-0001", None)
+    scheme = default_scheme("PRJ01", {"DES": "Progettista"})
+    r = scheme.validate_name("PRJ01-DES-ZZ-01-DR-A-0001.pdf.p7m")
+    assert r.valid and r.identifier == "PRJ01-DES-ZZ-01-DR-A-0001" and r.extension == "pdf.p7m"
+    assert scheme.compose(r.fields, "pdf.p7m") == "PRJ01-DES-ZZ-01-DR-A-0001.pdf.p7m"

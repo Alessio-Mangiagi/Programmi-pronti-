@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -22,10 +21,11 @@ from urllib.parse import quote
 import jsonschema
 import jwt
 from fastapi import APIRouter, Depends, Query, Request, Response
-from iso19650 import AutoNumbering, NamingScheme, ValidationResult, default_scheme, next_wip_revision
+from iso19650 import AutoNumbering, NamingScheme, ValidationResult, default_scheme, next_wip_revision, split_extension
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field, field_validator
 
+from .. import firma
 from ..deps import Ctx, Services, client_ip, ctx, require_container, require_project, services
 from ..errors import ApiError, forbidden, not_found, unauthorized
 from ..events import security_event
@@ -161,8 +161,13 @@ def load_auto_number(conn, project_id: uuid.UUID) -> AutoNumbering | None:
 
 
 def _extension(filename: str) -> str | None:
-    m = re.match(r"^.*\.([A-Za-z0-9]{1,10})$", filename.strip())
-    return m.group(1).lower() if m else None
+    """Estensione del file, compresa quella di busta firmata: "x.pdf.p7m" → "pdf.p7m" (ADR-55)."""
+    return split_extension(filename)[1]
+
+
+def _stem(filename: str) -> str:
+    """Il nome senza estensione (né .p7m): è l'identificativo del documento."""
+    return split_extension(filename)[0]
 
 
 def load_naming(conn, project: dict, *, container_id: uuid.UUID | None = None,
@@ -254,7 +259,8 @@ def check_name(conn, project: dict, name: str, *, container_id: uuid.UUID | None
     restrict = {"originator": {_my_org_code(conn)}} if any(f.key == "originator" for f in scheme.fields) else None
     result = scheme.validate_name(name, extra_codes=restrict)
     if not result.valid and container_id is not None:
-        stem, _, ext = name.rpartition(".") if "." in name else (name, "", "")
+        stem, ext = split_extension(name)
+        ext = ext or ""
         known = conn.execute("SELECT identifier, naming_fields FROM cde.documents WHERE project_id = %s "
                              "AND container_id = %s AND identifier = %s", [project["id"], container_id, stem]).fetchone()
         if known:
@@ -682,9 +688,12 @@ REVISION_SQL = """
            r.transition_reason, r.original_filename, r.source_filename, r.comment,
            r.created_by, r.created_at, u.first_name || ' ' || u.last_name AS created_by_name,
            f.size_bytes, f.content_type, f.scan_status, f.sha256_verified, f.scan_detail,
-           encode(f.sha256, 'hex') AS sha256
+           encode(f.sha256, 'hex') AS sha256,
+           -- busta firmata .p7m (ADR-55): stato dell'apertura e rapporto della verifica della firma, null altrimenti
+           fd.status AS firma_stato, fd.firma, fd.detail AS firma_dettaglio
     FROM cde.document_revisions r
     JOIN cde.file_objects f ON f.id = r.file_object_id
+    LEFT JOIN cde.file_derivatives fd ON fd.file_object_id = f.id AND fd.kind = 'P7M'
     LEFT JOIN cde.users u ON u.id = r.created_by"""
 
 DOCUMENT_SQL = """
@@ -830,8 +839,7 @@ def initiate_revision(document_id: uuid.UUID, body: UploadInitIn, c: Ctx = Depen
     """Nuova revisione di un documento esistente: il nome file deve corrispondere all'identificativo."""
     with c.tx() as conn:
         doc = _document(conn, document_id)
-    stem = body.filename.rsplit(".", 1)[0] if "." in body.filename else body.filename
-    if stem != doc["identifier"]:
+    if _stem(body.filename) != doc["identifier"]:      # anche "X.pdf.p7m": l'identificativo è X (ADR-55)
         raise ApiError(422, "identifier_mismatch", f"Il nome del file deve essere {doc['identifier']}")
     if body.container_id != doc["container_id"]:
         raise ApiError(409, "wrong_container", "Container diverso da quello del documento")
@@ -852,12 +860,57 @@ VIEWABLE = {
     # Office: anteprima in sola lettura convertita nel browser (Word in iframe sandbox, Excel in tabella)
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (".docx",),
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (".xlsx",),
+    # busta firmata CAdES: il browser non la apre, il viewer mostra il documento contenuto preparato dal worker
+    # (derivato P7M, ADR-55); ".pdf.p7m" finisce qui e non fra i PDF perché conta la fine del nome
+    "application/pkcs7-mime": (".p7m",),
 }
 
 
 def viewable_type(filename: str) -> str | None:
     name = filename.lower()
     return next((t for t, exts in VIEWABLE.items() if name.endswith(exts)), None)
+
+
+# ---------------------------------------------------------------------
+# Buste firmate .p7m (ADR-55): la revisione conserva la busta, si legge il documento contenuto (derivato P7M)
+# ---------------------------------------------------------------------
+def contenuto_p7m(conn, rev: dict) -> dict | None:
+    """Il derivato P7M di una revisione .p7m: stato, chiave S3 del documento contenuto, rapporto della firma."""
+    return conn.execute("SELECT status, storage_key, storage_version_id, size_bytes, firma, detail FROM cde.file_derivatives "
+                        "WHERE file_object_id = %s AND kind = 'P7M'", [rev["file_id"]]).fetchone()
+
+
+def nome_interno(rev: dict, d: dict | None) -> str:
+    """Il nome del documento dentro la busta ("X.pdf" per "X.pdf.p7m")."""
+    return ((d or {}).get("firma") or {}).get("nome_contenuto") or firma.nome_contenuto(rev["original_filename"])
+
+
+def _firma_pronta(d: dict | None) -> None:
+    """409 finché la busta non è aperta: chi deve leggere il documento (confronto, verifica, filigrana) aspetta."""
+    if d is None or d["status"] == "PENDING":
+        raise ApiError(409, "firma_in_corso", "Documento firmato: apertura della busta e verifica della firma in corso, "
+                                              "riprovare tra poco")
+    if d["status"] != "READY":
+        raise ApiError(409, "firma_non_aperta", "La busta firmata non si apre: " + (d["detail"] or "motivo sconosciuto"))
+
+
+def leggi_contenuto(storage: Storage, conn, rev: dict) -> tuple[bytes, str, int]:
+    """(byte, nome, dimensione) da leggere di una revisione: per una busta .p7m il documento contenuto, altrimenti il
+    file. Usato da confronto, verifica requisiti e /suite/revisioni/{id}/file (suite.py)."""
+    if firma.e_p7m(rev["original_filename"]):
+        d = contenuto_p7m(conn, rev)
+        _firma_pronta(d)
+        return storage.get_bytes(d["storage_key"], d["storage_version_id"]), nome_interno(rev, d), d["size_bytes"]
+    return storage.get_bytes(rev["storage_key"], rev["storage_version_id"]), rev["original_filename"], rev["size_bytes"]
+
+
+def _firma_out(rev: dict, d: dict | None) -> dict | None:
+    """Il blocco "firma" della risposta del download: stato, rapporto, motivo di un errore, nomi dei due file."""
+    if not firma.e_p7m(rev["original_filename"]):
+        return None
+    return {"stato": d["status"] if d else "PENDING", "rapporto": d["firma"] if d else None,
+            "dettaglio": d["detail"] if d and d["status"] == "FAILED" else None,
+            "originale": rev["original_filename"], "contenuto": nome_interno(rev, d)}
 
 
 def _downloadable(conn, revision_id: uuid.UUID) -> dict:
@@ -889,8 +942,13 @@ def _downloadable(conn, revision_id: uuid.UUID) -> dict:
 
 
 def _watermarked(conn, rev: dict) -> WatermarkIn | None:
-    """La filigrana da applicare a questa revisione (PDF in uno stato scelto dal Project Admin), se c'è."""
-    if not rev["original_filename"].lower().endswith(".pdf"):
+    """La filigrana da applicare a questa revisione (PDF in uno stato scelto dal Project Admin), se c'è.
+    Una busta .p7m con un PDF dentro: la filigrana va sul PDF contenuto, la busta non si può timbrare senza
+    rompere la firma (ADR-55)."""
+    nome = rev["original_filename"].lower()
+    if firma.e_p7m(nome):
+        nome = firma.nome_contenuto(nome)
+    if not nome.endswith(".pdf"):
         return None
     wm = load_watermark(conn, rev["project_id"])
     return wm if wm and rev["state"] in wm.states else None
@@ -913,10 +971,17 @@ def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment",
         if disposition == "inline" and inline_type is None:
             raise ApiError(415, "not_viewable", "Formato non visualizzabile in piattaforma: scaricare il file")
         watermark = _watermarked(conn, rev) is not None
-        if watermark and rev["size_bytes"] > settings.watermark_max_bytes:
+        p7m = firma.e_p7m(rev["original_filename"])
+        busta = contenuto_p7m(conn, rev) if p7m else None
+        if p7m and watermark:
+            _firma_pronta(busta)                 # la filigrana va sul PDF contenuto: serve la busta aperta
+        dimensione = busta["size_bytes"] if p7m and watermark else rev["size_bytes"]
+        if watermark and dimensione > settings.watermark_max_bytes:
             raise _too_large(settings, rev)
         security_event(conn, "REVISION_VIEWED" if inline_type else "REVISION_DOWNLOADED", user_id=c.user_id,
                        project_id=rev["project_id"], ip=c.ip, revision=revision_id, watermark=watermark)
+    if p7m:
+        return _download_p7m(c, rev, busta, inline=inline_type is not None, watermark=watermark)
     ttl = 300
     if watermark:
         ticket = c.svc.tokens.issue_download_ticket(c.user_id, revision_id, inline=inline_type is not None)
@@ -932,6 +997,67 @@ def download_revision(revision_id: uuid.UUID, disposition: Literal["attachment",
         # disegno CAD: l'URL firmato dell'originale serve solo al download; si guarda il derivato SVG
         out["derivative"] = _derivative(c, rev, ttl, kind="SVG")
     return out
+
+
+def _download_p7m(c: Ctx, rev: dict, d: dict | None, *, inline: bool, watermark: bool) -> dict:
+    """Download di una busta firmata (ADR-55).
+    - allegato: il .p7m originale, integro (valore legale); con la filigrana attiva in quello stato, il PDF
+      contenuto timbrato (la scelta del Project Admin vale anche qui: la busta non si può timbrare);
+    - visualizzatore: il documento contenuto, se la busta è aperta ed è un formato visualizzabile; altrimenti
+      ``content_type`` resta application/pkcs7-mime e il viewer mostra lo stato (in preparazione, errore).
+    In ogni caso ``firma`` porta lo stato e il rapporto della verifica, per il badge del viewer."""
+    settings, ttl = c.svc.settings, 300
+    interno = nome_interno(rev, d)
+    tipo_interno = viewable_type(interno)
+    out = {"expires_in": ttl, "watermark": watermark, "derivative": None, "firma": _firma_out(rev, d)}
+    if watermark:
+        ticket = c.svc.tokens.issue_download_ticket(c.user_id, rev["id"], inline=inline)
+        return {**out, "url": f"{settings.public_api_prefix}/revisions/{rev['id']}/watermarked?ticket={ticket}",
+                "filename": interno, "content_type": "application/pdf" if inline else None}
+    storage = _storage(c)
+    if inline and d is not None and d["status"] == "READY" and tipo_interno and tipo_interno != "application/pkcs7-mime":
+        url = storage.presign_get(d["storage_key"], d["storage_version_id"], interno, ttl, inline_type=tipo_interno)
+        return {**out, "url": url, "filename": interno, "content_type": tipo_interno}
+    url = storage.presign_get(rev["storage_key"], rev["storage_version_id"], rev["original_filename"], ttl)
+    return {**out, "url": url, "filename": rev["original_filename"],
+            "content_type": "application/pkcs7-mime" if inline else None}
+
+
+@router.post("/revisions/{revision_id}/firma/verifica")
+def riverifica_firma(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
+    """"Verifica di nuovo" la firma di una busta .p7m (ADR-55): utile se al caricamento la revoca non era
+    controllabile (rete, ente che non risponde) o se si vuole l'esito di oggi. Stesso motore del worker; il
+    rapporto nuovo sostituisce quello nel derivato P7M. Pochi tentativi al minuto per utente: ognuno interroga
+    gli enti certificatori (OCSP/CRL) e tiene occupato un thread dell'API."""
+    settings = c.svc.settings
+    if not c.svc.limiter.hit("6/minute", "firma-verifica", str(c.user_id)):
+        raise ApiError(429, "rate_limited", "Troppe verifiche: riprovare tra un minuto", {"Retry-After": "60"})
+    with c.tx() as conn:
+        rev = _downloadable(conn, revision_id)
+        if not firma.e_p7m(rev["original_filename"]):
+            raise ApiError(422, "not_signed", "La revisione non è una busta firmata .p7m")
+        d = contenuto_p7m(conn, rev)
+    if d is None:
+        raise ApiError(409, "firma_in_corso", "Apertura della busta non ancora partita: riprovare tra poco")
+    if rev["size_bytes"] > settings.firma_max_bytes:
+        raise ApiError(413, "too_large", f"Busta oltre {settings.firma_max_bytes // 1024 ** 2} MB: verificarla in locale")
+    dati = _storage(c).get_bytes(rev["storage_key"], rev["storage_version_id"])
+    try:
+        _, _, rapporto = firma.apri(dati, rev["original_filename"], rete=settings.firma_rete)
+    except firma.FirmaNonInstallata:
+        raise ApiError(503, "firma_non_installata", "Componente firma digitale non installato sul server: "
+                                                    "lanciare shared\\firma\\installa.bat") from None
+    except firma.BustaIllegibile as exc:
+        rapporto = firma.rapporto_errore(str(exc))
+    rapporto.pop("file_estratto", None)
+    rapporto["verificato_il"] = datetime.now(UTC).isoformat(timespec="seconds")
+    with c.tx() as conn:
+        conn.execute("UPDATE cde.file_derivatives SET firma = %s, detail = %s, updated_at = now() "
+                     "WHERE file_object_id = %s AND kind = 'P7M'",                  # RLS: solo file che vedo
+                     [Jsonb(rapporto), (rapporto.get("riepilogo") or "")[:500], rev["file_id"]])
+        security_event(conn, "SIGNATURE_VERIFIED", user_id=c.user_id, project_id=rev["project_id"], ip=c.ip,
+                       revision=revision_id, esito=rapporto.get("esito"))
+    return {"stato": d["status"], "rapporto": rapporto}
 
 
 def _derivative(c: Ctx, rev: dict, ttl: int, kind: str = "GLB") -> dict | None:
@@ -987,6 +1113,12 @@ def watermarked_revision(revision_id: uuid.UUID, ticket: str, request: Request, 
         wm = _watermarked(conn, rev)
         if wm is None:
             raise ApiError(409, "watermark_off", "Filigrana non più richiesta: riaprire il documento")
+        if firma.e_p7m(rev["original_filename"]):
+            # busta firmata: si timbra il PDF contenuto (ADR-55), con il suo nome e la sua dimensione
+            busta = contenuto_p7m(conn, rev)
+            _firma_pronta(busta)
+            rev = {**rev, "storage_key": busta["storage_key"], "storage_version_id": busta["storage_version_id"],
+                   "size_bytes": busta["size_bytes"], "original_filename": nome_interno(rev, busta)}
     if rev["size_bytes"] > svc.settings.watermark_max_bytes:
         raise _too_large(svc.settings, rev)
     # B6 (revisione di sicurezza del 03/11/2026): il link non si riusa a piacere fino alla scadenza. Si conta

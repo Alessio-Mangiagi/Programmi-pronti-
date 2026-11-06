@@ -40,7 +40,7 @@ import jsonschema
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from iso19650 import AutoNumbering, NamingScheme, next_wip_revision
+from iso19650 import AutoNumbering, NamingScheme, next_wip_revision, split_extension
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -258,8 +258,8 @@ def _model_row(conn, model_id: uuid.UUID) -> dict:
 
 
 def _extension(filename: str) -> str | None:
-    m = re.match(r"^.*\.([A-Za-z0-9]{1,10})$", (filename or "").strip())
-    return m.group(1).lower() if m else None
+    """Estensione del file, compresa quella di busta firmata ("pdf.p7m", ADR-55)."""
+    return split_extension(filename or "")[1]
 
 
 def _identifier(conn, project: dict, container_id: uuid.UUID, fields: dict, old_identifier: str, old_code: str,

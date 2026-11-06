@@ -118,7 +118,12 @@ class Settings(BaseSettings):
     # (G44, ADR-41). None = cercato nel PATH e nella cartella predefinita su Windows; senza, i DWG restano solo
     # scaricabili e i DXF si vedono comunque.
     dwg_converter_cmd: str | None = None
-    public_api_prefix: str = "/api"      # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
+    # PDF firmati in busta .p7m (ADR-55): il worker apre la busta con il motore comune shared/firma e verifica la
+    # firma. firma_rete=False: niente download (elenchi eIDAS dalla cache, revoca "da verificare"), per i test e
+    # per i server senza Internet. Oltre firma_max_bytes la busta non si apre (si legge tutta in memoria).
+    firma_rete: bool = True
+    firma_max_bytes: int = 200 * 1024 ** 2
+    public_api_prefix: str = "/api"     # percorso con cui il browser raggiunge l'API (proxy Vite, CloudFront)
     # Modifica di Word/Excel/PowerPoint con OnlyOffice Docs (ADR-37). Senza URL la funzione è spenta.
     onlyoffice_url: str | None = None              # Document Server come lo raggiunge il browser
     onlyoffice_internal_url: str | None = None     # come lo raggiunge l'API (file salvati); default onlyoffice_url

@@ -18,7 +18,8 @@ Chi non vede il progetto non lo trova (404), come sempre.
 Offerto:
   * GET  /suite/commesse                         progetti collegati a una commessa
   * GET  /suite/commesse/{codice}/documenti      documenti (default: pubblicati) con link
-  * GET  /suite/revisioni/{id}/file              i byte di una revisione (InCampo → planimetria)
+  * GET  /suite/revisioni/{id}/file              i byte di una revisione (InCampo → planimetria); per una busta
+                                                 firmata .p7m il documento contenuto (?originale=true: la busta)
   * POST /suite/commesse/{codice}/documenti      carica un file come nuovo documento WIP
     (report giacenze del Magazzino, PDF dei moduli e delle NC di InCampo)
   * GET  /suite/da-fare                          cosa aspetta l'utente del portale (notifiche, approvazioni)
@@ -48,6 +49,7 @@ from fastapi.responses import StreamingResponse
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
+from .. import firma
 from ..deps import Ctx, Services, client_ip, ctx, require_container, require_project, services
 from ..errors import ApiError
 from ..events import security_event
@@ -207,18 +209,32 @@ def suite_documenti(codice: str, area: Literal["WIP", "SHARED", "PUBLISHED", "AR
 
 
 @router.get("/revisioni/{revision_id}/file")
-def suite_file(revision_id: uuid.UUID, c: Ctx = Depends(ctx_suite)):
-    """I byte della revisione, con gli stessi controlli del download (permessi, antivirus)."""
+def suite_file(revision_id: uuid.UUID, originale: bool = Query(default=False), c: Ctx = Depends(ctx_suite)):
+    """I byte della revisione, con gli stessi controlli del download (permessi, antivirus).
+    Busta firmata .p7m (ADR-55): di default il documento contenuto, perché chi chiama (InCampo, Ponte Trimble)
+    deve leggerlo come un PDF qualunque; ``?originale=true`` dà la busta firmata. L'esito della verifica della
+    firma va nell'header X-Firma-Esito (valida | non valida | da verificare). 409 finché la busta non è aperta."""
+    firma_esito = None
     with c.tx() as conn:
         rev = docs._downloadable(conn, revision_id)
         f = conn.execute("SELECT content_type FROM cde.file_objects WHERE id = %s", [rev["file_id"]]).fetchone()
+        if firma.e_p7m(rev["original_filename"]):
+            busta = docs.contenuto_p7m(conn, rev)
+            firma_esito = ((busta or {}).get("firma") or {}).get("esito")
+            if not originale:
+                docs._firma_pronta(busta)
+                rev = {**rev, "storage_key": busta["storage_key"], "storage_version_id": busta["storage_version_id"],
+                       "size_bytes": busta["size_bytes"], "original_filename": docs.nome_interno(rev, busta)}
+                f = None                          # il tipo è quello del documento contenuto, non della busta
         security_event(conn, "REVISION_DOWNLOADED", user_id=c.user_id, project_id=rev["project_id"], ip=c.ip,
                        revision=revision_id, suite=True)
     tipo = (f and f["content_type"]) or mimetypes.guess_type(rev["original_filename"])[0] or "application/octet-stream"
     corpo = c.svc.storage.iter_object(rev["storage_key"], rev["storage_version_id"])
-    return StreamingResponse(corpo, media_type=tipo, headers={
-        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(rev['original_filename'])}",
-        "Content-Length": str(rev["size_bytes"]), "X-Revision-Code": rev["revision_code"]})
+    intestazioni = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(rev['original_filename'])}",
+                    "Content-Length": str(rev["size_bytes"]), "X-Revision-Code": rev["revision_code"]}
+    if firma_esito:
+        intestazioni["X-Firma-Esito"] = quote(firma_esito)
+    return StreamingResponse(corpo, media_type=tipo, headers=intestazioni)
 
 
 def _cartella(conn, c: Ctx, project: dict, container_id: uuid.UUID | None, nome: str) -> dict:
@@ -459,8 +475,11 @@ def _revisione_scaricabile(conn, revision_id: uuid.UUID) -> tuple[dict, dict]:
     return {**rev, "sequence": riga["sequence"], "document_id": riga["document_id"]}, doc
 
 
-def _byte_revisione(c: Ctx, rev: dict) -> bytes:
-    return c.svc.storage.get_bytes(rev["storage_key"], rev["storage_version_id"])
+def _contenuto_revisione(c: Ctx, rev: dict) -> tuple[bytes, str]:
+    """(byte, nome) da mandare all'altra app: per una busta .p7m il documento contenuto (ADR-55)."""
+    with c.tx() as conn:
+        dati, nome, _ = docs.leggi_contenuto(c.svc.storage, conn, rev)
+    return dati, nome
 
 
 def _controlla_dimensione(c: Ctx, rev: dict) -> None:
@@ -526,8 +545,10 @@ def confronta_revisione(revision_id: uuid.UUID, c: Ctx = Depends(ctx)):
         prec = docs._downloadable(conn, prec_id)
         _controlla_dimensione(c, rev)
         _controlla_dimensione(c, prec)
-    corpo, ctype = _multipart_file({}, [("pdf1", prec["original_filename"], _byte_revisione(c, prec), _tipo_file(prec["original_filename"])),
-                                        ("pdf2", rev["original_filename"], _byte_revisione(c, rev), _tipo_file(rev["original_filename"]))])
+    dati_prec, nome_prec = _contenuto_revisione(c, prec)
+    dati_rev, nome_rev = _contenuto_revisione(c, rev)
+    corpo, ctype = _multipart_file({}, [("pdf1", nome_prec, dati_prec, _tipo_file(nome_prec)),
+                                        ("pdf2", nome_rev, dati_rev, _tipo_file(nome_rev))])
     email, nome = _utente_portale(c)
     try:
         esito = suite_link.chiama("confronto", "POST", "/api/compare", corpo_file=(corpo, ctype, "confronto"),
@@ -560,12 +581,12 @@ def verifica_revisione(revision_id: uuid.UUID, body: VerificaIn, c: Ctx = Depend
     with c.tx() as conn:
         rev, doc = _revisione_scaricabile(conn, revision_id)
         _controlla_dimensione(c, rev)
-    dati = _byte_revisione(c, rev)
+    dati, nome_file = _contenuto_revisione(c, rev)
     email, nome = _utente_portale(c)
     chi = {"utente": email, "nome": nome, "email": email}
     try:
         caricato = suite_link.chiama("verifica", "POST", "/documenti", dati={},
-                                     file=("files", rev["original_filename"], dati, _tipo_file(rev["original_filename"])),
+                                     file=("files", nome_file, dati, _tipo_file(nome_file)),
                                      timeout=60, **chi)
         documenti = (caricato or {}).get("documenti") or []
         if not documenti:

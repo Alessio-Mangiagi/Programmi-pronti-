@@ -69,6 +69,27 @@ def pattern_insicuro(pattern: str) -> str | None:
     return None
 
 
+# Estensioni "di busta": la firma digitale CAdES aggiunge .p7m al nome del file firmato ("X.pdf.p7m", anche più
+# volte se firmano in più persone, ADR-55 di SkyTower). Fanno parte dell'estensione, non dell'identificativo.
+_BUSTA = re.compile(r"(\.p7m)+$", re.IGNORECASE)
+_ESTENSIONE = re.compile(r"^(.*?)\.([A-Za-z0-9]{1,10})$")
+
+
+def split_extension(name: str) -> tuple[str, str | None]:
+    """(radice, estensione in minuscolo) di un nome file: "A-B-0001.pdf" → ("A-B-0001", "pdf");
+    "A-B-0001.pdf.p7m" → ("A-B-0001", "pdf.p7m"); "A-B-0001.p7m" → ("A-B-0001", "p7m"); senza estensione → (nome, None)."""
+    raw = name.strip()
+    busta = _BUSTA.search(raw)
+    suffisso = busta.group(0).lower() if busta else ""
+    resto = raw[: busta.start()] if busta else raw
+    m = _ESTENSIONE.match(resto)
+    if m:
+        return m.group(1), m.group(2).lower() + suffisso
+    if suffisso:
+        return resto, suffisso.lstrip(".")
+    return raw, None
+
+
 class FieldError(BaseModel):
     field: str
     label: str
@@ -177,10 +198,7 @@ class NamingScheme(BaseModel):
         """Valida un nome file (estensione opzionale). ``extra_codes`` restringe ulteriormente
         i valori ammessi di un campo (es. originatore = solo l'organizzazione di chi carica)."""
         raw = name.strip()
-        stem, ext = raw, None
-        m = re.match(r"^(.*?)\.([A-Za-z0-9]{1,10})$", raw)
-        if m and self.separator != ".":
-            stem, ext = m.group(1), m.group(2).lower()
+        stem, ext = split_extension(raw) if self.separator != "." else (raw, None)
 
         result = ValidationResult(name=raw, valid=False, extension=ext)
         parts = stem.split(self.separator)

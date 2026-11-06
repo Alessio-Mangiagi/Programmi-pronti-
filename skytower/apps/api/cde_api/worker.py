@@ -5,7 +5,8 @@ Pipeline post-upload (G15): lettura in streaming dell'oggetto S3 → SHA-256 con
 dichiarato → antivirus → tipo MIME reale. Esito su cde.file_objects; file non conformi in quarantena
 (download bloccato dal DB, oggetto S3 marcato con tag).
 
-Dopo la verifica: testo per la ricerca (ADR-26) e, per gli IFC pesanti, il derivato .glb per il viewer (ADR-31).
+Dopo la verifica: testo per la ricerca (ADR-26) e, per gli IFC pesanti, il derivato .glb per il viewer (ADR-31);
+per i disegni CAD l'SVG (ADR-41); per le buste firmate .p7m il documento contenuto e la verifica della firma (ADR-55).
 
 Avvio: ``cde worker``.
 """
@@ -13,9 +14,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import mimetypes
 import tempfile
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from uuid import UUID
@@ -72,10 +75,12 @@ class _Tap:
 
 def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UUID, *,
                 derivative_min_bytes: int | None = None, ocr: ocr_mod.OcrConfig | None = None,
-                dwg_converter: str | None = None, cad: bool = True) -> VerifyOutcome | None:
+                dwg_converter: str | None = None, cad: bool = True, firma: dict | None = None) -> VerifyOutcome | None:
     """Idempotente: un file già verificato viene ignorato. Nessun lock tenuto durante la scansione.
     Con ``derivative_min_bytes`` un IFC verificato di almeno quella dimensione riceve subito il derivato .glb.
-    Con ``cad`` (default) un DWG/DXF verificato riceve subito il derivato SVG per il viewer (G44, ADR-41)."""
+    Con ``cad`` (default) un DWG/DXF verificato riceve subito il derivato SVG per il viewer (G44, ADR-41).
+    Con ``firma`` ({"rete": bool, "max_bytes": int}) una busta .p7m verificata viene aperta subito: documento
+    contenuto nel derivato P7M e rapporto della verifica della firma (ADR-55)."""
     f = conn.execute(
         "SELECT id, project_id, storage_key, storage_version_id, size_bytes, content_type, sha256, scan_status "
         "FROM cde.file_objects WHERE id = %s", [file_id],
@@ -131,7 +136,71 @@ def verify_file(conn: psycopg.Connection, storage: Storage, scanner, file_id: UU
                 wanted = conn.execute("SELECT cde.derivative_request_svg(%s) AS w", [file_id]).fetchone()["w"]
             if wanted:
                 make_svg_derivatives(conn, storage, converter=dwg_converter)
+        if firma is not None:
+            with conn.transaction():
+                wanted = conn.execute("SELECT cde.derivative_request_p7m(%s) AS w", [file_id]).fetchone()["w"]
+            if wanted:
+                make_p7m_derivatives(conn, storage, ocr=ocr, **firma)
     return outcome
+
+
+def make_p7m_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2, stale: str = "30 minutes", *,
+                         rete: bool = True, max_bytes: int = 200 * 1024 ** 2,
+                         ocr: ocr_mod.OcrConfig | None = None) -> int:
+    """Buste .p7m in attesa (ADR-55): apre la busta con il motore comune (shared/firma), mette il documento
+    contenuto nel derivato P7M, salva il rapporto della firma e il testo per la ricerca. Busta illeggibile, file
+    troppo grande o motore assente: FAILED subito con il motivo (il caricamento resta valido, il .p7m si scarica)."""
+    with conn.transaction():
+        rows = conn.execute("SELECT * FROM cde.derivatives_claim_p7m(%s, %s::interval)", [limit, stale]).fetchall()
+    for r in rows:
+        try:
+            _convert_p7m(conn, storage, r, rete=rete, max_bytes=max_bytes, ocr=ocr)
+        except Exception as exc:  # noqa: BLE001 - un errore di rete o di S3 si ritenta (3 volte), gli altri no
+            conn.rollback()
+            log.exception("busta firmata del file %s non aperta (tentativo %s)", r["file_id"], r["attempts"])
+            from . import firma as firma_mod
+            definitivo = isinstance(exc, (firma_mod.FirmaNonInstallata, firma_mod.BustaIllegibile, _BustaTroppoGrande))
+            rapporto = firma_mod.rapporto_errore(str(exc)) if isinstance(exc, firma_mod.BustaIllegibile) else None
+            with conn.transaction():
+                conn.execute("SELECT cde.derivative_done_p7m(%s, false, NULL, NULL, NULL, %s, %s, %s)",
+                             [r["file_id"], f"{type(exc).__name__}: {exc}", Jsonb(rapporto) if rapporto else None,
+                              definitivo])
+    return len(rows)
+
+
+class _BustaTroppoGrande(Exception):
+    """Busta oltre CDE_FIRMA_MAX_BYTES: si scarica soltanto (aprirla vorrebbe dire leggerla tutta in memoria)."""
+
+
+def _convert_p7m(conn: psycopg.Connection, storage: Storage, r: dict, *, rete: bool, max_bytes: int,
+                 ocr: ocr_mod.OcrConfig | None) -> None:
+    from . import firma as firma_mod
+
+    if r["size_bytes"] > max_bytes:
+        raise _BustaTroppoGrande(f"busta di {r['size_bytes'] // 1024 ** 2} MB oltre il limite di {max_bytes // 1024 ** 2} MB")
+    dati = b"".join(storage.iter_object(r["storage_key"], r["storage_version_id"]))
+    contenuto, nome, rapporto = firma_mod.apri(dati, r["filename"] or "documento.pdf.p7m", rete=rete)
+    rapporto.pop("file_estratto", None)                    # percorso temporaneo del motore: non serve a nessuno
+    rapporto["verificato_il"] = datetime.now(UTC).isoformat(timespec="seconds")
+    key = f"projects/{r['project_id']}/derivatives/{r['file_id']}.contenuto"
+    tipo = mimetypes.guess_type(nome)[0] or "application/octet-stream"
+    with tempfile.TemporaryDirectory() as tmp:
+        dst = Path(tmp) / "contenuto"
+        dst.write_bytes(contenuto)
+        version = storage.put_file(key, str(dst), tipo)
+    with conn.transaction():
+        conn.execute("SELECT cde.derivative_done_p7m(%s, true, %s, %s, %s, %s, %s)",
+                     [r["file_id"], key, version, len(contenuto), rapporto.get("riepilogo"), Jsonb(rapporto)])
+    # testo per la ricerca dal documento contenuto: l'indicizzazione normale ha visto solo la busta (testo vuoto)
+    if textextract.wants(nome) and len(contenuto) <= textextract.MAX_FILE:
+        try:
+            body = textextract.extract(nome, contenuto, ocr)
+            with conn.transaction():
+                conn.execute("SELECT cde.store_revision_text(%s, %s, %s)", [r["file_id"], body, ocr is not None])
+        except Exception:                                    # noqa: BLE001 - la ricerca non blocca la firma
+            conn.rollback()
+            log.exception("testo del documento firmato %s non indicizzato", r["file_id"])
+    log.info("busta firmata del file %s aperta: %s (%s)", r["file_id"], nome, rapporto.get("esito"))
 
 
 def make_derivatives(conn: psycopg.Connection, storage: Storage, limit: int = 2, stale: str = "30 minutes") -> int:
@@ -299,7 +368,12 @@ def verify_file_task(file_id: str) -> None:
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         verify_file(conn, storage, scanner, UUID(file_id), derivative_min_bytes=settings.ifc_derivative_min_bytes,
                     dwg_converter=settings.dwg_converter_cmd,
-                    ocr=ocr_mod.config_from(settings))
+                    ocr=ocr_mod.config_from(settings), firma=_firma(settings))
+
+
+def _firma(settings: Settings) -> dict:
+    """Parametri dell'apertura delle buste .p7m (ADR-55) dalle impostazioni."""
+    return {"rete": settings.firma_rete, "max_bytes": settings.firma_max_bytes}
 
 
 def run_worker() -> None:  # pragma: no cover - processo di lunga durata
@@ -358,11 +432,18 @@ def index_text_task(timestamp: int) -> None:
 @app.task(name="cde.ifc_derivatives", queue="default")
 def ifc_derivatives_task(timestamp: int) -> None:
     """Riprende i derivati .glb rimasti in attesa (worker fermato durante la conversione, errori temporanei) e divide
-    per piano quelli in un solo file, uno per giro."""
+    per piano quelli in un solo file, uno per giro. Stesso giro per gli SVG dei disegni e le buste .p7m: quelle
+    fermate perché il motore della firma mancava ripartono appena il motore c'è (ADR-55)."""
+    from . import firma as firma_mod
+
     storage, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         make_derivatives(conn, storage, limit=4)
         make_svg_derivatives(conn, storage, limit=4, converter=settings.dwg_converter_cmd)
+        if firma_mod.motore_installato():
+            with conn.transaction():
+                conn.execute("SELECT cde.derivatives_retry_p7m_motore()")
+        make_p7m_derivatives(conn, storage, limit=4, ocr=ocr_mod.config_from(settings), **_firma(settings))
         split_derivatives(conn, storage, limit=1)
 
 

@@ -42,6 +42,16 @@ call "%~dp0..\shared\avvia\libera-porta.bat" 5195 8100 9100
 REM Modifica di Word/Excel/PowerPoint: Document Server OnlyOffice in Docker, se c'e'.
 call "%~dp0onlyoffice.bat"
 
+REM PDF firmati .p7m (ADR-55): il worker apre le buste con il motore comune shared\firma. Al primo avvio se ne
+REM crea l'ambiente (serve la rete); se non riesce SkyTower parte lo stesso e le buste restano "da aprire"
+REM finche' il motore non c'e' (le riprende da solo il giro periodico del worker).
+if not exist "%~dp0..\shared\firma\.venv\Scripts\python.exe" (
+    if exist "%~dp0..\shared\firma\installa.bat" (
+        echo Preparo il motore della firma digitale ^(shared\firma^) ...
+        call "%~dp0..\shared\firma\installa.bat" >nul 2>&1
+    )
+)
+
 REM API in sviluppo locale: Postgres embedded (.devdata), S3 emulato, worker,
 REM dati demo al primo avvio. Stessa console: muore con questa finestra.
 REM SKYTOWER_RESET=1: database ricreato da zero (l'S3 emulato e' in memoria, i

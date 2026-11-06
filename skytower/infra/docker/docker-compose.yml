@@ -73,7 +73,8 @@ x-api-base: &api-base
     SUITE_URL_SCADENZARIO: ${SUITE_URL_SCADENZARIO:-http://host.docker.internal:5180/api}
     SUITE_URL_PORTALE: ${SUITE_URL_PORTALE:-http://host.docker.internal:8080/api}
   volumes:
-    # shared/ della suite (suite_link, cosedil_sso): l'API li importa da /shared, in sola lettura
+    # shared/ della suite (suite_link, cosedil_sso, firma): l'API li importa da /shared, in sola lettura; gli
+    # elenchi eIDAS del motore della firma vanno in FIRMA_CACHE_DIR dentro il container (Dockerfile, ADR-55)
     - ../../../shared:/shared:ro
     - segreti:/segreti
     - ${AWS_CA_BUNDLE_HOST:-./certs}:/certs:ro

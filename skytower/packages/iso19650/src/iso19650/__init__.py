@@ -9,6 +9,7 @@ from .naming import (
                      ValidationResult,
                      default_scheme,
                      pattern_insicuro,
+                     split_extension,
 )
 from .revisions import (
                      is_valid_revision,
@@ -35,5 +36,6 @@ __all__ = [
                      "pattern_insicuro",
                      "published_code_for",
                      "shared_code_for",
+                     "split_extension",
                      "suitability_stage",
 ]
