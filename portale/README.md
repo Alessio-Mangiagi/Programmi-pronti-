@@ -82,7 +82,9 @@ Dalla pagina **Utenti** (`/utenti`, voce *Gestione → Utenti* nella barra di si
 
 ### Chi vede quali programmi
 
-Si decide dall'area **Amministrazione** (link in alto nella home, solo per gli admin), riquadro **Utenti**. Ogni riga ha la colonna *Programmi visibili*, una casella per programma: spuntare abilita, togliere revoca, il salvataggio è immediato. Le stesse caselle sono nel form di creazione, così un utente nasce già con i suoi programmi. Gli admin hanno *tutti (admin)*: entrano ovunque per ruolo, senza spunte.
+Si decide dalla pagina **Abilitazioni** (`/abilitazioni`, voce *Gestione → Abilitazioni*; `pages/abilitazioni.html` + `assets/js/abilitazioni.js` + `assets/css/abilitazioni.css`): una tabella utenti × programmi, una casella per incrocio. Le spunte si accumulano (caselle cambiate in giallo) e partono insieme con **Salva modifiche**: un `PUT /api/utenti/<username>/apps` per utente cambiato, quindi una riga di registro (`abilita`) per utente e non per casella. In testa a ogni colonna: quanti utenti hanno il programma e i pulsanti *tutti/nessuno*, che agiscono sulle righe visibili (rispettano ricerca e filtro). Le app `adminOnly` non hanno colonna: `GET /api/utenti` le restituisce in `soloAdmin` e la pagina le nomina in una nota.
+
+Lo stesso elenco, per un utente alla volta, si cambia dalla pagina **Utenti** (clic sul numero di programmi della riga) e nel form di creazione, così un utente nasce già con i suoi programmi. Gli admin hanno *tutti (admin)*: entrano ovunque per ruolo, senza spunte.
 
 Sotto il cofano è il campo `apps` in `data/utenti.json` — l'elenco esatto dei programmi di quell'utente:
 

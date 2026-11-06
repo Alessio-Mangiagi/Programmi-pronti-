@@ -20,8 +20,8 @@ Scadenzario, Lettore DDT e gli altri strumenti senza dover rifare l'accesso in o
 
 3. [La plancia](03-plancia.md): stato dei programmi, calendario, utenti e loro attività,
    richieste di aiuto
-4. [Utenti e abilitazioni](04-utenti.md): creare utenti, scegliere i programmi visibili,
-   password, disattivazione, importazione da Excel
+4. [Utenti e abilitazioni](04-utenti.md): creare utenti, scegliere i programmi visibili
+   (anche tutti insieme nella pagina *Abilitazioni*), password, disattivazione, importazione da Excel
 5. [Le commesse della suite](05-commesse.md): l'elenco unico dei codici commessa
 6. [Registro accessi e avvisi](06-registro-e-avvisi.md): chi ha fatto cosa e cosa segnalano
    i programmi
@@ -42,6 +42,7 @@ Scadenzario, Lettore DDT e gli altri strumenti senza dover rifare l'accesso in o
 | **Scadenzario** | Scadenze e adempimenti: DURC, revisioni, polizze, corsi | [guida dello Scadenzario](../../../scadenzario/docs/guida/README.md) |
 | **Lettore DDT** | Da una bolla in PDF a un foglio Excel | [guida del Lettore DDT](../../../lettore-ddt/docs/guida/README.md) |
 | **Confronto Documenti**, **OCR Documenti**, **Analista Dati**, **Verifica Requisiti** | Confrontare due PDF, leggere documenti scansionati, fare domande sui dati, controllare i documenti contrattuali | dentro ciascun programma |
+| **Timbri per VFP** | Da un'immagine PNG (firma, logo, timbro) a un file `.stamp` per le annotazioni di VFP | [README di Timbri per VFP](../../../timbri-vfp/README.md) |
 | **Ponte Trimble**, **Auguri** | Strumenti riservati agli amministratori | dentro ciascun programma |
 
 **VFP Transfer** non si apre dal Portale: ha un accesso suo (vedi la
@@ -56,7 +57,7 @@ programmi compaiono nella sua pagina iniziale (vedi [Utenti e abilitazioni](04-u
 - Un programma che non ti è stato assegnato **non compare** e non si apre nemmeno scrivendo
   l'indirizzo a mano: il programma risponde che devi chiedere l'abilitazione a un
   amministratore.
-- Alcuni programmi sono **riservati** (oggi Verifica Requisiti e SkyTower): li vede solo chi
+- Alcuni programmi sono **riservati** (oggi Verifica Requisiti, SkyTower e Timbri per VFP): li vede solo chi
   li ha avuti assegnati espressamente.
 - Se un collega vede un programma che tu non hai, non è un guasto: chiedi l'abilitazione a
   un amministratore.

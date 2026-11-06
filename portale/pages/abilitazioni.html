@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!-- "><(((º> sabusabu <º)))><" -->
+<!-- Abilitazioni (solo admin): tabella utenti × programmi. Ogni casella dice se
+     quell'utente può usare quel programma; le modifiche si salvano insieme col
+     pulsante in fondo. Logica in assets/js/abilitazioni.js, API /api/utenti*. -->
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="/assets/manifest.webmanifest" />
+  <meta name="theme-color" content="#0c4577" />
+  <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Cosedil" />
+  <title>Abilitazioni — Portale Suite Cosedil</title>
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 21V11l7-4 7 4v10' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/plancia.css" />
+  <link rel="stylesheet" href="/assets/css/utenti.css" />
+  <link rel="stylesheet" href="/assets/css/abilitazioni.css" />
+</head>
+<body>
+  <div class="layout">
+    <!-- Stessa barra di sinistra delle altre pagine di gestione. -->
+    <aside class="side" aria-label="Navigazione">
+      <div class="brand"><span class="brand-word">Cosedil</span><span class="brand-word acc">Suite</span></div>
+      <p class="side-sec">Gestione</p>
+      <nav class="side-nav">
+        <a href="/">Plancia</a>
+        <a href="/utenti">Utenti</a>
+        <a href="/abilitazioni" aria-current="page">Abilitazioni</a>
+        <a href="/commesse">Commesse</a>
+        <a href="/admin">Registro accessi</a>
+        <a href="/avvisi">Avvisi</a>
+      </nav>
+      <div class="side-links side-links-fondo">
+        <a href="/doc?f=guida">Guida</a><a href="/doc?f=readme">README</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <span class="who"><span class="avatar" id="avatar">?</span><span id="userName">…</span></span>
+        <a href="/password">Password</a>
+        <button id="logout" type="button">Esci</button>
+      </div>
+
+      <header class="u-head">
+        <h1>Abilitazioni</h1>
+        <p>Spunta i programmi che ogni utente può usare: li vedrà nella home e potrà aprirli. Chi non ha la spunta non vede la scheda e, se prova l'indirizzo, il programma lo respinge. Gli amministratori li usano tutti.</p>
+        <p class="ab-nota" id="notaSoloAdmin" hidden></p>
+      </header>
+
+      <section class="box">
+        <div class="u-bar">
+          <input type="search" id="cerca" placeholder="Cerca per nome o username" aria-label="Cerca utente" />
+          <select id="fStato" aria-label="Filtra utenti">
+            <option value="">Tutti gli utenti</option>
+            <option value="attivo">Solo attivi</option>
+            <option value="off">Disattivati</option>
+          </select>
+          <label class="chk ab-mostra"><input type="checkbox" id="mostraAdmin" /> <span>Mostra amministratori</span></label>
+        </div>
+        <div class="u-wrap ab-wrap">
+          <table class="u-tab ab-tab" id="tabella">
+            <thead id="testa"></thead>
+            <tbody id="righe"></tbody>
+          </table>
+          <p class="empty" id="vuoto" hidden>Nessun utente con questi filtri.</p>
+        </div>
+      </section>
+
+      <!-- Compare solo con modifiche da salvare; resta incollata in fondo allo schermo. -->
+      <div class="ab-salva" id="barraSalva" hidden role="region" aria-label="Modifiche da salvare">
+        <span id="contaModifiche"></span>
+        <span class="u-bar-sp"></span>
+        <button type="button" class="b" id="annulla">Annulla</button>
+        <button type="button" class="b pri" id="salva">Salva modifiche</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/js/common.js"></script>
+  <script src="/assets/js/abilitazioni.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 
 Dalla plancia, nella colonna di sinistra, premi **Gestione → Utenti**. Qui crei le utenze,
 scegli quali programmi vede ognuno, reimposti le password e disattivi chi non deve più
-entrare.
+entrare. Per i programmi di tutti insieme c'è la pagina **Abilitazioni** (paragrafo 4.2b).
 
 ![La pagina Utenti](img/30-utenti.png)
 
@@ -62,11 +62,47 @@ Cosa sapere:
 - La modifica vale **subito**: il programma tolto sparisce dalla pagina iniziale della
   persona, e se prova ad aprirlo dall'indirizzo il programma le dice di chiedere
   l'abilitazione (al massimo dopo mezzo minuto).
-- I programmi segnati **riservato** (Verifica Requisiti, SkyTower) non si danno per
+- I programmi segnati **riservato** (Verifica Requisiti, SkyTower, Timbri per VFP) non si danno per
   abitudine: solo a chi ci lavora davvero.
 - Ponte Trimble e Auguri non hanno caselle: li vedono solo gli amministratori.
 - Ogni modifica resta scritta nel [Registro accessi](06-registro-e-avvisi.md) come
   *Abilitazioni*, con chi l'ha fatta e quando.
+
+## 4.2b Tutte le abilitazioni insieme: la pagina Abilitazioni
+
+Per vedere **chi usa cosa** e cambiare i programmi di più persone in una volta, premi
+**Gestione → Abilitazioni** nella colonna di sinistra. È una tabella: una riga per persona,
+una colonna per programma, una casella per ogni incrocio.
+
+![La pagina Abilitazioni](img/37-abilitazioni.png)
+
+1. Spunta o togli le caselle. Quelle cambiate si colorano di **giallo** e in fondo compare
+   la barra *N utenti modificati, non ancora salvati*.
+2. Premi **Salva modifiche**: compare *Abilitazioni salvate per N utenti*. **Annulla**
+   rimette tutto com'era.
+
+![Due abilitazioni cambiate e non ancora salvate](img/38-abilitazioni-modifiche.png)
+
+Dal salvataggio la persona trova la scheda del programma nella sua pagina iniziale, sotto
+*Tutti gli strumenti* (qui *Creare un timbro per VFP*, appena data a Marco Russo):
+
+![La scheda di Timbri per VFP nella pagina iniziale](img/39-scheda-timbri.png)
+
+In testa a ogni colonna trovi quanti utenti hanno quel programma e due pulsanti:
+
+- **tutti** dà il programma a **tutte le persone in elenco**;
+- **nessuno** lo toglie a tutte le persone in elenco.
+
+"In elenco" vuol dire quelle che vedi: scrivi un nome in **Cerca per nome o username** o
+scegli *Solo attivi* per restringere prima di premere *tutti*.
+
+Gli amministratori sono nascosti (usano tutti i programmi per ruolo): spunta **Mostra
+amministratori** per vederli, con un ✓ grigio al posto delle caselle. Se esci dalla pagina
+con modifiche non salvate il browser ti chiede conferma.
+
+Le regole sono le stesse del paragrafo precedente: la modifica vale subito, i programmi
+**riservati** vanno dati solo a chi ci lavora, ogni salvataggio resta nel Registro accessi
+(una riga per persona modificata).
 
 ## 4.3 Reimpostare la password di una persona
 

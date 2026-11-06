@@ -1,0 +1,56 @@
+/* "><(((º> sabusabu <º)))><" */
+/* Pagina Abilitazioni: tabella utenti × programmi. Riusa impianto e stili della
+   pagina Utenti (plancia.css + utenti.css); qui solo la griglia delle caselle,
+   la colonna degli utenti fissa a sinistra e la barra "Salva" in fondo. */
+
+.ab-nota { font-size: 13px; }
+.ab-nota[hidden] { display: none; }
+.ab-mostra { font-size: 13px; min-height: 36px; }
+
+/* Molti programmi = tabella larga: scorre in orizzontale dentro il riquadro,
+   con la colonna degli utenti sempre visibile. */
+.ab-wrap { overflow-x: auto; }
+.ab-tab th.ab-chi { position: sticky; left: 0; z-index: 1; background: #fff; text-align: left; font-weight: 400; min-width: 200px; border-right: 1px solid var(--soft); }
+.ab-tab thead th.ab-chi { z-index: 2; }
+/* Il nome dell'utente è una <th scope="row"> (accessibilità: la casella si legge
+   "Timbri per VFP per Mario Rossi"), ma deve sembrare una cella normale, non
+   l'intestazione in maiuscoletto grigio di utenti.css. */
+.ab-tab tbody th.ab-chi { padding: 10px 12px; border-top: 1px solid var(--soft); border-bottom: 0; font-family: inherit; font-stretch: normal; font-size: inherit; letter-spacing: normal; text-transform: none; color: inherit; white-space: normal; vertical-align: middle; }
+.ab-tab tbody tr:hover th.ab-chi { background: var(--paper); }
+.ab-tab .chi .st { margin-left: 6px; vertical-align: 1px; }
+
+/* intestazione di un programma: nome, "riservato", quanti utenti, tutti/nessuno */
+/* Colonne strette (~84px): con dieci programmi la tabella sta ancora tutta in
+   uno schermo da 1440px senza scorrere di lato; i nomi lunghi vanno a capo. */
+.ab-tab th.ab-app { text-align: center; vertical-align: bottom; white-space: normal; width: 84px; min-width: 76px; padding: 10px 4px 8px; }
+.ab-tab .ab-nome { display: block; color: var(--ink); font-size: 10.5px; letter-spacing: .03em; line-height: 1.15; overflow-wrap: anywhere; }
+.ab-tab th.ab-app .ris { display: inline-block; margin-top: 4px; font-weight: 800; font-stretch: 80%; font-size: 9px; letter-spacing: .1em; color: var(--grey); border: 1px solid var(--soft); padding: 0 4px; }
+.ab-tab .ab-conta { display: block; margin-top: 4px; font-weight: 600; letter-spacing: .04em; text-transform: none; font-size: 11px; color: var(--grey); }
+/* "tutti" sopra "nessuno": affiancati allargherebbero la colonna a 110px */
+.ab-tab .ab-col { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 6px; }
+.ab-tutti { width: 64px; border: 1px solid var(--soft); background: #fff; color: var(--ink); padding: 2px 4px; cursor: pointer; font-family: var(--font-cond); font-weight: 700; font-stretch: 85%; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.ab-tutti:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* caselle */
+.ab-tab td.ab-cella { text-align: center; padding: 6px 4px; }
+.ab-tab td.ab-cella input { accent-color: var(--cosedil-blue); width: 18px; height: 18px; margin: 0; cursor: pointer; }
+.ab-tab td.ab-adm { color: var(--grey); }
+/* casella cambiata e non ancora salvata: si vede a colpo d'occhio cosa partirà */
+.ab-tab td.ab-mod { background: #fff1cc; box-shadow: inset 0 0 0 2px #e0a800; }
+.ab-tab td.ab-tot, .ab-tab th.ab-tot { text-align: center; font-variant-numeric: tabular-nums; color: var(--grey); white-space: nowrap; }
+
+/* barra "Salva modifiche", incollata in fondo allo schermo mentre si scorre */
+.ab-salva { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; background: #fff; border: 2px solid var(--ink); box-shadow: 0 -6px 0 var(--cosedil-blue); font-size: 13.5px; }
+.ab-salva[hidden] { display: none; }
+
+/* Telefono: la tabella resta tabella (scorre di lato), la colonna utenti si stringe. */
+@media (max-width: 720px) {
+  .ab-tab thead { display: table-header-group; }
+  .ab-tab { display: table; }
+  .ab-tab tbody { display: table-row-group; }
+  .ab-tab tr { display: table-row; padding: 0; }
+  .ab-tab td, .ab-tab th { display: table-cell; padding: 8px 6px; border-top: 1px solid var(--soft); }
+  .ab-tab th.ab-chi { min-width: 150px; }
+  .ab-tab td:nth-child(5) { display: table-cell; }
+  .ab-salva .b { flex: 1 1 auto; }
+}

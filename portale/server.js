@@ -2471,6 +2471,15 @@ async function handle(req, res) {
     return sendFile(res, path.join(PAGES_DIR, 'utenti.html'), 'text/html');
   }
 
+  // ---- Abilitazioni (solo admin): tabella utenti × programmi con le spunte.
+  // Stessi dati e stesse API della finestra "Programmi" della pagina Utenti
+  // (GET /api/utenti, PUT /api/utenti/<u>/apps), ma tutti gli utenti insieme:
+  // si vede chi usa cosa e si abilita un programma a molti con un clic.
+  if (p === '/abilitazioni' || p === '/abilitazioni.html') {
+    if (!isAdmin) { res.writeHead(302, { Location: '/' }); return res.end(); }
+    return sendFile(res, path.join(PAGES_DIR, 'abilitazioni.html'), 'text/html');
+  }
+
   // ---- Avvisi dei programmi (solo admin) ----
   if (p === '/avvisi' || p === '/avvisi.html') {
     if (!isAdmin) { res.writeHead(302, { Location: '/' }); return res.end(); }
@@ -2587,7 +2596,12 @@ async function handle(req, res) {
         attivo: !u.disattivato, mustChange: !!u.mustChange,
       }));
       // assegnabili: le app da proporre come caselle nella tabella utenti.
-      return sendJson(res, 200, { utenti: list, assegnabili: appAssegnabili() });
+      // soloAdmin: le adminOnly, senza casella perché seguono il ruolo; la
+      // pagina Abilitazioni le nomina per spiegare perché non compaiono.
+      return sendJson(res, 200, {
+        utenti: list, assegnabili: appAssegnabili(),
+        soloAdmin: APPS.filter((a) => a.adminOnly).map((a) => ({ id: a.id, nome: a.nome })),
+      });
     }
     if (req.method === 'POST') {
       const { username, nome, password, ruolo, apps, email } = await readJsonBody(req);
