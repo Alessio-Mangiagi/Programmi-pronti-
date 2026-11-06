@@ -204,6 +204,24 @@ Oltre all'upload: scelta "Da SkyTower" (commessa dal registro → documenti pubb
 → uno o più) e `POST /api/lavori/da-skytower {revision_id, traduttore, formato,
 opzioni}` che scarica i byte e crea il lavoro come con l'upload.
 
+## 10. PDF firmati digitalmente (.p7m) (06/11/2026)
+
+Ogni programma che apre PDF (Lettore DDT, OCR Documenti, SkyTower, Confronto Documenti,
+Verifica Requisiti, Ponte Trimble) accetta anche le buste CAdES `.p7m` attraverso il motore
+unico `shared/firma` (README lì): `firma.js` per Node, `busta.py` per Python.
+
+* Riconoscimento: `eBustaFirmata(buffer, nome)` / `e_busta_firmata(dati, nome)` (estensione
+  `.p7m` o contenuto, anche base64); nessun processo, si può chiamare su ogni file.
+* Apertura: `apri(...)` dà il documento contenuto (si elabora come un PDF qualunque) e il
+  rapporto JSON (`esito` `valida` | `non valida` | `da verificare`, `riepilogo`, `firme[]` con
+  firmatario, codice fiscale, ente, tipo, marca temporale, motivi).
+* L'interfaccia mostra `riepilogo` accanto al documento (verde valida, rosso non valida,
+  giallo da verificare); una firma non valida non blocca la lettura, la segnala.
+* Chi archivia con valore legale conserva il `.p7m` originale (SkyTower); gli altri tengono
+  il rapporto insieme al risultato.
+* Motore non installato (`shared/firma/.venv` assente) = messaggio «Componente firma digitale
+  non installato», mai errore 500. Gli `avvia.bat` lo installano da soli al primo avvio.
+
 ## Regole per tutti
 
 * Niente dipendenze nuove; `suite_link` e basta.

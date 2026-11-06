@@ -1,0 +1,7 @@
+# "><(((º> sabusabu <º)))><"
+# Motore della firma digitale (shared/firma): verifica CAdES con catena, revoca ed elenchi eIDAS.
+# Installati in shared/firma/.venv da installa.bat; nessun programma li importa direttamente.
+pyhanko-certvalidator==0.33.0
+asn1crypto==1.5.1
+cryptography==50.0.2
+requests==2.34.2

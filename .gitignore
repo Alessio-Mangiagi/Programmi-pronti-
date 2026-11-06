@@ -33,3 +33,6 @@ desktop.ini
 /Contratti/
 lettore-ddt/Registro_FIR*.xlsx
 ocr-documenti/LT*.pdf
+
+# Motore della firma digitale: elenchi eIDAS scaricati (rigenerabili) e lock
+shared/firma/cache/
