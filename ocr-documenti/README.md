@@ -139,6 +139,12 @@ route con `impaginato`, lavori lato server): righe a capo ricucite, voci con `|`
 ricostruite solo se `qta × prezzo = importo`. `npm run modulo-in-pdf`
 ([tools/modulo_in_pdf.ts](tools/modulo_in_pdf.ts)) ne fa il PDF e la scansione simulata,
 `npm run confronta-moduli -- --variante formattato` misura la lettura.
+`npm run confronta-moduli -- --da-moduli <cartella>` mette al posto della scansione un altro
+modulo dello stesso documento, abbinato dal commento `leggendo "<pdf>"`. Serve a misurare
+un altro modo di compilarlo, per esempio dal solo testo OCR .MD (`contratti/moduli-da-md`).
+`npm run confronta-claude` ([tools/confronta_claude.ts](tools/confronta_claude.ts)) mette
+l'estrazione del programma accanto agli Excel preparati da Claude (`contratti/scansioni/`).
+Misure e risultati in [docs/PIPELINE_MODULO_CONTRATTO.md](docs/PIPELINE_MODULO_CONTRATTO.md).
 
 ## Scansione automatica di una cartella (⚙ Impostazioni)
 

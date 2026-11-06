@@ -272,6 +272,66 @@ Misura del 05/11/2026 sui 5 contratti di prova (colonne di testata giuste · voc
 Sulle scansioni restano gli errori dell'OCR nel testo libero (119 descrizioni identiche su
 129, `S.r.l.` letto `S.r.I.`): codici, quantità, prezzi e importi tornano tutti.
 
+### Modulo compilato dal solo testo OCR (.MD): `--da-moduli`
+
+Prova del 06/11/2026: il modulo si può compilare partendo **non dal PDF ma dal testo .MD**
+che il programma ricava dalla scansione (`tests/out/<pdf>/ocr.txt`, lo stesso testo del
+formato .MD dell'app, copiato in `contratti/moduli-da-md/_md/`)? Ogni modulo l'ha
+compilato un agente Claude nuovo, che vedeva solo quel testo, il modulo vuoto e gli
+elenchi ufficiali. Non vedeva il PDF né i moduli di riferimento: è una prova alla cieca.
+Poi `npm run moduli -- contratti/moduli-da-md` lo ha riletto (errori → correzione del
+solo formato) e `npm run confronta-moduli -- --da-moduli contratti/moduli-da-md` lo ha messo
+accanto al modulo fatto dal PDF (uscita `contratti/moduli/_confronto_moduli-da-md.md`).
+Colonne di testata giuste · voci esatte, rispetto al modulo compilato dal PDF:
+
+| Contratto | Modulo dal testo .MD | Programma da solo (harness) | Excel di Claude dal PDF |
+|---|---|---|---|
+| GFM Impianti | 15/15 · 106/108 | 12/15 · 58/108 | 12/15 · 62/108 |
+| TMT Trasporti | 14/14 · 5/5 | 8/14 · 2/5 | 8/14 · 0/5 |
+| Ticopter fornitura | 11/14 · 4/4 | 11/14 · 1/4 | 12/14 · 2/4 |
+| Ticopter subappalto | 15/15 · 13/13 | 10/15 · 0/13 | 11/15 · 0/13 |
+| Progetto Costruzioni | 15/15 · 4/4 | 9/15 · 0/4 | 9/15 · 0/4 |
+| **Totale** | **70/73 · 132/134** | 50/73 · 61/134 | 52/73 · 64/134 |
+
+- I 5 moduli sono stati accettati, 4 al primo giro. La somma delle voci torna con l'importo
+  lavori su 4/5; il quinto, il subappalto Ticopter, ha la stessa differenza del modulo dal
+  PDF, che sta nel documento.
+- Le 2 voci GFM "diverse" sono una scelta di arrotondamento: importo/quantità 0,885 e
+  1,545 invece dei prezzi stampati 0,89 e 1,55. Valgono entrambe.
+- Ticopter fornitura: FORNITORE e CUP stanno sulla pagina 1, che l'OCR non ha letto (nel
+  testo non c'è la P.IVA). La DIVISIONE 08 invece della 02 viene dalle istruzioni date
+  all'agente: diceva "Passivo a Misura + 08" per ciò che non ha una tipologia propria.
+- Quello che rende il modulo affidabile è il controllo del programma, più di chi lo
+  compila: `quantità × prezzo = importo` e la somma contro l'importo lavori. Con questi
+  controlli l'agente ha ricomposto i codici spezzati su due righe (SIC24), le quantità
+  divise ("1.100,00 0,00" → 1.100.000,00) e i numeri con lettere ("852.0o0"). L'Excel fatto
+  da Claude direttamente dal PDF non ha questi controlli.
+
+### Estrazione del programma contro gli Excel di Claude: `npm run confronta-claude`
+
+[`tools/confronta_claude.ts`](../tools/confronta_claude.ts) mette l'estrazione dell'harness
+(senza AI) accanto agli Excel Import_Contratti preparati da Claude in modalità Claude
+(`contratti/scansioni/`, abbinati al PDF dal nome del file). Usa lo stesso confronto di
+celle di `confronta-moduli` ([`tools/confronto-excel.ts`](../tools/confronto-excel.ts)).
+Dove c'è un modulo di riferimento dice chi dei due ci si avvicina di più. Le voci che
+l'Excel di Claude ripete (elenco prezzi copiato due volte) si contano a parte. Uscita:
+`contratti/scansioni/_confronto_programma.md/.json`.
+
+Misura del 06/11/2026 su tutti i 31 PDF di `contratti/`:
+- **31/31 confrontati**;
+- testata uguale a Claude nell'**89%** delle colonne (346/388);
+- **49%** delle voci uguali (467/951).
+
+L'Excel di Claude **non è la verità**:
+- in 12 contratti su 31 ha voci ripetute (in GFM tutto l'elenco prezzi copiato due volte);
+- in 6 il totale delle voci supera il milione ed è più di 10 volte quello del programma,
+  perché quantità e prezzo vengono da altre colonne (fino a miliardi di euro). Sui 5 contratti con modulo di riferimento, Claude e il
+programma si equivalgono: testata 52/73 contro 50/73, voci 64/134 contro 61/134.
+
+L'harness dà lo stesso risultato della procedura vera dell'app. È stato provato con la
+scansione della cartella (⚙ Impostazioni) in Edge sui PDF nativi: Excel identico su un
+contratto, mentre sull'altro cambiano solo le descrizioni, con `&gt;` invece di `>`.
+
 Regole di compilazione emerse (anche in GUIDA_UTILIZZO.md):
 - **RG e RI insieme**: `ritenuteRgRi` restituisce i codici scritti se ce n'è almeno uno, e
   non ricava più RG dalla percentuale. Con `CODICE RI: R005` va scritto anche `CODICE RG`.

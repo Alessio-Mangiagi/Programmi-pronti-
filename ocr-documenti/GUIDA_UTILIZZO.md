@@ -243,6 +243,8 @@ DIVISIONE, COND.PAG, RG/RI), e scrive accanto `<nome>_Import_Contratti.xlsx`.
 `npm run modulo-in-pdf` impagina i moduli in PDF (testo e scansione simulata, cartella
 `contratti/formattati/`); con `npm run harness -- --cartella contratti/formattati` e
 `npm run confronta-moduli -- --variante formattato` si misura quanto il programma ne legge.
+Con `npm run confronta-moduli -- --da-moduli <cartella>` si confrontano due moduli dello
+stesso contratto compilati in modo diverso, per esempio dal PDF e dal solo testo OCR .MD.
 
 ---
 
