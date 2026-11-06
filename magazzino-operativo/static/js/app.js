@@ -162,6 +162,16 @@
   }
   window.addEventListener('hashchange', naviga);
 
+  // Le viste ridisegnano spesso solo la tabella (nuova ricerca, filtro, "carica altri": innerHTML di #tab):
+  // naviga() adatta solo il primo disegno, quindi sul telefono la tabella ricaricata tornava larga, senza schede
+  // (difetto segnalato il 06/11/2026). L'osservatore riadatta ogni tabella che entra in #contenuto. Guarda solo
+  // i nodi aggiunti (childList), non gli attributi: adattaTabelle cambia classi e data-l e non lo riattiva.
+  new MutationObserver((mutazioni) => {
+    const nuovaTabella = mutazioni.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1
+      && (n.matches('table, .tabella-wrap') || n.querySelector('.tabella-wrap > table'))));
+    if (nuovaTabella) adattaTabelle($('#contenuto'));
+  }).observe($('#contenuto'), { childList: true, subtree: true });
+
   // Presenza: dice al server che la pagina è aperta e su quale vista (per gli admin).
   const battito = () => { fetch('/api/presenza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vista: (location.hash.replace('#', '').split('/')[0] || 'dashboard') }) }).catch(() => {}); };
   setInterval(battito, 30000);
