@@ -76,6 +76,19 @@ risolve reinstallando, serve l'IT. Il resto del programma (PDF con testo, .docx,
 | Word | `.docx`, `.doc` |
 | Excel | `.xlsx`, `.xls` |
 | Testo | `.md`, `.txt` |
+| PDF firmato digitalmente (busta CAdES) | `.p7m` (`.pdf.p7m`, anche annidate o in base64) |
+
+**PDF firmati (.p7m)** — 06/11/2026. Il browser manda la busta a `POST /api/firma/apri`
+(`server/firma.ts`, corpo grezzo + header `X-Nome-File`), che la apre col motore comune
+`shared/firma` (verifica completa: integrità, catena fino agli enti qualificati degli elenchi
+eIDAS, revoca, marca temporale; README e CONTRATTI §10 lì). In coda va il **PDF estratto**
+(`src/lib/firma.ts`: `preparaFile`, rapporto in `firmaDi(file)`, originale in `originaleDi(file)`),
+quindi anteprima, testo nativo, OCR, modulo ed Excel non cambiano. Badge e dettagli in
+`src/FirmaDigitale.tsx`; il rapporto entra nella sessione salvata e nel registro della scansione
+di cartella, che sposta il `.p7m` originale. L'Excel Import_Contratti non cambia (formato fisso
+di Alyante). Risposte: 503 motore non installato (`shared\firma\installa.bat`, lo lancia
+`avvia.bat`), 422 busta illeggibile, 502 motore fermo; firma non valida = 200 col rapporto.
+Anche `npm run harness` legge i `.p7m` di `contratti/` (estratti in `.harness-cache/firmati/`).
 
 Multi-file: si possono trascinare più file insieme, ognuno tiene il proprio risultato in coda.
 
@@ -224,6 +237,9 @@ all'OCR. "Scansiona con AI" resta una richiesta esplicita e scavalca la scorciat
 `npm test` (vitest) copre le librerie condivise (`src/lib/__tests__/`), l'aggancio agli
 elenchi Alyante e le righe Import_Contratti (`server/__tests__/`, `src/lib/__tests__/`).
 `npm run check` = typecheck (frontend + server) + ESLint + test: è quello che gira in CI.
+PDF firmati `.p7m`: `server/__tests__/firma.test.ts` (rotta con client finto + motore vero sulle
+fixture di `shared/firma/test_firma.py`, saltato se manca `shared/firma/.venv`) e
+`src/lib/__tests__/firma.test.ts` (client del browser).
 
 **Regressione sui contratti reali**: `server/__tests__/baseline.test.ts` rigioca la parte
 deterministica della pipeline (testo → `estrai` → struttura → elenchi) su ogni cartella di
@@ -266,6 +282,7 @@ Strumenti di supporto:
 | Problema | Soluzione |
 |----------|-----------|
 | PaddleOCR non trovato | Ricreare il venv (vedi Prerequisiti) o impostare `PYTHON_BIN` |
+| *Componente firma digitale non installato* su un `.p7m` | Lanciare `shared\firma\installa.bat` (serve la rete); `FIRMA_PYTHON` per un altro interprete |
 | Server non raggiungibile — riprovo | Pagina aperta prima del backend (`npm run dev`: Vite è su prima) o backend spento. `App.tsx` ripete `/api/health` e `/api/elenchi` ogni 3 s finché rispondono; intanto la scansione della cartella non parte (l'automatica riprova al giro dopo) |
 | Primo scan lentissimo | Normale una volta sola: download modelli (~30 MB) + caricamento |
 | 0 articoli sempre (`[Tabella TSV] ricostruiti 0`) | Layout non ancora tarato: guardare la sezione `### TABELLA ARTICOLI` in MD |

@@ -148,6 +148,18 @@ if not exist "node_modules" (
     echo  [OK] Dipendenze node_modules presenti
 )
 
+:: ── 6b. Firma digitale (.p7m) ─────────────────────────────
+:: I contratti firmati in busta .p7m li apre e li verifica il motore comune della suite
+:: (shared\firma, ambiente Python suo). Se manca lo si installa una volta, in silenzio:
+:: se non riesce (niente rete, niente Python) il programma parte lo stesso e la pagina
+:: dice "Componente firma digitale non installato" solo quando arriva un .p7m.
+if exist "%~dp0..\shared\firma\.venv\Scripts\python.exe" goto firma_ok
+echo  [SETUP] Motore della firma digitale (shared\firma): prima installazione...
+call "%~dp0..\shared\firma\installa.bat" >nul 2>&1
+if errorlevel 1 echo  [AVVISO] Motore della firma non installato: i .p7m non si apriranno. Rilancia shared\firma\installa.bat.
+:firma_ok
+echo  [OK] Firma digitale: shared\firma
+
 :: ── 7. Avvio ────────────────────────────────────────────────
 echo.
 echo ============================================================

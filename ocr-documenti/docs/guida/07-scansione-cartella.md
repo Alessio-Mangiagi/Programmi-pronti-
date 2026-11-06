@@ -43,6 +43,12 @@ Per ogni contratto trovato nella cartella il programma fa lo stesso giro di
 | Cartella dei contratti → **elaborati** | i contratti letti, con il loro Excel di allegato e la bozza Word se c'erano |
 | Cartella dei contratti → **da controllare** | i contratti che il programma ha respinto: il motivo è nel registro e nella colonna *Esito* della coda |
 
+I contratti **firmati digitalmente** (`.pdf.p7m`) si leggono come gli altri (vedi
+[2.5](02-contratto-excel.md#25-contratti-firmati-digitalmente-p7m)): in *elaborati*
+finisce il `.p7m` originale, quello con valore legale, e nel registro la colonna delle
+note riporta l'esito della firma (*Firma valida: …*). Un `.p7m` che non si apre resta
+nella cartella e il motivo compare in alto.
+
 Il riquadro verde in alto riassume l'esito (*1 elaborato, 0 da controllare*); se qualcosa
 è stato respinto il riquadro è rosso e dice dove guardare. Un file `.txt` che non è un
 modulo contratto e i file di altri tipi restano dove sono. Niente viene sovrascritto: se

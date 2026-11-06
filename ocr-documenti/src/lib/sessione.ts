@@ -14,6 +14,8 @@ export interface VoceSalvata {
   incerte?: unknown
   lavoroId?: string
   motore?: string
+  /** rapporto della firma digitale se il documento è stato estratto da un .p7m (src/lib/firma.ts) */
+  firma?: unknown
 }
 export interface Sessione {
   voci: VoceSalvata[]

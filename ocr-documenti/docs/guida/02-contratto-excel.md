@@ -23,9 +23,10 @@ Nella riga della coda compaiono le etichette essenziali (es. *3 voci*,
 **maschera** usata (es. *subappalto*), quanti campi di testata sono rimasti
 vuoti, quante righe vanno riviste, quanti campi ha completato l'Assist AI.
 
-**Formati accettati:** PDF (con testo o scansionato), immagini (JPG, PNG,
-WEBP, GIF), Word `.docx` (i vecchi `.doc` vanno salvati come `.docx`), Excel,
-testo. Le pagine con testo selezionabile e i Word si leggono **direttamente**,
+**Formati accettati:** PDF (con testo o scansionato), PDF **firmati
+digitalmente** in busta `.p7m` (vedi [2.5](#25-contratti-firmati-digitalmente-p7m)),
+immagini (JPG, PNG, WEBP, GIF), Word `.docx` (i vecchi `.doc` vanno salvati come
+`.docx`), Excel, testo. Le pagine con testo selezionabile e i Word si leggono **direttamente**,
 senza OCR: più veloce e senza errori di lettura. Le pagine scansionate passano
 dall'OCR ad alta risoluzione (più lento ma preciso su codici e numeri).
 
@@ -84,5 +85,40 @@ cambiare a mano dal menu **⋮** della riga.
 | **↓ Excel** | riscarica l'Excel senza rifare la lettura |
 | **Rivedi** | apre il risultato nel pannello |
 | **⋮** | **Apri in un'altra finestra** (il file così com'è, comodo da tenere accanto all'Excel), scelta della bozza abbinata, **Rimuovi dalla coda** |
+
+## 2.5 Contratti firmati digitalmente (.p7m)
+
+Un contratto firmato con la firma digitale arriva spesso come `contratto.pdf.p7m`:
+una «busta» che contiene il PDF e la firma. Si carica come un PDF qualunque
+(trascinandolo, con **Aggiungi documenti** o dalla
+[scansione di una cartella](07-scansione-cartella.md)).
+
+1. Il programma apre la busta e mette in coda il **PDF contenuto**, con lo stesso
+   nome senza `.p7m` (es. *Contratto nolo Edil Rossi.pdf*). Da qui si elabora come
+   sempre: **Elabora → Excel**, modulo contratto, confronto con la bozza Word.
+2. Sotto il nome, nella coda, un'etichetta dice com'è la firma:
+
+   | Etichetta | Significato |
+   |---|---|
+   | **✓ Firma valida** (verde) | documento integro, certificato di un ente certificatore riconosciuto, non revocato e valido |
+   | **✗ Firma NON valida** (rossa) | il documento è stato modificato dopo la firma, oppure il certificato è revocato o scaduto senza marca temporale |
+   | **! Firma da verificare** (gialla) | non si è potuto controllare tutto: niente rete per la revoca, ente non presente negli elenchi ufficiali, certificato non qualificato |
+
+3. Sopra l'anteprima del documento il riquadro della firma ripete l'esito; con
+   **Dettagli firma** si vedono il firmatario (nome, codice fiscale, azienda), l'ente
+   che ha emesso il certificato, il tipo di firma (*firma digitale*, *firma
+   elettronica qualificata*…), la data di firma, l'eventuale marca temporale e i
+   motivi di un esito non verde.
+
+![Un contratto firmato .p7m in coda: etichetta e dettagli della firma](img/19-firma-digitale.png)
+
+Una firma non valida **non blocca** la lettura: il programma la segnala e il
+contratto si elabora lo stesso. Se il contratto deve avere valore legale, controlla
+la firma prima di importare l'Excel. La verifica usa gli elenchi ufficiali europei
+degli enti certificatori (con quello italiano di AgID), aggiornati ogni giorno.
+
+L'Excel `Import_Contratti` non cambia (le colonne sono quelle di Alyante): l'esito
+della firma resta nella coda, nella sessione salvata e, nella scansione di una
+cartella, nel registro `registro_scansioni.csv`.
 
 [← La schermata](01-schermata.md) · [Avanti: Controllare e correggere →](03-controllo-e-modifica.md)

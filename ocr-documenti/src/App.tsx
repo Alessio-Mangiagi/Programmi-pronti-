@@ -29,6 +29,9 @@ import { CONTRACT_COLUMNS, contractJsonToRow, contractJsonToMarkdown } from './l
 import { ALY_TESTATA_COLS, ALY_RIGHE_COLS, ALY_IMPORTI_COLS, ALY_TESTATA_KEYS, ALY_RIGHE_KEYS, ALY_IMPORTI_KEYS, alyanteJsonToMarkdown } from './lib/export-alyante'
 import { parseAlyante, IMPORT_CONTRATTI_COLS, buildImportContrattiRowsFromContract, buildImportContrattiRowsFromAlyante, problemiRiga, diagnostica, validateAlyanteImport, cellaCsv, scriviImportContrattiXlsx, rowsHaveData, type CellaImport, type Avviso } from './lib/import-contratti'
 
+import { firmaDi, originaleDi, registraFirma, preparaFile, notaFirma, sembraFirmato } from './lib/firma'
+import { BadgeFirma, RiquadroFirma } from './FirmaDigitale'
+
 import { VistaConfronto } from './VistaConfronto'
 import { ImpostazioniScansione } from './ImpostazioniScansione'
 import {
@@ -402,9 +405,22 @@ export default function App() {
   }, [fileUrl])
 
   // Accoda uno o più file e rendi attivo il primo nuovo.
-  const appendFiles = useCallback((incoming: FileList | File[]) => {
+  // PDF firmati in busta .p7m: prima si aprono sul server (src/lib/firma.ts) e in coda va il
+  // PDF estratto col rapporto della firma; poi si riparte da qui con l'appendFiles della
+  // render più recente (ref), perché durante l'attesa la coda può essere cambiata.
+  const appendFilesRef = useRef<(incoming: File[]) => void>(() => {})
+  const appendFiles = useCallback((incoming: FileList | File[], preparati = false) => {
     const arr = Array.from(incoming).filter(Boolean)
     if (!arr.length) return
+    // `preparati`: già passati da preparaFile (anche un file senza estensione che non era una
+    // busta): non si riapre, altrimenti si girerebbe in tondo
+    if (!preparati && arr.some(f => /\.p7m\s*$/i.test(f.name) || /pkcs7/i.test(f.type) || !/\.[a-z0-9]{1,5}$/i.test(f.name))) {
+      void preparaFile(arr).then(({ pronti, errori }) => {
+        if (errori.length) setError(errori.join(' · '))
+        if (pronti.length) appendFilesRef.current(pronti)
+      })
+      return
+    }
     const startIdx = queue.length
     setQueue(q => [...q, ...arr.map(f => ({ file: f, result: '' }))])
     setActiveIdx(startIdx)
@@ -414,6 +430,8 @@ export default function App() {
     setSessionePrecedente(null)
     decisioneSessione.current = true
   }, [queue.length, loadPreview])
+  // i file già aperti (niente .p7m) rientrano senza ripassare dal server
+  useEffect(() => { appendFilesRef.current = f => appendFiles(f, true) }, [appendFiles])
 
   // Seleziona un file della coda come attivo (bloccato durante l'elaborazione).
   const selectFile = useCallback((idx: number) => {
@@ -1619,7 +1637,7 @@ export default function App() {
     if (!decisioneSessione.current) return
     const t = window.setTimeout(() => {
       void salvaSessione({
-        voci: queue.map(v => ({ file: v.file, result: v.result, testo: v.testo, formato: v.formato, confronto: v.confronto, incerte: v.incerte, lavoroId: v.lavoroId, motore: v.motore })),
+        voci: queue.map(v => ({ file: v.file, result: v.result, testo: v.testo, formato: v.formato, confronto: v.confronto, incerte: v.incerte, lavoroId: v.lavoroId, motore: v.motore, firma: firmaDi(v.file) })),
         activeIdx, format, abbinamenti, salvataAl: Date.now(),
       })
     }, 800)
@@ -1630,7 +1648,9 @@ export default function App() {
     if (!s) return
     setSessionePrecedente(null)
     decisioneSessione.current = true
-    const voci = s.voci.map(v => ({ ...v, formato: v.formato as Format | undefined, confronto: v.confronto as VoceCoda['confronto'], incerte: v.incerte as Incerta[] | undefined, motore: (v.motore === 'ocr' || v.motore === 'claude' ? v.motore : undefined) as Motore | undefined }))
+    // il rapporto della firma (.p7m) torna attaccato al File ripreso da IndexedDB
+    s.voci.forEach(v => registraFirma(v.file, v.firma))
+    const voci = s.voci.map(({ firma: _firma, ...v }) => ({ ...v, formato: v.formato as Format | undefined, confronto: v.confronto as VoceCoda['confronto'], incerte: v.incerte as Incerta[] | undefined, motore: (v.motore === 'ocr' || v.motore === 'claude' ? v.motore : undefined) as Motore | undefined }))
     setQueue(voci)
     setAbbinamenti(s.abbinamenti ?? {})
     if (s.format === 'contratti' || s.format === 'contract' || s.format === 'md' || s.format === 'json') setFormat(s.format)
@@ -1855,6 +1875,22 @@ export default function App() {
       if (automatica && imp.avvio === 'arrivo' && ora - t.file.lastModified < ETA_MINIMA_MS) continue
       candidati.push(t)
     }
+    // contratti firmati (.p7m): si apre la busta e in coda va il PDF estratto, col rapporto della
+    // firma; l'originale firmato resta legato al PDF (originaleDi) e a fine giro si sposta LUI,
+    // perché il valore legale ce l'ha la busta. Una busta che non si apre resta nella cartella,
+    // si segnala e in automatico non si riprova a ogni giro.
+    const nonAperti: string[] = []
+    for (const t of candidati.slice()) {
+      if (!sembraFirmato(t.file)) continue
+      const { pronti, errori } = await preparaFile([t.file])
+      if (pronti.length) t.file = pronti[0]
+      else {
+        candidati.splice(candidati.indexOf(t), 1)
+        giaScansionati.current.add(chiaveFile(t.file))
+        nonAperti.push(...errori)
+      }
+    }
+    if (nonAperti.length) setError(nonAperti.join(' · '))
     const documenti = candidati.filter(t => detectKind(t.file) !== 'excel')
     if (!documenti.length) {
       // all'orario si segna lo stesso: altrimenti ripartirebbe a ogni controllo del timer
@@ -1912,14 +1948,19 @@ export default function App() {
         }
         const compagni = [...allegatiPerDocumento(f), bozzaWordPer(f)].filter((x): x is File => !!x && !!r.origini[chiaveFile(x)])
         for (const x of [f, ...compagni]) {
+          // PDF estratto da un .p7m: si sposta la busta firmata vera, non la sua copia PDF
+          const daSpostare = originaleDi(x) ?? x
           giaScansionati.current.add(chiaveFile(x))
+          giaScansionati.current.add(chiaveFile(daSpostare))
           try {
-            await sposta(contratti, r.origini[chiaveFile(x)], x, ok ? SOTTOCARTELLA_FATTI : SOTTOCARTELLA_RESPINTI)
+            await sposta(contratti, r.origini[chiaveFile(x)], daSpostare, ok ? SOTTOCARTELLA_FATTI : SOTTOCARTELLA_RESPINTI)
           } catch (err) {
             nota = `${nota ? `${nota} · ` : ''}${x.name} non spostato: ${err instanceof Error ? err.message : String(err)}`
           }
         }
-        righe.push(rigaRegistro({ quando: new Date(), file: r.origini[chiaveFile(f)] ?? f.name, esito: ok ? 'elaborato' : 'da controllare', voci, note: nota }))
+        // nel registro anche l'esito della firma digitale (contratti .p7m)
+        const note = [notaFirma(firmaDi(f)), nota].filter(Boolean).join(' · ')
+        righe.push(rigaRegistro({ quando: new Date(), file: r.origini[chiaveFile(f)] ?? f.name, esito: ok ? 'elaborato' : 'da controllare', voci, note }))
         esiti.push({ nome: f.name, ok, ...(nota ? { msg: nota } : {}) })
         setBatchLog(esiti.slice())
       }
@@ -2664,7 +2705,7 @@ export default function App() {
         multiple
         title="Seleziona file da elaborare"
         aria-label="Seleziona file da elaborare"
-        accept=".pdf,.docx,.doc,.xlsx,.xls,.md,.markdown,.txt,image/*,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        accept=".pdf,.p7m,.docx,.doc,.xlsx,.xls,.md,.markdown,.txt,image/*,application/pkcs7-mime,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
         style={{ display: 'none' }}
         onChange={e => { if (e.target.files?.length) { appendFiles(e.target.files); e.target.value = '' } }}
       />
@@ -2813,7 +2854,11 @@ export default function App() {
                               <span title={allegato ? 'Allegato' : 'In attesa'} style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', border: `1.5px solid ${allegato ? C.border : '#9aa7b4'}` }} />
                             )}
                           </td>
-                          <td><NomeFile nome={item.file.name} style={{ fontWeight: 600 }} /></td>
+                          <td>
+                            <NomeFile nome={item.file.name} style={{ fontWeight: 600 }} />
+                            {/* PDF estratto da una busta .p7m: esito della firma digitale */}
+                            <BadgeFirma rapporto={firmaDi(item.file)} />
+                          </td>
                           <td className="num" style={{ color: C.muted }}>{meta ? (meta.pagine ?? '—') : allegato ? '—' : '…'}</td>
                           <td>
                             {inCorso ? (
@@ -3118,6 +3163,9 @@ export default function App() {
                 </ul>
               </div>
             )}
+
+            {/* ── Firma digitale del documento attivo (.p7m): esito e dettaglio dei firmatari ── */}
+            {activeIdx >= 0 && queue[activeIdx] && <RiquadroFirma key={chiaveFile(queue[activeIdx].file)} rapporto={firmaDi(queue[activeIdx].file)} />}
 
             {/* ── Contenuto: originale e/o risultato ── */}
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>

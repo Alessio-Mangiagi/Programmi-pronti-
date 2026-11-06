@@ -11,6 +11,13 @@ Dettagli tecnici nel [README](../../README.md).
 scansioni (al primo avvio scarica i modelli, ~30 MB); Ollama facoltativo per
 l'Assist AI (`ollama pull qwen2.5:3b`).
 
+**Firma digitale (.p7m).** I contratti firmati li apre e li verifica il motore
+comune della suite `shared\firma` (ambiente Python suo, elenchi ufficiali degli enti
+certificatori scaricati in `shared\firma\cache`). `avvia.bat` lo installa da solo
+al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
+*Componente firma digitale non installato*, lancia a mano quel file. Dettagli in
+`shared/firma/README.md`.
+
 **PaddleOCR bloccato.** Tipico: Windows App Control (WDAC) rifiuta le librerie
 non firmate del venv (`WinError 4551`). Non si risolve reinstallando: serve l'IT.
 

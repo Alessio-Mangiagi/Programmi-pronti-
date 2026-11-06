@@ -14,6 +14,11 @@
  *   npm run harness -- --assist     # abilita l'assist LLM (default: spento, non deterministico)
  *   npm run harness -- --cartella contratti/formattati   # PDF da un'altra cartella
  *
+ * Contratti firmati digitalmente (.pdf.p7m, .docx.p7m): la busta si apre col motore comune
+ * shared/firma (stessa verifica della pagina), il documento estratto va in
+ * .harness-cache/firmati/ e si analizza come gli altri; esito e riepilogo della firma
+ * finiscono nel report (campo `firma`). Motore non installato = errore del solo file.
+ *
  * Un documento che è un MODULO CONTRATTO stampato (riga di riconoscimento in testa) si
  * legge come fanno i lavori lato server: alla lettera, righe a capo ricucite, niente
  * parser euristici (server/modulo.ts). Un modulo con errori finisce come errore del file.
@@ -149,6 +154,7 @@ interface Esito {
   testataVuota: string[]    // campi di testata rimasti vuoti
   importiVuoti: string[]
   modulo?: boolean          // letto come MODULO CONTRATTO (alla lettera), non dai parser
+  firma?: { esito: string | null; riepilogo: string }   // contratto arrivato in busta .p7m
   errore?: string
 }
 
@@ -244,7 +250,7 @@ const analizza = async (documento: string): Promise<Esito> => {
 }
 
 const documenti = readdirSync(DIR_CONTRATTI)
-  .filter(f => /\.(pdf|docx)$/i.test(f))
+  .filter(f => /\.(pdf|docx)(\.p7m)*$/i.test(f))
   .filter(f => !filtri.length || filtri.some(x => f.toLowerCase().includes(x.toLowerCase())))
   .map(f => path.join(DIR_CONTRATTI, f))
 
@@ -255,13 +261,34 @@ if (!documenti.length) {
 
 console.log(`Banco di prova su ${documenti.length} contratti — cache: ${noCache ? 'IGNORATA' : DIR_CACHE}\n`)
 const esiti: Esito[] = []
+// Busta .p7m → documento estratto in .harness-cache/firmati/ (stesso motore della pagina,
+// server/firma.ts → shared/firma). Il nome resta quello del contratto senza ".p7m".
+const firma = (await import('../../shared/firma/firma.mjs')).default
+const apriBusta = async (documento: string): Promise<{ file: string; firma?: Esito['firma']; errore?: string }> => {
+  if (!/\.p7m$/i.test(documento)) return { file: documento }
+  try {
+    const { contenuto, nomeContenuto, rapporto } = await firma.apri(await fs.readFile(documento), path.basename(documento))
+    const dir = path.join(DIR_CACHE, 'firmati')
+    await fs.mkdir(dir, { recursive: true })
+    const file = path.join(dir, nomeContenuto)
+    await fs.writeFile(file, contenuto)
+    return { file, firma: { esito: rapporto.esito, riepilogo: rapporto.riepilogo } }
+  } catch (err) {
+    return { file: documento, errore: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 for (const documento of documenti) {
-  const e = await analizza(documento)
+  const busta = await apriBusta(documento)
+  const e: Esito = busta.errore
+    ? { file: path.basename(documento), pagine: 0, pagineNative: 0, paginePerse: 0, caratteri: 0, righe: 0, righeSenzaCodice: 0, righeSenzaImporto: 0, testataVuota: [], importiVuoti: [], errore: busta.errore }
+    : await analizza(busta.file)
+  if (busta.firma) e.firma = busta.firma
   esiti.push(e)
   process.stdout.write('\r' + ' '.repeat(70) + '\r')
   console.log(e.errore
     ? `✗ ${e.file} — ${e.errore}`
-    : `✓ ${e.file}${e.modulo ? ' [modulo]' : ''} — ${e.pagine}pp${e.pagineNative ? ` (${e.pagineNative} native)` : ''}${e.paginePerse ? ` (${e.paginePerse} illeggibili)` : ''}, ${e.righe} righe, testata mancante: ${e.testataVuota.join(',') || '—'}, importi mancanti: ${e.importiVuoti.join(',') || '—'}`)
+    : `✓ ${e.file}${e.modulo ? ' [modulo]' : ''}${e.firma ? ` [${e.firma.riepilogo}]` : ''} — ${e.pagine}pp${e.pagineNative ? ` (${e.pagineNative} native)` : ''}${e.paginePerse ? ` (${e.paginePerse} illeggibili)` : ''}, ${e.righe} righe, testata mancante: ${e.testataVuota.join(',') || '—'}, importi mancanti: ${e.importiVuoti.join(',') || '—'}`)
 }
 
 await fs.mkdir(DIR_OUT, { recursive: true })

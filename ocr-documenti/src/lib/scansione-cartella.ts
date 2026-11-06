@@ -114,7 +114,8 @@ export const prossimoAvvio = (imp: Impostazioni, ora: Date, ultimoControllo: num
 // Tipi di file che il programma elabora (vedi detectKind). Gli Excel entrano come
 // ALLEGATI del contratto con lo stesso nome, non da soli. Esclusi i file temporanei di
 // Office ("~$…"), quelli nascosti e il registro che il programma stesso scrive.
-const ESTENSIONI = /\.(pdf|docx|xlsx|xls|xlsm|png|jpe?g|tiff?|bmp|webp|txt|md)$/i
+// .p7m = contratto firmato digitalmente (busta CAdES): App.tsx lo apre e in coda va il PDF
+const ESTENSIONI = /\.(pdf|p7m|docx|xlsx|xls|xlsm|png|jpe?g|tiff?|bmp|webp|txt|md)$/i
 export const daConsiderare = (nome: string): boolean =>
   ESTENSIONI.test(nome) && !nome.startsWith('~$') && !nome.startsWith('.') && nome !== REGISTRO
 

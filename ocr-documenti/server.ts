@@ -18,6 +18,7 @@ import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.t
 import { descriviErrori, eModulo } from './src/lib/modulo-contratto.ts'
 import { risultatoDaModulo } from './server/modulo.ts'
 import { chiDa } from './server/accessoLavori.ts'
+import { montaRottaFirma } from './server/firma.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
 
@@ -304,6 +305,10 @@ let currentServer: ReturnType<typeof app.listen> | null = null
 // Lavori lato server (PDF caricato una volta, pipeline sul server, stato su disco).
 // Il PUT del file arriva come corpo grezzo, non JSON.
 montaRotteLavori(app, express.raw({ type: () => true, limit: MAX_MB }))
+
+// PDF firmati digitalmente (.p7m): il browser manda la busta, riceve il PDF estratto e il
+// rapporto della verifica dal motore comune shared/firma (server/firma.ts, CONTRATTI §10).
+montaRottaFirma(app, express.raw({ type: () => true, limit: MAX_MB }))
 
 // Produzione (avvia.bat): nessun dev server Vite, il frontend compilato lo serve
 // questo processo. DOPO tutte le rotte /api: il catchall prende qualunque GET, e
