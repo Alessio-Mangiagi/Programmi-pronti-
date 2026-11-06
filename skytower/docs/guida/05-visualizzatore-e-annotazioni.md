@@ -90,9 +90,32 @@ alla vista normale scegli **Nessun confronto**.
 
   ![Anteprima di un testo](img/05-anteprima-testo.png)
 - **Modelli BIM** (IFC, GLB) e **disegni CAD** (DWG, DXF): [capitolo 12](12-bim-ifc-dwg.md).
+- **Documenti firmati digitalmente** (`.p7m`): il PDF contenuto, vedi [5.7](#57-documenti-firmati-digitalmente).
 - Formati senza anteprima: «Puoi comunque lasciare commenti generali nel pannello a destra» e **Scarica il file**.
 
 ## 5.6 Da tablet in cantiere
 
 Su tablet il visualizzatore occupa tutto lo schermo; il pannello delle annotazioni si apre e chiude con l'icona del
 fumetto per lasciare spazio alla tavola. Zoom con le lenti o con due dita.
+
+## 5.7 Documenti firmati digitalmente
+
+Un file firmato con firma digitale (`.pdf.p7m`) si apre come un PDF: SkyTower mostra il **documento contenuto**
+nella busta, con zoom, ricerca, annotazioni e confronto. In alto a destra c'è l'esito della verifica della firma:
+
+| Etichetta | Significato |
+|---|---|
+| **Firma valida** (verde) | Documento integro, certificato qualificato di un ente riconosciuto (elenchi ufficiali europei e di AgID), non revocato e valido alla data della firma |
+| **Firma NON valida** (rossa) | Documento modificato dopo la firma, certificato revocato o scaduto senza marca temporale, oppure busta rovinata |
+| **Firma da verificare** (gialla) | La firma è integra ma qualcosa non si è potuto controllare: stato di revoca (rete o ente che non risponde), ente non presente negli elenchi, certificato non qualificato |
+
+Cliccando l'etichetta si apre **Firma digitale** con, per ogni firmatario, nome, tipo di firma, codice fiscale,
+ente certificatore, scadenza del certificato, data della firma (o della **marca temporale**, se c'è) e i motivi
+di un esito non verde. **Verifica di nuovo** rifà il controllo con l'esito di oggi: utile se al caricamento
+la revoca non si era potuta controllare.
+
+![Documento firmato nel visualizzatore, con i dettagli della firma](img/05-firma-digitale.png)
+
+Mentre il server apre la busta compare «Il server sta aprendo la busta firmata e verificando la firma»; se la
+busta non si apre (file rovinato, componente della firma non installato sul server) il messaggio dice perché e
+**Scarica il file firmato** resta disponibile. **Scarica** dà sempre il `.p7m` originale con la firma.

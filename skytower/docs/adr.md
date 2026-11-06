@@ -1105,3 +1105,60 @@ evita (ADR-51). Forcesave sempre: per le modifiche normali ogni "Salva" creerebb
 **Conseguenze.** Il Document Server resta da installare sul server (U42). Test: `tests/test_api_office.py`
 (`test_modifiche_richieste_con_onlyoffice`), `tests/test_api_suite.py` (`test_da_fare_chiarimenti_e_modifiche`), e2e
 `onlyoffice.spec.ts`; scenario U56.
+
+## ADR-55 — PDF firmati digitalmente in busta .p7m: si conserva la busta, si legge il documento contenuto
+
+**Contesto.** Il 06/11/2026 l'utente chiede che tutti i programmi della suite che aprono PDF leggano anche i
+**PDF firmati con firma digitale** in busta `.p7m` (CAdES), con la **verifica completa** della firma sui certificati
+degli enti riconosciuti. Fino ad allora un `.pdf.p7m` in SkyTower era rifiutato dal naming (l'identificativo
+risultava `X.pdf`) e comunque restava un file da scaricare: niente visualizzatore, ricerca, annotazioni,
+confronto, verifica requisiti. Il motore comune della suite è in `shared/firma` (contratto §10 di
+`shared/suite/CONTRATTI.md`): apre la busta e verifica integrità, catena fino a un ente qualificato degli elenchi
+eIDAS, revoca, scadenza e marca temporale.
+
+**Decisione.**
+- **Naming**: `.p7m` (anche ripetuto, firme "a matrioska") fa parte dell'estensione. `iso19650.split_extension`:
+  `X.pdf.p7m` → identificativo `X`, estensione `pdf.p7m`; vale in validazione, rinomina automatica, nuova
+  revisione e modelli di commessa. Un documento può avere una revisione `.pdf` e la successiva `.pdf.p7m` (il PDF
+  rivisto e poi firmato). Nessuna lista di estensioni ammesse da cambiare: SkyTower non ne ha.
+- **Conservazione**: la revisione conserva la busta originale, integra (è lei ad avere valore legale). Il download
+  "allegato" dà il `.p7m`.
+- **Lettura**: dopo l'antivirus il worker apre la busta con `shared/firma` (`cde_api/firma.py` → `busta.py` →
+  `firma.py` nell'ambiente del motore) e mette il **documento contenuto** in un derivato `P7M` (migrazione 0044),
+  come i `.glb` degli IFC (ADR-31) e gli SVG dei disegni (ADR-41): stesso ciclo PENDING/READY/FAILED, tre tentativi,
+  giro periodico. Visualizzatore (con annotazioni sulle pagine), ricerca nel testo (il testo viene dal PDF
+  contenuto), confronto con Confronto Documenti, checklist di Verifica Requisiti e `/suite/revisioni/{id}/file`
+  leggono il derivato. Scelto il derivato e non l'estrazione al volo: la busta si apre una volta, la verifica
+  (con OCSP/CRL verso gli enti) non si ripete a ogni apertura e il risultato è uno, per tutti.
+- **Verifica**: il rapporto del motore (esito `valida` / `non valida` / `da verificare`, riepilogo, firmatari con
+  codice fiscale, ente, tipo di firma, marca temporale, motivi, data della verifica) sta nella colonna nuova
+  `file_derivatives.firma`. Il dettaglio del documento lo mostra per revisione (`firma_stato`, `firma`), il
+  visualizzatore con un badge colorato e i dettagli. Una firma non valida **non blocca**: il documento si carica e
+  si legge, la firma è segnalata. "Verifica di nuovo" (`POST /revisions/{id}/firma/verifica`, 6 al minuto per
+  utente) rifà la verifica con l'esito di oggi (es. revoca non controllabile al caricamento); l'API aggiorna solo
+  `firma`, `detail` e `updated_at` dei derivati P7M dei file che l'utente vede (privilegio di colonna + RLS).
+- **Motore assente o busta rotta**: mai un 500. Il derivato va FAILED con il motivo; il `.p7m` resta scaricabile.
+  Le buste fermate per "motore non installato" ripartono da sole quando il motore c'è
+  (`cde.derivatives_retry_p7m_motore` nel giro periodico). `avvia.bat` installa il motore se manca
+  (`shared\firma\installa.bat`, silenzioso); nell'immagine Docker le librerie sono nel venv dell'API,
+  `FIRMA_PYTHON` lo indica e il codice arriva da `/shared` (già montato per suite_link).
+- **Filigrana**: la busta non si può timbrare senza rompere la firma. Negli stati in cui il Project Admin ha
+  attivato la filigrana, visualizzatore e download danno il PDF contenuto timbrato (nome `X.pdf`); il `.p7m`
+  originale resta nel CDE con il suo rapporto ma in quegli stati non si scarica così com'è: se deve circolare, il
+  Project Admin toglie la filigrana da quello stato.
+- **Altre app**: `/suite/revisioni/{id}/file` dà di default il documento contenuto (InCampo, Ponte Trimble lo
+  leggono come un PDF), `?originale=true` la busta, header `X-Firma-Esito`.
+- Impostazioni: `CDE_FIRMA_RETE` (default true; false = niente download: elenchi dalla cache del motore, revoca "da
+  verificare"), `CDE_FIRMA_MAX_BYTES` (200 MB: la busta si legge tutta in memoria).
+
+**Alternative scartate.** Estrarre il PDF al caricamento e conservare quello: si perderebbe il documento con
+valore legale. Aprire la busta a ogni visualizzazione: verifica ripetuta (rete verso gli enti), lenta e con esiti
+diversi nel tempo. Verifica nel processo dell'API con librerie proprie: le stesse regole andrebbero tenute in sei
+programmi; il motore comune le tiene in un posto solo. Rifiutare il caricamento di una firma non valida: in un CDE
+il documento ricevuto va comunque archiviato, la firma va segnalata.
+
+**Conseguenze.** La verifica è quella del momento del caricamento (con la data in `verificato_il`); "Verifica di
+nuovo" dà quella di oggi. Non gestiti per ora: firme staccate (`.p7s`), buste con marca separata (`.tsd`, `.m7m`),
+verifica della firma PAdES dentro un PDF (il PDF si legge già come prima). Test: `tests/test_firma_p7m.py`
+(motore finto per il flusso, motore vero con l'ente certificatore di prova se `shared/firma/.venv` c'è),
+`packages/iso19650/tests`, e2e `firma.spec.ts`; scenario U57.

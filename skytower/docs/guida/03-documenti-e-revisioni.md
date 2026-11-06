@@ -40,6 +40,20 @@ pubblica tramite un workflow ([capitolo 6](06-workflow-e-processi.md)).
 Un caricamento interrotto (rete che cade, finestra chiusa) **riprende da dove si era fermato** ricaricando lo
 stesso file. Con la **X** accanto al file lo togli dall'elenco o interrompi il caricamento.
 
+### Documenti firmati digitalmente (.p7m)
+
+Un PDF firmato con firma digitale arriva di solito come `nome.pdf.p7m` (la «busta» con dentro il PDF e la firma).
+Si carica come gli altri file: la parte `.pdf.p7m` è l'estensione, l'identificativo resta quello del nome (per
+esempio `ACI003-DES-ZZ-00-SP-A-0012.pdf.p7m` → documento `ACI003-DES-ZZ-00-SP-A-0012`). Lo stesso documento
+può avere una revisione `.pdf` e poi quella firmata `.pdf.p7m`.
+
+SkyTower **conserva il file firmato così com'è** e, pochi secondi dopo la verifica antivirus, apre la busta e
+**verifica la firma**: il PDF contenuto si legge, si cerca e si annota come gli altri
+([capitolo 5](05-visualizzatore-e-annotazioni.md#57-documenti-firmati-digitalmente)). Nel dettaglio del
+documento ogni revisione firmata ha un'etichetta: **Firma valida** (verde), **Firma NON valida** (rossa),
+**Firma da verificare** (gialla), oppure grigia mentre la verifica è in corso. Una firma non valida non blocca
+il caricamento: il documento c'è, la firma è segnalata.
+
 ### Rinomina con progressivo
 
 ![Rinomina proposta per un nome non conforme](img/03-rinomina-proposta.png)
@@ -169,11 +183,13 @@ I documenti in lavorazione di un'altra organizzazione non compaiono mai nei risu
 
 ## 3.8 Scaricare
 
-- **Scarica** (barra della cartella, visualizzatore, icona nella lista delle revisioni): il file originale.
+- **Scarica** (barra della cartella, visualizzatore, icona nella lista delle revisioni): il file originale. Per un
+  documento firmato è il `.p7m` con la firma, integro.
 - **Scarica cartella (n)** e **Scarica ZIP (n)**: un unico ZIP con i file e un **elenco.csv** con identificativo,
   revisione e impronta SHA-256 di ogni file.
 - Se il Project Admin ha attivato la **filigrana**, i PDF scaricati riportano su ogni pagina il tuo nome, email,
-  organizzazione, data e ora, documento e revisione ([capitolo 4](04-naming.md#45-filigrana-sui-pdf)).
+  organizzazione, data e ora, documento e revisione ([capitolo 4](04-naming.md#45-filigrana-sui-pdf)). Un `.p7m`
+  non si può timbrare senza rompere la firma: in quegli stati si scarica il PDF contenuto, timbrato.
 
 ## 3.9 Seguire un documento
 

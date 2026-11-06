@@ -51,6 +51,16 @@ Disegni CAD: i DXF si vedono subito; per i **DWG** serve [ODA File Converter](ht
 (gratuito) sul server: `CDE_DWG_CONVERTER_CMD` con l'eseguibile, oppure nel PATH o in `C:\Program Files\ODA\`.
 `cde genera-dxf pianta.dxf --svg pianta.svg` fa una pianta di prova e la conversione del worker.
 
+PDF firmati digitalmente (`.pdf.p7m`, ADR-55): il worker apre la busta e verifica la firma con il motore comune
+della suite `shared/firma` (README lì). `avvia.bat` lo installa al primo avvio (`shared\firma\installa.bat`); senza,
+i `.p7m` si caricano e si scaricano ma restano "da aprire" finché il motore non c'è. La revisione conserva la busta;
+visualizzatore, ricerca, confronto e verifica requisiti usano il documento contenuto (derivato `P7M`, migrazione
+0044), con l'esito della firma nel dettaglio (`firma_stato`, `firma`) e nel badge del visualizzatore.
+`POST /revisions/{id}/firma/verifica` rifà la verifica. Variabili: `CDE_FIRMA_RETE` (false = niente download verso
+enti ed elenchi: revoca "da verificare"), `CDE_FIRMA_MAX_BYTES` (200 MB); quelle del motore (`FIRMA_ELENCHI`,
+`FIRMA_CACHE_DIR`, `FIRMA_PYTHON`) passano così come sono. Docker: librerie nel venv dell'API, `FIRMA_PYTHON` e
+cache degli elenchi in `/tmp/firma-elenchi` (Dockerfile), codice da `/shared/firma`.
+
 `cde dev --reset` ricrea il database. `--data-dir` e `--s3-port` avviano un'istanza separata accanto a quella
 in uso (lo fanno i test e2e). Dati demo: password `Cantiere-2026!` per tutti gli utenti, ad esempio
 
@@ -169,7 +179,7 @@ protette dal token di servizio di `shared/suite` (header `X-Suite-Token`), non d
 |---|---|
 | `GET /suite/commesse` | progetti con codice commessa |
 | `GET /suite/commesse/{codice}/documenti?area=PUBLISHED&q=` | documenti della commessa (default: pubblicati) con file e link |
-| `GET /suite/revisioni/{id}/file` | i byte di una revisione (InCampo ne fa una planimetria), stessi controlli del download |
+| `GET /suite/revisioni/{id}/file` | i byte di una revisione (InCampo ne fa una planimetria), stessi controlli del download; per un PDF firmato `.p7m` il documento contenuto (`?originale=true`: la busta firmata), con l'esito della firma in `X-Firma-Esito` (ADR-55); 409 finché la busta non è aperta |
 | `POST /suite/commesse/{codice}/documenti` | un file (corpo della richiesta, nome in `X-Suite-Nome-File`, metadati in query) diventa documento WIP nella cartella «Suite Cosedil» dell'organizzazione, nome a norma (rinomina automatica se attiva, altrimenti primo progressivo libero, tipo `RP`, ruolo `Z`) |
 
 | `GET /suite/da-fare` | cosa aspetta l'utente del portale: approvazioni assegnate (compiti aperti, con «Chiarimento: …» e «Modifiche richieste: …» per i ritorni di ADR-51/54, link diretto al compito) e notifiche non lette, nel formato della home del portale |
