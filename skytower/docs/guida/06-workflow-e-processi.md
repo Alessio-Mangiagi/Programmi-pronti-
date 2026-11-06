@@ -285,7 +285,13 @@ Serve quando un passo precedente va rifatto, per esempio perché un file va corr
 Il passo scelto si riapre per chi lo aveva in carico, con la tua richiesta in evidenza:
 
 - in un'**approvazione di documento** usa **Carica nuova revisione** (stesso nome del file): il workflow
-  continua sulla revisione nuova, la vecchia resta nello storico;
+  continua sulla revisione nuova, la vecchia resta nello storico. Se il documento è un Word, un Excel o un
+  PowerPoint e l'installazione ha *OnlyOffice*, accanto c'è **Modifica con OnlyOffice**: corregge il file nel
+  browser partendo dalla revisione in esame. Premi **Salva** nell'editor (o chiudilo): dopo qualche secondo il
+  compito mostra «Caricata la revisione P02.01» e puoi completarlo con **Modifiche fatte**;
+
+  ![Modifiche richieste su un Word: carica o modifica con OnlyOffice](img/06-ritorno-modifiche-onlyoffice.png)
+
 - in un **processo** cambia gli **Allegati del processo** e premi **Salva allegati**.
 
 Poi sceglie di nuovo l'esito. Il flusso riparte da lì, rifà i passi intermedi e torna a te. Il tuo compito di
@@ -308,3 +314,9 @@ Cliccando un passo vedi, giro per giro, chi ha chiesto cosa e quando.
 
 Un passo può essere rifatto al massimo 20 volte nello stesso processo: oltre, il processo si ferma e chi l'ha
 avviato riceve un avviso.
+
+### Nel «Da fare oggi» del Portale
+
+Anche la home del Portale Suite distingue i ritorni: **Chiarimento: …** con chi lo chiede e la domanda,
+**Modifiche richieste: …** con il commento, e il tuo compito fermo *in attesa di chiarimento* in fondo all'elenco
+(non c'è niente da fare finché non arriva la risposta). Cliccando la voce si apre direttamente quel compito.

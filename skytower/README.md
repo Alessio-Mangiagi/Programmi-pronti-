@@ -172,7 +172,7 @@ protette dal token di servizio di `shared/suite` (header `X-Suite-Token`), non d
 | `GET /suite/revisioni/{id}/file` | i byte di una revisione (InCampo ne fa una planimetria), stessi controlli del download |
 | `POST /suite/commesse/{codice}/documenti` | un file (corpo della richiesta, nome in `X-Suite-Nome-File`, metadati in query) diventa documento WIP nella cartella «Suite Cosedil» dell'organizzazione, nome a norma (rinomina automatica se attiva, altrimenti primo progressivo libero, tipo `RP`, ruolo `Z`) |
 
-| `GET /suite/da-fare` | cosa aspetta l'utente del portale: approvazioni assegnate (compiti aperti) e notifiche non lette, nel formato della home del portale |
+| `GET /suite/da-fare` | cosa aspetta l'utente del portale: approvazioni assegnate (compiti aperti, con «Chiarimento: …» e «Modifiche richieste: …» per i ritorni di ADR-51/54, link diretto al compito) e notifiche non lette, nel formato della home del portale |
 
 Ogni chiamata gira come un utente SkyTower, perché RLS e permessi sono per utente:
 quello con l'email dell'utente del portale (`X-Suite-Email`, poi `X-Suite-Utente` anche

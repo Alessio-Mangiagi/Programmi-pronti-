@@ -282,6 +282,10 @@ join interno a un altro ramo no. Un compito in attesa di chiarimento tiene attiv
   l'istanza punta alla nuova (`revision_id`), il blocco resta sul documento, il passaggio di stato finale
   (`on_completed`) si applica alla nuova e deve restare valido; la vecchia resta nello storico. La richiesta registra
   `revision_from_*` → `revision_to_*`. Senza revisione nuova si prosegue su quella di prima.
+  Con OnlyOffice attivo la stessa persona può anche modificare il file nell'editor (ADR-54):
+  `POST /revisions/{id}/office-session` accetta l'ultima revisione anche se condivisa, risponde `in_modifica: true`
+  e attiva il pulsante "Salva" (forcesave); il salvataggio crea la WIP successiva (S0) come un caricamento.
+  `/me/tasks` dà `filename` per proporre il pulsante solo a Word, Excel e PowerPoint.
 - *Processo*: chi ha il compito riaperto sostituisce o aggiunge gli allegati (`PUT /processes/{id}/documents`); gli
   allegati che non può vedere restano; la richiesta registra prima/dopo.
 

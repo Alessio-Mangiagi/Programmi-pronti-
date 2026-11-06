@@ -190,5 +190,7 @@ seguirlo.
 - **Word, Excel, PowerPoint**: se l'installazione ha il server *OnlyOffice*, su una revisione **in lavorazione**
   compare **Modifica con OnlyOffice**: si apre una scheda dove più persone modificano insieme in tempo reale; alla
   chiusura nasce la revisione WIP successiva con la nota «Modificata in piattaforma (OnlyOffice)». Sulle revisioni
-  condivise o pubblicate il pulsante non c'è. Nell'ambiente fotografato OnlyOffice non è configurato, per questo il
+  condivise o pubblicate il pulsante non c'è, tranne per chi ha ricevuto una richiesta di modifiche in un workflow:
+  lo trova nel compito ([paragrafo 6.11](06-workflow-e-processi.md#611-tornare-indietro-chiarimenti-e-richieste-di-modifiche)).
+  Nell'ambiente fotografato OnlyOffice non è configurato, per questo il
   pulsante non compare nelle immagini.

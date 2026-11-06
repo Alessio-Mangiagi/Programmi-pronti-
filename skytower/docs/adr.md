@@ -1076,3 +1076,32 @@ password del portale giusta resterebbe fuori. Chiedere il portale anche per gli 
 **Conseguenze.** Una persona con due password (SkyTower e portale) ha due segreti indovinabili, entrambi con freno ai
 tentativi. Se il portale non risponde il login costa al massimo il timeout della chiamata (4 s) e poi fallisce come
 prima. Nei test il portale è finto (`conftest.password_portale_spenta`); test in `tests/test_api_portale.py`.
+
+## ADR-54 — OnlyOffice durante le modifiche richieste e ritorni nel "da fare" del portale
+
+**Contesto.** Dopo ADR-51 restavano due buchi. Chi riceveva "Richiedi modifiche" su un Word o un Excel poteva solo
+scaricarlo, correggerlo e ricaricarlo: `office.py` chiamava il blocco secco `cde.assert_not_in_review` e accettava solo
+l'ultima WIP, mentre il workflow sta spesso su una revisione condivisa. Il "da fare" della suite elencava i compiti di
+chiarimento come "Approvare …", senza dire che c'era una domanda a cui rispondere.
+
+**Decisione.**
+- `POST /revisions/{id}/office-session` usa `cde.assert_can_add_revision` (la stessa eccezione del caricamento, 0042):
+  entra solo chi ha il giro riaperto. Per lui vale anche l'ultima revisione **condivisa** su cui sta il workflow; fuori
+  dalle modifiche richieste resta la regola di ADR-37 (solo l'ultima WIP). La risposta ha `in_modifica`.
+- In quel caso l'editor ha **forcesave**: "Salva" manda subito la callback di stato 6 e la WIP nasce prima che la
+  persona completi "Modifiche fatte". Senza, il file arriverebbe solo alla chiusura dell'editor e, se il compito fosse
+  già completato, il salvataggio verrebbe rifiutato dal blocco.
+- `save_edit` crea la WIP sempre con idoneità **S0** (prima copiava quella di partenza, che da una SHARED violava il
+  vincolo `revision_code_matches_state`); l'idoneità la rimette il workflow condividendo la revisione nuova.
+- Nel compito (posta "Compiti") "Modifica con OnlyOffice" sta accanto a "Carica nuova revisione"; `/me/tasks` dà
+  `filename`.
+- `GET /suite/da-fare`: "Chiarimento: …" (chi chiede, da quale passo, la domanda), "Modifiche richieste: …" (chi le
+  chiede, il commento), compito fermo in attesa di chiarimento a priorità 3 e mai "in ritardo"; l'indirizzo apre il
+  compito (`/compiti?instance=…&task=…`).
+
+**Alternative scartate.** Togliere il blocco a chiunque abbia WRITE durante il workflow: è proprio ciò che il blocco
+evita (ADR-51). Forcesave sempre: per le modifiche normali ogni "Salva" creerebbe una revisione in più.
+
+**Conseguenze.** Il Document Server resta da installare sul server (U42). Test: `tests/test_api_office.py`
+(`test_modifiche_richieste_con_onlyoffice`), `tests/test_api_suite.py` (`test_da_fare_chiarimenti_e_modifiche`), e2e
+`onlyoffice.spec.ts`; scenario U56.
