@@ -66,7 +66,8 @@ export function MessageView({ msg, kind, question, onConfirmAction }: {
         <div className="card pending">
           <div className="pending-head">
             <span className="typing-dots"><i /><i /><i /></span>
-            <span>{msg.steps && msg.steps.length ? 'Sto lavorando…' : 'Sto analizzando…'}</span>
+            {/* con l'agente in streaming la risposta compare sotto mentre è ancora "pending" */}
+            <span>{msg.reply ? 'Sto scrivendo…' : msg.steps && msg.steps.length ? 'Sto lavorando…' : 'Sto analizzando…'}</span>
           </div>
           {msg.steps && msg.steps.length > 0 ? (
             <div className="agent-steps">

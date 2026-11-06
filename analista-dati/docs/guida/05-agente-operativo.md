@@ -26,6 +26,11 @@ C-2024-015»*, *«apri lo scadenzario»* (risponde con un pulsante per aprirlo),
 *«fammi un report sulle vendite 2026»* (serve un database collegato).
 
 Mentre lavora, l'agente mostra i passi (*«Uso scadenzario_dashboard…»*).
+Con **Claude** anche la risposta compare mentre viene scritta (*«Sto
+scrivendo…»*); una frase iniziale del tipo *«Controllo lo scadenzario.»*
+può comparire e sparire subito: l'agente sta passando a uno strumento e la
+risposta vera arriva dopo. Con i modelli locali (Ollama) la risposta arriva
+intera alla fine.
 
 ## 5.2 Allegare file
 

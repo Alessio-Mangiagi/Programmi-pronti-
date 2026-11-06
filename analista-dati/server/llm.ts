@@ -445,6 +445,15 @@ export interface AgentHooks {
   execTool: (name: string, args: Record<string, any>) => Promise<string> // esegue un tool READ, ritorna testo esito
   isAction: (name: string) => boolean                                    // true = scrittura → conferma
   onStatus?: (text: string) => void                                      // passi ("Interrogo lo scadenzario…")
+  /**
+   * Streaming dei token (solo Claude): il testo del passo in corso arriva a pezzi mentre il modello lo scrive.
+   * Se il passo finisce chiedendo strumenti di LETTURA, quel testo era un preambolo ("Controllo lo
+   * scadenzario…") e arriva `onTextReset`: chi mostra la risposta lo cancella e aspetta il passo dopo.
+   * La risposta definitiva resta quella di `AgentResult.reply` (può aggiungere testo, es. un errore API).
+   * Con Ollama / AI locale il loop non è in streaming: niente onText, la risposta arriva intera alla fine.
+   */
+  onText?: (delta: string) => void
+  onTextReset?: () => void
 }
 /** Turno precedente della conversazione (solo testo: i tool non si rigiocano). */
 export interface AgentTurn { role: 'user' | 'assistant'; content: string }
@@ -536,11 +545,21 @@ async function claudeAgent(opts: AgentOpts, hooks: AgentHooks): Promise<AgentRes
 
   for (let step = 0; step < max; step++) {
     let msg: any
+    let scritto = false                      // in questo passo sono già arrivati token al client
     try {
-      msg = await anthropic!.messages.create({
+      const params: any = {
         model: CLAUDE_MODEL, max_tokens: CLAUDE_MAX_TOKENS_REASON,
         system, messages, tools, tool_choice: { type: 'auto' },
-      })
+      }
+      if (hooks.onText) {
+        // Streaming: stessi parametri, i delta di testo vanno subito al client; finalMessage() ricompone il
+        // messaggio completo (blocchi tool_use con l'input JSON già assemblato, usage per il budget).
+        const stream = anthropic!.messages.stream(params)
+        stream.on('text', (t: string) => { scritto = true; hooks.onText!(t) })
+        msg = await stream.finalMessage()
+      } else {
+        msg = await anthropic!.messages.create(params)
+      }
     } catch (e) {
       // Errore API (429, 529, rete…): degrada con un messaggio azionabile invece
       // di far esplodere la richiesta, come già fa il ramo Ollama.
@@ -566,6 +585,11 @@ async function claudeAgent(opts: AgentOpts, hooks: AgentHooks): Promise<AgentRes
     // Azione di scrittura richiesta → stop e proponi la conferma (non eseguire).
     const action = toolUses.find(t => hooks.isAction(t.name))
     if (action) return { reply: lastText, pendingAction: { name: action.name, args: action.input || {} }, toolsUsed }
+
+    // Il passo continua con strumenti di lettura: il testo già mandato in streaming era un preambolo, non la
+    // risposta (che arriverà al passo dopo). Con un'azione da confermare o un troncamento, sopra, il testo
+    // resta: è proprio la risposta che accompagna la conferma.
+    if (scritto) hooks.onTextReset?.()
 
     // Esegui i tool di lettura e reinserisci i risultati. In PARALLELO: quando il
     // modello ne chiede più d'uno sono indipendenti fra loro (sono letture) e in

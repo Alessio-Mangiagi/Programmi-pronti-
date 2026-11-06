@@ -91,6 +91,8 @@ export function describeAction(name: string, args: Record<string, any>): string 
 export async function runSuiteAgent(
   message: string, ctx: SuiteCtx, provider?: LlmProvider,
   onStatus?: (text: string) => void,
+  /** Streaming dei token della risposta (vedi AgentHooks.onText/onTextReset in llm.ts). */
+  testo?: { onText?: (delta: string) => void; onTextReset?: () => void },
 ): Promise<AgentReply> {
   if (!SUITE_ENABLED) return { reply: 'Le azioni sulla suite sono disattivate (SUITE_TOOLS=off).', toolsUsed: [] }
   const tools = toolSchemas()
@@ -106,6 +108,8 @@ export async function runSuiteAgent(
     {
       isAction: (name) => getTool(name)?.kind === 'action',
       onStatus,
+      onText: testo?.onText,
+      onTextReset: testo?.onTextReset,
       execTool: async (name, args) => {
         const out = await runTool(name, args, ctx)
         if (out.file && !file) file = out.file // primo file prodotto → allegato alla risposta
@@ -130,18 +134,29 @@ export async function runSuiteAgent(
   return reply
 }
 
-// ── Streaming (SSE): stessi passi, ma emette gli step in tempo reale ─────────
+// ── Streaming (SSE): stessi passi, ma emette gli step e i token in tempo reale ─
+// Ordine degli eventi per il client (src/App.tsx askAgent):
+//   status*  → passi ("Uso scadenzario_dashboard…")
+//   delta*   → pezzi di testo del passo in corso, da accodare alla risposta mostrata (solo con Claude)
+//   reset    → il testo arrivato finora era un preambolo prima di usare strumenti: va cancellato
+//   done     → risposta DEFINITIVA (sostituisce il testo accumulato), azione da confermare, file, link
+//   error    → errore inatteso
 export type AgentStreamEvent =
-  | { type: 'status'; text: string }                       // passo ("Uso scadenzario_dashboard…")
+  | { type: 'status'; text: string }
+  | { type: 'delta'; text: string }
+  | { type: 'reset' }
   | { type: 'done'; reply: string; toolsUsed: string[]; pendingAction?: AgentReply['pendingAction']; file?: AgentReply['file']; openUrl?: AgentReply['openUrl'] }
   | { type: 'error'; error: string }
 
-/** Versione streaming di runSuiteAgent: emette gli step mentre usa gli strumenti. */
+/** Versione streaming di runSuiteAgent: emette gli step mentre usa gli strumenti e i token della risposta. */
 export async function runSuiteAgentStream(
   message: string, ctx: SuiteCtx, provider: LlmProvider | undefined,
   emit: (e: AgentStreamEvent) => void,
 ): Promise<AgentReply> {
-  const res = await runSuiteAgent(message, ctx, provider, (text) => emit({ type: 'status', text }))
+  const res = await runSuiteAgent(message, ctx, provider, (text) => emit({ type: 'status', text }), {
+    onText: (text) => emit({ type: 'delta', text }),
+    onTextReset: () => emit({ type: 'reset' }),
+  })
   emit({ type: 'done', reply: res.reply, toolsUsed: res.toolsUsed, pendingAction: res.pendingAction, file: res.file, openUrl: res.openUrl })
   return res
 }

@@ -184,7 +184,10 @@ export default function App() {
     .filter(m => m.content.trim() !== '')
     .slice(-AGENT_HISTORY_TURNS)
 
-  // Agente operativo (streaming SSE): mostra i passi live mentre usa gli strumenti.
+  // Agente operativo (streaming SSE): mostra i passi live mentre usa gli strumenti e, con Claude, la risposta
+  // mentre viene scritta. Eventi (server/agent.ts AgentStreamEvent): status = passo; delta = pezzo di testo da
+  // accodare; reset = il testo finora era un preambolo prima di usare strumenti, si cancella; done = risposta
+  // definitiva, che SOSTITUISCE il testo accumulato (può differire: errore API, testo della conferma).
   const askAgent = async (q: string, aid: number, files: Array<{ name: string; base64: string }>) => {
     const r = await apiFetch('/api/agent/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -200,6 +203,9 @@ export default function App() {
     let buf = ''
     const handle = (ev: any) => {
       if (ev.type === 'status') patchMsg(aid, m => ({ pending: true, steps: [...(m.steps || []), ev.text] }))
+      // pending resta vero durante i delta: i passi restano visibili sopra la risposta che si scrive
+      else if (ev.type === 'delta') patchMsg(aid, m => ({ reply: (m.reply || '') + ev.text }))
+      else if (ev.type === 'reset') patchMsg(aid, { reply: '' })
       else if (ev.type === 'done') {
         if (ev.file) downloadBase64(ev.file.base64, ev.file.name)
         patchMsg(aid, { pending: false, reply: ev.reply || '', toolsUsed: ev.toolsUsed || [], pendingAction: ev.pendingAction, file: ev.file, openUrl: ev.openUrl })
