@@ -116,6 +116,31 @@ $('#btn-ricostruisci').addEventListener('click', async () => {
 });
 
 // ── Documenti ───────────────────────────────────────────────────────────────
+// PDF firmati digitalmente (.p7m): esito della verifica fatta da shared/firma (catena, revoca, marca temporale).
+const ESITI_FIRMA = {
+  valida: { testo: 'Firma valida', classe: 'badge-verde' },
+  'non valida': { testo: 'Firma NON valida', classe: 'badge-rosso' },
+  'da verificare': { testo: 'Firma da verificare', classe: 'badge-giallo' },
+};
+
+/** Cella del nome: per una busta .p7m anche il bollino della firma, chi ha firmato e l'originale da scaricare. */
+function cellaNome(d) {
+  const td = document.createElement('td');
+  td.appendChild(el('div', d.nomeFile));
+  if (!d.busta) return td;
+  const info = d.firma ? ESITI_FIRMA[d.firma.esito] : null;
+  const b = el('span', ` ${info ? info.testo : 'Firmato .p7m'}`, `badge ${info ? info.classe : 'badge-blu'}`);
+  b.prepend(icona('file-signature'));
+  b.title = d.firma ? d.firma.riepilogo : 'Verifica della firma a estrazione finita';
+  td.appendChild(b);
+  if (d.firma) td.appendChild(el('div', d.firma.riepilogo, 'nota'));
+  const a = el('a', ' originale firmato', 'nota');
+  a.href = `/api/documenti/${encodeURIComponent(d.id)}/originale`;
+  a.prepend(icona('download'));
+  td.appendChild(a);
+  return td;
+}
+
 function badgeStato(d) {
   const classi = { pronto: 'badge-verde', errore: 'badge-rosso' };
   return el('span', d.stato, `badge ${classi[d.stato] || 'badge-blu'}`);
@@ -157,7 +182,7 @@ async function caricaDocumenti() {
     tdSel.appendChild(spunta);
     tr.appendChild(tdSel);
 
-    tr.appendChild(el('td', d.nomeFile));
+    tr.appendChild(cellaNome(d));
 
     const tdStato = document.createElement('td');
     tdStato.appendChild(badgeStato(d));

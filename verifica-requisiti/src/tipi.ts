@@ -8,6 +8,7 @@
  * Il verbo è la ricerca full-text, che lavora sul testo dei documenti.
  */
 import type { MotoreOcr } from './config';
+import type { FirmaDocumento } from './services/firma';
 
 export type StatoDocumento = 'in-coda' | 'in-lavorazione' | 'pronto' | 'errore';
 
@@ -37,6 +38,13 @@ export interface Documento {
   /** Etichette libere per filtrare (commessa, fornitore, tipo documento). */
   etichette: string[];
   errore?: string;
+  /**
+   * Caricato come busta firmata .p7m (CAdES): l'originale con valore legale resta qui, mentre `percorso` e `mime`
+   * diventano quelli del PDF estratto quando l'estrazione apre la busta (services/firma.ts).
+   */
+  busta?: { percorso: string; nome: string; byte: number };
+  /** Esito della verifica della firma digitale (shared/firma), solo per i documenti caricati come .p7m. */
+  firma?: FirmaDocumento;
 }
 
 // ── Requisiti ───────────────────────────────────────────────────────────────
@@ -54,11 +62,16 @@ export type TipoRegola =
   /** Numero catturato da pattern: deve stare fra min e max. */
   | 'numero'
   /** Nessun automatismo: sempre 'dubbio', decide una persona. */
-  | 'manuale';
+  | 'manuale'
+  /**
+   * Il documento deve essere firmato digitalmente (busta .p7m) con firma valida; `termini` facoltativi = nomi o
+   * codici fiscali dei firmatari attesi (basta uno). Non guarda il testo: usa la verifica di shared/firma.
+   */
+  | 'firma';
 
 export interface Regola {
   tipo: TipoRegola;
-  /** presenza/assenza: termini cercati (OR). */
+  /** presenza/assenza: termini cercati (OR). firma: firmatari attesi (nome o codice fiscale, OR). */
   termini?: string[];
   /** regex/scadenza/numero: pattern con almeno un gruppo di cattura. */
   pattern?: string;

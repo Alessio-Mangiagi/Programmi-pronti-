@@ -91,7 +91,11 @@ export function eliminaDocumento(id: string): boolean {
   const doc = elenco.find((d) => d.id === id);
   if (!doc) return false;
   try {
-    if (fs.existsSync(doc.percorso)) fs.unlinkSync(doc.percorso);
+    if (doc.percorso && fs.existsSync(doc.percorso)) fs.unlinkSync(doc.percorso);
+    // caricato come .p7m: c'è anche la busta firmata originale
+    if (doc.busta && doc.busta.percorso !== doc.percorso && fs.existsSync(doc.busta.percorso)) {
+      fs.unlinkSync(doc.busta.percorso);
+    }
   } catch {
     // Il file può essere già sparito o bloccato da un antivirus: il record va
     // via lo stesso, un orfano in archivio/ è meno grave di un record fantasma.
@@ -107,6 +111,12 @@ export function eliminaDocumento(id: string): boolean {
 export function percorsoArchivio(id: string, nomeFile: string): string {
   assicuraCartelle();
   return path.join(ARCHIVIO_DIR, `${id}${path.extname(nomeFile).toLowerCase()}`);
+}
+
+/** Dove va il documento estratto da una busta .p7m (accanto all'originale, che resta). */
+export function percorsoContenuto(id: string, estensione: string): string {
+  assicuraCartelle();
+  return path.join(ARCHIVIO_DIR, `${id}.contenuto${estensione.toLowerCase()}`);
 }
 
 /** Tutto il testo del documento, pagine concatenate: comodo per le regole. */

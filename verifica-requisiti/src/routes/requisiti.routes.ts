@@ -11,7 +11,7 @@ import { Requisito, TipoRegola } from '../tipi';
 
 const router = express.Router();
 
-const TIPI_REGOLA: TipoRegola[] = ['presenza', 'assenza', 'regex', 'scadenza', 'numero', 'manuale'];
+const TIPI_REGOLA: TipoRegola[] = ['presenza', 'assenza', 'regex', 'scadenza', 'numero', 'manuale', 'firma'];
 
 /** Errori di compilazione, in italiano: il set arriva da un form, non da un client fidato. */
 function erroriRequisito(r: Requisito, i: number): string[] {

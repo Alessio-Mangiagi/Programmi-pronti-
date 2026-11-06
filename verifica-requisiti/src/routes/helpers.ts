@@ -19,13 +19,30 @@ export const appConfig = config;
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const MAX_FILE_PER_UPLOAD = 20;
 
-export const ESTENSIONI_AMMESSE = new Set(['pdf', 'png', 'jpg', 'jpeg', 'tif', 'tiff']);
+export const ESTENSIONI_AMMESSE = new Set(['pdf', 'png', 'jpg', 'jpeg', 'tif', 'tiff', 'p7m']);
 export const MIME_AMMESSI = new Set([
   'application/pdf',
   'image/png',
   'image/jpeg',
   'image/tiff',
 ]);
+/**
+ * Mime con cui arriva una busta firmata .p7m: i browser e i programmi di firma non sono d'accordo (molti mandano
+ * octet-stream). Valgono solo con l'estensione .p7m; il contenuto lo controlla poi shared/firma.
+ */
+export const MIME_BUSTA = new Set([
+  'application/pkcs7-mime',
+  'application/x-pkcs7-mime',
+  'application/pkcs7-signature',
+  'application/octet-stream',
+]);
+
+/** Il filtro dell'upload: PDF e immagini, oppure una busta .p7m (CONTRATTI §10). */
+export function fileAmmesso(nome: string, mime: string): boolean {
+  const ext = path.extname(nome || '').toLowerCase().slice(1);
+  if (ext === 'p7m') return MIME_BUSTA.has(mime) || MIME_AMMESSI.has(mime);
+  return ESTENSIONI_AMMESSE.has(ext) && MIME_AMMESSI.has(mime);
+}
 
 export function assicuraTemp(): string {
   if (!fs.existsSync(UPLOAD_TEMP)) fs.mkdirSync(UPLOAD_TEMP, { recursive: true });

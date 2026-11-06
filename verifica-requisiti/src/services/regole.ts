@@ -116,7 +116,55 @@ interface EsitoGrezzo {
   riscontri: Riscontro[];
 }
 
-function applicaRegola(regola: Regola, t: TestoDocumento): EsitoGrezzo {
+/**
+ * Regola 'firma' (06/11/2026): il documento è arrivato come busta .p7m e shared/firma ha dato "valida".
+ * "da verificare" (revoca non controllabile, ente non negli elenchi, certificato non qualificato) diventa
+ * 'dubbio'; "non valida" o documento non firmato è una mancanza (ko se obbligatorio). `termini` facoltativi:
+ * nomi o codici fiscali dei firmatari attesi, ne basta uno fra le firme valide.
+ */
+function regolaFirma(regola: Regola, doc: Documento): EsitoGrezzo {
+  const f = doc.firma;
+  if (!f) {
+    return {
+      soddisfatto: false,
+      motivo: doc.busta
+        ? `Firma digitale non ancora verificata${doc.errore ? `: ${doc.errore}` : ''}.`
+        : 'Il documento non è firmato digitalmente (non è arrivato come busta .p7m).',
+      riscontri: [],
+    };
+  }
+  const attesi = (regola.termini ?? []).map(normalizza).filter(Boolean);
+  if (attesi.length > 0) {
+    const chi = f.firme.find((x) =>
+      attesi.some((a) => normalizza(x.firmatario) === a || normalizza(x.codiceFiscale ?? '') === a ||
+        normalizza(x.firmatario).includes(a))
+    );
+    if (!chi) {
+      return {
+        soddisfatto: false,
+        motivo: `Firmato da ${f.firme.map((x) => x.firmatario).join(', ')}, non da ${regola.termini!.join(' o ')}.`,
+        valore: f.firme.map((x) => x.firmatario).join(', '),
+        riscontri: [],
+      };
+    }
+    if (chi.esito !== 'valida') {
+      return {
+        soddisfatto: chi.esito === 'non valida' ? false : null,
+        causaNullo: 'controllo',
+        motivo: `Firma di ${chi.firmatario} ${chi.esito ?? 'non verificata'}: ${chi.motivi[0] ?? f.riepilogo}`,
+        valore: chi.firmatario,
+        riscontri: [],
+      };
+    }
+    return { soddisfatto: true, motivo: f.riepilogo, valore: chi.firmatario, riscontri: [] };
+  }
+  const valore = f.firme.map((x) => x.firmatario).join(', ');
+  if (f.esito === 'valida') return { soddisfatto: true, motivo: f.riepilogo, valore, riscontri: [] };
+  if (f.esito === 'non valida') return { soddisfatto: false, motivo: f.riepilogo, valore, riscontri: [] };
+  return { soddisfatto: null, causaNullo: 'controllo', motivo: f.riepilogo, valore, riscontri: [] };
+}
+
+function applicaRegola(regola: Regola, t: TestoDocumento, doc?: Documento): EsitoGrezzo {
   switch (regola.tipo) {
     case 'presenza':
     case 'assenza': {
@@ -241,6 +289,12 @@ function applicaRegola(regola: Regola, t: TestoDocumento): EsitoGrezzo {
       };
     }
 
+    case 'firma':
+      if (!doc) {
+        return { soddisfatto: null, causaNullo: 'regola', motivo: 'Regola firma senza documento.', riscontri: [] };
+      }
+      return regolaFirma(regola, doc);
+
     case 'manuale':
       return {
         soddisfatto: null,
@@ -268,7 +322,7 @@ function confidenzaMedia(doc: Documento): number {
 
 export function valutaRequisito(req: Requisito, doc: Documento, testo?: TestoDocumento): RisultatoRequisito {
   const t = testo ?? preparaTesto(doc);
-  const grezzo = applicaRegola(req.regola, t);
+  const grezzo = applicaRegola(req.regola, t, doc);
 
   let esito: Esito;
   let motivo = grezzo.motivo;
@@ -281,7 +335,8 @@ export function valutaRequisito(req: Requisito, doc: Documento, testo?: TestoDoc
   } else if (!req.obbligatorio) {
     esito = 'dubbio';
     motivo += ' Requisito facoltativo.';
-  } else if (doc.scansione && confidenzaMedia(doc) < CONFIDENZA_MINIMA) {
+  } else if (req.regola.tipo !== 'firma' && doc.scansione && confidenzaMedia(doc) < CONFIDENZA_MINIMA) {
+    // (la firma non dipende dall'OCR: un 'ko' sulla firma resta 'ko')
     // OCR poco affidabile: il testo potrebbe esserci e non essere stato letto.
     esito = 'dubbio';
     motivo += ' Testo da OCR poco affidabile: da controllare a mano.';

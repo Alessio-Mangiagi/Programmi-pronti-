@@ -115,7 +115,8 @@ Per ogni requisito scegli il tipo di regola più adatto:
 - "regex": serve catturare un valore → "pattern" con UN gruppo di cattura, minuscolo, accenti già tolti;
 - "scadenza": data di validità → "pattern" che cattura la data, "preavvisoGiorni" se il capitolato lo indica;
 - "numero": soglia o importo → "pattern" che cattura il numero, più "min"/"max";
-- "manuale": va guardato da una persona (firme, timbri, foto).
+- "firma": il documento deve essere firmato digitalmente (file .p7m) con firma valida → "termini" facoltativi con i nomi o i codici fiscali dei firmatari attesi;
+- "manuale": va guardato da una persona (firme autografe, timbri, foto).
 "obbligatorio" = true se la mancanza esclude il fornitore, false se è solo da segnalare.
 
 Rispondi SOLO con questo JSON, nient'altro:

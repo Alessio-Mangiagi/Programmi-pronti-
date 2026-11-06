@@ -51,8 +51,18 @@ upload  ->  archivio (data/archivio)  ->  estrazione testo  ->  indice + verific
 - **indice** (`src/services/indice.ts`): full-text in memoria, ricostruito all'avvio.
   Normalizzazione a lunghezza costante, così l'offset trovato punta al carattere giusto
   del testo originale e il riscontro si può mostrare com'era scritto.
-- **regole** (`src/services/regole.ts`): il motore degli esiti. Sei tipi di regola —
-  `presenza`, `assenza`, `regex`, `scadenza`, `numero`, `manuale`.
+- **regole** (`src/services/regole.ts`): il motore degli esiti. Sette tipi di regola —
+  `presenza`, `assenza`, `regex`, `scadenza`, `numero`, `manuale`, `firma` (documento
+  firmato digitalmente con firma valida, `termini` facoltativi = firmatari attesi).
+- **PDF firmati .p7m** (`src/services/firma.ts`, 06/11/2026): l'upload accetta le buste
+  CAdES (per estensione o per contenuto, `helpers.fileAmmesso`); l'originale resta in
+  `data/archivio/<id>.p7m` (campo `busta`), l'estrazione la apre con il motore comune
+  `shared/firma` (CONTRATTI §10: catena fino agli enti qualificati eIDAS, revoca, marca
+  temporale), scrive il PDF in `data/archivio/<id>.contenuto.pdf` e salva la sintesi in
+  `firma` (esito, riepilogo, firmatari). «Rielabora» rifà anche la verifica. Firma non
+  valida = bollino rosso, non blocco; motore assente = documento in errore con il
+  messaggio «Componente firma digitale non installato» (lo installa `avvia.bat`, in
+  sottofondo, se manca `shared\firma\.venv`).
 - **confronto con Claude** (`src/prompts.ts` + `src/services/importaEsito.ts`): i prompt
   dei bottoni della scheda "Analisi Claude" stanno tutti in `src/prompts.ts` — per
   aggiungerne uno si tocca solo quel file. Il frontend li prende da `GET /api/prompts`,
@@ -78,7 +88,8 @@ una scansione con OCR incerto un `ko` automatico manderebbe indietro un fornitor
 | POST | `/api/documenti` | carica file (multipart `files`, max 20) |
 | GET | `/api/documenti` | elenco con stato di lavorazione |
 | GET | `/api/documenti/:id/testo` | testo estratto, pagina per pagina |
-| GET | `/api/documenti/:id/file` | il file originale |
+| GET | `/api/documenti/:id/file` | il file da rileggere (per un `.p7m`: il PDF estratto) |
+| GET | `/api/documenti/:id/originale` | solo per i `.p7m`: la busta firmata originale |
 | POST | `/api/documenti/:id/rielabora` | rifà l'estrazione |
 | DELETE | `/api/documenti/:id` | elimina documento e sue verifiche |
 | GET | `/api/ricerca?q=` | ricerca full-text (AND fra i termini, `"frase"` esatta) |
@@ -96,13 +107,15 @@ il **token di servizio** della suite (`X-Suite-Token`, `shared/suite`) al posto
 della sessione del portale: così SkyTower manda un file, aspetta `pronto` e
 lancia una verifica. Chi entra col token è l'utente `suite` (o quello di
 `X-Suite-Utente`), mai admin (`src/middleware/suiteToken.ts`).
+SkyTower può mandare anche la busta `.p7m`: la scheda `GET /api/documenti/:id`
+riporta `busta` e `firma` (esito, riepilogo, firmatari) a lettura finita.
 
 ## Dati
 
 Tutto sotto `data/` (mai versionato):
 
 ```
-data/archivio/        file originali
+data/archivio/        file originali (per i .p7m anche <id>.contenuto.pdf estratto)
 data/documenti.json   metadati + testo estratto
 data/requisiti.json   checklist
 data/verifiche.json   storico esiti

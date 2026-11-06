@@ -19,11 +19,13 @@ import { estrazioneDuration } from '../utils/metrics';
 import {
   aggiornaDocumento,
   elencaDocumenti,
+  percorsoContenuto,
   salvaTesto,
   trovaDocumento,
 } from '../models/archivio';
 import { leggiConOcr } from './ocr';
 import { indicizza } from './indice';
+import { apriBusta } from './firma';
 
 const coda: string[] = [];
 let inCorso = false;
@@ -127,13 +129,24 @@ function caratteri(pagine: PaginaTesto[]): number {
  * si cambia motore OCR).
  */
 export async function elaboraDocumento(id: string): Promise<Documento | undefined> {
-  const doc = trovaDocumento(id);
+  let doc = trovaDocumento(id);
   if (!doc) return undefined;
-  if (!fs.existsSync(doc.percorso)) {
-    throw new Error(`File non trovato in archivio: ${doc.percorso}`);
+  const origine = doc.busta?.percorso ?? doc.percorso;
+  if (!fs.existsSync(origine)) {
+    throw new Error(`File non trovato in archivio: ${origine}`);
   }
 
   aggiornaDocumento(id, { stato: 'in-lavorazione', errore: undefined });
+
+  // Busta firmata .p7m: si apre e si verifica la firma (shared/firma) a ogni elaborazione, poi si legge il PDF
+  // estratto come un PDF qualunque. Una firma non valida non ferma la lettura: resta scritta in doc.firma.
+  if (doc.busta) {
+    const aperta = await apriBusta(fs.readFileSync(doc.busta.percorso), doc.busta.nome);
+    const percorso = percorsoContenuto(doc.id, aperta.estensione);
+    fs.writeFileSync(percorso, aperta.contenuto);
+    doc = aggiornaDocumento(id, { percorso, mime: aperta.mime, firma: aperta.firma }) ?? doc;
+    logger.info(`Busta firmata "${doc.nomeFile}": ${aperta.firma.riepilogo}`);
+  }
   const fine = estrazioneDuration.startTimer();
 
   let pagine: PaginaTesto[] = [];

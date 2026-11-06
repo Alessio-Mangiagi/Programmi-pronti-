@@ -7,7 +7,6 @@
 import express, { Request, Response } from 'express';
 import fs from 'fs';
 import multer from 'multer';
-import path from 'path';
 import { asyncHandler } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { requireAuth, utenteDi } from '../middleware/auth';
@@ -25,12 +24,12 @@ import {
 import { eliminaVerifichePerDocumento } from '../models/verifiche';
 import { accodaEstrazione, documentiInCoda } from '../services/estrazione';
 import { rimuoviDaIndice } from '../services/indice';
+import { eBustaFirmata } from '../services/firma';
 import {
-  ESTENSIONI_AMMESSE,
   MAX_FILE_PER_UPLOAD,
   MAX_FILE_SIZE,
-  MIME_AMMESSI,
   appConfig,
+  fileAmmesso,
   nomeSicuro,
   sha256,
   param,
@@ -42,10 +41,11 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname || '').toLowerCase().slice(1);
-    if (!ESTENSIONI_AMMESSE.has(ext) || !MIME_AMMESSI.has(file.mimetype)) {
+    if (!fileAmmesso(file.originalname || '', file.mimetype)) {
       return cb(
-        Object.assign(new Error('Ammessi solo PDF e immagini (png, jpg, tiff)'), { statusCode: 400 })
+        Object.assign(new Error('Ammessi solo PDF, immagini (png, jpg, tiff) e PDF firmati .p7m'), {
+          statusCode: 400,
+        })
       );
     }
     cb(null, true);
@@ -68,6 +68,9 @@ function sintesi(d: ReturnType<typeof trovaDocumento>) {
     caricatoDa: d.caricatoDa,
     caricatoIl: d.caricatoIl,
     errore: d.errore,
+    // .p7m: la busta originale e l'esito della firma (esito, riepilogo, firmatari) per il badge e per SkyTower
+    busta: d.busta ? { nome: d.busta.nome, byte: d.busta.byte } : null,
+    firma: d.firma ?? null,
   };
 }
 
@@ -102,11 +105,14 @@ router.post(
         return { nomeFile, id: esistente.id, duplicato: true, stato: esistente.stato };
       }
 
+      // Busta firmata .p7m (per estensione o per contenuto): si archivia l'originale, l'estrazione la apre,
+      // verifica la firma e legge il PDF che c'è dentro (services/firma.ts).
+      const busta = eBustaFirmata(file.buffer, file.originalname);
       const doc = creaDocumento({
         nomeFile,
         percorso: '',
         hash,
-        mime: file.mimetype,
+        mime: busta ? 'application/pkcs7-mime' : file.mimetype,
         byte: file.size,
         caricatoDa: utenteDi(req),
         etichette,
@@ -115,9 +121,9 @@ router.post(
       // Il percorso dipende dall'id, quindi si scrive il file dopo aver creato
       // il record e si aggiorna il campo: così un file orfano non resta senza
       // record (il contrario si recupera, l'orfano no).
-      const percorso = percorsoArchivio(doc.id, nomeFile);
+      const percorso = percorsoArchivio(doc.id, busta && !/\.p7m$/i.test(nomeFile) ? `${nomeFile}.p7m` : nomeFile);
       fs.writeFileSync(percorso, file.buffer);
-      aggiornaDocumento(doc.id, { percorso });
+      aggiornaDocumento(doc.id, busta ? { percorso, busta: { percorso, nome: nomeFile, byte: file.size } } : { percorso });
 
       accodaEstrazione(doc.id);
       return { nomeFile, id: doc.id, duplicato: false, stato: 'in-coda' as const };
@@ -168,6 +174,19 @@ router.get('/api/documenti/:id/file', requireAuth, (req: Request, res: Response)
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.nomeFile)}`);
   res.type(doc.mime).sendFile(doc.percorso);
+});
+
+// ── GET /api/documenti/:id/originale — la busta firmata .p7m così come è arrivata ──
+// Il PDF estratto si rilegge con /file; l'originale con valore legale si scarica da qui (mai inline: il browser
+// non sa mostrarlo).
+router.get('/api/documenti/:id/originale', requireAuth, (req: Request, res: Response) => {
+  const doc = trovaDocumento(param(req.params, 'id'));
+  if (!doc || !doc.busta) return res.status(404).json({ error: 'Documento firmato non trovato' });
+  if (!fs.existsSync(doc.busta.percorso)) {
+    return res.status(410).json({ error: 'File firmato non più presente in archivio' });
+  }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.download(doc.busta.percorso, doc.busta.nome);
 });
 
 // ── POST /api/documenti/:id/rielabora — rifà l'estrazione ───────────────────

@@ -27,7 +27,7 @@ futuro ci sarà un modulo a campi. Ogni requisito ha:
 | `obbligatorio` | `true` = se manca è **Non conforme**; `false` = se manca è solo **Da controllare** |
 | `regola` | come controllarlo (vedi sotto) |
 
-I sei tipi di regola:
+I sette tipi di regola:
 
 | Tipo | Controlla che… | Esempio |
 |---|---|---|
@@ -36,7 +36,13 @@ I sei tipi di regola:
 | `regex` | ci sia un dato con una certa forma, e lo riporta | una partita IVA di 11 cifre |
 | `scadenza` | una data trovata sia nel futuro; con *preavviso* (es. 30 giorni) una data vicina dà **Da controllare** | "Scadenza validità 30/01/2027" |
 | `numero` | un numero trovato stia fra un minimo e un massimo | un importo, una percentuale |
-| `manuale` | nessun controllo automatico: l'esito è sempre **Da controllare**, decide una persona | firma leggibile, timbro |
+| `manuale` | nessun controllo automatico: l'esito è sempre **Da controllare**, decide una persona | firma autografa leggibile, timbro |
+| `firma` | il documento sia **firmato digitalmente** (caricato come `.p7m`) con firma valida; nelle parole, facoltative, i nomi o i codici fiscali dei firmatari attesi (ne basta uno) | `{"tipo": "firma", "termini": ["RSSMRA80A01H501U"]}` |
+
+La regola `firma` non guarda il testo ma l'esito della verifica della firma
+([paragrafo 1.4](01-documenti.md)): firma valida = **OK**; da verificare =
+**Da controllare**; non valida, documento non firmato o firmato da un altro =
+**Non conforme** (o **Da controllare** se il requisito non è obbligatorio).
 
 Le regole `regex`, `scadenza` e `numero` usano un modello di ricerca tecnico
 (espressione regolare): per scriverne una nuova conviene partire da quelle

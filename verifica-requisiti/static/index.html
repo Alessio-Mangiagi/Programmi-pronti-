@@ -83,11 +83,12 @@
           <p class="nota">
             PDF o immagini (png, jpg, tiff), max 50&nbsp;MB per file. I PDF con testo si leggono
             direttamente; le scansioni passano dall'OCR e diventano <strong>pronto</strong> a
-            lavorazione finita.
+            lavorazione finita. Anche i <strong>PDF firmati digitalmente (.p7m)</strong>: la firma
+            viene verificata e l'esito compare accanto al nome.
           </p>
           <form id="form-upload" class="riga-bottoni">
             <input type="file" id="file" class="campo" multiple
-                   accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" />
+                   accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.p7m" />
             <input type="text" id="etichette" class="campo campo-largo"
                    placeholder="Etichette separate da virgola (commessa, fornitore…)" />
             <button type="submit" class="btn btn-primario">
