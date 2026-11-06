@@ -56,7 +56,14 @@ le Impostazioni lo segnalano in rosso.
 
 ## Accesso e utenti
 
-L'interfaccia chiede **nome utente e password**. Due ruoli:
+L'interfaccia chiede **nome utente e password**. Vale anche la **password del Portale Suite Cosedil**
+(una password per tutti i programmi): scrivendo il nome utente di qui, oppure lo username o l'email del
+portale, con la password del portale si entra nell'utente di VFP Transfer che ha **lo stesso nome dello
+username del portale o la stessa email**. Gli utenti restano quelli creati qui (con il codice inviato
+all'amministratore): il portale non ne crea e non cambia ruoli o aree. La password di VFP Transfer resta
+valida; col portale spento vale solo quella. Codice in `auth._utente_dal_portale`.
+
+Due ruoli:
 
 | Ruolo | Cosa vede e fa |
 |---|---|

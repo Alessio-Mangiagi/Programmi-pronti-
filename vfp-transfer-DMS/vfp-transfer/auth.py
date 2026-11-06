@@ -10,6 +10,12 @@ Gli utenti stanno nella cassaforte cifrata (cassaforte.py), con la password rido
 (PBKDF2-SHA256, 600.000 iterazioni, sale casuale). Il vecchio utenti.json viene importato e cancellato.
 Le sessioni sono solo in memoria: chiudendo il programma tutti devono rientrare.
 
+Password del portale: chi ha un utente qui entra anche con la password del Portale Suite Cosedil
+(una password per tutti i programmi, scelta del 06/11/2026). Se la password di VFP Transfer non coincide,
+login() chiede al portale (shared/sso/cosedil_sso.verifica_password) se e' quella del portale; l'utente di
+qui e' quello con lo stesso nome dello username del portale o con la stessa email. Gli utenti si creano
+sempre e solo qui (con il codice all'amministratore): il portale non ne aggiunge e non cambia i ruoli.
+
 Ogni modifica a utenti e credenziali richiede un codice monouso inviato via email SOLO all'amministratore
 (ADMIN_EMAIL): valido 10 minuti, legato a quella modifica, 5 tentativi. Finche' l'invio email non e'
 configurato la protezione non e' attiva (serve per la prima configurazione) e l'interfaccia lo segnala.
@@ -36,6 +42,9 @@ import attivita
 import cassaforte
 import env_config
 import mail_send
+
+# Modulo SSO condiviso della suite (shared/sso, due cartelle sopra): serve per la password del portale.
+_SSO = env_config.BASE_DIR.resolve().parents[1] / "shared" / "sso"
 
 USERS_PATH = env_config.BASE_DIR / "utenti.json"
 ROLES = {"admin": "Amministratore", "utente": "Utente"}
@@ -317,8 +326,39 @@ def get_user(name):
 
 # --------------------------------------------------------------------------- accesso e sessioni
 
-def login(name, password):
-    """Restituisce (token, ruolo). Blocca l'utente per 15 minuti dopo 5 tentativi sbagliati."""
+def _utente_dal_portale(users, name, password, ip):
+    """Nome dell'utente di VFP Transfer per cui ``password`` e' la password del portale, oppure None.
+
+    Il portale riconosce la persona da cio' che ha scritto (username o email del portale), controlla la
+    password con i suoi blocchi sull'IP della persona e risponde con username ed email: qui vale l'utente
+    con lo stesso nome dello username, altrimenti quello con la stessa email (uno solo). Portale spento,
+    COSEDIL_SSO=off, password sbagliata o nessun utente corrispondente: None, e il login fallisce come prima.
+    """
+    try:
+        import sys
+        if str(_SSO) not in sys.path:
+            sys.path.insert(0, str(_SSO))
+        import cosedil_sso
+        v = cosedil_sso.verifica_password(name, password, "vfp-transfer", ip=ip)
+    except Exception:  # modulo condiviso assente (copia del programma fuori dalla suite): solo password locale
+        return None
+    if not v.get("ok"):
+        return None
+    username = (v.get("username") or "").lower()
+    email = (v.get("email") or "").lower()
+    per_nome = [n for n in users if n.lower() == username]
+    if per_nome:
+        return per_nome[0]
+    per_email = [n for n, u in users.items() if email and (u.get("email") or "").strip().lower() == email]
+    return per_email[0] if len(per_email) == 1 else None
+
+
+def login(name, password, ip=None):
+    """Restituisce (token, ruolo). Blocca l'utente per 15 minuti dopo 5 tentativi sbagliati.
+
+    Vale la password di VFP Transfer oppure quella del portale (vedi _utente_dal_portale); ``ip`` e' l'indirizzo
+    di chi entra, passato al portale per i suoi blocchi sui tentativi.
+    """
     global _DUMMY_HASH
     name = (name or "").strip()[:64]
     key = name.lower()
@@ -338,6 +378,12 @@ def login(name, password):
             _DUMMY_HASH = hash_password(secrets.token_hex(8))
         verify_password(password or "", _DUMMY_HASH)  # stesso tempo di risposta di un utente esistente
         ok = False
+    if not ok and password:
+        # non e' la password di qui: puo' essere quella del portale (anche scrivendo username o email del portale)
+        dal_portale = _utente_dal_portale(users, name, password, ip)
+        if dal_portale:
+            match, ok = dal_portale, True
+            attivita.record(match, "accesso", "Accesso con la password del Portale", "")
     if not ok:
         with _lock:
             _failures.setdefault(key, []).append(time.time())

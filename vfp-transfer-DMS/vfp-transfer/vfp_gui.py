@@ -1142,7 +1142,8 @@ class Handler(BaseHTTPRequestHandler):
     def _login(self, body):
         name = str(body.get("username") or "")
         try:
-            token, role = auth.login(name, str(body.get("password") or ""))
+            # l'IP serve al portale quando si entra con la sua password (blocchi sui tentativi per PC)
+            token, role = auth.login(name, str(body.get("password") or ""), ip=self.client_address[0])
         except auth.AuthError as e:
             log.warning("Accesso all'interfaccia non riuscito per '%s': %s", name[:64], e)
             attivita.record(name[:64] or "(vuoto)", "accesso", "Accesso non riuscito", str(e), "fallito")
