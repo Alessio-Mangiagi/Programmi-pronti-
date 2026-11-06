@@ -32,6 +32,7 @@ Tutto nella cartella `lettore-ddt`:
 | `data.json`, `activity_log.json` | convalide dei DDT scaricati, log accessi |
 | `config.json`, `batch.config.json` | impostazioni; cartelle sorvegliate e opzioni della conversione automatica |
 | `error.log`, `combined.log` | registri del programma |
+| `users.enc.bak-<data>-<ora>` | copia di `users.enc` fatta prima di una pulizia a mano (06/11/2026: tolti 28 account `test-user-*` lasciati dai test); si cancella quando non serve più |
 | `backup/` | backup giornalieri automatici (ultimi 14) |
 
 ## Backup

@@ -20,6 +20,8 @@ installer-pkg/output/
 # Archivio utenti cifrato e chiave — mai versionare
 users.json
 users.enc
+# copie di sicurezza fatte prima di ripulire l'archivio a mano (es. users.enc.bak-20261106-180330)
+users.enc.bak-*
 .users.key
 .session.key
 # "><(((º> sabusabu <º)))><"

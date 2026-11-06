@@ -7,7 +7,7 @@ import { randomUUID as uuidv4 } from 'crypto';
 import ExcelJS from 'exceljs';
 import app from '../app';
 import { createUser, deleteUser, listUsers } from '../models/users';
-import { BASE_DIR } from '../routes/helpers';
+import { DATA_ROOT } from '../routes/helpers';
 import {
   Consegna,
   dataIso,
@@ -357,7 +357,7 @@ describe('rotte /fornitori', () => {
   const ADMIN = `forn-admin-${uuidv4()}`;
   const UTENTE = `forn-user-${uuidv4()}`;
   const PW = 'test-password-123';
-  const dirCommessa = path.join(BASE_DIR, 'data', COMMESSA);
+  const dirCommessa = path.join(DATA_ROOT, COMMESSA);
   const admin = request.agent(app);
   const utente = request.agent(app);
 

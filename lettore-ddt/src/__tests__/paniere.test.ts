@@ -17,7 +17,7 @@ import {
   previewMerge,
   removeFromPaniere,
 } from '../services/paniere';
-import { BASE_DIR, commessaJsonFolder } from '../routes/helpers';
+import { DATA_ROOT, commessaJsonFolder } from '../routes/helpers';
 
 const TEST_USERNAME = `paniere-user-${uuidv4()}`;
 const TEST_PASSWORD = 'paniere-password-123';
@@ -101,7 +101,7 @@ describe('storage del paniere', () => {
   });
 
   afterAll(() => {
-    fs.rmSync(path.join(BASE_DIR, 'data', commessa), { recursive: true, force: true });
+    fs.rmSync(path.join(DATA_ROOT, commessa), { recursive: true, force: true });
   });
 
   const aggiungi = (label: string, rows: (string | number | null)[][]) =>
@@ -191,7 +191,7 @@ describe('Route /paniere', () => {
 
   afterAll(() => {
     try {
-      fs.rmSync(path.join(BASE_DIR, 'data', TEST_COMMESSA), { recursive: true, force: true });
+      fs.rmSync(path.join(DATA_ROOT, TEST_COMMESSA), { recursive: true, force: true });
     } catch {
       /* niente da pulire */
     }

@@ -22,7 +22,7 @@ import {
 import { createZip, crc32 } from '../batch/zip';
 import { statoPulizia, trovaPython } from '../batch/pulisci';
 import { ddtIndexOfFolder, extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
-import { BASE_DIR } from '../routes/helpers';
+import { DATA_ROOT } from '../routes/helpers';
 import { dentroRadiciConsentite } from '../routes/batchAccesso';
 import { accorpa, statoOllama } from '../batch/ollama';
 
@@ -423,7 +423,7 @@ describe('Route /batch', () => {
     // Gli upload di prova finiscono in data/<commessa>/: senza questa pulizia
     // ogni esecuzione dei test lascia PDF e cartelle di lavoro sul disco.
     try {
-      fs.rmSync(path.join(BASE_DIR, 'data', TEST_COMMESSA), { recursive: true, force: true });
+      fs.rmSync(path.join(DATA_ROOT, TEST_COMMESSA), { recursive: true, force: true });
     } catch {
       /* niente da pulire */
     }

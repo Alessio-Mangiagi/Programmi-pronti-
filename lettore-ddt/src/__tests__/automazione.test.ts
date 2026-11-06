@@ -14,7 +14,7 @@ import {
   ultimeRighe,
 } from '../services/registroLavori';
 import { addToPaniere, clearPaniere, doppioniPaniere } from '../services/paniere';
-import { BASE_DIR } from '../routes/helpers';
+import { DATA_ROOT } from '../routes/helpers';
 
 let tmpDir: string;
 const tmp = (...p: string[]) => path.join(tmpDir, ...p);
@@ -165,7 +165,7 @@ describe('registroLavori', () => {
   };
 
   afterAll(() => {
-    fs.rmSync(path.join(BASE_DIR, 'data', commessa), { recursive: true, force: true });
+    fs.rmSync(path.join(DATA_ROOT, commessa), { recursive: true, force: true });
   });
 
   it('usa il ; come separatore e la virgola decimale (Excel italiano)', () => {
@@ -221,7 +221,7 @@ describe('doppioniPaniere', () => {
   afterEach(() => clearPaniere(commessa));
 
   afterAll(() => {
-    fs.rmSync(path.join(BASE_DIR, 'data', commessa), { recursive: true, force: true });
+    fs.rmSync(path.join(DATA_ROOT, commessa), { recursive: true, force: true });
   });
 
   it('segnala il DDT presente in due voci diverse', () => {

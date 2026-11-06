@@ -31,6 +31,8 @@ module.exports = {
       lines: 54,
     },
   },
+  // env.ts prima di tutto (percorsi temporanei: archivio utenti, sessioni, log…), poi setup.ts.
+  setupFiles: ['<rootDir>/src/__tests__/env.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   forceExit: true,
 };

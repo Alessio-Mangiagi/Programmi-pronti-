@@ -10,11 +10,10 @@
 // Tutte accettano ?commessa=<id> per restringere a una commessa.
 import express, { Request, Response } from 'express';
 import fs from 'fs';
-import path from 'path';
 import { asyncHandler } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/auth';
-import { BASE_DIR, COMMESSA_ID_RE, commessaDataDir, uniqueOutputPath } from './helpers';
+import { COMMESSA_ID_RE, DATA_ROOT, commessaDataDir, uniqueOutputPath } from './helpers';
 import { ExcelService } from '../services/excelService';
 import {
   Consegna,
@@ -29,7 +28,7 @@ const router = express.Router();
 function commesseVisibili(corrente: string): string[] {
   let voci: fs.Dirent[] = [];
   try {
-    voci = fs.readdirSync(path.join(BASE_DIR, 'data'), { withFileTypes: true });
+    voci = fs.readdirSync(DATA_ROOT, { withFileTypes: true });
   } catch {
     return [];
   }

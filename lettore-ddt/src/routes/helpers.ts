@@ -39,6 +39,9 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const isPkg = typeof (process as unknown as { pkg?: unknown }).pkg !== 'undefined';
 // BASE_DIR: root progetto (necessario per gestire relative paths consistentemente)
 export const BASE_DIR = isPkg ? path.dirname(process.execPath) : path.join(__dirname, '..', '..');
+// DATA_ROOT: cartella dei dati per commessa (data/<commessaId>/…). DDT_DATA_ROOT solo per i test
+// (src/__tests__/env.ts): le commesse finte dei test (__test__, …) non finiscono nell'installazione.
+export const DATA_ROOT = process.env.DDT_DATA_ROOT || path.join(BASE_DIR, 'data');
 // Cartelle temporanee su OS temp folder per PDF upload e output Excel
 export const UPLOAD_FOLDER = path.join(os.tmpdir(), 'pdf_to_xlsx_uploads');
 export const OUTPUT_FOLDER = path.join(os.tmpdir(), 'pdf_to_xlsx_outputs');
@@ -60,7 +63,7 @@ export function commessaDataDir(commessaId: string): string {
     throw Object.assign(new Error('commessaId non valido'), { statusCode: 400 });
   }
 
-  const base = path.join(BASE_DIR, 'data');
+  const base = DATA_ROOT;
   const dir = path.join(base, commessaId);
 
   // Validazione 2: path.relative check → se il path è esterno a base, startsWith '..'

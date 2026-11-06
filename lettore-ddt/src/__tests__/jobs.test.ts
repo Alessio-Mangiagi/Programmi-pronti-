@@ -20,7 +20,7 @@ import {
   spoolDirs,
   type BatchJob,
 } from '../batch/jobs';
-import { BASE_DIR } from '../routes/helpers';
+import { DATA_ROOT } from '../routes/helpers';
 
 const COMMESSA = '__test_jobs__';
 
@@ -63,7 +63,7 @@ beforeAll(() => {
 
 afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
-  fs.rmSync(path.join(BASE_DIR, 'data', COMMESSA), { recursive: true, force: true });
+  fs.rmSync(path.join(DATA_ROOT, COMMESSA), { recursive: true, force: true });
 });
 
 // ── Identificatori e cartelle ───────────────────────────────────────────────

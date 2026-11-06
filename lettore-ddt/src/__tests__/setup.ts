@@ -1,34 +1,10 @@
 import 'jest-extended';
 // "><(((º> sabusabu <º)))><"
-import os from 'os';
-import path from 'path';
 import logger from '../utils/logger';
 
-// La chiave API cifrata (.apikey.enc) va in un file temporaneo per worker:
-// le suite girano in parallelo e sul file reale nella root si pesterebbero
-// i piedi (es. batch.test.ts legge la chiave mentre apikey.test.ts la cancella).
-const worker = process.env.JEST_WORKER_ID || '0';
-
-// Gate SSO del portale spento nei test, come nelle altre app della suite: dal 03/11/2026 il gate protegge
-// ogni rotta che non sia un file statico (anche /auth/login e /batch, che non stanno sotto /api) e nei
-// test non c'è nessun portale a cui chiedere la sessione. Il comportamento col gate acceso lo provano
-// sicurezza.test.ts (identità del portale obbligatoria) e i test di shared/sso.
-if (!process.env.COSEDIL_SSO) process.env.COSEDIL_SSO = 'off';
-
-process.env.DDT_APIKEY_PATH = path.join(os.tmpdir(), `ddt-apikey-test-${worker}.enc`);
-
-// Archivio PDF pendenti/convalide e registro attività: senza override i test
-// scrivevano nel data.json e nell'activity_log.json reali dell'installazione,
-// mescolando login finti e convalide di prova ai dati di produzione.
-// Prompt custom: stesso motivo: il file vero (data/prompt-custom.json) è quello
-// che gli utenti vedono nelle tendine, i test non devono riempirlo di prove.
-process.env.DDT_PROMPT_CUSTOM_PATH = path.join(
-  os.tmpdir(),
-  `ddt-prompt-custom-test-${worker}.json`
-);
-
-process.env.DDT_DB_PATH = path.join(os.tmpdir(), `ddt-db-test-${worker}.json`);
-process.env.DDT_ACTIVITY_LOG_PATH = path.join(os.tmpdir(), `ddt-activity-test-${worker}.json`);
+// I percorsi temporanei dei test (archivio utenti, sessioni, log, convalide, registro attività,
+// chiave API, prompt custom) e il gate SSO spento stanno in env.ts, caricato da jest.config.js in
+// setupFiles prima di questo file: qui `import logger` li leggerebbe già, prima di impostarli.
 
 // Chiude i transport Winston e lascia completare le scritture async in coda
 // (users.enc, activity_log.json, autosave) così Jest può uscire senza handle

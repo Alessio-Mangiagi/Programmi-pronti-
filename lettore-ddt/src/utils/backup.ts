@@ -91,7 +91,8 @@ export async function eseguiBackupGiornaliero(): Promise<void> {
   bytes += aggiungiBatchConfigSenzaChiave(entries);
 
   // Dati per-commessa: solo ciò che non si rigenera.
-  const dataRoot = path.join(APP_DIR, 'data');
+  // Stessa cartella di DATA_ROOT (routes/helpers.ts), riletta qui per non importare le route nel backup.
+  const dataRoot = process.env.DDT_DATA_ROOT || path.join(APP_DIR, 'data');
   let commesse: string[] = [];
   try {
     commesse = fs.readdirSync(dataRoot).filter((d) => {

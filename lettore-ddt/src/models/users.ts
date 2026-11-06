@@ -20,9 +20,11 @@ interface UsersFile {
   users: UserRow[];
 }
 
-const DATA_DIR = path.join(__dirname, '..', '..');
-const USERS_PATH = path.join(DATA_DIR, 'users.enc');
-const LEGACY_USERS_PATH = path.join(DATA_DIR, 'users.json');
+// DDT_USERS_PATH esiste per i test (src/__tests__/env.ts): senza, ogni test che crea un account
+// (test-user-…, admin finti) lo scriveva nell'archivio vero dell'installazione, che poi compariva
+// nel pannello admin. Il vecchio users.json in chiaro si cerca accanto all'archivio scelto.
+const USERS_PATH = process.env.DDT_USERS_PATH || path.join(__dirname, '..', '..', 'users.enc');
+const LEGACY_USERS_PATH = path.join(path.dirname(USERS_PATH), 'users.json');
 
 let usersCache: UsersFile | null = null;
 let writeQueue: Promise<void> = Promise.resolve();

@@ -18,7 +18,7 @@ import path from 'path';
 import logger from '../utils/logger';
 import { segnala } from '../../../shared/avvisi/avvisi';
 import {
-  BASE_DIR,
+  DATA_ROOT,
   appConfig,
   commessaDataDir,
   commessaJsonFolder,
@@ -735,7 +735,7 @@ function finish(
  */
 export function resumeInterruptedJobs(): void {
   let commesse: string[] = [];
-  const dataRoot = path.join(BASE_DIR, 'data');
+  const dataRoot = DATA_ROOT;
   try {
     commesse = fs.readdirSync(dataRoot).filter((d) => {
       try {
