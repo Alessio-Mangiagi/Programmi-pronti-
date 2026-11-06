@@ -13,8 +13,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "5180"))
 
-# Database SQLite (creato a runtime, in .gitignore)
-DB_PATH = os.path.join(BASE_DIR, "scadenzario.db")
+# Database SQLite (creato a runtime, in .gitignore). SCADENZARIO_DB lo sposta (per esempio su un disco dati o
+# per una seconda copia di prova); default di sempre: scadenzario.db nella cartella del programma.
+DB_PATH = os.environ.get("SCADENZARIO_DB") or os.path.join(BASE_DIR, "scadenzario.db")
 
 # Cartella per i file allegati alle scadenze (evidenze/documenti), in .gitignore
 ALLEGATI_DIR = os.path.join(BASE_DIR, "allegati")
@@ -49,8 +50,8 @@ EMAIL_A = tuple(x.strip() for x in os.environ.get("EMAIL_A", "").split(",") if x
 # Amministratori dello Scadenzario: solo questi username del portale (oltre a
 # essere admin per l'app nel portale) vedono la pagina Amministrazione e possono
 # eliminare dati, esportare e gestire le utenze. Separati da virgola; vuoto (default)
-# = basta essere admin del portale per l'app. Nessun nome personale nel codice:
-# l'elenco, se serve, sta nella variabile d'ambiente (vedi avvia.bat).
+# = basta essere admin del portale per l'app. Nessun nome personale nel codice né in
+# avvia.bat: l'elenco, se serve, sta in impostazioni-locali.bat (fuori da git).
 ADMIN_UTENTI = tuple(
     x.strip().lower()
     for x in os.environ.get("SCADENZARIO_ADMIN", "").split(",") if x.strip())

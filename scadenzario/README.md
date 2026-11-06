@@ -35,7 +35,8 @@ Tutto gira **in locale** (nessuna dipendenza cloud): backend Flask + SQLite, fro
 
    Lo script:
    - attiva l'ambiente virtuale `.venv` (se esiste)
-   - esegue `python database.py` per creare/aggiornare il database `scadenzario.db` (con i tipi di scadenza predefiniti al primo avvio)
+   - richiama `impostazioni-locali.bat` se c'è (admin, `SCADENZARIO_DB`, posta: impostazioni di questa installazione, fuori da git)
+   - esegue `python database.py` per creare/aggiornare il database `scadenzario.db` (con i tipi di scadenza predefiniti al primo avvio; `SCADENZARIO_DB` lo sposta altrove)
    - avvia il server (`python app.py`)
    - apre il browser su **http://127.0.0.1:5180**
 
@@ -66,8 +67,12 @@ Le operazioni distruttive sono riservate all'amministratore:
   (`/api/allegati/<id>/download`) rispondono **403** a chi non è admin; il modello vuoto del
   calendario corsi resta scaricabile da tutti;
 - è admin chi è **admin per l'app `scadenzario` nel portale** *e*, se la variabile è valorizzata,
-  compare in `SCADENZARIO_ADMIN` (username separati da virgola; `avvia.bat` la imposta se manca).
+  compare in `SCADENZARIO_ADMIN` (username separati da virgola). La variabile non ha più un default
+  in `avvia.bat`: si imposta, se serve, in `impostazioni-locali.bat` (fuori da git, modello
+  `impostazioni-locali.esempio.bat`), che `avvia.bat` richiama prima di preparare il database.
   Con `SCADENZARIO_ADMIN` vuota basta essere admin nel portale.
+- La pagina mostra **Esporta Excel**, **Calendario (.ics)** e **Dossier AI Act** solo agli admin, e
+  propone per gli allegati solo le estensioni che il server accetta (le riceve da `/api/me`).
 
 Gli altri utenti possono consultare, inserire, modificare, rinnovare e importare, ma non
 cancellare: i pulsanti di eliminazione non compaiono nelle loro viste.
@@ -101,7 +106,7 @@ Azioni per riga:
 - **Modifica** — modale di modifica campi
 - **Checklist e allegati** — sotto-adempimenti ed evidenze della scadenza
 
-Pulsanti in testata: maschera/import Excel, **Dossier AI Act**, **Esporta Excel** e
+Pulsanti in testata: maschera/import Excel e, per gli admin, **Dossier AI Act**, **Esporta Excel** e
 **Calendario (.ics)**: le scadenze filtrate come eventi di calendario (Outlook, Google
 Calendar), con promemoria ai giorni di preavviso del tipo. L'import Excel salta le
 righe già presenti (stesso tipo, soggetto e data di scadenza).

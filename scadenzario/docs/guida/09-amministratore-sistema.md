@@ -22,14 +22,25 @@ nel [README del programma](../../README.md), in [SPEC.md](../../SPEC.md) e
 
 È amministratore chi è **admin per lo Scadenzario nel Portale** e, se la variabile
 `SCADENZARIO_ADMIN` contiene un elenco di username (separati da virgola), compare anche
-in quell'elenco. `avvia.bat` imposta un valore predefinito se la variabile manca:
-controllalo, altrimenti gli altri admin del Portale non vedono **Amministrazione**.
+in quell'elenco. Se la variabile è vuota basta essere admin dello Scadenzario nel Portale.
+
+L'elenco non sta più dentro `avvia.bat`: si scrive in **`impostazioni-locali.bat`**, nella
+cartella dello Scadenzario, che è di questa installazione e non finisce nel repository.
+Per crearlo copia `impostazioni-locali.esempio.bat`, rinominalo e togli il `REM` davanti alle
+righe che servono, per esempio:
+
+```bat
+set "SCADENZARIO_ADMIN=m.rossi,l.bianchi"
+```
+
+Lo stesso file può spostare il database (`SCADENZARIO_DB`, vedi sotto) e attivare la posta.
+Le modifiche valgono dal riavvio successivo dello Scadenzario.
 
 ## Dove stanno i dati
 
 | Cosa | Dove |
 |---|---|
-| Database (scadenze, anagrafiche, registro notifiche) | `scadenzario/scadenzario.db` |
+| Database (scadenze, anagrafiche, registro notifiche) | `scadenzario/scadenzario.db`, oppure il percorso in `SCADENZARIO_DB` |
 | Allegati | `scadenzario/allegati/` |
 | Backup automatici | `scadenzario/backup/scadenzario_AAAA-MM-GG.zip` |
 | Pratiche dei mezzi a nolo lette | cartella pratiche di VFP Transfer (`MEZZI_VFP_DIR`) |

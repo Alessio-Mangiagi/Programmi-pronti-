@@ -54,7 +54,9 @@ Grasso*; la **×** toglie il filtro.
    scadenza** si compila da sola (puoi correggerla).
 5. Facoltativi: **Documento di riferimento** (n. attestato, certificato…),
    **Referente / responsabile** (RSPP, medico competente, ufficio…), **Note**.
-6. **Allegati**: puoi già allegare uno o più file (max 20 MB l'uno).
+6. **Allegati**: puoi già allegare uno o più file (max 20 MB l'uno, stessi formati della
+   finestra *Checklist e allegati* qui sotto). Un file troppo grande o di un formato non
+   ammesso compare in rosso nell'elenco e la scadenza non si salva finché non lo togli.
 7. Premi **Crea scadenza**: compare "Scadenza registrata" (con il numero di allegati).
 
 ![Nuova scadenza](img/nuova-scadenza.png)
@@ -110,7 +112,7 @@ Chiudi con la **×** o con il pulsante in basso: l'elenco si aggiorna da solo.
 
 ## Esportazioni (solo amministratori)
 
-Pulsanti in alto nella vista Scadenze:
+Pulsanti in alto nella vista Scadenze, visibili solo agli amministratori:
 
 - **Esporta Excel**: le scadenze che vedi in quel momento, con gli stessi filtri;
 - **Calendario (.ics)**: le stesse scadenze come appuntamenti da importare in Outlook o
@@ -118,8 +120,8 @@ Pulsanti in alto nella vista Scadenze:
 - **Dossier AI Act**: un file Excel con le scadenze AI Act, il registro dei sistemi IA e
   le checklist, pronto per un audit.
 
-Per chi non è amministratore il download non parte (risposta "Operazione riservata
-all'amministratore dello Scadenzario").
+Chi non è amministratore non vede questi pulsanti: se gli serve un estratto lo chiede a un
+amministratore.
 
 ## Inserire tante scadenze insieme (Excel)
 

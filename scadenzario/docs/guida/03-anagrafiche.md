@@ -12,12 +12,13 @@ Le anagrafiche sono i **soggetti** a cui si agganciano le scadenze: **Dipendenti
 
 - **Ricerca** e filtro **Stato** (Tutti, Attivi, Non attivi).
 - Colonna **Scadenze**: quante scadenze ha il soggetto per stato (es. "1 scad.",
-  "1 in scad.", "2 valide"). Un clic apre la vista Scadenze filtrata su di lui.
+  "1 in scad.", "1 valida", "2 valide"). Un clic apre la vista Scadenze filtrata su di lui.
 - Matita = **Modifica**.
 
 ## Aggiungere o modificare
 
-**Nuovo dipendente** (o *subappaltatore*, *attrezzatura*, *sistema IA*) apre la scheda:
+**Nuovo dipendente** (o **Nuovo subappaltatore**, **Nuova attrezzatura**, **Nuovo sistema IA**)
+apre la scheda:
 
 ![Nuovo dipendente](img/nuovo-dipendente.png)
 

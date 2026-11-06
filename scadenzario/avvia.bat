@@ -18,6 +18,12 @@ if exist ".venv\Scripts\activate.bat" (
 )
 echo.
 
+REM Impostazioni di questa installazione (amministratori, percorso del database, posta...):
+REM impostazioni-locali.bat accanto a questo file, fuori da git. Modello commentato in
+REM impostazioni-locali.esempio.bat. Prima di "python database.py", cosi' SCADENZARIO_DB vale
+REM anche per la preparazione del database.
+if exist "%~dp0impostazioni-locali.bat" call "%~dp0impostazioni-locali.bat"
+
 REM Crea/aggiorna il database
 echo Preparazione database ...
 python database.py
@@ -38,9 +44,9 @@ echo.
 if not defined PORTALE_APRE_BROWSER (
     start "" /b cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:5180"
 )
-REM Amministratori dello Scadenzario (username del portale, separati da virgola): qui e non nel
-REM codice. Vuoto = basta essere admin per l'app nel portale.
-if not defined SCADENZARIO_ADMIN set "SCADENZARIO_ADMIN=a.mangiagi"
+REM Amministratori dello Scadenzario: SCADENZARIO_ADMIN (username del portale, separati da
+REM virgola) in impostazioni-locali.bat; vuota = basta essere admin per l'app nel portale.
+REM Nessun nome di persona di default qui (guida 04/11).
 REM Istanza precedente rimasta appesa sulla porta? Chiusura forzata, avvio pulito.
 call "%~dp0..\shared\avvia\libera-porta.bat" 5180
 python app.py

@@ -5,3 +5,5 @@ __pycache__/
 *.db
 allegati/
 backup/
+# impostazioni di questa installazione (admin, database, posta): mai nel repository
+impostazioni-locali.bat

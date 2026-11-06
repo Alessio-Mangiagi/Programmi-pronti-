@@ -101,8 +101,13 @@ def gate_admin():
 
 @app.get("/api/me")
 def api_me():
+    """Chi usa la pagina e le regole degli allegati: la pagina propone e controlla le stesse estensioni e la
+    stessa dimensione massima che il server accetta (config.ALLEGATI_*). Prima la pagina aveva un suo elenco
+    con .doc, .xls, .zip, .eml… che il server poi rifiutava (guida 04/11)."""
     u = utente_corrente() or {}
-    return jsonify({"username": u.get("username"), "nome": u.get("nome"), "admin": e_admin()})
+    return jsonify({"username": u.get("username"), "nome": u.get("nome"), "admin": e_admin(),
+                    "allegati": {"estensioni": list(config.ALLEGATI_ESTENSIONI),
+                                 "max_byte": config.ALLEGATI_MAX_BYTE}})
 
 # ---------------------------------------------------------------------------
 # Costanti di validazione (enum della SPEC)

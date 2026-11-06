@@ -73,10 +73,14 @@ const STATI = {
 
 const CANALI = { in_app: 'In-app', email: 'Email', whatsapp: 'WhatsApp' };
 
-// Allegati ammessi e dimensione massima — allineati a config.ALLEGATI_* lato server
-const ESTENSIONI_ALLEGATI = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg',
-  '.jpeg', '.txt', '.csv', '.eml', '.msg', '.p7m', '.zip'];
-const MAX_BYTE_ALLEGATO = 20 * 1024 * 1024;
+// Allegati ammessi e dimensione massima: li manda il server in /api/me (config.ALLEGATI_*), così la pagina
+// non propone file che poi verrebbero rifiutati. Questi valori valgono solo finché /api/me non ha risposto e
+// sono gli stessi di config.py (niente archivi, posta né Office binario: possono portare codice o macro).
+let ESTENSIONI_ALLEGATI = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.xlsx', '.p7m'];
+let MAX_BYTE_ALLEGATO = 20 * 1024 * 1024;
+const estensioneAmmessa = (nome) => ESTENSIONI_ALLEGATI.includes((nome.match(/\.[^.]+$/) || [''])[0].toLowerCase());
+// "Nuovo dipendente", "Nuova attrezzatura": il genere viene dalla configurazione dell'anagrafica (femminile)
+const nuovoRecord = (cfg) => (cfg.femminile ? 'Nuova ' : 'Nuovo ') + cfg.singolare;
 
 /* ============================================================
    Icone SVG inline (stile Lucide, stroke 1.75)
@@ -677,9 +681,13 @@ async function vistaScadenze(params) {
     '<div class="vista-testata">' +
       '<h2 class="vista-titolo">Scadenze</h2>' +
       barraImportHTML('sc') +
-      '<button type="button" class="btn btn-secondario" id="btn-dossier-ai">' + icona('scudo') + 'Dossier AI Act</button>' +
-      '<button type="button" class="btn btn-secondario" id="btn-esporta">' + icona('scarica') + 'Esporta Excel</button>' +
-      '<button type="button" class="btn btn-secondario" id="btn-ics" title="Calendario per Outlook / Google Calendar">' + icona('calendario') + 'Calendario (.ics)</button>' +
+      // export (Excel, dossier AI Act, calendario .ics) solo agli admin: il server li riserva a loro (dati personali
+      // di tutte le scadenze, commit 199358a); prima i pulsanti si vedevano anche agli altri e rispondevano 403
+      (utente.admin
+        ? '<button type="button" class="btn btn-secondario" id="btn-dossier-ai">' + icona('scudo') + 'Dossier AI Act</button>' +
+          '<button type="button" class="btn btn-secondario" id="btn-esporta">' + icona('scarica') + 'Esporta Excel</button>' +
+          '<button type="button" class="btn btn-secondario" id="btn-ics" title="Calendario per Outlook / Google Calendar">' + icona('calendario') + 'Calendario (.ics)</button>'
+        : '') +
       '<button type="button" class="btn btn-primario" id="btn-nuova-scadenza">' + icona('piu') + 'Nuova scadenza</button>' +
     '</div>' +
     '<div class="filtri">' +
@@ -764,7 +772,7 @@ async function vistaScadenze(params) {
 
   document.getElementById('btn-nuova-scadenza').addEventListener('click', () => modaleScadenza(null, aggiornaTabella));
   collegaBarraImport('sc', '/scadenze', 'modello_scadenze.xlsx', 'scadenze', () => aggiornaTabella());
-  document.getElementById('btn-dossier-ai').addEventListener('click', () =>
+  if (utente.admin) document.getElementById('btn-dossier-ai').addEventListener('click', () =>
     scaricaFile('/api/export/ai_act.xlsx', 'dossier_ai_act.xlsx'));
   // Stessi filtri della tabella visualizzata: il file esportato
   // corrisponde esattamente a ciò che l'utente vede al momento del click.
@@ -778,10 +786,12 @@ async function vistaScadenze(params) {
     qp.set('includi_chiuse', (filtri.includi_chiuse || filtri.stato === 'chiusa') ? '1' : '0');
     return qp.toString();
   }
-  document.getElementById('btn-esporta').addEventListener('click', () =>
-    scaricaFile('/api/export/scadenze.xlsx?' + queryFiltri(), 'scadenze.xlsx'));
-  document.getElementById('btn-ics').addEventListener('click', () =>
-    scaricaFile('/api/export/scadenze.ics?' + queryFiltri(), 'scadenze.ics'));
+  if (utente.admin) {
+    document.getElementById('btn-esporta').addEventListener('click', () =>
+      scaricaFile('/api/export/scadenze.xlsx?' + queryFiltri(), 'scadenze.xlsx'));
+    document.getElementById('btn-ics').addEventListener('click', () =>
+      scaricaFile('/api/export/scadenze.ics?' + queryFiltri(), 'scadenze.ics'));
+  }
 
   aggiornaTabella();
 }
@@ -903,8 +913,9 @@ async function modaleScadenza(scadenza, ricarica) {
       inAllegati.addEventListener('change', () => {
         elencoAllegati.innerHTML = Array.from(inAllegati.files).map((f) =>
           '<li>' + icona('graffetta', 15) + '<span>' + esc(f.name) + '</span>' +
-          '<span class="voce-data ' + (f.size > MAX_BYTE_ALLEGATO ? 'giorni-negativi' : 'muted') + '">' +
-          esc(fmtBytes(f.size)) + (f.size > MAX_BYTE_ALLEGATO ? ' · troppo grande' : '') + '</span></li>').join('');
+          '<span class="voce-data ' + (f.size > MAX_BYTE_ALLEGATO || !estensioneAmmessa(f.name) ? 'giorni-negativi' : 'muted') + '">' +
+          esc(fmtBytes(f.size)) + (f.size > MAX_BYTE_ALLEGATO ? ' · troppo grande' : '') +
+          (estensioneAmmessa(f.name) ? '' : ' · formato non ammesso') + '</span></li>').join('');
       });
 
       aggiornaSoggetti(scadenza ? scadenza.soggetto_id : null);
@@ -938,7 +949,14 @@ async function modaleScadenza(scadenza, ricarica) {
       const files = Array.from(overlay.querySelector('#sc-allegati').files);
       const troppoGrandi = files.filter((f) => f.size > MAX_BYTE_ALLEGATO);
       if (troppoGrandi.length) {
-        mostraErrore('File oltre 20 MB: ' + troppoGrandi.map((f) => f.name).join(', ') + '. Toglili dalla selezione.');
+        mostraErrore('File oltre ' + Math.round(MAX_BYTE_ALLEGATO / 1048576) + ' MB: ' + troppoGrandi.map((f) => f.name).join(', ') + '. Toglili dalla selezione.');
+        return false;
+      }
+      // stesso controllo del server, prima di salvare: altrimenti la scadenza si salva e l'allegato no
+      const nonAmmessi = files.filter((f) => !estensioneAmmessa(f.name));
+      if (nonAmmessi.length) {
+        mostraErrore('Formato non ammesso: ' + nonAmmessi.map((f) => f.name).join(', ') + '. Sono ammessi ' +
+          ESTENSIONI_ALLEGATI.join(', ') + ' (per un .doc o un .xls salvalo prima come .docx o .xlsx).');
         return false;
       }
 
@@ -1048,7 +1066,8 @@ async function modaleDettaglioScadenza(scadenza, ricarica) {
       '<div class="sezione-testata">' + icona('graffetta', 16) + '<h4>Allegati (evidenze)</h4><span id="dt-all-conta" class="muted"></span></div>' +
       '<div id="dt-allegati">' + htmlCaricamento() + '</div>' +
       '<button type="button" class="btn btn-secondario" id="dt-upload">' + icona('carica', 15) + 'Carica file</button>' +
-      '<input type="file" id="dt-file" style="display:none;">' +
+      // stesse estensioni del server anche qui: la finestra dei file propone solo i formati ammessi
+      '<input type="file" id="dt-file" accept="' + ESTENSIONI_ALLEGATI.join(',') + '" style="display:none;">' +
     '</div>';
 
   const { overlay } = apriModale({
@@ -1258,6 +1277,7 @@ const ANAGRAFICHE = {
     endpoint: '/attrezzature',
     titolo: 'Attrezzature',
     singolare: 'attrezzatura',
+    femminile: true,                 // "Nuova attrezzatura" (guida 04/11: c'era "Nuovo attrezzatura")
     articolo: 'l’attrezzatura',
     soggettoTipo: 'attrezzatura',
     iconaVuoto: 'chiave',
@@ -1318,7 +1338,7 @@ async function vistaAnagrafica(chiave) {
     '<div class="vista-testata">' +
       '<h2 class="vista-titolo">' + esc(cfg.titolo) + '</h2>' +
       barraImportHTML('anag') +
-      '<button type="button" class="btn btn-primario" id="btn-nuovo-record">' + icona('piu') + 'Nuovo ' + esc(cfg.singolare) + '</button>' +
+      '<button type="button" class="btn btn-primario" id="btn-nuovo-record">' + icona('piu') + esc(nuovoRecord(cfg)) + '</button>' +
     '</div>' +
     (cfg.sottotitolo ? '<p class="vista-sottotitolo">' + esc(cfg.sottotitolo) + '</p>' : '') +
     '<div class="filtri">' +
@@ -1370,7 +1390,7 @@ async function vistaAnagrafica(chiave) {
       const parti = [];
       if (c.scaduta) parti.push('<span class="badge badge-scaduta"><span class="punto"></span>' + c.scaduta + ' scad.</span>');
       if (c.in_scadenza) parti.push('<span class="badge badge-in_scadenza"><span class="punto"></span>' + c.in_scadenza + ' in scad.</span>');
-      if (c.valida) parti.push('<span class="badge badge-valida"><span class="punto"></span>' + c.valida + ' valide</span>');
+      if (c.valida) parti.push('<span class="badge badge-valida"><span class="punto"></span>' + c.valida + (c.valida === 1 ? ' valida' : ' valide') + '</span>');
       return '<a class="link-conteggi" href="' + href + '" title="Vedi scadenze del soggetto">' + parti.join('') + '</a>';
     };
 
@@ -1435,7 +1455,7 @@ function modaleAnagrafica(cfg, record, ricarica) {
   }).join('');
 
   apriModale({
-    titolo: record ? 'Modifica ' + cfg.singolare : 'Nuovo ' + cfg.singolare,
+    titolo: record ? 'Modifica ' + cfg.singolare : nuovoRecord(cfg),
     corpo,
     larga: true,
     labelConferma: record ? 'Salva modifiche' : 'Crea',
@@ -2099,7 +2119,9 @@ function avviaHeartbeat() {
 async function avvia() {
   avviaHeartbeat();
   try {
-    Object.assign(utente, await api('/me'));
+    const me = await api('/me');
+    Object.assign(utente, me);
+    if (me.allegati) { ESTENSIONI_ALLEGATI = me.allegati.estensioni; MAX_BYTE_ALLEGATO = me.allegati.max_byte; }
   } catch (e) { /* senza /me si resta utente semplice: niente area admin */ }
   const elUtente = document.getElementById('testata-utente');
   if (elUtente && (utente.nome || utente.username)) {
