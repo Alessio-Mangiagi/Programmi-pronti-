@@ -1,7 +1,7 @@
 # Guida sviluppatore — DDTSuite
 
 Manuale interno per manutenzione, aggiornamenti, sicurezza e versionamento.
-**Non esposto dal server** — solo `README.md` e `MANUALE.md` sono raggiungibili via `/docs/`.
+**Non esposto dal server** — via `/docs/` sono raggiungibili `README.md` e il manuale, che dal 06/11/2026 è la guida di `docs/guida` (capitoli 1-6, `guidaInTesto` in `system.routes.ts`; `MANUALE.md` solo come ripiego).
 
 ---
 
@@ -363,8 +363,8 @@ PREPARAZIONE
 [ ] npm run type-check               → 0 errori
 [ ] npm run lint                     → 0 warning
 [ ] Versione aggiornata in package.json, /status, README.md
-[ ] README.md / MANUALE.md aggiornati se ci sono cambi utente
-[ ] GUIDA_UTENTE.md / GUIDA_ADMIN.md aggiornate se cambia il flusso account
+[ ] README.md e docs/guida aggiornati se ci sono cambi utente
+[ ] docs/guida / GUIDA_ADMIN.md aggiornate se cambia il flusso account
 
 BUILD
 [ ] npm run build                    → tsc + vite senza errori

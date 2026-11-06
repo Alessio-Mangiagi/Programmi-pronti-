@@ -7,9 +7,9 @@ Applicazione web per la gestione di commesse edili: importa DDT e documenti PDF 
 Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con account proprio, i dati sono separati per commessa, l'archivio utenti è cifrato e c'è un pannello di amministrazione. Può girare in locale (uso single-user storico) oppure essere pubblicata online per più persone.
 
 > **Guide per l'uso quotidiano:**
-> - Utenti finali → [GUIDA_UTENTE.md](GUIDA_UTENTE.md)
+> - Chi usa il programma (e amministratori) → [guida con immagini](docs/guida/README.md): è anche quella
+>   che si apre con **LEGGI MANUALE** nell'app. `GUIDA_UTENTE.md` e `MANUALE.md` sono superati e rimandano lì.
 > - Amministratori → [GUIDA_ADMIN.md](GUIDA_ADMIN.md)
-> - Manuale completo funzionalità → [MANUALE.md](MANUALE.md)
 > - Scalare oltre la singola istanza → [SCALING.md](SCALING.md)
 
 ---
@@ -18,7 +18,7 @@ Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con accou
 
 | Layer | Tecnologia |
 |---|---|
-| Backend | Node.js 18+, TypeScript, Express 4 |
+| Backend | Node.js 20+, TypeScript, Express 5 |
 | Frontend | React 19, TypeScript, Vite |
 | Autenticazione | express-session + store su file (sessioni persistenti) |
 | Hash password | bcryptjs (cost 10) |
@@ -54,7 +54,7 @@ Dettagli e modello completo in [DEV_GUIDE.md](DEV_GUIDE.md) § Sicurezza.
 ## Sviluppo
 
 ### Prerequisiti
-- Node.js 18+
+- Node.js 20+ (come `engines` in package.json)
 - npm
 
 ### Installazione
@@ -69,7 +69,7 @@ npm install
 | `npm run dev` | Avvia server in modalità sviluppo (ts-node) |
 | `npm run build` | Compila TypeScript + build frontend Vite |
 | `npm start` | Avvia server di produzione (`dist/`) |
-| `npm test` | Esegue suite Jest |
+| `npm test` | Esegue suite Jest. I test scrivono solo in cartelle temporanee (`src/__tests__/env.ts`: archivio utenti, sessioni, log, dati delle commesse, convalide, registro attività), mai nei file dell'installazione |
 | `npm run test:watch` | Test in modalità watch |
 | `npm run lint` | Controllo ESLint |
 | `npm run lint:fix` | Corregge automaticamente errori ESLint |
@@ -266,7 +266,7 @@ In `serverMode` non apre il browser e non si spegne per inattività.
 
 ## Requisiti
 
-- Node.js 18+
+- Node.js 20+ (come `engines` in package.json)
 - Browser moderno (Chrome, Edge)
 - In locale: Windows 10/11, porta 5050–5059 disponibile
 - In hosting: reverse proxy con HTTPS consigliato

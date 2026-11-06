@@ -4,6 +4,8 @@ import { randomUUID as uuidv4 } from 'crypto';
 import app from '../app';
 import { createUser, deleteUser, listUsers } from '../models/users';
 import { VERSION } from '../config';
+import { getDDTValidations } from '../models/database';
+import { getRecentActivity } from '../models/activityLog';
 
 const TEST_USERNAME = `test-user-${uuidv4()}`;
 const TEST_PASSWORD = 'test-password-123';
@@ -68,6 +70,32 @@ describe('App', () => {
     expect(res.status).toBe(200);
     expect(res.body.username).toBe(TEST_USERNAME);
     expect(res.body.commessaId).toBe(TEST_COMMESSA);
+    // utente normale: niente funzioni admin e niente spiegazione da mostrare
+    expect(res.body.isAdmin).toBe(false);
+    expect(res.body.adminSoloDdt).toBe(false);
+  });
+
+  // ── Convalida dell'Excel ("✓ Dati convalidati") ───────────────────────────
+  it('download e poi "Dati convalidati" → una sola riga, convalidata, e evento ddt_validated', async () => {
+    const file = `convalida-${uuidv4()}.xlsx`;
+    // al download l'app registra "da convalidare"…
+    let res = await agent.post('/log-excel-validation').send({ fileName: file, validated: false });
+    expect(res.status).toBe(200);
+    // …il pulsante "✓ Dati convalidati" manda validated=true sullo stesso file
+    res = await agent.post('/log-excel-validation').send({ fileName: file, validated: true });
+    expect(res.status).toBe(200);
+    const righe = getDDTValidations(5000).filter((v) => v.fileName === file);
+    expect(righe).toHaveLength(1);
+    expect(righe[0].validated).toBe(true);
+    expect(righe[0].username).toBe(TEST_USERNAME);
+    const mio = (e: { type: string; username: string; commessaId: string | null }) =>
+      e.type === 'ddt_validated' && e.username === TEST_USERNAME && e.commessaId === TEST_COMMESSA;
+    expect(getRecentActivity(50).some(mio)).toBe(true);
+  });
+
+  it('POST /log-excel-validation senza nome file → 400', async () => {
+    const res = await agent.post('/log-excel-validation').send({ validated: true });
+    expect(res.status).toBe(400);
   });
 
   // ── Versions CRUD ──────────────────────────────────────────────────────────

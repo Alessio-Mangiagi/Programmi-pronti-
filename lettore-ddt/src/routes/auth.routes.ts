@@ -5,7 +5,7 @@
 import express, { Request, Response } from 'express';
 import { verifyPassword, updatePassword } from '../models/users';
 import { logActivity } from '../models/activityLog';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, eAdmin, adminSoloDdt } from '../middleware/auth';
 import { clientIp } from './helpers';
 import logger from '../utils/logger';
 
@@ -119,7 +119,9 @@ router.post('/auth/login', (req: Request, res: Response) => {
       username: user.username,
       commessaId: user.commessaId,
       displayName: user.displayName,
-      isAdmin: !!user.isAdmin,
+      // admin effettivo (account DDT + portale, vedi eAdmin): il web mostra le schede admin solo così
+      isAdmin: eAdmin(req),
+      adminSoloDdt: adminSoloDdt(req),
     });
   });
 });
@@ -161,7 +163,10 @@ router.get('/auth/me', (req: Request, res: Response) => {
     username: req.session.username,
     commessaId: req.session.commessaId,
     displayName: req.session.displayName,
-    isAdmin: !!req.session.isAdmin,
+    // Admin effettivo (account DDT + portale, vedi eAdmin): con solo l'account DDT le rotte admin
+    // rispondono 403, quindi il web non deve mostrarne le schede. adminSoloDdt = mostra il perché.
+    isAdmin: eAdmin(req),
+    adminSoloDdt: adminSoloDdt(req),
   });
 });
 

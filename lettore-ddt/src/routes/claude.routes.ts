@@ -24,8 +24,10 @@ import {
   pruneFolder,
   writeFileAtomicSerial,
   param,
+  clientIp,
 } from './helpers';
 import { insertDDTValidation } from '../models/database';
+import { logActivity } from '../models/activityLog';
 import { extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
 import { inviaDdtASkyTower } from '../services/skytower';
@@ -339,7 +341,11 @@ router.post(
   })
 );
 
-// Endpoint /log-excel-validation: registra nel log admin se l'utente ha convalidato i dati
+// Endpoint /log-excel-validation: stato di convalida di un Excel scaricato (scheda "DDT convalidati"
+// del pannello admin). Lo chiama l'app due volte: al download con validated=false (da controllare) e
+// dal pulsante "✓ Dati convalidati" con validated=true, che aggiorna la stessa riga (insertDDTValidation).
+// La convalida va anche nel registro attività di DDT (ddt_validated) e, tramite cosedilAttivita in
+// app.ts, nel registro del Portale ("Excel verificato · convalidato").
 router.post(
   '/log-excel-validation',
   requireAuth,
@@ -358,6 +364,14 @@ router.post(
         fileName,
         validated === true
       );
+      if (validated === true) {
+        logActivity(
+          'ddt_validated',
+          req.session.username || 'unknown',
+          req.commessaId || null,
+          clientIp(req)
+        );
+      }
 
       logger.info(`Excel validation: ${fileName} - ${validated ? 'VALIDATED' : 'REJECTED'}`, {
         userId: req.userId,

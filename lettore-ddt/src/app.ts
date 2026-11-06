@@ -86,7 +86,8 @@ app.use(
         azione: 'Excel verificato',
         dettaglio: (req) =>
           testo(req.body?.fileName) +
-          (req.body?.validated === true ? ' · convalidato' : ' · respinto'),
+          // validated=false arriva al download (Excel ancora da controllare), non è un rifiuto
+          (req.body?.validated === true ? ' · convalidato' : ' · da convalidare'),
       },
       {
         percorso: '/batch/jobs',
@@ -125,7 +126,9 @@ if (appCfg.trustProxy) app.set('trust proxy', 1);
 // Store sessioni persistente su file system. Le sessioni sopravvivono ai riavvii (single-process).
 // Per architetture multi-istanza usare store condiviso come Redis o Database.
 const FileStore = sessionFileStore(session);
-const sessionsDir = path.join(APP_DIR, 'sessions');
+// DDT_SESSIONS_DIR solo per i test (src/__tests__/env.ts): le sessioni dei login finti non
+// devono finire nella cartella sessions/ dell'installazione.
+const sessionsDir = process.env.DDT_SESSIONS_DIR || path.join(APP_DIR, 'sessions');
 try {
   if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
 } catch (_) {}

@@ -158,16 +158,37 @@ function cleanupOldPendingPdfs(threshold: number): void {
 // convalida ne riscrive l'intero contenuto. Stessa logica di activity_log.
 export const MAX_DDT_VALIDATIONS = 5000;
 
+/**
+ * Registra lo stato di convalida di un Excel scaricato.
+ * Il giro nell'app è in due tempi: al download si scrive "non convalidato" (validated=false: da
+ * controllare), poi il pulsante "✓ Dati convalidati" manda validated=true. In quel caso si aggiorna
+ * la riga "non convalidato" più recente dello stesso utente e dello stesso file (stato e ora), così
+ * nel pannello admin resta una riga per Excel invece di due che si contraddicono. Senza una riga da
+ * aggiornare (es. convalida da un altro giro) se ne aggiunge una nuova.
+ * Ritorna true se ha aggiornato una riga esistente.
+ */
 function insertDDTValidation(
   userId: string,
   username: string,
   commessaId: string,
   fileName: string,
   validated: boolean
-): void {
+): boolean {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- require locale storico, l'import in cima romperebbe l'ordine dei mock nei test
   const { randomUUID } = require('crypto');
   const db = getDb();
+  if (validated) {
+    for (let i = db.ddt_validations.length - 1; i >= 0; i--) {
+      const r = db.ddt_validations[i];
+      if (r.userId === userId && r.fileName === fileName && r.commessaId === commessaId) {
+        if (r.validated) break; // già convalidato: si registra come nuova convalida
+        r.validated = true;
+        r.timestamp = Math.floor(Date.now() / 1000);
+        persistDb();
+        return true;
+      }
+    }
+  }
   const record: DDTValidationRow = {
     id: randomUUID(),
     timestamp: Math.floor(Date.now() / 1000),
@@ -183,6 +204,7 @@ function insertDDTValidation(
     db.ddt_validations = db.ddt_validations.slice(-MAX_DDT_VALIDATIONS);
   }
   persistDb();
+  return false;
 }
 
 function getDDTValidations(limit: number = 500): DDTValidationRow[] {

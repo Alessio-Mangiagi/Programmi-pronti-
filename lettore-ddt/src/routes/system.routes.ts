@@ -15,7 +15,7 @@ import { listUsers } from '../models/users';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { hasActiveJobs } from '../batch/jobs';
 import { sorveglianzaConfigurata } from '../batch/sorveglianza';
-import { appConfig, BASE_DIR } from './helpers';
+import { appConfig, BASE_DIR, DATA_ROOT } from './helpers';
 
 const router = express.Router();
 
@@ -69,7 +69,7 @@ router.get('/status', (req: Request, res: Response) => {
   }
 
   try {
-    const dataDir = path.join(BASE_DIR, 'data');
+    const dataDir = DATA_ROOT;
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
     fs.accessSync(dataDir, fs.constants.W_OK);
     checks.dataDir = 'ok';
@@ -161,17 +161,61 @@ const makeDocApiRoute = (filePath: string) =>
     res.json({ content });
   });
 
+// "LEGGI MANUALE" nell'app (06/11/2026): mostra la guida nuova per chi usa il programma (docs/guida,
+// capitoli 1-6; il 7 è per l'amministratore di sistema). MANUALE.md e GUIDA_UTENTE.md erano rimasti
+// alla versione di giugno ("Gestione Progetto", 5 tentativi di login…). Il riquadro dell'app non mostra
+// immagini né link: si tolgono le immagini e i commenti, dei link resta il testo. Se la cartella della
+// guida non c'è (es. installazione senza docs/), si ripiega su MANUALE.md.
+const CAPITOLI_GUIDA = [
+  'README.md',
+  '01-accesso.md',
+  '02-convertire-un-ddt.md',
+  '03-paniere-e-altri-caricamenti.md',
+  '04-strumenti-amministratori.md',
+  '05-pannello-admin.md',
+  '06-problemi-frequenti.md',
+];
+export function guidaInTesto(): string {
+  const dir = path.join(BASE_DIR, 'docs', 'guida');
+  try {
+    return CAPITOLI_GUIDA.map((f) => fs.readFileSync(path.join(dir, f), 'utf-8'))
+      .map((t) =>
+        t
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .replace(/^\s*!\[[^\]]*\]\([^)]*\)\s*$/gm, '')
+          .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim()
+      )
+      .join('\n\n---\n\n');
+  } catch {
+    return fs.readFileSync(path.join(BASE_DIR, 'MANUALE.md'), 'utf-8');
+  }
+}
+
 // Browser viewing: ritorna HTML renderizzato.
 // Tutta la documentazione richiede login; guide admin/dev solo per amministratori.
 router.get('/docs/readme', requireAuth, makeDocRoute('README.md'));
-router.get('/docs/manual', requireAuth, makeDocRoute('MANUALE.md'));
+router.get(
+  '/docs/manual',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    res.type('text/html').send(markdownToHtml(guidaInTesto()));
+  })
+);
 router.get('/docs/admin-guide', requireAdmin, makeDocRoute('GUIDA_ADMIN.md'));
 router.get('/docs/dev-guide', requireAdmin, makeDocRoute('DEV_GUIDE.md'));
 router.get('/docs/import-guide', requireAdmin, makeDocRoute('GUIDA_IMPORTAZIONE_UTENTI.md'));
 
 // API: sempre JSON per il frontend
 router.get('/docs-api/readme', requireAuth, makeDocApiRoute('README.md'));
-router.get('/docs-api/manual', requireAuth, makeDocApiRoute('MANUALE.md'));
+router.get(
+  '/docs-api/manual',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    res.json({ content: guidaInTesto() });
+  })
+);
 router.get('/docs-api/admin-guide', requireAdmin, makeDocApiRoute('GUIDA_ADMIN.md'));
 router.get('/docs-api/dev-guide', requireAdmin, makeDocApiRoute('DEV_GUIDE.md'));
 router.get('/docs-api/import-guide', requireAdmin, makeDocApiRoute('GUIDA_IMPORTAZIONE_UTENTI.md'));

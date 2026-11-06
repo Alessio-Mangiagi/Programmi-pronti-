@@ -95,6 +95,22 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+/**
+ * Amministratore di Lettore DDT a tutti gli effetti: account DDT admin E, con il gate del portale attivo,
+ * admin dell'app nel portale (req.cosedil.admin; regola della revisione di sicurezza, 70b6f4a).
+ * È la stessa regola di requireAdmin e la usano anche /auth/me (schede e pulsante Admin del web), la
+ * pagina /admin, la conversione automatica riservata e le eccezioni per gli admin nelle rotte batch e
+ * prompt: prima il web guardava solo l'account DDT e mostrava schede che poi rispondevano 403.
+ */
+export function eAdmin(req: Request): boolean {
+  return !!req.session?.isAdmin && (!gatePortaleAttivo() || !!req.cosedil?.admin);
+}
+
+/** Admin dell'account DDT ma non nel portale: il web nasconde le funzioni admin e spiega perché. */
+export function adminSoloDdt(req: Request): boolean {
+  return !!req.session?.isAdmin && gatePortaleAttivo() && !req.cosedil?.admin;
+}
+
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (gatePortaleAttivo() && !req.cosedil) {
     res.status(401).json({ error: 'Accesso richiesto: entra dal Portale Suite Cosedil' });
@@ -107,8 +123,12 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   // Admin = admin DDT E admin dell'app nel portale (req.cosedil.admin): il portale decide chi
   // amministra le app della suite, l'account DDT da solo non basta. Utente riconosciuto ma senza
   // il ruolo: 403, non 401 (non è un problema di login).
-  if (!req.session.isAdmin || (gatePortaleAttivo() && !req.cosedil?.admin)) {
-    res.status(403).json({ error: 'Accesso amministratore richiesto' });
+  if (!eAdmin(req)) {
+    res.status(403).json({
+      error: adminSoloDdt(req)
+        ? 'Funzione da amministratore: nel Portale Suite non sei amministratore di Lettore DDT'
+        : 'Accesso amministratore richiesto',
+    });
     return;
   }
   next();

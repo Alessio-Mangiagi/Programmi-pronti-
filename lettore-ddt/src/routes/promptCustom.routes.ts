@@ -8,7 +8,7 @@
 // usato da una cartella sorvegliata non deve sparire per errore.
 
 import express, { Request, Response } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, eAdmin } from '../middleware/auth';
 import { asyncHandler } from '../utils/errorHandler';
 import {
   MAX_PROMPT_CUSTOM,
@@ -70,7 +70,7 @@ router.delete(
     if (!prompt) return res.status(404).json({ error: 'Prompt non trovato' });
 
     const utente = req.session.username || req.session.userId || '';
-    if (!req.session.isAdmin && prompt.creatoDa !== utente) {
+    if (!eAdmin(req) && prompt.creatoDa !== utente) {
       return res.status(403).json({
         error: `Questo prompt l'ha creato ${prompt.creatoDa}: può cancellarlo solo lui o un amministratore`,
       });

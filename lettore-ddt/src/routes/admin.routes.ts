@@ -17,7 +17,7 @@ import {
 import { logActivity, getRecentActivity, getActiveAccounts } from '../models/activityLog';
 // "><(((º> sabusabu <º)))><"
 import { getDDTValidations } from '../models/database';
-import { requireAdmin } from '../middleware/auth';
+import { requireAdmin, eAdmin, adminSoloDdt } from '../middleware/auth';
 import { apiKeySource, loadBatchConfig, resolveApiKey } from '../batch/config';
 import {
   deleteStoredApiKey,
@@ -235,7 +235,17 @@ router.delete('/admin/api/apikey', requireAdmin, (req: Request, res: Response) =
 });
 
 router.get('/admin', (req: Request, res: Response) => {
-  if (!req.session.userId || !req.session.isAdmin) {
+  // Stessa regola delle API admin (eAdmin): prima la pagina si apriva a chi era admin solo dell'account
+  // DDT e poi ogni tabella rispondeva 403.
+  if (req.session.userId && adminSoloDdt(req)) {
+    return res
+      .status(403)
+      .send(
+        'Pannello riservato: sei amministratore del Lettore DDT, ma nel Portale Suite non sei ' +
+          'amministratore di questo programma. Chiedi a un amministratore del Portale.'
+      );
+  }
+  if (!req.session.userId || !eAdmin(req)) {
     return res
       .status(401)
       .send(

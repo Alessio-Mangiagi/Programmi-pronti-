@@ -61,7 +61,8 @@ menu:
 - **Sezioni › WBS / SAL / KPI**: mostra o nasconde le schede WBS, SAL e Dashboard KPI. Queste schede sono
   riservate agli amministratori: per un utente normale l'interruttore non cambia niente.
 
-In fondo alla pagina ci sono anche i pulsanti **HOME**, **LEGGI README** e **LEGGI MANUALE**.
+In fondo alla pagina ci sono anche i pulsanti **HOME**, **LEGGI README** e **LEGGI MANUALE**, che apre il
+testo di questa guida (capitoli 1-6, senza immagini).
 
 ## Cambiare la password
 

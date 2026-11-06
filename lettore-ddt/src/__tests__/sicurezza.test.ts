@@ -61,7 +61,12 @@ describe('utils/csv', () => {
 // ── Revisione di sicurezza del 03/11/2026 ──────────────────────────────────
 // Con il gate del portale attivo, la sessione DDT da sola non basta: serve anche
 // l'identità messa dal gate (req.cosedil); e l'admin DDT deve essere admin anche nel portale.
-import { requireAuth as _requireAuth, requireAdmin as _requireAdmin } from '../middleware/auth';
+import {
+  requireAuth as _requireAuth,
+  requireAdmin as _requireAdmin,
+  eAdmin as _eAdmin,
+  adminSoloDdt as _adminSoloDdt,
+} from '../middleware/auth';
 import { pathAllowed as _pathAllowed } from '../routes/batchAccesso';
 import { config as _cfg } from '../config';
 
@@ -99,6 +104,36 @@ describe('identità del portale obbligatoria (gate attivo)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _requireAdmin(req({ userId: 'u', isAdmin: true }, { username: 'm', admin: true }), res as any, next);
     expect(next).toHaveBeenCalled();
+  });
+  it('admin effettivo per il web (/auth/me): stessa regola di requireAdmin, e il perché', () => {
+    const soloDdt = req({ userId: 'u', isAdmin: true }, { username: 'm', admin: false });
+    const tutti = req({ userId: 'u', isAdmin: true }, { username: 'm', admin: true });
+    const soloPortale = req({ userId: 'u', isAdmin: false }, { username: 'm', admin: true });
+    // solo account DDT admin: niente schede admin, ma il web spiega che manca il ruolo nel portale
+    expect([_eAdmin(soloDdt), _adminSoloDdt(soloDdt)]).toEqual([false, true]);
+    // admin in tutti e due: funzioni admin visibili, nessuna spiegazione
+    expect([_eAdmin(tutti), _adminSoloDdt(tutti)]).toEqual([true, false]);
+    // admin nel portale ma non nell'account DDT: niente admin, e non è il caso "solo DDT"
+    expect([_eAdmin(soloPortale), _adminSoloDdt(soloPortale)]).toEqual([false, false]);
+  });
+  it('403 di requireAdmin spiega che manca il ruolo nel portale', () => {
+    let corpo: { error?: string } = {};
+    const res = {
+      statusCode: 0,
+      status(c: number) {
+        res.statusCode = c;
+        return res;
+      },
+      json(b: { error?: string }) {
+        corpo = b;
+        return res;
+      },
+    };
+    const soloDdt = req({ userId: 'u', isAdmin: true }, { username: 'm', admin: false });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _requireAdmin(soloDdt, res as any, jest.fn());
+    expect(res.statusCode).toBe(403);
+    expect(corpo.error).toMatch(/Portale Suite non sei amministratore/);
   });
 });
 

@@ -57,7 +57,8 @@ scoprire gli account mai usati.
 ## Log accessi
 
 Gli ultimi eventi: **Login OK**, **Login fallito**, login bloccati, **Logout**, account creati, revocati,
-disabilitati, password cambiate, chiave API aggiornata. Per ognuno data e ora, utente, commessa e indirizzo IP.
+disabilitati, password cambiate, chiave API aggiornata, **DDT convalidato** (un utente ha cliccato *✓ Dati
+convalidati*). Per ognuno data e ora, utente, commessa e indirizzo IP.
 **Aggiorna** ricarica, la casella cerca per username, **Salva lista (CSV)** scarica.
 
 ![Log accessi](img/20-admin-log-accessi.png)
@@ -68,13 +69,16 @@ a indovinarla.
 ## DDT convalidati
 
 Lo storico dei file Excel scaricati: data, utente, commessa, nome del file e **Stato convalida**
-(*✓ Convalidato* / *✗ Non convalidato*).
+(*✓ Convalidato* / *✗ Da convalidare*). Sopra la tabella, il conteggio (*1 risultato*, *12 risultati*) segue
+la ricerca.
 
 ![DDT convalidati](img/21-admin-ddt-convalidati.png)
 
-> Attenzione: ogni Excel scaricato dalla scheda Importa viene registrato come *Non convalidato* al momento del
-> download, e il pulsante **✓ Dati convalidati** della finestra di convalida **non aggiorna** questo stato.
-> Quindi oggi i download manuali risultano tutti *Non convalidato* anche se l'utente ha confermato.
+Ogni Excel scaricato dalla scheda Importa entra come *✗ Da convalidare*; quando l'utente clicca **✓ Dati
+convalidati** la **stessa riga** passa a *✓ Convalidato* con l'ora della convalida (dal 06/11/2026: prima il
+pulsante non aggiornava lo stato). La convalida compare anche nel **Log accessi** come *DDT convalidato* e nel
+registro del Portale come *Excel verificato · convalidato*. Nell'immagine le righe sono quelle di prima della
+correzione, con la vecchia dicitura *Non convalidato*.
 
 ## Chiave API
 

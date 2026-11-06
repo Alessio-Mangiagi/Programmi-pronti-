@@ -13,7 +13,7 @@ import express, { Request, Response } from 'express';
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, eAdmin } from '../middleware/auth';
 import {
   BrowseEntry,
   isLoopback,
@@ -84,7 +84,7 @@ router.get(
     res.json({
       hasApiKey: !!resolveApiKey(config),
       // false = pagina riservata agli admin e questo utente non lo è.
-      puoiUsare: !config.soloAdmin || req.session.isAdmin === true,
+      puoiUsare: !config.soloAdmin || eAdmin(req),
       // Il bottone "Pulisci DDT" esiste solo se l'ambiente PaddleOCR c'è: senza,
       // la pagina lo mostra spento col motivo, invece di far partire un lavoro
       // che fallirebbe dopo l'upload.
@@ -498,7 +498,7 @@ router.get(
     // Solo le cartelle della propria commessa: l'elenco completo direbbe a
     // ogni utente quali percorsi del server sono in uso dalle altre.
     const tutte = statoSorveglianza();
-    const mie = req.session.isAdmin ? tutte : tutte.filter((s) => s.commessa === req.commessaId);
+    const mie = eAdmin(req) ? tutte : tutte.filter((s) => s.commessa === req.commessaId);
     res.json({ cartelle: mie, minutiMinimi: MIN_MINUTI_SCANSIONE });
   })
 );
@@ -510,7 +510,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const tutte = loadBatchConfig().sorvegliate || [];
     const mie = tutte.filter(
-      (s) => s.attiva !== false && (req.session.isAdmin || s.commessa === req.commessaId)
+      (s) => s.attiva !== false && (eAdmin(req) || s.commessa === req.commessaId)
     );
     if (mie.length === 0) {
       return res.status(400).json({ error: 'Nessuna cartella sorvegliata per questa commessa' });

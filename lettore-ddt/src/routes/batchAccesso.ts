@@ -14,6 +14,7 @@ import path from 'path';
 import { loadBatchConfig } from '../batch/config';
 import { config as appCfg } from '../config';
 import { richiestaLocale } from '../utils/richiesta';
+import { eAdmin } from '../middleware/auth';
 
 export interface BrowseEntry {
   name: string;
@@ -76,7 +77,8 @@ export function listDrives(): BrowseEntry[] {
 // /batch/config resta accessibile a tutti: la pagina lo legge per mostrare il
 // motivo del blocco invece di un errore nudo.
 export function requireBatchAccess(req: Request, res: Response, next: NextFunction): void {
-  if (!loadBatchConfig().soloAdmin || req.session.isAdmin) return next();
+  // admin effettivo (account DDT + portale), come le altre funzioni riservate: vedi eAdmin
+  if (!loadBatchConfig().soloAdmin || eAdmin(req)) return next();
   res.status(403).json({
     error:
       'La conversione automatica è riservata agli amministratori (batch.config.json → soloAdmin).',

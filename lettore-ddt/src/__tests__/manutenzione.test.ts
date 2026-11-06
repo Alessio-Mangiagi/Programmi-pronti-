@@ -75,6 +75,20 @@ describe('convalide DDT su data.json', () => {
     expect(getDDTValidations(MAX_DDT_VALIDATIONS * 2)).toHaveLength(MAX_DDT_VALIDATIONS);
   });
 
+  it('"Dati convalidati" aggiorna la riga del download; una seconda convalida ne aggiunge una', () => {
+    const file = `riga-${uuidv4()}.xlsx`;
+    expect(insertDDTValidation('u9', 'utente', '__test__', file, false)).toBe(false);
+    expect(insertDDTValidation('u9', 'utente', '__test__', file, true)).toBe(true);
+    let righe = getDDTValidations(MAX_DDT_VALIDATIONS).filter((v) => v.fileName === file);
+    expect(righe.map((v) => v.validated)).toEqual([true]);
+    // stesso file di un altro utente: riga sua, la convalida del primo non la tocca
+    insertDDTValidation('u8', 'altro', '__test__', file, false);
+    expect(insertDDTValidation('u9', 'utente', '__test__', file, true)).toBe(false);
+    righe = getDDTValidations(MAX_DDT_VALIDATIONS).filter((v) => v.fileName === file);
+    expect(righe).toHaveLength(3);
+    expect(righe.filter((v) => v.userId === 'u8').map((v) => v.validated)).toEqual([false]);
+  });
+
   it('la lettura ordinata non riordina la cache condivisa', () => {
     const prima = getDDTValidations(5).map((v) => v.fileName);
     getDDTValidations(1000); // ordina la copia, non l'originale

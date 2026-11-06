@@ -17,7 +17,9 @@ export type ActivityEvent = {
     | 'account_disabled'
     | 'account_enabled'
     | 'apikey_updated'
-    | 'apikey_deleted';
+    | 'apikey_deleted'
+    // "✓ Dati convalidati" dopo il download di un Excel (claude.routes.ts, /log-excel-validation)
+    | 'ddt_validated';
   username: string;
   commessaId: string | null;
   ip: string;

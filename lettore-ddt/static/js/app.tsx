@@ -134,7 +134,9 @@ const ClaudeJsonBox = React.memo(function ClaudeJsonBox({
 // MAIN APP
 // ============================================================
 interface AppProps {
-  user?: { username: string; commessaId: string; displayName: string; isAdmin?: boolean };
+  // isAdmin = admin effettivo (account DDT + Portale, eAdmin lato server); adminSoloDdt = admin solo
+  // dell'account DDT: le funzioni admin sono nascoste e una riga sotto le schede spiega perché.
+  user?: { username: string; commessaId: string; displayName: string; isAdmin?: boolean; adminSoloDdt?: boolean };
   onLogout?: () => void;
 }
 
@@ -206,6 +208,9 @@ export default function App({ user, onLogout }: AppProps = {}) {
   });
   const [pdfUploading, setPdfUploading] = useState(false);
   const [showExcelValidation, setShowExcelValidation] = useState(false);
+  // Nome dell'Excel appena scaricato: il pulsante "✓ Dati convalidati" lo rimanda a
+  // /log-excel-validation con validated=true (al download era stato registrato "da convalidare").
+  const [excelDaConvalidare, setExcelDaConvalidare] = useState('');
   // Nome del PDF scansionato: persiste in localStorage così l'export mantiene
   // lo stesso nome anche se la pagina viene ricaricata durante il lavoro su Claude.ai
   // temp_id del PDF caricato con /prepare-claude: con un solo PDF il server
@@ -552,6 +557,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
       }
 
       // Mostra banner di convalida dopo il download
+      setExcelDaConvalidare(excelName);
       setShowExcelValidation(true);
       notify('File Excel salvato · Convalidare l\'estrazione dati', 'info');
     } catch (err: any) {
@@ -2139,6 +2145,15 @@ export default function App({ user, onLogout }: AppProps = {}) {
             </div>
           ))}
         </div>
+        {/* Admin solo dell'account DDT: le API admin rispondono 403 (serve anche il ruolo nel Portale),
+            quindi schede e pulsante Admin non si vedono; qui si dice perché invece di lasciarlo a indovinare. */}
+        {user?.adminSoloDdt && (
+          <div role="note" style={{ margin: '8px 24px 0', padding: '8px 12px', borderRadius: 8, background: '#fff8e1', border: '1px solid #f0d58c', color: '#5f4b00', fontSize: 13 }}>
+            Il tuo account del Lettore DDT è da amministratore, ma nel Portale Suite non sei amministratore di
+            questo programma: conversione automatica, archivio, fornitori e pannello Admin restano nascosti.
+            Per usarli chiedi a un amministratore del Portale.
+          </div>
+        )}
 
         {/* Layout principale */}
         {activeSection === "main" && (
@@ -2313,8 +2328,27 @@ export default function App({ user, onLogout }: AppProps = {}) {
                 </ul>
               </div>
               <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                <button onClick={() => {
+                <button onClick={async () => {
                   setShowExcelValidation(false);
+                  // Prima mancava: il pulsante chiudeva il riquadro senza dirlo al server, e nel pannello
+                  // admin ogni Excel restava "non convalidato". Ora la convalida si salva (stessa riga del
+                  // download) e finisce nel registro attività di DDT e del Portale.
+                  if (excelDaConvalidare) {
+                    try {
+                      const res = await fetch('/log-excel-validation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ fileName: excelDaConvalidare, validated: true }),
+                      });
+                      if (!res.ok) throw new Error('HTTP ' + res.status);
+                      notify('Convalida registrata', 'success');
+                    } catch (err) {
+                      console.error('Errore registrazione convalida:', err);
+                      notify("Convalida non registrata: riprova o avvisa l'amministratore", "error");
+                    }
+                    setExcelDaConvalidare('');
+                  }
                   try {
                     const raw = JSON.parse(claudeResponse);
                     const converted = convertJsonToProject(raw, "Risposta Claude");

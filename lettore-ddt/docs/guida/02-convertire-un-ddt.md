@@ -90,7 +90,8 @@ Clicca **Conferma e scarica Excel**. Il file si scarica con il nome del PDF (es.
 ![Convalidare l'estrazione](img/09-convalida-excel.png)
 
 Apri l'Excel scaricato e segui la *Checklist di convalida*: dati presenti in tutti i fogli, numeri giusti,
-niente di tagliato. Poi clicca **✓ Dati convalidati**.
+niente di tagliato. Poi clicca **✓ Dati convalidati**: compare *Convalida registrata* e gli amministratori
+vedono quell'Excel come *✓ Convalidato*. Finché non lo clicchi, resta *✗ Da convalidare*.
 
 Il Lettore DDT conserva una copia dell'estrazione nella tua commessa: finisce nell'**Archivio DDT** e nel
 riepilogo **Fornitori** che consultano gli amministratori, e il registro dei DDT scaricati compare nel loro

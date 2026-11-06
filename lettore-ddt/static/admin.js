@@ -98,8 +98,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted' };
-const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa' };
+const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success' };
+const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato' };
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -116,7 +116,7 @@ function filterLogs() {
     if (matches) visible++;
   });
   const count = document.getElementById('logCount');
-  if (count) count.textContent = visible ? `${visible} risultato${visible !== 1 ? 'i' : ''}` : '';
+  if (count) count.textContent = visible ? `${visible} ${visible === 1 ? 'risultato' : 'risultati'}` : '';
 }
 
 function filterActiveAccounts() {
@@ -130,7 +130,7 @@ function filterActiveAccounts() {
     if (matches) visible++;
   });
   const count = document.getElementById('activeCount');
-  if (count) count.textContent = visible ? `${visible} risultato${visible !== 1 ? 'i' : ''}` : '';
+  if (count) count.textContent = visible ? `${visible} ${visible === 1 ? 'risultato' : 'risultati'}` : '';
 }
 
 function csvEsc(s) {
@@ -358,7 +358,7 @@ function filterDDT() {
     if (matches) visible++;
   });
   const count = document.getElementById('ddtCount');
-  if (count) count.textContent = visible ? `${visible} risultato${visible !== 1 ? 'i' : ''}` : '';
+  if (count) count.textContent = visible ? `${visible} ${visible === 1 ? 'risultato' : 'risultati'}` : '';
 }
 
 async function loadDDTValidations() {
@@ -373,7 +373,8 @@ async function loadDDTValidations() {
     const date = new Date(v.timestamp).toLocaleString('it-IT');
     const statusBadge = v.validated
       ? '<span class="badge badge-success">✓ Convalidato</span>'
-      : '<span class="badge badge-failed">✗ Non convalidato</span>';
+      // validated=false = Excel scaricato ma "✓ Dati convalidati" non ancora premuto
+      : '<span class="badge badge-failed">✗ Da convalidare</span>';
     tr.innerHTML = `
       <td>${esc(date)}</td>
       <td>${esc(v.username || '-')}</td>
