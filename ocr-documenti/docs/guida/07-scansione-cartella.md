@@ -63,5 +63,8 @@ in *elaborati* c'è già un file con lo stesso nome, il nuovo diventa `nome (2).
 - Se in alto leggi **Cartella · in pausa**, il browser vuole di nuovo il permesso:
   apri **⚙ Impostazioni** e premi **Riattiva**.
 - Se stai già elaborando altri documenti, la scansione automatica aspetta che tu finisca.
+- Se in alto leggi **Server non raggiungibile — riprovo**, la scansione automatica
+  aspetta che il server risponda e parte al controllo successivo (ogni 30 secondi):
+  nessun contratto finisce in *da controllare* per colpa del server spento.
 
 [← Indice](README.md)

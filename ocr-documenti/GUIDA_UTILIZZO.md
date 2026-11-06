@@ -317,6 +317,7 @@ Tutti nel pannello di destra, in basso, sul file selezionato:
 | Problema | Soluzione |
 |----------|-----------|
 | "PaddleOCR non trovato" nell'header | Ricreare il venv: `python -m venv .venv` poi `.venv\Scripts\pip install paddlepaddle paddleocr --trusted-host pypi.org --trusted-host files.pythonhosted.org` |
+| "Server non raggiungibile — riprovo" nell'header | Il backend sta partendo o è spento: la pagina riprova `/api/health` e `/api/elenchi` ogni 3 s, senza ricaricare. Fisso per più di un minuto → riavviare OCR Documenti |
 | Assist AI spento | Opzionale — per attivarlo: `ollama serve`, poi ricaricare |
 | Excel con poche righe / righe mancanti | Guardare la sezione `### TABELLA ARTICOLI` in MD: se incompleta, il layout del contratto non è ancora tarato |
 | Celle rosse PROGETTO/EPU | Commessa non in elenco: correggere o aggiornare `Elenchi/RIPARTIZIONE COMMESSE` |

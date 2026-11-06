@@ -13,8 +13,11 @@
 | **⚙ Impostazioni** | cartella dei contratti, cartella di destinazione e quando avviare la scansione da sola (vedi [7](07-scansione-cartella.md)) |
 | **README**, **Guida** | documentazione tecnica e guida rapida dentro il programma |
 | **PaddleOCR pronto** (verde) | il motore per leggere le **scansioni** è attivo. Se compare **PaddleOCR non trovato** o **PaddleOCR bloccato** (rosso), le scansioni non si possono leggere; i PDF con testo, i Word e gli Excel funzionano lo stesso. Il motivo è scritto passando il mouse sull'indicatore: avvisa l'amministratore |
+| **Server non raggiungibile — riprovo** (giallo) | il programma è stato aperto mentre il server stava ancora partendo, oppure il server è spento. La pagina riprova da sola ogni 3 secondi e passa a *PaddleOCR pronto* appena il server risponde: non serve ricaricare. Se resta così per più di un minuto, riavvia OCR Documenti |
 | **Cartella · prossima …** | compare solo con la scansione automatica attiva: quando parte la prossima. *Cartella · in pausa* = il browser vuole di nuovo il permesso sulle cartelle (⚙ Impostazioni → Riattiva) |
 | **Assist AI** | aiuto facoltativo che riempie i campi che il programma non ha trovato. *Assist AI spento — opzionale* (giallo) è normale: il programma funziona comunque |
+
+![La barra in alto mentre il server sta partendo](img/18-server-non-raggiungibile.png)
 
 La **Guida** integrata è un riassunto rapido; in alcuni punti descrive ancora
 la disposizione precedente della pagina (barra in alto invece del pannello a

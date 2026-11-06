@@ -260,6 +260,7 @@ Strumenti di supporto:
 | Problema | Soluzione |
 |----------|-----------|
 | PaddleOCR non trovato | Ricreare il venv (vedi Prerequisiti) o impostare `PYTHON_BIN` |
+| Server non raggiungibile — riprovo | Pagina aperta prima del backend (`npm run dev`: Vite è su prima) o backend spento. `App.tsx` ripete `/api/health` e `/api/elenchi` ogni 3 s finché rispondono; intanto la scansione della cartella non parte (l'automatica riprova al giro dopo) |
 | Primo scan lentissimo | Normale una volta sola: download modelli (~30 MB) + caricamento |
 | 0 articoli sempre (`[Tabella TSV] ricostruiti 0`) | Layout non ancora tarato: guardare la sezione `### TABELLA ARTICOLI` in MD |
 | Assist AI spento | Normale: è opzionale. Per attivarlo: `ollama serve` + `ollama pull qwen2.5:3b` |

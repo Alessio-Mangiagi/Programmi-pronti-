@@ -6,6 +6,7 @@
 | Cosa succede | Cosa fare |
 |---|---|
 | **PaddleOCR non trovato** / **PaddleOCR bloccato** in alto | Le scansioni non si possono leggere (PDF con testo, Word ed Excel sì). Il motivo è nel suggerimento dell'indicatore: avvisa l'amministratore. |
+| **Server non raggiungibile — riprovo** in alto (vedi [1.1](01-schermata.md#11-la-barra-in-alto)) | Il server sta partendo o è spento. Aspetta qualche secondo: la pagina se ne accorge da sola. Se dopo un minuto è ancora così, riavvia OCR Documenti. Intanto *Scansiona la cartella ora* risponde «non risponde ancora» e non sposta nessun file. |
 | **Assist AI spento** | Normale: è facoltativo. |
 | Il primo documento ci mette molto | Normale la prima volta dopo l'avvio: il motore si carica. |
 | Excel con poche righe o righe mancanti | Elabora in formato **.MD** e guarda in fondo la sezione *TABELLA ARTICOLI (ricostruita dalla scansione)*: se è incompleta, quel modello di contratto non è ancora "tarato" — segnalalo con il PDF. Nel frattempo correggi in **Modifica**. |
