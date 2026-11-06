@@ -35,6 +35,8 @@ Le pagine stanno in ui/ (HTML, CSS, JS senza dipendenze); questo file espone una
   POST /api/login | /api/logout | /api/state/reset
   GET  /api/mezzi | /api/mezzi/pratica?id= | /api/mezzi/fornitore?piva= | /api/mezzi/modelli | /api/mezzi/contratto.docx?id=
   GET  /api/mezzi/commessa?codice= | /api/mezzi/commesse   dati della commessa da CPM/Alyante (ponte.py, sola lettura)
+  GET  /api/modelli | /api/modelli/aree?rel= | /api/modelli/pratica?id= | /api/modelli/pratica.docx?id=
+  POST /api/modelli/pratica | /api/modelli/compila | /api/modelli/controlla   modelli Word protetti (modelli_protetti.py)
   POST /api/mezzi/salva | /api/mezzi/contratto/anteprima | /api/mezzi/contratto | /api/mezzi/dms   (mezzi.py, area mezzi)
   POST /api/mezzi/allega?id=&tipo=&nome=&scadenza=   file del mezzo dal browser (corpo = il file)   [area mezzi]
   POST /api/mezzi/carica      documentazione del mezzo in Viewpoint (solo admin)
@@ -763,6 +765,122 @@ def api_modelli_visto(body, sess):
     return api_modelli_avvisi()
 
 
+# --------------------------------------------------------------------------- pagina Modelli Word (modelli_protetti.py)
+# Solo amministratore, come gli avvisi sui modelli. Le cartelle (MODELLI_SORGENTE, MODELLI_LAVORO) si impostano solo
+# nel .env (env_config.SOLO_SVILUPPATORI): la pagina non le mostra e non le cambia, e nelle risposte non finiscono
+# percorsi assoluti del server (solo nomi relativi alla cartella condivisa).
+
+MAX_TESTO_AREA = 20000      # caratteri per area: un contratto intero sta sotto, un incollato per errore no
+MAX_SOSTITUZIONI = 50
+
+
+def _modello_dalla_pagina(s, rel):
+    """Il modello scelto nella pagina: solo percorsi relativi alla cartella condivisa, senza "..". La riga di
+    comando accetta anche percorsi assoluti (risolvi_modello), dal browser no: si leggerebbero .docx ovunque."""
+    rel = str(rel or "").strip().replace("\\", "/")
+    if not rel or rel.startswith("/") or re.match(r"^[A-Za-z]:", rel) or ".." in rel.split("/"):
+        raise ValueError("modello non valido: scegliere un file dall'elenco")
+    return modelli_protetti.modello_docx(s, modelli_protetti.risolvi_modello(s, rel))
+
+
+def _valori_dalla_pagina(valori):
+    """{id area: testo} oppure {id area: [[da, a], ...]} come li manda la pagina, controllati prima di scrivere."""
+    if not isinstance(valori, dict):
+        raise ValueError("valori delle aree non validi")
+    out = {}
+    for k, v in valori.items():
+        k = str(k)
+        if not re.fullmatch(r"-?\d{1,10}", k):
+            raise ValueError(f"area non valida: {k[:20]}")
+        if isinstance(v, str):
+            if len(v) > MAX_TESTO_AREA:
+                raise ValueError(f"area {k}: testo oltre {MAX_TESTO_AREA} caratteri")
+            out[k] = v
+        elif isinstance(v, list) and 0 < len(v) <= MAX_SOSTITUZIONI and all(
+                isinstance(c, list) and len(c) == 2 and all(isinstance(x, str) and len(x) <= MAX_TESTO_AREA for x in c)
+                for c in v):
+            out[k] = [[c[0], c[1]] for c in v]
+        else:
+            raise ValueError(f"area {k}: serve un testo oppure un elenco di sostituzioni [da, a]")
+    return out
+
+
+def _pratica_modello(pr, rec_id):
+    """Pratica per la pagina: dati del record senza percorsi del server, aree con il testo attuale della copia
+    compilata, quello dell'originale (per "Ripristina") e il valore salvato (testo o sostituzioni)."""
+    rec = pr.leggi(rec_id)
+    attuali = pr.aree(rec_id)
+    originali = {a["id"]: a["testo"] for a in pr.aree_originali(rec_id)["aree"]}
+    valori = rec.get("valori", {})
+    aree = [a | {"originale": originali.get(a["id"], ""), "valore": valori.get(a["id"])} for a in attuali["aree"]]
+    sicuro = {k: rec.get(k) for k in ("id", "stato", "creato", "aggiornato", "utente", "compilato", "protezione",
+                                      "modello", "fonte", "descrizione")}
+    sicuro["nome_file"] = rec["origine"].get("nome_file")
+    sicuro["sha256"] = rec["origine"].get("sha256")
+    sicuro["aree_cambiate"] = rec.get("aree_cambiate", [])
+    return {"pratica": sicuro, "protezione": attuali["protezione"], "aree": aree}
+
+
+def api_modelli():
+    """Modelli della cartella condivisa, pratiche e stato del controllo mensile. Le cartelle non impostate o non
+    raggiungibili non sono un errore della chiamata: la pagina mostra il messaggio in "errore"."""
+    s = env_config.load_settings()
+    out = {"impostata": bool(modelli_protetti.cartella_sorgente(s)), "modelli": [], "pratiche": [], "errore": ""}
+    try:
+        out["modelli"] = modelli_protetti.elenco_modelli(s)
+    except modelli_protetti.ModelloError as e:
+        out["errore"] = str(e)
+    try:
+        out["pratiche"] = modelli_protetti.pratiche(s).elenco()
+    except modelli_protetti.ModelloError as e:
+        out["errore"] = out["errore"] or str(e)
+    stato = modelli_protetti.avvisi_aperti()
+    out["controllo"] = {"ultimo": stato["ultimo_controllo"], "file": stato["file"], "avvisi": len(stato["avvisi"])}
+    return out
+
+
+def api_modelli_aree(query):
+    """Anteprima delle aree gialle di un modello, prima di creare la pratica."""
+    s = env_config.load_settings()
+    rel = _q(query, "rel")
+    info = modelli_protetti.leggi_aree(_modello_dalla_pagina(s, rel))
+    return {"rel": rel, **info}
+
+
+def api_modelli_nuova(body, sess):
+    s = env_config.load_settings()
+    rel = str(body.get("rel") or "")
+    pr = modelli_protetti.pratiche(s)
+    rec = pr.nuova(_modello_dalla_pagina(s, rel), sess["user"], rel=rel, fonte="pagina",
+                   descrizione=body.get("descrizione") or "")
+    log.info("Pratica %s dal modello Word %s creata da %s", rec["id"], rel, sess["user"])
+    attivita.record(sess["user"], "modifica", "Pratica da modello Word creata", f"{rec['id']} {rel}", role=sess["role"])
+    return _pratica_modello(pr, rec["id"])
+
+
+def api_modelli_pratica(query):
+    return _pratica_modello(modelli_protetti.pratiche(env_config.load_settings()), _q(query, "id"))
+
+
+def api_modelli_compila(body, sess):
+    pr = modelli_protetti.pratiche(env_config.load_settings())
+    rec_id = str(body.get("id") or "")
+    descrizione = body.get("descrizione")
+    rec = pr.compila(rec_id, _valori_dalla_pagina(body.get("valori") or {}), sess["user"],
+                     descrizione=None if descrizione is None else str(descrizione))
+    attivita.record(sess["user"], "modifica", "Modello Word compilato",
+                    f"{rec_id}: {len(rec['aree_cambiate'])} aree diverse dall'originale", role=sess["role"])
+    return _pratica_modello(pr, rec_id)
+
+
+def api_modelli_controlla(sess):
+    """Controllo dei modelli adesso, senza aspettare il mese (stessa logica del thread mensile)."""
+    avviso = modelli_protetti.controlla_modelli(env_config.load_settings(), forza=True)
+    attivita.record(sess["user"], "modifica", "Controllo dei modelli Word eseguito",
+                    "nessuna modifica" if not avviso else avviso.get("tipo", ""), role=sess["role"])
+    return {"avviso": avviso, **api_modelli()}
+
+
 # --------------------------------------------------------------------------- mezzi a nolo (mezzi.py)
 
 def _mezzi():
@@ -1013,6 +1131,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/activity": ("admin", lambda: api_activity(q, self._token())),
             "/api/ai/status": ("admin", lambda: api_ai_status()),
             "/api/modelli/avvisi": ("admin", lambda: api_modelli_avvisi()),
+            "/api/modelli": ("admin", lambda: api_modelli()),
+            "/api/modelli/aree": ("admin", lambda: api_modelli_aree(q)),
+            "/api/modelli/pratica": ("admin", lambda: api_modelli_pratica(q)),
             "/api/mezzi": ("area:mezzi", lambda: api_mezzi()),
             "/api/mezzi/pratica": ("area:mezzi", lambda: api_mezzi_pratica(q)),
             "/api/mezzi/fornitore": ("area:mezzi", lambda: api_mezzi_fornitore(q)),
@@ -1033,6 +1154,17 @@ class Handler(BaseHTTPRequestHandler):
             attivita.record(sess["user"], "report", "Contratto del mezzo scaricato", nome, role=sess["role"])
             return self._send(200, data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                               {"Content-Disposition": f"attachment; filename=\"contratto.docx\"; filename*=UTF-8''{quote(nome)}"})
+        if url.path == "/api/modelli/pratica.docx":  # copia compilata di una pratica della pagina Modelli Word
+            if not self._allowed(sess, "admin"):
+                return
+            try:
+                percorso, nome = modelli_protetti.pratiche(env_config.load_settings()).file_compilato(_q(q, "id"))
+                data = percorso.read_bytes()
+            except (ValueError, OSError) as e:
+                return self._send(404, {"error": str(e)})
+            attivita.record(sess["user"], "report", "Modello Word compilato scaricato", nome, role=sess["role"])
+            return self._send(200, data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                              {"Content-Disposition": f"attachment; filename=\"modello.docx\"; filename*=UTF-8''{quote(nome)}"})
         if url.path == "/api/report.xlsx":
             if not self._allowed(sess, "admin"):
                 return
@@ -1147,6 +1279,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/ai/start": ("admin", lambda: api_ai_start(body)),
             "/api/activity/session-close": ("admin", lambda: api_session_close(body, sess, self._token())),
             "/api/modelli/avvisi/visto": ("admin", lambda: api_modelli_visto(body, sess)),
+            "/api/modelli/pratica": ("admin", lambda: api_modelli_nuova(body, sess)),
+            "/api/modelli/compila": ("admin", lambda: api_modelli_compila(body, sess)),
+            "/api/modelli/controlla": ("admin", lambda: api_modelli_controlla(sess)),
             "/api/mezzi/salva": ("area:mezzi", lambda: api_mezzi_salva(body, sess)),
             "/api/mezzi/contratto/anteprima": ("area:mezzi", lambda: api_mezzi_anteprima(body)),
             "/api/mezzi/contratto": ("area:mezzi", lambda: api_mezzi_contratto(body, sess)),

@@ -10,7 +10,9 @@ progetto di Trimble). Lo fa in tre modi:
 - **Mezzi**: una scheda unica per i mezzi a nolo, con cui si compila il contratto Word e si archivia tutta la
   documentazione del mezzo.
 
-In più, per tutti, **Confronta documenti** mette a confronto due versioni dello stesso documento.
+In più, per tutti, **Confronta documenti** mette a confronto due versioni dello stesso documento; per gli
+amministratori **Modelli Word** compila i modelli Word protetti (contratti di trasporto, ordini) nelle sole aree
+gialle.
 
 ![Panoramica di VFP Transfer](img/02-panoramica-documenti.png)
 
@@ -24,12 +26,13 @@ In più, per tutti, **Confronta documenti** mette a confronto due versioni dello
 6. [Impostazioni (amministratori)](06-impostazioni.md)
 7. [Problemi frequenti e messaggi](07-problemi-frequenti.md)
 8. [Appendice per l'amministratore di sistema](08-amministratore-di-sistema.md)
+9. [Modelli Word (amministratori)](09-modelli-word.md)
 
 ## Chi vede cosa
 
 | Chi | Cosa vede |
 |---|---|
-| **Amministratore** | tutto, nelle tre aree (Documenti, Posta, Mezzi): trasferimenti, storico, smistamento AI, flusso posta, caselle, mezzi, attività utenti, impostazioni |
+| **Amministratore** | tutto, nelle tre aree (Documenti, Posta, Mezzi): trasferimenti, storico, smistamento AI, flusso posta, caselle, mezzi, modelli Word, attività utenti, impostazioni |
 | **Utente dell'area Documenti** | la Panoramica dei documenti, l'invio del report via email, Confronta documenti |
 | **Utente dell'area Posta** | la Panoramica della posta, il Flusso posta, l'invio del report, Confronta documenti |
 | **Utente dell'area Mezzi** | la pagina Mezzi e Confronta documenti |
@@ -44,4 +47,4 @@ L'area di ciascun utente la decide l'amministratore (Impostazioni › Utenti).
 
 *Le immagini sono state fatte su una copia di prova con dati di esempio (marcati "[ESEMPIO]"), senza
 collegamenti a Viewpoint, caselle email, PEC, DMS o Claude. Per questo in molte schermate si legge "Non
-collegato" e "Posta disattivata". Guida aggiornata al 4 novembre 2026.*
+collegato" e "Posta disattivata". Guida aggiornata al 6 novembre 2026.*

@@ -32,7 +32,7 @@ Tutto nella cartella `vfp-transfer`:
 | `registro_posta.csv`, `stato_posta.json`, `posta_in_arrivo/` | registro delle email, stato della posta, copia degli allegati |
 | `protocolli_manuali.json` | protocolli corretti a mano |
 | `moduli_compilati/` | pratiche dei mezzi e anagrafica delle ditte |
-| `modelli_compilati/` | contratti compilati |
+| `modelli_compilati/` | pratiche dei modelli Word: copia intatta dell'originale, copia compilata, `record.json` (pagina Modelli Word e contratti dei mezzi) |
 | `registro_attivita.jsonl` | registro delle attività utenti |
 | `confronti/` | confronti di documenti (30 giorni) |
 | `logs/` | registri del programma (`vfp_servizio.log`) |

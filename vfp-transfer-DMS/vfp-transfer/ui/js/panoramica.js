@@ -206,7 +206,8 @@ function renderModelliAvvisi({ avvisi }) {
          <ul class="banner-list">${Object.entries(MODELLI_VOCI).filter(([k]) => (a[k] || []).length)
            .map(([k, lbl]) => `<li>${lbl}: ${a[k].map(esc).join(', ')}</li>`).join('')}</ul>`;
     return `<p>${corpo} <button class="btn btn-sm btn-secondary banner-btn" type="button" data-modello-visto="${esc(a.id)}">
-      <svg class="ic"><use href="#i-check"/></svg>Segna come visto</button></p>`;
+      <svg class="ic"><use href="#i-check"/></svg>Segna come visto</button>
+      <a href="#" class="btn btn-sm btn-ghost banner-btn" data-goto="modelli">Apri Modelli Word</a></p>`;
   }).join('');
 }
 

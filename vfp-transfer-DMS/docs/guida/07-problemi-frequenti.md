@@ -20,7 +20,8 @@
 | Email **In errore** nel Flusso posta | Il caricamento in Viewpoint non è riuscito più volte | Leggi il dettaglio; risolto il problema, **Riprova adesso** (amministratore) |
 | Messaggio che inizia con **ANAGRAFICA** (Mezzi) | Hai scritto un dato diverso da quello registrato per la ditta (es. IBAN) | Verifica con la ditta per telefono; il cambio lo conferma un amministratore |
 | **Gestionale non raggiungibile** (Mezzi) | CPM o Alyante non rispondono | Compila a mano: la scheda funziona lo stesso |
-| **cartella dei modelli non impostata** (Mezzi) | Manca la cartella dei format dei contratti | Avvisa l'amministratore di sistema |
+| **cartella dei modelli non impostata** (Mezzi, Modelli Word) | Manca la cartella dei format dei contratti | Avvisa l'amministratore di sistema |
+| **Un'area ha N paragrafi ma il testo M righe** (Modelli Word) | L'area gialla occupa più paragrafi | Una riga per paragrafo, oppure *Sostituisci una parte* ([capitolo 9](09-modelli-word.md)) |
 | **Confronto non disponibile** | Il motore del confronto non è partito | **Riprova**; se persiste avvisa l'amministratore |
 | Viene chiesto un **codice** inviato all'amministratore | Modifica protetta (utenti, credenziali, sicurezza) | L'amministratore legge il codice nella sua email (vale 10 minuti) |
 

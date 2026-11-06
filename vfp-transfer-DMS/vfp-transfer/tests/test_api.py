@@ -2,6 +2,7 @@
 """Interfaccia: server HTTP vero su una porta libera, con file e sessioni finti in una cartella temporanea."""
 
 import csv
+import io
 import json
 import tempfile
 import threading
@@ -9,7 +10,9 @@ import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
+import zipfile
 from urllib.error import HTTPError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from tests import ROOT  # noqa: F401
@@ -254,6 +257,12 @@ class ApiTest(unittest.TestCase):
         import mezzi
         accetta = re.search(r'id="mzFile" hidden accept="([^"]+)"', html).group(1)
         self.assertEqual(set(accetta.split(",")), mezzi.ESTENSIONI_DOC)
+        # pagina Modelli Word: voce di menu solo per l'amministratore (come le rotte) e script caricato
+        voce = re.search(r'<button[^>]*data-view="modelli"[^>]*>', html).group(0)
+        self.assertIn("data-admin", voce)
+        self.assertNotIn("data-utente", voce)
+        self.assertIn('<script src="js/modelli.js"></script>', html)
+        self.assertIn('id="view-modelli"', html)
 
     def test_area_utente_valida(self):
         self.assertEqual(auth.area_di({"area": "posta"}), "posta")
@@ -346,6 +355,91 @@ class ApiTest(unittest.TestCase):
         code, body, _ = self.call("/api/modelli/avvisi/visto", {"id": "a1"})
         self.assertEqual((code, json.loads(body)["avvisi"]), (200, []))
         self.assertEqual(self.call("/api/modelli/avvisi/visto", {"id": "x"})[0], 400)
+
+    def test_pagina_modelli_word(self):
+        """Pagina Modelli Word: solo admin, niente percorsi assoluti, pratica, compilazione (testo, sostituzioni,
+        area vuota), errori chiari, scaricamento, originale intatto, controllo a richiesta."""
+        from tests.test_modelli_protetti import crea_docx
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            (d / "condivisa" / "Trasporti").mkdir(parents=True)
+            modello = crea_docx(d / "condivisa" / "Trasporti" / "contratto.docx")
+            prima = modello.read_bytes()
+            cartelle = {"MODELLI_SORGENTE": str(d / "condivisa"), "MODELLI_LAVORO": str(d / "lavoro")}
+            with mock.patch.dict(self.settings, cartelle):
+                for cookie in ("doc", "mz", "posta"):
+                    self.assertEqual(self.call("/api/modelli", cookie=cookie)[0], 403)
+                self.assertEqual(self.call("/api/modelli/pratica", {"rel": "Trasporti/contratto.docx"}, cookie="mz")[0], 403)
+                self.assertEqual(self.call("/api/modelli/compila", {"id": "x", "valori": {}}, cookie="doc")[0], 403)
+
+                code, body, _ = self.call("/api/modelli")
+                dati = json.loads(body)
+                self.assertTrue(dati["impostata"])
+                self.assertEqual([m["rel"] for m in dati["modelli"]], ["Trasporti/contratto.docx"])
+                self.assertNotIn(json.dumps(str(d))[1:-1], body.decode())   # nessun percorso del server
+
+                _, body, _ = self.call("/api/modelli/aree?rel=Trasporti/contratto.docx")
+                self.assertEqual([a["id"] for a in json.loads(body)["aree"]], ["10", "20", "30"])
+                for cattivo in ("../fuori.docx", str(modello), "C:/x.docx", "/etc/x.docx", ""):
+                    self.assertEqual(self.call("/api/modelli/aree?rel=" + quote(cattivo))[0], 400, cattivo)
+
+                code, body, _ = self.call("/api/modelli/pratica", {"rel": "Trasporti/contratto.docx",
+                                                                   "descrizione": "Trasporto Rossi\n101-003"})
+                self.assertEqual(code, 200, body)
+                p = json.loads(body)
+                rid = p["pratica"]["id"]
+                self.assertEqual((p["pratica"]["fonte"], p["pratica"]["descrizione"], p["pratica"]["stato"]),
+                                 ("pagina", "Trasporto Rossi 101-003", "bozza"))
+                self.assertNotIn(json.dumps(str(d))[1:-1], body.decode())
+
+                valori = {"10": "12/04/2026", "20": [["IBAN: ____", "IBAN: IT60X0542811101000000123456"]],
+                          "30": "Rossi Trasporti srl"}
+                code, body, _ = self.call("/api/modelli/compila", {"id": rid, "valori": valori, "descrizione": "Trasporto Rossi"})
+                self.assertEqual(code, 200, body)
+                p = json.loads(body)
+                aree = {a["id"]: a for a in p["aree"]}
+                self.assertEqual((aree["10"]["testo"], aree["10"]["originale"]), ("12/04/2026", "11/03/2026"))
+                self.assertEqual(aree["20"]["testo"], "IBAN: IT60X0542811101000000123456\nBanca: ____")
+                self.assertEqual(aree["20"]["valore"], valori["20"])
+                self.assertEqual(aree["30"]["testo"], "Rossi Trasporti srl")
+                self.assertEqual((p["pratica"]["stato"], sorted(p["pratica"]["aree_cambiate"]), p["pratica"]["descrizione"]),
+                                 ("compilata", ["10", "20", "30"], "Trasporto Rossi"))
+
+                code, body, _ = self.call("/api/modelli/compila", {"id": rid, "valori": {"20": "una riga sola"}})
+                self.assertEqual(code, 400)
+                self.assertIn("paragrafi", json.loads(body)["error"])
+                for sbagliati in ({"10": 5}, {"99": "x"}, {"../x": "y"}, {"10": [["solo da"]]}, "testo"):
+                    self.assertEqual(self.call("/api/modelli/compila", {"id": rid, "valori": sbagliati})[0], 400, sbagliati)
+                self.assertEqual(self.call("/api/modelli/pratica?id=../../x")[0], 400)
+
+                code, data, headers = self.call(f"/api/modelli/pratica.docx?id={rid}")
+                self.assertEqual(code, 200)
+                self.assertIn("contratto.docx", headers["Content-Disposition"])
+                with zipfile.ZipFile(io.BytesIO(data)) as z:
+                    xml = z.read("word/document.xml").decode()
+                self.assertIn("Rossi Trasporti srl", xml)
+                self.assertIn("Clausola fissa &amp; non modificabile", xml)
+                self.assertEqual(self.call("/api/modelli/pratica.docx?id=20260101-000000-abcdef")[0], 404)
+                self.assertEqual(self.call(f"/api/modelli/pratica.docx?id={rid}", cookie="doc")[0], 403)
+
+                dati = json.loads(self.call("/api/modelli")[1])
+                self.assertEqual([(x["id"], x["descrizione"], x["aree_cambiate"]) for x in dati["pratiche"]],
+                                 [(rid, "Trasporto Rossi", 3)])
+                self.assertEqual(modello.read_bytes(), prima)          # l'originale condiviso non cambia mai
+
+                code, body, _ = self.call("/api/modelli/controlla", {})
+                self.assertEqual(code, 200, body)
+                r = json.loads(body)
+                self.assertIsNone(r["avviso"])                          # prima volta: solo la fotografia
+                self.assertTrue(r["controllo"]["ultimo"])
+
+    def test_pagina_modelli_senza_cartella(self):
+        with mock.patch.dict(self.settings, {"MODELLI_SORGENTE": ""}):
+            code, body, _ = self.call("/api/modelli")
+            dati = json.loads(body)
+            self.assertEqual((code, dati["impostata"], dati["modelli"]), (200, False, []))
+            self.assertIn("MODELLI_SORGENTE", dati["errore"])
+            self.assertEqual(self.call("/api/modelli/pratica", {"rel": "x.docx"})[0], 400)
 
 
 if __name__ == "__main__":

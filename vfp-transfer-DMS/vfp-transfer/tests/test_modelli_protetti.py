@@ -135,6 +135,29 @@ class ModelliProtettiTest(unittest.TestCase):
                          {"10": "01/01/2027", "30": "Rossi"})
         self.assertEqual(pr.elenco()[0]["aree_cambiate"], 2)
 
+    def test_pratica_della_pagina(self):
+        """Campi usati dalla pagina Modelli Word: modello, fonte, nota, stato, originali, file compilato."""
+        s = self.settings()
+        pr = mp.pratiche(s)
+        self.assertIs(mp.pratiche(s), pr)                     # una sola istanza: il lock vale fra le richieste
+        rec = pr.nuova(mp.risolvi_modello(s, "Trasporti/contratto.docx"), "mario", rel="Trasporti/contratto.docx",
+                       fonte="pagina", descrizione="  Trasporto\tRossi\n" + "x" * 300)
+        self.assertEqual((rec["modello"], rec["fonte"], rec["stato"]), ("Trasporti/contratto.docx", "pagina", "bozza"))
+        self.assertEqual(len(rec["descrizione"]), 200)
+        self.assertTrue(rec["descrizione"].startswith("Trasporto Rossi x"))
+        rec = pr.compila(rec["id"], {"10": "12/04/2026"}, "anna", descrizione="Nota nuova")
+        self.assertEqual((rec["stato"], rec["descrizione"], rec["utente"]), ("compilata", "Nota nuova", "anna"))
+        rec = pr.compila(rec["id"], {"10": "11/03/2026"})      # di nuovo come il modello: torna "bozza"
+        self.assertEqual((rec["stato"], rec["descrizione"]), ("bozza", "Nota nuova"))
+        self.assertEqual({a["id"]: a["testo"] for a in pr.aree_originali(rec["id"])["aree"]}["10"], "11/03/2026")
+        percorso, nome = pr.file_compilato(rec["id"])
+        self.assertEqual((percorso.name, nome), ("contratto.docx", "contratto.docx"))
+        voce = pr.elenco()[0]
+        self.assertEqual((voce["modello"], voce["fonte"], voce["descrizione"]), ("Trasporti/contratto.docx", "pagina", "Nota nuova"))
+        percorso.unlink()
+        with self.assertRaisesRegex(mp.ModelloError, "file compilato non trovato"):
+            pr.file_compilato(rec["id"])
+
     def test_percorsi(self):
         s = self.settings()
         with self.assertRaisesRegex(mp.ModelloError, "fuori"):

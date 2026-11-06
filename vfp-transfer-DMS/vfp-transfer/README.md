@@ -228,6 +228,31 @@ usa sono compilati; altrimenti il buco resta. Per vedere cosa propone su un form
 python mezzi.py aree --modello "Mezzi\FORMAT CONTRATTUALIA-003 SEDE ACIREALE\Format Contratto nolo a freddo 2025 SEDE ACIREALE.doc"
 ```
 
+## Modelli Word protetti (solo amministratori)
+
+Pagina **Modelli Word** (menu *Strumenti*): compila i modelli Word protetti della cartella condivisa (contratti di
+trasporto, ordini, format) **solo nelle aree gialle**, le eccezioni di "Limita modifica". Guida: capitolo 9
+(`../docs/guida/09-modelli-word.md`).
+
+- **Elenco dei modelli** di `MODELLI_SORGENTE` (anche nelle sottocartelle). I `.doc` si usano se c'e' LibreOffice
+  (conversione con `modelli_doc.py`, sopra), altrimenti vanno salvati in `.docx`.
+- **Nuova pratica** da un modello, con una nota per ritrovarla: copia intatta dell'originale (SHA-256 nel record) e
+  copia compilata in `MODELLI_LAVORO/<id>/`. La cartella condivisa non si scrive mai.
+- **Compilazione**: per ogni area con la spunta, una riga per paragrafo oppure sostituzioni "da → a" (per cambiare
+  solo un pezzo di un'area lunga). La copia si rifa' sempre dall'originale; fuori dalle aree il testo deve restare
+  identico, altrimenti la compilazione si ferma con il motivo. *Ripristina il testo del modello* riporta un'area
+  com'era.
+- **Scarica Word** (`GET /api/modelli/pratica.docx?id=`), **Pratiche** (anche i contratti fatti dalla pagina Mezzi,
+  fonte `mezzi`), **Controlla i modelli** (il controllo mensile delle impronte, subito).
+
+Rotte (tutte solo amministratore, come gli avvisi sui modelli): `GET /api/modelli`, `GET /api/modelli/aree?rel=`,
+`GET /api/modelli/pratica?id=`, `GET /api/modelli/pratica.docx?id=`, `POST /api/modelli/pratica` (`rel`,
+`descrizione`), `POST /api/modelli/compila` (`id`, `valori` = `{id area: testo}` oppure `{id area: [[da, a], ...]}`,
+`descrizione`), `POST /api/modelli/controlla`. Il modello si sceglie solo per percorso relativo alla cartella
+condivisa (niente percorsi assoluti né `..`); le risposte non contengono percorsi del server. Le due cartelle si
+impostano solo nel `.env`. Ogni pratica creata, compilata o scaricata va nel registro attivita'.
+Riga di comando: `python modelli_protetti.py elenco | aree --file ... | compila --file ... --valori valori.json | controlla`.
+
 ## Posta automatica
 
 Con `MAIL_ENABLED=true` il programma controlla le caselle attive (`MAIL_SOURCES`) ogni `MAIL_POLL_SECONDS` secondi.

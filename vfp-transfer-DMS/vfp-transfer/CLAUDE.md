@@ -104,7 +104,7 @@ Programma Python che trasferisce documenti da un altro DMS (esportato su disco) 
   (`_PIVA_RE`, `_CODICE_RE`) prima di finire nella SELECT. API `/api/mezzi/fornitore` (campo `gestionale`),
   `/api/mezzi/commessa`, `/api/mezzi/commesse`; in `mezzi.js` `mzRiempi` compila i vuoti e segnala i diversi.
   Nei test la connessione si passa con `connetti=` (o si sostituisce `ponte.apri`).
-- Modelli Word protetti (trasporti, contratti): `modelli_protetti.py` (logica + CLI, GUI da fare). Documento in
+- Modelli Word protetti (trasporti, contratti): `modelli_protetti.py` (logica + CLI) + pagina Modelli Word (`ui/js/modelli.js`, rotte `/api/modelli/...` solo admin in `vfp_gui`; `_modello_dalla_pagina` rifiuta percorsi assoluti e `..`, `_valori_dalla_pagina` controlla testi/sostituzioni, `_pratica_modello` non manda percorsi del server). Record con `modello`, `fonte` (pagina/mezzi), `descrizione`, `stato` bozza/compilata; `pratiche(s)` restituisce un'istanza condivisa per cartella (lock fra richieste e fra pagina Mezzi e Modelli Word). Documento in
   "Limita modifica" sola lettura; le aree gialle sono le eccezioni `<w:permStart w:id>`...`<w:permEnd>`: si cambiano
   solo i `<w:t>` li' dentro (minima differenza, una riga per paragrafo o sostituzioni `[[da, a]]`), poi
   `_testo_fuori` deve risultare identico e le altre parti dello zip restano byte per byte. Originali in

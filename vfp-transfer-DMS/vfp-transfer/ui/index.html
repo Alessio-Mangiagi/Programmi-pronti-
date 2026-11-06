@@ -93,6 +93,7 @@
     <button class="tab" role="tab" data-admin data-area="posta" data-view="posta" aria-selected="false"><svg class="ic"><use href="#i-mail"/></svg>Caselle email<span class="tab-dot" id="mailDot" hidden></span></button>
     <p class="nav-sep">Strumenti</p>
     <button class="tab" role="tab" data-area="comune" data-tutti data-view="confronto" aria-selected="false"><svg class="ic"><use href="#i-compare"/></svg>Confronta documenti<span class="nav-count nav-count-run" id="cfRunCount" hidden>0</span></button>
+    <button class="tab" role="tab" data-admin data-area="comune" data-view="modelli" aria-selected="false"><svg class="ic"><use href="#i-file"/></svg>Modelli Word<span class="nav-count" id="mdAlert" hidden>!</span></button>
     <p class="nav-sep" data-admin>Generale</p>
     <button class="tab" role="tab" data-admin data-area="comune" data-view="attivita" aria-selected="false"><svg class="ic"><use href="#i-activity"/></svg>Attività utenti<span class="nav-count" id="actAlert" hidden>!</span></button>
     <button class="tab" role="tab" data-admin data-area="comune" data-view="impostazioni" aria-selected="false"><svg class="ic"><use href="#i-gear"/></svg>Impostazioni<span class="tab-badge" id="settingsBadge" hidden>!</span></button>
@@ -897,6 +898,74 @@
     </article>
   </section>
 
+  <!-- ======================================================= MODELLI WORD PROTETTI (solo admin, modelli.js) -->
+  <section class="view" id="view-modelli" role="tabpanel" hidden>
+    <div class="page-head page-head-row">
+      <div>
+        <p class="eyebrow">Contratti e trasporti</p>
+        <h1>Modelli Word</h1>
+        <p class="lead">I modelli Word protetti della cartella condivisa si compilano solo nelle aree gialle: tutto il resto del documento resta identico all'originale, che non viene mai modificato. Ogni compilazione è una pratica con la sua copia da scaricare.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="mdReload" type="button"><svg class="ic"><use href="#i-refresh"/></svg>Aggiorna</button>
+        <button class="btn btn-secondary" id="mdCheck" type="button"><svg class="ic"><use href="#i-shield"/></svg>Controlla i modelli</button>
+      </div>
+    </div>
+
+    <div class="error-box" id="mdError" hidden></div>
+
+    <div id="mdHome">
+      <article class="card">
+        <div class="card-head">
+          <div><h2>Modelli nella cartella condivisa</h2><p class="muted small" id="mdListInfo"></p></div>
+          <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="mdSearch" placeholder="Cerca un modello"></label>
+        </div>
+        <div class="table-wrap table-scroll">
+          <table class="data">
+            <thead><tr><th>Modello</th><th>Dimensione</th><th>Stato</th><th></th></tr></thead>
+            <tbody id="mdModelli"></tbody>
+          </table>
+          <div class="empty small" id="mdModelliEmpty" hidden>Nessun modello Word nella cartella condivisa.</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div><h2>Pratiche</h2><p class="muted small">Le compilazioni fatte, dalla più recente. Anche i contratti preparati dalla pagina Mezzi.</p></div>
+          <label class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="mdPrSearch" placeholder="Cerca modello, nota, utente"></label>
+        </div>
+        <div class="table-wrap table-scroll">
+          <table class="data">
+            <thead><tr><th>Aggiornata</th><th>Modello</th><th>Nota</th><th>Utente</th><th>Aree compilate</th><th>Stato</th><th></th></tr></thead>
+            <tbody id="mdPratiche"></tbody>
+          </table>
+          <div class="empty small" id="mdPraticheEmpty" hidden>Nessuna pratica ancora. Scegli un modello e premi <strong>Compila</strong>.</div>
+        </div>
+      </article>
+    </div>
+
+    <!-- pratica aperta -->
+    <div id="mdEditor" hidden>
+      <div class="mz-bar">
+        <button class="btn btn-ghost btn-sm" id="mdBack" type="button"><svg class="ic cf-flip"><use href="#i-chevron"/></svg>Tutti i modelli</button>
+        <div class="mz-bar-title"><strong id="mdTitle"></strong><span class="muted small" id="mdSub"></span></div>
+        <span class="muted small" id="mdSaveState"></span>
+        <a class="btn btn-secondary" id="mdDownload" href="#" download><svg class="ic"><use href="#i-download"/></svg>Scarica Word</a>
+        <button class="btn btn-primary" id="mdSave" type="button"><svg class="ic"><use href="#i-check"/></svg>Compila</button>
+      </div>
+      <div class="banner banner-warn" id="mdWarn" hidden><svg class="ic"><use href="#i-alert"/></svg><div id="mdWarnText"></div></div>
+      <article class="card">
+        <div class="field">
+          <label for="mdNote">Nota della pratica</label>
+          <input id="mdNote" type="text" maxlength="200" placeholder="Es. Trasporto Rossi srl, commessa 101-003">
+          <p class="hint">Serve a ritrovare la pratica nell'elenco; non finisce nel documento.</p>
+        </div>
+        <p class="muted small" id="mdAreasInfo"></p>
+        <div class="mz-areas" id="mdAreas"></div>
+      </article>
+    </div>
+  </section>
+
   <!-- ======================================================= ATTIVITA' UTENTI -->
   <section class="view" id="view-attivita" role="tabpanel" hidden>
     <div class="page-head page-head-row">
@@ -1545,6 +1614,7 @@
 <script src="js/protocolli.js"></script>
 <script src="js/ricerca.js"></script>
 <script src="js/confronto.js"></script>
+<script src="js/modelli.js"></script>
 <script src="js/avvio.js"></script>
 </body>
 </html>

@@ -15,7 +15,12 @@ controlla che il testo fuori dalle aree e tutte le altre parti del file siano id
 Le due cartelle si impostano solo nel .env (env_config.SOLO_SVILUPPATORI): l'interfaccia non le cambia.
 Ogni mese controlla_modelli confronta le impronte SHA-256 degli originali con il controllo precedente e lascia un
 avviso all'amministratore (stato_modelli.json) se qualcuno li ha modificati, aggiunti o rimossi.
-I .doc (Word 97-2003) non si gestiscono: la conversione senza Word perde le aree consentite. Vanno salvati in .docx.
+I .doc (Word 97-2003) si usano solo attraverso la conversione di modelli_doc (serve LibreOffice): senza, vanno
+salvati in .docx da Word.
+
+Interfaccia: pagina "Modelli Word" di vfp_gui (solo amministratore, ui/js/modelli.js, rotte /api/modelli/...):
+elenco dei modelli della cartella condivisa, nuova pratica da un modello, compilazione delle aree, scaricamento della
+copia compilata, controllo dei modelli a richiesta. La pagina Mezzi usa le stesse pratiche (fonte "mezzi").
 
 Prova da riga di comando:
   python modelli_protetti.py elenco
@@ -371,8 +376,11 @@ class Pratiche:
             raise ModelloError("identificativo della pratica non valido")
         return self.base / rec_id
 
-    def nuova(self, origine, utente=""):
-        """Copia il modello nella cartella interna (in sola lettura sull'originale) e ne legge le aree."""
+    def nuova(self, origine, utente="", rel="", fonte="", descrizione=""):
+        """Copia il modello nella cartella interna (in sola lettura sull'originale) e ne legge le aree.
+        rel = percorso del modello nella cartella condivisa (per l'elenco della pagina "Modelli Word"),
+        fonte = chi ha creato la pratica ("pagina" = pagina Modelli Word, "mezzi" = contratto di un mezzo a nolo,
+        vuoto = riga di comando), descrizione = nota libera per ritrovarla (es. "Trasporto Rossi, cantiere 101-003")."""
         origine = Path(origine)
         info = leggi_aree(origine)  # controlla formato e aree prima di copiare
         if not info["aree"]:
@@ -390,7 +398,8 @@ class Pratiche:
         rec = {"id": rec_id, "stato": "bozza", "creato": datetime.now().isoformat(timespec="seconds"), "aggiornato": "",
                "utente": utente, "origine": {"file": str(origine), "nome_file": origine.name, "sha256": impronta},
                "originale": copia.name, "compilato": nome, "protezione": info["protezione"], "valori": {},
-               "aree_cambiate": []}
+               "aree_cambiate": [], "modello": str(rel or ""), "fonte": str(fonte or ""),
+               "descrizione": pulisci_descrizione(descrizione)}
         compila_file(copia, d / nome, {})
         with self._lock:
             _scrivi_json(d / "record.json", rec)
@@ -408,8 +417,14 @@ class Pratiche:
         rec = self.leggi(rec_id)
         return leggi_aree(self._dir(rec_id) / rec["compilato"])
 
-    def compila(self, rec_id, valori, utente=""):
-        """Aggiunge i valori a quelli della pratica e rifa' la copia compilata partendo dall'originale intatto."""
+    def aree_originali(self, rec_id):
+        """Aree della copia intatta dell'originale: il testo di partenza, per "Ripristina" nella pagina."""
+        rec = self.leggi(rec_id)
+        return leggi_aree(self._dir(rec_id) / rec["originale"])
+
+    def compila(self, rec_id, valori, utente="", descrizione=None):
+        """Aggiunge i valori a quelli della pratica e rifa' la copia compilata partendo dall'originale intatto.
+        Lo stato diventa "compilata" se almeno un'area e' diversa dall'originale, altrimenti resta "bozza"."""
         with self._lock:
             rec = self.leggi(rec_id)
             d = self._dir(rec_id)
@@ -419,9 +434,20 @@ class Pratiche:
             tutti = {**rec["valori"], **{str(k): v for k, v in (valori or {}).items()}}
             rec["aree_cambiate"] = compila_file(originale, d / rec["compilato"], tutti)
             rec.update(valori=tutti, aggiornato=datetime.now().isoformat(timespec="seconds"),
-                       utente=utente or rec.get("utente", ""))
+                       utente=utente or rec.get("utente", ""),
+                       stato="compilata" if rec["aree_cambiate"] else "bozza")
+            if descrizione is not None:
+                rec["descrizione"] = pulisci_descrizione(descrizione)
             _scrivi_json(d / "record.json", rec)
             return rec
+
+    def file_compilato(self, rec_id):
+        """(percorso, nome) della copia compilata, per lo scaricamento dalla pagina."""
+        rec = self.leggi(rec_id)
+        p = self._dir(rec_id) / rec["compilato"]
+        if not p.is_file():
+            raise ModelloError("file compilato non trovato: riaprire la pratica e compilarla di nuovo")
+        return p, rec["compilato"]
 
     def elenco(self, limite=200):
         out = []
@@ -433,12 +459,30 @@ class Pratiche:
             except (OSError, ValueError):
                 continue
             out.append({k: r.get(k) for k in ("id", "stato", "creato", "aggiornato", "utente", "compilato")} |
-                       {"nome_file": r["origine"].get("nome_file"), "aree_cambiate": len(r.get("aree_cambiate", []))})
+                       {"nome_file": r["origine"].get("nome_file"), "aree_cambiate": len(r.get("aree_cambiate", [])),
+                        "modello": r.get("modello", ""), "fonte": r.get("fonte", ""),
+                        "descrizione": r.get("descrizione", "")})
         return out
 
 
+def pulisci_descrizione(testo):
+    """Nota della pratica: una riga, senza caratteri di controllo, al massimo 200 caratteri."""
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", str(testo or "")).strip()[:200]
+
+
+# Una sola istanza per coppia di cartelle: il lock di Pratiche deve valere fra le richieste dell'interfaccia
+# (due persone che compilano la stessa pratica) e fra pagina Modelli Word e pagina Mezzi, che usano la stessa
+# cartella di lavoro. Il costruttore controlla le cartelle: se solleva, non si memorizza nulla.
+_PRATICHE = {}
+_LOCK_PRATICHE = threading.Lock()
+
+
 def pratiche(s):
-    return Pratiche(cartella_lavoro(s), cartella_sorgente(s))
+    chiave = (str(cartella_lavoro(s)), str(cartella_sorgente(s) or ""))
+    with _LOCK_PRATICHE:
+        if chiave not in _PRATICHE:
+            _PRATICHE[chiave] = Pratiche(cartella_lavoro(s), cartella_sorgente(s))
+        return _PRATICHE[chiave]
 
 
 # --------------------------------------------------------------------------- controllo mensile degli originali

@@ -200,6 +200,7 @@ function showView(name) {
   if (name === 'posta' || name === 'flusso') loadMail();
   if (name === 'panoramica') loadOverview();
   if (name === 'confronto') loadConfronto();
+  if (name === 'modelli' && $('#mdEditor').hidden) loadModelli();  // pratica aperta: resta com'e'
   if (name === 'impostazioni') { loadAuth(); loadMailLog(); loadUsers(); loadHealth(); }
   window.scrollTo({ top: 0 });
 }

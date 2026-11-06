@@ -558,9 +558,10 @@ def compila_contratto(s, pr, rec_id, modello_rel, testi, utente=""):
                 lavoro.leggi(attuale["pratica"])
                 pid = attuale["pratica"]
             except modelli_protetti.ModelloError:
-                pid = lavoro.nuova(modello, utente)["id"]
+                pid = lavoro.nuova(modello, utente, rel=modello_rel, fonte="mezzi")["id"]
         else:
-            pid = lavoro.nuova(modello, utente)["id"]
+            # fonte "mezzi": nella pagina Modelli Word la pratica si riconosce come contratto di un mezzo a nolo
+            pid = lavoro.nuova(modello, utente, rel=modello_rel, fonte="mezzi")["id"]
         fatta = lavoro.compila(pid, testi, utente)
     except modelli_protetti.ModelloError as e:
         raise MezziError(str(e))

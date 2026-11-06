@@ -1066,6 +1066,14 @@ tr.cf-current td { background: var(--blue-soft); }
 .mz-area-old { font-size: .82rem; margin: 0 0 .5rem; color: var(--muted); white-space: pre-line; }
 .mz-area textarea { font-size: .88rem; }
 .mz-area textarea:disabled { opacity: .55; }
+/* pagina Modelli Word (modelli.js): sostituzioni "da → a" dentro un'area e pulsanti delle righe */
+.md-sost { display: flex; flex-direction: column; gap: .4rem; }
+.md-sost-riga { display: flex; align-items: center; gap: .5rem; }
+.md-sost-riga input { flex: 1; min-width: 0; }
+.md-sost > .btn { align-self: flex-start; }
+.md-area-azioni { margin-top: .5rem; }
+.md-azioni { white-space: nowrap; text-align: right; }
+.md-azioni .btn + .btn { margin-left: .35rem; }
 .mz-done { display: flex; gap: .75rem; align-items: flex-start; border-radius: var(--radius); padding: .9rem 1.1rem; background: var(--green-soft); font-size: .92rem; }
 .mz-done > .ic { color: var(--green); margin-top: 2px; }
 .mz-done .btn-row { margin-top: .6rem; }
