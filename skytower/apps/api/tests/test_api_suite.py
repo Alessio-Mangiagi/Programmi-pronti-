@@ -326,3 +326,41 @@ def test_da_fare_scadenze_in_cima(client, api_world, progetto_collegato):
     voce = next(v for v in voci if v["titolo"] == "Escalation: PRJ-X")
     assert voce["tipo"] == "task" and voce["priorita"] == 1
     assert [v["priorita"] for v in voci] == sorted(v["priorita"] for v in voci)
+
+
+def test_da_fare_chiarimenti_e_modifiche(client, as_user, progetto_collegato):
+    """ADR-51 nel "da fare" del portale: il compito di chiarimento si legge come "Chiarimento: …" con chi lo chiede e
+    la domanda; il compito fermo in attesa di risposta scende a priorità 3; il giro riaperto per una richiesta di
+    modifiche si legge come "Modifiche richieste: …" con il commento. Ogni voce apre il suo compito."""
+    from test_workflow_grafo import avvia, decisione, nodo, salva, utente
+    from test_workflow_ritorno import chiedi, completa, rimanda, rispondi
+
+    w = progetto_collegato
+    im, dl = as_user("com_im"), as_user("com_dl")
+    nodes = [nodo("s", "start", "Avvio", 0, 0),
+             decisione("a", "Verifica tecnica", 1, 0, [utente(w, "com_im")]),
+             decisione("b", "Parere DL", 2, 0, [utente(w, "com_dl")]),
+             nodo("ok", "end", "Concluso", 3, 0, result="OK"), nodo("ko", "end", "Fallito", 3, 1, result="KO")]
+    edges = [{"from": "s", "to": "a"}]
+    for x, y in (("a", "b"), ("b", "ok")):
+        edges += [{"from": x, "outcome": "OK", "to": y}, {"from": x, "outcome": "NO", "to": "ko"}]
+    titolo = "Ordine calcestruzzo " + uuid.uuid4().hex[:6]
+    g = avvia(client, as_user("com_admin"), w, salva(client, as_user("com_admin"), w, nodes, edges), title=titolo)
+    completa(client, im, g["id"], "a")
+
+    def voce(chi, titolo_voce):
+        voci = client.get("/suite/da-fare", headers=come(w, chi)).json()["voci"]
+        return next(v for v in voci if v["titolo"] == titolo_voce)
+
+    chiedi(client, dl, g["id"], "b", "a", "Quale classe di resistenza?")
+    v = voce("com_im", f"Chiarimento: {titolo}")
+    assert "Parere DL" in v["testo"] and "«Quale classe di resistenza?»" in v["testo"] and v["priorita"] == 2
+    assert f"instance={g['id']}" in v["url"] and "task=" in v["url"] and v["tipo"] == "documento"
+    v = voce("com_dl", f"Parere DL: {titolo}")
+    assert "in attesa di chiarimento" in v["testo"] and v["priorita"] == 3
+
+    rispondi(client, im, g["id"], "b", "C30/37")
+    assert voce("com_dl", f"Parere DL: {titolo}")["priorita"] == 2
+    rimanda(client, dl, g["id"], "b", "a", "Rifare la verifica con la C30/37")
+    v = voce("com_im", f"Modifiche richieste: {titolo}")
+    assert "Verifica tecnica" in v["testo"] and "Parere DL" in v["testo"] and "«Rifare la verifica con la C30/37»" in v["testo"]

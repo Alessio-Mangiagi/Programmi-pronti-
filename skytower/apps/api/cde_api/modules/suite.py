@@ -364,32 +364,70 @@ def _data_iso(v) -> str | None:
     return None
 
 
+def _voce_compito(c: Ctx, k: dict) -> dict:
+    """Un compito aperto come voce del "da fare" del portale (CONTRATTI.md §4).
+
+    Il titolo dice che cosa serve, perché nella home del portale non c'è altro contesto:
+    - compito di chiarimento → "Chiarimento: <documento>" e nel testo chi lo chiede, da quale passo, la domanda;
+    - giro riaperto da una richiesta di modifiche → "Modifiche richieste: <documento>" con chi le chiede e il commento;
+    - compito fermo in attesa di un chiarimento chiesto da chi lo ha → priorità bassa, senza "in ritardo"
+      (la scadenza è sospesa finché arriva la risposta);
+    - altrimenti "Approvare <documento> <revisione>" (documenti) o "<passo>: <processo>" (processi).
+    L'indirizzo apre direttamente il compito nella posta "Compiti" (parametri instance e task di quella pagina).
+    """
+    oggetto = k["identifier"] if k["processo"] else f"{k['identifier']} {k['revision_code']}"
+    da_chi = f"{k['richiesta_da']} (passo «{k['richiesta_dal_passo']}»)" if k["richiesta_da"] else None
+    testo_richiesta = (k["richiesta_testo"] or "").strip()
+    if len(testo_richiesta) > 120:
+        testo_richiesta = testo_richiesta[:119] + "…"
+    in_ritardo = k["overdue"] and not k["in_attesa"]
+    if k["kind"] == "CLARIFICATION":
+        titolo = f"Chiarimento: {oggetto}"
+        parti = [f"Chiesto da {da_chi}" if da_chi else "Chiarimento chiesto", k["project_code"], f"«{testo_richiesta}»"]
+    elif k["richiesta"] == "CHANGES":
+        titolo = f"Modifiche richieste: {oggetto}"
+        parti = [k["step_name"], f"chieste da {da_chi}" if da_chi else None, k["project_code"], f"«{testo_richiesta}»"]
+    else:
+        titolo = f"{k['step_name']}: {k['identifier']}" if k["processo"] else f"Approvare {oggetto}"
+        parti = [k["step_name"], k["project_code"], k["title"], "in attesa di chiarimento" if k["in_attesa"] else None]
+    if in_ritardo:
+        parti.append("in ritardo")
+    return {"id": f"compito:{k['id']}", "titolo": titolo, "testo": " · ".join(p for p in parti if p),
+            "url": _url_web(c, f"/compiti?instance={k['instance_id']}&task={k['id']}"), "tipo": "documento",
+            "priorita": 3 if k["in_attesa"] else 1 if in_ritardo else 2, "data": _data_iso(k["due_at"])}
+
+
 @router.get("/da-fare")
 def suite_da_fare(c: Ctx = Depends(ctx_suite)):
     """Cosa aspetta l'utente del portale in SkyTower: approvazioni assegnate (compiti aperti) e notifiche non lette."""
     voci = []
     with c.tx() as conn:
         compiti = conn.execute(
-            # compiti dei nodi del workflow a grafo (0039): su un documento o su un processo (senza documento)
-            """SELECT k.id, k.due_at, s.name AS step_name, coalesce(d.identifier, i.title) AS identifier,
+            # compiti dei nodi del workflow a grafo (0039): su un documento o su un processo (senza documento).
+            # Tornare indietro (0042, ADR-51): la richiesta collegata al compito è il chiarimento da dare
+            # (k.send_back_id, compito di chiarimento) oppure le modifiche per cui il giro è stato riaperto o va
+            # rifatto (s.send_back_id); waiting_send_back_id = il compito aspetta un chiarimento chiesto da chi lo ha.
+            """SELECT k.id, k.instance_id, k.due_at, k.kind, s.name AS step_name,
+                      coalesce(d.identifier, i.title) AS identifier,
                       coalesce(d.title, i.title) AS title, r.revision_code, p.code AS project_code,
                       i.document_id IS NULL AS processo,
-                      (k.due_at IS NOT NULL AND k.due_at < now()) AS overdue
+                      (k.due_at IS NOT NULL AND k.due_at < now()) AS overdue,
+                      k.waiting_send_back_id IS NOT NULL AS in_attesa,
+                      b.kind AS richiesta, b.comment AS richiesta_testo, fr.name AS richiesta_dal_passo,
+                      ua.first_name || ' ' || ua.last_name AS richiesta_da
                FROM cde.tasks k JOIN cde.workflow_node_runs s ON s.id = k.node_run_id
                JOIN cde.workflow_instances i ON i.id = k.instance_id LEFT JOIN cde.documents d ON d.id = i.document_id
                LEFT JOIN cde.document_revisions r ON r.id = i.revision_id JOIN cde.projects p ON p.id = i.project_id
+               LEFT JOIN cde.workflow_send_backs b ON b.id = coalesce(k.send_back_id, s.send_back_id)
+               LEFT JOIN cde.workflow_node_runs fr ON fr.id = b.from_run_id
+               LEFT JOIN cde.users ua ON ua.id = b.asked_by
                WHERE k.assignee_id = cde.current_app_user() AND k.status = 'OPEN'
                ORDER BY k.due_at NULLS LAST, k.created_at LIMIT 30""").fetchall()
         notifiche = conn.execute(
             """SELECT id, kind, title, body, link, created_at FROM cde.notifications
                WHERE user_id = cde.current_app_user() AND read_at IS NULL ORDER BY id DESC LIMIT 30""").fetchall()
     for k in compiti:
-        titolo = (f"{k['step_name']}: {k['identifier']}" if k["processo"]
-                  else f"Approvare {k['identifier']} {k['revision_code']}")
-        voci.append({"id": f"compito:{k['id']}", "titolo": titolo,
-                     "testo": f"{k['step_name']} · {k['project_code']} · {k['title']}" + (" · in ritardo" if k["overdue"] else ""),
-                     "url": _url_web(c, "/compiti"), "tipo": "documento", "priorita": 1 if k["overdue"] else 2,
-                     "data": _data_iso(k["due_at"])})
+        voci.append(_voce_compito(c, k))
     # Scadenze superate ed escalation (G35) sono compiti da sollecitare, non semplici avvisi:
     # vanno in cima al "da fare" del portale con la data del compito, come chiede CONTRATTI.md §4.
     URGENTI = {"TASK_OVERDUE", "TASK_ESCALATED", "RFI_OVERDUE"}
