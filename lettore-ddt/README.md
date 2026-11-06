@@ -36,7 +36,7 @@ Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con accou
 
 | Area | Misura |
 |---|---|
-| Account | Login con username/password, sessione con cookie `httpOnly` |
+| Account | Login con username/password, sessione con cookie `httpOnly`. Dal Portale Suite si entra senza seconda password se c'è un account DDT con lo stesso username (`ingressoDalPortale`, `src/middleware/auth.ts`); gli account non si creano da soli perché ognuno ha la sua commessa |
 | Password | Hash bcrypt, mai in chiaro; lunghezza minima 8 caratteri |
 | Archivio utenti | File `users.enc` cifrato AES-256-GCM (chiave da env o keyfile locale) |
 | Brute-force | Lockout temporaneo dopo 5 tentativi falliti (15 min) |

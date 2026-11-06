@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import type { CosedilIdentity } from '../../../shared/sso/cosedil-sso';
+import { findUserByUsernameCI } from '../models/users';
+import { logActivity } from '../models/activityLog';
+import { clientIp } from '../routes/helpers';
 
 declare module 'express-session' {
   interface SessionData {
@@ -8,6 +11,8 @@ declare module 'express-session' {
     commessaId?: string;
     displayName?: string;
     isAdmin?: boolean;
+    /** Username del Portale Suite di chi ha aperto questa sessione DDT (vedi ingressoDalPortale). */
+    portaleUtente?: string;
   }
 }
 
@@ -26,6 +31,49 @@ declare global {
 /** Il gate SSO è attivo? Con COSEDIL_SSO=off (sviluppo, test) non c'è identità del portale da pretendere. */
 export function gatePortaleAttivo(): boolean {
   return (process.env.COSEDIL_SSO || 'on').toLowerCase() !== 'off';
+}
+
+/**
+ * Ingresso dal Portale senza seconda password (06/11/2026: una password per tutti i programmi).
+ * Montato in app.ts subito dopo la sessione, quindi dopo il gate SSO che mette in req.cosedil
+ * chi è loggato nel portale.
+ *  - Nessuna sessione DDT: se esiste un account DDT con lo stesso username del portale (non
+ *    disabilitato) la sessione si apre da sola, come dopo il login. Gli account DDT NON si
+ *    creano qui: ognuno porta la sua commessa (commessaId), che sceglie l'amministratore DDT.
+ *    Senza account con quel nome resta la schermata di login (es. account della commessa).
+ *  - Sessione DDT aperta da un'altra persona del portale (cambio utente sullo stesso browser):
+ *    si chiude, e si riparte come sopra. Un login a mano su un altro account DDT (quello della
+ *    commessa) resta valido finché nel portale c'è la stessa persona.
+ *  - Sessione aperta prima di questa regola (senza portaleUtente): si lega a chi c'è adesso.
+ * Con il gate spento (COSEDIL_SSO=off, sviluppo e test) non fa niente.
+ */
+export function ingressoDalPortale(req: Request, res: Response, next: NextFunction): void {
+  const chi = String(req.cosedil?.username || '').toLowerCase().trim();
+  if (!gatePortaleAttivo() || !chi || !req.session) return next();
+  const s = req.session;
+  if (s.userId && !s.portaleUtente) {
+    s.portaleUtente = chi;
+    return next();
+  }
+  if (s.userId && s.portaleUtente === chi) return next();
+  const user = findUserByUsernameCI(chi);
+  const utilizzabile = !!user && !user.disabled;
+  if (!s.userId && !utilizzabile) return next(); // niente da chiudere, niente da aprire: login a mano
+  // Nuovo id di sessione sia per chiudere quella dell'altra persona sia per aprire la nuova
+  // (come al login: un cookie piantato prima non diventa mai una sessione autenticata).
+  req.session.regenerate((err) => {
+    if (err) return next(err);
+    if (utilizzabile && user) {
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      req.session.commessaId = user.commessaId;
+      req.session.displayName = user.displayName;
+      req.session.isAdmin = !!user.isAdmin;
+      req.session.portaleUtente = chi;
+      logActivity('login_success', user.username, user.commessaId, clientIp(req));
+    }
+    next();
+  });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {

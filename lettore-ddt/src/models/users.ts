@@ -86,6 +86,12 @@ function findUserByUsername(username: string): UserRow | undefined {
   return getUsersDb().users.find((u) => u.username === username);
 }
 
+/** Come findUserByUsername ma senza badare alle maiuscole: lo username del portale è sempre minuscolo. */
+function findUserByUsernameCI(username: string): UserRow | undefined {
+  const u = String(username || '').toLowerCase();
+  return getUsersDb().users.find((x) => x.username.toLowerCase() === u);
+}
+
 // Hash fittizio (password "·") per equalizzare i tempi quando l'utente non esiste:
 // evita user-enumeration via timing.
 const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
@@ -184,6 +190,7 @@ function setCodiceCommessa(id: string, codiceCommessa: string): UserRow | null {
 export {
   setCodiceCommessa,
   findUserByUsername,
+  findUserByUsernameCI,
   findUserById,
   verifyPassword,
   createUser,

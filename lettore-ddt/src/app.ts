@@ -11,6 +11,7 @@ import routes from './routes';
 // path relativo risolve in sviluppo e in build.
 import cosedilSSO, { cosedilAttivita } from '../../shared/sso/cosedil-sso';
 import { errorHandler } from './utils/errorHandler';
+import { ingressoDalPortale } from './middleware/auth';
 import { metricsMiddleware } from './utils/metrics';
 import logger from './utils/logger';
 import { config as appCfg, APP_DIR } from './config';
@@ -155,6 +156,11 @@ app.use(
     },
   })
 );
+
+// Chi è nel Portale entra senza seconda password se ha un account DDT con lo stesso username
+// (vedi ingressoDalPortale). Dopo la sessione, perché la apre lui; prima delle rotte, perché
+// /auth/me e requireAuth la vedano già in questa richiesta.
+app.use(ingressoDalPortale);
 
 // Corpi JSON. Il limite normale è 1 MB: basta a login, paniere, versioni piccole, admin. Le rotte
 // che ricevono estrazioni o versioni di progetto grosse accettano fino a 50 MB, ma solo da chi ha

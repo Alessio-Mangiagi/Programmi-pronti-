@@ -111,6 +111,9 @@ router.post('/auth/login', (req: Request, res: Response) => {
     req.session.commessaId = user.commessaId;
     req.session.displayName = user.displayName;
     req.session.isAdmin = !!user.isAdmin;
+    // Legata alla persona del portale che ha fatto il login: se nel portale entra un altro
+    // sullo stesso browser, ingressoDalPortale chiude questa sessione.
+    if (req.cosedil?.username) req.session.portaleUtente = String(req.cosedil.username).toLowerCase().trim();
     logActivity('login_success', user.username, user.commessaId, ip);
     res.json({
       username: user.username,
