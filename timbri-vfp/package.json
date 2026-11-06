@@ -1,0 +1,14 @@
+{
+  "name": "timbri-vfp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Timbri per VFP: crea file .stamp (OpenText IGCMarkupStamp) da immagini PNG. Pagina nel browser servita dentro la suite Cosedil.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
