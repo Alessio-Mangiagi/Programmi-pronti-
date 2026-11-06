@@ -29,7 +29,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 def _ancore(cartella: str | None) -> list:
     cartella = cartella or os.environ.get("FIRMA_ANCORE_EXTRA")
-    if not cartella:
+    # cartella indicata ma assente (variabile rimasta da una prova, disco scollegato): si ignora, come se non ci
+    # fosse, invece di far fallire l'apertura di ogni busta; i certificati di fiducia in più sono un di più
+    if not cartella or not Path(cartella).is_dir():
         return []
     import elenchi_fiduciari
     return [elenchi_fiduciari.carica_certificato(p) for p in sorted(Path(cartella).iterdir())

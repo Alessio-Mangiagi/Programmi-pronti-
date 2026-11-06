@@ -219,6 +219,10 @@ unico `shared/firma` (README lì): `firma.js` per Node, `busta.py` per Python.
   giallo da verificare); una firma non valida non blocca la lettura, la segnala.
 * Chi archivia con valore legale conserva il `.p7m` originale (SkyTower); gli altri tengono
   il rapporto insieme al risultato.
+* SkyTower (ADR-55): la revisione è il `.p7m`; il worker ne estrae il documento (derivato
+  P7M) e salva il rapporto. `GET /suite/revisioni/{id}/file` dà il **PDF contenuto** (header
+  `X-Firma-Esito`), con `?originale=true` la busta; le altre app che archiviano in SkyTower
+  (Lettore DDT, VFP Transfer) mandano la busta originale.
 * Motore non installato (`shared/firma/.venv` assente) = messaggio «Componente firma digitale
   non installato», mai errore 500. Gli `avvia.bat` lo installano da soli al primo avvio.
 
