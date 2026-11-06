@@ -193,13 +193,44 @@ def _raise_if_error(outcome):
     return outcome
 
 
+class _PasswordDelPortale:
+    """Esito di _login_tx: la password non è quella di SkyTower ma quella del portale per questa email.
+
+    Il login prosegue fuori dalla transazione, in portale.entra (stesse regole dell'ingresso dal portale)."""
+
+    def __init__(self, esito: dict):
+        self.esito = esito
+
+
+def _password_del_portale(email: str, password: str, ip: str | None):
+    """Una password per tutti i programmi della suite (06/11/2026): la password del portale vale anche qui.
+
+    Chiamata da _login_tx quando la password di SkyTower non coincide (o l'utente non ha password o non esiste),
+    PRIMA di contare il tentativo fallito: chi entra con la password del portale non deve accumulare errori.
+    Ritorna _PasswordDelPortale se il portale la riconosce; ApiError 403 se è giusta ma il portale nega l'accesso
+    (account disattivato, password temporanea da cambiare, SkyTower non fra i suoi programmi); None altrimenti
+    (sbagliata anche lì, portale spento, COSEDIL_SSO=off): il login fallisce come prima."""
+    from . import portale   # import qui: portale importa auth
+    v = portale.verifica_password_portale(email, password, ip)
+    if v.get("ok") and v.get("username"):
+        return _PasswordDelPortale(v)
+    if v.get("status") == 403:
+        motivo = (v.get("motivo") or "negato").replace("-", "_")
+        return ApiError(403, f"portale_{motivo}", v.get("errore") or "Accesso non consentito dal portale")
+    return None
+
+
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response, svc: Services = Depends(services)):
     email = body.email.lower()
     ip = client_ip(request)
     if not svc.limiter.hit(svc.settings.login_rate_limit, "login", ip or "-", email):
         raise ApiError(429, "rate_limited", "Troppi tentativi: riprovare tra un minuto", {"Retry-After": "60"})
-    return _raise_if_error(_login_tx(body, email, ip, request, response, svc))
+    esito = _login_tx(body, email, ip, request, response, svc)
+    if isinstance(esito, _PasswordDelPortale):
+        from . import portale
+        return portale.entra(svc, request, response, esito.esito, via="password")
+    return _raise_if_error(esito)
 
 
 def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, response: Response, svc: Services):
@@ -217,6 +248,10 @@ def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, respo
                 ph.verify(_DUMMY_HASH, body.password)   # tempo costante: non rivela se l'email esiste
             except VerificationError:
                 pass
+            # nessuna password di SkyTower (utente creato dal portale, o non ancora qui): vale quella del portale
+            dal_portale = _password_del_portale(email, body.password, ip)
+            if dal_portale is not None:
+                return dal_portale
             security_event(conn, "LOGIN_FAIL", ip=ip, user_agent=_ua(request), email=email, reason="unknown_user")
             return unauthorized(GENERIC_LOGIN_ERROR)
 
@@ -228,6 +263,10 @@ def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, respo
         try:
             ph.verify(user["password_hash"], body.password)
         except (VerificationError, InvalidHashError):
+            # non è la password di SkyTower: può essere quella del portale (il blocco qui sopra vale comunque)
+            dal_portale = _password_del_portale(email, body.password, ip)
+            if dal_portale is not None:
+                return dal_portale
             fails = user["failed_login_count"] + 1
             locked_until = None
             if fails >= svc.settings.lockout_threshold:

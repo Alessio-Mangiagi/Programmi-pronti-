@@ -241,3 +241,119 @@ def test_progetti_di_altri_committenti_non_ricevono_membri(client, api_world, po
     finally:
         with psycopg.connect(urls.owner) as conn:
             conn.execute("UPDATE cde.projects SET settings = settings - 'commessa' WHERE id = %s", [w.project2_id])
+
+
+# --------------------------------------------------------------------------- password del portale nel login normale
+@pytest.fixture
+def password_portale(monkeypatch, api_world):
+    """Finto portale.verifica_password_portale: ``conti[email] = (password, esito)``. Registra le chiamate; alla fine
+    spegne gli utenti creati e toglie le loro membership (DB di test condiviso)."""
+    stato = {"conti": {}, "chiamate": [], "creati": [], "rifiuto": None}
+
+    def verifica(email, password, ip):
+        stato["chiamate"].append(email)
+        if stato["rifiuto"]:
+            return dict(stato["rifiuto"])
+        conto = stato["conti"].get(email.lower())
+        if conto and conto[0] == password:
+            return {"ok": True, "reachable": True, "status": 200, "errore": "", "motivo": "", **conto[1]}
+        return {"ok": False, "reachable": True, "status": 401, "errore": "Credenziali non valide", "motivo": ""}
+    monkeypatch.setattr(portale, "verifica_password_portale", verifica)
+    yield stato
+    if stato["creati"]:
+        import psycopg
+        urls, _ = api_world
+        with psycopg.connect(urls.owner) as conn:
+            conn.execute("DELETE FROM cde.project_memberships WHERE user_id IN (SELECT id FROM cde.users WHERE email = ANY(%s))",
+                         [stato["creati"]])
+            conn.execute("UPDATE cde.users SET status = 'DISABLED' WHERE email = ANY(%s)", [stato["creati"]])
+            conn.commit()
+
+
+def _login(client, email, password):
+    client.app.state.services.limiter.reset()
+    return client.post("/auth/login", json={"email": email, "password": password})
+
+
+def _fallimenti(api_world, email):
+    import psycopg
+    urls, _ = api_world
+    with psycopg.connect(urls.owner) as conn:
+        return conn.execute("SELECT failed_login_count FROM cde.users WHERE email = %s", [email]).fetchone()[0]
+
+
+def test_password_del_portale_vale_nel_login_e_non_conta_errori(client, api_world, password_portale):
+    _, w = api_world
+    email = w.emails["com_dl"]
+    password_portale["conti"][email] = ("Portale-2026!", {"username": "com.dl", "email": email, "nome": "DL", "admin": False})
+    r = _login(client, email, "Portale-2026!")
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "ok" and r.json()["access_token"]
+    assert "cde_rt=" in (r.headers.get("set-cookie") or "")
+    me = client.get("/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"}).json()
+    assert me["email"] == email and "portale" in me["amr"]
+    assert _fallimenti(api_world, email) == 0, "la password del portale non è un tentativo fallito"
+
+
+def test_password_di_skytower_resta_valida_senza_chiamare_il_portale(client, api_world, password_portale):
+    _, w = api_world
+    assert _login(client, w.emails["com_dl"], DEMO_PASSWORD).status_code == 200
+    assert password_portale["chiamate"] == []
+
+
+def test_password_sbagliata_ovunque_conta_come_prima(client, api_world, password_portale):
+    import psycopg
+    urls, w = api_world
+    email = w.emails["com_dl"]
+    try:
+        r = _login(client, email, "sbagliata-ovunque")
+        assert r.status_code == 401 and r.json()["error"]["message"] == "Credenziali non valide"
+        assert password_portale["chiamate"] == [email]
+        assert _fallimenti(api_world, email) == 1
+    finally:
+        with psycopg.connect(urls.owner) as conn:
+            conn.execute("UPDATE cde.users SET failed_login_count = 0, locked_until = NULL WHERE email = %s", [email])
+
+
+def test_utente_nuovo_entra_con_la_password_del_portale(client, api_world, password_portale):
+    email = f"n.rossi{uuid.uuid4().hex[:4]}@cosedilspa.com"
+    password_portale["conti"][email] = ("Portale-2026!", {"username": email.split("@")[0], "email": email,
+                                                          "nome": "Nadia Rossi", "admin": False})
+    password_portale["creati"].append(email)
+    r = _login(client, email, "Portale-2026!")
+    assert r.status_code == 200, r.text
+    assert r.json()["creato"] is True and r.json()["email"] == email
+    # utente senza password di SkyTower: la seconda volta lo ritrova (nessun doppione)
+    r2 = _login(client, email, "Portale-2026!")
+    assert r2.status_code == 200 and r2.json()["creato"] is False
+
+
+def test_password_giusta_ma_accesso_negato_dal_portale(client, api_world, password_portale):
+    _, w = api_world
+    email = w.emails["com_dl"]
+    password_portale["rifiuto"] = {"ok": False, "reachable": True, "status": 403, "motivo": "non-abilitato",
+                                   "errore": "SkyTower non è fra i tuoi programmi del Portale"}
+    r = _login(client, email, "Portale-2026!")
+    assert r.status_code == 403 and r.json()["error"]["code"] == "portale_non_abilitato", r.text
+    assert _fallimenti(api_world, email) == 0
+
+
+def test_password_del_portale_non_apre_altre_organizzazioni_ne_account_bloccati(client, api_world, password_portale):
+    import psycopg
+    urls, w = api_world
+    des = w.emails["des_designer"]
+    password_portale["conti"][des] = ("Portale-2026!", {"username": "des.designer", "email": des, "nome": "D", "admin": False})
+    r = _login(client, des, "Portale-2026!")
+    assert r.status_code == 403 and r.json()["error"]["code"] == "portale_altra_organizzazione", r.text
+    # account bloccato: il blocco di SkyTower vale anche per la password del portale (il portale non viene chiesto)
+    dl = w.emails["com_dl"]
+    password_portale["conti"][dl] = ("Portale-2026!", {"username": "com.dl", "email": dl, "nome": "DL", "admin": False})
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("UPDATE cde.users SET locked_until = now() + interval '10 minutes' WHERE email = %s", [dl])
+    try:
+        password_portale["chiamate"].clear()
+        assert _login(client, dl, "Portale-2026!").status_code == 401
+        assert password_portale["chiamate"] == []
+    finally:
+        with psycopg.connect(urls.owner) as conn:
+            conn.execute("UPDATE cde.users SET locked_until = NULL, failed_login_count = 0 WHERE email = %s", [dl])

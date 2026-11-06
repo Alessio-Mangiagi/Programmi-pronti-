@@ -138,3 +138,14 @@ def registro_commesse_vuoto(monkeypatch, tmp_path):
     import suite_link
 
     monkeypatch.setattr(suite_link, "FILE_COMMESSE", tmp_path / "commesse.json")
+
+
+@pytest.fixture(autouse=True)
+def password_portale_spenta(monkeypatch):
+    """Il login prova la password del portale quando quella di SkyTower non coincide (portale.entra): nei test il
+    portale vero (localhost:8080) non va mai chiamato, né deve contare i tentativi sbagliati dei test. Di default
+    "portale non raggiungibile"; i test della password del portale mettono il loro finto."""
+    from cde_api.modules import portale
+
+    monkeypatch.setattr(portale, "verifica_password_portale",
+                        lambda *a, **k: {"ok": False, "reachable": False, "status": 0, "errore": "", "motivo": ""})

@@ -1046,3 +1046,33 @@ intestazioni che la copia non manda; si rilegge e si ricarica in streaming.
 dei documenti di modello sono copie: cancellarli o cambiarli nel modello non tocca le commesse. Un `.cdemodello`
 contiene nomi ed email delle persone: va conservato come un documento riservato. Rotte nel modulo
 `project_models.py`; test `tests/test_modelli_commessa.py`, `e2e/modelli-commessa.spec.ts`; scenario U55.
+
+## ADR-53 — La password del portale vale anche nel login di SkyTower
+
+**Stato:** accettata (06/11/2026).
+
+**Contesto.** La suite Cosedil vuole una password sola per persona: quella del Portale. L'ingresso dal portale
+(ADR-47) copre chi apre SkyTower dal portale, ma restano i casi in cui si scrive email e password (link diretto,
+sessione del portale scaduta, utente creato dal portale e quindi senza password di SkyTower).
+
+**Decisione.**
+- `POST /auth/login`: se la password non è quella di SkyTower, o l'utente non ne ha una, o l'email non esiste,
+  `_login_tx` chiede al portale `POST /api/verifica-password` (token di servizio della suite, IP della persona) **prima**
+  di contare il tentativo fallito; il portale applica i suoi blocchi (15 errori per utente da quel PC, 50 per PC) e
+  risponde 403 se l'account del portale è disattivato, se la password è ancora quella temporanea o se SkyTower non è fra
+  i programmi della persona (`portale_non_abilitato` qui).
+- Se il portale la riconosce, il login prosegue in `portale.entra(via="password")`: le stesse regole di ADR-47
+  (solo email esatta, solo organizzazione della suite, niente platform admin, niente SSO obbligatorio, account
+  disattivato o bloccato fuori, MFA come nel login), utente creato se manca; in più il contatore dei tentativi riparte
+  da zero (la password è stata provata) e `amr = ["pwd", "portale"]`.
+- Un account bloccato da SkyTower resta bloccato: la domanda al portale parte solo dopo il controllo del blocco.
+- La password di SkyTower resta valida (riserva, per esempio col portale spento).
+
+**Alternative scartate.** Copiare l'impronta della password del portale in `cde.users` a ogni cambio: due formati
+(scrypt e argon2), una copia della credenziale in più da proteggere e un canale portale → SkyTower da tenere
+allineato. Contare comunque il tentativo fallito e azzerarlo dopo: col tentativo che fa scattare il blocco, chi ha la
+password del portale giusta resterebbe fuori. Chiedere il portale anche per gli account bloccati: aggirerebbe il blocco.
+
+**Conseguenze.** Una persona con due password (SkyTower e portale) ha due segreti indovinabili, entrambi con freno ai
+tentativi. Se il portale non risponde il login costa al massimo il timeout della chiamata (4 s) e poi fallisce come
+prima. Nei test il portale è finto (`conftest.password_portale_spenta`); test in `tests/test_api_portale.py`.

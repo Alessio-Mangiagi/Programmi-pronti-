@@ -200,6 +200,20 @@ Con `COSEDIL_SSO=off` o portale spento risponde 401 e si vede il login di sempre
 La membership viene inserita a nome di un Project Admin del progetto (RLS); la migrazione
 `0034_suite_portale.sql` dà a `cde_auth` la lettura di progetti, ruoli e membership.
 
+### Password del portale nel login
+
+`POST /auth/login` accetta anche la **password del portale** (una password per tutti i programmi,
+06/11/2026). Se la password di SkyTower non coincide, l'utente non ne ha una o non esiste,
+`auth._login_tx` chiede al portale `POST /api/verifica-password` (`portale.verifica_password_portale`
+→ `shared/sso/cosedil_sso.verifica_password`, col token della suite e l'IP della persona) **prima**
+di contare il tentativo fallito. Se il portale la riconosce, il login prosegue in `portale.entra`
+(`via="password"`): stesse regole dell'ingresso dal portale (ADR-47: organizzazione della suite,
+niente platform admin né SSO obbligatorio, MFA come sempre, utente creato se manca), contatore dei
+tentativi azzerato, `amr = ["pwd", "portale"]`. Il portale risponde 403 se SkyTower non è fra i
+programmi della persona (`portale_non_abilitato`), se l'account del portale è disattivato o se la
+password è ancora quella temporanea. Un account bloccato di SkyTower resta bloccato (il portale non
+viene chiesto). La password di SkyTower resta valida; portale spento o `COSEDIL_SSO=off`: vale solo quella.
+
 ### Confronto Documenti e Verifica Requisiti dal dettaglio documento
 
 Sezione «Suite Cosedil» del dettaglio documento (JWT):

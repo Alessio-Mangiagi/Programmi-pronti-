@@ -28,6 +28,15 @@ organizzazione, quella della suite (``CDE_SUITE_ORG_ID``, altrimenti quella dell
 La rotta è anonima: ha un limite per IP e una cache di 30 secondi dell'esito per ``sid``, così un
 browser che la richiama (o chi la martella) non tiene occupati portale e database.
 
+**Password del portale nel login normale** (06/11/2026, una password per tutti i programmi): se in
+``POST /auth/login`` la password non è quella di SkyTower, ``auth._login_tx`` chiede al portale
+(``verifica_password_portale`` → ``shared/sso/cosedil_sso.verifica_password``) se è quella del portale
+per quell'email, prima di contare il tentativo fallito. Se sì, il login continua qui in ``entra``, con le
+stesse regole dell'ingresso dal portale (stessa organizzazione, niente platform admin, MFA, account creato
+se manca) e in più: contatore dei tentativi falliti azzerato (la password è stata provata) e SkyTower deve
+essere fra i programmi della persona nel portale (il portale risponde 403 altrimenti). La password di
+SkyTower resta valida.
+
 Regole per le altre app in ``shared/suite/CONTRATTI.md`` §1-2.
 """
 from __future__ import annotations
@@ -209,6 +218,12 @@ def _rifiuta(conn, request: Request, user: dict | None, motivo: str, messaggio: 
     return ApiError(403, f"portale_{motivo}", messaggio)
 
 
+def verifica_password_portale(email: str, password: str, ip: str | None) -> dict:
+    """La password è quella del portale per questa email? (POST /api/verifica-password del portale, col token della
+    suite; il portale conta i tentativi falliti sull'IP della persona). Vedi cosedil_sso.verifica_password."""
+    return cosedil_sso.verifica_password(email, password, APP_ID, ip=ip)
+
+
 @router.post("/portale")
 def login_portale(request: Request, response: Response, svc: Services = Depends(services)):
     """Entra in SkyTower con la sessione del portale (cookie ``sid``). 401 se non c'è o il portale non risponde,
@@ -222,6 +237,16 @@ def login_portale(request: Request, response: Response, svc: Services = Depends(
         raise ApiError(401, "portale_irraggiungibile", "Il portale della suite non risponde: entra con email e password")
     if not esito["ok"] or not esito.get("username"):
         raise ApiError(401, "portale_no_sessione", "Nessuna sessione del portale")
+    return entra(svc, request, response, esito)
+
+
+def entra(svc: Services, request: Request, response: Response, esito: dict, via: str = "sessione") -> dict:
+    """Apre la sessione SkyTower dell'utente del portale descritto da ``esito`` (username, email, nome, admin).
+
+    ``via="sessione"``: dal cookie del portale (POST /auth/portale). ``via="password"``: dal login normale con la
+    password del portale (auth.login); lì la password è stata provata, quindi il contatore dei tentativi falliti
+    riparte da zero. Regole di ammissione uguali per le due strade (docstring del modulo)."""
+    ip = client_ip(request)
     username = str(esito["username"]).strip().lower()
     email = ((esito.get("email") or "").strip() or f"{username}@{svc.settings.suite_email_dominio}").lower()
     admin = bool(esito.get("admin"))
@@ -251,7 +276,8 @@ def login_portale(request: Request, response: Response, svc: Services = Depends(
         # il portale ha verificato la sessione, ma il secondo fattore resta di SkyTower: stessa risposta del login
         if auth._has_verified_factor(conn, user["id"]):
             security_event(conn, "LOGIN_PORTALE", user_id=user["id"], organization_id=user["organization_id"], ip=ip,
-                           user_agent=auth._ua(request), username=username, creato=creato, progetti=progetti, next="mfa")
+                           user_agent=auth._ua(request), username=username, creato=creato, progetti=progetti, next="mfa",
+                           via=via)
             methods = [r["method"] for r in conn.execute(
                 "SELECT DISTINCT method::text FROM cde.user_mfa_factors WHERE user_id = %s AND verified_at IS NOT NULL "
                 "ORDER BY 1 DESC", [user["id"]]).fetchall()]
@@ -261,15 +287,21 @@ def login_portale(request: Request, response: Response, svc: Services = Depends(
         if user["mfa_required"]:
             security_event(conn, "LOGIN_PORTALE", user_id=user["id"], organization_id=user["organization_id"], ip=ip,
                            user_agent=auth._ua(request), username=username, creato=creato, progetti=progetti,
-                           next="mfa_enrollment")
+                           next="mfa_enrollment", via=via)
             return {"status": "mfa_enrollment_required", "mfa_token": svc.tokens.issue_mfa_pending(user["id"], enroll=True),
                     "creato": creato, "progetti_aggiunti": progetti, "email": user["email"]}
-        # niente azzeramento di failed_login_count/locked_until: il portale non è una prova della password
-        conn.execute("UPDATE cde.users SET last_login_at = now() WHERE id = %s", [user["id"]])
+        if via == "password":
+            # la password del portale è una prova della password: il contatore riparte, come dopo un login riuscito
+            conn.execute("UPDATE cde.users SET last_login_at = now(), failed_login_count = 0 WHERE id = %s", [user["id"]])
+        else:
+            # niente azzeramento di failed_login_count/locked_until: la sessione del portale non è una prova della password
+            conn.execute("UPDATE cde.users SET last_login_at = now() WHERE id = %s", [user["id"]])
         security_event(conn, "LOGIN_PORTALE", user_id=user["id"], organization_id=user["organization_id"],
-                       ip=ip, user_agent=auth._ua(request), username=username, creato=creato, progetti=progetti)
-        sessione = auth._start_session(svc, conn, response, user, amr=["portale"], request=request)
+                       ip=ip, user_agent=auth._ua(request), username=username, creato=creato, progetti=progetti, via=via)
+        sessione = auth._start_session(svc, conn, response, user,
+                                       amr=["pwd", "portale"] if via == "password" else ["portale"], request=request)
     return {**sessione, "creato": creato, "progetti_aggiunti": progetti, "email": user["email"]}
 
 
-__all__ = ["assicura_membership", "organizzazione_suite", "router", "suite_link", "verifica_portale"]
+__all__ = ["assicura_membership", "entra", "organizzazione_suite", "router", "suite_link", "verifica_password_portale",
+           "verifica_portale"]
