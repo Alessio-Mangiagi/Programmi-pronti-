@@ -21,6 +21,7 @@ import { WorkflowInstance, WorkflowProgress } from "../../components/WorkflowPro
 import { choosableFields, FieldValueInput, useFolderNaming } from "./Naming";
 import { SuiteDocumento } from "./SuiteDocumento";
 import { ModelDocumentToggle } from "../../components/ProjectModels";
+import { FirmaChip, type FirmaRapporto } from "../../components/FirmaDigitale";
 
 export interface DocumentRow {
   id: string;
@@ -51,6 +52,10 @@ interface Revision {
   created_by_name: string;
   size_bytes: number;
   scan_status: "PENDING" | "CLEAN" | "INFECTED" | "ERROR";
+  /** busta firmata .p7m (ADR-55): stato dell'apertura e rapporto della verifica della firma */
+  firma_stato?: "PENDING" | "READY" | "FAILED" | null;
+  firma?: FirmaRapporto | null;
+  firma_dettaglio?: string | null;
   scan_detail: string | null;
   sha256: string;
 }
@@ -395,7 +400,8 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
     queryFn: () => api<DocumentRow & { description: string | null; revisions: Revision[]; my_actions: string[];
                                        can_download_published: boolean; archive_reason: string | null; following: boolean }>(`/documents/${documentId}`),
     enabled: !!documentId,
-    refetchInterval: (query) => (query.state.data?.revisions.some((r) => r.scan_status === "PENDING") ? 3000 : false),
+    // si ricontrolla finché antivirus e apertura delle buste firmate (.p7m, ADR-55) non hanno finito
+    refetchInterval: (query) => (query.state.data?.revisions.some((r) => r.scan_status === "PENDING" || r.firma_stato === "PENDING") ? 3000 : false),
   });
   const { data: history = [] } = useQuery({
     queryKey: ["document", documentId, "history"],
@@ -486,6 +492,7 @@ export function DocumentDrawer({ projectId, documentId, onClose }: { projectId: 
                     <b>{r.revision_code}</b><span>{r.suitability}</span>
                     <Chip size="small" color={STATE_COLOR[r.state]} label={STATE_LABEL[r.state]} />
                     {r.scan_status !== "CLEAN" && <Chip size="small" {...SCAN[r.scan_status]} />}
+                    {r.firma_stato && <FirmaChip stato={r.firma_stato} rapporto={r.firma ?? null} dettaglio={r.firma_dettaglio} />}
                   </Stack>}
                   secondary={<>
                     {new Date(r.created_at).toLocaleString("it-IT")} · {r.created_by_name} · {formatBytes(r.size_bytes)}

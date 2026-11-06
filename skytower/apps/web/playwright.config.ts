@@ -17,6 +17,8 @@ export const IDP_PORT = 4320;
 export const OFFICE_PORT = 4330;
 export const OFFICE_SECRET = "segreto-onlyoffice-e2e-0123456789abcdef";
 const OFFICE = `http://127.0.0.1:${OFFICE_PORT}`;   // Document Server OnlyOffice finto
+// firma digitale .p7m (ADR-55): firma.spec.ts mette qui il certificato del suo ente certificatore di prova
+export const FIRMA_ANCORE = join(tmpdir(), "cde-e2e-firma-ancore");
 const S3 = `http://127.0.0.1:${API_PORT + 1000}`;   // S3 emulato al posto del bucket regionale
 // stessa CSP della produzione (modules/cde-platform/edge.tf, spa_csp): tutti i test girano sotto questa politica
 export const SPA_CSP = [
@@ -60,7 +62,9 @@ export default defineConfig({
       // la SPA di prova gira su un altro origin: chiavi di sicurezza e ritorno dal single sign-on puntano lì
       env: { CDE_LOGIN_RATE_LIMIT: "1000/minute", CDE_WEB_BASE_URL: `http://localhost:${WEB_PORT}`,
              CDE_WEBAUTHN_ORIGINS: `["http://localhost:${WEB_PORT}"]`,
-             CDE_ONLYOFFICE_URL: OFFICE, CDE_ONLYOFFICE_JWT_SECRET: OFFICE_SECRET },
+             CDE_ONLYOFFICE_URL: OFFICE, CDE_ONLYOFFICE_JWT_SECRET: OFFICE_SECRET,
+             // buste .p7m: niente rete né elenchi eIDAS veri, l'esito dipende solo dall'ente di prova (FIRMA_ANCORE)
+             CDE_FIRMA_RETE: "false", FIRMA_ANCORE_EXTRA: FIRMA_ANCORE, FIRMA_CACHE_DIR: join(tmpdir(), "cde-e2e-firma-cache") },
       url: `http://127.0.0.1:${API_PORT}/health`,
       reuseExistingServer: false,
       timeout: 180_000,

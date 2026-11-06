@@ -4,6 +4,7 @@
 // annotazioni; modelli IFC e glTF/GLB (Blender) in 3D con annotazioni sugli elementi (gli IFC pesanti nella
 // versione .glb preparata dal worker, ADR-31, con l'originale a un clic); disegni CAD (DWG/DXF) nell'SVG preparato
 // dal worker, con layer e misure (ADR-41); Word ed Excel in anteprima di sola lettura;
+// PDF firmati in busta .p7m: si legge il documento contenuto, con il badge della verifica della firma (ADR-55);
 // testo nel browser, modificabile: il salvataggio
 // crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -28,6 +29,7 @@ import { MarkupLayer } from "./markup/MarkupLayer";
 import { MarkupPanel } from "./markup/MarkupPanel";
 import { uploadFile } from "../upload";
 import { openDocument } from "../openDocument";
+import { FirmaBadge, type FirmaInfo } from "./FirmaDigitale";
 import type { ModelPart } from "./markup/model3d";
 import type { DxfLayer } from "./markup/DxfView";
 
@@ -50,7 +52,10 @@ interface Derivative {
   layers?: DxfLayer[] | null;
   detail?: string | null;
 }
-interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean; derivative?: Derivative | null }
+/** `firma`: solo per le buste .p7m (ADR-55). Busta aperta: `url`/`content_type` sono del documento contenuto;
+ * altrimenti content_type = application/pkcs7-mime e `url` scarica il file firmato. */
+interface Link { url: string; filename: string; content_type: string | null; watermark?: boolean; derivative?: Derivative | null;
+                 firma?: FirmaInfo | null }
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -75,6 +80,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
     enabled: !!revisionId && rev?.scan_status === "CLEAN",
     staleTime: 4 * 60_000,          // l'URL firmato vale 5'
     retry: false,
+    // busta firmata appena caricata: il worker la sta aprendo, si ricontrolla finché il documento è pronto
+    refetchInterval: (q) => (q.state.data?.firma?.stato === "PENDING" ? 3000 : false),
   });
   // Il link filigranato in cache può essere già esaurito (ticket a usi contati, ADR-49 B6): se il PDF risponde 401
   // ("Link già usato" o scaduto) si scarta il link dalla cache e se ne chiede uno nuovo, una volta sola per revisione.
@@ -147,7 +154,9 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const isText = !!link?.content_type?.startsWith("text/plain");
   const canEdit = isText && !!doc && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId;
   // Word ed Excel nell'editor OnlyOffice: solo l'ultima revisione, in WIP; il salvataggio crea la WIP successiva
-  const canOffice = !!officeConfig?.enabled && (office === "docx" || office === "xlsx") && !!doc
+  // busta .p7m: si guarda il documento contenuto ma non si modifica (la firma riguarda il file originale)
+  const busta = link?.content_type === "application/pkcs7-mime";
+  const canOffice = !!officeConfig?.enabled && (office === "docx" || office === "xlsx") && !!doc && !link?.firma
     && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId && doc.revisions[0]?.state === "WIP";
   const fill = (isPdf && !browserPdf) || !!model || !!office || isCad;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
@@ -252,6 +261,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
           <ToggleButton size="small" value="panel" selected={panel} onChange={() => setPanel((p) => !p)} aria-label="Annotazioni">
             <Badge badgeContent={openCount} color="error"><CommentIcon fontSize="small" /></Badge>
           </ToggleButton>
+          {link?.firma && revisionId && <FirmaBadge firma={link.firma} revisionId={revisionId} />}
           {link?.watermark && (
             <Tooltip title="Su ogni pagina, anche scaricata, compaiono il tuo nome, l'organizzazione, data e ora: lo ha deciso il Project Admin">
               <Chip size="small" color="warning" variant="outlined" label="Filigranato" tabIndex={0} />
@@ -339,6 +349,25 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
             <Suspense fallback={<CircularProgress sx={{ color: "#fff", m: "auto" }} />}>
               <OfficeView url={link.url} kind={office} />
             </Suspense>
+          ) : busta ? (
+            <Stack alignItems="center" spacing={2} p={3} m="auto" bgcolor="background.paper" borderRadius={2} maxWidth={560}>
+              {link.firma?.stato === "FAILED" ? (
+                <>
+                  <Typography>Il documento firmato non si è potuto aprire per la visualizzazione.</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {link.firma.rapporto?.riepilogo ?? link.firma.dettaglio ?? "Motivo sconosciuto"}
+                  </Typography>
+                </>
+              ) : link.firma?.stato === "READY" ? (
+                <Typography>Il documento dentro la busta firmata ({link.firma.contenuto}) non si apre nel browser.</Typography>
+              ) : (
+                <>
+                  <CircularProgress size={28} />
+                  <Typography>Il server sta aprendo la busta firmata e verificando la firma: pochi secondi dopo la verifica antivirus.</Typography>
+                </>
+              )}
+              <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => download.mutate()}>Scarica il file firmato</Button>
+            </Stack>
           ) : isImage ? (
             <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "100%", m: 2 }}>
               <Box component="img" src={link.url} alt={doc?.title} draggable={false}
