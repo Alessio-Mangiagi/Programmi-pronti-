@@ -101,6 +101,49 @@ function renderRiepilogo(job) {
   }));
 }
 
+// Firma digitale dei documenti .p7m (server.py, apri_busta): job.firma_a / job.firma_b = {esito, riepilogo,
+// firme[{firmatario, codice_fiscale, ente, tipo, esito, motivi, data_firma, marca_temporale}]} oppure null se il
+// documento non è firmato; job.firma_nota = confronto fra le due firme. Colore dall'esito: verde valida, rosso
+// non valida, giallo da verificare, grigio non firmato. Il riquadro compare solo se almeno uno è firmato.
+const ESITO_FIRMA = {
+  'valida': ['valida', 'Firma valida'],
+  'non valida': ['non-valida', 'Firma NON valida'],
+  'da verificare': ['da-verificare', 'Firma da verificare'],
+};
+const dataIt = s => (s ? new Date(s).toLocaleDateString('it-IT') : '');
+
+function cardFirma(lato, nome, f) {
+  if (!f) {
+    return '<div class="firma-card nessuna"><div class="firma-head"><span class="firma-lato">' + lato + '</span>' +
+           '<span class="firma-badge nessuna">Non firmato</span></div>' +
+           '<p class="firma-nome">' + esc(nome || '') + '</p></div>';
+  }
+  const [cls, testo] = ESITO_FIRMA[f.esito] || ['da-verificare', 'Firma non verificata'];
+  const firmatari = (f.firme || []).map(x =>
+    '<li><b>' + esc(x.firmatario || '?') + '</b>' +
+      (x.codice_fiscale ? ' · ' + esc(x.codice_fiscale) : '') +
+      (x.ente ? ' · ' + esc(x.ente) : '') +
+      (x.tipo ? ' · ' + esc(x.tipo) : '') +
+      (x.marca_temporale ? ' · marca temporale del ' + dataIt(x.marca_temporale)
+                         : x.data_firma ? ' · firmato il ' + dataIt(x.data_firma) + ' (data dichiarata)' : '') +
+      ((x.motivi || []).length ? '<ul class="firma-motivi">' + x.motivi.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>' : '') +
+    '</li>').join('');
+  return '<div class="firma-card ' + cls + '"><div class="firma-head"><span class="firma-lato">' + lato + '</span>' +
+         '<span class="firma-badge ' + cls + '">' + testo + '</span></div>' +
+         '<p class="firma-nome">' + esc(nome || '') + (f.documento ? ' → ' + esc(f.documento) : '') + '</p>' +
+         '<ul class="firma-firmatari">' + firmatari + '</ul></div>';
+}
+
+function renderFirme(job) {
+  const box = $('#firme');
+  if (!box) return;
+  if (!job.firma_a && !job.firma_b) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = '<h3>Firma digitale</h3>' +
+    (job.firma_nota ? '<p class="firma-nota">' + esc(job.firma_nota) + '</p>' : '') +
+    '<div class="firma-griglia">' + cardFirma('A', job.name_a, job.firma_a) + cardFirma('B', job.name_b, job.firma_b) + '</div>';
+}
+
 // Costruisce il report a pagine dal job completato e lo mostra.
 export function render(job) {
   state.job = job;
@@ -114,6 +157,7 @@ export function render(job) {
   $('#resNames').textContent = (job.name_a || '') + '  ↔  ' + (job.name_b || '');
 
   const numeri = new Set((job.riepilogo || []).map(n => n.risultato + ':' + n.idx));
+  renderFirme(job);
   renderRiepilogo(job);
 
   const wrap = $('#pages');

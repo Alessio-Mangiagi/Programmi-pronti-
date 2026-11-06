@@ -336,6 +336,27 @@ select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(16,64,112,.
 
 /* Riepilogo numeri e date cambiati */
 .res-names { font-weight: 600; color: var(--ink-2); }
+/* ---------- firma digitale (.p7m): riquadro A/B sopra il riepilogo (render.js, renderFirme) ---------- */
+.firme { padding: 1rem 1.2rem; margin-bottom: 1rem; }
+.firme h3 { font-weight: 700; font-size: .95rem; color: var(--navy); margin-bottom: .5rem; }
+.firma-nota { font-size: .85rem; color: var(--ink-2); margin-bottom: .6rem; }
+.firma-griglia { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .7rem; }
+.firma-card { border: 1px solid var(--line); border-left-width: 4px; border-radius: 6px; padding: .6rem .8rem; background: var(--bg); }
+.firma-card.valida { border-left-color: var(--add); }
+.firma-card.non-valida { border-left-color: var(--del); }
+.firma-card.da-verificare { border-left-color: #b7791f; }
+.firma-card.nessuna { border-left-color: var(--line); }
+.firma-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .3rem; }
+.firma-lato { font-family: var(--display); font-weight: 700; color: var(--navy); }
+.firma-badge { font-size: .72rem; font-weight: 600; border-radius: 999px; padding: .1rem .55rem; border: 1px solid var(--line); }
+.firma-badge.valida { color: #fff; background: var(--add); border-color: var(--add); }
+.firma-badge.non-valida { color: #fff; background: var(--del); border-color: var(--del); }
+.firma-badge.da-verificare { color: #5c3d00; background: #fdf3d8; border-color: #e3b341; }
+.firma-badge.nessuna { color: var(--dim); }
+.firma-nome { font-size: .8rem; color: var(--dim); word-break: break-word; margin-bottom: .3rem; }
+.firma-firmatari { list-style: none; display: grid; gap: .3rem; font-size: .82rem; color: var(--ink); }
+.firma-motivi { list-style: disc; margin: .2rem 0 0 1.1rem; color: var(--ink-2); font-size: .78rem; }
+
 .riepilogo { padding: 1rem 1.2rem; margin-bottom: 1rem; }
 .riepilogo h3 { font-weight: 700; font-size: .95rem; color: var(--navy); margin-bottom: .6rem; display: flex; align-items: center; gap: .5rem; }
 .riepilogo .count { font-size: .75rem; color: #fff; background: var(--del); border-radius: 999px; padding: .05rem .5rem; }

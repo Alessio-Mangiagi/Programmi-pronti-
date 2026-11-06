@@ -15,6 +15,12 @@ echo.
 
 rem Istanza precedente rimasta appesa sulla porta? Chiusura forzata, avvio pulito.
 call "%~dp0..\shared\avvia\libera-porta.bat" 5001
+
+rem Motore della firma digitale (PDF firmati .p7m): se manca il suo ambiente Python lo installa
+rem shared\firma\installa.bat in una finestra a parte, ridotta a icona, senza fermare l'avvio.
+if not exist "%~dp0..\shared\firma\.venv\Scripts\python.exe" if exist "%~dp0..\shared\firma\installa.bat" (
+    start "Firma digitale - installazione" /min cmd /c call "%~dp0..\shared\firma\installa.bat"
+)
 start "" http://localhost:5001
 "%PYTHON%" server.py
 pause

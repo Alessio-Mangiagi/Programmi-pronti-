@@ -17,14 +17,40 @@ pulsanti per scaricare il risultato.
 - **Elenco Excel**: una riga per differenza (pagina, tipo, testo A e B, parole
   cambiate, numeri/date, stato di revisione e nota), con i filtri già attivi.
 
-## 3.2 Numeri e date cambiati — da guardare per primo
+## 3.2 Firma digitale dei documenti .p7m
+
+Se almeno uno dei due documenti è un PDF firmato digitalmente (`.p7m`), sopra il
+riepilogo compare il riquadro **Firma digitale**, con una scheda per A e una per B.
+
+![Il riquadro Firma digitale: A firmato e valido, B non firmato](img/14-firma-digitale.png)
+
+- Il bollino dice l'esito della verifica: **Firma valida** (verde), **Firma NON
+  valida** (rosso), **Firma da verificare** (giallo), **Non firmato** (grigio).
+- Sotto, per ogni firmatario: nome, codice fiscale, ente certificatore, tipo di
+  firma (*firma digitale* = certificato qualificato su dispositivo sicuro) e la
+  data: quella della **marca temporale** se c'è, altrimenti quella dichiarata da
+  chi ha firmato. Se la firma non è valida o è da verificare, l'elenco puntato
+  spiega il motivo (documento modificato dopo la firma, certificato scaduto o
+  revocato, ente non riconosciuto, revoca non controllabile senza rete…).
+- La frase in alto confronta le due firme: *Solo A è firmato…*, *A e B firmati
+  dagli stessi firmatari*, *Firmatari diversi…*. La stessa frase compare
+  nell'esito e nei report Word, PDF ed Excel.
+- Una firma non valida **non ferma il confronto**: le differenze del testo si
+  vedono comunque, la firma è segnalata.
+
+La verifica è quella completa: il certificato deve risalire a un ente
+certificatore qualificato degli elenchi ufficiali europei e di AgID, non essere
+revocato né scaduto alla data della firma. Serve la rete per controllare la
+revoca: senza, la firma risulta *da verificare*.
+
+## 3.3 Numeri e date cambiati — da guardare per primo
 
 Il riquadro elenca le righe in cui cambia un **importo**, una **quantità** o
 una **data**: nell'esempio il calcestruzzo passa da 96 a 104 m³, il prezzo
 dell'acciaio da 1,32 a 1,38 €/kg, una voce di tinteggiatura è sostituita da una
 rasatura. **Clic su una voce** = il report salta a quella riga.
 
-## 3.3 Le pagine e i colori
+## 3.4 Le pagine e i colori
 
 Sotto c'è una scheda per pagina. Quelle con differenze sono già aperte; un clic
 sull'intestazione della pagina la apre o la chiude.
@@ -50,7 +76,7 @@ La barra sopra le pagine resta in vista mentre scorri:
 - **Solo numeri e date** nasconde tutto il resto;
 - a destra il contatore **Riviste x di N** dice a che punto sei con la revisione.
 
-## 3.4 Segnare le differenze già controllate (revisione)
+## 3.5 Segnare le differenze già controllate (revisione)
 
 Passando il mouse su una differenza compaiono quattro pulsanti:
 
@@ -66,7 +92,7 @@ Passando il mouse su una differenza compaiono quattro pulsanti:
 Lo stato resta salvato nel confronto (lo ritrovi riaprendolo dallo Storico) e
 finisce nell'**Elenco Excel**.
 
-## 3.5 Anteprima: vedere la differenza sulla pagina
+## 3.6 Anteprima: vedere la differenza sulla pagina
 
 **Clic su una differenza** (o Invio) apre il *Confronto visuale* su quella pagina.
 

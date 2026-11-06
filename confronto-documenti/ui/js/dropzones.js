@@ -4,8 +4,10 @@ import { state } from './state.js';
 
 // Estensioni accettate. Tenere allineata a IMAGE/PDF/DOCX/TEXT_EXTS in
 // confronta_pdf.py: qui è solo un filtro UX, il server è la validazione vera.
+// .p7m = PDF firmato digitalmente (busta CAdES): il server lo apre e verifica la
+// firma (apri_busta in server.py), poi confronta il PDF contenuto.
 export const ALLOWED = ['.pdf', '.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp',
-                        '.webp', '.gif', '.docx', '.txt', '.md', '.csv'];
+                        '.webp', '.gif', '.docx', '.txt', '.md', '.csv', '.p7m'];
 
 export const isAllowed = f => !!f && ALLOWED.some(ext => f.name.toLowerCase().endsWith(ext));
 

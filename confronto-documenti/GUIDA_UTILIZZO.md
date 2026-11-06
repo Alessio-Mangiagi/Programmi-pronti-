@@ -39,8 +39,9 @@ confronti fatti (vedi sotto).
 
 ## Fare un confronto
 
-1. **Scegli i due documenti.** Sono accettati PDF, immagini (JPG, PNG, TIFF…),
-   Word (`.docx`) e testo. Puoi:
+1. **Scegli i due documenti.** Sono accettati PDF (anche firmati digitalmente
+   `.p7m`: si confronta il PDF contenuto e il report mostra l'esito della firma),
+   immagini (JPG, PNG, TIFF…), Word (`.docx`) e testo. Puoi:
    - **prenderli da una cartella**: nel pannello a sinistra premi
      **Scegli cartella** e seleziona la cartella. Compaiono i file utilizzabili,
      anche quelli nelle sottocartelle. Trascina un file sul riquadro **A** (blu)

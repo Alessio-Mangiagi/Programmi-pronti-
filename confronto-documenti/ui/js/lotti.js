@@ -13,7 +13,9 @@ import { impostazioni } from './compare.js';
 import { ricorda, mostraStorico } from './storico.js';
 
 const rel = f => f.webkitRelativePath || f.name;
-const estensione = n => (n.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+// "offerta.pdf.p7m" (firmato digitalmente) si abbina a "offerta.pdf": il .p7m è solo la busta della firma.
+const senzaP7m = n => n.replace(/(\.p7m)+$/i, '');
+const estensione = n => (senzaP7m(n).match(/\.[^.]+$/) || [''])[0].toLowerCase();
 
 // Nome base senza estensione e senza i suffissi di versione più comuni.
 const SUFFISSI = [
@@ -24,7 +26,7 @@ const SUFFISSI = [
   /[\s_\-.]*(def|definitivo|definitiva|bozza|draft|old|new|vecchio|nuovo|firmato|firmata|agg|aggiornato|finale|copia)$/i,
 ];
 export function nomeBase(nome) {
-  let b = nome.replace(/\.[^.]+$/, '').toLowerCase().trim();
+  let b = senzaP7m(nome).replace(/\.[^.]+$/, '').toLowerCase().trim();
   for (let giro = 0, prima = ''; giro < 4 && b !== prima; giro++) {
     prima = b;
     SUFFISSI.forEach(re => { b = b.replace(re, ''); });
@@ -35,7 +37,7 @@ export function nomeBase(nome) {
 // Chiave di ordinamento della versione: numero di rev/v, poi data nel nome,
 // poi data di modifica del file.
 function chiaveVersione(f) {
-  const n = f.name.replace(/\.[^.]+$/, '');
+  const n = senzaP7m(f.name).replace(/\.[^.]+$/, '');
   const rev = n.match(/(?:rev|r|v|ver|vers|versione)[\s_\-.]*(\d+)/i);
   const data = n.match(/(\d{4})[\-_.]?(\d{2})[\-_.]?(\d{2})/) || n.match(/(\d{2})[\-_.](\d{2})[\-_.](\d{4})/);
   let d = 0;

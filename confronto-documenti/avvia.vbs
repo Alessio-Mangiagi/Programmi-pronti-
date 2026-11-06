@@ -25,6 +25,15 @@ End If
 shell.CurrentDirectory = scriptDir
 shell.Run "cmd /c call """ & scriptDir & "\..\shared\avvia\libera-porta.bat"" 5001", 0, True
 
+' Motore della firma digitale (PDF firmati .p7m, shared\firma): se il suo ambiente Python manca lo installa
+' installa.bat, in una finestra nascosta e senza aspettarlo (serve la rete, circa un minuto la prima volta).
+' Intanto il confronto parte lo stesso: solo i .p7m danno "componente non installato" finché non ha finito.
+Dim firmaDir
+firmaDir = scriptDir & "\..\shared\firma"
+If Not fso.FileExists(firmaDir & "\.venv\Scripts\python.exe") And fso.FileExists(firmaDir & "\installa.bat") Then
+    shell.Run "cmd /c """ & firmaDir & "\installa.bat""", 0, False
+End If
+
 ' Avvia il server con finestra nascosta (0 = hidden, False = non aspettare)
 shell.Run """" & pythonExe & """ """ & scriptDir & "\server.py""", 0, False
 

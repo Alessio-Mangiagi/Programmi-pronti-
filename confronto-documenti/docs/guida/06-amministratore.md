@@ -12,6 +12,14 @@ Python 3.10+ con il `.venv` creato da `Installa.bat`, Tesseract OCR con la
 lingua italiana (o la cartella `Tesseract-OCR` copiata accanto all'app).
 PaddleOCR è facoltativo e riusa il venv di OCR Documenti.
 
+**PDF firmati (.p7m).** Li apre e li verifica il motore comune della suite
+`shared/firma` (vedi il suo README): ambiente Python proprio `shared/firma/.venv`,
+creato da `shared\firma\installa.bat`. `avvia.vbs` e `Avvia con console.bat` lo
+lanciano da soli se manca (serve la rete la prima volta, per librerie ed elenchi
+ufficiali degli enti certificatori). Senza il motore i soli `.p7m` danno un
+messaggio chiaro; tutto il resto funziona. L'exe PyInstaller e l'immagine Docker
+non contengono `shared/`: lì i `.p7m` non si aprono.
+
 **Accesso.** Dietro il Portale l'accesso passa dal login del Portale.
 `COSEDIL_SSO=off` lo spegne (solo per uso isolato o sviluppo). Il server di
 rete (`installa-server-rete.ps1`) e Docker hanno opzioni proprie (login del

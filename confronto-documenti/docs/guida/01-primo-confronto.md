@@ -20,7 +20,11 @@ Regola pratica: in **A** la versione **vecchia**, in **B** quella **nuova**.
 Le righe rosse del report saranno "tolte", le verdi "aggiunte".
 
 Formati accettati: PDF, immagini (JPG, PNG, TIFF, BMP, WEBP, GIF), Word `.docx`,
-testo (`.txt`, `.md`, `.csv`).
+testo (`.txt`, `.md`, `.csv`), e i **PDF firmati digitalmente** (`.pdf.p7m`): il
+programma apre la busta, verifica la firma e confronta il PDF che c'è dentro. Si
+può confrontare anche un documento firmato con uno che non lo è (per esempio la
+copia firmata del contratto con la bozza): vedi il
+[paragrafo 3.2](03-leggere-il-report.md#32-firma-digitale-dei-documenti-p7m).
 
 ## 1.2 Il pannello cartella
 

@@ -6,7 +6,10 @@
 | Cosa succede | Cosa fare |
 |---|---|
 | **Avvia confronto** resta grigio | Manca uno dei due documenti: riempi sia A sia B. |
-| Il file non entra nel riquadro | Formato non supportato: usa PDF, immagine, Word `.docx` o testo. I vecchi `.doc` vanno salvati come `.docx`. |
+| Il file non entra nel riquadro | Formato non supportato: usa PDF (anche firmato `.p7m`), immagine, Word `.docx` o testo. I vecchi `.doc` vanno salvati come `.docx`. |
+| «… è firmato digitalmente (.p7m) ma il componente della firma digitale non è installato» | Il motore della firma della suite non è ancora pronto (si installa da solo al primo avvio, serve la rete): aspetta un minuto e rifai il confronto; se resta, avvisa l'amministratore. |
+| «Firma staccata: la busta non contiene il documento» o «Busta firmata illeggibile» | Il `.p7m` è rotto oppure contiene solo la firma senza il documento: chiedi a chi l'ha mandato il file completo. |
+| Firma **da verificare** con «Stato di revoca non controllabile» | Il programma non ha raggiunto l'ente certificatore (rete assente o ente che non risponde): rifai il confronto più tardi. |
 | Il pannello cartella non mostra un file | Formato non supportato, oppure il nome non corrisponde a quanto scritto in *Cerca per nome…*. |
 | Tante differenze "finte" su una scansione | Attiva **Confronto tollerante** e **Migliora scansioni**, o passa a **300 DPI · Preciso**. |
 | Differenze su numeri di pagina o date in testa alla pagina | Lascia attivo **Ignora intestazioni ripetute**; per il resto usa le **Righe da ignorare** (es. `Pagina # di #`). |

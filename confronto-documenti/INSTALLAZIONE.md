@@ -109,6 +109,21 @@ su file caricati e durata.
 | `CONFRONTO_STORICO_GIORNI` | `30` | Dopo quanti giorni lo storico viene cancellato. |
 | `CONFRONTO_MAX_PARALLELI` | `2` | Confronti eseguiti insieme; gli altri aspettano in coda. |
 
+## PDF firmati digitalmente (.p7m)
+
+I `.p7m` (buste CAdES) si aprono col motore comune della suite `shared/firma`
+(client `busta.py`, nessuna libreria nuova in questo programma): `apri_busta` in
+`server.py` estrae il documento, lo confronta come gli altri e mette nel job
+`firma_a` / `firma_b` (esito `valida` | `non valida` | `da verificare`, riepilogo,
+firmatari) e `firma_nota` (confronto fra le due firme), anche nello storico e nei
+report. La verifica è completa (catena fino agli elenchi eIDAS europei e AgID,
+revoca OCSP/CRL, marca temporale): vedi `shared/firma/README.md` e
+`shared/suite/CONTRATTI.md` §10. Installazione: `shared\firma\installa.bat`, che
+`avvia.vbs` e `Avvia con console.bat` lanciano da soli se `shared/firma/.venv`
+manca. Variabili del motore: `FIRMA_ELENCHI`, `FIRMA_ELENCHI_ORE`,
+`FIRMA_CACHE_DIR`, `FIRMA_ANCORE_EXTRA`, `FIRMA_PYTHON`. Exe PyInstaller e Docker
+(senza `shared/`): i `.p7m` rispondono con un messaggio, il resto funziona.
+
 ## Dati salvati
 
 - **File caricati:** cancellati a fine confronto.
@@ -126,7 +141,8 @@ Backup: basta copiare la cartella dati (volume `/data` in Docker).
 `POST /api/compare` e `GET/PUT/DELETE /api/jobs/...` accettano, al posto della
 sessione del portale, il **token di servizio** di `shared/suite` (header
 `X-Suite-Token`, con `X-Suite-Utente`/`X-Suite-Nome` per attribuire il confronto):
-così SkyTower confronta una revisione con la precedente senza cookie. Vale solo per
+così SkyTower confronta una revisione con la precedente senza cookie. Anche da
+qui si possono mandare buste `.p7m`: il job risponde con `firma_a`/`firma_b`. Vale solo per
 quelle rotte (`PERCORSI_SUITE` in `server.py`); senza token resta il gate SSO di
 sempre (401 se non loggati, 503 portale spento) e, se impostata, la
 `CONFRONTO_PASSWORD`. Con `COSEDIL_SSO=off` non cambia niente. Il confronto fatto

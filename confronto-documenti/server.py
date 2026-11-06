@@ -18,6 +18,11 @@ OCR: testo embedded quando c'è, altrimenti Tesseract o PaddleOCR (scelta via
 campo 'model'), con preprocessing scansioni e confronto tollerante al rumore
 OCR. I modelli vision via Ollama restano solo nella CLI di confronta_pdf.py.
 
+PDF firmati digitalmente (.p7m, CAdES): il worker apre la busta col motore comune
+shared/firma (apri_busta), confronta il documento contenuto e mette nel job
+firma_a / firma_b (esito, riepilogo, firmatari) e firma_nota (confronto fra le
+firme). Una firma non valida si segnala, non blocca il confronto.
+
 Confronti contemporanei limitati (CONFRONTO_MAX_PARALLELI, default 2): l'OCR
 usa già tutti i core, oltre si va in coda invece di rallentare tutti.
 
@@ -91,6 +96,17 @@ except ImportError:
 
 if cosedil_sso is not None:
     cosedil_sso.init(app, app_id="confronta", percorsi_liberi=PERCORSI_SUITE if suite_link else ())
+
+# PDF firmati digitalmente (.p7m, CAdES): li apre e ne verifica la firma il motore comune della suite
+# (shared/firma, README lì e CONTRATTI.md §10). busta.py è solo libreria standard: le librerie di verifica stanno
+# nell'ambiente shared/firma/.venv, che busta.apri richiama come processo separato. Senza il modulo (exe o
+# Docker fuori dalla suite) i .p7m danno un messaggio chiaro, il resto del confronto funziona come prima.
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared" / "firma"))
+try:
+    import busta as firma_busta
+except ImportError:
+    firma_busta = None
 
 
 def _token_suite_valido():
@@ -238,6 +254,11 @@ _STATI_REVISIONE = {"vista": "vista", "ok": "accettata", "dubbio": "da chiarire"
 
 ALLOWED_EXTS = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
                 ".webp", ".gif", ".docx", ".txt", ".md", ".csv"}
+# Busta firmata: "contratto.pdf.p7m". Si accetta se dentro c'è un formato di ALLOWED_EXTS (o se il nome non lo
+# dice: lo stabilisce il motore dal contenuto, dopo l'apertura).
+EXT_FIRMATA = ".p7m"
+# Testa del file letta per riconoscere una busta anche senza estensione .p7m (DER o base64, vedi busta.py).
+TESTA_BUSTA = 64 * 1024
 
 # Codici lingua Tesseract validi: token minuscoli (es. ita, eng, chi_sim) uniti
 # da '+'. Validare a monte evita che valori arbitrari dalla form finiscano nella
@@ -438,6 +459,116 @@ def _posizioni(ops: list[dict], n_a: int, n_b: int):
             ib += 1
 
 
+# --------------------------------------------------------------------------
+# PDF firmati digitalmente (.p7m)
+# --------------------------------------------------------------------------
+
+def _senza_p7m(nome: str) -> str:
+    """"offerta.pdf.p7m.p7m" → "offerta.pdf" (buste annidate)."""
+    base = Path(nome or "").name
+    while base.lower().endswith(EXT_FIRMATA):
+        base = base[:-len(EXT_FIRMATA)]
+    return base
+
+
+def _riassunto_firma(rapporto: dict) -> dict:
+    """Il rapporto del motore ridotto a quello che serve a pagina, report e storico (niente dati superflui):
+    esito della busta, riga di riepilogo e, per ogni firmatario, chi è, ente, tipo, esito, motivi e date."""
+    firme = []
+    for f in rapporto.get("firme") or []:
+        marca = f.get("marca_temporale") or {}
+        firme.append({
+            "firmatario": f.get("firmatario"), "codice_fiscale": f.get("codice_fiscale"),
+            "organizzazione": f.get("organizzazione"), "ente": f.get("ente_certificatore"),
+            "tipo": f.get("tipo"), "esito": f.get("esito"), "motivi": f.get("motivi") or [],
+            "data_firma": f.get("data_firma_dichiarata"),
+            "marca_temporale": marca.get("data") if marca.get("valida") else None,
+            "certificato_valido_al": f.get("certificato_valido_al"),
+        })
+    elenchi = rapporto.get("elenchi") or {}
+    return {"esito": rapporto.get("esito"), "riepilogo": rapporto.get("riepilogo") or "",
+            "livelli": rapporto.get("livelli") or 1, "documento": rapporto.get("nome_contenuto"),
+            "firme": firme, "elenchi_del": elenchi.get("aggiornati_il")}
+
+
+def apri_busta(path: Path, nome: str) -> tuple[Path, dict | None]:
+    """Se il file caricato è una busta .p7m ne estrae il documento (accanto, nella stessa cartella temporanea) e
+    rende (percorso del documento, riassunto della firma); un file non firmato torna com'è con None.
+
+    Una firma non valida NON blocca: il confronto si fa e la firma si segnala. Bloccano solo le buste che non si
+    possono aprire (DocumentError con un messaggio per l'utente): motore non installato, .p7m rotto o con la
+    firma staccata, contenuto in un formato che il confronto non legge. Se la sola verifica non riesce (rete,
+    processo che non risponde) il documento si estrae senza verifica e la firma resta "da verificare"."""
+    with open(path, "rb") as fh:
+        testa = fh.read(TESTA_BUSTA)
+    if firma_busta is None:
+        if nome.lower().endswith(EXT_FIRMATA):
+            raise DocumentError(f"«{nome}» è firmato digitalmente (.p7m) ma questa installazione non ha il "
+                                "componente della firma digitale (shared/firma).")
+        return path, None
+    if not firma_busta.e_busta_firmata(testa, nome):
+        return path, None
+    dati = path.read_bytes()
+    try:
+        contenuto, nome_doc, rapporto = firma_busta.apri(dati, nome)
+    except firma_busta.FirmaNonInstallata:
+        raise DocumentError(f"«{nome}» è firmato digitalmente (.p7m) ma il componente della firma digitale non è "
+                            "installato: lanciare shared\\firma\\installa.bat (una volta, serve la rete).") from None
+    except firma_busta.BustaIllegibile as exc:
+        raise DocumentError(f"«{nome}»: {exc}") from None
+    except Exception as exc:                         # noqa: BLE001 - verifica fallita (rete, tempo scaduto)
+        try:
+            contenuto, nome_doc, rapporto = firma_busta.apri(dati, nome, verifica=False)
+        except firma_busta.BustaIllegibile as exc2:
+            raise DocumentError(f"«{nome}»: {exc2}") from None
+        except Exception as exc2:                    # noqa: BLE001 - nemmeno l'estrazione: busta inservibile
+            raise DocumentError(f"«{nome}»: busta firmata non apribile ({exc2}).") from None
+        rapporto["esito"] = "da verificare"
+        rapporto["riepilogo"] = f"Firma non verificata ({str(exc)[:120]}): " + (rapporto.get("riepilogo") or "")
+    ext = Path(nome_doc).suffix.lower()
+    if ext not in ALLOWED_EXTS:
+        raise DocumentError(f"«{nome}» contiene un file {ext or 'senza estensione'} che il confronto non legge "
+                            "(ammessi PDF, immagini, Word .docx, testo).")
+    estratto = path.with_name(f"{path.stem}_contenuto{ext}")
+    estratto.write_bytes(contenuto)
+    return estratto, _riassunto_firma(rapporto)
+
+
+def _chi_firma(firma: dict) -> set[str]:
+    """Firmatari di una busta, per riconoscerli fra A e B: codice fiscale se c'è, altrimenti il nome."""
+    return {(f.get("codice_fiscale") or f.get("firmatario") or "?").upper() for f in firma.get("firme") or []}
+
+
+def nota_firme(firma_a: dict | None, firma_b: dict | None) -> str | None:
+    """Una frase che mette a confronto le firme dei due documenti (None se nessuno dei due è firmato)."""
+    if not firma_a and not firma_b:
+        return None
+    if firma_a and not firma_b:
+        return f"Solo A è firmato digitalmente (firma {firma_a['esito'] or 'non verificata'}); B non è firmato."
+    if firma_b and not firma_a:
+        return f"Solo B è firmato digitalmente (firma {firma_b['esito'] or 'non verificata'}); A non è firmato."
+    nomi = lambda f: ", ".join(x.get("firmatario") or "?" for x in f["firme"]) or "?"   # noqa: E731
+    if _chi_firma(firma_a) == _chi_firma(firma_b):
+        frase = f"A e B firmati digitalmente dagli stessi firmatari ({nomi(firma_a)})"
+    else:
+        frase = f"Firmatari diversi: A da {nomi(firma_a)}, B da {nomi(firma_b)}"
+    if firma_a["esito"] != firma_b["esito"]:
+        frase += f"; firma di A {firma_a['esito'] or 'non verificata'}, di B {firma_b['esito'] or 'non verificata'}"
+    return frase + "."
+
+
+def _righe_firme(job: dict) -> list[str]:
+    """Righe "firma digitale" per i report scaricabili (Word, PDF, Excel): una per documento firmato + la nota."""
+    righe = []
+    for lato in ("a", "b"):
+        f = job.get(f"firma_{lato}")
+        if f:
+            righe.append(f"Firma digitale {lato.upper()}: {f.get('riepilogo') or f.get('esito') or ''}")
+    if job.get("firma_nota"):
+        righe.append(job["firma_nota"])
+    return righe
+
+
 def run_compare_in_coda(job_id: str, path1: Path, path2: Path, *args):
     """Aspetta uno slot libero (MAX_PARALLELI) e poi esegue run_compare.
     Annullato mentre è in coda: niente lavoro, file caricati cancellati."""
@@ -464,13 +595,26 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
     allineamento pagine -> diff per riga/parola -> salva i risultati nel job.
     """
     doc1 = doc2 = None
+    estratti: list[Path] = []          # documenti tirati fuori dalle buste .p7m: da cancellare a fine job
     try:
         ignore = compile_ignore(ignore_raw)
 
         update_job(job_id, status="rendering", message="Apertura documenti...")
         try:
-            doc1 = open_document(path1)
-            doc2 = open_document(path2)
+            # Buste firmate (.p7m): prima si apre la busta e si verifica la firma, poi si confronta il
+            # documento contenuto come qualunque altro. firma_a/firma_b restano nel job (e nello storico).
+            firme, documenti = {}, {"a": path1, "b": path2}
+            for lato, nome in (("a", name1), ("b", name2)):
+                if nome.lower().endswith(EXT_FIRMATA):
+                    update_job(job_id, message=f"Verifica della firma digitale di «{nome}»...")
+                nuovo, firme[lato] = apri_busta(documenti[lato], nome)
+                if nuovo != documenti[lato]:
+                    estratti.append(nuovo)
+                    documenti[lato] = nuovo
+            firma_nota = nota_firme(firme["a"], firme["b"])
+            update_job(job_id, firma_a=firme["a"], firma_b=firme["b"], firma_nota=firma_nota)
+            doc1 = open_document(documenti["a"])
+            doc2 = open_document(documenti["b"])
         except DocumentError as exc:
             update_job(job_id, status="error", message=str(exc))
             return
@@ -587,6 +731,8 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
                         " (timbri, firme, disegni).")
         if ripetute_tolte:
             message += f" Ignorate {ripetute_tolte} righe di intestazione/piè di pagina ripetute."
+        if firma_nota:                  # anche nel riassunto dello storico, non solo nel riquadro delle firme
+            message += f" {firma_nota}"
         update_job(job_id, results=results, status="done", diff_count=diff_count,
                    uncertain_count=uncertain_count, visual_count=visual_count,
                    riepilogo=riepilogo, message=message)
@@ -608,7 +754,7 @@ def run_compare(job_id: str, path1: Path, path2: Path, name1: str, name2: str,
                     d.close()
             except Exception:
                 pass
-        for p in (path1, path2):
+        for p in (path1, path2, *estratti):
             try:
                 p.unlink(missing_ok=True)
             except OSError:
@@ -727,6 +873,11 @@ def build_report_docx(job: dict) -> bytes:
     mr.italic = True
     mr.font.color.rgb = GREY
     doc.add_paragraph().add_run(job.get("message", "")).bold = True
+    for riga in _righe_firme(job):                    # firma digitale dei documenti .p7m
+        par = doc.add_paragraph(riga)
+        par.paragraph_format.space_after = Pt(0)
+        for run in par.runs:
+            run.font.size = Pt(9)
     righe_num = _righe_riepilogo(job)
     if righe_num:
         doc.add_heading("Numeri e date cambiati", level=2)
@@ -855,8 +1006,13 @@ def build_report_xlsx(job: dict) -> bytes:
     ws.auto_filter.ref = ws.dimensions
 
     info = wb.create_sheet("Confronto")
+    # firma digitale dei .p7m: riepilogo per documento e confronto fra le firme (vedi apri_busta)
+    firme = [(f"Firma {lato.upper()}", (job.get(f"firma_{lato}") or {}).get("riepilogo", ""))
+             for lato in ("a", "b") if job.get(f"firma_{lato}")]
+    if job.get("firma_nota"):
+        firme.append(("Firme", job["firma_nota"]))
     for k, v in (("Documento A", job.get("name_a", "")), ("Documento B", job.get("name_b", "")),
-                 ("Esito", job.get("message", "")),
+                 ("Esito", job.get("message", "")), *firme,
                  ("Data", datetime.now().strftime("%d/%m/%Y %H:%M"))):
         info.append([k, v])
         info.cell(info.max_row, 1).font = Font(bold=True)
@@ -961,9 +1117,13 @@ def build_report_pdf(job: dict) -> bytes:
                       latin("Sinistra: documento A originale. "
                             "Destra: documento B con le differenze."),
                       fontname="helv", fontsize=9, color=GREY)
+    y_firme = M + 114
+    for riga in _righe_firme(job):                    # firma digitale dei .p7m, sotto la legenda
+        y_firme += 13
+        cover.insert_text((M, y_firme), latin(riga[:170]), fontname="helv", fontsize=8.5, color=INK)
     righe_num = _righe_riepilogo(job)
     if righe_num:
-        y = M + 142
+        y = y_firme + 28
         cover.insert_text((M, y), latin("Numeri e date cambiati"),
                           fontname="hebo", fontsize=11, color=INK)
         massimo = int((H - M - y - 14) // 13)
@@ -1042,8 +1202,15 @@ def models():
 
 
 def _save_upload(f, tmp_dir: Path, job_id: str, side: str) -> Path | None:
-    ext = Path(f.filename).suffix.lower()
-    if ext not in ALLOWED_EXTS:
+    """Salva il file caricato nella cartella temporanea; None se il formato non è ammesso.
+    Una busta firmata (.p7m) è ammessa se dentro c'è un formato ammesso o se il nome non lo dice
+    ("documento.p7m"): la apre e la controlla apri_busta nel worker."""
+    ext = Path(f.filename or "").suffix.lower()
+    if ext == EXT_FIRMATA:
+        interna = Path(_senza_p7m(f.filename)).suffix.lower()
+        if interna and interna not in ALLOWED_EXTS:
+            return None
+    elif ext not in ALLOWED_EXTS:
         return None
     path = tmp_dir / f"cmp_{job_id}_{side}{ext}"
     f.save(path)
@@ -1078,7 +1245,7 @@ def compare():
         for p in (path1, path2):
             if p:
                 p.unlink(missing_ok=True)
-        return jsonify({"error": "Formato non supportato. Ammessi: PDF, "
+        return jsonify({"error": "Formato non supportato. Ammessi: PDF (anche firmati .p7m), "
                                  "immagini, Word (.docx), testo."}), 400
 
     with JOBS_LOCK:
