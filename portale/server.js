@@ -1244,6 +1244,124 @@ function clearLoginFails(key) {
   ricaricaLoginFails();
   if (loginFails.delete(key)) salvaLoginFails();
 }
+// Un admin ha reimpostato la password DOPO l'ultimo errore: i blocchi di quell'utente
+// non valgono più. I blocchi stanno nella RAM di ogni processo (portale utenti e
+// plancia admin), mentre utenti.json lo leggono tutti: per questo lo sblocco si
+// riconosce dalla data scritta lì (sbloccatoIl) e non da una chiamata fra processi.
+function applicaSblocco(user, chiavi) {
+  if (!user || !user.sbloccatoIl) return;
+  const t = Date.parse(user.sbloccatoIl);
+  for (const k of chiavi) { const e = loginFails.get(k); if (e && e.ts < t) clearLoginFails(k); }
+}
+
+// ---------------------------------------------------------------------------
+// Password del portale valida negli altri programmi (POST /api/verifica-password).
+// SkyTower, InCampo (anche l'app per telefono) e VFP Transfer hanno un loro login
+// con email/nome e password: quando la loro password non coincide chiedono qui se
+// è quella del portale, così a ogni persona basta una password sola. Le password
+// proprie dei programmi restano valide come riserva (scelta del 06/11/2026).
+// La chiamata la fa il BACKEND del programma con il token della suite: il browser
+// non arriva mai qui, e l'IP che conta per i blocchi è quello della persona, che il
+// programma passa nel corpo (lo ha visto lui; noi vedremmo solo il suo server).
+// ---------------------------------------------------------------------------
+// Programmi fuori dal registro APPS che possono comunque chiedere la verifica.
+const APP_FUORI_PORTALE = { 'vfp-transfer': 'VFP Transfer' };
+
+// L'utente del portale per quello che la persona ha scritto nel login dell'altro
+// programma: lo username, oppure l'email (quella impostata dall'admin o quella
+// dedotta username@dominio, la stessa che /api/verify manda a SkyTower e InCampo).
+// Un'email condivisa da due utenti non identifica nessuno: null.
+function trovaUtentePerLogin(lista, login) {
+  const l = String(login || '').toLowerCase().trim();
+  if (!l) return null;
+  const perNome = lista.find((u) => u.username === l);
+  if (perNome) return perNome;
+  if (!l.includes('@')) return null;
+  const perEmail = lista.filter((u) => emailUtente(u) === l);
+  return perEmail.length === 1 ? perEmail[0] : null;
+}
+
+// Un IP scritto dal programma chiamante: solo cifre, punti, due punti (IPv4/IPv6),
+// niente altro, così non finisce testo arbitrario nel registro o nelle chiavi.
+function ipValido(ip) {
+  const s = String(ip || '').trim();
+  if (!/^[0-9a-fA-F:.]{2,45}$/.test(s)) return '';
+  return s.startsWith('::ffff:') ? s.slice(7) : (s === '::1' ? '127.0.0.1' : s);
+}
+
+/**
+ * Verifica username/email + password del portale per conto di un altro programma.
+ * Stesse regole del login del portale: stessi contatori di tentativi falliti (per
+ * utente+IP della persona e per solo IP), stesso sblocco dell'admin, account
+ * disattivato respinto. In più: chi deve ancora scegliere la sua password (password
+ * temporanea) la sceglie prima nel portale, e se il programma è nel registro APPS
+ * la persona deve averlo fra i suoi programmi (gli admin del portale entrano ovunque).
+ * corpo = { login, password, app, ip }; ipChiamante = IP del server che chiama,
+ * usato solo se il corpo non porta l'IP della persona.
+ * Ritorna { status, body, headers }: 200 con chi è, 400/401/403/429 con error.
+ */
+function verificaPasswordApp(corpo, ipChiamante, now = Date.now()) {
+  const c = corpo && typeof corpo === 'object' ? corpo : {};
+  const login = String(c.login || '').toLowerCase().trim().slice(0, 200);
+  const password = String(c.password || '');
+  const appId = String(c.app || '');
+  const app = APPS.find((a) => a.id === appId);
+  const nomeApp = app ? app.nome : APP_FUORI_PORTALE[appId];
+  if (!nomeApp) return { status: 400, body: { ok: false, error: 'Programma sconosciuto' } };
+  if (!login || !password) return { status: 400, body: { ok: false, error: 'Login e password obbligatori' } };
+  const ip = ipValido(c.ip) || ipChiamante || '';
+
+  const lista = loadUtenti();
+  const user = trovaUtentePerLogin(lista, login);
+  // Contatore sullo username vero quando la persona è riconosciuta (email o nome
+  // fanno lo stesso budget di tentativi), altrimenti su quello che ha scritto.
+  const key = loginKey(user ? user.username : login, ip);
+  const keyIp = loginKey('*', ip);
+  applicaSblocco(user, [key, keyIp]);
+  const bloccoMs = Math.max(loginBlockedMs(key, now), loginBlockedMs(keyIp, now));
+  if (bloccoMs > 0) {
+    const min = Math.ceil(bloccoMs / 60000);
+    logAccesso({ ts: new Date(now).toISOString(), username: user ? user.username : login.slice(0, 60), nome: user ? user.nome : null, appId, appNome: nomeApp, azione: 'login-bloccato', ip });
+    return {
+      status: 429,
+      body: { ok: false, error: `Troppi tentativi falliti. Riprova tra ${min} ${min === 1 ? 'minuto' : 'minuti'}.` },
+      headers: { 'Retry-After': String(Math.ceil(bloccoMs / 1000)) },
+    };
+  }
+  // Utente sconosciuto: scrypt a vuoto, stesso tempo di una password sbagliata.
+  const pwOk = user && user.salt && user.hash ? verifyPw(user, password) : (hashPw(password, SALT_FINTO), false);
+  if (!pwOk) {
+    noteLoginFail(key, now);
+    noteLoginFail(keyIp, now, LOGIN_MAX_FAIL_IP);
+    return { status: 401, body: { ok: false, error: 'Credenziali non valide' } };
+  }
+  clearLoginFails(key);
+  clearLoginFails(keyIp);
+  if (user.disattivato) {
+    logAccesso({ ts: new Date(now).toISOString(), username: user.username, nome: user.nome, appId, appNome: nomeApp, azione: 'login-disattivato', ip });
+    return { status: 403, body: { ok: false, motivo: 'disattivato', error: 'Account del Portale disattivato: rivolgiti a un amministratore' } };
+  }
+  // Password temporanea data dall'admin: non deve aprire i programmi prima che la
+  // persona ne abbia scelta una sua (il portale la obbliga al primo accesso).
+  if (user.mustChange) {
+    return { status: 403, body: { ok: false, motivo: 'cambia-password', error: 'Prima scegli la tua password nel Portale, poi usala qui' } };
+  }
+  // Solo il ruolo di utenti.json: l'elevazione per IP del portale vale per chi è
+  // davanti al portale, non per un IP riferito da un altro programma.
+  const sessione = { username: user.username, ruolo: user.ruolo, adm: [] };
+  if (app && !accessoApp(app, sessione)) {
+    return { status: 403, body: { ok: false, motivo: 'non-abilitato', error: `${nomeApp} non è fra i tuoi programmi del Portale: chiedi l'abilitazione a un amministratore` } };
+  }
+  logAccesso({ ts: new Date(now).toISOString(), username: user.username, nome: user.nome, appId, appNome: nomeApp, azione: 'login-app', ip });
+  return {
+    status: 200,
+    body: {
+      ok: true, username: user.username, nome: user.nome, ruolo: user.ruolo,
+      email: emailUtente(user), admin: user.ruolo === 'admin',
+    },
+  };
+}
+
 // Sblocco di un account da parte di un admin: via i blocchi di quell'utente da
 // QUALUNQUE PC (le chiavi sono "utente|ip").
 function sbloccaUtente(username) {
@@ -2116,14 +2234,8 @@ async function handle(req, res) {
     const keyIp = loginKey('*', ip);
 
     // Sblocco fatto da un admin (reset password) DOPO l'ultimo errore: il blocco
-    // non vale più. Serve perché i blocchi stanno nella RAM di ogni processo:
-    // l'admin che sblocca dalla plancia (8090) non tocca la memoria del portale
-    // utenti (8080), mentre utenti.json sì.
-    const uSblocco = loadUtenti().find((u) => u.username === String(username || '').toLowerCase().trim());
-    if (uSblocco && uSblocco.sbloccatoIl) {
-      const t = Date.parse(uSblocco.sbloccatoIl);
-      for (const k of [key, keyIp]) { const e = loginFails.get(k); if (e && e.ts < t) clearLoginFails(k); }
-    }
+    // non vale più (vedi applicaSblocco).
+    applicaSblocco(loadUtenti().find((u) => u.username === String(username || '').toLowerCase().trim()), [key, keyIp]);
 
     const bloccoMs = Math.max(loginBlockedMs(key), loginBlockedMs(keyIp));
     if (bloccoMs > 0) {
@@ -2225,6 +2337,17 @@ async function handle(req, res) {
       admin: appId ? isAdminForApp(s, appId) : (s.ruolo === 'admin'),
       appsAdmin: s.adm || [],
     }, cors);
+  }
+
+  // ---- Password del portale per gli altri programmi (vedi verificaPasswordApp) ----
+  // Fuori dalla sessione: chi chiama è il server di SkyTower, InCampo o VFP
+  // Transfer, che non ha il cookie della persona ma il token della suite. Senza
+  // token 403: dal browser questa rotta non serve a nessuno e non deve diventare
+  // un secondo modulo di login senza i controlli di /api/login.
+  if (p === '/api/verifica-password' && req.method === 'POST') {
+    if (!suite.verifica(req.headers['x-suite-token'])) return sendJson(res, 403, { ok: false, error: 'Token della suite mancante o errato' });
+    const esito = verificaPasswordApp(await readJsonBody(req), clientIp(req));
+    return sendJson(res, esito.status, esito.body, esito.headers);
   }
 
   // ================= da qui in poi serve la sessione =================
@@ -2860,6 +2983,7 @@ module.exports = {
   getWarmList,                                     // pre-warm (testabile)
   portalHostname, appUrl, isSuiteOrigin,           // URL/CORS in LAN
   loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
+  verificaPasswordApp, trovaUtentePerLogin, ipValido,   // password del portale negli altri programmi
   parseNetstatPid,                                 // spegnimento app
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente

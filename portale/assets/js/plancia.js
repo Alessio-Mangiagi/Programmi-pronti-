@@ -201,6 +201,7 @@ const AZIONI = {
   chiudi: 'Chiusura', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
   'richiesta-aiuto': 'Richiesta aiuto', 'reset-password': 'Reset password', 'richiesta-gestita': 'Richiesta gestita',
   disattiva: 'Disattivazione', riattiva: 'Riattivazione', 'login-disattivato': 'Accesso rifiutato (disattivato)',
+  'login-app': 'Accesso con la password del Portale',
 };
 
 // ---------------------------------------------------------------- richieste di aiuto
@@ -407,6 +408,12 @@ function testoRiga(e, app) {
     return `${nomeB} · ${esc(e.evento || 'Azione')}` + (e.dettaglio ? ` <small>${esc(e.dettaglio)}</small>` : '');
   }
   if (e.azione === 'login') return 'Accesso al Portale';
+  // Login fatto dentro un altro programma (SkyTower, InCampo, VFP Transfer) con la
+  // password del portale: /api/verifica-password scrive appId/appNome del programma.
+  // VFP Transfer non e' nel registro delle app: il nome arriva solo da appNome.
+  if (e.appId && /^login-(app|bloccato|disattivato)$/.test(e.azione)) {
+    return `<b>${esc(app ? app.nome : (e.appNome || e.appId))}</b> · ${esc(AZIONI[e.azione])}`;
+  }
   if (e.azione === 'logout') return 'Uscita dal Portale';
   return nomeB || esc(AZIONI[e.azione] || e.azione);
 }

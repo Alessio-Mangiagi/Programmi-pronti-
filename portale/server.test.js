@@ -916,3 +916,95 @@ test('freno al login: lo stato finisce su file (condiviso fra 8080 e 8090)', () 
   clearLoginFails(key);
   assert.ok(!JSON.parse(fs.readFileSync(path.join(DATA_TMP, 'login-fails.json'), 'utf8'))[key]);
 });
+
+// ---------------------------------------------------------------------------
+// Password del portale negli altri programmi (POST /api/verifica-password):
+// SkyTower, InCampo e VFP Transfer chiedono al portale se la password è giusta.
+// ---------------------------------------------------------------------------
+const { verificaPasswordApp, trovaUtentePerLogin, ipValido } = require('./server.js');
+
+// Utenti con password vera (scrypt come makeUser), aggiunti per questi test e poi tolti:
+// gli altri test leggono utenti.json e si aspettano solo mrossi e gverdi.
+function conUtentiPassword(fn) {
+  const file = path.join(DATA_TMP, 'utenti.json');
+  const prima = fs.readFileSync(file, 'utf8');
+  const pw = (password) => {
+    const salt = require('node:crypto').randomBytes(16).toString('hex');
+    return { salt, hash: require('node:crypto').scryptSync(password, salt, 64).toString('hex') };
+  };
+  const extra = [
+    { username: 'lbianchi', nome: 'Laura Bianchi', ruolo: 'utente', apps: ['incampo'], ...pw('Cantiere-2026!') },
+    { username: 'cpappa', nome: 'Carmela Pappalardo', ruolo: 'utente', email: 'carmela@impresa.it', ...pw('Ponteggio-77') },
+    { username: 'capo', nome: 'Capo Cantiere', ruolo: 'admin', ...pw('Gru-a-torre-9') },
+    { username: 'uscito', nome: 'Ex Collega', ruolo: 'utente', disattivato: true, ...pw('Cantiere-2026!') },
+    { username: 'nuovo', nome: 'Appena Creato', ruolo: 'utente', mustChange: true, ...pw('Temporanea-1') },
+  ];
+  fs.writeFileSync(file, JSON.stringify([...JSON.parse(prima), ...extra]));
+  try { return fn(); } finally { fs.writeFileSync(file, prima); }
+}
+const chiedi = (login, password, app, ip = '10.1.2.3') => verificaPasswordApp({ login, password, app, ip }, '127.0.0.1');
+
+test('verifica-password: username o email + password giusta → chi è, con l\'email per SkyTower/InCampo', () => conUtentiPassword(() => {
+  const a = chiedi('LBianchi ', 'Cantiere-2026!', 'incampo');
+  assert.equal(a.status, 200);
+  assert.deepEqual(a.body, { ok: true, username: 'lbianchi', nome: 'Laura Bianchi', ruolo: 'utente', email: 'lbianchi@cosedilspa.com', admin: false });
+  const b = chiedi('lbianchi@cosedilspa.com', 'Cantiere-2026!', 'incampo');
+  assert.equal(b.status, 200, 'email dedotta username@dominio');
+  const c = chiedi('Carmela@Impresa.it', 'Ponteggio-77', 'vfp-transfer');
+  assert.equal(c.body.username, 'cpappa', 'email impostata dall\'admin');
+}));
+
+test('verifica-password: password sbagliata o utente inesistente → 401, stesso messaggio', () => conUtentiPassword(() => {
+  const a = chiedi('lbianchi', 'sbagliata', 'incampo', '10.9.9.1');
+  const b = chiedi('nessuno', 'sbagliata', 'incampo', '10.9.9.1');
+  assert.equal(a.status, 401);
+  assert.equal(b.status, 401);
+  assert.equal(a.body.error, b.body.error, 'il messaggio non dice se l\'utente esiste');
+  clearLoginFails(loginKey('lbianchi', '10.9.9.1')); clearLoginFails(loginKey('nessuno', '10.9.9.1')); clearLoginFails(loginKey('*', '10.9.9.1'));
+}));
+
+test('verifica-password: stessi blocchi del login del portale, sull\'IP della persona', () => conUtentiPassword(() => {
+  const ip = '10.7.7.7';
+  for (let i = 0; i < LOGIN_MAX_FAIL; i++) chiedi('lbianchi@cosedilspa.com', 'sbagliata', 'incampo', ip);
+  const bloccato = chiedi('lbianchi', 'Cantiere-2026!', 'incampo', ip);
+  assert.equal(bloccato.status, 429, 'email e username contano sullo stesso utente');
+  assert.ok(Number(bloccato.headers['Retry-After']) > 0);
+  assert.equal(loginBlockedMs(loginKey('lbianchi', ip)) > 0, true, 'blocco anche per il login del portale da quel PC');
+  assert.equal(chiedi('lbianchi', 'Cantiere-2026!', 'incampo', '10.7.7.8').status, 200, 'da un altro PC entra');
+  clearLoginFails(loginKey('lbianchi', ip)); clearLoginFails(loginKey('*', ip));
+}));
+
+test('verifica-password: disattivato, password temporanea, programma non abilitato → 403 con il motivo', () => conUtentiPassword(() => {
+  assert.equal(chiedi('uscito', 'Cantiere-2026!', 'incampo').body.motivo, 'disattivato');
+  assert.equal(chiedi('nuovo', 'Temporanea-1', 'incampo').body.motivo, 'cambia-password');
+  const r = chiedi('lbianchi', 'Cantiere-2026!', 'skytower');
+  assert.equal(r.status, 403);
+  assert.equal(r.body.motivo, 'non-abilitato', 'SkyTower è riservato e lbianchi non ce l\'ha');
+  assert.match(r.body.error, /SkyTower/);
+  const adm = chiedi('capo', 'Gru-a-torre-9', 'skytower');
+  assert.equal(adm.status, 200, 'l\'admin del portale entra ovunque');
+  assert.equal(adm.body.admin, true);
+}));
+
+test('verifica-password: programma sconosciuto o campi vuoti → 400; VFP Transfer ammesso pur fuori dal registro', () => conUtentiPassword(() => {
+  assert.equal(chiedi('lbianchi', 'Cantiere-2026!', 'inventata').status, 400);
+  assert.equal(chiedi('', 'Cantiere-2026!', 'incampo').status, 400);
+  assert.equal(chiedi('lbianchi', '', 'incampo').status, 400);
+  assert.equal(chiedi('lbianchi', 'Cantiere-2026!', 'vfp-transfer').status, 200);
+}));
+
+test('trovaUtentePerLogin: un\'email di due utenti non identifica nessuno', () => {
+  const lista = [{ username: 'a', email: 'uff@x.it' }, { username: 'b', email: 'UFF@x.it' }, { username: 'c' }];
+  assert.equal(trovaUtentePerLogin(lista, 'uff@x.it'), null);
+  assert.equal(trovaUtentePerLogin(lista, 'c@cosedilspa.com').username, 'c');
+  assert.equal(trovaUtentePerLogin(lista, 'C').username, 'c');
+  assert.equal(trovaUtentePerLogin(lista, ''), null);
+});
+
+test('ipValido: solo indirizzi, niente testo nel registro', () => {
+  assert.equal(ipValido('10.0.0.5'), '10.0.0.5');
+  assert.equal(ipValido('::ffff:192.168.1.4'), '192.168.1.4');
+  assert.equal(ipValido('::1'), '127.0.0.1');
+  assert.equal(ipValido('10.0.0.5\nfalso'), '');
+  assert.equal(ipValido('<script>'), '');
+});

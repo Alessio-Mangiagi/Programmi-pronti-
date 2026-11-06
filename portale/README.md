@@ -140,7 +140,15 @@ Per insegnargli una nuova app basta aggiungerla ad `APPS` con i suoi campi:
 
 ## Accesso unico (SSO)
 
-Le app della suite condividono la sessione del portale: inoltrano il cookie del browser a `GET /api/verify`, così chi è loggato nel portale è riconosciuto anche nelle app. Se il portale è spento, le app restano usabili in autonomia (fail-open). Vedi `cosedil-sso.mjs` / `cosedil-sso.ts` nelle singole app.
+Le app della suite condividono la sessione del portale: inoltrano il cookie del browser a `GET /api/verify`, così chi è loggato nel portale è riconosciuto anche nelle app. Se il portale è spento le app non fanno entrare nessuno (gate chiuso); su un PC singolo `COSEDIL_SSO_FAIL=open` le lascia usabili da sole. Codice comune in `shared/sso/`.
+
+### Una password per tutti i programmi
+
+La password del portale vale in ogni programma (06/11/2026); le password proprie dei programmi restano valide come riserva.
+
+- **Analista Dati** e **Lettore DDT** aprono da soli la sessione dell'account con lo stesso username del portale (Analista lo crea se manca; DDT no, perché ogni account DDT ha la sua commessa).
+- **SkyTower**, **InCampo** (anche l'app per telefono) e **VFP Transfer**, quando la loro password non coincide, chiedono al portale `POST /api/verifica-password` (header `X-Suite-Token`, corpo `{ login, password, app, ip }`; funzione `verificaPasswordApp` in `server.js`). Il portale riconosce la persona da username o email, applica gli stessi blocchi del login (sull'IP della persona, passato dal programma), rifiuta account disattivati, password temporanee non ancora cambiate e programmi non abilitati, e scrive `login-app` nel registro accessi.
+- Dettagli e codici di risposta: `shared/suite/CONTRATTI.md` §2b; guida utente §1.8.
 
 ## Amministratore in base all'IP (per-app)
 
