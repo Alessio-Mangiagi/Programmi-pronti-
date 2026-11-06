@@ -17,6 +17,7 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "moduli": "tsx tools/verifica_moduli.ts",
     "confronta-moduli": "tsx tools/confronta_moduli.ts",
+    "confronta-claude": "tsx tools/confronta_claude.ts",
     "modulo-in-pdf": "tsx tools/modulo_in_pdf.ts"
   },
   "dependencies": {
