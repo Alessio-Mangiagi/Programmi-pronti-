@@ -162,6 +162,10 @@ function addColumn(table: string, colDef: string): void {
 
 // Flag "deve cambiare la password": 1 sull'admin creato con password di default.
 addColumn('users', 'must_change_pw INTEGER NOT NULL DEFAULT 0')
+// Utente del Portale Suite che ha aperto la sessione (ingresso dal portale o login a mano col
+// portale aperto): se nel portale cambia persona sullo stesso browser, la sessione non vale più
+// (vedi sessioneDalPortale in auth.ts). NULL = sessione aperta prima del 06/11/2026 o senza portale.
+addColumn('sessions', 'portale TEXT')
 // Esempio CONFERMATO dall'utente (👍): pesa di più nel ranking few-shot e
 // sopravvive più a lungo alla retention (un "riuscito" non è per forza corretto).
 addColumn('fewshot', 'confirmed INTEGER NOT NULL DEFAULT 0')

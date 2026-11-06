@@ -110,3 +110,62 @@ describe('validazione + reset (admin)', () => {
     expect(r.ok && r.user.role).toBe('admin')
   })
 })
+
+describe('ingresso dal Portale senza seconda password (sessioneDalPortale)', () => {
+  it("primo ingresso: crea l'account con lo stesso username e apre la sessione", async () => {
+    const r = await auth.sessioneDalPortale({ username: 'L.Bianchi', nome: 'Laura Bianchi', admin: false })
+    expect(r?.creato).toBe(true)
+    expect(r?.user).toMatchObject({ username: 'l.bianchi', role: 'user' })
+    expect(auth.sessionUser(r!.token)?.username).toBe('l.bianchi')
+    expect(auth.mustChangePw(r!.user.id)).toBe(false)
+    // stessa persona, stesso cookie: niente da fare
+    expect(await auth.sessioneDalPortale({ username: 'l.bianchi' }, r!.token)).toBeNull()
+  })
+
+  it('account già esistente: lo aggancia, la sua password resta valida', async () => {
+    await auth.createUser('g.ferrante', 'password-propria', 'admin')
+    const r = await auth.sessioneDalPortale({ username: 'g.ferrante', admin: false })
+    expect(r?.creato).toBe(false)
+    expect(r?.user.role).toBe('admin') // il ruolo resta quello dell'agente
+    expect((await auth.login('g.ferrante', 'password-propria')).ok).toBe(true)
+  })
+
+  it("admin del portale: l'account nuovo nasce admin", async () => {
+    const r = await auth.sessioneDalPortale({ username: 'capo.cantiere', admin: true })
+    expect(r?.user.role).toBe('admin')
+  })
+
+  it("un'altra persona del portale sullo stesso browser: la vecchia sessione si chiude", async () => {
+    const a = await auth.sessioneDalPortale({ username: 'pers.uno' })
+    const b = await auth.sessioneDalPortale({ username: 'pers.due' }, a!.token)
+    expect(b?.user.username).toBe('pers.due')
+    expect(auth.sessionUser(a!.token)).toBeNull()
+  })
+
+  it('login a mano su un altro account col portale aperto: resta valido', async () => {
+    await auth.createUser('ufficio.gare', 'password-gare', 'user')
+    const r = await auth.login('ufficio.gare', 'password-gare', 'pers.tre')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(await auth.sessioneDalPortale({ username: 'pers.tre' }, r.token)).toBeNull()
+    expect(auth.sessionUser(r.token)?.username).toBe('ufficio.gare')
+    // ma per un'altra persona del portale no
+    const altro = await auth.sessioneDalPortale({ username: 'pers.quattro' }, r.token)
+    expect(altro?.user.username).toBe('pers.quattro')
+    expect(auth.sessionUser(r.token)).toBeNull()
+  })
+
+  it('sessione vecchia (prima del portale) della stessa persona: la tiene e la lega', async () => {
+    await auth.createUser('vecchia.sess', 'password1', 'user')
+    const r = await auth.login('vecchia.sess', 'password1')
+    if (!r.ok) throw new Error('login')
+    expect(await auth.sessioneDalPortale({ username: 'vecchia.sess' }, r.token)).toBeNull()
+    expect(auth.sessionUser(r.token)?.username).toBe('vecchia.sess')
+  })
+
+  it('username del portale non valido qui o assente: resta il login a mano', async () => {
+    expect(await auth.sessioneDalPortale({ username: 'x' })).toBeNull()
+    expect(await auth.sessioneDalPortale({ username: null })).toBeNull()
+    expect(await auth.sessioneDalPortale(undefined)).toBeNull()
+  })
+})

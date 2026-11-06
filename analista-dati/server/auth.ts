@@ -2,7 +2,9 @@
  * Autenticazione per-utente (multi-utente su LAN interna).
  *  - password hashate con scrypt (node:crypto, nessun pacchetto esterno);
  *  - sessioni via cookie HttpOnly (token casuale), persistite in SQLite;
- *  - bootstrap: al primo avvio crea un admin (da env ADMIN_USER/ADMIN_PASSWORD).
+ *  - bootstrap: al primo avvio crea un admin (da env ADMIN_USER/ADMIN_PASSWORD);
+ *  - ingresso dal Portale Suite senza seconda password (sessioneDalPortale): l'utente
+ *    del portale trova qui il suo account con lo stesso username, creato se manca.
  *
  * Auth attiva di default; per lo sviluppo locale monoutente: AUTH_ENABLED=0.
  */
@@ -203,7 +205,22 @@ export type LoginResult =
   | { ok: true; token: string; user: AuthUser; mustChange: boolean }
   | { ok: false; reason: 'bad' | 'locked'; retryInMs?: number }
 
-export async function login(username: string, password: string): Promise<LoginResult> {
+/** Apre una sessione per l'utente (riga di users) e ritorna il token del cookie. `portale` = utente del portale. */
+function apriSessione(row: { id: number; username: string; role: Role }, portale: string | null): string {
+  const token = crypto.randomBytes(32).toString('hex')
+  const created = new Date()
+  const expires = new Date(created.getTime() + SESSION_TTL_MS)
+  appdb.prepare('INSERT INTO sessions(token, user_id, username, role, created_at, expires_at, portale) VALUES(?,?,?,?,?,?,?)')
+    .run(hashToken(token), row.id, row.username, row.role, created.toISOString(), expires.toISOString(), portale)
+  return token
+}
+
+/**
+ * Login con username e password dell'app. `portale` è lo username del Portale Suite di chi
+ * sta facendo il login (req.cosedil del gate), se c'è: lega la sessione a quella persona,
+ * così l'ingresso automatico dal portale non la sostituisce (vedi sessioneDalPortale).
+ */
+export async function login(username: string, password: string, portale: string | null = null): Promise<LoginResult> {
   const lock = lockRemainingMs(username)
   if (lock > 0) return { ok: false, reason: 'locked', retryInMs: lock }
 
@@ -218,12 +235,60 @@ export async function login(username: string, password: string): Promise<LoginRe
   }
   noteSuccess(username)
 
-  const token = crypto.randomBytes(32).toString('hex')
-  const created = new Date()
-  const expires = new Date(created.getTime() + SESSION_TTL_MS)
-  appdb.prepare('INSERT INTO sessions(token, user_id, username, role, created_at, expires_at) VALUES(?,?,?,?,?,?)')
-    .run(hashToken(token), row.id, row.username, row.role, created.toISOString(), expires.toISOString())
+  const token = apriSessione(row, portale ? normUsername(portale) : null)
   return { ok: true, token, user: { id: row.id, username: row.username, role: row.role }, mustChange: row.must_change_pw === 1 }
+}
+
+/** Chi arriva dal portale (identità messa dal gate SSO in req.cosedil). */
+export interface IdentitaPortale { username: string | null; nome?: string | null; admin?: boolean }
+
+/**
+ * Ingresso dal Portale Suite senza seconda password (scelta del 06/11/2026: una password
+ * per tutti i programmi). Chiamata a ogni richiesta che il gate SSO ha fatto passare:
+ *  - la sessione del cookie è già di questa persona del portale → null, niente da fare;
+ *  - la sessione è di un'altra persona del portale (cambio utente sullo stesso browser),
+ *    o è vecchia (senza portale) e di un altro username → chiusa, e si riparte;
+ *  - si cerca l'account con lo stesso username del portale; se manca lo si crea, ruolo
+ *    admin solo se il portale lo dice admin per l'agente, con una password casuale che
+ *    nessuno conosce (si entra dal portale; il login a mano resta per gli account vecchi).
+ * Ritorna la nuova sessione da mettere nel cookie, o null se non serve o non si può
+ * (username del portale non valido qui, AUTH_ENABLED=0): allora resta il login a mano.
+ * Un login a mano su un altro account, fatto col portale aperto, resta valido: è legato
+ * alla stessa persona del portale (colonna sessions.portale).
+ */
+export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenAttuale?: string):
+  Promise<{ token: string; user: AuthUser; creato: boolean } | null> {
+  if (!AUTH_ENABLED || !id?.username) return null
+  const chi = normUsername(id.username)
+  if (tokenAttuale) {
+    const s = appdb.prepare('SELECT username, portale, expires_at FROM sessions WHERE token=?').get(hashToken(tokenAttuale)) as
+      { username: string; portale: string | null; expires_at: string } | undefined
+    if (s && new Date(s.expires_at).getTime() >= Date.now()) {
+      if (s.portale === chi) return null
+      if (s.portale == null && s.username === chi) {
+        appdb.prepare('UPDATE sessions SET portale=? WHERE token=?').run(chi, hashToken(tokenAttuale))
+        return null
+      }
+      logout(tokenAttuale) // sessione di un'altra persona del portale: non deve restare aperta
+    }
+  }
+  if (!USERNAME_RE.test(chi)) return null
+  let row = appdb.prepare('SELECT id, username, role FROM users WHERE username=?').get(chi) as
+    { id: number; username: string; role: Role } | undefined
+  let creato = false
+  if (!row) {
+    try {
+      row = await createUser(chi, generateTempPassword(24), id.admin ? 'admin' : 'user', false)
+      creato = true
+    } catch (e) {
+      // due richieste insieme per la stessa persona: l'altra l'ha appena creato
+      row = appdb.prepare('SELECT id, username, role FROM users WHERE username=?').get(chi) as
+        { id: number; username: string; role: Role } | undefined
+      if (!row) throw e
+    }
+  }
+  const token = apriSessione(row, chi)
+  return { token, user: { id: row.id, username: row.username, role: row.role }, creato }
 }
 
 export function logout(token: string): void {

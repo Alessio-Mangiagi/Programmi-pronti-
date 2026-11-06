@@ -21,7 +21,7 @@ import { sessionId, sessionIdSeC, getSession, setSession, closeSession, closeAll
 import {
   AUTH_ENABLED, bootstrapAdmin, requireAuth, requireAdmin, enforcePwChange,
   login, logout, sessionUser, mustChangePw, changePassword, defaultAdminPasswordInUse,
-  parseCookies, setCookie, clearCookie, COOKIE,
+  parseCookies, setCookie, clearCookie, COOKIE, sessioneDalPortale,
   createUser, listUsers, deleteUser, userCount, setRole, resetPassword, generateTempPassword,
 } from './server/auth.ts'
 import { usageSummary, CLAUDE_DAILY_TOKEN_BUDGET } from './server/usage.ts'
@@ -133,6 +133,31 @@ app.use(cors((req, cb) => {
 app.use(cosedilSSO({ app: 'agente' }) as express.RequestHandler)
 
 /**
+ * Ingresso dal Portale senza seconda password (una password per tutti i programmi,
+ * 06/11/2026). Il gate qui sopra mette in req.cosedil chi è loggato nel portale:
+ * se il cookie dell'agente non è già di quella persona, sessioneDalPortale apre la
+ * sessione dell'account con lo stesso username (creato se manca) e qui la si mette
+ * nel cookie. La si scrive anche nell'header Cookie della richiesta in corso: così
+ * /api/auth/me, /api/health e requireAuth la vedono già adesso e il frontend non
+ * mostra mai la schermata di login. Senza gate (COSEDIL_SSO=off) non fa niente.
+ */
+app.use((req, res, next) => {
+  const id = (req as express.Request & { cosedil?: { username: string | null; nome?: string | null; admin?: boolean } }).cosedil
+  if (!AUTH_ENABLED || !id?.username) return next()
+  const cookies = parseCookies(req.headers.cookie)
+  sessioneDalPortale(id, cookies[COOKIE]).then((nuova) => {
+    if (nuova) {
+      setCookie(res, nuova.token)
+      cookies[COOKIE] = nuova.token
+      req.headers.cookie = Object.entries(cookies).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('; ')
+      log(nuova.creato ? 'login_portale_nuovo_utente' : 'login_portale', ctxFromReq(req),
+        { username: nuova.user.username, role: nuova.user.role })
+    }
+    next()
+  }, next)
+})
+
+/**
  * Due parser JSON, non uno.
  *
  * Il body grande (60mb: gli allegati viaggiano in base64, +33%) serve solo a
@@ -235,7 +260,8 @@ app.post('/api/auth/login', rateLimit, asyncH(async (req, res) => {
   const { username, password } = req.body as { username?: string; password?: string }
   const ctx = ctxFromReq(req)
   if (!username || !password) return res.status(400).json({ error: 'Credenziali mancanti' })
-  const r = await login(username, password)
+  // col portale aperto la sessione resta legata a chi è entrato nel portale (vedi sessioneDalPortale)
+  const r = await login(username, password, (req as express.Request & { cosedil?: { username: string | null } }).cosedil?.username ?? null)
   if (!r.ok) {
     if (r.reason === 'locked') {
       const min = Math.ceil((r.retryInMs || 0) / 60_000)
