@@ -8,9 +8,14 @@ export const getElenchi = (): Elenchi | null => ELENCHI
 // passano direttamente gli elenchi letti dal server (server/alyante.ts → ELENCHI).
 export const impostaElenchi = (e: Elenchi | null) => { ELENCHI = e }
 // "><(((º> sabusabu <º)))><"
-export const caricaElenchi = async () => {
+// true = elenchi arrivati. Con il backend non ancora su (pagina aperta mentre il server
+// parte) i lookup ricadono sulle liste manuali: App riprova finché il server risponde,
+// altrimenti l'export userebbe le liste manuali per tutta la sessione.
+export const caricaElenchi = async (): Promise<boolean> => {
   try {
     const r = await fetch('/api/elenchi')
-    if (r.ok) ELENCHI = await r.json() as Elenchi
-  } catch { /* backend non ancora su: i lookup ricadono sulle liste manuali */ }
+    if (!r.ok) return false
+    ELENCHI = await r.json() as Elenchi
+    return true
+  } catch { return false }
 }

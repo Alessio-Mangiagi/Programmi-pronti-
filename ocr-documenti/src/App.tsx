@@ -40,7 +40,8 @@ import {
 import { promptClaude, urlClaude, leggiEstratto, leggiTrascrizioneJson, leggiTrascrizioneMd, type Estratto } from './lib/claude'
 
 
-interface Health { tesseract: boolean; ocrErrore?: string; ollama?: boolean; vision?: boolean; visionModel?: string; name?: string; bin?: string; model?: string; workers?: number; lavori?: boolean }
+// `irraggiungibile`: lo mette solo il frontend, finché /api/health non risponde (si riprova)
+interface Health { tesseract: boolean; ocrErrore?: string; ollama?: boolean; vision?: boolean; visionModel?: string; name?: string; bin?: string; model?: string; workers?: number; lavori?: boolean; irraggiungibile?: boolean }
 
 // Voce della coda: il file, il risultato nel formato in cui è stato prodotto e, dopo
 // una compilazione Excel, anche il testo OCR da cui viene (serve a «Riprocessa»).
@@ -256,16 +257,37 @@ export default function App() {
     })
   }, [activeIdx, format])
 
+  // Stato del server ed elenchi ufficiali: si chiedono finché il server risponde, ogni 3 s.
+  // Se la pagina si apre mentre il server sta ancora partendo (npm run dev: Vite è su
+  // prima del backend) la prima richiesta fallisce; chiesti una volta sola, health.lavori
+  // restava falso per tutta la sessione → i PDF passavano dalla lettura pagina per pagina
+  // nel browser invece che dal lavoro sul server (su Warm: UM/QTA/PREZZO sbagliati), anche
+  // nella scansione automatica della cartella. Un 503 di /api/health è una risposta (OCR
+  // mancante o bloccato, col motivo in ocrErrore): quella non si riprova.
   useEffect(() => {
-    fetch('/api/health')
-      .then(r => r.json())
-      .then((d: Health) => {
-        setHealth(d)
-        // pagine in volo = worker OCR del backend (default 2 se il campo manca)
-        if (d.workers && d.workers > 0) CONCURRENCY = d.workers
-      })
-      .catch(() => setHealth({ tesseract: false }))
-    caricaElenchi()   // elenchi ufficiali (DITTA/PROGETTO/FAM/SFAM) dalla cartella Elenchi/
+    let vivo = true
+    let timer = 0
+    let healthOk = false
+    let elenchiOk = false
+    const chiedi = async () => {
+      if (!healthOk) {
+        try {
+          const d = await (await fetch('/api/health')).json() as Health
+          healthOk = true
+          if (vivo) setHealth(d)
+          // pagine in volo = worker OCR del backend (default 2 se il campo manca)
+          if (d.workers && d.workers > 0) CONCURRENCY = d.workers
+        } catch {
+          // server non raggiungibile (o proxy di Vite senza backend: 500 senza JSON)
+          if (vivo) setHealth(h => h ?? { tesseract: false, irraggiungibile: true })
+        }
+      }
+      // elenchi ufficiali (DITTA/PROGETTO/FAM/SFAM) dalla cartella Elenchi/
+      if (!elenchiOk) elenchiOk = await caricaElenchi()
+      if (vivo && !(healthOk && elenchiOk)) timer = window.setTimeout(chiedi, 3000)
+    }
+    void chiedi()
+    return () => { vivo = false; window.clearTimeout(timer) }
   }, [])
 
   useEffect(() => {
@@ -1797,6 +1819,12 @@ export default function App() {
   // legge `queue` dal render in cui viene chiamata.
   const avviaScansioneCartella = async (automatica: boolean, imp: Impostazioni = impRef.current) => {
     if (cartellaInCorso.current || loading || richiestaCartella) return
+    // Server non ancora raggiungibile: senza /api/ocr ogni contratto finirebbe in «da
+    // controllare». L'automatica riprova al giro dopo del timer, a mano si avvisa.
+    if (!health?.lavori) {
+      if (!automatica) setError('Il server di OCR Documenti non risponde ancora: riprova fra qualche secondo.')
+      return
+    }
     const { contratti, destinazione } = imp
     if (!supportaCartella() || !contratti || !destinazione) {
       if (!automatica) setError('Per scansionare una cartella scegli in ⚙ Impostazioni la cartella dei contratti e quella di destinazione (solo in Chrome o Edge).')
@@ -2497,6 +2525,8 @@ export default function App() {
           </button>
           {(health === null
             ? [{ dot: 'rgba(255,255,255,0.6)', label: 'controllo…' }]
+            : health.irraggiungibile
+            ? [{ dot: '#ffe082', label: 'Server non raggiungibile — riprovo', title: 'Il server di OCR Documenti non risponde ancora (in avvio o spento): si riprova ogni 3 secondi.' }]
             : [
                 // ocrErrore: i file ci sono ma il worker muore (es. DLL bloccata da App Control):
                 // "bloccato" e non "non trovato", col motivo intero nel tooltip.
