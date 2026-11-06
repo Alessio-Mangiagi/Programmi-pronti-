@@ -7,6 +7,9 @@
 //   .batch-in-corso.json     id dei batch già pagati (scritto dal motore)
 //   input/, output/          solo in modalità 'upload': PDF caricati dal browser
 //                            e Excel prodotti, in attesa di essere scaricati
+//   sbustati/                solo se nel lotto ci sono DDT firmati (.p7m): i PDF
+//                            estratti dalle buste e copie dei PDF normali, letti
+//                            dal motore al posto di inputDir (preparaFirmati)
 //
 // Perché la persistenza è seria: un batch inviato è già pagato lato Anthropic.
 // Se il processo muore (riavvio, watchdog, crash), alla ripartenza i job non
@@ -30,6 +33,7 @@ import { registraExport } from '../services/consegne';
 import { inviaDdtASkyTower } from '../services/skytower';
 import { addToPaniere } from '../services/paniere';
 import { registraLavoro } from '../services/registroLavori';
+import { apriDdtFirmato, eBustaFirmata, eNomeFirmato, FirmaDdt } from '../services/firmaDigitale';
 import { BatchConfig, loadBatchConfig, resolveApiKey } from './config';
 import { OllamaOptions, paramsDiDefault, runOllama } from './ollama';
 import {
@@ -64,6 +68,8 @@ export interface JobFile {
   status: 'in-attesa' | 'ok' | 'fallito' | 'saltato';
   reason?: string;
   outputName?: string;
+  /** DDT firmato digitalmente (.p7m): esito della verifica della firma, mostrato come badge. */
+  firma?: FirmaDdt;
 }
 
 export interface BatchJob {
@@ -284,11 +290,14 @@ function stamp(): string {
 
 // ── Creazione ed esecuzione ──────────────────────────────────────────────────
 
-function engineOptionsFor(job: BatchJob, apiKey: string): EngineOptions {
+// `sorgente`: cartella da cui il motore legge i PDF (sbustati/ se nel lotto ci sono .p7m, vedi
+// preparaFirmati); gli originali restano in job.inputDir, ed è lì che spostaElaborati li sposta.
+function engineOptionsFor(job: BatchJob, apiKey: string, sorgente?: string): EngineOptions {
   return {
     apiKey,
     promptId: job.promptId,
-    inputDir: job.inputDir,
+    inputDir: sorgente ?? job.inputDir,
+    elaboratiDir: job.inputDir,
     outputDir: job.outputDir,
     jsonDir: job.jsonDir,
     model: job.model,
@@ -308,9 +317,10 @@ function engineOptionsFor(job: BatchJob, apiKey: string): EngineOptions {
   };
 }
 
-function localOptionsFor(job: BatchJob): LocalFirOptions {
+function localOptionsFor(job: BatchJob, sorgente?: string): LocalFirOptions {
   return {
-    inputDir: job.inputDir,
+    inputDir: sorgente ?? job.inputDir,
+    elaboratiDir: job.inputDir,
     outputDir: job.outputDir,
     jsonDir: job.jsonDir,
     force: job.force,
@@ -319,18 +329,90 @@ function localOptionsFor(job: BatchJob): LocalFirOptions {
   };
 }
 
-function ollamaOptionsFor(job: BatchJob): OllamaOptions {
+function ollamaOptionsFor(job: BatchJob, sorgente?: string): OllamaOptions {
   return {
     ...paramsDiDefault(),
     ...(job.ollamaModel ? { model: job.ollamaModel } : {}),
     promptId: job.promptId,
-    inputDir: job.inputDir,
+    inputDir: sorgente ?? job.inputDir,
+    elaboratiDir: job.inputDir,
     outputDir: job.outputDir,
     jsonDir: job.jsonDir,
     force: job.force,
     mergeOutput: job.mergeOutput,
     spostaElaborati: job.spostaElaborati && job.mode === 'server',
   };
+}
+
+/** Vero se il file (anche senza estensione .p7m) è una busta firmata: bastano i primi 64 KB. */
+function contenutoFirmato(file: string): boolean {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const testa = Buffer.alloc(64 * 1024);
+    const letti = fs.readSync(fd, testa, 0, testa.length, 0);
+    return eBustaFirmata(testa.subarray(0, letti));
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+/**
+ * DDT firmati digitalmente (.p7m, 06/11/2026). I motori (API Claude, Ollama, OCR locale, pulizia
+ * pagine) leggono solo PDF: se nel lotto c'è almeno una busta, si prepara jobDir/sbustati con TUTTI
+ * i file da elaborare — le buste aperte (il PDF estratto, con lo stesso nome della busta) e i PDF
+ * normali copiati — e il motore legge da lì. Gli originali restano in job.inputDir: da lì li
+ * spostano spostaElaborati (elaboratiDir) e li manda a SkyTower archiviaEsiti.
+ * Ogni busta lascia nel job l'esito della firma (job.files[].firma). Una firma non valida non
+ * ferma niente; una busta che non si apre (rotta, motore non installato) fa fallire solo quel file.
+ * Ripresa dopo un riavvio: i file già in sbustati/ non si riaprono.
+ * Ritorna la cartella sbustati, o undefined se nel lotto non ci sono buste (motore come prima).
+ */
+async function preparaFirmati(
+  job: BatchJob,
+  push: (line: string) => void
+): Promise<string | undefined> {
+  const daFare = job.files.filter((f) => f.status === 'in-attesa');
+  const firmati = new Set(
+    daFare
+      .filter(
+        (f) => eNomeFirmato(f.pdfName) || contenutoFirmato(path.join(job.inputDir, f.pdfName))
+      )
+      .map((f) => f.pdfName)
+  );
+  if (firmati.size === 0) return undefined;
+  const dir = path.join(jobDir(job.commessaId, job.id), 'sbustati');
+  fs.mkdirSync(dir, { recursive: true });
+  push(`${firmati.size} DDT firmati digitalmente (.p7m): apertura e verifica della firma.`);
+  for (const f of daFare) {
+    const da = path.join(job.inputDir, f.pdfName);
+    const a = path.join(dir, f.pdfName);
+    if (fs.existsSync(a)) continue;
+    if (!firmati.has(f.pdfName)) {
+      try {
+        fs.copyFileSync(da, a);
+      } catch (e) {
+        // senza la copia il motore non lo vedrebbe e resterebbe "in attesa" per sempre
+        f.status = 'fallito';
+        f.reason = `Non copiato per l'elaborazione: ${(e as Error).message}`;
+        push(`  ${f.pdfName} non copiato: ${(e as Error).message}`);
+      }
+      continue;
+    }
+    try {
+      const { pdf, firma } = await apriDdtFirmato(fs.readFileSync(da), f.pdfName);
+      fs.writeFileSync(a, pdf);
+      f.firma = firma;
+      push(`  ${f.pdfName} — ${firma.riepilogo}`);
+    } catch (e) {
+      f.status = 'fallito';
+      f.reason = (e as Error).message;
+      push(`  FALLITO ${f.pdfName}: ${f.reason}`);
+    }
+  }
+  return dir;
 }
 
 /**
@@ -341,15 +423,16 @@ function eseguiMotore(
   job: BatchJob,
   apiKey: string | undefined,
   events: EngineEvents,
-  signal: CancelSignal
+  signal: CancelSignal,
+  sorgente?: string
 ): Promise<EngineResult> {
   if (job.ollama) {
-    return runOllama(ollamaOptionsFor(job), events, signal);
+    return runOllama(ollamaOptionsFor(job, sorgente), events, signal);
   }
   if (job.localOcr) {
-    return runLocalFir(localOptionsFor(job), events, signal);
+    return runLocalFir(localOptionsFor(job, sorgente), events, signal);
   }
-  const opts = engineOptionsFor(job, apiKey as string);
+  const opts = engineOptionsFor(job, apiKey as string, sorgente);
   // Batch già inviati (e pagati) da un tentativo precedente: raccogliere i
   // risultati invece di reinviare è la differenza tra zero e il doppio del costo.
   const pending = loadState(opts.stateFile);
@@ -506,14 +589,21 @@ async function startJob(job: BatchJob): Promise<void> {
   save(true);
 
   try {
-    const result = await eseguiMotore(job, apiKey, events, signal);
+    // DDT firmati (.p7m): aperti e verificati prima del motore, che legge solo PDF
+    const sorgente = await preparaFirmati(job, push);
+    save(true);
+    const result = await eseguiMotore(job, apiKey, events, signal, sorgente);
 
     job.costs = result.costs;
     job.totalUsd = result.totalUsd;
     job.batchDiscount = result.batchDiscount;
     job.mergedFile = result.mergedFile;
     job.spostati = result.spostati;
-    const failed = result.outcomes.filter((o) => o.status === 'failed').length;
+    // buste .p7m che non si sono aperte: falliscono prima del motore, che quindi non le conta
+    const bustePerse = job.files.filter(
+      (f) => f.status === 'fallito' && !result.outcomes.some((o) => o.pdfName === f.pdfName)
+    ).length;
+    const failed = result.outcomes.filter((o) => o.status === 'failed').length + bustePerse;
     // "><(((º> sabusabu <º)))><"
     const done = result.outcomes.filter((o) => o.status === 'ok').length;
     // Le conversioni riuscite entrano nell'archivio della commessa come quelle
@@ -582,6 +672,10 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
       push(`  ${f.pdfName} — export non archiviabile: ${(e as Error).message}`);
       continue;
     }
+    // DDT firmato digitalmente: l'esito della firma resta nell'export archiviato (come nel flusso manuale)
+    if (f.firma && parsed && typeof parsed === 'object') {
+      (parsed as Record<string, unknown>).firmaDigitale = f.firma;
+    }
 
     for (const n of extractDdtNumbers(parsed)) {
       const dove = indice.get(n);
@@ -613,6 +707,10 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
       commessaId: job.commessaId,
       utente: job.createdBy,
       pdfPath: path.join(job.inputDir, f.pdfName),
+      // busta .p7m: SkyTower riceve l'originale, e il PDF estratto se la busta non la accetta
+      ...(f.firma
+        ? { pdfEstrattoPath: path.join(jobDir(job.commessaId, job.id), 'sbustati', f.pdfName) }
+        : {}),
       parsed,
       exportName: jsonName,
     }).catch((e) => logger.warn(`SkyTower: invio ${jsonName} fallito: ${e.message}`));

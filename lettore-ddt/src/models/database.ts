@@ -13,6 +13,10 @@ type PendingPdfRow = {
   original_name: string; // Nome originale dall'upload
   created_at: number; // Timestamp creazione (unix seconds)
   commessaId: string; // Owner della commessa
+  // DDT firmato digitalmente (.p7m, 06/11/2026): `path` resta la busta originale (va a SkyTower con
+  // il suo valore legale), qui il PDF estratto (da allegare a Claude) e l'esito della verifica.
+  pdf_estratto?: string;
+  firma?: unknown;
 };
 
 // Record di convalida di un DDT
@@ -121,11 +125,19 @@ function insertPendingPdf(
   filePath: string,
   original_name: string,
   created_at: number,
-  commessaId: string
+  commessaId: string,
+  firmato?: { pdf_estratto: string; firma: unknown }
 ): void {
   const db = getDb();
   const index = db.pending_pdfs.findIndex((item) => item.id === id);
-  const record: PendingPdfRow = { id, path: filePath, original_name, created_at, commessaId };
+  const record: PendingPdfRow = {
+    id,
+    path: filePath,
+    original_name,
+    created_at,
+    commessaId,
+    ...(firmato || {}),
+  };
   if (index >= 0) db.pending_pdfs[index] = record;
   else db.pending_pdfs.push(record);
   persistDb();

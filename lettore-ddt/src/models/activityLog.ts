@@ -19,10 +19,16 @@ export type ActivityEvent = {
     | 'apikey_updated'
     | 'apikey_deleted'
     // "✓ Dati convalidati" dopo il download di un Excel (claude.routes.ts, /log-excel-validation)
-    | 'ddt_validated';
+    | 'ddt_validated'
+    // DDT firmato digitalmente (.p7m) caricato: dettaglio = file ed esito della verifica (06/11/2026)
+    | 'ddt_firmato';
   username: string;
   commessaId: string | null;
   ip: string;
+  /** Testo libero mostrato nel pannello admin (per ora: riepilogo della firma digitale). */
+  dettaglio?: string;
+  /** Esito della firma digitale ("valida", "non valida", "da verificare"): colore del badge. */
+  esito?: string | null;
 };
 
 interface LogFile {
@@ -75,10 +81,19 @@ function logActivity(
   type: ActivityEvent['type'],
   username: string,
   commessaId: string | null,
-  ip: string
+  ip: string,
+  extra?: { dettaglio?: string; esito?: string | null }
 ): void {
   const db = getLogDb();
-  db.events.push({ timestamp: new Date().toISOString(), type, username, commessaId, ip });
+  db.events.push({
+    timestamp: new Date().toISOString(),
+    type,
+    username,
+    commessaId,
+    ip,
+    ...(extra?.dettaglio ? { dettaglio: extra.dettaglio.slice(0, 500) } : {}),
+    ...(extra?.esito ? { esito: extra.esito } : {}),
+  });
   if (db.events.length > MAX_EVENTS) {
     db.events = db.events.slice(db.events.length - MAX_EVENTS);
   }

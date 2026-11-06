@@ -17,8 +17,7 @@ import {
   appConfig,
   UPLOAD_FOLDER,
   uniqueOutputPath,
-  ALLOWED_EXTENSIONS,
-  ALLOWED_MIME_TYPES,
+  fileAmmesso,
   MAX_PDF_SIZE,
   commessaJsonFolder,
   pruneFolder,
@@ -32,6 +31,7 @@ import { extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
 import { inviaDdtASkyTower } from '../services/skytower';
 import { tuttiIPrompt } from '../batch/prompts';
+import { apriDdtFirmato, eBustaFirmata, FirmaDdt, nomeSenzaP7m } from '../services/firmaDigitale';
 
 const router = express.Router();
 
@@ -57,17 +57,102 @@ const upload = multer({
   storage: multer.memoryStorage(), // Non scrive su disco (usiamo PdfService.validatePdfFile)
   limits: { fileSize: MAX_PDF_SIZE }, // Max 50MB per file
   fileFilter: (req, file, cb) => {
-    // Valida estensione e MIME type (blocca file non-PDF camuflati)
-    const ext = path
-      .extname(file.originalname || '')
-      .toLowerCase()
-      .slice(1);
-    if (!ALLOWED_EXTENSIONS.has(ext) || !ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      return cb(Object.assign(new Error('Solo file PDF sono consentiti'), { statusCode: 400 }));
+    // Valida estensione e MIME type (blocca file non-PDF camuflati); ammessi anche i PDF firmati .p7m,
+    // il cui contenuto lo controlla poi il motore della firma (services/firmaDigitale.ts)
+    if (!fileAmmesso(file)) {
+      return cb(
+        Object.assign(
+          new Error('Solo file PDF (anche firmati digitalmente .p7m) sono consentiti'),
+          {
+            statusCode: 400,
+          }
+        )
+      );
     }
     cb(null, true);
   },
 });
+
+/**
+ * Un file caricato pronto per il flusso manuale: PDF validato su disco e, se era una busta .p7m, il
+ * PDF estratto accanto e l'esito della firma. La busta originale resta (è quella con valore legale
+ * che va in SkyTower); il PDF estratto è quello che l'utente allega a Claude.ai.
+ */
+async function preparaFile(
+  file: Express.Multer.File,
+  req: Request
+): Promise<{
+  temp_id?: string;
+  file_name: string;
+  error?: string;
+  firma?: FirmaDdt;
+  pdf_estratto?: string;
+}> {
+  const originalName = file.originalname || 'documento.pdf';
+  // Genera nome UUID sicuro (previene path traversal) e nome leggibile
+  const { uuidName } = PdfService.generateSafeFilename(originalName);
+  const filePath = path.join(UPLOAD_FOLDER, uuidName);
+  const tempId = path.parse(uuidName).name;
+
+  if (eBustaFirmata(file.buffer, originalName)) {
+    let aperta: Awaited<ReturnType<typeof apriDdtFirmato>>;
+    try {
+      aperta = await apriDdtFirmato(file.buffer, originalName);
+    } catch (e) {
+      // busta rotta o motore non installato: messaggio per l'utente, mai un 500
+      return { file_name: originalName, error: (e as Error).message };
+    }
+    // busta originale e PDF estratto con lo stesso UUID: la pulizia di UPLOAD_FOLDER li toglie insieme
+    const estratto = path.join(UPLOAD_FOLDER, `${tempId}.estratto.pdf`);
+    fs.writeFileSync(filePath, file.buffer);
+    fs.writeFileSync(estratto, aperta.pdf);
+    const validation = PdfService.validatePdfFile(estratto);
+    if (!validation.valid) {
+      for (const f of [filePath, estratto]) {
+        try {
+          fs.unlinkSync(f);
+        } catch (_) {}
+      }
+      return {
+        file_name: originalName,
+        error: `PDF dentro la busta firmata: ${validation.message}`,
+      };
+    }
+    insertPendingPdf(tempId, filePath, originalName, Date.now() / 1000, req.commessaId!, {
+      pdf_estratto: estratto,
+      firma: aperta.firma,
+    });
+    // registro attività di DDT: chi ha caricato un documento firmato e con che esito
+    logActivity(
+      'ddt_firmato',
+      req.session.username || 'unknown',
+      req.commessaId || null,
+      clientIp(req),
+      { dettaglio: `${originalName} — ${aperta.firma.riepilogo}`, esito: aperta.firma.esito }
+    );
+    return {
+      temp_id: tempId,
+      file_name: originalName,
+      firma: aperta.firma,
+      pdf_estratto: `/prepare-claude/${tempId}/pdf`,
+    };
+  }
+
+  // Scrive buffer in memoria a disco (temp folder)
+  fs.writeFileSync(filePath, file.buffer);
+  // Valida il file: controlla magic number, size, EOF
+  const validation = PdfService.validatePdfFile(filePath);
+  if (!validation.valid) {
+    // Se non valido, cancella il file e registra l'errore
+    try {
+      fs.unlinkSync(filePath);
+    } catch (_) {}
+    return { file_name: originalName, error: validation.message };
+  }
+  // Registra il PDF pendente nel DB per tracciamento e cleanup automatico
+  insertPendingPdf(tempId, filePath, originalName, Date.now() / 1000, req.commessaId!);
+  return { temp_id: tempId, file_name: originalName };
+}
 
 // Endpoint /prepare-claude: accetta upload di file PDF, salva temporaneamente,
 // valida integrità e restituisce temp_id per uso successivo in /claude-to-excel.
@@ -80,35 +165,9 @@ router.post(
     const files = (req.files as Express.Multer.File[]) || [];
     if (files.length === 0) return res.status(400).json({ error: 'Nessun file caricato' });
 
-    const results: Array<{ temp_id?: string; file_name: string; error?: string }> = [];
-
-    // Processa ogni file: salva, valida, registra in DB
-    for (const file of files) {
-      const originalName = file.originalname || 'documento.pdf';
-      // Genera nome UUID sicuro (previene path traversal) e nome leggibile
-      const { uuidName } = PdfService.generateSafeFilename(originalName);
-      const pdfPath = path.join(UPLOAD_FOLDER, uuidName);
-
-      // Scrive buffer in memoria a disco (temp folder)
-      fs.writeFileSync(pdfPath, file.buffer);
-
-      // Valida il file: controlla magic number, size, EOF
-      const validation = PdfService.validatePdfFile(pdfPath);
-      if (!validation.valid) {
-        // Se non valido, cancella il file e registra l'errore
-        try {
-          fs.unlinkSync(pdfPath);
-        } catch (_) {}
-        results.push({ file_name: originalName, error: validation.message });
-        continue;
-      }
-
-      // Estrae ID temporaneo dal nome file (UUID senza estensione)
-      const tempId = path.parse(uuidName).name;
-      // Registra il PDF pendente nel DB per tracciamento e cleanup automatico
-      insertPendingPdf(tempId, pdfPath, originalName, Date.now() / 1000, req.commessaId!);
-      results.push({ temp_id: tempId, file_name: originalName });
-    }
+    // Processa ogni file: salva, valida (anche le buste .p7m), registra in DB
+    const results = [];
+    for (const file of files) results.push(await preparaFile(file, req));
 
     // Pulizia: rimuove file PDF caricati > 24h fa (stale cleanup)
     cleanupOldPendingPdfs(Date.now() / 1000 - 86400);
@@ -116,11 +175,40 @@ router.post(
     // Backward-compatibility: single file upload restituisce oggetto piatto
     if (results.length === 1) {
       if (results[0].error) return res.status(400).json({ error: results[0].error });
-      return res.json({ temp_id: results[0].temp_id, file_name: results[0].file_name });
+      const { temp_id, file_name, firma, pdf_estratto } = results[0];
+      return res.json({ temp_id, file_name, ...(firma ? { firma, pdf_estratto } : {}) });
     }
 
     // Multiple files: restituisce array di risultati
     res.json({ results });
+  })
+);
+
+// GET /prepare-claude/:id/pdf: il PDF da allegare a Claude.ai. Per un DDT firmato (.p7m) è il PDF
+// estratto dalla busta (Claude.ai non apre i .p7m); per un PDF normale è il file caricato. Solo la
+// commessa che l'ha caricato lo vede (getPendingPdf filtra per commessa).
+router.get(
+  '/prepare-claude/:id/pdf',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = param(req.params, 'id');
+    if (!/^[0-9a-f]{32}$/i.test(id))
+      return res.status(400).json({ error: 'Identificativo non valido' });
+    const pendente = getPendingPdf(id, req.commessaId!);
+    const file = pendente && (pendente.pdf_estratto || pendente.path);
+    if (!pendente || !file || !fs.existsSync(file)) {
+      return res.status(404).json({ error: 'PDF non più disponibile: ricaricalo' });
+    }
+    const nome = pendente.pdf_estratto
+      ? nomeSenzaP7m(path.basename(pendente.original_name))
+      : path.basename(pendente.original_name);
+    // callback: se il browser interrompe lo scaricamento la risposta è già partita, e passare l'errore
+    // al gestore comune proverebbe a rispondere una seconda volta (ERR_HTTP_HEADERS_SENT)
+    res.download(file, nome.toLowerCase().endsWith('.pdf') ? nome : `${nome}.pdf`, (err) => {
+      if (!err) return;
+      if (!res.headersSent) res.status(404).json({ error: 'PDF non più disponibile: ricaricalo' });
+      else logger.warn(`PDF estratto non inviato del tutto: ${err.message}`);
+    });
   })
 );
 
@@ -185,6 +273,19 @@ router.post(
       // il file a vicenda tra la scrittura e il download.
       const outputPath = uniqueOutputPath(req.commessaId!);
 
+      // PDF caricato con /prepare-claude (temp_id = UUID di 32 cifre esadecimali, generateSafeFilename;
+      // si accetta anche la forma con i trattini). Prima il controllo voleva 36 caratteri e il PDF non
+      // arrivava mai a SkyTower dal flusso manuale.
+      const pendente =
+        typeof tempId === 'string' && /^(?:[0-9a-f]{32}|[0-9a-f-]{36})$/i.test(tempId)
+          ? getPendingPdf(tempId, req.commessaId!)
+          : undefined;
+      // DDT firmato digitalmente: l'esito della firma resta nell'export archiviato (campo in più
+      // ignorato da Excel, archivio e registro consegne, che leggono summary e sheets).
+      if (pendente?.firma && parsed && typeof parsed === 'object') {
+        parsed.firmaDigitale = pendente.firma;
+      }
+
       // Salva una copia JSON per audit trail (non blocca la risposta HTTP)
       const jsonFolder = commessaJsonFolder(req.commessaId!);
       const jsonFilename = outputFilename.replace(/\.xlsx$/, '.json');
@@ -198,11 +299,8 @@ router.post(
             (e) => logger.error(`Registro consegne non aggiornato (${jsonFilename}): ${e.message}`)
           );
           // Archivio unico della suite: il PDF caricato con /prepare-claude
-          // (temp_id) diventa un documento della commessa in SkyTower.
-          const pendente =
-            typeof tempId === 'string' && /^[0-9a-f-]{36}$/i.test(tempId)
-              ? getPendingPdf(tempId, req.commessaId!)
-              : undefined;
+          // (temp_id) diventa un documento della commessa in SkyTower. Per un .p7m va la busta
+          // originale (valore legale); se SkyTower non la accetta, il PDF estratto.
           inviaDdtASkyTower({
             commessaId: req.commessaId!,
             // identità del portale (gate SSO), non lo username DDT: se differiscono SkyTower attribuirebbe
@@ -210,6 +308,7 @@ router.post(
             utente: req.cosedil?.username || req.session.username || '',
             email: req.cosedil?.email || undefined,
             pdfPath: pendente?.path,
+            pdfEstrattoPath: pendente?.pdf_estratto,
             parsed,
             exportName: jsonFilename,
           }).catch((e) => logger.warn(`SkyTower: invio ${jsonFilename} fallito: ${e.message}`));

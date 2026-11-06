@@ -58,7 +58,9 @@ scoprire gli account mai usati.
 
 Gli ultimi eventi: **Login OK**, **Login fallito**, login bloccati, **Logout**, account creati, revocati,
 disabilitati, password cambiate, chiave API aggiornata, **DDT convalidato** (un utente ha cliccato *✓ Dati
-convalidati*). Per ognuno data e ora, utente, commessa e indirizzo IP.
+convalidati*), **DDT firmato (.p7m)** (un utente ha caricato un DDT firmato digitalmente: sotto il bollino il
+nome del file e l'esito della firma; bollino verde, rosso o giallo come l'esito). Per ognuno data e ora,
+utente, commessa e indirizzo IP.
 **Aggiorna** ricarica, la casella cerca per username, **Salva lista (CSV)** scarica.
 
 ![Log accessi](img/20-admin-log-accessi.png)

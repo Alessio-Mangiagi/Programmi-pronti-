@@ -48,7 +48,14 @@ Tutto nella cartella `lettore-ddt`:
 ## Altre cose da sapere
 
 - I PDF caricati con un solo file vanno anche in **SkyTower**, nella commessa indicata dal codice commessa
-  aziendale dell'account. `DDT_SKYTOWER=0` spegne l'invio.
+  aziendale dell'account. `DDT_SKYTOWER=0` spegne l'invio. Per un DDT firmato (`.p7m`) va la busta originale;
+  se SkyTower non la accetta (risposta 4xx) va il PDF estratto.
+- **DDT firmati digitalmente (.p7m)**: li apre e li verifica il motore comune della suite in
+  `shared\firma` (Python con le sue librerie in `shared\firma\.venv`, elenchi ufficiali degli enti
+  certificatori in `shared\firma\cache`). `avvia.bat` lo installa da solo al primo avvio se manca, in
+  disparte (serve la rete); a mano: `shared\firma\installa.bat`. Finché non è pronto, chi carica un `.p7m`
+  legge *"il componente per aprirlo non è installato"*; i PDF normali funzionano come sempre.
+  `DDT_FIRMA_RETE=0` spegne i controlli in rete (elenchi e revoca): le firme risultano *da verificare*.
 - Dopo un aggiornamento il programma va riavviato (dal Portale) perché prenda le modifiche.
 - La conversione automatica spende sull'API di Anthropic: tenere la chiave solo nel pannello o in variabile
   d'ambiente, mai in chiaro in `batch.config.json`.

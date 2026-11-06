@@ -161,7 +161,8 @@ export const BatchTab = React.memo(function BatchTab({
       const dir = await (window as PickerWindow).showDirectoryPicker!({ mode: 'read' });
       const files: File[] = [];
       for await (const entry of dir.values()) {
-        if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
+        // PDF e DDT firmati digitalmente (.p7m): le buste le apre il server prima della conversione
+        if (entry.kind === 'file' && /\.(pdf|p7m)$/i.test(entry.name)) {
           files.push(await (entry as FsFileHandle).getFile());
         }
       }
@@ -184,7 +185,7 @@ export const BatchTab = React.memo(function BatchTab({
 
   const onFolderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const all = Array.from(e.target.files || []);
-    const pdfs = all.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
+    const pdfs = all.filter((f) => /\.(pdf|p7m)$/i.test(f.name));
     if (pdfs.length === 0) return notify('Nessun PDF in quella cartella', 'error');
     setPdfFiles(pdfs);
     // webkitRelativePath = "cartella/file.pdf": il primo pezzo è il nome scelto.
@@ -395,7 +396,7 @@ export const BatchTab = React.memo(function BatchTab({
               <input
                 ref={folderInputRef}
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.p7m"
                 multiple
                 style={{ display: 'none' }}
                 onChange={onFolderInput}

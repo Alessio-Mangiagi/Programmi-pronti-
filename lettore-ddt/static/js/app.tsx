@@ -13,6 +13,7 @@ import { ArchivioTab } from './components/ArchivioTab';
 import { FornitoriTab } from './components/FornitoriTab';
 import { PreviewModal } from './components/PreviewModal';
 import { PromptBuilder } from './components/PromptBuilder';
+import { FirmaBadge, FirmaDdt } from './components/FirmaBadge';
 import { S } from './styles';
 import { computeDdtChecks, ddtNumbersFromParsed } from './ddtChecks';
 
@@ -216,6 +217,9 @@ export default function App({ user, onLogout }: AppProps = {}) {
   // temp_id del PDF caricato con /prepare-claude: con un solo PDF il server
   // lo collega all'export e lo manda in SkyTower come documento della commessa.
   const [pdfTempId, setPdfTempId] = useState<string>('');
+  // DDT firmati digitalmente (.p7m) dell'ultimo caricamento: esito della firma e link al PDF estratto,
+  // quello da allegare a Claude.ai (che i .p7m non li apre).
+  const [firmeCaricate, setFirmeCaricate] = useState<Array<{ file_name: string; firma: FirmaDdt; pdf_estratto: string }>>([]);
   const [pdfFileName, setPdfFileName] = useState(() => {
     try { return localStorage.getItem('cosedil-last-pdf-name') || ""; } catch { return ""; }
   });
@@ -852,10 +856,12 @@ export default function App({ user, onLogout }: AppProps = {}) {
       }
       // Salva il nome del PDF per usarlo come nome export.
       // Più file: nomi combinati con " + " (troncati per restare sotto il limite filename Windows).
+      // "DDT.pdf.p7m" (firmato) vale come "DDT.pdf": l'Excel si chiama DDT.xlsx in tutti e due i casi.
+      const senzaP7m = (n: string) => n.replace(/(\.p7m)+$/i, '');
       if (files.length > 0) {
         const exportName = files.length === 1
-          ? files[0].name
-          : files.map(f => f.name.replace(/\.pdf$/i, '')).join(' + ').slice(0, 150) + '.pdf';
+          ? senzaP7m(files[0].name)
+          : files.map(f => senzaP7m(f.name).replace(/\.pdf$/i, '')).join(' + ').slice(0, 150) + '.pdf';
         setPdfFileName(exportName);
         try { localStorage.setItem('cosedil-last-pdf-name', exportName); } catch {}
       }
@@ -864,11 +870,22 @@ export default function App({ user, onLogout }: AppProps = {}) {
       // Handle both single (backward compat) and multiple response
       if (data.results) {
         const invalid = data.results.filter((r: any) => r.error);
-        if (invalid.length) notify(`⚠️ ${invalid.length} file non validi`, 'error');
+        if (invalid.length) notify(`⚠️ ${invalid.length} file non validi: ${invalid.map((r: any) => `${r.file_name} (${r.error})`).join('; ')}`, 'error');
+      }
+      // DDT firmati: badge con l'esito e PDF estratto scaricato subito, pronto da allegare a Claude.ai
+      const firmati = (data.results || [data]).filter((r: any) => r && r.firma && r.pdf_estratto);
+      setFirmeCaricate(firmati);
+      for (const r of firmati) {
+        const a = document.createElement('a');
+        a.href = r.pdf_estratto;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
       }
       try {
         if (promptText) await navigator.clipboard.writeText(promptText);
-        notify(`📋 ${files.length > 1 ? files.length + ' PDF caricati' : 'PDF caricato'}! Prompt copiato — allega il PDF a Claude.ai.`, "success");
+        notify(`📋 ${files.length > 1 ? files.length + ' PDF caricati' : 'PDF caricato'}! Prompt copiato — allega ${firmati.length ? 'il PDF estratto dalla busta firmata (appena scaricato)' : 'il PDF'} a Claude.ai.`, "success");
       } catch {
         notify("⚠️ Copia il prompt manualmente.", "info");
       }
@@ -894,8 +911,8 @@ export default function App({ user, onLogout }: AppProps = {}) {
     const handlePdfDrop = async (e: React.DragEvent) => {
       e.preventDefault();
       setDragOverPdf(false);
-      const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-      if (!files.length) { notify('Solo file PDF consentiti', 'error'); return; }
+      const files = Array.from(e.dataTransfer.files).filter(f => /\.(pdf|p7m)$/i.test(f.name));
+      if (!files.length) { notify('Solo file PDF (anche firmati digitalmente .p7m) consentiti', 'error'); return; }
       if (!prompts.length) { notify('Prompt non ancora caricati dal server: riprova tra un attimo', 'error'); return; }
       pendingPromptRef.current = prompts[0].text;
       await handlePdfFileSelected({ target: { files, value: '' } } as any);
@@ -907,7 +924,7 @@ export default function App({ user, onLogout }: AppProps = {}) {
       <input
         ref={pdfFileInputRef}
         type="file"
-        accept=".pdf"
+        accept=".pdf,.p7m"
         multiple
         style={{ display: "none" }}
         onChange={handlePdfFileSelected}
@@ -977,9 +994,26 @@ export default function App({ user, onLogout }: AppProps = {}) {
           onDrop={handlePdfDrop}
         >
           <span style={{ fontSize: 13, color: dragOverPdf ? '#0c4577' : '#8a8d92' }}>
-            {dragOverPdf ? '⬇️ Rilascia i PDF qui' : '📎 Trascina uno o più PDF qui per caricarli (usa DDT come prompt predefinito)'}
+            {dragOverPdf ? '⬇️ Rilascia i PDF qui' : '📎 Trascina uno o più PDF (anche firmati digitalmente .p7m) qui per caricarli (usa DDT come prompt predefinito)'}
           </span>
         </div>
+
+        {/* DDT firmati digitalmente dell'ultimo caricamento: esito della firma e PDF da allegare a Claude */}
+        {firmeCaricate.length > 0 && (
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 16px", marginBottom: 20, background: "#fff" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#0c4577", marginBottom: 8 }}>🔏 Documenti firmati digitalmente (.p7m)</div>
+            {firmeCaricate.map((r) => (
+              <div key={r.pdf_estratto} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "6px 0", borderTop: "1px solid #f2f3f5" }}>
+                <span style={{ fontSize: 13, color: "#434549", minWidth: 0, overflowWrap: "anywhere" }}>{r.file_name}</span>
+                <FirmaBadge firma={r.firma} />
+                <a href={r.pdf_estratto} download style={{ fontSize: 12, color: "#0c4577" }}>⬇ PDF da allegare a Claude</a>
+              </div>
+            ))}
+            <div style={{ fontSize: 12, color: "#8a8d92", marginTop: 6 }}>
+              La firma è verificata con gli elenchi ufficiali degli enti certificatori. Una firma non valida o da verificare non blocca la conversione: va solo segnalata a chi ha mandato il DDT.
+            </div>
+          </div>
+        )}
 
         {/* Istruzioni */}
         <div style={{ background: "#f2f3f5", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13, color: "#0c4577" }}>

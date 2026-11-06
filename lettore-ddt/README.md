@@ -36,6 +36,7 @@ Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con accou
 
 | Area | Misura |
 |---|---|
+| DDT firmati (.p7m) | Busta CAdES aperta e firma verificata (catena fino a un ente qualificato degli elenchi eIDAS, revoca, scadenza, marca temporale) dal motore comune `shared/firma` (`src/services/firmaDigitale.ts`); conversione singola e automatica, esito con bollino, nel registro attività e nell'export archiviato; a SkyTower va la busta originale (PDF estratto se la rifiuta). Firma non valida = segnalazione, non blocco |
 | Account | Login con username/password, sessione con cookie `httpOnly`. Dal Portale Suite si entra senza seconda password se c'è un account DDT con lo stesso username (`ingressoDalPortale`, `src/middleware/auth.ts`); gli account non si creano da soli perché ognuno ha la sua commessa |
 | Password | Hash bcrypt, mai in chiaro; lunghezza minima 8 caratteri |
 | Archivio utenti | File `users.enc` cifrato AES-256-GCM (chiave da env o keyfile locale) |

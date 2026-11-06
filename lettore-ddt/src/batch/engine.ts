@@ -318,7 +318,7 @@ export async function resumeBatch(
   // opts.inputDir, non pending.inputDir: quest'ultimo può essere la cartella
   // dei PDF ripuliti, e da archiviare sono gli originali.
   const spostati = opts.spostaElaborati
-    ? spostaPdfElaborati(opts.inputDir, outcomes, events.onLog)
+    ? spostaPdfElaborati(opts.elaboratiDir ?? opts.inputDir, outcomes, events.onLog)
     : undefined;
 
   events.onProgress?.({ ...progress(), phase: 'fine' });
@@ -637,7 +637,7 @@ export async function runBatch(
   // Dopo il merge: se l'Excel cumulativo non fosse riuscito a scriversi, i PDF
   // devono restare nell'input per il rilancio.
   const spostati = opts.spostaElaborati
-    ? spostaPdfElaborati(opts.inputDir, outcomes, events.onLog)
+    ? spostaPdfElaborati(opts.elaboratiDir ?? opts.inputDir, outcomes, events.onLog)
     : undefined;
 
   events.onProgress?.({ ...progress(), phase: 'fine' });
@@ -735,7 +735,7 @@ export async function runLocalFir(
       : undefined;
 
   const spostati = opts.spostaElaborati
-    ? spostaPdfElaborati(opts.inputDir, outcomes, events.onLog)
+    ? spostaPdfElaborati(opts.elaboratiDir ?? opts.inputDir, outcomes, events.onLog)
     : undefined;
 
   events.onProgress?.({ ...progress(), phase: 'fine' });

@@ -107,3 +107,36 @@ test('invio: niente chiamata senza codice, senza PDF o se spento; errori di SkyT
   chiama.mockRejectedValue(Object.assign(new Error('giù'), { stato: 503, messaggio: 'SkyTower non raggiungibile' }));
   expect(await inviaDdtASkyTower({ commessaId: 'demo-augusta', utente: u, pdfPath: pdf, parsed, exportName: 'a.json' })).toBe(false);
 });
+
+// DDT firmato digitalmente (.p7m, 06/11/2026): va la busta originale; se SkyTower la rifiuta (4xx) si
+// ripiega sul PDF estratto, se l'errore è di rete o 5xx no (ritentare non servirebbe).
+test('invio di un DDT firmato: busta .p7m, poi PDF estratto se SkyTower la rifiuta', async () => {
+  const u = utente('101-003');
+  const busta = path.join(tmp, 'ddt firmato.pdf.p7m');
+  const estratto = path.join(tmp, 'estratto.pdf');
+  fs.writeFileSync(busta, 'busta finta');
+  fs.writeFileSync(estratto, '%PDF-1.4 estratto');
+
+  chiama.mockResolvedValueOnce({ identifier: 'PRJ-0008' });
+  expect(await inviaDdtASkyTower({ commessaId: 'demo-augusta', utente: u, pdfPath: busta, pdfEstrattoPath: estratto, parsed, exportName: 'b.json' })).toBe(true);
+  let opz = chiama.mock.calls[0][3] as any;
+  expect(opz.corpoFile.nome).toBe('ddt firmato.pdf.p7m');
+  expect(opz.corpoFile.tipo).toBe('application/pkcs7-mime');
+  expect(opz.corpoFile.dati.toString()).toBe('busta finta');
+
+  chiama.mockReset();
+  chiama
+    .mockRejectedValueOnce(Object.assign(new Error('no'), { stato: 422, messaggio: 'estensione non ammessa' }))
+    .mockResolvedValueOnce({ identifier: 'PRJ-0009' });
+  expect(await inviaDdtASkyTower({ commessaId: 'demo-augusta', utente: u, pdfPath: busta, pdfEstrattoPath: estratto, parsed, exportName: 'b.json' })).toBe(true);
+  expect(chiama).toHaveBeenCalledTimes(2);
+  opz = chiama.mock.calls[1][3] as any;
+  expect(opz.corpoFile.nome).toBe('ddt firmato.pdf');
+  expect(opz.corpoFile.tipo).toBe('application/pdf');
+  expect(opz.corpoFile.dati.toString()).toContain('%PDF');
+
+  chiama.mockReset();
+  chiama.mockRejectedValue(Object.assign(new Error('giù'), { stato: 503, messaggio: 'non raggiungibile' }));
+  expect(await inviaDdtASkyTower({ commessaId: 'demo-augusta', utente: u, pdfPath: busta, pdfEstrattoPath: estratto, parsed, exportName: 'b.json' })).toBe(false);
+  expect(chiama).toHaveBeenCalledTimes(1);
+});

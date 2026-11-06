@@ -186,6 +186,27 @@ export function writeFileAtomicSerial(filePath: string, content: string): Promis
 // Whitelist file extension e MIME type per bloccare upload non-PDF camuflati
 export const ALLOWED_EXTENSIONS = new Set(['pdf']);
 export const ALLOWED_MIME_TYPES = new Set(['application/pdf', 'application/x-pdf']);
+// PDF firmati digitalmente in busta .p7m (CAdES, 06/11/2026): il browser li manda con tipi diversi
+// secondo il sistema (spesso octet-stream o vuoto). Il contenuto lo controlla poi il motore della firma.
+export const P7M_MIME_TYPES = new Set([
+  'application/pkcs7-mime',
+  'application/x-pkcs7-mime',
+  'application/pkcs7-signature',
+  'application/x-pkcs7-signature',
+  'application/octet-stream',
+  '',
+]);
+
+/** Filtro dei caricamenti (multer): PDF con tipo PDF, oppure busta firmata .p7m. */
+export function fileAmmesso(file: { originalname?: string; mimetype?: string }): boolean {
+  const ext = path
+    .extname(file.originalname || '')
+    .toLowerCase()
+    .slice(1);
+  const mime = String(file.mimetype || '').toLowerCase();
+  if (ext === 'p7m') return P7M_MIME_TYPES.has(mime);
+  return ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mime);
+}
 // Max file size PDF: 50MB per prevenire DoS (disk exhaustion)
 export const MAX_PDF_SIZE = 50 * 1024 * 1024;
 // Max elementi array per prevenire DoS (memory/parsing)

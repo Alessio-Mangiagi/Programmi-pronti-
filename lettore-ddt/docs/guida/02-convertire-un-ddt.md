@@ -110,4 +110,29 @@ predefinito)"**. Trascinandoci il PDF:
 
 Il PDF va comunque allegato anche in Claude: il browser non può passarglielo da solo.
 
+## DDT firmati digitalmente (.p7m)
+
+Alcuni fornitori mandano il DDT **firmato digitalmente**: il file si chiama per esempio
+`DDT 245.pdf.p7m` e Windows non lo apre come un PDF. Il Lettore DDT lo accetta come un PDF qualunque:
+trascinalo nel riquadro tratteggiato (o sceglilo con un pulsante del tipo di documento).
+
+1. Il Lettore DDT apre la "busta" firmata, tira fuori il PDF e **verifica la firma** con gli elenchi ufficiali
+   degli enti certificatori: che il documento non sia stato modificato dopo la firma, che il certificato sia
+   di un ente riconosciuto, non revocato e valido.
+2. Compare il riquadro **Documenti firmati digitalmente (.p7m)** con il nome del file e l'esito:
+   - verde **Firma valida** — chi ha firmato, l'ente e la data;
+   - rosso **Firma NON valida** — per esempio *"Il documento è stato modificato dopo la firma"* o certificato
+     revocato o scaduto;
+   - giallo **Firma da verificare** — per esempio l'ente non è negli elenchi ufficiali o lo stato del
+     certificato non si è potuto controllare (rete assente).
+   Passando il mouse sul bollino si leggono tutti i firmatari e i motivi.
+3. Il **PDF estratto** si scarica da solo (e resta il collegamento **⬇ PDF da allegare a Claude**): è questo
+   che va allegato in Claude, perché Claude non apre i file `.p7m`.
+
+![DDT firmato digitalmente caricato](img/23-ddt-firmato.png)
+
+Una firma non valida o da verificare **non blocca** la conversione: si converte lo stesso, ma va segnalato a
+chi ha mandato il DDT. L'esito della firma resta nell'estrazione archiviata e nel registro del pannello Admin;
+in **SkyTower** va il file firmato originale (con il suo valore legale).
+
 [← Accesso](01-accesso.md) · [Avanti: paniere e altri caricamenti →](03-paniere-e-altri-caricamenti.md)

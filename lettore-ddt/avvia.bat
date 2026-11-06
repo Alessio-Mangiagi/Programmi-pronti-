@@ -22,6 +22,11 @@ if not exist "dist\server.js" (
     goto fine
 )
 
+rem Motore della firma digitale per i DDT firmati .p7m (shared\firma): al primo avvio si installa in
+rem disparte (Python, librerie, elenchi ufficiali degli enti certificatori: serve la rete). Non blocca
+rem l'avvio: finche' non e' pronto, un .p7m caricato da' il messaggio "componente non installato".
+if not exist "%~dp0..\shared\firma\.venv\Scripts\python.exe" if exist "%~dp0..\shared\firma\installa.bat" start "" /b cmd /c "%~dp0..\shared\firma\installa.bat" ^>nul 2^>^&1
+
 echo  Server in avvio. Il browser si apre da solo.
 echo  Chiudi il tab del browser per spegnere.
 echo.

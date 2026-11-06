@@ -4,6 +4,7 @@
 // file) o per versare le estrazioni nel paniere.
 import React from 'react';
 import { S } from '../../styles';
+import { FirmaBadge } from '../FirmaBadge';
 import { api, FILE_ICON, FsDirHandle, Job, JOB_ATTIVO, Notify, STATUS_BADGE } from './tipi';
 
 export function JobDetail({
@@ -231,6 +232,8 @@ export function JobDetail({
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {f.pdfName}
             </span>
+            {/* DDT firmato digitalmente: esito della firma, dettaglio dei firmatari nel tooltip */}
+            {f.firma && <FirmaBadge firma={f.firma} compatto />}
             {f.reason && (
               <span
                 style={{ color: f.status === 'fallito' ? '#c0392b' : '#8a8d92', maxWidth: '45%', textAlign: 'right' }}

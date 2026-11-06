@@ -44,6 +44,12 @@ export interface EngineOptions {
    * cartella di destinazione per rielaborarli tutti — e ripagarli.
    */
   spostaElaborati?: boolean;
+  /**
+   * Dove stanno i file originali da spostare in _elaborati, se diversa da inputDir. Serve quando nel
+   * lotto ci sono DDT firmati (.p7m): il motore legge i PDF estratti da una cartella del job
+   * (inputDir = …/sbustati, vedi jobs.preparaFirmati) ma in _elaborati vanno le buste originali.
+   */
+  elaboratiDir?: string;
 }
 
 /** Opzioni dell'estrazione locale (PaddleOCR): niente API, niente costi. */
@@ -55,6 +61,8 @@ export interface LocalFirOptions {
   onlyFiles?: string[];
   mergeOutput?: boolean;
   spostaElaborati?: boolean;
+  /** Vedi EngineOptions.elaboratiDir (DDT firmati .p7m). */
+  elaboratiDir?: string;
 }
 
 export type FileStatus = 'ok' | 'failed' | 'skipped';

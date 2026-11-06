@@ -16,6 +16,7 @@ import logger from '../utils/logger';
 import { findUserByUsername } from '../models/users';
 import { estraiConsegne } from './consegne';
 import { extractDdtNumbers } from './ddtArchive';
+import { eBustaFirmata } from './firmaDigitale';
 
 interface SuiteLink {
   chiama(app: string, metodo: string, percorso: string, opzioni?: Record<string, unknown>): Promise<any>;
@@ -34,8 +35,14 @@ export interface InvioDdt {
   utente: string;
   /** Email dell'utente nel portale (req.cosedil.email): SkyTower riconosce l'utente da questa. */
   email?: string;
-  /** PDF originale; se manca o non esiste non si manda niente. */
+  /** PDF originale; se manca o non esiste non si manda niente. Può essere una busta firmata .p7m. */
   pdfPath?: string;
+  /**
+   * Solo per i DDT firmati (.p7m): il PDF estratto dalla busta. Si manda la busta originale (è lei
+   * ad avere valore legale); se SkyTower la rifiuta (4xx: formato non ammesso dal naming del
+   * progetto o versione senza supporto .p7m) si ripiega su questo PDF.
+   */
+  pdfEstrattoPath?: string;
   /** JSON estratto (summary, sheets). */
   parsed: unknown;
   /** Nome dell'export (per titolo e log). */
@@ -105,19 +112,45 @@ export async function inviaDdtASkyTower(o: InvioDdt): Promise<boolean> {
     return false;
   }
   const d = descriviDdt(o.parsed, o.commessaId, o.exportName);
-  try {
-    const r = await suite.chiama('skytower', 'POST', `/suite/commesse/${encodeURIComponent(codice)}/documenti`, {
+  const firmato = eBustaFirmata(pdf, o.pdfPath);
+  const invia = (dati: Buffer, tipo: string, nome: string) =>
+    suite.chiama('skytower', 'POST', `/suite/commesse/${encodeURIComponent(codice)}/documenti`, {
       parametri: { title: d.titolo, description: d.descrizione, tipo: tipoDocumento(), attributes: JSON.stringify(d.attributes) },
-      corpoFile: { dati: pdf, tipo: 'application/pdf', nome: path.basename(o.pdfPath) },
+      corpoFile: { dati, tipo, nome },
       utente: o.utente,
       email: o.email,
       timeout: 60000,
     });
-    logger.info(`SkyTower: ${o.exportName} archiviato nella commessa ${codice} come ${(r && r.identifier) || 'documento'}`);
+  try {
+    const r = await invia(pdf, firmato ? 'application/pkcs7-mime' : 'application/pdf', nomeInviato(o.pdfPath, firmato));
+    logger.info(`SkyTower: ${o.exportName} archiviato nella commessa ${codice} come ${(r && r.identifier) || 'documento'}${firmato ? ' (busta firmata .p7m)' : ''}`);
     return true;
   } catch (e) {
     const err = e as { stato?: number; messaggio?: string; message?: string };
+    // busta .p7m rifiutata (es. SkyTower senza supporto .p7m o naming che non ammette l'estensione):
+    // meglio il PDF estratto che niente; errori di rete o 5xx non si ritentano
+    const rifiuto = typeof err.stato === 'number' && err.stato >= 400 && err.stato < 500;
+    if (firmato && rifiuto && o.pdfEstrattoPath && fs.existsSync(o.pdfEstrattoPath)) {
+      try {
+        const nome = nomeInviato(o.pdfPath, true).replace(/\.p7m$/i, '');
+        const r = await invia(fs.readFileSync(o.pdfEstrattoPath), 'application/pdf', nome.toLowerCase().endsWith('.pdf') ? nome : `${nome}.pdf`);
+        logger.info(`SkyTower: ${o.exportName} archiviato nella commessa ${codice} come ${(r && r.identifier) || 'documento'} (PDF estratto: busta .p7m rifiutata, ${err.stato})`);
+        return true;
+      } catch (e2) {
+        const err2 = e2 as { stato?: number; messaggio?: string; message?: string };
+        logger.warn(`SkyTower: ${o.exportName} non archiviato nemmeno come PDF estratto (${err2.stato || '?'}): ${err2.messaggio || err2.message}`);
+        return false;
+      }
+    }
     logger.warn(`SkyTower: ${o.exportName} non archiviato (${err.stato || '?'}): ${err.messaggio || err.message}`);
     return false;
   }
+}
+
+/** Nome del file mandato a SkyTower: una busta firmata finisce sempre in ".pdf.p7m". */
+function nomeInviato(pdfPath: string, firmato: boolean): string {
+  const base = path.basename(pdfPath);
+  if (!firmato) return base;
+  const senza = base.replace(/(\.p7m)+$/i, '');
+  return `${senza.toLowerCase().endsWith('.pdf') ? senza : `${senza}.pdf`}.p7m`;
 }

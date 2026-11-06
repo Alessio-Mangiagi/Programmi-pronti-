@@ -48,3 +48,8 @@ fs.mkdirSync(process.env.DDT_LOG_DIR, { recursive: true });
 // Gli errori del logger diventano anche avvisi per gli admin del portale (shared/avvisi): nei test
 // non devono finire nella cartella avvisi-in del portale del repo.
 process.env.SUITE_AVVISI_DIR = tmp('avvisi');
+
+// Motore della firma digitale (DDT .p7m): nei test niente download di elenchi e stato di revoca, e la
+// cache degli elenchi ufficiali non è quella vera di shared/firma/cache.
+if (!process.env.DDT_FIRMA_RETE) process.env.DDT_FIRMA_RETE = '0';
+if (!process.env.FIRMA_CACHE_DIR) process.env.FIRMA_CACHE_DIR = tmp('firma-cache');

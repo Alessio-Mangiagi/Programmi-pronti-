@@ -98,8 +98,10 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success' };
-const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato' };
+const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success', ddt_firmato: 'badge-pwd' };
+const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato', ddt_firmato: 'DDT firmato (.p7m)' };
+// DDT firmato digitalmente: il colore segue l'esito della verifica della firma (dettaglio = riepilogo)
+const badgeFirma = { 'valida': 'badge-success', 'non valida': 'badge-failed', 'da verificare': 'badge-pwd' };
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -176,7 +178,7 @@ async function loadLogs() {
     const date = new Date(ev.timestamp).toLocaleString('it-IT');
     tr.innerHTML = `
       <td>${esc(date)}</td>
-      <td><span class="badge ${badgeClass[ev.type] || ''}">${labels[ev.type] || esc(ev.type)}</span></td>
+      <td><span class="badge ${(ev.esito && badgeFirma[ev.esito]) || badgeClass[ev.type] || ''}" title="${esc(ev.dettaglio || '')}">${labels[ev.type] || esc(ev.type)}</span>${ev.dettaglio ? `<div style="font-size:11px;color:#6b7280;margin-top:3px;max-width:420px">${esc(ev.dettaglio)}</div>` : ''}</td>
       <td>${esc(ev.username)}</td>
       <td>${esc(ev.commessaId || '-')}</td>
       <td>${esc(ev.ip)}</td>`;

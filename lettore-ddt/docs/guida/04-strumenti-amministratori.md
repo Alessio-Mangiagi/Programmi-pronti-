@@ -55,6 +55,14 @@ inseriscila dal pannello Admin (capitolo 5, *Chiave API*). Nel frattempo si lavo
 > Le cartelle **sorvegliate** (configurate dall'amministratore di sistema) convertono da sole i PDF che ci
 > finiscono dentro; quando ci sono, il loro stato compare in un riquadro in questa scheda.
 
+**DDT firmati digitalmente (.p7m)**: nella cartella possono esserci anche file `.pdf.p7m`. Prima della
+conversione il Lettore DDT apre ogni busta e verifica la firma; nell'elenco dei file del lavoro compare il
+bollino dell'esito (verde valida, rosso non valida, giallo da verificare, dettaglio passando il mouse) e il
+diario riporta una riga per ogni documento firmato. Una busta che non si apre (file rotto) fallisce da sola,
+gli altri file vanno avanti. Con **sposta i PDF convertiti in `_elaborati`** si sposta il file firmato
+originale. `DDT 12.pdf.p7m` e `DDT 12.pdf` nella stessa cartella darebbero lo stesso Excel: il lavoro si ferma
+con *Conflitto di nomi* e chiede di rinominarne uno.
+
 ## Archivio DDT
 
 Scheda **ARCHIVIO DDT**: tutte le conversioni salvate della tua commessa, dalla più recente.

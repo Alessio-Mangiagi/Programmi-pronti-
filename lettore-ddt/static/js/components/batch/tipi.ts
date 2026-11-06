@@ -58,6 +58,8 @@ export interface JobFile {
   status: 'in-attesa' | 'ok' | 'fallito' | 'saltato';
   reason?: string;
   outputName?: string;
+  /** DDT firmato digitalmente (.p7m): esito della verifica della firma (FirmaBadge). */
+  firma?: import('../FirmaBadge').FirmaDdt;
 }
 
 export interface Job {

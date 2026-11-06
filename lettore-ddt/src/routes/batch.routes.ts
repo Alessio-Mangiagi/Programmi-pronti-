@@ -45,7 +45,7 @@ import {
   spoolDirs,
 } from '../batch/jobs';
 import { createZip } from '../batch/zip';
-import { ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES, param } from './helpers';
+import { fileAmmesso, param } from './helpers';
 
 const router = express.Router();
 
@@ -57,12 +57,16 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_PDF_BYTES, files: MAX_UPLOAD_FILES },
   fileFilter: (req, file, cb) => {
-    const ext = path
-      .extname(file.originalname || '')
-      .toLowerCase()
-      .slice(1);
-    if (!ALLOWED_EXTENSIONS.has(ext) || !ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      return cb(Object.assign(new Error('Solo file PDF sono consentiti'), { statusCode: 400 }));
+    // PDF, oppure DDT firmati digitalmente (.p7m): le buste le apre il job prima del motore
+    if (!fileAmmesso(file)) {
+      return cb(
+        Object.assign(
+          new Error('Solo file PDF (anche firmati digitalmente .p7m) sono consentiti'),
+          {
+            statusCode: 400,
+          }
+        )
+      );
     }
     cb(null, true);
   },
@@ -169,7 +173,8 @@ router.get(
       // Symlink: non li seguiamo, sarebbero un modo per uscire da allowedRoots.
       if (e.isDirectory() && !e.isSymbolicLink()) {
         dirs.push({ name: e.name, path: path.join(target, e.name) });
-      } else if (e.isFile() && e.name.toLowerCase().endsWith('.pdf')) {
+      } else if (e.isFile() && /\.(pdf|p7m)$/i.test(e.name)) {
+        // anche i DDT firmati digitalmente (.p7m), come listPdfFiles
         pdfCount++;
       }
     }

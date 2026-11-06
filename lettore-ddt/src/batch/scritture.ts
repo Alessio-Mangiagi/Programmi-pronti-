@@ -18,6 +18,9 @@ export function safeOutputBase(pdfName: string): string {
     .basename(pdfName)
     // eslint-disable-next-line no-control-regex
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    // "DDT 12.pdf.p7m" (firmato digitalmente) dà lo stesso Excel di "DDT 12.pdf": se nella cartella ci
+    // sono tutti e due, planFiles lo segnala come conflitto di nomi invece di sovrascrivere
+    .replace(/(\.p7m)+$/i, '')
     .replace(/\.pdf$/i, '')
     .trim();
   if (base) return base;
@@ -25,10 +28,12 @@ export function safeOutputBase(pdfName: string): string {
   return `documento_${hash}`;
 }
 
+// PDF e DDT firmati digitalmente in busta .p7m (06/11/2026): le buste le apre jobs.preparaFirmati
+// prima del motore, che lavora sempre su PDF.
 export function listPdfFiles(dir: string): string[] {
   return fs
     .readdirSync(dir)
-    .filter((f) => f.toLowerCase().endsWith('.pdf'))
+    .filter((f) => /\.(pdf|p7m)$/i.test(f))
     .sort();
 }
 
@@ -111,8 +116,10 @@ export function spostaPdfElaborati(
     // con un suffisso invece di sovrascrivere l'originale di prima.
     let a = path.join(dest, name);
     if (fs.existsSync(a)) {
-      const base = name.replace(/\.pdf$/i, '');
-      a = path.join(dest, `${base}_${Date.now().toString(36)}.pdf`);
+      // l'estensione resta quella vera: ".pdf" oppure ".pdf.p7m" per le buste firmate
+      const est = (name.match(/(\.pdf)?(\.p7m)*$/i) || [''])[0] || '.pdf';
+      const base = name.slice(0, name.length - est.length);
+      a = path.join(dest, `${base}_${Date.now().toString(36)}${est}`);
     }
     try {
       fs.renameSync(da, a);

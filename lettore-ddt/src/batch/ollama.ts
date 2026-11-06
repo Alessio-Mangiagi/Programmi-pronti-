@@ -68,6 +68,8 @@ export interface OllamaOptions extends OllamaParams {
   onlyFiles?: string[];
   mergeOutput?: boolean;
   spostaElaborati?: boolean;
+  /** Originali da spostare in _elaborati se il motore legge altrove (DDT firmati .p7m, tipi.ts). */
+  elaboratiDir?: string;
 }
 
 // ── Rendering pagine (rendi_pagine.py) ───────────────────────────────────────
@@ -567,7 +569,7 @@ export async function runOllama(
       : undefined;
 
   const spostati = opts.spostaElaborati
-    ? spostaPdfElaborati(opts.inputDir, outcomes, events.onLog)
+    ? spostaPdfElaborati(opts.elaboratiDir ?? opts.inputDir, outcomes, events.onLog)
     : undefined;
 
   events.onLog?.("Estrazione locale: meno affidabile dell'API Claude — ricontrolla l'output.");
