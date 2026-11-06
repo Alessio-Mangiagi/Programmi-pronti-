@@ -59,7 +59,8 @@ subito la voce mancante:
   ha un indirizzo.
 - **Andamento della giacenza**: un grafico con una linea per ubicazione; scegli
   **30 gg**, **90 gg** o **1 anno**.
-- **Ultimi movimenti** dell'articolo.
+- **Ultimi movimenti** dell'articolo, con la quantità e la sua unità di misura (la colonna
+  Articolo qui non c'è: è sempre quello della scheda).
 
 ## La scheda di un mezzo
 

@@ -38,7 +38,8 @@ due programmi sono spenti, vedi sotto):
 - **Apri** porta al progetto in SkyTower.
 
 Se uno dei due programmi è spento o non raggiungibile il riquadro lo dice (per esempio
-"InCampo non raggiungibile … è spenta? Aprila dal portale.") e il resto funziona.
+"InCampo non risponde: probabilmente è spenta. Aprila dal portale e riprova.") e il resto
+funziona.
 Aprilo dal Portale e ricarica la scheda.
 
 ## InCampo legge il Magazzino

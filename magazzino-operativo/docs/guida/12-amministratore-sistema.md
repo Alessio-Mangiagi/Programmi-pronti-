@@ -31,12 +31,25 @@ del Portale).
 
 ## Backup
 
-Il Magazzino **non fa backup da solo**. Mettete nel backup aziendale almeno
-`magazzino.db` e la cartella `foto/`. Per una copia coerente del database fatela a
-programma fermo (oppure con lo strumento di backup di SQLite). Il registro attività è
-nel database: copiando il database si salva anche quello.
+Dal 06/11/2026 il Magazzino **copia da solo il suo database** una volta al giorno nella
+cartella `backup/` accanto a `magazzino.db` e tiene le ultime 14 copie
+(`magazzino-AAAAMMGG-HHMMSS.db`). La copia è coerente anche con il programma acceso.
+Si può cambiare con tre variabili d'ambiente:
+
+| Variabile | Di solito | A cosa serve |
+|---|---|---|
+| `MAGAZZINO_BACKUP_DIR` | `backup/` accanto al database | dove mettere le copie: meglio un altro disco o il NAS |
+| `MAGAZZINO_BACKUP_ORE` | `24` | ogni quante ore fare una copia (`0` = spento) |
+| `MAGAZZINO_BACKUP_TENERE` | `14` | quante copie tenere |
+
+L'ultima copia e il pulsante **Fai un backup adesso** sono in
+[Amministrazione](10-amministrazione.md#backup-del-database). Il registro attività è nel
+database: copiando il database si salva anche quello. La cartella `foto/` invece non è nel
+database: mettetela nel backup aziendale insieme alla cartella delle copie.
 
 ## Ripristino
 
-Fermate il Magazzino, rimettete `magazzino.db` e `foto/` al loro posto e riavviate.
+Fermate il Magazzino, rimettete al posto di `magazzino.db` la copia scelta dalla cartella
+`backup/` (rinominandola `magazzino.db`; togliete `magazzino.db-wal` e `magazzino.db-shm` se
+ci sono), rimettete `foto/` e riavviate.
 I DDT e le pratiche mezzi già letti non vengono duplicati alla rilettura.

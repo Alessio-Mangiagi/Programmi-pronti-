@@ -7,3 +7,5 @@ __pycache__/
 *.db-shm
 foto/
 .pytest_cache/
+backup/
+*.parziale

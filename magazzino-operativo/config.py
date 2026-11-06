@@ -19,6 +19,13 @@ PORT = int(os.environ.get("PORT", "5200"))
 # Database SQLite (creato a runtime, in .gitignore)
 DB_PATH = os.environ.get("MAGAZZINO_DB", os.path.join(BASE_DIR, "magazzino.db"))
 
+# Backup automatico del database (backup.py): cartella delle copie (default backup/ accanto al database,
+# in .gitignore), ogni quante ore farne una (0 = spento) e quante tenerne (le più vecchie si cancellano).
+# Per stare al sicuro da un disco rotto conviene puntare MAGAZZINO_BACKUP_DIR su un altro disco o sul NAS.
+BACKUP_DIR = os.environ.get("MAGAZZINO_BACKUP_DIR", os.path.join(os.path.dirname(os.path.abspath(DB_PATH)), "backup"))
+BACKUP_ORE = float(os.environ.get("MAGAZZINO_BACKUP_ORE", "24"))
+BACKUP_TENERE = max(1, int(os.environ.get("MAGAZZINO_BACKUP_TENERE", "14")))
+
 # Sorgente dei DDT: la cartella dati del Lettore DDT, con una sottocartella per
 # commessa e dentro consegne.json (il registro delle consegne già normalizzato).
 DDT_DATA_DIR = os.environ.get("MAGAZZINO_DDT_DIR", os.path.join(SUITE_DIR, "lettore-ddt", "data"))

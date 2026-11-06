@@ -210,6 +210,25 @@ articolo (una linea per ubicazione) e nei tooltip. Tutto è SVG disegnato dal se
 dei dati (`statistiche.py`) e dal browser (`static/js/grafici.js`), senza librerie
 esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 
+### Backup del database
+
+`backup.py` copia `magazzino.db` con l'API di backup di SQLite (copia coerente anche mentre l'app
+scrive) in `MAGAZZINO_BACKUP_DIR` come `magazzino-AAAAMMGG-HHMMSS.db`: all'avvio se l'ultima copia è più
+vecchia dell'intervallo, poi ogni `MAGAZZINO_BACKUP_ORE` ore; tiene le ultime `MAGAZZINO_BACKUP_TENERE`.
+Una copia non riuscita non lascia file a metà e non cancella le vecchie. Da **Amministrazione** →
+*Backup del database* l'admin vede l'ultima copia e può farne una subito (`GET/POST /api/admin/backup`,
+registrata nel registro attività come *Backup del database*). Le foto (`foto/`) non sono nel database:
+vanno nel backup aziendale insieme alla cartella delle copie.
+
+**Ripristino**: fermare il Magazzino, sostituire `magazzino.db` con la copia scelta (togliere anche
+`magazzino.db-wal` e `magazzino.db-shm` se ci sono), riavviare.
+
+### Messaggi d'errore
+
+Gli errori che l'utente vede sono frasi che dicono cosa fare (`messaggi.py`): file non leggibili nelle
+importazioni, app della suite spenta, foto non valide, valori duplicati. Il testo tecnico originale
+(`[WinError …]`, vincoli SQLite, eccezioni di Pillow o JSON) resta solo nel log del Magazzino.
+
 ## Variabili d'ambiente
 
 | Variabile | Default | Effetto |
@@ -221,6 +240,9 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `MAGAZZINO_IMPORT_SEC` | `120` | intervallo importazione automatica (0 = spenta) |
 | `MAGAZZINO_FOTO_DIR` | `foto/` | cartella delle foto dei mezzi |
 | `MAGAZZINO_ADMIN` | vuoto | username admin oltre agli admin del portale |
+| `MAGAZZINO_BACKUP_DIR` | `backup/` accanto al database | cartella delle copie del database (meglio un altro disco o il NAS) |
+| `MAGAZZINO_BACKUP_ORE` | `24` | ogni quante ore fare una copia (0 = backup automatico spento) |
+| `MAGAZZINO_BACKUP_TENERE` | `14` | quante copie tenere: le più vecchie si cancellano dopo ogni copia riuscita |
 | `COSEDIL_SSO`, `COSEDIL_PORTAL`, `COSEDIL_SSO_FAIL` | vedi `shared/sso` | gate SSO |
 
 ## API principali
@@ -243,6 +265,7 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `POST /api/presenza` | battito della pagina `{vista}` |
 | `GET /api/admin/riepilogo?giorni=` | per utente: movimenti per tipo, scansioni, importazioni, anagrafiche; mezzi in uso; collegati |
 | `GET /api/admin/attivita?giorni=&utente=&azione=&oggetto=&q=` | registro attività filtrabile |
+| `GET/POST /api/admin/backup` | stato delle copie del database / una copia subito (admin) |
 | `GET /etichette?tipo=articoli&ids=1,2` | foglio etichette da stampare |
 | `GET /api/codici/<codice>.svg?formato=code128\|qr` | il solo codice a barre |
 
@@ -258,6 +281,8 @@ esterne; ogni grafico ha legenda, tooltip e una vista tabella.
 | `statistiche.py` | dati per i grafici e stato delle importazioni |
 | `foto.py` | foto dei mezzi: raddrizzamento, riduzione, miniature |
 | `suite_rotte.py` | dialogo con InCampo e SkyTower (rotte `/api/suite`, `/api/incampo`, `/api/skytower`) |
+| `backup.py` | copie coerenti di `magazzino.db` con rotazione (thread di sfondo e pulsante admin) |
+| `messaggi.py` | testi d'errore per l'utente al posto di quelli tecnici (che restano nel log) |
 | `pdf_semplice.py` | PDF di tabelle senza dipendenze (report giacenze per SkyTower) |
 | `static/js/targa.js` | lettura della targa da foto (Tesseract.js + formati targhe italiane) |
 | `static/js/grafici.js` | grafici SVG (colonne impilate, linee, barre, flusso, sparkline) |

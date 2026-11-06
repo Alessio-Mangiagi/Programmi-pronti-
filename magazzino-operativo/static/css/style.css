@@ -178,6 +178,17 @@ tbody tr:hover { background: var(--cosedil-blue-ghost); }
 tr.riga-link { cursor: pointer; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td .mono, td.mono { white-space: nowrap; }
+/* Colonna delle azioni (Sposta, Modifica, Mappa, Elimina) nelle tabelle larghe: i pulsanti stanno uno sotto
+   l'altro invece di allargare la tabella, e la colonna resta incollata al bordo destro anche quando la tabella
+   scorre in orizzontale. Prima su uno schermo da portatile "Elimina" restava tagliato fuori (guida 04/11). */
+th.azioni, td.azioni { position: sticky; right: 0; width: 8.5rem; min-width: 8.5rem; white-space: normal; }
+td.azioni { background: var(--cosedil-surface); box-shadow: -8px 0 8px -8px rgba(12, 69, 119, 0.25); z-index: 1; }
+th.azioni { z-index: 2; }
+tbody tr:nth-child(even) td.azioni { background: #fafbfc; }
+tbody tr:hover td.azioni { background: var(--cosedil-blue-ghost); }
+td.azioni .btn { display: flex; width: 100%; justify-content: center; }
+td.azioni .btn + .btn, td.azioni .btn + span, td.azioni span + .btn { margin-top: 0.35rem; }
+td.azioni > span.muto { display: block; font-size: 0.78rem; }
 .tabella-mini td { padding: 0.45rem 0.5rem; font-size: 0.85rem; }
 .tabella-mini tbody tr:nth-child(even) { background: transparent; }
 
@@ -508,6 +519,9 @@ td .mono, td.mono { white-space: nowrap; }
   table.schede-mobile td.cella-azioni::before, table.schede-mobile td[data-l=""]::before { display: none; }
   table.schede-mobile td:empty { display: none; }
   table.schede-mobile td.cella-azioni .btn { flex: 1; justify-content: center; }
+  /* sul telefono la colonna Azioni torna la riga di pulsanti della scheda: niente colonna incollata a destra */
+  table.schede-mobile tbody tr td.azioni { position: static; width: auto; min-width: 0; box-shadow: none; background: transparent; }
+  table.schede-mobile td.azioni .btn { width: auto; margin-top: 0; }
   .tabella-wrap:has(> table.schede-mobile) { overflow: visible; margin: 0; padding: 0; }
   .tasti-grandi { gap: 0.6rem; }
 }

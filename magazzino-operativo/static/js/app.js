@@ -200,14 +200,18 @@
         ${tabellaMovimenti(d.ultimi_movimenti)}</div>`;
   };
 
-  function tabellaMovimenti(lista, conAzioni) {
+  // Tabella dei movimenti (Riepilogo, Movimenti, scheda articolo). opz.senzaArticolo: nella scheda di un articolo
+  // la colonna Articolo ripeterebbe sempre lo stesso nome e si toglie; la quantità porta sempre l'unità di misura
+  // (l'API la manda anche nella scheda articolo dal 06/11: prima colonna vuota e "12" senza "pz", guida 04/11).
+  function tabellaMovimenti(lista, conAzioni, opz = {}) {
     if (!lista.length) return vuoto('Nessun movimento');
-    return `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Articolo</th><th class="num">Quantità</th><th>Da</th><th>A</th><th>Riferimento</th><th>Origine</th>${conAzioni && me.admin ? '<th></th>' : ''}</tr></thead><tbody>
+    const conArticolo = !opz.senzaArticolo;
+    return `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th>${conArticolo ? '<th>Articolo</th>' : ''}<th class="num">Quantità</th><th>Da</th><th>A</th><th>Riferimento</th><th>Origine</th>${conAzioni && me.admin ? '<th class="azioni"></th>' : ''}</tr></thead><tbody>
       ${lista.map((m) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(m.data || m.ts)}</td><td>${badgeTipoMov(m.tipo)}</td>
-        <td><a href="#scansione/${h(m.codice)}">${h(m.descrizione)}</a> <span class="muto mono">${h(m.codice)}</span></td>
-        <td class="num">${fmtN(m.quantita)} ${h(m.um)}</td><td>${h(m.da_nome || (m.tipo === 'carico' ? m.fornitore || '' : ''))}</td><td>${h(m.a_nome || '')}</td>
+        ${conArticolo ? `<td><a href="#scansione/${h(m.codice)}">${h(m.descrizione)}</a> <span class="muto mono">${h(m.codice)}</span></td>` : ''}
+        <td class="num" style="white-space:nowrap">${fmtN(m.quantita)} ${h(m.um || '')}</td><td>${h(m.da_nome || (m.tipo === 'carico' ? m.fornitore || '' : ''))}</td><td>${h(m.a_nome || '')}</td>
         <td class="muto">${h(m.riferimento || '')}${m.note ? ` <span title="${h(m.note)}">·</span>` : ''}</td><td>${badgeOrigine(m.origine)}</td>
-        ${conAzioni && me.admin ? `<td><button class="btn btn-rosso btn-piccolo" data-del-mov="${m.id}">Elimina</button></td>` : ''}</tr>`).join('')}
+        ${conAzioni && me.admin ? `<td class="azioni"><button class="btn btn-rosso btn-piccolo" data-del-mov="${m.id}">Elimina</button></td>` : ''}</tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -328,7 +332,7 @@
             </tbody></table>` : '<p class="muto">Nessuna giacenza: registra un carico.</p>'}</div>
         </div>
         <div id="andamento" style="margin-top:1.25rem"><div class="card-testa"><h4>Andamento della giacenza</h4><div class="segmenti">${[[30, '30 gg'], [90, '90 gg'], [365, '1 anno']].map(([g, t]) => `<button type="button" data-gg="${g}">${t}</button>`).join('')}</div></div><div class="grafico" id="g-andamento"></div><div class="tabella-grafico" id="t-andamento"></div></div>
-        <h4 style="margin-top:1.25rem">Ultimi movimenti</h4>${tabellaMovimenti(d.movimenti)}</div>`;
+        <h4 style="margin-top:1.25rem">Ultimi movimenti</h4>${tabellaMovimenti(d.movimenti, false, { senzaArticolo: true })}</div>`;
     }
 
     function cardMezzo(d) {
@@ -534,10 +538,10 @@
       <div class="card" id="tab"></div>`;
     const carica = async () => {
       const l = await api(`/api/articoli?q=${encodeURIComponent($('#q').value)}&tutti=${$('#tutti').checked ? 1 : 0}`);
-      $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Descrizione</th><th>UM</th><th>Categoria</th><th>Fornitore</th><th class="num">Giacenza</th><th></th></tr></thead><tbody>
+      $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Descrizione</th><th>UM</th><th>Categoria</th><th>Fornitore</th><th class="num">Giacenza</th><th class="azioni"></th></tr></thead><tbody>
         ${l.map((a) => `<tr ${a.attivo ? '' : 'style="opacity:.55"'}><td class="mono"><a href="#scansione/${h(a.codice)}">${h(a.codice)}</a>${a.codice_esterno ? `<br><span class="muto">${h(a.codice_esterno)}</span>` : ''}</td><td>${h(a.descrizione)}</td><td>${h(a.um)}</td><td>${h(a.categoria || '')}</td><td>${h(a.fornitore || '')}</td>
           <td class="num" ${a.scorta_minima != null && a.totale < a.scorta_minima ? 'style="color:var(--rosso)"' : ''}>${fmtN(a.totale)}</td>
-          <td style="white-space:nowrap"><button class="btn btn-sec btn-piccolo" data-mod="${a.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${a.id}">Elimina</button>` : ''}</td></tr>`).join('')}
+          <td class="azioni"><button class="btn btn-sec btn-piccolo" data-mod="${a.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${a.id}">Elimina</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : vuoto('Nessun articolo. Importa i DDT o creane uno.');
       $('#tab').querySelectorAll('[data-mod]').forEach((b) => { b.onclick = () => formArticolo(l.find((x) => x.id == b.dataset.mod), carica); });
       $('#tab').querySelectorAll('[data-del]').forEach((b) => {
@@ -584,11 +588,11 @@
       <div class="card" id="tab"></div>`;
     const carica = async () => {
       const l = await api(`/api/mezzi?q=${encodeURIComponent($('#q').value)}&stato=${$('#stato').value}&proprieta=${$('#prop').value}`);
-      $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Nolo fino al</th><th></th></tr></thead><tbody>
+      $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Nolo fino al</th><th class="azioni"></th></tr></thead><tbody>
         ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td><div style="display:flex;align-items:center;gap:.6rem">${m.foto_id ? `<img class="foto-mini" src="/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="" loading="lazy">` : `<a class="foto-mini foto-vuota" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Nessuna foto: cerca su internet">${ICONE_FOTO}</a>`}<span>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}${m.n_foto ? `<br><span class="muto">${m.n_foto} foto</span>` : ''}</span></div></td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
           <td>${m.proprieta === 'nolo' ? `<span class="badge badge-ambra">Nolo</span><br><span class="muto">${h(m.ditta || '')}</span>` : '<span class="badge badge-verde">Proprio</span>'}</td><td>${h(m.ubicazione || '—')}</td><td>${badgeStato(m.stato)}${m.assegnato_a ? `<br><span class="muto">${h(m.assegnato_a)}</span>` : ''}</td>
           <td class="muto">${m.nolo_al ? fmtData(m.nolo_al) : ''}</td>
-          <td style="white-space:nowrap"><button class="btn btn-piccolo" data-sposta="${m.id}">Sposta</button> <button class="btn btn-sec btn-piccolo" data-mod="${m.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${m.id}">Elimina</button>` : ''}</td></tr>`).join('')}
+          <td class="azioni"><button class="btn btn-piccolo" data-sposta="${m.id}">Sposta</button> <button class="btn btn-sec btn-piccolo" data-mod="${m.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${m.id}">Elimina</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : vuoto('Nessun mezzo. Importa le pratiche di nolo o registrane uno.');
       $('#tab').querySelectorAll('[data-mod]').forEach((b) => { b.onclick = () => formMezzo(l.find((x) => x.id == b.dataset.mod), carica); });
       $('#tab').querySelectorAll('[data-sposta]').forEach((b) => { b.onclick = () => formSpostaMezzo(l.find((x) => x.id == b.dataset.sposta), carica); });
@@ -656,9 +660,9 @@
     const carica = async () => {
       const l = await api('/api/ubicazioni?tutte=1');
       ubicazioniCache = l.filter((u) => u.attivo);
-      $('#tab').innerHTML = `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Nome</th><th>Tipo</th><th>Commessa</th><th class="num">Articoli</th><th class="num">Mezzi</th><th></th></tr></thead><tbody>
+      $('#tab').innerHTML = `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Nome</th><th>Tipo</th><th>Commessa</th><th class="num">Articoli</th><th class="num">Mezzi</th><th class="azioni"></th></tr></thead><tbody>
         ${l.map((u) => `<tr ${u.attivo ? '' : 'style="opacity:.55"'}><td class="mono"><a href="#scansione/${h(u.codice)}">${h(u.codice)}</a></td><td>${h(u.nome)}${u.indirizzo ? `<br><span class="muto">${h(u.indirizzo)}</span>` : ''}</td><td><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></td><td class="muto">${h(u.commessa || '')}</td><td class="num">${u.articoli}</td><td class="num">${u.mezzi}</td>
-          <td style="white-space:nowrap">${btnMappa(u)} <button class="btn btn-sec btn-piccolo" data-mod="${u.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${u.id}">Elimina</button>` : ''}</td></tr>`).join('')}
+          <td class="azioni">${btnMappa(u)} <button class="btn btn-sec btn-piccolo" data-mod="${u.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${u.id}">Elimina</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>`;
       $('#tab').querySelectorAll('[data-mod]').forEach((b) => { b.onclick = () => formUbicazione(l.find((x) => x.id == b.dataset.mod), carica); });
       $('#tab').querySelectorAll('[data-del]').forEach((b) => {
@@ -855,7 +859,7 @@
   // ------------------------------------------------------------------ amministrazione (chi ha fatto cosa, chi usa cosa)
   const AZIONI = { scansione: ['', 'Scansione'], movimento: ['verde', 'Movimento'], crea: ['blu', 'Creazione'], modifica: ['blu', 'Modifica'],
     elimina: ['rosso', 'Eliminazione'], elimina_movimento: ['rosso', 'Movimento eliminato'], disattiva: ['ambra', 'Disattivazione'],
-    sposta: ['blu', 'Spostamento mezzo'], importazione: ['ambra', 'Importazione'] };
+    sposta: ['blu', 'Spostamento mezzo'], importazione: ['ambra', 'Importazione'], backup: ['verde', 'Backup del database'] };
   const badgeAzione = (a) => { const [c, t] = AZIONI[a] || ['', a]; return `<span class="badge ${c ? 'badge-' + c : ''}">${h(t)}</span>`; };
   let timerAdmin = null;
   viste.amministrazione = async (cont) => {
@@ -881,7 +885,11 @@
           <select id="adm-azione"><option value="">Tutte le azioni</option>${Object.entries(AZIONI).map(([k, v]) => `<option value="${k}">${v[1]}</option>`).join('')}</select>
           <select id="adm-oggetto"><option value="">Tutti gli oggetti</option><option value="articolo">Articoli</option><option value="mezzo">Mezzi</option><option value="ubicazione">Ubicazioni</option><option value="ddt">Import DDT</option><option value="mezzi">Import mezzi</option><option value="upload">Upload</option></select>
           <input id="adm-q" placeholder="Cerca nel dettaglio, utente, IP..."></div>
-        <div id="adm-registro"></div></div>`;
+        <div id="adm-registro"></div></div>
+      <div style="height:1.25rem"></div>
+      <div class="card"><div class="card-testa"><div><h3>Backup del database</h3><p class="muto" style="margin:0">Copie automatiche di giacenze, movimenti e anagrafiche; le più vecchie si cancellano da sole.</p></div>
+        <div class="azioni"><button class="btn btn-sec btn-piccolo" id="adm-backup-ora">Fai un backup adesso</button></div></div>
+        <div id="adm-backup"></div></div>`;
     let registro = [];
     const caricaRiepilogo = async () => {
       const d = await api(`/api/admin/riepilogo?giorni=${stato.giorni}`);
@@ -912,7 +920,19 @@
       const csv = ['Quando;Utente;IP;Azione;Oggetto;Codice;Dettaglio', ...registro.map((a) => [a.ts, a.utente, a.ip, a.azione, a.oggetto_nome || a.oggetto || '', a.oggetto_codice || '', a.descrizione || ''].map((x) => `"${String(x == null ? '' : x).replace(/"/g, '""')}"`).join(';'))].join('\r\n');
       const el = document.createElement('a'); el.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); el.download = 'registro-attivita.csv'; el.click();
     };
-    await Promise.all([caricaRiepilogo(), caricaRegistro()]);
+    // backup (backup.py, GET/POST /api/admin/backup): ultima copia, cartella, intervallo
+    const caricaBackup = async () => {
+      const b = await api('/api/admin/backup');
+      $('#adm-backup').innerHTML = `<p>${b.ultima ? `Ultima copia: <strong>${fmtData(b.ultima.quando)}</strong> · ${b.totale_copie === 1 ? '1 copia tenuta' : b.totale_copie + ' copie tenute'} (al massimo ${b.tenere})` : '<strong>Nessuna copia ancora.</strong>'}</p>
+        <p class="muto">${b.attivo ? `Una copia ogni ${b.ogni_ore} ore` : 'Backup automatico spento (MAGAZZINO_BACKUP_ORE=0)'} · cartella <span class="mono">${h(b.cartella)}</span></p>
+        ${b.ultimo_errore ? `<div class="avviso avviso-errore">L'ultimo backup non è riuscito (${fmtData(b.ultimo_errore.quando)}): controlla che la cartella sia scrivibile e che il disco non sia pieno.</div>` : ''}`;
+    };
+    $('#adm-backup-ora').onclick = async (ev) => {
+      const b = ev.currentTarget; b.disabled = true; b.textContent = 'Backup in corso…';
+      try { const r = await api('/api/admin/backup', { method: 'POST' }); toast(`Backup fatto: ${r.copia.nome}`, 'ok'); await caricaBackup(); } catch (e) { toast(e.message, 'errore'); }
+      b.disabled = false; b.textContent = 'Fai un backup adesso';
+    };
+    await Promise.all([caricaRiepilogo(), caricaRegistro(), caricaBackup()]);
     timerAdmin = setInterval(() => { if (location.hash.startsWith('#amministrazione')) caricaRiepilogo(); else clearInterval(timerAdmin); }, 15000);
   };
 
@@ -1092,7 +1112,7 @@
       t.querySelectorAll('tbody tr').forEach((tr) => {
         [...tr.children].forEach((td, i) => {
           td.dataset.l = th[i] || '';
-          if (!th[i] && td.children.length && [...td.children].every((c) => c.classList.contains('btn'))) td.classList.add('cella-azioni');
+          if (td.classList.contains('azioni') || (!th[i] && td.children.length && [...td.children].every((c) => c.classList.contains('btn')))) td.classList.add('cella-azioni');
         });
       });
     });

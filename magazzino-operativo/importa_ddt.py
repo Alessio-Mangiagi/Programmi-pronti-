@@ -28,6 +28,7 @@ import re
 from datetime import datetime
 
 import config
+import messaggi
 from codici import normalizza, prossimo_codice
 
 log = logging.getLogger("magazzino.ddt")
@@ -45,8 +46,8 @@ COL_QUANTITA = (("m³", "m³"), ("Quantità Mc", "m³"), ("Quantità", None), ("
 VALORI_VUOTI = re.compile(r"^(mancante|\(illeggibile\)|illeggibile|n\.?d\.?|-+|\?)$", re.IGNORECASE)
 
 
-class ImportError_(ValueError):
-    pass
+class ImportError_(messaggi.ErroreParlante):
+    """Export non riconosciuto: il testo è già scritto per l'utente (pagina Importazioni)."""
 
 
 # --------------------------------------------------------------------------- lettura formati
@@ -261,9 +262,11 @@ def importa_consegne_file(conn, percorso, commessa, forza=False):
             esiti.append({"export": nome_export, "commessa": commessa, "righe": n, "nuove": nuove,
                           "scartate": scartate, "esito": "ok"})
         except Exception as e:  # una riga rotta non deve fermare le altre commesse
+            # nel registro e nella pagina il testo per l'utente; il dettaglio tecnico resta nel log
             log.exception("import %s", chiave)
-            _registra(conn, percorso, chiave, impronta, 0, 0, esito="errore", dettaglio=str(e))
-            esiti.append({"export": nome_export, "commessa": commessa, "esito": "errore", "dettaglio": str(e)})
+            testo = messaggi.per_utente(e)
+            _registra(conn, percorso, chiave, impronta, 0, 0, esito="errore", dettaglio=testo)
+            esiti.append({"export": nome_export, "commessa": commessa, "esito": "errore", "dettaglio": testo})
     conn.commit()
     return esiti
 
@@ -283,9 +286,10 @@ def importa_cartella(conn, radice=None, forza=False):
                 esiti.extend(importa_consegne_file(conn, p, nome, forza=forza))
             except (OSError, ValueError, ImportError_) as e:
                 log.warning("consegne.json di %s non leggibile: %s", nome, e)
-                _registra(conn, p, nome, "", 0, 0, esito="errore", dettaglio=str(e))
+                testo = messaggi.per_utente(e)
+                _registra(conn, p, nome, "", 0, 0, esito="errore", dettaglio=testo)
                 conn.commit()
-                esiti.append({"commessa": nome, "esito": "errore", "dettaglio": str(e)})
+                esiti.append({"commessa": nome, "esito": "errore", "dettaglio": testo})
     return esiti
 
 

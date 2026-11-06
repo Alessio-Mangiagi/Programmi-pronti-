@@ -14,6 +14,7 @@ La chiave è il codice commessa aziendale scritto sull'ubicazione.
 Importato in fondo ad app.py: usa le sue funzioni (db, registra, ...).
 """
 import json
+import logging
 import os
 import sys
 import urllib.parse
@@ -38,6 +39,8 @@ from flask import g, jsonify, request
 sys.path.insert(0, os.path.join(config.SUITE_DIR, "shared", "suite"))
 import codici
 import suite_link
+
+log = logging.getLogger("magazzino.suite")
 
 # --------------------------------------------------------------------------- utilità
 
@@ -95,7 +98,13 @@ def _chiama(app_id, metodo, percorso, **kw):
     try:
         return suite_link.chiama(app_id, metodo, percorso, **_chi(), **kw)
     except suite_link.SuiteError as e:
-        raise ApiError(e.messaggio, e.stato if e.stato in (400, 403, 404, 409, 422, 503) else 502)
+        if e.stato == 503:
+            # app spenta o irraggiungibile: il testo di shared/suite contiene l'errore di rete grezzo
+            # ("[WinError 10061] …", guida 04/11); all'utente basta sapere cosa fare, il resto va nel log
+            log.warning("chiamata a %s non riuscita: %s", app_id, e.messaggio)
+            nome = suite_link.NOMI.get(app_id, app_id)
+            raise ApiError(f"{nome} non risponde: probabilmente è spenta. Aprila dal portale e riprova.", 503)
+        raise ApiError(e.messaggio, e.stato if e.stato in (400, 403, 404, 409, 422) else 502)
 
 
 def _q(codice):

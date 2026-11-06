@@ -34,6 +34,18 @@ aggiorna da sola ogni 15 secondi.
   oggetto (cliccabile) e dettaglio. Filtri per utente, azione, oggetto e testo libero.
   **Esporta CSV** scarica le righe filtrate (si apre con Excel).
 
+## Backup del database
+
+In fondo alla pagina il riquadro **Backup del database** dice quando è stata fatta
+l'**ultima copia**, quante copie sono tenute, ogni quante ore si fa e in quale cartella.
+![Il riquadro Backup del database](img/backup.png)
+
+**Fai un backup adesso** ne fa una subito (per esempio prima di una rilettura completa dei
+DDT o di molte eliminazioni): compare "Backup fatto: magazzino-…db" e la copia resta nel
+registro attività come *Backup del database*. Se l'ultima copia non è riuscita il
+riquadro lo segnala in rosso: avvisate l'amministratore di sistema
+([capitolo 12](12-amministratore-sistema.md#backup)).
+
 ## Le altre cose riservate agli amministratori
 
 - i pulsanti **Elimina** di articoli, mezzi, ubicazioni, movimenti e foto;

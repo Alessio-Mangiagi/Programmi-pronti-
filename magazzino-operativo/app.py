@@ -27,6 +27,7 @@ import database
 import foto
 import importa_ddt
 import importa_mezzi
+import backup
 import statistiche
 
 # Codice condiviso della suite (cartelle sorelle, non pacchetti installati).
@@ -134,9 +135,29 @@ def _err_http(e):
     return e
 
 
+# Nomi leggibili dei campi che possono collidere (vincoli UNIQUE di database.py), per il messaggio all'utente.
+CAMPI_UNICI = {"codice": "codice", "codice_esterno": "codice esterno (EAN)", "targa": "targa", "matricola": "matricola",
+               "nome": "nome"}
+
+
+def messaggio_integrita(e):
+    """Testo per l'utente da un errore di vincolo SQLite (il testo grezzo, es. "UNIQUE constraint failed:
+    articoli.codice_esterno", resta nel log: la guida del 04/11 lo aveva trovato a vista)."""
+    testo = str(e)
+    if "UNIQUE" in testo:
+        campo = testo.rsplit(".", 1)[-1].strip() if "." in testo else ""
+        return f"Esiste già un elemento con lo stesso {CAMPI_UNICI.get(campo, 'valore')}: controlla e cambialo."
+    if "FOREIGN KEY" in testo:
+        return "L'elemento collegato non esiste più (articolo, mezzo o ubicazione): ricarica la pagina e riprova."
+    if "NOT NULL" in testo:
+        return "Manca un dato obbligatorio: compila tutti i campi richiesti."
+    return "Dato non accettato dal database: controlla i valori e riprova."
+
+
 @app.errorhandler(sqlite3.IntegrityError)
 def _err_integrita(e):
-    return jsonify({"errore": f"Dato duplicato o riferimento mancante: {e}"}), 409
+    log.warning("vincolo del database su %s: %s", request.path, e)
+    return jsonify({"errore": messaggio_integrita(e)}), 409
 
 
 @app.errorhandler(Exception)
@@ -274,8 +295,11 @@ def dettaglio_articolo(c, id_):
         "SELECT g.ubicazione_id, u.nome AS ubicazione, u.tipo, u.indirizzo, u.lat, u.lng, g.quantita, g.ultimo_movimento "
         "FROM giacenze g JOIN ubicazioni u ON u.id = g.ubicazione_id WHERE g.articolo_id = ? AND g.quantita <> 0 "
         "ORDER BY g.quantita DESC", (id_,)))
+    # codice, descrizione e unità di misura dell'articolo anche qui: la tabella dei movimenti le usa per la quantità
+    # ("12 pz"); prima mancavano e la colonna Quantità restava senza unità (guida 04/11)
     mov = righe(c.execute(
-        "SELECT m.*, ud.nome AS da_nome, ua.nome AS a_nome FROM movimenti m "
+        "SELECT m.*, a.codice, a.descrizione, a.um, ud.nome AS da_nome, ua.nome AS a_nome FROM movimenti m "
+        "JOIN articoli a ON a.id = m.articolo_id "
         "LEFT JOIN ubicazioni ud ON ud.id = m.da_ubicazione_id LEFT JOIN ubicazioni ua ON ua.id = m.a_ubicazione_id "
         "WHERE m.articolo_id = ? ORDER BY m.id DESC LIMIT 20", (id_,)))
     return {"tipo": "articolo", "articolo": dict(a), "giacenze": giac,
@@ -569,7 +593,12 @@ def api_movimento_crea():
                       (art, da)).fetchone()
         disponibile = r["quantita"] if r else 0
         if qta > disponibile + 1e-9 and not d.get("forza"):
-            raise ApiError(f"Giacenza insufficiente: disponibili {disponibile:g} (invia forza=true per registrare comunque)")
+            # messaggio per chi usa la pagina (che chiede "Registrare comunque?" e rimanda con forza=true);
+            # la parola "insufficiente" è quella che la pagina riconosce: non cambiarla
+            um = c.execute("SELECT um FROM articoli WHERE id = ?", (art,)).fetchone()["um"] or ""
+            dove = c.execute("SELECT nome FROM ubicazioni WHERE id = ?", (da,)).fetchone()["nome"]
+            raise ApiError(f"Giacenza insufficiente in {dove}: disponibili {disponibile:g} {um}".rstrip()
+                           + f", richiesti {qta:g}.")
     cur = c.execute(
         "INSERT INTO movimenti (data, tipo, articolo_id, quantita, da_ubicazione_id, a_ubicazione_id, riferimento, "
         "fornitore, origine, utente, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -873,7 +902,8 @@ def api_importa_upload():
     try:
         parsed = json.load(f.stream)
     except (ValueError, UnicodeDecodeError) as e:
-        raise ApiError(f"JSON non valido: {e}")
+        log.info("upload %s: JSON non leggibile: %s", f.filename, e)
+        raise ApiError("Il file non è un export JSON del Lettore DDT leggibile: scaricalo di nuovo e riprova.")
     commessa = (request.form.get("commessa") or "").strip()[:80]
     try:
         with _lock_import:
@@ -958,6 +988,29 @@ def api_articolo_andamento(id_):
 def avvia_importazioni_di_sfondo():
     if config.IMPORT_INTERVALLO_SEC > 0:
         threading.Thread(target=_thread_importazioni, daemon=True, name="importazioni").start()
+    backup.avvia_di_sfondo()          # copie del database ogni MAGAZZINO_BACKUP_ORE (backup.py)
+
+
+# --------------------------------------------------------------------------- backup del database (solo admin)
+
+@app.get("/api/admin/backup")
+def api_backup_stato():
+    """Ultime copie, cartella e intervallo per la pagina Amministrazione (le rotte /api/admin sono riservate)."""
+    return jsonify(backup.stato())
+
+
+@app.post("/api/admin/backup")
+def api_backup_adesso():
+    """"Fai un backup adesso": una copia subito, con la stessa rotazione di quelle automatiche."""
+    try:
+        fatta = backup.esegui()
+    except (OSError, sqlite3.Error) as e:
+        log.error("backup a mano non riuscito: %s", e)
+        raise ApiError("Backup non riuscito: la cartella delle copie non è scrivibile o il disco è pieno "
+                       "(dettagli nel log del Magazzino).", 500)
+    registra("backup", "database", None, f"{fatta['nome']} ({fatta['byte']} byte)")
+    db().commit()
+    return jsonify({"ok": True, "copia": fatta, "stato": backup.stato()})
 
 
 # --------------------------------------------------------------------------- presenze e amministrazione

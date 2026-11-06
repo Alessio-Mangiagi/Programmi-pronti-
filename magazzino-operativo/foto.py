@@ -13,6 +13,7 @@ import secrets
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 import config
+import messaggi
 
 # Tetto ai pixel di un'immagine: un PNG di pochi KB può dichiarare 20000x20000 pixel e far esplodere la
 # memoria in decodifica ("decompression bomb"); oltre questo limite Pillow rifiuta di aprirla.
@@ -21,7 +22,7 @@ Image.MAX_IMAGE_PIXELS = 50_000_000
 ESTENSIONI = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif"}
 
 
-class FotoError(ValueError):
+class FotoError(messaggi.ErroreParlante):
     pass
 
 
@@ -38,10 +39,11 @@ def _apri(dati):
         if img.size[0] * img.size[1] > Image.MAX_IMAGE_PIXELS:
             raise FotoError(f"immagine troppo grande: {img.size[0]}x{img.size[1]} pixel")
         img.load()
-    except Image.DecompressionBombError as e:
-        raise FotoError(f"immagine troppo grande: {e}")
-    except (UnidentifiedImageError, OSError, ValueError) as e:
-        raise FotoError(f"immagine non leggibile: {e}")
+    except Image.DecompressionBombError:
+        raise FotoError("immagine troppo grande: riducila o scatta una foto a risoluzione normale") from None
+    except (UnidentifiedImageError, OSError, ValueError):
+        # il testo di Pillow ("cannot identify image file <_io.BytesIO …>") non serve a chi carica la foto
+        raise FotoError("immagine non leggibile: carica una foto JPG o PNG") from None
     img = ImageOps.exif_transpose(img)  # raddrizza le foto del telefono
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")

@@ -20,6 +20,7 @@ config.DB_PATH = os.path.join(_cartella, "test.db")
 config.DDT_DATA_DIR = os.path.join(_cartella, "ddt")
 config.MEZZI_VFP_DIR = os.path.join(_cartella, "mezzi")
 config.FOTO_DIR = os.path.join(_cartella, "foto")
+config.BACKUP_DIR = os.path.join(_cartella, "backup")      # mai copie del database dentro la cartella del programma
 os.environ["SUITE_AVVISI_DIR"] = os.path.join(_cartella, "avvisi")
 
 import database  # noqa: E402

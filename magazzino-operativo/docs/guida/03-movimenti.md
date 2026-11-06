@@ -39,7 +39,8 @@ registrato") e la scheda si aggiorna.
 ### Scarico o trasferimento oltre la giacenza
 
 Se provi a togliere più di quanto risulta, il browser chiede conferma con un messaggio
-come "Giacenza insufficiente: disponibili 20 … Registrare comunque?".
+come "Giacenza insufficiente in Deposito centrale: disponibili 20 pz, richiesti 25.
+Registrare comunque?".
 
 - **Annulla** se hai sbagliato la quantità o l'ubicazione;
 - **OK** se il materiale c'è davvero (per esempio il DDT di carico non è ancora stato

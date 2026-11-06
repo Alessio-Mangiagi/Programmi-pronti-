@@ -16,6 +16,7 @@ import os
 import sys
 
 import config
+import messaggi
 from codici import prossimo_codice
 
 sys.path.insert(0, os.path.join(config.SUITE_DIR, "shared", "suite"))
@@ -67,7 +68,7 @@ def importa_record(conn, record, percorso=""):
     pratica = str(record.get("id") or "").strip()
     v = record.get("valori") or {}
     if not pratica or not isinstance(v, dict):
-        raise ValueError("record senza id o valori")
+        raise messaggi.ErroreParlante("Pratica senza codice o senza dati del mezzo: non è una pratica mezzi di VFP Transfer completa.")
     tipo = (v.get("tipo_mezzo") or "Mezzo").strip()
     dati = {
         "tipo_mezzo": tipo,
@@ -137,9 +138,10 @@ def importa_cartella(conn, radice=None, forza=False):
             esiti.append({"pratica": nome, "esito": esito, "mezzo_id": mezzo_id})
         except (OSError, ValueError) as e:
             log.warning("pratica %s non leggibile: %s", nome, e)
+            testo = messaggi.per_utente(e)       # per l'utente; il dettaglio tecnico è nel log qui sopra
             conn.execute(
                 "INSERT INTO importazioni (sorgente, file, chiave, impronta, esito, dettaglio) "
-                "VALUES ('mezzi', ?, ?, ?, 'errore', ?)", (p, nome, impronta, str(e)))
-            esiti.append({"pratica": nome, "esito": "errore", "dettaglio": str(e)})
+                "VALUES ('mezzi', ?, ?, ?, 'errore', ?)", (p, nome, impronta, testo))
+            esiti.append({"pratica": nome, "esito": "errore", "dettaglio": testo})
     conn.commit()
     return esiti

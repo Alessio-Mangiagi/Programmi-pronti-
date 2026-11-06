@@ -122,7 +122,8 @@ def test_incampo_spento(client, cantiere, monkeypatch):
         raise suite_rotte.suite_link.SuiteError("incampo", 503, "InCampo non raggiungibile")
     monkeypatch.setattr(suite_rotte.suite_link, "chiama", giu)
     r = client.get("/api/incampo/commessa/101-003")
-    assert r.status_code == 503 and "InCampo non raggiungibile" in r.get_json()["errore"]
+    # dal 06/11 il testo è per l'utente (il dettaglio di rete va nel log): niente "[WinError 10061]" a vista
+    assert r.status_code == 503 and "InCampo non risponde" in r.get_json()["errore"]
 
 
 # --------------------------------------------------------------------------- SkyTower
