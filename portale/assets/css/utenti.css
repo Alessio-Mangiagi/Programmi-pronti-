@@ -1,3 +1,4 @@
+/* "><(((º> sabusabu <º)))>< */
 /* Pagina Utenti: stesso impianto e stessa grafica della plancia (plancia.css),
    qui solo la tabella, la barra di ricerca e le finestre. */
 
@@ -90,6 +91,24 @@
 }
 @media (max-width: 560px) {
   .b { min-height: 44px; }
+}
+
+/* Schermi da ufficio (fino a ~1600 px): con email lunghe la tabella non ci stava e a 1440 px la
+   colonna dei pulsanti restava tagliata a destra (emerso scrivendo la guida, 04/11/2026). Celle un
+   po' più strette, email a capo prima della @ (<wbr> in utenti.js), pulsanti compatti; lo
+   scorrimento orizzontale di .u-wrap resta come ultima risorsa. Sotto 720 px vale la vista a schede. */
+@media (min-width: 721px) {
+  .u-tab th, .u-tab td { padding-left: 8px; padding-right: 8px; }
+  .u-tab .chi { min-width: 170px; }
+  .u-tab td.mail { max-width: 250px; }
+  .u-tab .az .b { padding: 0 8px; margin-left: 3px; }
+}
+/* portatili (1280-1400 px): il nome va a capo, l'email resta più stretta */
+@media (min-width: 721px) and (max-width: 1400px) {
+  .u-tab .chi { min-width: 0; }
+  .u-tab td.mail { max-width: 200px; }
+  .u-tab th, .u-tab td { padding-left: 6px; padding-right: 6px; }
+  .u-tab .az .b { padding: 0 6px; margin-left: 2px; }
 }
 
 /* Colonna email: valore (dedotto se non impostato) e tasto piccolo per cambiarla. */

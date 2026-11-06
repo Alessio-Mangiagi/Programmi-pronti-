@@ -43,7 +43,7 @@ Scadenzario, Lettore DDT e gli altri strumenti senza dover rifare l'accesso in o
 | **Lettore DDT** | Da una bolla in PDF a un foglio Excel | [guida del Lettore DDT](../../../lettore-ddt/docs/guida/README.md) |
 | **Confronto Documenti**, **OCR Documenti**, **Analista Dati**, **Verifica Requisiti** | Confrontare due PDF, leggere documenti scansionati, fare domande sui dati, controllare i documenti contrattuali | dentro ciascun programma |
 | **Timbri per VFP** | Da un'immagine PNG (firma, logo, timbro) a un file `.stamp` per le annotazioni di VFP | [README di Timbri per VFP](../../../timbri-vfp/README.md) |
-| **Ponte Trimble**, **Auguri** | Strumenti riservati agli amministratori | dentro ciascun programma |
+| **Ponte Trimble**, **Auguri** | Strumenti solo per gli amministratori | dentro ciascun programma |
 
 **VFP Transfer** non si apre dal Portale: ha un accesso suo (vedi la
 [guida di VFP Transfer](../../../vfp-transfer-DMS/docs/guida/README.md)). I suoi avvisi però

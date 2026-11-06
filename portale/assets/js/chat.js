@@ -161,7 +161,7 @@ function chatInit() {
   panel.innerHTML = `
     <div class="chat-head">
       <h2>Assistente della suite</h2>
-      <p>Assistente automatico (AI): rispondo solo sulle app e su cosa fanno</p>
+      <p>Assistente automatico a regole: rispondo solo sulle app e su cosa fanno</p>
     </div>
     <div class="chat-log" id="chatLog"></div>
     <form class="chat-form" id="chatForm">

@@ -74,7 +74,7 @@ function renderRighe() {
     const io = me && u.username === me.username;
     return `<tr class="${u.attivo ? '' : 'off'}">
       <td><div class="chi"><span class="u-av">${esc(iniz(u.nome))}</span><span><b>${esc(u.nome)}</b><small>${esc(u.username)}</small></span></div></td>
-      <td class="mail"><span title="${u.email ? 'Impostata dall’amministratore' : 'Non impostata: vale username@dominio'}">${esc(u.emailEffettiva || '')}</span>${u.email ? '' : '<small class="dedotta">dedotta</small>'}<button type="button" class="b mini" data-mail="${esc(u.username)}" title="Cambia l'email con cui InCampo e SkyTower riconoscono l'utente">Email</button></td>
+      <td class="mail"><span title="${u.email ? 'Impostata dall’amministratore' : 'Non impostata: vale username@dominio'}">${esc(u.emailEffettiva || '').replace('@', '<wbr>@')}</span>${u.email ? '' : '<small class="dedotta">dedotta</small>'}<button type="button" class="b mini" data-mail="${esc(u.username)}" title="Cambia l'email con cui InCampo e SkyTower riconoscono l'utente">Email</button></td>
       <td>${u.ruolo === 'admin' ? '<span class="st adm">Admin</span>' : 'Utente'}</td>
       <td>${stato(u)}</td>
       <td>${programmi(u)}</td>

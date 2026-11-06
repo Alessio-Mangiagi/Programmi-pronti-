@@ -34,7 +34,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .who { display: flex; align-items: center; gap: 0.55rem; }
 .who .av { width: 26px; height: 26px; border-radius: 50%; background: var(--cosedil-bg-alt); color: var(--cosedil-blue); display: grid; place-items: center; font-family: var(--font-display); font-weight: 500; font-size: 0.72rem; flex-shrink: 0; }
 .badge { display: inline-flex; align-items: center; gap: 0.35rem; font-family: var(--font-ui); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.2rem 0.55rem; border-radius: 999px; }
-.badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #9aa0a6; }
+/* colore di partenza per le azioni senza un colore proprio (prima restavano senza sfondo) */
+.badge { background: var(--cosedil-bg-alt); color: var(--cosedil-gray); }
 .badge.avvia { background: rgba(12,69,119,0.10); color: var(--cosedil-blue); }
 .badge.avvia .dot { background: var(--cosedil-blue); }
 .badge.apri { background: rgba(101,188,123,0.16); color: var(--cosedil-green-text); }
@@ -45,6 +47,14 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.abilita .dot { background: var(--cosedil-blue-light); }
 .badge.off { background: rgba(192,57,43,0.10); color: #c0392b; }
 .badge.off .dot { background: #c0392b; }
+/* accessi rifiutati e utenti disattivati: rosso come .off */
+.badge.login-bloccato, .badge.login-disattivato, .badge.disattiva { background: rgba(192,57,43,0.10); color: #c0392b; }
+.badge.login-bloccato .dot, .badge.login-disattivato .dot, .badge.disattiva .dot { background: #c0392b; }
+/* gestione degli utenti (password, email, riattivazione, richieste): azzurro come le abilitazioni */
+.badge.reset-password, .badge.email-utente, .badge.riattiva, .badge.richiesta-gestita, .badge.richiesta-aiuto { background: rgba(25,143,217,0.12); color: var(--cosedil-blue-light); }
+.badge.reset-password .dot, .badge.email-utente .dot, .badge.riattiva .dot, .badge.richiesta-gestita .dot, .badge.richiesta-aiuto .dot { background: var(--cosedil-blue-light); }
+/* colonna Dettaglio del registro: a chi, cosa è cambiato, da quale PC */
+td.dett { font-size: 0.82rem; color: var(--cosedil-gray); max-width: 42ch; }
 .muted { color: var(--cosedil-gray); }
 tbody tr.off td { color: var(--cosedil-gray); }
 .azioni-utente { white-space: nowrap; }

@@ -24,7 +24,9 @@
       <div class="brand"><span class="brand-word">Cosedil</span><span class="brand-word acc">Suite</span></div>
       <p class="side-sec">App</p>
       <nav class="apps" id="apps"></nav>
-      <p class="side-sec" id="secRiservate" hidden>Area riservata</p>
+      <!-- app adminOnly (Ponte Trimble, Auguri): "Solo amministratori", per non confonderle
+           con i programmi "riservati" delle Abilitazioni, che arrivano a chi ha la spunta -->
+      <p class="side-sec" id="secRiservate" hidden>Solo amministratori</p>
       <nav class="apps" id="appsRiservate"></nav>
       <p class="side-sec">Gestione</p>
       <nav class="side-nav">
@@ -47,7 +49,7 @@
         <span class="who"><span class="avatar" id="avatar">?</span><span id="userName">…</span></span>
         <a id="avvisiLink" class="avvisi-link" href="/avvisi" hidden>Avvisi<span class="avvisi-n" id="avvisiN" hidden></span></a>
         <a href="/?vista=utente" title="La home come la vedono gli utenti">Vista utente</a>
-        <a id="adminLink" href="/admin" hidden>Amministrazione</a>
+        <a id="adminLink" href="/admin" hidden>Registro accessi</a>
         <a href="/password">Password</a>
         <button id="logout" type="button">Esci</button>
       </div>

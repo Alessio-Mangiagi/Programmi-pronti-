@@ -1181,7 +1181,7 @@ function getSession(req) {
 // Freno ai tentativi di login. Senza, chiunque sulla LAN può provare password a
 // raffica: scrypt rallenta il singolo tentativo, non le migliaia. Chiave =
 // utente+IP, così un PC che sbaglia non blocca l'account agli altri.
-// Stato in RAM: si azzera al riavvio, e va bene (il riavvio lo fa un admin).
+// Stato in RAM e su data/login-fails.json (vedi sotto): sopravvive al riavvio.
 // ---------------------------------------------------------------------------
 const loginFails = new Map();   // "user|ip" -> { n, until, ts }
 // Lo stato sta anche su file, condiviso fra il portale utenti (8080) e la
@@ -1635,6 +1635,22 @@ function filtraApps(apps) {
   return [...new Set(richiesti.map(String).filter((id) => validi.has(id)))];
 }
 
+// Cosa è cambiato nei programmi di un utente, per il registro accessi (azione "abilita"):
+// id aggiunti e tolti rispetto a prima (per chi non aveva un elenco suo, "prima" è il default
+// appsPredefinite) e una frase con i nomi dei programmi, mostrata nella colonna Dettaglio.
+// Prima del 06/11/2026 il registro scriveva solo l'elenco finale, senza dire cosa era cambiato.
+function descriviAbilitazioni(utente, prima, dopo) {
+  const nomeDi = (id) => (APPS.find((a) => a.id === id) || {}).nome || id;
+  const p = new Set(prima || []);
+  const d = new Set(dopo || []);
+  const aggiunte = [...d].filter((id) => !p.has(id));
+  const tolte = [...p].filter((id) => !d.has(id));
+  const parti = [];
+  if (aggiunte.length) parti.push('aggiunti ' + aggiunte.map(nomeDi).join(', '));
+  if (tolte.length) parti.push('tolti ' + tolte.map(nomeDi).join(', '));
+  return { aggiunte, tolte, dettaglio: `${utente}: ${parti.join('; ') || 'nessun cambiamento'}` };
+}
+
 // ---------------------------------------------------------------------------
 // Utility HTTP.
 // ---------------------------------------------------------------------------
@@ -1659,9 +1675,34 @@ function sendJson(res, code, obj, headers) {
 function sendFile(res, file, type) {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(500); return res.end('Errore lettura ' + path.basename(file)); }
-    res.writeHead(200, Object.assign({ 'Content-Type': type + '; charset=utf-8' }, type === 'text/html' ? HEADER_PAGINA : HEADER_COMUNI));
+    // il charset ha senso solo per i testi: le immagini della guida passano di qui così come sono
+    const ct = /^image\//.test(type) ? type : type + '; charset=utf-8';
+    res.writeHead(200, Object.assign({ 'Content-Type': ct }, type === 'text/html' ? HEADER_PAGINA : HEADER_COMUNI));
     res.end(data);
   });
+}
+
+// Documentazione per il visualizzatore /doc (pages/doc.html + assets/js/doc.js), dietro il login.
+// "guida" è la guida utente con le immagini in docs/guida/ (indice README.md, capitoli NN-nome.md,
+// immagini in img/); "readme" il README tecnico. Il vecchio guida.md della radice è solo un rimando.
+// Nomi ammessi solo da questi schemi: niente percorsi liberi, quindi niente path traversal.
+const GUIDA_DIR = path.join(__dirname, 'docs', 'guida');
+const IMG_DOC = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
+function fileDocumentazione(nome) {
+  const n = String(nome || '');
+  const fisso = { guida: path.join(GUIDA_DIR, 'README.md'), 'guida.md': path.join(GUIDA_DIR, 'README.md'),
+    readme: path.join(__dirname, 'README.md'), 'readme.md': path.join(__dirname, 'README.md') }[n.toLowerCase()];
+  let file = fisso || null;
+  let tipo = 'text/markdown';
+  const cap = /^guida\/(README|\d{2}-[a-z0-9-]+)\.md$/i.exec(n);
+  const img = /^guida\/img\/([A-Za-z0-9_-][A-Za-z0-9._-]*)$/.exec(n);
+  if (cap) file = path.join(GUIDA_DIR, cap[1] + '.md');
+  else if (img && IMG_DOC[path.extname(img[1]).toLowerCase()]) {
+    file = path.join(GUIDA_DIR, 'img', img[1]);
+    tipo = IMG_DOC[path.extname(img[1]).toLowerCase()];
+  }
+  if (!file || !fs.existsSync(file)) return null;
+  return { file, tipo };
 }
 
 // Serve i file statici da /assets (css, js, font). Pubblico: nessun dato
@@ -2424,11 +2465,11 @@ async function handle(req, res) {
     return sendFile(res, path.join(PAGES_DIR, 'doc.html'), 'text/html');
   }
   if (p.startsWith('/docs/')) {
-    const name = decodeURIComponent(p.slice('/docs/'.length)).toLowerCase();
-    const map = { guida: 'guida.md', 'guida.md': 'guida.md', readme: 'README.md', 'readme.md': 'README.md' };
-    const file = map[name];
-    if (!file) { res.writeHead(404); return res.end('Not found'); }
-    return sendFile(res, path.join(__dirname, file), 'text/markdown');
+    let nome = '';
+    try { nome = decodeURIComponent(p.slice('/docs/'.length)); } catch { /* % malformato: 404 */ }
+    const doc = fileDocumentazione(nome);
+    if (!doc) { res.writeHead(404); return res.end('Not found'); }
+    return sendFile(res, doc.file, doc.tipo);
   }
 
   // ---- Cambio password (qualsiasi utente autenticato) ----
@@ -2661,7 +2702,7 @@ async function handle(req, res) {
     if (mRich[2] === 'reimposta') {
       const utenti = loadUtenti();
       const u = utenti.find((x) => x.username === r.username);
-      if (!u) return sendJson(res, 404, { ok: false, error: 'Nessun account con questo username: crealo da Amministrazione' });
+      if (!u) return sendJson(res, 404, { ok: false, error: 'Nessun account con questo username: crealo dalla pagina Utenti' });
       // Password temporanea mostrata UNA volta all'admin, che la comunica a voce
       // o per mail; al primo accesso l'utente deve cambiarla. sv++ chiude le
       // sessioni ancora aperte, sbloccaUtente toglie il blocco per tentativi.
@@ -2824,12 +2865,15 @@ async function handle(req, res) {
     const list = loadUtenti();
     const u = list.find((x) => x.username === uname);
     if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const prima = Array.isArray(u.apps) ? u.apps : appsPredefinite();
     u.apps = filtraApps(apps);
     saveUtenti(list);
+    // nel registro: a chi, cosa è stato aggiunto e tolto (colonna Dettaglio di /admin)
+    const cambi = descriviAbilitazioni(uname, prima, u.apps);
     logAccesso({
       ts: new Date().toISOString(), username: session.username, nome: session.nome,
       appId: 'portale', appNome: 'Portale (programmi utente)', azione: 'abilita',
-      dettaglio: uname + ' -> ' + (u.apps.join(', ') || 'nessun programma'),
+      per: uname, aggiunte: cambi.aggiunte, tolte: cambi.tolte, dettaglio: cambi.dettaglio,
     });
     return sendJson(res, 200, { ok: true, apps: u.apps });
   }
@@ -2984,6 +3028,8 @@ module.exports = {
   portalHostname, appUrl, isSuiteOrigin,           // URL/CORS in LAN
   loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
   verificaPasswordApp, trovaUtentePerLogin, ipValido,   // password del portale negli altri programmi
+  fileDocumentazione,                              // guida e README per /doc
+  descriviAbilitazioni,                            // dettaglio delle abilitazioni nel registro
   parseNetstatPid,                                 // spegnimento app
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente

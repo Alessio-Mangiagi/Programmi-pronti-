@@ -1008,3 +1008,39 @@ test('ipValido: solo indirizzi, niente testo nel registro', () => {
   assert.equal(ipValido('10.0.0.5\nfalso'), '');
   assert.equal(ipValido('<script>'), '');
 });
+
+// ---------------------------------------------------------------------------
+// Documentazione per /doc (06/11/2026): la guida è quella con le immagini in docs/guida/,
+// e dal server escono solo i file dei nomi ammessi.
+// ---------------------------------------------------------------------------
+test('fileDocumentazione: guida nuova, capitoli, immagini, README e niente percorsi liberi', () => {
+  const { fileDocumentazione } = require('./server.js');
+  const guida = fileDocumentazione('guida');
+  assert.ok(guida && guida.file.endsWith(path.join('docs', 'guida', 'README.md')) && guida.tipo === 'text/markdown');
+  assert.equal(fileDocumentazione('GUIDA').file, guida.file);
+  assert.ok(fileDocumentazione('readme').file.endsWith('README.md'));
+  const cap = fileDocumentazione('guida/01-entrare.md');
+  assert.ok(cap && cap.file.endsWith(path.join('docs', 'guida', '01-entrare.md')));
+  const img = fileDocumentazione('guida/img/01-login.png');
+  assert.ok(img && img.tipo === 'image/png');
+  // capitolo o immagine che non esistono, percorsi strani, estensioni non immagine
+  assert.equal(fileDocumentazione('guida/99-non-esiste.md'), null);
+  assert.equal(fileDocumentazione('guida/../server.js'), null);
+  assert.equal(fileDocumentazione('guida/img/../../../server.js'), null);
+  assert.equal(fileDocumentazione('guida/img/..%2f..%2fserver.js'), null);
+  assert.equal(fileDocumentazione('guida/img/note.txt'), null);
+  assert.equal(fileDocumentazione('../data/utenti.json'), null);
+  assert.equal(fileDocumentazione(''), null);
+});
+
+// Registro accessi: l'azione "abilita" dice cosa è stato aggiunto e tolto, con i nomi dei programmi.
+test('descriviAbilitazioni: aggiunti, tolti, nessun cambiamento', () => {
+  const { descriviAbilitazioni } = require('./server.js');
+  const d = descriviAbilitazioni('mrossi', ['ddt', 'requisiti'], ['ddt', 'skytower']);
+  assert.deepEqual(d.aggiunte, ['skytower']);
+  assert.deepEqual(d.tolte, ['requisiti']);
+  assert.match(d.dettaglio, /^mrossi: aggiunti SkyTower; tolti Verifica Requisiti$/);
+  assert.equal(descriviAbilitazioni('gverdi', ['ddt'], ['ddt']).dettaglio, 'gverdi: nessun cambiamento');
+  // id sconosciuto: resta l'id, la riga non si perde
+  assert.match(descriviAbilitazioni('x', [], ['boh']).dettaglio, /aggiunti boh/);
+});

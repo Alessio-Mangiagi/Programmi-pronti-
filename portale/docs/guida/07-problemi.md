@@ -29,4 +29,4 @@
 | *Non puoi disattivare te stesso* / *È l'ultimo amministratore attivo* | Il Portale non resta mai senza amministratori: nomina prima un altro amministratore. |
 | Un programma compare *Spenta* e non riparte dal Portale | Avvisa l'amministratore di sistema: guarda anche la pagina **Avvisi** per eventuali errori di avvio. |
 | La plancia non mostra cosa fanno le persone dentro un programma | Lettore DDT, Verifica Requisiti, Analista Dati, OCR Documenti e Auguri, se accesi prima dell'aggiornamento di sicurezza del 4 novembre 2026, non mandano più presenze e azioni: riavviali (pulsante *Ferma*, poi clic sul nome). |
-| *Nessun account con questo username: crealo da Amministrazione* (richiesta di aiuto) | Lo username indicato non esiste: crea l'utente dalla pagina **Utenti** e segna la richiesta come gestita. |
+| *Nessun account con questo username: crealo dalla pagina Utenti* (richiesta di aiuto) | Lo username indicato non esiste: crea l'utente dalla pagina **Utenti** e segna la richiesta come gestita. |

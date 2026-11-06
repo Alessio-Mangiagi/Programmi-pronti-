@@ -84,7 +84,8 @@ si filtrano mentre scrivi e restano solo quelle che c'entrano.
 ![La ricerca filtra le schede](img/10-ricerca.png)
 
 Appena clicchi nella barra compare un riquadro verde: *«Stai scrivendo a un assistente
-automatico…»*. Se nessuna scheda corrisponde, il Portale ti suggerisce di premere **Invio**
+automatico…»*. È un programma a regole che conosce solo le schede del Portale: non è una
+persona né un'intelligenza artificiale. Se nessuna scheda corrisponde, il Portale ti suggerisce di premere **Invio**
 per chiederlo all'assistente.
 
 ## 2.4 Chiedere all'assistente
@@ -113,7 +114,9 @@ Cose da sapere:
 ## 2.5 Guida e contatti
 
 - **Guida all'uso** (colonna di sinistra) e **Apri la guida** (in fondo alla pagina) aprono
-  la guida breve dentro il Portale.
+  dentro il Portale questa stessa guida, con le immagini: dall'indice si passa ai capitoli e
+  i collegamenti fra un capitolo e l'altro funzionano. La scheda **README tecnico** è per chi
+  installa il Portale.
 - **Scrivi all'amministratore** apre un'email già indirizzata alla persona di riferimento.
   L'indirizzo è scritto anche nel riquadro in fondo, *Non trovi quello che cerchi?*.
 

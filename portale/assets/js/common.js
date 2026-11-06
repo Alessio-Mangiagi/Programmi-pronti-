@@ -52,3 +52,38 @@ const ICONS = {
   timbri: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.5" r="2.5"/><path d="M10.5 8v3.5M13.5 8v3.5"/><rect x="5" y="11.5" width="14" height="4.5" rx="1"/><path d="M4 20h16"/></svg>',
   auguri: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/></svg>'
 };
+
+// Azioni del registro accessi (data/accessi.log, campo "azione") con il nome da leggere.
+// Le usano il registro (/admin, admin.js) e la plancia (plancia.js), così una sigla del server
+// non arriva mai grezza a schermo (prima del 06/11/2026 /admin mostrava "reset-password",
+// "evento" e simili). Nomi e non participi: "Scadenzario · Apertura" vale per ogni programma.
+// Un'azione nuova sul server va aggiunta qui; se manca si vede la sigla, non si perde la riga.
+const AZIONI_PORTALE = {
+  login: 'Accesso al Portale', logout: 'Uscita', apri: 'Apertura', avvia: 'Avvio', riavvia: 'Riavvio',
+  ferma: 'Arresto', chiudi: 'Chiusura', evento: 'Azione nel programma',
+  'login-app': 'Accesso con la password del Portale', 'login-bloccato': 'Accesso bloccato (troppi tentativi)',
+  'login-disattivato': 'Accesso rifiutato (account disattivato)',
+  'richiesta-aiuto': 'Richiesta di aiuto', 'richiesta-gestita': 'Richiesta gestita',
+  'reset-password': 'Password reimpostata', disattiva: 'Disattivazione', riattiva: 'Riattivazione',
+  abilita: 'Abilitazioni', 'email-utente': 'Cambio email', commesse: 'Registro commesse',
+};
+const nomeAzione = (azione) => AZIONI_PORTALE[azione] || azione;
+
+// Dettaglio leggibile di una riga del registro: cosa porta con sé ogni azione
+// (a chi, cosa è cambiato, da quale PC). Testo semplice: chi lo mette in pagina fa l'escape.
+function dettaglioAzione(e) {
+  const pc = e.ip ? `dal PC ${e.ip}` : '';
+  switch (e.azione) {
+    case 'abilita': return e.dettaglio ? String(e.dettaglio).replace(' -> ', ': ') : '';
+    case 'reset-password': return e.per ? `per ${e.per}` : '';
+    case 'richiesta-gestita': return e.per ? `richiesta di ${e.per}` : '';
+    case 'disattiva': case 'riattiva': return e.per ? `utente ${e.per}` : '';
+    case 'email-utente': return `${e.utente || ''}: ${e.da || '(dedotta)'} → ${e.a || '(dedotta)'}`;
+    case 'evento': return [e.evento, e.dettaglio].filter(Boolean).join(' · ');
+    case 'commesse': return e.dettaglio || '';
+    case 'chiudi': return e.durataMin != null ? `usata per ${Math.round(e.durataMin)} min` : '';
+    case 'login': case 'login-app': case 'login-bloccato': case 'login-disattivato': case 'richiesta-aiuto': case 'logout':
+      return pc;
+    default: return e.dettaglio || '';
+  }
+}

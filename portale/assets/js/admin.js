@@ -5,7 +5,7 @@ function fmtData(iso) {
   return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' · ' +
          d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
-const AZIONE_LABEL = { avvia: 'Avvio', apri: 'Apertura', login: 'Login portale', abilita: 'Abilitazioni' };
+// Nomi delle azioni e dettaglio di ogni riga: AZIONI_PORTALE / nomeAzione / dettaglioAzione in common.js.
 
 let accessi = [];
 
@@ -37,6 +37,12 @@ function populateFilters() {
   const apps = [...new Map(accessi.filter(a => a.appId).map(a => [a.appId, a.appNome])).entries()];
   fApp.innerHTML = '<option value="">Tutti i programmi</option>' +
     apps.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
+  // Le azioni del filtro sono quelle presenti nel registro, col loro nome (prima erano quattro fisse).
+  const fAzione = document.getElementById('fAzione');
+  const azioni = [...new Set(accessi.map(a => a.azione).filter(Boolean))]
+    .sort((x, y) => nomeAzione(x).localeCompare(nomeAzione(y), 'it'));
+  fAzione.innerHTML = '<option value="">Tutte le azioni</option>' +
+    azioni.map(az => `<option value="${esc(az)}">${esc(nomeAzione(az))}</option>`).join('');
 }
 
 function renderStats() {
@@ -74,7 +80,8 @@ function renderLog() {
       <td class="muted">${esc(fmtData(a.ts))}</td>
       <td><div class="who"><span class="av">${esc(iniz(a.nome))}</span><span>${esc(a.nome || a.username)}</span></div></td>
       <td>${a.appNome ? esc(a.appNome) : '<span class="muted">— (portale)</span>'}</td>
-      <td><span class="badge ${esc(a.azione)}"><span class="dot"></span>${esc(AZIONE_LABEL[a.azione] || a.azione)}</span></td>
+      <td><span class="badge ${esc(a.azione)}"><span class="dot"></span>${esc(nomeAzione(a.azione))}</span></td>
+      <td class="dett">${esc(dettaglioAzione(a)) || '<span class="muted">—</span>'}</td>
     </tr>
   `).join('');
 }

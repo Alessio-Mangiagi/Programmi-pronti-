@@ -109,3 +109,21 @@
   color: var(--cosedil-gray);
 }
 .doc hr { border: none; border-top: 1px solid var(--cosedil-border); margin: 2rem 0; }
+
+/* ---- Guida con le immagini (docs/guida, dal 06/11/2026): schermate e tabelle ---- */
+.doc img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.4rem 0 1.2rem;
+  border: 1px solid var(--cosedil-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+/* le tabelle larghe scorrono dentro il riquadro invece di allargare la pagina */
+.doc .tab-wrap { overflow-x: auto; margin: 0 0 1.2rem; }
+.doc table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+.doc th, .doc td { text-align: left; vertical-align: top; padding: 0.5rem 0.7rem; border: 1px solid var(--cosedil-border); }
+.doc th { background: var(--cosedil-bg-alt); font-family: var(--font-ui); font-weight: 600; color: var(--cosedil-text-strong); }
+/* scorrendo a un paragrafo (#18-...) il titolo non finisce sotto il bordo della finestra */
+.doc h1, .doc h2, .doc h3 { scroll-margin-top: 1rem; }

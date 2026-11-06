@@ -15,7 +15,7 @@ In alto a destra:
 |---|---|
 | **Avvisi** (con il numero) | Apre la pagina degli avvisi dei programmi. Il numero è rosso se c'è almeno un errore. |
 | **Vista utente** | Mostra la pagina iniziale come la vede un utente normale. |
-| **Amministrazione** | Apre il **Registro accessi** (vedi [capitolo 6](06-registro-e-avvisi.md)). |
+| **Registro accessi** | Apre il registro di chi ha fatto cosa (vedi [capitolo 6](06-registro-e-avvisi.md)). Fino al 06/11/2026 si chiamava *Amministrazione*. |
 | **Password**, **Esci** | Come per tutti (vedi [capitolo 1](01-entrare.md)). |
 
 ## 3.1 Gli avvisi appena entri
@@ -41,8 +41,10 @@ La colonna di sinistra elenca tutti i programmi. Il quadratino a destra dice lo 
   liberare memoria sul server. Il Portale chiede conferma: *«Fermare …? Chi lo sta usando in
   questo momento perde il lavoro non salvato.»* Usalo a fine giornata o su programmi che
   nessuno sta usando.
-- **Area riservata** raccoglie gli strumenti che vede solo l'amministratore (Ponte Trimble,
-  Auguri).
+- **Solo amministratori** raccoglie gli strumenti che vede solo l'amministratore (Ponte
+  Trimble, Auguri): non hanno spunte, seguono il ruolo. Non vanno confusi con i programmi
+  *riservati* della pagina Abilitazioni (per esempio SkyTower), che arrivano anche agli
+  utenti a cui l'amministratore mette la spunta.
 - **Gestione** porta alle pagine [Utenti](04-utenti.md), [Commesse](05-commesse.md),
   [Registro accessi](06-registro-e-avvisi.md) e [Avvisi](06-registro-e-avvisi.md#62-gli-avvisi-dei-programmi).
 

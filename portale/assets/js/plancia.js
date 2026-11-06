@@ -196,13 +196,12 @@ function quando(ts) {
 
 // Le azioni come nomi, non come participi: "Scadenzario · Apertura" vale per
 // qualunque app, senza accordare maschile e femminile.
-const AZIONI = {
-  login: 'Accesso', logout: 'Uscita', apri: 'Apertura', avvia: 'Avvio', ferma: 'Arresto',
-  chiudi: 'Chiusura', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
-  'richiesta-aiuto': 'Richiesta aiuto', 'reset-password': 'Reset password', 'richiesta-gestita': 'Richiesta gestita',
-  disattiva: 'Disattivazione', riattiva: 'Riattivazione', 'login-disattivato': 'Accesso rifiutato (disattivato)',
-  'login-app': 'Accesso con la password del Portale',
-};
+// Elenco unico in common.js (AZIONI_PORTALE, lo usa anche il registro /admin); qui solo le
+// forme corte per la colonna stretta della cronologia.
+const AZIONI = Object.assign({}, AZIONI_PORTALE, {
+  login: 'Accesso', evento: 'Azione', 'login-bloccato': 'Accesso bloccato',
+  'login-disattivato': 'Accesso rifiutato (disattivato)',
+});
 
 // ---------------------------------------------------------------- richieste di aiuto
 // Dal login (password dimenticata / account bloccato). Ogni avviso dice chi è,
@@ -415,6 +414,11 @@ function testoRiga(e, app) {
     return `<b>${esc(app ? app.nome : (e.appNome || e.appId))}</b> · ${esc(AZIONI[e.azione])}`;
   }
   if (e.azione === 'logout') return 'Uscita dal Portale';
+  // azioni di amministrazione (abilitazioni, password, email, commesse): con il dettaglio di common.js
+  const det = dettaglioAzione(e);
+  if (/^(abilita|reset-password|richiesta-gestita|disattiva|riattiva|email-utente|commesse)$/.test(e.azione)) {
+    return esc(AZIONI[e.azione] || e.azione) + (det ? ` <small>${esc(det)}</small>` : '');
+  }
   return nomeB || esc(AZIONI[e.azione] || e.azione);
 }
 

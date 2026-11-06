@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Cosedil" />
-  <title>Amministrazione — Portale Suite Cosedil</title>
+  <title>Registro accessi — Portale Suite Cosedil</title>
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c4577'/%3E%3Cpath d='M9 21V11l7-4 7 4v10' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/assets/css/tokens.css" />
@@ -24,7 +24,7 @@
         </div>
         <div>
           <div class="brand-name">Cosedil</div>
-          <div class="brand-sub">Amministrazione</div>
+          <div class="brand-sub">Registro accessi</div>
         </div>
       </div>
       <div class="header-actions">
@@ -58,19 +58,14 @@
         <div class="filters">
           <select id="fUtente"><option value="">Tutti gli utenti</option></select>
           <select id="fApp"><option value="">Tutti i programmi</option></select>
-          <select id="fAzione">
-            <option value="">Tutte le azioni</option>
-            <option value="avvia">Avvio</option>
-            <option value="apri">Apertura</option>
-            <option value="login">Login</option>
-            <option value="abilita">Abilitazioni</option>
-          </select>
+          <!-- le azioni le riempie admin.js con quelle presenti nel registro -->
+          <select id="fAzione"><option value="">Tutte le azioni</option></select>
         </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Data e ora</th><th>Utente</th><th>Programma</th><th>Azione</th></tr>
+            <tr><th>Data e ora</th><th>Utente</th><th>Programma</th><th>Azione</th><th>Dettaglio</th></tr>
           </thead>
           <tbody id="logBody"></tbody>
         </table>
