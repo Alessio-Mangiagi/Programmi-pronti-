@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import type { ReactElement } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/useAuth'
@@ -11,6 +12,7 @@ import WbsPage from './pages/WbsPage'
 import PcqPage from './pages/PcqPage'
 import PcqStructurePage from './pages/PcqStructurePage'
 import ProjectFormsPage from './pages/ProjectFormsPage'
+import ProjectMembersPage from './pages/ProjectMembersPage'
 import CompilePickerPage from './pages/CompilePickerPage'
 import CompileFormPage from './pages/CompileFormPage'
 import TasksPage from './pages/TasksPage'
@@ -61,6 +63,7 @@ export default function App() {
         <Route path="/compila" element={<CompilePickerPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
+        <Route path="/projects/:projectId/persone" element={<ProjectMembersPage />} />
         <Route path="/templates" element={<TemplatesHubPage />} />
         <Route path="/templates/elenco" element={<TemplatesPage />} />
         <Route path="/templates/scelte" element={<TemplateChoicesPage />} />

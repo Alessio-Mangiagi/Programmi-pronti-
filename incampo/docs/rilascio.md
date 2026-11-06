@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))>< -->
 # InCampo: checklist di rilascio
 
 Stato al 2026-10-06. Tutto ciò che si poteva fare nel codice è fatto; quello che resta
@@ -69,7 +70,7 @@ Legenda: **[x]** pronto · **[ ]** da fare · *chi* = chi deve farlo.
 
 ## 6. Go-live — *direzione + referente progetto*
 - [ ] Pilota: un cantiere, pochi utenti, 1–2 settimane; segnalazioni da "Contatta l'amministratore".
-- [ ] Formazione: utenti con `docs/guida-utente.md`, admin con `docs/guida-admin.md`.
+- [ ] Formazione: utenti con la guida `docs/guida/` (capitoli 1-12), admin con il capitolo 10 e `docs/guida-admin.md`.
 - [ ] Cambiare la password annotata in `CREDENZIALI.md` (file locale) e non usare mai in
       produzione gli account demo (`demo1234`).
 

@@ -19,8 +19,8 @@ inventati (commesse *101-003 Sede Acireale* e *C-2024-015 Scuola Via Roma*).
 
 | # | Capitolo | Per chi |
 |---|---|---|
-| 1 | [Entrare in InCampo](01-accesso.md): dal Portale, login, invito, la schermata | tutti |
-| 2 | [Commesse e cantieri](02-commesse-e-cantieri.md): la pagina Progetti, la barra in alto | tutti; creare: Ufficio |
+| 1 | [Entrare in InCampo](01-accesso.md): dal Portale, login, invito, cambiare la password, la schermata | tutti |
+| 2 | [Commesse e cantieri](02-commesse-e-cantieri.md): la pagina Progetti, la barra in alto, le persone del cantiere | tutti; creare: Ufficio |
 | 3 | [Planimetrie e pin](03-planimetrie-e-pin.md): muoversi sulla pianta, segnare un punto | tutti |
 | 4 | [Compilare un modulo](04-moduli.md): campi, foto, firma, non conformità, PDF | tutti |
 | 5 | [Task](05-task.md): creare, assegnare, risolvere, verificare | tutti |

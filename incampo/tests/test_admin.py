@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """Spazio admin: gestione utenti (PATCH /users/{id}) e registro operazioni (GET /audit)."""
 import uuid
 
@@ -24,16 +25,16 @@ def test_login_is_audited_including_failures(client, users):
 
 
 def test_user_management_and_self_protection(client, users):
-    r = client.post("/users", json={"email": "Nuovo@Test.local", "name": "Nuovo", "password": "12345678", "role": "field"})
+    r = client.post("/users", json={"email": "Nuovo@Test.local", "name": "Nuovo", "password": "123456789012", "role": "field"})
     assert r.status_code == 201
     uid = r.json()["id"]
     # aggiorna nome+ruolo, reset password, disattiva
-    r = client.patch(f"/users/{uid}", json={"name": "Nuovo Nome", "role": "manager", "password": "87654321"})
+    r = client.patch(f"/users/{uid}", json={"name": "Nuovo Nome", "role": "manager", "password": "876543210987"})
     assert r.status_code == 200 and r.json()["role"] == "manager" and r.json()["name"] == "Nuovo Nome"
-    assert client.post("/auth/login", json={"email": "nuovo@test.local", "password": "87654321"}).status_code == 200
+    assert client.post("/auth/login", json={"email": "nuovo@test.local", "password": "876543210987"}).status_code == 200
     r = client.patch(f"/users/{uid}", json={"is_active": False})
     assert r.status_code == 200 and r.json()["is_active"] is False
-    assert client.post("/auth/login", json={"email": "nuovo@test.local", "password": "87654321"}).status_code == 401
+    assert client.post("/auth/login", json={"email": "nuovo@test.local", "password": "876543210987"}).status_code == 401
     assert audit(client, action=["auth.login_failed"])["items"][0]["details"]["reason"] == "inactive"
     # lista: i disattivati solo con include_inactive (admin)
     assert uid not in {u["id"] for u in client.get("/users").json()}

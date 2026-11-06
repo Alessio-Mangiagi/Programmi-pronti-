@@ -18,25 +18,25 @@ operazioni**, **Parametri commessa**, **Etichette invito**.
 - Pulsanti su ogni riga:
   - **Attività**: apre il *Registro operazioni* filtrato su quella persona;
   - **Modifica**: nome e ruolo (*Utente aggiornato*);
-  - **Password**: imposta una nuova password (almeno 8 caratteri; *Password di ... reimpostata*).
-    Comunicala alla persona di persona, non per email. Serve anche a chi è entrato
-    solo dal Portale e ora vuole usare l'app sul telefono;
+  - **Password**: imposta una nuova password (almeno 12 caratteri; *Password di ... reimpostata*).
+    Comunicala alla persona di persona, non per email. Di solito non serve a chi entra dal
+    Portale: sul telefono può usare la password del Portale. Ognuno può anche cambiarsi la
+    password da solo (**Cambia password**, capitolo 1);
   - **Disattiva** / **Riattiva**: chiede conferma (*Disattivare ...? Non potrà più accedere;
     i suoi dati restano.*). Non puoi disattivare te stesso né toglierti il ruolo di Amministratore.
 
 ### Nuovo utente
 
 **+ Nuovo utente** apre la finestra con **Nome e cognome**, **Email (login)**,
-**Ruolo** (*Cantiere*, *Ufficio*, *Amministratore*) e **Password iniziale (min. 8 caratteri)**.
+**Ruolo** (*Cantiere*, *Ufficio*, *Amministratore*) e **Password iniziale (min. 12 caratteri)**.
 **Crea utente** → *Utente ... creato*.
 
 ![Finestra Nuovo utente](img/10-nuovo-utente.png)
 
 Di solito non serve: chi entra dal Portale ottiene l'account da solo, gli esterni si
-invitano (capitolo 9). Attenzione: un utente creato qui con ruolo **Cantiere** non vede
-nessun cantiere finché non viene iscritto, e nel programma **non c'è un pulsante per
-iscrivere un utente esistente a un cantiere**. Per chi deve lavorare solo su alcuni
-cantieri usa un **invito** con l'etichetta giusta; altrimenti chiedi all'amministratore di sistema.
+invitano (capitolo 9). Un utente creato qui con ruolo **Cantiere** o **Ufficio** non vede
+nessun cantiere finché non viene iscritto: aprilo dalla pagina **Persone** di ogni cantiere
+in cui deve lavorare (capitolo 2).
 
 ## Segnalazioni
 

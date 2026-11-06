@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import { expect, test, type Page } from '@playwright/test'
 
 // Utenti del seed demo (scripts/seed.py).
@@ -418,7 +419,8 @@ test('spazio admin: crea utente, reset password, disattiva; registro operazioni 
   await login(page, { email: 'admin@fieldview.local', password: 'demo1234' })
   await page.getByRole('link', { name: 'Utenti' }).click()
   await expect(page.getByRole('heading', { name: 'Utenti' })).toBeVisible()
-  await expect(page.locator('.users-table tbody tr')).toHaveCount(4) // i 3 demo + l'admin personale del seed
+  // i 3 utenti demo del seed (l'admin personale non c'è più dal 03/11, scripts/seed.py: credenziali solo da create_admin)
+  await expect(page.locator('.users-table tbody tr')).toHaveCount(3)
 
   // crea
   await page.getByRole('button', { name: '+ Nuovo utente' }).click()
@@ -434,7 +436,8 @@ test('spazio admin: crea utente, reset password, disattiva; registro operazioni 
 
   // reset password + disattiva (conferma nativa)
   await row.getByRole('button', { name: 'Password' }).click()
-  await page.getByRole('dialog').getByLabel(/Nuova password/).fill('nuova12345')
+  // almeno 12 caratteri (PASSWORD_MIN, stessa regola del server)
+  await page.getByRole('dialog').getByLabel(/Nuova password/).fill('nuova-password-12')
   await page.getByRole('dialog').getByRole('button', { name: 'Reimposta' }).click()
   await expect(page.locator('.toast-success', { hasText: 'reimpostata' })).toBeVisible()
   page.once('dialog', (d) => d.accept())

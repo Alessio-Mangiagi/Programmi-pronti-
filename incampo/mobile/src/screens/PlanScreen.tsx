@@ -1,7 +1,8 @@
+// "><(((º> sabusabu <º)))><"
 import { useFocusEffect } from '@react-navigation/native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useAuth } from '../auth/AuthContext'
 import { getToken } from '../auth/token'
 import { PIN_COLOR } from '../components/PlanViewer'
@@ -106,15 +107,19 @@ type SheetProps = { pinId: string; onClose: () => void; onChanged: () => void; o
 /** Bottom sheet del pin: etichetta, moduli, task, foto; cancellazione. */
 function PinSheet({ pinId, onClose, onChanged, onFill, onOpenTask, canDelete }: SheetProps) {
   const db = useDb()
+  // Rinomina dentro la scheda, con un campo di testo: prima usava Alert.prompt, che esiste solo su iOS,
+  // quindi su Android il titolo non si poteva toccare e il pin restava senza nome (guida, 04/11/2026).
+  // null = non si sta rinominando; la stringa è il testo in modifica.
+  const [labelDraft, setLabelDraft] = useState<string | null>(null)
   const detail = pinDetail(db, pinId)
   if (!detail) return null
   const { pin, submissions, tasks, attachments } = detail
 
-  function rename() {
-    Alert.prompt?.('Etichetta', undefined, (label) => {
-      updatePin(db, pinId, { label: label?.trim() || null })
-      onChanged()
-    }, 'plain-text', pin.label ?? '')
+  function saveLabel() {
+    if (labelDraft === null) return
+    updatePin(db, pinId, { label: labelDraft.trim() || null })   // vuoto = pin senza etichetta
+    setLabelDraft(null)
+    onChanged()
   }
   function remove() {
     Alert.alert('Cancellare il pin?', 'Con tutti i moduli, task e foto collegati.', [
@@ -123,7 +128,6 @@ function PinSheet({ pinId, onClose, onChanged, onFill, onOpenTask, canDelete }: 
         text: 'Cancella',
         style: 'destructive',
         onPress: () => {
-          // "><(((º> sabusabu <º)))><"
           deletePin(db, pinId)
           onChanged()
           onClose()
@@ -136,9 +140,31 @@ function PinSheet({ pinId, onClose, onChanged, onFill, onOpenTask, canDelete }: 
     <View style={sheet.container}>
       <View style={sheet.handle} />
       <View style={styles.row}>
-        <TouchableOpacity onPress={rename} disabled={!Alert.prompt}>
-          <Text style={styles.title}>{pin.label ?? 'Pin senza etichetta'}</Text>
-        </TouchableOpacity>
+        {labelDraft === null ? (
+          <TouchableOpacity onPress={() => setLabelDraft(pin.label ?? '')} accessibilityLabel="Rinomina il pin" style={{ flex: 1 }}>
+            <Text style={styles.title}>{pin.label ?? 'Pin senza etichetta'}</Text>
+            <Text style={styles.muted}>Tocca per rinominare</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.row, { flex: 1, gap: 6 }]}>
+            <TextInput
+              style={[styles.input, { flex: 1, paddingVertical: 8 }]}
+              value={labelDraft}
+              onChangeText={setLabelDraft}
+              onSubmitEditing={saveLabel}
+              placeholder="Etichetta del pin"
+              autoFocus
+              returnKeyType="done"
+              testID="pin-label"
+            />
+            <TouchableOpacity style={[styles.btn, { paddingVertical: 8, paddingHorizontal: 10 }]} onPress={saveLabel}>
+              <Text style={[styles.btnText, { fontSize: 13 }]}>Salva</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setLabelDraft(null)} accessibilityLabel="Annulla la rinomina">
+              <Text style={{ fontSize: 13, color: colors.muted }}>Annulla</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <TouchableOpacity onPress={onClose} accessibilityLabel="Chiudi">
           <Text style={{ fontSize: 22, color: colors.muted }}>×</Text>
         </TouchableOpacity>

@@ -86,8 +86,10 @@ In alto ci sono **Task del progetto** e **I miei task**; in fondo
   **+ Compila modulo**, **Task (N)** (tocca un task per aprirlo), le foto (quelle *da
   caricare* non sono ancora partite) e **Cancella pin** (*Cancellare il pin? Con tutti i
   moduli, task e foto collegati.*).
-- Per **rinominare il pin** si tocca il nome: su iPhone si apre la richiesta *Etichetta*.
-  Su Android il nome non si può toccare: rinomina il pin dal web.
+- Per **rinominare il pin** tocca il nome (sotto c'è scritto *Tocca per rinominare*): al suo
+  posto compare un campo di testo con **Salva** e **Annulla**, uguale su Android e iPhone.
+  Lasciarlo vuoto toglie il nome (*Pin senza etichetta*). Il nome nuovo parte con la
+  prossima sincronizzazione.
 
 ## Compilare un modulo dal telefono
 

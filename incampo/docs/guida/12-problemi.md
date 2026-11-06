@@ -25,9 +25,9 @@ messaggio: riprova quando sei online.*
 
 | Messaggio | Cosa vuol dire | Cosa fare |
 |---|---|---|
-| *Email o password errati* | email o password sbagliate | ricontrolla; se non ricordi la password chiedila all'amministratore |
+| *Email o password errati* | email o password sbagliate | ricontrolla; prova anche la password del Portale; se non ricordi nessuna delle due chiedi all'amministratore |
 | Vieni rimandato al login del Portale | non sei entrato nel Portale (o la sessione è scaduta) | entra nel Portale e riapri InCampo dal suo riquadro |
-| Login di InCampo invece dell'accesso automatico | il Portale non risponde, InCampo non è abilitato per te o il tuo account è disattivato | entra con email e password InCampo; se non le hai, Contatta l'amministratore o scrivigli |
+| Login di InCampo invece dell'accesso automatico | il Portale non risponde, InCampo non è abilitato per te o il tuo account è disattivato | entra con la tua email e la password di InCampo o del Portale; se non funziona, Contatta l'amministratore o scrivigli |
 | *Invito non valido* | link già usato, scaduto (7 giorni) o revocato | chiedi a chi ti ha invitato di usare **Rimanda** |
 | *Campo obbligatorio*, *N campi da correggere* | nel modulo manca qualcosa | compila i campi segnati in rosso |
 | *Modulo salvato ma N allegati non caricati* | il modulo c'è, qualche foto no | apri il modulo, **Modifica**, riaggiungi la foto |

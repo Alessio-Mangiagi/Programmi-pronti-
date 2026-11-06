@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Test autenticazione, ruoli e visibilità per progetto.
 Il `client` di default agisce da admin; `users` fornisce manager/field (membri
@@ -74,12 +75,12 @@ def test_no_token_or_bad_token_is_401(client):
 # ---------- utenti ----------
 
 def test_create_user_admin_only(client, users):
-    r = client.post("/users", json={"email": "New@Test.local", "name": "N", "password": "longenough", "role": "field"})
+    r = client.post("/users", json={"email": "New@Test.local", "name": "N", "password": "lunga-abbastanza", "role": "field"})
     assert r.status_code == 201 and r.json()["email"] == "new@test.local"
-    assert client.post("/users", json={"email": "new@test.local", "name": "N", "password": "longenough"}).status_code == 409
+    assert client.post("/users", json={"email": "new@test.local", "name": "N", "password": "lunga-abbastanza"}).status_code == 409
     assert client.post("/users", json={"email": "a@b.c", "name": "N", "password": "short"}).status_code == 422
-    assert client.post("/users", json={"email": "a@b.c", "name": "N", "password": "longenough", "role": "boss"}).status_code == 422
-    assert client.post("/users", json={"email": "b@b.c", "name": "N", "password": "longenough"},
+    assert client.post("/users", json={"email": "a@b.c", "name": "N", "password": "lunga-abbastanza", "role": "boss"}).status_code == 422
+    assert client.post("/users", json={"email": "b@b.c", "name": "N", "password": "lunga-abbastanza"},
                        headers=users["manager"]["headers"]).status_code == 403
     # manager e admin leggono l'elenco completo (serve per assegnare i task)
     emails = {u["email"] for u in client.get("/users", headers=users["manager"]["headers"]).json()}
@@ -241,3 +242,46 @@ def test_sync_push_validates_user_fks(client, pin):
     assert r["tasks"]["rejected"][0]["reason"] == "assigned_to not found"
     r = push(client, attachments=[{"file_type": "photo"}])
     assert "exactly one" in r["attachments"]["rejected"][0]["reason"]
+
+
+def test_password_minima_unica(client):
+    """Una sola regola (schemas.PASSWORD_MIN = 12) per creazione utenti, reset e inviti; prima 8 dal web e 12
+    dallo script create_admin."""
+    from app.schemas import PASSWORD_MIN
+    from scripts import create_admin
+    assert PASSWORD_MIN == 12 and create_admin.MIN_PASSWORD == PASSWORD_MIN
+    corta = "x" * (PASSWORD_MIN - 1)
+    assert client.post("/users", json={"email": "c@test.local", "name": "C", "password": corta}).status_code == 422
+    assert client.post("/users", json={"email": "c@test.local", "name": "C", "password": corta + "y"}).status_code == 201
+
+
+def test_cambio_password_da_soli(client, users):
+    """POST /auth/me/password: serve la password attuale; gli errori contano come login falliti (stesso blocco),
+    rispondono 400 e non 401; la nuova vale subito e quella vecchia no; resta nel registro."""
+    from tests.conftest import PASSWORD, login
+    h = users["field"]["headers"]
+    url = "/auth/me/password"
+    assert client.post(url, json={"current_password": PASSWORD, "new_password": "corta"}, headers=h).status_code == 422
+    r = client.post(url, json={"current_password": "sbagliata", "new_password": "nuova-password-1"}, headers=h)
+    assert r.status_code == 400 and r.json()["detail"] == "Password attuale errata"
+    assert client.post(url, json={"current_password": PASSWORD, "new_password": PASSWORD}, headers=h).status_code == 422
+    assert client.post(url, json={"current_password": PASSWORD, "new_password": "nuova-password-1"}, headers=h).status_code == 204
+    assert client.post("/auth/login", json={"email": "field@test.local", "password": PASSWORD}).status_code == 401
+    login(client, "field@test.local", "nuova-password-1")
+    azioni = [a["action"] for a in client.get("/audit").json()["items"]]
+    assert "user.password_changed" in azioni
+    fallito = next(a for a in client.get("/audit", params={"action": ["auth.login_failed"]}).json()["items"]
+                   if a["details"].get("reason") == "password_change")
+    assert fallito["actor_email"] == "field@test.local"
+    # senza login niente
+    assert client.post(url, json={"current_password": "x", "new_password": "nuova-password-2"},
+                       headers={"Authorization": ""}).status_code == 401
+
+
+def test_cambio_password_bloccato_dopo_troppi_errori(client, users, monkeypatch):
+    """Il blocco anti brute force di /auth/login vale anche qui: chi ha rubato una sessione non prova password."""
+    from app.routers import users as users_router
+    monkeypatch.setattr(users_router, "LOGIN_MAX_FAILS_PER_IP", 2)
+    h = users["field"]["headers"]
+    body = {"current_password": "sbagliata", "new_password": "nuova-password-1"}
+    assert [client.post("/auth/me/password", json=body, headers=h).status_code for _ in range(3)] == [400, 400, 429]

@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))>< -->
 # Field View
 
 Gestione cantiere tipo Trimble Field View: planimetrie con pin, moduli dinamici,
@@ -5,7 +6,7 @@ task, notifiche, dashboard. Backend FastAPI (SQLite in dev, Postgres in prod),
 web React (`web/`), app Expo offline-first (`mobile/`), logica moduli condivisa
 (`packages/form-core`). Stato: MVP a 30 giorni completato lato codice — vedi
 `ROADMAP.md`, `docs/retrospettiva.md` (cosa manca prima del rilascio) e le guide
-`docs/guida-utente.md` / `docs/guida-admin.md`.
+la guida utente con immagini `docs/guida/` (README.md è l'indice) / `docs/guida-admin.md`.
 
 ## Avvio
 

@@ -66,6 +66,43 @@
         ]
       }
     },
+    "/auth/me/password": {
+      "post": {
+        "summary": "Change My Password",
+        "description": "L'utente collegato cambia la sua password di InCampo (prima poteva solo l'admin, da Utenti).\n\nServe la password attuale: con un token rubato non si prende l'account. Gli errori contano come\ntentativi di login falliti (stesso blocco anti brute force di /auth/login: 429 quando scatta) e\nrispondono 400, non 401, per non far scadere la sessione nel web. La nuova password segue\nPASSWORD_MIN e deve essere diversa dall'attuale. Chi entra solo con la password del portale (utente\ncreato dal portale, password InCampo casuale) non conosce quella attuale: per lui vale quella del portale.",
+        "operationId": "change_my_password_auth_me_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/auth/me/preferences": {
       "patch": {
         "summary": "Update Preferences",
@@ -1349,6 +1386,7 @@
       },
       "post": {
         "summary": "Add Member",
+        "description": "Iscrive al cantiere un utente che esiste già (pagina Cantieri › Persone).\n\nLo fa l'admin o un manager membro del cantiere (assert_project_access). Prima mancava dal web: un utente\ngià registrato si poteva solo reinvitare, e l'invito rifiuta le email già registrate (guida, 04/11/2026).\nUn utente disattivato non si iscrive (409); iscriverlo due volte non fa nulla. Resta nel registro.",
         "operationId": "add_member_projects__project_id__members_post",
         "security": [
           {
@@ -1407,6 +1445,7 @@
     "/projects/{project_id}/members/{user_id}": {
       "delete": {
         "summary": "Remove Member",
+        "description": "Toglie una persona dal cantiere (i suoi pin, moduli e task restano). Resta nel registro.",
         "operationId": "remove_member_projects__project_id__members__user_id__delete",
         "security": [
           {
@@ -5761,7 +5800,7 @@
           },
           "password": {
             "type": "string",
-            "minLength": 8,
+            "minLength": 12,
             "title": "Password"
           }
         },
@@ -6331,6 +6370,26 @@
           "event"
         ],
         "title": "NotificationOut"
+      },
+      "PasswordChange": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 12,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PasswordChange",
+        "description": "POST /auth/me/password: l'utente cambia la sua password dando quella attuale."
       },
       "PcqPreview": {
         "properties": {
@@ -8670,7 +8729,7 @@
           },
           "password": {
             "type": "string",
-            "minLength": 8,
+            "minLength": 12,
             "title": "Password"
           },
           "role": {
@@ -8769,7 +8828,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "minLength": 8
+                "minLength": 12
               },
               {
                 "type": "null"

@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Crea il primo amministratore su un DB di produzione (vuoto, SEED_DEMO=0).
 
@@ -14,8 +15,10 @@ import sys
 
 from app import auth, models
 from app.database import SessionLocal
+from app.schemas import PASSWORD_MIN
 
-MIN_PASSWORD = 12  # più lungo del minimo degli utenti normali: è l'account più potente
+# stessa regola del web, dell'app e degli inviti (prima lo script chiedeva 12 e il web 8)
+MIN_PASSWORD = PASSWORD_MIN
 
 
 def main(argv: list[str] | None = None) -> int:

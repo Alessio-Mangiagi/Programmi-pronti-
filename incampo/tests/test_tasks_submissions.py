@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Test degli endpoint web: /submissions, /tasks, /pins/{id} e della
 validazione delle submission nel sync push.
@@ -168,11 +169,11 @@ def test_update_submission_validates_and_checks_owner(client, project, pin, user
     assert r.status_code == 422 and r.json()["detail"][0]["field"] == "esito"
     # manager sì, altro field no, outsider 403 per progetto
     assert client.patch(url, headers=users["manager"]["headers"], json={"data_json": {"esito": "Conforme"}}).status_code == 200
-    other = client.post("/users", json={"email": "altro@test.local", "password": "password123",
+    other = client.post("/users", json={"email": "altro@test.local", "password": "password1234",
                                         "name": "Altro", "role": "field"}).json()
     client.post(f"/projects/{project['project']['id']}/members", json={"user_id": other["id"]})
     from tests.conftest import login
-    assert client.patch(url, headers=login(client, "altro@test.local"), json={"data_json": {}}).status_code == 403
+    assert client.patch(url, headers=login(client, "altro@test.local", "password1234"), json={"data_json": {}}).status_code == 403
     assert client.patch(url, headers=users["outsider"]["headers"], json={"data_json": {}}).status_code == 403
     assert client.patch("/submissions/nope", json={"data_json": {}}).status_code == 404
 
@@ -188,10 +189,10 @@ def test_delete_attachment_soft(client, project, pin, users):
     assert client.get(f"/pins/{pin}").json()["submissions"][0]["attachments"] == []
     att2 = client.post("/attachments", headers=field, json={"submission_id": sub["id"]}).json()
     from tests.conftest import login
-    other = client.post("/users", json={"email": "altro@test.local", "password": "password123",
+    other = client.post("/users", json={"email": "altro@test.local", "password": "password1234",
                                         "name": "Altro", "role": "field"}).json()
     client.post(f"/projects/{project['project']['id']}/members", json={"user_id": other["id"]})
-    assert client.delete(f"/attachments/{att2['id']}", headers=login(client, "altro@test.local")).status_code == 403
+    assert client.delete(f"/attachments/{att2['id']}", headers=login(client, "altro@test.local", "password1234")).status_code == 403
     assert client.delete(f"/attachments/{att2['id']}", headers=field).status_code == 204
     pulled = client.get("/sync/pull", params={"project_id": project["project"]["id"]}).json()
     assert any(a["id"] == att2["id"] and a["deleted_at"] for a in pulled["attachments"])

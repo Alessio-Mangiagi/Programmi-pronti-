@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import { useCallback, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
@@ -7,7 +8,7 @@ import { useAuth } from '../../auth/useAuth'
 import Loading from '../../components/Loading'
 import Modal from '../../components/Modal'
 import { useToast } from '../../components/useToast'
-import { ROLE_LABEL } from '../../labels'
+import { PASSWORD_MIN, ROLE_LABEL } from '../../labels'
 import { useLoad } from '../../hooks/useLoad'
 
 type Activity = components['schemas']['UserActivityOut']
@@ -266,8 +267,8 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf?: boolean; onD
       </div>
       {!user && (
         <div className="field">
-          <label htmlFor="uf-pass">Password iniziale (min. 8 caratteri)</label>
-          <input id="uf-pass" type="text" autoComplete="off" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <label htmlFor="uf-pass">Password iniziale (min. {PASSWORD_MIN} caratteri)</label>
+          <input id="uf-pass" type="text" autoComplete="off" minLength={PASSWORD_MIN} value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
       )}
       {error && <p className="error">{error}</p>}
@@ -303,8 +304,8 @@ function PasswordForm({ user, onDone }: { user: User; onDone: () => void }) {
     <form onSubmit={submit}>
       <p className="muted small">Comunica la nuova password all'utente di persona. L'operazione viene registrata.</p>
       <div className="field">
-        <label htmlFor="pw-new">Nuova password (min. 8 caratteri)</label>
-        <input id="pw-new" type="text" autoComplete="off" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus />
+        <label htmlFor="pw-new">Nuova password (min. {PASSWORD_MIN} caratteri)</label>
+        <input id="pw-new" type="text" autoComplete="off" minLength={PASSWORD_MIN} value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus />
       </div>
       {error && <p className="error">{error}</p>}
       <div className="row form-actions">

@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """Eventi (outbox) e regole di notifica: ogni cambio di stato produce la riga giusta."""
 import uuid
 
@@ -68,7 +69,7 @@ def test_submission_non_conformity_notifies_project_managers(client, project, pi
     with client.session_factory() as s:
         admin = s.query(models.User).filter(models.User.email == "admin@test.local").first().id
     assert {n[2] for n in notifs(client.session_factory, admin)} == {"submission.created"}  # creatore del progetto = membro
-    outsider_mgr = client.post("/users", json={"email": "mgr2@test.local", "password": "password123", "name": "M2", "role": "manager"}).json()
+    outsider_mgr = client.post("/users", json={"email": "mgr2@test.local", "password": "password1234", "name": "M2", "role": "manager"}).json()
     client.post("/submissions", headers=field, json={"template_id": tpl, "pin_id": pin, "data_json": {"esito": "Non conforme"}})
     assert notifs(client.session_factory, outsider_mgr["id"]) == []
 

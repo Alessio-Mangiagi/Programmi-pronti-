@@ -19,10 +19,10 @@ Quando arrivi dal Portale succede una di queste due cose:
    l'account InCampo con **la stessa email** del tuo utente del Portale. L'email deve
    essere identica: se in InCampo sei registrato con un'altra email, non ti riconosce.
    - Se l'account InCampo non c'è ancora, viene creato in quel momento con il tuo nome:
-     chi è amministratore del Portale entra come **Amministratore**, tutti gli altri
-     come **Ufficio**. L'amministratore di InCampo può poi cambiare il ruolo.
-   - Un account creato così **non ha una password che conosci**: per usare l'app sul
-     telefono chiedi all'amministratore di impostartene una (capitolo 10, pulsante *Password*).
+     chi è amministratore del Portale (o amministratore di InCampo nel Portale) entra come
+     **Amministratore**, tutti gli altri come **Ufficio**. L'amministratore di InCampo può poi cambiare il ruolo.
+   - Un account creato così **non ha una password InCampo che conosci**: sul telefono e
+     nella pagina di login entri con la tua email e la **password del Portale**.
 2. **Vedi la pagina di login di InCampo.** Succede se il Portale non risponde, se
    InCampo non è abilitato per il tuo utente del Portale o se il tuo account InCampo
    è stato disattivato. In questo caso entri con email e password di InCampo, come
@@ -33,16 +33,33 @@ Quando arrivi dal Portale succede una di queste due cose:
 ![Pagina di login di InCampo](img/01-login.png)
 
 1. In **Email o utente** scrivi la tua email (es. `salvatore.grasso@...`).
-2. In **Password** scrivi la password di InCampo.
+2. In **Password** scrivi la password di InCampo oppure quella del **Portale**: vale l'una
+   o l'altra (una password per tutti i programmi della suite).
 3. Clicca **Accedi**. Mentre controlla, il pulsante diventa *Accesso…*.
 
 Se email o password sono sbagliate compare in rosso **Email o password errati**:
 
 ![Errore di login](img/01-login-errore.png)
 
-Controlla le maiuscole e riprova. Se non ricordi la password, chiedila
-all'amministratore di InCampo: non c'è un pulsante "password dimenticata" e
-non c'è una pagina per cambiarsi la password da soli.
+Controlla le maiuscole e riprova. Se non ricordi la password di InCampo, prova quella
+del Portale oppure chiedi all'amministratore di InCampo di reimpostarla: non c'è un
+pulsante "password dimenticata".
+
+## Cambiare la propria password
+
+In basso a sinistra, sotto il tuo nome, c'è **Cambia password**:
+
+1. scrivi la **Password attuale**;
+2. scrivi la **Nuova password** (almeno **12 caratteri**, diversa da quella attuale) e
+   ripetila;
+3. clicca **Cambia password**: compare *Password cambiata*.
+
+![Finestra Cambia password](img/01-cambia-password.png)
+
+Se la password attuale è sbagliata compare *Password attuale errata*; dopo troppi
+errori InCampo blocca i tentativi per qualche minuto, come al login. Se sei sempre
+entrato dal Portale non conosci una password InCampo: usa quella del Portale, oppure
+chiedi all'amministratore di impostartene una.
 
 ## Primo accesso con un invito
 
@@ -53,7 +70,7 @@ collega). Il link si apre anche senza essere entrati nel Portale.
 
 - In alto vedi la tua email, l'etichetta dell'invito (es. *Operaio di cantiere*), il
   **ruolo** e quanti **cantieri** ti vengono assegnati.
-- Scrivi **Il tuo nome**, scegli una password (**almeno 8 caratteri**) e ripetila.
+- Scrivi **Il tuo nome**, scegli una password (**almeno 12 caratteri**) e ripetila.
 - Clicca **Entra in InCampo**: sei già dentro, con i cantieri giusti.
 
 Il link vale **una volta sola** e **scade dopo 7 giorni**. Se compare *Invito non
@@ -68,10 +85,11 @@ invitato di rimandarlo.
   cantieri) e **+ Compila modulo**. Chi è *Ufficio* vede anche **Moduli** e **Inviti**;
   l'*Amministratore* vede in più la sezione **Amministrazione**.
 - Quando apri un cantiere, sotto il suo nome compaiono le sue pagine: **Dashboard**,
-  **Planimetrie**, **WBS**, **Moduli compilati**, **PCQ** (solo Ufficio), **Task**, **I miei task**.
+  **Planimetrie**, **WBS**, **Moduli compilati**, **PCQ** (solo Ufficio), **Task**, **I miei task**
+  e **Persone** (chi fa parte del cantiere, capitolo 2).
 - **In basso a sinistra** ci sono il tuo nome, il ruolo (*Cantiere*, *Ufficio*,
   *Amministratore*), il pulsante **Contatta l'amministratore** (per segnalare un problema,
-  vedi capitolo 12) ed **Esci**.
+  vedi capitolo 12), **Cambia password** ed **Esci**.
 - **In alto** c'è la barra **Commessa / Cantiere**, spiegata nel capitolo successivo.
 
 Per uscire clicca **Esci** in basso a sinistra.

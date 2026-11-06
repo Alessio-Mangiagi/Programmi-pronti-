@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { api, errorMessage } from '../api/client'
@@ -5,6 +6,7 @@ import type { InvitePreview } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import Loading from '../components/Loading'
 import BrandMark from '../components/BrandMark'
+import { PASSWORD_MIN } from '../labels'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Amministratore', manager: 'Ufficio', field: 'Cantiere' }
 
@@ -38,7 +40,7 @@ export default function InviteAcceptPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (password.length < 8) return setError('La password deve avere almeno 8 caratteri')
+    if (password.length < PASSWORD_MIN) return setError(`La password deve avere almeno ${PASSWORD_MIN} caratteri`)
     if (password !== confirm) return setError('Le due password non coincidono')
     setBusy(true)
     const { data, error: err } = await api.POST('/invites/accept', { body: { token, name: name.trim(), password } })
@@ -101,10 +103,10 @@ export default function InviteAcceptPage() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
+            minLength={PASSWORD_MIN}
             required
           />
-          <div className="muted small">Almeno 8 caratteri.</div>
+          <div className="muted small">Almeno {PASSWORD_MIN} caratteri.</div>
         </div>
         <div className="field">
           <label htmlFor="inv-pwd2">Ripeti la password</label>

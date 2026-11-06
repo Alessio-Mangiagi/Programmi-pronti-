@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 from datetime import datetime, timezone
 from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -16,6 +17,12 @@ def to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 # --- Auth / utenti ---
 
+# Lunghezza minima delle password di InCampo, una sola regola per web, app, inviti e scripts/create_admin.py
+# (prima 8 dal web e 12 dallo script). 12 come SkyTower, l'altra app della suite con account propri: la
+# password di InCampo è ormai la riserva, perché si entra anche con quella del portale (che ha la sua regola).
+# Le password già impostate restano valide: la regola vale quando se ne sceglie una nuova.
+PASSWORD_MIN = 12
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -24,7 +31,7 @@ class LoginRequest(BaseModel):
 class UserCreate(BaseModel):
     email: str
     name: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=PASSWORD_MIN)
     role: str = "field"
 
 
@@ -44,7 +51,7 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
-    password: Optional[str] = Field(default=None, min_length=8)
+    password: Optional[str] = Field(default=None, min_length=PASSWORD_MIN)
 
 
 # ---------- Inviti ed etichette (credenziali preimpostate) ----------
@@ -130,7 +137,13 @@ class InvitePreviewOut(BaseModel):
 class InviteAccept(BaseModel):
     token: str
     name: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=PASSWORD_MIN)
+
+
+class PasswordChange(BaseModel):
+    """POST /auth/me/password: l'utente cambia la sua password dando quella attuale."""
+    current_password: str
+    new_password: str = Field(min_length=PASSWORD_MIN)
 
 
 class AuditOut(BaseModel):

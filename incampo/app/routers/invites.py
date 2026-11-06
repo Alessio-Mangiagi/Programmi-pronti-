@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """Etichette d'invito (credenziali preimpostate), inviti e attività utenti."""
 import re
 from datetime import timedelta
@@ -171,9 +172,15 @@ def _invite_out(inv: models.Invite, url: Optional[str] = None) -> schemas.Invite
 
 
 def _send_invite_email(db: Session, invite: models.Invite, url: str, inviter: models.User) -> bool:
-    """Manda l'email d'invito; se SMTP manca o fallisce resta il link da consegnare a mano."""
+    """Manda l'email d'invito; se SMTP manca o fallisce resta il link da consegnare a mano.
+
+    Senza SMTP configurato (sender di sviluppo che scrive solo nel log, `consegna = False`) l'email non
+    parte davvero: `email_sent_at` resta vuoto, così la pagina Inviti dice "consegna tu il link" invece di
+    "Email inviata" (correzione emersa scrivendo la guida, 04/11/2026)."""
     subject, body = inv_lib.email_body(invite, url, inviter.name)
     email_sender, _ = notify.senders_from_env()
+    if not getattr(email_sender, "consegna", True):
+        return False
     try:
         email_sender.send(invite.email, subject, body)
     except Exception as exc:  # noqa: BLE001 - l'invito resta valido anche senza email

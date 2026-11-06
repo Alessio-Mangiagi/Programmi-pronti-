@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Inviti con credenziali preimpostate: etichette (solo admin) e inviti
 (admin e manager), link a uso singolo con scadenza, accettazione pubblica.
@@ -250,6 +251,21 @@ def test_invite_survives_email_failure(client, monkeypatch):
 
 def test_login_works_after_accept(client):
     inv = invite(client, "accesso@test.local")
-    client.post("/invites/accept", json={"token": token_of(inv["url"]), "name": "Accesso",
-                                         "password": PASSWORD})
-    assert login(client, "accesso@test.local")
+    # PASSWORD delle fixture (11 caratteri) è sotto il minimo di 12: qui ne serve una valida
+    r = client.post("/invites/accept", json={"token": token_of(inv["url"]), "name": "Accesso",
+                                             "password": PASSWORD + "-lunga"})
+    assert r.status_code == 201, r.text
+    assert login(client, "accesso@test.local", PASSWORD + "-lunga")
+
+
+def test_senza_smtp_l_invito_non_dice_email_inviata(client, monkeypatch):
+    """Senza SMTP_HOST il sender di sviluppo scrive solo nel log (consegna = False): email_sent_at resta vuoto,
+    così la pagina Inviti dice "consegna tu il link" e non "Email inviata" (guida, 04/11/2026). Vale anche
+    per "Rimanda"."""
+    from app import notify
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    assert isinstance(notify.senders_from_env()[0], notify.ConsoleEmailSender)
+    inv = invite(client, "nosmtp@test.local")
+    assert inv["email_sent_at"] is None and inv["url"]
+    again = client.post(f"/invites/{inv['id']}/resend").json()
+    assert again["email_sent_at"] is None and again["url"] and again["url"] != inv["url"]

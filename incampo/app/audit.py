@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Registro delle operazioni (audit log): chi ha fatto cosa, quando, da dove.
 
@@ -17,7 +18,8 @@ from . import models
 # Catalogo delle azioni: `GET /audit/actions` lo espone alla UI per il filtro.
 ACTIONS = [
     "auth.login", "auth.login_failed",
-    "user.created", "user.updated", "user.password_reset", "user.deactivated", "user.reactivated",
+    "user.created", "user.updated", "user.password_reset", "user.password_changed", "user.deactivated",
+    "user.reactivated",
     "invite_label.created", "invite_label.updated", "invite_label.deleted",
     "invite.created", "invite.resent", "invite.revoked", "invite.accepted", "invite.email_failed",
     "project.created", "project.updated", "project.member_added", "project.member_removed",
@@ -38,6 +40,7 @@ ACTIONS = [
 ACTION_LABELS = {
     "auth.login": "Accesso", "auth.login_failed": "Accesso fallito",
     "user.created": "Utente creato", "user.updated": "Utente modificato", "user.password_reset": "Password reimpostata",
+    "user.password_changed": "Password cambiata dall'utente",
     "user.deactivated": "Utente disattivato", "user.reactivated": "Utente riattivato",
     "invite_label.created": "Etichetta invito creata", "invite_label.updated": "Etichetta invito modificata",
     "invite_label.deleted": "Etichetta invito eliminata",

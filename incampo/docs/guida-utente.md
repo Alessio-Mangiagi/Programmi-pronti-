@@ -1,43 +1,16 @@
-# Field View — guida per il cantiere (1 pagina)
+<!-- "><(((º> sabusabu <º)))>< -->
+# InCampo — guida per chi lo usa: spostata
 
-**Cos'è**: la planimetria del cantiere sul tablet/telefono. Ogni segnalazione è un
-**pin** sulla planimetria: sul pin si compilano i **moduli** (ispezione, punch list,
-diario) e si aprono i **task** da risolvere. Funziona anche senza rete: tutto quello
-che fai viene salvato sul device e inviato appena torna la connessione.
+Questa pagina era la guida di una pagina del vecchio prototipo "Field View" e non è più aggiornata.
+La guida di InCampo, con le immagini e un capitolo per argomento, è in **[docs/guida/](guida/README.md)**:
 
-## Primo avvio
-1. Apri l'app, entra con email e password che ti ha dato l'ufficio.
-2. Trascina verso il basso la lista progetti: scarica planimetrie, moduli e task.
-   Aspetta che la barra in alto dica **"Sync hh:mm"** — da lì sei operativo anche offline.
+| Per | Capitolo |
+|---|---|
+| entrare (Portale, login, invito, cambiare la password) | [1. Entrare in InCampo](guida/01-accesso.md) |
+| commesse, cantieri e persone del cantiere | [2. Commesse e cantieri](guida/02-commesse-e-cantieri.md) |
+| planimetrie e pin | [3. Planimetrie e pin](guida/03-planimetrie-e-pin.md) |
+| moduli e task | [4. Moduli](guida/04-moduli.md) · [5. Task](guida/05-task.md) |
+| l'app sul telefono, anche offline | [11. App sul telefono](guida/11-app-mobile.md) |
+| messaggi d'errore e domande frequenti | [12. Problemi](guida/12-problemi.md) |
 
-## Sulla planimetria
-- **Pizzica** per lo zoom, **trascina** per spostarti, **doppio tap** per tornare a tutta planimetria.
-- **Tocca un pin** per vedere moduli, task e foto. I colori: 🔴 task aperto ·
-  🟠 assegnato · 🟢 risolto · ⚪ verificato · 🔵 solo moduli.
-- **Tieni premuto** un punto per aggiungere un pin.
-
-## Compilare un modulo
-1. Tocca il pin → **+ Compila modulo** → scegli il modulo.
-2. Compila i campi (* = obbligatorio). Foto: **Scatta** o **Galleria**; firma con il dito.
-3. **Salva modulo**. Se chiudi a metà, ritrovi la **bozza** la prossima volta (anche sul
-   web, nello stesso browser: lì foto e firma vanno riaggiunte).
-4. Un esito **"Non conforme"** avvisa automaticamente l'ufficio.
-
-## Task
-- **Task del progetto** / **I miei task** dalla lista planimetrie.
-- Apri un task → **Prendo in carico** → quando hai finito **✓ Risolto** (con foto,
-  consigliato). L'ufficio verifica e chiude.
-
-## La barra in alto
-- **Sync 10:32** — tutto inviato. **N in attesa** — modifiche da inviare (partono da sole
-  con la rete). **Offline** — nessuna rete, continua pure a lavorare.
-- **⚠ problemi** — qualcosa è stato rifiutato: tocca per vedere e scegliere "Riprova" o "Scarta".
-- Tocca la barra per forzare una sincronizzazione.
-
-## Prima di uscire (Esci)
-Se la barra dice "N in attesa", sincronizza prima: uscendo i dati non inviati vanno persi.
-
-**Problemi?** Usa **Contatta l'amministratore**: sul web è il pulsante in basso nella barra
-laterale, nell'app è in fondo alle liste Progetti e Planimetrie. Scrivi cosa stavi facendo e
-cosa è successo; il messaggio arriva all'amministratore insieme al cantiere e alla pagina in
-cui ti trovi. Dall'app serve la connessione.
+Il file resta solo perché lo citano vecchi appunti e checklist (sostituito il 06/11/2026).

@@ -43,10 +43,18 @@ Subito dopo si apre la finestra con il **link d'invito**:
 - Il link **vale una volta sola** e **scade dopo 7 giorni**. Non resta salvato da nessuna
   parte: se lo perdi, usa **Rimanda** per generarne un altro.
 
-> **Attenzione: copia sempre il link.** La finestra può dire *Email inviata a ...* anche
-> quando il server non ha la posta configurata: in quel caso l'email non parte davvero
-> (finisce solo nel registro tecnico del server). Se la persona non riceve niente entro
-> pochi minuti, mandale tu il link.
+La finestra dice il vero sull'email:
+
+- *Email inviata a ...* solo se il server ha la posta configurata e l'email è partita;
+- *Email non inviata (SMTP non configurato o non raggiungibile): consegna tu il link a ...*
+  quando la posta non c'è o non ha funzionato. In questo caso **copia il link** e mandalo
+  tu alla persona; nell'elenco degli inviti, sotto l'email, resta la nota *email non partita*.
+
+Anche con l'email partita conviene tenere il link: se la persona non riceve niente entro
+pochi minuti (spam, indirizzo sbagliato), mandaglielo tu.
+
+Un invito serve solo a chi **non ha ancora un account**: per aggiungere a un cantiere una
+persona già registrata usa la pagina **Persone** del cantiere (capitolo 2).
 
 ## Rimandare o revocare
 

@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Invio delle notifiche pendenti (email SMTP, push Expo).
 
@@ -115,7 +116,13 @@ class PushSender(Protocol):
 
 
 class ConsoleEmailSender:
-    """Sviluppo senza SMTP: stampa nel log e considera inviato."""
+    """Sviluppo senza SMTP: stampa nel log e considera inviato.
+
+    `consegna = False`: l'email non arriva a nessuno. Chi deve dire il vero all'utente (l'invito: "email
+    inviata" oppure "consegna tu il link") lo controlla; le notifiche del worker restano "sent" come sempre.
+    """
+    consegna = False
+
     def send(self, to: str, subject: str, body: str) -> None:
         log.info("EMAIL a %s | %s\n%s", to, subject, body)
 

@@ -58,8 +58,28 @@ i cantieri restano.*).
 
 ![Finestra Nuovo cantiere](img/02-nuovo-cantiere.png)
 
-Il passo successivo è caricare le planimetrie (capitolo 3) e far entrare le persone
-con un invito (capitolo 9).
+Il passo successivo è caricare le planimetrie (capitolo 3) e far entrare le persone:
+chi ha già un account si iscrive dalla pagina **Persone** (qui sotto), chi è nuovo si
+invita (capitolo 9).
+
+## Persone del cantiere
+
+Dentro un cantiere, **Persone** nel menu a sinistra mostra chi ne fa parte (nome, email,
+ruolo). Ufficio e Cantiere vedono solo i cantieri in cui compaiono qui; gli
+Amministratori li vedono tutti.
+
+![Persone del cantiere](img/02-persone.png)
+
+Chi è *Ufficio* (iscritto al cantiere) o *Amministratore* può anche:
+
+- **iscrivere una persona che ha già un account**: sceglila nel menu *— scegli un utente
+  già registrato —* e clicca **Iscrivi al cantiere** (*... iscritto al cantiere*). Da quel
+  momento vede il cantiere, anche sull'app dopo la prossima sincronizzazione;
+- **togliere una persona** con **Togli**: chiede conferma (*Togliere ... dal cantiere? I suoi
+  pin, moduli e task restano.*).
+
+Un utente disattivato non si può iscrivere. Iscrizioni e rimozioni restano nel
+**Registro operazioni** (*Membro aggiunto*, *Membro rimosso*).
 
 ## Dentro un cantiere
 

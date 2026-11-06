@@ -38,6 +38,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change My Password
+         * @description L'utente collegato cambia la sua password di InCampo (prima poteva solo l'admin, da Utenti).
+         *
+         *     Serve la password attuale: con un token rubato non si prende l'account. Gli errori contano come
+         *     tentativi di login falliti (stesso blocco anti brute force di /auth/login: 429 quando scatta) e
+         *     rispondono 400, non 401, per non far scadere la sessione nel web. La nuova password segue
+         *     PASSWORD_MIN e deve essere diversa dall'attuale. Chi entra solo con la password del portale (utente
+         *     creato dal portale, password InCampo casuale) non conosce quella attuale: per lui vale quella del portale.
+         */
+        post: operations["change_my_password_auth_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me/preferences": {
         parameters: {
             query?: never;
@@ -442,7 +468,14 @@ export interface paths {
         /** List Members */
         get: operations["list_members_projects__project_id__members_get"];
         put?: never;
-        /** Add Member */
+        /**
+         * Add Member
+         * @description Iscrive al cantiere un utente che esiste già (pagina Cantieri › Persone).
+         *
+         *     Lo fa l'admin o un manager membro del cantiere (assert_project_access). Prima mancava dal web: un utente
+         *     già registrato si poteva solo reinvitare, e l'invito rifiuta le email già registrate (guida, 04/11/2026).
+         *     Un utente disattivato non si iscrive (409); iscriverlo due volte non fa nulla. Resta nel registro.
+         */
         post: operations["add_member_projects__project_id__members_post"];
         delete?: never;
         options?: never;
@@ -460,7 +493,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove Member */
+        /**
+         * Remove Member
+         * @description Toglie una persona dal cantiere (i suoi pin, moduli e task restano). Resta nel registro.
+         */
         delete: operations["remove_member_projects__project_id__members__user_id__delete"];
         options?: never;
         head?: never;
@@ -2052,6 +2088,16 @@ export interface components {
             event: components["schemas"]["EventOut"];
         };
         /**
+         * PasswordChange
+         * @description POST /auth/me/password: l'utente cambia la sua password dando quella attuale.
+         */
+        PasswordChange: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
          * PcqPreview
          * @description Struttura letta da un PCQ Word/PDF (anteprima: niente scritto).
          */
@@ -3136,6 +3182,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    change_my_password_auth_me_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

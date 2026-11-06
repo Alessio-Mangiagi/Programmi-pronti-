@@ -1,7 +1,9 @@
+// "><(((º> sabusabu <º)))><"
 import { NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { isManager, useAuth } from '../auth/useAuth'
 import { useProject } from '../hooks/useProject'
 import CommessaBar from '../commesse/CommessaBar'
+import ChangePassword from './ChangePassword'
 import ContactAdmin from './ContactAdmin'
 import Icon from './Icon'
 import { compileUrl } from '../routes'
@@ -64,6 +66,8 @@ export default function Layout() {
               <NavLink to={`/projects/${projectId}/tasks?mine=1`} className={({ isActive }) => (isActive && mine ? 'active' : '')}>
                 I miei task
               </NavLink>
+              {/* chi fa parte del cantiere; admin e ufficio iscrivono qui gli utenti già registrati */}
+              <NavLink to={`/projects/${projectId}/persone`}>Persone</NavLink>
             </>
           )}
         </nav>
@@ -71,6 +75,7 @@ export default function Layout() {
           <div>{user?.name}</div>
           <div className="muted small">{ROLE_LABEL[user?.role ?? ''] ?? user?.role}</div>
           {user?.role !== 'admin' && <ContactAdmin projectId={projectId} projectName={project?.name} />}
+          <ChangePassword />
           <button className="btn" onClick={logout}>
             Esci
           </button>

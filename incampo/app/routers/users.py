@@ -64,6 +64,33 @@ def me(user: models.User = Depends(current_user)):
     return user
 
 
+@router.post("/auth/me/password", status_code=204)
+def change_my_password(payload: schemas.PasswordChange, request: Request, db: Session = Depends(get_db),
+                       user: models.User = Depends(current_user)):
+    """L'utente collegato cambia la sua password di InCampo (prima poteva solo l'admin, da Utenti).
+
+    Serve la password attuale: con un token rubato non si prende l'account. Gli errori contano come
+    tentativi di login falliti (stesso blocco anti brute force di /auth/login: 429 quando scatta) e
+    rispondono 400, non 401, per non far scadere la sessione nel web. La nuova password segue
+    PASSWORD_MIN e deve essere diversa dall'attuale. Chi entra solo con la password del portale (utente
+    creato dal portale, password InCampo casuale) non conosce quella attuale: per lui vale quella del portale.
+    """
+    if _login_locked(db, user.email, request):
+        raise HTTPException(429, "Troppi tentativi falliti: riprova tra qualche minuto")
+    if not auth.verify_password(payload.current_password, user.password_hash):
+        audit.record(db, "auth.login_failed", actor_email=user.email, request=request,
+                     details={"reason": "password_change"})
+        db.commit()
+        raise HTTPException(400, "Password attuale errata")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(422, "La nuova password deve essere diversa da quella attuale")
+    user.password_hash = auth.hash_password(payload.new_password)
+    user.updated_at = utcnow()
+    audit.record(db, "user.password_changed", user, entity_type="user", entity_id=user.id, request=request,
+                 details={"email": user.email})
+    db.commit()
+
+
 @router.patch("/auth/me/preferences", response_model=schemas.UserOut)
 def update_preferences(payload: schemas.PreferencesUpdate, db: Session = Depends(get_db),
                        user: models.User = Depends(current_user)):
