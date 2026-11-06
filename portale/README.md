@@ -63,6 +63,7 @@ npm test
 - **OCR Documenti** — OCR ed estrazione — porta `5179`
 - **Scadenzario** — scadenze e adempimenti — porta `5180`
 - **Verifica Requisiti** — ricerca e checklist sui documenti — porta `5185` — *riservata*
+- **Timbri per VFP** — da PNG a timbro `.stamp` per VFP — porta `5205` — *riservata*
 - **Ponte Trimble** — PCQ, computi e SAL verso Trimble — porta `3011` — *solo admin*
 - **Auguri** — compleanni su WhatsApp — porta `3000` — *solo admin*
 
@@ -154,7 +155,7 @@ Su un server centrale in LAN, certe postazioni possono **elevare ad amministrato
 ```
 
 - `ip`: esatto (`192.168.1.10`), CIDR (`192.168.1.0/24`) o `*`.
-- `apps`: `ddt`, `agente`, `confronta`, `ocr`, `scadenzario`, `requisiti`, `trimble`, `auguri`, `portale`, oppure `*` (tutte).
+- `apps`: `ddt`, `agente`, `confronta`, `ocr`, `scadenzario`, `requisiti`, `incampo`, `skytower`, `magazzino`, `timbri`, `trimble`, `auguri`, `portale`, oppure `*` (tutte).
 - Le modifiche valgono ai **nuovi accessi**: chi è già loggato deve rifare login.
 
 ## Avvisi dei programmi

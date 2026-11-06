@@ -26,7 +26,7 @@ const {
   portalHostname, appUrl, isSuiteOrigin,
   loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,
   parseNetstatPid,
-  rispondiAssistente, APPS,
+  rispondiAssistente, APPS, sottodominio,
   rowsToUsers, csvToRows,
   accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,
@@ -319,6 +319,25 @@ test("appAssegnabili: tutte le app tranne le adminOnly, con il flag riservata", 
   const ids = appAssegnabili().map((a) => a.id);
   assert.deepEqual(ids, APPS.filter((a) => !a.adminOnly).map((a) => a.id));
   assert.equal(appAssegnabili().find((a) => a.id === 'requisiti').riservata, true);
+});
+
+// Timbri per VFP (06/11/2026): riservata per scelta dell'utente — la vede solo
+// chi ha la spunta in Abilitazioni — e la cartella deve poter fare da sottodominio.
+test('Timbri per VFP: riservata, assegnabile, fuori dal default, cartella valida come sottodominio', () => {
+  const t = APPS.find((a) => a.id === 'timbri');
+  assert.ok(t, 'registrata in APPS');
+  assert.equal(t.riservata, true);
+  assert.equal(appsPredefinite().includes('timbri'), false, 'non arriva a tutti da sola');
+  assert.ok(appAssegnabili().some((a) => a.id === 'timbri'), 'ha la sua casella');
+  assert.equal(sottodominio(t), 'timbri-vfp');
+  assert.ok(fs.existsSync(path.join(__dirname, '..', t.dir, t.launch)), 'il launcher esiste');
+});
+
+test('APPS: porte e cartelle tutte diverse (una porta doppia spegnerebbe un programma con l\'altro)', () => {
+  const porte = APPS.map((a) => a.porta);
+  assert.equal(new Set(porte).size, porte.length);
+  const dir = APPS.map((a) => a.dir);
+  assert.equal(new Set(dir).size, dir.length);
 });
 
 test('clientIp: normalizza IPv6 mappato e ::1', () => {

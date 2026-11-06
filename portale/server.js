@@ -269,6 +269,25 @@ const APPS = [
     dettaglio: 'Dice dove sta il materiale e quanto ce n\'è, e dove stanno i mezzi, scansionando il codice a barre con un lettore o con la fotocamera del telefono. Il materiale entra da solo dai DDT estratti dal Lettore DDT; i mezzi a nolo dalle pratiche di VFP Transfer. Stampa le etichette con Code 128 e QR.',
   },
   {
+    id: 'timbri',
+    nome: 'Timbri per VFP',
+    sottotitolo: 'Da PNG a timbro .stamp',
+    fai: 'Creare un timbro per VFP',
+    guida: 'Carichi il PNG della firma o del timbro, scegli posizione e formato pagina e scarichi il file .stamp da importare in VFP. Le immagini restano sul tuo PC.',
+    desc: 'Converte immagini PNG (firme, loghi, timbri scansionati) in file .stamp OpenText per le annotazioni di VFP, con sfondo trasparente.',
+    porta: 5205,
+    dir: 'timbri-vfp',
+    launch: 'avvia.vbs',
+    tipo: 'HTML + Node.js',
+    // Riservata per scelta (06/11/2026): decide l'admin chi la usa, con le
+    // spunte in Gestione > Abilitazioni. La pagina lavora solo nel browser;
+    // server.js della cartella c'è per il login del portale (gate SSO, id 'timbri').
+    riservata: true,
+    kw: ['timbri', 'timbro', 'timbrificio', 'stamp', 'file stamp', 'firma', 'firme', 'logo', 'png', 'opentext',
+      'brava', 'annotazione', 'annotazioni', 'markup', 'vfp', 'vpf', 'viewpoint', 'sfondo trasparente'],
+    dettaglio: 'Trasforma un\'immagine PNG — una firma, un logo, un timbro scansionato — in un file .stamp (OpenText) da importare tra i timbri delle annotazioni di VFP. Scegli posizione, risoluzione e formato pagina, e se serve rende trasparente lo sfondo bianco della scansione. Le immagini vengono elaborate nel browser e non lasciano il PC.',
+  },
+  {
     id: 'trimble',
     nome: 'Ponte Trimble',
     sottotitolo: 'Da PDF a file su Trimble',
@@ -511,7 +530,7 @@ function ensureData() {
     // Solo "rules" è attivo. Gli "_esempi" servono da modello: copiali in "rules"
     // e sostituisci gli IP con quelli reali della tua rete. Vuoto = nessuna regola.
     const esempio = {
-      _leggimi: 'Regole IP -> admin per-app. app validi: ddt, agente, confronta, ocr, scadenzario, requisiti, magazzino, trimble, auguri, portale. "*" = tutte. ip: esatto ("192.168.1.10"), CIDR ("192.168.1.0/24") o "*". Le modifiche valgono ai NUOVI accessi: chi è già loggato deve rifare login.',
+      _leggimi: 'Regole IP -> admin per-app. app validi: ddt, agente, confronta, ocr, scadenzario, requisiti, incampo, skytower, magazzino, timbri, trimble, auguri, portale. "*" = tutte. ip: esatto ("192.168.1.10"), CIDR ("192.168.1.0/24") o "*". Le modifiche valgono ai NUOVI accessi: chi è già loggato deve rifare login.',
       _esempi: [
         { ip: '192.168.1.50', apps: ['portale'], nota: 'PC direzione: admin del portale' },
         { ip: '192.168.1.0/24', apps: ['ddt', 'ocr'], nota: 'rete uffici: admin in DDT e OCR' },
@@ -523,7 +542,7 @@ function ensureData() {
   }
   if (!fs.existsSync(WARM_FILE)) {
     writeFileAtomic(WARM_FILE, JSON.stringify({
-      _leggimi: 'App da avviare "a caldo" all\'avvio del portale e tenere accese, così sono già pronte quando qualcuno le apre (id: ddt, agente, confronta, ocr, scadenzario, requisiti, magazzino; "all" = tutte). Utile sul server centrale. Sovrascrivibile con la variabile d\'ambiente WARM_APPS (es. WARM_APPS=ocr,agente). Vuoto = nessun pre-avvio.',
+      _leggimi: 'App da avviare "a caldo" all\'avvio del portale e tenere accese, così sono già pronte quando qualcuno le apre (id: ddt, agente, confronta, ocr, scadenzario, requisiti, incampo, skytower, magazzino, timbri; "all" = tutte). Utile sul server centrale. Sovrascrivibile con la variabile d\'ambiente WARM_APPS (es. WARM_APPS=ocr,agente). Vuoto = nessun pre-avvio.',
       apps: [],
     }, null, 2));
   }

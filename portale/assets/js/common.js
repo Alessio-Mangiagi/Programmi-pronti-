@@ -48,5 +48,7 @@ const ICONS = {
   // InCampo ha già un logo suo nei colori Cosedil (incampo/web/public/favicon.svg): si usa quello.
   incampo: '<svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0c4577"/><path d="M16 26s-7-6-7-12.5a7 7 0 0 1 14 0C23 20 16 26 16 26z" fill="#fff"/><circle cx="16" cy="13.5" r="3" fill="#65bc7b"/></svg>',
   trimble: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/></svg>',
+  // Timbri per VFP: timbro di gomma (pomello, manico, piastra, riga d'inchiostro).
+  timbri: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.5" r="2.5"/><path d="M10.5 8v3.5M13.5 8v3.5"/><rect x="5" y="11.5" width="14" height="4.5" rx="1"/><path d="M4 20h16"/></svg>',
   auguri: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/></svg>'
 };

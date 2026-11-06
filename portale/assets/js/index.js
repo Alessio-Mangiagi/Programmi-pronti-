@@ -18,6 +18,7 @@ const TRATTI = {
   incampo: '<path d="M3 7v13l6-2 6 2 6-2V5l-6 2-6-2-3 1"/><path d="M15 7v5"/><path d="M9 5v13"/><path d="M15 21v-2"/>',
   skytower: '<path d="M9 21V9l3-6 3 6v12"/><path d="M9 13h6M9 17h6"/><path d="M4 21h16"/><path d="M5 21v-5l4-2M19 21v-5l-4-2"/>',
   magazzino: '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  timbri: '<circle cx="12" cy="5.5" r="2.5"/><path d="M10.5 8v3.5M13.5 8v3.5"/><rect x="5" y="11.5" width="14" height="4.5" rx="1"/><path d="M4 20h16"/>',
   auguri: '<path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/>',
 };
 const icona = (id) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${TRATTI[id] || TRATTI.ddt}</svg>`;
