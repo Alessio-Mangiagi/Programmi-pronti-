@@ -18,6 +18,7 @@ on:
       - 'verifica-requisiti/**'
       - 'ponte-trimble/**'
       - "auguri/**"
+      - 'timbri-vfp/**'
       - 'shared/**'
       - '.github/workflows/ci-suite.yml'
   pull_request:
@@ -28,6 +29,7 @@ on:
       - 'verifica-requisiti/**'
       - 'ponte-trimble/**'
       - "auguri/**"
+      - 'timbri-vfp/**'
       - 'shared/**'
       - '.github/workflows/ci-suite.yml'
 
@@ -69,6 +71,12 @@ jobs:
             node: 20.x
             installa: 'si'
             comandi: node --check src/server.js && npm test
+          # Timbri per VFP: solo moduli core, come il portale (niente npm ci).
+          - nome: timbri-vfp
+            cartella: timbri-vfp
+            node: 20.x
+            installa: 'no'
+            comandi: npm test
 
     name: ${{ matrix.nome }}
     defaults:

@@ -50,6 +50,7 @@ $porte = @(
     @{ Nome = 'InCampo';             Porta = 5190 },
     @{ Nome = 'SkyTower';            Porta = 5195 },
     @{ Nome = 'Magazzino Operativo'; Porta = 5200 },
+    @{ Nome = 'Timbri per VFP';      Porta = 5205 },
     @{ Nome = 'Ponte Trimble';       Porta = 3011 },
     @{ Nome = 'Auguri';              Porta = 3000 }
 )

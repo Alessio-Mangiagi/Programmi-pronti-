@@ -17,6 +17,7 @@ Ogni cartella ha il nome dell'app, e sul server lo stesso nome diventa il suo in
 | `incampo/` | InCampo — gestione cantiere: planimetrie, moduli, task; web e app mobile | 5190 | Python + React |
 | `skytower/` | SkyTower — CDE ISO 19650: documenti e revisioni di commessa, approvazioni, RFI (riservata) | 5195 | Python + React |
 | `magazzino-operativo/` | Magazzino Operativo — giacenze materiali e posizione mezzi con codice a barre, alimentato dai DDT | 5200 | Python |
+| `timbri-vfp/` | Timbri per VFP — da PNG a timbro `.stamp` per le annotazioni di VFP (riservata) | 5205 | HTML + Node.js zero-dip |
 | `ponte-trimble/` | Ponte Trimble — PCQ, computi e SAL da PDF a Trimble (solo admin) | 3011 | Node.js |
 | `auguri/` | Auguri — compleanni su WhatsApp (solo admin) | 3000 | Node.js |
 
@@ -61,6 +62,7 @@ reverse proxy, ogni app ha un indirizzo col proprio nome:
 | `https://incampo.<dominio>` | InCampo |
 | `https://skytower.<dominio>` | SkyTower |
 | `https://magazzino-operativo.<dominio>` | Magazzino Operativo |
+| `https://timbri-vfp.<dominio>` | Timbri per VFP |
 | `https://ponte-trimble.<dominio>` | Ponte Trimble |
 
 Si attiva con una sola variabile, letta dal portale e dal Caddyfile:

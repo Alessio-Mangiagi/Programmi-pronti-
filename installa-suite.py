@@ -225,6 +225,11 @@ def installa_magazzino(d: Path) -> str:
     crea_venv(d)                                        # come installa.bat
     return "venv + requirements. Porta 5200 (avvia.bat esegue anche database.py)"
 
+def installa_timbri(d: Path) -> str:
+    # Pagina statica + server.js con soli moduli core di Node: niente npm install.
+    richiedi_node("Timbri per VFP")
+    return "nessuna dipendenza (Node puro). Porta 5205"
+
 def installa_incampo(d: Path) -> str:
     vpy = crea_venv(d)                                  # come installa.bat
     richiedi_node("Il frontend di InCampo")
@@ -306,6 +311,7 @@ APPS = [
     ("incampo",     "InCampo - gestione cantiere, web e app mobile (porta 5190)", "incampo",            installa_incampo),
     ("skytower",    "SkyTower - documenti di commessa CDE ISO 19650 (porta 5195)", "skytower",          installa_skytower),
     ("magazzino",   "Magazzino Operativo - giacenze e mezzi con barcode (porta 5200)", "magazzino-operativo", installa_magazzino),
+    ("timbri",      "Timbri per VFP - da PNG a timbro .stamp (porta 5205)",       "timbri-vfp",          installa_timbri),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),
