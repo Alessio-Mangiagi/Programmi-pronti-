@@ -18,7 +18,8 @@ stanno le librerie di verifica (`pyhanko-certvalidator`, `asn1crypto`, `cryptogr
 
 `shared\firma\installa.bat` (una volta, serve la rete): crea `.venv` con Python 3.12, installa
 `requirements.txt` e scarica gli elenchi ufficiali. Gli `avvia.bat` dei programmi lo lanciano da soli se `.venv`
-manca. Su Linux/Docker: un Python con `requirements.txt` e la variabile `FIRMA_PYTHON` che punta a lui.
+manca. Se più programmi partono insieme al primo avvio, la cartella `.installazione.lock` fa installare uno alla
+volta (gli altri aspettano; un lock abbandonato da un'installazione interrotta si scavalca dopo 5 minuti). Su Linux/Docker: un Python con `requirements.txt` e la variabile `FIRMA_PYTHON` che punta a lui.
 
 ## Cosa fa
 

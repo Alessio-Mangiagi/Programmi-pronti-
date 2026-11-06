@@ -36,3 +36,4 @@ ocr-documenti/LT*.pdf
 
 # Motore della firma digitale: elenchi eIDAS scaricati (rigenerabili) e lock
 shared/firma/cache/
+shared/firma/.installazione.lock/
