@@ -83,14 +83,21 @@ def rileva_device():
 
 def prova_lettura(ocr):
     """Prova di lettura su un'immagine generata qui (testo nero su bianco, ben leggibile).
-    False = il motore non ha trovato NESSUN testo.
+    False = il motore non ha ritrovato il testo scritto ("CONTRATTO 2026 PROVA").
 
     Perché: su GPU troppo nuove per i kernel del paddle installato (es. RTX serie 50,
     compute capability 12.0, con paddle CUDA 12.6) l'inferenza non solleva errori ma il
     rilevamento restituisce zero box: ogni pagina usciva vuota ("txt:0ch blocchi:0") e il
     contratto risultava senza dati, in silenzio. Con questa prova il worker se ne accorge
     all'avvio e ripiega sulla CPU. Se la prova stessa non si può fare (PIL o font
-    mancanti, errore imprevisto) si risponde True: meglio non bloccare un motore buono."""
+    mancanti, errore imprevisto) si risponde True: meglio non bloccare un motore buono.
+
+    Non basta "almeno un blocco": a volte la stessa GPU restituisce UN blocco grande
+    quanto l'immagine con caratteri a caso ('v�v�.�^1{15s…', confidenza 100), memoria
+    non inizializzata. Contarlo come lettura riuscita teneva la GPU (06/11/2026: un banco
+    di prova intero a pagine vuote, e lo stesso poteva capitare al server). Si pretende di
+    ritrovare almeno una delle parole scritte; una lettera sbagliata dall'OCR non basta a
+    perderle tutte e tre."""
     try:
         import tempfile
         from PIL import Image, ImageDraw, ImageFont
@@ -104,7 +111,10 @@ def prova_lettura(ocr):
         os.close(fd)
         try:
             img.save(png)
-            return len(ocr_pagina(ocr, png)) > 0
+            letto = " ".join(b["text"] for b in ocr_pagina(ocr, png))
+            # solo lettere e cifre maiuscole: "CONTRATTO2026PROVA" o "CONTRATT0 2026 PROVA"
+            pulito = "".join(c for c in letto.upper() if c.isascii() and c.isalnum())
+            return any(parola in pulito for parola in ("CONTRATTO", "2026", "PROVA"))
         finally:
             os.remove(png)
     except Exception as e:
@@ -160,7 +170,7 @@ def costruisci_ocr():
             )
             # GPU che "funziona" ma non legge nulla (vedi prova_lettura) → si passa alla CPU
             if device != "cpu" and not prova_lettura(ocr):
-                print(f"[worker] device {device}: nessun testo sull'immagine di prova "
+                print(f"[worker] device {device}: testo di prova non ritrovato sull'immagine "
                       f"(GPU non supportata da questo paddle?) — passo alla CPU", file=sys.stderr)
                 continue
             return ocr, f"PaddleOCR {versione} ({det.split('_')[0]}, {device.upper()})"
@@ -176,7 +186,7 @@ def costruisci_ocr():
                         device=device,
                     )
                     if device != "cpu" and not prova_lettura(ocr):
-                        print(f"[worker] device {device}: nessun testo sull'immagine di prova — passo alla CPU", file=sys.stderr)
+                        print(f"[worker] device {device}: testo di prova non ritrovato sull'immagine — passo alla CPU", file=sys.stderr)
                         continue
                     return ocr, f"PaddleOCR {versione} ({det.split('_')[0]}, {device.upper()})"
                 except TypeError:
