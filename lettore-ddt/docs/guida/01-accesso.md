@@ -30,10 +30,12 @@ che fai finché resti dentro, cioè per
 - i documenti che vanno in **SkyTower** (il PDF della bolla e l'Excel della conversione);
 - i **carichi in magazzino** (i materiali della bolla entrano nel cantiere di quella commessa).
 
-![Scegliere la commessa all'ingresso](img/24-scelta-commessa.png)
+![Scegliere la commessa all'ingresso: un utente con due commesse abilitate e la sua cartella precedente](img/24-scelta-commessa.png)
 
 1. Cerca la commessa per codice, nome o cliente, oppure scorri l'elenco: sono le commesse del **registro della
-   suite** (le stesse di InCampo, SkyTower e Magazzino). Quella proposta è l'ultima che hai usato.
+   suite** (le stesse di InCampo, SkyTower e Magazzino) in cui puoi lavorare, vedi qui sotto. Nell'immagine
+   Marco Russo ha abilitate 101-003 e C-2024-015 più la sua cartella di prima; la 101-006, che c'è nel
+   registro, per lui non compare. Quella proposta è l'ultima che hai usato.
 2. Clicca la commessa e poi **CONFERMA**: la pagina si ricarica con la commessa scelta.
 
 **Quali commesse vedi.** Nell'elenco ci sono solo le commesse in cui puoi lavorare:
