@@ -99,9 +99,14 @@ if cosedil_sso is not None:
 
 # PDF firmati digitalmente (.p7m, CAdES): li apre e ne verifica la firma il motore comune della suite
 # (shared/firma, README lì e CONTRATTI.md §10). busta.py è solo libreria standard: le librerie di verifica stanno
-# nell'ambiente shared/firma/.venv, che busta.apri richiama come processo separato. Senza il modulo (exe o
-# Docker fuori dalla suite) i .p7m danno un messaggio chiaro, il resto del confronto funziona come prima.
-if not getattr(sys, "frozen", False):
+# nell'ambiente shared/firma/.venv, che busta.apri richiama come processo separato. Senza il modulo (Docker fuori
+# dalla suite, exe senza la cartella accanto) i .p7m danno un messaggio chiaro, il resto del confronto funziona.
+# Nell'exe PyInstaller busta.py NON sta nel bundle (ConfrontaPDF.spec non lo include, apposta): si importa dal
+# disco, da FIRMA_DIR o da <cartella dell'exe>\shared\firma, dove lo copia shared\firma\copia-motore.bat. Così
+# busta.py trova accanto a sé firma.py e il .venv del motore, che dentro l'exe non potrebbero stare.
+if getattr(sys, "frozen", False):
+    sys.path.insert(0, os.environ.get("FIRMA_DIR") or str(Path(sys.executable).resolve().parent / "shared" / "firma"))
+else:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared" / "firma"))
 try:
     import busta as firma_busta
@@ -503,17 +508,21 @@ def apri_busta(path: Path, nome: str) -> tuple[Path, dict | None]:
         testa = fh.read(TESTA_BUSTA)
     if firma_busta is None:
         if nome.lower().endswith(EXT_FIRMATA):
+            # busta.py non importato: exe senza la cartella shared\firma accanto, o Docker fuori dalla suite
             raise DocumentError(f"«{nome}» è firmato digitalmente (.p7m) ma questa installazione non ha il "
-                                "componente della firma digitale (shared/firma).")
+                                "componente della firma digitale: copiare la cartella shared\\firma della suite "
+                                "accanto al programma (o indicarla con FIRMA_DIR) e riavviarlo.")
         return path, None
     if not firma_busta.e_busta_firmata(testa, nome):
         return path, None
     dati = path.read_bytes()
     try:
         contenuto, nome_doc, rapporto = firma_busta.apri(dati, nome)
-    except firma_busta.FirmaNonInstallata:
+    except firma_busta.FirmaNonInstallata as exc:
+        # il messaggio del client dice già cosa fare: "in installazione, riprovare fra qualche minuto" (la prima
+        # busta avvia da sola installa.bat in disparte) oppure quale installa.bat lanciare a mano
         raise DocumentError(f"«{nome}» è firmato digitalmente (.p7m) ma il componente della firma digitale non è "
-                            "installato: lanciare shared\\firma\\installa.bat (una volta, serve la rete).") from None
+                            f"pronto. {exc}") from None
     except firma_busta.BustaIllegibile as exc:
         raise DocumentError(f"«{nome}»: {exc}") from None
     except Exception as exc:                         # noqa: BLE001 - verifica fallita (rete, tempo scaduto)

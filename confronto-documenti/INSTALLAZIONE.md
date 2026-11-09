@@ -121,8 +121,18 @@ revoca OCSP/CRL, marca temporale): vedi `shared/firma/README.md` e
 `shared/suite/CONTRATTI.md` §10. Installazione: `shared\firma\installa.bat`, che
 `avvia.vbs` e `Avvia con console.bat` lanciano da soli se `shared/firma/.venv`
 manca. Variabili del motore: `FIRMA_ELENCHI`, `FIRMA_ELENCHI_ORE`,
-`FIRMA_CACHE_DIR`, `FIRMA_ANCORE_EXTRA`, `FIRMA_PYTHON`. Exe PyInstaller e Docker
-(senza `shared/`): i `.p7m` rispondono con un messaggio, il resto funziona.
+`FIRMA_CACHE_DIR`, `FIRMA_ANCORE_EXTRA`, `FIRMA_PYTHON`, `FIRMA_DIR`. Se il programma
+parte senza i suoi script (servizio, exe) e `.venv` del motore manca, la prima busta
+avvia da sola `installa.bat` in disparte e risponde "riprovare fra qualche minuto".
+
+**Exe (PyInstaller).** `build-exe.bat` costruisce `dist\ConfrontaPDF.exe` e gli copia
+accanto il motore in `dist\shared\firma` (`shared\firma\copia-motore.bat`): si
+distribuisce la cartella `dist` intera. L'exe importa `busta.py` da quella cartella (o da
+`FIRMA_DIR`); sul PC di destinazione per i `.p7m` serve Python 3.12 e la rete la prima
+volta (`shared\firma\installa.bat`, o lo fa l'exe da solo alla prima busta). Senza la
+cartella `shared\firma` accanto i `.p7m` danno un messaggio che dice di copiarla; il
+resto del confronto funziona. Docker: la cartella `shared/` non c'è, i `.p7m` rispondono
+con lo stesso messaggio.
 
 ## Dati salvati
 

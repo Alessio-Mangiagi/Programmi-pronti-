@@ -3,7 +3,12 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('ui', 'ui')]
 binaries = []
-hiddenimports = []
+# Firma digitale (.p7m): busta.py, il client del motore comune, NON entra nel bundle. Il server lo importa dal
+# disco, da <cartella dell'exe>/shared/firma (o FIRMA_DIR), dove va copiato il motore con
+# ../shared/firma/copia-motore.bat (lo fa build-exe.bat): lì busta.py trova firma.py e il .venv con le librerie
+# di verifica, che dentro l'exe non possono stare. Un modulo letto dal disco usa però la libreria standard del
+# bundle: queste sono quelle che gli servono, elencate perché l'analisi di PyInstaller non le vede.
+hiddenimports = ['base64', 'binascii', 'json', 're', 'subprocess', 'tempfile', 'time', 'pathlib']
 tmp_ret = collect_all('pymupdf')
 # "><(((º> sabusabu <º)))><"
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

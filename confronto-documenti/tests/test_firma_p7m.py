@@ -71,7 +71,11 @@ class MotoreFinto:
     def apri(self, dati, nome=None, *, verifica=True, rete=True, timeout=180):
         self.chiamate.append(verifica)
         if self.comportamento == "non installato":
-            raise self.FirmaNonInstallata("manca .venv")
+            raise self.FirmaNonInstallata("Componente firma digitale non installato: lanciare "
+                                          r"C:\suite\shared\firma\installa.bat (serve Python 3.12 e la rete)")
+        if self.comportamento == "in installazione":
+            raise self.FirmaNonInstallata("Componente firma digitale in installazione (...): riprovare fra "
+                                          "qualche minuto")
         if self.comportamento == "rotta":
             raise self.BustaIllegibile("Firma staccata: la busta non contiene il documento")
         if self.comportamento == "verifica fallita" and verifica:
@@ -117,8 +121,11 @@ def test_motore_non_installato_o_assente_messaggio_chiaro(tmp_path, motore, monk
     motore("non installato")
     with pytest.raises(DocumentError, match="installa.bat"):
         server.apri_busta(_busta(tmp_path), "offerta.pdf.p7m")
-    monkeypatch.setattr(server, "firma_busta", None)          # exe/Docker senza shared/firma
-    with pytest.raises(DocumentError, match="componente della firma digitale"):
+    motore("in installazione")                                # prima busta: installa.bat partito in disparte
+    with pytest.raises(DocumentError, match="riprovare fra qualche minuto"):
+        server.apri_busta(_busta(tmp_path), "offerta.pdf.p7m")
+    monkeypatch.setattr(server, "firma_busta", None)          # exe senza shared\firma accanto, Docker
+    with pytest.raises(DocumentError, match="copiare la cartella shared"):
         server.apri_busta(_busta(tmp_path), "offerta.pdf.p7m")
 
 
