@@ -27,7 +27,7 @@ con gli utenti di prova (Com Admin, Com Im, Des Lead, Sub1 User…).
 2. [Commesse e cartelle](02-commesse-e-cartelle.md) — progetti, cartelle, condivisioni, aree riservate
 3. [Documenti e revisioni](03-documenti-e-revisioni.md) — caricare, condividere, pubblicare, cercare, scaricare
 4. [Naming dei file](04-naming.md) — regola dei nomi, rinomina automatica, prenotazioni, filigrana
-5. [Visualizzatore e annotazioni](05-visualizzatore-e-annotazioni.md) — PDF, ricerca nel testo, confronto, commenti, documenti firmati digitalmente (.p7m)
+5. [Visualizzatore e annotazioni](05-visualizzatore-e-annotazioni.md) — PDF, ricerca nel testo, confronto, commenti, documenti firmati digitalmente (.p7m), timbri sui PDF
 6. [Workflow e processi](06-workflow-e-processi.md) — approvazioni, editor a scacchiera, processi, libreria, chiarimenti e modifiche
 7. [RFI — richieste di informazioni](07-rfi.md)
 8. [Transmittal — trasmissioni ufficiali](08-transmittal.md)

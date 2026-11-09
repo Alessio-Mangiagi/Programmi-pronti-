@@ -1162,3 +1162,66 @@ nuovo" dà quella di oggi. Non gestiti per ora: firme staccate (`.p7s`), buste c
 verifica della firma PAdES dentro un PDF (il PDF si legge già come prima). Test: `tests/test_firma_p7m.py`
 (motore finto per il flusso, motore vero con l'ente certificatore di prova se `shared/firma/.venv` c'è),
 `packages/iso19650/tests`, e2e `firma.spec.ts`; scenario U57.
+
+## ADR-56 — Timbri sui PDF: il PDF timbrato è una nuova revisione WIP, con traccia di chi e quando
+
+**Contesto.** Il 09/11/2026 l'utente chiede di "inglobare una versione di Timbri in SkyTower" (scelta 4a): mettere
+sulle pagine dei PDF la firma scansionata, il logo, «Approvato», il timbro dell'impresa con lo sfondo reso
+trasparente come fa il programma della suite *Timbri per VFP* (`timbri-vfp/`, che resta com'è: produce file
+`.stamp` per le annotazioni di VFP), e avere il PDF timbrato come nuova revisione con traccia di chi ha timbrato e
+quando. Fino ad allora in SkyTower c'erano le annotazioni (fuori dal file) e la filigrana (sul file scaricato, non
+archiviata).
+
+**Decisione.**
+- **Libreria dei timbri** (migrazione 0045, tabella `cde.stamps`, `modules/stamps.py`): un timbro è un PNG con
+  trasparenza su S3 (`stamps/<organizzazione>/<id>.png`). Tre ambiti: **personale** (la propria firma: la vede e
+  la usa solo il proprietario, in tutte le sue commesse), **dell'organizzazione** (logo, timbro dell'impresa: lo
+  crea l'amministratore dell'organizzazione, lo usano tutti i colleghi in tutte le commesse), **della commessa**
+  («Approvato DL», «Visto CSE»: lo crea il Project Admin, lo usano tutti i membri, di ogni organizzazione). RLS:
+  visibilità = chi lo può usare; creazione e modifica solo da chi lo gestisce (`cde.stamp_manageable`), sempre
+  nella propria organizzazione. I timbri **non si cancellano**: si disattivano (le revisioni già timbrate e il
+  registro restano sensati); si cambiano solo nome e attivazione (privilegio di colonna), l'immagine no.
+- **Scontorno**: lo stesso algoritmo di Timbri per VFP ("color to alpha" sul colore di sfondo stimato dal bordo,
+  tolleranza 0–60%). Il PNG salvato lo prepara l'**API** (`cde_api/timbri.py`, Pillow + numpy; immagini oltre
+  2000 px rimpicciolite, oltre 40 Mpx rifiutate); il browser fa la stessa cosa solo per l'anteprima
+  (`components/timbri/scontorno.ts`, test unitari con lo stesso risultato del server). L'immagine arriva in
+  base64 dentro il JSON (8 MB, `CDE_TIMBRO_IMMAGINE_MAX_BYTES`): l'API non accetta multipart.
+- **Timbrare** (`POST /revisions/{id}/timbra`): il visualizzatore manda, per ogni timbro, pagina e rettangolo in
+  **frazioni della pagina come la si vede** (origine in alto a sinistra, come le annotazioni). Il server trasferisce
+  l'eventuale /Rotate nel contenuto (come la filigrana) e disegna una sovrapposizione grande quanto l'area visibile
+  (intersezione CropBox/MediaBox, la stessa che mostra pdf.js) con fpdf2, fusa con pypdf solo sulle pagine
+  timbrate; l'immagine sta nel rettangolo senza deformarsi. A richiesta, sotto il timbro, la didascalia «Timbrato
+  da Nome Cognome il gg/mm/aaaa hh:mm»: la scrive il server (nome dell'utente, ora nel fuso della commessa), non il
+  browser.
+- **Nuova revisione**: il PDF timbrato diventa la **WIP successiva** (sempre S0, come il salvataggio di OnlyOffice)
+  con lo stesso nome di file e il commento «Timbrata in piattaforma (timbri) a partire dalla P01.01»; antivirus,
+  impronta, testo per la ricerca e anteprime come per ogni file (job `cde.verify_file`). La revisione di partenza
+  resta com'era. Regole di una revisione nuova: si timbra l'**ultima** revisione del documento (qualunque stato:
+  «Approvato» su una tavola pubblicata dà una WIP da condividere e pubblicare di nuovo), serve **WRITE** sulla
+  cartella, documento non archiviato, e durante un **workflow** vale `cde.assert_can_add_revision`: bloccato (423)
+  tranne per chi ha il compito riaperto da una richiesta di modifiche (ADR-51), come per OnlyOffice (ADR-54).
+  Il controllo si ripete al salvataggio (se nel frattempo è arrivata un'altra revisione: 409).
+- **Traccia**: nel registro attività (catena di hash) `REVISION_UPLOADED` con `via: timbri` e `REVISION_STAMPED` con
+  revisione di partenza e nuova, timbri usati (id, nome, ambito, pagina), didascalia; `STAMP_CREATED` e
+  `STAMP_UPDATED` per la libreria.
+- **Documenti firmati**: una busta **.p7m non si timbra** (409 `firmato`): la firma riguarda il file originale e il
+  timbro la romperebbe; il visualizzatore non offre «Timbra» sul documento contenuto. Si timbra il PDF prima di
+  firmarlo, o se ne carica una copia non firmata. Un **PDF con firma PAdES** (campo /Sig compilato) si timbra solo
+  dopo una conferma esplicita (409 `pdf_firmato`, poi `accetta_firma_pdf`): la revisione timbrata non ha più una
+  firma valida (la conserva quella di partenza) e il registro lo dice (`pdf_signature_dropped`).
+- Impostazioni: `CDE_TIMBRI_PDF_MAX_BYTES` (100 MB: il PDF si legge tutto in memoria); PDF protetti da password
+  rifiutati con un messaggio.
+
+**Alternative scartate.** Timbri come annotazioni sovrapposte (fuori dal file): non viaggerebbero con il PDF
+scaricato o trasmesso, e un timbro di approvazione deve stare sul documento. Timbrare la revisione sul posto: le
+revisioni sono immutabili (impronta SHA-256, ISO 19650). Scontorno solo nel browser con il PNG già pronto dal
+client: il server non potrebbe garantire cosa archivia; per l'anteprima il browser basta. Timbri solo
+dell'organizzazione: la firma personale non deve essere usabile dai colleghi, «Approvato DL» deve valere per tutte
+le organizzazioni della commessa.
+
+**Conseguenze.** Un PDF timbrato durante una richiesta di modifiche entra nel workflow come una revisione
+caricata. Le revisioni timbrate restano anche se il timbro viene poi disattivato. Non gestiti per ora: timbri
+ruotati, timbri su immagini o disegni CAD (solo PDF), copia dei timbri della commessa nei modelli di commessa
+(ADR-52). Test: `tests/test_api_timbri.py` (scontorno, posizione con pagine ruotate e CropBox controllata
+rendendo il PDF con pdfium, firma PAdES, permessi e visibilità, nuova revisione e registro, revisione pubblicata,
+buste .p7m, workflow), `unit/scontorno.test.ts`, e2e `timbri.spec.ts`; scenario U58.

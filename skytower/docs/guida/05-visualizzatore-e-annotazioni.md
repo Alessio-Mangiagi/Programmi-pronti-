@@ -119,3 +119,65 @@ la revoca non si era potuta controllare.
 Mentre il server apre la busta compare «Il server sta aprendo la busta firmata e verificando la firma»; se la
 busta non si apre (file rovinato, componente della firma non installato sul server) il messaggio dice perché e
 **Scarica il file firmato** resta disponibile. **Scarica** dà sempre il `.p7m` originale con la firma.
+
+## 5.8 Timbri: firma, logo, «Approvato» sui PDF
+
+Un **timbro** è un'immagine (la tua firma su un foglio bianco, il logo dell'impresa, «Approvato DL») da mettere
+sulle pagine di un PDF. Il PDF timbrato diventa una **nuova revisione in WIP** del documento: la revisione da cui
+parti resta com'era, e il registro attività dice chi ha timbrato, quando, con quali timbri.
+
+### I timbri della commessa
+
+Scheda **Timbri** della commessa: i timbri divisi in tre gruppi.
+
+| Gruppo | Chi lo crea | Chi lo usa |
+|---|---|---|
+| **Della commessa** (es. «Approvato DL», «Visto CSE») | il Project Admin | tutti i membri della commessa, di ogni organizzazione |
+| **Della mia organizzazione** (logo, timbro dell'impresa) | l'amministratore della tua organizzazione | tutti i tuoi colleghi, in tutte le commesse |
+| **Personale** (la tua firma, la tua sigla) | tu | solo tu, in tutte le tue commesse |
+
+![La scheda Timbri della commessa](img/05-timbri-libreria.png)
+
+**Nuovo timbro**:
+
+1. **Scegli l'immagine** (PNG o JPG, fino a 8 MB): una foto dritta o una scansione.
+2. Dai un **nome** e scegli il gruppo (quelli che non puoi creare sono spenti).
+3. **Scontorna lo sfondo** (acceso di solito) rende trasparente il foglio bianco, come fa *Timbri per VFP*:
+   l'anteprima a scacchi a destra mostra come sarà il timbro. Alza la **tolleranza** se restano aloni o la grana
+   della carta, abbassala se il timbro perde dettagli (le righe sottili della firma).
+4. **Crea il timbro**.
+
+![Nuovo timbro: immagine caricata e anteprima con lo sfondo trasparente](img/05-timbro-nuovo.png)
+
+Un timbro non si cancella: **Disattiva** lo toglie dalla scelta (le revisioni già timbrate restano), **Riattiva** lo
+rimette, **Rinomina** ne cambia il nome. Lo può fare solo chi lo ha in carico (te per i tuoi, l'amministratore
+dell'organizzazione, il Project Admin). **Mostra i disattivati** li fa vedere tutti.
+
+### Timbrare un PDF
+
+1. Apri il PDF nel visualizzatore e clicca **Timbra** (c'è se puoi caricare revisioni in quella cartella e stai
+   guardando l'ultima revisione). A destra si apre **Timbra il documento**.
+2. Scegli un timbro nell'elenco e **clicca sulla pagina** dove metterlo. Trascinalo per spostarlo; tira il
+   quadratino blu in basso a destra per ingrandirlo o rimpicciolirlo (le proporzioni restano); la **×** lo toglie.
+   Puoi mettere più timbri, anche su pagine diverse.
+3. **Sotto i nuovi timbri «Timbrato da … il …»**: con la spunta, sotto il timbro compaiono il tuo nome, la data e
+   l'ora, scritti dal server al momento del salvataggio.
+4. Se vuoi, scrivi una **nota per la revisione** e clicca **Salva come nuova revisione**.
+
+![Timbro messo sulla pagina, pronto da salvare](img/05-timbra-pdf.png)
+
+Il visualizzatore passa da solo alla nuova revisione (es. da P01.01 a **P01.02**, WIP, S0): dopo la verifica
+antivirus la vedi con i timbri al loro posto. Da lì si condivide e si pubblica come ogni revisione.
+
+![La nuova revisione timbrata](img/05-timbro-revisione.png)
+
+Casi particolari:
+
+- Si timbra solo l'**ultima** revisione; se nel frattempo un collega ne ha caricata un'altra, il programma lo dice.
+- Un documento **in approvazione** (workflow in corso) è bloccato come per il caricamento; se ti chiedono
+  modifiche, puoi timbrarlo tu che hai il compito riaperto: la revisione timbrata è quella che il workflow prende.
+- Un PDF tavola **pubblicato** si timbra: nasce una WIP da condividere e pubblicare di nuovo.
+- I **documenti firmati digitalmente** (`.pdf.p7m`, §5.7) non si timbrano: la firma andrebbe persa. Timbra il PDF
+  prima di firmarlo, o caricane una copia non firmata.
+- Un PDF con **firma digitale dentro** (PAdES) chiede conferma: la nuova revisione non avrà più una firma valida,
+  quella di partenza la conserva.

@@ -43,6 +43,7 @@ Sotto, le schede:
 | **Workflow** | Modelli di approvazione e di processo | [6](06-workflow-e-processi.md) |
 | **Processi** | Processi in corso e conclusi (es. RdA) | [6](06-workflow-e-processi.md#68-processi) |
 | **Membri**, **Organizzazioni**, **Ruoli e permessi**, **Naming**, **Suite Cosedil** | Impostazioni della commessa | [4](04-naming.md), [10](10-amministrazione.md) |
+| **Timbri** | Firme, loghi e timbri («Approvato DL») da mettere sui PDF dal visualizzatore | [5](05-visualizzatore-e-annotazioni.md#58-timbri-firma-logo-approvato-sui-pdf) |
 | **Cruscotto**, **Registro** | Solo per il Project Admin | [10](10-amministrazione.md#105-cruscotto), [11](11-sicurezza-e-registro.md#113-registro-attività) |
 
 Se le schede non stanno tutte nello schermo, usa le frecce ‹ › ai lati della fila.
