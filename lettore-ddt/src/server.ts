@@ -16,6 +16,7 @@ import { eseguiBackupGiornaliero } from './utils/backup';
 import { UPLOAD_FOLDER, OUTPUT_FOLDER, pruneOlderThan } from './routes/helpers';
 import { acquisisciLock, EsitoLock } from '../../shared/node/istanza-unica';
 import { config, APP_DIR } from './config';
+import { avviaMagazzino, avvioAutomatico, fermaMagazzino } from './services/magazzinoProcesso';
 
 // Intervallo porte su cui provare ad avviare il server (fallback se la prima è occupata)
 const PORT_START = 5050;
@@ -121,6 +122,19 @@ async function startServer(port: number): Promise<void> {
     // Temporanei: giro subito e poi periodico (unref: non tiene vivo il processo).
     pulisciTemporanei();
     setInterval(pulisciTemporanei, TEMP_PRUNE_EVERY_MS).unref();
+    // "DDT e Magazzino" (09/11/2026, contratto C1): con il Lettore DDT parte anche il Magazzino
+    // Operativo, se non è già acceso. Non blocca l'avvio: la sezione Magazzino aspetta da sola.
+    if (avvioAutomatico()) {
+      avviaMagazzino()
+        .then((ok) =>
+          logger.info(
+            ok
+              ? 'Magazzino pronto (sezione /magazzino).'
+              : 'Magazzino non avviato: vedi le righe sopra.'
+          )
+        )
+        .catch(() => {});
+    }
   });
 
   // Gestisce errori di binding (es. porta già in uso)
@@ -151,6 +165,9 @@ async function startServer(port: number): Promise<void> {
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+  // Qualunque uscita (Ctrl+C, chiusura per inattività, errore): il Magazzino avviato da noi si ferma
+  // con il Lettore DDT. fermaMagazzino è sincrona: nell'evento 'exit' l'asincrono non gira più.
+  process.on('exit', () => fermaMagazzino());
 }
 
 // Un solo processo per cartella dati: le cache in memoria (data.json,

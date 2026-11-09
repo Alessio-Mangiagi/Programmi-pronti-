@@ -2,21 +2,24 @@
 // skytower.ts — ogni DDT elaborato finisce anche in SkyTower (il CDE della
 // suite), come documento della commessa: l'archivio dei documenti è uno solo.
 //
-// Il Lettore DDT conosce la commessa come `commessaId` dell'utente (es.
-// "demo-augusta"), che non è il codice commessa aziendale ("101-003") con cui
-// SkyTower e le altre app si riconoscono. Il codice si prende dal campo
-// `codiceCommessa` dell'utente (lo imposta l'admin); in mancanza vale il
-// commessaId stesso se esiste nel registro della suite (shared/suite/commesse.json).
+// Dal 09/11/2026 ("DDT e Magazzino") la commessa si sceglie all'ingresso dal registro
+// della suite e la cartella dati è il suo codice ("101-003"): quello è il codice per
+// SkyTower. Per le cartelle di prima ("demo-augusta") vale il campo `codiceCommessa`
+// dell'utente (lo imposta l'admin). Oltre al PDF va anche l'Excel della conversione
+// (inviaExcelASkyTower, senza doppioni: vedi sotto).
 //
 // Mai un errore per l'utente: SkyTower spenta, commessa sconosciuta o PDF
 // mancante finiscono nel log e basta. Si spegne con DDT_SKYTOWER=0.
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
 import { findUserByUsername } from '../models/users';
+import { commessaDataDir, writeFileAtomicSerial } from '../routes/helpers';
 import { estraiConsegne } from './consegne';
 import { extractDdtNumbers } from './ddtArchive';
 import { eBustaFirmata } from './firmaDigitale';
+import { codiceDaCartella } from './commessaSessione';
 
 interface SuiteLink {
   chiama(app: string, metodo: string, percorso: string, opzioni?: Record<string, unknown>): Promise<any>;
@@ -58,12 +61,18 @@ export function tipoDocumento(): string {
   return (String(process.env.DDT_SKYTOWER_TIPO || 'RP').trim().toUpperCase() || 'RP').slice(0, 2);
 }
 
-/** Codice commessa aziendale per un utente/commessaId, '' se non si sa. */
+/**
+ * Codice commessa aziendale per un utente/cartella dati, '' se non si sa.
+ * Dal 09/11/2026 la commessa si sceglie all'ingresso dal registro della suite e la cartella dati È il
+ * codice (services/commessaSessione): se la cartella corrisponde a una commessa del registro vince lei,
+ * anche sul codice scritto a mano sull'account (che resta il ripiego per le cartelle precedenti, es.
+ * "demo-augusta", e per la conversione automatica di cartelle con un nome che non è un codice).
+ */
 export function codiceCommessaPer(utente: string, commessaId: string): string {
+  const dalRegistro = codiceDaCartella(commessaId);
+  if (dalRegistro) return dalRegistro;
   const u = findUserByUsername(utente);
-  const proprio = String((u && u.codiceCommessa) || '').trim();
-  if (proprio) return proprio;
-  return suite.trovaCommessa(commessaId) ? commessaId : '';
+  return String((u && u.codiceCommessa) || '').trim();
 }
 
 /** Titolo e attributi del documento a partire dall'export. */
@@ -143,6 +152,120 @@ export async function inviaDdtASkyTower(o: InvioDdt): Promise<boolean> {
       }
     }
     logger.warn(`SkyTower: ${o.exportName} non archiviato (${err.stato || '?'}): ${err.messaggio || err.message}`);
+    return false;
+  }
+}
+
+// ── Excel della conversione (09/11/2026: su SkyTower va "tutto", risposta "3b") ─────────────────
+// Oltre al PDF va in SkyTower anche l'Excel prodotto dalla conversione, nella stessa commessa e
+// cartella "Suite Cosedil". SkyTower crea un documento NUOVO a ogni invio dalla suite (POST
+// /suite/commesse/{codice}/documenti non fa revisioni), quindi i doppioni si evitano da qui: per ogni
+// export si ricorda l'impronta dei DATI estratti (non dei byte dell'xlsx, che ExcelJS rigenera con la
+// data di creazione dentro) e lo stesso Excel non riparte. Succedeva con "Riscarica" dalla cronologia,
+// che ripassa da /claude-to-excel. Se i dati cambiano (export corretto e risalvato) parte un documento
+// nuovo, con l'identificativo di quello che sostituisce negli attributi. Registro degli invii:
+// data/<cartella>/skytower-inviati.json.
+
+const FILE_INVIATI = 'skytower-inviati.json';
+
+export interface InvioExcel {
+  /** Cartella dati della commessa (data/<commessaId>): da qui anche il codice commessa. */
+  commessaId: string;
+  utente: string;
+  email?: string;
+  /** L'Excel: i byte (flusso manuale, il file si cancella dopo il download) o il percorso (conversione automatica). */
+  excel: Buffer | string;
+  /** Nome del file come lo vede chi lo apre in SkyTower. */
+  nomeFile: string;
+  /** Dati estratti (per titolo, attributi e impronta); senza, l'impronta è quella dei byte. */
+  parsed?: unknown;
+  /** Chiave dell'invio: nome dell'export JSON, o del file cumulativo della conversione automatica. */
+  exportName: string;
+}
+
+interface VoceInviata {
+  impronta: string;
+  identifier?: string;
+  il: string;
+}
+
+function leggiInviati(commessaId: string): Record<string, VoceInviata> {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(commessaDataDir(commessaId), FILE_INVIATI), 'utf8'));
+    return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Impronta dei dati di un export (stabile fra due conversioni identiche). */
+export function improntaDati(parsed: unknown, byte?: Buffer): string {
+  const h = crypto.createHash('sha256');
+  if (parsed !== undefined && parsed !== null) h.update(JSON.stringify(parsed));
+  else if (byte) h.update(byte);
+  return h.digest('hex');
+}
+
+/**
+ * Manda a SkyTower l'Excel di una conversione. true = in SkyTower (anche "c'era già, identico");
+ * false con una riga di log in ogni altro caso (SkyTower spenta, commessa senza codice, file illeggibile):
+ * mai un errore per l'utente, come per il PDF.
+ */
+export async function inviaExcelASkyTower(o: InvioExcel): Promise<boolean> {
+  if (!attivo()) return false;
+  const codice = codiceCommessaPer(o.utente, o.commessaId);
+  if (!codice) {
+    logger.info(`SkyTower: Excel di ${o.exportName} non inviato, nessun codice commessa per "${o.commessaId}"`);
+    return false;
+  }
+  let dati: Buffer;
+  try {
+    dati = Buffer.isBuffer(o.excel) ? o.excel : fs.readFileSync(o.excel);
+  } catch (e) {
+    logger.info(`SkyTower: Excel di ${o.exportName} non inviato, file illeggibile: ${(e as Error).message}`);
+    return false;
+  }
+  if (!dati.length) return false;
+  const chiave = `${o.exportName}#xlsx`;
+  const impronta = improntaDati(o.parsed, dati);
+  const prima = leggiInviati(o.commessaId)[chiave];
+  if (prima && prima.impronta === impronta) {
+    logger.info(`SkyTower: Excel di ${o.exportName} già archiviato (${prima.identifier || 'stesso contenuto'}), non lo rimando`);
+    return true;
+  }
+  const d = o.parsed !== undefined ? descriviDdt(o.parsed, o.commessaId, o.exportName) : null;
+  const base = o.exportName.replace(/\.json$/i, '');
+  const titolo = `${d ? d.titolo : base} (Excel)`.slice(0, 200);
+  const attributi: Record<string, unknown> = { ...(d ? d.attributes : { origine: 'ddt', export: o.exportName }), formato: 'xlsx' };
+  if (prima?.identifier) attributi.sostituisce = prima.identifier;
+  try {
+    const r = await suite.chiama('skytower', 'POST', `/suite/commesse/${encodeURIComponent(codice)}/documenti`, {
+      parametri: {
+        title: titolo,
+        description: `Excel della conversione del Lettore DDT (${base}).`.slice(0, 4000),
+        tipo: tipoDocumento(),
+        attributes: JSON.stringify(attributi),
+      },
+      corpoFile: {
+        dati,
+        tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        nome: /\.xlsx$/i.test(o.nomeFile) ? o.nomeFile : `${o.nomeFile}.xlsx`,
+      },
+      utente: o.utente,
+      email: o.email,
+      timeout: 60000,
+    });
+    const identifier = (r && r.identifier) || '';
+    logger.info(`SkyTower: Excel di ${o.exportName} archiviato nella commessa ${codice} come ${identifier || 'documento'}`);
+    // Registro degli invii riletto subito prima di scrivere: due invii vicini della stessa commessa
+    // (conversione automatica di più file) non si cancellano a vicenda la voce.
+    const inviati = leggiInviati(o.commessaId);
+    inviati[chiave] = { impronta, identifier, il: new Date().toISOString() };
+    await writeFileAtomicSerial(path.join(commessaDataDir(o.commessaId), FILE_INVIATI), JSON.stringify(inviati, null, 1));
+    return true;
+  } catch (e) {
+    const err = e as { stato?: number; messaggio?: string; message?: string };
+    logger.warn(`SkyTower: Excel di ${o.exportName} non archiviato (${err.stato || '?'}): ${err.messaggio || err.message}`);
     return false;
   }
 }

@@ -7,7 +7,7 @@
 // job.json scadono a 7 giorni, quelle righe no.
 import React from 'react';
 import { S } from '../../styles';
-import { api, CartellaSorvegliata, Notify } from './tipi';
+import { api, CartellaSorvegliata, Notify, VoceRegistro } from './tipi';
 
 export function SorveglianzaCard({
   notify,
@@ -19,11 +19,16 @@ export function SorveglianzaCard({
   const [cartelle, setCartelle] = React.useState<CartellaSorvegliata[] | null>(null);
   const [righe, setRighe] = React.useState<string[]>([]);
   const [scanning, setScanning] = React.useState(false);
+  // Elenco del registro della suite: arriva solo all'amministratore, che sceglie da qui la commessa di
+  // ogni cartella (09/11/2026, "DDT e Magazzino": la conversione automatica non ha una sessione a cui
+  // chiederla, quindi la commessa la decide l'admin una volta per cartella).
+  const [registro, setRegistro] = React.useState<VoceRegistro[] | null>(null);
 
   const carica = React.useCallback(async () => {
     try {
       const b = await api('/batch/sorveglianza');
       setCartelle(b.cartelle || []);
+      setRegistro(Array.isArray(b.registro) ? b.registro : null);
     } catch {
       setCartelle([]); // niente permessi o niente config: la card sparisce
     }
@@ -56,6 +61,20 @@ export function SorveglianzaCard({
       notify((e as Error).message, 'error');
     } finally {
       setScanning(false);
+    }
+  };
+
+  const cambiaCommessa = async (input: string, commessa: string) => {
+    try {
+      await api('/batch/sorveglianza/commessa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, commessa }),
+      });
+      notify(`Cartella sulla commessa ${commessa}: i prossimi DDT vanno lì`, 'success');
+      await carica();
+    } catch (e) {
+      notify((e as Error).message, 'error');
     }
   };
 
@@ -116,9 +135,35 @@ export function SorveglianzaCard({
               <div style={{ flex: 1, minWidth: 260 }}>
                 <div style={{ fontWeight: 600, color: '#212326' }}>{c.input}</div>
                 <div style={{ color: '#8a8d92' }}>
-                  → {c.output} · {c.prompt} · ogni {c.ogniMinuti} min · commessa {c.commessa}
+                  → {c.output} · {c.prompt} · ogni {c.ogniMinuti} min
+                  {!registro && <> · commessa {c.codiceRegistro || c.commessa}</>}
                 </div>
+                {!c.codiceRegistro && (
+                  <div style={{ color: '#a35a00', marginTop: 2 }}>
+                    ⚠ La commessa «{c.commessa}» non è nel registro della suite: i DDT non vanno in SkyTower
+                    {registro ? ' — sceglila qui accanto' : ''}.
+                  </div>
+                )}
               </div>
+              {registro && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#434549' }}>
+                  Commessa
+                  <select
+                    value={c.codiceRegistro || ''}
+                    onChange={(e) => e.target.value && cambiaCommessa(c.input, e.target.value)}
+                    style={{ ...S.select, fontSize: 12, padding: '4px 8px', minWidth: 160 }}
+                    aria-label={`Commessa della cartella ${c.input}`}
+                  >
+                    {!c.codiceRegistro && <option value="">{c.commessa} (fuori registro)</option>}
+                    {registro.map((v) => (
+                      <option key={v.codice} value={v.codice}>
+                        {v.codice}
+                        {v.nome ? ` · ${v.nome}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <span style={{ color: c.inAttesa > 0 ? '#0c4577' : '#8a8d92', fontWeight: c.inAttesa > 0 ? 600 : 400 }}>
                 {c.occupata ? 'lavoro in corso' : `${c.inAttesa} PDF in attesa`}
               </span>

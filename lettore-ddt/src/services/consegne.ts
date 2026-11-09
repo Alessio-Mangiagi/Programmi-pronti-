@@ -301,18 +301,43 @@ export function registraExport(
   parsed: any,
   codiceCommessa = ''
 ): Promise<number> {
+  return registraEsportazione(dirCommessa, commessa, exportName, parsed, codiceCommessa).then(
+    (b) => b.righe.length
+  );
+}
+
+/** Il blocco appena scritto nel registro: è quello che va al Magazzino (services/magazzino, contratto C3). */
+export interface BloccoRegistrato {
+  righe: Consegna[];
+  /** Momento del salvataggio (ISO): è l'"impronta" con cui il Magazzino riconosce un blocco già importato. */
+  salvatoIl: string;
+}
+
+/**
+ * Come registraExport, ma restituisce le righe scritte e il loro salvatoIl: dal 09/11/2026 il Lettore
+ * DDT, appena salvato un export, manda al Magazzino proprio questo blocco (carico immediato) invece di
+ * aspettare che il Magazzino passi a rileggere consegne.json. Stessa coda per commessa delle scritture.
+ */
+export function registraEsportazione(
+  dirCommessa: string,
+  commessa: string,
+  exportName: string,
+  parsed: any,
+  codiceCommessa = ''
+): Promise<BloccoRegistrato> {
   return inCoda(dirCommessa, () => {
     const reg = leggiRegistro(dirCommessa, commessa);
     const righe = estraiConsegne(parsed, commessa, exportName);
     const codice = String(codiceCommessa || '').trim();
     if (codice) for (const r of righe) r.codiceCommessa = codice;
+    const salvatoIl = new Date().toISOString();
     if (righe.length) {
-      reg.perExport[exportName] = { salvatoIl: new Date().toISOString(), righe };
+      reg.perExport[exportName] = { salvatoIl, righe };
     } else {
       delete reg.perExport[exportName];
     }
     scriviAtomico(path.join(dirCommessa, FILE_REGISTRO), JSON.stringify(reg));
-    return righe.length;
+    return { righe, salvatoIl };
   });
 }
 

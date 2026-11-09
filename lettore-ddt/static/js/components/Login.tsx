@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface LoginProps {
   onSuccess: (user: { username: string; commessaId: string; displayName: string }) => void;
@@ -9,6 +9,18 @@ export const Login = ({ onSuccess }: LoginProps) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // "DDT e Magazzino" (09/11/2026): chi entra dal portale senza account del Lettore DDT (il DDT non crea
+  // account) arriva qui. Il Magazzino lo può usare lo stesso: glielo si dice invece di lasciarlo davanti
+  // a un login che non lo riguarda. Nome dal portale via /guscio/stato.
+  const [soloPortale, setSoloPortale] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/guscio/stato', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => {
+        if (s && s.portale && s.ddt && !s.ddt.account) setSoloPortale(s.portale.nome || s.portale.username || '');
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +76,18 @@ export const Login = ({ onSuccess }: LoginProps) => {
         <p style={{ fontSize: 13, color: '#434549', margin: '0 0 24px', lineHeight: 1.6 }}>
           Inserisci le credenziali della tua commessa.
         </p>
+
+        {soloPortale !== null && (
+          <div role="note" style={{
+            fontSize: 13, color: '#0c4577', background: '#eef4fa', border: '1px solid #c3d7e8',
+            borderRadius: 6, padding: '10px 12px', margin: '-8px 0 20px', lineHeight: 1.55,
+          }}>
+            {soloPortale ? <><b>{soloPortale}</b>, sei</> : 'Sei'} entrato dal portale ma non hai un account del
+            Lettore DDT: per convertire i DDT entra qui con l'account della commessa o chiedilo
+            all'amministratore. Il magazzino lo puoi usare subito:{' '}
+            <a href="/magazzino/" style={{ color: '#0c4577', fontWeight: 700 }}>vai al Magazzino</a>.
+          </div>
+        )}
 
         <label style={{
           fontFamily: "'Inter','Segoe UI',sans-serif", fontSize: 13, fontWeight: 600,

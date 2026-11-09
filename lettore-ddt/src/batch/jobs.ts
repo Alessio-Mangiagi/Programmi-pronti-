@@ -29,12 +29,18 @@ import {
   writeFileAtomicSerial,
 } from '../routes/helpers';
 import { ddtIndexOfFolder, extractDdtNumbers } from '../services/ddtArchive';
-import { registraExport } from '../services/consegne';
+import { BloccoRegistrato, registraEsportazione } from '../services/consegne';
 import {
   attivo as skytowerAttiva,
   codiceCommessaPer,
   inviaDdtASkyTower,
+  inviaExcelASkyTower,
 } from '../services/skytower';
+import {
+  caricaInMagazzino,
+  caricoImmediatoAttivo,
+  MSG_MAGAZZINO_SPENTO,
+} from '../services/magazzino';
 import { addToPaniere } from '../services/paniere';
 import { registraLavoro } from '../services/registroLavori';
 import { apriDdtFirmato, eBustaFirmata, eNomeFirmato, FirmaDdt } from '../services/firmaDigitale';
@@ -630,7 +636,7 @@ async function startJob(job: BatchJob): Promise<void> {
     // vedono e lo stesso registro può essere contabilizzato due volte.
     if (done > 0) {
       try {
-        archiviaEsiti(job, push);
+        await archiviaEsiti(job, push);
       } catch (e) {
         push(`Archiviazione non riuscita: ${(e as Error).message} (gli Excel restano validi)`);
       }
@@ -667,8 +673,12 @@ async function startJob(job: BatchJob): Promise<void> {
  * (data/<commessa>/json_exports, lo stesso del flusso manuale) e segnala nel
  * diario i numeri DDT già presenti in altri export: è l'avviso "possibile
  * doppia contabilizzazione" che il flusso manuale dà in pagina.
+ *
+ * Dal 09/11/2026 ("DDT e Magazzino") aspetta anche il registro consegne di ogni file e manda subito i
+ * blocchi al Magazzino (contratto C3), con una riga nel diario; e manda a SkyTower, oltre al PDF,
+ * l'Excel di ogni file (o quello cumulativo della "tabella unica"). Per questo è asincrona.
  */
-function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
+async function archiviaEsiti(job: BatchJob, push: (line: string) => void): Promise<void> {
   const folder = commessaJsonFolder(job.commessaId);
   // safeOutputBase(pdfName), non outputName: in modalità "tabella unica" non
   // esiste un .xlsx per PDF, ma il JSON grezzo per PDF viene scritto comunque.
@@ -681,6 +691,17 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
 
   let archiviati = 0;
   let duplicati = 0;
+  // Codice del registro della suite per la cartella del lavoro (commessa scelta all'ingresso da chi ha
+  // avviato il lavoro, o della cartella sorvegliata), lo stesso per tutti i file.
+  const codice = codiceCommessaPer(job.createdBy, job.commessaId);
+  const blocchi: Array<{ export: string; salvatoIl: string; righe: BloccoRegistrato['righe'] }> =
+    [];
+  const excelDaInviare: Array<{
+    path: string;
+    nome: string;
+    parsed?: unknown;
+    exportName: string;
+  }> = [];
   for (const f of okFiles) {
     const jsonName = `${safeOutputBase(f.pdfName)}.json`;
     const sorgente = path.join(job.jsonDir, jsonName);
@@ -717,15 +738,30 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
     );
     // Registro consegne per fornitore (vedi services/consegne): indipendente
     // dalla potatura di json_exports qui sotto. Con il codice commessa del registro della
-    // suite (account di chi ha lanciato il lavoro, o cartella già nel registro): il Magazzino
-    // lo usa per il cantiere dei carichi.
-    registraExport(
-      path.dirname(folder),
-      job.commessaId,
-      jsonName,
-      parsed,
-      codiceCommessaPer(job.createdBy, job.commessaId)
-    ).catch((e) => logger.error(`Registro consegne non aggiornato (${jsonName}): ${e.message}`));
+    // suite: il Magazzino lo usa per il cantiere dei carichi. Il blocco scritto parte subito
+    // verso il Magazzino, dopo il giro (carico immediato).
+    try {
+      const b = await registraEsportazione(
+        path.dirname(folder),
+        job.commessaId,
+        jsonName,
+        parsed,
+        codice
+      );
+      if (b.righe.length)
+        blocchi.push({ export: jsonName, salvatoIl: b.salvatoIl, righe: b.righe });
+    } catch (e) {
+      logger.error(`Registro consegne non aggiornato (${jsonName}): ${(e as Error).message}`);
+    }
+    // L'Excel del file (non c'è in modalità "tabella unica": lì va quello cumulativo, dopo il giro).
+    if (f.outputName && !job.mergeOutput) {
+      excelDaInviare.push({
+        path: path.join(job.outputDir, f.outputName),
+        nome: f.outputName,
+        parsed,
+        exportName: jsonName,
+      });
+    }
     // Archivio unico della suite: il PDF originale va in SkyTower. Con "sposta in _elaborati" il
     // motore l'ha già spostato quando arriviamo qui (lo sposta a fine lavoro, prima di restituire
     // il risultato): il percorso vero è f.elaborato, scritto da onSpostato — col suffisso se c'era
@@ -756,6 +792,65 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
     `${archiviati} export archiviati nell'Archivio DDT della commessa` +
       (duplicati > 0 ? ` — ATTENZIONE: ${duplicati} DDT già contabilizzati altrove` : '')
   );
+
+  // Carico immediato in magazzino (C3): un blocco per export, in fila. Al primo Magazzino spento ci si
+  // ferma (gli altri li prenderà il suo giro periodico da consegne.json, senza doppioni) e lo si dice
+  // una volta sola nel diario.
+  if (blocchi.length && caricoImmediatoAttivo()) {
+    let carichi = 0;
+    let dove = '';
+    let spento = false;
+    for (const b of blocchi) {
+      const esito = await caricaInMagazzino(
+        {
+          cartella: job.commessaId,
+          export: b.export,
+          codiceCommessa: codice,
+          salvatoIl: b.salvatoIl,
+          righe: b.righe,
+        },
+        { utente: job.createdBy }
+      );
+      if (!esito.registrati) {
+        spento = true;
+        break;
+      }
+      carichi += esito.righe || 0;
+      dove = dove || esito.ubicazione || (esito.commessa ? `cantiere ${esito.commessa}` : '');
+      for (const a of esito.avvisi) push(`  Magazzino: ${a}`);
+    }
+    if (carichi > 0)
+      push(
+        `Magazzino: ${carichi} ${carichi === 1 ? 'carico registrato' : 'carichi registrati'}${dove ? ` (${dove})` : ''}.`
+      );
+    if (spento) push(`Magazzino: ${MSG_MAGAZZINO_SPENTO}`);
+  }
+
+  // Excel su SkyTower ("tutto su SkyTower", 09/11/2026): uno per file o quello cumulativo, in fila
+  // (il registro degli invii della commessa si aggiorna uno alla volta). Mai un errore del lavoro.
+  if (job.mergeOutput && job.mergedFile) {
+    excelDaInviare.push({
+      path: path.join(job.outputDir, job.mergedFile),
+      nome: job.mergedFile,
+      exportName: job.mergedFile,
+    });
+  }
+  if (excelDaInviare.length && skytowerAttiva()) {
+    let inviati = 0;
+    for (const x of excelDaInviare) {
+      if (!fs.existsSync(x.path)) continue;
+      const ok = await inviaExcelASkyTower({
+        commessaId: job.commessaId,
+        utente: job.createdBy,
+        excel: x.path,
+        nomeFile: x.nome,
+        parsed: x.parsed,
+        exportName: x.exportName,
+      }).catch(() => false);
+      if (ok) inviati++;
+    }
+    if (inviati > 0) push(`SkyTower: ${inviati} Excel nella commessa.`);
+  }
 }
 
 /**

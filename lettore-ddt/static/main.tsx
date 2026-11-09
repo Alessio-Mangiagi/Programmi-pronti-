@@ -24,8 +24,15 @@ function Root() {
     setUser(null);
   };
 
+  // Dopo un login a mano (account della commessa) la sessione è nuova: la barra comune di "DDT e
+  // Magazzino" (static/guscio/barra.js) rilegge lo stato e richiede la commessa.
+  const entrato = (u: User) => {
+    setUser(u);
+    (window as unknown as { GuscioDdt?: { ricarica: () => void } }).GuscioDdt?.ricarica();
+  };
+
   if (checking) return null;
-  if (!user) return <Login onSuccess={setUser} />;
+  if (!user) return <Login onSuccess={entrato} />;
   return <App user={user} onLogout={handleLogout} />;
 }
 

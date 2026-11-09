@@ -21,7 +21,9 @@ export type ActivityEvent = {
     // "✓ Dati convalidati" dopo il download di un Excel (claude.routes.ts, /log-excel-validation)
     | 'ddt_validated'
     // DDT firmato digitalmente (.p7m) caricato: dettaglio = file ed esito della verifica (06/11/2026)
-    | 'ddt_firmato';
+    | 'ddt_firmato'
+    // Commessa scelta all'ingresso in "DDT e Magazzino" (services/commessaSessione, 09/11/2026)
+    | 'commessa_scelta';
   username: string;
   commessaId: string | null;
   ip: string;

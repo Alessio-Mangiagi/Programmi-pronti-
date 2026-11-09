@@ -102,6 +102,17 @@ export interface CartellaSorvegliata {
   esiste: boolean;
   inAttesa: number;
   occupata: boolean;
+  /** Codice del registro della suite della commessa ('' = commessa fuori registro: niente SkyTower). */
+  codiceRegistro?: string;
+  nomeCommessa?: string;
+}
+
+/** Commessa del registro della suite (GET /batch/sorveglianza → registro, solo per l'admin). */
+export interface VoceRegistro {
+  codice: string;
+  nome: string;
+  cliente?: string;
+  cartella: string;
 }
 
 export const JOB_ATTIVO = (s: Job['status']) => s === 'in-corso' || s === 'in-attesa';

@@ -28,12 +28,21 @@ import {
 import { insertDDTValidation } from '../models/database';
 import { logActivity } from '../models/activityLog';
 import { extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
-import { registraExport } from '../services/consegne';
-import { codiceCommessaPer, inviaDdtASkyTower } from '../services/skytower';
+import { registraEsportazione } from '../services/consegne';
+import { codiceCommessaPer, inviaDdtASkyTower, inviaExcelASkyTower } from '../services/skytower';
+import { caricaInMagazzino, EsitoMagazzino } from '../services/magazzino';
 import { tuttiIPrompt } from '../batch/prompts';
 import { apriDdtFirmato, eBustaFirmata, FirmaDdt, nomeSenzaP7m } from '../services/firmaDigitale';
 
 const router = express.Router();
+
+// Quanto aspetta /claude-to-excel l'esito del carico in magazzino prima di far partire l'Excel (ms).
+const ATTESA_MAGAZZINO_MS = (() => {
+  const n = Number(process.env.DDT_MAGAZZINO_ATTESA_MS);
+  return Number.isFinite(n) && n >= 0 ? n : 6000;
+})();
+const attesa = (ms: number): Promise<null> =>
+  new Promise((r) => setTimeout(() => r(null), ms).unref());
 
 // ── GET /prompts — prompt preimpostati per l'analisi PDF ────────────────────
 // Unica fonte: src/batch/prompts.ts (preset) + data/prompt-custom.json (quelli
@@ -290,43 +299,100 @@ router.post(
       const jsonFolder = commessaJsonFolder(req.commessaId!);
       const jsonFilename = outputFilename.replace(/\.xlsx$/, '.json');
       const jsonPath = path.join(jsonFolder, jsonFilename);
-      // Scrittura serializzata atomica: evita race condition se più utenti salvano simultaneamente
-      writeFileAtomicSerial(jsonPath, JSON.stringify(parsed, null, 2))
-        .then(() => {
+      // Identità del portale (gate SSO), non lo username DDT: se differiscono SkyTower e Magazzino
+      // attribuirebbero il documento o il carico a un omonimo o all'utente tecnico.
+      const chi = {
+        utente: req.cosedil?.username || req.session.username || '',
+        email: req.cosedil?.email || undefined,
+      };
+      // Codice commessa del registro della suite: la cartella stessa quando la commessa è stata scelta
+      // all'ingresso (services/commessaSessione), altrimenti il codice scritto sull'account DDT.
+      const codice = codiceCommessaPer(
+        req.session.username || req.cosedil?.username || '',
+        req.commessaId!
+      );
+      // Scrittura serializzata atomica: evita race condition se più utenti salvano simultaneamente.
+      // La catena finisce con l'esito del carico in magazzino (C3), che torna all'utente in X-Magazzino.
+      const salvataggio: Promise<EsitoMagazzino | null> = writeFileAtomicSerial(
+        jsonPath,
+        JSON.stringify(parsed, null, 2)
+      )
+        .then(async () => {
           logger.info(`JSON salvato: ${path.basename(jsonPath)}`);
-          // Registro consegne per fornitore: sopravvive alla potatura qui sotto. Il codice commessa
-          // del registro della suite viene dall'account DDT (req.session.username: è lui che ha
-          // commessaId e codiceCommessa); il Magazzino lo usa per il cantiere dei carichi.
-          registraExport(
-            path.dirname(jsonFolder),
-            req.commessaId!,
-            jsonFilename,
-            parsed,
-            codiceCommessaPer(req.session.username || req.cosedil?.username || '', req.commessaId!)
-          ).catch((e) =>
-            logger.error(`Registro consegne non aggiornato (${jsonFilename}): ${e.message}`)
-          );
           // Archivio unico della suite: il PDF caricato con /prepare-claude
           // (temp_id) diventa un documento della commessa in SkyTower. Per un .p7m va la busta
           // originale (valore legale); se SkyTower non la accetta, il PDF estratto.
           inviaDdtASkyTower({
             commessaId: req.commessaId!,
-            // identità del portale (gate SSO), non lo username DDT: se differiscono SkyTower attribuirebbe
-            // il documento a un omonimo o all'utente tecnico
-            utente: req.cosedil?.username || req.session.username || '',
-            email: req.cosedil?.email || undefined,
+            ...chi,
             pdfPath: pendente?.path,
             pdfEstrattoPath: pendente?.pdf_estratto,
             parsed,
             exportName: jsonFilename,
           }).catch((e) => logger.warn(`SkyTower: invio ${jsonFilename} fallito: ${e.message}`));
+          let esito: EsitoMagazzino | null = null;
+          try {
+            // Registro consegne per fornitore: sopravvive alla potatura qui sotto. Il blocco appena
+            // scritto va subito al Magazzino (carico immediato, contratto C3 di "DDT e Magazzino").
+            const blocco = await registraEsportazione(
+              path.dirname(jsonFolder),
+              req.commessaId!,
+              jsonFilename,
+              parsed,
+              codice
+            );
+            esito = await caricaInMagazzino(
+              {
+                cartella: req.commessaId!,
+                export: jsonFilename,
+                codiceCommessa: codice,
+                salvatoIl: blocco.salvatoIl,
+                righe: blocco.righe,
+              },
+              chi
+            );
+          } catch (e) {
+            logger.error(
+              `Registro consegne non aggiornato (${jsonFilename}): ${(e as Error).message}`
+            );
+          }
           // Mantieni solo gli ultimi N export JSON per evitare accumulo su disco
           pruneFolder(jsonFolder, appConfig.maxJsonExports);
+          return esito;
         })
-        .catch((err) => logger.error(`Errore salvataggio JSON: ${err.message}`));
+        .catch((err) => {
+          logger.error(`Errore salvataggio JSON: ${err.message}`);
+          return null;
+        });
 
       // Crea file Excel formattato con styling, header frozen, auto-width colonne
       await ExcelService.createXlsxFromData(parsed, outputPath);
+
+      // Su SkyTower va anche l'Excel (09/11/2026, "tutto su SkyTower"): i byte si leggono adesso, perché
+      // il file si cancella dopo il download. Lo stesso Excel già archiviato non riparte (impronta dei dati).
+      try {
+        const excel = fs.readFileSync(outputPath);
+        inviaExcelASkyTower({
+          commessaId: req.commessaId!,
+          ...chi,
+          excel,
+          nomeFile: outputFilename,
+          parsed,
+          exportName: jsonFilename,
+        }).catch((e) =>
+          logger.warn(`SkyTower: Excel di ${jsonFilename} non inviato: ${e.message}`)
+        );
+      } catch (e) {
+        logger.warn(`SkyTower: Excel di ${jsonFilename} illeggibile: ${(e as Error).message}`);
+      }
+
+      // Esito del carico in magazzino nell'intestazione X-Magazzino (JSON codificato): il download non
+      // ha un corpo JSON in cui metterlo. Si aspetta al massimo ATTESA_MAGAZZINO_MS: oltre, l'Excel parte
+      // lo stesso e il carico lo finisce il Magazzino da solo.
+      const esito = await Promise.race([salvataggio, attesa(ATTESA_MAGAZZINO_MS)]);
+      if (esito && esito.messaggio) {
+        res.setHeader('X-Magazzino', encodeURIComponent(JSON.stringify(esito)));
+      }
 
       // Ritorna il file Excel come download con il nome leggibile, poi lo
       // rimuove: l'Excel è rigenerabile dal JSON archiviato.

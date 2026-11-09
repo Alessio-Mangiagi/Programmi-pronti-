@@ -23,6 +23,7 @@ import fornitoriRoutes from './fornitori.routes';
 import dataRoutes from './data.routes';
 // "><(((º> sabusabu <º)))><"
 import systemRoutes from './system.routes';
+import guscioRoutes from './guscio.routes';
 
 const router = express.Router();
 
@@ -126,6 +127,8 @@ router.use(batchRoutes);
 router.use(paniereRoutes);
 router.use(fornitoriRoutes);
 router.use(dataRoutes);
+// Barra comune di "DDT e Magazzino": commessa di sessione (prima dei file statici di /guscio).
+router.use(guscioRoutes);
 // systemRoutes per ultimo: contiene i file statici e la rotta catch-all '/'.
 router.use(systemRoutes);
 

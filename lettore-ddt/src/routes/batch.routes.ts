@@ -24,7 +24,14 @@ import {
 } from './batchAccesso';
 import { asyncHandler } from '../utils/errorHandler';
 import logger from '../utils/logger';
-import { MIN_MINUTI_SCANSIONE, loadBatchConfig, resolveApiKey, resolveDir } from '../batch/config';
+import {
+  MIN_MINUTI_SCANSIONE,
+  impostaCommessaSorvegliata,
+  loadBatchConfig,
+  resolveApiKey,
+  resolveDir,
+} from '../batch/config';
+import { codiceDaCartella, commesseRegistro } from '../services/commessaSessione';
 import { scansionaCartella, statoSorveglianza } from '../batch/sorveglianza';
 import { NOME_REGISTRO, registroPath, ultimeRighe } from '../services/registroLavori';
 import { statoEstrazioneLocale } from '../batch/estraiLocale';
@@ -504,7 +511,44 @@ router.get(
     // ogni utente quali percorsi del server sono in uso dalle altre.
     const tutte = statoSorveglianza();
     const mie = eAdmin(req) ? tutte : tutte.filter((s) => s.commessa === req.commessaId);
-    res.json({ cartelle: mie, minutiMinimi: MIN_MINUTI_SCANSIONE });
+    // Per ogni cartella: la commessa è nel registro della suite? (senza codice i DDT non vanno a
+    // SkyTower e i carichi finiscono in un cantiere che le altre app non conoscono). All'admin anche
+    // l'elenco del registro, per cambiarla dalla card.
+    const cartelle = mie.map((s) => {
+      const codice = codiceDaCartella(s.commessa);
+      const voce = codice ? commesseRegistro().find((c) => c.codice === codice) : undefined;
+      return { ...s, codiceRegistro: codice, nomeCommessa: voce?.nome || '' };
+    });
+    res.json({
+      cartelle,
+      minutiMinimi: MIN_MINUTI_SCANSIONE,
+      ...(eAdmin(req) ? { registro: commesseRegistro() } : {}),
+    });
+  })
+);
+
+// Commessa di una cartella sorvegliata, scelta dall'amministratore fra le commesse del registro della
+// suite (la conversione automatica non ha una sessione a cui chiederla). Scrive batch.config.json.
+router.post(
+  '/batch/sorveglianza/commessa',
+  requireAuth,
+  requireBatchAccess,
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!eAdmin(req)) return res.status(403).json({ error: 'Accesso amministratore richiesto' });
+    const input = typeof req.body?.input === 'string' ? req.body.input : '';
+    const codice = typeof req.body?.commessa === 'string' ? req.body.commessa.trim() : '';
+    const voce = commesseRegistro().find((c) => c.codice === codice);
+    if (!input || !voce)
+      return res.status(400).json({ error: 'Scegli una commessa del registro della suite' });
+    const fatto = impostaCommessaSorvegliata(input, voce.cartella);
+    if (!fatto)
+      return res
+        .status(404)
+        .json({ error: 'Cartella sorvegliata non trovata in batch.config.json' });
+    logger.info(
+      `Sorveglianza: ${input} ora sulla commessa ${voce.codice} (${req.session.username})`
+    );
+    res.json({ ok: true, commessa: voce.cartella, codiceRegistro: voce.codice });
   })
 );
 

@@ -9,7 +9,10 @@ import { readStoredApiKey } from './apiKeyStore';
 import { DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL } from './engine';
 
 export const PROJECT_ROOT = APP_DIR;
-export const CONFIG_PATH = path.join(PROJECT_ROOT, 'batch.config.json');
+// DDT_BATCH_CONFIG solo per i test (src/__tests__/env.ts): dal 09/11/2026 la pagina scrive anche qui
+// (commessa delle cartelle sorvegliate) e un test non deve mai toccare il file dell'installazione.
+export const CONFIG_PATH =
+  process.env.DDT_BATCH_CONFIG || path.join(PROJECT_ROOT, 'batch.config.json');
 
 export interface BatchConfig {
   inputDir: string;
@@ -166,6 +169,34 @@ export function loadBatchConfig(opts: LoadOptions = {}): BatchConfig {
     opts.onInvalid?.((e as Error).message);
     return { ...DEFAULT_BATCH_CONFIG };
   }
+}
+
+/**
+ * Cambia la commessa di una cartella sorvegliata in batch.config.json (09/11/2026: l'amministratore
+ * la sceglie dall'elenco del registro della suite nella card "Conversione automatica delle cartelle",
+ * invece di scriverla a mano). `input` è il percorso come lo dà statoSorveglianza (assoluto); la voce
+ * si riconosce risolvendo il suo input come fa normalizzaSorvegliata. Il resto del file resta com'è.
+ * Ritorna false se la voce non c'è.
+ */
+export function impostaCommessaSorvegliata(input: string, commessa: string): boolean {
+  if (!fs.existsSync(CONFIG_PATH)) return false;
+  const grezzo = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+  const voci: unknown[] = Array.isArray(grezzo?.sorvegliate) ? grezzo.sorvegliate : [];
+  const bersaglio = path.resolve(PROJECT_ROOT, input);
+  let trovata = false;
+  for (const v of voci) {
+    if (!v || typeof v !== 'object') continue;
+    const o = v as Record<string, unknown>;
+    if (typeof o.input === 'string' && path.resolve(PROJECT_ROOT, o.input.trim()) === bersaglio) {
+      o.commessa = commessa;
+      trovata = true;
+    }
+  }
+  if (!trovata) return false;
+  const tmp = `${CONFIG_PATH}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(grezzo, null, 2) + '\n', 'utf8');
+  fs.renameSync(tmp, CONFIG_PATH);
+  return true;
 }
 
 /**

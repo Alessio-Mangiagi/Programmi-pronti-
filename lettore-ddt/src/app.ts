@@ -12,6 +12,8 @@ import routes from './routes';
 import cosedilSSO, { cosedilAttivita } from '../../shared/sso/cosedil-sso';
 import { errorHandler } from './utils/errorHandler';
 import { ingressoDalPortale } from './middleware/auth';
+import { proxyMagazzino } from './services/proxyMagazzino';
+import { codicePerMagazzino } from './services/commessaSessione';
 import { metricsMiddleware } from './utils/metrics';
 import logger from './utils/logger';
 import { config as appCfg, APP_DIR } from './config';
@@ -59,7 +61,9 @@ const app = express();
 // Gate SSO: richiede il login del Portale Suite Cosedil. Portale giù = accesso
 // chiuso (COSEDIL_SSO_FAIL=open per il vecchio comportamento; COSEDIL_SSO=off
 // per disattivare). Deve stare prima di tutto il resto.
-app.use(cosedilSSO({ app: 'ddt' }));
+// Due id (09/11/2026, "DDT e Magazzino" è un programma solo): entra chi è abilitato al Lettore DDT
+// o al Magazzino; l'admin resta quello di 'ddt'. La sezione DDT chiede comunque l'account DDT.
+app.use(cosedilSSO({ app: ['ddt', 'magazzino'] }));
 
 // Attività per la plancia admin del portale: presenza (il keepalive della
 // pagina pinga ogni 10s, quindi il portale sa quando l'utente chiude DDT) e le
@@ -164,6 +168,12 @@ app.use(
 // (vedi ingressoDalPortale). Dopo la sessione, perché la apre lui; prima delle rotte, perché
 // /auth/me e requireAuth la vedano già in questa richiesta.
 app.use(ingressoDalPortale);
+
+// Sezione Magazzino di "DDT e Magazzino" (contratto C2): /magazzino/* va al Magazzino Operativo su
+// 127.0.0.1:5200, con la commessa scelta all'ingresso in X-Suite-Commessa. Dopo gate e sessione (login
+// del portale e commessa), PRIMA dei parser del corpo: il corpo (anche le foto multipart) va inoltrato
+// intatto. Fuori dal router: rate limit, CORS e intestazioni di sicurezza le decide il Magazzino.
+app.use('/magazzino', proxyMagazzino({ commessaPer: codicePerMagazzino }));
 
 // Corpi JSON. Il limite normale è 1 MB: basta a login, paniere, versioni piccole, admin. Le rotte
 // che ricevono estrazioni o versioni di progetto grosse accettano fino a 50 MB, ma solo da chi ha

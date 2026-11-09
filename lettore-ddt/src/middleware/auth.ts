@@ -13,6 +13,14 @@ declare module 'express-session' {
     isAdmin?: boolean;
     /** Username del Portale Suite di chi ha aperto questa sessione DDT (vedi ingressoDalPortale). */
     portaleUtente?: string;
+    /**
+     * Commessa scelta all'ingresso in "DDT e Magazzino" (services/commessaSessione): da quel momento
+     * commessaId è la sua cartella dati e vale per tutta la sessione. Assente = non ancora scelta (la
+     * barra comune apre la finestra "In che commessa lavori?"; intanto vale la cartella dell'account).
+     */
+    commessaScelta?: boolean;
+    /** Codice del registro della suite della commessa scelta ('' per una cartella precedente). */
+    commessaCodice?: string;
   }
 }
 

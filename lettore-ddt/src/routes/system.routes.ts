@@ -16,6 +16,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth';
 import { hasActiveJobs } from '../batch/jobs';
 import { sorveglianzaConfigurata } from '../batch/sorveglianza';
 import { appConfig, BASE_DIR, DATA_ROOT } from './helpers';
+import { segnaAttivita, ultimaAttivita } from '../utils/attivita';
 
 const router = express.Router();
 
@@ -25,10 +26,10 @@ const INACTIVITY_TIMEOUT_MS =
   Number.isFinite(envTimeoutMs) && envTimeoutMs > 0
     ? envTimeoutMs
     : appConfig.inactivityTimeoutMinutes * 60 * 1000;
-let lastPingTime = Date.now();
+// L'ultimo segno di vita lo tiene utils/attivita: lo aggiornano /ping e il proxy del Magazzino.
 if (!appConfig.serverMode) {
   const watchdog = setInterval(() => {
-    if (Date.now() - lastPingTime <= INACTIVITY_TIMEOUT_MS) return;
+    if (Date.now() - ultimaAttivita() <= INACTIVITY_TIMEOUT_MS) return;
     // Una conversione batch dura anche un'ora e va avanti col browser chiuso:
     // spegnere qui lascerebbe a metà dei batch che sono già stati pagati.
     if (hasActiveJobs()) {
@@ -51,7 +52,7 @@ if (!appConfig.serverMode) {
 }
 
 router.post('/ping', (req: Request, res: Response) => {
-  lastPingTime = Date.now();
+  segnaAttivita();
   res.status(204).send();
 });
 
@@ -281,6 +282,11 @@ router.use('/webfonts', express.static(path.join(libDir, 'webfonts'), { maxAge: 
 router.use('/lib', staticGzip(libDir, WEEK), express.static(libDir, { maxAge: '7d' }));
 router.use('/js', staticGzip(jsDir, REVALIDATE), express.static(jsDir));
 router.use('/static', staticGzip(staticDir, REVALIDATE), express.static(staticDir));
+// Barra comune di "DDT e Magazzino" (static/guscio/barra.js): la carica la pagina del Lettore DDT e il
+// proxy la aggiunge alla pagina del Magazzino. Senza hash nel nome → revalidazione a ogni richiesta.
+// Le rotte /guscio/stato, /guscio/commesse e /guscio/commessa stanno in guscio.routes, montate prima.
+const guscioDir = path.join(BASE_DIR, 'static', 'guscio');
+router.use('/guscio', staticGzip(guscioDir, REVALIDATE), express.static(guscioDir));
 
 router.get('/', (req: Request, res: Response) => {
   const htmlPath = path.join(BASE_DIR, 'dist', 'static', 'index.html');

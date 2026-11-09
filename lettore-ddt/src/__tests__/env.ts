@@ -49,6 +49,16 @@ fs.mkdirSync(process.env.DDT_LOG_DIR, { recursive: true });
 // non devono finire nella cartella avvisi-in del portale del repo.
 process.env.SUITE_AVVISI_DIR = tmp('avvisi');
 
+// "DDT e Magazzino" (09/11/2026): i test non devono mai toccare i programmi veri accesi su questo PC.
+// Niente avvio del Magazzino dal proxy, e SkyTower/Magazzino della suite puntati su una porta chiusa
+// (9 = discard): un Excel o un carico mandati per sbaglio da un test finirebbero nel SkyTower o nel
+// magazzino.db veri. I test che li provano montano il loro finto servizio e cambiano questi indirizzi.
+process.env.DDT_MAGAZZINO_AVVIO = '0';
+// batch.config.json: la card delle cartelle sorvegliate ora lo scrive (commessa dal registro).
+process.env.DDT_BATCH_CONFIG = tmp('batch-config') + '.json';
+if (!process.env.SUITE_URL_SKYTOWER) process.env.SUITE_URL_SKYTOWER = 'http://127.0.0.1:9';
+if (!process.env.SUITE_URL_MAGAZZINO) process.env.SUITE_URL_MAGAZZINO = 'http://127.0.0.1:9/api';
+
 // Motore della firma digitale (DDT .p7m): nei test niente download di elenchi e stato di revoca, e la
 // cache degli elenchi ufficiali non è quella vera di shared/firma/cache.
 if (!process.env.DDT_FIRMA_RETE) process.env.DDT_FIRMA_RETE = '0';

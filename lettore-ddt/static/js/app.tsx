@@ -19,6 +19,21 @@ import { computeDdtChecks, ddtNumbersFromParsed } from './ddtChecks';
 
 declare const XLSX: any;
 
+/**
+ * Esito del carico immediato in magazzino che /claude-to-excel mette in X-Magazzino (JSON codificato,
+ * src/routes/claude.routes.ts): { registrati, righe, ubicazione, messaggio }. null se manca o è rotto.
+ */
+function esitoMagazzino(res: Response): { registrati: boolean; messaggio: string } | null {
+  const grezzo = res.headers.get('X-Magazzino');
+  if (!grezzo) return null;
+  try {
+    const e = JSON.parse(decodeURIComponent(grezzo));
+    return e && typeof e.messaggio === 'string' && e.messaggio ? { registrati: !!e.registrati, messaggio: e.messaggio } : null;
+  } catch {
+    return null;
+  }
+}
+
 // ============================================================
 // ClaudeJsonBox — area di incolla della risposta JSON.
 // Componente top-level memoizzato con stato locale: la digitazione
@@ -212,6 +227,8 @@ export default function App({ user, onLogout }: AppProps = {}) {
   // Nome dell'Excel appena scaricato: il pulsante "✓ Dati convalidati" lo rimanda a
   // /log-excel-validation con validated=true (al download era stato registrato "da convalidare").
   const [excelDaConvalidare, setExcelDaConvalidare] = useState('');
+  // Esito del carico in magazzino dell'ultimo Excel (X-Magazzino), mostrato nella finestra di convalida.
+  const [magazzinoDopoExcel, setMagazzinoDopoExcel] = useState<{ registrati: boolean; messaggio: string } | null>(null);
   // Nome del PDF scansionato: persiste in localStorage così l'export mantiene
   // lo stesso nome anche se la pagina viene ricaricata durante il lavoro su Claude.ai
   // temp_id del PDF caricato con /prepare-claude: con un solo PDF il server
@@ -560,10 +577,18 @@ export default function App({ user, onLogout }: AppProps = {}) {
         console.error('Errore logging convalida:', err);
       }
 
+      // Carico immediato in magazzino ("DDT e Magazzino", 09/11/2026): il server mette l'esito
+      // nell'intestazione X-Magazzino, perché il corpo della risposta è l'Excel. Va anche nella
+      // finestra di convalida: la notifica in alto a destra resta sotto il suo velo.
+      const magazzino = esitoMagazzino(res);
+      setMagazzinoDopoExcel(magazzino);
       // Mostra banner di convalida dopo il download
       setExcelDaConvalidare(excelName);
       setShowExcelValidation(true);
-      notify('File Excel salvato · Convalidare l\'estrazione dati', 'info');
+      notify(
+        'File Excel salvato · Convalidare l\'estrazione dati' + (magazzino ? ` · ${magazzino.messaggio}` : ''),
+        magazzino?.registrati ? 'success' : 'info'
+      );
     } catch (err: any) {
       notify('Errore: ' + err.message, 'error');
     } finally {
@@ -2348,6 +2373,16 @@ export default function App({ user, onLogout }: AppProps = {}) {
               }}>
                 Per favore, verifica il file Excel scaricato per assicurarti che i dati siano stati estratti correttamente.
               </p>
+              {magazzinoDopoExcel && (
+                <div role="status" style={{
+                  margin: "-8px 0 20px", padding: "10px 14px", borderRadius: 8, fontSize: 14, textAlign: "left",
+                  background: magazzinoDopoExcel.registrati ? "#eef7f0" : "#eef4fa",
+                  border: `1px solid ${magazzinoDopoExcel.registrati ? "#c9e7d2" : "#c3d7e8"}`,
+                  color: magazzinoDopoExcel.registrati ? "#2f6b40" : "#0c4577",
+                }}>
+                  📦 {magazzinoDopoExcel.messaggio}
+                </div>
+              )}
               <div style={{
                 background: "#f2f3f5", padding: 16, borderRadius: 8, marginBottom: 24,
                 borderLeft: "4px solid #1f7f1f", textAlign: "left"
