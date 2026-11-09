@@ -70,14 +70,46 @@ function magazzinoDentroDdt() {
 
 /** Indirizzo da mostrare all'utente (link "Apri in InCampo").
  *  Il Magazzino sta dentro il Lettore DDT a <ddt>/magazzino: la sua porta 5200 ascolta solo sulla macchina
- *  (CONTRATTI § 11, C1-C2), quindi i link "Apri nel Magazzino" di Analista, InCampo ecc. vanno lì. */
-function urlPubblico(app) {
+ *  (CONTRATTI § 11, C1-C2), quindi i link "Apri nel Magazzino" di Analista, InCampo ecc. vanno lì.
+ *  `host` = l'host con cui il browser sta usando la suite (header Host della richiesta): se c'è, prende il
+ *  posto di "localhost" (vedi conHostRichiesta). Senza, resta localhost come prima. */
+function urlPubblico(app, host) {
   const forzato = String(process.env['SUITE_URL_PUBBLICO_' + app.toUpperCase()] || '').trim();
-  if (forzato) return forzato.replace(/\/+$/, '');
-  if (app === 'magazzino' && magazzinoDentroDdt()) return urlPubblico('ddt') + '/magazzino';
+  if (forzato) return conHostRichiesta(forzato.replace(/\/+$/, ''), host);
+  if (app === 'magazzino' && magazzinoDentroDdt()) return urlPubblico('ddt', host) + '/magazzino';
   const dominio = String(process.env.SUITE_DOMINIO || '').trim();
   const [sotto, porta] = APP[app];
-  return dominio ? `https://${sotto}.${dominio}` : `http://localhost:${porta}`;
+  return dominio ? `https://${sotto}.${dominio}` : conHostRichiesta(`http://localhost:${porta}`, host);
+}
+
+const HOST_LOOPBACK = /^(localhost|127\.0\.0\.1|\[::1\])$/i;
+
+/** Hostname pulito da un header Host ("127.0.0.1:8080" → "127.0.0.1", "[::1]:8080" → "[::1]"); '' se non
+ *  è un nome/IP valido, così un header strano non finisce mai dentro un link. */
+function hostDaRichiesta(hostHeader) {
+  let h = String(hostHeader || '').trim().split(',')[0].trim();
+  if (!h) return '';
+  h = h.startsWith('[') ? h.slice(0, h.indexOf(']') + 1) : h.split(':')[0];
+  return /^(\[[0-9a-f:.]+\]|[a-z0-9]([a-z0-9.-]{0,252}[a-z0-9])?)$/i.test(h) ? h.toLowerCase() : '';
+}
+
+/**
+ * Un link verso un'app della suite costruito con un host di loopback (localhost, 127.0.0.1, [::1]) prende
+ * l'host con cui il browser sta usando la suite. Il cookie del portale (sid) vale per l'host, non per la
+ * porta: aperto il portale come http://127.0.0.1:8080, un link http://localhost:5190 non lo porta con sé e
+ * il programma rimanda al login del portale; da un altro PC "localhost" è addirittura il PC di chi clicca.
+ * Si tocca solo un host di loopback: indirizzi forzati o con SUITE_DOMINIO restano come sono.
+ */
+function conHostRichiesta(url, host) {
+  const h = hostDaRichiesta(host);
+  if (!h || !url) return url;
+  let u;
+  try { u = new URL(url); } catch { return url; }
+  if (!HOST_LOOPBACK.test(u.hostname) || u.hostname.toLowerCase() === h) return url;
+  u.hostname = h;
+  // new URL aggiunge "/" a un indirizzo senza percorso: lo si toglie se l'originale non l'aveva
+  const s = u.toString();
+  return !/^[a-z]+:\/\/[^/]+\//i.test(url) && s.endsWith('/') ? s.slice(0, -1) : s;
 }
 
 /** Token di servizio: ambiente, altrimenti file condiviso (creato se manca). */
@@ -259,6 +291,6 @@ function trovaCommessa(codice, opts) {
 module.exports = {
   NOMI, APP, SALUTE, HEADER_TOKEN, HEADER_UTENTE, HEADER_NOME, HEADER_EMAIL, HEADER_NOME_FILE,
   FILE_TOKEN, FILE_COMMESSE, STATI_COMMESSA,
-  urlApi, urlPubblico, token, verifica, normalizzaCommessa, SuiteError, intestazioni, chiama, raggiungibile,
+  urlApi, urlPubblico, conHostRichiesta, hostDaRichiesta, token, verifica, normalizzaCommessa, SuiteError, intestazioni, chiama, raggiungibile,
   commesse, salvaCommesse, trovaCommessa,
 };

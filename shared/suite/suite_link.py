@@ -75,25 +75,64 @@ def _magazzino_dentro_ddt():
     return v not in ("0", "off", "no", "false")
 
 
-def url_pubblico(app, magazzino_dentro_ddt=None):
+def url_pubblico(app, magazzino_dentro_ddt=None, host=None):
     """Indirizzo che si può mostrare all'utente (link "Apri in InCampo").
 
     Il Magazzino sta dentro il Lettore DDT a <ddt>/magazzino: la sua porta 5200 ascolta solo sulla
     macchina (CONTRATTI § 11, C1-C2), quindi i link "Apri nel Magazzino" di InCampo, Analista ecc. vanno lì.
     ``magazzino_dentro_ddt`` lo decide chi chiama (il Magazzino passa la sua config); None = variabile
-    MAGAZZINO_PROGRAMMA_UNICO."""
+    MAGAZZINO_PROGRAMMA_UNICO. ``host`` = l'host con cui il browser sta usando la suite (header Host della
+    richiesta): se c'è prende il posto di "localhost" (vedi con_host_richiesta); senza, resta localhost."""
     forzato = os.environ.get(f"SUITE_URL_PUBBLICO_{app.upper()}")
     if forzato:
-        return forzato.rstrip("/")
+        return con_host_richiesta(forzato.rstrip("/"), host)
     if magazzino_dentro_ddt is None:
         magazzino_dentro_ddt = _magazzino_dentro_ddt()
     if app == "magazzino" and magazzino_dentro_ddt:
-        return url_pubblico("ddt") + "/magazzino"
+        return url_pubblico("ddt", host=host) + "/magazzino"
     dominio = (os.environ.get("SUITE_DOMINIO") or "").strip()
     sotto, porta, _ = _APP[app]
     if dominio:
         return f"https://{sotto}.{dominio}"
-    return f"http://localhost:{porta}"
+    return con_host_richiesta(f"http://localhost:{porta}", host)
+
+
+_HOST_LOOPBACK = re.compile(r"^(localhost|127\.0\.0\.1|\[::1\])$", re.IGNORECASE)
+_HOST_VALIDO = re.compile(r"^(\[[0-9a-f:.]+\]|[a-z0-9]([a-z0-9.-]{0,252}[a-z0-9])?)$", re.IGNORECASE)
+
+
+def host_da_richiesta(host_header):
+    """Hostname pulito da un header Host ("127.0.0.1:8080" → "127.0.0.1", "[::1]:8080" → "[::1]"); "" se non
+    è un nome/IP valido, così un header strano non finisce mai dentro un link."""
+    h = str(host_header or "").strip().split(",")[0].strip()
+    if not h:
+        return ""
+    h = h[: h.index("]") + 1] if h.startswith("[") and "]" in h else h.split(":")[0]
+    return h.lower() if _HOST_VALIDO.match(h) else ""
+
+
+def con_host_richiesta(url, host):
+    """Un link verso un'app della suite costruito con un host di loopback (localhost, 127.0.0.1, [::1]) prende
+    l'host con cui il browser sta usando la suite. Il cookie del portale (sid) vale per l'host, non per la
+    porta: aperto il portale come http://127.0.0.1:8080, un link http://localhost:5190 non lo porta con sé e il
+    programma rimanda al login del portale; da un altro PC "localhost" è addirittura il PC di chi clicca.
+    Si tocca solo un host di loopback: indirizzi forzati o con SUITE_DOMINIO restano come sono."""
+    h = host_da_richiesta(host)
+    if not h or not url:
+        return url
+    try:
+        p = urllib.parse.urlsplit(url)
+        vecchio = p.hostname or ""
+        porta = p.port
+    except ValueError:
+        return url
+    vecchio = f"[{vecchio}]" if ":" in vecchio else vecchio
+    if not _HOST_LOOPBACK.match(vecchio) or vecchio.lower() == h:
+        return url
+    netloc = h + (f":{porta}" if porta else "")
+    if "@" in p.netloc:                               # credenziali nel link: non si toccano, si lascia com'è
+        return url
+    return urllib.parse.urlunsplit((p.scheme, netloc, p.path, p.query, p.fragment))
 
 
 # ----------------------------------------------------------------------------- registro commesse

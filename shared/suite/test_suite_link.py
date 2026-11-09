@@ -53,6 +53,24 @@ def test_url_pubblico(monkeypatch):
     assert suite_link.url_pubblico("magazzino") == "https://magazzino-operativo.cosedil.it"
 
 
+def test_link_con_host_della_richiesta(monkeypatch):
+    """Il cookie del portale vale per l'host, non per la porta: aperto il portale come 127.0.0.1 (o da un altro
+    PC) i link verso le app prendono quell'host invece di "localhost", che farebbe ricomparire il login."""
+    for v in ("SUITE_DOMINIO", "SUITE_URL_PUBBLICO_INCAMPO", "SUITE_URL_PUBBLICO_MAGAZZINO", "MAGAZZINO_PROGRAMMA_UNICO"):
+        monkeypatch.delenv(v, raising=False)
+    assert suite_link.url_pubblico("incampo", host="127.0.0.1:8080") == "http://127.0.0.1:5190"
+    assert suite_link.url_pubblico("incampo", host="192.168.1.5") == "http://192.168.1.5:5190"
+    assert suite_link.url_pubblico("magazzino", host="127.0.0.1") == "http://127.0.0.1:5050/magazzino"
+    assert suite_link.url_pubblico("incampo") == "http://localhost:5190"                 # senza host: come prima
+    assert suite_link.con_host_richiesta("http://localhost:5200/#giacenze", "[::1]:8080") == "http://[::1]:5200/#giacenze"
+    assert suite_link.con_host_richiesta("https://incampo.cosedil.it/x", "127.0.0.1") == "https://incampo.cosedil.it/x"
+    assert suite_link.con_host_richiesta("http://localhost:5190", "evil.com/<x>") == "http://localhost:5190"
+    assert suite_link.con_host_richiesta("http://localhost:5190", None) == "http://localhost:5190"
+    assert suite_link.host_da_richiesta("Portale.Lan:8080") == "portale.lan"
+    monkeypatch.setenv("SUITE_DOMINIO", "cosedil.it")                                    # dietro Caddy: invariato
+    assert suite_link.url_pubblico("incampo", host="127.0.0.1") == "https://incampo.cosedil.it"
+
+
 class _Finto(BaseHTTPRequestHandler):
     ricevute = []
 

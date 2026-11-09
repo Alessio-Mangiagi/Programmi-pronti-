@@ -311,3 +311,9 @@ Dentro restano i due motori (Node e Python Flask), avviati insieme; nessuna risc
   messaggio, non errore 500.
 * Test per ogni rotta nuova (app vicina finta con monkeypatch/mock).
 * README dell'app aggiornato con la sezione «Suite» e le variabili nuove.
+* **Link verso un'altra app mostrati nel browser** (09/11/2026): si costruiscono con l'host con cui il browser
+  sta usando la suite, `urlPubblico(app, req.headers.host)` / `url_pubblico(app, host=...)`, oppure si passa il
+  link già fatto in `conHostRichiesta` / `con_host_richiesta`. Il cookie del portale (`sid`) vale per l'host,
+  non per la porta: con il portale aperto come `http://127.0.0.1:8080` un link `http://localhost:5190` non porta
+  la sessione e il programma rimanda al login; da un altro PC "localhost" è il PC di chi clicca. Si cambia solo un
+  host di loopback. Le voci di `/suite/da-fare` (chiamate da server a server) le riscrive il portale.

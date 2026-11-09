@@ -39,6 +39,25 @@ test('normalizzaCommessa e urlPubblico', () => {
   delete process.env.SUITE_DOMINIO;
 });
 
+test("link con l'host della richiesta: il cookie del portale vale per l'host, non per la porta", () => {
+  delete process.env.SUITE_DOMINIO;
+  // portale aperto come 127.0.0.1 o da un altro PC: il link prende quell'host, non "localhost"
+  assert.strictEqual(suite.urlPubblico('incampo', '127.0.0.1:8080'), 'http://127.0.0.1:5190');
+  assert.strictEqual(suite.urlPubblico('incampo', '192.168.1.5'), 'http://192.168.1.5:5190');
+  assert.strictEqual(suite.urlPubblico('magazzino', '127.0.0.1'), 'http://127.0.0.1:5050/magazzino');
+  assert.strictEqual(suite.urlPubblico('incampo', 'localhost:8080'), 'http://localhost:5190');
+  assert.strictEqual(suite.urlPubblico('incampo'), 'http://localhost:5190');            // senza host: come prima
+  assert.strictEqual(suite.conHostRichiesta('http://localhost:5200/#giacenze', '[::1]:8080'), 'http://[::1]:5200/#giacenze');
+  // solo un host di loopback si cambia; un host strano non entra mai nel link
+  assert.strictEqual(suite.conHostRichiesta('https://incampo.cosedil.it/x', '127.0.0.1'), 'https://incampo.cosedil.it/x');
+  assert.strictEqual(suite.conHostRichiesta('http://localhost:5190', 'evil.com/<x>'), 'http://localhost:5190');
+  assert.strictEqual(suite.conHostRichiesta('http://localhost:5190', ''), 'http://localhost:5190');
+  assert.strictEqual(suite.hostDaRichiesta('Portale.Lan:8080'), 'portale.lan');
+  process.env.SUITE_DOMINIO = 'cosedil.it';                                            // dietro Caddy: invariato
+  assert.strictEqual(suite.urlPubblico('incampo', '127.0.0.1'), 'https://incampo.cosedil.it');
+  delete process.env.SUITE_DOMINIO;
+});
+
 test('registro commesse: salva, unisce doppioni, rilegge, trova', () => {
   const out = suite.salvaCommesse([
     { code: '101-003', nome: 'Porto di Augusta', stato: 'attiva' },
