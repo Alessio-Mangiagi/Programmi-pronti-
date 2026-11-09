@@ -238,6 +238,36 @@ pagine esce con storpiature OCR diverse). Vale anche per le anagrafiche articolo
 Le pipeline preesistenti non sono state toccate: sui loro documenti (catalogo ANAS per
 opera, prestazioni a lettere, tabelle pipe, blocchi Sidersipe) vincono come prima.
 
+### 4.4 Aggiunte del 09/11/2026 (piano senza AI, `RICERCA_OCR_SOLUZIONE.md` §7)
+
+Misurate sui 31 contratti contro i moduli di riferimento (`npm run confronta-moduli --
+contratti/moduli-da-md`, totali in fondo all'output).
+
+- **Tabella dalle celle.** Il worker trova con OpenCV le linee delle tabelle con i bordi
+  (`griglia_tabella` in `ocr_worker.py`); `server/tabella-griglia.ts` mette ogni blocco
+  OCR nella sua cella e scrive il blocco `### TABELLA ARTICOLI (dalle celle della
+  tabella)`, letto alla lettera da `estraiRigheCelle`. Entra in fondo alla gara, dopo la
+  griglia elenco prezzi, e vince anche con il 20% di voci in meno, perché le colonne sono
+  certe. Se sulla pagina c'è l'intestazione, i numeri si prendono solo dalle colonne di
+  quantità, prezzo, importo e oneri. Una tabella vale solo se ha numeri con la virgola:
+  l'elenco automezzi «portata | anno» non è un elenco prezzi. Una cella numerica con più
+  numeri impilati (voci senza linee fra loro: GFM, Jonico) fa rinunciare alla pagina, e
+  resta la ricostruzione geometrica di sempre.
+- **Prezzo lordo dalle colonne oneri.** Due coppie prezzo/importo sulla stessa quantità
+  (P.U. oneri + P.U. lavori, oppure P.U. + P.U. O.S. nelle tabelle `% O.S.`) → prezzo e
+  importo sono le somme (`valoriRiga`, `estraiRigheWbsOs`), come nei moduli fatti dal PDF.
+- **Terna coerente** (`ternaCoerente`): fra i numeri di una riga si cerca la terna in ordine
+  con `qta × prezzo ≈ importo`; un numero spurio letto dall'OCR non sposta più le colonne.
+  Nel computo la riga `SOMMANO` accetta lo sporco (`cad =:`, `)cad`, `cad I`) e ricava la
+  quantità persa da importo / prezzo quando esce pulita.
+- **Codici**: `RE_COD_GRIGLIA` non scambia più `06.` di `06.P01.S01.003` per un progressivo e
+  accetta il codice come ultima cosa prima dei valori (`1C.12.350.0010.H m 9,50 …`) o con la
+  cifra dopo il punto (`NP.06`); nel computo valgono anche le analisi `A.N.E.009` e la riga
+  codice si legge dal testo originale (la normalizzazione dei decimali la rovinava).
+- **Modelli per formato** (`MODELLI_CONTRATTO`, alla invoice2data): «Ordine fornitore»
+  (codice = numero ordine, PROGETTO = cantiere) e la maschera **listino materiali**
+  (`estraiRigheListino`: prima parola = codice, anche `CH` o `429`).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
@@ -323,6 +353,7 @@ misure intermedie; le righe che restano sono quelle che il documento porta davve
 | Unità di misura nuova                          | `UM_GRIGLIA`                                                       |
 | Codici articolo con forma diversa               | `RE_COD_GRIGLIA` (griglia) · `RE_COD_NEP` (computo)             |
 | Un layout con colonne extra in fondo            | come per`% O.S.`: parser dedicato + esclusione nella gara          |
+| Un formato ricorrente (stesso gestionale/fornitore) | un elemento in `MODELLI_CONTRATTO` (parole chiave + campi)     |
 
 ---
 

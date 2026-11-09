@@ -12,7 +12,8 @@
 | *… busta firmata illeggibile* / *firma staccata* su un `.p7m` | Il file firmato è rovinato o incompleto, oppure la firma è in un file a parte (`.p7s`): chiedi di nuovo il documento firmato. |
 | **! Firma da verificare** o **✗ Firma NON valida** sotto un contratto | Il contratto si legge lo stesso; **Dettagli firma** sopra l'anteprima dice il motivo (vedi [2.5](02-contratto-excel.md#25-contratti-firmati-digitalmente-p7m)). |
 | Il primo documento ci mette molto | Normale la prima volta dopo l'avvio: il motore si carica. |
-| Excel con poche righe o righe mancanti | Elabora in formato **.MD** e guarda in fondo la sezione *TABELLA ARTICOLI (ricostruita dalla scansione)*: se è incompleta, quel modello di contratto non è ancora "tarato" — segnalalo con il PDF. Nel frattempo correggi in **Modifica**. |
+| Excel con poche righe o righe mancanti | Elabora in formato **.MD** e guarda in fondo alle pagine la sezione *TABELLA ARTICOLI*: *(dalle celle della tabella)* se la tabella ha i bordi, *(ricostruita dalla scansione)* se non li ha. Se è incompleta, quel modello di contratto non è ancora "tarato" — segnalalo con il PDF. Nel frattempo correggi in **Modifica**, o usa la pagina CLAUDE (vedi [4.3](04-formati-e-claude.md#43-modalità-claude)). |
+| Una pagina scansionata **capovolta** esce illeggibile | Il programma la rilegge ruotata da solo quando la lettura è troppo incerta. Se era già stata letta prima di questo aiuto, è rimasta in memoria così: chiedi all'amministratore di svuotare la cache (capitolo 6) e rifai il documento. |
 | Celle rosse su PROGETTO/EPU | Commessa non nell'elenco ufficiale: correggi il codice o chiedi di aggiornare l'elenco. |
 | Riquadro giallo con *somma righe ≠ importo lavori* | Mancano righe o l'importo di testata è diverso: controlla l'originale e correggi in **Modifica**. |
 | In **⚙ Impostazioni** i pulsanti *Scegli…* sono spenti | Stai usando Firefox (o Safari): le cartelle del PC si usano solo in **Chrome** o **Edge**. |

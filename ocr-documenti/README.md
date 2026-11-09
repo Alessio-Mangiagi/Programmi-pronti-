@@ -39,6 +39,8 @@ Pipeline ibrida:
 | `PADDLE_DET_MODEL` | `PP-OCRv5_mobile_det` | modello detection (più preciso ma ~3× più lento: `PP-OCRv6_medium_det`) |
 | `PADDLE_REC_MODEL` | `latin_PP-OCRv5_mobile_rec` | modello recognition (alternativa: `PP-OCRv6_medium_rec`) |
 | `PADDLE_WORKERS` | `3` | processi OCR in parallelo (~1 GB RAM ciascuno); partono solo se la coda li richiede |
+| `PADDLE_SOGLIA_ROTAZIONE` | `60` | pagina letta sotto questa confidenza media (%) → riletta a 180°/90°/270°, vince la lettura con più testo letto bene (pagine scansionate capovolte). `0` spegne la prova |
+| `PADDLE_GRIGLIA` | acceso | linee della tabella trovate con OpenCV: le voci si leggono dalle celle (`server/tabella-griglia.ts`). `0` spegne il passo |
 | `PORT` | `3007` | porta backend Express |
 | `OLLAMA_BASE` | `http://localhost:11434` | endpoint Ollama |
 | `ASSIST_MODEL` | `qwen2.5:3b` | modello assist |

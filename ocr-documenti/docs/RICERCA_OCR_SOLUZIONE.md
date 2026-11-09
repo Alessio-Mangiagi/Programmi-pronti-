@@ -7,6 +7,14 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
+- **Aggiornamento della sera (§9): i passi 1-6 sono fatti, senza AI.** Sugli stessi 30
+  contratti:
+  - testata dal 73% al 94%;
+  - voci con quantità e prezzo giusti dal 59% al 78%;
+  - voci esatte dal 33% al 58%.
+
+  Le pagine capovolte si raddrizzano da sole. PP-StructureV3 è stato provato: tabelle
+  ottime, ma ~90 s a pagina e 885 MB di modelli (§6c).
 - **L'OCR non è il collo di bottiglia.** Dallo stesso testo OCR che il programma ricava
   dalla scansione, Claude compila moduli che il programma accetta per 31 contratti su 31.
   Sui 5 contratti con un modulo di riferimento fatto dal PDF, quei moduli tornano per
@@ -106,7 +114,7 @@ cambiare OCR:
 | Motore | Tipo | Su CPU | Tabelle | Per noi |
 |---|---|---|---|---|
 | **PaddleOCR 3.7, PP-OCRv5 mobile + latin** (in uso) | OCR classico, Apache 2.0 | ~50 s/pagina misurati qui | No (solo righe di testo) | Ultima release: 3.7.0 dell'11/06/2026. PP-OCRv6 è il nuovo default, ma misurato qui è 3,4× più lento e meno preciso sull'italiano del latin v5 (vedi `ocr_worker.py`) |
-| **PP-StructureV3** (stessa libreria) | Layout + tabelle (SLANeXt, rilevatore di celle) → Markdown/HTML | ~8 s/pagina su Xeon nelle misure ufficiali | Sì | Il candidato più naturale. Servono `paddlex[ocr]` e alcune centinaia di MB di modelli: la prova non si è potuta fare qui perché il download dei modelli è bloccato dalla politica TLS di questa sessione. Va fatta con l'IT |
+| **PP-StructureV3** (stessa libreria) | Layout + tabelle (SLANeXt, rilevatore di celle) → Markdown/HTML | ~8 s/pagina su Xeon nelle misure ufficiali; **~90 s/pagina misurati qui** | Sì | Provato (§6c): tabelle ottime anche senza linee fra le voci, ma 885 MB di modelli e ~90 s a pagina su questa CPU. Da tenere come secondo passaggio sulle sole pagine-tabella difficili |
 | **PaddleOCR-VL-1.6** | Modello visione-linguaggio da 0,9 miliardi di parametri, Apache 2.0 | 72-92 s/pagina (conversione ONNX della comunità) | Sì, fra i primi su OmniDocBench v1.6 (96,34) | Da GPU. La RTX serie 50 del PC vuole paddle cu129. È comunque un modello AI, anche se locale |
 | **Docling** (IBM) | Layout + TableFormer, MIT | Tabelle in 2-6 s; con EasyOCR fino a ~30 s/pagina | Sì, buono sulle tabelle complesse | Alternativa se PP-StructureV3 non va. Usa come OCR EasyOCR, Tesseract o RapidOCR, tutti più deboli di PP-OCRv5 sull'italiano |
 | **MinerU 2.5, Marker/Surya, olmOCR** | Modelli transformer / visione-linguaggio | Lenti | Sì | Pensati per GPU e articoli scientifici. I numeri migliori li pubblicano gli autori stessi |
@@ -194,9 +202,21 @@ confidenza. Di queste 12 sono le pagine capovolte; le altre 3 sono pagine quasi 
 la sola firma. Oggi il
 worker ha `use_doc_orientation_classify=False`.
 
-**c) PP-StructureV3:** non eseguita. Le dipendenze (`paddlex[ocr]`) sono state installate
-in un ambiente di prova separato, ma il download dei modelli è stato bloccato dalla politica
-TLS della sessione. Il venv di produzione non è stato toccato.
+**c) PP-StructureV3** (eseguita la sera del 09/11, con il permesso al download; verifica
+dei certificati normale, nessuna eccezione TLS servita). Ambiente di prova separato, venv
+di produzione non toccato, CPU, 4 pagine-tabella:
+
+| | Risultato |
+|---|---|
+| Download | 885 MB di modelli (layout, celle con e senza bordi, struttura tabella), ~20 minuti |
+| Tempo | ~90 s a pagina (450 s la prima, col caricamento) |
+| Progetto Costruzioni (bordi, colonne oneri + lavori) | Perfetta: 8 colonne con intestazioni, 4 voci esatte, totali |
+| GFM (senza linee fra le voci) | Voci separate giuste (PA.IE.015, SIC24_14.01.01.001…) con quantità, prezzo, importo: è il caso che OpenCV da solo non risolve |
+| Ticopter fornitura e subappalto (celle unite FORNITURA/POSA) | Righe slittate di una colonna dove una cella copre più righe |
+
+Conclusione: è il miglior lettore di tabelle provato, ma costa ~90 s a pagina in più su
+CPU (oltre all'OCR) e quasi 1 GB di modelli. Sensato solo come secondo passaggio sulle
+pagine-tabella che la griglia OpenCV (§9) non risolve, o con la GPU (§8).
 
 ## 7. La soluzione proposta: senza AI, un passo alla volta
 
@@ -226,12 +246,114 @@ quantità o prezzi presi da colonne sbagliate in 6.
 
 ## 8. Dopo, se serve
 
-- **PP-StructureV3 sui 31 contratti**, con l'IT per il download dei modelli: se le sue
-  tabelle sono migliori del passo 4, lo si usa al posto del prototipo OpenCV. Su CPU costa
-  ~8 s/pagina in più.
+- **PP-StructureV3 sulle pagine-tabella che la griglia non risolve** (voci senza linee
+  fra loro: GFM, Jonico, Gecob). Provato sul §6c: le separa bene, ma su questa CPU costa
+  ~90 s a pagina e 885 MB di modelli; da accendere solo su quelle pagine, o con la GPU.
 - **GPU** (paddle cu129 per la RTX serie 50): accelera l'OCR attuale e rende praticabile
   PaddleOCR-VL come «secondo parere» locale sulle pagine difficili. Resta un modello AI,
   quindi solo come supporto, come Claude.
+
+## 9. Il piano eseguito (09/11/2026, sera)
+
+Passi 1-6 del §7 fatti, senza AI e senza modelli nuovi. Misura sugli stessi 31 contratti:
+`npm run harness` e poi `npm run confronta-moduli -- contratti/moduli-da-md`, che ora
+stampa da solo i totali. La testata si conta senza i campi vuoti in entrambi: per questo
+la partenza è al 73% e non al 74% del §3.
+
+**Risultato sui 30 contratti** con lo stesso riferimento prima e dopo. Ragusana-1 è a parte,
+sotto: il suo riferimento era stato compilato dal testo con le pagine capovolte.
+
+| Misura | Prima | Dopo | Obiettivo §7 |
+|---|---|---|---|
+| Campi di testata giusti | 299/410 (73%) | **385/410 (94%)** | ≥ 90% ✓ |
+| Voci esatte (codice, quantità, prezzo) | 266/806 (33%) | **470/806 (58%)** | — |
+| Voci con quantità e prezzo giusti | 479/806 (59%) | **627/806 (78%)** | ≥ 85%, non raggiunto |
+| Voci mancanti | 224 | 141 | |
+| Voci con valori diversi | 103 | 38 | |
+| Voci in più | 71 | 46 | |
+
+Andamento passo per passo (giro veloce sul testo già letto, 31 contratti col vecchio
+riferimento di Ragusana-1):
+
+| Dopo | Testata | Voci esatte | Qtà e prezzo |
+|---|---|---|---|
+| partenza | 73% | 37% | 61% |
+| regole di testata (2) | 94% | 37% | 61% |
+| codici, oneri, computo (3, 5) | 94% | 53% | 73% |
+| modelli: ordine fornitore, listino (6) | 94% | 60% | 78% |
+| celle e orientamento (4, 1) | 94% | 61% | 78% |
+
+Le celle cambiano poco il totale perché valgono solo per le tabelle con i bordi, ma lì il
+salto è netto:
+- subappalto 030: da 0 a 12 voci giuste su 13;
+- subappalto Ticopter: da 0 a 8 su 13;
+- Gecob: da 0 a 13 su 34;
+- Progetto Costruzioni: da 0 a 3 su 4.
+
+L'orientamento recupera le 12 pagine dell'elenco prezzi di Ragusana-1: 7 erano capovolte
+(180°), 5 erano tabelle stampate di traverso (270°). Lette ora all'85-90% di confidenza,
+prima al 39-48%.
+
+**Cosa è stato fatto, passo per passo** (dettagli in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.4):
+
+1. **Orientamento** (`ocr_worker.py`): una pagina sotto il 60% di confidenza si rilegge a
+   180°, 90° e 270°. Vince la lettura con più testo letto bene (caratteri × confidenza),
+   se ne legge almeno il 25% in più. Con la sola confidenza media vinceva una lettura di
+   traverso con pochi numeri. Le pagine normali non costano nulla; una capovolta costa da
+   2 a 4 letture.
+2. **Testata** (`server/parser-contratti.ts`, `server/alyante.ts`):
+   - data delle firme cercata in tutto il testo;
+   - ritenute del modello «tra le Parti»;
+   - codice contratto ricomposto;
+   - commessa dalle premesse con pesi sull'elenco;
+   - ditta designata dall'etichetta di ruolo;
+   - P.IVA e CUP con gli errori tipici dell'OCR;
+   - servizi → Passivo a Misura e divisione 08;
+   - oggetto con la frase intera.
+3. **Codici**: progressivo e codice non si confondono più (`06.P01…`, `NP.06`,
+   `1C.12…`); nel computo la riga del codice si legge dal testo originale.
+4. **Celle** (`server/tabella-griglia.ts`): linee della tabella con OpenCV, ogni blocco
+   nella sua cella. Serve per le tabelle con i bordi: 030, Ticopter, Progetto
+   Costruzioni, SICS, Gecob. Dove più voci stanno nella stessa cella, la pagina resta
+   alla ricostruzione di sempre.
+5. **Aritmetica**:
+   - terna quantità × prezzo ≈ importo fra i numeri della riga;
+   - colonne oneri + lavori sommate;
+   - quantità persa ricavata da importo / prezzo;
+   - riga SOMMANO tollerante allo sporco OCR.
+6. **Modelli**: «Ordine fornitore» (codice = numero ordine, PROGETTO = cantiere) e listino
+   materiali (prima parola = codice). Si aggiungono come elementi di `MODELLI_CONTRATTO`.
+
+**Correzioni ai riferimenti.** I moduli LGM e GEMMALPE trattavano lo 0,50% «a garanzia di
+debiti previdenziali» come ritenuta di garanzia (RG005). Corretti in RI R005, come i moduli
+compilati dal PDF (TMT).
+
+**Ragusana-1, riferimento rifatto.** Dopo il raddrizzamento il riferimento è stato
+ricompilato alla cieca dal testo nuovo, con le stesse istruzioni degli altri 30. Il
+riferimento vecchio aveva 75 voci con solo codice e u.m.; quello nuovo ne ha 142, di cui
+114 con quantità e prezzo, e 28 restano DA VERIFICARE perché le cifre sono illeggibili.
+Somma voci 1.008.826,74 contro un importo lavori di 1.141.450,43.
+
+Il programma invece da quell'elenco ricava solo 59 codici, senza quantità né prezzi:
+0 voci giuste su 142. Il testo ora c'è, ma il layout non ha ancora una regola:
+- riga WBS su più righe, come «032 Lotto4 … 5104 B.03.031.c … m² 735,23 15,90 €
+  11.688,46 € 442,79 € OG03»;
+- 5 pagine stampate di traverso, con le colonne mescolate.
+
+Contando anche Ragusana-1, i 31 contratti sono a 399/425 (94%) di testata, 470/948 (50%) di
+voci esatte e 627/948 (66%) di voci con quantità e prezzo giusti.
+
+**Cosa resta**, in ordine di peso:
+- l'elenco WBS di Ragusana-1 (142 voci): un modello in più, con la terna coerente
+  quantità × prezzo = importo per ritrovare i valori nella riga;
+- voci senza linee fra loro (GFM, Jonico, parte di Gecob), che il §8 propone di passare a
+  PP-StructureV3;
+- voci composte in SICS (calcestruzzo + pompaggio P.01/P.02 per ogni classe);
+- voci a corpo senza codice nei noli (Ulma);
+- condizioni di pagamento con più scadenze (8 campi);
+- codici SIC24 letti senza i punti («SIC24 143145»), che senza il prezzario non si
+  ricompongono con certezza;
+- voci uguali dello stesso computo in quadri diversi: il dedup ne tiene una sola.
 
 ## Fonti
 

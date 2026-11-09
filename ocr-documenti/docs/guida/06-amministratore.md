@@ -18,6 +18,17 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
 *Componente firma digitale non installato*, lancia a mano quel file. Dettagli in
 `shared/firma/README.md`.
 
+**Lettura senza AI.** Due aiuti all'OCR girano da soli, senza modelli in più né rete:
+- le pagine scansionate **capovolte** o di traverso si rileggono ruotate, solo quando la
+  lettura esce troppo incerta (`PADDLE_SOGLIA_ROTAZIONE`, `0` la spegne). Una pagina così
+  costa da 2 a 4 letture invece di una;
+- nelle tabelle **con i bordi** le linee si trovano con OpenCV e le voci si leggono cella
+  per cella, con le colonne giuste (`PADDLE_GRIGLIA=0` lo spegne).
+
+Le pagine già lette prima di questi aiuti restano in `.ocr-cache/`: alla prima riapertura
+si cercano solo le linee della tabella, senza rifare l'OCR. Per rileggere ruotata una
+pagina capovolta già in cache, svuota `.ocr-cache/`.
+
 **PaddleOCR bloccato.** Tipico: Windows App Control (WDAC) rifiuta le librerie
 non firmate del venv (`WinError 4551`). Non si risolve reinstallando: serve l'IT.
 
