@@ -150,6 +150,29 @@ def crea_venv(d: Path, req: str = "requirements.txt", nome: str = ".venv") -> Pa
         run(f'"{vpy}" -m pip install -r {req}', cwd=d)
     return vpy
 
+# Motore della firma digitale (PDF firmati .p7m): shared\firma, uno solo per tutta la suite, con il suo .venv.
+# Lo usano Lettore DDT, Confronto Documenti, OCR Documenti, Verifica Requisiti, SkyTower e Ponte Trimble: i loro
+# avvia.bat lo installano da soli al primo avvio, qui lo si prepara subito insieme al programma, una volta sola
+# per giro. Non fa fallire l'installazione del programma: senza Python 3.12 o senza rete il resto funziona, i .p7m
+# danno un messaggio con cosa fare e il programma stesso ci riprova alla prima busta.
+_esito_firma: str | None = None
+
+def motore_firma() -> str:
+    """Installa shared\\firma (installa.bat) la prima volta che serve; rende la nota per il riepilogo."""
+    global _esito_firma
+    if _esito_firma is None:
+        bat = ROOT / "shared" / "firma" / "installa.bat"
+        if not bat.exists():
+            _esito_firma = " ATTENZIONE: manca shared\\firma, i PDF firmati .p7m non si apriranno."
+        else:
+            try:
+                run(f'"{bat}"', cwd=bat.parent)
+                _esito_firma = " Motore della firma .p7m pronto (shared\\firma)."
+            except RuntimeError:
+                _esito_firma = (" ATTENZIONE: motore della firma .p7m non installato (serve Python 3.12 e la rete):"
+                                " rilanciare shared\\firma\\installa.bat.")
+    return _esito_firma
+
 def richiedi_node(app: str, minimo: int = NODE_MIN) -> None:
     if not node_ok(minimo):
         raise RuntimeError(f"{app} richiede Node.js >= {minimo} ({versione_node() or 'assente'}). "
@@ -176,7 +199,7 @@ def installa_ddt(d: Path) -> str:
         (d / "json_exports").mkdir(exist_ok=True)
     if (d / "crea_collegamento.ps1").exists() and chiedi_si_no("  Creo il collegamento sul Desktop per Lettore DDT?"):
         run(f'powershell -NoProfile -ExecutionPolicy Bypass -File "crea_collegamento.ps1" -AppDir "{d}"', cwd=d)
-    return "dipendenze + build (dist/server.js). Porta 5050"
+    return "dipendenze + build (dist/server.js). Porta 5050." + motore_firma()
 
 def installa_agente(d: Path) -> str:
     richiedi_node("L'agente", 24)                       # engines >=24: node:sqlite
@@ -190,7 +213,7 @@ def installa_agente(d: Path) -> str:
 def installa_confronta(d: Path) -> str:
     crea_venv(d)                                        # come Installa_librerie.bat
     avviso = "" if ha_tesseract() else " ATTENZIONE: Tesseract OCR non trovato (serve a pytesseract): installalo da https://github.com/UB-Mannheim/tesseract/wiki."
-    return f"venv + requirements. Porta 5001.{avviso}"
+    return f"venv + requirements. Porta 5001.{avviso}" + motore_firma()
 
 def installa_ocr(d: Path) -> str:
     richiedi_node("La webapp OCR")
@@ -215,7 +238,7 @@ def installa_ocr(d: Path) -> str:
             run("ollama pull qwen2.5:3b")
         else:
             note.append("modello qwen2.5:3b da scaricare (ollama pull qwen2.5:3b)")
-    return "npm + venv PaddleOCR. Porte 5179+3007." + (" " + "; ".join(note) if note else "")
+    return "npm + venv PaddleOCR. Porte 5179+3007." + (" " + "; ".join(note) if note else "") + motore_firma()
 
 def installa_scadenzario(d: Path) -> str:
     crea_venv(d)                                        # come installa.bat
@@ -257,7 +280,7 @@ def installa_skytower(d: Path) -> str:
     npm_install(d / "apps" / "web")
     run("npm run build", cwd=d / "apps" / "web")        # apps/web/dist, servito da vite preview
     return ("venv + build web. Porta 5195 (API interna 8100). Al primo avvio crea il database"
-            " con i dati demo: password Cantiere-2026! (vedi skytower/README.md)")
+            " con i dati demo: password Cantiere-2026! (vedi skytower/README.md)." + motore_firma())
 
 def installa_verifica(d: Path) -> str:
     richiedi_node("Verifica Requisiti")
@@ -273,7 +296,7 @@ def installa_verifica(d: Path) -> str:
     if not ha("pdftoppm"):
         note.append("pdftoppm (poppler) non nel PATH: serve all'OCR dei PDF scansionati")
     avviso = (" ATTENZIONE: " + "; ".join(note)) if note else ""
-    return f"dipendenze + build (dist/server.js). Porta 5185.{avviso}"
+    return f"dipendenze + build (dist/server.js). Porta 5185.{avviso}" + motore_firma()
 
 def installa_auguri(d: Path) -> str:
     richiedi_node("Auguri")
@@ -290,7 +313,7 @@ def installa_trimble(d: Path) -> str:
     if not envf.exists() and (d / ".env.example").exists() and not DRY:
         shutil.copyfile(d / ".env.example", envf)       # come avvia.bat
         say("    creato .env da .env.example: le credenziali Trimble vanno compilate a mano")
-    return "dipendenze installate. Porta 3011; credenziali Trimble nel .env"
+    return "dipendenze installate. Porta 3011; credenziali Trimble nel .env." + motore_firma()
 
 def installa_credenziali(d: Path) -> str:
     bat = ROOT / "installa-credenziali.bat"
