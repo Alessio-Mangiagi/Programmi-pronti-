@@ -1,5 +1,5 @@
 <!-- "><(((º> sabusabu <º)))><" -->
-# Contratti fra le app della suite (versione 06/11/2026)
+# Contratti fra le app della suite (versione 09/11/2026)
 
 Regole comuni che ogni app rispetta per far lavorare l'operatore su una suite sola.
 Le funzioni citate stanno in `suite_link.py` (Python) e `suite_link.js` (Node,
@@ -230,6 +230,64 @@ unico `shared/firma` (README lì): `firma.js` per Node, `busta.py` per Python.
 * Dove sta il motore: `FIRMA_DIR` → `<cartella dell'eseguibile>\shared\firma` → cartella del
   client. Un programma impacchettato in `.exe` (ConfrontaPDF.exe, server.exe del Lettore DDT)
   si distribuisce con `shared\firma` accanto, copiata da `shared\firma\copia-motore.bat`.
+
+## 11. Programma unico "DDT e Magazzino" (09/11/2026)
+
+Lettore DDT e Magazzino Operativo sono **un solo programma per chi lo usa**: una tessera nel
+portale, un indirizzo (quello del Lettore DDT), la commessa chiesta **una volta all'accesso**.
+Dentro restano i due motori (Node e Python Flask), avviati insieme; nessuna riscrittura.
+
+* **C1 — avvio.** Il Magazzino resta in ascolto su `127.0.0.1:5200`; le rotte `/api/suite/*`
+  dirette restano per portale, InCampo e Analista. Lo avvia il Lettore DDT se `GET /health`
+  sulla 5200 non risponde (`/health` è fuori dal gate: `{"ok": true, "app": "magazzino"}`):
+  `python app.py` in `../magazzino-operativo` come il suo `avvia.bat` (prima `database.py` se il
+  database manca), con le variabili che il portale passa al DDT (`COSEDIL_EVENTI`,
+  `SUITE_AVVISI_DIR`, `COSEDIL_PORTAL`, `HOST` di ascolto loopback). Allo spegnimento del DDT si
+  ferma anche il Magazzino, solo se l'ha avviato lui.
+* **C2 — proxy.** Il server del Lettore DDT inoltra `/magazzino/*` → `http://127.0.0.1:5200/*`
+  togliendo il prefisso (metodo, corpo anche multipart, cookie, intestazioni) e aggiunge
+  `X-Forwarded-Prefix: /magazzino`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Forwarded-For` e
+  `X-Suite-Commessa: <codice della commessa di sessione>` (si può codificare per URL). Riscrive
+  sotto `/magazzino` i `Location` dei redirect. Le richieste al proxy contano come attività per lo
+  spegnimento automatico (i telefoni in cantiere usano `/magazzino/`). Magazzino spento → pagina
+  di cortesia "sto avviando il magazzino…" che riprova da sola.
+  Il Magazzino (`prefisso.py`) crede a queste intestazioni **solo da loopback** e con valori
+  sani: il prefisso va in `SCRIPT_NAME` (link della pagina, `url_for`, manifest e service worker
+  con scope `/magazzino/`), la commessa diventa il filtro proposto (giacenze, movimenti,
+  ubicazioni, arrivo dei movimenti a mano) e compare nella testata con le linguette
+  **DDT | Magazzino** (DDT = la parte sopra il prefisso, `/`). Aperto direttamente sulla 5200 il
+  Magazzino resta alla radice com'era.
+* **C3 — carico immediato.** Dopo ogni export salvato (`registraExport`: `/claude-to-excel` e
+  conversione automatica) il DDT chiama `POST http://127.0.0.1:5200/api/suite/ddt/consegne` con
+  `X-Suite-Token` e il JSON `{cartella, export, codiceCommessa, salvatoIl, righe:[Consegna…]}`
+  (righe = quelle appena scritte in `data/<cartella>/consegne.json`, stessi campi e ordine).
+  Risposta `{righe, nuove, scartate, commessa, ubicazione, avvisi:[], gia_importato}`. Il
+  Magazzino usa le chiavi dell'importazione periodica (`chiave_import` `<cartella>/<export>`,
+  impronta = `salvatoIl`, `chiave_riga` per indice): il giro di sfondo da `consegne.json` salta
+  l'export già arrivato e, se lo rilegge, sostituisce le righe — **nessun doppione** in nessun
+  ordine; lo stesso invio ripetuto risponde `gia_importato: true`. Il DDT mostra "N carichi
+  registrati in magazzino (cantiere X)"; Magazzino spento o errore → nessun errore per
+  l'utente, solo "il magazzino li registrerà appena acceso". Tetto 5000 righe (413).
+* **C4 — accesso.** Una sola tessera nel portale, "DDT e Magazzino" (id `ddt`); la tessera
+  `magazzino` non si vede in home ma l'id resta nel registro (abilitazioni, `DA_FARE_APP`,
+  `FONTI_COMMESSE`, avvio interno). La tessera si vede a chi è abilitato a `ddt` **o** a
+  `magazzino`. Parte DDT solo a chi ha l'account DDT, come prima; parte Magazzino a chi è
+  abilitato a `ddt` o `magazzino`: il gate Python accetta più id
+  (`cosedil_sso.init(app, app_id=("magazzino", "ddt"))`, il primo che il portale accetta dà
+  l'esito e il flag admin).
+* **Link verso il Magazzino** (da fare del portale, InCampo, task): `<Lettore DDT>/magazzino`
+  (`suite_rotte.url_magazzino`); `MAGAZZINO_URL_PUBBLICO` li forza, `MAGAZZINO_PROGRAMMA_UNICO=0`
+  torna all'indirizzo proprio del Magazzino.
+* **Riepilogo in SkyTower.** In SkyTower va "tutto": PDF del DDT ed Excel della conversione
+  (Lettore DDT, § 5) e, per ogni commessa con movimenti nel giorno, il **riepilogo di
+  magazzino** — un PDF e un Excel (movimenti del giorno con DDT di provenienza, giacenze del
+  cantiere) caricati con `POST /suite/commesse/{codice}/documenti` (tipo `RP`, attributi
+  `{"origine": "magazzino", "tipo": "riepilogo_giornaliero", ...}`). Automatico una volta al
+  giorno dopo `MAGAZZINO_RIEPILOGO_ORA` (default 19:00, `off` = spento; SkyTower spenta = riprova
+  al giro dopo) e a richiesta (`POST /api/riepiloghi/invia`, amministratore o chi lavora nella
+  commessa di sessione). La tabella `riepiloghi` tiene l'impronta di ogni invio: stessi
+  movimenti = non si rimanda; movimenti nuovi = un documento in più "(aggiornamento hh:mm)"
+  (la suite di SkyTower non ha una rotta "nuova revisione").
 
 ## Regole per tutti
 
