@@ -484,12 +484,15 @@ def _commessa_del_cantiere(db: Session, user: models.User, project_id: str) -> t
 
 
 @router.get("/projects/{project_id}/magazzino")
-def magazzino_del_cantiere(project_id: str, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+def magazzino_del_cantiere(project_id: str, request: Request, db: Session = Depends(get_db),
+                           user: models.User = Depends(current_user)):
     """Materiale e mezzi presenti nelle ubicazioni del Magazzino con il codice di questa commessa."""
     project, commessa = _commessa_del_cantiere(db, user, project_id)
     d = _chiama("magazzino", "GET", f"/suite/commesse/{quote(commessa.code, safe='')}/giacenze", user)
     d["commessa_code"] = commessa.code
-    d["magazzino_url"] = suite_link.url_pubblico("magazzino")
+    # link "Apri nel Magazzino" con l'host con cui il browser usa InCampo: il cookie del portale vale per l'host,
+    # e un link "localhost" visto da http://127.0.0.1:5190 (o da un altro PC) farebbe ricomparire il login
+    d["magazzino_url"] = suite_link.url_pubblico("magazzino", host=request.headers.get("host"))
     return d
 
 

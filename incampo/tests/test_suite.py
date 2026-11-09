@@ -123,6 +123,17 @@ def test_magazzino_del_cantiere(client, commessa, altre_app):
     assert kw["utente"] == "admin@test.local"
 
 
+def test_magazzino_url_con_host_del_browser(client, commessa, altre_app, monkeypatch):
+    """Il link "Apri nel Magazzino" prende l'host con cui il browser usa InCampo: il cookie del portale vale per
+    l'host, e un link "localhost" visto da http://127.0.0.1:5190 farebbe ricomparire il login del portale."""
+    for v in ("SUITE_DOMINIO", "SUITE_URL_PUBBLICO_MAGAZZINO", "SUITE_URL_PUBBLICO_DDT", "MAGAZZINO_PROGRAMMA_UNICO"):
+        monkeypatch.delenv(v, raising=False)
+    r = client.get(f"/projects/{commessa['project_id']}/magazzino", headers={"Host": "127.0.0.1:5190"})
+    assert r.json()["magazzino_url"] == "http://127.0.0.1:5050/magazzino"
+    r = client.get(f"/projects/{commessa['project_id']}/magazzino", headers={"Host": "192.168.1.5:5190"})
+    assert r.json()["magazzino_url"] == "http://192.168.1.5:5050/magazzino"
+
+
 def test_cantiere_senza_commessa(client, project, altre_app):
     r = client.get(f"/projects/{project['project']['id']}/magazzino")
     assert r.status_code == 409 and "commessa" in r.json()["detail"]
