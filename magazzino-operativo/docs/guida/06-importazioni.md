@@ -6,7 +6,8 @@
 Il Magazzino si alimenta da solo da due programmi della suite:
 
 - **Lettore DDT**: ogni riga dei DDT letti diventa un **carico** nel cantiere della
-  commessa. Se il cantiere o l'articolo non esistono vengono creati.
+  commessa, con il codice del registro della suite (es. `101-003`). Se il cantiere o
+  l'articolo non esistono vengono creati.
 - **VFP Transfer**: ogni pratica di un mezzo a nolo diventa un **mezzo a nolo**,
   posizionato nel cantiere della commessa del contratto.
 
@@ -48,8 +49,19 @@ mostra come sta andando e permette di forzare una lettura.
 
 ## Da sapere
 
-- Il carico va nel cantiere con quel **codice commessa**; se la destinazione scritta
-  sul DDT corrisponde al nome di un'ubicazione, si usa quella.
+- Il carico va nel cantiere con il **codice commessa del registro della suite** (lo stesso
+  di InCampo, SkyTower e Portale); se la destinazione scritta sul DDT corrisponde al nome di
+  un'ubicazione, si usa quella. Il codice viene dal **codice commessa aziendale** dell'account
+  del Lettore DDT che ha convertito il DDT; se manca, dalla commessa del Lettore DDT quando è
+  già un codice del registro (o lo contiene).
+- Se il codice non si trova, il carico va in **"Cantiere &lt;commessa del Lettore DDT&gt;"**
+  (es. "Cantiere demo-augusta"), l'esito dell'importazione dice *"commessa «demo-augusta» non
+  nel registro della suite…"* e gli amministratori vedono in **Da fare oggi** *"Carichi DDT su
+  commessa non nel registro: demo-augusta"*. Per sistemare: imposta il codice commessa
+  sull'utente del Lettore DDT (pannello admin → **Codice commessa**) oppure aggiungi la
+  commessa nel registro del Portale. Alla lettura successiva il cantiere passa da solo al
+  codice giusto (e si chiama "Cantiere 101-003" se il nome non era stato cambiato a mano):
+  i carichi già importati lo seguono, **senza doppioni**.
 - Righe senza materiale o quantità vengono **scartate** e contate come tali.
 - Un mezzo a nolo spostato a mano **non viene riportato indietro** dalle letture
   successive: la pratica dice dove arriva il mezzo, non dove sta oggi.

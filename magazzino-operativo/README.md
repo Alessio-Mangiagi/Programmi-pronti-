@@ -131,6 +131,15 @@ descrizione e unità di misura (creato se manca).
 
 - Un export risalvato dal Lettore DDT (`salvatoIl` nuovo) **sostituisce** le sue
   righe: niente doppioni.
+- La commessa del cantiere è il **codice del registro della suite**
+  (`shared/suite/commesse.json`): `codiceCommessa` scritto dal Lettore DDT sulla riga →
+  quello delle righe più recenti della stessa cartella → nome della cartella se è (o
+  contiene, come pezzo intero) un codice del registro → nome della cartella com'è
+  (`importa_ddt.risolvi_commessa`). I cantieri creati prima con il nome della cartella
+  passano al codice appena lo si conosce (`allinea_ubicazioni`, anche senza reimportare:
+  i movimenti seguono l'ubicazione). `chiave_import` resta `<cartella>/<export>`.
+  Le commesse fuori registro le segnala l'esito dell'importazione e, agli admin, il
+  "da fare" (`ddt-commessa-fuori-registro`); con il registro vuoto nessun avviso.
 - Dalla pagina **Importazioni** si può forzare la lettura o caricare a mano un
   `consegne.json` oppure un export grezzo (`json_exports/*.json`).
 

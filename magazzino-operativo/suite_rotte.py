@@ -147,6 +147,29 @@ def suite_giacenze(codice):
 ETICH_STATO_MEZZO = {"fermo": "Mezzo fermo", "manutenzione": "Mezzo in manutenzione"}
 
 
+def _carichi_ddt_fuori_registro(c, base):
+    """Voce del "da fare" (admin) per i carichi del Lettore DDT finiti in cantieri la cui commessa non è
+    nel registro della suite: di solito il nome di una cartella del Lettore DDT ("demo-augusta") perché
+    l'utente che converte non ha il codice commessa. Quei cantieri non si collegano a InCampo, SkyTower e
+    portale. Si calcola a ogni richiesta (nessuno stato salvato): sparisce da sola quando il codice viene
+    impostato e l'importazione successiva allinea il cantiere (importa_ddt.allinea_ubicazioni). Con il
+    registro vuoto (Magazzino usato senza suite) non c'è niente da segnalare."""
+    if not suite_link.commesse():
+        return []
+    fuori = [r for r in righe(c.execute(
+        "SELECT u.commessa, COUNT(*) AS carichi FROM movimenti m JOIN ubicazioni u ON u.id = m.a_ubicazione_id "
+        "WHERE m.origine = 'ddt' AND u.commessa IS NOT NULL AND u.commessa <> '' "
+        "GROUP BY u.commessa ORDER BY u.commessa")) if not suite_link.trova_commessa(r["commessa"])]
+    if not fuori:
+        return []
+    nomi = ", ".join(r["commessa"] for r in fuori[:4]) + (f" e altre {len(fuori) - 4}" if len(fuori) > 4 else "")
+    carichi = sum(r["carichi"] for r in fuori)
+    return [{"id": "ddt-commessa-fuori-registro", "titolo": f"Carichi DDT su commessa non nel registro: {nomi}",
+             "testo": f"{carichi} {'carico' if carichi == 1 else 'carichi'}: imposta il codice commessa sull'utente del Lettore DDT o aggiungi "
+                      "la commessa nel registro del portale",
+             "url": f"{base}/#ubicazioni", "tipo": "avviso", "priorita": 3, "data": None}]
+
+
 def _da_fare(c, admin):
     """Cose da fare nel Magazzino per la home del portale (shared/suite/CONTRATTI.md § 4)."""
     base = suite_link.url_pubblico("magazzino")
@@ -181,6 +204,7 @@ def _da_fare(c, admin):
             voci.append({"id": "ubicazioni-senza-commessa", "titolo": f"{len(senza)} cantieri senza codice commessa",
                          "testo": f"{nomi}: senza codice non si collegano a InCampo e SkyTower",
                          "url": f"{base}/#ubicazioni", "tipo": "avviso", "priorita": 3, "data": None})
+        voci.extend(_carichi_ddt_fuori_registro(c, base))
     voci.sort(key=lambda v: (v["priorita"], v["data"] or "9999"))
     return voci[:50]
 

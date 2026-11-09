@@ -15,9 +15,18 @@ Ogni riga DDT diventa un movimento di `carico` nell'ubicazione di destinazione
 riconosciuta come ubicazione) dell'articolo con quella descrizione. Articoli e
 ubicazioni che non esistono vengono creati.
 
+Commessa del cantiere: il codice del registro della suite (shared/suite/commesse.json,
+es. 101-003), così il cantiere combacia con InCampo, SkyTower e il portale. Si prende,
+in ordine: il `codiceCommessa` scritto dal Lettore DDT sulla riga (account di chi ha
+convertito), quello delle altre righe della stessa cartella, il nome della cartella se
+è (o contiene) un codice del registro; altrimenti resta il nome della cartella, come
+prima, e il "da fare" del Magazzino lo segnala. Vedi `risolvi_commessa`.
+
 Chiavi:
-- `chiave_import` = "<commessa>/<export>": quando il Lettore DDT risalva lo
-  stesso export, le righe vecchie vengono sostituite da quelle nuove.
+- `chiave_import` = "<cartella>/<export>": quando il Lettore DDT risalva lo
+  stesso export, le righe vecchie vengono sostituite da quelle nuove. Resta il
+  nome della cartella del Lettore DDT anche quando il cantiere prende il codice
+  del registro: cambiarla duplicherebbe i movimenti già importati.
 - `chiave_riga` = chiave_import + piva + n. DDT + indice: la stessa riga non
   entra due volte.
 """
@@ -25,11 +34,15 @@ import json
 import logging
 import os
 import re
+import sys
 from datetime import datetime
 
 import config
 import messaggi
 from codici import normalizza, prossimo_codice
+
+sys.path.insert(0, os.path.join(config.SUITE_DIR, "shared", "suite"))
+import suite_link  # registro commesse della suite (shared/suite), come in importa_mezzi
 
 log = logging.getLogger("magazzino.ddt")
 
@@ -147,6 +160,92 @@ def leggi_consegne(parsed):
     return out
 
 
+# --------------------------------------------------------------------------- commessa del registro
+
+def codice_registro(testo, registro=None):
+    """Il codice del registro della suite che corrisponde a `testo`, o '' se nessuno.
+
+    `testo` è il nome della cartella del Lettore DDT ("101-003", "demo-augusta") o il
+    codiceCommessa scritto a mano sull'account ("101-003 SEDE"). Vale l'uguaglianza
+    normalizzata (spazi e maiuscole, suite_link.normalizza_commessa); altrimenti un codice
+    contenuto come pezzo intero, il più lungo ("101-003 SEDE" → 101-003, ma "101-0031" non
+    è 101-003: a differenza di importa_mezzi.codice_commessa qui il confine conta, perché il
+    risultato decide in quale cantiere vanno i carichi). `registro` = lista già letta
+    (suite_link.commesse()), per non rileggere il file a ogni riga.
+    """
+    k = suite_link.normalizza_commessa(testo)
+    if not k:
+        return ""
+    registro = suite_link.commesse() if registro is None else registro
+    codici = [c["code"] for c in registro if suite_link.normalizza_commessa(c.get("code"))]
+    for c in codici:
+        if suite_link.normalizza_commessa(c) == k:
+            return c
+    pezzi = re.sub(r"\s+", " ", str(testo)).upper()
+    trovati = [c for c in codici
+               if re.search(r"(?<![A-Z0-9])" + re.escape(re.sub(r"\s+", " ", c).upper()) + r"(?![A-Z0-9])", pezzi)]
+    return max(trovati, key=len) if trovati else ""
+
+
+def codice_della_cartella(per_export):
+    """Il codiceCommessa più recente scritto dal Lettore DDT nelle righe di un consegne.json
+    ({export: {salvatoIl, righe}}), o ''. Vale per tutta la cartella: le righe salvate prima
+    che l'account avesse il codice (o prima di questa versione) non lo portano, ma sono della
+    stessa commessa e devono finire nello stesso cantiere."""
+    for _nome, blocco in sorted(per_export.items(), key=lambda kv: kv[1].get("salvatoIl") or "", reverse=True):
+        for r in blocco.get("righe") or []:
+            c = str((r or {}).get("codiceCommessa") or "").strip()
+            if c:
+                return c
+    return ""
+
+
+def risolvi_commessa(scritto, cartella, codice_cartella="", registro=None):
+    """(commessa del cantiere, nel_registro).
+
+    Ordine: codice scritto sulla riga dal Lettore DDT → codice della cartella (altre righe
+    dello stesso consegne.json) → nome della cartella ricondotto al registro → nome della
+    cartella com'è (comportamento di prima). Un codice scritto ma assente dal registro si
+    usa lo stesso (l'ha impostato l'admin del Lettore DDT, ed è lo stesso con cui il PDF va
+    in SkyTower), però nel_registro=False: lo segnala l'esito dell'importazione.
+    """
+    registro = suite_link.commesse() if registro is None else registro
+    for testo in (scritto, codice_cartella):
+        testo = str(testo or "").strip()
+        if testo:
+            codice = codice_registro(testo, registro)
+            return (codice, True) if codice else (testo, False)
+    codice = codice_registro(cartella, registro)
+    return (codice, True) if codice else (cartella, False)
+
+
+def allinea_ubicazioni(conn, vecchia, codice):
+    """Porta al codice del registro i cantieri nati con il nome della cartella del Lettore DDT.
+
+    Prima di questa correzione l'importazione creava "Cantiere <cartella>" con commessa =
+    nome della cartella. Si aggiorna la commessa (i movimenti seguono l'ubicazione: nessun
+    movimento si tocca né si duplica) e, se il nome è ancora quello automatico, lo si
+    rinomina in "Cantiere <codice>" quando quel nome è libero. Ritorna quante ubicazioni ha
+    aggiornato."""
+    if not vecchia or not codice or vecchia == codice:
+        return 0
+    vecchie = conn.execute("SELECT id, nome FROM ubicazioni WHERE commessa = ?", (vecchia,)).fetchall()
+    for u in vecchie:
+        conn.execute("UPDATE ubicazioni SET commessa = ? WHERE id = ?", (codice, u["id"]))
+        nuovo_nome = f"Cantiere {codice}"
+        if u["nome"] == f"Cantiere {vecchia}" and not conn.execute(
+                "SELECT 1 FROM ubicazioni WHERE lower(nome) = lower(?)", (nuovo_nome,)).fetchone():
+            conn.execute("UPDATE ubicazioni SET nome = ? WHERE id = ?", (nuovo_nome, u["id"]))
+        log.info("ubicazione %s: commessa %s → %s (codice del registro della suite)", u["nome"], vecchia, codice)
+    return len(vecchie)
+
+
+def avviso_commessa(commessa):
+    """Testo per l'esito dell'importazione quando la commessa non è nel registro della suite."""
+    return (f"commessa «{commessa}» non nel registro della suite: imposta il codice commessa sull'utente "
+            "del Lettore DDT o aggiungi la commessa nel portale")
+
+
 # --------------------------------------------------------------------------- scrittura
 
 def ubicazione_per(conn, commessa, destinazione):
@@ -159,7 +258,8 @@ def ubicazione_per(conn, commessa, destinazione):
         if r:
             return r["id"]
     if commessa:
-        r = conn.execute("SELECT id FROM ubicazioni WHERE commessa = ?", (commessa,)).fetchone()
+        # più cantieri con la stessa commessa (es. uno creato a mano e uno dall'importazione): il più vecchio
+        r = conn.execute("SELECT id FROM ubicazioni WHERE commessa = ? ORDER BY id", (commessa,)).fetchone()
         if r:
             return r["id"]
         nome = f"Cantiere {commessa}"
@@ -196,13 +296,21 @@ def articolo_per(conn, descrizione, um, fornitore=""):
     return cur.lastrowid
 
 
-def importa_righe(conn, righe, commessa, nome_export, utente="importazione"):
-    """Sostituisce i movimenti dell'export con le righe date. Ritorna (righe, nuove, scartate)."""
+def importa_righe(conn, righe, commessa, nome_export, utente="importazione", codice_cartella="",
+                  fuori_registro=None):
+    """Sostituisce i movimenti dell'export con le righe date. Ritorna (righe, nuove, scartate).
+
+    `commessa` è la cartella del Lettore DDT (chiave dell'importazione); il cantiere prende il
+    codice del registro (risolvi_commessa, con `codice_cartella` come ripiego per le righe senza
+    codice). Le commesse rimaste fuori dal registro finiscono nell'insieme `fuori_registro`, se dato
+    (solo quando il registro ha almeno una commessa: un Magazzino senza suite non ha niente da allineare)."""
     chiave_import = f"{commessa}/{nome_export}"
     presenti = {r["chiave_riga"] for r in conn.execute(
         "SELECT chiave_riga FROM movimenti WHERE chiave_import = ?", (chiave_import,))}
     conn.execute("DELETE FROM movimenti WHERE chiave_import = ?", (chiave_import,))
     nuove = scartate = 0
+    registro = suite_link.commesse()          # letto una volta per export, non a ogni riga
+    risolte = {}                              # (codice scritto, cartella) -> commessa del cantiere
     for i, riga in enumerate(righe):
         materiale = (riga.get("materiale") or "").strip()
         quantita = riga.get("quantita")
@@ -213,7 +321,15 @@ def importa_righe(conn, righe, commessa, nome_export, utente="importazione"):
             continue
         chiave_riga = f"{chiave_import}#{riga.get('piva') or ''}#{riga.get('ddt') or ''}#{i}"
         art = articolo_per(conn, materiale, riga.get("um"), riga.get("fornitore"))
-        ubi = ubicazione_per(conn, riga.get("commessa") or commessa, riga.get("destinazione"))
+        cartella = riga.get("commessa") or commessa
+        k = (str(riga.get("codiceCommessa") or "").strip(), cartella)
+        if k not in risolte:
+            codice, nel_registro = risolvi_commessa(k[0], cartella, codice_cartella, registro)
+            allinea_ubicazioni(conn, cartella, codice)     # "Cantiere <cartella>" di prima → codice
+            if not nel_registro and registro and fuori_registro is not None:
+                fuori_registro.add(codice)
+            risolte[k] = codice
+        ubi = ubicazione_per(conn, risolte[k], riga.get("destinazione"))
         ddt = riga.get("ddt") or "?"
         data = riga.get("dataIso") or data_iso(riga.get("data"))
         rif = f"DDT {ddt}" + (f" del {riga.get('data')}" if riga.get("data") else "")
@@ -249,18 +365,32 @@ def importa_consegne_file(conn, percorso, commessa, forza=False):
     """Un consegne.json intero. Ritorna lista di esiti per export."""
     with open(percorso, encoding="utf-8") as f:
         parsed = json.load(f)
+    per_export = leggi_consegne(parsed)
+    codice_cartella = codice_della_cartella(per_export)
+    # Anche se nessun export è cambiato (impronte uguali, niente da reimportare): i cantieri
+    # creati prima con il nome della cartella passano al codice del registro appena lo si conosce
+    # (codice impostato sull'utente del Lettore DDT, o commessa aggiunta al registro).
+    codice, _nel_registro = risolvi_commessa("", commessa, codice_cartella)
+    if allinea_ubicazioni(conn, commessa, codice):
+        conn.commit()
     esiti = []
-    for nome_export, blocco in leggi_consegne(parsed).items():
+    for nome_export, blocco in per_export.items():
         chiave = f"{commessa}/{nome_export}"
         impronta = blocco["salvatoIl"] or ""
         if not forza and _gia_importato(conn, chiave, impronta):
             continue
         try:
-            n, nuove, scartate = importa_righe(conn, blocco["righe"], commessa, nome_export)
-            _registra(conn, percorso, chiave, impronta, n, nuove,
-                      dettaglio=f"{scartate} righe senza materiale o quantità" if scartate else None)
-            esiti.append({"export": nome_export, "commessa": commessa, "righe": n, "nuove": nuove,
-                          "scartate": scartate, "esito": "ok"})
+            fuori = set()
+            n, nuove, scartate = importa_righe(conn, blocco["righe"], commessa, nome_export,
+                                               codice_cartella=codice_cartella, fuori_registro=fuori)
+            note = [f"{scartate} righe senza materiale o quantità"] if scartate else []
+            note += [avviso_commessa(c) for c in sorted(fuori)]
+            _registra(conn, percorso, chiave, impronta, n, nuove, dettaglio="; ".join(note) or None)
+            esito = {"export": nome_export, "commessa": commessa, "righe": n, "nuove": nuove,
+                     "scartate": scartate, "esito": "ok"}
+            if fuori:
+                esito["avviso"] = "; ".join(avviso_commessa(c) for c in sorted(fuori))
+            esiti.append(esito)
         except Exception as e:  # una riga rotta non deve fermare le altre commesse
             # nel registro e nella pagina il testo per l'utente; il dettaglio tecnico resta nel log
             log.exception("import %s", chiave)
@@ -298,9 +428,12 @@ def importa_json_caricato(conn, parsed, nome_file, commessa=""):
     nome_file = os.path.basename(nome_file or "upload.json")
     esiti = []
     if isinstance(parsed, dict) and "perExport" in parsed:
-        for nome_export, blocco in leggi_consegne(parsed).items():
+        per_export = leggi_consegne(parsed)
+        codice_cartella = codice_della_cartella(per_export)
+        for nome_export, blocco in per_export.items():
             com = commessa or (blocco["righe"][0].get("commessa") if blocco["righe"] else "") or "manuale"
-            n, nuove, scartate = importa_righe(conn, blocco["righe"], com, nome_export)
+            n, nuove, scartate = importa_righe(conn, blocco["righe"], com, nome_export,
+                                               codice_cartella=codice_cartella)
             _registra(conn, nome_file, f"{com}/{nome_export}", blocco["salvatoIl"], n, nuove)
             esiti.append({"export": nome_export, "commessa": com, "righe": n, "nuove": nuove, "scartate": scartate,
                           "esito": "ok"})
