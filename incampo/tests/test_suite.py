@@ -246,6 +246,58 @@ def test_login_portale_admin_e_username_senza_email(client, portale_finto, monke
     assert d["user"]["email"] == "capo.cantiere@cosedil.it" and d["user"]["role"] != "admin"
 
 
+# Regola della suite del 09/11/2026: "le mie credenziali valgono come admin ovunque". Prima il ruolo dal
+# portale valeva solo alla creazione dell'utente InCampo; ora un amministratore del portale diventa admin a
+# ogni ingresso (cookie, password del portale, /auth/me con un token già salvato). Solo promozione.
+
+def test_admin_del_portale_promuove_utente_esistente(client, portale_finto):
+    from tests.conftest import make_user
+    with client.session_factory() as s:
+        make_user(s, "a.capo@cosedilspa.com", "field", name="Anna Capo")
+    portale_finto["risposta"] = {"ok": True, "username": "a.capo", "nome": "Anna Capo", "ruolo": "admin", "admin": True,
+                                 "email": "a.capo@cosedilspa.com"}
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=a"}).json()
+    assert d["user"]["role"] == "admin"
+    with client.session_factory() as s:
+        ev = s.query(suite_router.models.AuditLog).filter_by(action="user.updated", actor_email="a.capo@cosedilspa.com").all()
+        assert any((e.details or {}).get("origine") == "admin-del-portale"
+                   and (e.details or {}).get("role") == {"da": "field", "a": "admin"} for e in ev)
+
+
+def test_admin_solo_da_regola_ip_o_utente_normale_non_promossi(client, portale_finto):
+    from tests.conftest import make_user
+    with client.session_factory() as s:
+        make_user(s, "b.campo@cosedilspa.com", "field", name="Bruno Campo")
+    # admin per l'app concesso da una regola IP del portale (ruolo utente): il ruolo qui non cambia
+    portale_finto["risposta"] = {"ok": True, "username": "b.campo", "nome": "Bruno Campo", "ruolo": "utente", "admin": True,
+                                 "email": "b.campo@cosedilspa.com"}
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=b"}).json()
+    assert d["user"]["role"] == "field"
+    portale_finto["risposta"]["admin"] = False
+    d = client.post("/auth/portale", headers={"Authorization": "", "Cookie": "sid=b"}).json()
+    assert d["user"]["role"] == "field"
+
+
+def test_auth_me_promuove_chi_ha_gia_il_token_solo_se_e_la_stessa_persona(client, portale_finto):
+    from tests.conftest import login, make_user
+    with client.session_factory() as s:
+        make_user(s, "c.token@cosedilspa.com", "manager", name="Carla Token")
+        make_user(s, "d.altro@cosedilspa.com", "field", name="Dario Altro")
+    # token di Dario, ma nel browser c'è la sessione del portale di Carla (admin): Dario NON diventa admin
+    h = login(client, "d.altro@cosedilspa.com")
+    portale_finto["risposta"] = {"ok": True, "username": "c.token", "nome": "Carla Token", "ruolo": "admin", "admin": True,
+                                 "email": "c.token@cosedilspa.com"}
+    assert client.get("/auth/me", headers={**h, "Cookie": "sid=c"}).json()["role"] == "field"
+    # token di Carla e sessione del portale di Carla, admin nel portale: promossa all'apertura del web
+    h = login(client, "c.token@cosedilspa.com")
+    assert client.get("/auth/me", headers=h).json()["role"] == "manager"            # senza cookie del portale: com'era
+    assert client.get("/auth/me", headers={**h, "Cookie": "sid=c"}).json()["role"] == "admin"
+    # un admin non richiama più il portale
+    chiamate = len(portale_finto["chiamate"])
+    client.get("/auth/me", headers={**h, "Cookie": "sid=c"})
+    assert len(portale_finto["chiamate"]) == chiamate
+
+
 def test_login_portale_rifiuti(client, portale_finto, monkeypatch):
     assert client.post("/auth/portale", headers={"Authorization": ""}).status_code == 401          # niente cookie
     portale_finto["http"] = 403

@@ -62,7 +62,10 @@ lo stesso, se il server raggiunge internet.
 - Il riconoscimento avviene per **email**: l'utente InCampo deve avere la stessa email
   dell'utente del Portale. Se non esiste viene creato: amministratore del Portale →
   Amministratore, gli altri → il ruolo di `INCAMPO_RUOLO_PORTALE` nel `.env`
-  (predefinito: Ufficio). Gli utenti del Portale senza email diventano
+  (predefinito: Ufficio). Un utente che c'è già e nel Portale è amministratore diventa
+  Amministratore anche in InCampo al suo prossimo ingresso (anche se era nato Cantiere o
+  Ufficio): dal 09/11/2026 un amministratore del Portale è amministratore in tutti i
+  programmi. Il ruolo non viene mai abbassato da qui. Gli utenti del Portale senza email diventano
   `nomeutente@cosedilspa.com` (dominio cambiabile con `SUITE_EMAIL_DOMINIO`).
 - `COSEDIL_SSO=off` nel `.env` spegne sia il blocco "prima il Portale" sia l'accesso automatico.
 - Gli utenti creati dal Portale non hanno una password conosciuta: per l'app serve

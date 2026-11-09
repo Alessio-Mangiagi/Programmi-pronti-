@@ -60,7 +60,19 @@ def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends
 
 
 @router.get("/auth/me", response_model=schemas.UserOut)
-def me(user: models.User = Depends(current_user)):
+def me(request: Request, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """L'utente del token. Il web la chiama a ogni apertura: se l'utente non è admin ma il browser ha la sessione
+    del portale (cookie ``sid``) di un amministratore del portale che corrisponde a QUESTO utente, lo promuove ad
+    admin (regola della suite del 09/11/2026, suite.allinea_admin_dal_portale). Così vale subito anche per chi
+    aveva già un token salvato e non ripassa da /auth/portale. Una sola chiamata al portale, solo per i non admin."""
+    if user.role != UserRole.admin and "sid=" in (request.headers.get("cookie") or ""):
+        from .suite import _utente_esistente_dal_portale, allinea_admin_dal_portale, verifica_portale
+        dati = verifica_portale(request.headers.get("cookie") or "")
+        if dati["ok"] and dati.get("ruolo") == "admin":
+            stesso = _utente_esistente_dal_portale(db, dati)
+            if stesso is not None and stesso.id == user.id and allinea_admin_dal_portale(db, user, dati, request):
+                db.commit()
+                db.refresh(user)
     return user
 
 

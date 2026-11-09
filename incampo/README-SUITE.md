@@ -104,7 +104,11 @@ che legge il cookie `sid` del portale (stesso host, o stesso `SUITE_DOMINIO`) e 
 verifica con `/api/verify?app=incampo`. L'utente InCampo è quello con la stessa
 email del portale (o lo username prima della `@`); se manca viene **creato** attivo,
 senza password usabile: admin del portale → `admin`, altrimenti
-`INCAMPO_RUOLO_PORTALE` (default `manager`). Senza email dal portale vale
+`INCAMPO_RUOLO_PORTALE` (default `manager`). Se c'è già e nel portale è
+**amministratore** (ruolo admin), diventa `admin` anche qui: a ogni ingresso dal
+portale, con la password del portale e all'apertura del web (`GET /auth/me` con il
+cookie `sid` della stessa persona). Regola della suite del 09/11/2026; solo
+promozione, l'admin per l'app da regola IP del portale non basta. Senza email dal portale vale
 `<username>@<SUITE_EMAIL_DOMINIO>` (default `cosedilspa.com`). Con il portale
 spento, non loggati o `COSEDIL_SSO=off` risponde 401 e si vede il login di sempre.
 Variabili: `COSEDIL_PORTAL` (default `http://localhost:8080`), `COSEDIL_SSO`,

@@ -123,9 +123,8 @@ def verifica_portale(cookie: str) -> dict:
     return esito
 
 
-def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
-    """L'utente InCampo dell'utente del portale (email, poi parte prima della @ = username);
-    se non c'è lo crea attivo, senza password usabile. Ritorna (utente, creato)."""
+def _utente_esistente_dal_portale(db: Session, dati: dict) -> Optional[models.User]:
+    """L'utente InCampo già esistente dell'utente del portale (email, poi parte prima della @ = username), o None."""
     email = dati["email"]
     username = dati["username"]
     user = db.query(models.User).filter(models.User.email == email).first()
@@ -138,6 +137,35 @@ def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
             if em.endswith("@" + EMAIL_DOMINIO) and em.split("@")[0] == username and u.role != UserRole.admin:
                 user = u
                 break
+    return user
+
+
+def allinea_admin_dal_portale(db: Session, user: models.User, dati: dict, request: Request) -> bool:
+    """Amministratore del portale = admin anche in InCampo (regola della suite del 09/11/2026: "le mie
+    credenziali valgono come admin ovunque"). Prima il ruolo dal portale valeva solo alla creazione dell'utente;
+    ora a ogni ingresso dal portale (cookie, password del portale, apertura del web con /auth/me) un utente
+    attivo il cui ruolo nel portale è ``admin`` diventa admin qui, con evento ``user.updated`` nel registro.
+
+    Solo promozione: chi non è più admin nel portale non perde il ruolo (lo cambia un admin da Utenti), e
+    l'admin per l'app concesso da una regola IP del portale (``admin`` vero ma ``ruolo`` utente) non basta,
+    perché il ruolo resterebbe anche lontano da quel PC. Non fa commit: lo fa chi chiama. True se ha promosso."""
+    if dati.get("ruolo") != "admin" or not user.is_active or user.role == UserRole.admin:
+        return False
+    prima = user.role.value
+    user.role = UserRole.admin
+    user.updated_at = utcnow()
+    audit.record(db, "user.updated", user, entity_type="user", entity_id=user.id, request=request,
+                 details={"email": user.email, "role": {"da": prima, "a": "admin"}, "origine": "admin-del-portale",
+                          "utente_portale": dati.get("username")})
+    return True
+
+
+def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
+    """L'utente InCampo dell'utente del portale (vedi _utente_esistente_dal_portale);
+    se non c'è lo crea attivo, senza password usabile. Ritorna (utente, creato)."""
+    email = dati["email"]
+    username = dati["username"]
+    user = _utente_esistente_dal_portale(db, dati)
     if user is not None:
         return user, False
     if dati.get("admin") or dati.get("ruolo") == "admin":
@@ -181,6 +209,8 @@ def login_con_password_portale(db: Session, email: str, password: str, request: 
     user, creato = _utente_dal_portale(db, dati)
     if not user.is_active:
         raise HTTPException(401, "Utente InCampo disattivato")
+    if not creato:
+        allinea_admin_dal_portale(db, user, dati, request)
     if creato:
         audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
                      details={"email": user.email, "role": user.role.value, "origine": "password-portale",
@@ -198,7 +228,8 @@ def login_dal_portale(request: Request, db: Session = Depends(get_db)):
 
     L'utente InCampo è quello con la stessa email del portale (o lo username prima della @);
     se manca viene creato: admin del portale → admin, altrimenti ``INCAMPO_RUOLO_PORTALE``
-    (default manager). 401 se il portale non risponde, non si è loggati o lo SSO è spento.
+    (default manager); se c'è e nel portale è amministratore diventa admin (allinea_admin_dal_portale).
+    401 se il portale non risponde, non si è loggati o lo SSO è spento.
     """
     dati = verifica_portale(request.headers.get("cookie") or "")
     if not dati["ok"]:
@@ -206,6 +237,8 @@ def login_dal_portale(request: Request, db: Session = Depends(get_db)):
     user, creato = _utente_dal_portale(db, dati)
     if not user.is_active:
         raise HTTPException(401, "Utente InCampo disattivato")
+    if not creato:
+        allinea_admin_dal_portale(db, user, dati, request)
     if creato:
         audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
                      details={"email": user.email, "role": user.role.value, "origine": "portale", "utente_portale": dati["username"]})
