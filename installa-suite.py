@@ -325,7 +325,7 @@ def installa_credenziali(d: Path) -> str:
 APPS = [
     # (id, nome a menu, cartella, funzione)
     ("portale",     "Portale - accesso e avvio della suite (porta 8080)",        "portale",             installa_portale),
-    ("ddt",         "Lettore DDT - da PDF a Excel (porta 5050)",                 "lettore-ddt",         installa_ddt),
+    ("ddt",         "DDT e Magazzino - bolle in Excel e magazzino (porta 5050, installa anche il Magazzino)", "lettore-ddt", installa_ddt),
     ("agente",      "Analista Dati - domande sui dati con AI (porte 5173+3001)", "analista-dati",       installa_agente),
     ("confronta",   "Confronto Documenti (porta 5001)",                          "confronto-documenti", installa_confronta),
     ("ocr",         "OCR Documenti (porte 5179+3007)",                           "ocr-documenti",       installa_ocr),
@@ -333,7 +333,7 @@ APPS = [
     ("requisiti",   "Verifica Requisiti - ricerca e checklist (porta 5185)",     "verifica-requisiti",  installa_verifica),
     ("incampo",     "InCampo - gestione cantiere, web e app mobile (porta 5190)", "incampo",            installa_incampo),
     ("skytower",    "SkyTower - documenti di commessa CDE ISO 19650 (porta 5195)", "skytower",          installa_skytower),
-    ("magazzino",   "Magazzino Operativo - giacenze e mezzi con barcode (porta 5200)", "magazzino-operativo", installa_magazzino),
+    ("magazzino",   "Magazzino Operativo - parte di DDT e Magazzino (porta interna 5200)", "magazzino-operativo", installa_magazzino),
     ("timbri",      "Timbri per VFP - da PNG a timbro .stamp (porta 5205)",       "timbri-vfp",          installa_timbri),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
@@ -409,6 +409,11 @@ def main() -> int:
         if not scelte:
             return 0
 
+    # Programma unico "DDT e Magazzino" (09/11/2026, CONTRATTI § 11): il Lettore DDT avvia da sé il Magazzino
+    # con il python di magazzino-operativo/.venv, quindi chi installa il DDT deve avere anche il Magazzino.
+    if "ddt" in scelte and "magazzino" not in scelte:
+        say("DDT e Magazzino: installo anche il Magazzino Operativo, che il Lettore DDT avvia da solo.")
+        scelte.append("magazzino")
     # ordine consigliato = ordine del registro APPS (credenziali per ultime)
     scelte = [i for i in ids if i in scelte]
     esiti: list[tuple[str, bool, str]] = []
