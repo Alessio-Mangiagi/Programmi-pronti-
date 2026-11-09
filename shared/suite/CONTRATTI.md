@@ -224,7 +224,12 @@ unico `shared/firma` (README lì): `firma.js` per Node, `busta.py` per Python.
   `X-Firma-Esito`), con `?originale=true` la busta; le altre app che archiviano in SkyTower
   (Lettore DDT, VFP Transfer) mandano la busta originale.
 * Motore non installato (`shared/firma/.venv` assente) = messaggio «Componente firma digitale
-  non installato», mai errore 500. Gli `avvia.bat` lo installano da soli al primo avvio.
+  non installato», mai errore 500. Gli `avvia.bat` e `InstallaSuite.exe` lo installano; se
+  manca lo stesso, la prima busta avvia `installa.bat` in disparte («in installazione,
+  riprovare fra qualche minuto»).
+* Dove sta il motore: `FIRMA_DIR` → `<cartella dell'eseguibile>\shared\firma` → cartella del
+  client. Un programma impacchettato in `.exe` (ConfrontaPDF.exe, server.exe del Lettore DDT)
+  si distribuisce con `shared\firma` accanto, copiata da `shared\firma\copia-motore.bat`.
 
 ## Regole per tutti
 

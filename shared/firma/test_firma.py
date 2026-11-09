@@ -317,6 +317,36 @@ class RigaDiComandoEClient(unittest.TestCase):
                     else:
                         os.environ[k] = v
 
+    def test_dove_si_cerca_il_motore(self):
+        """FIRMA_DIR → <cartella dell'eseguibile>/shared/firma → cartella di busta.py; motore senza .venv né
+        installa.bat = messaggio con cosa fare (nessuna installazione lanciata davvero)."""
+        vecchio = {k: os.environ.get(k) for k in ("FIRMA_DIR", "FIRMA_PYTHON")}
+        os.environ.pop("FIRMA_PYTHON", None)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                altrove = Path(tmp) / "motore"
+                altrove.mkdir()
+                os.environ["FIRMA_DIR"] = str(altrove)
+                # cartella indicata ma senza firma.py: si passa alla successiva (qui quella di busta.py)
+                self.assertEqual(busta.candidati_motore()[0], altrove.resolve())
+                self.assertEqual(busta.cartella_motore(), CARTELLA)
+                # con firma.py vince lei, anche per l'interprete; senza .venv e senza installa.bat niente
+                # installazione automatica: il messaggio dice quale installa.bat lanciare
+                (altrove / "firma.py").write_text("# finto")
+                self.assertEqual(busta.cartella_motore(), altrove.resolve())
+                self.assertTrue(str(busta.python_firma()).startswith(str(altrove.resolve())))
+                with self.assertRaises(busta.FirmaNonInstallata) as e:
+                    busta.apri(b"x", "a.pdf.p7m")
+                self.assertIn(str(altrove.resolve() / "installa.bat"), str(e.exception))
+                # da un eseguibile impacchettato si guarda accanto all'exe
+                self.assertIn(Path(sys.executable).resolve().parent / "shared" / "firma", busta.candidati_motore())
+        finally:
+            for k, v in vecchio.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "fixture":

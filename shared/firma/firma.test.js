@@ -22,6 +22,28 @@ test('eBustaFirmata riconosce estensione, DER e base64', () => {
   assert.equal(firma.nomeSenzaP7m('offerta.pdf.p7m.p7m'), 'offerta.pdf');
 });
 
+test('dove si cerca il motore: FIRMA_DIR, accanto all\'eseguibile, cartella del client', async () => {
+  // senza installa.bat nella cartella indicata non parte nessuna installazione vera: solo il messaggio
+  const vecchi = { FIRMA_DIR: process.env.FIRMA_DIR, FIRMA_PYTHON: process.env.FIRMA_PYTHON };
+  delete process.env.FIRMA_PYTHON;
+  const altrove = fs.mkdtempSync(path.join(os.tmpdir(), 'firma-dir-'));
+  try {
+    process.env.FIRMA_DIR = altrove;
+    const candidati = firma.candidatiMotore();
+    assert.equal(candidati[0], path.resolve(altrove));
+    assert.equal(candidati[1], path.join(path.dirname(process.execPath), 'shared', 'firma'));
+    assert.equal(firma.cartellaMotore(), __dirname);            // FIRMA_DIR senza firma.py: si passa oltre
+    fs.writeFileSync(path.join(altrove, 'firma.py'), '# finto');
+    assert.equal(firma.cartellaMotore(), path.resolve(altrove));
+    assert.ok(firma.pythonFirma().startsWith(path.resolve(altrove)));
+    await assert.rejects(firma.apri(Buffer.from('x'), 'a.pdf.p7m'),
+      (e) => e.code === 'FIRMA_NON_INSTALLATA' && e.message.includes(path.join(path.resolve(altrove), 'installa.bat')));
+  } finally {
+    for (const [k, v] of Object.entries(vecchi)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    fs.rmSync(altrove, { recursive: true, force: true });
+  }
+});
+
 test('apri estrae il PDF e verifica la firma', { skip: !pronto && 'motore non installato (shared/firma/installa.bat)' }, async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'firma-node-'));
   try {

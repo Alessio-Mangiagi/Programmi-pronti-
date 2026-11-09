@@ -44,11 +44,16 @@ export interface RapportoFirma {
 export function eBustaFirmata(buffer: Buffer, nome?: string | null): boolean;
 export function nomeSenzaP7m(nome?: string | null): string;
 export function pythonFirma(): string;
+/** Cartella del motore in uso (FIRMA_DIR → <cartella dell'exe>/shared/firma → shared/firma), null se non c'è. */
+export function cartellaMotore(): string | null;
+/** Le cartelle provate, nell'ordine (per i messaggi e le diagnosi). */
+export function candidatiMotore(): string[];
 export function apri(buffer: Buffer, nome?: string | null,
   opzioni?: { rete?: boolean; verifica?: boolean; timeoutMs?: number }):
   Promise<{ contenuto: Buffer; nomeContenuto: string; rapporto: RapportoFirma }>;
 
 declare const _default: {
   eBustaFirmata: typeof eBustaFirmata; apri: typeof apri; nomeSenzaP7m: typeof nomeSenzaP7m; pythonFirma: typeof pythonFirma;
+  cartellaMotore: typeof cartellaMotore; candidatiMotore: typeof candidatiMotore;
 };
 export default _default;

@@ -20,6 +20,27 @@ stanno le librerie di verifica (`pyhanko-certvalidator`, `asn1crypto`, `cryptogr
 `requirements.txt` e scarica gli elenchi ufficiali. Gli `avvia.bat` dei programmi lo lanciano da soli se `.venv`
 manca. Se più programmi partono insieme al primo avvio, la cartella `.installazione.lock` fa installare uno alla
 volta (gli altri aspettano; un lock abbandonato da un'installazione interrotta si scavalca dopo 5 minuti). Su Linux/Docker: un Python con `requirements.txt` e la variabile `FIRMA_PYTHON` che punta a lui.
+Lo lancia anche `InstallaSuite.exe` / `installa-suite.py` insieme ai programmi che lo usano.
+
+**Installazione alla prima busta.** Se un programma riceve un `.p7m` e il motore c'è ma `.venv` manca (programma
+avviato senza il suo `avvia.bat`, exe copiato su un altro PC), il client lancia da solo `installa.bat` in disparte
+(solo Windows, solo senza `FIRMA_PYTHON`) e risponde "in installazione, riprovare fra qualche minuto". Al massimo
+un tentativo ogni 10 minuti per processo: se finisce senza `.venv` (manca Python 3.12, niente rete) il messaggio
+dice quale `installa.bat` lanciare a mano.
+
+**Dove si cerca il motore** (stesso ordine in `firma.js` e `busta.py`, vince la prima cartella con `firma.py`):
+
+1. `FIRMA_DIR`, se impostata (un motore installato altrove);
+2. `<cartella dell'eseguibile>\shared\firma`: per i programmi impacchettati in un `.exe`, dove il client sta dentro
+   l'eseguibile e Python non potrebbe leggere `firma.py` né creare `.venv`;
+3. la cartella del client stesso (programmi lanciati dal repo o da una copia della suite).
+
+**Programmi impacchettati.** `copia-motore.bat DESTINAZIONE` copia qui i soli sorgenti (niente `.venv`, che ha
+percorsi assoluti e si crea sul PC di destinazione, niente cache, lock e test). Lo usano
+`confronto-documenti\build-exe.bat` (ConfrontaPDF.exe con `shared\firma` accanto) e
+`lettore-ddt\installer-pkg\build-installer-pkg.bat` (server.exe; l'installer copia il motore in
+`{app}\shared\firma`, lo prepara a fine installazione e il watchdog ci riprova a ogni avvio). Sul PC di
+destinazione per i `.p7m` serve Python 3.12; il resto del programma funziona anche senza.
 
 ## Cosa fa
 
@@ -94,7 +115,8 @@ if e_busta_firmata(dati, nome):
     pdf, nome_pdf, rapporto = apri(dati, nome)
 ```
 
-Errori: `FIRMA_NON_INSTALLATA` / `FirmaNonInstallata` (manca `.venv`), `BUSTA_ILLEGGIBILE` / `BustaIllegibile`
+Errori: `FIRMA_NON_INSTALLATA` / `FirmaNonInstallata` (motore non trovato o `.venv` mancante: il messaggio dice
+già se l'installazione è partita da sola o cosa fare), `BUSTA_ILLEGGIBILE` / `BustaIllegibile`
 (file rotto o firma staccata: messaggio leggibile per l'utente). Il documento originale firmato va conservato
 dove conta il valore legale (SkyTower conserva il `.p7m`); gli altri programmi lavorano sul PDF estratto e
 mostrano il riepilogo.
