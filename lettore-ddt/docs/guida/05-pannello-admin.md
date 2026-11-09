@@ -79,8 +79,8 @@ la ricerca.
 Ogni Excel scaricato dalla scheda Importa entra come *✗ Da convalidare*; quando l'utente clicca **✓ Dati
 convalidati** la **stessa riga** passa a *✓ Convalidato* con l'ora della convalida (dal 06/11/2026: prima il
 pulsante non aggiornava lo stato). La convalida compare anche nel **Log accessi** come *DDT convalidato* e nel
-registro del Portale come *Excel verificato · convalidato*. Nell'immagine le righe sono quelle di prima della
-correzione, con la vecchia dicitura *Non convalidato*.
+registro del Portale come *Excel verificato · convalidato*. Nell'immagine: quattro Excel già convalidati e tre
+ancora da convalidare (dati inventati).
 
 ## Chiave API
 
