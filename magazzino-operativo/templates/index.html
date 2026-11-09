@@ -8,8 +8,8 @@
   <meta name="description" content="Magazzino Operativo Cosedil S.p.A. — giacenze materiali e posizione mezzi con codice a barre">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230c4577%27/%3E%3Cpath d=%27M16 6l9 5v10l-9 5-9-5V11z%27 fill=%27none%27 stroke=%27%2365bc7b%27 stroke-width=%272.2%27 stroke-linejoin=%27round%27/%3E%3Cpath d=%27M7 11l9 5 9-5M16 16v10%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%272%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
   <meta name="theme-color" content="#0c4577">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/static/icone/apple-touch-icon.png">
+  <link rel="manifest" href="{{ base }}/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="{{ base }}/static/icone/apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,18 +17,29 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Inter:wght@500;600&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="{{ base }}/static/css/style.css">
 </head>
 <body>
   <div class="app-shell">
     <header class="testata">
       <span class="logo">COSEDIL</span>
       <span class="testata-divisore" aria-hidden="true"></span>
+      {% if cfg.unico %}
+      <!-- Programma unico "DDT e Magazzino" (09/11/2026): la testata porta le due parti e la commessa
+           scelta all'accesso. La commessa si cambia dalla parte DDT, che l'ha chiesta. -->
+      <h1 class="testata-titolo">DDT e Magazzino<small>Giacenze e mezzi</small></h1>
+      <nav class="testata-programma" aria-label="Parti del programma">
+        <a href="{{ cfg.ddt }}">DDT</a>
+        <a href="{{ base }}/" class="attiva" aria-current="page">Magazzino</a>
+      </nav>
+      {% else %}
       <h1 class="testata-titolo">Magazzino Operativo<small>Giacenze e mezzi</small></h1>
+      {% endif %}
       <button class="testata-menu" id="btn-menu" type="button" aria-label="Menu">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
       <span class="testata-spazio"></span>
+      {% if cfg.commessa %}<span class="testata-commessa" title="Commessa scelta all'accesso: si cambia dalla parte DDT"><span class="testata-commessa-et">Commessa</span> <strong>{{ cfg.commessa }}</strong></span>{% endif %}
       <span class="testata-utente" id="testata-utente"></span>
     </header>
 
@@ -48,8 +59,10 @@
     </div>
   </div>
 
-  <script src="/static/js/grafici.js"></script>
-  <script src="/static/js/targa.js"></script>
-  <script src="/static/js/app.js"></script>
+  <!-- Base dei link (prefisso del programma unico, vuoto alla radice) e commessa di sessione: app.js li legge da qui -->
+  <script>window.MAGAZZINO = {{ cfg|tojson }};</script>
+  <script src="{{ base }}/static/js/grafici.js"></script>
+  <script src="{{ base }}/static/js/targa.js"></script>
+  <script src="{{ base }}/static/js/app.js"></script>
 </body>
 </html>

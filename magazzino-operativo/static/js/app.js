@@ -3,6 +3,15 @@
 'use strict';
 
 (function () {
+  // ------------------------------------------------------------------ dove è aperta la pagina
+  // window.MAGAZZINO lo scrive il server nel template (app.info_pagina): base = prefisso dei link
+  // ('' alla radice, '/magazzino' dentro il programma unico "DDT e Magazzino"), unico = aperta dal
+  // Lettore DDT, commessa = quella scelta all'accesso nel programma unico (filtro proposto, modificabile).
+  const CFG = window.MAGAZZINO || {};
+  const BASE = CFG.base || '';
+  const COMMESSA = CFG.commessa || '';
+  const normCom = (c) => String(c || '').replace(/\s+/g, '').toUpperCase();
+
   // ------------------------------------------------------------------ utilità
   const $ = (sel, el) => (el || document).querySelector(sel);
   const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,6 +26,8 @@
   let ubicazioniCache = null;
 
   async function api(url, opt) {
+    // gli indirizzi delle API si scrivono sempre da '/': qui prende il prefisso del programma unico
+    if (typeof url === 'string' && url.startsWith('/')) url = BASE + url;
     const o = Object.assign({ headers: {} }, opt || {});
     if (o.body && !(o.body instanceof FormData)) {
       o.headers['Content-Type'] = 'application/json';
@@ -58,6 +69,15 @@
     if (!ubicazioniCache || forza) ubicazioniCache = await api('/api/ubicazioni');
     return ubicazioniCache;
   }
+  // Ubicazione della commessa scelta all'accesso (il cantiere, se ce n'è uno): proposta nei filtri di
+  // giacenze e movimenti e come arrivo dei movimenti a mano. null fuori dal programma unico.
+  function ubicazioneCommessa(lista) {
+    if (!COMMESSA) return null;
+    const della = (lista || []).filter((u) => normCom(u.commessa) === normCom(COMMESSA));
+    return della.find((u) => u.tipo === 'cantiere') || della[0] || null;
+  }
+  const idUbiCommessa = (lista) => (ubicazioneCommessa(lista) || {}).id || '';
+
   const opzioniUbicazioni = (lista, sel, vuoto) =>
     (vuoto ? `<option value="">${h(vuoto)}</option>` : '') +
     lista.map((u) => `<option value="${u.id}" ${u.id == sel ? 'selected' : ''}>${h(u.nome)}</option>`).join('');
@@ -173,7 +193,7 @@
   }).observe($('#contenuto'), { childList: true, subtree: true });
 
   // Presenza: dice al server che la pagina è aperta e su quale vista (per gli admin).
-  const battito = () => { fetch('/api/presenza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vista: (location.hash.replace('#', '').split('/')[0] || 'dashboard') }) }).catch(() => {}); };
+  const battito = () => { fetch(BASE + '/api/presenza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vista: (location.hash.replace('#', '').split('/')[0] || 'dashboard') }) }).catch(() => {}); };
   setInterval(battito, 30000);
   window.addEventListener('hashchange', battito);
 
@@ -207,7 +227,9 @@
       <div style="height:1.25rem"></div>
       <div class="card"><div class="card-testa"><h3>Ultimi movimenti</h3><a href="#movimenti" class="muto">Tutti i movimenti</a>
         ${d.ultima_importazione ? `<span class="muto">Ultima importazione: ${fmtData(d.ultima_importazione.ts)} (${h(d.ultima_importazione.sorgente)}, ${h(d.ultima_importazione.esito)})</span>` : ''}</div>
-        ${tabellaMovimenti(d.ultimi_movimenti)}</div>`;
+        ${tabellaMovimenti(d.ultimi_movimenti)}</div>
+      <div id="riepilogo-sky"></div>`;
+    caricaRiepiloghi($('#riepilogo-sky'));
   };
 
   // Tabella dei movimenti (Riepilogo, Movimenti, scheda articolo). opz.senzaArticolo: nella scheda di un articolo
@@ -332,7 +354,7 @@
     function cardArticolo(d) {
       const a = d.articolo;
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Articolo</span><h3>${h(a.descrizione)}</h3><span class="codice">${h(a.codice)}</span>${a.codice_esterno ? `<span class="muto mono">EAN ${h(a.codice_esterno)}</span>` : ''}</div>
-          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/api/etichette?tipo=articoli&ids=${a.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="${BASE}/api/etichette?tipo=articoli&ids=${a.id}" target="_blank">Etichetta</a></div></div>
         <div class="griglia griglia-2">
           <div><div class="totale-grande">${fmtN(d.totale)} <small>${h(a.um)} in totale</small></div>
             <p class="muto">${a.categoria ? h(a.categoria) + ' · ' : ''}${a.fornitore ? 'Fornitore ' + h(a.fornitore) : ''}${a.scorta_minima != null ? ` · scorta minima ${fmtN(a.scorta_minima)}` : ''}</p>
@@ -348,8 +370,8 @@
     function cardMezzo(d) {
       const m = d.mezzo;
       const principale = (d.foto || []).find((f) => f.principale) || (d.foto || [])[0];
-      return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo">${principale ? `<a href="/api/mezzi/${m.id}/foto/${principale.id}" target="_blank" rel="noopener"><img class="foto-mini" src="/api/mezzi/${m.id}/foto/${principale.id}?dim=min" alt="foto del mezzo"></a>` : ''}<span class="badge badge-blu">Mezzo</span><h3>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</h3><span class="codice">${h(m.codice)}</span></div>
-          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="/api/etichette?tipo=mezzi&ids=${m.id}" target="_blank">Etichetta</a></div></div>
+      return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo">${principale ? `<a href="${BASE}/api/mezzi/${m.id}/foto/${principale.id}" target="_blank" rel="noopener"><img class="foto-mini" src="${BASE}/api/mezzi/${m.id}/foto/${principale.id}?dim=min" alt="foto del mezzo"></a>` : ''}<span class="badge badge-blu">Mezzo</span><h3>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}</h3><span class="codice">${h(m.codice)}</span></div>
+          <div class="azioni"><button class="btn btn-sec btn-piccolo" data-modifica>Modifica</button><a class="btn btn-sec btn-piccolo" href="${BASE}/api/etichette?tipo=mezzi&ids=${m.id}" target="_blank">Etichetta</a></div></div>
         <div class="griglia griglia-2">
           <div><div class="totale-grande" style="font-size:1.6rem">${h(m.ubicazione || 'Ubicazione non registrata')}</div>
             <p>${badgeStato(m.stato)} <span class="badge">${m.proprieta === 'nolo' ? 'A nolo' : 'Di proprietà'}</span>${m.assegnato_a ? ` <span class="badge badge-blu">In uso da ${h(m.assegnato_a)}</span>` : ''}</p>
@@ -364,7 +386,7 @@
     function cardUbicazione(d) {
       const u = d.ubicazione;
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Ubicazione</span><h3>${h(u.nome)}</h3><span class="codice">${h(u.codice)}</span><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></div>
-          <div class="azioni">${urlMappa(u) ? `<a class="btn btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="/api/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni">${urlMappa(u) ? `<a class="btn btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="${BASE}/api/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
         ${u.indirizzo ? `<p class="muto">${h(u.indirizzo)}</p>` : ''}
         <div class="griglia griglia-2">
           <div><h4>Materiale (${d.giacenze.length})</h4>${d.giacenze.length ? `<table><thead><tr><th>Articolo</th><th class="num">Quantità</th></tr></thead><tbody>
@@ -429,7 +451,7 @@
       <div class="pieno"><strong>${h(articolo.descrizione)}</strong> <span class="muto mono">${h(articolo.codice)}</span></div>
       ${tipo === 'carico' || tipo === 'trasferimento' || tipo === 'rettifica' || tipo === 'inventario' ? '' : ''}
       ${['scarico', 'trasferimento'].includes(tipo) ? campo('Da ubicazione', select('da_ubicazione_id', daOpz)) : ''}
-      ${['carico', 'trasferimento', 'rettifica', 'inventario'].includes(tipo) ? campo(tipo === 'trasferimento' ? 'A ubicazione' : 'Ubicazione', `<select name="a_ubicazione_id">${opzioniUbicazioni(lista, lista[0] && lista[0].id)}</select>`) : ''}
+      ${['carico', 'trasferimento', 'rettifica', 'inventario'].includes(tipo) ? campo(tipo === 'trasferimento' ? 'A ubicazione' : 'Ubicazione', `<select name="a_ubicazione_id">${opzioniUbicazioni(lista, idUbiCommessa(lista) || (lista[0] && lista[0].id))}</select>`) : ''}
       ${campo(tipo === 'inventario' ? `Conteggio reale (${articolo.um})` : tipo === 'rettifica' ? `Quantità con segno (${articolo.um})` : `Quantità (${articolo.um})`, input('quantita', '', 'type="number" step="any" required inputmode="decimal"'))}
       ${tipo === 'carico' ? campo('Fornitore', input('fornitore', articolo.fornitore || '')) : campo('Data', input('data', new Date().toISOString().slice(0, 10), 'type="date"'))}
       ${campo('Riferimento (DDT, ordine, bolla...)', input('riferimento', ''))}
@@ -481,7 +503,7 @@
     const lista = await ubicazioni();
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Materiale</div><h2>Giacenze</h2></div>
       <div class="azioni"><button class="btn btn-sec" id="btn-csv">Esporta CSV</button></div></div>
-      <div class="filtri"><input id="q" placeholder="Cerca articolo o ubicazione..."><select id="ubi">${opzioniUbicazioni(lista, '', 'Tutte le ubicazioni')}</select></div>
+      <div class="filtri"><input id="q" placeholder="Cerca articolo o ubicazione..."><select id="ubi">${opzioniUbicazioni(lista, idUbiCommessa(lista), 'Tutte le ubicazioni')}</select></div>
       <div class="card" id="tab"></div>`;
     let righe = [];
     const carica = async () => {
@@ -507,7 +529,7 @@
       <div class="azioni"><button class="btn" id="btn-nuovo">Nuovo movimento</button></div></div>
       <div class="filtri"><input id="q" placeholder="Cerca articolo, riferimento, fornitore..."><select id="tipo"><option value="">Tutti i tipi</option>${['carico', 'scarico', 'trasferimento', 'rettifica', 'inventario'].map((t) => `<option>${t}</option>`).join('')}</select>
       <select id="origine"><option value="">Tutte le origini</option><option value="ddt">DDT</option><option value="scansione">Scansione</option><option value="manuale">Manuale</option></select>
-      <select id="ubi">${opzioniUbicazioni(lista, '', 'Tutte le ubicazioni')}</select></div>
+      <select id="ubi">${opzioniUbicazioni(lista, idUbiCommessa(lista), 'Tutte le ubicazioni')}</select></div>
       <div class="card" id="tab"></div>`;
     const carica = async () => {
       const m = await api(`/api/movimenti?q=${encodeURIComponent($('#q').value)}&tipo=${$('#tipo').value}&origine=${$('#origine').value}&ubicazione_id=${$('#ubi').value}&limite=300`);
@@ -543,7 +565,7 @@
   // ------------------------------------------------------------------ articoli
   viste.articoli = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Articoli</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/api/etichette?tipo=articoli" target="_blank">Stampa tutte le etichette</a><button class="btn" id="btn-nuovo">Nuovo articolo</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="${BASE}/api/etichette?tipo=articoli" target="_blank">Stampa tutte le etichette</a><button class="btn" id="btn-nuovo">Nuovo articolo</button></div></div>
       <div class="filtri"><input id="q" placeholder="Cerca per descrizione, codice, categoria..."><label class="muto"><input type="checkbox" id="tutti"> anche disattivati</label></div>
       <div class="card" id="tab"></div>`;
     const carica = async () => {
@@ -592,14 +614,14 @@
   // ------------------------------------------------------------------ mezzi
   viste.mezzi = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Mezzi</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/api/etichette?tipo=mezzi" target="_blank">Stampa tutte le etichette</a><button class="btn btn-sec" id="btn-vfp">Importa da VFP Transfer</button><button class="btn" id="btn-nuovo">Nuovo mezzo</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="${BASE}/api/etichette?tipo=mezzi" target="_blank">Stampa tutte le etichette</a><button class="btn btn-sec" id="btn-vfp">Importa da VFP Transfer</button><button class="btn" id="btn-nuovo">Nuovo mezzo</button></div></div>
       <div class="filtri"><input id="q" placeholder="Cerca tipo, marca, targa, matricola, ditta..."><select id="stato"><option value="">Tutti gli stati</option>${['disponibile', 'in_uso', 'manutenzione', 'fermo', 'restituito'].map((s) => `<option value="${s}">${s.replace('_', ' ')}</option>`).join('')}</select>
       <select id="prop"><option value="">Proprietà e nolo</option><option value="proprio">Di proprietà</option><option value="nolo">A nolo</option></select></div>
       <div class="card" id="tab"></div>`;
     const carica = async () => {
       const l = await api(`/api/mezzi?q=${encodeURIComponent($('#q').value)}&stato=${$('#stato').value}&proprieta=${$('#prop').value}`);
       $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Nolo fino al</th><th class="azioni"></th></tr></thead><tbody>
-        ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td><div style="display:flex;align-items:center;gap:.6rem">${m.foto_id ? `<img class="foto-mini" src="/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="" loading="lazy">` : `<a class="foto-mini foto-vuota" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Nessuna foto: cerca su internet">${ICONE_FOTO}</a>`}<span>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}${m.n_foto ? `<br><span class="muto">${m.n_foto} foto</span>` : ''}</span></div></td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
+        ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td><div style="display:flex;align-items:center;gap:.6rem">${m.foto_id ? `<img class="foto-mini" src="${BASE}/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="" loading="lazy">` : `<a class="foto-mini foto-vuota" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Nessuna foto: cerca su internet">${ICONE_FOTO}</a>`}<span>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}${m.n_foto ? `<br><span class="muto">${m.n_foto} foto</span>` : ''}</span></div></td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
           <td>${m.proprieta === 'nolo' ? `<span class="badge badge-ambra">Nolo</span><br><span class="muto">${h(m.ditta || '')}</span>` : '<span class="badge badge-verde">Proprio</span>'}</td><td>${h(m.ubicazione || '—')}</td><td>${badgeStato(m.stato)}${m.assegnato_a ? `<br><span class="muto">${h(m.assegnato_a)}</span>` : ''}</td>
           <td class="muto">${m.nolo_al ? fmtData(m.nolo_al) : ''}</td>
           <td class="azioni"><button class="btn btn-piccolo" data-sposta="${m.id}">Sposta</button> <button class="btn btn-sec btn-piccolo" data-mod="${m.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${m.id}">Elimina</button>` : ''}</td></tr>`).join('')}
@@ -656,7 +678,8 @@
   // ------------------------------------------------------------------ ubicazioni
   viste.ubicazioni = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Ubicazioni</h2></div>
-      <div class="azioni"><a class="btn btn-sec" href="/api/etichette?tipo=ubicazioni" target="_blank">Stampa etichette</a><button class="btn btn-sec" id="btn-incampo" title="Crea un'ubicazione di tipo cantiere per ogni cantiere di InCampo, con codice commessa e indirizzo">Importa cantieri da InCampo</button><button class="btn" id="btn-nuovo">Nuova ubicazione</button></div></div>
+      <div class="azioni"><a class="btn btn-sec" href="${BASE}/api/etichette?tipo=ubicazioni" target="_blank">Stampa etichette</a><button class="btn btn-sec" id="btn-incampo" title="Crea un'ubicazione di tipo cantiere per ogni cantiere di InCampo, con codice commessa e indirizzo">Importa cantieri da InCampo</button><button class="btn" id="btn-nuovo">Nuova ubicazione</button></div></div>
+      ${COMMESSA ? `<div class="filtri"><label class="muto"><input type="checkbox" id="solo-commessa" checked> solo la commessa ${h(COMMESSA)}</label></div>` : ''}
       <div class="card" id="tab"></div>`;
     $('#btn-incampo').onclick = async () => {
       const b = $('#btn-incampo'); b.disabled = true;
@@ -668,8 +691,11 @@
       b.disabled = false;
     };
     const carica = async () => {
-      const l = await api('/api/ubicazioni?tutte=1');
-      ubicazioniCache = l.filter((u) => u.attivo);
+      const tutte = await api('/api/ubicazioni?tutte=1');
+      ubicazioniCache = tutte.filter((u) => u.attivo);
+      const solo = COMMESSA && $('#solo-commessa') && $('#solo-commessa').checked;
+      const l = solo ? tutte.filter((u) => normCom(u.commessa) === normCom(COMMESSA)) : tutte;
+      if (!l.length) { $('#tab').innerHTML = vuoto(`Nessuna ubicazione con la commessa ${COMMESSA}: togli la spunta per vederle tutte, o creane una nuova.`); return; }
       $('#tab').innerHTML = `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Nome</th><th>Tipo</th><th>Commessa</th><th class="num">Articoli</th><th class="num">Mezzi</th><th class="azioni"></th></tr></thead><tbody>
         ${l.map((u) => `<tr ${u.attivo ? '' : 'style="opacity:.55"'}><td class="mono"><a href="#scansione/${h(u.codice)}">${h(u.codice)}</a></td><td>${h(u.nome)}${u.indirizzo ? `<br><span class="muto">${h(u.indirizzo)}</span>` : ''}</td><td><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></td><td class="muto">${h(u.commessa || '')}</td><td class="num">${u.articoli}</td><td class="num">${u.mezzi}</td>
           <td class="azioni">${btnMappa(u)} <button class="btn btn-sec btn-piccolo" data-mod="${u.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${u.id}">Elimina</button>` : ''}</td></tr>`).join('')}
@@ -679,7 +705,8 @@
         b.onclick = async () => { if (!confirm('Eliminare l\'ubicazione? Se ha movimenti o mezzi viene solo disattivata.')) return; try { const r = await api('/api/ubicazioni/' + b.dataset.del, { method: 'DELETE' }); toast(r.messaggio || 'Eliminata', 'ok'); carica(); } catch (e) { toast(e.message, 'errore'); } };
       });
     };
-    $('#btn-nuovo').onclick = () => formUbicazione(null, carica);
+    $('#btn-nuovo').onclick = () => formUbicazione(COMMESSA ? { tipo: 'cantiere', commessa: COMMESSA } : null, carica);
+    if ($('#solo-commessa')) $('#solo-commessa').onchange = carica;
     await carica();
   };
 
@@ -956,7 +983,7 @@
           <button class="btn btn-sec btn-piccolo" type="button" data-leggi-targa>Leggi targa da foto</button>
           <a class="btn ${lista.length ? 'btn-sec' : ''} btn-piccolo" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Cerca immagini di questo mezzo su internet">Cerca su internet</a></div></div>
       ${lista.length ? `<div class="galleria">${lista.map((f) => `<figure class="foto ${f.principale ? 'principale' : ''}">
-          <a href="/api/mezzi/${m.id}/foto/${f.id}" target="_blank" rel="noopener"><img src="/api/mezzi/${m.id}/foto/${f.id}?dim=min" alt="${h(f.nota || f.nome_originale || 'foto')}" loading="lazy"></a>
+          <a href="${BASE}/api/mezzi/${m.id}/foto/${f.id}" target="_blank" rel="noopener"><img src="${BASE}/api/mezzi/${m.id}/foto/${f.id}?dim=min" alt="${h(f.nota || f.nome_originale || 'foto')}" loading="lazy"></a>
           <figcaption><span class="muto">${fmtData(f.caricato_il)}${f.utente ? ' · ' + h(f.utente) : ''}${f.nota ? '<br>' + h(f.nota) : ''}</span>
             <span class="foto-azioni">${f.principale ? '<span class="badge badge-blu">Principale</span>' : `<button class="btn btn-sec btn-piccolo" data-foto-principale="${f.id}">Principale</button>`}${me.admin ? ` <button class="btn btn-rosso btn-piccolo" data-foto-elimina="${f.id}">Elimina</button>` : ''}</span></figcaption></figure>`).join('')}</div>`
         : `<p class="muto">Nessuna foto: aggiungine una dal telefono oppure <a href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener">cerca il mezzo su internet</a> (${h([m.marca, m.modello, m.tipo_mezzo].filter(Boolean).join(' '))}).</p>`}
@@ -1101,7 +1128,7 @@
       if (!arts.length && !mezzi.length && !u.length) { esiti.innerHTML = vuoto(`Niente per "${q}"`); return; }
       esiti.innerHTML = `<div class="card">
         ${arts.length ? `<div class="cerca-sezione">Articoli (${arts.length})</div><ul class="elenco">${arts.slice(0, 30).map((a) => riga(a.codice, ICONE.box, a.descrizione, [a.codice, a.categoria, a.fornitore].filter(Boolean).join(' · '), a.totale != null ? `${fmtN(a.totale)}<small>${h(a.um)}</small>` : '')).join('')}</ul>` : ''}
-        ${mezzi.length ? `<div class="cerca-sezione">Mezzi (${mezzi.length})</div><ul class="elenco">${mezzi.slice(0, 30).map((m) => riga(m.codice, m.foto_id ? `<img src="/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="">` : ICONE.truck, [m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '), [m.targa, m.ubicazione, m.assegnato_a ? 'in uso da ' + m.assegnato_a : ''].filter(Boolean).join(' · '), badgeStato(m.stato))).join('')}</ul>` : ''}
+        ${mezzi.length ? `<div class="cerca-sezione">Mezzi (${mezzi.length})</div><ul class="elenco">${mezzi.slice(0, 30).map((m) => riga(m.codice, m.foto_id ? `<img src="${BASE}/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="">` : ICONE.truck, [m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '), [m.targa, m.ubicazione, m.assegnato_a ? 'in uso da ' + m.assegnato_a : ''].filter(Boolean).join(' · '), badgeStato(m.stato))).join('')}</ul>` : ''}
         ${u.length ? `<div class="cerca-sezione">Ubicazioni (${u.length})</div><ul class="elenco">${u.slice(0, 30).map((x) => riga(x.codice, ICONE.pin, x.nome, [ETICH_TIPO_UBI[x.tipo] || x.tipo, x.commessa, x.indirizzo].filter(Boolean).join(' · '))).join('')}</ul>` : ''}
       </div>`;
       esiti.querySelectorAll('[data-cod]').forEach((li) => { li.onclick = () => { location.hash = '#scansione/' + li.dataset.cod; }; });
@@ -1160,9 +1187,10 @@
     api(`/api/skytower/commessa/${encodeURIComponent(commessa)}/documenti`).then((d) => {
       const voci = d.items || [];
       sky.innerHTML = `<div class="card-testa"><h4>${MARCHIO('SkyTower')} ${h(d.project && d.project.name || 'Documenti pubblicati')}</h4>
-          <div class="azioni"><button class="btn btn-piccolo" type="button" id="btn-report">Invia report giacenze</button>${d.project && d.project.url ? `<a class="btn btn-sec btn-piccolo" href="${h(d.project.url)}" target="_blank" rel="noopener">Apri</a>` : ''}</div></div>
+          <div class="azioni"><button class="btn btn-piccolo" type="button" id="btn-report">Invia report giacenze</button>${puoRiepilogo(commessa) ? '<button class="btn btn-sec btn-piccolo" type="button" id="btn-riepilogo-ubi">Riepilogo di oggi</button>' : ''}${d.project && d.project.url ? `<a class="btn btn-sec btn-piccolo" href="${h(d.project.url)}" target="_blank" rel="noopener">Apri</a>` : ''}</div></div>
         ${voci.length ? `<ul class="elenco">${voci.slice(0, 8).map((v) => `<li onclick="window.open('${h(v.url || '#')}','_blank')"><div class="testo"><strong>${h(v.title)}</strong><span class="mono">${h(v.identifier)} · ${h(v.revision_code || '')}${v.updated_at ? ' · ' + fmtData(v.updated_at) : ''}</span></div>${ICONE.freccia}</li>`).join('')}</ul>${voci.length > 8 ? `<p class="muto">e altri ${voci.length - 8}: aprili in SkyTower</p>` : ''}` : '<p class="muto">Nessun documento pubblicato per questa commessa.</p>'}`;
       $('#btn-report', sky).onclick = () => inviaReportSkyTower(commessa, $('#btn-report', sky));
+      if ($('#btn-riepilogo-ubi', sky)) $('#btn-riepilogo-ubi', sky).onclick = () => inviaRiepilogo(commessa, $('#btn-riepilogo-ubi', sky));
     }).catch((e) => errore(sky, e, 'SkyTower'));
   }
 
@@ -1204,6 +1232,48 @@
     if (btn) { btn.disabled = false; btn.textContent = 'Invia report giacenze'; }
   }
 
+  // ------------------------------------------------------------------ riepilogo giornaliero in SkyTower
+  // Ogni giorno, per ogni commessa con movimenti, il Magazzino carica in SkyTower un PDF e un Excel con i
+  // movimenti del giorno e le giacenze del cantiere (riepilogo.py, programma unico "DDT e Magazzino" del
+  // 09/11/2026). Qui: gli ultimi invii e il pulsante per mandarlo subito. Lo manda l'amministratore, o chi
+  // lavora nella commessa scelta all'accesso del programma unico (il server ricontrolla: 403 agli altri).
+  const puoRiepilogo = (commessa) => me.admin || (COMMESSA && normCom(COMMESSA) === normCom(commessa));
+  const ESITO_RIEPILOGO = { ok: '<span class="badge badge-verde">in SkyTower</span>', parziale: '<span class="badge badge-ambra">solo il PDF</span>',
+    errore: '<span class="badge badge-rosso">non inviato</span>' };
+
+  async function caricaRiepiloghi(box) {
+    if (!box) return;
+    let d;
+    try { d = await api('/api/riepiloghi?limite=6' + (COMMESSA && !me.admin ? '&commessa=' + encodeURIComponent(COMMESSA) : '')); }
+    catch (_) { box.innerHTML = ''; return; }
+    if (!d.puo_inviare.length && !d.voci.length) { box.innerHTML = ''; return; }
+    const voce = (v) => `<li ${v.url ? `onclick="window.open('${h(v.url)}','_blank')"` : ''}><div class="testo"><strong>${h(v.commessa)} · ${fmtData(v.giorno)}</strong>
+      <span>${h([v.pdf, v.xlsx].filter(Boolean).join(' · '))} · ${v.movimenti} movimenti · ${v.automatico ? 'automatico' : h(v.utente || '')}${v.esito !== 'ok' && v.dettaglio ? ' · ' + h(v.dettaglio) : ''}</span></div>
+      <div class="destra">${ESITO_RIEPILOGO[v.esito] || ''}</div>${v.url ? ICONE.freccia : ''}</li>`;
+    box.innerHTML = `<div style="height:1.25rem"></div><div class="card"><div class="card-testa"><h3>${MARCHIO('SkyTower')} Riepilogo del giorno</h3>
+        <div class="azioni">${d.puo_inviare.length > 1 ? `<select id="riep-commessa" aria-label="Commessa">${d.puo_inviare.map((c) => `<option>${h(c)}</option>`).join('')}</select>` : ''}
+        ${d.puo_inviare.length ? `<button class="btn btn-piccolo" type="button" id="btn-riepilogo">Invia il riepilogo di oggi${d.puo_inviare.length === 1 ? ' · ' + h(d.puo_inviare[0]) : ''}</button>` : ''}</div></div>
+      <p class="muto">${d.automatico ? `Parte da solo ogni giorno alle ${h(d.automatico)} per ogni commessa con movimenti: un PDF e un Excel con i movimenti del giorno e le giacenze del cantiere, nei documenti della commessa in SkyTower.` : 'Invio automatico spento: il riepilogo si manda da questo pulsante.'}</p>
+      ${d.voci.length ? `<ul class="elenco">${d.voci.map(voce).join('')}</ul>` : '<p class="muto">Nessun riepilogo inviato finora.</p>'}</div>`;
+    const b = $('#btn-riepilogo', box);
+    if (b) b.onclick = () => inviaRiepilogo(($('#riep-commessa', box) || {}).value || d.puo_inviare[0], b, () => caricaRiepiloghi(box));
+  }
+
+  async function inviaRiepilogo(commessa, btn, dopo) {
+    const testoBtn = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
+    try {
+      let r = await api('/api/riepiloghi/invia', { method: 'POST', body: { commessa } });
+      // già in SkyTower con gli stessi movimenti: si rimanda solo se chi guarda lo chiede (nuovo documento "aggiornamento")
+      if (r.esito === 'gia_inviato' && confirm(r.messaggio + '\n\nMandarne comunque un altro?')) {
+        r = await api('/api/riepiloghi/invia', { method: 'POST', body: { commessa, forza: true } });
+      }
+      toast(r.messaggio, r.esito === 'ok' ? 'ok' : (r.esito === 'errore' ? 'errore' : ''));
+    } catch (e) { toast(e.message, 'errore'); }
+    if (btn) { btn.disabled = false; btn.textContent = testoBtn; }
+    if (dopo) dopo();
+  }
+
   // ------------------------------------------------------------------ etichette
   viste.etichette = async (cont) => {
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Stampa</div><h2>Etichette</h2></div></div>
@@ -1228,7 +1298,7 @@
     $('#stampa').onclick = () => {
       const ids = [...$('#lista').querySelectorAll('input:checked')].map((c) => c.value);
       if (!ids.length) return toast('Seleziona almeno una voce', 'errore');
-      window.open(`/etichette?tipo=${$('#tipo').value}&ids=${ids.join(',')}`, '_blank');
+      window.open(`${BASE}/api/etichette?tipo=${$('#tipo').value}&ids=${ids.join(',')}`, '_blank');
     };
     await carica();
   };
@@ -1244,7 +1314,7 @@
     naviga();
     battito();
     // Installabile sul telefono: il service worker tiene la pagina anche senza rete (le API no).
-    if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register(BASE + '/sw.js', { scope: BASE + '/' }).catch(() => {});
     const rete = () => { const c = $('#chip-rete'); if (c) { c.classList.toggle('offline', !navigator.onLine); c.textContent = navigator.onLine ? 'In linea' : 'Senza rete'; } if (!navigator.onLine) toast('Connessione assente: le registrazioni non partono finché non torna la rete.', 'errore'); };
     window.addEventListener('online', rete); window.addEventListener('offline', rete);
   })();

@@ -115,6 +115,27 @@ CREATE TABLE IF NOT EXISTS importazioni (
 );
 CREATE INDEX IF NOT EXISTS idx_imp_chiave ON importazioni(sorgente, chiave);
 
+-- Riepiloghi giornalieri caricati in SkyTower (riepilogo.py): uno per invio, così lo stesso giorno
+-- con gli stessi movimenti (stessa impronta) non si rimanda e la pagina mostra cosa è partito.
+CREATE TABLE IF NOT EXISTS riepiloghi (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL DEFAULT (datetime('now')),
+  giorno TEXT NOT NULL,                   -- AAAA-MM-GG dei movimenti riassunti
+  commessa TEXT NOT NULL,                 -- codice com'è scritto sull'ubicazione
+  chiave TEXT NOT NULL,                   -- commessa senza spazi, maiuscola (confronto)
+  impronta TEXT,                          -- hash di movimenti e giacenze del riepilogo
+  movimenti INTEGER NOT NULL DEFAULT 0,
+  esito TEXT NOT NULL CHECK (esito IN ('ok','parziale','errore')),
+  stato_http INTEGER,                     -- risposta di SkyTower quando è andata male
+  pdf TEXT,                               -- identificativo SkyTower del PDF
+  xlsx TEXT,                              -- identificativo SkyTower dell'Excel
+  url TEXT,                               -- dove aprire il PDF in SkyTower
+  automatico INTEGER NOT NULL DEFAULT 0,
+  utente TEXT,
+  dettaglio TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_riep_chiave ON riepiloghi(chiave, giorno);
+
 CREATE TABLE IF NOT EXISTS foto_mezzi (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   mezzo_id INTEGER NOT NULL REFERENCES mezzi(id),

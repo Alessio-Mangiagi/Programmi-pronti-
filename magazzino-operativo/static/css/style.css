@@ -81,6 +81,14 @@ a:hover { color: var(--cosedil-blue-hover); }
 .testata-utente:empty { display: none; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--cosedil-green); color: #0b2a14; font-family: var(--font-display); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.02em; }
 .testata-menu { display: none; background: none; border: 0; color: #fff; cursor: pointer; padding: 0.25rem; }
+/* Programma unico "DDT e Magazzino" (09/11/2026): due linguette nella testata per passare fra le parti,
+   e la commessa scelta all'accesso. Stessa altezza della testata: il resto dell'impaginazione non cambia. */
+.testata-programma { display: inline-flex; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); border-radius: 999px; padding: 3px; gap: 2px; }
+.testata-programma a { font-family: var(--font-ui); font-weight: 600; font-size: 0.82rem; color: #fff; text-decoration: none; padding: 0.3rem 0.9rem; border-radius: 999px; min-height: 32px; display: inline-flex; align-items: center; opacity: 0.85; transition: background 0.2s, opacity 0.2s; }
+.testata-programma a:hover { background: rgba(255,255,255,0.14); opacity: 1; }
+.testata-programma a.attiva { background: #fff; color: var(--cosedil-blue); opacity: 1; }
+.testata-commessa { font-family: var(--font-ui); font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid rgba(101, 188, 123, 0.7); background: rgba(101, 188, 123, 0.16); border-radius: 999px; padding: 0.25rem 0.75rem; white-space: nowrap; }
+.testata-commessa strong { font-family: var(--font-mono); font-weight: 600; }
 
 .corpo { display: flex; flex: 1; }
 .sidebar {
@@ -451,6 +459,8 @@ td.azioni > span.muto { display: block; font-size: 0.78rem; }
   .testata-divisore { display: none; }
   .testata-utente span:not(.avatar) { display: none; }
   .testata-utente { padding-right: 0.3rem; }
+  .testata-programma a { padding: 0.25rem 0.7rem; font-size: 0.78rem; }
+  .testata-commessa { font-size: 0.72rem; padding: 0.2rem 0.55rem; }
   .logo { letter-spacing: 0.1em; font-size: 0.95rem; }
   /* Telefono: barra laterale nascosta del tutto, esce a scorrimento dal bottone menu o da "Altro". */
   .sidebar { position: fixed; left: 0; top: var(--testata-h); height: calc(100dvh - var(--testata-h)); transform: translateX(-100%); transition: transform 0.3s var(--ease-out); z-index: 30; box-shadow: var(--shadow-pop); width: min(300px, 84vw); padding: 1rem 0.75rem calc(var(--tabbar-h) + 1rem); overflow-y: auto; }
@@ -524,6 +534,14 @@ td.azioni > span.muto { display: block; font-size: 0.78rem; }
   table.schede-mobile td.azioni .btn { width: auto; margin-top: 0; }
   .tabella-wrap:has(> table.schede-mobile) { overflow: visible; margin: 0; padding: 0; }
   .tasti-grandi { gap: 0.6rem; }
+}
+@media (max-width: 480px) {
+  /* telefono stretto: la testata del programma unico tiene linguette, commessa e utente; il logo cede il posto */
+  .testata-commessa-et { display: none; }
+  .testata:has(.testata-programma) .logo, .testata:has(.testata-programma) .testata-titolo { display: none; }
+  .testata-programma a { padding: 0.25rem 0.6rem; }
+  .testata-commessa { max-width: 32vw; min-width: 0; }
+  .testata-commessa strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 }
 @media (max-width: 380px) {
   /* Telefoni stretti (iPhone SE, Android economici): una colonna quasi ovunque, testi un filo più piccoli. */

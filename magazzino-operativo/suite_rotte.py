@@ -1,7 +1,7 @@
 # "><(((º> sabusabu <º)))><"
-"""Dialogo con le altre app della suite (InCampo, SkyTower).
+"""Dialogo con le altre app della suite (InCampo, SkyTower, Lettore DDT).
 
-Due famiglie di rotte:
+Tre famiglie di rotte:
   * ``/api/suite/...``: quello che il Magazzino offre alle altre app, protetto dal
     token di servizio (``shared/suite/suite_link.py``), fuori dal gate SSO.
     Oggi: le giacenze e i mezzi di una commessa (le vede InCampo nella scheda cantiere).
@@ -9,6 +9,9 @@ Due famiglie di rotte:
     chiede alle altre app (task e non conformità del cantiere, segnalazione di un
     mezzo, cantieri da importare, documenti pubblicati, invio del report giacenze).
     Passano dal gate SSO come tutte le altre API.
+  * programma unico "DDT e Magazzino" (09/11/2026, CONTRATTI § 11): il carico immediato che il
+    Lettore DDT manda appena salva un export (``/api/suite/ddt/consegne``, token di servizio) e il
+    riepilogo giornaliero dei movimenti verso SkyTower (``/api/riepiloghi``, riepilogo.py).
 
 La chiave è il codice commessa aziendale scritto sull'ubicazione.
 Importato in fondo ad app.py: usa le sue funzioni (db, registra, ...).
@@ -21,13 +24,18 @@ import urllib.parse
 from datetime import datetime
 
 import config
+import importa_ddt
 import pdf_semplice
+import prefisso
+import riepilogo
 from app import (
     ApiError,
     _dati_ubicazione,
+    _lock_import,
     app,
     corpo,
     db,
+    e_admin,
     nome_utente,
     registra,
     righe,
@@ -43,6 +51,20 @@ import suite_link
 log = logging.getLogger("magazzino.suite")
 
 # --------------------------------------------------------------------------- utilità
+
+def url_magazzino():
+    """Indirizzo del Magazzino da mostrare fuori (da fare del portale, InCampo, task).
+
+    Programma unico "DDT e Magazzino" (09/11/2026): gli utenti lo aprono dentro il Lettore DDT, a
+    <Lettore DDT>/magazzino, e la porta propria (5200) ascolta solo sulla macchina (CONTRATTI § 11, C1).
+    Ordine: MAGAZZINO_URL_PUBBLICO → SUITE_URL_PUBBLICO_MAGAZZINO (indirizzo forzato della suite) →
+    Lettore DDT + /magazzino; con MAGAZZINO_PROGRAMMA_UNICO=0 l'indirizzo proprio, come prima."""
+    if config.URL_PUBBLICO:
+        return config.URL_PUBBLICO
+    if not config.PROGRAMMA_UNICO or os.environ.get("SUITE_URL_PUBBLICO_MAGAZZINO"):
+        return suite_link.url_pubblico("magazzino")
+    return suite_link.url_pubblico("ddt") + config.PREFISSO_UNICO
+
 
 def _richiede_token():
     if not suite_link.verifica(request.headers.get(suite_link.HEADER_TOKEN)):
@@ -76,7 +98,7 @@ def _giacenze_commessa(c, codice):
         f"SELECT m.id, m.codice, m.tipo_mezzo, m.marca, m.modello, m.targa, m.matricola, m.stato, m.assegnato_a, "
         f"m.proprieta, m.ditta, m.nolo_al, u.nome AS ubicazione FROM mezzi m JOIN ubicazioni u ON u.id = m.ubicazione_id "
         f"WHERE m.ubicazione_id IN ({segna}) AND m.attivo = 1 ORDER BY m.tipo_mezzo, m.marca", ids))
-    base = suite_link.url_pubblico("magazzino")
+    base = url_magazzino()
     for u in ubi:
         u["url"] = f"{base}/#scansione/{u['codice']}"
     for a in articoli:
@@ -172,7 +194,7 @@ def _carichi_ddt_fuori_registro(c, base):
 
 def _da_fare(c, admin):
     """Cose da fare nel Magazzino per la home del portale (shared/suite/CONTRATTI.md § 4)."""
-    base = suite_link.url_pubblico("magazzino")
+    base = url_magazzino()
     voci = []
     for m in righe(c.execute(
             "SELECT m.id, m.codice, m.tipo_mezzo, m.marca, m.modello, m.targa, m.stato, u.nome AS ubicazione, "
@@ -255,7 +277,7 @@ def incampo_task(codice):
         m = db().execute("SELECT * FROM mezzi WHERE id = ?", (int(d["mezzo_id"]),)).fetchone()
         if m:
             riga = " ".join(x for x in (m["tipo_mezzo"], m["marca"], m["modello"]) if x)
-            dati["description"] = (dati["description"] or "") + f"\n\nMezzo: {riga} ({m['targa'] or m['codice']}) — {suite_link.url_pubblico('magazzino')}/#scansione/{m['codice']}"
+            dati["description"] = (dati["description"] or "") + f"\n\nMezzo: {riga} ({m['targa'] or m['codice']}) — {url_magazzino()}/#scansione/{m['codice']}"
     r = _chiama("incampo", "POST", f"/suite/commesse/{_q(codice)}/task", dati=dati)
     registra("segnalazione_incampo", "mezzo" if d.get("mezzo_id") else "ubicazione", d.get("mezzo_id") or d.get("ubicazione_id"),
              f"{codice}: {titolo}")
@@ -337,3 +359,108 @@ def skytower_report(codice):
     registra("report_skytower", "ubicazione", d["ubicazioni"][0]["id"], f"{d['commessa']}: {r.get('identifier', '')}")
     c.commit()
     return jsonify(r), 201
+
+
+# --------------------------------------------------------------------------- programma unico "DDT e Magazzino"
+
+# Tetti del carico immediato: un export del Lettore DDT ha decine di righe, un lotto grande qualche
+# centinaio. Oltre, qualcosa non va: meglio un 413 che un database riempito per sbaglio.
+CONSEGNE_MAX_RIGHE = 5000
+CAMPI_CONSEGNA = ("commessa", "export", "fornitore", "piva", "ddt", "data", "dataIso", "materiale", "quantita",
+                  "um", "destinazione", "targa", "codiceCommessa")
+
+
+def _testo_corto(v, maxlen):
+    v = "" if v is None else str(v).strip()
+    if any(ord(c) < 32 for c in v):
+        raise ApiError("Caratteri di controllo non ammessi")
+    return v[:maxlen]
+
+
+@app.post("/api/suite/ddt/consegne")
+def suite_ddt_consegne():
+    """Carico immediato dal Lettore DDT (CONTRATTI § 11, C3): appena salva un export, il DDT manda le righe
+    appena scritte in data/<cartella>/consegne.json. Corpo: {cartella, export, codiceCommessa, salvatoIl,
+    righe:[Consegna]}. Le righe entrano come carichi con le stesse chiavi dell'importazione periodica
+    (importa_ddt.importa_consegne_inviate): il giro di sfondo non le duplica. Risposta: {righe, nuove,
+    scartate, commessa, ubicazione, avvisi}. Token di servizio della suite (X-Suite-Token)."""
+    _richiede_token()
+    d = corpo()
+    cartella = _testo_corto(d.get("cartella"), 120)
+    nome_export = _testo_corto(d.get("export"), 200)
+    if not cartella or not nome_export:
+        raise ApiError("Servono cartella ed export (il nome dell'export salvato dal Lettore DDT)")
+    if "/" in cartella or "\\" in cartella or cartella in (".", ".."):
+        raise ApiError("Cartella non valida")
+    lista = d.get("righe")
+    if not isinstance(lista, list) or not all(isinstance(r, dict) for r in lista):
+        raise ApiError("righe deve essere un elenco di consegne")
+    if len(lista) > CONSEGNE_MAX_RIGHE:
+        raise ApiError(f"Troppe righe in un export ({len(lista)}, massimo {CONSEGNE_MAX_RIGHE})", 413)
+    # solo i campi del contratto, testi accorciati: il resto del corpo non entra nel database
+    pulite = [{k: (r[k] if k == "quantita" and isinstance(r[k], (int, float)) and not isinstance(r[k], bool)
+                   else _testo_corto(r[k], 300))
+               for k in CAMPI_CONSEGNA if r.get(k) is not None} for r in lista]
+    codice = _testo_corto(d.get("codiceCommessa"), 80)
+    salvato_il = _testo_corto(d.get("salvatoIl"), 60)
+    with _lock_import:                       # mai insieme al giro di sfondo sulle stesse chiavi
+        esito = importa_ddt.importa_consegne_inviate(db(), cartella, nome_export, pulite, codice=codice,
+                                                     salvato_il=salvato_il, utente=nome_utente())
+    if not esito["gia_importato"]:
+        registra("importazione", "ddt", None,
+                 f"Lettore DDT {cartella}/{nome_export}: {esito['nuove']} carichi nuovi "
+                 f"({esito['ubicazione'] or 'nessuna ubicazione'})")
+        db().commit()
+    return jsonify(esito)
+
+
+def _puo_inviare_riepilogo(commessa):
+    """Riepilogo a richiesta: l'amministratore per ogni commessa, gli altri solo per quella su cui lavorano
+    nel programma unico (scelta all'accesso, X-Suite-Commessa)."""
+    if e_admin():
+        return True
+    di_sessione = prefisso.commessa_sessione(request.environ)
+    return bool(di_sessione) and suite_link.normalizza_commessa(di_sessione) == suite_link.normalizza_commessa(commessa)
+
+
+@app.get("/api/riepiloghi")
+def api_riepiloghi():
+    """Per la pagina: riepiloghi già mandati a SkyTower, commesse con movimenti oggi, ora del giro automatico
+    e le commesse per cui chi guarda può mandarlo a mano."""
+    c = db()
+    commessa = (request.args.get("commessa") or "").strip() or None
+    oggi = riepilogo.commesse_del_giorno(c, datetime.now().date().isoformat())
+    di_sessione = prefisso.commessa_sessione(request.environ)
+    possibili = list(oggi) if e_admin() else []
+    if di_sessione and not any(suite_link.normalizza_commessa(x) == suite_link.normalizza_commessa(di_sessione)
+                               for x in possibili):
+        possibili.insert(0, di_sessione)
+    ora = riepilogo.ora_automatica()
+    try:
+        limite = int(request.args.get("limite") or 20)
+    except ValueError:
+        raise ApiError("limite non valido")
+    return jsonify({"automatico": f"{ora[0]:02d}:{ora[1]:02d}" if ora else None, "oggi": oggi,
+                    "puo_inviare": possibili, "voci": riepilogo.elenco(c, commessa, limite)})
+
+
+@app.post("/api/riepiloghi/invia")
+def api_riepiloghi_invia():
+    """Manda subito il riepilogo di una commessa (default oggi) a SkyTower. Risponde 200 con l'esito
+    (ok, gia_inviato, vuoto, errore, rimandato) e il messaggio da mostrare: SkyTower spenta non è un errore
+    della pagina. forza=true rimanda anche se niente è cambiato (nuovo documento "aggiornamento")."""
+    d = corpo()
+    commessa = testo(d, "commessa", True, 80)
+    giorno = testo(d, "giorno", maxlen=10) or None
+    if giorno:
+        try:
+            datetime.strptime(giorno, "%Y-%m-%d")
+        except ValueError:
+            raise ApiError("giorno deve essere AAAA-MM-GG")
+    if not _puo_inviare_riepilogo(commessa):
+        raise ApiError("Il riepilogo a richiesta lo manda l'amministratore, o chi lavora in quella commessa", 403)
+    esito = riepilogo.invia(db(), commessa, giorno, utente=nome_utente(), forza=bool(d.get("forza")))
+    if esito["esito"] in ("ok", "errore"):
+        registra("riepilogo_skytower", "commessa", None, f"{commessa} {giorno or 'oggi'}: {esito['messaggio']}"[:300])
+        db().commit()
+    return jsonify(esito)

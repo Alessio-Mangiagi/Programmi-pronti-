@@ -39,7 +39,8 @@
     <button type="button" onclick="window.print()">Stampa</button>
     <span>{{ voci|length }} etichette · {{ tipo }} · fogli A4 da 24 (70×37 mm)</span>
     <span style="flex:1"></span>
-    <a href="/#etichette">Torna al magazzino</a>
+    <!-- request.script_root: '' alla radice, '/magazzino' dentro il programma unico "DDT e Magazzino" -->
+    <a href="{{ request.script_root }}/#etichette">Torna al magazzino</a>
   </div>
   {% if not voci %}
     <p class="vuoto">Nessuna voce da stampare.</p>

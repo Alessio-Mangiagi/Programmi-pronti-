@@ -7,6 +7,8 @@ a nolo dalle pratiche di VFP Transfer; il resto (scarichi, trasferimenti,
 rettifiche, mezzi propri) si registra a mano o dalla pagina di scansione.
 
 Avvio: python app.py (o avvia.bat). API JSON sotto /api, pagina unica in /.
+Dal 09/11/2026 è una parte del programma unico "DDT e Magazzino": lo avvia il Lettore DDT e
+gli utenti lo vedono sotto <Lettore DDT>/magazzino/ (proxy, prefisso.py; CONTRATTI § 11).
 """
 import json
 import logging
@@ -28,6 +30,8 @@ import foto
 import importa_ddt
 import importa_mezzi
 import backup
+import prefisso
+import riepilogo
 import statistiche
 
 # Codice condiviso della suite (cartelle sorelle, non pacchetti installati).
@@ -44,7 +48,10 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = config.UPLOAD_MAX_BYTE
 avvisi.collega_log("magazzino")
 # /api/suite/: rotte per le altre app della suite, protette dal token di servizio (suite_rotte.py), non dal cookie.
-cosedil_sso.init(app, app_id="magazzino", percorsi_liberi=("/api/suite/",))
+# /health: il Lettore DDT la interroga per sapere se deve avviare il Magazzino (CONTRATTI § 11, C1).
+# Due id: il Magazzino si apre dentro il programma unico "DDT e Magazzino" (09/11/2026) e lo usa
+# chi nel portale è abilitato a "magazzino" O a "ddt" (cosedil_sso, più id provati in ordine).
+cosedil_sso.init(app, app_id=("magazzino", "ddt"), percorsi_liberi=("/api/suite/", "/health"))
 if not cosedil_sso.ENABLED:
     # senza gate ogni richiesta è "sviluppo" e admin: va bene sul PC di chi sviluppa, mai su un server
     log.warning("COSEDIL_SSO=off: Magazzino senza login, tutti amministratori. Solo per sviluppo locale.")
@@ -53,6 +60,10 @@ if os.environ.get("SUITE_DOMINIO", "").strip():
     # senza proxy l'header lo scriverebbe il client e non va creduto, quindi il ProxyFix resta spento
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+# Dentro il programma unico il Lettore DDT inoltra /magazzino/* qui (prefisso.py): il prefisso, la
+# commessa di sessione e l'IP vero arrivano in intestazioni, credute solo da loopback. Va FUORI dal
+# ProxyFix (montato per ultimo = eseguito per primo): deve vedere l'indirizzo vero del socket.
+app.wsgi_app = prefisso.Prefisso(app.wsgi_app)
 
 TIPI_UBICAZIONE = ("deposito", "cantiere", "officina", "fornitore", "altro")
 STATI_MEZZO = ("disponibile", "in_uso", "manutenzione", "fermo", "restituito")
@@ -246,11 +257,28 @@ def api_health():
     return jsonify({"ok": True, "app": "magazzino", "data": date.today().isoformat()})
 
 
+@app.get("/health")
+def health():
+    """Salute senza login (fuori dal gate): la usa il Lettore DDT per sapere se il Magazzino è acceso
+    prima di avviarlo (programma unico, CONTRATTI § 11, C1). Non dice niente dei dati."""
+    return jsonify({"ok": True, "app": "magazzino"})
+
+
+def info_pagina():
+    """Dove e come la pagina è aperta: base dei link (prefisso del programma unico, '' alla radice),
+    commessa scelta all'accesso nel programma unico (X-Suite-Commessa) e indirizzo della parte DDT."""
+    base = prefisso.base(request.environ)
+    unico = prefisso.programma_unico(request.environ)
+    # la parte DDT del programma unico sta "sopra" il prefisso: /magazzino -> /, /x/magazzino -> /x/
+    ddt = (base.rsplit("/", 1)[0] + "/") if unico else ""
+    return {"base": base, "unico": unico, "commessa": prefisso.commessa_sessione(request.environ), "ddt": ddt}
+
+
 @app.get("/api/me")
 def api_me():
     u = utente_corrente() or {}
     return jsonify({"username": u.get("username"), "nome": u.get("nome"), "admin": e_admin(),
-                    "qr": codici.segno is not None})
+                    "qr": codici.segno is not None, **info_pagina()})
 
 
 @app.get("/api/dashboard")
@@ -989,6 +1017,7 @@ def avvia_importazioni_di_sfondo():
     if config.IMPORT_INTERVALLO_SEC > 0:
         threading.Thread(target=_thread_importazioni, daemon=True, name="importazioni").start()
     backup.avvia_di_sfondo()          # copie del database ogni MAGAZZINO_BACKUP_ORE (backup.py)
+    riepilogo.avvia_di_sfondo()       # riepilogo giornaliero in SkyTower dopo MAGAZZINO_RIEPILOGO_ORA (riepilogo.py)
 
 
 # --------------------------------------------------------------------------- backup del database (solo admin)
@@ -1146,7 +1175,9 @@ def etichette_vecchia():
     """Vecchio indirizzo del foglio etichette: rimanda a /api/etichette. Stava fuori da /api e il gate SSO
     lo lasciava passare a chi mandava un Accept diverso da text/html (revisione di sicurezza del 03/11/2026):
     l'elenco completo di articoli, mezzi (targhe, matricole) e ubicazioni usciva senza login."""
-    return redirect("/api/etichette" + ("?" + request.query_string.decode() if request.query_string else ""), 302)
+    # request.script_root: dentro il programma unico il foglio sta sotto /magazzino
+    return redirect(request.script_root + "/api/etichette"
+                    + ("?" + request.query_string.decode() if request.query_string else ""), 302)
 
 
 @app.get("/api/etichette")
@@ -1184,7 +1215,9 @@ def etichette():
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    # cfg arriva alla pagina come window.MAGAZZINO (base dei link, programma unico, commessa di sessione)
+    cfg = info_pagina()
+    return render_template("index.html", cfg=cfg, base=cfg["base"])
 
 
 # Installazione sul telefono (PWA): manifest e service worker vanno serviti dalla
@@ -1200,7 +1233,8 @@ def manifest():
 def service_worker():
     r = send_file(os.path.join(config.BASE_DIR, "static", "js", "sw.js"), mimetype="text/javascript")
     r.headers["Cache-Control"] = "no-cache"
-    r.headers["Service-Worker-Allowed"] = "/"
+    # il service worker governa solo la sua cartella: "/" da solo, "/magazzino/" nel programma unico
+    r.headers["Service-Worker-Allowed"] = (request.script_root or "") + "/"
     return r
 
 

@@ -457,9 +457,11 @@ def test_pwa_manifest_e_service_worker(client):
     r = client.get("/manifest.webmanifest")
     assert r.status_code == 200 and r.mimetype == "application/manifest+json"
     m = r.get_json(force=True)
-    assert m["display"] == "standalone" and m["start_url"].startswith("/")
+    # indirizzi relativi al manifest: valgono alla radice e sotto /magazzino (programma unico, 09/11/2026)
+    assert m["display"] == "standalone" and m["start_url"].startswith("./") and m["scope"] == "./"
+    from urllib.parse import urljoin
     for icona in m["icons"]:
-        assert client.get(icona["src"]).status_code == 200, icona
+        assert client.get(urljoin("/manifest.webmanifest", icona["src"])).status_code == 200, icona
     sw = client.get("/sw.js")
     assert sw.status_code == 200 and sw.headers["Service-Worker-Allowed"] == "/"
     assert b"addEventListener('fetch'" in sw.data

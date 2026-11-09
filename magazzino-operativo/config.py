@@ -35,6 +35,18 @@ MEZZI_VFP_DIR = os.environ.get(
     "MAGAZZINO_MEZZI_DIR",
     os.path.join(SUITE_DIR, "vfp-transfer-DMS", "vfp-transfer", "moduli_compilati", "mezzi"))
 
+# Riepilogo giornaliero dei movimenti caricato in SkyTower per ogni commessa (riepilogo.py):
+# ora del giro automatico, HH:MM. Vuoto, "off" o "0" = solo a richiesta dal pulsante della pagina.
+RIEPILOGO_ORA = os.environ.get("MAGAZZINO_RIEPILOGO_ORA", "19:00")
+
+# Programma unico "DDT e Magazzino" (09/11/2026): gli utenti aprono il Magazzino dentro il Lettore
+# DDT, all'indirizzo <Lettore DDT>/magazzino. I link che il Magazzino manda fuori (da fare del
+# portale, InCampo, task) puntano lì. MAGAZZINO_URL_PUBBLICO li forza a un altro indirizzo;
+# MAGAZZINO_PROGRAMMA_UNICO=0 torna all'indirizzo proprio del Magazzino (uso da solo, senza DDT).
+URL_PUBBLICO = os.environ.get("MAGAZZINO_URL_PUBBLICO", "").strip().rstrip("/")
+PROGRAMMA_UNICO = os.environ.get("MAGAZZINO_PROGRAMMA_UNICO", "1").strip().lower() not in ("0", "off", "no", "false")
+PREFISSO_UNICO = "/magazzino"   # dove il Lettore DDT inoltra il Magazzino (CONTRATTI § 11, C2)
+
 # Ogni quanti secondi il thread di sfondo ricontrolla le due cartelle.
 # 0 = nessuna importazione automatica (solo a mano dalla pagina Importazioni).
 IMPORT_INTERVALLO_SEC = int(os.environ.get("MAGAZZINO_IMPORT_SEC", "120"))

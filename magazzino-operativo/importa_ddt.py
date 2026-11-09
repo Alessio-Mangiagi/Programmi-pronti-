@@ -312,10 +312,12 @@ def importa_righe(conn, righe, commessa, nome_export, utente="importazione", cod
     registro = suite_link.commesse()          # letto una volta per export, non a ogni riga
     risolte = {}                              # (codice scritto, cartella) -> commessa del cantiere
     for i, riga in enumerate(righe):
-        materiale = (riga.get("materiale") or "").strip()
+        materiale = str(riga.get("materiale") or "").strip()
         quantita = riga.get("quantita")
-        if quantita is None:
-            quantita = numero_it(riga.get("quantita"))
+        if isinstance(quantita, bool) or not isinstance(quantita, (int, float)):
+            # dal consegne.json arriva un numero; dal carico immediato (POST /api/suite/ddt/consegne) o da un
+            # file scritto a mano può arrivare "14" o "1.234,5": un testo confrontato con 0 farebbe TypeError
+            quantita = numero_it(quantita if not isinstance(quantita, bool) else None)
         if not materiale or quantita is None or quantita <= 0:
             scartate += 1
             continue
@@ -399,6 +401,51 @@ def importa_consegne_file(conn, percorso, commessa, forza=False):
             esiti.append({"export": nome_export, "commessa": commessa, "esito": "errore", "dettaglio": testo})
     conn.commit()
     return esiti
+
+
+def importa_consegne_inviate(conn, cartella, nome_export, righe, codice="", salvato_il="", utente="importazione"):
+    """Carico immediato dal Lettore DDT (programma unico "DDT e Magazzino", CONTRATTI § 11, C3).
+
+    Il Lettore DDT, appena salvato un export, manda qui le stesse righe che ha scritto in
+    data/<cartella>/consegne.json, con lo stesso `salvatoIl`. Si importa con le stesse chiavi
+    dell'importazione periodica (chiave_import "<cartella>/<export>", impronta = salvatoIl,
+    chiave_riga per indice): quando il thread di sfondo rilegge consegne.json trova l'impronta
+    già importata e salta; se anche la rileggesse, sostituirebbe le righe di quella chiave
+    (DELETE + INSERT), quindi un doppione non può nascere in nessun ordine.
+    Un secondo invio con lo stesso salvatoIl non rifà niente (risponde con quello di prima).
+
+    `codice` = commessa della sessione del programma unico (codiceCommessa): vale per le righe
+    che non lo portano. Ritorna il dict della risposta: righe, nuove, scartate, commessa,
+    ubicazione (nomi delle ubicazioni di arrivo), avvisi, gia_importato.
+    """
+    chiave = f"{cartella}/{nome_export}"
+    impronta = str(salvato_il or "")
+    codice = str(codice or "").strip()
+    gia = impronta and _gia_importato(conn, chiave, impronta)
+    if not gia:
+        righe = [dict(r, codiceCommessa=r.get("codiceCommessa") or codice) if codice else dict(r) for r in righe]
+        commessa_risolta, _ = risolvi_commessa("", cartella, codice)
+        allinea_ubicazioni(conn, cartella, commessa_risolta)     # come importa_consegne_file
+        fuori = set()
+        n, nuove, scartate = importa_righe(conn, righe, cartella, nome_export, utente=utente,
+                                           codice_cartella=codice, fuori_registro=fuori)
+        note = [f"{scartate} righe senza materiale o quantità"] if scartate else []
+        note += [avviso_commessa(c) for c in sorted(fuori)]
+        _registra(conn, f"Lettore DDT (invio immediato): {chiave}", chiave, impronta, n, nuove,
+                  dettaglio="; ".join(note) or None)
+        conn.commit()
+        avvisi = [avviso_commessa(c) for c in sorted(fuori)]
+    else:
+        r = conn.execute("SELECT righe, dettaglio FROM importazioni WHERE sorgente = 'ddt' AND chiave = ? AND esito = 'ok' "
+                         "ORDER BY id DESC LIMIT 1", (chiave,)).fetchone()
+        n, nuove, scartate = (r["righe"] if r else len(righe)), 0, 0
+        avvisi = []
+    dove = conn.execute(
+        "SELECT u.nome, u.commessa, COUNT(*) AS n FROM movimenti m JOIN ubicazioni u ON u.id = m.a_ubicazione_id "
+        "WHERE m.chiave_import = ? GROUP BY u.id ORDER BY n DESC, u.nome", (chiave,)).fetchall()
+    commessa = next((d["commessa"] for d in dove if d["commessa"]), "") or risolvi_commessa("", cartella, codice)[0]
+    return {"righe": n, "nuove": nuove, "scartate": scartate, "commessa": commessa,
+            "ubicazione": ", ".join(d["nome"] for d in dove), "avvisi": avvisi, "gia_importato": bool(gia)}
 
 
 def importa_cartella(conn, radice=None, forza=False):
