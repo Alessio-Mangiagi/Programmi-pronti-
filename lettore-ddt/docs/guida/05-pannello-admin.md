@@ -7,9 +7,15 @@ Clicca il pulsante giallo **Admin** in alto a destra. Si apre il pannello, con l
 **Account**, **Account attivi**, **Log accessi**, **DDT convalidati**, **Chiave API** e **Aiuto** (la guida
 amministratore completa).
 
-> Il pannello gestisce gli account **del Lettore DDT** (nome utente, password, commessa). Chi può aprire il
-> Lettore DDT dal Portale, e chi ne è amministratore, si decide invece nel Portale: vedi la
-> [guida del Portale](../../../portale/docs/guida/README.md). Servono entrambe le cose.
+> Il pannello gestisce gli account **del Lettore DDT** (nome utente, commesse abilitate, stato). Chi può aprire
+> **DDT e Magazzino** dal Portale, e chi ne è amministratore, si decide invece nel Portale: vedi la
+> [guida del Portale](../../../portale/docs/guida/README.md). Dal 9 novembre 2026:
+>
+> - chi è **amministratore nel Portale** è amministratore anche qui, anche se il suo account del Lettore DDT
+>   non ha la spunta Admin; un account con la spunta Admin che nel Portale non è amministratore resta utente;
+> - chi è abilitato a DDT e Magazzino nel Portale e non ha un account qui lo trova **creato da solo** al primo
+>   ingresso (colonna Ruolo: *dal portale*): senza password propria (vale quella del Portale) e **senza
+>   commesse**, finché non gliele abiliti tu con il pulsante **Commesse**.
 
 ## Account
 
@@ -39,6 +45,8 @@ Il file contiene password in chiaro: cancellalo dopo l'importazione e non mandar
 
 Nella tabella, colonna **Azioni**:
 
+- **Commesse**: sceglie le **commesse abilitate**, cioè quelle che l'utente può scegliere entrando in DDT e
+  Magazzino (vedi sotto);
 - **Codice commessa**: cambia il codice commessa aziendale (quello di SkyTower e del Magazzino). Vale per i
   DDT salvati da quel momento; nel Magazzino il cantiere creato prima passa da solo al codice nuovo;
 - **Reset password**: imposta una password nuova (almeno 8 caratteri); comunicala all'utente;
@@ -47,6 +55,25 @@ Nella tabella, colonna **Azioni**:
 
 Non puoi disabilitare o revocare te stesso né l'ultimo amministratore attivo. **Salva lista (CSV)** scarica
 l'elenco degli account.
+
+### Commesse abilitate
+
+Ogni utente che non è amministratore lavora solo nelle commesse che gli abiliti: le vede nella finestra *In che
+commessa lavori?* e il programma rifiuta tutte le altre, anche se qualcuno prova a chiederle a mano. Gli
+amministratori le vedono tutte. La colonna **Commesse abilitate** della tabella mostra l'elenco di ciascuno;
+*(di sempre)* vuol dire che l'utente non ha un elenco e usa la sua commessa di prima (cartella e codice
+aziendale), *nessuna* che non può ancora lavorare nel Lettore DDT.
+
+1. Clicca **Commesse** sulla riga dell'utente.
+2. Cerca per codice, nome o cliente e spunta le commesse del registro della suite (ed eventualmente le
+   **cartelle precedenti** del Lettore DDT, con i DDT di prima del registro).
+3. Clicca **Salva**.
+
+![Commesse abilitate di un utente](img/29-admin-commesse-abilitate.png)
+
+Senza nessuna spunta l'utente torna alla sua commessa di sempre. Se togli una commessa che l'utente sta usando,
+smette di funzionare subito e il programma gli chiede di sceglierne un'altra. Ogni cambiamento resta nel **Log
+accessi** come *Commesse abilitate*, con chi l'ha fatto, quali commesse sono state aggiunte e quali tolte.
 
 ## Account attivi
 
@@ -58,7 +85,8 @@ scoprire gli account mai usati.
 ## Log accessi
 
 Gli ultimi eventi: **Login OK**, **Login fallito**, login bloccati, **Logout**, account creati, revocati,
-disabilitati, password cambiate, chiave API aggiornata, **DDT convalidato** (un utente ha cliccato *✓ Dati
+disabilitati, password cambiate, chiave API aggiornata, **Commessa scelta** (anche quella scelta da sola,
+quando l'utente ne ha una sola), **Commesse abilitate** (chi le ha cambiate e come), **DDT convalidato** (un utente ha cliccato *✓ Dati
 convalidati*), **DDT firmato (.p7m)** (un utente ha caricato un DDT firmato digitalmente: sotto il bollino il
 nome del file e l'esito della firma; bollino verde, rosso o giallo come l'esito). Per ognuno data e ora,
 utente, commessa e indirizzo IP.

@@ -12,8 +12,14 @@ import {
   updatePassword,
   setUserDisabled,
   setCodiceCommessa,
+  setCommesseAbilitate,
   MIN_PASSWORD_LENGTH,
 } from '../models/users';
+import {
+  commesseAbilitateDi,
+  commesseRegistro,
+  elencoCartellePrecedenti,
+} from '../services/commessaSessione';
 import { logActivity, getRecentActivity, getActiveAccounts } from '../models/activityLog';
 // "><(((º> sabusabu <º)))><"
 import { getDDTValidations } from '../models/database';
@@ -101,12 +107,75 @@ router.post('/admin/api/users/:id/codice-commessa', requireAdmin, (req: Request,
   const { codiceCommessa } = req.body || {};
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
   const c = String(codiceCommessa || '').trim();
-  if (c.length > 80) return res.status(400).json({ error: 'Codice commessa troppo lungo (max 80)' });
+  if (c.length > 80)
+    return res.status(400).json({ error: 'Codice commessa troppo lungo (max 80)' });
   const user = setCodiceCommessa(id, c);
   if (!user) return res.status(404).json({ error: 'Utente non trovato' });
   logActivity('user_updated', user.username, user.commessaId, clientIp(req));
   res.json({ ok: true, codiceCommessa: user.codiceCommessa || '' });
 });
+
+// ── Commesse abilitate (opzione b del 09/11/2026) ─────────────────────────────
+// Gli amministratori scelgono e vedono tutte le commesse; gli altri account solo quelle abilitate qui
+// (senza elenco: la commessa di sempre dell'account). Lo applicano services/commessaSessione (elenco e
+// scelta all'ingresso) e requireAuth (ogni rotta dei dati).
+
+/** Elenco per la finestra admin: commesse attive del registro + cartelle precedenti su disco. */
+router.get('/admin/api/commesse', requireAdmin, (_req: Request, res: Response) => {
+  res.json({
+    registro: commesseRegistro(),
+    precedenti: elencoCartellePrecedenti(),
+  });
+});
+
+router.post(
+  '/admin/api/users/:id/commesse-abilitate',
+  requireAdmin,
+  (req: Request, res: Response) => {
+    const id = param(req.params, 'id');
+    if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
+    const target = findUserById(id);
+    if (!target) return res.status(404).json({ error: 'Utente non trovato' });
+    const richieste = Array.isArray(req.body?.commesse) ? req.body.commesse : null;
+    if (!richieste)
+      return res.status(400).json({ error: 'Serve l’elenco "commesse" (anche vuoto)' });
+    if (richieste.length > 300) return res.status(400).json({ error: 'Troppe commesse (max 300)' });
+    // ammesse: codici del registro (anche chiusi: restano leggibili) e cartelle precedenti esistenti o
+    // quella dell'account stesso; mai un nome inventato, che darebbe una cartella dati nuova a caso
+    const registro = new Set(commesseRegistro().map((c) => c.codice));
+    const precedenti = new Set([...elencoCartellePrecedenti(), target.commessaId].filter(Boolean));
+    const pulite: string[] = [];
+    for (const r of richieste) {
+      const c = String(r || '').trim();
+      if (!c) continue;
+      if (!registro.has(c) && !(COMMESSA_ID_RE.test(c) && precedenti.has(c))) {
+        return res.status(400).json({
+          error: `Commessa "${c.slice(0, 40)}" non nel registro né fra le cartelle del Lettore DDT`,
+        });
+      }
+      if (!pulite.includes(c)) pulite.push(c);
+    }
+    const prima = commesseAbilitateDi(target);
+    const user = setCommesseAbilitate(id, pulite);
+    if (!user) return res.status(404).json({ error: 'Utente non trovato' });
+    const dopo = commesseAbilitateDi(user);
+    const aggiunte = dopo.filter((c) => !prima.includes(c));
+    const tolte = prima.filter((c) => !dopo.includes(c));
+    const chi = req.cosedil?.username || req.session.username || '';
+    logActivity('commesse_abilitate', user.username, user.commessaId || null, clientIp(req), {
+      dettaglio:
+        `da ${chi}: ` +
+          [
+            aggiunte.length ? `aggiunte ${aggiunte.join(', ')}` : '',
+            tolte.length ? `tolte ${tolte.join(', ')}` : '',
+            pulite.length ? '' : 'elenco vuoto = commessa di sempre dell’account',
+          ]
+            .filter(Boolean)
+            .join('; ') || `da ${chi}: nessun cambiamento`,
+    });
+    res.json({ ok: true, commesseAbilitate: user.commesseAbilitate || [], effettive: dopo });
+  }
+);
 
 // Reset password di un utente (admin)
 router.post('/admin/api/users/:id/password', requireAdmin, (req: Request, res: Response) => {

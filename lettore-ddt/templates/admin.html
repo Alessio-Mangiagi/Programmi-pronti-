@@ -50,7 +50,7 @@
   <button id="saveUsers" class="btn-primary" style="margin-bottom: 16px;">Salva lista (CSV)</button>
   <table>
     <thead>
-      <tr><th>Username</th><th>Nome</th><th>Commessa</th><th>Codice aziendale</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr>
+      <tr><th>Username</th><th>Nome</th><th>Commessa</th><th>Codice aziendale</th><th title="Le commesse che l'account può scegliere entrando in DDT e Magazzino. Gli amministratori le vedono tutte.">Commesse abilitate</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr>
     </thead>
     <tbody id="userRows"></tbody>
   </table>
@@ -136,6 +136,23 @@
       </div>
     </div>
   </div>
+
+<!-- Finestra "Commesse abilitate" (opzione b del 09/11/2026): quali commesse un account non amministratore
+     può scegliere all'ingresso in "DDT e Magazzino". Nessuna spunta = la commessa di sempre dell'account. -->
+<dialog id="dlgCommesse" class="dlg-commesse" aria-labelledby="dlgCommesseTitolo">
+  <form method="dialog" id="formCommesse">
+    <h3 id="dlgCommesseTitolo">Commesse abilitate</h3>
+    <p class="sub" id="dlgCommesseSotto"></p>
+    <input type="search" id="cercaCommesse" placeholder="Cerca per codice, nome o cliente" aria-label="Cerca commessa">
+    <div id="listaCommesse" class="lista-commesse" role="group" aria-label="Commesse"></div>
+    <p class="sub nota-commesse">Nessuna spunta = solo la commessa di sempre dell'account (cartella e codice aziendale). Gli amministratori vedono comunque tutte le commesse.</p>
+    <div class="dlg-azioni">
+      <span id="errCommesse" class="err-commesse" role="alert"></span>
+      <button type="button" class="btn-neutral" id="annullaCommesse">Annulla</button>
+      <button type="submit" class="btn-primary" id="salvaCommesse">Salva</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="/static/admin.js" defer></script>
 </body>

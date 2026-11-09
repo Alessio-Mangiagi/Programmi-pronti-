@@ -69,7 +69,7 @@ jest.mock('../batch/ollama', () => ({
 
 import app from '../app';
 import { createJob, readJob, type BatchJob } from '../batch/jobs';
-import { createUser, deleteUser } from '../models/users';
+import { createUser, deleteUser, setCommesseAbilitate } from '../models/users';
 import { DATA_ROOT } from '../routes/helpers';
 import { cartellaPerCodice, codiceDaCartella } from '../services/commessaSessione';
 import { codiceCommessaPer, inviaExcelASkyTower } from '../services/skytower';
@@ -87,10 +87,13 @@ import {
 
 const PW = 'password-lunga-1';
 const utenti: string[] = [];
-function utente(commessaId: string, isAdmin = false, codice = ''): string {
+// abilitate: commesse abilitate sull'account (opzione b del 09/11/2026); senza, vale la commessa di
+// sempre dell'account (cartella commessaId + codice aziendale), come per gli account di prima
+function utente(commessaId: string, isAdmin = false, codice = '', abilitate?: string[]): string {
   const id = uuidv4();
   const username = `dm-${id.slice(0, 8)}`;
   createUser(id, username, PW, commessaId, 'Prova', isAdmin, codice);
+  if (abilitate) setCommesseAbilitate(id, abilitate);
   utenti.push(id);
   return username;
 }
@@ -225,9 +228,11 @@ describe('commessa scelta all’ingresso', () => {
     expect(codiceCommessaPer(u, 'vecchia-cartella')).toBe('999-999');
   });
 
-  test('stato, elenco, scelta: registro + cartella precedente dell’account, mai una cartella altrui', async () => {
+  test('stato, elenco, scelta: solo le commesse abilitate (registro + cartella precedente), mai una cartella altrui', async () => {
     fs.mkdirSync(path.join(DATA_ROOT, 'cartella-di-altri'), { recursive: true });
-    const a = await entra(utente('vecchia-cartella'));
+    const a = await entra(
+      utente('vecchia-cartella', false, '', ['101-003', 'C/2024/15', 'vecchia-cartella'])
+    );
     const s0 = await a.get('/guscio/stato');
     expect(s0.status).toBe(200);
     expect(s0.body).toMatchObject({
@@ -237,6 +242,7 @@ describe('commessa scelta all’ingresso', () => {
     });
 
     const el = await a.get('/guscio/commesse');
+    expect(el.body.limitata).toBe(true);
     expect(el.body.commesse.map((c: { codice: string }) => c.codice)).toEqual([
       '101-003',
       'C/2024/15',
@@ -248,10 +254,12 @@ describe('commessa scelta all’ingresso', () => {
     // la cartella vecchia non si propone d'ufficio: la prima volta si sceglie dal registro
     expect(el.body.proposta).toBe('');
 
-    expect((await a.post('/guscio/commessa').send({ codice: 'non-esiste' })).status).toBe(400);
+    // fuori elenco: 403 (controllo lato server, l'elenco della finestra non le offre)
+    expect((await a.post('/guscio/commessa').send({ codice: 'non-esiste' })).status).toBe(403);
     expect((await a.post('/guscio/commessa').send({ codice: 'cartella-di-altri' })).status).toBe(
-      400
+      403
     );
+    expect((await a.post('/guscio/commessa').send({ codice: '' })).status).toBe(400);
 
     const ok = await a.post('/guscio/commessa').send({ codice: '101-003' });
     expect(ok.status).toBe(200);
@@ -271,7 +279,7 @@ describe('commessa scelta all’ingresso', () => {
   });
 
   test('la proposta è l’ultima scelta; l’amministratore vede tutte le cartelle precedenti', async () => {
-    const u = utente('vecchia-cartella');
+    const u = utente('vecchia-cartella', false, '', ['101-003', 'vecchia-cartella']);
     const a = await entra(u);
     await a.post('/guscio/commessa').send({ codice: '101-003' });
     const di_nuovo = await entra(u);
@@ -297,7 +305,7 @@ describe('commessa scelta all’ingresso', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('proxy /magazzino (C2)', () => {
   test('/magazzino senza barra → redirect; pagina principale con la barra comune e le intestazioni del proxy', async () => {
-    const a = await entra(utente('vecchia-cartella'));
+    const a = await entra(utente('vecchia-cartella', false, '101-003'));
     await a.post('/guscio/commessa').send({ codice: '101-003' });
 
     const r301 = await a.get('/magazzino');
@@ -404,7 +412,7 @@ const esitoDi = (r: request.Response) =>
 
 describe('carico immediato in magazzino dopo la conversione (C3)', () => {
   test('il blocco appena salvato va al Magazzino con il token e la commessa; esito in X-Magazzino', async () => {
-    const a = await entra(utente('vecchia-cartella'));
+    const a = await entra(utente('vecchia-cartella', false, '101-003'));
     await a.post('/guscio/commessa').send({ codice: '101-003' });
     visti.length = 0;
     const r = await a
@@ -435,7 +443,7 @@ describe('carico immediato in magazzino dopo la conversione (C3)', () => {
   });
 
   test('Magazzino che risponde male o spento: niente errore per l’utente, solo "li registrerà appena acceso"', async () => {
-    const a = await entra(utente('vecchia-cartella'));
+    const a = await entra(utente('vecchia-cartella', false, '101-003'));
     await a.post('/guscio/commessa').send({ codice: '101-003' });
     rispostaCarico = { stato: 500, corpo: { error: 'rotto' } };
     try {
@@ -485,7 +493,7 @@ describe('carico immediato in magazzino dopo la conversione (C3)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Excel della conversione su SkyTower', () => {
   test('dalla conversione manuale: l’Excel arriva nella commessa; lo stesso Excel non riparte', async () => {
-    const a = await entra(utente('vecchia-cartella'));
+    const a = await entra(utente('vecchia-cartella', false, '101-003'));
     await a.post('/guscio/commessa').send({ codice: '101-003' });
     documenti.length = 0;
     const corpo = { response: JSON.stringify(bolla('121')), pdfFileName: 'bolla-121.pdf' };

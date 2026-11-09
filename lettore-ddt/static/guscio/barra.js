@@ -59,6 +59,7 @@
     '#gb-barra .gb-sez{color:#dbe7f2;text-decoration:none;padding:.35rem .9rem;border-radius:999px;font-weight:600;white-space:nowrap}' +
     '#gb-barra .gb-sez:hover{background:rgba(255,255,255,.12);color:#fff}' +
     '#gb-barra .gb-sez.gb-attiva{background:#fff;color:#0c4577}' +
+    '#gb-barra .gb-sez.gb-spenta{opacity:.45;cursor:not-allowed}#gb-barra .gb-sez.gb-spenta:hover{background:none;color:#dbe7f2}' +
     '#gb-barra .gb-spazio{flex:1}' +
     '#gb-barra .gb-commessa{display:flex;align-items:center;gap:.5rem;min-width:0}' +
     '#gb-barra .gb-etich{color:#9fbbd4;font-size:11px;text-transform:uppercase;letter-spacing:.06em}' +
@@ -133,6 +134,11 @@
     };
   }
 
+  /** Entrato dal portale ma abilitato solo al Magazzino (GET /guscio/stato → ddt.motivo). */
+  function soloMagazzino() {
+    return !!(stato && stato.ddt && !stato.ddt.account && stato.ddt.motivo === 'solo-magazzino');
+  }
+
   function montaBarra() {
     if (testataIntegrata()) {
       collegaTestata();
@@ -149,7 +155,10 @@
     b.innerHTML =
       '<span class="gb-nome">DDT e Magazzino</span>' +
       '<nav class="gb-sezioni">' +
-      '<a class="gb-sez' + (sezione === 'ddt' ? ' gb-attiva' : '') + '" href="/"' + (sezione === 'ddt' ? ' aria-current="page"' : '') + '>Lettore DDT</a>' +
+      // abilitato solo al Magazzino nel portale: la voce resta (il programma è uno) ma spenta, con il perché
+      (soloMagazzino()
+        ? '<span class="gb-sez gb-spenta" title="Nel portale sei abilitato solo al Magazzino">Lettore DDT</span>'
+        : '<a class="gb-sez' + (sezione === 'ddt' ? ' gb-attiva' : '') + '" href="/"' + (sezione === 'ddt' ? ' aria-current="page"' : '') + '>Lettore DDT</a>') +
       '<a class="gb-sez' + (sezione === 'magazzino' ? ' gb-attiva' : '') + '" href="/magazzino/"' + (sezione === 'magazzino' ? ' aria-current="page"' : '') + '>Magazzino</a>' +
       '</nav><span class="gb-spazio"></span>' +
       '<span class="gb-commessa">' + testoCommessa() + '</span>' +
@@ -179,7 +188,7 @@
     var conferma = velo.querySelector('[data-conferma]');
     var errore = velo.querySelector('.gb-errore');
     var scelta = '';
-    var dati = { commesse: [], precedenti: [], proposta: '' };
+    var dati = { commesse: [], precedenti: [], proposta: '', limitata: false };
 
     function chiudi() {
       velo.remove();
@@ -207,8 +216,11 @@
       var c = dati.commesse.filter(filtra);
       var p = dati.precedenti.filter(filtra);
       if (!dati.commesse.length && !dati.precedenti.length) {
-        lista.innerHTML =
-          '<div class="gb-vuoto">Il registro delle commesse della suite è vuoto: chiedi a un amministratore del portale di aggiungerle (Portale › Commesse).</div>';
+        // account non amministratore senza commesse abilitate (opzione b, 09/11/2026; tipico: account
+        // appena creato dal portale) oppure registro della suite vuoto
+        lista.innerHTML = dati.limitata
+          ? '<div class="gb-vuoto">Nessuna commessa abilitata sul tuo account del Lettore DDT: chiedi a un amministratore di abilitartene una. Intanto puoi usare il <a href="/magazzino/">Magazzino</a>.</div>'
+          : '<div class="gb-vuoto">Il registro delle commesse della suite è vuoto: chiedi a un amministratore del portale di aggiungerle (Portale › Commesse).</div>';
         if (obbligatoria) {
           // niente da scegliere: si lascia lavorare come prima, la finestra tornerà alla prossima apertura
           conferma.textContent = 'Continua';
@@ -251,7 +263,7 @@
 
     json('/guscio/commesse')
       .then(function (d) {
-        dati = { commesse: d.commesse || [], precedenti: d.precedenti || [], proposta: d.proposta || '' };
+        dati = { commesse: d.commesse || [], precedenti: d.precedenti || [], proposta: d.proposta || '', limitata: !!d.limitata };
         scelta = (stato && stato.scelta && stato.commessa && stato.commessa.codice) || dati.proposta || '';
         conferma.disabled = !scelta;
         disegna();

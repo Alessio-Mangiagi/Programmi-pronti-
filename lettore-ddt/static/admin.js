@@ -98,8 +98,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success', ddt_firmato: 'badge-pwd', commessa_scelta: 'badge-active' };
-const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato', ddt_firmato: 'DDT firmato (.p7m)', commessa_scelta: 'Commessa scelta' };
+const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success', ddt_firmato: 'badge-pwd', commessa_scelta: 'badge-active', commesse_abilitate: 'badge-pwd' };
+const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato', ddt_firmato: 'DDT firmato (.p7m)', commessa_scelta: 'Commessa scelta', commesse_abilitate: 'Commesse abilitate' };
 // DDT firmato digitalmente: il colore segue l'esito della verifica della firma (dettaglio = riepilogo)
 const badgeFirma = { 'valida': 'badge-success', 'non valida': 'badge-failed', 'da verificare': 'badge-pwd' };
 
@@ -192,6 +192,7 @@ async function loadUsers() {
   const res = await fetch('/admin/api/users', { credentials: 'include' });
   if (!res.ok) return;
   const data = await res.json();
+  utentiAdmin = data.users || [];
   const rows = document.getElementById('userRows');
   rows.innerHTML = '';
   document.getElementById('usersEmpty').style.display = data.users.length ? 'none' : 'block';
@@ -207,9 +208,11 @@ async function loadUsers() {
       <td>${esc(u.displayName)}</td>
       <td>${esc(u.commessaId)}</td>
       <td>${esc(u.codiceCommessa || '—')}</td>
-      <td>${role}</td>
+      <td>${celleCommesse(u)}</td>
+      <td>${role}${u.creatoDalPortale ? ' <span class="badge badge-created" title="Creato da solo al primo ingresso dal portale: entra con la password del portale">dal portale</span>' : ''}</td>
       <td>${stato}</td>
       <td><div class="actions">
+        <button class="btn-neutral" data-act="commesse" data-id="${id}" data-user="${user}">Commesse</button>
         <button class="btn-neutral" data-act="codice" data-id="${id}" data-user="${user}" data-codice="${esc(u.codiceCommessa || '')}">Codice commessa</button>
         <button class="btn-warn" data-act="pwd" data-id="${id}" data-user="${user}">Reset password</button>
         <button class="btn-neutral" data-act="toggle" data-id="${id}" data-user="${user}" data-disabled="${u.disabled ? '1' : '0'}">${toggleLabel}</button>
@@ -222,10 +225,82 @@ async function loadUsers() {
       const { act, id, user } = btn.dataset;
       if (act === 'revoke') revokeUser(id, user);
       else if (act === 'codice') impostaCodiceCommessa(id, user, btn.dataset.codice || '');
+      else if (act === 'commesse') apriCommesse(id, user);
       else if (act === 'pwd') resetPassword(id, user);
       else if (act === 'toggle') toggleDisabled(id, user, btn.dataset.disabled === '1');
     });
   });
+}
+
+// ── Commesse abilitate (opzione b del 09/11/2026) ────────────────────────────
+// Un account non amministratore sceglie, entrando in "DDT e Magazzino", solo fra le commesse abilitate
+// qui; senza elenco vale la commessa di sempre (cartella + codice aziendale). Il controllo vero è sul
+// server (POST /admin/api/users/:id/commesse-abilitate, services/commessaSessione, requireAuth).
+let utentiAdmin = [];
+
+function celleCommesse(u) {
+  if (u.isAdmin) return '<span class="sub-cella">tutte (admin)</span>';
+  const elenco = Array.isArray(u.commesseAbilitate) ? u.commesseAbilitate : [];
+  if (elenco.length) return elenco.map((c) => `<span class="chip-commessa">${esc(c)}</span>`).join(' ');
+  const sempre = [u.commessaId, u.codiceCommessa].filter(Boolean);
+  return sempre.length
+    ? `<span class="sub-cella" title="Nessun elenco: vale la commessa di sempre dell'account">${sempre.map(esc).join(', ')} (di sempre)</span>`
+    : '<span class="sub-cella avviso-cella">nessuna</span>';
+}
+
+async function apriCommesse(id, username) {
+  const u = utentiAdmin.find((x) => x.id === id) || {};
+  const dlg = document.getElementById('dlgCommesse');
+  const lista = document.getElementById('listaCommesse');
+  const cerca = document.getElementById('cercaCommesse');
+  const err = document.getElementById('errCommesse');
+  document.getElementById('dlgCommesseSotto').textContent =
+    `Account "${username}"${u.isAdmin ? ' (amministratore: vede comunque tutte le commesse)' : ''}.`;
+  err.textContent = '';
+  cerca.value = '';
+  lista.textContent = 'Caricamento…';
+  if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+  const res = await fetch('/admin/api/commesse', { credentials: 'include' });
+  const dati = res.ok ? await res.json() : { registro: [], precedenti: [] };
+  const spuntate = new Set(Array.isArray(u.commesseAbilitate) ? u.commesseAbilitate : []);
+  // la cartella dell'account è sempre fra le precedenti offerte, anche se su disco non c'è ancora
+  const registro = dati.registro || [];
+  const cartellaAccount = u.commessaId && !registro.some((c) => c.cartella === u.commessaId) ? [u.commessaId] : [];
+  const precedenti = [...new Set([...(dati.precedenti || []), ...cartellaAccount])].sort();
+  const voci = [
+    ...registro.map((c) => ({ codice: c.codice, testo: [c.nome, c.cliente].filter(Boolean).join(' · '), gruppo: 'Commesse del registro' })),
+    ...precedenti.map((c) => ({ codice: c, testo: 'Cartella precedente del Lettore DDT', gruppo: 'Cartelle precedenti' })),
+  ];
+  function disegna() {
+    const q = cerca.value.trim().toLowerCase();
+    const vis = voci.filter((v) => !q || `${v.codice} ${v.testo}`.toLowerCase().includes(q));
+    if (!voci.length) { lista.innerHTML = '<div class="sub">Il registro delle commesse della suite è vuoto (Portale › Commesse).</div>'; return; }
+    let html = ''; let gruppo = '';
+    for (const v of vis) {
+      if (v.gruppo !== gruppo) { gruppo = v.gruppo; html += `<div class="gruppo-commesse">${esc(gruppo)}</div>`; }
+      html += `<label class="voce-commessa"><input type="checkbox" value="${esc(v.codice)}"${spuntate.has(v.codice) ? ' checked' : ''}> <b>${esc(v.codice)}</b> <small>${esc(v.testo)}</small></label>`;
+    }
+    lista.innerHTML = html || `<div class="sub">Nessuna commessa con «${esc(q)}»</div>`;
+    lista.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.onchange = () => { if (cb.checked) spuntate.add(cb.value); else spuntate.delete(cb.value); };
+    });
+  }
+  cerca.oninput = disegna;
+  disegna();
+  document.getElementById('annullaCommesse').onclick = () => dlg.close();
+  document.getElementById('formCommesse').onsubmit = async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    const r = await fetch('/admin/api/users/' + encodeURIComponent(id) + '/commesse-abilitate', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commesse: [...spuntate] }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { err.textContent = d.error || 'Errore nel salvataggio'; return; }
+    dlg.close();
+    loadUsers();
+    loadLogs();
+  };
 }
 
 async function revokeUser(id, username) {

@@ -287,6 +287,12 @@ Dentro restano i due motori (Node e Python Flask), avviati insieme; nessuna risc
   `/claude-to-excel`. Barra comune `static/guscio/barra.js`: se la pagina ha già `.testata-programma`
   (la testata del Magazzino) non si duplica e rende cliccabile `.testata-commessa` per "Cambia commessa".
   Il proxy non inoltra WebSocket (il Magazzino non li usa).
+* **Accesso e commesse (09/11/2026).** Un solo login: chi entra dalla tessera non vede mai un secondo
+  accesso; il Lettore DDT crea da sé l'account a chi `/api/verify?app=ddt` dice `diretto: true` (abilitato
+  proprio al DDT, non solo al Magazzino che la tessera comprende). Admin del portale = admin in tutte e due
+  le parti. Commesse: gli admin tutte; gli altri account DDT solo quelle abilitate sull'account (pagina admin
+  del Lettore DDT), controllate sul server su ogni rotta dei dati; chi entra solo per il Magazzino sceglie la
+  commessa liberamente, come filtro del Magazzino.
 * **Riepilogo in SkyTower.** In SkyTower va "tutto": PDF del DDT ed Excel della conversione
   (Lettore DDT, § 5) e, per ogni commessa con movimenti nel giorno, il **riepilogo di
   magazzino** — un PDF e un Excel (movimenti del giorno con DDT di provenienza, giacenze del

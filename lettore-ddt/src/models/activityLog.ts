@@ -23,7 +23,10 @@ export type ActivityEvent = {
     // DDT firmato digitalmente (.p7m) caricato: dettaglio = file ed esito della verifica (06/11/2026)
     | 'ddt_firmato'
     // Commessa scelta all'ingresso in "DDT e Magazzino" (services/commessaSessione, 09/11/2026)
-    | 'commessa_scelta';
+    | 'commessa_scelta'
+    // Commesse abilitate su un account cambiate da un amministratore (opzione b, 09/11/2026):
+    // username = account modificato, dettaglio = chi l'ha fatto, aggiunte e tolte
+    | 'commesse_abilitate';
   username: string;
   commessaId: string | null;
   ip: string;

@@ -15,13 +15,25 @@
  *
  * L'ultima commessa scelta da ogni persona sta in data/.ultime-commesse.json (file, non cartella: le
  * scansioni di data/ — Magazzino, backup, ripresa dei lavori — guardano solo le cartelle).
+ *
+ * Chi può scegliere cosa (decisione dell'utente del 09/11/2026, opzione b):
+ *  - amministratori del Lettore DDT (eAdmin: account DDT admin + admin nel portale): tutte le commesse
+ *    del registro e tutte le cartelle precedenti su disco;
+ *  - account DDT non amministratori: solo le commesse abilitate sull'account (UserRow.commesseAbilitate,
+ *    pagina admin); senza elenco, la commessa di sempre dell'account (commessaId e codiceCommessa), come
+ *    prima del programma unico. Il controllo è lato server: elenco, scelta (POST /guscio/commessa) e ogni
+ *    rotta dei dati (requireAuth → commessaNonAbilitata);
+ *  - chi entra solo per il Magazzino (nessun account DDT): tutto il registro, perché per lui la commessa
+ *    è solo il filtro proposto del Magazzino (che non ha restrizioni per commessa) e i dati DDT gli
+ *    restano chiusi (requireAuth vuole l'account DDT).
+ * Con una sola commessa possibile la scelta è automatica (sceltaAutomatica, da /guscio/stato).
  */
 import fs from 'fs';
 import path from 'path';
 import type { Request } from 'express';
 import logger from '../utils/logger';
 import { COMMESSA_ID_RE, DATA_ROOT } from '../routes/helpers';
-import { findUserByUsername } from '../models/users';
+import { findUserByUsername, type UserRow } from '../models/users';
 
 interface CommessaRegistro {
   code: string;
@@ -145,6 +157,37 @@ function ricordaCommessa(persona: string, codice: string): void {
   }
 }
 
+// ── Commesse abilitate sull'account (opzione b, 09/11/2026) ───────────────────
+
+type AccountCommesse = Pick<UserRow, 'commessaId' | 'codiceCommessa' | 'commesseAbilitate'>;
+
+/**
+ * Codici e cartelle che un account non amministratore può scegliere: l'elenco messo da un
+ * amministratore o, senza, la commessa di sempre (cartella commessaId + codice aziendale), così un
+ * account creato prima del 09/11/2026 vede esattamente quello che vedeva prima.
+ */
+export function commesseAbilitateDi(account: AccountCommesse): string[] {
+  const elenco = (account.commesseAbilitate || [])
+    .map((c) => String(c || '').trim())
+    .filter(Boolean);
+  const voci = elenco.length ? elenco : [account.commessaId, account.codiceCommessa || ''];
+  return [...new Set(voci.map((c) => String(c || '').trim()).filter(Boolean))];
+}
+
+/** Cartelle dati (data/<cartella>) che corrispondono alle commesse abilitate dell'account. */
+export function cartelleAbilitateDi(account: AccountCommesse): Set<string> {
+  return new Set(commesseAbilitateDi(account).map(cartellaPerCodice).filter(Boolean));
+}
+
+/** true se il codice esiste nel registro della suite (anche chiuso o sospeso). */
+function nelRegistro(codice: string): boolean {
+  try {
+    return !!suite.trovaCommessa(codice);
+  } catch {
+    return false;
+  }
+}
+
 // ── Chi sta scegliendo ───────────────────────────────────────────────────────
 
 /** La persona: username del portale (gate SSO) o, col gate spento, quello dell'account DDT. */
@@ -182,23 +225,44 @@ function cartellePrecedentiSuDisco(registro: Set<string>): string[] {
   }
 }
 
+/** Cartelle precedenti su disco (dati di prima del registro), per la finestra admin delle abilitazioni. */
+export function elencoCartellePrecedenti(): string[] {
+  return cartellePrecedentiSuDisco(new Set(commesseRegistro().map((c) => c.cartella)));
+}
+
 /**
- * Elenco per la finestra "In che commessa lavori?": commesse del registro, cartelle precedenti
- * (quella dell'account; tutte per l'amministratore) e la proposta (ultima scelta → codice commessa
- * dell'account se è nel registro → cartella dell'account se è un codice del registro → nessuna).
+ * Elenco per la finestra "In che commessa lavori?": commesse del registro, cartelle precedenti e la
+ * proposta (ultima scelta → codice commessa dell'account se è nel registro → cartella dell'account se
+ * è un codice del registro → nessuna). Cosa entra nell'elenco dipende da chi sceglie (vedi in testa):
+ * amministratore = tutto; account DDT non amministratore = solo le commesse abilitate (limitata: true);
+ * solo Magazzino = tutto il registro, senza cartelle precedenti.
  */
 export function elencoPer(
   req: Request,
   eAdmin: (r: Request) => boolean
-): { commesse: VoceCommessa[]; precedenti: VoceCommessa[]; proposta: string } {
-  const commesse = commesseRegistro();
-  const cartelleRegistro = new Set(commesse.map((c) => c.cartella));
+): { commesse: VoceCommessa[]; precedenti: VoceCommessa[]; proposta: string; limitata: boolean } {
+  const tutte = commesseRegistro();
+  const cartelleRegistro = new Set(tutte.map((c) => c.cartella));
   const account = accountDi(req);
+  const admin = amministratore(req, eAdmin);
+  const limitata = !!account && !admin;
+  let commesse = tutte;
   const nomiPrecedenti = new Set<string>();
-  if (account && account.commessaId && !cartelleRegistro.has(account.commessaId)) {
-    nomiPrecedenti.add(account.commessaId);
-  }
-  if (amministratore(req, eAdmin)) {
+  if (limitata && account) {
+    const abilitate = commesseAbilitateDi(account);
+    const codici = new Set(abilitate);
+    const cartelle = new Set(abilitate.map(cartellaPerCodice));
+    commesse = tutte.filter((c) => codici.has(c.codice) || cartelle.has(c.cartella));
+    for (const a of abilitate) {
+      // cartella precedente: non è (né è mai stata) una commessa del registro e ha un nome di cartella
+      // valido. Un codice del registro chiuso o sospeso non torna come "cartella precedente".
+      if (COMMESSA_ID_RE.test(a) && !cartelleRegistro.has(a) && !nelRegistro(a))
+        nomiPrecedenti.add(a);
+    }
+  } else if (admin) {
+    if (account && account.commessaId && !cartelleRegistro.has(account.commessaId)) {
+      nomiPrecedenti.add(account.commessaId);
+    }
     for (const n of cartellePrecedentiSuDisco(cartelleRegistro)) nomiPrecedenti.add(n);
   }
   const precedenti: VoceCommessa[] = [...nomiPrecedenti].sort().map((n) => ({
@@ -212,16 +276,16 @@ export function elencoPer(
   // precedente non si propone d'ufficio: lo scopo è passare alle commesse del registro, e senza
   // proposta chi entra la prima volta sceglie lui invece di confermare la cartella vecchia.
   const valide = new Set([...commesse, ...precedenti].map((v) => v.codice));
-  const delRegistro = new Set(commesse.map((v) => v.codice));
+  const delElenco = new Set(commesse.map((v) => v.codice));
   const ultima = ultimaCommessa(personaDi(req));
   const candidati = [account?.codiceCommessa || '', account?.commessaId || ''].map((c) =>
     String(c || '').trim()
   );
   const proposta =
     (ultima && valide.has(ultima) ? ultima : '') ||
-    candidati.find((c) => c && delRegistro.has(c)) ||
+    candidati.find((c) => c && delElenco.has(c)) ||
     '';
-  return { commesse, precedenti, proposta };
+  return { commesse, precedenti, proposta, limitata };
 }
 
 /** Commessa corrente della sessione (null se non ancora scelta e senza account DDT). */
@@ -265,6 +329,36 @@ export function scegliCommessa(
   req.session.commessaScelta = true;
   ricordaCommessa(personaDi(req), voce.codice);
   return { voce };
+}
+
+/**
+ * Con una sola commessa possibile (tipico: account con la sua sola commessa) la scelta è automatica,
+ * senza finestra. Chiamata da GET /guscio/stato finché la commessa non è scelta. Ritorna la voce scelta
+ * o null (già scelta, nessuna o più di una).
+ */
+export function sceltaAutomatica(
+  req: Request,
+  eAdmin: (r: Request) => boolean
+): VoceCommessa | null {
+  if (!req.session || req.session.commessaScelta) return null;
+  const { commesse, precedenti } = elencoPer(req, eAdmin);
+  const tutte = [...commesse, ...precedenti];
+  if (tutte.length !== 1) return null;
+  return scegliCommessa(req, tutte[0].codice, eAdmin).voce || null;
+}
+
+/**
+ * Cartella della sessione fuori dalle commesse abilitate dell'account (null = va bene). Vale solo per
+ * gli account DDT non amministratori: requireAuth la chiama su ogni rotta dei dati (archivio, paniere,
+ * export, download, conversioni, invio a SkyTower e al Magazzino), così una commessa tolta da un
+ * amministratore smette di funzionare subito anche per chi l'aveva già scelta.
+ */
+export function commessaNonAbilitata(req: Request, eAdmin: (r: Request) => boolean): string | null {
+  if (amministratore(req, eAdmin)) return null;
+  const account = accountDi(req);
+  const cartella = String(req.session?.commessaId || '').trim();
+  if (!account || !cartella) return null;
+  return cartelleAbilitateDi(account).has(cartella) ? null : cartella;
 }
 
 /** Codice da mettere in X-Suite-Commessa verso il Magazzino: quello del registro, altrimenti la cartella. */
