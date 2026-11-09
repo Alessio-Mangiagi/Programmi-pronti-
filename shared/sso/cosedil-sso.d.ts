@@ -12,6 +12,11 @@ export interface CosedilIdentity {
   admin: boolean;
   /** id app che ha dato l'accesso (con più id: il primo a cui l'utente è abilitato) */
   app?: string;
+  /**
+   * true = abilitato proprio a quell'id; false = entra solo perché è abilitato a un'app che quell'id
+   * comprende (es. solo Magazzino dentro "DDT e Magazzino"); undefined = portale che non lo dice.
+   */
+  diretto?: boolean;
 }
 
 export interface CosedilSSOOptions {

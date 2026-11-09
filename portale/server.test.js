@@ -30,7 +30,7 @@ const {
   parseNetstatPid,
   rispondiAssistente, APPS, sottodominio,
   rowsToUsers, csvToRows,
-  accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
+  accessoApp, accessoDiretto, appsUtente, appsPredefinite, appAssegnabili, filtraApps,
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,
   normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,
   ipInterno, validaRichiesta, passwordTemporanea,
@@ -311,6 +311,12 @@ test("accessoApp: 'DDT e Magazzino' per chi è abilitato al Lettore DDT o al Mag
   assert.ok(accessoApp(magazzino, soloMagazzino));
   assert.equal(accessoApp(ddt, conElenco), false, 'mrossi ha solo requisiti: niente DDT e Magazzino');
   assert.ok(accessoApp(ddt, senzaElenco), 'default: tutti e due');
+  // /api/verify manda anche "diretto": il Lettore DDT crea l'account solo a chi ha la spunta del DDT,
+  // non a chi entra dalla tessera unica perché abilitato al solo Magazzino (un solo login, 09/11/2026)
+  assert.equal(accessoDiretto(ddt, soloMagazzino), false, 'solo Magazzino: non è un utente del Lettore DDT');
+  assert.ok(accessoDiretto(magazzino, soloMagazzino));
+  assert.ok(accessoDiretto(ddt, senzaElenco), 'default: abilitato al Lettore DDT');
+  assert.ok(accessoDiretto(ddt, { username: 'chiunque', ruolo: 'admin', adm: [] }), 'admin del portale: sempre');
 });
 
 test("appsUtente: elenco esplicito, default per chi non ce l'ha", () => {

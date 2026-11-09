@@ -181,6 +181,9 @@ test('più id app: entra chi è abilitato ad almeno uno, admin solo dal primo id
       return json(200, { ok: true, username: 'gino', admin: cookie === 'sid=capo-mag' });
     }
     if (cookie === 'sid=nessuno') return json(403, { ok: false, error: 'Accesso riservato' });
+    // portale dal 09/11/2026: "DDT e Magazzino" comprende il Magazzino, quindi chi ha solo quella spunta
+    // passa anche su ddt, ma con diretto: false (il Lettore DDT non gli crea l'account)
+    if (cookie === 'sid=via-comprende') return json(200, { ok: true, username: 'tneri', admin: false, diretto: app !== 'ddt' });
     if (cookie === 'sid=ddt-admin') return json(200, { ok: true, username: 'boss', admin: true });
     return json(401, { ok: false });
   });
@@ -204,6 +207,9 @@ test('più id app: entra chi è abilitato ad almeno uno, admin solo dal primo id
     assert.equal(JSON.parse((await chiedi('sid=capo-mag')).body).admin, false);
     const ddt = JSON.parse((await chiedi('sid=ddt-admin')).body);
     assert.deepEqual({ app: ddt.app, admin: ddt.admin }, { app: 'ddt', admin: true });
+    const viaComprende = JSON.parse((await chiedi('sid=via-comprende')).body);
+    assert.deepEqual({ app: viaComprende.app, diretto: viaComprende.diretto }, { app: 'ddt', diretto: false });
+    assert.equal(ddt.diretto, undefined, 'portale che non lo dice: non si sa');
     assert.equal((await chiedi('sid=nessuno')).status, 403);     // nessuno dei due: "chiedi l'abilitazione"
     assert.equal((await chiedi('sid=sconosciuto')).status, 401); // non loggato: come sempre
   } finally {

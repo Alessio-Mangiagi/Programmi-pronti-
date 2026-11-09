@@ -2419,6 +2419,10 @@ async function handle(req, res) {
       email: emailUtente(loadUtenti().find((x) => x.username === s.username) || { username: s.username }),
       admin: appId ? isAdminForApp(s, appId) : (s.ruolo === 'admin'),
       appsAdmin: s.adm || [],
+      // diretto: abilitato proprio a QUELL'app, non solo a una di quelle che comprende ("DDT e Magazzino"
+      // comprende il Magazzino: chi ha solo la spunta Magazzino entra dalla tessera ma non è un utente del
+      // Lettore DDT). Il Lettore DDT lo usa per creare l'account solo a chi è abilitato al DDT (09/11/2026).
+      diretto: appChiesta ? accessoDiretto(appChiesta, s) : true,
     }, cors);
   }
 
@@ -3095,7 +3099,7 @@ module.exports = {
   parseNetstatPid,                                 // spegnimento app
   pathDalRegistro,                                 // PATH fresco per le app lanciate
   rispondiAssistente,                              // assistente
-  accessoApp, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
+  accessoApp, accessoDiretto, appsUtente, appsPredefinite, appAssegnabili, filtraApps,   // programmi per utente
   riepilogoAttivita, riepilogoUtenti, calendarioAttivita,   // plancia degli admin
   normalizzaAvviso, unisciAvviso, potaAvvisi, vistaAvvisi, raccogliAvvisi, loadAvvisi,   // avvisi dei programmi
   ipInterno, validaRichiesta, passwordTemporanea,  // richieste di aiuto dal login

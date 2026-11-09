@@ -98,6 +98,9 @@ async function verificaSessione(cookie, app) {
       vietato: r.status === 403,
       username: data.username || null, nome: data.nome || null, ruolo: data.ruolo || null,
       email: data.email || null,   // per le app con utenti propri (InCampo, SkyTower)
+      // abilitato proprio a questo id e non solo a un'app che contiene (portale dal 09/11/2026; un portale
+      // più vecchio non lo manda: undefined = non si sa, chi lo usa tiene il comportamento di prima)
+      diretto: typeof data.diretto === 'boolean' ? data.diretto : undefined,
     };
   } catch {
     out = { ok: false, reachable: false, admin: false, username: null, nome: null, ruolo: null, email: null };
@@ -169,7 +172,7 @@ function cosedilSSO(opts = {}) {
       const esito = await verificaPerApp(req.headers.cookie, apps);
       const v = { ...esito.v, admin: esito.admin };
       // Identità + admin per-app a disposizione dell'app (rotte, UI, log); app = id che ha dato l'accesso.
-      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin, app: esito.app };
+      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin, app: esito.app, diretto: v.diretto };
 
       if (v.ok) {
         const rottaAdmin = adminOnly || adminPaths.some((pre) => url.startsWith(pre));
