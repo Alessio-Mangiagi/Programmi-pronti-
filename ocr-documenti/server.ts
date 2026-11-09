@@ -8,7 +8,7 @@ import { OCR_WORKER, PYTHON_BIN } from './server/config.ts'
 import { tabellaDaTsv } from './server/tabella-tsv.ts'
 import { splitPageTiles, unisciMigliaiaSpazio } from './server/testo.ts'
 import { decodificaCorpoOcr, type ImmagineOcr } from './server/immagine.ts'
-import { POOL_MAX, componiTesto, ocrErrore, ocrPaddle, ocrPaddleDettagli, prendiWorker, setDumpBlocchi, testoGarbled, workerEngine, type BloccoIncerto } from './server/ocr.ts'
+import { POOL_MAX, componiTesto, grigliaPagina, letturaDaCache, letturaPerCache, ocrErrore, ocrPaddle, ocrPaddleDettagli, prendiWorker, setDumpBlocchi, testoGarbled, workerEngine, type BloccoIncerto } from './server/ocr.ts'
 import { ELENCHI, normalizzaRisultatoAlyante, ricaricaElenchi } from './server/alyante.ts'
 import { estrai, type Estratto } from './server/parser-contratti.ts'
 import { ASSIST_MODEL, OLLAMA_BASE, modelloAttivo, ocrVisionPagina, ollamaAttivo, scegliModelloVision } from './server/ollama.ts'
@@ -365,4 +365,4 @@ if (!process.env.OCR_LIB_MODE) { startServer(); void caricaLavori() }
 // Superficie pubblica per il banco di prova offline (tools/harness.ts): stesse
 // funzioni che usa la route /api/ocr, così l'harness misura la pipeline REALE.
 // risultatoDaModulo + ELENCHI servono a tools/verifica_moduli.ts (moduli compilati → Excel).
-export { ocrPaddle, componiTesto, setDumpBlocchi, estrai, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, tabellaDaTsv, unisciMigliaiaSpazio, risultatoDaModulo, ELENCHI }
+export { ocrPaddle, componiTesto, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estrai, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, tabellaDaTsv, unisciMigliaiaSpazio, risultatoDaModulo, ELENCHI }

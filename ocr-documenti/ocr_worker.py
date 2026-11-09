@@ -6,6 +6,10 @@ Il server Node lo avvia UNA volta: il modello si carica una sola volta (~5-10s),
 poi ogni pagina costa solo l'inferenza. Protocollo a righe JSON:
   stdin  → {"id": 1, "path": "C:\\...\\pagina.png"}
   stdout → {"id": 1, "lines": [{"text": "...", "conf": 98.5, "x":.., "y":.., "w":.., "h":..}]}
+           (+ "rotazione": 180 se la pagina era capovolta ed è stata riletta raddrizzata)
+           (+ "griglia": {"xs": [...], "ys": [...]} linee della tabella con i bordi, o null)
+  stdin  → {"id": 2, "path": "...", "solo_griglia": true, "rotazione": 0}
+  stdout → {"id": 2, "griglia": {...} | null}   pagina già in cache: solo le linee
   stdout → {"id": 1, "error": "..."}          in caso di problema sulla singola pagina
   stdout → {"ready": true, "engine": "..."}   una volta, a modello caricato
 
@@ -130,8 +134,9 @@ def costruisci_ocr():
         versione = getattr(paddleocr, "__version__", "?")
     except Exception:
         versione = "?"
-    # 3.x: pipeline di pre-analisi documento spente — le pagine arrivano già
-    # raddrizzate dal rendering PDF del frontend, e senza queste è più veloce.
+    # 3.x: pipeline di pre-analisi documento spente — senza è più veloce e il modello
+    # d'orientamento non va scaricato. Le rare pagine scansionate capovolte le raddrizza
+    # ocr_orientato(), che rilegge ruotata solo la pagina con confidenza troppo bassa.
     base = dict(
         lang="it",
         use_doc_orientation_classify=False,
@@ -237,6 +242,169 @@ def ocr_pagina(ocr, path):
     return lines
 
 
+# ── Pagine capovolte o di traverso ──────────────────────────────────────────
+# Il classificatore d'orientamento di PaddleOCR è spento (vedi costruisci_ocr) e il suo
+# modello andrebbe scaricato. Le pagine scansionate al contrario però esistono: l'elenco
+# prezzi del subappalto Progetto Costruzioni Ragusana ha 12 pagine capovolte, lette così
+# al 39-48% di confidenza media e illeggibili per i parser (misura del 09/11/2026 sui 31
+# contratti: tutte le altre pagine stanno sopra l'85%). Ruotata di 180° la stessa pagina
+# sale all'82%. Si rilegge quindi ruotata SOLO la pagina sotto soglia e si tiene la
+# lettura migliore: le pagine normali non costano nulla in più.
+# PADDLE_SOGLIA_ROTAZIONE=0 spegne la prova.
+SOGLIA_ROTAZIONE = float(os.environ.get("PADDLE_SOGLIA_ROTAZIONE", "60"))
+# Sotto questo numero di blocchi la pagina è quasi vuota (firme, timbri): la confidenza
+# bassa non dice nulla sull'orientamento e rileggerla 3 volte costerebbe minuti per niente.
+MIN_BLOCCHI_ROTAZIONE = 20
+# Una rotazione si tiene solo se legge almeno il 25% di testo sicuro in più (vedi
+# testo_sicuro): una pagina brutta ma dritta (fotocopia sbiadita) non deve finire girata
+# per poco.
+MARGINE_ROTAZIONE = 1.25
+
+
+def confidenza_media(lines):
+    """Media della confidenza (0-100) sui blocchi con almeno due lettere o cifre:
+    i segni isolati ("|", ".", "-") hanno confidenza alta anche sulle pagine capovolte
+    e alzerebbero la media senza motivo."""
+    utili = [b["conf"] for b in lines if sum(c.isalnum() for c in b["text"]) >= 2]
+    return sum(utili) / len(utili) if utili else 0.0
+
+
+def testo_sicuro(lines):
+    """Lettere e cifre lette, pesate con la loro confidenza: misura QUANTO testo si legge
+    bene, non solo quanto bene. La sola confidenza media ingannava: una pagina girata di
+    traverso dava 67 blocchi corti (numeri) al 66%, contro i 191 al 44% della pagina
+    com'era, e "vinceva" perdendo due terzi del testo (Ragusana, pag. 39)."""
+    return sum(sum(c.isalnum() for c in b["text"]) * b["conf"] / 100 for b in lines
+               if sum(c.isalnum() for c in b["text"]) >= 2)
+
+
+def ocr_orientato(ocr, path):
+    """OCR della pagina come arriva; se la lettura è sotto SOGLIA_ROTAZIONE la si rifà
+    ruotata di 180°, poi di 90° e 270° solo se non basta. Vince la rotazione con più
+    testo letto bene (testo_sicuro), se supera la pagina com'era di MARGINE_ROTAZIONE.
+    Restituisce (blocchi, gradi): gradi = rotazione antioraria applicata all'immagine
+    (0 = nessuna). Le coordinate dei blocchi sono quelle dell'immagine ruotata, cioè della
+    pagina raddrizzata: i parser e la ricostruzione delle tabelle lavorano solo sulle
+    posizioni relative (e la griglia della tabella si calcola sulla stessa immagine)."""
+    lines = ocr_pagina(ocr, path)
+    media = confidenza_media(lines)
+    if SOGLIA_ROTAZIONE <= 0 or len(lines) < MIN_BLOCCHI_ROTAZIONE or media >= SOGLIA_ROTAZIONE:
+        return lines, 0
+    base = testo_sicuro(lines)
+    migliore = (base, 0, lines, media)
+    for gradi in (180, 90, 270):
+        ruotata = ruota_su_file(path, gradi)
+        try:
+            letta = ocr_pagina(ocr, ruotata)
+        finally:
+            os.remove(ruotata)
+        punti, m = testo_sicuro(letta), confidenza_media(letta)
+        if punti > migliore[0]:
+            migliore = (punti, gradi, letta, m)
+        if migliore[1] and migliore[3] >= SOGLIA_ROTAZIONE and migliore[0] >= base * MARGINE_ROTAZIONE:
+            break                    # pagina raddrizzata: le altre rotazioni non servono
+    if migliore[1] and migliore[0] >= base * MARGINE_ROTAZIONE:
+        print(f"[worker] pagina ruotata di {migliore[1]}°: confidenza {media:.0f}% → {migliore[3]:.0f}%, "
+              f"testo letto bene {base:.0f} → {migliore[0]:.0f}", file=sys.stderr)
+        return migliore[2], migliore[1]
+    return lines, 0
+
+
+# ── Linee della tabella (celle) ─────────────────────────────────────────────
+# L'OCR restituisce righe di testo, non celle: nelle tabelle con i bordi le colonne si
+# perdono (prezzo "P.U. lavori" e "P.U. oneri" confusi, celle su più righe mescolate:
+# docs/RICERCA_OCR_SOLUZIONE.md §3). Le linee però sono nell'immagine: con OpenCV (già
+# installato con PaddleOCR) si trovano per morfologia, come fa img2table, e il server
+# mette ogni blocco OCR nella cella che lo contiene (server/tabella-griglia.ts).
+# Niente modelli in più, niente AI: ~0,3 s a pagina. PADDLE_GRIGLIA=0 spegne il passo.
+def _posizioni(profilo, minimo):
+    """Coordinate delle linee: indici dove il profilo supera la soglia, raggruppati."""
+    gruppi = []
+    for i, v in enumerate(profilo):
+        if v <= minimo:
+            continue
+        if gruppi and i - gruppi[-1][-1] <= 3:
+            gruppi[-1].append(i)
+        else:
+            gruppi.append([i])
+    return [int(sum(g) / len(g)) for g in gruppi]
+
+
+def griglia_tabella(path):
+    """{"xs": [...], "ys": [...]} = linee verticali e orizzontali della tabella più grande
+    della pagina (coordinate dell'immagine, come i blocchi), o None se la pagina non ha una
+    tabella con i bordi (almeno 3 linee per verso). Si cercano prima le verticali lunghe
+    almeno 1/25 della pagina; la tabella è il gruppo di verticali che si sovrappongono in
+    altezza con più linee; le orizzontali valide sono quelle dentro quell'altezza che
+    coprono almeno il 30% della larghezza della tabella (le linee sottili escono
+    tratteggiate dalla soglia: misurate al 40-50% su un subappalto con tutti i bordi)."""
+    if os.environ.get("PADDLE_GRIGLIA") == "0":
+        return None
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return None
+    # imdecode e non imread: imread non apre i percorsi Windows con caratteri non ASCII
+    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return None
+    alt, larg = img.shape
+    bw = cv2.adaptiveThreshold(~img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 15, -2)
+    vert = cv2.morphologyEx(bw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (1, alt // 40)))
+    oriz = cv2.morphologyEx(bw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (larg // 40, 1)))
+    # verticali: x con abbastanza pixel di linea, e per ognuna l'estensione in altezza
+    linee_v = []
+    for x in _posizioni((vert > 0).sum(axis=0), alt / 25):
+        colonna = vert[:, max(0, x - 2):x + 3].max(axis=1)
+        righe = np.where(colonna > 0)[0]
+        if len(righe):
+            linee_v.append((x, int(righe[0]), int(righe[-1])))
+    # gruppi di verticali che si sovrappongono in altezza = tabelle diverse della pagina
+    gruppi = []
+    for v in sorted(linee_v, key=lambda t: t[1]):
+        for g in gruppi:
+            if v[1] <= g["fondo"] and v[2] >= g["cima"]:
+                g["linee"].append(v)
+                g["cima"], g["fondo"] = min(g["cima"], v[1]), max(g["fondo"], v[2])
+                break
+        else:
+            gruppi.append({"linee": [v], "cima": v[1], "fondo": v[2]})
+    if not gruppi:
+        return None
+    tab = max(gruppi, key=lambda g: len(g["linee"]))
+    xs = sorted({v[0] for v in tab["linee"]})
+    if len(xs) < 3:
+        return None
+    x0, x1 = xs[0], xs[-1]
+    fascia = oriz[max(0, tab["cima"] - 10):tab["fondo"] + 11, x0:x1 + 1]
+    ys = [y + max(0, tab["cima"] - 10) for y in _posizioni((fascia > 0).sum(axis=1), (x1 - x0) * 0.3)]
+    if len(ys) < 3:
+        return None
+    return {"xs": xs, "ys": ys}
+
+
+def griglia_sicura(path):
+    """griglia_tabella senza mai far fallire la pagina: la griglia è un aiuto in più."""
+    try:
+        return griglia_tabella(path)
+    except Exception as e:
+        print(f"[worker] griglia non calcolata: {e}", file=sys.stderr)
+        return None
+
+
+def ruota_su_file(path, gradi):
+    """Copia temporanea dell'immagine ruotata (per calcolare la griglia sulla pagina
+    raddrizzata, nello stesso sistema di coordinate dei blocchi)."""
+    import tempfile
+    from PIL import Image
+    fd, ruotata = tempfile.mkstemp(suffix=".png")
+    os.close(fd)
+    with Image.open(path) as img:
+        img.rotate(gradi, expand=True).save(ruotata)
+    return ruotata
+
+
 def spiega_errore_avvio(e):
     """Messaggio umano per il server (campo `fatal`): la traccia Python la vede solo
     chi legge i log. WinError 4551 = Windows App Control (WDAC) rifiuta di caricare
@@ -272,7 +440,28 @@ def main():
         req = {}
         try:
             req = json.loads(raw)
-            manda({"id": req["id"], "lines": ocr_pagina(ocr, req["path"])})
+            # solo la griglia: pagina già letta e in cache, manca il passo delle celle
+            # (cache scritta prima che esistesse). Niente OCR, pochi decimi di secondo.
+            if req.get("solo_griglia"):
+                gradi = int(req.get("rotazione") or 0)
+                path = ruota_su_file(req["path"], gradi) if gradi else req["path"]
+                try:
+                    manda({"id": req["id"], "griglia": griglia_sicura(path)})
+                finally:
+                    if gradi:
+                        os.remove(path)
+                continue
+            lines, gradi = ocr_orientato(ocr, req["path"])
+            risposta = {"id": req["id"], "lines": lines}
+            if gradi:
+                risposta["rotazione"] = gradi     # pagina raddrizzata: coordinate ruotate
+            path = ruota_su_file(req["path"], gradi) if gradi else req["path"]
+            try:
+                risposta["griglia"] = griglia_sicura(path)
+            finally:
+                if gradi:
+                    os.remove(path)
+            manda(risposta)
         except Exception as e:
             manda({"id": req.get("id"), "error": f"{type(e).__name__}: {e}"})
 

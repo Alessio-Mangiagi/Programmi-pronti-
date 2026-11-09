@@ -9,6 +9,7 @@ import { createHash } from 'crypto'
 import { spawn } from 'child_process'
 import { OCR_WORKER, PYTHON_BIN, VISION_FALLBACK, ROOT } from './config.ts'
 import { tabellaDaTsv } from './tabella-tsv.ts'
+import { TITOLO_CELLE, tabellaDaGriglia, type Griglia } from './tabella-griglia.ts'
 import { normalizzaNumeriOcr } from './testo.ts'
 import { modelloVisionAttivo, ocrVisionArticoli, visionOff } from './ollama.ts'
 
@@ -19,10 +20,14 @@ import { modelloVisionAttivo, ocrVisionArticoli, visionOff } from './ollama.ts'
 // del worker singolo: cambia solo chi esegue, non il risultato.
 // Protocollo a righe JSON su stdin/stdout (vedi ocr_worker.py).
 export type BloccoOcr = { text: string; conf: number; x: number; y: number; w: number; h: number }
+// Lettura di una pagina: blocchi OCR più, se la pagina ha una tabella con i bordi, le sue
+// linee (ocr_worker.py, griglia_tabella) e la rotazione applicata (pagina capovolta).
+// griglia: null = cercata e assente; undefined = non ancora cercata (cache vecchia).
+export type LetturaOcr = { blocchi: BloccoOcr[]; griglia?: Griglia | null; rotazione?: number }
 export type SlotWorker = {
   proc: ReturnType<typeof spawn>
   ready: Promise<void>
-  pending: Map<number, { resolve: (b: BloccoOcr[]) => void; reject: (e: Error) => void }>
+  pending: Map<number, { resolve: (l: LetturaOcr) => void; reject: (e: Error) => void }>
 }
 export const POOL_MAX = Math.max(1, Number(process.env.PADDLE_WORKERS) || 3)
 // Cartella di dump dei blocchi OCR per il banco di prova (vuota in esercizio).
@@ -67,7 +72,7 @@ export const creaWorker = (): SlotWorker => {
         if (!p) continue
         slot.pending.delete(msg.id)
         if (msg.error) p.reject(new Error(`PaddleOCR: ${msg.error}`))
-        else p.resolve(msg.lines as BloccoOcr[])
+        else p.resolve({ blocchi: (msg.lines ?? []) as BloccoOcr[], griglia: msg.griglia ?? null, rotazione: msg.rotazione ?? 0 })
       } catch { /* riga non-JSON (log sfuggito) → ignora */ }
     }
   })
@@ -161,10 +166,19 @@ export const testoGarbled = (testo: string): boolean => {
 // banco di prova (tools/harness.ts) mette in cache i BLOCCHI (l'inferenza, cara) e
 // ricompone il testo a ogni modifica, gratis. La normalizzazione dei numeri è
 // idempotente, quindi ripeterla qui è sicuro.
-export const componiTesto = (blocchi: BloccoOcr[]): string => {
+// Con la griglia della tabella (pagina con i bordi) la tabella si legge dalle celle
+// (server/tabella-griglia.ts) e quella ricostruita dalle sole coordinate non serve: le
+// due insieme darebbero ogni voce due volte. Senza griglia, o se le celle non danno voci
+// (più voci nella stessa cella), resta la ricostruzione geometrica di sempre.
+export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null): string => {
   for (const b of blocchi) b.text = normalizzaNumeriOcr(b.text)
   const righe = righeDaBlocchi(blocchi)
   const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')
+  const celle = (() => { try { return tabellaDaGriglia(blocchi, griglia) } catch { return '' } })()
+  if (celle) {
+    console.log(`[Tabella celle] ${celle.split('\n').length} voci dalle celle (${griglia!.xs.length - 1}×${griglia!.ys.length - 1})`)
+    return `${testo.trimEnd()}\n\n${TITOLO_CELLE}\n${celle}\n`
+  }
   const tabella = (() => { try { return tabellaDaTsv(tsvDaBlocchi(righe)) } catch { return '' } })()
   if (!tabella) {
     console.log(`[Tabella TSV] 0 articoli (txt:${testo.length}ch blocchi:${blocchi.length})`)
@@ -177,8 +191,8 @@ export const componiTesto = (blocchi: BloccoOcr[]): string => {
 // Aggancio per il banco di prova: riceve i blocchi grezzi di ogni pagina appena
 // escono dall'inferenza, così la cache su disco conserva l'OCR e non il testo già
 // ricostruito (che invece cambia ad ogni modifica dei parser).
-export let dumpBlocchi: ((b: BloccoOcr[]) => void) | null = null
-export const setDumpBlocchi = (f: ((b: BloccoOcr[]) => void) | null) => { dumpBlocchi = f }
+export let dumpBlocchi: ((b: BloccoOcr[], griglia?: Griglia | null) => void) | null = null
+export const setDumpBlocchi = (f: ((b: BloccoOcr[], griglia?: Griglia | null) => void) | null) => { dumpBlocchi = f }
 
 // Blocco letto con poca sicurezza: PaddleOCR dà uno score 0-100 per riga rilevata.
 // Sotto la soglia il revisore deve guardare: la cella in tabella si colora.
@@ -191,14 +205,24 @@ export type EsitoOcr = { testo: string; incerte: BloccoIncerto[] }
 // e un riprocesso dopo un riavvio costano zero. OCR_CACHE=0 la spegne; la cartella si
 // può svuotare quando si vuole (si rigenera da sola).
 export const OCR_CACHE_DIR = process.env.OCR_CACHE === '0' ? '' : (process.env.OCR_CACHE_DIR || path.join(ROOT, '.ocr-cache', 'blocchi'))
-const leggiCache = async (chiave: string): Promise<BloccoOcr[] | null> => {
+// Formato del file: { v: 2, blocchi, griglia, rotazione }. I file scritti prima della
+// griglia sono il solo array dei blocchi: valgono ancora, la griglia si chiede a parte
+// (grigliaPagina) senza rifare l'OCR.
+export const letturaDaCache = (dato: unknown): LetturaOcr | null => {
+  if (Array.isArray(dato)) return dato.length ? { blocchi: dato as BloccoOcr[] } : null
+  const l = dato as (Partial<LetturaOcr> & { v?: number }) | null
+  if (!l || !Array.isArray(l.blocchi) || !l.blocchi.length) return null
+  return { blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0 }
+}
+export const letturaPerCache = (l: LetturaOcr): string =>
+  JSON.stringify({ v: 2, blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0 })
+const leggiCache = async (chiave: string): Promise<LetturaOcr | null> => {
   if (!OCR_CACHE_DIR) return null
   const f = path.join(OCR_CACHE_DIR, `${chiave}.json`)
   if (!existsSync(f)) return null
   try {
-    const b = JSON.parse(await fs.readFile(f, 'utf8')) as BloccoOcr[]
     // lettura vuota = cache non valida, si rifà l'OCR: vedi scriviCache
-    return Array.isArray(b) && b.length ? b : null
+    return letturaDaCache(JSON.parse(await fs.readFile(f, 'utf8')))
   } catch { return null }
 }
 // Una pagina senza NESSUN blocco non si salva. Una pagina vera di contratto non è mai
@@ -206,10 +230,34 @@ const leggiCache = async (chiave: string): Promise<BloccoOcr[] | null> => {
 // serie 50 non supportata da paddle CUDA 12.6 (vedi prova_lettura in ocr_worker.py).
 // Salvarla la congelava: anche col motore riparato la pagina restava vuota per sempre
 // (04/11/2026: 129 pagine su 131 in cache erano "[]").
-const scriviCache = async (chiave: string, blocchi: BloccoOcr[]): Promise<void> => {
-  if (!OCR_CACHE_DIR || !blocchi.length) return
+const scriviCache = async (chiave: string, l: LetturaOcr): Promise<void> => {
+  if (!OCR_CACHE_DIR || !l.blocchi.length) return
   await fs.mkdir(OCR_CACHE_DIR, { recursive: true }).catch(() => {})
-  await fs.writeFile(path.join(OCR_CACHE_DIR, `${chiave}.json`), JSON.stringify(blocchi)).catch(() => {})
+  await fs.writeFile(path.join(OCR_CACHE_DIR, `${chiave}.json`), letturaPerCache(l)).catch(() => {})
+}
+
+// Richiesta al pool: OCR completo, oppure solo le linee della tabella (pagina già letta).
+const chiediAlWorker = (richiesta: Record<string, unknown>): Promise<LetturaOcr> => new Promise((resolve, reject) => {
+  // niente await sul ready: la richiesta va in pending SUBITO, così le pagine
+  // successive vedono il carico reale e si distribuiscono sugli altri worker
+  const slot = prendiWorker()
+  const id = ++reqId
+  slot.pending.set(id, { resolve, reject })
+  slot.proc.stdin!.write(JSON.stringify({ id, ...richiesta }) + '\n')
+  // il singolo worker processa in SERIE: il timeout deve coprire anche
+  // l'attesa in coda, quindi scala con la posizione nella coda di QUESTO
+  // worker — 5 minuti per ogni pagina davanti + la propria (copre anche
+  // il caricamento del modello al primo avvio e le riletture delle pagine capovolte).
+  const timeoutMs = 300_000 * slot.pending.size
+  setTimeout(() => { if (slot.pending.delete(id)) reject(new Error(`PaddleOCR: timeout sulla pagina (${Math.round(timeoutMs / 1000)}s)`)) }, timeoutMs)
+})
+
+// Linee della tabella di una pagina già letta (cache scritta prima della griglia).
+// Errore o worker assente → null: la pagina si compone come prima, senza celle.
+export const grigliaPagina = async (pngPath: string, rotazione = 0): Promise<Griglia | null> => {
+  try {
+    return (await chiediAlWorker({ path: pngPath, solo_griglia: true, rotazione })).griglia ?? null
+  } catch { return null }
 }
 
 // Blocchi sotto soglia con almeno due caratteri alfanumerici (un "|" o un "." letto
@@ -233,22 +281,16 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
   await fs.writeFile(tmp, png)
   try {
     const inCache = await leggiCache(chiave)
-    const blocchi = inCache ?? await new Promise<BloccoOcr[]>((resolve, reject) => {
-      // niente await sul ready: la richiesta va in pending SUBITO, così le pagine
-      // successive vedono il carico reale e si distribuiscono sugli altri worker
-      const slot = prendiWorker()
-      const id = ++reqId
-      slot.pending.set(id, { resolve, reject })
-      slot.proc.stdin!.write(JSON.stringify({ id, path: tmp }) + '\n')
-      // il singolo worker processa in SERIE: il timeout deve coprire anche
-      // l'attesa in coda, quindi scala con la posizione nella coda di QUESTO
-      // worker — 5 minuti per ogni pagina davanti + la propria (copre anche
-      // il caricamento del modello al primo avvio).
-      const timeoutMs = 300_000 * slot.pending.size
-      setTimeout(() => { if (slot.pending.delete(id)) reject(new Error(`PaddleOCR: timeout sulla pagina (${Math.round(timeoutMs / 1000)}s)`)) }, timeoutMs)
-    })
-    if (inCache) console.log(`[OCR] pagina dalla cache (${chiave.slice(0, 8)}, ${blocchi.length} blocchi)`)
-    else await scriviCache(chiave, blocchi.map(b => ({ ...b })))    // blocchi grezzi, prima della normalizzazione
+    const lettura = inCache ?? await chiediAlWorker({ path: tmp })
+    const blocchi = lettura.blocchi
+    if (inCache) {
+      console.log(`[OCR] pagina dalla cache (${chiave.slice(0, 8)}, ${blocchi.length} blocchi)`)
+      // cache scritta prima della griglia: si cercano ora le linee, una volta sola
+      if (inCache.griglia === undefined) {
+        lettura.griglia = await grigliaPagina(tmp, inCache.rotazione ?? 0)
+        await scriviCache(chiave, { ...lettura, blocchi: blocchi.map(b => ({ ...b })) })
+      }
+    } else await scriviCache(chiave, { ...lettura, blocchi: blocchi.map(b => ({ ...b })) })    // blocchi grezzi, prima della normalizzazione
     for (const b of blocchi) b.text = normalizzaNumeriOcr(b.text)
     const incerte = blocchiIncerti(blocchi)
     // Banco di prova (tools/harness): con OCR_DUMP_DIR i blocchi riconosciuti finiscono
@@ -260,7 +302,7 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
     }
     const righe = righeDaBlocchi(blocchi)
     const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')
-    if (dumpBlocchi) dumpBlocchi(blocchi)
+    if (dumpBlocchi) dumpBlocchi(blocchi, lettura.griglia)
     // Scansione illeggibile (grana/retino) → PaddleOCR restituisce salad. Se è attivo un
     // modello vision locale, lo si usa per ri-trascrivere la TABELLA ARTICOLI da questa
     // pagina (codice tariffa + descrizione + UM; i prezzi non interessano). Costa solo
@@ -273,7 +315,7 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
       }
       console.log(`[Vision] pagina illeggibile: recupero vision non riuscito — resta il testo PaddleOCR`)
     }
-    return { testo: componiTesto(blocchi), incerte }
+    return { testo: componiTesto(blocchi, lettura.griglia), incerte }
   } finally {
     fs.unlink(tmp).catch(() => {})
   }

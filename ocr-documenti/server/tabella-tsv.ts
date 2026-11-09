@@ -1,6 +1,28 @@
 // Ricostruzione geometrica della tabella articoli dai blocchi OCR con coordinate.
 import { DBG_TABELLA } from './config.ts'
-import { NUM_SRC, UM_SRC } from './parser-contratti.ts'
+import { NUM_SRC, UM_SRC, contoTorna, itStr, numIt, ternaCoerente } from './parser-contratti.ts'
+
+// Valori di una riga articolo dai numeri letti dopo l'unità di misura: di solito
+// quantità, prezzo, importo. Alcuni elenchi prezzi però separano gli oneri della
+// sicurezza su colonne proprie, ognuna col suo importo: "m² 286,23 | 2,400 € 686,94 € |
+// 29,600 € 8.472,26 €" = quantità, P.U. oneri, importo oneri, P.U. lavori, importo lavori.
+// Se ENTRAMBE le coppie tornano con la stessa quantità (q × p = importo, come nei
+// controlli di Rossum/ABBYY sulle righe), prezzo e importo della voce sono le somme: è
+// la forma lorda dei moduli compilati dal PDF (29,60 + 2,40 = 32,00). Prima usciva il
+// solo P.U. oneri (2,40). Altrimenti, con più di tre numeri, la terna in ordine il cui
+// conto torna (un numero spurio in mezzo non sposta più le colonne); se nessuna torna,
+// restano i primi tre numeri come letti.
+export const valoriRiga = (nums: string[]): string[] => {
+  if (nums.length >= 5) {
+    const [q, p1, i1, p2, i2] = nums.slice(0, 5).map(numIt)
+    if (contoTorna(q, p1, i1) && contoTorna(q, p2, i2)) return [nums[0], itStr(p1 + p2), itStr(i1 + i2)]
+  }
+  if (nums.length > 3) {
+    const terna = ternaCoerente(nums.slice(0, 5))
+    if (terna) return terna
+  }
+  return nums.slice(0, 3)
+}
 
 // ── Ricostruzione GEOMETRICA della tabella articoli dal TSV (formato Tesseract) ──
 // Il TSV dà ogni parola con le sue coordinate (left/top/width). La tabella viene
@@ -125,7 +147,8 @@ export const tabellaArticoliElenco = (lines: RigaTsv[]): string => {
     }
     const descrTot = [descr.join(' '), dett.join(' ')].filter(Boolean).join(' — ').replace(/\s{2,}/g, ' ').trim()
     if (codice.length || descrTot) {
-      out.push(`| ${codice.join(' ').trim()} | ${descrTot} | ${wsTot[iu].text.replace(/\.$/, '')} | ${numeri[0] ?? ''} | ${numeri[1] ?? ''} | ${numeri[2] ?? ''} |`)
+      const v = valoriRiga(numeri)
+      out.push(`| ${codice.join(' ').trim()} | ${descrTot} | ${wsTot[iu].text.replace(/\.$/, '')} | ${v[0] ?? ''} | ${v[1] ?? ''} | ${v[2] ?? ''} |`)
     }
     inizio = fineCella + 1
   }
@@ -326,7 +349,8 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
       const attaccati = destraPrec >= 0 && w.left - destraPrec < 30
       if (attaccati && prec && /^\d{1,3}$/.test(prec) && /^\d{3},\d{1,3}$/.test(valore)) {
         cur.num[cur.num.length - 1] = `${prec}.${valore}`
-      } else if (cur.num.length < 3) cur.num.push(valore)
+      // fino a 5 numeri: servono a valoriRiga per riconoscere le colonne oneri + lavori
+      } else if (cur.num.length < 5) cur.num.push(valore)
       else continue
       destraPrec = w.left + w.width
     }
@@ -343,6 +367,8 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
   const conValori = validi.filter(a => a.um || a.num.length >= 2).length
   const codiciVeri = validi.filter(a => /[A-Za-z0-9]\.[A-Za-z0-9]/.test(a.codice.join(' '))).length
   if (!conValori && codiciVeri < 2) return ''
-  return validi.map(a =>
-    `| ${a.codice.join(' ')} | ${a.descr.join(' ').replace(/\s{2,}/g, ' ').trim()} | ${a.um} | ${a.num[0] ?? ''} | ${a.num[1] ?? ''} | ${a.num[2] ?? ''} |`).join('\n')
+  return validi.map(a => {
+    const v = valoriRiga(a.num)
+    return `| ${a.codice.join(' ')} | ${a.descr.join(' ').replace(/\s{2,}/g, ' ').trim()} | ${a.um} | ${v[0] ?? ''} | ${v[1] ?? ''} | ${v[2] ?? ''} |`
+  }).join('\n')
 }
