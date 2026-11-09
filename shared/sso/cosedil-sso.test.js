@@ -167,6 +167,53 @@ test('adminPaths: blocca solo le rotte elencate', async () => {
   await chiudi(appServer);
 });
 
+test('più id app: entra chi è abilitato ad almeno uno, admin solo dal primo id', async () => {
+  // Portale a parte che conosce le abilitazioni per app: "solo-mag" è abilitato al magazzino e non
+  // al ddt (403), "capo-mag" è admin del magazzino. Gate con { app: ['ddt', 'magazzino'] } come
+  // "DDT e Magazzino" (09/11/2026).
+  const portale = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://x');
+    const app = url.searchParams.get('app');
+    const cookie = req.headers.cookie || '';
+    const json = (stato, corpo) => { res.writeHead(stato, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(corpo)); };
+    if (cookie === 'sid=solo-mag' || cookie === 'sid=capo-mag') {
+      if (app === 'ddt') return json(403, { ok: false, error: 'Accesso riservato' });
+      return json(200, { ok: true, username: 'gino', admin: cookie === 'sid=capo-mag' });
+    }
+    if (cookie === 'sid=nessuno') return json(403, { ok: false, error: 'Accesso riservato' });
+    if (cookie === 'sid=ddt-admin') return json(200, { ok: true, username: 'boss', admin: true });
+    return json(401, { ok: false });
+  });
+  await new Promise((r) => portale.listen(0, '127.0.0.1', r));
+  const prima = process.env.COSEDIL_PORTAL;
+  process.env.COSEDIL_PORTAL = `http://127.0.0.1:${portale.address().port}`;
+  delete require.cache[require.resolve('./cosedil-sso.js')];
+  const gate = require('./cosedil-sso.js')({ app: ['ddt', 'magazzino'] });
+  const srv = http.createServer((req, res) => gate(req, res, () => { res.writeHead(200); res.end(JSON.stringify(req.cosedil)); }));
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const chiedi = (cookie) => new Promise((resolve, reject) => {
+    const q = http.request({ host: '127.0.0.1', port: srv.address().port, path: '/api/x', headers: { Cookie: cookie, Accept: 'application/json' } },
+      (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => resolve({ status: res.statusCode, body: b })); });
+    q.on('error', reject); q.end();
+  });
+  try {
+    const mag = await chiedi('sid=solo-mag');
+    assert.equal(mag.status, 200);
+    assert.deepEqual({ app: JSON.parse(mag.body).app, admin: JSON.parse(mag.body).admin }, { app: 'magazzino', admin: false });
+    // admin del magazzino non diventa admin del programma (l'admin è quello del primo id)
+    assert.equal(JSON.parse((await chiedi('sid=capo-mag')).body).admin, false);
+    const ddt = JSON.parse((await chiedi('sid=ddt-admin')).body);
+    assert.deepEqual({ app: ddt.app, admin: ddt.admin }, { app: 'ddt', admin: true });
+    assert.equal((await chiedi('sid=nessuno')).status, 403);     // nessuno dei due: "chiedi l'abilitazione"
+    assert.equal((await chiedi('sid=sconosciuto')).status, 401); // non loggato: come sempre
+  } finally {
+    process.env.COSEDIL_PORTAL = prima;
+    delete require.cache[require.resolve('./cosedil-sso.js')];
+    await chiudi(srv);
+    await chiudi(portale);
+  }
+});
+
 test('portale giù: gate chiuso risponde 503', async () => {
   await avviaApp({ app: 'giu-closed' });
   await chiudi(fintoPortale);                       // spegne il portale

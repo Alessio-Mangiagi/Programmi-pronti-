@@ -123,9 +123,36 @@ function rispondi(res, code, isDoc, messaggio, headers) {
   return res.end(JSON.stringify({ ok: false, error: messaggio }));
 }
 
+// Più id app nello stesso programma (09/11/2026: "DDT e Magazzino" è un programma solo, con dentro il
+// Lettore DDT e il Magazzino Operativo). Con { app: ['ddt', 'magazzino'] } entra chi è abilitato ad
+// ALMENO UNO dei due: si chiede al portale il primo id (quello "di casa", che decide anche l'admin) e,
+// solo se lì la risposta non è un sì, gli altri in ordine. req.cosedil.app dice quale id ha aperto la
+// porta; admin resta quello del primo id (un admin del Magazzino non diventa admin del Lettore DDT).
+// Con una stringa sola il comportamento è quello di sempre.
+function idApp(opzione) {
+  const lista = Array.isArray(opzione) ? opzione : [opzione];
+  return lista.map((a) => String(a || '').trim()).filter(Boolean);
+}
+
+// Esito del portale per il primo id che dà accesso; se nessuno lo dà, l'esito del primo id (così
+// "non loggato", "riservata" e "portale giù" restano quelli di sempre).
+async function verificaPerApp(cookie, apps) {
+  if (apps.length <= 1) {
+    const v = await verificaSessione(cookie, apps[0] || '');
+    return { v, app: apps[0] || '', admin: v.admin };
+  }
+  const primo = await verificaSessione(cookie, apps[0]);
+  if (primo.ok || !primo.reachable) return { v: primo, app: apps[0], admin: primo.admin };
+  for (const altro of apps.slice(1)) {
+    const v = await verificaSessione(cookie, altro);
+    if (v.ok) return { v, app: altro, admin: false };
+  }
+  return { v: primo, app: apps[0], admin: primo.admin };
+}
+
 function cosedilSSO(opts = {}) {
   const portal = (opts.portal || PORTAL_PUBBLICO).replace(/\/+$/, '');
-  const app = opts.app || '';                                   // id app per l'admin per-app
+  const apps = idApp(opts.app);                                 // id app per l'admin per-app (uno o più)
   const adminPaths = Array.isArray(opts.adminPaths) ? opts.adminPaths : [];
   const adminOnly = !!opts.adminOnly;
   const failOpen = opts.failOpen != null ? !!opts.failOpen : FAIL_OPEN;
@@ -139,9 +166,10 @@ function cosedilSSO(opts = {}) {
       // sessione del portale, qualunque sia il nome della rotta.
       if (!isDoc && eAsset(url)) return next();
 
-      const v = await verificaSessione(req.headers.cookie, app);
-      // Identità + admin per-app a disposizione dell'app (rotte, UI, log).
-      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin };
+      const esito = await verificaPerApp(req.headers.cookie, apps);
+      const v = { ...esito.v, admin: esito.admin };
+      // Identità + admin per-app a disposizione dell'app (rotte, UI, log); app = id che ha dato l'accesso.
+      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin, app: esito.app };
 
       if (v.ok) {
         const rottaAdmin = adminOnly || adminPaths.some((pre) => url.startsWith(pre));
@@ -178,7 +206,7 @@ function cosedilSSO(opts = {}) {
 // I socket non passano dal middleware HTTP: senza questo, chi si collega via
 // websocket parla con l'app senza aver mai fatto login.
 function cosedilSocketIO(opts = {}) {
-  const app = opts.app || '';
+  const app = idApp(opts.app)[0] || '';   // socket di una sola app: vale il primo id
   const adminOnly = !!opts.adminOnly;
   const failOpen = opts.failOpen != null ? !!opts.failOpen : FAIL_OPEN;
 

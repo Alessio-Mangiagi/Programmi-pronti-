@@ -59,6 +59,9 @@ const cosedilSSO = require('../../shared/sso/cosedil-sso');
 app.use(cosedilSSO({ app: 'ddt' }));                       // identità + admin per-app
 app.use(cosedilSSO({ app: 'auguri', adminOnly: true }));   // intera app agli admin
 app.use(cosedilSSO({ app: 'ocr', adminPaths: ['/api/admin'] }));
+// Più programmi in uno ("DDT e Magazzino", 09/11/2026): entra chi è abilitato ad ALMENO uno degli id;
+// req.cosedil.app = l'id che ha aperto la porta, req.cosedil.admin = admin del PRIMO id soltanto.
+app.use(cosedilSSO({ app: ['ddt', 'magazzino'] }));
 
 // Socket.IO: i websocket non passano dal middleware HTTP, vanno gattati a parte
 const { cosedilSocketIO } = cosedilSSO;

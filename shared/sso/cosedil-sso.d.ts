@@ -8,14 +8,20 @@ export interface CosedilIdentity {
   nome: string | null;
   ruolo: string | null;
   email: string | null;
+  /** admin del primo id app passato al gate (vedi CosedilSSOOptions.app) */
   admin: boolean;
+  /** id app che ha dato l'accesso (con più id: il primo a cui l'utente è abilitato) */
+  app?: string;
 }
 
 export interface CosedilSSOOptions {
   /** URL del portale a cui mandare il browser per il login; default COSEDIL_PORTAL_PUBBLICO, poi COSEDIL_PORTAL, poi http://localhost:8080 */
   portal?: string;
-  /** id app nel registro del portale (ddt, agente, confronta, ocr, scadenzario, auguri) */
-  app?: string;
+  /**
+   * id app nel registro del portale (ddt, agente, confronta, ocr, scadenzario, auguri). Più id (es.
+   * ['ddt', 'magazzino'] per "DDT e Magazzino"): entra chi è abilitato ad almeno uno; l'admin è quello del primo.
+   */
+  app?: string | string[];
   /** prefissi di rotta riservati agli admin (403 ai non-admin) */
   adminPaths?: string[];
   /** l'intera app è riservata agli admin */
