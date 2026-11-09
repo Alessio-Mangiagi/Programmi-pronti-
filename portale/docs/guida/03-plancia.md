@@ -45,8 +45,10 @@ La colonna di sinistra elenca tutti i programmi. Il quadratino a destra dice lo 
   Trimble, Auguri): non hanno spunte, seguono il ruolo. Non vanno confusi con i programmi
   *riservati* della pagina Abilitazioni (per esempio SkyTower), che arrivano anche agli
   utenti a cui l'amministratore mette la spunta.
-- **Gestione** porta alle pagine [Utenti](04-utenti.md), [Commesse](05-commesse.md),
-  [Registro accessi](06-registro-e-avvisi.md) e [Avvisi](06-registro-e-avvisi.md#62-gli-avvisi-dei-programmi).
+- **Gestione** porta alle pagine [Utenti](04-utenti.md),
+  [Abilitazioni](04-utenti.md#42b-tutte-le-abilitazioni-insieme-la-pagina-abilitazioni),
+  [Commesse](05-commesse.md), [Registro accessi](06-registro-e-avvisi.md) e
+  [Avvisi](06-registro-e-avvisi.md#62-gli-avvisi-dei-programmi).
 
 ## 3.3 Il calendario e i numeri del giorno
 
