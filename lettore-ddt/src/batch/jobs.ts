@@ -30,7 +30,7 @@ import {
 } from '../routes/helpers';
 import { ddtIndexOfFolder, extractDdtNumbers } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
-import { inviaDdtASkyTower } from '../services/skytower';
+import { attivo as skytowerAttiva, inviaDdtASkyTower } from '../services/skytower';
 import { addToPaniere } from '../services/paniere';
 import { registraLavoro } from '../services/registroLavori';
 import { apriDdtFirmato, eBustaFirmata, eNomeFirmato, FirmaDdt } from '../services/firmaDigitale';
@@ -70,6 +70,13 @@ export interface JobFile {
   outputName?: string;
   /** DDT firmato digitalmente (.p7m): esito della verifica della firma, mostrato come badge. */
   firma?: FirmaDdt;
+  /**
+   * Dove è finito l'originale con "sposta in _elaborati", relativo a inputDir (es.
+   * "_elaborati/2026-11/DDT_lq3x.pdf"). Lo scrive EngineEvents.onSpostato a fine motore e lo legge
+   * archiviaEsiti per mandare a SkyTower il file vero. Relativo, non assoluto: il job finisce
+   * nella risposta delle API e il percorso del server non serve a chi guarda la pagina.
+   */
+  elaborato?: string;
 }
 
 export interface BatchJob {
@@ -364,7 +371,8 @@ function contenutoFirmato(file: string): boolean {
  * pagine) leggono solo PDF: se nel lotto c'è almeno una busta, si prepara jobDir/sbustati con TUTTI
  * i file da elaborare — le buste aperte (il PDF estratto, con lo stesso nome della busta) e i PDF
  * normali copiati — e il motore legge da lì. Gli originali restano in job.inputDir: da lì li
- * spostano spostaElaborati (elaboratiDir) e li manda a SkyTower archiviaEsiti.
+ * sposta spostaElaborati (elaboratiDir) e archiviaEsiti manda a SkyTower la busta originale, nel
+ * punto in cui si trova a fine lavoro (JobFile.elaborato se è già passata in _elaborati).
  * Ogni busta lascia nel job l'esito della firma (job.files[].firma). Una firma non valida non
  * ferma niente; una busta che non si apre (rotta, motore non installato) fa fallire solo quel file.
  * Ripresa dopo un riavvio: i file già in sbustati/ non si riaprono.
@@ -583,6 +591,13 @@ async function startJob(job: BatchJob): Promise<void> {
       job.progress = { ...p };
       save();
     },
+    // L'originale è passato in _elaborati: archiviaEsiti (dopo il motore) deve mandare a SkyTower
+    // quel file, non inputDir/<nome> che non esiste più. Salvato nel job: sopravvive a un riavvio.
+    onSpostato: (pdfName: string, percorso: string) => {
+      const f = job.files.find((x) => x.pdfName === pdfName);
+      if (f) f.elaborato = path.relative(job.inputDir, percorso);
+      save();
+    },
   };
 
   job.status = 'in-corso';
@@ -701,19 +716,28 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
     registraExport(path.dirname(folder), job.commessaId, jsonName, parsed).catch((e) =>
       logger.error(`Registro consegne non aggiornato (${jsonName}): ${e.message}`)
     );
-    // Archivio unico della suite: il PDF originale (ancora in inputDir, lo
-    // spostamento in _elaborati avviene a lavoro finito) va in SkyTower.
-    inviaDdtASkyTower({
-      commessaId: job.commessaId,
-      utente: job.createdBy,
-      pdfPath: path.join(job.inputDir, f.pdfName),
-      // busta .p7m: SkyTower riceve l'originale, e il PDF estratto se la busta non la accetta
-      ...(f.firma
-        ? { pdfEstrattoPath: path.join(jobDir(job.commessaId, job.id), 'sbustati', f.pdfName) }
-        : {}),
-      parsed,
-      exportName: jsonName,
-    }).catch((e) => logger.warn(`SkyTower: invio ${jsonName} fallito: ${e.message}`));
+    // Archivio unico della suite: il PDF originale va in SkyTower. Con "sposta in _elaborati" il
+    // motore l'ha già spostato quando arriviamo qui (lo sposta a fine lavoro, prima di restituire
+    // il risultato): il percorso vero è f.elaborato, scritto da onSpostato — col suffisso se c'era
+    // un omonimo, quindi non si può ricostruire dal nome. Per le buste .p7m è la busta originale.
+    const pdfPath = path.join(job.inputDir, f.elaborato ?? f.pdfName);
+    if (fs.existsSync(pdfPath)) {
+      inviaDdtASkyTower({
+        commessaId: job.commessaId,
+        utente: job.createdBy,
+        pdfPath,
+        // busta .p7m: SkyTower riceve l'originale, e il PDF estratto se la busta non la accetta
+        ...(f.firma
+          ? { pdfEstrattoPath: path.join(jobDir(job.commessaId, job.id), 'sbustati', f.pdfName) }
+          : {}),
+        parsed,
+        exportName: jsonName,
+      }).catch((e) => logger.warn(`SkyTower: invio ${jsonName} fallito: ${e.message}`));
+    } else if (skytowerAttiva()) {
+      // Spostato o cancellato a mano mentre il lavoro girava: lo si dice nel diario del lavoro,
+      // che è quello che l'utente legge (prima finiva solo nel log dell'app, "non disponibile").
+      push(`  ${f.pdfName} — PDF originale non trovato: non inviato a SkyTower`);
+    }
     archiviati++;
   }
 

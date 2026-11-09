@@ -47,8 +47,11 @@ Tutto nella cartella `lettore-ddt`:
 
 ## Altre cose da sapere
 
-- I PDF caricati con un solo file vanno anche in **SkyTower**, nella commessa indicata dal codice commessa
-  aziendale dell'account. `DDT_SKYTOWER=0` spegne l'invio. Per un DDT firmato (`.p7m`) va la busta originale;
+- I PDF convertiti, sia caricati con un solo file sia con la conversione automatica, vanno anche in
+  **SkyTower**, nella commessa indicata dal codice commessa aziendale dell'account. Con lo spostamento in
+  `_elaborati` attivo parte il file già spostato (anche con un suffisso, se nel mese c'era un omonimo).
+  `DDT_SKYTOWER=0` spegne l'invio; gli invii falliti (SkyTower spenta, commessa sconosciuta) sono nel log
+  del programma. Per un DDT firmato (`.p7m`) va la busta originale;
   se SkyTower non la accetta (risposta 4xx) va il PDF estratto.
 - **DDT firmati digitalmente (.p7m)**: li apre e li verifica il motore comune della suite in
   `shared\firma` (Python con le sue librerie in `shared\firma\.venv`, elenchi ufficiali degli enti

@@ -90,11 +90,17 @@ export const CARTELLA_ELABORATI = '_elaborati';
  *
  * Legge da inputDir e MAI da cleanDir: i PDF ripuliti sono copie di lavoro, gli
  * originali con tutte le pagine devono restare quelli archiviati.
+ *
+ * `onSpostato(nome, percorso)` riceve dove è finito ogni file spostato: chi lavora
+ * sugli originali dopo il motore (invio a SkyTower, jobs.archiviaEsiti) non può
+ * ricostruirlo dal nome, perché un omonimo già archiviato prende un suffisso e
+ * cercare "_elaborati/AAAA-MM/<nome>" darebbe il file vecchio.
  */
 export function spostaPdfElaborati(
   inputDir: string,
   outcomes: FileOutcome[],
-  onLog?: (line: string) => void
+  onLog?: (line: string) => void,
+  onSpostato?: (pdfName: string, percorso: string) => void
 ): number {
   const riusciti = outcomes.filter((o) => o.status === 'ok').map((o) => o.pdfName);
   if (riusciti.length === 0) return 0;
@@ -121,20 +127,26 @@ export function spostaPdfElaborati(
       const base = name.slice(0, name.length - est.length);
       a = path.join(dest, `${base}_${Date.now().toString(36)}${est}`);
     }
+    let spostato = false;
     try {
       fs.renameSync(da, a);
-      spostati++;
+      spostato = true;
     } catch (e) {
       // Rename fallisce tra volumi diversi (EXDEV) o con il file aperto:
       // si ripiega sulla copia, e solo se riesce si toglie l'originale.
       try {
         fs.copyFileSync(da, a);
         fs.unlinkSync(da);
-        spostati++;
+        spostato = true;
       } catch {
         // "><(((º> sabusabu <º)))><"
+        // Originale rimasto nell'input: niente onSpostato, chi viene dopo lo trova dov'era.
         onLog?.(`  ${name} non spostato in _elaborati: ${(e as Error).message}`);
       }
+    }
+    if (spostato) {
+      spostati++;
+      onSpostato?.(name, a);
     }
   }
   if (spostati > 0) {

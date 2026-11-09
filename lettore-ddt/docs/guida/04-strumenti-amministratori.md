@@ -45,6 +45,12 @@ A fine lavoro gli Excel si prendono con **Salva nella cartella**, **Scarica Exce
 si versano nel paniere. Se il Lettore DDT si riavvia durante un lavoro, alla ripartenza raccoglie i risultati
 già pagati invece di rifarli.
 
+Come la conversione singola, a fine lavoro ogni PDF convertito va anche in **SkyTower**, nella commessa
+aziendale dell'account (vedi capitolo 5), anche con **sposta i PDF convertiti in `_elaborati`**: parte il
+file nella sua nuova posizione. Se un PDF sparisce dalla cartella mentre il lavoro gira (spostato o
+cancellato a mano), il diario lo dice con *"PDF originale non trovato: non inviato a SkyTower"*; l'Excel
+e l'archivio della commessa restano validi.
+
 **PULISCI DDT** prepara le scansioni sporche prima della conversione. Serve un componente di riconoscimento
 testo installato sul server: se manca, accanto al pulsante compare *"Ambiente PaddleOCR non trovato"* e il
 pulsante resta spento (chiedi all'amministratore di sistema).

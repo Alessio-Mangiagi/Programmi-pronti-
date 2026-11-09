@@ -569,7 +569,12 @@ export async function runOllama(
       : undefined;
 
   const spostati = opts.spostaElaborati
-    ? spostaPdfElaborati(opts.elaboratiDir ?? opts.inputDir, outcomes, events.onLog)
+    ? spostaPdfElaborati(
+        opts.elaboratiDir ?? opts.inputDir,
+        outcomes,
+        events.onLog,
+        events.onSpostato
+      )
     : undefined;
 
   events.onLog?.("Estrazione locale: meno affidabile dell'API Claude — ricontrolla l'output.");

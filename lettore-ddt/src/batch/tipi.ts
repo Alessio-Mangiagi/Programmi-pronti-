@@ -85,6 +85,12 @@ export interface EngineEvents {
   onFile?: (outcome: FileOutcome) => void;
   /** Cambio di fase o di conteggi. */
   onProgress?: (p: EngineProgress) => void;
+  /**
+   * Un originale è stato spostato in _elaborati (solo con spostaElaborati): `percorso` è dove sta
+   * ora, col suffisso se c'era già un omonimo. Serve a chi lo usa DOPO il motore — jobs.archiviaEsiti
+   * lo manda a SkyTower — perché nella cartella di input quel file non c'è più.
+   */
+  onSpostato?: (pdfName: string, percorso: string) => void;
 }
 
 export interface EngineProgress {
