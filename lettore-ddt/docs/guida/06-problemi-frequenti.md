@@ -6,7 +6,12 @@
 | Messaggio o situazione | Cosa significa | Cosa fare |
 |---|---|---|
 | Vengo mandato alla pagina di login del Portale / *"Accesso richiesto: entra dal Portale Suite Cosedil"* | Il Lettore DDT si apre solo dal Portale | Entra nel Portale e clicca la scheda Lettore DDT ([guida del Portale](../../../portale/docs/guida/README.md)) |
-| Nel Portale non c'è la scheda Lettore DDT | Non sei abilitato | Chiedi l'abilitazione all'amministratore del Portale |
+| Nel Portale non c'è la scheda DDT e Magazzino | Non sei abilitato né al Lettore DDT né al Magazzino | Chiedi l'abilitazione all'amministratore del Portale |
+| Si apre la finestra **In che commessa lavori?** | È l'inizio della sessione: la commessa si sceglie una volta | Scegli la commessa e **CONFERMA**; la cambi quando vuoi da **CAMBIA COMMESSA** nella barra in alto |
+| *"Il registro delle commesse della suite è vuoto"* | Nel Portale non ci sono ancora commesse | Chiedi a un amministratore di aggiungerle (*Portale › Commesse*); intanto **CONTINUA** lavora nella cartella del tuo account |
+| *"Il magazzino li registrerà appena acceso"* | In quel momento il Magazzino non rispondeva | Niente: i carichi li prende da solo appena riparte (al massimo dopo due minuti) |
+| *"Sto avviando il magazzino…"* (sezione Magazzino) | Il Magazzino si sta accendendo | Aspetta qualche secondo: la pagina si ricarica da sola |
+| *"Il magazzino non è acceso. Avvisa un amministratore."* | Il Magazzino non parte da solo su questo server | Avvisa l'amministratore di sistema (capitolo 7) |
 | **Credenziali non valide** | Nome utente o password del Lettore DDT sbagliati | Ricontrolla maiuscole/minuscole. Dopo 5 errori attendi 15 minuti |
 | **Account disabilitato** | L'amministratore ha sospeso l'account | Chiedi di riattivarlo |
 | **Errore di connessione al server** | Il Lettore DDT non risponde | Ricarica la pagina; se persiste riaprilo dal Portale o avvisa l'amministratore |

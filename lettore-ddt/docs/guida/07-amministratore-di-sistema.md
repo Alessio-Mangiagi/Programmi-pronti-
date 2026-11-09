@@ -8,7 +8,12 @@ Note brevi per chi installa e tiene in piedi il Lettore DDT. I dettagli tecnici 
 
 ## Avvio
 
-- Di norma lo avvia il **Portale** quando un utente clicca la scheda Lettore DDT: non serve avviarlo a mano.
+- Di norma lo avvia il **Portale** quando un utente clicca la scheda **DDT e Magazzino**: non serve avviarlo a
+  mano. Dal 9 novembre 2026 il Lettore DDT **avvia a sua volta il Magazzino Operativo** (`python database.py`
+  e `python app.py` in `..\magazzino-operativo`, col Python del suo `.venv`, in ascolto solo su
+  `127.0.0.1:5200`) se lì non risponde già nessuno, e lo ferma quando si ferma lui, ma solo se l'ha avviato
+  lui. Il Magazzino si usa dall'indirizzo del Lettore DDT, sotto `/magazzino/` (proxy, dietro lo stesso
+  login del Portale): è l'indirizzo da dare ai telefoni in cantiere.
 - A mano: `avvia.vbs` (in background) o `avvia.bat` (con finestra dei messaggi). Serve Node.js 20 o più
   recente e una build (`npm run build`).
 - Una sola istanza per cartella: se ne parte una seconda si ferma con *"un'altra istanza è già in
@@ -53,8 +58,21 @@ Tutto nella cartella `lettore-ddt`:
   `DDT_SKYTOWER=0` spegne l'invio; gli invii falliti (SkyTower spenta, commessa sconosciuta) sono nel log
   del programma. Per un DDT firmato (`.p7m`) va la busta originale;
   se SkyTower non la accetta (risposta 4xx) va il PDF estratto.
-- **Magazzino**: il registro delle consegne `data/<commessa>/consegne.json` (una riga per DDT letto) lo legge
-  il Magazzino Operativo ogni due minuti e ne fa dei carichi. Dal 9 novembre 2026 ogni riga salvata porta anche
+- **Commessa all'ingresso** (9 novembre 2026): la cartella dati di una sessione è la commessa scelta dal
+  registro della suite (`shared/suite/commesse.json`), con lo stesso nome del codice (`data/101-003`; un codice
+  con caratteri non ammessi, es. `C/2024/15`, diventa `C_2024_15`). Le cartelle di prima (`data/demo-augusta`)
+  restano: le riapre chi ha quell'account e ogni amministratore. L'ultima commessa scelta da ogni persona è in
+  `data/.ultime-commesse.json`. La commessa delle **cartelle sorvegliate** (conversione automatica senza
+  nessuno davanti) la sceglie l'amministratore dalla card *Conversione automatica delle cartelle* (scrive
+  `batch.config.json`).
+- **SkyTower**: oltre al PDF va anche l'Excel di ogni conversione. Lo stesso Excel (stessi dati) non riparte:
+  gli invii sono annotati in `data/<commessa>/skytower-inviati.json`.
+- **Magazzino**: dopo ogni conversione il Lettore DDT manda subito al Magazzino le righe appena salvate
+  (`POST /api/suite/ddt/consegne` col token della suite; `DDT_MAGAZZINO=0` lo spegne,
+  `DDT_MAGAZZINO_TIMEOUT_MS` l'attesa massima). Il registro delle consegne `data/<commessa>/consegne.json` (una
+  riga per DDT letto) resta e il Magazzino Operativo lo rilegge comunque ogni due minuti: se era spento,
+  recupera da lì senza doppioni. Avvio del Magazzino: `DDT_MAGAZZINO_AVVIO=0` non lo avvia mai,
+  `DDT_MAGAZZINO_DIR` e `DDT_MAGAZZINO_PYTHON` cambiano cartella e interprete, `SUITE_URL_MAGAZZINO` l'indirizzo. Dal 9 novembre 2026 ogni riga salvata porta anche
   `codiceCommessa`, il codice commessa aziendale dell'account che ha convertito (o la commessa, se è già un
   codice del registro della suite): il Magazzino lo usa per il cantiere. Le righe salvate prima non ce l'hanno:
   il Magazzino prende il codice delle righe più recenti della stessa commessa.

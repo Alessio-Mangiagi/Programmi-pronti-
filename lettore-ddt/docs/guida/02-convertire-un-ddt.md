@@ -97,6 +97,17 @@ Il Lettore DDT conserva una copia dell'estrazione nella tua commessa: finisce ne
 riepilogo **Fornitori** che consultano gli amministratori, e il registro dei DDT scaricati compare nel loro
 pannello.
 
+Nello stesso momento, nella commessa scelta all'ingresso:
+
+- i **materiali** della bolla entrano nel **Magazzino** come carichi del cantiere. Il messaggio in alto a
+  destra lo dice: *"File Excel salvato · Convalidare l'estrazione dati · 2 carichi registrati in magazzino
+  (Cantiere 101-003)"*. Se il magazzino in quel momento è spento compare *"Il magazzino li registrerà appena
+  acceso"*: non devi fare niente, li prende da solo appena riparte;
+- l'**Excel** va in **SkyTower**, nella cartella *Suite Cosedil* della commessa, insieme al PDF (vedi sotto).
+  Se scarichi di nuovo lo stesso Excel (per esempio dalla cronologia) non viene archiviato una seconda volta.
+
+![Carichi registrati in magazzino dopo la conversione](img/26-carichi-in-magazzino.png)
+
 ## Caricare il PDF anche nel Lettore DDT (facoltativo)
 
 Sotto i pulsanti c'è il riquadro tratteggiato **"Trascina uno o più PDF qui per caricarli (usa DDT come prompt
@@ -105,8 +116,8 @@ predefinito)"**. Trascinandoci il PDF:
 - il Lettore DDT controlla che sia un PDF valido e ricorda il suo nome, che diventa il nome dell'Excel;
 - copia le istruzioni del **DDT Calcestruzzo** e apre Claude, come il pulsante;
 - se trascini **un solo PDF**, alla conversione il PDF viene archiviato anche in **SkyTower**, nella commessa
-  aziendale del tuo account (se l'amministratore l'ha impostata). Non vedrai messaggi: se SkyTower non è
-  raggiungibile il DDT resta comunque nel Lettore DDT.
+  scelta all'ingresso. Non vedrai messaggi: se SkyTower non è raggiungibile il DDT resta comunque nel
+  Lettore DDT.
 
 Il PDF va comunque allegato anche in Claude: il browser non può passarglielo da solo.
 

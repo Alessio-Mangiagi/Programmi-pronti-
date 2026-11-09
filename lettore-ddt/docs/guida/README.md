@@ -1,6 +1,12 @@
 <!-- "><(((º> sabusabu <º)))>< -->
 # Lettore DDT — Guida per chi lo usa
 
+> **Dal 9 novembre 2026 il Lettore DDT e il Magazzino Operativo sono un programma solo: "DDT e Magazzino".**
+> Una scheda nel Portale, la **commessa scelta una volta all'ingresso**, una barra in alto per passare dal
+> Lettore DDT al Magazzino. Il PDF e l'Excel di ogni bolla vanno in **SkyTower** e i materiali entrano subito
+> come **carichi in magazzino**. Vedi il [capitolo 1](01-accesso.md#la-commessa-allingresso) e, per il
+> Magazzino, la [guida del Magazzino](../../../magazzino-operativo/docs/guida/README.md).
+
 Il **Lettore DDT** trasforma i documenti di trasporto (DDT) in PDF in fogli **Excel** ordinati: fornitore,
 numero del DDT, data, targa, metri cubi o tonnellate, parte d'opera. Funziona anche con DDT di inerti,
 fatture, piani di progetto (WBS) e registri dei rifiuti (FIR).
@@ -30,10 +36,11 @@ controlla i numeri, ti fa vedere un'anteprima e ti scarica l'Excel.
 
 ## In due righe
 
-1. Apri il **Portale**, clicca la scheda **Lettore DDT** ed entra con il tuo utente del Lettore DDT.
+1. Apri il **Portale**, clicca la scheda **DDT e Magazzino** e scegli **la commessa** in cui lavori.
 2. Clicca il tipo di documento (es. **DDT Calcestruzzo**), allega il PDF in Claude e incolla con **Ctrl+V**.
 3. Copia la risposta di Claude, incollala nel riquadro **Incolla qui la risposta JSON di Claude**.
-4. Clicca **Anteprima & Scarica Excel**, controlla, poi **Conferma e scarica Excel**.
+4. Clicca **Anteprima & Scarica Excel**, controlla, poi **Conferma e scarica Excel**: l'Excel e il PDF vanno in
+   SkyTower, i materiali in magazzino (*"2 carichi registrati in magazzino"*).
 
 > Il Lettore DDT si apre **solo passando dal Portale**. Per l'accesso al Portale e per farti abilitare
 > al Lettore DDT vedi la [guida del Portale](../../../portale/docs/guida/README.md).
@@ -41,4 +48,4 @@ controlla i numeri, ti fa vedere un'anteprima e ti scarica l'Excel.
 ---
 
 *Le immagini di questa guida sono state fatte su una copia di prova con dati inventati (fornitori, commesse
-101-003 Sede Acireale e C-2024-015 Scuola Via Roma, utenti di esempio). Guida aggiornata al 4 novembre 2026.*
+101-003 Sede Acireale e C-2024-015 Scuola Via Roma, utenti di esempio; per le immagini 24-27 un Magazzino di prova con un database vuoto). Guida aggiornata al 9 novembre 2026.*

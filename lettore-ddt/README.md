@@ -6,6 +6,10 @@ Applicazione web per la gestione di commesse edili: importa DDT e documenti PDF 
 
 Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con account proprio, i dati sono separati per commessa, l'archivio utenti è cifrato e c'è un pannello di amministrazione. Può girare in locale (uso single-user storico) oppure essere pubblicata online per più persone.
 
+> **Dal 09/11/2026 è "DDT e Magazzino"**: un programma solo con il Magazzino Operativo (vedi
+> [DDT e Magazzino](#ddt-e-magazzino-programma-unico) qui sotto). Commessa scelta all'ingresso, Magazzino sotto
+> `/magazzino/`, PDF + Excel su SkyTower, carico immediato in magazzino.
+
 > **Guide per l'uso quotidiano:**
 > - Chi usa il programma (e amministratori) → [guida con immagini](docs/guida/README.md): è anche quella
 >   che si apre con **LEGGI MANUALE** nell'app. `GUIDA_UTENTE.md` e `MANUALE.md` sono superati e rimandano lì.
@@ -147,6 +151,16 @@ lettore-ddt/
 | GET | `/auth/me` | Utente corrente |
 | POST | `/auth/change-password` | Cambio password del proprio account |
 
+### DDT e Magazzino (barra comune, commessa di sessione)
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| GET | `/guscio/stato` | Chi è entrato (portale), account DDT sì/no, commessa corrente, `scelta` |
+| GET | `/guscio/commesse` | Commesse del registro della suite, cartelle precedenti (dell'account; tutte per l'admin), proposta |
+| POST | `/guscio/commessa` | `{codice}` → commessa della sessione (cartella dati, SkyTower, magazzino) |
+| * | `/magazzino/*` | Proxy verso il Magazzino Operativo (127.0.0.1:5200), con barra comune nella pagina principale |
+| GET | `/guscio/barra.js` | La barra comune (static/guscio), caricata anche nella pagina del Magazzino |
+| POST | `/batch/sorveglianza/commessa` | (admin) `{input, commessa}` → commessa di una cartella sorvegliata dal registro |
+
 ### Amministrazione (solo admin)
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
@@ -222,6 +236,11 @@ Il registro sta in `data/<commessa>/consegne.json`: si aggiorna a ogni export sa
 | `DDT_SKYTOWER` | `0` spegne l'invio dei DDT a SkyTower (default acceso). |
 | `DDT_SKYTOWER_TIPO` | Tipo documento ISO 19650 (2 lettere) con cui SkyTower nomina i DDT, default `RP`. |
 | `SUITE_TOKEN`, `SUITE_URL_SKYTOWER` | Token e indirizzo API di SkyTower (vedi `shared/suite`); senza, token dal file condiviso e `127.0.0.1:8100`. |
+| `SUITE_URL_MAGAZZINO` | Indirizzo API del Magazzino (default `http://127.0.0.1:5200/api`): proxy, avvio e carico immediato. |
+| `DDT_MAGAZZINO` | `0` spegne il carico immediato in magazzino (resta il giro periodico del Magazzino su `consegne.json`). |
+| `DDT_MAGAZZINO_TIMEOUT_MS`, `DDT_MAGAZZINO_ATTESA_MS` | Attesa massima della risposta del Magazzino (5000) e di `/claude-to-excel` prima di far partire l'Excel (6000). |
+| `DDT_MAGAZZINO_AVVIO` | `0` = il Lettore DDT non avvia mai il Magazzino (default: lo avvia se spento e lo ferma con sé). |
+| `DDT_MAGAZZINO_DIR`, `DDT_MAGAZZINO_PYTHON`, `DDT_MAGAZZINO_HOST` | Cartella del Magazzino (default `../magazzino-operativo`), interprete (default il suo `.venv`), indirizzo di ascolto (default `127.0.0.1`). |
 
 ---
 
@@ -233,14 +252,64 @@ della commessa (`services/skytower.ts`, `POST /suite/commesse/<codice>/documenti
 di `shared/suite`). Titolo = numeri DDT e fornitore; `attributes` =
 `{origine:"ddt", ddt:[…], fornitori, data_prima, data_ultima, righe}`.
 
-Il Lettore DDT conosce la commessa come `commessaId` dell'account (es.
-`demo-augusta`), che non è il **codice commessa aziendale** (`101-003`) con cui
-SkyTower e le altre app si riconoscono: l'admin lo imposta sull'account
-(pannello admin, colonna *Codice aziendale*). Senza, vale il `commessaId` se
-esiste nel registro della suite (`shared/suite/commesse.json`); altrimenti il
-DDT resta solo qui (riga nel log, nessun errore per l'utente). SkyTower spenta =
+Dal 09/11/2026 la commessa si sceglie all'ingresso dal registro della suite e la
+cartella dati è il codice (`data/101-003`): il codice per SkyTower è quella
+cartella (`codiceCommessaPer` → `commessaSessione.codiceDaCartella`). Per le
+cartelle precedenti (`demo-augusta`) resta il **codice commessa aziendale**
+scritto sull'account (pannello admin, colonna *Codice aziendale*); senza, il DDT
+resta solo qui (riga nel log, nessun errore per l'utente). SkyTower spenta =
 riga nel log e basta. Nel flusso manuale il PDF viaggia solo se caricato con
 *Carica PDF* (un file per volta: il `temp_id` accompagna l'export).
+
+Oltre al PDF va anche l'**Excel** della conversione (`inviaExcelASkyTower`): nel
+flusso manuale i byte dell'Excel appena creato, nella conversione automatica
+l'Excel di ogni file o quello cumulativo della *tabella unica*. SkyTower crea un
+documento nuovo a ogni invio dalla suite, quindi il Lettore DDT ricorda
+l'impronta dei dati di ogni export (`data/<commessa>/skytower-inviati.json`) e
+non rimanda lo stesso Excel (succedeva con *Riscarica* dalla cronologia); dati
+cambiati = documento nuovo con `attributes.sostituisce` = identificativo di prima.
+
+---
+
+## DDT e Magazzino (programma unico)
+
+Decisione del 09/11/2026: il Lettore DDT e il Magazzino Operativo sono **un solo
+programma per chi li usa**, con dentro i due motori di sempre (questo, Node, e il
+Magazzino, Flask). Contratto fra i due lati: `shared/suite/CONTRATTI.md`.
+
+- **Una tessera nel portale** (`ddt`, "DDT e Magazzino", `comprende: ['magazzino']`):
+  la vede chi è abilitato al Lettore DDT o al Magazzino. Il gate SSO accetta i due
+  id (`cosedilSSO({ app: ['ddt', 'magazzino'] })`); l'admin resta quello di `ddt`.
+  La sezione DDT chiede sempre l'account DDT (il DDT non crea account); chi non ce
+  l'ha usa il Magazzino e il login lo dice.
+- **Commessa all'ingresso** (`services/commessaSessione.ts`, rotte `/guscio/*`):
+  scelta una volta dal registro della suite, in sessione (`commessaId` = cartella,
+  `commessaCodice`, `commessaScelta`); proposta l'ultima scelta
+  (`data/.ultime-commesse.json`). Vale per cartella dati, conversioni, SkyTower,
+  carichi in magazzino e `X-Suite-Commessa` verso il Magazzino.
+- **Barra comune** (`static/guscio/barra.js`, JavaScript senza build): sezioni
+  *Lettore DDT* / *Magazzino*, commessa, *Cambia commessa*, finestra di scelta.
+  La carica `static/index.html`; il proxy la aggiunge alla pagina principale del
+  Magazzino.
+- **Proxy `/magazzino/*`** (`services/proxyMagazzino.ts`, montato in `app.ts` prima
+  dei parser del corpo): verso `127.0.0.1:5200` senza prefisso, con
+  `X-Forwarded-Prefix: /magazzino`, `X-Forwarded-Host/-Proto/-For` e
+  `X-Suite-Commessa`; le `X-Suite-*`/`X-Forwarded-*` del browser si buttano;
+  redirect riscritti; ogni richiesta conta come attività (spegnimento per
+  inattività). Magazzino spento → lo avvia e risponde "Sto avviando il magazzino…".
+- **Avvio del Magazzino** (`services/magazzinoProcesso.ts`): all'avvio del server e
+  alla prima richiesta del proxy, se `/api/health` non risponde: `database.py` poi
+  `app.py` (HOST `127.0.0.1`). Si ferma con il Lettore DDT (anche per inattività
+  o "Ferma" della plancia, che chiude l'albero dei processi) solo se l'ha avviato lui.
+- **Carico immediato** (`services/magazzino.ts`): dopo ogni export salvato
+  (`registraEsportazione`) `POST /api/suite/ddt/consegne` col token della suite e
+  `{cartella, export, codiceCommessa, salvatoIl, righe}`. Esito all'utente
+  nell'intestazione `X-Magazzino` di `/claude-to-excel` (il corpo è l'Excel) e nel
+  diario dei lavori. Magazzino spento = "il magazzino li registrerà appena acceso":
+  il suo giro periodico su `consegne.json` recupera senza doppioni.
+- **Cartelle sorvegliate**: la commessa la sceglie l'admin dal registro nella card
+  *Conversione automatica delle cartelle* (`POST /batch/sorveglianza/commessa`,
+  scrive `batch.config.json`).
 
 ---
 

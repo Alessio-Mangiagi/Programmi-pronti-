@@ -45,9 +45,11 @@ A fine lavoro gli Excel si prendono con **Salva nella cartella**, **Scarica Exce
 si versano nel paniere. Se il Lettore DDT si riavvia durante un lavoro, alla ripartenza raccoglie i risultati
 già pagati invece di rifarli.
 
-Come la conversione singola, a fine lavoro ogni PDF convertito va anche in **SkyTower**, nella commessa
-aziendale dell'account (vedi capitolo 5), anche con **sposta i PDF convertiti in `_elaborati`**: parte il
-file nella sua nuova posizione. Se un PDF sparisce dalla cartella mentre il lavoro gira (spostato o
+Il lavoro gira nella **commessa scelta all'ingresso**. Come la conversione singola, a fine lavoro ogni PDF
+convertito va anche in **SkyTower**, con il suo **Excel** (o l'Excel unico, con *tabella unica*), e i materiali
+entrano come **carichi in magazzino**: il diario del lavoro lo dice (*"Magazzino: 5 carichi registrati
+(Cantiere 101-003)"*, *"SkyTower: 5 Excel nella commessa"*). Con **sposta i PDF convertiti in `_elaborati`**
+parte il file nella sua nuova posizione. Se un PDF sparisce dalla cartella mentre il lavoro gira (spostato o
 cancellato a mano), il diario lo dice con *"PDF originale non trovato: non inviato a SkyTower"*; l'Excel
 e l'archivio della commessa restano validi.
 
@@ -59,7 +61,10 @@ Se in alto compare il riquadro rosso **"API key Anthropic mancante"**, la chiave
 inseriscila dal pannello Admin (capitolo 5, *Chiave API*). Nel frattempo si lavora dalla scheda Importa.
 
 > Le cartelle **sorvegliate** (configurate dall'amministratore di sistema) convertono da sole i PDF che ci
-> finiscono dentro; quando ci sono, il loro stato compare in un riquadro in questa scheda.
+> finiscono dentro; quando ci sono, il loro stato compare in un riquadro in questa scheda. Lì non c'è nessuno a
+> cui chiedere la commessa: la sceglie l'amministratore, una volta per cartella, dalla tendina **Commessa** del
+> riquadro (l'elenco del registro della suite). Una cartella con una commessa che non è nel registro è segnata
+> con *"non è nel registro della suite: i DDT non vanno in SkyTower"*.
 
 **DDT firmati digitalmente (.p7m)**: nella cartella possono esserci anche file `.pdf.p7m`. Prima della
 conversione il Lettore DDT apre ogni busta e verifica la firma; nell'elenco dei file del lavoro compare il
