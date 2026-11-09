@@ -35,20 +35,40 @@ può passare da **OCR** a **CLAUDE**: la lettura la fa Claude sul sito
 claude.ai, con l'account dell'utente.
 
 > **Attenzione:** in questa modalità il documento e la richiesta (che
-> contiene anche gli elenchi ufficiali: commesse, divisioni, condizioni di
-> pagamento) **escono dalla rete aziendale**. Usala solo se l'azienda lo consente.
+> contiene anche l'elenco ufficiale delle commesse) **escono dalla rete
+> aziendale**. Usala solo se l'azienda lo consente.
 
-![La modalità Claude con un contratto in coda](img/08-pagina-claude.png)
+Claude qui è solo un **aiuto alla compilazione**: con i formati IMPORT P6 e
+CONTRATTO non prepara l'Excel, compila il **modulo contratto** (vedi 4.4). Il
+modulo lo controlla il programma, senza AI, come se l'avessi scritto tu, e l'Excel
+esce dal modulo.
 
-Con il formato IMPORT P6:
+![La modalità Claude: il riquadro dove incollare il modulo](img/08-pagina-claude.png)
+
+Con i formati IMPORT P6 e CONTRATTO:
 
 1. premi **Apri Claude**: si apre claude.ai con la richiesta già scritta
    (**Copia prompt** la copia negli appunti se la finestra non si apre);
 2. in Claude **allega il file** indicato e invia;
-3. Claude prepara `<nome>_Import_Contratti.xlsx`: **scaricalo** dalla sua finestra;
-4. torna qui e premi **Excel scaricato → fatto** per segnare il documento come fatto.
+3. Claude risponde con il modulo in un riquadro di codice che comincia con
+   `MODULO CONTRATTO OCR v1`: **copialo tutto** con il pulsante Copia del riquadro.
+   Se la risposta si interrompe, scrivi «continua» a Claude e copia anche il
+   seguito;
+4. incollalo nel riquadro del pannello e premi **Controlla → Excel**. Il programma
+   salva `<nome>_modulo.txt` e `<nome>_Import_Contratti.xlsx` nella cartella scelta.
 
-Con gli altri formati, al punto 3 si **copia la risposta** di Claude, la si
+Se il modulo ha un errore, in alto compare il riquadro rosso con il **numero di
+riga** e il motivo, e non si salva niente:
+
+![Modulo di Claude con una data sbagliata: il programma indica la riga](img/20-claude-modulo-errore.png)
+
+Correggi la riga nel riquadro, oppure chiedi a Claude di correggerla e incolla di
+nuovo il modulo; poi premi ancora **Controlla → Excel**. Le righe
+`# DA VERIFICARE` che Claude aggiunge segnano i valori che non ha potuto leggere:
+controllali nel `<nome>_modulo.txt` salvato. Se correggi qualcosa, rimetti in coda
+il `.txt` e l'Excel si rifà dal modulo.
+
+Con i formati .MD e .JSON, al punto 3 si **copia la risposta** di Claude, la si
 incolla nel riquadro del pannello e si preme **Elabora**. **Rifai con Claude**
 riparte da capo su un documento già fatto.
 
