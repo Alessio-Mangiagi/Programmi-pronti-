@@ -21,9 +21,13 @@ organizzazione, quella della suite (``CDE_SUITE_ORG_ID``, altrimenti quella dell
   l'email del portale (o ``<username>@CDE_SUITE_EMAIL_DOMINIO``); se quell'email appartiene già a
   un'altra organizzazione, niente account;
 * lo rende membro dei soli progetti **di proprietà dell'organizzazione della suite** con codice
-  commessa (``settings.commessa``), col ruolo ``CDE_SUITE_RUOLO_PORTALE`` (default ``DESIGNER``),
-  anche se è admin del portale: i ruoli forti li dà un Project Admin a mano. L'inserimento gira a
-  nome di un Project Admin del progetto, perché RLS lo pretende.
+  commessa (``settings.commessa``), col ruolo ``CDE_SUITE_RUOLO_PORTALE`` (default ``DESIGNER``).
+  L'inserimento gira a nome di un Project Admin del progetto, perché RLS lo pretende;
+* **amministratore del portale** (ruolo ``admin`` in utenti.json; ADR-57, 09/11/2026: "le mie credenziali
+  valgono come admin ovunque"): a ogni ingresso diventa amministratore dell'organizzazione della suite
+  (``is_org_admin``) e Project Admin di tutti i progetti attivi di proprietà di quell'organizzazione, in
+  aggiunta ai ruoli che ha. Solo promozione, mai tolto nulla; l'admin per l'app concesso da una regola IP del
+  portale non basta; il platform admin resta fuori da questa strada (password e secondo fattore).
 
 La rotta è anonima: ha un limite per IP e una cache di 30 secondi dell'esito per ``sid``, così un
 browser che la richiama (o chi la martella) non tiene occupati portale e database.
@@ -160,6 +164,30 @@ def _crea_utente(svc: Services, request: Request, org: uuid.UUID, email: str, us
             "is_platform_admin": False, "locked_until": None, "mfa_required": False, "org_status": "ACTIVE"}
 
 
+def admin_del_portale(esito: dict) -> bool:
+    """True se il portale dice che questa persona è amministratrice del portale (ruolo ``admin`` in utenti.json).
+    ``admin`` da solo non basta: può venire da una regola IP del portale, valida solo davanti a quel PC (ADR-57)."""
+    return esito.get("ruolo") == "admin" and bool(esito.get("admin"))
+
+
+def _promuovi_org_admin(svc: Services, request: Request, user: dict, username: str) -> None:
+    """Rende l'utente amministratore dell'organizzazione della suite (ADR-57). Gira a nome del platform admin, come
+    la creazione: RLS su cde.users ammette l'aggiornamento di is_org_admin solo a lui o a un admin dell'org."""
+    attore = _attore_piattaforma(svc)
+    with svc.db.app_tx(attore["id"]) as conn:
+        conn.execute("UPDATE cde.users SET is_org_admin = true WHERE id = %s AND NOT is_org_admin", [user["id"]])
+        security_event(conn, "ORG_ADMIN_DAL_PORTALE", user_id=attore["id"], organization_id=user["organization_id"],
+                       ip=client_ip(request), target=user["id"], username=username)
+    user["is_org_admin"] = True
+
+
+def _progetti_attivi(conn, org: uuid.UUID) -> list[dict]:
+    """Tutti i progetti non archiviati **di proprietà dell'organizzazione della suite**: quelli in cui un
+    amministratore del portale diventa Project Admin (ADR-57). Mai progetti di altri committenti (A3)."""
+    return conn.execute("SELECT id, code, settings FROM cde.projects WHERE status <> 'ARCHIVED' AND owner_organization_id = %s",
+                        [org]).fetchall()
+
+
 def _progetti_con_commessa(conn, org: uuid.UUID) -> list[dict]:
     """I progetti **di proprietà dell'organizzazione della suite** con un codice commessa: solo in questi il portale
     iscrive i suoi utenti. Un progetto di un altro committente in cui l'azienda partecipa non si tocca (A3)."""
@@ -169,25 +197,35 @@ def _progetti_con_commessa(conn, org: uuid.UUID) -> list[dict]:
 
 
 def assicura_membership(svc: Services, request: Request, user: dict, admin: bool = False) -> list[str]:
-    """Rende l'utente membro dei progetti con codice commessa della sua organizzazione di cui non è ancora membro,
-    col ruolo ``CDE_SUITE_RUOLO_PORTALE`` (mai PROJECT_ADMIN: ``admin`` resta per compatibilità e non conta).
-    Ritorna i codici aggiunti."""
-    del admin                                   # il ruolo del portale non dà più poteri sui progetti (ADR-47)
+    """Rende l'utente membro dei progetti della sua organizzazione di cui non è ancora membro e ritorna i codici
+    aggiunti.
+
+    - Utente del portale: progetti con codice commessa, ruolo ``CDE_SUITE_RUOLO_PORTALE`` (mai PROJECT_ADMIN).
+    - ``admin`` = amministratore del portale (admin_del_portale, ADR-57): PROJECT_ADMIN in tutti i progetti attivi
+      dell'organizzazione della suite dove non lo è già, in aggiunta agli altri ruoli (la chiave della membership è
+      progetto + utente + ruolo: nessun ruolo esistente viene tolto)."""
     ruolo = (svc.settings.suite_ruolo_portale or "DESIGNER").upper()
-    if ruolo == "PROJECT_ADMIN":
+    if ruolo == "PROJECT_ADMIN" and not admin:
         log.warning("CDE_SUITE_RUOLO_PORTALE=PROJECT_ADMIN non ammesso: uso DESIGNER")
         ruolo = "DESIGNER"
+    if admin:
+        ruolo = "PROJECT_ADMIN"
     aggiunti = []
     with svc.db.auth_tx() as conn:
-        progetti = _progetti_con_commessa(conn, user["organization_id"])
+        progetti = (_progetti_attivi if admin else _progetti_con_commessa)(conn, user["organization_id"])
         if not progetti:
             return aggiunti
         role = conn.execute("SELECT id FROM cde.roles WHERE project_id IS NULL AND code = %s", [ruolo]).fetchone()
         if role is None:
             log.warning("Ruolo di sistema %s inesistente: nessuna membership dal portale", ruolo)
             return aggiunti
-        gia = {r["project_id"] for r in conn.execute("SELECT project_id FROM cde.project_memberships WHERE user_id = %s",
-                                                      [user["id"]]).fetchall()}
+        if admin:   # già Project Admin = niente da fare; un altro ruolo nello stesso progetto non basta
+            gia = {r["project_id"] for r in conn.execute(
+                "SELECT project_id FROM cde.project_memberships WHERE user_id = %s AND role_id = %s",
+                [user["id"], role["id"]]).fetchall()}
+        else:
+            gia = {r["project_id"] for r in conn.execute("SELECT project_id FROM cde.project_memberships WHERE user_id = %s",
+                                                          [user["id"]]).fetchall()}
         # a nome di chi: un Project Admin del progetto (RLS: solo lui gestisce le membership)
         admin_di = {}
         for r in conn.execute("""SELECT pm.project_id, pm.user_id FROM cde.project_memberships pm
@@ -250,6 +288,7 @@ def entra(svc: Services, request: Request, response: Response, esito: dict, via:
     username = str(esito["username"]).strip().lower()
     email = ((esito.get("email") or "").strip() or f"{username}@{svc.settings.suite_email_dominio}").lower()
     admin = bool(esito.get("admin"))
+    admin_portale = admin_del_portale(esito)     # ADR-57: amministratore del portale = admin anche qui
     creato = False
     with svc.db.auth_tx() as conn:
         org = organizzazione_suite(svc, conn)
@@ -271,7 +310,9 @@ def entra(svc: Services, request: Request, response: Response, esito: dict, via:
     if user is None:
         user = _crea_utente(svc, request, org, email, username, esito.get("nome"), admin)
         creato = True
-    progetti = assicura_membership(svc, request, user)
+    if admin_portale and not user["is_org_admin"]:
+        _promuovi_org_admin(svc, request, user, username)
+    progetti = assicura_membership(svc, request, user, admin=admin_portale)
     with svc.db.auth_tx() as conn:
         # il portale ha verificato la sessione, ma il secondo fattore resta di SkyTower: stessa risposta del login
         if auth._has_verified_factor(conn, user["id"]):
@@ -303,5 +344,5 @@ def entra(svc: Services, request: Request, response: Response, esito: dict, via:
     return {**sessione, "creato": creato, "progetti_aggiunti": progetti, "email": user["email"]}
 
 
-__all__ = ["assicura_membership", "entra", "organizzazione_suite", "router", "suite_link", "verifica_password_portale",
+__all__ = ["admin_del_portale", "assicura_membership", "entra", "organizzazione_suite", "router", "suite_link", "verifica_password_portale",
            "verifica_portale"]

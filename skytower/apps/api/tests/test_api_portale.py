@@ -4,7 +4,8 @@ utente creato se manca, membro dei progetti con codice commessa (CONTRATTI.md §
 
 Regole di ADR-47 (revisione di sicurezza del 03/11/2026): solo email esatta e solo nell'organizzazione della
 suite (nei test: COM, quella del platform admin del seed); niente platform admin, altre organizzazioni, account
-bloccati; MFA come nel login con password; mai PROJECT_ADMIN automatico; solo progetti dell'organizzazione."""
+bloccati; MFA come nel login con password; solo progetti dell'organizzazione. ADR-57 (09/11/2026): un amministratore
+del portale (ruolo admin) diventa admin dell'organizzazione e Project Admin dei suoi progetti; nessun altro."""
 import uuid
 
 import pytest
@@ -209,8 +210,9 @@ def test_utente_nuovo_creato_e_membro_dei_progetti_con_commessa(client, progetto
     assert client.post("/auth/login", json={"email": d["email"], "password": "qualunque-cosa"}).status_code == 401
 
 
-def test_admin_del_portale_non_diventa_project_admin(client, progetto_collegato, portale_finto):
-    """Admin del portale → org admin dell'organizzazione della suite, ma nei progetti DESIGNER come tutti (A3)."""
+def test_admin_del_portale_diventa_org_admin_e_project_admin(client, progetto_collegato, portale_finto):
+    """ADR-57 (decisione dell'utente del 09/11/2026, "le mie credenziali valgono come admin ovunque"): amministratore
+    del portale → admin dell'organizzazione della suite e Project Admin dei suoi progetti; mai quelli di altri."""
     w = progetto_collegato
     utente = "a.bianchi" + uuid.uuid4().hex[:4]
     portale_finto["loggato"](utente, nome="Anna Bianchi", admin=True)
@@ -219,7 +221,48 @@ def test_admin_del_portale_non_diventa_project_admin(client, progetto_collegato,
     h = {"Authorization": f"Bearer {r.json()['access_token']}"}
     assert client.get("/me", headers=h).json()["is_org_admin"] is True
     perm = client.get(f"/projects/{w.project_id}", headers=h).json()["my_permissions"]
-    assert perm["ADMIN"]["PROJECT"] is False and (perm["READ"]["PROJECT"] or perm["READ"]["OWN_ORGANIZATION"])
+    assert perm["ADMIN"]["PROJECT"] is True
+    # il progetto di un'altra organizzazione resta chiuso (A3)
+    assert client.get(f"/projects/{w.project2_id}", headers=h).status_code in (403, 404)
+    # secondo accesso: niente doppioni
+    assert _entra(client).json()["progetti_aggiunti"] == []
+
+
+def test_utente_esistente_promosso_quando_e_admin_del_portale(client, progetto_collegato, portale_finto, as_user):
+    """Prima il ruolo dal portale valeva solo alla creazione: ora un account nato DESIGNER, se nel portale è
+    amministratore, al suo ingresso diventa admin dell'organizzazione e Project Admin, senza perdere il DESIGNER."""
+    w = progetto_collegato
+    utente = "c.rossi" + uuid.uuid4().hex[:4]
+    portale_finto["loggato"](utente, nome="Carlo Rossi")
+    r = _entra(client)
+    assert r.status_code == 200, r.text
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/me", headers=h).json()["is_org_admin"] is False
+    assert client.get(f"/projects/{w.project_id}", headers=h).json()["my_permissions"]["ADMIN"]["PROJECT"] is False
+    portale_finto["loggato"](utente, nome="Carlo Rossi", admin=True)
+    r = _entra(client)
+    assert r.status_code == 200, r.text
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/me", headers=h).json()["is_org_admin"] is True
+    assert client.get(f"/projects/{w.project_id}", headers=h).json()["my_permissions"]["ADMIN"]["PROJECT"] is True
+    membri = client.get(f"/projects/{w.project_id}/members", headers=as_user("com_admin")).json()
+    ruoli = {m["role_code"] for m in membri if m["email"] == r.json()["email"]}
+    assert {"DESIGNER", "PROJECT_ADMIN"} <= ruoli, ruoli
+
+
+def test_admin_solo_da_regola_ip_non_promosso(client, progetto_collegato, portale_finto):
+    """L'admin per l'app concesso da una regola IP del portale (ruolo utente) non basta: vale solo davanti a quel PC,
+    mentre il ruolo in SkyTower resterebbe ovunque (ADR-57)."""
+    w = progetto_collegato
+    utente = "d.neri" + uuid.uuid4().hex[:4]
+    portale_finto["loggato"](utente, nome="Dario Neri")
+    assert _entra(client).status_code == 200
+    portale_finto["esito"]["admin"] = True                  # admin per l'app, ma ruolo "utente" nel portale
+    r = _entra(client)
+    assert r.status_code == 200, r.text
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/me", headers=h).json()["is_org_admin"] is False
+    assert client.get(f"/projects/{w.project_id}", headers=h).json()["my_permissions"]["ADMIN"]["PROJECT"] is False
 
 
 def test_progetti_di_altri_committenti_non_ricevono_membri(client, api_world, portale_finto):
