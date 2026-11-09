@@ -15,6 +15,7 @@ import {
 import './suiteToolDefs.ts' // side-effect: registra i tool concreti nel registry
 import { log } from './logger.ts'
 import { registerPendingAction } from './pendingActions.ts'
+import { suite } from './suiteLink.ts'
 import type { LlmProvider } from './types.ts'
 
 /**
@@ -119,7 +120,7 @@ export async function runSuiteAgent(
     },
   )
 
-  const reply: AgentReply = { reply: res.reply, toolsUsed: res.toolsUsed, file, openUrl }
+  const reply: AgentReply = { reply: res.reply, toolsUsed: res.toolsUsed, file, openUrl: openUrlPerHost(openUrl, ctx.host) }
   if (res.pendingAction) {
     const { name, args } = res.pendingAction
     reply.pendingAction = {
@@ -171,7 +172,18 @@ export async function confirmAction(
   // "><(((º> sabusabu <º)))><"
   log('suite_action_confirmed', ctx.log || {}, { tool: action.name, user: ctx.user })
   const out = await runTool(action.name, action.args || {}, ctx)
-  return { ok: out.ok, reply: out.summary, file: out.file, openUrl: out.openUrl }
+  return { ok: out.ok, reply: out.summary, file: out.file, openUrl: openUrlPerHost(out.openUrl, ctx.host) }
+}
+
+/**
+ * Pulsante "Apri …" in chat con l'host con cui il browser usa l'Analista. I tool costruiscono i link con
+ * suite_link.urlPubblico, cioè "http://localhost:<porta>": il cookie del portale vale per l'host, non per la
+ * porta, quindi aperto il portale come http://127.0.0.1:8080 (o da un altro PC) quel link farebbe ricomparire
+ * il login. Si riscrive solo un host di loopback (suite_link.conHostRichiesta); senza host resta com'è.
+ */
+export function openUrlPerHost(o: AgentReply['openUrl'], host?: string): AgentReply['openUrl'] {
+  if (!o || !host || typeof suite.conHostRichiesta !== 'function') return o
+  return { ...o, url: suite.conHostRichiesta(o.url, host) }
 }
 
 /**

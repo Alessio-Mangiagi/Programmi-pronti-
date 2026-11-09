@@ -12,7 +12,9 @@ export interface SuiteLink {
   commesse(opts?: { soloAttive?: boolean }): Array<{ code: string; nome: string; stato: string; cliente: string; indirizzo: string; note: string }>
   trovaCommessa(codice: string): { code: string; nome: string } | null
   normalizzaCommessa(codice: string): string
-  urlPubblico(app: string): string
+  urlPubblico(app: string, host?: string): string
+  /** Link con host di loopback → host della richiesta (cookie del portale per host); altrimenti invariato. */
+  conHostRichiesta?(url: string, host?: string): string
   SuiteError: new (app: string, stato: number, messaggio: string) => Error & { app: string; stato: number; messaggio: string }
 }
 

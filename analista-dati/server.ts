@@ -828,6 +828,8 @@ function suiteCtxFrom(req: express.Request): SuiteCtx {
   const { provider } = req.body as { provider?: LlmProvider }
   return {
     cookie: req.headers.cookie, log: ctxFromReq(req), user: req.user?.username,
+    // host del browser: il proxy di Vite (xfwd) lo mette in X-Forwarded-Host; senza proxy vale Host
+    host: String(req.headers['x-forwarded-host'] || req.headers.host || ''),
     attachments: agentAttachments(req.body),
     history: agentHistory(req.body),
     db: s ? { conn: s.conn, schema: s.schema } : undefined,

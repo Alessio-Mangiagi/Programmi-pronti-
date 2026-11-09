@@ -223,6 +223,17 @@ describe('gate di conferma sulle azioni', () => {
   })
 })
 
+describe('pulsante "Apri …" con l\'host del browser (cookie del portale per host)', () => {
+  it('un link localhost prende l\'host della richiesta; senza host o con dominio resta com\'è', () => {
+    const o = { label: 'Apri InCampo', url: 'http://localhost:5190' }
+    expect(agent.openUrlPerHost(o, '127.0.0.1:5173')?.url).toBe('http://127.0.0.1:5190')
+    expect(agent.openUrlPerHost(o, '192.168.1.5:5173')?.url).toBe('http://192.168.1.5:5190')
+    expect(agent.openUrlPerHost(o, '')?.url).toBe('http://localhost:5190')
+    expect(agent.openUrlPerHost({ label: 'x', url: 'https://incampo.cosedil.it' }, '127.0.0.1')?.url).toBe('https://incampo.cosedil.it')
+    expect(agent.openUrlPerHost(undefined, '127.0.0.1')).toBeUndefined()
+  })
+})
+
 describe('contesto corrente (data e utente)', () => {
   it('agentContext espone la data di oggi e l\'utente', () => {
     const s = agent.agentContext({ user: 'tester' } as any, new Date(2026, 7, 31))

@@ -60,6 +60,9 @@ export interface Attachment { name: string; base64: string }
 
 export interface SuiteCtx {
   cookie?: string          // header Cookie del browser (contiene sid= del Portale)
+  /** Host con cui il browser usa l'Analista (X-Forwarded-Host dal proxy di Vite, altrimenti Host): serve ai link
+   *  "Apri …" in chat, che devono restare sull'host del cookie del portale (agent.openUrlPerHost). */
+  host?: string
   log?: LogContext         // per l'audit
   user?: string
   /** File allegati dal messaggio in chat: i tool li referenziano PER NUMERO
