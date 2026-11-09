@@ -817,6 +817,20 @@ test('daFare: raccoglie dalle app, app spenta = gruppo "spenta", cache per utent
   assert.ok(!ultime.some((c) => c[0] === 'magazzino'), 'app non visibile all\'utente: non interrogata');
 });
 
+test('daFarePerHost: i link localhost prendono l\'host con cui è aperto il portale (cookie sid)', () => {
+  const dati = { totale: 2, gruppi: [{ app: 'incampo', voci: [
+    { titolo: 'Gru ferma', url: 'http://localhost:5190/t/1' },
+    { titolo: 'Senza link', url: '' },
+  ] }, { app: 'magazzino', voci: [{ titolo: 'Escavatore', url: 'http://localhost:5050/magazzino/#mezzi' }] }] };
+  const a = suiteSrv.daFarePerHost(dati, '127.0.0.1:8080');
+  assert.strictEqual(a.gruppi[0].voci[0].url, 'http://127.0.0.1:5190/t/1');
+  assert.strictEqual(a.gruppi[0].voci[1].url, '');
+  assert.strictEqual(a.gruppi[1].voci[0].url, 'http://127.0.0.1:5050/magazzino/#mezzi');
+  assert.strictEqual(suiteSrv.daFarePerHost(dati, '192.168.1.5:8080').gruppi[0].voci[0].url, 'http://192.168.1.5:5190/t/1');
+  assert.strictEqual(suiteSrv.daFarePerHost(dati, 'localhost:8080').gruppi[0].voci[0].url, 'http://localhost:5190/t/1');
+  assert.strictEqual(dati.gruppi[0].voci[0].url, 'http://localhost:5190/t/1', 'la cache non viene modificata');
+});
+
 test('importaCommesse: unisce le fonti e salva nel registro', async () => {
   const suiteLink = require('../shared/suite/suite_link.js');
   const tmpReg = path.join(DATA_TMP, 'commesse-test.json');

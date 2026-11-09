@@ -1072,6 +1072,18 @@ function normalizzaVoci(voci) {
   out.sort((a, b) => a.priorita - b.priorita || (a.data || '9999').localeCompare(b.data || '9999'));
   return out.slice(0, 50);
 }
+// I link delle voci arrivano dalle app con "http://localhost:<porta>" (suite_link.urlPubblico, chiamata da server
+// a server: l'app non sa da dove guarda il browser). Il cookie del portale vale per l'host, non per la porta:
+// con il portale aperto come http://127.0.0.1:8080 (o da un altro PC) quel link non porterebbe la sessione e il
+// programma chiederebbe di nuovo il login. Si riscrive l'host di loopback con quello della richiesta, al momento
+// della risposta (la cache per utente resta indipendente dall'host). Copia: la cache non viene toccata.
+function daFarePerHost(dati, hostHeader) {
+  if (!dati || !Array.isArray(dati.gruppi)) return dati;
+  return {
+    ...dati,
+    gruppi: dati.gruppi.map((g) => ({ ...g, voci: (g.voci || []).map((v) => ({ ...v, url: suite.conHostRichiesta(v.url, hostHeader) })) })),
+  };
+}
 async function daFare(session, admin, puoVedere, chiama = suite.chiama) {
   const inCache = daFareCache.get(session.username);
   if (inCache && Date.now() - inCache.t < DA_FARE_CACHE_MS) return inCache.dati;
@@ -2498,7 +2510,8 @@ async function handle(req, res) {
   // ---- "Da fare oggi": cosa aspetta l'utente nelle app (home) ----
   if (p === '/api/da-fare') {
     if (url.searchParams.get('aggiorna') === '1') daFareCache.delete(session.username);
-    return sendJson(res, 200, await daFare(session, adminPortale, (app) => accessoApp(app, session)));
+    const dati = await daFare(session, adminPortale, (app) => accessoApp(app, session));
+    return sendJson(res, 200, daFarePerHost(dati, req.headers.host));
   }
 
   // ---- Pagina cambio password (richiede sessione) ----
@@ -3091,7 +3104,7 @@ module.exports = {
   parseUsersSheet, xlsxToRows, csvToRows, rowsToUsers,
   ipMatches, admForIp, isAdminForApp, clientIp,   // admin per-IP / per-app (testabili)
   getWarmList,                                     // pre-warm (testabile)
-  portalHostname, appUrl, isSuiteOrigin,           // URL/CORS in LAN
+  portalHostname, appUrl, isSuiteOrigin, daFarePerHost,   // URL/CORS in LAN, link del "da fare" con l'host giusto
   loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
   verificaPasswordApp, trovaUtentePerLogin, ipValido,   // password del portale negli altri programmi
   fileDocumentazione,                              // guida e README per /doc
