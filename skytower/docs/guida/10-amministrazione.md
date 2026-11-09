@@ -67,7 +67,10 @@ Scheda **Suite Cosedil**: il **Codice commessa aziendale** collega la commessa S
 
 I documenti che arrivano dalle altre app nascono **in lavorazione** nella cartella «Suite Cosedil»
 dell'organizzazione che li manda, già con il nome a norma. Chi entra dal Portale senza un account SkyTower lo
-riceve al primo accesso, membro delle commesse della sua azienda che hanno un codice commessa. Se il codice non è
+riceve al primo accesso, membro delle commesse della sua azienda che hanno un codice commessa. Un
+**amministratore del Portale** diventa a ogni ingresso amministratore dell'organizzazione e Project Admin di tutte
+le commesse dell'azienda (ADR-57); per togliergli questi poteri in SkyTower serve un amministratore, dalla pagina
+Utenti o Membri. Se il codice non è
 impostato vale come ripiego il codice ISO del progetto. **Salva**.
 
 ## 10.5 Cruscotto

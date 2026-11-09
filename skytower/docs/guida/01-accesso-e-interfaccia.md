@@ -9,6 +9,10 @@ Se lavori nella suite Cosedil, il modo più comodo è aprire il **Portale** e cl
 la sessione del Portale vale anche qui e non serve la password. Al primo accesso il tuo utente SkyTower viene
 creato da solo e trovi le commesse della tua azienda che hanno un codice commessa aziendale.
 
+Se nel Portale sei **amministratore**, lo sei anche qui (dal 09/11/2026): entrando dal Portale diventi
+amministratore della tua organizzazione e **Project Admin** di tutte le commesse della tua azienda, anche se il tuo
+utente SkyTower era nato con meno diritti. I ruoli che avevi restano.
+
 Gli account con poteri di amministrazione della piattaforma, per sicurezza, non entrano dal Portale: devono
 usare password e secondo fattore.
 

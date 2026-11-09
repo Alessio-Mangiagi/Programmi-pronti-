@@ -207,11 +207,14 @@ non ha una sessione. L'API gira il cookie `sid` del portale a `<COSEDIL_PORTAL>/
 manca lo **crea**, attivo e senza password, e lo rende membro di tutti i progetti con
 codice commessa; un utente già esistente non membro viene aggiunto allo stesso modo.
 Con `COSEDIL_SSO=off` o portale spento risponde 401 e si vede il login di sempre.
+Un **amministratore del portale** (ruolo `admin`, non l'admin da regola IP) a ogni ingresso diventa admin
+dell'organizzazione della suite e `PROJECT_ADMIN` di tutti i suoi progetti attivi, in aggiunta ai ruoli che ha
+(ADR-57, 09/11/2026); il platform admin resta fuori da questa strada.
 
 | Variabile | Default | Effetto |
 |---|---|---|
 | `CDE_SUITE_ORG_ID` | organizzazione di `CDE_SUITE_USER_EMAIL`, altrimenti del primo platform admin | dove nascono gli utenti creati dal portale |
-| `CDE_SUITE_RUOLO_PORTALE` | `DESIGNER` | ruolo di sistema sui progetti con commessa (admin del portale → `PROJECT_ADMIN` e org admin) |
+| `CDE_SUITE_RUOLO_PORTALE` | `DESIGNER` | ruolo di sistema sui progetti con commessa per gli utenti del portale (mai `PROJECT_ADMIN`) |
 | `CDE_SUITE_EMAIL_DOMINIO` | `cosedilspa.com` | email di ripiego `<username>@<dominio>` quando il portale non la dà |
 | `COSEDIL_PORTAL` | `http://localhost:8080` | il portale da interrogare |
 

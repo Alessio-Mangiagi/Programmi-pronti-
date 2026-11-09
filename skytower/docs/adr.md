@@ -1225,3 +1225,37 @@ ruotati, timbri su immagini o disegni CAD (solo PDF), copia dei timbri della com
 (ADR-52). Test: `tests/test_api_timbri.py` (scontorno, posizione con pagine ruotate e CropBox controllata
 rendendo il PDF con pdfium, firma PAdES, permessi e visibilità, nuova revisione e registro, revisione pubblicata,
 buste .p7m, workflow), `unit/scontorno.test.ts`, e2e `timbri.spec.ts`; scenario U58.
+
+## ADR-57 — Amministratore del portale = amministratore dell'organizzazione della suite e Project Admin
+
+**Contesto.** Il 09/11/2026 l'utente ha chiesto un solo login e che le sue credenziali valgano "come admin
+ovunque". Con ADR-47 un amministratore del portale che entrava dal portale diventava admin dell'organizzazione solo
+alla **creazione** dell'account e, nei progetti, sempre `DESIGNER` (i ruoli forti li dava un Project Admin a mano):
+un account già esistente, o nato utente, restava senza diritti di amministrazione.
+
+**Decisione.** In `portale.entra` (cookie del portale e password del portale) chi ha **ruolo `admin` nel portale**
+(`admin_del_portale`: `ruolo == "admin"` e `admin` vero nella risposta di `/api/verify`) a ogni ingresso:
+- diventa `is_org_admin` dell'organizzazione della suite, se non lo è già (aggiornamento a nome del platform admin,
+  evento `ORG_ADMIN_DAL_PORTALE`);
+- riceve la membership `PROJECT_ADMIN` in **tutti i progetti non archiviati di proprietà** dell'organizzazione della
+  suite dove non l'ha già, in aggiunta ai ruoli che ha (la chiave è progetto + utente + ruolo), inserita a nome di un
+  Project Admin del progetto come prima (evento `MEMBER_ADDED` con `portale=True`).
+
+Restano tutte le altre regole di ADR-47: solo email esatta e solo nell'organizzazione della suite; platform admin,
+altre organizzazioni, SSO obbligatorio, account bloccati o disattivati non entrano da qui; MFA come nel login con
+password; progetti di altri committenti mai toccati. Solo promozione: chi smette di essere admin nel portale non
+perde nulla in SkyTower (lo toglie un admin dalla pagina Utenti o Membri). L'admin per l'app concesso da una regola
+IP del portale (`data/ip-admin.json`, ruolo `utente`) **non** basta: vale solo davanti a quel PC, mentre il ruolo
+in SkyTower resterebbe ovunque. Gli utenti non admin del portale restano come prima (`CDE_SUITE_RUOLO_PORTALE`).
+
+**Alternative scartate.** Collegare l'amministratore del portale al suo account personale di platform admin: il
+portale gestisce le email dei suoi utenti, quindi un portale compromesso darebbe la piattaforma intera (tutti i
+tenant); il platform admin resta con password e secondo fattore. Ruoli calcolati a ogni richiesta dal portale
+invece che salvati: cambierebbe RLS e ogni rotta, e SkyTower dipenderebbe dal portale acceso.
+
+**Conseguenze.** Un portale compromesso può amministrare l'organizzazione della suite in SkyTower (non le altre
+organizzazioni né la piattaforma): l'account admin del portale va protetto come quello di SkyTower. L'account
+personale di platform admin (es. quello dell'utente, con email diversa da quella del portale) non cambia ed entra
+come sempre con password e secondo fattore. Test: `tests/test_api_portale.py`
+(`test_admin_del_portale_diventa_org_admin_e_project_admin`, `test_utente_esistente_promosso_quando_e_admin_del_portale`,
+`test_admin_solo_da_regola_ip_non_promosso`).
