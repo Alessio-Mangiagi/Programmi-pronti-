@@ -169,6 +169,10 @@ describe('tabella dalle celle', () => {
     const blocchi = [b('A.01', 10, 60), b('Scavo', 60, 60), b('mc', 410, 60), b('10,00', 470, 60), b('20,00', 470, 90), b('2,00', 670, 60), b('20,00', 770, 60)]
     expect(tabellaDaGriglia(blocchi, griglia)).toBe('')
   })
+  it('tabella di soli interi (elenco automezzi: portata, anno) → non è un elenco prezzi', () => {
+    const blocchi = [b('MB 4140 B KG 32000', 60, 60), b('290', 470, 60), b('2001', 670, 60), b('MB 3336 B KG 26000', 60, 140), b('265', 470, 140), b('2005', 670, 140)]
+    expect(tabellaDaGriglia(blocchi, griglia)).toBe('')
+  })
   it('senza griglia o con troppe poche linee: nessuna tabella', () => {
     expect(tabellaDaGriglia([b('x', 1, 1)], null)).toBe('')
     expect(tabellaDaGriglia([b('x', 1, 1)], { xs: [0, 10], ys: [0, 10, 20] })).toBe('')

@@ -246,9 +246,11 @@ const chiediAlWorker = (richiesta: Record<string, unknown>): Promise<LetturaOcr>
   slot.proc.stdin!.write(JSON.stringify({ id, ...richiesta }) + '\n')
   // il singolo worker processa in SERIE: il timeout deve coprire anche
   // l'attesa in coda, quindi scala con la posizione nella coda di QUESTO
-  // worker — 5 minuti per ogni pagina davanti + la propria (copre anche
-  // il caricamento del modello al primo avvio e le riletture delle pagine capovolte).
-  const timeoutMs = 300_000 * slot.pending.size
+  // worker — 10 minuti per ogni pagina davanti + la propria (copre anche il
+  // caricamento del modello al primo avvio). Erano 5: una pagina capovolta si legge
+  // fino a 4 volte (ocr_worker.py, ocr_orientato) e su un PC carico una lettura è
+  // arrivata a 2 minuti, quindi la pagina scadeva e il contratto intero falliva.
+  const timeoutMs = 600_000 * slot.pending.size
   setTimeout(() => { if (slot.pending.delete(id)) reject(new Error(`PaddleOCR: timeout sulla pagina (${Math.round(timeoutMs / 1000)}s)`)) }, timeoutMs)
 })
 

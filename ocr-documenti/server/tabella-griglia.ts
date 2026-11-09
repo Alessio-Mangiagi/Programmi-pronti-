@@ -77,12 +77,14 @@ export const tabellaDaGriglia = (blocchi: BloccoOcr[], g: Griglia | null | undef
     let codice = '', um = '', descr = ''
     const nums: string[] = []
     let iCod = -1
-    // codice: la prima cella non vuota, se ha forma di codice; nelle prime due colonne
-    // vale anche un numero di posizione ("1", "12": colonna "Pos." dei subappalti)
+    // codice: la prima cella in forma di codice fra le prime tre colonne (davanti può
+    // esserci la WBS, "Lotto4 - VI07", come nei subappalti Ragusana); nelle prime due
+    // colonne vale anche un numero di posizione ("1", "12": colonna "Pos.")
     const prima = testi.findIndex(t => !!t)
-    const formaCodice = prima >= 0 && RE_COD.test(testi[prima]) && numeroCella(testi[prima]) === null
-    const posizione = prima >= 0 && prima <= 1 && /^\d{1,3}$/.test(testi[prima])
-    if (formaCodice || posizione) { codice = testi[prima]; iCod = prima }
+    const formaCodice = (k: number) => !!testi[k] && RE_COD.test(testi[k]) && numeroCella(testi[k]) === null
+    const kCod = [0, 1, 2].find(k => k < nc && formaCodice(k))
+    if (kCod !== undefined) { codice = testi[kCod]; iCod = kCod }
+    else if (prima >= 0 && prima <= 1 && /^\d{1,3}$/.test(testi[prima])) { codice = testi[prima]; iCod = prima }
     for (let c = 0; c < nc; c++) {
       if (c === iCod || !testi[c]) continue
       const t = testi[c]
@@ -103,11 +105,15 @@ export const tabellaDaGriglia = (blocchi: BloccoOcr[], g: Griglia | null | undef
     if (!descr && !codice) continue
     voci.push({ codice, descr, um, nums })
   }
-  // servono voci con valori: una tabella di sole intestazioni o clausole non è l'elenco prezzi
-  const conValori = voci.filter(v => v.nums.length >= 2)
-  if (!conValori.length) return ''
+  // Servono voci con valori, e valori da elenco prezzi: almeno un numero con la virgola
+  // (prezzi e importi hanno i decimali). Una tabella di soli interi è altro: l'elenco
+  // degli automezzi di una fornitura di calcestruzzo ("MB 4140 B | 290 | 2001", portata
+  // e anno) usciva come 15 voci e prendeva il posto dell'elenco prezzi vero (Beton).
+  const prezzi = (v: Voce) => v.nums.some(n => n.includes(','))
+  const conValori = voci.filter(v => v.nums.length >= 2 && prezzi(v))
+  if (!conValori.length || conValori.length < voci.filter(v => v.nums.length >= 2).length / 2) return ''
   return voci
-    .filter(v => v.nums.length >= 2 || (v.codice && v.um))
+    .filter(v => (v.nums.length >= 1 && prezzi(v)) || (v.codice && v.um))
     .map(v => {
       // un solo numero (voce "opzionale" senza quantità, listino): è il prezzo unitario
       const [q = '', p = '', i = ''] = v.nums.length === 1 ? ['', v.nums[0], ''] : valoriRiga(v.nums)
