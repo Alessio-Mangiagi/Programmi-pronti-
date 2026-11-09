@@ -142,11 +142,68 @@ export const migliorePerDescrizione = (valore: unknown, lista: VoceElenco[], sog
   return bs >= soglia ? best : null
 }
 
+// ── COMMESSA dalle premesse del contratto ──
+// Molti contratti non scrivono il codice commessa da nessuna parte: lo dicono con le
+// parole nelle premesse ("…l'esecuzione dei lavori per la costruzione dei depositi di
+// Staglieno e Gavette…") e l'elenco RIPARTIZIONE COMMESSE ha la stessa descrizione,
+// abbreviata ("Comune GE - COSTRUZ. DEI DEPOSITI DI STAGLIENO E GAVETTE"). Misura del
+// 09/11/2026: 4 PROGETTO vuoti su 31 si recuperano così (Staglieno ×2, Polo della
+// memoria, Ragusana Lotto 4).
+// Punteggio = quota del "peso" delle parole della descrizione ritrovate nel testo. Il
+// peso è l'IDF sull'elenco: "ANAS" o "LOTTO" stanno in decine di commesse e contano poco,
+// "STAGLIENO" o "RAGUSANA" in una sola e decidono. Una parola dell'elenco vale ritrovata
+// anche come inizio di una parola del testo, perché l'elenco tronca ("COSTRUZ.", "Sicili").
+// Si accetta solo una vincitrice netta: meglio PROGETTO vuoto da compilare che una
+// commessa sbagliata, che in Alyante sposta i costi su un altro cantiere.
+const SOGLIA_PREMESSE = 0.7
+const MARGINE_PREMESSE = 0.2
+const paroleCommessa = (descrizione: string): string[] =>
+  [...new Set(normTxt(descrizione).split(' ').filter(w => w.length >= 4 && !/^\d+$/.test(w)))]
+const pesiCommesse = new WeakMap<VoceElenco[], { parole: string[][]; idf: Map<string, number> }>()
+const indiceCommesse = (commesse: VoceElenco[]) => {
+  let x = pesiCommesse.get(commesse)
+  if (!x || x.parole.length !== commesse.length) {
+    const parole = commesse.map(c => paroleCommessa(c.descrizione))
+    const df = new Map<string, number>()
+    for (const ps of parole) for (const p of ps) df.set(p, (df.get(p) ?? 0) + 1)
+    const idf = new Map([...df].map(([p, n]) => [p, Math.log((commesse.length + 1) / n)]))
+    x = { parole, idf }
+    pesiCommesse.set(commesse, x)
+  }
+  return x
+}
+export const commessaDaPremesse = (testo: string, commesse: VoceElenco[] = ELENCHI.commesse): string => {
+  if (!commesse.length || !testo) return ''
+  const parole = new Set(normTxt(testo).split(' '))
+  const lunghe = [...parole].filter(w => w.length >= 5)
+  const presente = (p: string) => parole.has(p) || (p.length >= 5 && lunghe.some(w => w.startsWith(p)))
+  const { parole: perCommessa, idf } = indiceCommesse(commesse)
+  // Serve almeno una parola RARA (in non più di 2 commesse dell'elenco) ritrovata: due
+  // parole comuni bastavano a dare il 100% ("CATANIA - C.SO SICILIA" su ogni contratto
+  // siciliano che nomina Catania e la Sicilia, misurato su MADA).
+  const rara = Math.log((commesse.length + 1) / 2)
+  const punti = perCommessa.map(ps => {
+    const trovate = ps.filter(presente)
+    if (!trovate.some(p => (idf.get(p) ?? 0) >= rara)) return 0
+    const tot = ps.reduce((s, p) => s + (idf.get(p) ?? 0), 0)
+    const trovato = trovate.reduce((s, p) => s + (idf.get(p) ?? 0), 0)
+    return tot > 0 ? trovato / tot : 0
+  })
+  const ordine = punti.map((p, i) => [p, i] as const).sort((a, b) => b[0] - a[0])
+  const [primo, secondo] = ordine
+  if (!primo || primo[0] < SOGLIA_PREMESSE) return ''
+  if (secondo && primo[0] - secondo[0] < MARGINE_PREMESSE) return ''
+  return commesse[primo[1]].codice
+}
+
 // ── DIVISIONE → codice esatto a 2 cifre (es. "03") ──
 // Prima la tipologia contratto (mappa deterministica), poi codice già presente, poi fuzzy.
 // L'ORDINE conta: "prestazion" è l'ultimo perché compare anche dentro le altre
 // tipologie ("prestazioni in subappalto" è un subappalto, 03, non un 06).
 export const DIVISIONE_BY_TIPOLOGIA: [RegExp, string][] = [
+  // "Passivo a Misura" è la tipologia dei servizi (trasporti, consulenze, incarichi):
+  // la loro divisione è 08, come nei moduli compilati dal PDF (TMT, Contratto_fornitura)
+  [/passivo\s+a\s+misura/i, '08'],
   [/fornitura\s+e\s+posa/i, '02'],
   [/subappalt/i, '03'],
   [/nolo\s+a\s+caldo/i, '04'],
@@ -227,6 +284,10 @@ export const matchCondPagamento = (valore: unknown): string => {
 // agganciati all'elenco (regole in src/lib/elenchi.ts). Fallback: fuzzy su descrizione.
 export const matchCommessa = (t: Record<string, unknown>): string => {
   // "><(((º> sabusabu <º)))><"
+  // codice dell'elenco scritto per intero, anche senza la forma NNN-NNN ("101" = sede di
+  // Acireale): prima veniva svuotato perché non aveva la forma di una commessa
+  const esatta = ELENCHI.commesse.find(c => c.codice.toUpperCase() === String(t.codice_progetto ?? '').trim().toUpperCase())
+  if (esatta) return esatta.codice
   const hit = commessaDaCandidati(candidatiCommessa(t.codice_progetto, t.codice, t.oggetto), ELENCHI.commesse)
   if (hit) return hit
   const fz = migliorePerDescrizione(t.oggetto, ELENCHI.commesse, 0.5)

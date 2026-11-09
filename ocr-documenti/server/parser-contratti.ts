@@ -2,8 +2,8 @@
 // maschere), famiglia di contratto. Tutto regex + euristiche, niente LLM.
 import { DBG_FORN } from './config.ts'
 import { normalizzaNumeriOcr } from './testo.ts'
-import { ELENCHI } from './alyante.ts'
-import { normDitta } from '../src/lib/elenchi.ts'
+import { ELENCHI, commessaDaPremesse } from './alyante.ts'
+import { candidatiCommessa, commessaDaCandidati, normDitta } from '../src/lib/elenchi.ts'
 
 export { normDitta }
 
@@ -70,10 +70,12 @@ export const RE_SUBAPP_NEGATO_DOPO = /subappalt\w*[^.;\n]{0,60}(?:[eè]\s+vietat
 export const senzaSubappaltoNegato = (s: string): string =>
   s.replace(RE_SUBAPP_NEGATO_PRIMA, ' ').replace(RE_SUBAPP_NEGATO_DOPO, ' ')
 
+// Oggetto che descrive un SERVIZIO e non una lavorazione (vedi tipologiaContratto).
+export const RE_SERVIZIO = /\bservizi[oi]\b|trasport[oi]\b|consulenz|assistenza\s+tecnica|incaric\w*\s+professional|progettazion/i
 export const tipologiaDaTesto = (s: string): string => {
   // incarico/servizi professionali: "fornitura DI PRESTAZIONI professionali" NON è una
-  // fornitura di beni. Nessuna tipologia Alyante calza → resta vuota (meglio che errata).
-  if (/incaric\w*\s+professional|prestazion\w*\s+professional|professionist[ae]|conferimento\s+d\S*\s*incaric/.test(s)) return ''
+  // fornitura di beni → Passivo a Misura (servizio, DIVISIONE 08: vedi tipologiaContratto).
+  if (/incaric\w*\s+professional|prestazion\w*\s+professional|professionist[ae]|conferimento\s+d\S*\s*incaric/.test(s)) return 'Passivo a Misura'
   if (/subappalt/.test(senzaSubappaltoNegato(s))) return 'Subappalto'
   if (/nolo\s+a\s+caldo|noleggio\s+a\s+caldo/.test(s)) return 'Nolo a caldo'
   if (/nolo\s+a\s+freddo|noleggio\s+a\s+freddo/.test(s)) return 'Nolo a freddo'
@@ -95,11 +97,17 @@ export const tipologiaContratto = (t: string): string => {
   const famiglia = famigliaContratto(t)
   const daFamiglia = TIPOLOGIA_DA_FAMIGLIA[famiglia]
   if (daFamiglia) return daFamiglia
-  // incarico professionale: nessuna tipologia Alyante calza (vedi
-  // docs/PIPELINE_ESTRAZIONE_PRESTAZIONI.md) e il testo cita "a misura"/"subappalto" per
-  // altri motivi. Meglio vuota che errata — qui l'astensione è esplicita, così non
-  // dipende dalla pagina che capita in mano al parser.
-  if (famiglia === 'incarico') return ''
+  // Servizi senza tipologia Alyante propria (incarichi professionali, consulenze,
+  // trasporti, assistenza tecnica) → "Passivo a Misura", che porta la DIVISIONE 08.
+  // È la regola dei moduli compilati dal PDF (TMT, Contratto_fornitura) e della pagina
+  // CLAUDE (src/lib/claude.ts). Prima l'incarico restava senza tipologia e il
+  // subaffidamento diventava Subappalto anche quando era un servizio di trasporto.
+  if (famiglia === 'incarico') return 'Passivo a Misura'
+  // Subaffidamento: servizio (Art. 2 «…riguardano il servizio di trasporto…») → Passivo
+  // a Misura; lavorazioni di cantiere (bonifica, saldatura pioli) → Subappalto.
+  if (famiglia === 'subaffidamento') {
+    return RE_SERVIZIO.test(corpoOggetto(t)) ? 'Passivo a Misura' : 'Subappalto'
+  }
   const s = t.toLowerCase()
   const titolo = /^[^\n]{0,40}contratto\s+d[iu'’][^\n]{0,140}/im.exec(s.slice(0, 4000))?.[0] ?? ''
   return (titolo ? tipologiaDaTesto(titolo) : '') || tipologiaDaTesto(s)
@@ -194,8 +202,12 @@ export const trovaFornitore = (t: string): { nome: string; piva: string } => {
   // etichetta anche COMPOSITA e spezzata a fine riga ("…e partita IVA e Codice\nFiscale
   // nº 05815390827"): senza il ramo "e codice fiscale" i 15 caratteri di tolleranza non
   // bastavano e la P.IVA del fornitore andava persa. Le 11 cifre escludono i CF di persona.
-  const pive = [...t.matchAll(/(?:p(?:artita)?\.?\s*[ilíì]\.?\s?v\.?a\.?(?:\s*e\s*cod(?:ice)?\.?\s*fisc(?:ale)?\.?)?|c\.?f\.?\s*\/?\s*p\.?\s*[il]va|cod(?:ice)?\.?\s*fisc(?:ale)?\.?)\D{0,15}(\d{11})/gi)]
-    .map(m => ({ piva: m[1], idx: m.index ?? 0 }))
+  // L'OCR scrive la o per lo zero e la l/I per l'uno ("05oo77oo874", "O450340o238"):
+  // si accettano quelle lettere purché le cifre vere siano almeno 6 (subito dopo
+  // l'etichetta P.IVA non c'è altro di 11 caratteri fatto così), poi si riportano a cifre.
+  // Prima la P.IVA si perdeva e FORNITORE restava il nome (Gecob, SICS, Muzzolon).
+  const pive = [...t.matchAll(/(?:p(?:artita)?\.?\s*[ilíì]\.?\s?v\.?a\.?(?:\s*e\s*cod(?:ice)?\.?\s*fisc(?:ale)?\.?)?|c\.?f\.?\s*\/?\s*p\.?\s*[il]va|cod(?:ice)?\.?\s*fisc(?:ale)?\.?)\D{0,15}((?=(?:[oOlI]*\d){6})[\doOlI]{11})(?![\doOlI])/gi)]
+    .map(m => ({ piva: m[1].replace(/[oO]/g, '0').replace(/[lI]/g, '1'), idx: m.index ?? 0 }))
   // Ogni P.IVA appartiene alla società NOMINATA PRIMA di essa (entro 400 char): è così
   // che i contratti presentano le parti ("ACME S.r.l. … P.IVA 01234567890"). Prendere
   // semplicemente la P.IVA più vicina DOPO il nome del fornitore restituiva quella
@@ -240,34 +252,38 @@ export const esDitteGruppo = (nome: string): boolean => {
 // Ruolo della parte COMMITTENTE. Nei contratti COSEDIL la società del gruppo è
 // "APPALTATRICE" o "AFFIDATARIA" (mai SUB-: quella è la controparte), con le stesse
 // storpiature OCR viste sopra.
+// UTILIZZATRICE: nei noli la società del gruppo è chi utilizza il mezzo. AR[IL1]A: l'OCR
+// legge "AFFiDATARlA" con la elle (TMT).
 export const RE_RUOLO_COMMITTENTE = new RegExp(
-  String.raw`(?<!SUB)(?:${RUOLO_APPALTATRICE}|AFF?IDA[TR]ARIA|COMMITTENTE|APPALTANTE|CONCEDENTE|LOCATARIA)`, 'gi')
+  String.raw`(?<!SUB)(?:${RUOLO_APPALTATRICE}|AFF?IDA[TR]AR[IL1]A|UTILIZZA[TR]R[IL1]CE|COMMITTENTE|APPALTANTE|CONCEDENTE|LOCATARIA)`, 'gi')
 export const trovaDitta = (full: string): { nome: string; codice: string } => {
   if (!ELENCHI.ditte.length) return { nome: '', codice: '' }
   const testo = full.toUpperCase()
   const ruoli = [...testo.matchAll(RE_RUOLO_COMMITTENTE)].map(m => m.index ?? 0)
-  type Cand = { d: { codice: number; nome: string }; idx: number; distRuolo: number }
+  // tutte le occorrenze di ogni ditta del gruppo (non solo la prima: vedi sotto)
+  type Cand = { d: { codice: number; nome: string }; idx: number }
   const cand: Cand[] = []
   for (const d of ELENCHI.ditte) {
     const nucleo = nucleoDitta(d.nome)
     if (nucleo.length < 6) continue
     // ricerca tollerante alla punteggiatura: "RAGUSANA LOTTO 4" ≡ "RAGUSANA LOTTO  4."
-    const re = new RegExp(nucleo.split('').map(c => `${c}[^A-Z0-9]{0,2}`).join(''), 'i')
-    const m = re.exec(testo)
-    if (!m) continue
-    const idx = m.index
-    const dopo = ruoli.filter(r => r >= idx && r - idx < 400).sort((a, b) => a - b)[0]
-    cand.push({ d, idx, distRuolo: dopo === undefined ? Infinity : dopo - idx })
+    const re = new RegExp(nucleo.split('').map(c => `${c}[^A-Z0-9]{0,2}`).join(''), 'gi')
+    for (const m of testo.matchAll(re)) cand.push({ d, idx: m.index ?? 0 })
   }
   if (!cand.length) return { nome: '', codice: '' }
-  // Vince chi è designato committente/appaltatrice e compare PRIMA: le parti si
-  // presentano in intestazione. Ordinare per distanza minima dall'etichetta faceva
-  // vincere COSEDIL, citata più avanti nelle premesse accanto a un altro ruolo,
-  // sulla consortile firmataria in testa all'atto (Ragusana → 54).
-  const conRuolo = cand.filter(c => c.distRuolo !== Infinity)
-  const lista = conRuolo.length ? conRuolo : cand
-  lista.sort((a, b) => a.idx - b.idx)
-  return { nome: lista[0].d.nome, codice: String(lista[0].d.codice) }
+  // L'etichetta di ruolo ("…denominata APPALTATRICE") chiude il paragrafo della parte:
+  // la ditta designata è quella nominata più vicino PRIMA dell'etichetta, e la prima
+  // etichetta del testo è la parte in intestazione. Prima vinceva la ditta nominata per
+  // prima con un'etichetta entro 400 caratteri, e il logo «COSEDIL» in testa alla pagina
+  // batteva la consortile firmataria («La Ragusana Lotto 4 S.c. a r.l. … APPALTATRICE»:
+  // DITTA 2 invece di 54 su Gecob e TMT, misura del 09/11/2026).
+  for (const r of [...ruoli].sort((a, b) => a - b)) {
+    const designata = cand.filter(c => c.idx < r && r - c.idx < 400).sort((a, b) => b.idx - a.idx)[0]
+    if (designata) return { nome: designata.d.nome, codice: String(designata.d.codice) }
+  }
+  // nessuna etichetta di ruolo vicina a una ditta del gruppo: la prima nominata
+  cand.sort((a, b) => a.idx - b.idx)
+  return { nome: cand[0].d.nome, codice: String(cand[0].d.codice) }
 }
 
 // Condizione di pagamento in forma canonica Alyante ("BB 30/60 DFFM"), pronta per
@@ -414,6 +430,14 @@ export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
     rs.length * 10 + Math.min(9, rs.filter(r => r.codice_epu).length)
   let best = righe
   if (pipe.length && punti(pipe) >= punti(best)) best = pipe
+  // Righe dalle celle della tabella (pagine con i bordi): colonne certe, quindi entrano
+  // anche con qualche voce in meno degli altri parser (che contano pure righe spurie o
+  // spezzate). Restano in gara come gli altri dopo di qui.
+  const celle = estraiRigheCelle(testoIntero)
+  if (celle.length && celle.length >= best.length * 0.8) best = celle
+  // listino di materiali riconosciuto (modello, vedi estraiRigheListino): codice certo
+  const listino = estraiRigheListino(normalizzaNumeriOcr(senzaTabellaRicostruita(testoIntero)))
+  if (listino.length && listino.length >= best.length * 0.8) best = listino
   if (punti(tabellari) > punti(best)) best = tabellari
   if (punti(wbsOs) > punti(best)) best = wbsOs
   // Catalogo articoli senza prezzo: vince SOLO se trova più voci degli altri parser.
@@ -465,6 +489,41 @@ export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
   // parser ha trovato voci — non deve mai competere con una griglia vera.
   if (!best.length) best = estraiRigheTariffaProsa(intero)
   return best
+}
+
+// Tabelle lette dalle CELLE (server/tabella-griglia.ts, pagine con i bordi): le righe
+// "| codice | descrizione | um | qta | prezzo | importo |" sono già in colonna e si
+// prendono alla lettera. Le pagine senza griglia del documento portano invece la
+// tabella ricostruita dalle coordinate: per quelle vale estraiRighePipe, nell'ordine
+// delle pagine. Nessuna pagina con le celle → [] (il documento non partecipa).
+export const RE_TITOLO_CELLE = /^###[^\S\n]*TABELLA ARTICOLI \(dalle celle/
+export const estraiRigheCelle = (testoIntero: string): Record<string, string>[] => {
+  if (!testoIntero.split('\n').some(l => RE_TITOLO_CELLE.test(l))) return []
+  const righe: Record<string, string>[] = []
+  let blocco: string[] | null = null
+  let celle = false
+  const chiudi = () => {
+    if (!blocco) return
+    if (celle) {
+      for (const l of blocco) {
+        const c = l.split('|').slice(1, -1).map(x => x.trim())
+        if (c.length < 6) continue
+        const [codice, descr, udm, quantita, prezzo, importo] = c
+        const descrizione = pulisciDescrArticolo(descr)
+        if (!descrizione && !codice) continue
+        righe.push({ progressivo: '', codice_epu: codice, descrizione, udm: udm.toLowerCase(), quantita, prezzo_lordo: prezzo, importo })
+      }
+    } else righe.push(...estraiRighePipe(blocco.join('\n')))
+    blocco = null
+  }
+  for (const l of normalizzaNumeriOcr(testoIntero).split('\n')) {
+    if (/^###[^\S\n]*TABELLA ARTICOLI/.test(l)) { chiudi(); blocco = []; celle = RE_TITOLO_CELLE.test(l); continue }
+    if (blocco && /^\s*\|/.test(l)) { blocco.push(l); continue }
+    chiudi()
+  }
+  chiudi()
+  righe.forEach((r, i) => { r.progressivo = String(i + 1) })
+  return righe
 }
 
 // Tabelle markdown/pipe: "| BA.CZ.A.3 09.B | ACCIAIO … | kg | 151.000,00 | 0,750 € | 113.250,00 € |"
@@ -876,7 +935,9 @@ export const normalizzaValoriTabella = (s: string): string => s
 // Unità di misura viste nei contratti + le storpiature OCR ricorrenti ("m³" letto
 // "$m^{²", "m² x mese"). Volutamente più larga di UM_SRC: qui la posizione (subito
 // prima dei valori) è già un vincolo forte.
-export const UM_GRIGLIA = String.raw`\$?m\s?\^?\{?\s?[23²³]\}?(?:\s*x\s*mes[ei])?|mq\s?x\s?cm|mc\s?x\s?cm|kg|mc|mq|ml|mt|cad\b|corpo|a\s?corpo|ton|q\.?li|nr\b|n°|pz|a\.?\s?c\.?|ore|ora|\bh\b|lt|gg|giorn[oi]|mes[ei]|settiman\w*|anno|anni|%|m\b|t\b|l\b|n\b`
+// m2/m3: la cifra dell'esponente non deve essere l'inizio di un numero. "SOMMANO m
+// 230,5" si leggeva "m2" + quantità 30,5 (PF Future).
+export const UM_GRIGLIA = String.raw`\$?m\s?\^?\{?\s?[23²³](?![\d,.])\}?(?:\s*x\s*mes[ei])?|mq\s?x\s?cm|mc\s?x\s?cm|kg|mc|mq|ml|mt|cad\b|corpo|a\s?corpo|ton|q\.?li|nr\b|n°|pz|a\.?\s?c\.?|ore|ora|\bh\b|lt|gg|giorn[oi]|mes[ei]|settiman\w*|anno|anni|%|m\b|t\b|l\b|n\b`
 export const EURO_SRC = String.raw`(?:€|EUR|Euro)\s*\.?\s*`
 export const CIFRA_SRC = String.raw`(?:${EURO_SRC})?(${NUM_SRC})\s*(?:€|EUR)?\.?`
 // coda valori della riga: [U.M.] quantità prezzo [importo]
@@ -886,7 +947,14 @@ export const RE_CODA_VALORI = new RegExp(
 // codice voce in testa alla riga: tariffa regionale ("SIC24_26.01.04.002"), prezzario
 // ("20.A28.C05.020", "B.03.025.a"), codice articolo di magazzino ("1498B", "PANEL-RINF"),
 // nuovo prezzo ("NP1"). Deve contenere una cifra o un trattino: le parole normali no.
-export const RE_COD_GRIGLIA = /^\s*(?:(\d{1,3})[).\s]+)?((?=[A-Z0-9]*[\d\-])[A-Z0-9][A-Z0-9._,\-\/]{1,22})(?=\s+\S)/
+// Il progressivo in testa ("1 A.01.001", "2) B.03") va staccato da uno spazio o da ")":
+// "06.P01.S01.003" è un codice intero, e prima "06." passava per progressivo (Warm).
+// Il codice può anche essere l'ultima cosa prima dei valori ("1C.12.350.0010.H m 9,50
+// …", descrizione sulle righe sopra e sotto): prima si pretendeva altro testo dopo, il
+// codice finiva nella descrizione e ne veniva ripescato solo "C.12.350.0010.H".
+// Un numero di 1-3 cifre da solo resta un progressivo, non un codice. La cifra può
+// venire dopo un punto ("NP.06"): prima doveva stare prima del primo punto.
+export const RE_COD_GRIGLIA = /^\s*(?:(\d{1,3})(?:[).]?\s+|\)))?((?!\d{1,3}(?:\s|$))(?=[A-Z0-9._]*[\d\-])[A-Z0-9][A-Z0-9._,\-\/]{1,22})(?=\s+\S|\s*$)/
 
 export const numIt = (s?: string): number =>
   s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : NaN
@@ -1053,18 +1121,44 @@ export const NUM_LARGO = String.raw`\d{1,3}(?:\.\d{3})+(?:,\d{1,9})?|\d+,\d{1,9}
 // I separatori fra i valori sono OBBLIGATORI (\s+): con \s* la regex spezzava "721"
 // in "72" + "1" e la riga usciva con quantità e prezzo inventati.
 // il terzo valore manca quando l'OCR perde una colonna: si accetta anche la coppia
+// Tollerante allo sporco OCR fra SOMMANO, unità e numeri ("SOMMANO )cad", "cad =: 0,5",
+// "cad I 3,5", "2260,66143; 707,59"): con la forma rigida 9 voci su 70 di un computo
+// PF Future si perdevano. Il flag d dà la posizione del primo numero (vedi
+// numeriSommano). Il secondo numero è facoltativo: "SOMMANO cad 211,27041 211,27 €" ha
+// perso la quantità ma prezzo e importo bastano a ricavarla.
 export const RE_SOMMANO = new RegExp(
-  String.raw`SOMMANO\s*(${UM_GRIGLIA})?\.?\s*=?\s*` +
-  String.raw`(${NUM_LARGO})\s+(?:[A-Za-z$]{1,2}\s+)?(${NUM_LARGO})(?:\s+(${NUM_LARGO}))?\s*€?`, 'i')
+  String.raw`SOMMANO[^\S\n]*[^\w\s]{0,3}[^\S\n]*(${UM_GRIGLIA})?\.?[^\d\n]{0,4}?` +
+  String.raw`(${NUM_LARGO})(?:[\s;:)|]+(?:[A-Za-z$]{1,2}\s+)?(${NUM_LARGO}))?(?:[\s;:)|]+(${NUM_LARGO}))?\s*€?`, 'id')
+// Tutti i numeri della riga SOMMANO dal primo valore in poi (al più 5): l'unità di
+// misura resta fuori, così "m2" non diventa il numero 2.
+const numeriSommano = (riga: string, m: RegExpExecArray): string[] => {
+  const da = m.indices?.[2]?.[0] ?? m.index
+  return [...riga.slice(da).matchAll(new RegExp(NUM_LARGO, 'g'))].map(x => x[0]).slice(0, 5)
+}
+// Riparazione aritmetica della riga, come i controlli quantità × prezzo = importo dei
+// prodotti di acquisizione documenti (Rossum, ABBYY, Continia): fra i numeri letti, la
+// terna in ordine (quantità, prezzo, importo) il cui conto torna. A parità vince il
+// prezzo con più decimali (i prezzi da prezzario ne hanno 4-9). Nessuna terna → null,
+// e la riga resta come letta: un valore non si inventa.
+export const ternaCoerente = (nums: string[]): [string, string, string] | null => {
+  let best: [string, string, string] | null = null, decBest = -1
+  for (let i = 0; i < nums.length; i++) for (let j = i + 1; j < nums.length; j++) for (let k = j + 1; k < nums.length; k++) {
+    if (!contoTorna(numIt(nums[i]), numIt(nums[j]), numIt(nums[k]))) continue
+    if (decimali(nums[j]) > decBest) { best = [nums[i], nums[j], nums[k]]; decBest = decimali(nums[j]) }
+  }
+  return best
+}
 // codice N.E.P. del computo: "SIC24 14.3.14.5", "002397", "AP.01"
 // Il separatore dopo l'anno del prezzario è OPZIONALE: l'OCR incolla spesso sigla e
 // tariffa ("SIC2418.1.3.1" per "SIC24 18.1.3.1") e con il separatore obbligatorio
 // quelle voci restavano senza codice.
-export const RE_COD_NEP = /\b([A-Z]{2,6}\s?\d{2}[\s.]?\d{1,3}(?:\.\d{1,3}){0,3}|\d{6}|[A-Z]{2,4}\.\d{2,3}(?:\.\d{1,3})?)\b/
+// Anche le analisi nuovi prezzi "A.N.E.009" (lettere puntate + numero), lette a volte
+// con uno spazio ("A.N.E 009"): prima restavano senza codice (PF Future, 2 ordini).
+export const RE_COD_NEP = /\b([A-Z]{2,6}\s?\d{2}[\s.]?\d{1,3}(?:\.\d{1,3}){0,3}|\d{6}|[A-Z]{2,4}\.\d{2,3}(?:\.\d{1,3})?|[A-Z](?:\.[A-Z]){1,3}[.\s]?\d{2,3})\b/
 // La RIGA che porta solo il codice apre la voce (nel computo Primus il codice sta su
 // una riga sua, al più preceduto dal numero d'ordine). Serve per capire dove finiscono
 // le misure della voce precedente e dove comincia la descrizione di questa.
-export const RE_LINEA_COD_NEP = /^[^A-Za-z0-9]{0,3}(?:[\dA-Za-z]{1,3}[\s.]+){0,2}(?:[A-Z]{2,7}[\s.]?\d{2}[\s.]?\d[\d.]*|\d{6})[\s.]*$/
+export const RE_LINEA_COD_NEP = /^[^A-Za-z0-9]{0,3}(?:[\dA-Za-z]{1,3}[\s.]+){0,2}(?:[A-Z]{2,7}[\s.]?\d{2}[\s.]?\d[\d.]*|\d{6}|[A-Z](?:\.[A-Z]){1,3}[.\s]?\d{2,3})[\s.]*$/
 // Dopo la parola SOMMANO ci sono SOLO numeri: qui il punto è quasi sempre il separatore
 // decimale letto male dall'OCR ("318.86" = 318,86). Si converte solo in questa coda —
 // sul resto del testo spaccherebbe i codici tariffa ("26.01.04").
@@ -1090,21 +1184,43 @@ export const staccaQtaIncollata = (v1: string, v2: string): [string, string, str
   return null
 }
 export const estraiRigheSommano = (text: string): Record<string, string>[] => {
+  // I valori si leggono dal testo normalizzato, le righe di codice e descrizione da
+  // quello originale: la normalizzazione trasforma "…40" finale in decimale e rovinava
+  // le righe-codice ("SIC24 14.3.17.40" → "SIC24 14.3.17,40", non più riconosciuta: 2
+  // voci su 3 del computo PF Future uscivano senza codice). Stesso numero di righe.
+  const originali = text.split('\n')
   const lines = normalizzaValoriTabella(text).split('\n')
   const righe: Record<string, string>[] = []
   let blocco: string[] = []
-  for (const raw of lines) {
+  for (const [n, raw] of lines.entries()) {
     const line = raw.trim()
     const iS = line.search(/SOMMANO/i)
-    const m = iS < 0 ? null : RE_SOMMANO.exec(puntiInVirgole(line.slice(iS)))
+    const coda = iS < 0 ? '' : puntiInVirgole(line.slice(iS))
+    const m = iS < 0 ? null : RE_SOMMANO.exec(coda)
     if (!m) {
-      if (line && !RE_RIGA_SERVIZIO.test(line) && !RE_PROSA_MODELLO.test(line)) blocco.push(line)
+      const orig = (originali[n] ?? raw).trim()
+      if (orig && !RE_RIGA_SERVIZIO.test(orig) && !RE_PROSA_MODELLO.test(orig)) blocco.push(orig)
       if (blocco.length > 30) blocco.shift()
       continue
     }
-    const [, um, v1, v2, v3] = m
+    const um = m[1]
+    const [v1, v2 = '', v3] = m.slice(2, 5)
     let qta = v1, pu = v2, imp = v3 ?? ''
-    if (!v3) {
+    // prima la terna coerente fra tutti i numeri della riga ("0,5 8 80,9631758 40,48":
+    // l'8 è sporco, la terna vera è 0,5 × 80,96 = 40,48)
+    const terna = ternaCoerente(numeriSommano(coda, m))
+    if (terna) [qta, pu, imp] = terna
+    // un numero solo: niente da ricavare, ma la riga SOMMANO chiude comunque la voce
+    else if (!v2) { blocco = []; continue }
+    // prezzo da prezzario (≥4 decimali) seguito dall'importo: la quantità è andata
+    // persa ("SOMMANO cad 211,27041 211,27 €") e vale importo / prezzo se esce pulita
+    else if (decimali(v1) >= 4 && decimali(v2) <= 2 && !v3) {
+      const q = numIt(v2) / numIt(v1)
+      if (!isFinite(q) || q <= 0 || Math.abs(q * 1000 - Math.round(q * 1000)) > 5) { blocco = []; continue }
+      qta = String(Math.round(q * 1000) / 1000).replace('.', ',')
+      pu = v1; imp = v2
+    }
+    else if (!v3) {
       // Quantità e prezzo INCOLLATI dall'OCR ("6 63,7689624" letto "663,7689624"):
       // i prezzi Primus hanno 7-9 decimali, quindi un primo valore così lungo è un
       // prezzo, non una quantità. Si stacca la testa cifra per cifra e si tiene la
@@ -1302,6 +1418,19 @@ export const estraiRigheWbsOs = (text: string): Record<string, string>[] => {
   }
   const conSuffisso = (code: string, suff?: string): string =>
     !suff || /[a-z]$/.test(code) ? code : `${code.replace(/[.,\s]+$/, '')}.${suff}`
+  // Colonne degli oneri ("3,368% 0,13 € 1.294,75 €" = % O.S., P.U. O.S., importo O.S.):
+  // il PREZZO della voce per Alyante è lordo, P.U. lavori + P.U. oneri sicurezza, e così
+  // l'IMPORTO. È la regola dei moduli compilati dal PDF (Progetto Costruzioni: 29,60 +
+  // 2,40 = 32,00). Prima si prendeva il solo P.U. lavori: 32 voci su 35 con il prezzo
+  // sbagliato in ognuno dei due contratti Jonico (misura del 09/11/2026).
+  const RE_ONERI = new RegExp(String.raw`%\D*?(${NUM_SRC})\s*€?\D*?(${NUM_SRC})`)
+  const lordi = (pu: string, imp: string, os?: string): [string, string] => {
+    const o = os ? RE_ONERI.exec(os) : null
+    if (!o) return [pu, imp]
+    const [p, po, i, io] = [numIt(pu), numIt(o[1]), numIt(imp), numIt(o[2])]
+    if (![p, po, i, io].every(isFinite)) return [pu, imp]
+    return [itStr(p + po), itStr(i + io)]
+  }
   type Trovata = { idx: number; riga: Record<string, string> }
   const trovate: Trovata[] = []
   let conOs = 0
@@ -1313,16 +1442,17 @@ export const estraiRigheWbsOs = (text: string): Record<string, string>[] => {
     if (descrizione.length < 5) continue
     if (os) conOs++
     spans.push([idx, idx + tutto.length])
+    const [prezzo, importo] = lordi(pu, imp, os)
     trovate.push({ idx, riga: {
       codice_epu: conSuffisso(code.replace(/\s+/g, ' ').trim(), suff),
-      descrizione, udm: umNorm(um), quantita: qta, prezzo_lordo: pu, importo: imp, progressivo: '',
+      descrizione, udm: umNorm(um), quantita: qta, prezzo_lordo: prezzo, importo, progressivo: '',
     } })
   }
   // T2 solo sul testo NON già consumato da T1 (spans mascherati)
   let masked = flat
   for (const [s, e] of spans) masked = masked.slice(0, s) + ' '.repeat(e - s) + masked.slice(e)
   for (const m of masked.matchAll(T2)) {
-    const [tutto, um, qta, pu, imp, , code] = m
+    const [tutto, um, qta, pu, imp, os, code] = m
     const idx = m.index ?? 0
     conOs++
     // suffisso a/b subito dopo il codice (anche storpiato: "bi", "|mo b")
@@ -1331,9 +1461,10 @@ export const estraiRigheWbsOs = (text: string): Record<string, string>[] => {
     // descrizione: testo che precede i valori, fino all'ultimo €/%/codice
     const prefix = masked.slice(Math.max(0, idx - 160), idx).split(/€|%/).pop() ?? ''
     const descrizione = pulisciDescrArticolo(prefix.replace(/^[\s\d.,\-_\/|]+/, ''))
+    const [prezzo, importo] = lordi(pu, imp, os)
     trovate.push({ idx, riga: {
       codice_epu: conSuffisso(code.replace(/\s+/g, ' ').trim(), ms?.[1]),
-      descrizione, udm: umNorm(um), quantita: qta, prezzo_lordo: pu, importo: imp, progressivo: '',
+      descrizione, udm: umNorm(um), quantita: qta, prezzo_lordo: prezzo, importo, progressivo: '',
     } })
   }
   if (!conOs) return []   // nessuna firma "% O.S." → non è questo layout
@@ -1406,6 +1537,63 @@ export const estraiRigheTabellari = (text: string): Record<string, string>[] => 
   return righe.filter(r => r.codice_epu || r.descrizione)
 }
 
+// ── MODELLI PER FORMATO ──────────────────────────────────────────────────────
+// Per i formati che ricorrono uguali (stesso gestionale, stesso fornitore), un modello
+// dice dove stanno i campi: si riconosce da parole chiave del testo e ricava i campi
+// con espressioni regolari, come i modelli YAML di invoice2data (docs/RICERCA_OCR_
+// SOLUZIONE.md §5). Senza AI; un formato nuovo = un elemento in più qui sotto.
+// Il modello vince sulle regole generiche solo per i campi che trova.
+export interface ModelloContratto {
+  nome: string
+  // tutte le espressioni devono comparire nelle prime pagine
+  riconosci: RegExp[]
+  campi: Partial<Record<'codice' | 'codice_progetto', (testo: string) => string>>
+}
+// "IOI" letto dall'OCR al posto di "101": lettere scambiate per cifre in un codice numerico
+const cifreOcr = (s: string): string => s.replace(/[IlL|]/g, '1').replace(/[oO]/g, '0')
+export const MODELLI_CONTRATTO: ModelloContratto[] = [
+  {
+    // Ordine fornitore stampato dal gestionale (PF Future): intestazione a colonne
+    // "… Numero ordine Data ordine" con i valori sulla riga sotto ("… 1.533/99
+    // 29/06/2026") e il cantiere in testa ("CANTIERE: 101 - VILLETTE - ACIREALE").
+    nome: 'Ordine fornitore',
+    riconosci: [/ORDINE\s+FORNITORE/i, /Numero\s+ordine/i],
+    campi: {
+      codice: t => /Numero\s+ordine[\s\S]{0,300}?\b(\d\.?\d{3}\/\d{2})\b/i.exec(t)?.[1] ?? '',
+      codice_progetto: t => {
+        const m = /\bCA[NM][TL]?\w{0,4}\s*:?\s*([0-9IOl]{3})\b/.exec(t)
+        return m ? cifreOcr(m[1]) : ''
+      },
+    },
+  },
+]
+export const modelloContratto = (full: string): ModelloContratto | null => {
+  const testa = full.slice(0, 6000)
+  return MODELLI_CONTRATTO.find(m => m.riconosci.every(re => re.test(testa))) ?? null
+}
+
+// Listino di materiali (contratti quadro di fornitura "Materiali Vari"): una riga per
+// articolo, "CODICE DESCRIZIONE UM QUANTITÀ PREZZO €" ("XRECPMS MORSETTO BLOCCA PANNELLI
+// PZ 1,00 4,800 €"). Il codice è la PRIMA parola anche quando non ha cifre ("CH", "NJ")
+// o ne ha solo tre ("429"): le regole generiche lo scambiavano per descrizione o per
+// numero d'ordine e 36 voci su 98 uscivano senza codice (misura del 09/11/2026).
+// Vale solo se le righe così sono almeno 10: allora il documento È un listino.
+const RE_RIGA_LISTINO = /^\s*(?:\|\s*)?([A-Z0-9][A-Za-z0-9.\/\-_]{0,24})\s+(.{3,}?)\s+(PZ|NR|KG|MT|ML|MQ|M2|LT|CF|CONF|ROT|SC|CT|PA|CP|BR|MC|N)\.?\s+(\d{1,3}(?:\.\d{3})*,\d{2,3})\s+(\d{1,3}(?:\.\d{3})*,\d{2,4})\s*€?\s*\|?\s*$/
+export const estraiRigheListino = (text: string): Record<string, string>[] => {
+  const righe: Record<string, string>[] = []
+  for (const l of text.split('\n')) {
+    if (/^\s*\|/.test(l)) continue                 // tabelle ricostruite: stesse righe, già lette qui sotto
+    const m = RE_RIGA_LISTINO.exec(l)
+    if (!m) continue
+    const [, codice, descr, um, qta, prezzo] = m
+    righe.push({
+      progressivo: String(righe.length + 1), codice_epu: codice, descrizione: pulisciDescrArticolo(descr),
+      udm: um.toLowerCase(), quantita: qta, prezzo_lordo: prezzo, importo: '',
+    })
+  }
+  return righe.length >= 10 ? righe : []
+}
+
 // ── SEZIONE DEROGHE ──────────────────────────────────────────────────────────
 // Molti contratti COSEDIL chiudono con una sezione "DEROGHE" (o "DEROGHE ALLE
 // CONDIZIONI GENERALI") che SOSTITUISCE quanto scritto negli articoli: oneri
@@ -1434,8 +1622,10 @@ export const sezioneDeroghe = (full: string): string => {
 // RG = ritenuta di garanzia ("RG055", "RG10"), RI/R = ritenuta d'ingresso ("R005").
 // gli zeri iniziali fanno parte del codice ("RG055" ≠ "RG55") → nessuno strip
 export const RE_COD_RG = /\bR\.?\s?G\.?\s*(\d{2,3})\b/i
-// "R005"/"RI 005": la G esclusa in lookahead per non catturare la ritenuta di garanzia
-export const RE_COD_RI = /\bR(?!\s?G)\.?\s?I?\.?\s*(\d{2,3})\b/i
+// "R005"/"RI 005": la G esclusa in lookahead per non catturare la ritenuta di garanzia.
+// Il codice è una percentuale per cento con lo zero davanti (R005 = 0,50%): senza lo
+// zero obbligatorio passavano numeri qualsiasi ("R98/81875" letto in calce → R098).
+export const RE_COD_RI = /\bR(?!\s?G)\.?\s?I?\.?\s*(0\d{1,2})(?![\d\/])/i
 
 export const estraiImporti = (t: string): Record<string, string> => {
   const der = sezioneDeroghe(t)
@@ -1501,16 +1691,38 @@ export const estraiImporti = (t: string): Record<string, string> => {
   // percentuale. Nessuna delle due → i campi restano vuoti e l'export NON scrive
   // RG/RI (prima ne inventava sempre uno di default sui subappalti: era il bug
   // "entrambe le ritenute riportate nonostante non previste dal contratto").
-  const testoRit = der || t
-  const codRg = RE_COD_RG.exec(testoRit)
+  // Le DEROGHE hanno la precedenza, ma le ritenute del modello stanno nel corpo (art.
+  // GARANZIE): cercarle SOLO nelle deroghe, quando la sezione c'è, le perdeva tutte.
+  const inDerOTesto = (re: RegExp) => (der ? re.exec(der) : null) ?? re.exec(t)
+  // i codici scritti alla lettera ("RG055", "R005") restano cercati come prima, nelle
+  // deroghe se ci sono: nel corpo "R.G. 123" o "D.P.R. 445" passerebbero per codici
+  const codRg = RE_COD_RG.exec(der || t)
   if (codRg) imp.ritenuta_garanzia_codice = `RG${codRg[1]}`
-  const menzionaRg = /ritenut[ae]\s+(?:di\s+|a\s+)?garanzia/i.test(testoRit)
+  // Modello «tra le Parti» (art. GARANZIE): "effettuerà una ritenuta del 5% (cinque per
+  // cento), a garanzia della corretta esecuzione delle prestazioni". La percentuale sta
+  // PRIMA di «garanzia» e le regex sopra non la vedevano: RG vuoto in 16 contratti su 31
+  // (misura del 09/11/2026). L'OCR scrive a volte la o per lo zero ("5,0o %", "o%").
+  const rgEsecuzione = inDerOTesto(/ritenut[ae]\s+(?:del(?:lo|l['’])?\s*)?([0-9oO]{1,2}(?:,[0-9oO]{1,2})?)\s*%[^.;]{0,80}?a\s+garanzia\s+della\s+(?:corretta|regolare|buona)\s+esecuzione/i)
+  if (rgEsecuzione && !imp.ritenuta_garanzia_percent) imp.ritenuta_garanzia_percent = rgEsecuzione[1].replace(/[oO]/g, '0')
+  const menzionaRg = !!rgEsecuzione || /ritenut[ae]\s+(?:di\s+|a\s+)?garanzia/i.test(der || t)
   if (!codRg && !menzionaRg) delete imp.ritenuta_garanzia_percent
-  // RI (ritenuta d'ingresso): richiede una menzione esplicita, non si deduce dalla RG
-  const menzionaRi = /ritenut[ae]\s+d\w*\s*ingresso|ritenut[ae]\s+(?:dello?\s+)?0,5\s*%/i.test(testoRit)
+  // RI: la ritenuta dello 0,50% "a garanzia di eventuali debiti c/o gli enti previdenziali"
+  // (tutela dei lavoratori) → R005. È una ritenuta distinta da quella di garanzia, anche
+  // quando il testo dice «a garanzia»: così i moduli compilati dal PDF (es. TMT, solo RI).
+  // "0,50%": prima la regex voleva "0,5%" esatto e lo 0 finale la faceva fallire; l'OCR
+  // scrive anche "0,s0%".
+  const menzionaRi = inDerOTesto(/ritenut[ae]\s+d\w*\s*ingresso|ritenut[ae]\s+(?:dello?\s+)?0,[5s]0?\s*%/i)
   if (menzionaRi) {
-    const codRi = RE_COD_RI.exec(testoRit)
+    const codRi = der ? RE_COD_RI.exec(der) : null
     imp.ritenuta_ingresso_codice = codRi?.[1] ? `R${codRi[1].padStart(3, '0')}` : 'R005'
+    // Con il codice RI compilato l'export non ricava più RG dalla percentuale
+    // (ritenuteRgRi in src/lib/import-contratti.ts): il codice RG va scritto qui, con la
+    // stessa regola (5 → RG05, 0,5 → RG005, 10 → RG10). Percentuale 0 → nessuna RG.
+    const pctRg = parseFloat(String(imp.ritenuta_garanzia_percent ?? '').replace(',', '.'))
+    if (!imp.ritenuta_garanzia_codice && pctRg > 0) {
+      const [intera, decimali = ''] = String(pctRg).split('.')
+      imp.ritenuta_garanzia_codice = `RG${intera.padStart(2, '0')}${decimali.replace(/0+$/, '')}`
+    }
   }
   for (const k of Object.keys(imp)) if (!imp[k]) delete imp[k]
   return imp
@@ -1585,7 +1797,10 @@ export const corpoOggetto = (full: string): string => {
     /^(?:art(?:icolo)?\.?\s*)?2\s*[-–—.):]?\s*oggetto\b/i.test(l))
   if (start < 0) return ''
   const contenuto: string[] = []
-  for (let j = start + 1; j < Math.min(lines.length, start + 8); j++) {
+  // L'oggetto è la frase intera dell'Art. 2, fino al punto: tagliarlo a 120 caratteri
+  // lasciava fuori metà della descrizione in 14 contratti su 31 (misura del 09/11/2026,
+  // i moduli compilati dal testo la riportano intera). Tetto a ~380 caratteri.
+  for (let j = start + 1; j < Math.min(lines.length, start + 12); j++) {
     const l = lines[j]
     if (!l) { if (contenuto.length) break; continue }
     // un nuovo titolo d'articolo CHIUDE l'oggetto (prima veniva saltato e il corpo
@@ -1599,10 +1814,13 @@ export const corpoOggetto = (full: string): string => {
     if (contenuto.length && /^[A-Z]\)\s/.test(l)) break
     if (/[:：]\s*$/.test(l) || /^costituisce\s+oggetto/i.test(l)) continue
     contenuto.push(l)
-    if (contenuto.join(' ').length > 120) break
+    if (contenuto.join(' ').length > 380 || /[.;]\s*$/.test(l)) break
   }
   const testo = contenuto.join(' ').replace(/\s{2,}/g, ' ').trim()
-  return testo.length >= 10 ? ripulisciOggetto(testo).slice(0, 250) : ''
+  if (testo.length < 10) return ''
+  // punto finale via e iniziale maiuscola: nell'Excel è un titolo ("Servizio di trasporto…")
+  const o = ripulisciOggetto(testo).replace(/[.;\s]+$/, '').slice(0, 400)
+  return o.charAt(0).toUpperCase() + o.slice(1)
 }
 
 // CODICE CONTRATTO. Il valore ufficiale segue l'etichetta "Cod. Ident. Contratto"
@@ -1610,13 +1828,22 @@ export const corpoOggetto = (full: string): string => {
 // SUFFISSO ("177-125_216/2025", "208-148_042/2026") — i pattern liberi lo troncavano
 // sempre. Nella finestra dell'etichetta si cerca comunque un codice STRUTTURATO: lo
 // scan OCR può infilarci prima altro testo ("Costpis.p.A. 177-125_250/2026").
+// Chiusura con (?![A-Za-z0-9]) e non \b: "_" è un carattere di parola, e l'OCR lascia
+// spesso un "_" in coda ("177-125_284/2026_") — col \b il codice intero non passava e
+// vinceva un pattern più corto ("177-125_284").
 export const RE_CODICI = [
-  /\b(\d{4}[-_]\d{3}[-_]\d{3}(?:[-_/][A-Za-z0-9]{1,4})?)\b/,          // 2026-159-115-11
-  /\b(\d{3}-\d{3}(?:[_-][A-Za-z0-9]{1,4})?[_-]\d{1,4}\/\d{4})\b/,      // 177-125_216/2025
-  /\b(\d{4}[-_]\d{3}[-_]\d{1,2}\.\d{2,3})\b/,                          // 2024-095-4.004
-  /\b(\d{3}-\d{3}(?:[_-][A-Za-z0-9]{1,4})?[_-]\d{2,4})\b/,             // 208-148_042
-  /\b([A-Z]{2,4}-[A-Z]{2,4}-[A-Z]{2,4}(?:-\d{1,6})?)\b/,               // AEC-CNT-FOR-0001
+  /\b(\d{4}[-_]\d{3}[-_]\d{3}(?:[-_/][A-Za-z0-9]{1,4}){0,3})(?![A-Za-z0-9])/,  // 2026-159-115-11, 2026-195-137_6_024
+  /\b(\d{3}-\d{3}(?:[_-][A-Za-z0-9]{1,4})?[_-]\d{1,4}\/\d{4})(?![A-Za-z0-9])/, // 177-125_216/2025
+  /\b(\d{4}[-_]\d{3}[-_]\d{1,2}\.\d{2,3})(?![A-Za-z0-9])/,                     // 2024-095-4.004
+  /\b(\d{3}-\d{3}(?:[_-][A-Za-z0-9]{1,4})?[_-]\d{2,4})(?![A-Za-z0-9])/,        // 208-148_042
+  /\b([A-Z]{2,4}-[A-Z]{2,4}-[A-Z]{2,4}(?:-\d{1,6})?)\b/,                       // AEC-CNT-FOR-0001
 ]
+// Valore sotto l'etichetta letto dall'OCR con spazi al posto dei "_" ("208-148 050/2026",
+// "2026-195-137 6 023"): si ricompone prima di applicare i pattern. Solo nella finestra
+// dell'etichetta, dove un codice è atteso: nel testo libero sarebbe troppo azzardato.
+const ricomponiCodice = (s: string): string => s
+  .replace(/\b(\d{3}-\d{3})[^\S\n]+(\d{2,4}\/\d{4})\b/g, '$1_$2')
+  .replace(/\b(\d{4}-\d{3}-\d{3})((?:[^\S\n]\d{1,3}){1,2})(?![\d\/])/g, (_m, testa: string, coda: string) => testa + coda.replace(/[^\S\n]/g, '_'))
 export const RE_ETICHETTA_CODICE = /cod[.,]?\s*[il1]dent[.,]?\s*(?:con[ftl]{0,2}ratto)\s*:?/i
 // La sigla del MODELLO in calce ("FORPOS-2025-0", "SUBAP-2025-0") ha la forma di un
 // codice a sigle e veniva presa per il codice del contratto: si toglie prima di cercare.
@@ -1625,7 +1852,7 @@ export const codiceContratto = (paginaGrezza: string): string => {
   const primaPagina = senzaSiglaModello(paginaGrezza)
   const et = RE_ETICHETTA_CODICE.exec(primaPagina)
   if (et) {
-    const finestra = primaPagina.slice(et.index + et[0].length, et.index + et[0].length + 120)
+    const finestra = ricomponiCodice(primaPagina.slice(et.index + et[0].length, et.index + et[0].length + 120))
     for (const re of RE_CODICI) {
       const v = primoMatch(finestra, re)
       if (v) return v
@@ -1644,14 +1871,58 @@ export const codiceContratto = (paginaGrezza: string): string => {
 // Senza esclusioni si finiva regolarmente su "31/05/65" (L. 575/65) o su una data di
 // nascita; la data delle firme resta il fallback del chiamante.
 export const RE_CONTESTO_DATA = /nat[oa]\b|legge|\bL\.\s*\d|D\.?\s?L(?:gs)?\.|D\.?P\.?R|decreto|circolare|delibera|protocollo|prefettur|convenzione|appalto\s+principale|contratto\s+di\s+appalto|R\.?F\.?I|committente\s+generale/i
+// Data valida per un contratto: giorno 1-31, mese 1-12. L'OCR produce "29/65/2026" o
+// "12/12/225": meglio scartarle e tenere un'altra occorrenza della stessa firma.
+const dataPlausibile = (d: string): boolean => {
+  const [g, m, a] = d.split(/\s*[\/\-.]\s*/).map(Number)
+  return g >= 1 && g <= 31 && m >= 1 && m <= 12 && (a < 100 || (a >= 1990 && a <= 2099))
+}
+// Luogo e data delle firme: "Santa Venerina (CT), lì 11/05/2026", "Roma lì 12/12/2025",
+// "Santa Venerina, 20/07/2026" (senza lì), "Santa Venering17/03/2026" (OCR incollato).
+const RE_DATA_FIRMA = /(?:(?<![\p{L}])l[iì]|add[iì]|Venerin\p{L}*\s*(?:\(\s*CT\s*\))?\s*,?)\s*[:,]?\s*(\d{1,2}\s?[\/\-.]\s?\d{1,2}\s?[\/\-.]\s?(?:\d{4}|\d{2}))(?!\d)/giu
 export const dataContratto = (full: string): string => {
-  // solo intestazione e calce: nel corpo le date sono quasi tutte di contesto
-  // (norme citate, protocolli, nascite dei rappresentanti)
+  // 1) La data che accompagna le firme. Nei contratti del gruppo è "<luogo>, lì <data>"
+  // e si ripete (firme, clausole 1341-1342 c.c., privacy): vince la data più frequente,
+  // a parità la prima. Va cercata in TUTTO il testo: dopo le firme vengono spesso
+  // allegati di decine di pagine (elenco prezzi, privacy), e limitarsi agli ultimi 3000
+  // caratteri la perdeva in 12 contratti su 31 (misura del 09/11/2026), che finivano
+  // sull'ultima data del documento (una norma, un allegato).
+  const firme = new Map<string, { n: number; primo: number }>()
+  for (const m of full.matchAll(RE_DATA_FIRMA)) {
+    const d = m[1].replace(/\s/g, '')
+    if (!dataPlausibile(d)) continue
+    const i = m.index ?? 0
+    if (RE_CONTESTO_DATA.test(full.slice(Math.max(0, i - 120), i + m[0].length + 40))) continue
+    const f = firme.get(d) ?? { n: 0, primo: i }
+    f.n++
+    firme.set(d, f)
+  }
+  const migliore = [...firme].sort((a, b) => b[1].n - a[1].n || a[1].primo - b[1].primo)[0]
+  if (migliore) return migliore[0]
+  // 2) Senza luogo e data alle firme: data di stipula dichiarata in intestazione o in
+  // calce ("in data …", "il giorno …"). Solo lì: nel corpo le date sono quasi tutte di
+  // contesto (norme citate, protocolli, nascite dei rappresentanti).
   for (const zona of [full.slice(0, 2500), full.slice(-3000)]) {
     for (const m of zona.matchAll(/(?:^|[\s,;])(?:l[iì]\b|add[iì]|in\s+data|il\s+giorno|data\s+(?:del\s+)?contratto\s*:?)\s*[:]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.](?:\d{4}|\d{2}))/gi)) {
       const i = m.index ?? 0
       if (RE_CONTESTO_DATA.test(zona.slice(Math.max(0, i - 120), i + m[0].length + 40))) continue
       return m[1]
+    }
+  }
+  return ''
+}
+
+// CUP = 15 caratteri alfanumerici. L'OCR ci infila a volte uno spazio ("CUp: B31
+// E20000230001"): si accettano due pezzi sulla stessa riga purché insieme facciano 15.
+const cupDa = (full: string): string => {
+  for (const m of full.matchAll(/\bC\.?U\.?P\.?\b/gi)) {
+    const inizio = (m.index ?? 0) + m[0].length
+    const dopo = full.slice(inizio, inizio + 40).split('\n')[0]
+    const intero = /(?<![A-Z0-9])([A-Z0-9]{15})(?![A-Z0-9])/i.exec(dopo)
+    if (intero && /\d/.test(intero[1])) return intero[1].toUpperCase()
+    const spezzato = /(?<![A-Z0-9])([A-Z0-9]{2,13})[^\S\n]([A-Z0-9]{2,13})(?![A-Z0-9])/i.exec(dopo)
+    if (spezzato && spezzato[1].length + spezzato[2].length === 15 && /\d/.test(spezzato[1] + spezzato[2])) {
+      return (spezzato[1] + spezzato[2]).toUpperCase()
     }
   }
   return ''
@@ -1695,7 +1966,7 @@ export const estraiTestata = (full: string): Record<string, string> => {
     cond_pagamento: condPagamento(full),
     oggetto: trovaOggetto(full),
     cig: primoMatch(full, /\bC\.?I\.?G\.?\b\D{0,10}([A-Z0-9]{10})\b/i),
-    cup: primoMatch(full, /\bC\.?U\.?P\.?\b\D{0,10}([A-Z0-9]{15})\b/i),
+    cup: cupDa(full),
     // Dt. Doc SOLO se etichettata: prendere la prima data del documento pescava
     // date di leggi/norme citate nel preambolo (viste in output: 29/03/1957,
     // 10/03/1970) e le spacciava per data del documento. Meglio vuota che inventata.
@@ -1708,6 +1979,23 @@ export const estraiTestata = (full: string): Record<string, string> => {
   const d = trovaDitta(full)
   t.ditta = d.nome
   t.ditta_codice = d.codice
+  // modello del formato (vedi MODELLI_CONTRATTO): i campi che trova vincono
+  const modello = modelloContratto(full)
+  if (modello) {
+    for (const [k, f] of Object.entries(modello.campi)) {
+      const v = f?.(full)
+      if (v) t[k] = v
+    }
+  }
+  // PROGETTO dalle premesse ("…costruzione dei depositi di Staglieno e Gavette…"), solo
+  // se né l'etichetta «commessa» né il codice contratto portano una commessa dell'elenco
+  // (vedi commessaDaPremesse in server/alyante.ts). Le premesse stanno nelle prime pagine.
+  // Un codice di commessa dell'elenco scritto per intero (es. "101", sede) vale già.
+  const commessaEsatta = !!t.codice_progetto && ELENCHI.commesse.some(c => c.codice.toUpperCase() === t.codice_progetto.toUpperCase())
+  if (!commessaEsatta && !commessaDaCandidati(candidatiCommessa(t.codice_progetto, t.codice), ELENCHI.commesse)) {
+    const c = commessaDaPremesse(full.slice(0, 8000))
+    if (c) t.codice_progetto = c
+  }
   for (const k of Object.keys(t)) if (!t[k]) delete t[k]
   return t
 }
@@ -1723,7 +2011,10 @@ export const estrai = (full: string): Estratto => {
   // I marcatori di colonna " | " servono SOLO al parser delle righe articoli;
   // testata e importi leggono il testo scorrevole senza pipe (le etichette tipo
   // "OGGETTO | …" spezzerebbero le regex).
-  const scorrevole = full.replace(/[ \t]*\|[ \t]*/g, ' ')
+  // Un "|" attaccato a un codice "NN-NNN_…" è la prima cifra 1 letta come riga del
+  // riquadro ("|77-125_282/2026" = 177-125_282/2026): va ricucito PRIMA di togliere i
+  // pipe, altrimenti resta "77-125…" e codice contratto e commessa si perdono.
+  const scorrevole = full.replace(/\|(?=\d{2}-\d{3}[_/-])/g, '1').replace(/[ \t]*\|[ \t]*/g, ' ')
   return {
     testata: estraiTestata(scorrevole),
     importi: estraiImporti(scorrevole),
