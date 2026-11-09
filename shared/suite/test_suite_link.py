@@ -42,8 +42,14 @@ def test_normalizza_commessa():
 def test_url_pubblico(monkeypatch):
     monkeypatch.delenv("SUITE_DOMINIO", raising=False)
     monkeypatch.delenv("SUITE_URL_PUBBLICO_INCAMPO", raising=False)
+    monkeypatch.delenv("SUITE_URL_PUBBLICO_MAGAZZINO", raising=False)
+    monkeypatch.delenv("MAGAZZINO_PROGRAMMA_UNICO", raising=False)
     assert suite_link.url_pubblico("incampo") == "http://localhost:5190"
+    # programma unico "DDT e Magazzino": il Magazzino si apre dentro il Lettore DDT
+    assert suite_link.url_pubblico("magazzino") == "http://localhost:5050/magazzino"
     monkeypatch.setenv("SUITE_DOMINIO", "cosedil.it")
+    assert suite_link.url_pubblico("magazzino") == "https://lettore-ddt.cosedil.it/magazzino"
+    monkeypatch.setenv("MAGAZZINO_PROGRAMMA_UNICO", "0")             # Magazzino da solo: indirizzo proprio
     assert suite_link.url_pubblico("magazzino") == "https://magazzino-operativo.cosedil.it"
 
 

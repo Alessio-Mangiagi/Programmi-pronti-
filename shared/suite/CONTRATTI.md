@@ -275,9 +275,18 @@ Dentro restano i due motori (Node e Python Flask), avviati insieme; nessuna risc
   abilitato a `ddt` o `magazzino`: il gate Python accetta più id
   (`cosedil_sso.init(app, app_id=("magazzino", "ddt"))`, il primo che il portale accetta dà
   l'esito e il flag admin).
-* **Link verso il Magazzino** (da fare del portale, InCampo, task): `<Lettore DDT>/magazzino`
-  (`suite_rotte.url_magazzino`); `MAGAZZINO_URL_PUBBLICO` li forza, `MAGAZZINO_PROGRAMMA_UNICO=0`
+* **Link verso il Magazzino** (da fare del portale, InCampo, task, Analista): `<Lettore DDT>/magazzino`.
+  La regola sta in `suite_link.url_pubblico("magazzino")` / `urlPubblico('magazzino')`, così vale per
+  tutte le app; il Magazzino la chiama con la sua configurazione (`suite_rotte.url_magazzino`).
+  `SUITE_URL_PUBBLICO_MAGAZZINO` o `MAGAZZINO_URL_PUBBLICO` li forzano, `MAGAZZINO_PROGRAMMA_UNICO=0`
   torna all'indirizzo proprio del Magazzino.
+* **Lato Lettore DDT.** Commessa di sessione: rotte `GET /guscio/stato`, `GET /guscio/commesse`,
+  `POST /guscio/commessa` (registro della suite + cartelle precedenti dell'account; l'admin le vede
+  tutte); la commessa diventa cartella dati (`C/2024/15` → `C_2024_15`), destinazione dei carichi e
+  `X-Suite-Commessa`. Esito del carico immediato al browser nell'intestazione `X-Magazzino` di
+  `/claude-to-excel`. Barra comune `static/guscio/barra.js`: se la pagina ha già `.testata-programma`
+  (la testata del Magazzino) non si duplica e rende cliccabile `.testata-commessa` per "Cambia commessa".
+  Il proxy non inoltra WebSocket (il Magazzino non li usa).
 * **Riepilogo in SkyTower.** In SkyTower va "tutto": PDF del DDT ed Excel della conversione
   (Lettore DDT, § 5) e, per ogni commessa con movimenti nel giorno, il **riepilogo di
   magazzino** — un PDF e un Excel (movimenti del giorno con DDT di provenienza, giacenze del

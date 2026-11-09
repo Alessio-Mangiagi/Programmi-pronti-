@@ -61,10 +61,20 @@ function urlApi(app) {
   return (env || APP[app][2]).replace(/\/+$/, '');
 }
 
-/** Indirizzo da mostrare all'utente (link "Apri in InCampo"). */
+/** True se il Magazzino si apre dentro il Lettore DDT (programma unico "DDT e Magazzino", 09/11/2026).
+ *  MAGAZZINO_PROGRAMMA_UNICO=0 torna al Magazzino da solo, come in magazzino-operativo/config.py. */
+function magazzinoDentroDdt() {
+  const v = String(process.env.MAGAZZINO_PROGRAMMA_UNICO || '1').trim().toLowerCase();
+  return !['0', 'off', 'no', 'false'].includes(v);
+}
+
+/** Indirizzo da mostrare all'utente (link "Apri in InCampo").
+ *  Il Magazzino sta dentro il Lettore DDT a <ddt>/magazzino: la sua porta 5200 ascolta solo sulla macchina
+ *  (CONTRATTI § 11, C1-C2), quindi i link "Apri nel Magazzino" di Analista, InCampo ecc. vanno lì. */
 function urlPubblico(app) {
   const forzato = String(process.env['SUITE_URL_PUBBLICO_' + app.toUpperCase()] || '').trim();
   if (forzato) return forzato.replace(/\/+$/, '');
+  if (app === 'magazzino' && magazzinoDentroDdt()) return urlPubblico('ddt') + '/magazzino';
   const dominio = String(process.env.SUITE_DOMINIO || '').trim();
   const [sotto, porta] = APP[app];
   return dominio ? `https://${sotto}.${dominio}` : `http://localhost:${porta}`;

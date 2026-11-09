@@ -29,8 +29,13 @@ test('normalizzaCommessa e urlPubblico', () => {
   assert.strictEqual(suite.normalizzaCommessa('c-2026 014'), 'C-2026014');
   delete process.env.SUITE_DOMINIO;
   assert.strictEqual(suite.urlPubblico('ddt'), 'http://localhost:5050');
+  // programma unico "DDT e Magazzino": il Magazzino si apre dentro il Lettore DDT
+  assert.strictEqual(suite.urlPubblico('magazzino'), 'http://localhost:5050/magazzino');
   process.env.SUITE_DOMINIO = 'cosedil.it';
+  assert.strictEqual(suite.urlPubblico('magazzino'), 'https://lettore-ddt.cosedil.it/magazzino');
+  process.env.MAGAZZINO_PROGRAMMA_UNICO = '0';                      // Magazzino da solo: indirizzo proprio
   assert.strictEqual(suite.urlPubblico('magazzino'), 'https://magazzino-operativo.cosedil.it');
+  delete process.env.MAGAZZINO_PROGRAMMA_UNICO;
   delete process.env.SUITE_DOMINIO;
 });
 

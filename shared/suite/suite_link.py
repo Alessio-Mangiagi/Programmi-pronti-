@@ -68,11 +68,27 @@ FILE_TOKEN = Path(__file__).resolve().parent / ".token"
 FILE_COMMESSE = Path(__file__).resolve().parent / "commesse.json"
 
 
-def url_pubblico(app):
-    """Indirizzo che si può mostrare all'utente (link "Apri in InCampo")."""
+def _magazzino_dentro_ddt():
+    """True se il Magazzino si apre dentro il Lettore DDT (programma unico "DDT e Magazzino", 09/11/2026).
+    MAGAZZINO_PROGRAMMA_UNICO=0 torna al Magazzino da solo, come in magazzino-operativo/config.py."""
+    v = (os.environ.get("MAGAZZINO_PROGRAMMA_UNICO") or "1").strip().lower()
+    return v not in ("0", "off", "no", "false")
+
+
+def url_pubblico(app, magazzino_dentro_ddt=None):
+    """Indirizzo che si può mostrare all'utente (link "Apri in InCampo").
+
+    Il Magazzino sta dentro il Lettore DDT a <ddt>/magazzino: la sua porta 5200 ascolta solo sulla
+    macchina (CONTRATTI § 11, C1-C2), quindi i link "Apri nel Magazzino" di InCampo, Analista ecc. vanno lì.
+    ``magazzino_dentro_ddt`` lo decide chi chiama (il Magazzino passa la sua config); None = variabile
+    MAGAZZINO_PROGRAMMA_UNICO."""
     forzato = os.environ.get(f"SUITE_URL_PUBBLICO_{app.upper()}")
     if forzato:
         return forzato.rstrip("/")
+    if magazzino_dentro_ddt is None:
+        magazzino_dentro_ddt = _magazzino_dentro_ddt()
+    if app == "magazzino" and magazzino_dentro_ddt:
+        return url_pubblico("ddt") + "/magazzino"
     dominio = (os.environ.get("SUITE_DOMINIO") or "").strip()
     sotto, porta, _ = _APP[app]
     if dominio:
