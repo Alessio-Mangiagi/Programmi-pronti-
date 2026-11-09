@@ -37,6 +37,11 @@ const RE_PCT = /\d\s*%/
 // posizione della tabella ("1", "12"): senza spazi interni, con almeno una cifra.
 const RE_COD = /^(?=[^\s]*\d)[A-Za-z0-9][A-Za-z0-9._\-\/]{0,24}$/
 
+// Intestazioni di colonna: quelle dei valori (quantità, prezzi, importi, oneri) e quella
+// della descrizione, che conferma di essere sulla riga d'intestazione.
+const RE_INTEST_VALORE = /quantit|q\.?\s?t[àa']|\bqty\b|prezz|p\.\s?u\b|unitari|importo|totale|oneri/i
+const RE_INTEST_DESCR = /descri|lavorazion|indicazione/i
+
 const indiceIn = (lim: number[], v: number): number => {
   for (let i = 0; i + 1 < lim.length; i++) if (lim[i] <= v && v < lim[i + 1]) return i
   return -1
@@ -65,9 +70,17 @@ export const tabellaDaGriglia = (blocchi: BloccoOcr[], g: Griglia | null | undef
   }
   type Voce = { codice: string; descr: string; um: string; nums: string[] }
   const voci: Voce[] = []
+  // Intestazione della tabella, se è su questa pagina: dice quali colonne portano i
+  // valori (quantità, prezzi, importi, anche quelle degli oneri). Da lì in giù i numeri
+  // si prendono SOLO da quelle colonne: un "N." o un sotto-numero accanto al codice
+  // ("A.01.010 | 2") finiva letto come quantità (TMT). Senza intestazione (pagine di
+  // continuazione) decide il contenuto, come sotto.
+  let colonneValori: Set<number> | null = null
   for (let r = 0; r < nr; r++) {
     const testi = celle[r].map(testoCella)
     if (testi.every(t => !t)) continue
+    const valori = testi.map((t, c) => (RE_INTEST_VALORE.test(t) && !numeroCella(t) ? c : -1)).filter(c => c >= 0)
+    if (valori.length >= 2 && testi.some(t => RE_INTEST_DESCR.test(t))) { colonneValori = new Set(valori); continue }
     // più numeri impilati nella stessa cella numerica = più voci senza linea fra loro
     for (let c = 0; c < nc; c++) {
       const numeriInCella = celle[r][c].filter(b => numeroCella(b.text) !== null && !RE_PCT.test(b.text))
@@ -90,7 +103,7 @@ export const tabellaDaGriglia = (blocchi: BloccoOcr[], g: Griglia | null | undef
       const t = testi[c]
       if (RE_PCT.test(t)) continue                         // incidenza % (colonna degli oneri)
       const n = numeroCella(t)
-      if (n !== null) { nums.push(n); continue }
+      if (n !== null) { if (!colonneValori || colonneValori.has(c)) nums.push(n); continue }
       if (!um && RE_UM.test(t.replace(/[^A-Za-z0-9²³°.]/g, ''))) { um = t.replace(/[^A-Za-z0-9²³°]/g, '').toLowerCase(); continue }
       if (t.length > descr.length) descr = t
     }

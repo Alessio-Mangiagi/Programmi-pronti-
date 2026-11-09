@@ -369,6 +369,9 @@ export const testoDaTabellaArticoli = (text: string): string => {
 // (intestazione "### TABELLA ARTICOLI …" seguita dalle righe "| … | … |").
 export const senzaTabellaRicostruita = (s: string): string =>
   s.replace(/^###[^\S\n]*TABELLA ARTICOLI[^\n]*\n(?:[^\S\n]*\|[^\n]*\n?)*/gm, '')
+// Solo i blocchi letti dalle celle (server/tabella-griglia.ts), le altre tabelle restano.
+export const senzaBlocchiCelle = (s: string): string =>
+  s.replace(/^###[^\S\n]*TABELLA ARTICOLI \(dalle celle[^\n]*\n(?:[^\S\n]*\|[^\n]*\n?)*/gm, '')
 
 export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
   // il testo può arrivare anche incollato (percorso `text`), senza la correzione
@@ -404,7 +407,9 @@ export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
   // blocchi multi-riga. Vince chi trova più voci — il riga-singola su queste
   // tabelle prende al massimo una riga spuria e senza confronto bloccherebbe
   // sia gli altri parser che l'assist AI.
-  const pipe = estraiRighePipe(text)
+  // senza i blocchi letti dalle celle: quelli li legge estraiRigheCelle, e contarli qui
+  // spegnerebbe la griglia elenco prezzi (vedi sotto, "!pipe.length")
+  const pipe = estraiRighePipe(senzaBlocchiCelle(text))
   const tabellari = estraiRigheTabellari(text)
   const wbsOs = estraiRigheWbsOs(text)
   const articoli = estraiRigheArticoli(text)
@@ -430,14 +435,6 @@ export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
     rs.length * 10 + Math.min(9, rs.filter(r => r.codice_epu).length)
   let best = righe
   if (pipe.length && punti(pipe) >= punti(best)) best = pipe
-  // Righe dalle celle della tabella (pagine con i bordi): colonne certe, quindi entrano
-  // anche con qualche voce in meno degli altri parser (che contano pure righe spurie o
-  // spezzate). Restano in gara come gli altri dopo di qui.
-  const celle = estraiRigheCelle(testoIntero)
-  if (celle.length && celle.length >= best.length * 0.8) best = celle
-  // listino di materiali riconosciuto (modello, vedi estraiRigheListino): codice certo
-  const listino = estraiRigheListino(normalizzaNumeriOcr(senzaTabellaRicostruita(testoIntero)))
-  if (listino.length && listino.length >= best.length * 0.8) best = listino
   if (punti(tabellari) > punti(best)) best = tabellari
   if (punti(wbsOs) > punti(best)) best = wbsOs
   // Catalogo articoli senza prezzo: vince SOLO se trova più voci degli altri parser.
@@ -464,6 +461,16 @@ export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
   // "42,25 1 042,25". Dove pipe non trova nulla (contratti digitali, allegati Excel)
   // la griglia resta l'unica fonte e lavora come previsto.
   if (elenco.length && !wbsOs.length && !pipe.length && punti(elenco) >= punti(best)) best = elenco
+  // Righe dalle celle della tabella (pagine con i bordi): colonne certe, quindi vincono
+  // anche con qualche voce in meno degli altri parser (che contano pure righe spurie o
+  // spezzate), ma non se ne hanno molte meno: un documento con le linee solo su alcune
+  // pagine darebbe meno voci della griglia letta dal testo su tutte (Sabbie d'oro: 4
+  // contro 8). Per questo stanno in fondo alla gara, dopo la griglia elenco prezzi.
+  const celle = estraiRigheCelle(testoIntero)
+  if (celle.length && celle.length >= best.length * 0.8) best = celle
+  // listino di materiali riconosciuto (modello, vedi estraiRigheListino): codice certo
+  const listino = estraiRigheListino(intero)
+  if (listino.length && listino.length >= best.length * 0.8) best = listino
   // Computo metrico: la riga "SOMMANO" è l'unico modo di distinguere le quantità vere
   // dalle misure parziali. Dove c'è vince sempre sulla griglia, che sullo stesso
   // allegato legge le righe di misura come se fossero voci.
