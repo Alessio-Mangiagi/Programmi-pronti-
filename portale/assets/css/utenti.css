@@ -61,6 +61,9 @@
 .chks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; }
 .chk { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; font-size: 13.5px; }
 .chk input { accent-color: var(--cosedil-blue); width: 16px; height: 16px; margin: 0; }
+/* icona del programma (iconaApp, common.js) fra la casella e il nome */
+.chk .chk-ic { color: var(--cosedil-blue); display: grid; place-items: center; }
+.chk .chk-ic svg { width: 17px; height: 17px; }
 .chk .ris { font-family: var(--font-cond); font-weight: 800; font-stretch: 80%; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); border: 1px solid var(--soft); padding: 0 4px; }
 .esito { margin: 8px 0 12px; font-size: 13px; line-height: 1.6; }
 .esito:empty { margin: 0; }

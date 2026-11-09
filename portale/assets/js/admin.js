@@ -75,11 +75,15 @@ function renderLog() {
   const empty = document.getElementById('logEmpty');
   if (!rows.length) { body.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
+  // Colonna Programma: icona del programma (common.js, la stessa di home e plancia) e nome; le azioni
+  // fatte nel portale (accesso, utenti, abilitazioni) hanno l'icona della casa e "Portale".
   body.innerHTML = rows.map(a => `
     <tr>
       <td class="muted">${esc(fmtData(a.ts))}</td>
       <td><div class="who"><span class="av">${esc(iniz(a.nome))}</span><span>${esc(a.nome || a.username)}</span></div></td>
-      <td>${a.appNome ? esc(a.appNome) : '<span class="muted">— (portale)</span>'}</td>
+      <td>${a.appNome || a.appId
+        ? `<div class="prog">${iconaApp(a.appId)}<span>${esc(a.appNome || a.appId)}</span></div>`
+        : `<div class="prog muted">${iconaApp('portale')}<span>Portale</span></div>`}</td>
       <td><span class="badge ${esc(a.azione)}"><span class="dot"></span>${esc(nomeAzione(a.azione))}</span></td>
       <td class="dett">${esc(dettaglioAzione(a)) || '<span class="muted">—</span>'}</td>
     </tr>

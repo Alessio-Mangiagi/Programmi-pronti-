@@ -57,6 +57,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.crea-utente .dot, .badge.importa-utenti .dot { background: var(--cosedil-blue-light); }
 /* colonna Dettaglio del registro: a chi, cosa è cambiato, da quale PC */
 td.dett { font-size: 0.82rem; color: var(--cosedil-gray); max-width: 42ch; }
+/* colonna Programma del registro: icona (iconaApp, common.js) + nome */
+.prog { display: flex; align-items: center; gap: 0.5rem; }
+.prog svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--cosedil-blue); }
+.prog.muted svg { color: var(--cosedil-gray); }
 .muted { color: var(--cosedil-gray); }
 tbody tr.off td { color: var(--cosedil-gray); }
 .azioni-utente { white-space: nowrap; }

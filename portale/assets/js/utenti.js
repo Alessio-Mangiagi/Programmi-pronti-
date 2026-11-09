@@ -117,9 +117,11 @@ async function cambiaEmail(username) {
   await caricaUtenti();
 }
 
+// Caselle dei programmi (nuovo utente, finestra "Programmi"): icona del programma (common.js) e nome.
 function caselle(sel, attributo) {
   return assegnabili.map((a) => `
     <label class="chk"><input type="checkbox" ${attributo}="${esc(a.id)}" ${sel(a) ? 'checked' : ''} />
+      <span class="chk-ic">${iconaApp(a.id)}</span>
       <span>${esc(a.nome)}${a.riservata ? ' <span class="ris">riservato</span>' : ''}</span></label>`).join('');
 }
 

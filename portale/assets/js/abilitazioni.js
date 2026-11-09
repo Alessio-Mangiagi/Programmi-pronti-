@@ -80,9 +80,14 @@ function renderTesta() {
     <th class="ab-chi" scope="col">Utente</th>
     ${assegnabili.map((a) => {
       const n = nonAdmin.filter((u) => spuntati(u).has(a.id)).length;
+      // piccola icona del programma sopra il nome (common.js, la stessa di home e plancia):
+      // le colonne si riconoscono a colpo d'occhio senza allargarle. Il nome ha sempre l'altezza di
+      // due righe e "riservato" lascia il suo posto anche quando non c'è (segnaposto invisibile),
+      // così le icone stanno tutte sulla stessa riga.
       return `<th class="ab-app" scope="col">
+        <span class="ab-ic">${iconaApp(a.id)}</span>
         <span class="ab-nome">${esc(a.nome)}</span>
-        ${a.riservata ? '<span class="ris" title="Arriva solo a chi ha la spunta">riservato</span>' : ''}
+        ${a.riservata ? '<span class="ris" title="Arriva solo a chi ha la spunta">riservato</span>' : '<span class="ris segnaposto" aria-hidden="true">riservato</span>'}
         <span class="ab-conta">${n === 1 ? '1 utente' : n + ' utenti'}</span>
         <span class="ab-col">
           <button type="button" class="ab-tutti" data-col="${esc(a.id)}" data-val="1" title="Spunta ${esc(a.nome)} a tutti gli utenti in elenco">tutti</button>

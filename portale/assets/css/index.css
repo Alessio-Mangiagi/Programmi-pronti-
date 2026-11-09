@@ -22,7 +22,9 @@ a { color: var(--cosedil-blue); }
 .top { background: #fff; border-bottom: 1px solid var(--linea); position: sticky; top: 0; z-index: 20; }
 .top-in { max-width: 1600px; margin: 0 auto; padding: 12px clamp(16px, 3vw, 40px); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
-.mark { width: 38px; height: 38px; border-radius: 8px; background: var(--cosedil-blue); display: grid; place-items: center; }
+/* marchio ufficiale della suite (casa + airone), lo stesso dell'icona dell'app e della scheda del browser */
+.mark { width: 38px; height: 38px; display: block; flex-shrink: 0; }
+.mark .marchio { width: 100%; height: 100%; display: block; }
 .brand b { font-size: 18px; font-weight: 500; display: block; line-height: 1.1; }
 .brand small { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--cosedil-blue); }
 .utente { display: flex; align-items: center; gap: 12px; font-size: 14px; flex-wrap: wrap; }

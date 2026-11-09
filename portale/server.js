@@ -2558,6 +2558,10 @@ async function handle(req, res) {
         adminOnly: !!a.adminOnly,   // la home le raggruppa in "Area riservata"
         principale: !!a.principale,   // home utenti: in alto e in grande
       })),
+      // Nomi di TUTTI i programmi che l'utente può vedere, anche quelli senza tessera propria (il Magazzino
+      // dentro "DDT e Magazzino"): la plancia li usa per le righe di attività e "ultima app", che
+      // altrimenti mostrerebbero l'id ("magazzino") al posto del nome.
+      nomi: Object.fromEntries(APPS.filter((a) => canSeeApp(a)).map((a) => [a.id, a.nome])),
     });
   }
 

@@ -58,7 +58,7 @@ Persa prima di cambiarla: fermare il portale, cancellare `data/utenti.json` e ri
 npm test
 ```
 
-`node --test`, nessuna dipendenza. Copre URL/CORS in LAN, freno al brute force, lettura di `netstat`, assistente, admin per-IP, import utenti, programmi per utente e dettaglio delle abilitazioni, verifica della password per gli altri programmi, file della documentazione per `/doc`. `server.js` importato come modulo non apre porte e non tocca `data/`.
+`node --test`, nessuna dipendenza. Copre URL/CORS in LAN, freno al brute force, lettura di `netstat`, assistente, admin per-IP, import utenti, programmi per utente e dettaglio delle abilitazioni, verifica della password per gli altri programmi, file della documentazione per `/doc`, icone dei programmi e marchio delle pagine (`icone.test.js`). `server.js` importato come modulo non apre porte e non tocca `data/`.
 
 ## Le applicazioni della suite
 
@@ -220,6 +220,8 @@ La funzione è `pathDalRegistro()` in `server.js`; fuori da Windows restituisce 
 - `pages/` — pagine HTML (login, portale, plancia, utenti, abilitazioni, commesse, avvisi, registro accessi, cambio password, documentazione).
 - `docs/guida/` — guida utente con le immagini (capitoli `NN-nome.md`, immagini in `img/`). La pagina `/doc` (*Guida all'uso*) la mostra con i link fra i capitoli; `guida.md` nella radice è solo un rimando.
 - `assets/` — CSS, JavaScript e font.
+  - `assets/js/common.js` — `ICONE_APP` e `iconaApp(id)`: **un solo insieme di icone dei programmi** (SVG a linee) per home, plancia, registro accessi, abilitazioni, avvisi e finestra *Programmi* degli utenti. Un programma nuovo in `APPS` va aggiunto lì (lo controlla `icone.test.js`); uno aggiunto dagli admin prende l'icona generica, mai una sigla.
+  - `assets/icon/` — marchio ufficiale della suite (casa + airone): `marchio-96.png` nelle testate di tutte le pagine, `favicon-32.png` e `suite-cosedil.ico` per la scheda del browser, `pwa-*.png` e `apple-touch-icon.png` per l'app installata.
 - `data/` — dati a runtime (creati automaticamente):
   - `utenti.json` — utenti (password con hash scrypt, programmi, email, disattivazione, `sessioniDa`).
   - `login-fails.json` — tentativi di accesso falliti (condiviso con la plancia 8090).
@@ -235,6 +237,7 @@ La funzione è `pathDalRegistro()` in `server.js`; fuori da Windows restituisce 
   - `.session-secret` — chiave di firma delle sessioni.
   - `server.log` — errori a runtime (oltre 5 MB diventa `server.log.1`).
 - `server.test.js` — test (`npm test`).
+- `icone.test.js` — ogni programma di `APPS` ha la sua icona, marchio e favicon in tutte le pagine.
 
 ## Note di sicurezza
 

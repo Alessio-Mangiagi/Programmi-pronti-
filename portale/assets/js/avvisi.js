@@ -70,7 +70,7 @@ function avvisoHtml(a) {
     <li class="avviso ${esc(a.livello)}">
       <div class="avviso-testa">
         <span class="badge liv-${esc(a.livello)}"><span class="dot"></span>${esc(LIVELLO_LABEL[a.livello] || a.livello)}</span>
-        <span class="avviso-app">${esc(a.appNome)}</span>
+        <span class="avviso-app">${iconaApp(a.app)}${esc(a.appNome)}</span>
         <span class="avviso-quando">${quando}</span>
       </div>
       <p class="avviso-titolo">${esc(a.titolo)}</p>
@@ -79,6 +79,7 @@ function avvisoHtml(a) {
     </li>`;
 }
 
+// Il programma di ogni avviso si riconosce dall'icona (common.js, la stessa di home e plancia) e dal nome.
 function renderAperti() {
   const lista = filtrati();
   document.getElementById('aperti').innerHTML = lista.map(avvisoHtml).join('');
@@ -92,7 +93,7 @@ function renderVisti() {
   document.getElementById('vistiBody').innerHTML = visti.map((a) => `
     <tr>
       <td class="muted">${esc(fmtData(a.ultimo || a.data))}</td>
-      <td>${esc(a.appNome)}</td>
+      <td><span class="avviso-app">${iconaApp(a.app)}${esc(a.appNome)}</span></td>
       <td><span class="badge liv-${esc(a.livello)}"><span class="dot"></span>${esc(LIVELLO_LABEL[a.livello] || a.livello)}</span> ${esc(a.titolo)}${a.n > 1 ? ` <span class="muted">(${a.n} volte)</span>` : ''}</td>
       <td class="muted">${esc(a.visto_da)} · ${esc(fmtData(a.visto_il))}</td>
     </tr>`).join('');

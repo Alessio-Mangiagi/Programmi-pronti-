@@ -23,7 +23,11 @@
 /* Colonne strette (~84px): con dieci programmi la tabella sta ancora tutta in
    uno schermo da 1440px senza scorrere di lato; i nomi lunghi vanno a capo. */
 .ab-tab th.ab-app { text-align: center; vertical-align: bottom; white-space: normal; width: 84px; min-width: 76px; padding: 10px 4px 8px; }
-.ab-tab .ab-nome { display: block; color: var(--ink); font-size: 10.5px; letter-spacing: .03em; line-height: 1.15; overflow-wrap: anywhere; }
+/* icona del programma sopra il nome (iconaApp, common.js) */
+.ab-tab th.ab-app .ab-ic { display: block; color: var(--cosedil-blue); }
+.ab-tab th.ab-app .ab-ic svg { display: block; width: 20px; height: 20px; margin: 0 auto 5px; }
+.ab-tab .ab-nome { display: flex; align-items: flex-end; justify-content: center; min-height: 2.3em; color: var(--ink); font-size: 10.5px; letter-spacing: .03em; line-height: 1.15; overflow-wrap: anywhere; }
+.ab-tab th.ab-app .ris.segnaposto { visibility: hidden; }
 .ab-tab th.ab-app .ris { display: inline-block; margin-top: 4px; font-weight: 800; font-stretch: 80%; font-size: 9px; letter-spacing: .1em; color: var(--grey); border: 1px solid var(--soft); padding: 0 4px; }
 .ab-tab .ab-conta { display: block; margin-top: 4px; font-weight: 600; letter-spacing: .04em; text-transform: none; font-size: 11px; color: var(--grey); }
 /* "tutti" sopra "nessuno": affiancati allargherebbero la colonna a 110px */

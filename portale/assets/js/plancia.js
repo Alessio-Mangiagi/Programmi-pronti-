@@ -11,11 +11,17 @@
 // aggiunto dagli admin (app-extra) non è qui: prende le prime tre lettere del nome.
 const SIGLE = { ddt: 'DDT', agente: 'AI', confronta: 'PDF', ocr: 'OCR', scadenzario: 'SCA', requisiti: 'REQ', incampo: 'CAM', trimble: 'TRM', timbri: 'TIM', auguri: 'WA' };
 const sigla = (a) => SIGLE[a.id] || String(a.nome || a.id).replace(/[^A-Za-zÀ-ÿ]/g, '').slice(0, 3).toUpperCase();
-// Nella barra delle app, le stesse icone della griglia (ICONS, in common.js);
-// la sigla resta per chi un'icona non ce l'ha.
-const marchio = (a) => ICONS[a.id] || esc(sigla(a));
+// Icona del programma (common.js, la stessa delle schede della home) nella barra delle app, nella
+// colonna "ultima app" degli utenti e nella cronologia; un programma aggiunto dagli admin prende
+// l'icona generica, mai una sigla di testo. Il nome per esteso va nel title di chi la contiene.
+// La sigla resta solo nelle frasi ("Ora in DDT") e nel riquadro "La più usata".
+const marchio = (a) => iconaApp(a.id);
 
 let apps = [];
+// id -> nome di ogni programma visibile, anche senza tessera (Magazzino dentro "DDT e Magazzino"):
+// da /api/apps (nomi). Serve alle righe di attività e alla colonna "ultima app".
+let nomiApp = {};
+const nomeProgramma = (id, nomeDalRegistro) => (appById(id) || {}).nome || nomiApp[id] || nomeDalRegistro || id;
 let isAdmin = false;   // solo gli admin del portale possono fermare le app
 const online = {};     // id -> true/false, dall'ultimo giro di /api/status
 const appById = (id) => apps.find((a) => a.id === id);
@@ -285,7 +291,7 @@ function durata(min) {
 }
 
 // Nome breve dell'app per le frasi ("in DDT dalle 10:03").
-const nomeApp = (id) => { const a = appById(id); return a ? sigla(a) : id; };
+const nomeApp = (id) => { const a = appById(id); return a ? sigla(a) : nomeProgramma(id); };
 
 // ---------------------------------------------------------------- calendario
 // Mese a griglia (lunedì per primo). Ogni giorno ha un livello di attività
@@ -375,7 +381,7 @@ function renderUtenti() {
   const el = document.getElementById('utenti');
   if (!utenti.length) { el.innerHTML = '<p class="empty">Nessun utente registrato.</p>'; return; }
   el.innerHTML = utenti.map((u) => {
-    const app = u.ultimaApp && appById(u.ultimaApp.appId);
+    const ultima = u.ultimaApp && u.ultimaApp.appId;   // anche un programma senza tessera ha icona e nome
     const ora = u.inUso || [];
     // Chi ha un'app aperta adesso lo si dice prima di tutto: è la domanda della plancia.
     const meta = ora.length
@@ -386,7 +392,7 @@ function renderUtenti() {
       <span class="u-name"><b>${esc(u.nome)}</b><span class="u-meta">${esc(u.username)} · ${esc(meta)}</span></span>
       <span class="u-role${u.disattivato ? ' off' : ''}">${u.disattivato ? 'Disattivato' : u.ruolo === 'admin' ? 'Admin' : 'Utente'}</span>
       <span class="u-num"><b>${u.accessi30}</b><small>accessi 30 gg</small></span>
-      <span class="u-app" title="${app ? 'Ultima app: ' + esc(app.nome) : ''}">${app ? esc(sigla(app)) : '—'}</span>
+      <span class="u-app" title="${ultima ? 'Ultima app: ' + esc(nomeProgramma(ultima)) : ''}">${ultima ? iconaApp(ultima) : '—'}</span>
     </button>`;
   }).join('');
   el.querySelectorAll('[data-utente]').forEach((b) => b.addEventListener('click', () => {
@@ -397,8 +403,9 @@ function renderUtenti() {
 }
 
 // Testo della riga: cosa è successo, con i dettagli che l'azione porta con sé.
-function testoRiga(e, app) {
-  const nomeB = app ? `<b>${esc(app.nome)}</b>` : e.appId ? `<b>${esc(e.appId)}</b>` : '';
+// Il nome del programma viene da nomeProgramma(): anche quelli senza tessera o tolti dall'elenco.
+function testoRiga(e) {
+  const nomeB = e.appId ? `<b>${esc(nomeProgramma(e.appId, e.appNome))}</b>` : '';
   if (e.azione === 'chiudi') {
     const dal = e.inizio ? ora2(new Date(e.inizio)) + '–' + ora2(new Date(e.ts)) : '';
     return `${nomeB} <small>usata ${esc(dal)} · ${esc(durata(e.durataMin))}</small>`;
@@ -411,7 +418,7 @@ function testoRiga(e, app) {
   // password del portale: /api/verifica-password scrive appId/appNome del programma.
   // VFP Transfer non e' nel registro delle app: il nome arriva solo da appNome.
   if (e.appId && /^login-(app|bloccato|disattivato)$/.test(e.azione)) {
-    return `<b>${esc(app ? app.nome : (e.appNome || e.appId))}</b> · ${esc(AZIONI[e.azione])}`;
+    return `<b>${esc(nomeProgramma(e.appId, e.appNome))}</b> · ${esc(AZIONI[e.azione])}`;
   }
   if (e.azione === 'logout') return 'Uscita dal Portale';
   // azioni di amministrazione (abilitazioni, password, email, commesse): con il dettaglio di common.js
@@ -428,11 +435,12 @@ function renderTimeline(attivita, nome, inUso) {
   // Con un giorno passato filtrato, "Adesso" non c'entra.
   const conVive = !giornoSel || giornoSel === chiaveGiorno(new Date());
   const vive = (conVive ? inUso || [] : []).map((x) => {
-    const app = appById(x.appId);
+    // anche un programma senza tessera (Magazzino dentro "DDT e Magazzino") ha icona e nome veri
+    const nome = nomeProgramma(x.appId);
     return `<li class="live">
       <time datetime="${esc(x.dal)}">${esc(ora2(new Date(x.dal)))}</time>
-      <span class="k">${app ? esc(sigla(app)) : '—'}</span>
-      <span class="t"><b>${esc(app ? app.nome : x.appId)}</b> <small>aperta da ${esc(durata((Date.now() - Date.parse(x.dal)) / 60000))}</small></span>
+      <span class="k" title="${esc(nome)}">${iconaApp(x.appId)}</span>
+      <span class="t"><b>${esc(nome)}</b> <small>aperta da ${esc(durata((Date.now() - Date.parse(x.dal)) / 60000))}</small></span>
       <span class="az">In uso ora</span></li>`;
   });
   if (!attivita.length && !vive.length) {
@@ -447,12 +455,11 @@ function renderTimeline(attivita, nome, inUso) {
     const d = new Date(e.ts);
     const g = giornoEtichetta(d);
     if (g !== ultimoGiorno) { righe.push(`<li class="day">${esc(g)}</li>`); ultimoGiorno = g; }
-    const app = e.appId ? appById(e.appId) : null;
-    // App non più nell'elenco (rimossa o non visibile): si mostra l'id, non si perde la riga.
-    const testo = testoRiga(e, app);
+    // Programma non più nell'elenco (rimosso o non visibile): nome dal registro o id, non si perde la riga.
+    const testo = testoRiga(e);
     righe.push(`<li class="${e.azione === 'login-bloccato' ? 'warn' : e.azione === 'evento' ? 'ev' : ''}">
       <time datetime="${esc(e.ts)}">${esc(ora2(d))}</time>
-      <span class="k">${app ? esc(sigla(app)) : '—'}</span>
+      <span class="k" title="${esc(e.appId ? nomeProgramma(e.appId, e.appNome) : 'Portale')}">${iconaApp(e.appId ? e.appId : 'portale')}</span>
       <span class="t">${testo}</span>
       <span class="az">${esc(AZIONI[e.azione] || e.azione)}</span></li>`);
   }
@@ -583,7 +590,9 @@ document.getElementById('logout').addEventListener('click', async () => {
 async function init() {
   const ok = await loadMe();
   if (!ok) return;
-  apps = (await (await fetch('/api/apps')).json()).apps;
+  const elenco = await (await fetch('/api/apps')).json();
+  apps = elenco.apps;
+  nomiApp = elenco.nomi || {};
   renderApps();
   renderOggi();
   renderCalendario();   // subito, vuoto: i livelli arrivano con /api/plancia

@@ -5,23 +5,9 @@
 // Niente stato acceso/spento né storico: un clic apre l'app, e se è spenta
 // la avvia prima. Testi delle schede (fai, guida) dal server: /api/apps.
 
-// Tratti delle icone per app (SVG stroke, niente emoji): solo i path, il
-// contorno lo aggiunge icona(). Non sono gli ICONS di common.js (SVG interi).
-const TRATTI = {
-  ddt: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/>',
-  agente: '<path d="M4 19V5M4 19h16"/><path d="M8 15v-4M12 15V8M16 15v-6"/>',
-  confronta: '<path d="M5 4h6v16H5zM13 4h6v16h-6z"/>',
-  ocr: '<path d="M3 8V6a2 2 0 0 1 2-2h2M17 4h2a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2M7 20H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10M9 9h6M9 15h4"/>',
-  scadenzario: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="m9 15 2 2 4-4"/>',
-  requisiti: '<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/><path d="m8 11 2.2 2.2L14.5 9"/>',
-  trimble: '<path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/>',
-  incampo: '<path d="M3 7v13l6-2 6 2 6-2V5l-6 2-6-2-3 1"/><path d="M15 7v5"/><path d="M9 5v13"/><path d="M15 21v-2"/>',
-  skytower: '<path d="M9 21V9l3-6 3 6v12"/><path d="M9 13h6M9 17h6"/><path d="M4 21h16"/><path d="M5 21v-5l4-2M19 21v-5l-4-2"/>',
-  magazzino: '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
-  timbri: '<circle cx="12" cy="5.5" r="2.5"/><path d="M10.5 8v3.5M13.5 8v3.5"/><rect x="5" y="11.5" width="14" height="4.5" rx="1"/><path d="M4 20h16"/>',
-  auguri: '<path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/>',
-};
-const icona = (id) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${TRATTI[id] || TRATTI.ddt}</svg>`;
+// Icone dei programmi: le stesse della plancia, da common.js (ICONE_APP, iconaApp), così home e
+// plancia mostrano lo stesso disegno per ogni programma (prima erano due insiemi diversi).
+const icona = (id) => iconaApp(id);
 const FRECCIA = '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
 let apps = [];        // globale: lo riusa anche chat.js
