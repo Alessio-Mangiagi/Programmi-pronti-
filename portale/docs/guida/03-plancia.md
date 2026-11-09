@@ -94,13 +94,15 @@ Se lo username indicato non esiste, compare l'etichetta *non esiste* e manca il 
 ## 3.5 Gli utenti e le loro attività
 
 In basso a sinistra c'è l'elenco **Utenti**: per ognuno ruolo, ultimo accesso, quanti
-accessi negli ultimi 30 giorni e la sigla del programma che usa di più. Chi è disattivato
-ha l'etichetta rossa *Disattivato*; chi non è mai entrato ha *Mai entrato*.
+accessi negli ultimi 30 giorni e l'icona dell'ultimo programma aperto (il nome compare
+passandoci sopra con il mouse). Chi è disattivato ha l'etichetta rossa *Disattivato*; chi
+non è mai entrato ha *Mai entrato*.
 
 **Clic su un utente**: a destra compare **Attività di …**, giorno per giorno: accessi al
 Portale, programmi aperti o avviati, quanto tempo li ha usati (*usata 09:21–10:06 · 45
 min*) e le azioni principali fatte dentro i programmi (per esempio *InCampo · Non
-conformità*).
+conformità*). Ogni riga ha l'icona del programma, la stessa delle schede della pagina
+iniziale; la casetta indica le azioni fatte nel Portale (accessi, utenti, abilitazioni).
 
 ![Le attività di un utente](img/25-attivita-utente.png)
 
