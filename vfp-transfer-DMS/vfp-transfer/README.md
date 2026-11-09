@@ -60,8 +60,17 @@ L'interfaccia chiede **nome utente e password**. Vale anche la **password del Po
 (una password per tutti i programmi): scrivendo il nome utente di qui, oppure lo username o l'email del
 portale, con la password del portale si entra nell'utente di VFP Transfer che ha **lo stesso nome dello
 username del portale o la stessa email**. Gli utenti restano quelli creati qui (con il codice inviato
-all'amministratore): il portale non ne crea e non cambia ruoli o aree. La password di VFP Transfer resta
-valida; col portale spento vale solo quella. Codice in `auth._utente_dal_portale`.
+all'amministratore). La password di VFP Transfer resta valida; col portale spento vale solo quella. Codice
+in `auth._utente_dal_portale`.
+
+**Un solo login (09/11/2026).** Aprendo la pagina (`/`, o `/login.html` dopo una sessione scaduta) con la
+sessione del portale nel browser (cookie `sid`, stesso host) si entra senza scrivere nulla:
+`auth.ingresso_dal_portale` chiede al portale chi è (solo `sid` va al portale, `/api/verify?app=vfp-transfer`) e
+apre la sessione dell'utente collegato (stesso nome o stessa email). Un **amministratore del portale** (ruolo
+admin in utenti.json; non basta l'admin da regola IP) è amministratore anche qui: l'utente "utente" viene
+promosso, e se manca viene creato admin con una password casuale (unica eccezione alla creazione col codice
+all'amministratore, decisa dall'utente: "le mie credenziali valgono come admin ovunque"). Creazione e promozione
+finiscono nel registro attività (Sicurezza). Dopo **Esci** (`/login.html?uscito=1`) non si rientra da soli.
 
 Due ruoli:
 

@@ -1211,6 +1211,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._allowed(sess, "utente") and self._confronto_get(url, sess)
         if url.path.startswith("/api/"):
             return self._send(404, {"error": "non trovato"})
+        # Un solo login nella suite (09/11/2026): senza sessione qui ma con quella del portale si entra da soli
+        # (auth.ingresso_dal_portale; l'amministratore del portale e' amministratore anche qui). Vale anche per
+        # /login.html, dove base.js manda chi ha la sessione scaduta; non dopo "Esci" (/login.html?uscito=1),
+        # cosi' chi esce resta fuori e puo' entrare con un altro utente di qui.
+        if sess is None and url.path in ("/", "", "/index.html", "/login.html") and "uscito" not in q:
+            dal_portale = auth.ingresso_dal_portale(self.headers.get("Cookie") or "", ip=self.client_address[0])
+            if dal_portale:
+                token, role, nome = dal_portale
+                log.info("Accesso all'interfaccia dal Portale: %s (%s)", nome, role)
+                cookie = f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict{'; Secure' if NET['tls'] else ''}"
+                return self._send(302, b"", "text/plain", {"Location": "/", "Set-Cookie": cookie})
         # pagine: senza sessione si va al login, con la sessione il login rimanda alla pagina principale
         if url.path in ("/", "", "/index.html") and sess is None:
             return self._send(302, b"", "text/plain", {"Location": "/login.html"})

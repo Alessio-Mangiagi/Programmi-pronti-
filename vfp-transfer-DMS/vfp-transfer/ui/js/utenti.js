@@ -36,7 +36,8 @@ $('#btnSignOut').addEventListener('click', async () => {
   if (state.dirty && !(await confirmDialog({ title: 'Uscire senza salvare?', html: '<p>Ci sono impostazioni modificate non salvate.</p>', okText: 'Esci' }))) return;
   state.dirty = false;
   try { await api('/api/session/logout', { method: 'POST' }); } catch { /* si esce comunque */ }
-  window.location.replace('/login.html');
+  // ?uscito=1: dopo "Esci" il server non rientra da solo con la sessione del Portale (vfp_gui.do_GET)
+  window.location.replace('/login.html?uscito=1');
 });
 
 // ------------------------------------------------------------------ attivita' degli utenti (solo amministratori)

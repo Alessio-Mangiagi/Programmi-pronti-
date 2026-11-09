@@ -14,7 +14,9 @@ Password del portale: chi ha un utente qui entra anche con la password del Porta
 (una password per tutti i programmi, scelta del 06/11/2026). Se la password di VFP Transfer non coincide,
 login() chiede al portale (shared/sso/cosedil_sso.verifica_password) se e' quella del portale; l'utente di
 qui e' quello con lo stesso nome dello username del portale o con la stessa email. Gli utenti si creano
-sempre e solo qui (con il codice all'amministratore): il portale non ne aggiunge e non cambia i ruoli.
+qui (con il codice all'amministratore); unica eccezione dal 09/11/2026: l'amministratore del portale che apre
+l'interfaccia con la sessione del portale entra da solo ed e' amministratore anche qui, creato se manca
+(ingresso_dal_portale, un solo login nella suite).
 
 Ogni modifica a utenti e credenziali richiede un codice monouso inviato via email SOLO all'amministratore
 (ADMIN_EMAIL): valido 10 minuti, legato a quella modifica, 5 tentativi. Finche' l'invio email non e'
@@ -397,6 +399,75 @@ def login(name, password, ip=None):
             users[match]["last_login"] = time.strftime("%Y-%m-%dT%H:%M:%S")
             _save_users(users)
     return token, users.get(match, {}).get("role", "utente")
+
+
+def _nome_per_portale(users, username, email):
+    """Utente di qui per la persona del portale: stesso nome dello username, altrimenti la stessa email (una sola)."""
+    username, email = (username or "").lower(), (email or "").lower()
+    per_nome = [n for n in users if n.lower() == username]
+    if per_nome:
+        return per_nome[0]
+    per_email = [n for n, u in users.items() if email and (u.get("email") or "").strip().lower() == email]
+    return per_email[0] if len(per_email) == 1 else None
+
+
+def ingresso_dal_portale(cookie_header, ip=None):
+    """Un solo login nella suite (richiesta dell'utente del 09/11/2026): chi apre l'interfaccia con la sessione del
+    Portale Suite Cosedil (cookie ``sid``, che il browser manda anche qui: stesso host) entra senza scrivere nulla.
+
+    - Utente di qui collegato alla persona del portale (stesso nome o stessa email, come per la password del
+      portale): entra con il suo ruolo e la sua area.
+    - **Amministratore del portale** (ruolo ``admin`` in utenti.json): e' amministratore anche qui, con tutte le
+      aree. Se l'utente di qui era "utente" viene promosso; se manca viene creato (nome = username del portale,
+      password casuale che nessuno conosce: si entra dal portale o con la password del portale). E' la sola
+      eccezione alla regola "gli utenti si creano solo qui con il codice all'amministratore": la decisione e'
+      dell'utente ("le mie credenziali valgono come admin ovunque") e l'identita' l'ha gia' verificata il portale.
+      L'admin concesso da una regola IP del portale non basta (vale solo davanti a quel PC). Solo promozione.
+    - Chiunque altro senza utente qui: None, resta la pagina di accesso di sempre.
+
+    Al portale va solo ``sid=<valore>`` (non il cookie di sessione di VFP Transfer). Portale spento, COSEDIL_SSO=off
+    o modulo condiviso assente (copia fuori dalla suite): None. Ritorna (token, ruolo, nome) oppure None.
+    """
+    try:
+        import sys
+        if str(_SSO) not in sys.path:
+            sys.path.insert(0, str(_SSO))
+        import cosedil_sso
+    except Exception:  # copia del programma fuori dalla suite: solo login locale
+        return None
+    sid = cosedil_sso.leggi_sid(cookie_header or "")
+    if not cosedil_sso.ENABLED or not sid:
+        return None
+    v = cosedil_sso.verifica_sessione(f"sid={sid}", "vfp-transfer")
+    username = (v.get("username") or "").strip()
+    if not v.get("ok") or not username:
+        return None
+    admin_portale = v.get("ruolo") == "admin" and bool(v.get("admin"))
+    evento = None
+    with _lock:
+        users = load_users()
+        nome = _nome_per_portale(users, username, v.get("email"))
+        if nome is None:
+            if not admin_portale or not _NAME_RE.match(username):
+                return None
+            nome = username
+            users[nome] = {"role": "admin", "hash": hash_password(secrets.token_urlsafe(32)),
+                           "email": (v.get("email") or "").strip(), "area": AREA_PREDEFINITA,
+                           "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "origine": "portale"}
+            evento = ("Utente creato dal Portale", "amministratore del Portale")
+        elif admin_portale and users[nome]["role"] != "admin":
+            users[nome]["role"] = "admin"
+            evento = ("Ruolo amministratore dal Portale", "amministratore del Portale")
+        users[nome]["last_login"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        _save_users(users)
+        role = users[nome]["role"]
+        token = secrets.token_urlsafe(32)
+        now = time.time()
+        _sessions[token] = {"user": nome, "role": role, "created": now, "seen": now}
+    if evento:
+        attivita.record(nome, "sicurezza", evento[0], evento[1], role=role)
+    attivita.record(nome, "accesso", "Accesso dal Portale", "", role=role)
+    return token, role, nome
 
 
 def session(token):
