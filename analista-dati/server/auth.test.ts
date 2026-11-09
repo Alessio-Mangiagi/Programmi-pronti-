@@ -163,6 +163,38 @@ describe('ingresso dal Portale senza seconda password (sessioneDalPortale)', () 
     expect(auth.sessionUser(r.token)?.username).toBe('vecchia.sess')
   })
 
+  // Regola della suite del 09/11/2026: le credenziali di un amministratore del portale valgono come admin ovunque.
+  it("amministratore del portale con un account 'user' già esistente: diventa admin, anche la sessione aperta", async () => {
+    await auth.createUser('a.capo', 'password-propria', 'user')
+    const r = await auth.sessioneDalPortale({ username: 'a.capo', ruolo: 'admin', admin: true })
+    expect(r?.creato).toBe(false)
+    expect(r?.user.role).toBe('admin')
+    expect(auth.sessionUser(r!.token)?.role).toBe('admin')
+    // sessione già aperta da utente semplice (login a mano) della stessa persona: promossa al volo
+    await auth.createUser('b.capo', 'password-propria', 'user')
+    const m = await auth.login('b.capo', 'password-propria', 'b.capo')
+    if (!m.ok) throw new Error('login')
+    expect(auth.sessionUser(m.token)?.role).toBe('user')
+    expect(await auth.sessioneDalPortale({ username: 'b.capo', ruolo: 'admin', admin: true }, m.token)).toBeNull()
+    expect(auth.sessionUser(m.token)?.role).toBe('admin')
+  })
+
+  it("chi non è amministratore del portale non guadagna diritti; l'admin da regola IP non basta", async () => {
+    await auth.createUser('c.semplice', 'password-propria', 'user')
+    const r = await auth.sessioneDalPortale({ username: 'c.semplice', ruolo: 'utente', admin: false })
+    expect(r?.user.role).toBe('user')
+    // admin per l'agente solo per una regola IP del portale (ruolo utente): il ruolo qui non cambia
+    const ip = await auth.sessioneDalPortale({ username: 'c.semplice', ruolo: 'utente', admin: true }, r!.token)
+    expect(ip).toBeNull()
+    expect(auth.sessionUser(r!.token)?.role).toBe('user')
+    // login a mano su un ALTRO account col portale di un admin aperto: quell'account non viene promosso
+    await auth.createUser('d.ufficio', 'password-ufficio', 'user')
+    const m = await auth.login('d.ufficio', 'password-ufficio', 'e.admin')
+    if (!m.ok) throw new Error('login')
+    expect(await auth.sessioneDalPortale({ username: 'e.admin', ruolo: 'admin', admin: true }, m.token)).toBeNull()
+    expect(auth.sessionUser(m.token)?.role).toBe('user')
+  })
+
   it('username del portale non valido qui o assente: resta il login a mano', async () => {
     expect(await auth.sessioneDalPortale({ username: 'x' })).toBeNull()
     expect(await auth.sessioneDalPortale({ username: null })).toBeNull()

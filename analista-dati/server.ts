@@ -142,7 +142,7 @@ app.use(cosedilSSO({ app: 'agente' }) as express.RequestHandler)
  * mostra mai la schermata di login. Senza gate (COSEDIL_SSO=off) non fa niente.
  */
 app.use((req, res, next) => {
-  const id = (req as express.Request & { cosedil?: { username: string | null; nome?: string | null; admin?: boolean } }).cosedil
+  const id = (req as express.Request & { cosedil?: { username: string | null; nome?: string | null; admin?: boolean; ruolo?: string | null } }).cosedil
   if (!AUTH_ENABLED || !id?.username) return next()
   const cookies = parseCookies(req.headers.cookie)
   sessioneDalPortale(id, cookies[COOKIE]).then((nuova) => {

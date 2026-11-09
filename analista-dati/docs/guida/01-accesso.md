@@ -5,7 +5,12 @@
 
 ## 1.1 Entrare
 
-Dal Portale apri *Analista Dati*. Compare la pagina **Accedi**:
+Dal Portale apri *Analista Dati*: entri **direttamente**, con il tuo utente del Portale e senza un'altra
+password. La prima volta l'account di Analista Dati si crea da solo, con lo stesso nome utente del Portale.
+Se nel Portale sei **amministratore**, lo sei anche qui (anche se il tuo account di Analista Dati era nato
+come utente semplice): un amministratore del Portale vale come amministratore in tutti i programmi.
+
+La pagina **Accedi** compare solo se apri Analista Dati senza passare dal Portale (o con il Portale spento):
 
 ![La pagina di accesso](img/01-login.png)
 

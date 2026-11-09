@@ -239,8 +239,34 @@ export async function login(username: string, password: string, portale: string 
   return { ok: true, token, user: { id: row.id, username: row.username, role: row.role }, mustChange: row.must_change_pw === 1 }
 }
 
-/** Chi arriva dal portale (identità messa dal gate SSO in req.cosedil). */
-export interface IdentitaPortale { username: string | null; nome?: string | null; admin?: boolean }
+/** Chi arriva dal portale (identità messa dal gate SSO in req.cosedil). `ruolo` = ruolo in utenti.json del
+ *  portale ('admin' / 'utente'); `admin` = admin per l'agente (anche da regola IP del portale). */
+export interface IdentitaPortale { username: string | null; nome?: string | null; admin?: boolean; ruolo?: string | null }
+
+/**
+ * Amministratore del portale = admin anche qui (regola della suite del 09/11/2026: "le mie credenziali valgono
+ * come admin ovunque"). Se il ruolo nel portale è 'admin' e l'account dell'agente non lo è, lo si promuove,
+ * insieme alle sue sessioni aperte (il ruolo della sessione è copiato in sessions.role). Solo promozione: chi
+ * smette di essere admin nel portale non perde il ruolo qui (lo toglie un admin dalla pagina Utenti), e l'admin
+ * per l'agente concesso da una regola IP del portale non basta, perché il ruolo resterebbe anche lontano da quel PC.
+ * Ritorna true se ha promosso.
+ */
+function promuoviAdminDalPortale(id: IdentitaPortale, userId: number): boolean {
+  if (id.ruolo !== 'admin' || !id.admin) return false
+  const r = appdb.prepare("UPDATE users SET role='admin' WHERE id=? AND role<>'admin'").run(userId)
+  if (Number(r.changes) === 0) return false
+  appdb.prepare("UPDATE sessions SET role='admin' WHERE user_id=?").run(userId)
+  log('ruolo_admin_dal_portale', {}, { userId })
+  return true
+}
+
+/** Sessione già aperta: promuove l'account solo se è proprio quello della persona del portale (stesso username).
+ *  Un login a mano su un altro account fatto col portale aperto resta com'è. */
+function allineaAdmin(id: IdentitaPortale, usernameSessione: string, chi: string): void {
+  if (usernameSessione !== chi) return
+  const u = appdb.prepare('SELECT id FROM users WHERE username=?').get(chi) as { id: number } | undefined
+  if (u) promuoviAdminDalPortale(id, u.id)
+}
 
 /**
  * Ingresso dal Portale Suite senza seconda password (scelta del 06/11/2026: una password
@@ -264,9 +290,13 @@ export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenA
     const s = appdb.prepare('SELECT username, portale, expires_at FROM sessions WHERE token=?').get(hashToken(tokenAttuale)) as
       { username: string; portale: string | null; expires_at: string } | undefined
     if (s && new Date(s.expires_at).getTime() >= Date.now()) {
-      if (s.portale === chi) return null
+      if (s.portale === chi) {
+        allineaAdmin(id, s.username, chi)
+        return null
+      }
       if (s.portale == null && s.username === chi) {
         appdb.prepare('UPDATE sessions SET portale=? WHERE token=?').run(chi, hashToken(tokenAttuale))
+        allineaAdmin(id, s.username, chi)
         return null
       }
       logout(tokenAttuale) // sessione di un'altra persona del portale: non deve restare aperta
@@ -286,6 +316,8 @@ export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenA
         { id: number; username: string; role: Role } | undefined
       if (!row) throw e
     }
+  } else if (promuoviAdminDalPortale(id, row.id)) {
+    row = { ...row, role: 'admin' }
   }
   const token = apriSessione(row, chi)
   return { token, user: { id: row.id, username: row.username, role: row.role }, creato }
