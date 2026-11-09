@@ -15,6 +15,7 @@ import { ingressoDalPortale } from './middleware/auth';
 import { proxyMagazzino } from './services/proxyMagazzino';
 import { codicePerMagazzino } from './services/commessaSessione';
 import { metricsMiddleware } from './utils/metrics';
+import { conRitentativi } from './utils/sessioniFile';
 import logger from './utils/logger';
 import { config as appCfg, APP_DIR } from './config';
 
@@ -139,13 +140,17 @@ try {
 
 app.use(
   session({
-    store: new FileStore({
-      path: sessionsDir,
-      ttl: 12 * 60 * 60, // TTL 12h, sincronizzato con cookie.maxAge
-      retries: 2,
-      reapInterval: 60 * 60, // Pulizia automatica sessioni scadute ogni ora
-      logFn: () => {}, // Silenzia log del store file
-    }),
+    // conRitentativi: le scritture della stessa sessione da richieste parallele si scontrano su Windows
+    // (EPERM nel rename); session-file-store ritenta solo le letture (utils/sessioniFile.ts)
+    store: conRitentativi(
+      new FileStore({
+        path: sessionsDir,
+        ttl: 12 * 60 * 60, // TTL 12h, sincronizzato con cookie.maxAge
+        retries: 2,
+        reapInterval: 60 * 60, // Pulizia automatica sessioni scadute ogni ora
+        logFn: () => {}, // Silenzia log del store file
+      })
+    ),
     // Nome proprio e non il default "connect.sid": i cookie valgono per host,
     // non per porta, e Lettore DDT e Verifica Requisiti sono entrambe Express
     // sullo stesso PC. Con lo stesso nome, la prima che scrive in sessione
@@ -181,10 +186,22 @@ app.use('/magazzino', proxyMagazzino({ commessaPer: codicePerMagazzino }));
 // porta poteva tenerlo occupato con corpi enormi (revisione di sicurezza del 03/11/2026).
 // La sessione sta sopra di proposito: il parser grande deve sapere se l'utente è autenticato.
 // I PDF passano da multer; nessun client manda form urlencoded: lì basta poco.
-const ROTTE_CORPO_GRANDE = ['/claude-to-excel', '/prepare-claude', '/versions', '/paniere', '/project',
-  '/json-exports', '/log-excel-validation', '/ddt-check-duplicates', '/batch', '/export'];
+const ROTTE_CORPO_GRANDE = [
+  '/claude-to-excel',
+  '/prepare-claude',
+  '/versions',
+  '/paniere',
+  '/project',
+  '/json-exports',
+  '/log-excel-validation',
+  '/ddt-check-duplicates',
+  '/batch',
+  '/export',
+];
 const jsonGrande = express.json({ limit: '50mb' });
-app.use(ROTTE_CORPO_GRANDE, (req, res, next) => (req.session?.userId ? jsonGrande(req, res, next) : next()));
+app.use(ROTTE_CORPO_GRANDE, (req, res, next) =>
+  req.session?.userId ? jsonGrande(req, res, next) : next()
+);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 

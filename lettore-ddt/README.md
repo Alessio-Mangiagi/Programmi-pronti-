@@ -41,7 +41,7 @@ Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con accou
 | Area | Misura |
 |---|---|
 | DDT firmati (.p7m) | Busta CAdES aperta e firma verificata (catena fino a un ente qualificato degli elenchi eIDAS, revoca, scadenza, marca temporale) dal motore comune `shared/firma` (`src/services/firmaDigitale.ts`); conversione singola e automatica, esito con bollino, nel registro attività e nell'export archiviato; a SkyTower va la busta originale (PDF estratto se la rifiuta). Firma non valida = segnalazione, non blocco |
-| Account | Login con username/password, sessione con cookie `httpOnly`. Dal Portale Suite si entra senza seconda password se c'è un account DDT con lo stesso username (`ingressoDalPortale`, `src/middleware/auth.ts`); gli account non si creano da soli perché ognuno ha la sua commessa |
+| Account | Un solo login dal Portale Suite (09/11/2026): `ingressoDalPortale` (`src/middleware/auth.ts`) apre la sessione dell'account DDT con lo stesso username e, se manca, lo **crea** (`creaAccountDalPortale`: non admin, senza password propria, nessuna commessa) a chi il portale dice abilitato proprio al DDT (`req.cosedil.diretto`); chi ha solo il Magazzino va al Magazzino. Admin = admin del portale (`eAdmin`). Il login username/password resta solo col gate spento (installazione senza portale) |
 | Password | Hash bcrypt, mai in chiaro; lunghezza minima 8 caratteri |
 | Archivio utenti | File `users.enc` cifrato AES-256-GCM (chiave da env o keyfile locale) |
 | Brute-force | Lockout temporaneo dopo 5 tentativi falliti (15 min) |
@@ -156,7 +156,7 @@ lettore-ddt/
 |---|---|---|
 | GET | `/guscio/stato` | Chi è entrato (portale), account DDT sì/no, commessa corrente, `scelta` |
 | GET | `/guscio/commesse` | Commesse del registro della suite, cartelle precedenti (dell'account; tutte per l'admin), proposta |
-| POST | `/guscio/commessa` | `{codice}` → commessa della sessione (cartella dati, SkyTower, magazzino) |
+| POST | `/guscio/commessa` | `{codice}` → commessa della sessione (cartella dati, SkyTower, magazzino); 403 per una commessa non abilitata |
 | * | `/magazzino/*` | Proxy verso il Magazzino Operativo (127.0.0.1:5200), con barra comune nella pagina principale |
 | GET | `/guscio/barra.js` | La barra comune (static/guscio), caricata anche nella pagina del Magazzino |
 | POST | `/batch/sorveglianza/commessa` | (admin) `{input, commessa}` → commessa di una cartella sorvegliata dal registro |
@@ -171,6 +171,8 @@ lettore-ddt/
 | POST | `/admin/api/users` | Crea account |
 | POST | `/admin/api/users/import-excel` | Importa batch utenti da Excel/CSV |
 | DELETE | `/admin/api/users/:id` | Revoca (elimina) account |
+| GET | `/admin/api/commesse` | Commesse del registro + cartelle precedenti, per la finestra "Commesse abilitate" |
+| POST | `/admin/api/users/:id/commesse-abilitate` | `{commesse: [...]}` → commesse abilitate dell'account (vuoto = la sua di sempre); traccia `commesse_abilitate` nel registro |
 | POST | `/admin/api/users/:id/password` | Reset password account |
 | POST | `/admin/api/users/:id/disabled` | Abilita / disabilita account |
 | POST | `/admin/api/users/:id/codice-commessa` | Codice commessa aziendale dell'account (`{codiceCommessa}`, vuoto = nessun invio a SkyTower) |
@@ -279,9 +281,20 @@ Magazzino, Flask). Contratto fra i due lati: `shared/suite/CONTRATTI.md`.
 
 - **Una tessera nel portale** (`ddt`, "DDT e Magazzino", `comprende: ['magazzino']`):
   la vede chi è abilitato al Lettore DDT o al Magazzino. Il gate SSO accetta i due
-  id (`cosedilSSO({ app: ['ddt', 'magazzino'] })`); l'admin resta quello di `ddt`.
-  La sezione DDT chiede sempre l'account DDT (il DDT non crea account); chi non ce
-  l'ha usa il Magazzino e il login lo dice.
+  id (`cosedilSSO({ app: ['ddt', 'magazzino'] })`); l'admin è quello del portale.
+  **Un solo login** (09/11/2026): mai un secondo accesso. L'account DDT si crea da sé
+  al primo ingresso per chi il portale abilita proprio al DDT (`/api/verify` →
+  `diretto`); chi ha solo il Magazzino viene portato a `/magazzino/` (`main.tsx`,
+  `/guscio/stato` → `ddt.motivo`); "Esci" torna al portale (`portale.indirizzo`).
+- **Commesse abilitate** (opzione b del 09/11/2026): gli admin scelgono fra tutte le
+  commesse; gli altri account solo fra quelle in `UserRow.commesseAbilitate` (pagina
+  admin, pulsante *Commesse*), senza elenco la loro commessa di sempre (`commessaId` +
+  `codiceCommessa`). Controllo lato server in `elencoPer`/`scegliCommessa` e in
+  `requireAuth` (`commessaNonAbilitata` → 403 `COMMESSA_NON_ABILITATA`; account senza
+  commessa → 403 `COMMESSA_DA_SCEGLIERE`, non 401). Una sola commessa = scelta automatica.
+  Chi entra solo per il Magazzino sceglie liberamente (filtro del Magazzino, niente dati DDT).
+- **Sessioni su file** (`utils/sessioniFile.ts`): le scritture si ritentano su
+  EPERM/EBUSY/EACCES (richieste parallele della stessa sessione su Windows).
 - **Commessa all'ingresso** (`services/commessaSessione.ts`, rotte `/guscio/*`):
   scelta una volta dal registro della suite, in sessione (`commessaId` = cartella,
   `commessaCodice`, `commessaScelta`); proposta l'ultima scelta

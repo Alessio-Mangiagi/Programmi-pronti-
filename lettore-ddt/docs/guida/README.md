@@ -26,7 +26,7 @@ controlla i numeri, ti fa vedere un'anteprima e ti scarica l'Excel.
 
 ## Indice
 
-1. [Entrare, cambiare la password, uscire](01-accesso.md)
+1. [Entrare (un solo accesso dal Portale), scegliere la commessa, uscire](01-accesso.md)
 2. [Convertire un DDT in Excel (passo per passo)](02-convertire-un-ddt.md)
 3. [Paniere, tipi di documento e altri modi di caricare i dati](03-paniere-e-altri-caricamenti.md)
 4. [Strumenti degli amministratori: conversione automatica, archivio, fornitori](04-strumenti-amministratori.md)

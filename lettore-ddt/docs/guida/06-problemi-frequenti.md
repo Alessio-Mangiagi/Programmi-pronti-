@@ -12,7 +12,10 @@
 | *"Il magazzino li registrerà appena acceso"* | In quel momento il Magazzino non rispondeva | Niente: i carichi li prende da solo appena riparte (al massimo dopo due minuti) |
 | *"Sto avviando il magazzino…"* (sezione Magazzino) | Il Magazzino si sta accendendo | Aspetta qualche secondo: la pagina si ricarica da sola |
 | *"Il magazzino non è acceso. Avvisa un amministratore."* | Il Magazzino non parte da solo su questo server | Avvisa l'amministratore di sistema (capitolo 7) |
-| **Credenziali non valide** | Nome utente o password del Lettore DDT sbagliati | Ricontrolla maiuscole/minuscole. Dopo 5 errori attendi 15 minuti |
+| **Credenziali non valide** | Solo in un'installazione senza Portale: nome utente o password del Lettore DDT sbagliati | Ricontrolla maiuscole/minuscole. Dopo 5 errori attendi 15 minuti |
+| *"Nessuna commessa abilitata sul tuo account del Lettore DDT"* | Nessun amministratore ti ha ancora abilitato una commessa (tipico di un utente appena creato dal Portale) | Chiedi a un amministratore (*Admin › Account › Commesse*); intanto usa il Magazzino |
+| *"La commessa … non è abilitata sul tuo account"* | Un amministratore ti ha tolto la commessa che stavi usando | Scegline un'altra dalla barra in alto (*CAMBIA COMMESSA*) |
+| *"Lettore DDT non disponibile"* con *VAI AL MAGAZZINO* | Il tuo utente del Lettore DDT è disattivato | Chiedi a un amministratore di riattivarlo |
 | **Account disabilitato** | L'amministratore ha sospeso l'account | Chiedi di riattivarlo |
 | **Errore di connessione al server** | Il Lettore DDT non risponde | Ricarica la pagina; se persiste riaprilo dal Portale o avvisa l'amministratore |
 | **Incolla prima la risposta di Claude** | Il riquadro è vuoto | Incolla la risposta di Claude |
@@ -31,6 +34,6 @@
 | Non vedo le schede Archivio, Fornitori, Conversione automatica | Sono riservate agli amministratori | Normale per un utente |
 | **Accesso amministratore richiesto** | Sei admin nel Lettore DDT ma non nel Portale (o viceversa) | Fatti abilitare come amministratore del Lettore DDT nel Portale |
 | **API key Anthropic mancante** (Conversione automatica) | Manca la chiave dell'API | Inseriscila in Admin › Chiave API |
-| Password dimenticata | — | L'amministratore fa *Reset password*, poi la cambi tu |
+| Password dimenticata | Entrando dal Portale vale la password del Portale | Si recupera dal Portale; senza Portale l'amministratore fa *Reset password*, poi la cambi tu |
 
 [← Pannello di amministrazione](05-pannello-admin.md) · [Avanti: appendice per l'amministratore di sistema →](07-amministratore-di-sistema.md)

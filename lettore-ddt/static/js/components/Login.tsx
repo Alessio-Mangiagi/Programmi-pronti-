@@ -1,27 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 interface LoginProps {
   onSuccess: (user: { username: string; commessaId: string; displayName: string }) => void;
 }
 
+/**
+ * Login degli account del Lettore DDT. Dal 09/11/2026 ("DDT e Magazzino" con un solo login) si vede
+ * SOLO senza il portale (gate SSO spento: sviluppo, prove, installazione fuori dalla suite): chi entra
+ * dal portale ha la sessione aperta da ingressoDalPortale o, senza account utilizzabile, SenzaAccount.
+ */
 export const Login = ({ onSuccess }: LoginProps) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  // "DDT e Magazzino" (09/11/2026): chi entra dal portale senza account del Lettore DDT (il DDT non crea
-  // account) arriva qui. Il Magazzino lo può usare lo stesso: glielo si dice invece di lasciarlo davanti
-  // a un login che non lo riguarda. Nome dal portale via /guscio/stato.
-  const [soloPortale, setSoloPortale] = useState<string | null>(null);
-  useEffect(() => {
-    fetch('/guscio/stato', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => {
-        if (s && s.portale && s.ddt && !s.ddt.account) setSoloPortale(s.portale.nome || s.portale.username || '');
-      })
-      .catch(() => {});
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -76,18 +68,6 @@ export const Login = ({ onSuccess }: LoginProps) => {
         <p style={{ fontSize: 13, color: '#434549', margin: '0 0 24px', lineHeight: 1.6 }}>
           Inserisci le credenziali della tua commessa.
         </p>
-
-        {soloPortale !== null && (
-          <div role="note" style={{
-            fontSize: 13, color: '#0c4577', background: '#eef4fa', border: '1px solid #c3d7e8',
-            borderRadius: 6, padding: '10px 12px', margin: '-8px 0 20px', lineHeight: 1.55,
-          }}>
-            {soloPortale ? <><b>{soloPortale}</b>, sei</> : 'Sei'} entrato dal portale ma non hai un account del
-            Lettore DDT: per convertire i DDT entra qui con l'account della commessa o chiedilo
-            all'amministratore. Il magazzino lo puoi usare subito:{' '}
-            <a href="/magazzino/" style={{ color: '#0c4577', fontWeight: 700 }}>vai al Magazzino</a>.
-          </div>
-        )}
 
         <label style={{
           fontFamily: "'Inter','Segoe UI',sans-serif", fontSize: 13, fontWeight: 600,
@@ -152,3 +132,35 @@ export const Login = ({ onSuccess }: LoginProps) => {
     </div>
   );
 };
+
+/**
+ * Entrato dal portale ma senza una sessione del Lettore DDT utilizzabile: niente secondo login (un solo
+ * accesso per "DDT e Magazzino", 09/11/2026), solo il perché e la strada per il Magazzino, che resta
+ * usabile (al Magazzino entra chiunque sia abilitato a DDT o Magazzino nel portale).
+ */
+export const SenzaAccount = ({ motivo }: { motivo: 'disattivato' | 'non-creato' }) => (
+  <div style={{
+    minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: '#f9f9fb', fontFamily: "'Open Sans','Segoe UI',system-ui,sans-serif", padding: 16,
+  }}>
+    <div role="alert" style={{
+      background: '#fff', borderRadius: 8, padding: 32, maxWidth: 440,
+      boxShadow: '0 8px 24px rgba(12,69,119,0.10)', border: '1px solid #e5e7eb', borderTop: '3px solid #0c4577',
+    }}>
+      <h1 style={{ fontFamily: "'Ubuntu','Segoe UI',sans-serif", fontWeight: 400, fontSize: 22, margin: '0 0 10px', color: '#212326' }}>
+        {motivo === 'disattivato' ? 'Lettore DDT non disponibile' : 'Accesso al Lettore DDT non pronto'}
+      </h1>
+      <p style={{ fontSize: 14, color: '#434549', lineHeight: 1.6, margin: '0 0 18px' }}>
+        {motivo === 'disattivato'
+          ? 'Il tuo account del Lettore DDT è disattivato: chiedi a un amministratore di riattivarlo.'
+          : 'Non è stato possibile preparare il tuo accesso al Lettore DDT. Riprova fra poco; se si ripete, avvisa un amministratore.'}
+        {' '}Il magazzino lo puoi usare lo stesso.
+      </p>
+      <a href="/magazzino/" style={{
+        display: 'inline-block', padding: '10px 18px', borderRadius: 4, background: '#0c4577', color: '#fff',
+        fontSize: 13, textDecoration: 'none', fontFamily: "'Ubuntu','Segoe UI',sans-serif", textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}>Vai al Magazzino</a>
+    </div>
+  </div>
+);

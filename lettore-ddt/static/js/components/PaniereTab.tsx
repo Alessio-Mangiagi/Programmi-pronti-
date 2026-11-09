@@ -84,6 +84,12 @@ export function PaniereTab({
   const [etichetta, setEtichetta] = React.useState('');
   const fileRef = React.useRef<HTMLInputElement>(null);
 
+  // notify in un ref: se carica dipendesse da notify, un errore (che chiama notify e ne cambia l'identità
+  // nel genitore) ricreerebbe carica e l'effetto qui sotto la rilancerebbe all'infinito. Visto con
+  // "DDT e Magazzino" (09/11/2026): con /paniere in 403 ("nessuna commessa") partivano centinaia di
+  // richieste al secondo finché il browser non esauriva le connessioni.
+  const notifyRef = React.useRef(notify);
+  notifyRef.current = notify;
   const carica = React.useCallback(async () => {
     setLoading(true);
     try {
@@ -94,11 +100,11 @@ export function PaniereTab({
       // Una voce tolta da un'altra scheda non deve restare "selezionata" qui.
       setSelected((prev) => new Set([...prev].filter((id) => (b.items || []).some((i: PaniereItem) => i.id === id))));
     } catch (e) {
-      notify((e as Error).message, 'error');
+      notifyRef.current((e as Error).message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [notify]);
+  }, []);
 
   React.useEffect(() => {
     void carica();

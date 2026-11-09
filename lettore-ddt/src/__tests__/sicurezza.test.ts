@@ -113,8 +113,11 @@ describe('identità del portale obbligatoria (gate attivo)', () => {
     expect([_eAdmin(soloDdt), _adminSoloDdt(soloDdt)]).toEqual([false, true]);
     // admin in tutti e due: funzioni admin visibili, nessuna spiegazione
     expect([_eAdmin(tutti), _adminSoloDdt(tutti)]).toEqual([true, false]);
-    // admin nel portale ma non nell'account DDT: niente admin, e non è il caso "solo DDT"
-    expect([_eAdmin(soloPortale), _adminSoloDdt(soloPortale)]).toEqual([false, false]);
+    // admin nel portale ma non nell'account DDT: admin (decisione dell'utente del 09/11/2026, le
+    // credenziali del portale valgono ovunque); prima di quella data serviva anche l'account DDT admin
+    expect([_eAdmin(soloPortale), _adminSoloDdt(soloPortale)]).toEqual([true, false]);
+    // senza sessione DDT però no: l'account si crea da solo al primo ingresso (ingressoDalPortale)
+    expect(_eAdmin(req({}, { username: 'm', admin: true }))).toBe(false);
   });
   it('403 di requireAdmin spiega che manca il ruolo nel portale', () => {
     let corpo: { error?: string } = {};

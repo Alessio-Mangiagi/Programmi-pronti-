@@ -152,7 +152,9 @@ const ClaudeJsonBox = React.memo(function ClaudeJsonBox({
 interface AppProps {
   // isAdmin = admin effettivo (account DDT + Portale, eAdmin lato server); adminSoloDdt = admin solo
   // dell'account DDT: le funzioni admin sono nascoste e una riga sotto le schede spiega perché.
-  user?: { username: string; commessaId: string; displayName: string; isAdmin?: boolean; adminSoloDdt?: boolean };
+  // conPortale = entrato dal portale (un solo login dal 09/11/2026): la password è quella del portale,
+  // quindi qui niente "Password"
+  user?: { username: string; commessaId: string; displayName: string; isAdmin?: boolean; adminSoloDdt?: boolean; conPortale?: boolean };
   onLogout?: () => void;
 }
 
@@ -2097,7 +2099,8 @@ export default function App({ user, onLogout }: AppProps = {}) {
             <span>README</span>
           </div>
 
-          {user && (
+          {/* con il portale la password è quella del portale: niente "Cambia password" del DDT */}
+          {user && !user.conPortale && (
             <div
               style={S.menuItem}
               onClick={() => {
@@ -2161,12 +2164,14 @@ export default function App({ user, onLogout }: AppProps = {}) {
             {user && (
               <>
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-                  {user.displayName} · {user.commessaId}
+                  {user.displayName} · {user.commessaId || 'nessuna commessa'}
                 </span>
-                <button onClick={openChangePwd} title="Cambia password"
-                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                  🔑 Password
-                </button>
+                {!user.conPortale && (
+                  <button onClick={openChangePwd} title="Cambia password"
+                    style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    🔑 Password
+                  </button>
+                )}
                 {user?.isAdmin && (
                   <button onClick={() => window.location.href = '/admin'} title="Pannello amministrazione"
                     style={{ background: 'rgba(255,215,0,0.3)', border: '1px solid rgba(255,215,0,0.5)', color: '#ffd700', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>

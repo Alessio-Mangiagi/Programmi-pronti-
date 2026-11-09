@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import { randomBytes, randomUUID } from 'crypto';
 import logger from '../utils/logger';
 import { encryptString, decryptString } from '../utils/secureStore';
 
@@ -14,6 +15,20 @@ export type UserRow = {
   disabled?: boolean;
   /** Codice commessa aziendale (es. "101-003"): con questo i DDT finiscono in SkyTower. */
   codiceCommessa?: string;
+  /**
+   * Commesse che l'account può scegliere all'ingresso in "DDT e Magazzino" (decisione del 09/11/2026,
+   * opzione b): codici del registro della suite e/o cartelle precedenti di data/. Le imposta un
+   * amministratore dalla pagina admin. Assente o vuoto = la commessa di sempre dell'account
+   * (commessaId e codiceCommessa), cioè come prima del programma unico: nessuno vede di più senza
+   * che un amministratore lo decida. Gli amministratori vedono comunque tutte le commesse.
+   */
+  commesseAbilitate?: string[];
+  /**
+   * Account creato da solo al primo ingresso dal portale (09/11/2026, un solo login per "DDT e
+   * Magazzino"): niente password propria (vale quella unica del portale), nessuna commessa finché un
+   * amministratore non gliene abilita (commessaId vuoto).
+   */
+  creatoDalPortale?: boolean;
 };
 
 interface UsersFile {
@@ -189,7 +204,48 @@ function setCodiceCommessa(id: string, codiceCommessa: string): UserRow | null {
   return user;
 }
 
+/**
+ * Crea l'account DDT di una persona del portale al suo primo ingresso in "DDT e Magazzino" (decisione
+ * dell'utente del 09/11/2026: un solo login, supera la regola del 06/11 "il DDT non crea account").
+ * Non amministratore, legato allo username del portale, senza commessa (gliele abilita un admin) e
+ * senza una password utilizzabile: l'hash è di un segreto casuale che nessuno conosce, si entra solo
+ * dal portale (ingressoDalPortale). Se l'account c'è già lo restituisce com'è.
+ */
+function creaAccountDalPortale(username: string, nome: string): UserRow {
+  const esistente = findUserByUsernameCI(username);
+  if (esistente) return esistente;
+  const db = getUsersDb();
+  const record: UserRow = {
+    id: randomUUID(),
+    username,
+    passwordHash: bcrypt.hashSync(randomBytes(32).toString('base64url'), 10),
+    commessaId: '',
+    displayName: nome || username,
+    isAdmin: false,
+    creatoDalPortale: true,
+  };
+  db.users.push(record);
+  persistUsersDb();
+  return record;
+}
+
+/**
+ * Imposta l'elenco delle commesse abilitate di un utente (codici del registro / cartelle precedenti,
+ * già validati dalla rotta admin). Elenco vuoto = torna alla commessa di sempre dell'account.
+ */
+function setCommesseAbilitate(id: string, commesse: string[]): UserRow | null {
+  const user = getUsersDb().users.find((u) => u.id === id);
+  if (!user) return null;
+  const pulite = [...new Set((commesse || []).map((c) => String(c || '').trim()).filter(Boolean))];
+  if (pulite.length) user.commesseAbilitate = pulite;
+  else delete user.commesseAbilitate;
+  persistUsersDb();
+  return user;
+}
+
 export {
+  creaAccountDalPortale,
+  setCommesseAbilitate,
   setCodiceCommessa,
   findUserByUsername,
   findUserByUsernameCI,

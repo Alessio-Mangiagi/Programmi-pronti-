@@ -1,5 +1,5 @@
 <!-- "><(((º> sabusabu <º)))>< -->
-# 1. Entrare, cambiare la password, uscire
+# 1. Entrare, scegliere la commessa, uscire
 
 [← Indice](README.md)
 
@@ -8,6 +8,18 @@
 1. Apri il **Portale** della suite Cosedil ed entra con il tuo utente del Portale.
 2. Nella pagina iniziale clicca la scheda **DDT e Magazzino** (fino all'8 novembre 2026 si chiamava *Lettore
    DDT* e il Magazzino aveva una scheda sua): si apre in una nuova pagina del browser.
+
+**Un solo accesso.** Dal 9 novembre 2026 non c'è un secondo login: entri con l'utente e la password del Portale e
+basta, sia nella parte DDT sia nel Magazzino.
+
+- Se nel Portale sei abilitato a **DDT e Magazzino** e nel Lettore DDT non avevi ancora un utente, il programma
+  te lo crea da solo la prima volta che entri (senza una password sua: vale quella del Portale). All'inizio non
+  ha commesse: le abilita un amministratore (vedi sotto).
+- Se nel Portale sei abilitato **solo al Magazzino**, la scheda ti porta direttamente nel **Magazzino**; la voce
+  *Lettore DDT* nella barra in alto resta grigia.
+- Se l'amministratore ha **disattivato** il tuo utente del Lettore DDT, compare una pagina che lo dice, con il
+  pulsante **VAI AL MAGAZZINO**: il Magazzino lo puoi usare lo stesso.
+- Chi è **amministratore nel Portale** è amministratore anche qui: vede tutte le commesse e il pulsante **Admin**.
 
 ## La commessa all'ingresso
 
@@ -24,10 +36,29 @@ che fai finché resti dentro, cioè per
    suite** (le stesse di InCampo, SkyTower e Magazzino). Quella proposta è l'ultima che hai usato.
 2. Clicca la commessa e poi **CONFERMA**: la pagina si ricarica con la commessa scelta.
 
-Sotto **Cartelle precedenti del Lettore DDT** trovi, se c'è, la cartella che il tuo account usava prima del
-registro delle commesse (per esempio *demo-augusta*): lì restano i DDT convertiti prima, e la puoi riaprire per
-consultarli. Un amministratore vede tutte le cartelle precedenti. Se l'elenco è vuoto, il registro delle
-commesse non è ancora stato riempito: chiedi a un amministratore del Portale (*Portale › Commesse*).
+**Quali commesse vedi.** Nell'elenco ci sono solo le commesse in cui puoi lavorare:
+
+- un **amministratore** vede tutte le commesse del registro e tutte le cartelle precedenti;
+- gli altri vedono solo le commesse che un amministratore ha **abilitato sul loro utente** (pagina *Admin ›
+  Account*, pulsante *Commesse*, vedi il [capitolo 5](05-pannello-admin.md)). Un utente che non ha ancora un
+  elenco vede la sua commessa di sempre, come prima del 9 novembre;
+- se ne hai **una sola**, il programma la sceglie da solo e la finestra non compare;
+- se non ne hai **nessuna**, la finestra dice *"Nessuna commessa abilitata sul tuo account del Lettore DDT"*:
+  chiedi a un amministratore di abilitartene una. Intanto puoi usare il Magazzino.
+
+![Un utente con le sue sole commesse abilitate](img/28-commesse-abilitate-utente.png)
+
+Una commessa tolta da un amministratore smette di funzionare subito: alla prossima operazione compare
+*"La commessa … non è abilitata sul tuo account"* e la finestra di scelta si riapre.
+
+Sotto **Cartelle precedenti del Lettore DDT** trovi, se ti è stata abilitata, la cartella che il tuo utente
+usava prima del registro delle commesse (per esempio *demo-augusta*): lì restano i DDT convertiti prima, e la
+puoi riaprire per consultarli. Se l'elenco di un amministratore è vuoto, il registro delle commesse non è ancora
+stato riempito: chiedi a un amministratore del Portale (*Portale › Commesse*).
+
+Per chi usa **solo il Magazzino** la commessa è solo il filtro proposto di giacenze e movimenti: la sceglie
+liberamente fra tutte quelle del registro (il Magazzino non ha limiti per commessa) e non dà accesso ai dati del
+Lettore DDT.
 
 ## La barra in alto: Lettore DDT e Magazzino
 
@@ -54,12 +85,10 @@ segnalibro senza essere entrato nel Portale, vieni rimandato al login del Portal
 ancora abilitato: chiedi all'amministratore. Come entrare nel Portale e come si chiedono le abilitazioni è
 spiegato nella [guida del Portale](../../../portale/docs/guida/README.md).
 
-## Il login del Lettore DDT
+## Senza Portale: il login del Lettore DDT
 
-Se nel Lettore DDT c'è un utente con il tuo stesso nome del Portale, entri da solo. Altrimenti il Lettore DDT
-chiede **le sue credenziali**: un nome utente e una password del Lettore DDT, che ti dà l'amministratore.
-Intanto il **Magazzino** lo puoi usare lo stesso: il riquadro azzurro sopra il login lo dice e porta lì con
-*vai al Magazzino*.
+Il modulo **Username / Password** del Lettore DDT si vede solo in un'installazione **senza il Portale** (per
+esempio un PC di prova): chi entra dal Portale non lo vede mai.
 
 ![Schermata di accesso del Lettore DDT](img/01-accesso.png)
 
@@ -79,8 +108,8 @@ chiedigli di riattivarlo.
 
 ## La schermata principale
 
-In alto a destra trovi il tuo nome e la commessa (es. *Marco Russo · 101-003*), il pulsante **Password** e
-**Esci**. Sotto c'è la scheda **IMPORTA**, dove si fa tutto il lavoro di tutti i giorni.
+In alto a destra trovi il tuo nome e la commessa (es. *Marco Russo · 101-003*) ed **Esci** (il pulsante
+**Password** c'è solo senza Portale). Sotto c'è la scheda **IMPORTA**, dove si fa tutto il lavoro di tutti i giorni.
 
 ![Schermata principale per un utente normale](img/03-schermata-principale.png)
 
@@ -99,7 +128,7 @@ menu:
 
 - **Home**: torna alla scheda Importa.
 - **README**: la documentazione tecnica del programma (non serve per l'uso quotidiano).
-- **Cambia password**: come il pulsante Password in alto.
+- **Cambia password**: come il pulsante Password in alto (solo senza Portale).
 - **Sezioni › WBS / SAL / KPI**: mostra o nasconde le schede WBS, SAL e Dashboard KPI. Queste schede sono
   riservate agli amministratori: per un utente normale l'interruttore non cambia niente.
 
@@ -108,7 +137,9 @@ testo di questa guida (capitoli 1-6, senza immagini).
 
 ## Cambiare la password
 
-Fallo al primo accesso, se la password te l'ha data l'amministratore.
+Entrando dal Portale la password è **quella del Portale** e si cambia nel Portale: nel Lettore DDT il pulsante
+**Password** non c'è. Quello che segue vale solo per un'installazione senza Portale: fallo al primo accesso, se
+la password te l'ha data l'amministratore.
 
 1. Clicca **Password** in alto a destra (oppure ☰ Menu › **Cambia password**).
 2. Scrivi la **password attuale**, poi la **nuova** (almeno **8 caratteri**) e ripetila.
@@ -119,11 +150,11 @@ Fallo al primo accesso, se la password te l'ha data l'amministratore.
 Password dimenticata? Da qui non si può cambiare senza quella attuale: chiedi all'amministratore di
 impostartene una nuova, poi cambiala tu.
 
-> Questa è la password del **Lettore DDT**, diversa da quella del Portale. La password del Portale si cambia nel
-> Portale.
+> Questa è la password del **Lettore DDT** senza Portale, diversa da quella del Portale.
 
 ## Uscire
 
-Clicca **Esci** in alto a destra. Su un PC condiviso esci sempre a fine lavoro e chiudi anche il Portale.
+Clicca **Esci** in alto a destra: torni al **Portale** (non a un login), da dove esci dalla suite. Su un PC
+condiviso esci sempre a fine lavoro anche dal Portale.
 
 [Avanti: convertire un DDT →](02-convertire-un-ddt.md)
