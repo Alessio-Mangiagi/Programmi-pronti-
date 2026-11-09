@@ -222,6 +222,12 @@ nella coda e si preme **Elabora → Excel**. Esiste anche in Word (`docs/modulo/
   riportare così come letto) e subito dopo `<nome>_modulo_Import_Contratti.xlsx`,
   compilato rileggendo il modulo alla lettera, senza AI: Excel e modulo coincidono. Se il
   modulo ha errori l'Excel non si fa; se correggi il `.txt`, rimettilo in coda.
+- **Con Claude** (pagina **CLAUDE** in alto, formati IMPORT P6 e CONTRATTO): Claude non
+  prepara l'Excel ma compila questo modulo e lo scrive in chat. Lo copi tutto, lo incolli
+  nel riquadro e premi **Controlla → Excel**: il programma lo controlla come un modulo
+  scritto a mano (errori con la riga, niente salvato finché non è valido), poi salva
+  `<nome>_modulo.txt` e `<nome>_Import_Contratti.xlsx`. Claude è solo un aiuto alla
+  compilazione: controlli ed Excel restano del programma.
 
 **Come si compila un contratto vero** (regole usate sui moduli di esempio):
 
@@ -245,6 +251,9 @@ DIVISIONE, COND.PAG, RG/RI), e scrive accanto `<nome>_Import_Contratti.xlsx`.
 `npm run confronta-moduli -- --variante formattato` si misura quanto il programma ne legge.
 Con `npm run confronta-moduli -- --da-moduli <cartella>` si confrontano due moduli dello
 stesso contratto compilati in modo diverso, per esempio dal PDF e dal solo testo OCR .MD.
+Con `npm run confronta-moduli -- contratti/moduli-da-md` si misura il programma da solo
+contro i 31 moduli di riferimento; ricerca e piano dei miglioramenti senza AI in
+`docs/RICERCA_OCR_SOLUZIONE.md`.
 
 ---
 

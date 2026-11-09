@@ -341,6 +341,48 @@ Regole di compilazione emerse (anche in GUIDA_UTILIZZO.md):
   modulo viene respinto; si scrive il prezzo che dà l'importo (es. 1.947,00 / 6.600 = 0,295)
   e lo si dichiara in commento.
 
+### I 31 moduli dal testo OCR: banco di prova del programma senza AI
+
+Il 09/11/2026 lo stesso metodo (un agente per contratto, solo il testo OCR, regola
+DIVISIONE corretta: 08 solo per i servizi) ha prodotto i moduli dei 26 contratti che non
+li avevano. Ora `contratti/moduli-da-md/` ha **31 moduli su 31**, tutti riletti dal
+programma senza errori (`npm run moduli -- contratti/moduli-da-md`). Dei 25 agenti, 24
+hanno visto il modulo accettato al primo tentativo e uno al secondo. Il ventiseiesimo
+modulo non ha avuto bisogno di un agente: i due PDF Jonico hanno lo stesso testo OCR e
+quindi lo stesso modulo.
+
+I limiti di questo riferimento:
+- è compilato da un'AI, quindi non è infallibile;
+- 4 contratti hanno voci senza numeri: 2 listini «esemplificativi», una consulenza a ore,
+  e un elenco prezzi scansionato capovolto che l'OCR non legge.
+
+`npm run confronta-moduli -- contratti/moduli-da-md` mette il programma da solo accanto ai
+31 moduli e scrive il dettaglio in `contratti/moduli-da-md/_confronto.md`. Risultato:
+- testata giusta al **74%** (344/465);
+- voci esatte al **37%** (325/881);
+- quantità e prezzo giusti, contando anche le voci con il codice diverso, al **61%**
+  (538/881).
+
+Analisi degli errori, ricerca sugli OCR e piano dei miglioramenti senza AI sono in
+[RICERCA_OCR_SOLUZIONE.md](RICERCA_OCR_SOLUZIONE.md).
+
+### Pagina CLAUDE: Claude compila il modulo
+
+Dal 09/11/2026, nella pagina CLAUDE dell'app (formati IMPORT P6 e CONTRATTO) Claude non
+crea più l'Excel. Compila il modulo, con il prompt `promptClaudeModulo` di
+[`src/lib/claude.ts`](../src/lib/claude.ts), che contiene il modulo vuoto, le regole di
+questa prova e l'elenco delle commesse. L'utente incolla la risposta nell'app e il
+programma fa questi passi:
+1. `moduloDaRisposta` prende il blocco di codice con il modulo, anche diviso in più blocchi
+   dopo un «continua»;
+2. `leggiModulo` lo controlla: se ci sono errori li mostra con il numero di riga e non
+   salva niente;
+3. `risultatoDaModulo` sul server lo rilegge, poi si salvano `<nome>_modulo.txt` e
+   `<nome>_Import_Contratti.xlsx`.
+
+L'Excel ha quindi gli stessi controlli di un modulo scritto a mano, e Claude resta un
+supporto alla compilazione.
+
 ## 4. Limiti e scelte
 
 - **Un modulo = una richiesta.** Anche in PDF il modulo si legge tutto insieme (vedi

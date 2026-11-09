@@ -158,6 +158,17 @@ un altro modo di compilarlo, per esempio dal solo testo OCR .MD (`contratti/modu
 `npm run confronta-claude` ([tools/confronta_claude.ts](tools/confronta_claude.ts)) mette
 l'estrazione del programma accanto agli Excel preparati da Claude (`contratti/scansioni/`).
 Misure e risultati in [docs/PIPELINE_MODULO_CONTRATTO.md](docs/PIPELINE_MODULO_CONTRATTO.md).
+`npm run confronta-moduli -- contratti/moduli-da-md` misura il programma da solo contro i 31
+moduli di riferimento compilati dal testo OCR: è il banco di prova per migliorarlo senza AI.
+Ricerca sugli OCR, chi ha già risolto il problema e piano dei miglioramenti in
+[docs/RICERCA_OCR_SOLUZIONE.md](docs/RICERCA_OCR_SOLUZIONE.md).
+
+**Pagina CLAUDE** (formati IMPORT P6 e CONTRATTO): Claude non crea l'Excel, compila il
+modulo contratto (`promptClaudeModulo` in [src/lib/claude.ts](src/lib/claude.ts)) e lo
+scrive in chat. Il modulo incollato nell'app passa da `moduloDaRisposta` → `leggiModulo`
+(errori con la riga, niente salvato) → `risultatoDaModulo` sul server, poi si salvano
+`<nome>_modulo.txt` e `<nome>_Import_Contratti.xlsx`. Una risposta vecchia in JSON
+«Estratto» si legge ancora.
 
 ## Scansione automatica di una cartella (⚙ Impostazioni)
 
