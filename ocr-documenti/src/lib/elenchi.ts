@@ -21,10 +21,13 @@ export interface Elenchi {
 // Separatori tollerati: - _ . /. Chiusura con lookahead (non \b): "_" è word char e
 // il \b falliva su codici seguiti da un altro segmento, es. "193-136_6_008" →
 // candidato "193-136_6" mai estratto.
-export const COMMESSA_RE = /\b(\d{3})\s*[-_./]\s*(\d{3})(?:\s*[-_./]\s*([A-Za-z0-9]{1,3}))?(?![A-Za-z0-9])/g
+// Apertura con lookbehind per lo stesso motivo: nei codici contratto col prefisso
+// d'anno ("2026_198-138_030") la commessa segue un "_" e il \b non scattava, così il
+// PROGETTO restava vuoto (3 contratti su 31, misura del 09/11/2026).
+export const COMMESSA_RE = /(?<![A-Za-z0-9])(\d{3})\s*[-_./]\s*(\d{3})(?:\s*[-_./]\s*([A-Za-z0-9]{1,3}))?(?![A-Za-z0-9])/g
 // Stessa forma senza flag globale: test() su una regex /g avanza lastIndex e alterna
 // vero/falso fra chiamate consecutive.
-export const HA_FORMA_COMMESSA = /\b\d{3}\s*[-_./]\s*\d{3}(?![A-Za-z0-9])/
+export const HA_FORMA_COMMESSA = /(?<![A-Za-z0-9])\d{3}\s*[-_./]\s*\d{3}(?![A-Za-z0-9])/
 
 // Tutti i candidati commessa nei testi dati, nell'ordine in cui compaiono, in forma
 // canonica "NNN-NNN" / "NNN-NNN_S".
