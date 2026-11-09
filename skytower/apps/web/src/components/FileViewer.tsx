@@ -5,6 +5,7 @@
 // versione .glb preparata dal worker, ADR-31, con l'originale a un clic); disegni CAD (DWG/DXF) nell'SVG preparato
 // dal worker, con layer e misure (ADR-41); Word ed Excel in anteprima di sola lettura;
 // PDF firmati in busta .p7m: si legge il documento contenuto, con il badge della verifica della firma (ADR-55);
+// "Timbra" sui PDF: timbri (firma, logo, «Approvato») messi sulle pagine e salvati come nuova revisione WIP (ADR-56);
 // testo nel browser, modificabile: il salvataggio
 // crea una nuova revisione con il normale caricamento (impronta, antivirus, controllo di concorrenza). Gli altri formati si scaricano. Le annotazioni stanno nel pannello a destra.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -13,6 +14,7 @@ import {
   Alert, AppBar, Badge, Box, Button, Chip, CircularProgress, Dialog, IconButton, InputAdornment, MenuItem, Stack, TextField,
   ToggleButton, Toolbar, Tooltip, Typography,
 } from "@mui/material";
+import ApprovalIcon from "@mui/icons-material/Approval";
 import CloseIcon from "@mui/icons-material/Close";
 import CommentIcon from "@mui/icons-material/Comment";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -30,6 +32,10 @@ import { MarkupPanel } from "./markup/MarkupPanel";
 import { uploadFile } from "../upload";
 import { openDocument } from "../openDocument";
 import { FirmaBadge, type FirmaInfo } from "./FirmaDigitale";
+import { TimbraLayer, type Piazzamento } from "./timbri/TimbraLayer";
+import { TimbraPanel } from "./timbri/TimbraPanel";
+import type { Timbro } from "./timbri/timbri";
+import { useAuth } from "../auth";
 import type { ModelPart } from "./markup/model3d";
 import type { DxfLayer } from "./markup/DxfView";
 
@@ -123,6 +129,13 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const [zoom, setZoom] = useState(1.25);
   const [pages, setPages] = useState(0);
   const [drawing, setDrawing] = useState(false);
+  // strumento "Timbra" (ADR-56): timbro scelto, timbri messi sulle pagine, quello selezionato, didascalia sui nuovi
+  const [stamping, setStamping] = useState(false);
+  const [piazzamenti, setPiazzamenti] = useState<Piazzamento[]>([]);
+  const [timbroAttivo, setTimbroAttivo] = useState<Timbro | null>(null);
+  const [piazzamentoSel, setPiazzamentoSel] = useState<string | null>(null);
+  const [didascalia, setDidascalia] = useState(true);
+  const { me } = useAuth();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusPage, setFocusPage] = useState<{ page: number; seq: number } | null>(null);
@@ -136,6 +149,8 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   }, [searchInput]);
   const nextMatch = (d: 1 | -1) => matchCount && setActiveMatch((m) => (m + d + matchCount) % matchCount);
   useEffect(() => { setDraft(null); setSelectedId(null); setDrawing(false); setCompareId(""); setEditing(false); setOriginalIfc(false); }, [revisionId]);
+  const chiudiTimbra = () => { setStamping(false); setPiazzamenti([]); setTimbroAttivo(null); setPiazzamentoSel(null); };
+  useEffect(chiudiTimbra, [revisionId]);
 
   // numerazione stabile per data di creazione, indipendente dai filtri
   const numbers = useMemo(() => new Map([...markups].sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -158,14 +173,26 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
   const busta = link?.content_type === "application/pkcs7-mime";
   const canOffice = !!officeConfig?.enabled && (office === "docx" || office === "xlsx") && !!doc && !link?.firma
     && doc.my_actions.includes("WRITE") && doc.revisions[0]?.id === revisionId && doc.revisions[0]?.state === "WIP";
+  // Timbra: PDF (non il documento dentro una busta .p7m: la firma andrebbe persa), ultima revisione, permesso di
+  // scrittura; durante un workflow il server risponde 423 salvo modifiche richieste a chi timbra (ADR-51)
+  const canStamp = isPdf && !browserPdf && !link?.firma && !!doc && doc.my_actions.includes("WRITE")
+    && doc.revisions[0]?.id === revisionId && rev?.scan_status === "CLEAN";
+  const testoDidascalia = `Timbrato da ${me ? `${me.first_name} ${me.last_name}` : "…"} il ${new Date().toLocaleString("it-IT",
+    { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", "")}`;
   const fill = (isPdf && !browserPdf) || !!model || !!office || isCad;
   const selectedRef = markups.find((m) => m.id === selectedId)?.element_ref ?? null;
   const openCount = markups.filter((m) => m.status === "OPEN").length;
 
-  const layer = (page: number) => (
+  const layer = (page: number) => (stamping ? (
+    <TimbraLayer page={page} piazzamenti={piazzamenti.filter((p) => p.pagina === page)} attivo={timbroAttivo}
+                 selezionato={piazzamentoSel} didascalia={didascalia} testoDidascalia={testoDidascalia}
+                 onAggiungi={(p) => { const chiave = crypto.randomUUID(); setPiazzamenti((l) => [...l, { ...p, chiave }]); setPiazzamentoSel(chiave); }}
+                 onCambia={(k, c) => setPiazzamenti((l) => l.map((p) => (p.chiave === k ? { ...p, ...c } : p)))}
+                 onSeleziona={setPiazzamentoSel} onTogli={(k) => setPiazzamenti((l) => l.filter((p) => p.chiave !== k))} />
+  ) : (
     <MarkupLayer page={page} markups={markups} numbers={numbers} selectedId={selectedId} drawing={drawing}
                  draft={draft && "page" in draft ? draft : null} onDraw={(a) => { setDraft(a); setDrawing(false); setPanel(true); }} onSelect={setSelectedId} />
-  );
+  ));
   const step = (dir: 1 | -1) => setZoom((z) => (dir > 0
     ? ZOOMS.find((x) => x > z + 0.001) ?? ZOOMS[ZOOMS.length - 1]
     : [...ZOOMS].reverse().find((x) => x < z - 0.001) ?? ZOOMS[0]));
@@ -213,7 +240,7 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
             </Stack>
           )}
           {isPdf && !browserPdf && doc && doc.revisions.length > 1 && (
-            <TextField select size="small" label="Confronta con" value={compareId} sx={{ minWidth: 170 }}
+            <TextField select size="small" label="Confronta con" value={compareId} sx={{ minWidth: 170 }} disabled={stamping}
                        onChange={(e) => setCompareId(e.target.value)}>
               <MenuItem value="">Nessun confronto</MenuItem>
               {doc.revisions.filter((r) => r.id !== revisionId && r.scan_status === "CLEAN").map((r) => (
@@ -253,7 +280,15 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
               Modifica con OnlyOffice
             </Button>
           )}
-          {canDraw && (
+          {canStamp && (
+            <Tooltip describeChild title="Metti sulle pagine firma, logo o «Approvato»: il PDF timbrato diventa una nuova revisione in WIP">
+              <ToggleButton size="small" value="timbra" selected={stamping} color="primary" sx={{ color: "text.primary" }}
+                            onChange={() => { if (stamping) chiudiTimbra(); else { setStamping(true); setDrawing(false); setCompareId(""); setPanel(true); } }}>
+                <ApprovalIcon fontSize="small" sx={{ mr: 0.5 }} />Timbra
+              </ToggleButton>
+            </Tooltip>
+          )}
+          {canDraw && !stamping && (
             <ToggleButton size="small" value="draw" selected={drawing} color="primary" sx={{ color: "text.primary" }} onChange={() => setDrawing((d) => !d)}>
               <DrawIcon fontSize="small" sx={{ mr: 0.5 }} />Annota
             </ToggleButton>
@@ -382,9 +417,16 @@ export function FileViewer({ documentId, revisionId: initialRevision, taskId, in
         {panel && revisionId && (
           <Box width={{ xs: "100%", sm: 300, md: 360 }} flexShrink={0} borderLeft={1} borderColor="divider" bgcolor="background.paper"
                position={{ xs: "absolute", sm: "static" }} top={{ xs: 64 }} bottom={0} right={0} zIndex={1}>
-            <MarkupPanel revisionId={revisionId} taskId={taskId} markups={markups} numbers={numbers} selectedId={selectedId}
-                         draft={draft} onClearDraft={() => setDraft(null)}
-                         onSelect={(m) => { setSelectedId(m.id); if (m.page) setFocusPage({ page: m.page, seq: Date.now() }); }} />
+            {stamping && doc ? (
+              <TimbraPanel projectId={doc.project_id} documentId={documentId} revisionId={revisionId} piazzamenti={piazzamenti}
+                           attivo={timbroAttivo} didascalia={didascalia} onScegli={setTimbroAttivo} onDidascalia={setDidascalia}
+                           onTogli={(k) => setPiazzamenti((l) => l.filter((p) => p.chiave !== k))} onAnnulla={chiudiTimbra}
+                           onSalvato={(r) => { chiudiTimbra(); setRevisionId(r.id); }} />
+            ) : (
+              <MarkupPanel revisionId={revisionId} taskId={taskId} markups={markups} numbers={numbers} selectedId={selectedId}
+                           draft={draft} onClearDraft={() => setDraft(null)}
+                           onSelect={(m) => { setSelectedId(m.id); if (m.page) setFocusPage({ page: m.page, seq: Date.now() }); }} />
+            )}
           </Box>
         )}
       </Box>

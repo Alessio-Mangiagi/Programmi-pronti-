@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "e2e": "playwright test",
-    "test:unit": "node --test unit/griglia.test.ts"
+    "test:unit": "node --test unit/griglia.test.ts unit/scontorno.test.ts"
   },
   "dependencies": {
     "@emotion/react": "11.13.3",

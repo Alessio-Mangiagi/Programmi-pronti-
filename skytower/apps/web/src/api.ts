@@ -97,6 +97,18 @@ export async function apiDownload(path: string, fallbackName: string, init: { me
   return res;
 }
 
+/** Un file da un endpoint autenticato come Blob (es. l'immagine di un timbro, ADR-56): un <img> non porta il token. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const doFetch = () => fetch(`/api${path}`, {
+    credentials: "same-origin",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  let res = await doFetch();
+  if (res.status === 401 && accessToken && (await refreshSession())) res = await doFetch();
+  if (!res.ok) await parse(res);
+  return res.blob();
+}
+
 // ---------------------------------------------------------------------
 // Tipi principali
 // ---------------------------------------------------------------------
