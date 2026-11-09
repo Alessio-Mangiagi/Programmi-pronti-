@@ -66,8 +66,9 @@ Le operazioni distruttive sono riservate all'amministratore:
   visite mediche e contatti di tutta l'anagrafica) e il **download degli allegati**
   (`/api/allegati/<id>/download`) rispondono **403** a chi non è admin; il modello vuoto del
   calendario corsi resta scaricabile da tutti;
-- è admin chi è **admin per l'app `scadenzario` nel portale** *e*, se la variabile è valorizzata,
-  compare in `SCADENZARIO_ADMIN` (username separati da virgola). La variabile non ha più un default
+- è admin ogni **amministratore del portale** (ruolo admin: regola della suite del 09/11/2026, le sue
+  credenziali valgono come admin ovunque); chi è admin per l'app `scadenzario` solo per una regola IP del
+  portale lo è se, con la variabile valorizzata, compare in `SCADENZARIO_ADMIN` (username separati da virgola). La variabile non ha più un default
   in `avvia.bat`: si imposta, se serve, in `impostazioni-locali.bat` (fuori da git, modello
   `impostazioni-locali.esempio.bat`), che `avvia.bat` richiama prima di preparare il database.
   Con `SCADENZARIO_ADMIN` vuota basta essere admin nel portale.

@@ -73,13 +73,19 @@ def utente_corrente() -> dict | None:
 
 
 def e_admin() -> bool:
-    """Admin dello Scadenzario: admin per l'app nel portale E (se configurato)
-    presente in config.ADMIN_UTENTI. Con SSO spento si è sempre admin."""
+    """Admin dello Scadenzario. Con SSO spento si è sempre admin.
+
+    - Amministratore del portale (ruolo "admin" in utenti.json): admin anche qui, sempre. Regola della suite
+      del 09/11/2026 ("le mie credenziali valgono come admin ovunque"): SCADENZARIO_ADMIN non lo esclude.
+    - Admin per l'app concesso dal portale in altro modo (regole IP di data/ip-admin.json): admin solo se
+      compare in config.ADMIN_UTENTI, quando l'elenco è impostato (come prima)."""
     if not cosedil_sso.ENABLED:
         return True
     u = utente_corrente()
     if not u or not u.get("admin"):
         return False
+    if u.get("ruolo") == "admin":
+        return True
     return not config.ADMIN_UTENTI or (u.get("username") or "").lower() in config.ADMIN_UTENTI
 
 

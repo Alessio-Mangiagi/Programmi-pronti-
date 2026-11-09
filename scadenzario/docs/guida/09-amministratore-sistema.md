@@ -20,9 +20,13 @@ nel [README del programma](../../README.md), in [SPEC.md](../../SPEC.md) e
 
 ## Chi è amministratore
 
-È amministratore chi è **admin per lo Scadenzario nel Portale** e, se la variabile
-`SCADENZARIO_ADMIN` contiene un elenco di username (separati da virgola), compare anche
-in quell'elenco. Se la variabile è vuota basta essere admin dello Scadenzario nel Portale.
+Ogni **amministratore del Portale** è amministratore anche qui, sempre: dal 09/11/2026 le
+credenziali di un amministratore del Portale valgono come amministratore in tutti i programmi.
+
+Chi invece è admin dello Scadenzario nel Portale solo per una regola sull'indirizzo del PC
+(regole IP del Portale) è amministratore se la variabile `SCADENZARIO_ADMIN`, quando contiene
+un elenco di username (separati da virgola), ha anche il suo nome. Se la variabile è vuota
+basta essere admin dello Scadenzario nel Portale.
 
 L'elenco non sta più dentro `avvia.bat`: si scrive in **`impostazioni-locali.bat`**, nella
 cartella dello Scadenzario, che è di questa installazione e non finisce nel repository.
