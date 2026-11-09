@@ -109,8 +109,11 @@ const ocrConCache = async (png: string): Promise<string> => {
   const key = sha1(await fs.readFile(png))
   const cache = path.join(DIR_CACHE, 'blocchi', `${key}.json`)
   if (!noCache && existsSync(cache)) {
+    const dato = JSON.parse(await fs.readFile(cache, 'utf8'))
+    // pagina bianca già letta: nessun blocco, niente da rifare (vedi sotto)
+    if (dato?.vuota === true) return ''
     // "[]" = pagina che il motore non ha letto (GPU non supportata): si rifà, come in server/ocr.ts
-    const inCache = letturaDaCache(JSON.parse(await fs.readFile(cache, 'utf8')))
+    const inCache = letturaDaCache(dato)
     if (inCache) {
       if (inCache.griglia === undefined) {
         inCache.griglia = await grigliaPagina(png, inCache.rotazione ?? 0)
@@ -121,12 +124,19 @@ const ocrConCache = async (png: string): Promise<string> => {
   }
   let blocchi: Parameters<typeof componiTesto>[0] | null = null
   let griglia: Parameters<typeof componiTesto>[1] = null
-  setDumpBlocchi((b, g) => { blocchi = b; griglia = g ?? null })
+  let rotazione = 0
+  setDumpBlocchi((b, g, r) => { blocchi = b; griglia = g ?? null; rotazione = r ?? 0 })
   const testo = await ocrPaddle((await fs.readFile(png)).toString('base64'))
   setDumpBlocchi(null)
+  await fs.mkdir(path.dirname(cache), { recursive: true })
   if (blocchi && (blocchi as unknown[]).length) {
-    await fs.mkdir(path.dirname(cache), { recursive: true })
-    await fs.writeFile(cache, letturaPerCache({ blocchi, griglia }), 'utf8')
+    await fs.writeFile(cache, letturaPerCache({ blocchi, griglia, rotazione }), 'utf8')
+  } else if (blocchi) {
+    // Pagina bianca (retro, separatore): zero blocchi da un motore che ha superato la
+    // prova di lettura all'avvio (ocr_worker.py, prova_lettura). Solo nel banco si segna
+    // come vuota: rileggerla a ogni giro costava ~20 minuti su 12 pagine col PC carico.
+    // Il server invece non salva mai le pagine vuote (server/ocr.ts, scriviCache).
+    await fs.writeFile(cache, JSON.stringify({ v: 2, vuota: true }), 'utf8')
   }
   return testo
 }

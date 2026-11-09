@@ -191,8 +191,11 @@ export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null): st
 // Aggancio per il banco di prova: riceve i blocchi grezzi di ogni pagina appena
 // escono dall'inferenza, così la cache su disco conserva l'OCR e non il testo già
 // ricostruito (che invece cambia ad ogni modifica dei parser).
-export let dumpBlocchi: ((b: BloccoOcr[], griglia?: Griglia | null) => void) | null = null
-export const setDumpBlocchi = (f: ((b: BloccoOcr[], griglia?: Griglia | null) => void) | null) => { dumpBlocchi = f }
+// Riceve anche griglia e rotazione: la cache del banco deve sapere se la pagina era
+// capovolta, altrimenti una griglia ricalcolata dopo andrebbe sull'immagine non ruotata.
+type DumpBlocchi = (b: BloccoOcr[], griglia?: Griglia | null, rotazione?: number) => void
+export let dumpBlocchi: DumpBlocchi | null = null
+export const setDumpBlocchi = (f: DumpBlocchi | null) => { dumpBlocchi = f }
 
 // Blocco letto con poca sicurezza: PaddleOCR dà uno score 0-100 per riga rilevata.
 // Sotto la soglia il revisore deve guardare: la cella in tabella si colora.
@@ -304,7 +307,7 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
     }
     const righe = righeDaBlocchi(blocchi)
     const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')
-    if (dumpBlocchi) dumpBlocchi(blocchi, lettura.griglia)
+    if (dumpBlocchi) dumpBlocchi(blocchi, lettura.griglia, lettura.rotazione)
     // Scansione illeggibile (grana/retino) → PaddleOCR restituisce salad. Se è attivo un
     // modello vision locale, lo si usa per ri-trascrivere la TABELLA ARTICOLI da questa
     // pagina (codice tariffa + descrizione + UM; i prezzi non interessano). Costa solo
