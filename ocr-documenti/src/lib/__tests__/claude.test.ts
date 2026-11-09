@@ -1,34 +1,34 @@
 import { describe, it, expect } from 'vitest'
-import { promptClaude, promptClaudeExcel, urlClaude, leggiEstratto, leggiTrascrizioneJson, leggiTrascrizioneMd } from '../claude'
-import { IMPORT_CONTRATTI_COLS } from '../import-contratti'
+import { promptClaude, promptClaudeModulo, urlClaude, leggiEstratto, leggiTrascrizioneJson, leggiTrascrizioneMd, moduloDaRisposta } from '../claude'
+import { leggiModulo, moduloVuoto } from '../modulo-contratto'
 import { ELENCHI } from '../../../server/alyante.ts'
 
 describe('promptClaude', () => {
-  it('su IMPORT P6 chiede a Claude di creare direttamente l’Import_Contratti.xlsx', () => {
+  it('su IMPORT P6 chiede a Claude di compilare il modulo contratto, non l’Excel né il JSON', () => {
     const p = promptClaude('contratti', 'LT26.pdf', false, ELENCHI)
     expect(p).toContain('"LT26.pdf"')
-    expect(p).toContain('"LT26_Import_Contratti.xlsx"')
-    expect(p).toContain('CREA UN FILE EXCEL')
-    expect(p).toContain(IMPORT_CONTRATTI_COLS.join(' | '))
+    expect(p).toContain('COMPILA IL MODULO CONTRATTO')
+    // il modulo vuoto è dentro il prompt, generato dalla stessa specifica che lo rilegge
+    expect(p).toContain(moduloVuoto())
+    expect(p).not.toContain('CREA UN FILE EXCEL')
     expect(p).not.toContain('"testata"')
-    // gli elenchi ufficiali sono dentro il prompt: senza, l'Excel esce con testi al posto dei codici
-    expect(p).toContain('2=COSEDIL')
-    for (const c of ELENCHI.condPagamento) expect(p).toContain(`${c.codice}=`)
+    // dell'elenco commesse servono i codici: il resto (DITTA, COND.PAG) lo aggancia il programma
     for (const c of ELENCHI.commesse) expect(p).toContain(`${c.codice}=`)
-    for (const f of ELENCHI.famiglie) expect(p).toContain(`${f.fam}/${f.sfam}=`)
   })
-  it('il prompt Excel con gli elenchi veri sta nel limite dell’URL di claude.ai (~64k codificato)', () => {
-    const u = urlClaude(promptClaudeExcel('contratto con nome lungo 2026_198-138_029.pdf', ELENCHI, true))
+  it('sul formato CONTRATTO chiede lo stesso modulo', () => {
+    expect(promptClaude('contract', 'LT26.pdf', true, ELENCHI)).toBe(promptClaude('contratti', 'LT26.pdf', true, ELENCHI))
+  })
+  it('DIVISIONE 08 solo per i servizi: le forniture non la ricevono dal prompt', () => {
+    const p = promptClaudeModulo('a.pdf', ELENCHI)
+    expect(p).toMatch(/servizi[^\n]*Passivo a Misura e in questo solo caso DIVISIONE: 08/)
+    expect(p).toMatch(/fornitura di materiali \(con o senza posa\) → Fornitura e posa/)
+  })
+  it('il prompt del modulo con gli elenchi veri sta nel limite dell’URL di claude.ai (~64k codificato)', () => {
+    const u = urlClaude(promptClaudeModulo('contratto con nome lungo 2026_198-138_029.pdf', ELENCHI, true))
     expect(u.length).toBeLessThan(60_000)
   })
   it('senza elenchi lo dice, invece di inventare codici', () => {
-    const p = promptClaudeExcel('a.pdf', null)
-    expect(p).toContain('Elenchi ufficiali non disponibili')
-  })
-  it('sul formato CONTRATTO chiede ancora l’Estratto {testata, importi, righe} in JSON', () => {
-    const p = promptClaude('contract', 'LT26.pdf')
-    expect(p).toContain('"testata"')
-    expect(p).toContain('Rispondi SOLO con l\'oggetto JSON')
+    expect(promptClaudeModulo('a.pdf', null)).toContain('Elenco commesse non disponibile')
   })
   it('in .MD chiede la trascrizione, non il JSON', () => {
     // "><(((º> sabusabu <º)))><"
@@ -71,5 +71,49 @@ describe('trascrizioni', () => {
   it('.MD: toglie i fence attorno alla trascrizione', () => {
     expect(leggiTrascrizioneMd('```markdown\n# Titolo\ntesto\n```')).toBe('# Titolo\ntesto')
     expect(leggiTrascrizioneMd('  # Titolo  ')).toBe('# Titolo')
+  })
+})
+
+// Modulo d'esempio come lo scrive Claude: campi obbligatori, una voce che torna.
+const MODULO = `MODULO CONTRATTO OCR v1
+# Modulo compilato da Claude leggendo "a.pdf"
+[TESTATA]
+CODICE CONTRATTO: 208-148_042/2026
+COMMESSA: 208-148
+FORNITORE: Sidersipe S.r.l.
+TIPOLOGIA: Fornitura e posa
+DATA CONTRATTO: 11/05/2026
+OGGETTO: Fornitura acciaio B450C
+[IMPORTI]
+IMPORTO LAVORI: 1.000,00
+[RIGHE]
+ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO
+A.1 | Acciaio in barre | kg | 100,00 | 10,00 | 1.000,00
+[FINE]`
+
+describe('moduloDaRisposta', () => {
+  it('prende il blocco di codice col modulo e scarta il testo attorno', () => {
+    const m = moduloDaRisposta(`Ecco il modulo compilato:\n\n\`\`\`text\n${MODULO}\n\`\`\`\n\n1 voce.`)
+    expect(m).toBe(MODULO + '\n')
+    expect(leggiModulo(m!).errori).toEqual([])
+  })
+  it('unisce le prosecuzioni chieste con «continua» (blocchi successivi)', () => {
+    const [prima, dopo] = MODULO.split('A.1 |')
+    const r = `\`\`\`text\n${prima}\`\`\`\nScrivi «continua».\n\`\`\`text\nA.1 |${dopo}\n\`\`\``
+    const m = moduloDaRisposta(r)!
+    expect(leggiModulo(m).estratto.righe).toHaveLength(1)
+    expect(leggiModulo(m).errori).toEqual([])
+  })
+  it('senza blocchi di codice prende dal marcatore in poi; dopo [FINE] taglia', () => {
+    expect(moduloDaRisposta(`Ecco:\n${MODULO}\nSpero vada bene.`)).toBe(MODULO + '\n')
+  })
+  it('un blocco rimasto aperto (risposta interrotta) si legge lo stesso', () => {
+    const m = moduloDaRisposta('```text\n' + MODULO.replace('[FINE]', ''))
+    expect(m?.startsWith('MODULO CONTRATTO OCR v1')).toBe(true)
+    expect(m).toContain('A.1 | Acciaio in barre')
+  })
+  it('null se la risposta non contiene un modulo (es. il JSON del prompt di prima)', () => {
+    expect(moduloDaRisposta('{ "testata": { "codice": "X" } }')).toBeNull()
+    expect(moduloDaRisposta('Non riesco ad aprire il file.')).toBeNull()
   })
 })

@@ -1,154 +1,113 @@
 // Pagina «Claude»: al posto dell'OCR il documento lo legge Claude (claude.ai), con un
 // prompt già pronto per il formato scelto.
 //
-// IMPORT P6 (contratti): Claude crea DIRETTAMENTE l'Import_Contratti.xlsx nella sua
-// finestra, con colonne, regole ed elenchi ufficiali nel prompt (promptClaudeExcel);
-// l'utente lo scarica da lì, nell'app segna solo «fatto».
-// CONTRATTO: Claude risponde con l'«Estratto» {testata, importi, righe} — lo stesso
-// oggetto che i parser del server producono dal testo OCR — che si incolla nell'app e
-// da lì la filiera è quella di sempre. Su .MD e .JSON Claude trascrive.
+// IMPORT P6 e CONTRATTO: Claude COMPILA IL MODULO CONTRATTO (promptClaudeModulo) e lo
+// scrive in chat; l'utente lo incolla nell'app, che lo rilegge alla lettera senza AI
+// (leggiModulo in modulo-contratto.ts: formati, quantità × prezzo, somma delle voci),
+// lo salva come <nome>_modulo.txt e ne fa l'Excel. Claude è solo un supporto alla
+// compilazione: i controlli e l'Excel restano del programma, come per un modulo scritto
+// a mano. Misurato il 09/11/2026: moduli compilati così da 5 contratti di riferimento
+// tornano 70/73 campi di testata e 132/134 voci (docs/PIPELINE_MODULO_CONTRATTO.md).
+// Una risposta vecchia in JSON «Estratto» {testata, importi, righe} si legge ancora
+// (leggiEstratto). Su .MD e .JSON Claude trascrive.
 
 // Stessi id di `Format` in App.tsx.
 export type Format = 'md' | 'json' | 'contract' | 'contratti'
 
 import type { Elenchi } from './elenchi'
-import { IMPORT_CONTRATTI_COLS } from './import-contratti'
+import { eModulo, moduloVuoto } from './modulo-contratto'
 
 // "><(((º> sabusabu <º)))><"
 export const URL_CLAUDE = 'https://claude.ai/new'
 
-// Campi che il server sa strutturare: gli stessi di CAMPI_TESTATA / CAMPI_IMPORTI in
-// server.ts, con le regole di copia letterale dell'assist Ollama.
-const TIPOLOGIE = ['Passivo a Misura', 'Subappalto', 'Fornitura e posa', 'Nolo a caldo', 'Nolo a freddo', 'Nolo infragruppo']
-
-const SCHEMA_ESTRATTO = `{
-  "testata": {
-    "codice": "numero/sigla del contratto (es. LT260908-126-E)",
-    "codice_progetto": "codice commessa/progetto (es. 193-136_6)",
-    "ditta": "società del gruppo che stipula (es. COSEDIL S.p.A.)",
-    "fornitore": "ragione sociale della controparte",
-    "fornitore_piva": "partita IVA della controparte",
-    "tipologia_contratto": "una tra: ${TIPOLOGIE.join(' | ')}",
-    "data_contratto": "data del contratto come scritta",
-    "documento_data": "data del documento se diversa",
-    "cond_pagamento": "condizioni di pagamento come scritte (es. 60 gg DFFM bonifico)",
-    "oggetto": "oggetto del contratto",
-    "cig": "CIG",
-    "cup": "CUP"
-  },
-  "importi": {
-    "importo_lavori": "importo contrattuale complessivo",
-    "importo_oneri_sicurezza": "oneri della sicurezza",
-    "importo_netto": "importo netto",
-    "importo_anticipi": "anticipazione",
-    "percent_recupero_anticipazioni": "percentuale di recupero anticipazione",
-    "ritenuta_garanzia_percent": "percentuale ritenuta di garanzia"
-  },
-  "righe": [
-    { "codice_epu": "codice articolo/tariffa", "descrizione": "descrizione della voce", "udm": "unità di misura", "quantita": "quantità", "prezzo_lordo": "prezzo unitario", "importo": "importo della voce" }
-  ]
-}`
-
-const REGOLE_ESTRATTO = `REGOLE ASSOLUTE:
-- Copia ogni valore ESATTAMENTE come scritto nel documento (stesse cifre, stessi separatori italiani: 1.234,56).
-- Se un campo NON è presente nel documento: OMETTILO. Non inventare, non dedurre, non calcolare.
-- "righe" = l'elenco prezzi / computo del contratto, UNA voce per riga della tabella, nell'ordine del documento. Negli articoli con "Dettaglio Prezzi" (sotto-prezzi tipo riferimento listino + trasporto/sfrido) il prezzo unitario è il TOTALE della colonna "Prezzo Unitario", non i sotto-prezzi: una sola voce per articolo. Un codice spezzato su più righe (es. "BA.CZ.A.3 09.B" + "Ø.1000") va riunito. Se non c'è una tabella: "righe": [].
-- Le tabelle possono proseguire su più pagine: continua fino all'ultima voce, senza saltarne e senza riassumere.
-- Rispondi SOLO con l'oggetto JSON, senza testo prima o dopo e senza commenti.`
-
 const INTESTAZIONE = (nome: string) =>
   `Sei un estrattore di dati da contratti edili italiani (Cosedil S.p.A.). Il documento allegato è "${nome}".`
 
-// ── IMPORT P6: Claude produce direttamente l'Import_Contratti.xlsx ──────────
-// Prima rispondeva col JSON «Estratto» che l'utente doveva incollare nell'app, e
-// l'Excel lo faceva l'app (buildImportContrattiRowsFromAlyante + elenchi ufficiali).
-// Ora il file lo crea Claude nella sua finestra e l'utente lo scarica da lì: nel
-// prompt vanno quindi le stesse regole di quella funzione e gli stessi elenchi
-// (DITTA, DIVISIONE, commesse, cond. pagamento, FAM/SFAM), altrimenti l'Excel
-// esce con descrizioni al posto dei codici e Alyante non lo importa.
-// Il prompt viaggia nell'URL di claude.ai (?q=): misurato, oltre ~64k caratteri
-// codificati risponde 414. Le descrizioni degli elenchi vanno quindi accorciate.
+// ── IMPORT P6 e CONTRATTO: Claude compila il MODULO CONTRATTO ───────────────
+// Prima Claude creava direttamente l'Import_Contratti.xlsx nella sua finestra: l'Excel
+// non passava dal programma, nessun controllo, e negli Excel di prova del 06/11 c'erano
+// voci ripetute (12 contratti su 31) e quantità/prezzi presi da colonne sbagliate (6).
+// Ora Claude scrive il modulo, il formato che il programma rilegge alla lettera e
+// controlla riga per riga: gli errori tornano con il numero di riga e si correggono
+// prima dell'Excel. Le regole qui sotto sono quelle della prova alla cieca del
+// 09/11/2026 (moduli dal solo testo OCR), corrette sulla DIVISIONE: 08 solo per i servizi.
+// Il prompt viaggia nell'URL di claude.ai (?q=): oltre ~64k caratteri codificati
+// risponde 414, quindi degli elenchi entra solo quello delle commesse (DITTA, COND.PAG
+// e DIVISIONE il programma li aggancia da sé dal testo scritto nel modulo).
 
 const corta = (s: string, n = 42) => {
   const t = s.replace(/\s+/g, ' ').trim()
   return t.length > n ? t.slice(0, n - 1) + '…' : t
 }
 
-const elenchiPerPrompt = (e: Elenchi | null): string => {
-  if (!e) return 'Elenchi ufficiali non disponibili: nelle colonne DITTA, PROGETTO, EPU, DIVISIONE, COND.PAG, FAM e SFAM scrivi il valore come nel documento.'
-  const riga = (v: { codice: string | number; descrizione?: string; nome?: string }) => `${v.codice}=${corta(v.descrizione ?? v.nome ?? '')}`
-  return [
-    `DITTA (codice=società):\n${e.ditte.map(d => `${d.codice}=${corta(d.nome)}`).join('; ')}`,
-    `DIVISIONE (codice=tipo contratto):\n${e.divisioni.map(riga).join('; ')}`,
-    `PROGETTO / EPU (commesse, codice=descrizione):\n${e.commesse.map(riga).join('; ')}`,
-    `COND.PAG (codice=condizione di pagamento):\n${e.condPagamento.map(riga).join('; ')}`,
-    `FAM/SFAM (coppie ammesse FAM/SFAM=descrizione sottofamiglia):\n${e.famiglie.map(f => `${f.fam}/${f.sfam}=${corta(f.descrSfam, 32)}`).join('; ')}`,
-  ].join('\n\n')
-}
+const commessePerPrompt = (e: Elenchi | null): string => e?.commesse.length
+  ? `ELENCO COMMESSE (codice=descrizione), per il campo COMMESSA:\n${e.commesse.map(c => `${c.codice}=${corta(c.descrizione)}`).join('; ')}`
+  : 'Elenco commesse non disponibile: in COMMESSA scrivi il codice come riportato nel documento.'
 
-const nomeExcel = (nomeFile: string) => `${nomeFile.replace(/\.[^.]+$/, '')}_Import_Contratti.xlsx`
-
-export const promptClaudeExcel = (nomeFile: string, elenchi: Elenchi | null, conAllegati = false): string => {
+export const promptClaudeModulo = (nomeFile: string, elenchi: Elenchi | null, conAllegati = false): string => {
   const allegati = conAllegati
     ? '\nIl contratto rimanda a un allegato Excel per le voci: se è allegato, le righe dell\'elenco prezzi le prendi da lì.'
     : ''
   return `${INTESTAZIONE(nomeFile)}
-Leggi TUTTO il documento (tutte le pagine) e CREA UN FILE EXCEL chiamato "${nomeExcel(nomeFile)}" pronto per l'import in Alyante (maschera Import_Contratti). Produci il file scaricabile: non scrivere tabelle o JSON nella chat, al massimo una riga per dire che il file è pronto e quante voci contiene.${allegati}
+Leggi TUTTO il documento (tutte le pagine) e COMPILA IL MODULO CONTRATTO riportato in fondo. Il modulo lo rilegge il programma OCR Documenti alla lettera, senza AI: controlla ogni riga (formati, quantità × prezzo = importo, somma delle voci contro l'importo lavori) e dal modulo crea l'Excel per Alyante. Non creare file Excel e non rispondere in JSON.${allegati}
 
-STRUTTURA DEL FILE
-- Un solo foglio, chiamato "Contratti". Riga 1 = intestazioni, ESATTAMENTE queste ${IMPORT_CONTRATTI_COLS.length} colonne in quest'ordine:
-${IMPORT_CONTRATTI_COLS.join(' | ')}
-- Dalla riga 2: UNA riga per ogni voce dell'elenco prezzi / computo del contratto, nell'ordine del documento, con i dati di testata RIPETUTI IDENTICI su ogni riga. Se il contratto non ha un elenco prezzi: una sola riga con la testata e le colonne articolo vuote.
-- Numeri come numeri (non testo): QTA, PREZZO, IMP ANTICIPI, %RECUPERO ANTIC, IMP ONERI SICUREZZA. DATA CONTRATTO come data Excel.
+COME RISPONDERE
+- Un solo blocco di codice \`\`\`text … \`\`\` con il modulo compilato, dalla prima riga «MODULO CONTRATTO OCR v1» fino a «[FINE]». Dopo il blocco al massimo una riga con il numero di voci.
+- Se la risposta si interrompe e ti scrivo «continua», riprendi dalla voce successiva in un nuovo blocco \`\`\`text, senza ripetere quelle già scritte.
 
-COME COMPILARE LE COLONNE
-- DITTA: il CODICE numerico della società del gruppo che stipula (elenco DITTA sotto). Se non indicata: 2 (COSEDIL S.p.A.).
-- CODICE CONTRATTO: numero/sigla del contratto come scritto (es. LT260908-126-E).
-- DESCR.CONTR e OGGETTO: IDENTICHE, l'oggetto del contratto come scritto.
-- COLL. LINEA TECNICA = 1; CONTRATTO FIRMATO = 1; NODO = 0.
-- PROGETTO ed EPU: uguali, il codice commessa (forma NNN-NNN o NNN-NNN_S) preso dall'elenco commesse sotto; se il codice letto nel documento non è in elenco scrivi comunque quello letto; se manca del tutto: "!!".
-- FORNITORE: la partita IVA della controparte; se non c'è, la ragione sociale.
-- DIVISIONE: codice dall'elenco DIVISIONE in base al tipo di contratto (fornitura e posa → 02, subappalto → 03, nolo a caldo → 04, nolo a freddo o infragruppo → 05, prestazione → 06, cottimo → 07, subaffidamento → 08, progettista → 09).
-- DATA CONTRATTO: la data del contratto.
-- IMP ANTICIPI: importo dell'anticipazione, 0 se assente. %RECUPERO ANTIC: percentuale di recupero; se c'è un anticipo e la percentuale non è scritta: 100; senza anticipo: 0.
-- IMP ONERI SICUREZZA: oneri della sicurezza, 0 se assenti.
-- COND.PAG: il CODICE dell'elenco COND.PAG che corrisponde alle condizioni di pagamento scritte (es. "60 gg data fattura fine mese bonifico"); se nessuna voce corrisponde, il testo come scritto.
-- CIG, CUP: come scritti, vuoti se assenti.
-- RG: ritenuta di garanzia in percentuale nel formato RG + due cifre intere + eventuali decimali senza virgola: 5% → RG05, 5,5% → RG055, 10% → RG10; vuoto se non prevista. RI: vuoto.
-- PROG.RIGA: 1, 2, 3… progressivo della voce.
-- ARTICOLO: codice articolo/tariffa della voce (un codice spezzato su più righe va riunito). DES ARTICOLO, DESCR BREVE, DESCR ESTESA: IDENTICHE, la descrizione della voce.
-- UM: unità di misura in minuscolo, solo lettere e cifre (m² → mq, m³ → mc, n → nr, cad → cad, kg, t, h, gg, a corpo → corpo).
-- QTA: quantità. PREZZO: prezzo unitario; negli articoli con "Dettaglio Prezzi" è il TOTALE della colonna prezzo unitario, non i sotto-prezzi (una sola voce per articolo).
-- FAM e SFAM: una coppia AMMESSA dall'elenco FAM/SFAM sotto, scelta in base alla natura della voce; se non riesci a decidere usa la regola del tipo di contratto: subappalto → C/C101, nolo a caldo → C/C107, nolo a freddo → E/E035, nolo infragruppo → E/E030, altro nolo → E/E017; altrimenti "!!" in entrambe.
+REGOLE DI COMPILAZIONE
+- Solo ciò che il documento dice; niente inventato. Valore illeggibile o assente → campo vuoto e subito sopra una riga di commento «# DA VERIFICARE: <motivo>».
+- Numeri in formato italiano (1.234,56), date GG/MM/AAAA. DATA CONTRATTO = data di stipula/firma del contratto, non le date citate nelle premesse.
+- DITTA = società del gruppo che stipula (di norma COSEDIL S.p.A.). FORNITORE = la controparte; PARTITA IVA FORNITORE = la sua P.IVA (11 cifre).
+- COMMESSA: il codice dall'elenco commesse in fondo che corrisponde ai lavori del contratto; se il documento riporta un codice che non è in elenco, scrivi quello letto.
+- TIPOLOGIA una tra quelle del modulo, scelta dalla natura del contratto: subappalto o subaffidamento di lavori → Subappalto; fornitura di materiali (con o senza posa) → Fornitura e posa; noli → Nolo a caldo / Nolo a freddo / Nolo infragruppo; servizi senza tipologia propria (trasporti, consulenze, incarichi professionali) → Passivo a Misura e in questo solo caso DIVISIONE: 08. Negli altri casi DIVISIONE vuota (la ricava il programma), salvo che il contratto riporti il codice divisione.
+- OGGETTO: l'oggetto del contratto (di solito Art. 2 / «Oggetto»), su una riga.
+- Ritenuta di garanzia: la percentuale in RITENUTA GARANZIA %. Se il contratto prevede anche la ritenuta dello 0,50% a tutela dei lavoratori scrivi CODICE RI: R005 e allora anche CODICE RG (5% → RG05, 10% → RG10). Forniture senza ritenuta → vuoti.
+- [RIGHE]: tutte le voci dell'elenco prezzi / computo del contratto, una per riga, celle separate da " | " nell'ordine ARTICOLO | DESCRIZIONE | UM | QUANTITA | PREZZO | IMPORTO, anche con celle vuote. ARTICOLO = codice come scritto (anche se va a capo: ricomponilo). DESCRIZIONE su una riga sola, senza "|". Una voce davvero ripetuta nel contratto resta ripetuta, nessun'altra. Le tabelle proseguono su più pagine: continua fino all'ultima voce, senza saltarne e senza riassumere.
+- Se il prezzo unitario è diviso in colonne (es. P.U. lavori e P.U. oneri sicurezza), PREZZO = prezzo unitario complessivo della voce, quello che moltiplicato per la quantità dà l'importo della voce; spiegalo in un commento. Negli articoli con «Dettaglio Prezzi» (riferimento listino + trasporto/sfrido) PREZZO è il totale, una sola voce per articolo.
+- Se quantità × prezzo non torna con l'importo stampato per l'arrotondamento del prezzo, scrivi il prezzo che dà l'importo (importo / quantità, fino a 4 decimali) e dichiaralo in un commento sopra la riga.
+- Se il contratto non ha un elenco prezzi (importo a corpo, solo ribasso) lascia [RIGHE] con la sola intestazione e scrivilo in un commento.
 
-REGOLE ASSOLUTE
-- Copia ogni valore ESATTAMENTE come nel documento: niente inventato, niente dedotto, niente calcolato (a parte i codici degli elenchi qui sotto).
-- Le tabelle possono proseguire su più pagine: continua fino all'ultima voce, senza saltarne e senza riassumere.
-- Un campo assente nel documento resta vuoto (o 0 dove indicato), mai un valore di comodo.
+${commessePerPrompt(elenchi)}
 
-ELENCHI UFFICIALI (usa SOLO questi codici)
-${elenchiPerPrompt(elenchi)}`
+MODULO DA COMPILARE
+${moduloVuoto()}`
+}
+
+/**
+ * Risposta di Claude → testo del modulo, o null se nella risposta non c'è.
+ * Si prende il blocco di codice che comincia con la riga del modulo e quelli dopo
+ * (le prosecuzioni chieste con «continua»); senza blocchi, dal marcatore in poi. Tutto
+ * ciò che segue «[FINE]» si scarta: è il commento di Claude, non il modulo.
+ */
+export const moduloDaRisposta = (risposta: string): string | null => {
+  // un blocco rimasto aperto (risposta interrotta) si chiude, così il regex lo trova
+  const testo = (risposta.match(/```/g)?.length ?? 0) % 2 ? `${risposta}\n\`\`\`` : risposta
+  const blocchi = [...testo.matchAll(/```[^\n]*\n([\s\S]*?)```/g)].map(m => m[1])
+  const i = blocchi.findIndex(eModulo)
+  let modulo: string
+  if (i >= 0) modulo = blocchi.slice(i).join('\n')
+  else {
+    const righe = testo.split(/\r?\n/)
+    const k = righe.findIndex(r => eModulo(r))
+    if (k < 0) return null
+    modulo = righe.slice(k).join('\n').replace(/```/g, '')
+  }
+  // [ \t] e non \s: \s prenderebbe anche gli a capo e la riga vuota prima di [FINE]
+  const fine = modulo.search(/^[ \t]*\[FINE\][ \t]*$/m)
+  if (fine >= 0) modulo = modulo.slice(0, fine) + '[FINE]'
+  return modulo.trim() + '\n'
 }
 
 // Prompt per il formato scelto. Il documento lo allega l'utente nella finestra di
-// Claude: il prompt gli dice cosa produrre e in che forma. Su IMPORT P6 (contratti)
-// Claude crea direttamente l'Excel (vedi promptClaudeExcel); sugli altri risponde in
-// chat e la risposta si incolla nell'app.
+// Claude: il prompt gli dice cosa produrre e in che forma. Sui formati contratto
+// (IMPORT P6 e CONTRATTO) Claude compila il modulo (promptClaudeModulo); sugli altri
+// trascrive. In tutti i casi la risposta si incolla nell'app.
 export const promptClaude = (format: Format, nomeFile: string, conAllegati = false, elenchi: Elenchi | null = null): string => {
-  const allegati = conAllegati
-    ? '\nIl contratto rimanda a un allegato Excel per le voci: se lo alleghi, prendi le righe da lì.'
-    : ''
   switch (format) {
     case 'contratti':
-      return promptClaudeExcel(nomeFile, elenchi, conAllegati)
     case 'contract':
-      return `${INTESTAZIONE(nomeFile)}
-Leggi TUTTO il documento ed estrai la testata e gli importi del contratto nella struttura JSON qui sotto. Per "righe" basta la PRIMA voce dell'elenco prezzi, se c'è.${allegati}
-
-${REGOLE_ESTRATTO}
-
-Struttura della risposta (i valori sono spiegazioni, sostituiscili con i dati letti):
-${SCHEMA_ESTRATTO}`
+      return promptClaudeModulo(nomeFile, elenchi, conAllegati)
     case 'json':
       return `Sei un trascrittore di documenti italiani (contratti edili). Il documento allegato è "${nomeFile}".
 Trascrivi FEDELMENTE tutto il testo di TUTTE le pagine, riga per riga, nell'ordine del documento. Non riassumere, non correggere, non tradurre. Le celle delle tabelle sulla stessa riga vanno separate con " | ".

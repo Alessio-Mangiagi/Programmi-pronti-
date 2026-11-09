@@ -22,7 +22,7 @@ import { notaCella, contaNote, type Incerta } from './lib/note-celle'
 import { salvaSessione, leggiSessione, cancellaSessione, type Sessione } from './lib/sessione'
 import { TUTTI_I_FORMATI, type Format, type FileKind } from './lib/formati'
 import { supportaCartella, chiediCartella, salvaFile, downloadBlob, xlsxBlob, csvEscape, nomeFileSicuro, type DirHandle } from './lib/salvataggio'
-import { descriviErrori, eModulo, moduloDaRisultato, moduloVuoto, NOME_FILE_MODULO } from './lib/modulo-contratto'
+import { descriviErrori, eModulo, leggiModulo, moduloDaRisultato, moduloVuoto, NOME_FILE_MODULO } from './lib/modulo-contratto'
 import { caricaElenchi, getElenchi } from './lib/elenchi-client'
 import { contenutiSimili, runPool, imageFileToPng, renderPdfPage, testoDaLayerPdf, docxATesto, detectKind, chiaveFile, nomiSimili, miniaturaFile, type MetaFile } from './lib/file-input'
 import { CONTRACT_COLUMNS, contractJsonToRow, contractJsonToMarkdown } from './lib/export-contratto'
@@ -40,7 +40,7 @@ import {
   rigaRegistro, salvaImpostazioni, scriviTesto, sposta, type Cartella, type Impostazioni,
 } from './lib/scansione-cartella'
 // Pagina «Claude»: prompt pronto per claude.ai e lettura della risposta incollata.
-import { promptClaude, urlClaude, leggiEstratto, leggiTrascrizioneJson, leggiTrascrizioneMd, type Estratto } from './lib/claude'
+import { promptClaude, urlClaude, leggiEstratto, leggiTrascrizioneJson, leggiTrascrizioneMd, moduloDaRisposta, type Estratto } from './lib/claude'
 
 
 // `irraggiungibile`: lo mette solo il frontend, finché /api/health non risponde (si riprova)
@@ -2091,18 +2091,25 @@ export default function App() {
     apriClaude(i)
   }
 
-  // IMPORT P6 con Claude: l'Excel l'ha creato Claude e l'utente l'ha scaricato dalla
-  // sua finestra. Qui si segna solo che il documento è fatto (coda, «prossimo da fare»).
-  const segnaExcelDaClaude = (i: number) => {
-    if (!queue[i]) return
-    setQueue(q => {
-      if (!q[i]) return q
-      const copy = q.slice()
-      copy[i] = { ...copy[i], excelDaClaude: true, motore: 'claude' }
-      return copy
-    })
-    setBatchLog(log => [...log.filter(e => e.nome !== queue[i].file.name), { nome: queue[i].file.name, ok: true }])
-    setRispostaClaude('')
+  // Modulo compilato da Claude → controllo del programma → <nome>_modulo.txt + Excel.
+  // Il modulo si rilegge qui con la stessa leggiModulo del server: con errori ci si ferma
+  // PRIMA di salvare qualcosa e l'utente li vede con il numero di riga (correggendo nel
+  // riquadro, o chiedendo a Claude di correggere quelle righe). Senza errori va al server
+  // come un modulo caricato a mano (ramo risultatoDaModulo di /api/ocr: alla lettera,
+  // elenchi ufficiali, nessun assist AI): l'Excel contiene esattamente i valori del modulo.
+  // Sempre IMPORT P6, anche dal formato CONTRATTO: è l'Excel che Alyante importa.
+  const excelDaModuloClaude = async (modulo: string, base: string, dir: DirHandle | null): Promise<string> => {
+    const { errori } = leggiModulo(modulo)
+    if (errori.length) {
+      throw new Error(`Il modulo compilato da Claude non è valido (${errori.length} ${errori.length === 1 ? 'punto' : 'punti'}): correggilo nel riquadro, o chiedi a Claude di correggere queste righe e incolla di nuovo il modulo.\n${descriviErrori(errori)}`)
+    }
+    const json = await postOcr({ text: modulo, format: 'contratti', origine: 'nativo' })
+    const rows = buildImportContrattiRowsFromAlyante(json)
+    if (!rowsHaveData(rows)) throw new Error('Il modulo compilato da Claude non ha dati da esportare (testata e righe vuote): controlla che il documento fosse allegato in Claude.')
+    // BOM: il Blocco note di Windows apre l'UTF-8 senza BOM come ANSI (accenti rotti)
+    await salvaFile(new Blob(['﻿' + modulo], { type: 'text/plain;charset=utf-8' }), `${base}_modulo.txt`, dir)
+    await writeImportContrattiXlsx(rows!, base, dir)
+    return json
   }
 
   // Risposta incollata → risultato della voce (e, sui formati contratto, il suo Excel).
@@ -2121,12 +2128,22 @@ export default function App() {
     setBatchLog(log => log.filter(e => e.nome !== f.name))
     try {
       if (format === 'contratti' || format === 'contract') {
-        const estratto = leggiEstratto(risposta)
+        const base = f.name.replace(/\.[^.]+$/, '')
         const dir = await cartellaExport()
-        const { json, formato } = await compileExcelDaEstratto(estratto, f.name.replace(/\.[^.]+$/, ''), dir, await testoAllegatiExcel(f))
-        // `testo` = la risposta di Claude: è ciò da cui viene il risultato (Riprocessa la rilegge)
-        scrivi({ result: json, testo: risposta, formato, confronto: undefined, motore: 'claude' })
-        if (formato !== format) setFormat(formato)
+        const modulo = moduloDaRisposta(risposta)
+        if (modulo) {
+          // `testo` = il modulo: è ciò da cui viene il risultato (Riprocessa lo rilegge)
+          scrivi({ result: await excelDaModuloClaude(modulo, base, dir), testo: modulo, formato: 'contratti', confronto: undefined, motore: 'claude' })
+          if (format !== 'contratti') setFormat('contratti')
+        } else if (!risposta.includes('{')) {
+          throw new Error('Nella risposta incollata non c’è il modulo: copia da Claude tutto il blocco che comincia con «MODULO CONTRATTO OCR v1» (pulsante Copia del riquadro di codice) e incollalo qui.')
+        } else {
+          // risposta al prompt di prima (JSON «Estratto»): si legge ancora
+          const estratto = leggiEstratto(risposta)
+          const { json, formato } = await compileExcelDaEstratto(estratto, base, dir, await testoAllegatiExcel(f))
+          scrivi({ result: json, testo: risposta, formato, confronto: undefined, motore: 'claude' })
+          if (formato !== format) setFormat(formato)
+        }
       } else {
         const text = format === 'json' ? leggiTrascrizioneJson(risposta) : leggiTrascrizioneMd(risposta)
         scrivi({ result: text, testo: undefined, formato: format, confronto: undefined, motore: 'claude' })
@@ -3268,8 +3285,8 @@ export default function App() {
                       <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.text, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <li><b>Apri Claude</b>: la finestra si apre col prompt già scritto.</li>
                         <li>In Claude <b>allega il file</b> «<NomeFile nome={file.name} style={{ maxWidth: 260, verticalAlign: 'bottom' }} />» e invia.</li>
-                        {format === 'contratti'
-                          ? <li>Claude crea <b>«{file.name.replace(/\.[^.]+$/, '')}_Import_Contratti.xlsx»</b>: <b>scaricalo</b> dalla sua finestra, poi premi «Excel scaricato» qui sotto.</li>
+                        {formatoContratto
+                          ? <li>Claude risponde con il <b>modulo contratto</b> compilato: <b>copialo tutto</b> (pulsante Copia del riquadro), incollalo qui sotto e premi «Controlla → Excel». Il programma lo controlla riga per riga, senza AI, e salva modulo ed Excel.</li>
                           : <li><b>Copia la risposta</b> di Claude e incollala qui sotto, poi «Elabora».</li>}
                       </ol>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -3289,31 +3306,14 @@ export default function App() {
                           {promptCopiato ? '✓ Prompt copiato' : 'Copia prompt'}
                         </button>
                       </div>
-                      {format === 'contratti' ? (
-                        /* IMPORT P6: l'Excel lo produce Claude (prompt con colonne, regole ed
-                           elenchi ufficiali). Niente JSON da incollare: si segna solo che è fatto. */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: `1px dashed ${C.border}`, borderRadius: 6, background: C.bg }}>
-                          <span style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
-                            Il prompt chiede a Claude il file Excel già nella maschera <b>Import_Contratti</b> (30 colonne, codici DITTA, PROGETTO, DIVISIONE, COND.PAG, FAM/SFAM dagli elenchi ufficiali). Il file si scarica dalla finestra di Claude, non passa da qui.
-                          </span>
-                          <div>
-                            <button
-                              onClick={() => segnaExcelDaClaude(activeIdx)}
-                              disabled={loading}
-                              title="Segna questo documento come fatto: l’Excel l’ha creato Claude e l’hai scaricato dalla sua finestra"
-                              style={{ ...bottone('primario', C.green, !loading), width: 'auto', padding: '9px 18px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                            >
-                              <IconCheck size={14} /> Excel scaricato → fatto
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                      <>
+                      {/* Formati contratto: si incolla il MODULO che Claude ha compilato; il
+                          programma lo controlla (leggiModulo) e ne fa l'Excel — vedi
+                          excelDaModuloClaude. Gli errori restano nel riquadro rosso con la riga. */}
                       <textarea
                         value={rispostaClaude}
                         onChange={e => setRispostaClaude(e.target.value)}
                         placeholder={formatoContratto
-                          ? 'Incolla qui la risposta di Claude (l’oggetto JSON con testata, importi e righe)…'
+                          ? 'Incolla qui il modulo compilato da Claude (comincia con «MODULO CONTRATTO OCR v1»)…'
                           : 'Incolla qui la trascrizione fatta da Claude…'}
                         aria-label="Risposta di Claude"
                         spellCheck={false}
@@ -3323,10 +3323,10 @@ export default function App() {
                         <button
                           onClick={() => elaboraDaClaude(activeIdx)}
                           disabled={loading || !rispostaClaude.trim()}
-                          title={formatoContratto ? 'Struttura la risposta, aggancia gli elenchi ufficiali e salva l’Import_Contratti.xlsx' : 'Usa la risposta come risultato di questo documento'}
+                          title={formatoContratto ? 'Controlla il modulo riga per riga (senza AI), aggancia gli elenchi ufficiali e salva <nome>_modulo.txt e l’Import_Contratti.xlsx' : 'Usa la risposta come risultato di questo documento'}
                           style={{ ...bottone('primario', C.green, !loading && !!rispostaClaude.trim()), width: 'auto', padding: '9px 18px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                         >
-                          <IconCheck size={14} /> {formatoContratto ? 'Elabora → Excel' : 'Elabora'}
+                          <IconCheck size={14} /> {formatoContratto ? 'Controlla → Excel' : 'Elabora'}
                         </button>
                         {rispostaClaude && (
                           <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
@@ -3334,8 +3334,6 @@ export default function App() {
                           </span>
                         )}
                       </div>
-                      </>
-                      )}
                     </div>
                   )}
                   {!result && !loading && !(pagina === 'claude' && fileKind !== 'excel') && (
