@@ -53,6 +53,11 @@ Tutto nella cartella `lettore-ddt`:
   `DDT_SKYTOWER=0` spegne l'invio; gli invii falliti (SkyTower spenta, commessa sconosciuta) sono nel log
   del programma. Per un DDT firmato (`.p7m`) va la busta originale;
   se SkyTower non la accetta (risposta 4xx) va il PDF estratto.
+- **Magazzino**: il registro delle consegne `data/<commessa>/consegne.json` (una riga per DDT letto) lo legge
+  il Magazzino Operativo ogni due minuti e ne fa dei carichi. Dal 9 novembre 2026 ogni riga salvata porta anche
+  `codiceCommessa`, il codice commessa aziendale dell'account che ha convertito (o la commessa, se è già un
+  codice del registro della suite): il Magazzino lo usa per il cantiere. Le righe salvate prima non ce l'hanno:
+  il Magazzino prende il codice delle righe più recenti della stessa commessa.
 - **DDT firmati digitalmente (.p7m)**: li apre e li verifica il motore comune della suite in
   `shared\firma` (Python con le sue librerie in `shared\firma\.venv`, elenchi ufficiali degli enti
   certificatori in `shared\firma\cache`). `avvia.bat` lo installa da solo al primo avvio se manca, in

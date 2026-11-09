@@ -24,7 +24,7 @@ Compila la riga in alto e clicca **Crea account**:
 | **Username** | lettere, numeri e `. _ @ -` (es. `marco.russo`); deve essere unico |
 | **Password** | almeno 8 caratteri; l'utente la cambia al primo accesso |
 | **Commessa** | il codice che separa i dati (es. `101-003`). Chi ha la stessa commessa condivide gli stessi dati |
-| **Codice commessa aziendale (SkyTower)** | il codice ufficiale della commessa (es. `101-003`): con questo i PDF dei DDT finiscono anche nella commessa giusta di SkyTower. Vuoto = nessun invio a SkyTower |
+| **Codice commessa aziendale (SkyTower)** | il codice ufficiale della commessa (es. `101-003`): con questo i PDF dei DDT finiscono anche nella commessa giusta di SkyTower e le righe dei DDT entrano nel Magazzino come carichi del cantiere con lo stesso codice. Vuoto = vale la **Commessa** se è già un codice del registro della suite; altrimenti nessun invio a SkyTower e i carichi del Magazzino restano in "Cantiere &lt;commessa&gt;" (lo segnala il Magazzino) |
 | **Nome visualizzato** | il nome che compare in alto nel programma |
 | **Admin** | spunta solo per chi deve amministrare |
 
@@ -39,7 +39,8 @@ Il file contiene password in chiaro: cancellalo dopo l'importazione e non mandar
 
 Nella tabella, colonna **Azioni**:
 
-- **Codice commessa**: cambia il codice commessa aziendale (quello di SkyTower);
+- **Codice commessa**: cambia il codice commessa aziendale (quello di SkyTower e del Magazzino). Vale per i
+  DDT salvati da quel momento; nel Magazzino il cantiere creato prima passa da solo al codice nuovo;
 - **Reset password**: imposta una password nuova (almeno 8 caratteri); comunicala all'utente;
 - **Disabilita / Abilita**: sospende o riattiva l'accesso **senza cancellare niente** (preferibile);
 - **Revoca**: elimina l'account per sempre (i dati della commessa restano). Chiede conferma.

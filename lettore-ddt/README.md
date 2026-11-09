@@ -186,7 +186,7 @@ Consegne lette dai DDT e raggruppate per fornitore (P.IVA, altrimenti nome norma
 | GET | `/fornitori/dettaglio?chiave=` | Consegne del fornitore, materiali, totali per mese |
 | GET | `/fornitori/excel[?chiave=]` | Lo stesso in Excel (elenco o singolo fornitore) |
 
-Il registro sta in `data/<commessa>/consegne.json`: si aggiorna a ogni export salvato (manuale e batch), si ricostruisce dagli export al primo accesso e **non** segue la potatura di `json_exports` (`maxJsonExports`), quindi lo storico resta intero.
+Il registro sta in `data/<commessa>/consegne.json`: si aggiorna a ogni export salvato (manuale e batch), si ricostruisce dagli export al primo accesso e **non** segue la potatura di `json_exports` (`maxJsonExports`), quindi lo storico resta intero. Ogni riga salvata porta anche `codiceCommessa` (facoltativo): il codice commessa aziendale dell'account che ha convertito o, senza, la commessa se è già un codice del registro della suite (`services/skytower.codiceCommessaPer`). Lo legge il Magazzino Operativo (`importa_ddt.py`) per mettere i carichi nel cantiere con lo stesso codice di InCampo e SkyTower.
 
 ---
 

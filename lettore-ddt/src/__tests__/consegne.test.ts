@@ -350,6 +350,18 @@ describe('consegne: registro persistente', () => {
     await registraExport(dir, 'cx', 'a.json', { sheets: [] });
     expect(righeRegistro(leggiRegistro(dir, 'cx')).some((r) => r.export === 'a.json')).toBe(false);
   });
+
+  // Il Magazzino (importa_ddt.py) mette i carichi nel cantiere col codice del registro della suite:
+  // il codice viaggia sulle righe, solo quando è noto (le righe vecchie restano senza campo).
+  it('codice commessa del registro scritto sulle righe, campo assente senza codice', async () => {
+    await registraExport(dir, 'cx', 'con-codice.json', ddt('c1'), ' 101-003 ');
+    await registraExport(dir, 'cx', 'senza-codice.json', ddt('s1'));
+    const righe = righeRegistro(leggiRegistro(dir, 'cx'));
+    expect(righe.find((r) => r.ddt === 'c1')?.codiceCommessa).toBe('101-003');
+    const senza = righe.find((r) => r.ddt === 's1')!;
+    expect('codiceCommessa' in senza).toBe(false);
+    expect(senza.commessa).toBe('cx'); // la cartella resta la chiave di sempre
+  });
 });
 
 describe('rotte /fornitori', () => {
@@ -382,7 +394,8 @@ describe('rotte /fornitori', () => {
         ])
       )
     );
-    createUser(uuidv4(), ADMIN, PW, COMMESSA, 'Admin Fornitori', true);
+    // codiceCommessa scritto come lo scrive l'admin (testo libero): finisce sulle righe del registro
+    createUser(uuidv4(), ADMIN, PW, COMMESSA, 'Admin Fornitori', true, '101-003 SEDE');
     createUser(uuidv4(), UTENTE, PW, COMMESSA, 'Utente Fornitori');
     expect((await admin.post('/auth/login').send({ username: ADMIN, password: PW })).status).toBe(
       200
@@ -431,6 +444,11 @@ describe('rotte /fornitori', () => {
       await new Promise((r) => setTimeout(r, 50));
     }
     expect(f).toMatchObject({ ddt: 2, ultima: '2026-03-06', totali: [{ um: 'm³', quantita: 12 }] });
+    // la riga nuova porta il codice commessa dell'account che ha convertito (per il Magazzino);
+    // quella ricostruita dall'archivio no
+    const righe = righeRegistro(leggiRegistro(dirCommessa, COMMESSA));
+    expect(righe.find((r) => r.ddt === '502')?.codiceCommessa).toBe('101-003 SEDE');
+    expect(righe.find((r) => r.ddt === '501')?.codiceCommessa).toBeUndefined();
   });
 
   it('dettaglio, chiave non valida, fornitore assente, commessa sconosciuta', async () => {

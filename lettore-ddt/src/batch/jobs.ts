@@ -30,7 +30,11 @@ import {
 } from '../routes/helpers';
 import { ddtIndexOfFolder, extractDdtNumbers } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
-import { attivo as skytowerAttiva, inviaDdtASkyTower } from '../services/skytower';
+import {
+  attivo as skytowerAttiva,
+  codiceCommessaPer,
+  inviaDdtASkyTower,
+} from '../services/skytower';
 import { addToPaniere } from '../services/paniere';
 import { registraLavoro } from '../services/registroLavori';
 import { apriDdtFirmato, eBustaFirmata, eNomeFirmato, FirmaDdt } from '../services/firmaDigitale';
@@ -712,10 +716,16 @@ function archiviaEsiti(job: BatchJob, push: (line: string) => void): void {
       logger.error(`Archiviazione ${jsonName} fallita: ${e.message}`)
     );
     // Registro consegne per fornitore (vedi services/consegne): indipendente
-    // dalla potatura di json_exports qui sotto.
-    registraExport(path.dirname(folder), job.commessaId, jsonName, parsed).catch((e) =>
-      logger.error(`Registro consegne non aggiornato (${jsonName}): ${e.message}`)
-    );
+    // dalla potatura di json_exports qui sotto. Con il codice commessa del registro della
+    // suite (account di chi ha lanciato il lavoro, o cartella già nel registro): il Magazzino
+    // lo usa per il cantiere dei carichi.
+    registraExport(
+      path.dirname(folder),
+      job.commessaId,
+      jsonName,
+      parsed,
+      codiceCommessaPer(job.createdBy, job.commessaId)
+    ).catch((e) => logger.error(`Registro consegne non aggiornato (${jsonName}): ${e.message}`));
     // Archivio unico della suite: il PDF originale va in SkyTower. Con "sposta in _elaborati" il
     // motore l'ha già spostato quando arriviamo qui (lo sposta a fine lavoro, prima di restituire
     // il risultato): il percorso vero è f.elaborato, scritto da onSpostato — col suffisso se c'era

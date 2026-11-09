@@ -29,7 +29,7 @@ import { insertDDTValidation } from '../models/database';
 import { logActivity } from '../models/activityLog';
 import { extractDdtNumbers, extractM3ByDate } from '../services/ddtArchive';
 import { registraExport } from '../services/consegne';
-import { inviaDdtASkyTower } from '../services/skytower';
+import { codiceCommessaPer, inviaDdtASkyTower } from '../services/skytower';
 import { tuttiIPrompt } from '../batch/prompts';
 import { apriDdtFirmato, eBustaFirmata, FirmaDdt, nomeSenzaP7m } from '../services/firmaDigitale';
 
@@ -294,9 +294,17 @@ router.post(
       writeFileAtomicSerial(jsonPath, JSON.stringify(parsed, null, 2))
         .then(() => {
           logger.info(`JSON salvato: ${path.basename(jsonPath)}`);
-          // Registro consegne per fornitore: sopravvive alla potatura qui sotto.
-          registraExport(path.dirname(jsonFolder), req.commessaId!, jsonFilename, parsed).catch(
-            (e) => logger.error(`Registro consegne non aggiornato (${jsonFilename}): ${e.message}`)
+          // Registro consegne per fornitore: sopravvive alla potatura qui sotto. Il codice commessa
+          // del registro della suite viene dall'account DDT (req.session.username: è lui che ha
+          // commessaId e codiceCommessa); il Magazzino lo usa per il cantiere dei carichi.
+          registraExport(
+            path.dirname(jsonFolder),
+            req.commessaId!,
+            jsonFilename,
+            parsed,
+            codiceCommessaPer(req.session.username || req.cosedil?.username || '', req.commessaId!)
+          ).catch((e) =>
+            logger.error(`Registro consegne non aggiornato (${jsonFilename}): ${e.message}`)
           );
           // Archivio unico della suite: il PDF caricato con /prepare-claude
           // (temp_id) diventa un documento della commessa in SkyTower. Per un .p7m va la busta

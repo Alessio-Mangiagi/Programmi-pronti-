@@ -31,6 +31,14 @@ export interface Consegna {
   um: string;
   destinazione: string;
   targa: string;
+  /**
+   * Codice della commessa nel registro della suite (shared/suite/commesse.json, es. "101-003"), quando è
+   * noto al salvataggio: il codiceCommessa dell'account che converte o, senza, la cartella se è già un
+   * codice del registro (services/skytower.codiceCommessaPer). Facoltativo: assente nelle righe salvate
+   * prima e in quelle ricostruite dagli export. Lo legge il Magazzino (importa_ddt.py) per mettere i
+   * carichi nel cantiere con lo stesso codice di InCampo e SkyTower invece che in "Cantiere <cartella>".
+   */
+  codiceCommessa?: string;
 }
 
 // ── Colonne riconosciute (alias per i diversi prompt) ───────────────────────
@@ -283,16 +291,21 @@ export function leggiRegistro(dirCommessa: string, commessa: string): Registro {
 /**
  * Registra (o sostituisce) le consegne di un export appena salvato. Idempotente:
  * lo stesso export risalvato rimpiazza le sue righe, non le duplica.
+ * `codiceCommessa` (facoltativo) è il codice del registro della suite da scrivere su
+ * ogni riga (vedi Consegna.codiceCommessa); vuoto = campo omesso, come prima.
  */
 export function registraExport(
   dirCommessa: string,
   commessa: string,
   exportName: string,
-  parsed: any
+  parsed: any,
+  codiceCommessa = ''
 ): Promise<number> {
   return inCoda(dirCommessa, () => {
     const reg = leggiRegistro(dirCommessa, commessa);
     const righe = estraiConsegne(parsed, commessa, exportName);
+    const codice = String(codiceCommessa || '').trim();
+    if (codice) for (const r of righe) r.codiceCommessa = codice;
     if (righe.length) {
       reg.perExport[exportName] = { salvatoIl: new Date().toISOString(), righe };
     } else {
