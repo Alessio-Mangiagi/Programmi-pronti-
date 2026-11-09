@@ -18,6 +18,7 @@ import threading
 COOKIE_OK = "sid=utente-valido"
 COOKIE_ADMIN = "sid=admin-valido"
 ULTIMA_VERIFICA = {}   # corpo dell'ultima verifica password riuscita, per controllare cosa arriva al portale
+VERIFICHE = []         # id app chiesti a /api/verify, in ordine (test con più id)
 
 
 class FintoPortale(http.server.BaseHTTPRequestHandler):
@@ -25,6 +26,12 @@ class FintoPortale(http.server.BaseHTTPRequestHandler):
         if not self.path.startswith("/api/verify"):
             self.send_response(404); self.end_headers(); return
         cookie = self.headers.get("Cookie", "")
+        # ?app=<id>: le app che iniziano con "vietata" sono riservate e l'utente normale non ha la spunta
+        # (il portale vero risponde 403, accessoApp); l'admin entra ovunque. Serve ai test con più id.
+        app_chiesta = (self.path.split("app=", 1)[1] if "app=" in self.path else "").split("&")[0]
+        VERIFICHE.append(app_chiesta)
+        if cookie == COOKIE_OK and app_chiesta.startswith("vietata"):
+            self.send_response(403); self.end_headers(); return
         if cookie in (COOKIE_OK, COOKIE_ADMIN):
             corpo = {"ok": True, "username": "mario", "nome": "Mario",
                      "ruolo": "admin" if cookie == COOKIE_ADMIN else "utente",
@@ -164,6 +171,28 @@ controlla("admin_paths: rotta libera passa", r.status_code == 200)
 r = get(c, "/api/admin/utenti", COOKIE_OK)
 controlla("admin_paths: rotta admin 403", r.status_code == 403)
 
+# Più id (programma unico "DDT e Magazzino"): entra chi è abilitato ad almeno uno, in ordine.
+c = crea_app(app_id="vietata-x")
+r = get(c, "/api/dati", COOKIE_OK)
+controlla("un id riservato senza spunta: 403", r.status_code == 403)
+c = crea_app(app_id=("vietata-a", "permessa-b"))
+r = get(c, "/api/dati", COOKIE_OK)
+controlla("più id: abilitato al secondo -> passa", r.status_code == 200 and r.data == b"APP")
+c = crea_app(app_id=("vietata-c", "vietata-d"))
+r = get(c, "/api/dati", COOKIE_OK)
+controlla("più id: nessuno abilitato -> 403 (non al login)", r.status_code == 403)
+r = get(c, "/api/dati")
+controlla("più id: non loggato -> 401", r.status_code == 401)
+v = cosedil_sso.verifica_sessione(COOKIE_OK, ("vietata-e", "permessa-f"))
+controlla("più id: l'esito dice quale id è passato", v["ok"] and v["app"] == "permessa-f")
+v = cosedil_sso.verifica_sessione(COOKIE_ADMIN, ("vietata-g", "permessa-h"))
+controlla("più id: l'admin passa al primo id, con il flag admin", v["ok"] and v["admin"] and v["app"] == "vietata-g")
+VERIFICHE.clear()
+v = cosedil_sso.verifica_sessione("sid=sconosciuto-multi", ("primo-i", "secondo-j"))
+controlla("più id: non loggato -> una sola domanda al portale", not v["ok"] and VERIFICHE == ["primo-i"])
+v = cosedil_sso.verifica_sessione(COOKIE_OK, "permessa-k")
+controlla("un solo id: esito di sempre, senza la chiave app", v["ok"] and "app" not in v)
+
 # --- Adattatore ASGI (FastAPI): chiamato a mano, senza dipendenze ---
 import asyncio  # noqa: E402
 
@@ -215,6 +244,11 @@ controlla("asgi solo_pagine: pagina loggata passa", s == 200 and b == b"STATO")
 a = cosedil_sso.asgi(app_asgi, app_id="test", admin_only=True)
 s, h, b = get_asgi(a, "/api/dati", COOKIE_OK)
 controlla("asgi admin_only: utente normale 403", s == 403)
+
+s, h, b = get_asgi(cosedil_sso.asgi(app_asgi, app_id=("vietata-l", "permessa-m")), "/api/dati", COOKIE_OK)
+controlla("asgi più id: abilitato al secondo -> passa", s == 200 and b == b"STATO")
+s, h, b = get_asgi(cosedil_sso.asgi(app_asgi, app_id=["vietata-n", "vietata-o"]), "/api/dati", COOKIE_OK)
+controlla("asgi più id: nessuno abilitato -> 403", s == 403)
 
 # Password del portale negli altri programmi (SkyTower, InCampo, VFP Transfer).
 v = cosedil_sso.verifica_password("mario@cosedilspa.com", "Giusta-2026", "incampo", ip="10.0.0.7")

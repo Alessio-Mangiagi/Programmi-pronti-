@@ -29,6 +29,13 @@ COSEDIL_SSO_FAIL=open.
 Admin per-app: init(app, app_id="scadenzario") chiede al portale se la sessione è
 admin PER QUELL'APP (ruolo utente o IP di provenienza, vedi data/ip-admin.json
 nel portale). L'esito finisce in flask.g.cosedil. Poi:
+
+Più id per una stessa app: init(app, app_id=("magazzino", "ddt")) fa entrare chi è
+abilitato ad ALMENO UNO dei programmi, provati nell'ordine dato. Serve al programma
+unico "DDT e Magazzino" (09/11/2026): il Magazzino si apre dentro il Lettore DDT e
+lo usa anche chi nel portale ha la spunta solo su "ddt". L'esito (anche il flag admin)
+è quello del primo id che il portale accetta, e porta in più la chiave "app" con
+quell'id. Non loggato o portale giù valgono per tutti gli id: non si riprova.
     admin_paths=("/api/admin",)  -> quelle rotte rispondono 403 ai non-admin
     admin_only=True              -> l'INTERA app è riservata agli admin
 
@@ -98,12 +105,38 @@ def leggi_sid(cookie_header):
     return ""
 
 
+def _elenco_id(app_id):
+    """app_id come elenco: "magazzino" → ["magazzino"], ("magazzino", "ddt") → com'è (vuoti tolti)."""
+    if isinstance(app_id, (list, tuple, set, frozenset)):
+        ids = [str(a).strip() for a in app_id if a and str(a).strip()]
+        return ids or [""]
+    return [app_id or ""]
+
+
 def verifica_sessione(cookie_header, app_id=""):
     """Chiede al portale chi è l'utente di questo cookie (e se è admin per app_id).
 
     Ritorna sempre un dict: reachable=False significa "portale non risponde", che
     è diverso da ok=False ("portale risponde: non sei loggato").
+
+    app_id può essere un elenco di id ("magazzino", "ddt"): passa chi è abilitato ad
+    almeno uno, provati in ordine (vedi l'intestazione del modulo). Il primo che il
+    portale accetta dà l'esito, con in più "app" = quell'id. Se tutti rispondono 403
+    l'esito è "vietato"; non loggato o portale giù si fermano al primo tentativo,
+    perché la risposta sarebbe uguale per ogni id.
     """
+    ids = _elenco_id(app_id)
+    if len(ids) > 1:
+        vietato = None
+        for i in ids:
+            v = verifica_sessione(cookie_header, i)
+            if v["ok"]:
+                return dict(v, app=i)           # copia: l'esito in cache resta quello del singolo id
+            if not v.get("vietato"):
+                return v
+            vietato = vietato or v
+        return vietato
+    app_id = ids[0]
     key = (leggi_sid(cookie_header) or "none", app_id or "")
     now = time.time()
     hit = _cache.get(key)
@@ -255,6 +288,8 @@ def _chiuso_se_giu(fail_open):
 def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None, percorsi_liberi=()):
     """Registra il gate sull'app Flask. No-op se COSEDIL_SSO=off.
 
+    app_id: un id ("scadenzario") o un elenco di id (("magazzino", "ddt")): entra chi è
+    abilitato ad almeno uno (verifica_sessione).
     percorsi_liberi: prefissi che il gate non guarda (es. "/api/suite/", le rotte
     fra app della suite protette dal token di servizio di shared/suite)."""
     if not ENABLED:
