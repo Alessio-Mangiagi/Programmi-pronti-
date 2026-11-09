@@ -9,6 +9,12 @@ moduli che salgono dal basso e tabelle trasformate in schede da scorrere col dit
 Per usare la **fotocamera** apri il Magazzino dall'indirizzo `https://…` del Portale,
 non da un indirizzo con il numero di porta: altrimenti il pulsante avvisa e non si apre.
 
+Dentro il programma unico "DDT e Magazzino" la barra in alto tiene le linguette **DDT |
+Magazzino**, la commessa scelta all'ingresso e le tue iniziali; il logo e il nome del
+programma lasciano il posto.
+
+<img src="img/mobile-programma-unico.png" alt="Il Magazzino sul telefono dentro il programma unico" width="300">
+
 ## La barra in basso
 
 | Tasto | Cosa fa |

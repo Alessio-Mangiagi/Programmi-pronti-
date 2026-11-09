@@ -10,8 +10,12 @@ Appendice breve per chi installa e mantiene il Magazzino. I dettagli tecnici son
 
 - Prima volta: `installa.bat` nella cartella `magazzino-operativo` (crea l'ambiente
   Python e installa i componenti; serve Python 3.10 o superiore).
-- Normalmente il Magazzino lo avvia il **Portale**. A mano: `avvia.bat` (o `avvia.vbs`
-  senza finestra); chiudendo la finestra il programma si ferma.
+- Dal 09/11/2026 il Magazzino è una parte del programma unico **"DDT e Magazzino"**: lo
+  avvia il **Lettore DDT** quando parte (se `http://127.0.0.1:5200/health` non risponde) e lo
+  ferma quando si ferma lui, se l'aveva avviato lui. Gli utenti lo aprono all'indirizzo del
+  Lettore DDT sotto `/magazzino/`; la porta 5200 serve al Lettore DDT e alle altre app della
+  suite. A mano: `avvia.bat` (o `avvia.vbs` senza finestra); chiudendo la finestra il
+  programma si ferma. Il contratto fra le due parti è in `shared/suite/CONTRATTI.md` § 11.
 - Senza Portale acceso nessuno entra: il controllo dell'accesso è del Portale.
 - Per la fotocamera dei telefoni serve l'indirizzo `https://` della suite (vedi la
   documentazione del Portale sull'accesso in rete).
@@ -26,8 +30,13 @@ Appendice breve per chi installa e mantiene il Magazzino. I dettagli tecnici son
 | Pratiche dei mezzi a nolo | cartella pratiche di VFP Transfer | `MAGAZZINO_MEZZI_DIR` |
 
 Altre impostazioni: `MAGAZZINO_IMPORT_SEC` (ogni quanti secondi si rileggono DDT e
-pratiche, 0 = solo a mano) e `MAGAZZINO_ADMIN` (username amministratori oltre agli admin
-del Portale).
+pratiche, 0 = solo a mano), `MAGAZZINO_ADMIN` (username amministratori oltre agli admin
+del Portale), `MAGAZZINO_RIEPILOGO_ORA` (ora del riepilogo giornaliero in SkyTower, `19:00`;
+`off` = solo a richiesta), `MAGAZZINO_URL_PUBBLICO` (indirizzo del Magazzino nei link verso le
+altre app; di solito `<Lettore DDT>/magazzino`) e `MAGAZZINO_PROGRAMMA_UNICO=0` per usare il
+Magazzino da solo, senza Lettore DDT, con i link al suo indirizzo.
+
+Il registro dei riepiloghi mandati a SkyTower sta nel database (tabella `riepiloghi`).
 
 ## Backup
 

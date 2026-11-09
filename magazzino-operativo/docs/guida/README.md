@@ -14,7 +14,7 @@ e cosa fare se qualcosa non va.
 
 ## Indice
 
-1. [Primi passi](01-primi-passi.md) — come si entra, com'è fatta la pagina, il Riepilogo
+1. [Primi passi](01-primi-passi.md) — come si entra (programma unico "DDT e Magazzino"), com'è fatta la pagina, il Riepilogo
 2. [Scansione e schede](02-scansione.md) — lettore, fotocamera, scheda articolo, mezzo e ubicazione
 3. [Movimenti e giacenze](03-movimenti.md) — carico, scarico, trasferimento, rettifica, inventario
 4. [Anagrafiche](04-anagrafiche.md) — articoli, mezzi (foto e targa), ubicazioni e mappa
@@ -22,7 +22,7 @@ e cosa fare se qualcosa non va.
 6. [Importazioni](06-importazioni.md) — DDT dal Lettore DDT e mezzi a nolo da VFP Transfer
 7. [Flussi](07-flussi.md) — i grafici dei movimenti
 8. [Dal telefono](08-telefono.md) — la vista Operatore, Cerca, installare l'app
-9. [Collegamenti con la suite](09-suite.md) — InCampo, SkyTower, "Da fare oggi" del Portale
+9. [Collegamenti con la suite](09-suite.md) — InCampo, SkyTower (anche il riepilogo del giorno), "Da fare oggi" del Portale
 10. [Amministrazione](10-amministrazione.md) — chi fa cosa, chi usa i mezzi, registro attività
 11. [Se qualcosa non va](11-problemi.md) — messaggi frequenti e cosa fare
 12. [Per l'amministratore di sistema](12-amministratore-sistema.md) — avvio, dati, backup
@@ -35,9 +35,13 @@ e cosa fare se qualcosa non va.
 - La **giacenza** non si scrive a mano: è la somma dei movimenti. Se un numero è
   sbagliato si corregge con una rettifica o con un inventario, non "sovrascrivendo".
 - I **DDT** letti dal Lettore DDT e le **pratiche dei mezzi a nolo** di VFP Transfer
-  entrano da soli nel Magazzino.
-- Si entra **dal Portale** con il proprio utente: login e abilitazioni sono spiegati
-  nella [guida del Portale](../../../portale/docs/guida/README.md).
+  entrano da soli nel Magazzino; i DDT convertiti nel programma unico arrivano **subito**.
+- Dal 09/11/2026 Lettore DDT e Magazzino sono **un programma solo**, "DDT e Magazzino": si
+  entra **dal Portale** con il proprio utente, si sceglie la commessa e si passa dall'una
+  all'altra parte con le linguette in alto. Login e abilitazioni sono spiegati nella
+  [guida del Portale](../../../portale/docs/guida/README.md).
+- Ogni sera il Magazzino manda in **SkyTower** il riepilogo dei movimenti del giorno di ogni
+  commessa (PDF ed Excel).
 
 > Le immagini di questa guida sono fatte con dati di prova (commesse 101-003 Sede
 > Acireale e C-2024-015 Scuola Via Roma, persone e fornitori inventati).

@@ -29,13 +29,19 @@ stanno i mezzi**, scansionando un codice a barre.
 
 Tutto gira **in locale**: Flask + SQLite, pagina unica senza build, porta `5200`.
 
+**Dal 09/11/2026 è una parte del programma unico "DDT e Magazzino"**: chi lo usa lo apre
+dalla tessera *DDT e Magazzino* del portale, all'indirizzo del Lettore DDT sotto
+`/magazzino/`, con la commessa scelta all'accesso. Il motore resta questo (vedi
+[Programma unico DDT e Magazzino](#programma-unico-ddt-e-magazzino)).
+
 ---
 
 ## Installazione e avvio
 
 1. **`installa.bat`**: crea `.venv` e installa Flask, waitress e `segno` (QR).
 2. **`avvia.bat`** (o `avvia.vbs` senza finestra): prepara il database e apre il
-   browser su http://127.0.0.1:5200. Dal Portale Suite parte da sola.
+   browser su http://127.0.0.1:5200. Nel programma unico lo avvia il **Lettore DDT**
+   (`python app.py`, se `/health` sulla 5200 non risponde) e lo ferma quando si ferma lui.
 
 Serve Python 3.10 o superiore. Il database `magazzino.db` nasce al primo avvio e
 non è versionato.
@@ -43,7 +49,9 @@ non è versionato.
 ## Accesso
 
 L'app monta il gate SSO del Portale (`shared/sso`): senza login nel portale non si
-entra. Per lo sviluppo in locale `COSEDIL_SSO=off` (utente admin fittizio).
+entra. Entra chi è abilitato nel portale a **`magazzino` o a `ddt`** (il gate prova i due id in
+ordine: il Magazzino si apre dentro il programma unico). Per lo sviluppo in locale
+`COSEDIL_SSO=off` (utente admin fittizio).
 
 Gli **admin** dell'app nel portale (o gli username in `MAGAZZINO_ADMIN`) possono
 eliminare articoli, mezzi, ubicazioni e movimenti e vedono la vista
@@ -238,6 +246,33 @@ Gli errori che l'utente vede sono frasi che dicono cosa fare (`messaggi.py`): fi
 importazioni, app della suite spenta, foto non valide, valori duplicati. Il testo tecnico originale
 (`[WinError …]`, vincoli SQLite, eccezioni di Pillow o JSON) resta solo nel log del Magazzino.
 
+### Programma unico DDT e Magazzino
+
+Decisione del 09/11/2026: Lettore DDT e Magazzino sono un programma solo per chi li usa,
+con i due motori di oggi (contratto in `shared/suite/CONTRATTI.md` § 11).
+
+- **Sotto `/magazzino/`.** Il Lettore DDT inoltra `/magazzino/*` alla 5200 togliendo il prefisso
+  e aggiunge `X-Forwarded-Prefix`, `X-Forwarded-Host/Proto/For` e `X-Suite-Commessa`.
+  `prefisso.py` (middleware WSGI) ci crede **solo da loopback** e con valori sani: il prefisso va
+  in `SCRIPT_NAME` (link, `url_for`, manifest e service worker con scope `/magazzino/`), l'IP vero
+  nel registro attività. La pagina riceve base e commessa in `window.MAGAZZINO` (template) e in
+  `GET /api/me` (`base`, `unico`, `commessa`, `ddt`). Aperto sulla 5200 il Magazzino resta alla radice.
+- **Commessa di sessione.** Scelta all'accesso dalla parte DDT: la testata mostra le linguette
+  **DDT | Magazzino** e la commessa; giacenze e movimenti partono filtrati sul cantiere della
+  commessa, le ubicazioni mostrano solo quelle della commessa (spunta per vederle tutte), il
+  movimento a mano propone quel cantiere come arrivo. Tutto resta modificabile.
+- **Carico immediato** (`POST /api/suite/ddt/consegne`, token di servizio): appena salva un
+  export il DDT manda le righe; entrano come carichi con le stesse chiavi dell'importazione
+  periodica, quindi il giro di sfondo da `consegne.json` non le duplica (`importa_ddt.importa_consegne_inviate`).
+- **Riepilogo in SkyTower** (`riepilogo.py`): per ogni commessa con movimenti nel giorno, un PDF e
+  un Excel (movimenti del giorno con DDT di provenienza, giacenze del cantiere) nei documenti della
+  commessa. In automatico dopo `MAGAZZINO_RIEPILOGO_ORA` (thread ogni 5 minuti; SkyTower spenta =
+  riprova; recupera il giorno prima se il server era spento), a richiesta dal Riepilogo o dalla
+  scheda del cantiere. La tabella `riepiloghi` tiene l'impronta: stessi movimenti non si rimandano,
+  movimenti nuovi danno un documento "(aggiornamento hh:mm)"; un PDF già caricato non si rimanda se
+  era mancato solo l'Excel. Excel scritto da `xlsx_semplice.py` (nessuna dipendenza).
+- **Link verso fuori** (da fare del portale, InCampo, task): `<Lettore DDT>/magazzino`.
+
 ## Variabili d'ambiente
 
 | Variabile | Default | Effetto |
@@ -252,6 +287,9 @@ importazioni, app della suite spenta, foto non valide, valori duplicati. Il test
 | `MAGAZZINO_BACKUP_DIR` | `backup/` accanto al database | cartella delle copie del database (meglio un altro disco o il NAS) |
 | `MAGAZZINO_BACKUP_ORE` | `24` | ogni quante ore fare una copia (0 = backup automatico spento) |
 | `MAGAZZINO_BACKUP_TENERE` | `14` | quante copie tenere: le più vecchie si cancellano dopo ogni copia riuscita |
+| `MAGAZZINO_RIEPILOGO_ORA` | `19:00` | ora del riepilogo giornaliero automatico in SkyTower (`off` = solo a richiesta) |
+| `MAGAZZINO_URL_PUBBLICO` | vuoto | indirizzo del Magazzino nei link verso le altre app (default `<Lettore DDT>/magazzino`) |
+| `MAGAZZINO_PROGRAMMA_UNICO` | `1` | `0` = link all'indirizzo proprio del Magazzino (uso da solo, senza Lettore DDT) |
 | `COSEDIL_SSO`, `COSEDIL_PORTAL`, `COSEDIL_SSO_FAIL` | vedi `shared/sso` | gate SSO |
 
 ## API principali
@@ -275,7 +313,11 @@ importazioni, app della suite spenta, foto non valide, valori duplicati. Il test
 | `GET /api/admin/riepilogo?giorni=` | per utente: movimenti per tipo, scansioni, importazioni, anagrafiche; mezzi in uso; collegati |
 | `GET /api/admin/attivita?giorni=&utente=&azione=&oggetto=&q=` | registro attività filtrabile |
 | `GET/POST /api/admin/backup` | stato delle copie del database / una copia subito (admin) |
-| `GET /etichette?tipo=articoli&ids=1,2` | foglio etichette da stampare |
+| `GET /api/etichette?tipo=articoli&ids=1,2` | foglio etichette da stampare (`/etichette` rimanda qui) |
+| `GET /health` | salute senza login: la usa il Lettore DDT prima di avviare il Magazzino |
+| `POST /api/suite/ddt/consegne` | carico immediato dal Lettore DDT `{cartella, export, codiceCommessa, salvatoIl, righe}` (token suite) |
+| `GET /api/riepiloghi?commessa=&limite=` | riepiloghi mandati a SkyTower, commesse con movimenti oggi, ora automatica |
+| `POST /api/riepiloghi/invia` | `{commessa, giorno?, forza?}`: riepilogo subito (admin o commessa di sessione) |
 | `GET /api/codici/<codice>.svg?formato=code128\|qr` | il solo codice a barre |
 
 ## File
@@ -292,7 +334,10 @@ importazioni, app della suite spenta, foto non valide, valori duplicati. Il test
 | `suite_rotte.py` | dialogo con InCampo e SkyTower (rotte `/api/suite`, `/api/incampo`, `/api/skytower`) |
 | `backup.py` | copie coerenti di `magazzino.db` con rotazione (thread di sfondo e pulsante admin) |
 | `messaggi.py` | testi d'errore per l'utente al posto di quelli tecnici (che restano nel log) |
-| `pdf_semplice.py` | PDF di tabelle senza dipendenze (report giacenze per SkyTower) |
+| `pdf_semplice.py` | PDF di tabelle senza dipendenze (report giacenze e riepilogo per SkyTower) |
+| `xlsx_semplice.py` | Excel di tabelle senza dipendenze (riepilogo per SkyTower) |
+| `riepilogo.py` | riepilogo giornaliero dei movimenti in SkyTower (automatico e a richiesta) |
+| `prefisso.py` | il Magazzino sotto `/magazzino/` dietro il proxy del Lettore DDT (programma unico) |
 | `static/js/targa.js` | lettura della targa da foto (Tesseract.js + formati targhe italiane) |
 | `static/js/grafici.js` | grafici SVG (colonne impilate, linee, barre, flusso, sparkline) |
 | `static/js/sw.js`, `static/manifest.webmanifest`, `static/icone/` | installazione sul telefono (PWA) |

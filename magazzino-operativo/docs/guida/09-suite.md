@@ -36,11 +36,44 @@ due programmi sono spenti, vedi sotto):
   materiale e mezzi della commessa, nella cartella "Suite Cosedil", come bozza (WIP).
   Esito: "Report caricato su SkyTower: …".
 - **Apri** porta al progetto in SkyTower.
+- **Riepilogo di oggi** (all'amministratore e a chi lavora in quella commessa): manda subito
+  il riepilogo del giorno, vedi [Riepilogo del giorno in SkyTower](#riepilogo-del-giorno-in-skytower).
 
 Se uno dei due programmi è spento o non raggiungibile il riquadro lo dice (per esempio
 "InCampo non risponde: probabilmente è spenta. Aprila dal portale e riprova.") e il resto
 funziona.
 Aprilo dal Portale e ricarica la scheda.
+
+## Riepilogo del giorno in SkyTower
+
+Ogni giorno, per ogni commessa che ha avuto movimenti, il Magazzino carica in SkyTower, fra i
+documenti della commessa (cartella "Suite Cosedil", come bozza WIP), **due documenti**:
+
+- un **PDF** con i movimenti del giorno (ora, tipo, articolo, quantità, da dove a dove, DDT di
+  provenienza e fornitore) e le giacenze del cantiere a fine giornata;
+- un **Excel** con le stesse due tabelle (più chi ha registrato ogni movimento e l'origine),
+  da filtrare o sommare.
+
+Così in SkyTower c'è tutto: il PDF del DDT e l'Excel della conversione li manda la parte
+DDT, il riepilogo di magazzino lo aggiunge il Magazzino.
+
+![Il riquadro Riepilogo del giorno](img/riepilogo-skytower.png)
+
+- **In automatico** parte ogni sera all'ora impostata (di solito le 19:00). Se SkyTower è
+  spenta riprova da solo appena si riaccende; se il server era spento all'ora del riepilogo,
+  il giorno prima si recupera alla riaccensione.
+- **A richiesta**: nel **Riepilogo** del Magazzino, in fondo, il riquadro *Riepilogo del
+  giorno* ha il pulsante **Invia il riepilogo di oggi** (con la commessa su cui lavori; gli
+  amministratori scelgono fra le commesse con movimenti oggi). Lo stesso pulsante c'è nel
+  riquadro SkyTower della scheda del cantiere.
+- **Niente doppioni**: se i movimenti non sono cambiati dall'ultimo invio compare
+  "Riepilogo del … già in SkyTower …: nessun movimento nuovo da allora" e puoi scegliere di
+  mandarne comunque un altro. Se sono arrivati movimenti nuovi, il documento in più si chiama
+  "… (aggiornamento hh:mm)".
+- L'elenco nel riquadro dice cosa è partito: **in SkyTower** (verde, con i due codici dei
+  documenti; un clic apre il PDF in SkyTower), **solo il PDF** (l'Excel è mancato: al prossimo
+  invio parte solo lui) o **non inviato** (rosso, con il motivo, per esempio una commessa che
+  in SkyTower non ha un progetto).
 
 ## InCampo legge il Magazzino
 

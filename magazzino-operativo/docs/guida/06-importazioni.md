@@ -11,8 +11,12 @@ Il Magazzino si alimenta da solo da due programmi della suite:
 - **VFP Transfer**: ogni pratica di un mezzo a nolo diventa un **mezzo a nolo**,
   posizionato nel cantiere della commessa del contratto.
 
-Il controllo avviene in automatico ogni due minuti circa. La vista **Importazioni**
-mostra come sta andando e permette di forzare una lettura.
+Nel programma unico "DDT e Magazzino" i DDT arrivano **subito**: appena un DDT è
+convertito e salvato nella parte DDT, i suoi carichi entrano nel cantiere della commessa
+scelta all'ingresso, e la parte DDT dice quanti sono ("N carichi registrati in magazzino").
+Se in quel momento il Magazzino è spento non si perde niente: li prende al controllo
+automatico, che avviene comunque ogni due minuti circa e non crea doppioni. La vista
+**Importazioni** mostra come sta andando e permette di forzare una lettura.
 
 ![Importazioni](img/importazioni.png)
 
