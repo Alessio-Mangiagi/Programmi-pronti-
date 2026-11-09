@@ -149,10 +149,16 @@ export async function apriDdtFirmato(
   } catch (e) {
     const err = e as Error & { code?: string };
     if (err.code === 'FIRMA_NON_INSTALLATA') {
+      // Il client condiviso dice già cosa succede: "in installazione, riprovare fra qualche minuto" (la prima
+      // busta avvia da sola installa.bat in disparte), quale installa.bat lanciare, o dove copiare il motore
+      // (server.exe del pacchetto: shared\firma accanto all'eseguibile). Il rimedio a mano si aggiunge solo
+      // se il messaggio non lo nomina già.
+      const rimedio = /installa\.bat/i.test(err.message)
+        ? ''
+        : " Se non si risolve da solo, l'amministratore lanci shared\\firma\\installa.bat (lo fa anche avvia.bat al prossimo avvio).";
       throw new ErroreFirma(
         'FIRMA_NON_INSTALLATA',
-        'Documento firmato digitalmente (.p7m): il componente per aprirlo non è installato sul server. ' +
-          "L'amministratore deve lanciare shared\\firma\\installa.bat (lo fa anche avvia.bat al prossimo avvio)."
+        `Documento firmato digitalmente (.p7m): il componente per aprirlo non è pronto sul server. ${err.message}.${rimedio}`
       );
     }
     if (err.code === 'BUSTA_ILLEGGIBILE') {

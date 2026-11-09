@@ -45,10 +45,24 @@ Source: "build\MANUALE.md"; DestDir: "{app}"; Flags: ignoreversion
 ; Dati — non sovrascrivere se già esistono (preserva dati utente)
 Source: "build\data.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
+; Motore della firma digitale (DDT firmati .p7m): sorgenti copiati da shared\firma\copia-motore.bat. Il client
+; dentro server.exe lo cerca in {app}\shared\firma; il .venv lo crea installa.bat qui sotto (serve Python 3.12 e
+; la rete; se manca, il resto del programma funziona e i .p7m danno un messaggio con cosa fare).
+Source: "build\shared\firma\*"; DestDir: "{app}\shared\firma"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[UninstallDelete]
+; creati dopo l'installazione da installa.bat e dal motore: l'uninstaller da solo non li conosce
+Type: filesandordirs; Name: "{app}\shared\firma\.venv"
+Type: filesandordirs; Name: "{app}\shared\firma\cache"
+Type: filesandordirs; Name: "{app}\shared\firma\__pycache__"
+
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\avvia.vbs"; IconFilename: "{app}\static\favicon.ico"
 Name: "{group}\Disinstalla {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\avvia.vbs"; IconFilename: "{app}\static\favicon.ico"; Tasks: desktopicon
 
 [Run]
+; ambiente Python del motore della firma: un paio di minuti la prima volta; se non riesce (niente Python o rete)
+; ci riprovano il watchdog a ogni avvio e il programma alla prima busta .p7m
+Filename: "{app}\shared\firma\installa.bat"; WorkingDir: "{app}\shared\firma"; StatusMsg: "Preparazione del componente per i DDT firmati (.p7m)..."; Flags: runhidden waituntilterminated
 Filename: "{app}\avvia.vbs"; Description: "Avvia {#MyAppName} ora"; Flags: postinstall shellexec skipifsilent

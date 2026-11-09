@@ -10,7 +10,7 @@
     "start": "set NODE_ENV=production && node dist/server.js",
     "dev": "set NODE_ENV=development && ts-node src/server.ts",
     "build": "tsc && node scripts/copia-risorse.js && vite build",
-    "build:pkg": "npm run build && npx pkg dist/server.js --targets node20-win-x64 --output installer-pkg/build/server.exe",
+    "build:pkg": "npm run build && npx -y @yao-pkg/pkg dist/server.js --targets node22-win-x64 --output installer-pkg/build/server.exe",
     "batch": "ts-node src/batch/batchClaude.ts",
     "batch:ollama": "ts-node src/batch/batchOllama.ts",
     "test": "jest",
@@ -28,7 +28,7 @@
       "dist/batch/pulisci_ddt.py"
     ],
     "targets": [
-      "node20-win-x64"
+      "node22-win-x64"
     ],
     "outputPath": "installer-pkg/build"
   },

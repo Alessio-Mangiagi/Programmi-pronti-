@@ -212,7 +212,9 @@ describe('conversione singola con un DDT firmato', () => {
       contentType: 'application/octet-stream',
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/non è installato/);
+    // "non è pronto": vale sia per il motore assente sia per quello in installazione alla prima busta
+    expect(res.body.error).toMatch(/non è pronto/);
+    expect(res.body.error).toMatch(/installa\.bat/);
   });
 });
 

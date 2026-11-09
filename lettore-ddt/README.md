@@ -254,6 +254,13 @@ avvia.bat   → avvio con finestra terminale (utile per debug)
 Il server tenta le porte **5050–5059** in sequenza e apre automaticamente il browser (in locale).
 In `serverMode` non apre il browser e non si spegne per inattività.
 
+**Pacchetto con `server.exe`** (`installer-pkg\build-installer-pkg.bat`, pkg + Inno Setup): Node è dentro
+l'eseguibile, ma il motore della firma digitale per i DDT firmati `.p7m` no. Lo script lo copia in
+`installer-pkg\build\shared\firma` (`shared\firma\copia-motore.bat`), l'installer lo mette in
+`{app}\shared\firma` e lancia `installa.bat` a fine installazione; il watchdog (`_avvia_server.bat`) ci riprova a
+ogni avvio e il server alla prima busta. Sul PC serve Python 3.12 solo per i `.p7m`: senza, il resto funziona e
+il DDT firmato dà un messaggio con cosa fare (vedi `shared/firma/README.md`).
+
 ---
 
 ## Monitoraggio
