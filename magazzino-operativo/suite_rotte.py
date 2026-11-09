@@ -61,9 +61,9 @@ def url_magazzino():
     Lettore DDT + /magazzino; con MAGAZZINO_PROGRAMMA_UNICO=0 l'indirizzo proprio, come prima."""
     if config.URL_PUBBLICO:
         return config.URL_PUBBLICO
-    if not config.PROGRAMMA_UNICO or os.environ.get("SUITE_URL_PUBBLICO_MAGAZZINO"):
-        return suite_link.url_pubblico("magazzino")
-    return suite_link.url_pubblico("ddt") + config.PREFISSO_UNICO
+    # la regola "dentro il Lettore DDT a /magazzino" sta in suite_link.url_pubblico (la usano anche InCampo e
+    # Analista); qui le si passa la configurazione del Magazzino, che può valere MAGAZZINO_PROGRAMMA_UNICO=0
+    return suite_link.url_pubblico("magazzino", magazzino_dentro_ddt=config.PROGRAMMA_UNICO)
 
 
 def _richiede_token():
