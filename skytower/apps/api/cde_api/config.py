@@ -130,6 +130,10 @@ class Settings(BaseSettings):
     onlyoffice_jwt_secret: str | None = None       # segreto condiviso (services.CoAuthoring.secret)
     onlyoffice_callback_url: str | None = None     # API come la raggiunge il Document Server; default web_base_url + prefisso
     office_edit_max_bytes: int = 100 * 1024 ** 2
+    # Timbri sui PDF (ADR-56): il PDF da timbrare passa dall'API (si legge tutto in memoria), l'immagine del timbro
+    # arriva in base64 dentro il JSON (sotto request_max_bytes anche gonfiata del 33%)
+    timbri_pdf_max_bytes: int = 100 * 1024 ** 2
+    timbro_immagine_max_bytes: int = 8 * 1024 ** 2
 
     # Registro attività: ancore giornaliere su S3 WORM e marca temporale RFC 3161 (TSA qualificata in produzione)
     audit_anchor_prefix: str = "audit-anchors"
