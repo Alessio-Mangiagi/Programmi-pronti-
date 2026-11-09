@@ -14,7 +14,10 @@
  *
  * Il PDF d'origine si ricava dal commento in testa al modulo:
  *   # Modulo compilato a mano leggendo "Contratto_fornitura.pdf" ...
- * Scrive accanto ai moduli _confronto.md (dettaglio leggibile) e _confronto.json.
+ * Scrive accanto ai moduli _confronto.md (dettaglio leggibile) e _confronto.json, e a video
+ * (e in testa a _confronto.md) i TOTALI: testata giusta, voci esatte, voci con quantità e
+ * prezzo giusti, campi di testata sbagliati per colonna — i numeri da guardare dopo ogni
+ * modifica dei parser (docs/RICERCA_OCR_SOLUZIONE.md).
  *
  * --variante <nome>: invece del PDF d'origine si confronta il documento ricavato dal
  * modulo stesso, <modulo senza _modulo.txt>_<nome>.pdf (tools/modulo_in_pdf.ts:
@@ -162,6 +165,33 @@ for (const e of esiti) {
     ...e.campi.map(c => `| ${c.colonna} | ${c.riferimento.replace(/\|/g, '/') || '—'} | ${c.programma.replace(/\|/g, '/') || '—'} | ${c.esito} |`), '',
     `| Esito | Articolo (modulo) | Articolo (${altro}) | QTA modulo / ${altro} | PREZZO modulo / ${altro} | Note |`, '|---|---|---|---|---|---|',
     ...e.voci.map(v => `| ${v.esito} | ${v.rif?.articolo || '—'} | ${v.prog?.articolo || '—'} | ${v.rif ? v.rif.qta : '—'} / ${v.prog ? v.prog.qta : '—'} | ${v.rif ? v.rif.prezzo : '—'} / ${v.prog ? v.prog.prezzo : '—'} | ${v.note} |`), '')
+}
+// Totali su tutti i documenti confrontati: sono i numeri che si guardano a ogni modifica
+// dei parser (docs/RICERCA_OCR_SOLUZIONE.md §3 e §7). «Quantità e prezzo giusti» conta
+// anche le voci col codice diverso: il valore economico è giusto, l'articolo no.
+const confrontati = esiti.filter(e => e.scansionato)
+if (confrontati.length) {
+  const somma = (f: (e: Esito) => number) => confrontati.reduce((s, e) => s + f(e), 0)
+  const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '—')
+  const campiOk = somma(e => conta(e.campi, 'uguale') + conta(e.campi, 'simile'))
+  const campiPieni = somma(e => e.campi.filter(c => c.esito !== 'vuoto in entrambi').length)
+  const nRif = somma(e => e.voci.filter(v => v.rif).length)
+  const esatte = somma(e => conta(e.voci, 'esatta'))
+  const qtaPrezzo = esatte + somma(e => conta(e.voci, 'codice diverso'))
+  const righe = [
+    `Documenti confrontati: ${confrontati.length}`,
+    `Testata giusta: ${campiOk}/${campiPieni} (${pct(campiOk, campiPieni)})`,
+    `Voci esatte: ${esatte}/${nRif} (${pct(esatte, nRif)})`,
+    `Voci con quantità e prezzo giusti: ${qtaPrezzo}/${nRif} (${pct(qtaPrezzo, nRif)})`,
+    `Valori diversi ${somma(e => conta(e.voci, 'valori diversi'))} · mancanti ${somma(e => conta(e.voci, 'mancante'))} · in più ${somma(e => conta(e.voci, 'in più'))}`,
+  ]
+  console.log(`\n── Totale ──\n${righe.join('\n')}`)
+  // campi di testata sbagliati per colonna: dicono quale regola guardare per prima
+  const perColonna = new Map<string, number>()
+  for (const e of confrontati) for (const c of e.campi) if (c.esito === 'diverso' || c.esito === 'mancante') perColonna.set(c.colonna, (perColonna.get(c.colonna) ?? 0) + 1)
+  const colonne = [...perColonna].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} ${n}`).join(' · ')
+  if (colonne) console.log(`Testata sbagliata per colonna: ${colonne}`)
+  md.splice(4, 0, '## Totale', '', ...righe.map(r => `- ${r}`), ...(colonne ? [`- Testata sbagliata per colonna: ${colonne}`] : []), '')
 }
 const dirOut = files.length ? path.dirname(files[0]) : DIR_DEFAULT
 const suffisso = daModuli ? `_${path.basename(daModuli)}` : variante ? `_${variante}` : ''

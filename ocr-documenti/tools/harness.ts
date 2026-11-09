@@ -23,6 +23,12 @@
  * legge come fanno i lavori lato server: alla lettera, righe a capo ricucite, niente
  * parser euristici (server/modulo.ts). Un modulo con errori finisce come errore del file.
  *
+ * Cache OCR in .harness-cache/blocchi/<sha1 del PNG>.json, stesso formato di .ocr-cache:
+ * { v: 2, blocchi, griglia, rotazione } (griglia = linee della tabella con i bordi,
+ * rotazione = pagina capovolta riletta). I file vecchi (solo l'array dei blocchi) valgono:
+ * la griglia si chiede al worker una volta, senza rifare l'OCR. Per rileggere da capo una
+ * pagina (es. dopo un cambio della rotazione) basta togliere il suo file.
+ *
  * Output in tests/out/<nome>/:
  *   ocr.txt          testo OCR completo (input esatto dei parser)
  *   alyante.json     JSON formato ALYANTE (quello che alimenta l'export xlsx)
@@ -63,7 +69,7 @@ const noCache = process.argv.includes('--no-cache')
 const noNativo = process.argv.includes('--no-nativo')
 const filtri = process.argv.slice(2).filter((a, k, tutti) => !a.startsWith('--') && tutti[k - 1] !== '--cartella')
 
-const { ocrPaddle, componiTesto, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo } =
+const { ocrPaddle, componiTesto, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo } =
   await import('../server.ts')
 
 const { moduloDaRisultato, eModulo, descriviErrori } = await import('../src/lib/modulo-contratto.ts')
@@ -96,21 +102,31 @@ const rendiPagine = (pdf: string): Promise<string[]> => new Promise((resolve, re
 // tabella ricostruita dai parser, quindi cachearlo congelava proprio ciò che si sta
 // modificando (le prove sembravano "senza effetto"). Dai blocchi il testo si
 // ricompone a ogni run in millisecondi.
+// Cache nel formato di server/ocr.ts ({ v: 2, blocchi, griglia, rotazione }); i file
+// vecchi (solo l'array dei blocchi) valgono ancora: la griglia della tabella si chiede
+// al worker una volta (pochi decimi di secondo, niente OCR) e il file si aggiorna.
 const ocrConCache = async (png: string): Promise<string> => {
   const key = sha1(await fs.readFile(png))
   const cache = path.join(DIR_CACHE, 'blocchi', `${key}.json`)
   if (!noCache && existsSync(cache)) {
-    const inCache = JSON.parse(await fs.readFile(cache, 'utf8'))
     // "[]" = pagina che il motore non ha letto (GPU non supportata): si rifà, come in server/ocr.ts
-    if (Array.isArray(inCache) && inCache.length) return componiTesto(inCache)
+    const inCache = letturaDaCache(JSON.parse(await fs.readFile(cache, 'utf8')))
+    if (inCache) {
+      if (inCache.griglia === undefined) {
+        inCache.griglia = await grigliaPagina(png, inCache.rotazione ?? 0)
+        await fs.writeFile(cache, letturaPerCache(inCache), 'utf8')
+      }
+      return componiTesto(inCache.blocchi, inCache.griglia)
+    }
   }
-  let blocchi: unknown[] | null = null
-  setDumpBlocchi(b => { blocchi = b })
+  let blocchi: Parameters<typeof componiTesto>[0] | null = null
+  let griglia: Parameters<typeof componiTesto>[1] = null
+  setDumpBlocchi((b, g) => { blocchi = b; griglia = g ?? null })
   const testo = await ocrPaddle((await fs.readFile(png)).toString('base64'))
   setDumpBlocchi(null)
   if (blocchi && (blocchi as unknown[]).length) {
     await fs.mkdir(path.dirname(cache), { recursive: true })
-    await fs.writeFile(cache, JSON.stringify(blocchi), 'utf8')
+    await fs.writeFile(cache, letturaPerCache({ blocchi, griglia }), 'utf8')
   }
   return testo
 }
