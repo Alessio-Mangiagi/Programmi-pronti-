@@ -210,6 +210,12 @@ if _PASSWORD:
             return None
         if request.path.startswith(PERCORSI_SUITE) and _token_suite_valido():
             return None                          # chiamata di un'altra app della suite
+        # Chi arriva dal portale (sessione già verificata dal gate SSO, registrato prima di questo) non deve
+        # dare una seconda password: un solo login per tutta la suite (09/11/2026). La password HTTP Basic
+        # resta per chi entra senza portale (Docker, cloud).
+        v = g.get("cosedil")
+        if v and v.get("ok") and not v.get("suite"):
+            return None
         auth = request.authorization
         if (auth and hmac.compare_digest(auth.username or "", _UTENTE)
                 and hmac.compare_digest(auth.password or "", _PASSWORD)):

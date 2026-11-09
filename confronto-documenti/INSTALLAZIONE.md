@@ -103,7 +103,7 @@ su file caricati e durata.
 | `HOST` | `127.0.0.1` (`0.0.0.0` in rete e Docker) | Indirizzo di ascolto. |
 | `PORT` | `5001` (`8080` in Docker) | Porta. |
 | `COSEDIL_SSO` | `on` (`off` in Docker e in rete senza login) | Login del portale Suite Cosedil. Con `off` la cartella `shared/` non serve. |
-| `CONFRONTO_PASSWORD` | vuota | Se impostata, utente e password su tutte le pagine (HTTP Basic). |
+| `CONFRONTO_PASSWORD` | vuota | Se impostata, utente e password su tutte le pagine (HTTP Basic). Chi arriva dal portale con la sua sessione non la deve scrivere: un solo login nella suite (09/11/2026). |
 | `CONFRONTO_UTENTE` | `cosedil` | Utente per la password. |
 | `CONFRONTO_DATI` | cartella dell'app (`/data` in Docker) | Dove stanno cache OCR (`.ocr_cache`) e storico (`storico`). |
 | `CONFRONTO_STORICO_GIORNI` | `30` | Dopo quanti giorni lo storico viene cancellato. |
