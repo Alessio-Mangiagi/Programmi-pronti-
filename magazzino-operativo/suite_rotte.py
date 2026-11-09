@@ -253,8 +253,11 @@ def api_commesse():
 
 @app.get("/api/collegamenti")
 def api_collegamenti():
-    """Per la pagina: quali app rispondono e a che indirizzo aprirle."""
-    return jsonify({a: {"nome": suite_link.NOMI[a], "attiva": suite_link.raggiungibile(a), "url": suite_link.url_pubblico(a)}
+    """Per la pagina: quali app rispondono e a che indirizzo aprirle. L'indirizzo usa l'host con cui il browser
+    sta usando il Magazzino (request.host: dietro il Lettore DDT è quello di X-Forwarded-Host, vedi prefisso.py),
+    perché il cookie del portale vale per l'host e un link "localhost" farebbe ricomparire il login."""
+    return jsonify({a: {"nome": suite_link.NOMI[a], "attiva": suite_link.raggiungibile(a),
+                        "url": suite_link.url_pubblico(a, host=request.host)}
                     for a in ("incampo", "skytower")})
 
 

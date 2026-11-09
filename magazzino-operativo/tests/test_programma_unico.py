@@ -108,6 +108,19 @@ def test_link_esterni_puntano_al_programma_unico(monkeypatch):
     assert suite_rotte.url_magazzino() == "https://ddt.cosedil.lan/magazzino"
 
 
+def test_collegamenti_con_host_del_browser(client, monkeypatch):
+    """I link verso InCampo e SkyTower della pagina prendono l'host con cui il browser usa il Magazzino (dietro il
+    Lettore DDT: X-Forwarded-Host): il cookie del portale vale per l'host e "localhost" farebbe rifare il login."""
+    for v in ("SUITE_DOMINIO", "SUITE_URL_PUBBLICO_INCAMPO", "SUITE_URL_PUBBLICO_SKYTOWER"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setattr(suite_rotte.suite_link, "raggiungibile", lambda app, timeout=2: True)
+    d = client.get("/api/collegamenti", headers=PROXY, environ_base=LOOPBACK).get_json()
+    assert d["incampo"]["url"] == "http://server-cantiere:5190"
+    assert d["skytower"]["url"] == "http://server-cantiere:5195"
+    d = client.get("/api/collegamenti", headers={"Host": "127.0.0.1:5200"}, environ_base=LOOPBACK).get_json()
+    assert d["incampo"]["url"] == "http://127.0.0.1:5190"
+
+
 # --------------------------------------------------------------------------- C3: carico immediato
 
 def _consegna(materiale="Misto stabilizzato", quantita=14, ddt="118", **extra):
