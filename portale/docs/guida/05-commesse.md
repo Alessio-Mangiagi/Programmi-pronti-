@@ -53,5 +53,6 @@ Perché tutto funzioni il codice deve essere **lo stesso** in:
 - le commesse di **InCampo**;
 - la scheda *Suite Cosedil* dei progetti **SkyTower**;
 - le ubicazioni del **Magazzino**;
-- l'utente del **Lettore DDT** (il DDT finito va nella commessa giusta di SkyTower);
+- la commessa scelta all'ingresso in **DDT e Magazzino** (il DDT finito va nella commessa giusta
+  di SkyTower e i suoi materiali nel cantiere giusto del Magazzino): l'elenco è questo registro;
 - le scadenze dello **Scadenzario** legate a una commessa.

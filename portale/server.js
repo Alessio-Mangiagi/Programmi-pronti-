@@ -107,21 +107,31 @@ const LOGIN_LOCK_MS = 15 * 60 * 1000;
 //         che compare passando sopra la scheda.
 // principale — true per le app di punta (InCampo, SkyTower): nella home degli
 //         utenti stanno in alto, in grande, sopra tutte le altre.
+//
+// comprende / dentro (09/11/2026, "DDT e Magazzino"): un programma per chi lo usa può contenerne un
+// altro. 'ddt' comprende 'magazzino': una tessera sola, che vede chi è abilitato all'uno O all'altro
+// (accessoApp); 'magazzino' sta dentro 'ddt': niente tessera in home né voce nell'assistente, ma l'id
+// resta nel registro per abilitazioni, "da fare", importazione commesse e avvio interno. Il Lettore
+// DDT avvia da sé il Magazzino e lo mostra sotto /magazzino/ del suo indirizzo.
 const APPS = [
   {
     id: 'ddt',
-    nome: 'Lettore DDT',
-    sottotitolo: 'Da PDF a Excel',
-    fai: 'Trasformare una bolla in Excel',
-    guida: 'Tieni a portata di mano il PDF della bolla: lo carichi, controlli i dati estratti e scarichi il foglio Excel pronto.',
-    desc: 'Converte i documenti di trasporto (DDT) da PDF a Excel. Gestione utenti, template e storico versioni.',
+    nome: 'DDT e Magazzino',
+    sottotitolo: 'Bolle in Excel, giacenze e mezzi',
+    fai: 'Leggere le bolle e gestire il magazzino',
+    guida: 'All’ingresso scegli la commessa. Carichi il PDF della bolla e scarichi l’Excel: PDF ed Excel vanno in SkyTower e i materiali entrano subito in magazzino. Dalla barra in alto passi al Magazzino: giacenze, mezzi e scansioni anche dal telefono.',
+    desc: 'Converte i documenti di trasporto (DDT) da PDF a Excel e tiene il magazzino: i materiali delle bolle diventano carichi del cantiere, giacenze e mezzi si cercano con il codice a barre. Tutto nella commessa scelta all’ingresso, con archivio in SkyTower.',
     porta: 5050,
     dir: 'lettore-ddt',
     launch: 'avvia.vbs',
-    tipo: 'Node.js',
-    kw: ['lettore ddt', 'lettore', 'ddt suite', 'ddt', 'documento di trasporto', 'documenti di trasporto', 'bolla', 'bolle',
-      'excel', 'xlsx', 'foglio di calcolo', 'template', 'fornitore', 'fornitori', 'trasporto'],
-    dettaglio: 'Prende i documenti di trasporto in PDF e li trasforma in fogli Excel. Gestisce gli utenti, i template di estrazione per ogni fornitore e lo storico delle versioni.',
+    tipo: 'Node.js + Python',
+    comprende: ['magazzino'],
+    kw: ['ddt e magazzino', 'lettore ddt', 'lettore', 'ddt suite', 'ddt', 'documento di trasporto', 'documenti di trasporto', 'bolla', 'bolle',
+      'excel', 'xlsx', 'foglio di calcolo', 'template', 'fornitore', 'fornitori', 'trasporto',
+      'magazzino', 'magazzino operativo', 'giacenza', 'giacenze', 'scorta', 'scorte', 'codice a barre', 'barcode',
+      'qr', 'etichetta', 'etichette', 'scanner', 'materiale', 'materiali', 'mezzi', 'mezzo', 'nolo',
+      'deposito', 'inventario', 'carico', 'scarico', 'ubicazione'],
+    dettaglio: 'È un programma solo con due sezioni. Nel Lettore DDT carichi i documenti di trasporto in PDF e li trasformi in fogli Excel, con i template di estrazione per ogni fornitore. Nel Magazzino vedi dove sta il materiale e quanto ce n\'è, e dove stanno i mezzi, scansionando il codice a barre anche con la fotocamera del telefono. La commessa la scegli una volta all\'ingresso: il PDF e l\'Excel di ogni bolla finiscono in SkyTower e i materiali diventano subito carichi del cantiere in magazzino.',
   },
   {
     id: 'agente',
@@ -263,6 +273,8 @@ const APPS = [
     dir: 'magazzino-operativo',
     launch: 'avvia.vbs',
     tipo: 'Python',
+    // Dal 09/11/2026 sta dentro "DDT e Magazzino" (vedi il commento sopra APPS): niente tessera propria.
+    dentro: 'ddt',
     kw: ['magazzino', 'magazzino operativo', 'giacenza', 'giacenze', 'scorta', 'scorte', 'codice a barre', 'barcode',
       'qr', 'etichetta', 'etichette', 'scansione', 'scanner', 'materiale', 'materiali', 'mezzi', 'mezzo', 'nolo',
       'deposito', 'inventario', 'carico', 'scarico', 'ubicazione'],
@@ -1611,6 +1623,12 @@ function appsPredefinite() {
 // gate SSO delle app. Nascondere solo la card lascerebbe l'app aperta a chi ne
 // conosce l'indirizzo — che in LAN è una porta su un host noto.
 function accessoApp(app, session) {
+  if (accessoDiretto(app, session)) return true;
+  // Un programma che ne comprende altri ("DDT e Magazzino" comprende il Magazzino): basta essere
+  // abilitati a uno di quelli dentro. Vale per la tessera e per /api/verify, cioè per il gate SSO.
+  return !!(app && Array.isArray(app.comprende) && app.comprende.some((id) => accessoDiretto(APPS.find((a) => a.id === id), session)));
+}
+function accessoDiretto(app, session) {
   if (!app || !session) return false;
   if (isAdminForApp(session, 'portale')) return true;
   if (app.adminOnly) return false;
@@ -1618,6 +1636,9 @@ function accessoApp(app, session) {
   if (isAdminForApp(session, app.id)) return true;
   return appsUtente(session.username).includes(app.id);
 }
+
+// Programmi con una tessera propria (home, plancia, assistente): non quelli che stanno dentro un altro.
+const conTessera = (app) => !app.dentro;
 
 // Le app che si possono assegnare a un utente dall'area Amministrazione: tutte
 // tranne le adminOnly, che seguono il ruolo e non le spunte.
@@ -2530,7 +2551,7 @@ async function handle(req, res) {
   // ---- Elenco app ----
   if (p === '/api/apps') {
     return sendJson(res, 200, {
-      apps: APPS.filter(canSeeApp).map((a) => ({
+      apps: APPS.filter((a) => conTessera(a) && canSeeApp(a)).map((a) => ({
         id: a.id, nome: a.nome, sottotitolo: a.sottotitolo, desc: a.desc,
         fai: a.fai, guida: a.guida,   // home utenti: l'attività e il suggerimento al passaggio del mouse
         porta: a.porta, tipo: a.tipo, url: appUrl(req, a),
@@ -2546,7 +2567,7 @@ async function handle(req, res) {
   if (p === '/api/chat' && req.method === 'POST') {
     const { domanda } = await readJsonBody(req);
     const q = String(domanda || '').slice(0, 500);   // domande lunghe: tagliate
-    return sendJson(res, 200, rispondiAssistente(q, APPS.filter(canSeeApp), { emailAdmin: emailAdmin() }));
+    return sendJson(res, 200, rispondiAssistente(q, APPS.filter((a) => conTessera(a) && canSeeApp(a)), { emailAdmin: emailAdmin() }));
   }
 
   // ---- Stato app ----

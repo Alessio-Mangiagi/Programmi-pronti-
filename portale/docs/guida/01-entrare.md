@@ -103,13 +103,16 @@ l'accesso.
 
 Una volta entrato nel Portale, i programmi ti riconoscono da soli:
 
-- **Scadenzario, Magazzino, Confronto Documenti, Timbri per VFP** e gli altri strumenti si
+- **Scadenzario, Confronto Documenti, Timbri per VFP** e gli altri strumenti si
   aprono già con il tuo nome, senza un secondo accesso.
 - **Analista Dati** ti fa entrare con l'utente che ha il tuo stesso username; la prima
   volta lo crea da solo.
-- **Lettore DDT** ti fa entrare da solo se c'è un utente DDT con il tuo stesso username.
-  Gli utenti DDT li crea l'amministratore, perché ognuno lavora su una commessa: se non
-  ce n'è uno col tuo nome, entri con l'utente della commessa che ti hanno dato.
+- **DDT e Magazzino** (dal 9 novembre 2026 un programma solo, con due sezioni) ti chiede
+  all'ingresso **in che commessa lavori**: la scegli una volta dall'elenco delle commesse della
+  suite e vale finché non la cambi dalla barra in alto. La sezione **Magazzino** si apre già
+  con il tuo nome. La sezione **Lettore DDT** ti fa entrare da sola se c'è un utente DDT con il
+  tuo stesso username (gli utenti DDT li crea l'amministratore); se non c'è, entri con l'utente
+  della commessa che ti hanno dato, e intanto il magazzino lo puoi usare lo stesso.
 - **InCampo** e **SkyTower** hanno utenti propri. Ti riconoscono dall'**email** che
   l'amministratore ha associato al tuo utente del Portale (oppure da
   `username@cosedilspa.com`). Se l'email non coincide esattamente, ti chiedono di entrare

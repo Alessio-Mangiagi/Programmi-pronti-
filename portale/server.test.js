@@ -18,6 +18,8 @@ process.env.DATA_DIR = DATA_TMP;
 fs.writeFileSync(path.join(DATA_TMP, 'utenti.json'), JSON.stringify([
   { username: 'mrossi', nome: 'Mario Rossi', ruolo: 'utente', apps: ['requisiti'] },
   { username: 'gverdi', nome: 'Giulia Verdi', ruolo: 'utente' },
+  // abilitata solo al Magazzino: vede la tessera "DDT e Magazzino" (09/11/2026)
+  { username: 'tneri', nome: 'Tea Neri', ruolo: 'utente', apps: ['magazzino'] },
 ]));
 test.after(() => fs.rmSync(DATA_TMP, { recursive: true, force: true }));
 
@@ -294,6 +296,21 @@ test("accessoApp: admin del portale e admin per-IP di quell'app entrano comunque
   assert.ok(accessoApp(riservata, admin), "admin del portale");
   assert.ok(accessoApp(riservata, { username: 'gverdi', ruolo: 'utente', adm: ['requisiti'] }), 'admin per-IP');
   assert.equal(accessoApp(riservata, { username: 'ignoto', ruolo: 'utente', adm: [] }), false, 'utente che non esiste più');
+});
+
+// "DDT e Magazzino" (09/11/2026): una tessera sola, che comprende il Magazzino. La vede (e ci entra:
+// la stessa funzione risponde a /api/verify) chi è abilitato a uno dei due; il Magazzino non ha più
+// una tessera propria ma resta nel registro (abilitazioni, "da fare", commesse).
+test("accessoApp: 'DDT e Magazzino' per chi è abilitato al Lettore DDT o al Magazzino", () => {
+  const ddt = APPS.find((a) => a.id === 'ddt');
+  const magazzino = APPS.find((a) => a.id === 'magazzino');
+  assert.deepEqual(ddt.comprende, ['magazzino']);
+  assert.equal(magazzino.dentro, 'ddt');
+  const soloMagazzino = { username: 'tneri', ruolo: 'utente', adm: [] };
+  assert.ok(accessoApp(ddt, soloMagazzino), 'abilitata al magazzino: vede la tessera unica');
+  assert.ok(accessoApp(magazzino, soloMagazzino));
+  assert.equal(accessoApp(ddt, conElenco), false, 'mrossi ha solo requisiti: niente DDT e Magazzino');
+  assert.ok(accessoApp(ddt, senzaElenco), 'default: tutti e due');
 });
 
 test("appsUtente: elenco esplicito, default per chi non ce l'ha", () => {
@@ -924,7 +941,7 @@ test('freno al login: lo stato finisce su file (condiviso fra 8080 e 8090)', () 
 const { verificaPasswordApp, trovaUtentePerLogin, ipValido } = require('./server.js');
 
 // Utenti con password vera (scrypt come makeUser), aggiunti per questi test e poi tolti:
-// gli altri test leggono utenti.json e si aspettano solo mrossi e gverdi.
+// gli altri test leggono utenti.json e si aspettano solo mrossi, gverdi e tneri.
 function conUtentiPassword(fn) {
   const file = path.join(DATA_TMP, 'utenti.json');
   const prima = fs.readFileSync(file, 'utf8');
@@ -1052,7 +1069,7 @@ test('descriviUtente: nome, ruolo, email e programmi, senza segreti', () => {
   const u = { username: 'mrossi', nome: 'Mario Rossi', ruolo: 'admin', email: 'm.rossi@esempio.it',
     apps: ['ddt', 'skytower'], salt: 'abc', hash: 'segreto' };
   const d = descriviUtente(u);
-  assert.equal(d, 'mrossi (Mario Rossi), amministratore, email m.rossi@esempio.it, programmi: Lettore DDT, SkyTower');
+  assert.equal(d, 'mrossi (Mario Rossi), amministratore, email m.rossi@esempio.it, programmi: DDT e Magazzino, SkyTower');
   assert.doesNotMatch(d, /segreto|abc/);
   // senza elenco proprio (segue il default) e senza email: solo chi è
   assert.equal(descriviUtente({ username: 'gverdi', nome: 'Gino Verdi', ruolo: 'utente' }), 'gverdi (Gino Verdi), utente');

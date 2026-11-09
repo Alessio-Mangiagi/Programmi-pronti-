@@ -62,7 +62,7 @@ npm test
 
 ## Le applicazioni della suite
 
-- **Lettore DDT** — da PDF a Excel — porta `5050`
+- **DDT e Magazzino** — Lettore DDT (da PDF a Excel) e Magazzino Operativo in un programma solo — porta `5050`, il Magazzino sotto `/magazzino/` (dal 09/11/2026: tessera unica `ddt` con `comprende: ['magazzino']`; il Magazzino ha `dentro: 'ddt'` e niente tessera propria, ma resta nel registro per abilitazioni, "da fare" e commesse; chi è abilitato a uno dei due vede la tessera)
 - **Analista Dati** — interrogazione dati con AI — porta `5173`
 - **Confronto Documenti** — raffronto documenti con OCR — porta `5001`
 - **OCR Documenti** — OCR ed estrazione — porta `5179`
@@ -163,7 +163,7 @@ Le app della suite condividono la sessione del portale: inoltrano il cookie del 
 
 La password del portale vale in ogni programma (06/11/2026); le password proprie dei programmi restano valide come riserva.
 
-- **Analista Dati** e **Lettore DDT** aprono da soli la sessione dell'account con lo stesso username del portale (Analista lo crea se manca; DDT no, perché ogni account DDT ha la sua commessa).
+- **Analista Dati** e **Lettore DDT** aprono da soli la sessione dell'account con lo stesso username del portale (Analista lo crea se manca; DDT no: gli account DDT li crea l'amministratore). In **DDT e Magazzino** la commessa si sceglie all'ingresso dal registro della suite.
 - **SkyTower**, **InCampo** (anche l'app per telefono) e **VFP Transfer**, quando la loro password non coincide, chiedono al portale `POST /api/verifica-password` (header `X-Suite-Token`, corpo `{ login, password, app, ip }`; funzione `verificaPasswordApp` in `server.js`). Il portale riconosce la persona da username o email, applica gli stessi blocchi del login (sull'IP della persona, passato dal programma), rifiuta account disattivati, password temporanee non ancora cambiate e programmi non abilitati, e scrive `login-app` nel registro accessi.
 - Dettagli e codici di risposta: `shared/suite/CONTRATTI.md` §2b; guida utente §1.8.
 

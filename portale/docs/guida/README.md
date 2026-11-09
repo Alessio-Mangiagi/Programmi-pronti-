@@ -2,8 +2,8 @@
 # Guida al Portale della Suite Cosedil
 
 Il **Portale** è la porta d'ingresso di tutti i programmi Cosedil. Entri una volta sola con
-il tuo nome utente e la tua password, e da lì apri InCampo, SkyTower, Magazzino,
-Scadenzario, Lettore DDT e gli altri strumenti senza dover rifare l'accesso in ognuno.
+il tuo nome utente e la tua password, e da lì apri InCampo, SkyTower, DDT e Magazzino,
+Scadenzario e gli altri strumenti senza dover rifare l'accesso in ognuno.
 
 ![La pagina iniziale del Portale](img/06-home.png)
 
@@ -38,9 +38,8 @@ Scadenzario, Lettore DDT e gli altri strumenti senza dover rifare l'accesso in o
 |---|---|---|
 | **InCampo** | Il lavoro in cantiere: planimetrie, moduli di controllo, task e non conformità, anche da telefono | [guida di InCampo](../../../incampo/docs/guida/README.md) |
 | **SkyTower** | I documenti di commessa (disegni, relazioni, revisioni e approvazioni) | [guida di SkyTower](../../../skytower/docs/guida/README.md) |
-| **Magazzino Operativo** | Dove sta il materiale e dove sono i mezzi, con codice a barre | [guida del Magazzino](../../../magazzino-operativo/docs/guida/README.md) |
 | **Scadenzario** | Scadenze e adempimenti: DURC, revisioni, polizze, corsi | [guida dello Scadenzario](../../../scadenzario/docs/guida/README.md) |
-| **Lettore DDT** | Da una bolla in PDF a un foglio Excel | [guida del Lettore DDT](../../../lettore-ddt/docs/guida/README.md) |
+| **DDT e Magazzino** | Un programma con due sezioni: il **Lettore DDT** (da una bolla in PDF a un foglio Excel, archiviati in SkyTower) e il **Magazzino** (dove sta il materiale e dove sono i mezzi, con codice a barre). La commessa si sceglie all'ingresso | [guida del Lettore DDT](../../../lettore-ddt/docs/guida/README.md), [guida del Magazzino](../../../magazzino-operativo/docs/guida/README.md) |
 | **Confronto Documenti**, **OCR Documenti**, **Analista Dati**, **Verifica Requisiti** | Confrontare due PDF, leggere documenti scansionati, fare domande sui dati, controllare i documenti contrattuali | dentro ciascun programma |
 | **Timbri per VFP** | Da un'immagine PNG (firma, logo, timbro) a un file `.stamp` per le annotazioni di VFP | [README di Timbri per VFP](../../../timbri-vfp/README.md) |
 | **Ponte Trimble**, **Auguri** | Strumenti solo per gli amministratori | dentro ciascun programma |
