@@ -69,8 +69,9 @@ I documenti che arrivano dalle altre app nascono **in lavorazione** nella cartel
 dell'organizzazione che li manda, già con il nome a norma. Chi entra dal Portale senza un account SkyTower lo
 riceve al primo accesso, membro delle commesse della sua azienda che hanno un codice commessa. Un
 **amministratore del Portale** diventa a ogni ingresso amministratore dell'organizzazione e Project Admin di tutte
-le commesse dell'azienda (ADR-57); per togliergli questi poteri in SkyTower serve un amministratore, dalla pagina
-Utenti o Membri. Se il codice non è
+le commesse dell'azienda (ADR-57); dall'11/11/2026 vale anche il contrario: chi nel Portale non è più
+amministratore, al prossimo accesso perde qui l'amministrazione e i Project Admin che il Portale gli aveva dato
+(ADR-58). Gli amministratori si decidono nel Portale. Se il codice non è
 impostato vale come ripiego il codice ISO del progetto. **Salva**.
 
 ## 10.5 Cruscotto
@@ -129,6 +130,15 @@ Azioni sugli utenti:
 - **Azzera MFA** per chi ha perso telefono o chiave: verifica prima l'identità della persona per telefono al numero
   noto. L'azzeramento chiude anche le sue sessioni e resta nel registro;
 - interruttore **Admin** per nominare altri amministratori. L'ultimo amministratore non si può togliere.
+
+**Chi decide gli amministratori** (dall'11/11/2026, ADR-58). Nominare, togliere, disattivare o riattivare un
+amministratore può solo il **proprietario della suite Cosedil**, cioè chi il Portale indica come proprietario, entrato
+in SkyTower dal Portale; SkyTower lo chiede al Portale ogni volta. Per tutti gli altri amministratori l'interruttore
+**Admin**, l'opzione **Amministratore dell'organizzazione** dell'invito e **Disattiva** / **Riattiva** sugli
+amministratori sono spenti, con la scritta «Solo il proprietario della suite gestisce gli amministratori». Accanto a
+chi entra dal Portale c'è **dal portale**: per queste persone l'amministratore, il nome e l'email li decide il Portale
+e si aggiornano a ogni loro accesso, quindi l'interruttore resta spento anche per il proprietario (si cambia nel
+Portale). Se il Portale non risponde, nessuno può dare o togliere amministratori finché non torna.
 
 Il link **Libreria workflow** in alto porta ai modelli dell'organizzazione
 ([capitolo 6](06-workflow-e-processi.md#610-libreria-workflow-dellorganizzazione)).

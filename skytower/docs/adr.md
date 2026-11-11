@@ -1244,7 +1244,8 @@ un account già esistente, o nato utente, restava senza diritti di amministrazio
 Restano tutte le altre regole di ADR-47: solo email esatta e solo nell'organizzazione della suite; platform admin,
 altre organizzazioni, SSO obbligatorio, account bloccati o disattivati non entrano da qui; MFA come nel login con
 password; progetti di altri committenti mai toccati. Solo promozione: chi smette di essere admin nel portale non
-perde nulla in SkyTower (lo toglie un admin dalla pagina Utenti o Membri). L'admin per l'app concesso da una regola
+perde nulla in SkyTower (lo toglie un admin dalla pagina Utenti o Membri). **Superato da ADR-58** (11/11/2026):
+l'admin ora si dà e si toglie a ogni ingresso, e alla creazione la regola IP non basta più. L'admin per l'app concesso da una regola
 IP del portale (`data/ip-admin.json`, ruolo `utente`) **non** basta: vale solo davanti a quel PC, mentre il ruolo
 in SkyTower resterebbe ovunque. Gli utenti non admin del portale restano come prima (`CDE_SUITE_RUOLO_PORTALE`).
 
@@ -1259,3 +1260,66 @@ personale di platform admin (es. quello dell'utente, con email diversa da quella
 come sempre con password e secondo fattore. Test: `tests/test_api_portale.py`
 (`test_admin_del_portale_diventa_org_admin_e_project_admin`, `test_utente_esistente_promosso_quando_e_admin_del_portale`,
 `test_admin_solo_da_regola_ip_non_promosso`).
+
+## ADR-58 — Il profilo del portale vale in SkyTower: account collegato, admin dato e tolto, controllo al login
+
+**Contesto.** L'11/11/2026 l'utente ha deciso che "il profilo del portale vale per ogni programma" e che "gli admin
+devono essere creati solo da me, io posso creare e cancellare gli admin" (scelte 2b: il portale si controlla solo al
+login; 3b: le password proprie dei programmi restano, ma ogni login chiede anche al portale; 4a: i ruoli sotto
+l'admin restano decisi dentro ogni programma). Con ADR-57 SkyTower prendeva dal portale solo la **promozione**
+all'admin, e solo all'ingresso dal portale: l'account era legato al portale per email (un'email cambiata nel portale
+creava un secondo account, il vecchio con i suoi diritti), un admin tolto nel portale restava admin in SkyTower, una
+persona disattivata nel portale continuava a entrare con la password di SkyTower, una passkey o una sessione
+rinnovata all'infinito (il refresh token si allungava a ogni rinnovo), e alla creazione bastava l'admin dato da una
+regola IP del portale. Qualunque admin dell'organizzazione poteva nominarne altri.
+
+**Decisione.**
+- **Collegamento per username** (migrazione 0046, `users.portale_username`, unico): l'account che entra dal portale
+  (cookie o password del portale) o che il portale riconosce al login si collega allo username della persona; poi lo
+  si cerca prima per username e poi per email. A ogni ingresso nome, cognome ed email si allineano al portale (un nome
+  già giusto ma diviso diversamente non si riscrive; un'email di un altro account non si copia). Se l'email del
+  portale appartiene a un account già collegato a un'altra persona: 403 `portale_collegato_ad_altro`. Per i dati già
+  esistenti il collegamento è ricostruito dal registro di sicurezza (ultimo `LOGIN_PORTALE`/`USER_CREATED_PORTALE`).
+- **Admin dato e tolto** (`portale.allinea_profilo`): per un account collegato `is_org_admin` = ruolo `admin` del
+  portale a ogni ingresso; il declassamento (`ORG_ADMIN_TOLTO_DAL_PORTALE`) toglie anche i `PROJECT_ADMIN` aggiunti
+  dalla regola di ADR-57, ora segnati `project_memberships.dal_portale_admin` (ricostruiti dagli eventi
+  `MEMBER_ADDED` con `portale=true`); gli altri ruoli della persona restano (la chiave è progetto + utente + ruolo),
+  e chi resta senza ruolo in una commessa con codice torna `CDE_SUITE_RUOLO_PORTALE`. Se la persona è l'unico Project
+  Admin di una commessa il ruolo resta (`PROJECT_ADMIN_DAL_PORTALE_TENUTO`). Alla creazione dell'account conta solo il
+  ruolo `admin`, mai la regola IP.
+- **Controllo al login** (`portale.controlla_ingresso`, `POST <portale>/api/suite/profilo` col token della suite):
+  dopo la password giusta di SkyTower, la passkey, il single sign-on e prima di mandare o usare un link di reset della
+  password, per gli account dell'organizzazione della suite (non platform admin): persona disattivata nel portale →
+  403 `portale_disattivato`; SkyTower non fra i suoi programmi → 403 `portale_non_abilitato`; account collegato ma
+  persona eliminata dal portale → admin tolti e 403 `portale_eliminato`; portale spento → si entra (3b), evento
+  `PROFILO_PORTALE_NON_VERIFICATO`; persona sconosciuta e account non collegato → account solo-SkyTower, nulla cambia.
+  Con la persona attiva il profilo si copia anche da qui (collegamento, nome, email, admin, commesse con codice). Il
+  single sign-on fa solo il controllo (tiene bloccata la riga dell'utente): l'allineamento avviene al login seguente.
+- **Rinnovo con tetto assoluto** (`auth._refresh_tx`): il refresh token nuovo eredita la scadenza del precedente,
+  cioè quella fissata dal login (14 giorni; 12 ore in HTTP, ADR-49). Prima ogni rinnovo la spostava avanti e la SPA
+  prova il rinnovo prima del portale: una persona disattivata non sarebbe mai tornata al login. Scaduto il tetto la
+  SPA ricade da sola su `POST /auth/portale` (`api.refreshSession` → `sessioneDalPortale`): per chi viene dal portale
+  non cambia nulla, gli altri rifanno il login. Fra un login e l'altro il portale non si chiede (2b).
+- **Admin solo dal proprietario** (`portale.richiedi_proprietario`, `GET /me/proprietario`): nominare, togliere,
+  disattivare o riattivare un amministratore dell'organizzazione (pagina Organizzazione, invito con
+  «Amministratore», in **qualunque** organizzazione) può solo chi è collegato al portale e per cui il portale dice
+  `proprietario` (oggi l'utente), verificato dal vivo: altrimenti 403 `solo_proprietario`, portale spento 503. Su un
+  account collegato l'admin non si cambia nemmeno dal proprietario: 409 `deciso_dal_portale` (lo si cambia nel
+  portale). Gli strumenti da riga di comando (`tooling/`, seed, demo, account personali) restano liberi.
+
+**Alternative scartate.** Chiedere il portale a ogni richiesta (2a): cache e dipendenza continua dal portale acceso,
+scartata dall'utente. Togliere le password di SkyTower ai collegati (3a): scartata dall'utente, il portale spento non
+deve fermare SkyTower. Riconoscere come proprietario anche il platform admin: il platform admin non è una persona del
+portale (account personale con altra email) e il proprietario va verificato dove lo decide l'utente, cioè nel
+portale; il primo admin di una nuova organizzazione esterna lo nomina il proprietario entrando dal portale, oppure da
+riga di comando. Togliere solo l'admin dato dal portale lasciando quello dato in SkyTower (1b): scartata, "gli admin li
+creo e li cancello solo io".
+
+**Conseguenze.** Il portale è la fonte dell'identità e dell'admin per i suoi utenti; un portale compromesso continua a
+poter amministrare l'organizzazione della suite (ADR-57), non la piattaforma. Gli admin delle organizzazioni esterne
+non possono più nominare colleghi admin: lo fa il proprietario. Una persona disattivata nel portale perde SkyTower al
+login successivo, al più entro la scadenza della sessione (14 giorni; 12 ore in HTTP). Portale spento: si entra, ma
+nessuno può dare o togliere admin finché non torna. Migrazione 0046 (applicata da `cde dev` all'avvio). Test:
+`tests/test_api_profilo_portale.py` (collegamento ed email cambiata, admin dato e tolto con i ruoli di prima, regola IP
+alla creazione, login con password propria disattivato / non abilitato / eliminato / portale spento, account trovato
+per email, reset della password, tetto del rinnovo, admin solo dal proprietario), `tests/test_api_portale.py`.

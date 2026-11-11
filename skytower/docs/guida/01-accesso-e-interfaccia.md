@@ -13,6 +13,19 @@ Se nel Portale sei **amministratore**, lo sei anche qui (dal 09/11/2026): entran
 amministratore della tua organizzazione e **Project Admin** di tutte le commesse della tua azienda, anche se il tuo
 utente SkyTower era nato con meno diritti. I ruoli che avevi restano.
 
+Dall'11/11/2026 il tuo **profilo del Portale vale anche qui**, sempre:
+
+- il tuo utente SkyTower resta legato al tuo utente del Portale: se nel Portale cambiano il tuo nome o la tua email,
+  al prossimo accesso cambiano anche qui (resta lo stesso utente, con le stesse commesse);
+- se nel Portale non sei più amministratore, al prossimo accesso non lo sei più nemmeno qui: perdi l'amministrazione
+  dell'organizzazione e il ruolo di Project Admin che ti aveva dato il Portale, mentre i ruoli che avevi nelle
+  commesse restano;
+- se nel Portale il tuo account è **disattivato**, o SkyTower non è più fra i tuoi programmi, non entri più nemmeno
+  con email e password di SkyTower: compare «Il tuo account del Portale è disattivato: rivolgiti a un amministratore»
+  (o «SkyTower non è fra i tuoi programmi del Portale»). Se il Portale è spento si entra lo stesso;
+- la sessione di SkyTower dura al massimo 14 giorni dall'accesso (12 ore se il server non usa HTTPS): poi, se il
+  Portale è aperto, SkyTower ti fa rientrare da solo; altrimenti ti chiede di nuovo email e password.
+
 Gli account con poteri di amministrazione della piattaforma, per sicurezza, non entrano dal Portale: devono
 usare password e secondo fattore.
 

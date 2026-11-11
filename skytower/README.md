@@ -211,6 +211,20 @@ Un **amministratore del portale** (ruolo `admin`, non l'admin da regola IP) a og
 dell'organizzazione della suite e `PROJECT_ADMIN` di tutti i suoi progetti attivi, in aggiunta ai ruoli che ha
 (ADR-57, 09/11/2026); il platform admin resta fuori da questa strada.
 
+**Il profilo del portale vale in SkyTower** (ADR-58, 11/11/2026, migrazione 0046):
+- l'account resta collegato allo username del portale (`users.portale_username`): nome, cognome ed email si
+  allineano a ogni ingresso, un'email cambiata nel portale non crea un secondo account;
+- l'admin dell'organizzazione e i `PROJECT_ADMIN` della regola (`project_memberships.dal_portale_admin`) si danno
+  **e si tolgono** a ogni ingresso; alla creazione la regola IP non basta;
+- login con la password di SkyTower, passkey, single sign-on e reset della password chiedono al portale
+  `POST /api/suite/profilo` (token della suite): disattivato, SkyTower non spuntato o persona eliminata → 403;
+  portale spento → si entra (evento `PROFILO_PORTALE_NON_VERIFICATO`);
+- la catena dei rinnovi della sessione scade alla data del login (non si allunga più): il login torna almeno ogni
+  `CDE_REFRESH_TOKEN_TTL_S`; la SPA ricade da sola sulla sessione del portale;
+- dare, togliere, disattivare o riattivare un amministratore (in qualunque organizzazione) può solo il
+  **proprietario della suite** (`proprietario: true` nel portale, verificato dal vivo; `GET /me/proprietario`);
+  per un account collegato l'admin lo decide il portale (409 `deciso_dal_portale`). `tooling/` resta libero.
+
 | Variabile | Default | Effetto |
 |---|---|---|
 | `CDE_SUITE_ORG_ID` | organizzazione di `CDE_SUITE_USER_EMAIL`, altrimenti del primo platform admin | dove nascono gli utenti creati dal portale |
