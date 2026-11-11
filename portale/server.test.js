@@ -984,10 +984,10 @@ const chiedi = (login, password, app, ip = '10.1.2.3') => verificaPasswordApp({ 
 test('verifica-password: username o email + password giusta → chi è, con l\'email per SkyTower/InCampo', () => conUtentiPassword(() => {
   const a = chiedi('LBianchi ', 'Cantiere-2026!', 'incampo');
   assert.equal(a.status, 200);
-  assert.deepEqual(a.body, { ok: true, username: 'lbianchi', nome: 'Laura Bianchi', ruolo: 'utente', email: 'lbianchi@cosedilspa.com', admin: false });
+  assert.deepEqual(a.body, { ok: true, username: 'lbianchi', nome: 'Laura Bianchi', ruolo: 'utente', email: 'lbianchi@cosedilspa.com', admin: false, proprietario: false });
   const b = chiedi('lbianchi@cosedilspa.com', 'Cantiere-2026!', 'incampo');
   assert.equal(b.status, 200, 'email dedotta username@dominio');
-  const c = chiedi('Carmela@Impresa.it', 'Ponteggio-77', 'vfp-transfer');
+  const c = chiedi('Carmela@Impresa.it', 'Ponteggio-77', 'incampo');
   assert.equal(c.body.username, 'cpappa', 'email impostata dall\'admin');
 }));
 
@@ -1023,11 +1023,16 @@ test('verifica-password: disattivato, password temporanea, programma non abilita
   assert.equal(adm.body.admin, true);
 }));
 
-test('verifica-password: programma sconosciuto o campi vuoti → 400; VFP Transfer ammesso pur fuori dal registro', () => conUtentiPassword(() => {
+// Dall'11/11/2026 VFP Transfer è nel registro (riservato, senza tessera): passa solo chi ha la spunta o è admin.
+test('verifica-password: programma sconosciuto o campi vuoti → 400; VFP Transfer solo a chi ha la spunta', () => conUtentiPassword(() => {
   assert.equal(chiedi('lbianchi', 'Cantiere-2026!', 'inventata').status, 400);
   assert.equal(chiedi('', 'Cantiere-2026!', 'incampo').status, 400);
   assert.equal(chiedi('lbianchi', '', 'incampo').status, 400);
-  assert.equal(chiedi('lbianchi', 'Cantiere-2026!', 'vfp-transfer').status, 200);
+  const no = chiedi('lbianchi', 'Cantiere-2026!', 'vfp-transfer');
+  assert.equal(no.status, 403);
+  assert.equal(no.body.motivo, 'non-abilitato');
+  assert.match(no.body.error, /VFP Transfer/);
+  assert.equal(chiedi('capo', 'Gru-a-torre-9', 'vfp-transfer').status, 200, 'l\'admin del portale entra ovunque');
 }));
 
 test('trovaUtentePerLogin: un\'email di due utenti non identifica nessuno', () => {

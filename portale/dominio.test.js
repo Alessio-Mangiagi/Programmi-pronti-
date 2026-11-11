@@ -81,8 +81,11 @@ test('Caddyfile: un blocco per ogni app del registro, con la sua porta', () => {
     }
   }
   assert.equal(blocchi.get('portale'), 8080, 'portale');
-  for (const a of APPS) {
+  // Solo i programmi con una porta nel registro: VFP Transfer (dall'11/11/2026) ci sta per le spunte,
+  // ma gira sul PC dell'ufficio e non passa dal reverse proxy.
+  const conPorta = APPS.filter((a) => a.porta);
+  for (const a of conPorta) {
     assert.equal(blocchi.get(sottodominio(a)), a.porta, `${a.dir}: porta nel Caddyfile diversa dal registro`);
   }
-  assert.equal(blocchi.size, APPS.length + 1, 'blocchi in piu\' o in meno rispetto al registro');
+  assert.equal(blocchi.size, conPorta.length + 1, 'blocchi in piu\' o in meno rispetto al registro');
 });

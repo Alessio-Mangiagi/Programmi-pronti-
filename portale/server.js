@@ -331,6 +331,25 @@ const APPS = [
     kw: ['auguri', 'compleanno', 'compleanni', 'whatsapp', 'messaggio automatico', 'nascita'],
     dettaglio: 'Manda da sola gli auguri di compleanno su WhatsApp ai contatti in elenco. Riservata agli amministratori del portale.',
   },
+  // VFP Transfer (11/11/2026, "il profilo del portale vale in ogni programma"): entra nel registro solo
+  // per avere la sua spunta in Amministrazione > Utenti e Abilitazioni, così /api/verify?app=vfp-transfer,
+  // /api/verifica-password e /api/suite/profilo dicono chi può usarlo. Prima stava in APP_FUORI_PORTALE
+  // e chiunque avesse un account del portale passava il controllo.
+  // senzaTessera: niente porta, cartella né launcher. VFP Transfer gira sul PC dell'ufficio che lo
+  // usa (vfp-transfer-DMS/vfp-transfer, avvia_interfaccia.bat o l'avvio automatico di Windows) e si
+  // apre da lì: il portale non lo avvia, non ne guarda lo stato e non gli dà una tessera in home;
+  // compare solo nelle pagine di gestione e nel registro accessi.
+  {
+    id: 'vfp-transfer',
+    nome: 'VFP Transfer',
+    sottotitolo: 'Documenti dal DMS a Viewpoint For Projects',
+    fai: 'Trasferire i documenti in Viewpoint For Projects',
+    guida: 'Porta i documenti dal DMS a Viewpoint For Projects e archivia pratiche dei mezzi e posta. Si apre dal PC dell’ufficio dove è installato, non dal portale.',
+    desc:'Trasferisce i documenti dal DMS a Viewpoint For Projects, archivia le pratiche dei mezzi e gli allegati di posta. Si apre dal PC dell’ufficio dove è installato.',
+    tipo: 'Python',
+    riservata: true,     // spenta per default: la vedono gli admin e chi ha la spunta
+    senzaTessera: true,  // vedi sopra: niente tessera, avvio, stato o assistente
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -569,6 +588,8 @@ function ensureData() {
     // riavvia — il setup rifà l'admin con una password nuova.
     const password = crypto.randomBytes(9).toString('base64url');   // 12 caratteri
     const admin = makeUser(ADMIN_INIZIALE, 'Amministratore', password, 'admin', true);
+    // Chi installa il portale ne è il proprietario: solo lui nominerà gli altri amministratori (11/11/2026).
+    admin.proprietario = true;
     writeFileAtomic(UTENTI_FILE, JSON.stringify([admin], null, 2));
     console.log('  ============================================');
     console.log('  [SETUP] Creato l\'utente amministratore. Segna la password: viene');
@@ -578,7 +599,33 @@ function ensureData() {
     console.log('          Al primo accesso ti verra chiesto di cambiarla.');
     console.log('  ============================================');
   }
+  assicuraProprietario();
   SECRET = loadSecret();
+}
+
+// All'avvio: il proprietario della suite (vedi nomeProprietario) c'è? Se utenti.json è di prima
+// dell'11/11/2026 lo sceglie migraProprietario e lo scrive nel file e nel registro accessi;
+// altrimenti dice nel log perché nessuno può gestire gli amministratori.
+function assicuraProprietario() {
+  const lista = loadUtenti();
+  const scelto = migraProprietario(lista);
+  if (scelto) {
+    saveUtenti(lista);
+    console.log(`  [PROPRIETARIO] ${scelto} è il proprietario della suite: solo lui crea, cambia ed elimina gli amministratori.`);
+    logAccesso({
+      ts: new Date().toISOString(), username: scelto, nome: (lista.find((u) => u.username === scelto) || {}).nome || scelto,
+      appId: null, appNome: null, azione: 'proprietario', per: scelto,
+      dettaglio: `${scelto} proprietario della suite (unico amministratore attivo, migrazione dell'11/11/2026)`,
+    });
+    return;
+  }
+  const nome = nomeProprietario(lista);
+  if (!nome) {
+    console.log('  [PROPRIETARIO] Nessun proprietario della suite: con più amministratori non lo sceglie il portale.');
+    console.log('                 Impostalo con PORTALE_PROPRIETARIO=<username> o "proprietario": true in data/utenti.json.');
+  } else if (!eProprietario(lista, nome)) {
+    console.log(`  [PROPRIETARIO] "${nome}" non è un amministratore attivo: nessuno può gestire gli amministratori.`);
+  }
 }
 
 function loadSecret() {
@@ -1134,6 +1181,73 @@ function motivoNoDisattiva(utenti, username, me) {
   return '';
 }
 
+// ---------------------------------------------------------------------------
+// Proprietario della suite (11/11/2026). Decisione dell'utente: "Gli admin devono essere creati
+// solo da me, io posso creare e cancellare gli admin". Il proprietario è UN utente del portale
+// (oggi a.mangiagi): `proprietario: true` in utenti.json, oppure PORTALE_PROPRIETARIO=<username>,
+// che vince sul file (serve se il file si rovina, o per passare la mano senza aprirlo).
+//   - Solo lui crea un amministratore, cambia il ruolo di chiunque (utente <-> admin) e, sugli
+//     amministratori, disattiva, riattiva, elimina, cambia password, email, nome e programmi.
+//     Gli altri admin gestiscono solo gli utenti normali: altrimenti un admin potrebbe reimpostare
+//     la password di un altro admin ed entrare al suo posto.
+//   - Nessuno, nemmeno lui, lo disattiva, lo elimina o gli toglie il ruolo admin: il portale
+//     resterebbe senza chi può nominare gli amministratori.
+//   - Ha poteri solo se è un admin attivo: un nome in PORTALE_PROPRIETARIO che non è admin non
+//     dà niente (il portale lo scrive nel log all'avvio).
+// Le app della suite lo sanno da /api/verify e /api/suite/profilo (campo `proprietario`): dentro
+// le app solo lui dà o toglie l'admin (shared/suite/CONTRATTI.md § 12).
+// ---------------------------------------------------------------------------
+const SOLO_PROPRIETARIO = 'Solo il proprietario della suite gestisce gli amministratori';
+const PROPRIETARIO_INTOCCABILE = 'Il proprietario della suite non si disattiva, non si elimina e resta amministratore';
+
+// Username del proprietario come scritto (variabile o file), senza guardare se è admin: serve alle
+// guardie, che lo proteggono anche se il file è in uno stato strano.
+function nomeProprietario(lista) {
+  const daEnv = String(process.env.PORTALE_PROPRIETARIO || '').toLowerCase().trim();
+  if (daEnv) return daEnv;
+  const u = (lista || []).find((x) => x && x.proprietario === true);
+  return u ? String(u.username) : '';
+}
+// true se `username` è il proprietario e può esercitarne i poteri (admin attivo).
+function eProprietario(lista, username) {
+  const nome = nomeProprietario(lista);
+  if (!nome || nome !== username) return false;
+  const u = (lista || []).find((x) => x.username === nome);
+  return !!(u && u.ruolo === 'admin' && !u.disattivato);
+}
+
+// Migrazione una tantum, all'avvio: utenti.json di prima dell'11/11/2026 non ha un proprietario.
+// Se c'è esattamente un admin attivo è lui (sulla suite di oggi: a.mangiagi); con più admin non si
+// indovina: nessuno gestisce gli admin finché non si imposta PORTALE_PROPRIETARIO o il campo nel file
+// (lo dice il log). Pura: cambia la lista in memoria e ritorna lo username scelto, '' se niente.
+function migraProprietario(lista) {
+  if (String(process.env.PORTALE_PROPRIETARIO || '').trim()) return '';
+  if ((lista || []).some((u) => u && u.proprietario === true)) return '';
+  const admin = (lista || []).filter((u) => u && u.ruolo === 'admin' && !u.disattivato);
+  if (admin.length !== 1) return '';
+  admin[0].proprietario = true;
+  return admin[0].username;
+}
+
+/**
+ * Chi può fare cosa sugli utenti del portale, dal punto di vista "amministratori". Pura (testata).
+ * lista = utenti.json; attore = username di chi agisce; bersaglio = utente su cui agisce (null per
+ * 'crea-admin'); azione: 'crea-admin' | 'promuovi' | 'declassa' | 'nome' | 'email' | 'apps' |
+ * 'password' | 'disattiva' | 'riattiva' | 'elimina'.
+ * Ritorna null se si può, altrimenti { status, error }: 403 per chi non è il proprietario,
+ * 400 per le azioni che nessuno può fare sul proprietario.
+ */
+function controlloAmministratori(lista, attore, bersaglio, azione) {
+  const sulProprietario = !!bersaglio && bersaglio.username === nomeProprietario(lista);
+  if (sulProprietario && ['declassa', 'disattiva', 'elimina'].includes(azione)) {
+    return { status: 400, error: PROPRIETARIO_INTOCCABILE };
+  }
+  const tocca = azione === 'crea-admin' || azione === 'promuovi' || azione === 'declassa'
+    || (!!bersaglio && bersaglio.ruolo === 'admin');
+  if (tocca && !eProprietario(lista, attore)) return { status: 403, error: SOLO_PROPRIETARIO };
+  return null;
+}
+
 function verifyPw(user, password) {
   const h = Buffer.from(hashPw(password, user.salt), 'hex');
   const stored = Buffer.from(user.hash, 'hex');
@@ -1192,12 +1306,20 @@ function getSession(req) {
   // password scollega subito, invece che alla scadenza del cookie. utenti.json
   // è un file piccolo letto dal filesystem (in cache dell'OS): il costo per
   // richiesta è trascurabile rispetto alla verifica HMAC appena fatta.
-  const u = loadUtenti().find((x) => x.username === s.username);
+  const lista = loadUtenti();
+  const u = lista.find((x) => x.username === s.username);
   if (!u || u.disattivato || (u.sv || 1) !== (p.v || 1)) return null;
   // Logout: l'utente ha chiuso le sessioni in un certo istante (sessioniDa) e i
   // cookie emessi prima — anche uno copiato da un PC condiviso o da un'app che
   // lo ha visto passare — non valgono più. Senza iat (cookie vecchio) idem.
   if (u.sessioniDa && (!p.iat || p.iat < u.sessioniDa)) return null;
+  // Ruolo e nome dal disco, non dalla foto nel cookie (11/11/2026, profilo del portale valido
+  // ovunque): un admin declassato perde subito l'area amministrazione e /api/verify dice alle app
+  // il ruolo e il nome di adesso. Il cambio di ruolo fa anche sv++ (sessione da rifare); questo
+  // copre le modifiche fatte a mano in utenti.json, che prima valevano solo dopo 8 ore.
+  s.ruolo = u.ruolo;
+  s.nome = u.nome || s.nome;
+  s.proprietario = eProprietario(lista, u.username);
   return s;
 }
 
@@ -1289,7 +1411,10 @@ function applicaSblocco(user, chiavi) {
 // programma passa nel corpo (lo ha visto lui; noi vedremmo solo il suo server).
 // ---------------------------------------------------------------------------
 // Programmi fuori dal registro APPS che possono comunque chiedere la verifica.
-const APP_FUORI_PORTALE = { 'vfp-transfer': 'VFP Transfer' };
+// Vuoto dall'11/11/2026: VFP Transfer, l'unico che c'era, è entrato nel registro APPS (senza tessera)
+// per avere la sua spunta in Amministrazione > Utenti. Resta per un eventuale programma futuro che
+// verifica la password senza essere un programma del portale: qui non si controlla l'abilitazione.
+const APP_FUORI_PORTALE = {};
 
 // L'utente del portale per quello che la persona ha scritto nel login dell'altro
 // programma: lo username, oppure l'email (quella impostata dall'admin o quella
@@ -1382,6 +1507,46 @@ function verificaPasswordApp(corpo, ipChiamante, now = Date.now()) {
     body: {
       ok: true, username: user.username, nome: user.nome, ruolo: user.ruolo,
       email: emailUtente(user), admin: user.ruolo === 'admin',
+      proprietario: eProprietario(lista, user.username),   // 11/11/2026, CONTRATTI § 12
+    },
+  };
+}
+
+/**
+ * Profilo del portale di una persona, per un altro programma (POST /api/suite/profilo, 11/11/2026).
+ * Decisione dell'utente "il profilo del portale vale in ogni programma" (scelte 2b e 3b): SkyTower,
+ * InCampo, VFP Transfer e Analista Dati, che hanno account propri, lo chiedono a OGNI login o ingresso
+ * — anche quando la persona entra con la password del programma — e allineano l'account: admin dato e
+ * tolto come nel portale, nome ed email aggiornati, ingresso rifiutato a chi è disattivato o non ha più
+ * quel programma fra i suoi. Lo chiedono anche prima di dare o togliere l'admin dentro l'app, per sapere
+ * se chi agisce è il proprietario della suite.
+ * Server a server col token della suite (la rotta controlla X-Suite-Token): niente contatore di
+ * tentativi, che è dei login con password. corpo = { login: username o email, app: id del registro }.
+ * Ritorna { status, body }:
+ *   200 { ok, trovato: true, username, nome, email, ruolo, admin, proprietario, disattivato, mustChange, abilitato }
+ *   200 { ok, trovato: false }   (nessun utente, o email di due utenti: non identifica nessuno)
+ *   400 login mancante o programma sconosciuto.
+ * admin = ruolo admin e account attivo, MAI l'elevazione per IP (vale solo davanti a quel PC);
+ * abilitato = account attivo e programma fra i suoi (gli admin del portale li hanno tutti).
+ */
+function profiloPerApp(corpo) {
+  const c = corpo && typeof corpo === 'object' ? corpo : {};
+  const login = String(c.login || '').toLowerCase().trim().slice(0, 200);
+  const appId = String(c.app || '');
+  const app = APPS.find((a) => a.id === appId);
+  if (!app && !APP_FUORI_PORTALE[appId]) return { status: 400, body: { ok: false, error: 'Programma sconosciuto' } };
+  if (!login) return { status: 400, body: { ok: false, error: 'Login mancante' } };
+  const lista = loadUtenti();
+  const u = trovaUtentePerLogin(lista, login);
+  if (!u) return { status: 200, body: { ok: true, trovato: false } };
+  const attivo = !u.disattivato;
+  const abilitato = attivo && (app ? accessoApp(app, { username: u.username, ruolo: u.ruolo, adm: [] }) : true);
+  return {
+    status: 200,
+    body: {
+      ok: true, trovato: true, username: u.username, nome: u.nome || u.username, email: emailUtente(u),
+      ruolo: u.ruolo, admin: u.ruolo === 'admin' && attivo, proprietario: eProprietario(lista, u.username),
+      disattivato: !attivo, mustChange: !!u.mustChange, abilitato,
     },
   };
 }
@@ -1544,7 +1709,7 @@ function sottodominio(app) {
 // ospitata su un altro PC della LAN poteva leggere username e ruolo di chi la
 // apriva da loggato.
 const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/i;
-const SUITE_PORTS = new Set([PORT, ...APPS.map((a) => a.porta)]);
+const SUITE_PORTS = new Set([PORT, ...APPS.map((a) => a.porta).filter(Boolean)]);   // VFP Transfer non ha porta qui
 function isSuiteOrigin(origin, req) {
   let u;
   try { u = new URL(origin); } catch { return false; }
@@ -1650,7 +1815,10 @@ function accessoDiretto(app, session) {
 }
 
 // Programmi con una tessera propria (home, plancia, assistente): non quelli che stanno dentro un altro.
-const conTessera = (app) => !app.dentro;
+// senzaTessera (VFP Transfer, 11/11/2026): nel registro solo per spunte e verifiche, si apre altrove.
+const conTessera = (app) => !app.dentro && !app.senzaTessera;
+// Programmi che il portale sa avviare e controllare (porta + launcher): non VFP Transfer.
+const avviabile = (app) => !!(app && app.porta && app.launch && app.dir);
 
 // Le app che si possono assegnare a un utente dall'area Amministrazione: tutte
 // tranne le adminOnly, che seguono il ruolo e non le spunte.
@@ -2089,6 +2257,7 @@ function pathDalRegistro() {
 }
 
 function launchApp(app) {
+  if (!avviabile(app)) return { ok: false, error: `${app && app.nome} non si avvia dal portale` };
   const appDir = path.join(ROOT, app.dir);
   const launcher = path.join(appDir, app.launch);
   if (!fs.existsSync(launcher)) return { ok: false, error: 'Launcher non trovato: ' + launcher };
@@ -2206,8 +2375,9 @@ function getWarmList() {
       ids = Array.isArray(j.apps) ? j.apps.map((s) => String(s).trim().toLowerCase()) : [];
     } catch { ids = []; }
   }
-  if (ids.includes('all') || ids.includes('*')) return APPS.map((a) => a.id);
-  return ids.filter((id) => APPS.some((a) => a.id === id));
+  // solo i programmi che il portale sa avviare (non VFP Transfer, che non ha launcher qui)
+  if (ids.includes('all') || ids.includes('*')) return APPS.filter(avviabile).map((a) => a.id);
+  return ids.filter((id) => APPS.some((a) => a.id === id && avviabile(a)));
 }
 
 const WARM_BOOT_MS = 120_000;             // finestra di boot: non ri-lanciare mentre sta ancora partendo
@@ -2222,7 +2392,7 @@ const warmVisteSu = new Set();
 async function warmApps() {
   for (const id of getWarmList()) {
     const app = APPS.find((a) => a.id === id);
-    if (!app || spenteAMano.has(id)) { warmVisteSu.delete(id); continue; }
+    if (!app || !avviabile(app) || spenteAMano.has(id)) { warmVisteSu.delete(id); continue; }
     try {
       if (await checkPort(app.porta)) { warmVisteSu.add(id); continue; }    // già su: niente da fare
       if (Date.now() - (warmLaunchedAt.get(id) || 0) < WARM_BOOT_MS) continue; // sta ancora partendo
@@ -2427,9 +2597,12 @@ async function handle(req, res) {
       return sendJson(res, 403, { ok: false, error: 'Accesso riservato', app: appId }, cors);
     }
     return sendJson(res, 200, {
+      // nome e ruolo freschi da utenti.json (getSession), non quelli del cookie (11/11/2026)
       ok: true, username: s.username, nome: s.nome, ruolo: s.ruolo,
       email: emailUtente(loadUtenti().find((x) => x.username === s.username) || { username: s.username }),
       admin: appId ? isAdminForApp(s, appId) : (s.ruolo === 'admin'),
+      // proprietario della suite: nelle app solo lui dà o toglie l'admin (CONTRATTI § 12)
+      proprietario: !!s.proprietario,
       appsAdmin: s.adm || [],
       // diretto: abilitato proprio a QUELL'app, non solo a una di quelle che comprende ("DDT e Magazzino"
       // comprende il Magazzino: chi ha solo la spunta Magazzino entra dalla tessera ma non è un utente del
@@ -2447,6 +2620,16 @@ async function handle(req, res) {
     if (!suite.verifica(req.headers['x-suite-token'])) return sendJson(res, 403, { ok: false, error: 'Token della suite mancante o errato' });
     const esito = verificaPasswordApp(await readJsonBody(req), clientIp(req));
     return sendJson(res, esito.status, esito.body, esito.headers);
+  }
+
+  // ---- Profilo del portale per gli altri programmi (vedi profiloPerApp, 11/11/2026) ----
+  // Come /api/verifica-password: la chiama il backend di SkyTower, InCampo, VFP Transfer o Analista
+  // con il token della suite, a ogni login, per allineare l'account al profilo del portale. Senza
+  // token 403: dal browser direbbe a chiunque chi esiste e chi è admin.
+  if (p === '/api/suite/profilo' && req.method === 'POST') {
+    if (!suite.verifica(req.headers['x-suite-token'])) return sendJson(res, 403, { ok: false, error: 'Token della suite mancante o errato' });
+    const esito = profiloPerApp(await readJsonBody(req));
+    return sendJson(res, esito.status, esito.body);
   }
 
   // ================= da qui in poi serve la sessione =================
@@ -2480,6 +2663,7 @@ async function handle(req, res) {
     return sendJson(res, 200, {
       username: u.username, nome: u.nome, ruolo: u.ruolo, mustChange: !!u.mustChange,
       email: emailUtente(u), appsAdmin, adminPortale, apps: appsUtente(u.username),
+      proprietario: !!session.proprietario,   // la pagina Utenti mostra i comandi sugli admin solo a lui
     });
   }
 
@@ -2593,21 +2777,21 @@ async function handle(req, res) {
 
   // ---- Stato app ----
   if (p === '/api/status') {
-    const stati = await Promise.all(APPS.filter(canSeeApp).map(async (a) => ({ id: a.id, online: await checkPort(a.porta) })));
+    const stati = await Promise.all(APPS.filter((a) => avviabile(a) && canSeeApp(a)).map(async (a) => ({ id: a.id, online: await checkPort(a.porta) })));
     return sendJson(res, 200, { apps: stati });
   }
 
   // ---- Stato di una singola app (poll rapido dopo l'avvio) ----
   if (p.startsWith('/api/status/')) {
     const app = APPS.find((a) => a.id === p.split('/').pop());
-    if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
+    if (!app || !avviabile(app) || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
     return sendJson(res, 200, { id: app.id, online: await checkPort(app.porta) });
   }
 
   // ---- Avvia app (registra 'avvia') ----
   if (p.startsWith('/api/launch/') && req.method === 'POST') {
     const app = APPS.find((a) => a.id === p.split('/').pop());
-    if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
+    if (!app || !avviabile(app) || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
     const decisione = decisioneAvvio({ accesa: await checkPort(app.porta), forza: url.searchParams.get('forza') === '1', admin: adminPortale });
     if (decisione === 'gia-accesa') return sendJson(res, 200, { ok: true, giaAccesa: true });
     if (decisione === 'vietato') return sendJson(res, 403, { ok: false, error: 'È già accesa: il riavvio è riservato agli amministratori' });
@@ -2628,7 +2812,7 @@ async function handle(req, res) {
   if (p.startsWith('/api/stop/') && req.method === 'POST') {
     if (!adminPortale) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
     const app = APPS.find((a) => a.id === p.split('/').pop());
-    if (!app || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
+    if (!app || !avviabile(app) || !canSeeApp(app)) return sendJson(res, 404, { ok: false, error: 'App sconosciuta' });
     const r = await stopApp(app);
     if (r.ok) {
       spenteAMano.add(app.id);
@@ -2766,6 +2950,9 @@ async function handle(req, res) {
       const utenti = loadUtenti();
       const u = utenti.find((x) => x.username === r.username);
       if (!u) return sendJson(res, 404, { ok: false, error: 'Nessun account con questo username: crealo dalla pagina Utenti' });
+      // Come /api/utenti/<u>/password: la password di un amministratore la reimposta solo il proprietario.
+      const noRich = controlloAmministratori(utenti, session.username, u, 'password');
+      if (noRich) return sendJson(res, noRich.status, { ok: false, error: noRich.error });
       // Password temporanea mostrata UNA volta all'admin, che la comunica a voce
       // o per mail; al primo accesso l'utente deve cambiarla. sv++ chiude le
       // sessioni ancora aperte, sbloccaUtente toglie il blocco per tentativi.
@@ -2816,18 +3003,24 @@ async function handle(req, res) {
       // Chi non ha un elenco suo vede il default: le caselle lo mostrano già
       // spuntato, così l'admin vede la situazione vera e non una riga vuota.
       const predefinite = appsPredefinite();
-      const list = loadUtenti().map((u) => ({
+      const tutti = loadUtenti();
+      const nomeProp = nomeProprietario(tutti);
+      const list = tutti.map((u) => ({
         username: u.username, nome: u.nome, ruolo: u.ruolo, creato: u.creato,
         email: u.email || '', emailEffettiva: emailUtente(u),
         apps: Array.isArray(u.apps) ? u.apps : predefinite,
         attivo: !u.disattivato, mustChange: !!u.mustChange,
+        proprietario: !!nomeProp && u.username === nomeProp,   // etichetta "Proprietario" nella pagina Utenti
       }));
       // assegnabili: le app da proporre come caselle nella tabella utenti.
       // soloAdmin: le adminOnly, senza casella perché seguono il ruolo; la
       // pagina Abilitazioni le nomina per spiegare perché non compaiono.
+      // sonoProprietario: chi guarda la pagina può gestire gli amministratori (11/11/2026); per gli
+      // altri admin la pagina blocca i comandi sulle righe admin (il server li rifiuta comunque).
       return sendJson(res, 200, {
         utenti: list, assegnabili: appAssegnabili(),
         soloAdmin: APPS.filter((a) => a.adminOnly).map((a) => ({ id: a.id, nome: a.nome })),
+        sonoProprietario: !!session.proprietario,
       });
     }
     if (req.method === 'POST') {
@@ -2839,6 +3032,11 @@ async function handle(req, res) {
       if (mail && !emailValida(mail)) return sendJson(res, 400, { ok: false, error: 'Email non valida' });
       if (String(password).length < MIN_PW_LEN) return sendJson(res, 400, { ok: false, error: `La password deve avere almeno ${MIN_PW_LEN} caratteri` });
       const list = loadUtenti();
+      // Un amministratore nuovo lo crea solo il proprietario della suite (11/11/2026).
+      if (ruolo === 'admin') {
+        const no = controlloAmministratori(list, session.username, null, 'crea-admin');
+        if (no) return sendJson(res, no.status, { ok: false, error: no.error });
+      }
       if (list.some((u) => u.username === uname)) return sendJson(res, 409, { ok: false, error: 'Username già esistente' });
       // mustChange: il nuovo utente dovrà impostare una propria password al primo accesso.
       const nuovo = makeUser(uname, String(nome).trim().slice(0, NOME_MAX), String(password), ruolo === 'admin' ? 'admin' : 'utente', true);
@@ -2873,6 +3071,9 @@ async function handle(req, res) {
 
     const defPw = String(defaultPassword || '').trim();
     const list = loadUtenti();
+    // Righe con ruolo admin: solo il proprietario della suite crea amministratori (11/11/2026); per gli
+    // altri admin quelle righe si scartano col motivo, le altre entrano.
+    const creaAdmin = !controlloAmministratori(list, session.username, null, 'crea-admin');
     const noti = new Set(list.map((u) => u.username));   // username già esistenti + già visti nel file
     const aggiunti = [];
     const scartati = [];
@@ -2886,6 +3087,7 @@ async function handle(req, res) {
       if (!usernameValido(uname)) { scartati.push({ riga: r.riga, username: uname, motivo: 'username non valido (minuscole, numeri, . _ -, max 40)' }); continue; }
       if (pw.length < MIN_PW_LEN) { scartati.push({ riga: r.riga, username: uname, motivo: `password assente o < ${MIN_PW_LEN} caratteri` }); continue; }
       if (noti.has(uname)) { scartati.push({ riga: r.riga, username: uname, motivo: 'username già esistente' }); continue; }
+      if (ruolo === 'admin' && !creaAdmin) { scartati.push({ riga: r.riga, username: uname, motivo: 'ruolo admin: gli amministratori li crea solo il proprietario della suite' }); continue; }
       list.push(makeUser(uname, nome, pw, ruolo, true));
       noti.add(uname);
       aggiunti.push(uname);
@@ -2911,6 +3113,8 @@ async function handle(req, res) {
     const list = loadUtenti();
     const u = list.find((x) => x.username === uname);
     if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const noEmail = controlloAmministratori(list, session.username, u, 'email');
+    if (noEmail) return sendJson(res, noEmail.status, { ok: false, error: noEmail.error });
     // L'email è la chiave con cui InCampo e SkyTower aprono la sessione senza
     // password: due utenti del portale con la stessa email sarebbero la stessa
     // persona di là. E ogni cambio resta nel registro accessi, con chi l'ha fatto.
@@ -2939,6 +3143,8 @@ async function handle(req, res) {
     const list = loadUtenti();
     const u = list.find((x) => x.username === uname);
     if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const noApps = controlloAmministratori(list, session.username, u, 'apps');
+    if (noApps) return sendJson(res, noApps.status, { ok: false, error: noApps.error });
     const prima = Array.isArray(u.apps) ? u.apps : appsPredefinite();
     u.apps = filtraApps(apps);
     saveUtenti(list);
@@ -2968,6 +3174,10 @@ async function handle(req, res) {
     const u = list.find((x) => x.username === uname);
     if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
     if (uname === session.username) return sendJson(res, 400, { ok: false, error: 'La tua password la cambi da «Password»' });
+    // La password di un amministratore la reimposta solo il proprietario: chi la reimposta la conosce,
+    // e potrebbe entrare al posto di quell'admin (11/11/2026).
+    const noPw = controlloAmministratori(list, session.username, u, 'password');
+    if (noPw) return sendJson(res, noPw.status, { ok: false, error: noPw.error });
     const nuova = scelta || passwordTemporanea();
     u.salt = crypto.randomBytes(16).toString('hex');
     u.hash = hashPw(nuova, u.salt);
@@ -2983,6 +3193,69 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true, password: scelta ? null : nuova });
   }
 
+  // ---- Ruolo di un utente: utente <-> amministratore (11/11/2026) ----
+  // PUT /api/utenti/<u>/ruolo { ruolo: 'admin' | 'utente' }. Solo il proprietario della suite
+  // (controlloAmministratori), mai sul proprietario stesso, mai sull'ultimo admin attivo.
+  // sv++: la persona rientra e il nuovo ruolo vale subito anche nelle app, che lo leggono da
+  // /api/verify (fresco da utenti.json) e da /api/suite/profilo al prossimo login.
+  const mRuolo = /^\/api\/utenti\/([^/]+)\/ruolo$/.exec(p);
+  if (mRuolo && req.method === 'PUT') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const uname = decodeURIComponent(mRuolo[1]);
+    const { ruolo } = await readJsonBody(req);
+    if (ruolo !== 'admin' && ruolo !== 'utente') return sendJson(res, 400, { ok: false, error: 'Ruolo non valido: admin o utente' });
+    const list = loadUtenti();
+    const u = list.find((x) => x.username === uname);
+    if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const no = controlloAmministratori(list, session.username, u, ruolo === 'admin' ? 'promuovi' : 'declassa');
+    if (no) return sendJson(res, no.status, { ok: false, error: no.error });
+    if (u.ruolo === ruolo) return sendJson(res, 200, { ok: true, ruolo, invariato: true });
+    if (ruolo === 'utente' && !u.disattivato && list.filter((x) => x.ruolo === 'admin' && !x.disattivato).length <= 1) {
+      return sendJson(res, 400, { ok: false, error: "È l'ultimo amministratore attivo" });
+    }
+    const prima = u.ruolo || 'utente';
+    u.ruolo = ruolo;
+    u.sv = (u.sv || 1) + 1;   // sessioni aperte chiuse: si rientra col ruolo nuovo
+    saveUtenti(list);
+    const parola = (r) => (r === 'admin' ? 'amministratore' : 'utente');
+    logAccesso({
+      ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: 'ruolo-utente', per: uname, da: prima, a: ruolo, ip: clientIp(req),
+      dettaglio: `${uname}: ${parola(prima)} → ${parola(ruolo)}`,
+    });
+    daFareCache.delete(uname);
+    return sendJson(res, 200, { ok: true, ruolo });
+  }
+
+  // ---- Nome visualizzato di un utente (11/11/2026) ----
+  // PUT /api/utenti/<u>/nome { nome }. Gli admin per gli utenti normali, il proprietario anche per gli
+  // admin. Nessuna sessione da rifare: il nome lo leggono dal disco getSession e /api/verify, quindi
+  // le app lo vedono cambiato alla prossima verifica (30 s di cache del gate) o al prossimo login.
+  const mNome = /^\/api\/utenti\/([^/]+)\/nome$/.exec(p);
+  if (mNome && req.method === 'PUT') {
+    if (!isAdmin) return sendJson(res, 403, { ok: false, error: 'Riservato agli amministratori' });
+    const uname = decodeURIComponent(mNome[1]);
+    const { nome } = await readJsonBody(req);
+    // spazi multipli e caratteri di controllo via: il nome finisce in pagine, registro e app
+    const nuovo = String(nome || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, NOME_MAX);
+    if (!nuovo) return sendJson(res, 400, { ok: false, error: 'Il nome non può essere vuoto' });
+    const list = loadUtenti();
+    const u = list.find((x) => x.username === uname);
+    if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const no = controlloAmministratori(list, session.username, u, 'nome');
+    if (no) return sendJson(res, no.status, { ok: false, error: no.error });
+    const prima = u.nome || '';
+    if (prima === nuovo) return sendJson(res, 200, { ok: true, nome: nuovo, invariato: true });
+    u.nome = nuovo;
+    saveUtenti(list);
+    logAccesso({
+      ts: new Date().toISOString(), username: session.username, nome: session.nome, appId: null, appNome: null,
+      azione: 'nome-utente', per: uname, da: prima, a: nuovo, ip: clientIp(req), dettaglio: `${uname}: ${prima} → ${nuovo}`,
+    });
+    daFareCache.delete(uname);
+    return sendJson(res, 200, { ok: true, nome: nuovo });
+  }
+
   // ---- Disattiva / riattiva un utente ----
   // Disattivato = resta in elenco con storico e programmi, ma non entra: il
   // login lo rifiuta e getSession scarta i cookie che ha già (sv++ per
@@ -2995,6 +3268,8 @@ async function handle(req, res) {
     const list = loadUtenti();
     const u = list.find((x) => x.username === uname);
     if (!u) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const noAtt = controlloAmministratori(list, session.username, u, attivo ? 'riattiva' : 'disattiva');
+    if (noAtt) return sendJson(res, noAtt.status, { ok: false, error: noAtt.error });
     if (!attivo) {
       const no = motivoNoDisattiva(list, uname, session.username);
       if (no) return sendJson(res, 400, { ok: false, error: no });
@@ -3020,6 +3295,8 @@ async function handle(req, res) {
     let list = loadUtenti();
     const eliminato = list.find((u) => u.username === uname);
     if (!eliminato) return sendJson(res, 404, { ok: false, error: 'Utente non trovato' });
+    const noDel = controlloAmministratori(list, session.username, eliminato, 'elimina');
+    if (noDel) return sendJson(res, noDel.status, { ok: false, error: noDel.error });
     list = list.filter((u) => u.username !== uname);
     saveUtenti(list);
     // l'utente non esiste più: il registro tiene chi era (nome, ruolo, programmi) e chi l'ha eliminato
@@ -3124,4 +3401,8 @@ module.exports = {
   normalizzaVoci, daFare, daFareCache,              // "da fare oggi"
   motivoCsrf, originePortale, decisioneAvvio, usernameValido, NOME_MAX,   // difese (revisione 03/11/2026)
   HEADER_PAGINA, HEADER_COMUNI, makeSessionCookie, getSession, chiudiSessioni, loadSecret, SECRET_FILE,
+  // profilo del portale valido ovunque (11/11/2026): proprietario della suite, guardie sugli admin, profilo per le app
+  nomeProprietario, eProprietario, migraProprietario, assicuraProprietario, controlloAmministratori, profiloPerApp,
+  SOLO_PROPRIETARIO, PROPRIETARIO_INTOCCABILE, conTessera, avviabile,
+  server,                                          // i test delle rotte lo mettono in ascolto su una porta a caso
 };

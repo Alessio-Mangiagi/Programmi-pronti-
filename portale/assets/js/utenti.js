@@ -3,11 +3,20 @@
 // creare, importare da Excel, cambiare password, scegliere i programmi.
 // Disattiva/Riattiva ed Elimina chiedono conferma e agiscono subito.
 // API: /api/utenti (GET, POST), /api/utenti/import, /api/utenti/<u>/password,
-// /api/utenti/<u>/attivo, /api/utenti/<u>/apps, DELETE /api/utenti/<u>.
+// /api/utenti/<u>/attivo, /api/utenti/<u>/apps, /api/utenti/<u>/ruolo,
+// /api/utenti/<u>/nome, DELETE /api/utenti/<u>.
+//
+// Proprietario della suite (11/11/2026): solo lui crea, promuove, declassa ed elimina gli
+// amministratori e ne cambia password, email, nome e programmi. Per gli altri admin la pagina
+// mostra le righe degli amministratori con i comandi spenti e il motivo al passaggio del mouse
+// (il server rifiuta comunque, vedi controlloAmministratori in server.js). Il ruolo si cambia dal
+// menu nella colonna Ruolo, il nome con «Nome» sotto la persona.
 
 let utenti = [];
 let assegnabili = [];   // programmi con casella: [{ id, nome, riservata }]
 let me = null;
+let sonoProprietario = false;   // da /api/utenti: chi guarda la pagina può gestire gli admin
+const SOLO_PROP = 'Solo il proprietario della suite gestisce gli amministratori';
 
 const $ = (id) => document.getElementById(id);
 const json = (r) => r.json().catch(() => ({}));
@@ -36,6 +45,12 @@ async function caricaUtenti() {
   const d = await json(r);
   utenti = (d.utenti || []).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
   assegnabili = d.assegnabili || [];
+  sonoProprietario = !!d.sonoProprietario;
+  // "Amministratore" fra i ruoli del nuovo utente solo per il proprietario; agli altri la nota
+  // nell'import spiega che le righe admin del foglio vengono scartate.
+  $('nRuoloAdmin').hidden = !sonoProprietario;
+  $('nRuoloAdmin').disabled = !sonoProprietario;
+  $('impAdminNota').hidden = sonoProprietario;
   renderNumeri();
   renderRighe();
 }
@@ -55,6 +70,25 @@ function stato(u) {
   return '<span class="st ok">Attivo</span>';
 }
 
+// Ruolo: menu per il proprietario (non sulla sua riga), testo per gli altri. Sulla riga del
+// proprietario l'etichetta "Proprietario": è admin per sempre, nessuno lo declassa.
+function ruolo(u) {
+  const etichetta = u.ruolo === 'admin' ? '<span class="st adm">Admin</span>' : 'Utente';
+  if (u.proprietario) return '<span class="st prop" title="Proprietario della suite: solo lui gestisce gli amministratori. Resta sempre amministratore.">Proprietario</span>';
+  if (!sonoProprietario) {
+    return u.ruolo === 'admin' ? `${etichetta}<span class="lucchetto" title="${esc(SOLO_PROP)}" aria-label="${esc(SOLO_PROP)}"></span>` : etichetta;
+  }
+  return `<select class="ruolo-sel" data-ruolo="${esc(u.username)}" aria-label="Ruolo di ${esc(u.nome)}">
+      <option value="utente"${u.ruolo === 'admin' ? '' : ' selected'}>Utente</option>
+      <option value="admin"${u.ruolo === 'admin' ? ' selected' : ''}>Amministratore</option>
+    </select>`;
+}
+
+// Le righe degli amministratori le gestisce solo il proprietario: per gli altri i pulsanti restano
+// visibili ma spenti, con il motivo nel suggerimento (così si capisce perché non succede niente).
+const bloccata = (u) => u.ruolo === 'admin' && !sonoProprietario;
+const spento = (u) => (bloccata(u) ? ` disabled title="${esc(SOLO_PROP)}"` : '');
+
 // Un admin vede tutto per ruolo: niente caselle, lo si dice e basta.
 function programmi(u) {
   if (u.ruolo === 'admin') return '<span class="tu">Tutti (admin)</span>';
@@ -72,17 +106,22 @@ function renderRighe() {
   $('vuoto').hidden = righe.length > 0;
   $('righe').innerHTML = righe.map((u) => {
     const io = me && u.username === me.username;
+    // Il proprietario non si disattiva né si elimina (nemmeno da sé): sulla sua riga niente pulsanti.
+    const azioni = io ? '<span class="tu">Sei tu</span>'
+      : u.proprietario ? '<span class="tu" title="Il proprietario della suite non si disattiva e non si elimina">Proprietario</span>' : `
+        <button type="button" class="b" data-pw="${esc(u.username)}"${spento(u)}>Password</button>
+        <button type="button" class="b" data-att="${esc(u.username)}" data-attivo="${u.attivo ? '0' : '1'}"${spento(u)}>${u.attivo ? 'Disattiva' : 'Riattiva'}</button>
+        <button type="button" class="b rosso" data-del="${esc(u.username)}"${spento(u)}>Elimina</button>`;
+    const titoloNome = bloccata(u) ? '' : ' title="Cambia il nome che si vede nel portale e nei programmi"';
+    const titoloMail = bloccata(u) ? '' : ' title="Cambia l’email con cui InCampo e SkyTower riconoscono l’utente"';
     return `<tr class="${u.attivo ? '' : 'off'}">
-      <td><div class="chi"><span class="u-av">${esc(iniz(u.nome))}</span><span><b>${esc(u.nome)}</b><small>${esc(u.username)}</small></span></div></td>
-      <td class="mail"><span title="${u.email ? 'Impostata dall’amministratore' : 'Non impostata: vale username@dominio'}">${esc(u.emailEffettiva || '').replace('@', '<wbr>@')}</span>${u.email ? '' : '<small class="dedotta">dedotta</small>'}<button type="button" class="b mini" data-mail="${esc(u.username)}" title="Cambia l'email con cui InCampo e SkyTower riconoscono l'utente">Email</button></td>
-      <td>${u.ruolo === 'admin' ? '<span class="st adm">Admin</span>' : 'Utente'}</td>
+      <td><div class="chi"><span class="u-av">${esc(iniz(u.nome))}</span><span><b>${esc(u.nome)}</b><small>${esc(u.username)}<button type="button" class="link nome-b" data-nome="${esc(u.username)}"${spento(u)}${titoloNome}>Nome</button></small></span></div></td>
+      <td class="mail"><span title="${u.email ? 'Impostata dall’amministratore' : 'Non impostata: vale username@dominio'}">${esc(u.emailEffettiva || '').replace('@', '<wbr>@')}</span>${u.email ? '' : '<small class="dedotta">dedotta</small>'}<button type="button" class="b mini" data-mail="${esc(u.username)}"${spento(u)}${titoloMail}>Email</button></td>
+      <td class="ruolo">${ruolo(u)}</td>
       <td>${stato(u)}</td>
       <td>${programmi(u)}</td>
       <td class="quando">${esc(data(u.creato))}</td>
-      <td class="az">${io ? '<span class="tu">Sei tu</span>' : `
-        <button type="button" class="b" data-pw="${esc(u.username)}">Password</button>
-        <button type="button" class="b" data-att="${esc(u.username)}" data-attivo="${u.attivo ? '0' : '1'}">${u.attivo ? 'Disattiva' : 'Riattiva'}</button>
-        <button type="button" class="b rosso" data-del="${esc(u.username)}">Elimina</button>`}</td>
+      <td class="az">${azioni}</td>
     </tr>`;
   }).join('');
 }
@@ -94,11 +133,20 @@ $('fStato').addEventListener('change', renderRighe);
 $('righe').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
+  if (b.disabled) return;
   if (b.dataset.mail) cambiaEmail(b.dataset.mail);
+  else if (b.dataset.nome) cambiaNome(b.dataset.nome);
   else if (b.dataset.pw) apriPassword(b.dataset.pw);
   else if (b.dataset.att) cambiaAttivo(b.dataset.att, b.dataset.attivo === '1');
   else if (b.dataset.del) elimina(b.dataset.del);
   else if (b.dataset.apps) apriProgrammi(b.dataset.apps);
+});
+
+// Ruolo dal menu della riga (solo il proprietario lo vede). Chiede conferma spiegando cosa cambia
+// nei programmi; se annulla, il menu torna com'era.
+$('righe').addEventListener('change', (e) => {
+  const sel = e.target.closest('select[data-ruolo]');
+  if (sel) cambiaRuolo(sel.dataset.ruolo, sel.value, sel);
 });
 
 // Tutti i pulsanti "Annulla"/"Chiudi" delle finestre.
@@ -115,6 +163,33 @@ async function cambiaEmail(username) {
   const d = await invia('PUT', `/api/utenti/${encodeURIComponent(username)}/email`, { email: nuova.trim() });
   if (!d.ok) { alert(d.error || 'Non salvata'); return; }
   await caricaUtenti();
+}
+
+// Ruolo: utente <-> amministratore. Il server chiude le sessioni aperte della persona (rientra col
+// ruolo nuovo); i programmi con account propri (SkyTower, InCampo, VFP Transfer, Analista Dati)
+// danno o tolgono l'admin al suo prossimo accesso, gli altri alla prossima verifica della sessione.
+async function cambiaRuolo(username, nuovo, sel) {
+  const u = trova(username);
+  const testo = nuovo === 'admin'
+    ? `Rendere ${u.nome} (${username}) amministratore?\n\nVedrà tutti i programmi e la gestione del portale, e sarà amministratore anche nei programmi della suite dal suo prossimo accesso. Le sue sessioni aperte si chiudono.`
+    : `Togliere a ${u.nome} (${username}) il ruolo di amministratore?\n\nPerde subito la gestione del portale e, dal suo prossimo accesso, l'amministrazione nei programmi della suite. Le sue sessioni aperte si chiudono.`;
+  if (!confirm(testo)) { sel.value = u.ruolo; return; }
+  const d = await invia('PUT', `/api/utenti/${encodeURIComponent(username)}/ruolo`, { ruolo: nuovo });
+  if (!d.ok) { sel.value = u.ruolo; toast(d.error || 'Ruolo non cambiato'); return; }
+  toast(`${u.nome}: ${nuovo === 'admin' ? 'ora amministratore' : 'ora utente'}`);
+  caricaUtenti();
+}
+
+// Nome visualizzato: una finestra semplice, come l'email. Vale subito nel portale e, nei programmi,
+// alla prossima verifica della sessione (pochi secondi) o al prossimo accesso.
+async function cambiaNome(username) {
+  const u = trova(username);
+  const nuovo = prompt(`Nome e cognome di ${username}:`, u ? u.nome : '');
+  if (nuovo === null || !nuovo.trim() || (u && nuovo.trim() === u.nome)) return;
+  const d = await invia('PUT', `/api/utenti/${encodeURIComponent(username)}/nome`, { nome: nuovo.trim() });
+  if (!d.ok) { alert(d.error || 'Nome non salvato'); return; }
+  toast('Nome salvato');
+  caricaUtenti();
 }
 
 // Caselle dei programmi (nuovo utente, finestra "Programmi"): icona del programma (common.js) e nome.

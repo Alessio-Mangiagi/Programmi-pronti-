@@ -46,7 +46,7 @@
 
       <header class="u-head">
         <h1>Utenti</h1>
-        <p>Crea le utenze, importa il personale da Excel, cambia le password e disattiva chi non deve più entrare.</p>
+        <p>Crea le utenze, importa il personale da Excel, cambia le password e disattiva chi non deve più entrare. Il profilo che dai qui (ruolo, nome, email, programmi) vale in tutti i programmi della suite; gli amministratori li gestisce solo il proprietario della suite.</p>
       </header>
 
       <section class="kpi" aria-label="Numeri degli utenti">
@@ -94,7 +94,7 @@
         <div class="fld"><label for="nEmail">Email <small>(facoltativa: la usano InCampo e SkyTower per riconoscerlo)</small></label><input id="nEmail" type="email" maxlength="160" autocomplete="off" placeholder="nome.cognome@cosedilspa.com" /></div>
         <div class="fld"><label for="nPassword">Password iniziale</label><input id="nPassword" type="text" required minlength="8" autocomplete="off" placeholder="min 8 caratteri" /></div>
         <div class="fld"><label for="nRuolo">Ruolo</label>
-          <select id="nRuolo"><option value="utente">Utente</option><option value="admin">Amministratore</option></select>
+          <select id="nRuolo"><option value="utente">Utente</option><option value="admin" id="nRuoloAdmin">Amministratore</option></select>
         </div>
       </div>
       <div class="fld" id="nAppsFld">
@@ -116,6 +116,7 @@
       <p class="sotto">File <b>.xlsx</b> o <b>.csv</b> con le colonne <code>username</code> e <code>nome</code> (facoltative <code>password</code> e <code>ruolo</code>). Chi non ha una password nel foglio riceve quella predefinita; tutti la cambiano al primo accesso. Gli username già presenti vengono saltati.</p>
       <div class="fld"><label for="impFile">File</label><input id="impFile" type="file" accept=".xlsx,.csv" required /></div>
       <div class="fld"><label for="impPw">Password predefinita</label><input id="impPw" type="text" autocomplete="off" placeholder="min 8 caratteri" /></div>
+      <p class="sotto" id="impAdminNota" hidden>Le righe con ruolo <code>admin</code> vengono scartate: gli amministratori li crea solo il proprietario della suite.</p>
       <p class="sotto"><button type="button" class="link" id="modello">Scarica il modello</button></p>
       <div class="esito" id="importEsito" role="status"></div>
       <div class="azioni">

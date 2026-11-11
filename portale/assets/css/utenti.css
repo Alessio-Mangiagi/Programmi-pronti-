@@ -118,3 +118,13 @@
 .u-tab td.mail { font-size: 13px; }
 .u-tab td.mail .dedotta { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; background: #f2f3f5; color: var(--grey, #5b6573); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
 .u-tab td.mail .b.mini { min-height: 26px; padding: 0 8px; font-size: 10px; margin-left: 8px; }
+
+/* Proprietario della suite e ruoli (11/11/2026): etichetta "Proprietario", menu del ruolo per il
+   proprietario, lucchetto sulle righe admin per gli altri admin, pulsante «Nome» sotto la persona. */
+.st.prop { color: #fff; background: var(--cosedil-blue); border-color: var(--cosedil-blue); }
+.u-tab .ruolo-sel { font: inherit; font-size: 12.5px; border: 1.5px solid var(--ink); background: #fff; min-height: 30px; padding: 0 6px; color: var(--ink); }
+.u-tab .lucchetto { display: inline-block; width: 10px; height: 12px; margin-left: 6px; vertical-align: -1px; cursor: help;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' fill='none' stroke='%235b6573' stroke-width='1.4'%3E%3Crect x='1' y='5' width='8' height='6.3' rx='1'/%3E%3Cpath d='M3 5V3.4a2 2 0 0 1 4 0V5'/%3E%3C/svg%3E"); }
+.u-tab .chi small .nome-b { margin-left: 8px; padding: 0; border: 0; background: none; font: inherit; font-size: 11px; font-weight: 600; color: var(--cosedil-blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.u-tab .chi small .nome-b[disabled] { color: var(--grey); text-decoration: none; cursor: not-allowed; opacity: .55; }
+.u-tab .az .b[disabled], .u-tab td.mail .b.mini[disabled] { opacity: .45; cursor: not-allowed; }

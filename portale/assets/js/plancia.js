@@ -416,14 +416,14 @@ function testoRiga(e) {
   if (e.azione === 'login') return 'Accesso al Portale';
   // Login fatto dentro un altro programma (SkyTower, InCampo, VFP Transfer) con la
   // password del portale: /api/verifica-password scrive appId/appNome del programma.
-  // VFP Transfer non e' nel registro delle app: il nome arriva solo da appNome.
+  // VFP Transfer dall'11/11/2026 e' nel registro (senza tessera): il nome arriva da /api/apps (nomi) o da appNome.
   if (e.appId && /^login-(app|bloccato|disattivato)$/.test(e.azione)) {
     return `<b>${esc(nomeProgramma(e.appId, e.appNome))}</b> · ${esc(AZIONI[e.azione])}`;
   }
   if (e.azione === 'logout') return 'Uscita dal Portale';
   // azioni di amministrazione (abilitazioni, password, email, commesse): con il dettaglio di common.js
   const det = dettaglioAzione(e);
-  if (/^(abilita|reset-password|richiesta-gestita|disattiva|riattiva|email-utente|commesse|crea-utente|importa-utenti|elimina-utente)$/.test(e.azione)) {
+  if (/^(abilita|reset-password|richiesta-gestita|disattiva|riattiva|email-utente|commesse|crea-utente|importa-utenti|elimina-utente|ruolo-utente|nome-utente|proprietario)$/.test(e.azione)) {
     return esc(AZIONI[e.azione] || e.azione) + (det ? ` <small>${esc(det)}</small>` : '');
   }
   return nomeB || esc(AZIONI[e.azione] || e.azione);

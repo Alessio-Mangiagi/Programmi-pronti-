@@ -71,6 +71,9 @@ const ICONE_APP = {
   trimble: '<path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/>',
   // Auguri: torta con la candelina
   auguri: '<path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/>',
+  // VFP Transfer (nel registro dall'11/11/2026, senza tessera: spunte, abilitazioni, registro): la
+  // cartella del DMS con la freccia verso Viewpoint For Projects
+  'vfp-transfer': '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/><path d="M3 7v10a2 2 0 0 0 2 2h7"/><path d="M15 17h6M18.5 14.5 21 17l-2.5 2.5"/>',
   // Portale: la casa della suite (righe "(portale)" del registro, azioni fatte nel portale)
   portale: '<path d="M4 10.5 12 4l8 6.5"/><path d="M6 9v11h12V9"/><path d="M10 20v-5h4v5"/>',
 };
@@ -99,6 +102,8 @@ const AZIONI_PORTALE = {
   abilita: 'Abilitazioni', 'email-utente': 'Cambio email', commesse: 'Registro commesse',
   // gestione utenti (dal 06/11/2026 anche creazione, import ed eliminazione lasciano traccia)
   'crea-utente': 'Nuovo utente', 'importa-utenti': 'Importazione utenti', 'elimina-utente': 'Utente eliminato',
+  // profilo del portale valido ovunque (11/11/2026): ruolo e nome cambiati, proprietario della suite
+  'ruolo-utente': 'Cambio ruolo', 'nome-utente': 'Cambio nome', proprietario: 'Proprietario della suite',
 };
 const nomeAzione = (azione) => AZIONI_PORTALE[azione] || azione;
 

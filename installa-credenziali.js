@@ -88,6 +88,13 @@ step('portale (data/utenti.json)', () => {
     });
     msg = 'creato';
   }
+  // Proprietario della suite (11/11/2026, shared/suite/CONTRATTI.md § 12): solo lui crea, cambia ed
+  // elimina gli amministratori. Se il portale non ne ha ancora uno, lo diventa l'admin installato qui
+  // (chi ha in mano il PC del portale). Se c'è già, non si tocca: questo script non passa la mano.
+  if (!process.env.PORTALE_PROPRIETARIO && !list.some((u) => u.proprietario === true)) {
+    list.find((u) => u.username === username).proprietario = true;
+    msg += ', proprietario della suite';
+  }
   writeFileAtomic(file, JSON.stringify(list, null, 2));
   return msg;
 });
