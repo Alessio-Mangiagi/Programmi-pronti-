@@ -125,7 +125,7 @@ jobs:
         working-directory: skytower/apps/web
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -150,7 +150,7 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/pip install -r apps/api/requirements.lock -e "packages/iso19650" -e "apps/api[dev]"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
