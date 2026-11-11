@@ -15,7 +15,15 @@ amministratore completa).
 >   non ha la spunta Admin; un account con la spunta Admin che nel Portale non è amministratore resta utente;
 > - chi è abilitato a DDT e Magazzino nel Portale e non ha un account qui lo trova **creato da solo** al primo
 >   ingresso (colonna Ruolo: *dal portale*): senza password propria (vale quella del Portale) e **senza
->   commesse**, finché non gliele abiliti tu con il pulsante **Commesse**.
+>   commesse**, finché non gliele abiliti tu con il pulsante **Commesse**. Il suo **nome** resta uguale a quello
+>   del Portale: se lo cambiano lì, cambia anche qui al primo ingresso dopo.
+>
+> Dall'11 novembre 2026 gli **amministratori li crea e li toglie solo il proprietario della suite**, nel Portale.
+> Se sei amministratore ma non proprietario, in questa pagina la casella **Admin** non c'è e sulle righe degli
+> account amministratore i pulsanti **Reset password**, **Disabilita** e **Revoca** sono spenti; sotto il modulo
+> una riga lo spiega. Ogni tentativo fatto lo stesso resta nel **Log accessi** come *Azione rifiutata*:
+>
+> ![Pannello Account visto da un amministratore che non è il proprietario della suite](img/30-admin-account-non-proprietario.png)
 
 ## Account
 
@@ -32,13 +40,15 @@ Compila la riga in alto e clicca **Crea account**:
 | **Commessa** | il codice che separa i dati (es. `101-003`). Chi ha la stessa commessa condivide gli stessi dati |
 | **Codice commessa aziendale (SkyTower)** | il codice ufficiale della commessa (es. `101-003`): con questo i PDF dei DDT finiscono anche nella commessa giusta di SkyTower e le righe dei DDT entrano nel Magazzino come carichi del cantiere con lo stesso codice. Vuoto = vale la **Commessa** se è già un codice del registro della suite; altrimenti nessun invio a SkyTower e i carichi del Magazzino restano in "Cantiere &lt;commessa&gt;" (lo segnala il Magazzino) |
 | **Nome visualizzato** | il nome che compare in alto nel programma |
-| **Admin** | spunta solo per chi deve amministrare |
+| **Admin** | la vede solo il **proprietario della suite**. Con il Portale conta poco: amministratore qui è chi lo è nel Portale |
 
 ### Importare molti utenti da Excel
 
 Nel riquadro **Importa da Excel**: **Template** scarica un file d'esempio con le colonne *Username, Password,
 Commessa, Nome visualizzato, Admin* (*sì*/*no*). Compilalo, sceglilo con **Scegli il file** e clicca **Importa
-utenti**: il messaggio dice quanti account sono stati creati e quali righe sono state scartate e perché.
+utenti**: il messaggio dice quanti account sono stati creati e quali righe sono state scartate e perché. Le
+righe con *Admin* = *sì* le accetta solo se sei il proprietario della suite; per gli altri sono scartate con il
+motivo.
 Il file contiene password in chiaro: cancellalo dopo l'importazione e non mandarlo per email.
 
 ### Gestire un account
@@ -53,7 +63,8 @@ Nella tabella, colonna **Azioni**:
 - **Disabilita / Abilita**: sospende o riattiva l'accesso **senza cancellare niente** (preferibile);
 - **Revoca**: elimina l'account per sempre (i dati della commessa restano). Chiede conferma.
 
-Non puoi disabilitare o revocare te stesso né l'ultimo amministratore attivo. **Salva lista (CSV)** scarica
+Non puoi disabilitare o revocare te stesso né l'ultimo amministratore attivo; sugli account amministratore
+**Reset password**, **Disabilita** e **Revoca** li usa solo il proprietario della suite. **Salva lista (CSV)** scarica
 l'elenco degli account.
 
 ### Commesse abilitate

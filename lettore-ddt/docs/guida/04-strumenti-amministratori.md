@@ -7,12 +7,13 @@ Chi è **amministratore** del Lettore DDT vede più schede e il pulsante giallo 
 
 ![Le schede di un amministratore](img/13-schede-amministratore.png)
 
-Per avere queste schede servono **due cose**: l'account del Lettore DDT deve essere *Admin* e, nel Portale,
-l'utente deve essere amministratore dell'app Lettore DDT. Se manca la seconda, schede e pulsante **Admin** non
-compaiono e sotto le schede una riga gialla dice *"Il tuo account del Lettore DDT è da amministratore, ma nel
-Portale Suite non sei amministratore di questo programma…"*: fatti abilitare nel Portale (vedi la
-[guida del Portale](../../../portale/docs/guida/README.md)). La stessa regola vale per la conversione
-automatica quando è riservata agli amministratori.
+Amministratore del Lettore DDT è **chi lo è nel Portale** (dal 9 novembre 2026), anche se il suo account del
+Lettore DDT non ha la spunta *Admin*. Al contrario, un account con la spunta *Admin* che nel Portale non è
+amministratore resta utente: schede e pulsante **Admin** non compaiono e sotto le schede una riga gialla dice *"Il
+tuo account del Lettore DDT è da amministratore, ma nel Portale Suite non sei amministratore di questo
+programma…"*. Gli amministratori del Portale li nomina e li toglie solo il **proprietario della suite** (dall'11
+novembre 2026; vedi la [guida del Portale](../../../portale/docs/guida/README.md)). La stessa regola vale per la
+conversione automatica quando è riservata agli amministratori.
 
 ## Conversione automatica di una cartella
 

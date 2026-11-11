@@ -41,7 +41,7 @@ Dalla versione **2.4.0** l'app è **multi-utente**: ogni utente accede con accou
 | Area | Misura |
 |---|---|
 | DDT firmati (.p7m) | Busta CAdES aperta e firma verificata (catena fino a un ente qualificato degli elenchi eIDAS, revoca, scadenza, marca temporale) dal motore comune `shared/firma` (`src/services/firmaDigitale.ts`); conversione singola e automatica, esito con bollino, nel registro attività e nell'export archiviato; a SkyTower va la busta originale (PDF estratto se la rifiuta). Firma non valida = segnalazione, non blocco |
-| Account | Un solo login dal Portale Suite (09/11/2026): `ingressoDalPortale` (`src/middleware/auth.ts`) apre la sessione dell'account DDT con lo stesso username e, se manca, lo **crea** (`creaAccountDalPortale`: non admin, senza password propria, nessuna commessa) a chi il portale dice abilitato proprio al DDT (`req.cosedil.diretto`); chi ha solo il Magazzino va al Magazzino. Admin = admin del portale (`eAdmin`). Il login username/password resta solo col gate spento (installazione senza portale) |
+| Account | Un solo login dal Portale Suite (09/11/2026): `ingressoDalPortale` (`src/middleware/auth.ts`) apre la sessione dell'account DDT con lo stesso username e, se manca, lo **crea** (`creaAccountDalPortale`: non admin, senza password propria, nessuna commessa) a chi il portale dice abilitato proprio al DDT (`req.cosedil.diretto`); chi ha solo il Magazzino va al Magazzino. Admin = admin del portale (`eAdmin`). Il login username/password resta solo col gate spento (installazione senza portale). Profilo del portale valido ovunque (11/11/2026): spunta DDT tolta → la sessione DDT già aperta si chiude alla richiesta dopo (`chiudiParteDdt`), nome degli account `creatoDalPortale` allineato al portale (`aggiornaNomeDalPortale`), account admin creati/eliminati/disattivati/cambiata password solo dal **proprietario della suite** (`req.cosedil.proprietario`, `puoGestireAdmin`, 403 `SOLO_PROPRIETARIO`) |
 | Password | Hash bcrypt, mai in chiaro; lunghezza minima 8 caratteri |
 | Archivio utenti | File `users.enc` cifrato AES-256-GCM (chiave da env o keyfile locale) |
 | Brute-force | Lockout temporaneo dopo 5 tentativi falliti (15 min) |
@@ -286,6 +286,17 @@ Magazzino, Flask). Contratto fra i due lati: `shared/suite/CONTRATTI.md`.
   al primo ingresso per chi il portale abilita proprio al DDT (`/api/verify` →
   `diretto`); chi ha solo il Magazzino viene portato a `/magazzino/` (`main.tsx`,
   `/guscio/stato` → `ddt.motivo`); "Esci" torna al portale (`portale.indirizzo`).
+  **Profilo del portale valido ovunque** (11/11/2026): il portale si ascolta a ogni
+  richiesta, non solo all'ingresso. Spunta "DDT" tolta con la sessione aperta (resta
+  "Magazzino") → `ingressoDalPortale` chiude la parte DDT (`chiudiParteDdt`, riga
+  *Logout* nel registro; la commessa del registro resta per il Magazzino); un login a
+  mano di chi ha solo il Magazzino → 403 `SOLO_MAGAZZINO`. Il nome degli account creati
+  dal portale segue quello del portale. Gli **admin li crea e li toglie solo il
+  proprietario della suite** (decisione dell'utente): nella pagina admin chi non lo è
+  (`GET /admin/api/users` → `puoGestireAdmin: false`) non vede la casella *Admin* e non
+  può eliminare, disattivare o cambiare la password di un account admin (403
+  `SOLO_PROPRIETARIO`, riga *Azione rifiutata* nel registro). Col gate spento vale
+  l'admin dell'account DDT come prima.
 - **Commesse abilitate** (opzione b del 09/11/2026): gli admin scelgono fra tutte le
   commesse; gli altri account solo fra quelle in `UserRow.commesseAbilitate` (pagina
   admin, pulsante *Commesse*), senza elenco la loro commessa di sempre (`commessaId` +

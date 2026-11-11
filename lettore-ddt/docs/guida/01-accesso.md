@@ -16,7 +16,10 @@ basta, sia nella parte DDT sia nel Magazzino.
   te lo crea da solo la prima volta che entri (senza una password sua: vale quella del Portale). All'inizio non
   ha commesse: le abilita un amministratore (vedi sotto).
 - Se nel Portale sei abilitato **solo al Magazzino**, la scheda ti porta direttamente nel **Magazzino**; la voce
-  *Lettore DDT* nella barra in alto resta grigia.
+  *Lettore DDT* nella barra in alto resta grigia. Se un amministratore ti toglie il Lettore DDT nel Portale
+  mentre ci lavori, la parte DDT si chiude alla prossima operazione (entro mezzo minuto) e, ricaricando la
+  pagina, sei nel Magazzino con la stessa commessa.
+- Il tuo **nome** è quello del Portale: se cambia lì, cambia anche qui.
 - Se l'amministratore ha **disattivato** il tuo utente del Lettore DDT, compare una pagina che lo dice, con il
   pulsante **VAI AL MAGAZZINO**: il Magazzino lo puoi usare lo stesso.
 - Chi è **amministratore nel Portale** è amministratore anche qui: vede tutte le commesse e il pulsante **Admin**.

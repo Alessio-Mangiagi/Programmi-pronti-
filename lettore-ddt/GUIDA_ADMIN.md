@@ -37,7 +37,7 @@ Nella sezione **Account**, compila il modulo in alto:
 | **Password** | Minimo **8 caratteri**. |
 | **Commessa** | Lettere, numeri, `-`, `_` (max 64). Identifica la cartella dati. |
 | **Nome visualizzato** | Nome mostrato in alto nell'app (facoltativo). |
-| **Admin** | Spunta solo se l'utente deve gestire gli account. |
+| **Admin** | La vede solo il **proprietario della suite** (dall'11/11/2026 gli amministratori li crea e li toglie solo lui, nel Portale). Con il Portale amministratore è chi lo è nel Portale. |
 
 Clicca **Crea account**. Comunica all'utente username e password; digli di **cambiarla al primo accesso**.
 
@@ -55,7 +55,7 @@ Se hai **molti utenti da creare**, usa l'importazione da file Excel o CSV nella 
    - **Password** (obbligatorio, min 8 caratteri)
    - **Commessa** (obbligatorio)
    - **Nome visualizzato** (opzionale)
-   - **Admin** (opzionale: digita `sì` o `no`)
+   - **Admin** (opzionale: digita `sì` o `no`; le righe con `sì` le accetta solo se sei il proprietario della suite)
 
 3. Clicca **"Seleziona un file"**, scegli il tuo file compilato.
 4. Clicca **"Importa utenti"**. Il sistema valida e crea gli account in batch.
@@ -83,6 +83,8 @@ La colonna **Stato** mostra **Attivo** o **Disabilitato**.
 ### Protezioni automatiche
 - Non puoi **revocare** o **disabilitare** te stesso.
 - Non puoi **revocare/disabilitare l'ultimo amministratore attivo** (per non restare chiusi fuori).
+- Sugli account **amministratore** Reset password, Disabilita e Revoca li usa solo il **proprietario della suite**:
+  per gli altri amministratori i pulsanti sono spenti e un tentativo resta nel Log accessi come *Azione rifiutata*.
 
 > **Disabilita** è quasi sempre preferibile a **Revoca**: reversibile e non perdi lo storico. Revoca solo quando sei certo.
 
