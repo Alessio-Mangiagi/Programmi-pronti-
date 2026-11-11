@@ -300,7 +300,17 @@ def passkey_options(request: Request, svc: Services = Depends(services)):
 def passkey_verify(body: PasskeyVerifyIn, request: Request, response: Response, svc: Services = Depends(services)):
     if not svc.limiter.hit(svc.settings.login_rate_limit, "passkey", client_ip(request) or "-"):
         raise ApiError(429, "rate_limited", "Troppi tentativi: riprovare tra un minuto", {"Retry-After": "60"})
-    return _raise_if_error(_passkey_tx(body, request, response, svc))
+    user = _raise_if_error(_passkey_tx(body, request, response, svc))
+    # la passkey è giusta: prima di aprire la sessione il portale dice se la persona può ancora entrare (ADR-58, 3b).
+    # Fuori dalla transazione della passkey, che teneva bloccata la riga dell'utente (last_login_at).
+    from . import portale  # import qui: portale importa auth
+    rifiuto = portale.controlla_ingresso(svc, request, user["id"], via="passkey")
+    if rifiuto is not None:
+        raise rifiuto
+    with svc.db.auth_tx() as conn:
+        security_event(conn, "LOGIN_OK", user_id=user["id"], organization_id=user["organization_id"], ip=client_ip(request),
+                       user_agent=_ua(request), amr="hwk,mfa", method="passkey")
+        return _start_session(svc, conn, response, user, amr=["hwk", "mfa"], request=request)
 
 
 PASSKEY_ERROR = "Passkey non riconosciuta: accedi con email e password"
@@ -345,6 +355,4 @@ def _passkey_tx(body: PasskeyVerifyIn, request: Request, response: Response, svc
         conn.execute("""UPDATE cde.user_mfa_factors SET webauthn_sign_count = %s, last_used_at = now(),
                             webauthn_discoverable = true WHERE id = %s""", [verified.new_sign_count, factor["id"]])
         conn.execute("UPDATE cde.users SET last_login_at = now() WHERE id = %s", [user_id])
-        security_event(conn, "LOGIN_OK", user_id=user_id, organization_id=user["organization_id"], ip=ip,
-                       user_agent=_ua(request), amr="hwk,mfa", method="passkey")
-        return _start_session(svc, conn, response, user, amr=["hwk", "mfa"], request=request)
+        return user          # LOGIN_OK e sessione in passkey_verify, dopo il profilo del portale (ADR-58)

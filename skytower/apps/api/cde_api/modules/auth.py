@@ -4,6 +4,12 @@
 Login Argon2id → (eventuale) MFA TOTP, chiave di sicurezza (passkeys.py) o recovery code → JWT RS256 15' + refresh token opaco in cookie
 HttpOnly, ruotato a ogni uso; il riuso di un token già ruotato revoca l'intera famiglia.
 Lavora solo con il ruolo DB cde_auth.
+
+Suite Cosedil (ADR-58, 11/11/2026): dopo la password giusta e prima del secondo fattore o della sessione si chiede al
+portale il profilo della persona (portale.controlla_ingresso: disattivata o senza SkyTower fra i programmi → 403). Il
+rinnovo della sessione non chiede nulla al portale (scelta 2b, "solo al login"), ma la catena dei rinnovi scade alla
+data fissata dal login (non si allunga più a ogni rinnovo): il login, e quindi il controllo, torna almeno ogni
+``CDE_REFRESH_TOKEN_TTL_S`` (14 giorni; 12 ore in HTTP).
 """
 from __future__ import annotations
 
@@ -128,7 +134,12 @@ def _sso_enforced(conn: psycopg.Connection, user_id: uuid.UUID) -> bool:
 
 
 def _start_session(svc: Services, conn: psycopg.Connection, response: Response, user: dict, *,
-                   amr: list[str], request: Request, family_id: uuid.UUID | None = None) -> dict:
+                   amr: list[str], request: Request, family_id: uuid.UUID | None = None,
+                   expires_at: datetime | None = None) -> dict:
+    """Emette access token e refresh token. ``family_id`` + ``expires_at`` per un rinnovo: il nuovo refresh token
+    eredita la scadenza della catena (fissata dal login), così una sessione rinnovata ogni giorno non dura per sempre
+    e il login — con il controllo del profilo del portale — torna almeno ogni CDE_REFRESH_TOKEN_TTL_S (ADR-58)."""
+    scade = expires_at or (_now() + timedelta(seconds=svc.settings.refresh_token_ttl_s))
     if family_id is None:                      # nuovo accesso (non un rinnovo): dispositivo mai visto?
         seen = conn.execute(
             """SELECT EXISTS (SELECT 1 FROM cde.refresh_tokens WHERE user_id = %(u)s) AS any,
@@ -141,10 +152,9 @@ def _start_session(svc: Services, conn: psycopg.Connection, response: Response, 
     conn.execute(
         """INSERT INTO cde.refresh_tokens (user_id, family_id, token_hash, mfa_verified, expires_at, ip, user_agent)
            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-        [user["id"], family_id or uuid.uuid4(), token_hash, bool(MFA_AMR & set(amr)),
-         _now() + timedelta(seconds=svc.settings.refresh_token_ttl_s), client_ip(request), _ua(request)],
+        [user["id"], family_id or uuid.uuid4(), token_hash, bool(MFA_AMR & set(amr)), scade, client_ip(request), _ua(request)],
     )
-    _set_refresh_cookie(svc, response, token)
+    _set_refresh_cookie(svc, response, token, max_age=max(1, int((scade - _now()).total_seconds())))
     return {
         "status": "ok",
         "access_token": svc.tokens.issue_access(user["id"], user["organization_id"], amr),
@@ -153,8 +163,8 @@ def _start_session(svc: Services, conn: psycopg.Connection, response: Response, 
     }
 
 
-def _set_refresh_cookie(svc: Services, response: Response, token: str) -> None:
-    response.set_cookie(svc.settings.refresh_cookie_name, token, max_age=svc.settings.refresh_token_ttl_s,
+def _set_refresh_cookie(svc: Services, response: Response, token: str, max_age: int | None = None) -> None:
+    response.set_cookie(svc.settings.refresh_cookie_name, token, max_age=max_age or svc.settings.refresh_token_ttl_s,
                         httponly=True, secure=svc.settings.cookie_secure, samesite="strict", path=svc.settings.refresh_cookie_path)
 
 
@@ -230,7 +240,44 @@ def login(body: LoginIn, request: Request, response: Response, svc: Services = D
     if isinstance(esito, _PasswordDelPortale):
         from . import portale
         return portale.entra(svc, request, response, esito.esito, via="password")
+    if isinstance(esito, _PasswordGiusta):
+        return _raise_if_error(_dopo_la_password(svc, request, response, esito.user))
     return _raise_if_error(esito)
+
+
+class _PasswordGiusta:
+    """Esito di _login_tx: password di SkyTower giusta, contatori già azzerati. Il resto (profilo del portale, secondo
+    fattore, sessione) prosegue in _dopo_la_password, FUORI dalla transazione che teneva bloccata la riga dell'utente:
+    il controllo del portale può dover cambiare l'admin dell'account su un'altra connessione (ADR-58)."""
+
+    def __init__(self, user: dict):
+        self.user = user
+
+
+def _dopo_la_password(svc: Services, request: Request, response: Response, user: dict):
+    """Password giusta: profilo del portale (scelta 3b dell'11/11/2026, la password di SkyTower resta ma il portale
+    decide se la persona può ancora entrare), poi secondo fattore o sessione come prima."""
+    from . import portale  # import qui: portale importa auth
+    ip = client_ip(request)
+    rifiuto = portale.controlla_ingresso(svc, request, user["id"], via="password")
+    if rifiuto is not None:
+        return rifiuto
+    with svc.db.auth_tx() as conn:
+        if _has_verified_factor(conn, user["id"]):
+            security_event(conn, "LOGIN_PASSWORD_OK", user_id=user["id"], ip=ip, next="mfa")
+            methods = [r["method"] for r in conn.execute(
+                "SELECT DISTINCT method::text FROM cde.user_mfa_factors WHERE user_id = %s AND verified_at IS NOT NULL "
+                "ORDER BY 1 DESC", [user["id"]]).fetchall()]
+            return {"status": "mfa_required", "methods": [*methods, "RECOVERY_CODE"],
+                    "mfa_token": svc.tokens.issue_mfa_pending(user["id"], enroll=False)}
+        if user["mfa_required"]:
+            security_event(conn, "LOGIN_PASSWORD_OK", user_id=user["id"], ip=ip, next="mfa_enrollment")
+            return {"status": "mfa_enrollment_required",
+                    "mfa_token": svc.tokens.issue_mfa_pending(user["id"], enroll=True)}
+
+        security_event(conn, "LOGIN_OK", user_id=user["id"], organization_id=user["organization_id"], ip=ip,
+                       user_agent=_ua(request), amr="pwd")
+        return _start_session(svc, conn, response, user, amr=["pwd"], request=request)
 
 
 def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, response: Response, svc: Services):
@@ -294,22 +341,8 @@ def _login_tx(body: LoginIn, email: str, ip: str | None, request: Request, respo
             "UPDATE cde.users SET " + ", ".join(f"{k} = %s" for k in updates) + " WHERE id = %s",
             [*updates.values(), user["id"]],
         )
-
-        if _has_verified_factor(conn, user["id"]):
-            security_event(conn, "LOGIN_PASSWORD_OK", user_id=user["id"], ip=ip, next="mfa")
-            methods = [r["method"] for r in conn.execute(
-                "SELECT DISTINCT method::text FROM cde.user_mfa_factors WHERE user_id = %s AND verified_at IS NOT NULL "
-                "ORDER BY 1 DESC", [user["id"]]).fetchall()]
-            return {"status": "mfa_required", "methods": [*methods, "RECOVERY_CODE"],
-                    "mfa_token": svc.tokens.issue_mfa_pending(user["id"], enroll=False)}
-        if user["mfa_required"]:
-            security_event(conn, "LOGIN_PASSWORD_OK", user_id=user["id"], ip=ip, next="mfa_enrollment")
-            return {"status": "mfa_enrollment_required",
-                    "mfa_token": svc.tokens.issue_mfa_pending(user["id"], enroll=True)}
-
-        security_event(conn, "LOGIN_OK", user_id=user["id"], organization_id=user["organization_id"], ip=ip,
-                       user_agent=_ua(request), amr="pwd")
-        return _start_session(svc, conn, response, user, amr=["pwd"], request=request)
+        # secondo fattore e sessione in _dopo_la_password, dopo il profilo del portale (ADR-58)
+        return _PasswordGiusta(user)
 
 
 # ---------------------------------------------------------------------
@@ -522,7 +555,9 @@ def _refresh_tx(token: str, request: Request, response: Response, svc: Services)
             return unauthorized("Utente non attivo")
 
         amr = ["pwd", "otp"] if rt["mfa_verified"] else ["pwd"]
-        result = _start_session(svc, conn, response, user, amr=amr, request=request, family_id=rt["family_id"])
+        # tetto assoluto (ADR-58): il token nuovo scade quando scadeva quello di prima, cioè alla data del login
+        result = _start_session(svc, conn, response, user, amr=amr, request=request, family_id=rt["family_id"],
+                                expires_at=rt["expires_at"])
         new_id = conn.execute("SELECT id FROM cde.refresh_tokens WHERE family_id = %s ORDER BY issued_at DESC LIMIT 1",
                               [rt["family_id"]]).fetchone()["id"]
         conn.execute("UPDATE cde.refresh_tokens SET revoked_at = now(), replaced_by = %s WHERE id = %s",
@@ -584,6 +619,13 @@ def forgot_password(body: ForgotPasswordIn, request: Request, svc: Services = De
         return {"status": "accepted"}
     with svc.db.auth_tx() as conn:
         user = conn.execute("SELECT id FROM cde.users WHERE email = %s AND status = 'ACTIVE'", [email]).fetchone()
+    if user:
+        # persona disattivata nel portale o senza SkyTower fra i programmi: niente link (ADR-58). Stessa risposta
+        # di sempre: il rifiuto resta nel registro di sicurezza (LOGIN_PORTALE_RIFIUTATO, via=reset)
+        from . import portale
+        if portale.controlla_ingresso(svc, request, user["id"], via="reset", allinea=False) is not None:
+            return {"status": "accepted"}
+    with svc.db.auth_tx() as conn:
         if user:
             token, token_hash = new_opaque_token()
             conn.execute(
@@ -599,6 +641,15 @@ def forgot_password(body: ForgotPasswordIn, request: Request, svc: Services = De
 
 @router.post("/password/reset")
 def reset_password(body: ResetPasswordIn, request: Request, svc: Services = Depends(services)):
+    # il link può essere partito prima che il portale disattivasse la persona: si richiede il profilo adesso (ADR-58)
+    with svc.db.auth_tx() as conn:
+        chi = conn.execute("""SELECT user_id FROM cde.user_tokens WHERE token_hash = %s AND purpose = 'PASSWORD_RESET'
+                              AND used_at IS NULL AND expires_at > now()""", [hash_token(body.token)]).fetchone()
+    if chi is not None:
+        from . import portale
+        rifiuto = portale.controlla_ingresso(svc, request, chi["user_id"], via="reset", allinea=False)
+        if rifiuto is not None:
+            raise rifiuto
     with svc.db.auth_tx() as conn:
         row = _consume_user_token(conn, body.token, "PASSWORD_RESET")
         validate_password(body.password, row["email"], svc.settings.password_min_length)

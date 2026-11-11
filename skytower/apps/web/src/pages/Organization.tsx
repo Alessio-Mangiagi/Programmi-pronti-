@@ -1,6 +1,9 @@
 // "><(((º> sabusabu <º)))><"
 // La mia organizzazione (org admin): dati, policy MFA, utenti — inviti, reinvio, disattivazione, ruolo di admin.
 // Il platform admin sceglie l'organizzazione da gestire e ne crea di nuove. Single sign-on OpenID Connect (SsoPanel).
+// Amministratori (ADR-58, 11/11/2026): darli, toglierli, disattivarli o riattivarli può solo il proprietario della
+// suite Cosedil (GET /me/proprietario, verificato col portale; l'API ripete il controllo). Per chi entra dal portale
+// ("dal portale") l'admin lo decide il portale: qui l'interruttore è spento e lo dice.
 import { FormEvent, useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,7 +19,13 @@ interface OrgUser {
   id: string; email: string; first_name: string; last_name: string; status: "INVITED" | "ACTIVE" | "LOCKED" | "DISABLED";
   is_org_admin: boolean; last_login_at: string | null; job_title: string | null;
   mfa_methods?: string[]; recovery_codes_left?: number;
+  dal_portale?: boolean;
 }
+
+/** Esito di GET /me/proprietario: solo il proprietario della suite gestisce gli amministratori (ADR-58). */
+interface Proprietario { proprietario: boolean; collegato: boolean; raggiungibile: boolean }
+
+const SOLO_PROPRIETARIO = "Solo il proprietario della suite gestisce gli amministratori";
 
 const MFA_LABEL: Record<string, string> = { TOTP: "App", WEBAUTHN: "Chiave" };
 
@@ -70,6 +79,11 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
   const { data: users = [] } = useQuery({
     queryKey: ["organization", orgId, "users"], queryFn: () => api<OrgUser[]>(`/organizations/${orgId}/users`),
   });
+  // proprietario della suite? (verificato col portale a ogni apertura della pagina; l'API ripete il controllo)
+  const { data: prop } = useQuery({
+    queryKey: ["me", "proprietario"], queryFn: () => api<Proprietario>("/me/proprietario"), staleTime: 30_000,
+  });
+  const proprietario = !!prop?.proprietario;
   const [inviting, setInviting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["organization", orgId] });
@@ -149,10 +163,15 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
                           {org.mfa_required && u.status === "ACTIVE" ? "da configurare" : "no"}
                         </Typography>}
                   </TableCell>
-                  <TableCell>
-                    <Switch size="small" checked={u.is_org_admin} disabled={self || patchUser.isPending || lastAdmin}
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+                    {/* ADR-58: l'admin lo dà e lo toglie solo il proprietario della suite; per chi entra dal portale lo
+                        decide il portale (l'interruttore resta spento e lo dice) */}
+                    <Switch size="small" checked={u.is_org_admin}
+                            disabled={self || patchUser.isPending || lastAdmin || !proprietario || !!u.dal_portale}
+                            title={u.dal_portale ? "Lo decide il Portale della suite" : !proprietario ? SOLO_PROPRIETARIO : undefined}
                             inputProps={{ "aria-label": `Amministratore: ${u.first_name} ${u.last_name}` }}
                             onChange={(e) => patchUser.mutate({ id: u.id, is_org_admin: e.target.checked })} />
+                    {u.dal_portale && <Chip size="small" variant="outlined" label="dal portale" sx={{ ml: 0.5 }} />}
                   </TableCell>
                   <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                     {!self && !!u.mfa_methods?.length && (
@@ -161,10 +180,13 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
                     {u.status === "INVITED" && (
                       <Button size="small" disabled={resend.isPending} onClick={() => resend.mutate(u)}>Reinvia invito</Button>
                     )}
+                    {/* disattivare o riattivare un amministratore vale come toglierlo o darlo: solo il proprietario */}
                     {!self && u.status !== "INVITED" && (
                       u.status === "DISABLED"
-                        ? <Button size="small" onClick={() => patchUser.mutate({ id: u.id, status: "ACTIVE" })}>Riattiva</Button>
-                        : <Button size="small" color="error" onClick={() => patchUser.mutate({ id: u.id, status: "DISABLED" })}
+                        ? <Button size="small" disabled={u.is_org_admin && !proprietario}
+                                  onClick={() => patchUser.mutate({ id: u.id, status: "ACTIVE" })}>Riattiva</Button>
+                        : <Button size="small" color="error" disabled={u.is_org_admin && !proprietario}
+                                  onClick={() => patchUser.mutate({ id: u.id, status: "DISABLED" })}
                                   aria-label={`Disattiva ${u.first_name} ${u.last_name}`}>Disattiva</Button>
                     )}
                   </TableCell>
@@ -175,6 +197,12 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
         </Table>
         <Typography variant="caption" color="text.secondary" display="block" mt={1}>
           Un utente disattivato non accede più e i suoi link già emessi smettono di funzionare; i documenti e lo storico restano.
+        </Typography>
+        <Typography variant="caption" color="text.secondary" display="block">
+          Gli amministratori li nomina, li toglie e li disattiva solo il proprietario della suite Cosedil
+          {proprietario ? " (sei tu)" : ""}. Per chi entra dal Portale («dal portale») l'amministratore, il nome e l'email
+          li decide il Portale e si aggiornano a ogni accesso.
+          {prop?.collegato && !prop.raggiungibile && " Il Portale ora non risponde: riprova più tardi."}
         </Typography>
       </Paper>
       <SecurityLog orgId={orgId} />
@@ -194,13 +222,15 @@ function OrgDetails({ orgId, meId }: { orgId: string; meId: string }) {
           </DialogActions>
         </Dialog>
       )}
-      {inviting && <InviteDialog org={org} onClose={() => setInviting(false)}
+      {inviting && <InviteDialog org={org} proprietario={proprietario} onClose={() => setInviting(false)}
                                  onInvited={(email) => { setInviting(false); setNotice(`Invito inviato se l'indirizzo è valido (${email})`); refresh(); }} />}
     </>
   );
 }
 
-function InviteDialog({ org, onClose, onInvited }: { org: Org; onClose: () => void; onInvited: (email: string) => void }) {
+function InviteDialog({ org, proprietario, onClose, onInvited }: {
+  org: Org; proprietario: boolean; onClose: () => void; onInvited: (email: string) => void;
+}) {
   const [form, setForm] = useState({ email: "", first_name: "", last_name: "", is_org_admin: false });
   const invite = useMutation({
     mutationFn: () => api(`/organizations/${org.id}/users`, { method: "POST", json: form }),
@@ -217,8 +247,10 @@ function InviteDialog({ org, onClose, onInvited }: { org: Org; onClose: () => vo
                      onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <TextField label="Nome" required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
           <TextField label="Cognome" required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-          <FormControlLabel label="Amministratore dell'organizzazione" control={
+          {/* ADR-58: un amministratore lo crea solo il proprietario della suite */}
+          <FormControlLabel label="Amministratore dell'organizzazione" disabled={!proprietario} control={
             <Switch checked={form.is_org_admin} onChange={(e) => setForm({ ...form, is_org_admin: e.target.checked })} />} />
+          {!proprietario && <Typography variant="caption" color="text.secondary">{SOLO_PROPRIETARIO}.</Typography>}
           <Typography variant="caption" color="text.secondary">
             Riceverà un'email con il link per scegliere la password; il link scade dopo 72 ore.
           </Typography>
@@ -370,8 +402,13 @@ const SEC_LABEL: Record<string, string> = {
   USER_INVITED: "Utente invitato", USER_UPDATED: "Utente modificato", ORGANIZATION_UPDATED: "Organizzazione modificata",
   ORGANIZATION_CREATED: "Organizzazione creata", SSO_CONFIGURED: "Single sign-on configurato", SSO_REMOVED: "Single sign-on rimosso",
   SSO_FAIL: "Single sign-on fallito",
+  // suite Cosedil: ingresso dal portale e profilo del portale (ADR-57, ADR-58)
+  LOGIN_PORTALE: "Accesso dal Portale", LOGIN_PORTALE_RIFIUTATO: "Accesso negato dal Portale",
+  USER_CREATED_PORTALE: "Utente creato dal Portale", PROFILO_DAL_PORTALE: "Nome o email aggiornati dal Portale",
+  ORG_ADMIN_DAL_PORTALE: "Amministratore dato dal Portale", ORG_ADMIN_TOLTO_DAL_PORTALE: "Amministratore tolto dal Portale",
+  PROFILO_PORTALE_NON_VERIFICATO: "Portale spento: accesso non verificato",
 };
-const ALERT = new Set(["LOGIN_LOCKED", "TOKEN_REUSE", "MFA_RESET_BY_ADMIN", "SSO_FAIL"]);
+const ALERT = new Set(["LOGIN_LOCKED", "TOKEN_REUSE", "MFA_RESET_BY_ADMIN", "SSO_FAIL", "LOGIN_PORTALE_RIFIUTATO"]);
 
 function SecurityLog({ orgId }: { orgId: string }) {
   const [type, setType] = useState("");

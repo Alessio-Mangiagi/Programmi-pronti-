@@ -39,6 +39,25 @@ def progetto_collegato(client, api_world, as_user):
     return w
 
 
+def _ripristina_demo(api_world):
+    """ADR-58: un account demo trovato per email (com.admin, com.dl...) si collega al portale e ne segue il profilo,
+    admin compreso. Il DB di test è condiviso: a fine test si scollegano gli account demo, si tolgono i Project Admin
+    dati dalla regola e si rimette l'admin dell'organizzazione del seed."""
+    import psycopg
+
+    from cde_api.tooling import demo_seed
+    urls, w = api_world
+    demo = list(w.emails.values())
+    with psycopg.connect(urls.owner) as conn:
+        conn.execute("""DELETE FROM cde.project_memberships WHERE dal_portale_admin
+                        AND user_id IN (SELECT id FROM cde.users WHERE email = ANY(%s))""", [demo])
+        conn.execute("UPDATE cde.users SET portale_username = NULL WHERE email = ANY(%s)", [demo])
+        for chiave, (_, _, org_admin) in demo_seed.USERS.items():   # admin e nome del seed (il portale li allinea)
+            conn.execute("UPDATE cde.users SET is_org_admin = %s, first_name = %s, last_name = %s WHERE id = %s",
+                         [org_admin, chiave.split("_")[0].title(), chiave.split("_")[-1].title(), w.users[chiave]])
+        conn.commit()
+
+
 @pytest.fixture
 def portale_finto(monkeypatch, api_world):
     """Il portale risponde quello che il test decide; registra i cookie ricevuti. Alla fine toglie le membership
@@ -57,13 +76,15 @@ def portale_finto(monkeypatch, api_world):
             stato["creati"].append(f"{username}@cosedilspa.com")
     stato["loggato"] = loggato
     yield stato
+    _ripristina_demo(api_world)
     if stato["creati"]:
         import psycopg
         urls, _ = api_world
         with psycopg.connect(urls.owner) as conn:
             conn.execute("""DELETE FROM cde.project_memberships WHERE user_id IN (SELECT id FROM cde.users WHERE email = ANY(%s))""",
                          [stato["creati"]])
-            conn.execute("UPDATE cde.users SET status = 'DISABLED' WHERE email = ANY(%s)", [stato["creati"]])
+            # ADR-58: anche il collegamento allo username del portale, che altrimenti aggancerebbe l'account spento
+            conn.execute("UPDATE cde.users SET status = 'DISABLED', portale_username = NULL WHERE email = ANY(%s)", [stato["creati"]])
             conn.commit()
 
 
@@ -303,13 +324,15 @@ def password_portale(monkeypatch, api_world):
         return {"ok": False, "reachable": True, "status": 401, "errore": "Credenziali non valide", "motivo": ""}
     monkeypatch.setattr(portale, "verifica_password_portale", verifica)
     yield stato
+    _ripristina_demo(api_world)
     if stato["creati"]:
         import psycopg
         urls, _ = api_world
         with psycopg.connect(urls.owner) as conn:
             conn.execute("DELETE FROM cde.project_memberships WHERE user_id IN (SELECT id FROM cde.users WHERE email = ANY(%s))",
                          [stato["creati"]])
-            conn.execute("UPDATE cde.users SET status = 'DISABLED' WHERE email = ANY(%s)", [stato["creati"]])
+            # ADR-58: anche il collegamento allo username del portale, che altrimenti aggancerebbe l'account spento
+            conn.execute("UPDATE cde.users SET status = 'DISABLED', portale_username = NULL WHERE email = ANY(%s)", [stato["creati"]])
             conn.commit()
 
 

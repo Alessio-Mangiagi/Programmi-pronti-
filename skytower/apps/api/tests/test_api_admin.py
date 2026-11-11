@@ -259,8 +259,12 @@ def test_disabilitare_utente_blocca_subito_l_accesso(client, api_world, as_user)
                      headers=as_user("sub1_admin"), json={"status": "ACTIVE"})
 
 
-def test_ultimo_admin_non_si_toglie(client, api_world, as_user):
+def test_ultimo_admin_non_si_toglie(client, api_world, as_user, monkeypatch):
     _, w = api_world
+    # dare e togliere l'admin può solo il proprietario della suite (ADR-58): qui chi agisce lo è, si prova l'altra regola
+    from cde_api.modules import portale
+    monkeypatch.setattr(portale, "stato_proprietario",
+                        lambda *a, **k: {"proprietario": True, "collegato": True, "raggiungibile": True})
     url = f"/organizations/{w.orgs['SUB1']}/users/{w.users['sub1_admin']}"
     for change in ({"is_org_admin": False}, {"status": "DISABLED"}):
         r = client.patch(url, headers=as_user("platform"), json=change)

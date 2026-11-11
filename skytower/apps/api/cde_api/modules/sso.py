@@ -236,6 +236,14 @@ def _complete(svc: Services, request: Request, response: RedirectResponse, cfg: 
             security_event(conn, "SSO_FAIL", organization_id=cfg["organization_id"], ip=ip, email=email,
                            reason="unknown_or_disabled_user", subject=claims.get("sub"))
             return _back(svc, sso="error", reason="unknown_user")
+        # il profilo del portale della suite vale anche qui (ADR-58): persona disattivata o senza SkyTower fra i suoi
+        # programmi → niente sessione. Solo controllo (allinea=False): questa transazione tiene bloccata la riga
+        # dell'utente, l'allineamento di admin e nome avverrà al prossimo ingresso dal portale o con la password
+        from . import portale  # import qui: portale importa auth
+        if portale.controlla_ingresso(svc, request, user["id"], via="sso", allinea=False) is not None:
+            security_event(conn, "SSO_FAIL", user_id=user["id"], organization_id=cfg["organization_id"], ip=ip,
+                           email=email, reason="portale", subject=claims.get("sub"))
+            return _back(svc, sso="error", reason="portale")
         if user["status"] == "INVITED":           # primo accesso: l'invito vale come attivazione
             conn.execute("UPDATE cde.users SET status = 'ACTIVE' WHERE id = %s", [user["id"]])
             conn.execute("UPDATE cde.user_tokens SET used_at = now() WHERE user_id = %s AND purpose = 'INVITATION' "

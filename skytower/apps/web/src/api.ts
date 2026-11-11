@@ -34,16 +34,40 @@ async function parse(res: Response) {
   return body;
 }
 
-/** Rinnova l'access token tramite il cookie di refresh (una sola richiesta concorrente). */
+/**
+ * Login automatico dal portale della suite Cosedil: se il browser ha il cookie `sid` del portale (stesso host o
+ * stesso dominio), l'API lo verifica col portale, crea l'utente se manca e apre la sessione. false = niente portale
+ * (o serve il secondo fattore): si passa al login di sempre.
+ */
+export async function sessioneDalPortale(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/portale", { method: "POST", credentials: "same-origin" });
+    if (!res.ok) return false;
+    const body = await res.json();
+    if (!body?.access_token) return false;
+    setAccessToken(body.access_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rinnova l'access token tramite il cookie di refresh (una sola richiesta concorrente). Se il rinnovo non va —
+ * anche perché la catena dei rinnovi è arrivata alla scadenza fissata dal login (ADR-58: il login, con il profilo
+ * del portale, torna almeno ogni 14 giorni) — prova la sessione del portale: per chi viene dal portale non cambia
+ * nulla, gli altri tornano al login.
+ */
 export function refreshSession(): Promise<boolean> {
   refreshing ??= fetch("/api/auth/refresh", { method: "POST", credentials: "same-origin" })
     .then(async (res) => {
-      if (!res.ok) {
-        setAccessToken(null);
-        return false;
+      if (res.ok) {
+        setAccessToken((await res.json()).access_token);
+        return true;
       }
-      setAccessToken((await res.json()).access_token);
-      return true;
+      if (await sessioneDalPortale()) return true;
+      setAccessToken(null);
+      return false;
     })
     .catch(() => false)
     .finally(() => {
@@ -125,6 +149,8 @@ export interface Me {
   organization_code: string;
   is_org_admin: boolean;
   is_platform_admin: boolean;
+  /** account collegato al portale della suite: admin, nome ed email li decide il portale (ADR-58) */
+  dal_portale?: boolean;
   mfa: boolean;
   mfa_required: boolean;
   phone: string | null;

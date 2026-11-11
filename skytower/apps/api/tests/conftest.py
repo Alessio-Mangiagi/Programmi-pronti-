@@ -149,3 +149,17 @@ def password_portale_spenta(monkeypatch):
 
     monkeypatch.setattr(portale, "verifica_password_portale",
                         lambda *a, **k: {"ok": False, "reachable": False, "status": 0, "errore": "", "motivo": ""})
+
+
+@pytest.fixture(autouse=True)
+def profilo_portale_spento(monkeypatch):
+    """ADR-58: ogni login con le credenziali di SkyTower chiede al portale il profilo della persona
+    (portale.profilo_portale) e la pagina Organizzazione chiede se chi agisce è il proprietario della suite. Nei test
+    il portale vero non va mai chiamato: di default "non raggiungibile" (il login entra, come col portale spento);
+    i test del profilo mettono il loro finto (test_api_profilo_portale.py)."""
+    from cde_api.modules import portale
+
+    monkeypatch.setattr(portale, "profilo_portale",
+                        lambda *a, **k: {"reachable": False, "trovato": False, "username": None, "nome": None,
+                                         "email": None, "ruolo": None, "admin": False, "proprietario": False,
+                                         "disattivato": False, "abilitato": False, "status": 0})

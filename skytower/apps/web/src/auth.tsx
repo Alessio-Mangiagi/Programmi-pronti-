@@ -12,24 +12,6 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/**
- * Login automatico dal portale della suite Cosedil: se il browser ha il cookie `sid` del portale
- * (stesso host o stesso dominio), l'API lo verifica col portale, crea l'utente se manca e apre la
- * sessione. Una sola chiamata all'apertura; 401 = niente portale, si passa al login di sempre.
- */
-async function loginDalPortale(): Promise<boolean> {
-  try {
-    const res = await fetch("/api/auth/portale", { method: "POST", credentials: "same-origin" });
-    if (!res.ok) return false;
-    const body = await res.json();
-    if (!body?.access_token) return false;
-    setAccessToken(body.access_token);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
@@ -37,9 +19,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const off = onAuthChange(setAuthenticated);
-    refreshSession()                                   // ripristina la sessione dal cookie di refresh
-      .then((ok) => (ok ? true : loginDalPortale()))   // altrimenti prova con la sessione del portale
-      .finally(() => setReady(true));
+    // ripristina la sessione dal cookie di refresh; altrimenti, dentro refreshSession, prova la sessione del portale
+    // (login automatico dalla suite Cosedil, api.sessioneDalPortale)
+    refreshSession().finally(() => setReady(true));
     return () => {
       off();
     };

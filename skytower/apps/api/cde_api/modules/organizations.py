@@ -1,5 +1,9 @@
 # "><(((º> sabusabu <º)))><"
-"""Organizzazioni (tenant) e loro utenti. Autorizzazione: RLS + controlli espliciti per 404/403."""
+"""Organizzazioni (tenant) e loro utenti. Autorizzazione: RLS + controlli espliciti per 404/403.
+
+Amministratori dell'organizzazione (ADR-58, 11/11/2026): nominarli, toglierli, disattivarli o riattivarli può solo il
+proprietario della suite Cosedil (portale.richiedi_proprietario, verificato dal vivo col portale); per gli account
+collegati al portale l'admin lo decide il portale stesso (409 ``deciso_dal_portale``)."""
 from __future__ import annotations
 
 import uuid
@@ -15,6 +19,7 @@ from ..errors import ApiError, forbidden, not_found
 from ..events import security_event
 from ..security import alerts
 from ..security.tokens import new_opaque_token
+from . import portale
 from .me import USER_COLUMNS
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
@@ -163,6 +168,9 @@ def invite_user(org_id: uuid.UUID, body: UserIn, c: Ctx = Depends(ctx)):
     l'admin vede comunque nell'elenco utenti. Tetto per admin: ``CDE_INVITE_RATE_LIMIT``."""
     if not c.svc.limiter.hit(c.svc.settings.invite_rate_limit, "invite", str(c.user_id)):
         raise ApiError(429, "rate_limited", "Troppi inviti: riprovare più tardi", {"Retry-After": "600"})
+    if body.is_org_admin:
+        # un amministratore lo crea solo il proprietario della suite (ADR-58, decisione dell'11/11/2026)
+        portale.richiedi_proprietario(c.svc, c.user_id)
     user_id = uuid.uuid4()
     email = body.email.lower()
     with c.tx() as conn:
@@ -236,10 +244,20 @@ def update_user(org_id: uuid.UUID, user_id: uuid.UUID, body: UserPatch, c: Ctx =
     if user_id == c.user_id and (changes.get("status") == "DISABLED" or changes.get("is_org_admin") is False):
         raise forbidden("Non puoi disabilitare o declassare te stesso")
     with c.tx() as conn:
-        target = conn.execute("SELECT is_org_admin, status FROM cde.users WHERE id = %s AND organization_id = %s",
-                              [user_id, org_id]).fetchone()
+        target = conn.execute("""SELECT is_org_admin, status, (portale_username IS NOT NULL) AS dal_portale FROM cde.users
+                                 WHERE id = %s AND organization_id = %s""", [user_id, org_id]).fetchone()
         if target is None:
             raise not_found("Utente")
+        # Amministratori (ADR-58, decisione dell'11/11/2026 "gli admin li creo e li cancello solo io"): dare o togliere
+        # l'admin, o disattivare un admin, può solo il proprietario della suite, in qualunque organizzazione. Per chi
+        # entra dal portale l'admin non si cambia qui: lo decide il portale e verrebbe riscritto al prossimo ingresso.
+        cambia_admin = "is_org_admin" in changes and changes["is_org_admin"] != target["is_org_admin"]
+        if cambia_admin and target["dal_portale"]:
+            raise ApiError(409, "deciso_dal_portale",
+                           "Per chi entra dal portale l'amministratore lo decide il Portale: cambialo lì")
+        stato_di_un_admin = target["is_org_admin"] and "status" in changes and changes["status"] != target["status"]
+        if cambia_admin or stato_di_un_admin:          # disattivare o riattivare un admin vale come toglierlo o darlo
+            portale.richiedi_proprietario(c.svc, c.user_id)
         demoting = changes.get("is_org_admin") is False or changes.get("status") == "DISABLED"
         if demoting and target["is_org_admin"] and target["status"] == "ACTIVE" and not conn.execute(
                 """SELECT EXISTS (SELECT 1 FROM cde.users WHERE organization_id = %s AND id <> %s

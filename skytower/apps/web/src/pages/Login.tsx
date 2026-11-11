@@ -25,6 +25,8 @@ const SSO_ERRORS: Record<string, string> = {
   idp_error: "Il provider aziendale ha restituito un errore: riprova più tardi.",
   idp_unreachable: "Il provider aziendale non risponde: riprova più tardi.",
   disabled: "Il single sign-on della tua organizzazione è stato disattivato: accedi con la password.",
+  // ADR-58: il profilo del portale della suite vale anche per chi entra dal provider aziendale
+  portale: "Il Portale della suite non ti fa entrare in SkyTower (account disattivato o programma non abilitato): rivolgiti a un amministratore.",
 };
 
 type Step =

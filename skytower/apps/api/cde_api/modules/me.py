@@ -10,8 +10,10 @@ from ..errors import unauthorized
 
 router = APIRouter(tags=["me"])
 
+# dal_portale (ADR-58): l'account segue il profilo del portale della suite, admin compreso (lo username non esce)
 USER_COLUMNS = ("u.id, u.organization_id, u.email, u.first_name, u.last_name, u.status, u.is_org_admin, "
-                "u.is_platform_admin, u.last_login_at, u.created_at, u.phone, u.job_title, u.locale")
+                "u.is_platform_admin, u.last_login_at, u.created_at, u.phone, u.job_title, u.locale, "
+                "(u.portale_username IS NOT NULL) AS dal_portale")
 
 
 class ProfileIn(BaseModel):
@@ -24,6 +26,15 @@ class ProfileIn(BaseModel):
 @router.get("/me")
 def me(c: Ctx = Depends(ctx)):
     return _me(c)
+
+
+@router.get("/me/proprietario")
+def me_proprietario(c: Ctx = Depends(ctx)):
+    """Sono il proprietario della suite? (ADR-58: solo lui dà e toglie l'admin, in ogni organizzazione). Lo chiede
+    la pagina Organizzazione per abilitare l'interruttore "Admin"; la decisione vera la ripete l'API a ogni modifica.
+    Ritorna {"proprietario", "collegato", "raggiungibile"} (verificato dal vivo col portale)."""
+    from . import portale  # import qui: portale importa auth e il resto dei moduli
+    return portale.stato_proprietario(c.svc, c.user_id)
 
 
 @router.patch("/me")
