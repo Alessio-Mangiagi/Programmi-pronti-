@@ -101,14 +101,23 @@ variabili: `shared/suite/README.md`.
 Chi è già entrato nel Portale Suite Cosedil entra in InCampo **senza altra
 password**: il web, se non ha un token, chiama una volta `POST /api/auth/portale`,
 che legge il cookie `sid` del portale (stesso host, o stesso `SUITE_DOMINIO`) e lo
-verifica con `/api/verify?app=incampo`. L'utente InCampo è quello con la stessa
-email del portale (o lo username prima della `@`); se manca viene **creato** attivo,
-senza password usabile: admin del portale → `admin`, altrimenti
-`INCAMPO_RUOLO_PORTALE` (default `manager`). Se c'è già e nel portale è
-**amministratore** (ruolo admin), diventa `admin` anche qui: a ogni ingresso dal
-portale, con la password del portale e all'apertura del web (`GET /auth/me` con il
-cookie `sid` della stessa persona). Regola della suite del 09/11/2026; solo
-promozione, l'admin per l'app da regola IP del portale non basta. Senza email dal portale vale
+verifica con `/api/verify?app=incampo`. L'utente InCampo è quello **collegato** allo
+username del portale (`users.portale_username`, migrazione `2c3d4e5f6071`); la prima volta
+quello con la stessa email del portale (o lo username prima della `@`, mai un admin), che da
+lì resta collegato. Se manca viene **creato** attivo, collegato, senza password usabile:
+ruolo admin nel portale → `admin`, altrimenti `INCAMPO_RUOLO_PORTALE` (default `manager`).
+
+**Il profilo del portale vale in InCampo** (regola della suite dell'11/11/2026, scelte
+dell'utente "gli admin li creo e li cancello solo io", 2b 3b 4a; `suite.allinea_profilo_dal_portale`):
+a ogni ingresso dal portale (cookie, password del portale, password di InCampo, apertura
+del web con `GET /auth/me` e il cookie `sid` della stessa persona) nome ed email seguono il
+portale (un cambio email aggiorna lo stesso account, non ne crea un doppione) e
+l'amministratore è **dato e tolto** come il ruolo admin nel portale: chi lo perde riprende il
+ruolo di prima (`users.ruolo_prima_admin`) o `INCAMPO_RUOLO_PORTALE`. L'admin per l'app da
+regola IP del portale non basta mai, neanche alla creazione. Ruoli `manager`/`field`: decisi
+in InCampo (4a). Account senza utente del portale (installazione, demo, invitati): non
+toccati. Gestire gli amministratori dentro InCampo: solo il proprietario della suite (vedi
+`docs/guida-admin.md`). Senza email dal portale vale
 `<username>@<SUITE_EMAIL_DOMINIO>` (default `cosedilspa.com`). Con il portale
 spento, non loggati o `COSEDIL_SSO=off` risponde 401 e si vede il login di sempre.
 Variabili: `COSEDIL_PORTAL` (default `http://localhost:8080`), `COSEDIL_SSO`,
@@ -125,6 +134,15 @@ La password di InCampo resta valida. Il blocco di InCampo sui tentativi vale per
 due; il portale aggiunge il suo. Risposte: 403 se la password è giusta ma il portale nega
 (account disattivato, password temporanea, InCampo non abilitato), 429 se il portale ha
 bloccato i tentativi. Portale spento: vale solo la password di InCampo.
+
+Anche il login con la **password di InCampo** passa dal portale (scelte 2b e 3b dell'11/11/2026,
+`suite.controlla_login_locale`): `POST <portale>/api/suite/profilo` col token della suite
+(`{login: <username collegato o email>, app: "incampo"}`). Utente del portale disattivato o
+InCampo non abilitato → 403 col motivo (e `auth.login_failed` reason `portale` nel registro);
+account collegato il cui utente del portale non esiste più → 403; trovato → profilo applicato;
+nessun utente del portale → come prima; portale irraggiungibile → si entra, e l'accesso nel
+registro ha `portale: non verificato`. Il controllo è **solo al login** (2b): il JWT da
+`ACCESS_TOKEN_HOURS` (12 h) non richiama il portale a ogni richiesta.
 
 ### Registro unico delle commesse
 

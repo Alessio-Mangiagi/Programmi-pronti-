@@ -15,12 +15,16 @@ alla pagina di login del Portale: prima il Portale, poi InCampo.
 
 Quando arrivi dal Portale succede una di queste due cose:
 
-1. **Entri subito, senza altra password.** InCampo chiede al Portale chi sei e cerca
-   l'account InCampo con **la stessa email** del tuo utente del Portale. L'email deve
-   essere identica: se in InCampo sei registrato con un'altra email, non ti riconosce.
+1. **Entri subito, senza altra password.** InCampo chiede al Portale chi sei e ritrova
+   il tuo account InCampo: la prima volta per **la stessa email** del tuo utente del Portale,
+   poi per il tuo **nome utente del Portale**, a cui l'account resta collegato. Se l'email
+   cambia nel Portale, InCampo la aggiorna sullo stesso account (non ne crea un altro).
    - Se l'account InCampo non c'è ancora, viene creato in quel momento con il tuo nome:
-     chi è amministratore del Portale (o amministratore di InCampo nel Portale) entra come
-     **Amministratore**, tutti gli altri come **Ufficio**. L'amministratore di InCampo può poi cambiare il ruolo.
+     chi è **amministratore del Portale** entra come **Amministratore**, tutti gli altri come
+     **Ufficio**. L'amministratore di InCampo può poi scegliere fra *Ufficio* e *Cantiere*.
+   - **Il tuo profilo del Portale vale anche qui** (dall'11/11/2026): nome, email e ruolo di
+     amministratore si aggiornano a ogni ingresso. Se nel Portale smetti di essere
+     amministratore, al prossimo ingresso in InCampo torni al ruolo che avevi prima.
    - Un account creato così **non ha una password InCampo che conosci**: sul telefono e
      nella pagina di login entri con la tua email e la **password del Portale**.
 2. **Vedi la pagina di login di InCampo.** Succede se il Portale non risponde, se
@@ -44,6 +48,13 @@ Se email o password sono sbagliate compare in rosso **Email o password errati**:
 Controlla le maiuscole e riprova. Se non ricordi la password di InCampo, prova quella
 del Portale oppure chiedi all'amministratore di InCampo di reimpostarla: non c'è un
 pulsante "password dimenticata".
+
+Anche con la password di InCampo, se hai un utente del Portale InCampo gli chiede se
+puoi entrare. Se il tuo account del Portale è stato **disattivato**, o InCampo **non è più
+fra i tuoi programmi**, il login si ferma con il motivo scritto in rosso (per esempio
+*Il tuo account del Portale è disattivato: rivolgiti a un amministratore*). Vale anche
+per l'app sul telefono. Se il Portale in quel momento non risponde, la password di
+InCampo ti fa entrare lo stesso.
 
 ## Cambiare la propria password
 

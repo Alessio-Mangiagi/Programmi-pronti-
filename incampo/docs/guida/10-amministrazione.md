@@ -13,8 +13,9 @@ operazioni**, **Parametri commessa**, **Etichette invito**.
 
 - **Cerca** per nome o email, filtra per **Ruolo**, spunta **Mostra disattivati** per
   vedere anche chi è stato disattivato. A destra *N attivi su M*.
-- Colonne: **Utente** (nome ed email; *tu* accanto al tuo nome), **Ruolo**, **Stato**,
-  **Ultimo accesso**, **Operazioni (30 gg)** e **Totale**.
+- Colonne: **Utente** (nome ed email; *tu* accanto al tuo nome, **Portale** accanto a chi è
+  collegato a un utente del Portale), **Ruolo** (sotto un amministratore del Portale:
+  *deciso dal Portale*), **Stato**, **Ultimo accesso**, **Operazioni (30 gg)** e **Totale**.
 - Pulsanti su ogni riga:
   - **Attività**: apre il *Registro operazioni* filtrato su quella persona;
   - **Modifica**: nome e ruolo (*Utente aggiornato*);
@@ -25,10 +26,30 @@ operazioni**, **Parametri commessa**, **Etichette invito**.
   - **Disattiva** / **Riattiva**: chiede conferma (*Disattivare ...? Non potrà più accedere;
     i suoi dati restano.*). Non puoi disattivare te stesso né toglierti il ruolo di Amministratore.
 
+### Chi gestisce gli amministratori
+
+Dall'11/11/2026 gli **amministratori li crea e li toglie solo il proprietario della suite**
+(l'utente del Portale indicato come proprietario). InCampo glielo chiede ogni volta al
+Portale. Per tutti gli altri amministratori:
+
+- sopra l'elenco c'è la nota *Gli amministratori li crea e li toglie solo il proprietario della
+  suite, dal Portale*;
+- nella finestra **Modifica** o **Nuovo utente** la voce **Amministratore** è spenta, e chi è già
+  amministratore non si può portare a *Ufficio* o *Cantiere*;
+- **Password** e **Disattiva** sono spenti sulle righe degli altri amministratori (chi cambia la
+  password di un amministratore ne prende il posto);
+- le etichette d'invito col ruolo *Amministratore* le salva e le usa solo il proprietario.
+
+Per chi ha il riquadro **Portale** l'amministratore non si cambia neanche qui: lo decide il
+ruolo nel Portale, a ogni ingresso in InCampo. *Ufficio* e *Cantiere* invece si scelgono
+sempre in InCampo. Se InCampo è installato senza Portale vale la regola di prima: ogni
+amministratore gestisce gli altri.
+
 ### Nuovo utente
 
 **+ Nuovo utente** apre la finestra con **Nome e cognome**, **Email (login)**,
-**Ruolo** (*Cantiere*, *Ufficio*, *Amministratore*) e **Password iniziale (min. 12 caratteri)**.
+**Ruolo** (*Cantiere*, *Ufficio*, *Amministratore*: quest'ultimo solo per il proprietario della
+suite, vedi sopra) e **Password iniziale (min. 12 caratteri)**.
 **Crea utente** → *Utente ... creato*.
 
 ![Finestra Nuovo utente](img/10-nuovo-utente.png)

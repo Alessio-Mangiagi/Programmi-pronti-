@@ -32,8 +32,15 @@ tecnico: rotte API, installazione Docker, storage S3, backup, aggiornamenti e di
   con mittente, cantiere e pagina da cui scrivono. Ogni admin attivo riceve anche una
   notifica email/push. **Chiudi** quando è gestita (resta tra le chiuse), **Riapri** se serve.
   Massimo 10 segnalazioni l'ora per utente.
-- API equivalenti: `POST/GET/PATCH /users`, `GET /users/activity`, `GET /audit`, `GET /audit/actions`,
-  `POST/GET /support/messages`, `PATCH /support/messages/{id}`.
+- API equivalenti: `POST/GET/PATCH /users`, `GET /users/activity`, `GET /users/gestione-admin`, `GET /audit`,
+  `GET /audit/actions`, `POST/GET /support/messages`, `PATCH /support/messages/{id}`.
+- **Amministratori (dall'11/11/2026)**: dare o togliere il ruolo admin, creare un utente admin, disattivare o
+  reimpostare la password di un altro admin, salvare o usare un'etichetta d'invito col ruolo admin → solo il
+  **proprietario della suite**, chiesto al portale dal vivo (`POST <portale>/api/suite/profilo`, campo
+  `proprietario`); altrimenti 403 *Solo il proprietario della suite gestisce gli amministratori* (anche col
+  portale irraggiungibile). Per un account collegato al portale (`dal_portale`) l'admin non si cambia da qui
+  (409): lo decide il ruolo nel portale a ogni ingresso. Con `COSEDIL_SSO=off` vale la regola di prima.
+  `GET /users/gestione-admin` → `{puo_gestire_admin, motivo, portale}` per la pagina Utenti.
 
 Membri di progetto: pagina **Persone** del cantiere (`/projects/:id/persone`, admin o manager iscritto) oppure
 `POST /projects/{id}/members` con `user_id` (utente disattivato → 409; nel registro «Membro aggiunto/rimosso»).
