@@ -12,6 +12,7 @@ export const cosedilSSO = mod.cosedilSSO;
 export const cosedilSocketIO = mod.cosedilSocketIO;
 // "><(((º> sabusabu <º)))><"
 export const verificaSessione = mod.verificaSessione;
+export const profiloPortale = mod.profiloPortale;   // profilo del portale (CONTRATTI § 12)
 export const leggiSid = mod.leggiSid;
 export const PORTAL = mod.PORTAL;
 export const PORTAL_PUBBLICO = mod.PORTAL_PUBBLICO;

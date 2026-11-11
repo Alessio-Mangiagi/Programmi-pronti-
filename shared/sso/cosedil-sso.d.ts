@@ -17,6 +17,8 @@ export interface CosedilIdentity {
    * comprende (es. solo Magazzino dentro "DDT e Magazzino"); undefined = portale che non lo dice.
    */
   diretto?: boolean;
+  /** proprietario della suite (portale dall'11/11/2026): solo lui dà o toglie l'admin nelle app */
+  proprietario?: boolean;
 }
 
 export interface CosedilSSOOptions {
@@ -44,7 +46,31 @@ export interface VerifyResult {
   nome: string | null;
   ruolo: string | null;
   email: string | null;
+  diretto?: boolean;
+  proprietario?: boolean;
   exp: number;
+}
+
+/** Profilo del portale per un programma con account propri (POST /api/suite/profilo, CONTRATTI § 12). */
+export interface ProfiloPortale {
+  ok: boolean;
+  /** false = portale giù o SSO spento: l'app tiene l'account com'è (con una riga di log) */
+  reachable: boolean;
+  status: number;
+  errore: string;
+  /** false = nessun utente del portale con quel login: account solo dell'app, da non toccare */
+  trovato: boolean;
+  username?: string;
+  nome?: string | null;
+  email?: string | null;
+  ruolo?: string | null;
+  /** ruolo admin del portale e account attivo (mai la regola IP) */
+  admin?: boolean;
+  proprietario?: boolean;
+  disattivato?: boolean;
+  mustChange?: boolean;
+  /** account attivo e programma fra i suoi nel portale */
+  abilitato?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,6 +86,7 @@ export declare function cosedilSocketIO(
 ): (socket: { handshake: { headers: { cookie?: string } } }, next: Next) => Promise<void>;
 
 export declare function verificaSessione(cookie: string | undefined, app?: string): Promise<VerifyResult>;
+export declare function profiloPortale(login: string, app: string, opzioni?: { timeout?: number }): Promise<ProfiloPortale>;
 export declare function leggiSid(cookie?: string): string;
 export declare const PORTAL: string;
 export declare const PORTAL_PUBBLICO: string;

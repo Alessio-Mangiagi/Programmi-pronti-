@@ -23,7 +23,7 @@
 // Admin per-app: passando { app: 'ocr' } il gate chiede al portale se questa
 // sessione è admin PER QUELL'APP (ruolo utente o IP di provenienza, vedi
 // data/ip-admin.json nel portale). L'esito finisce in req.cosedil =
-// { username, nome, ruolo, admin }. Poi:
+// { username, nome, ruolo, email, admin, app, diretto, proprietario }. Poi:
 //   { adminPaths: ['/api/admin'] }  -> quelle rotte rispondono 403 ai non-admin
 //   { adminOnly: true }             -> l'INTERA app è riservata agli admin
 //
@@ -33,6 +33,13 @@
 //   COSEDIL_PORTAL_PUBBLICO=https://portale.<dominio>   dove mandare il browser
 //                                          al login (default = COSEDIL_PORTAL)
 //   COSEDIL_SSO_FAIL=open|closed           portale giù: passa / blocca (default closed)
+//
+// Profilo del portale (11/11/2026, shared/suite/CONTRATTI.md § 12): profiloPortale(login, app)
+// chiede al portale (POST /api/suite/profilo, col token della suite) ruolo, admin, proprietario
+// della suite, disattivato, programma abilitato, nome ed email di una persona. I programmi con
+// account propri (Analista Dati) lo chiedono a ogni login, anche con la loro password, e allineano
+// l'account. `proprietario` arriva anche in req.cosedil e socket.cosedil: dentro le app solo il
+// proprietario della suite dà o toglie l'admin.
 
 'use strict';
 
@@ -101,9 +108,11 @@ async function verificaSessione(cookie, app) {
       // abilitato proprio a questo id e non solo a un'app che contiene (portale dal 09/11/2026; un portale
       // più vecchio non lo manda: undefined = non si sa, chi lo usa tiene il comportamento di prima)
       diretto: typeof data.diretto === 'boolean' ? data.diretto : undefined,
+      // proprietario della suite (portale dall'11/11/2026): solo lui dà o toglie l'admin nelle app
+      proprietario: !!data.proprietario,
     };
   } catch {
-    out = { ok: false, reachable: false, admin: false, username: null, nome: null, ruolo: null, email: null };
+    out = { ok: false, reachable: false, admin: false, username: null, nome: null, ruolo: null, email: null, proprietario: false };
   }
   out.exp = now + (out.reachable ? CACHE_TTL : CACHE_TTL_IRRAGGIUNGIBILE);
   if (cache.size >= CACHE_MAX) {
@@ -172,7 +181,7 @@ function cosedilSSO(opts = {}) {
       const esito = await verificaPerApp(req.headers.cookie, apps);
       const v = { ...esito.v, admin: esito.admin };
       // Identità + admin per-app a disposizione dell'app (rotte, UI, log); app = id che ha dato l'accesso.
-      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin, app: esito.app, diretto: v.diretto };
+      if (v.ok) req.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin, app: esito.app, diretto: v.diretto, proprietario: !!v.proprietario };
 
       if (v.ok) {
         const rottaAdmin = adminOnly || adminPaths.some((pre) => url.startsWith(pre));
@@ -219,7 +228,7 @@ function cosedilSocketIO(opts = {}) {
       const v = await verificaSessione(socket.handshake.headers.cookie, app);
       if (v.ok) {
         if (adminOnly && !v.admin) return next(new Error(MSG_NON_ADMIN));
-        socket.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin };
+        socket.cosedil = { username: v.username, nome: v.nome, ruolo: v.ruolo, email: v.email, admin: v.admin, proprietario: !!v.proprietario };
         return next();
       }
       if (v.vietato) return next(new Error(MSG_NON_ABILITATO));
@@ -332,11 +341,47 @@ function cosedilAttivita(opts = {}) {
   };
 }
 
+// Profilo del portale di chi ha scritto `login` (username o email) per il programma `app`
+// (CONTRATTI § 12). Non lancia mai. Ritorna una Promise di:
+//   { ok: true, trovato: true, username, nome, email, ruolo, admin, proprietario, disattivato, mustChange, abilitato }
+//   { ok: true, trovato: false }                       nessun utente del portale (account solo dell'app)
+//   { ok: false, reachable: false }                    portale giù o SSO spento: l'app tiene l'account com'è
+//   { ok: false, reachable: true, status, errore }     token sbagliato (403), programma sconosciuto (400)
+// admin = ruolo admin del portale e account attivo, mai la regola IP; abilitato = attivo e con quel
+// programma fra i suoi. username ed email in minuscolo, come verifica_password del modulo Python.
+async function profiloPortale(login, app, opzioni = {}) {
+  const base = { ok: false, reachable: true, status: 0, errore: '', trovato: false };
+  if (!ENABLED) return { ...base, reachable: false, errore: 'Verifica col portale spenta (COSEDIL_SSO=off)' };
+  let r;
+  let dati = {};
+  try {
+    r = await fetch(PORTAL + '/api/suite/profilo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Suite-Token': leggiTokenSuite() },
+      body: JSON.stringify({ login: String(login || ''), app: String(app || '') }),
+      signal: AbortSignal.timeout(opzioni.timeout || 4000),
+    });
+    try { dati = await r.json(); } catch { dati = {}; }
+  } catch {
+    return { ...base, reachable: false, errore: 'Portale non raggiungibile' };
+  }
+  if (!r.ok || !dati.ok) return { ...base, status: r.status, errore: String(dati.error || 'Risposta del portale non valida') };
+  if (!dati.trovato || !dati.username) return { ...base, ok: true, status: r.status };
+  return {
+    ...base, ok: true, status: r.status, trovato: true,
+    username: String(dati.username).trim().toLowerCase(), nome: dati.nome || null,
+    email: String(dati.email || '').trim().toLowerCase() || null, ruolo: dati.ruolo || null,
+    admin: !!dati.admin, proprietario: !!dati.proprietario, disattivato: !!dati.disattivato,
+    mustChange: !!dati.mustChange, abilitato: !!dati.abilitato,
+  };
+}
+
 module.exports = cosedilSSO;
 module.exports.default = cosedilSSO;          // interop con gli import ESM/TS
 module.exports.cosedilSSO = cosedilSSO;
 module.exports.cosedilSocketIO = cosedilSocketIO;
 module.exports.verificaSessione = verificaSessione;
+module.exports.profiloPortale = profiloPortale;
 module.exports.leggiSid = leggiSid;
 module.exports.PORTAL = PORTAL;
 module.exports.PORTAL_PUBBLICO = PORTAL_PUBBLICO;

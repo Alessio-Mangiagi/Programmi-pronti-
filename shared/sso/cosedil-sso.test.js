@@ -16,6 +16,7 @@ const http = require('http');
 
 process.env.COSEDIL_SSO = 'on';
 process.env.COSEDIL_SSO_FAIL = 'closed';
+process.env.SUITE_TOKEN = 'token-di-prova';   // profiloPortale lo manda come X-Suite-Token
 
 let fintoPortale;          // server che impersona <portale>/api/verify
 let portalePort;
@@ -29,10 +30,27 @@ function avviaFintoPortale() {
     fintoPortale = http.createServer((req, res) => {
       const cookie = req.headers.cookie || '';
       const url = new URL(req.url, 'http://x');
+      // Finto /api/suite/profilo (11/11/2026, CONTRATTI § 12): token della suite obbligatorio.
+      if (url.pathname === '/api/suite/profilo' && req.method === 'POST') {
+        let corpo = '';
+        req.on('data', (c) => (corpo += c));
+        req.on('end', () => {
+          const c = JSON.parse(corpo || '{}');
+          const manda = (codice, dati) => { res.writeHead(codice, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(dati)); };
+          if (req.headers['x-suite-token'] !== 'token-di-prova') return manda(403, { ok: false, error: 'Token della suite mancante o errato' });
+          if (c.app === 'boh') return manda(400, { ok: false, error: 'Programma sconosciuto' });
+          if (c.login === 'Boss@CosedilSpa.com') {
+            return manda(200, { ok: true, trovato: true, username: 'Boss', nome: 'Boss', email: 'Boss@CosedilSpa.com', ruolo: 'admin',
+              admin: true, proprietario: true, disattivato: false, mustChange: false, abilitato: c.app === 'agente' });
+          }
+          return manda(200, { ok: true, trovato: false });
+        });
+        return undefined;
+      }
       if (!url.pathname.startsWith('/api/verify')) { res.writeHead(404); return res.end(); }
       if (cookie === COOKIE_ADMIN) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ ok: true, username: 'boss', nome: 'Boss', ruolo: 'admin', admin: true }));
+        return res.end(JSON.stringify({ ok: true, username: 'boss', nome: 'Boss', ruolo: 'admin', admin: true, proprietario: true }));
       }
       if (cookie === COOKIE_OK) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -220,12 +238,34 @@ test('più id app: entra chi è abilitato ad almeno uno, admin solo dal primo id
   }
 });
 
+test('profilo del portale: proprietario in verificaSessione, profiloPortale col token della suite', async () => {
+  delete require.cache[require.resolve('./cosedil-sso.js')];
+  const sso = require('./cosedil-sso.js');
+  assert.equal((await sso.verificaSessione(COOKIE_ADMIN, 'profilo-1')).proprietario, true);
+  assert.equal((await sso.verificaSessione(COOKIE_OK, 'profilo-1')).proprietario, false, 'portale che non lo dice: false');
+  const p = await sso.profiloPortale('Boss@CosedilSpa.com', 'agente');
+  assert.deepEqual(
+    { ok: p.ok, trovato: p.trovato, username: p.username, email: p.email, admin: p.admin, proprietario: p.proprietario, abilitato: p.abilitato },
+    { ok: true, trovato: true, username: 'boss', email: 'boss@cosedilspa.com', admin: true, proprietario: true, abilitato: true });
+  assert.equal((await sso.profiloPortale('Boss@CosedilSpa.com', 'skytower')).abilitato, false);
+  const nessuno = await sso.profiloPortale('sconosciuto', 'agente');
+  assert.ok(nessuno.ok && !nessuno.trovato && nessuno.reachable);
+  const ignoto = await sso.profiloPortale('boss', 'boh');
+  assert.ok(!ignoto.ok && ignoto.status === 400 && ignoto.reachable);
+});
+
 test('portale giù: gate chiuso risponde 503', async () => {
   await avviaApp({ app: 'giu-closed' });
   await chiudi(fintoPortale);                       // spegne il portale
   fintoPortale = null;
   const r = await richiesta('/api/dati', { cookie: 'sid=chiunque-giu-1' });
   assert.equal(r.status, 503);
+});
+
+test('portale giù: profiloPortale non lancia, reachable false', async () => {
+  const sso = require('./cosedil-sso.js');
+  const p = await sso.profiloPortale('Boss@CosedilSpa.com', 'agente', { timeout: 1000 });
+  assert.ok(!p.ok && !p.reachable);
 });
 
 test('portale giù: failOpen esplicito passa', async () => {

@@ -44,6 +44,12 @@ chiede al portale (POST /api/verifica-password, col token della suite) se è la 
 del portale di quella persona. La usano i programmi con un login proprio (SkyTower,
 InCampo, VFP Transfer) quando la loro password non coincide.
 
+Profilo del portale (11/11/2026, shared/suite/CONTRATTI.md § 12): profilo(login, app_id)
+chiede al portale (POST /api/suite/profilo, col token della suite) il profilo di una persona:
+ruolo, admin, proprietario della suite, disattivato, programma abilitato, nome ed email. I
+programmi con account propri lo chiedono a ogni login, anche con la loro password, e allineano
+l'account. L'esito di verifica_sessione porta anche "proprietario" e "diretto".
+
 Config via variabili d'ambiente:
     COSEDIL_SSO=off                        disabilita il gate
     COSEDIL_PORTAL=http://localhost:8080   URL del portale per la verifica (default)
@@ -143,8 +149,12 @@ def verifica_sessione(cookie_header, app_id=""):
     if hit and hit[0] > now:
         return hit[1]
 
+    # proprietario: proprietario della suite (solo lui dà e toglie l'admin nelle app, 11/11/2026).
+    # diretto: abilitato proprio a questo id e non solo a un programma che lo comprende ("DDT e
+    # Magazzino"); None = il portale non lo dice (portale di prima del 09/11/2026).
     esito = {"ok": False, "reachable": True, "admin": False,
-             "username": None, "nome": None, "ruolo": None, "email": None, "vietato": False}
+             "username": None, "nome": None, "ruolo": None, "email": None, "vietato": False,
+             "proprietario": False, "diretto": None}
     try:
         url = PORTAL + "/api/verify"
         if app_id:
@@ -161,6 +171,8 @@ def verifica_sessione(cookie_header, app_id=""):
             esito["nome"] = dati.get("nome")
             esito["ruolo"] = dati.get("ruolo")
             esito["email"] = dati.get("email")   # per le app con utenti propri (InCampo, SkyTower)
+            esito["proprietario"] = bool(dati.get("proprietario"))
+            esito["diretto"] = dati["diretto"] if isinstance(dati.get("diretto"), bool) else None
     except urllib.error.HTTPError as errore:
         # 403: sessione valida ma app riservata a cui l’utente non ha accesso.
         # Rimandarlo al login non servirebbe: il login lo ha già fatto.
@@ -206,7 +218,7 @@ def verifica_password(login, password, app_id, ip=None, timeout=4):
                  con la sua password e basta.
     """
     esito = {"ok": False, "reachable": True, "status": 0, "errore": "", "motivo": "",
-             "username": None, "nome": None, "email": None, "ruolo": None, "admin": False}
+             "username": None, "nome": None, "email": None, "ruolo": None, "admin": False, "proprietario": False}
     if not ENABLED:
         esito.update(reachable=False, errore="Verifica col portale spenta (COSEDIL_SSO=off)")
         return esito
@@ -234,7 +246,63 @@ def verifica_password(login, password, app_id, ip=None, timeout=4):
         return esito
     esito.update(ok=True, username=str(dati["username"]).strip().lower(), nome=dati.get("nome"),
                  email=str(dati.get("email") or "").strip().lower() or None, ruolo=dati.get("ruolo"),
-                 admin=bool(dati.get("admin")))
+                 admin=bool(dati.get("admin")), proprietario=bool(dati.get("proprietario")))
+    return esito
+
+
+def profilo(login, app_id, timeout=4):
+    """Profilo del portale di chi ha scritto ``login`` (username o email), per il programma ``app_id``.
+
+    Contratto shared/suite/CONTRATTI.md § 12 (11/11/2026, "il profilo del portale vale in ogni
+    programma"): i programmi con account propri (SkyTower, InCampo, VFP Transfer, Analista Dati) lo
+    chiedono a ogni login o ingresso, anche quando la persona entra con la password del programma, e:
+    rifiutano chi è ``disattivato`` o non ``abilitato``; danno e tolgono l'admin come ``admin`` (ruolo
+    admin del portale, mai la regola IP); aggiornano nome ed email. Prima di dare o togliere l'admin
+    dentro il programma guardano ``proprietario`` di chi agisce: solo il proprietario della suite lo fa.
+
+    Non solleva mai. Ritorna un dict:
+      ok=True, trovato=True  → username, nome, email, ruolo, admin, proprietario, disattivato,
+                               mustChange, abilitato;
+      ok=True, trovato=False → nessun utente del portale con quel login (o email di due utenti):
+                               account solo del programma, si lascia com'è;
+      ok=False → reachable=False se il portale non risponde o lo SSO è spento (il programma usa
+                 l'account com'è e scrive una riga di log: scelta 3b), altrimenti status/errore.
+    """
+    esito = {"ok": False, "reachable": True, "status": 0, "errore": "", "trovato": False,
+             "username": None, "nome": None, "email": None, "ruolo": None, "admin": False,
+             "proprietario": False, "disattivato": False, "mustChange": False, "abilitato": False}
+    if not ENABLED:
+        esito.update(reachable=False, errore="Verifica col portale spenta (COSEDIL_SSO=off)")
+        return esito
+    corpo = json.dumps({"login": login or "", "app": app_id}).encode("utf-8")
+    try:
+        req = urllib.request.Request(PORTAL + "/api/suite/profilo", data=corpo, method="POST",
+                                     headers={"Content-Type": "application/json", "Accept": "application/json",
+                                              "X-Suite-Token": _token_suite()})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            dati = json.loads(resp.read().decode("utf-8") or "{}")
+            esito["status"] = resp.status
+    except urllib.error.HTTPError as errore:
+        try:
+            dati = json.loads(errore.read().decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError, OSError):
+            dati = {}
+        esito.update(status=errore.code, errore=str(dati.get("error") or ""))
+        return esito
+    except Exception:
+        esito.update(reachable=False, errore="Portale non raggiungibile")
+        return esito
+    if not dati.get("ok"):
+        esito["errore"] = str(dati.get("error") or "Risposta del portale non valida")
+        return esito
+    esito["ok"] = True
+    if not dati.get("trovato") or not dati.get("username"):
+        return esito
+    esito.update(trovato=True, username=str(dati["username"]).strip().lower(), nome=dati.get("nome"),
+                 email=str(dati.get("email") or "").strip().lower() or None, ruolo=dati.get("ruolo"),
+                 admin=bool(dati.get("admin")), proprietario=bool(dati.get("proprietario")),
+                 disattivato=bool(dati.get("disattivato")), mustChange=bool(dati.get("mustChange")),
+                 abilitato=bool(dati.get("abilitato")))
     return esito
 
 

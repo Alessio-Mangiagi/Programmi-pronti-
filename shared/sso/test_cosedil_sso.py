@@ -36,6 +36,8 @@ class FintoPortale(http.server.BaseHTTPRequestHandler):
             corpo = {"ok": True, "username": "mario", "nome": "Mario",
                      "ruolo": "admin" if cookie == COOKIE_ADMIN else "utente",
                      "admin": cookie == COOKIE_ADMIN}
+            if cookie == COOKIE_ADMIN:   # portale dall'11/11/2026: proprietario e diretto
+                corpo.update(proprietario=True, diretto=True)
             dati = json.dumps(corpo).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -45,10 +47,28 @@ class FintoPortale(http.server.BaseHTTPRequestHandler):
             self.send_response(401); self.end_headers()
 
     def do_POST(self):
-        """Finto /api/verifica-password: token della suite obbligatorio, poi utente e password."""
-        if self.path != "/api/verifica-password":
+        """Finto /api/verifica-password e /api/suite/profilo: token della suite obbligatorio."""
+        if self.path not in ("/api/verifica-password", "/api/suite/profilo"):
             self.send_response(404); self.end_headers(); return
         corpo = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        if self.path == "/api/suite/profilo":
+            if self.headers.get("X-Suite-Token") != "token-di-prova":
+                codice, dati = 403, {"ok": False, "error": "Token della suite mancante o errato"}
+            elif corpo.get("app") == "boh":
+                codice, dati = 400, {"ok": False, "error": "Programma sconosciuto"}
+            elif corpo.get("login") == "Mario@CosedilSpa.com":
+                codice, dati = 200, {"ok": True, "trovato": True, "username": "Mario", "nome": "Mario Rossi",
+                                     "email": "Mario@CosedilSpa.com", "ruolo": "admin", "admin": True,
+                                     "proprietario": True, "disattivato": False, "mustChange": False,
+                                     "abilitato": corpo.get("app") == "incampo"}
+            else:
+                codice, dati = 200, {"ok": True, "trovato": False}
+            out = json.dumps(dati).encode()
+            self.send_response(codice)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+            return
         if self.headers.get("X-Suite-Token") != "token-di-prova":
             codice, dati = 403, {"ok": False, "error": "Token della suite mancante o errato"}
         elif corpo.get("login") == "mario@cosedilspa.com" and corpo.get("password") == "Giusta-2026":
@@ -265,8 +285,32 @@ v = cosedil_sso.verifica_password("mario@cosedilspa.com", "Giusta-2026", "incamp
 controlla("verifica_password: token sbagliato -> niente accesso", not v["ok"] and v["status"] == 403)
 os.environ["SUITE_TOKEN"] = "token-di-prova"
 
+# Profilo del portale (11/11/2026, CONTRATTI § 12): /api/verify porta proprietario e diretto,
+# profilo() chiede /api/suite/profilo col token della suite.
+v = cosedil_sso.verifica_sessione(COOKIE_ADMIN, "profilo-test")
+controlla("verifica_sessione: proprietario e diretto dal portale", v["proprietario"] is True and v["diretto"] is True)
+v = cosedil_sso.verifica_sessione(COOKIE_OK, "profilo-test")
+controlla("verifica_sessione: portale che non li dice -> proprietario False, diretto None",
+          v["proprietario"] is False and v["diretto"] is None)
+p = cosedil_sso.profilo("Mario@CosedilSpa.com", "incampo")
+controlla("profilo: trovato, username ed email in minuscolo, admin e proprietario",
+          p["ok"] and p["trovato"] and p["username"] == "mario" and p["email"] == "mario@cosedilspa.com"
+          and p["admin"] and p["proprietario"] and p["abilitato"] and not p["disattivato"])
+p = cosedil_sso.profilo("Mario@CosedilSpa.com", "skytower")
+controlla("profilo: programma non abilitato", p["ok"] and p["trovato"] and not p["abilitato"])
+p = cosedil_sso.profilo("sconosciuto", "incampo")
+controlla("profilo: non trovato -> ok ma trovato False", p["ok"] and not p["trovato"] and p["reachable"])
+p = cosedil_sso.profilo("mario", "boh")
+controlla("profilo: programma sconosciuto -> 400, non ok", not p["ok"] and p["status"] == 400)
+os.environ["SUITE_TOKEN"] = "token-sbagliato"
+p = cosedil_sso.profilo("Mario@CosedilSpa.com", "incampo")
+controlla("profilo: token sbagliato -> 403", not p["ok"] and p["status"] == 403)
+os.environ["SUITE_TOKEN"] = "token-di-prova"
+
 # Portale giù: cookie mai visti (la cache tiene gli esiti per sid).
 server.shutdown()
+p = cosedil_sso.profilo("Mario@CosedilSpa.com", "incampo", timeout=1)
+controlla("profilo: portale giù -> reachable False, mai un'eccezione", not p["ok"] and not p["reachable"])
 v = cosedil_sso.verifica_password("mario@cosedilspa.com", "Giusta-2026", "incampo", timeout=1)
 controlla("verifica_password: portale giù -> reachable False, mai un'eccezione", not v["ok"] and not v["reachable"])
 c = crea_app(app_id="giu")
