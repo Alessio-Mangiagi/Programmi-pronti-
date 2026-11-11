@@ -1,5 +1,5 @@
 <!-- "><(((º> sabusabu <º)))><" -->
-# Contratti fra le app della suite (versione 09/11/2026)
+# Contratti fra le app della suite (versione 11/11/2026)
 
 Regole comuni che ogni app rispetta per far lavorare l'operatore su una suite sola.
 Le funzioni citate stanno in `suite_link.py` (Python) e `suite_link.js` (Node,
@@ -10,7 +10,9 @@ CommonJS: `require('../shared/suite/suite_link.js')`, in ESM con `createRequire`
 * L'utente è quello del portale. Il portale, in `/api/verify` e `/api/me`, dà
   `username`, `nome`, `ruolo` (`admin` | `utente`), `admin` e ora anche **`email`**:
   il campo `email` dell'utente se l'admin l'ha impostato, altrimenti
-  `<username>@<SUITE_EMAIL_DOMINIO>` (default `cosedilspa.com`).
+  `<username>@<SUITE_EMAIL_DOMINIO>` (default `cosedilspa.com`). Dall'11/11/2026 anche
+  **`proprietario`** (§ 12); `nome` e `ruolo` sono letti da `utenti.json` a ogni verifica, non dal
+  cookie della sessione: un cambio fatto nel portale si vede subito.
 * Nelle chiamate fra app chi chiama manda `X-Suite-Utente` (username),
   `X-Suite-Nome`, **`X-Suite-Email`** (`chiama(..., utente=, nome=, email=)`).
 * Le app con utenti propri (InCampo, SkyTower) cercano l'utente **prima per email**,
@@ -33,9 +35,11 @@ stesso host o stesso `SUITE_DOMINIO`) e lo verifica con
     dell'utente tecnico `CDE_SUITE_USER_EMAIL`, altrimenti quella del primo platform
     admin), `admin` del portale → `is_org_admin`; membro dei **progetti di proprietà
     di quell'organizzazione con codice commessa** (`settings.commessa`) col ruolo
-    `CDE_SUITE_RUOLO_PORTALE` (default `DESIGNER`: legge, scrive, scarica), **anche
-    se è admin del portale** (i ruoli forti li dà un Project Admin). Un utente già
+    `CDE_SUITE_RUOLO_PORTALE` (default `DESIGNER`: legge, scrive, scarica). Un utente già
     esistente che non è membro di un progetto con commessa viene aggiunto allo stesso modo.
+    **Admin del portale** (ADR-57, 09/11/2026): `is_org_admin` e `PROJECT_ADMIN` su tutti i
+    progetti attivi dell'organizzazione della suite, a ogni ingresso; dall'11/11/2026 anche
+    tolti quando il portale non lo dice più admin (§ 12).
 * **Regole di sicurezza di SkyTower** (ADR-47, revisione del 03/11/2026):
   * l'utente si cerca **solo per email esatta** e solo nell'organizzazione della suite:
     niente ripiego sulla parte prima della `@` per agganciare un account esistente;
@@ -61,9 +65,10 @@ restano valide come riserva.
   la sessione dell'account **con lo stesso username**:
   * Analista Dati (`sessioneDalPortale`, `server/auth.ts`): se l'account manca lo crea,
     `admin` solo se il portale lo dice admin dell'agente, password casuale non usata;
-  * Lettore DDT (`ingressoDalPortale`, `src/middleware/auth.ts`): lo aggancia ma **non lo
-    crea**, perché ogni account DDT porta la sua commessa (`commessaId`) scelta dall'admin
-    DDT; senza account con quel nome resta il login (es. account della commessa);
+  * Lettore DDT (`ingressoDalPortale`, `src/middleware/auth.ts`): lo aggancia e, dal
+    09/11/2026, **lo crea** se `/api/verify?app=ddt` dice `diretto: true` (abilitato proprio al
+    DDT, non solo al Magazzino che la tessera comprende): non admin, senza commesse, che sceglie
+    l'admin DDT (§ 11); l'admin lo decide il portale a ogni richiesta;
   * la sessione ricorda chi l'ha aperta nel portale: se nel portale entra un'altra persona
     sullo stesso browser, la sessione dell'app si chiude. Un login a mano su un altro
     account dell'app, col portale aperto, resta valido finché c'è la stessa persona.
@@ -75,9 +80,10 @@ restano valide come riserva.
   `{"login", "password", "app", "ip"}`:
   * `login` = username del portale o la sua email (impostata dall'admin, altrimenti
     `<username>@<SUITE_EMAIL_DOMINIO>`); `ip` = indirizzo della persona visto dall'app;
-  * `app` = id del registro APPS del portale, oppure `vfp-transfer` (fuori registro);
-  * `200 {ok, username, nome, ruolo, email, admin}` (`admin` = ruolo admin del portale,
-    mai l'elevazione per IP); `401` credenziali; `403 {motivo}` con `disattivato`,
+  * `app` = id del registro APPS del portale (dall'11/11/2026 anche `vfp-transfer`, nel registro
+    senza tessera: passa solo chi ha la spunta o è admin del portale);
+  * `200 {ok, username, nome, ruolo, email, admin, proprietario}` (`admin` = ruolo admin del
+    portale, mai l'elevazione per IP; `proprietario` § 12); `401` credenziali; `403 {motivo}` con `disattivato`,
     `cambia-password` (password temporanea non ancora cambiata nel portale) o
     `non-abilitato` (programma non fra i suoi nel portale); `429` bloccato; `400` campi o
     programma sconosciuto; senza token `403`;
@@ -303,6 +309,69 @@ Dentro restano i due motori (Node e Python Flask), avviati insieme; nessuna risc
   commessa di sessione). La tabella `riepiloghi` tiene l'impronta di ogni invio: stessi
   movimenti = non si rimanda; movimenti nuovi = un documento in più "(aggiornamento hh:mm)"
   (la suite di SkyTower non ha una rotta "nuova revisione").
+
+## 12. Profilo del portale valido in ogni programma (11/11/2026)
+
+Decisione dell'utente: "Gli admin devono essere creati solo da me, io posso creare e cancellare gli
+admin" e scelte **2b** (disattivato o programma tolto: si controlla **al login**), **3b** (le password
+proprie dei programmi restano, ma ogni login chiede anche al portale), **4a** (i ruoli sotto l'admin
+restano nei programmi; il portale decide admin e accesso).
+
+* **Proprietario della suite.** Un utente del portale con `"proprietario": true` in `utenti.json`
+  (oggi a.mangiagi), oppure `PORTALE_PROPRIETARIO=<username>` che vince sul file. Vale solo se è
+  admin attivo. All'avvio, se `utenti.json` non ha un proprietario e c'è **un solo** admin attivo, lo
+  diventa lui (riga `proprietario` nel registro accessi); con più admin lo dice il log e nessuno
+  gestisce gli admin finché non lo si imposta. L'admin creato al primo avvio o da
+  `installa-credenziali.js` (se non c'è già un proprietario) nasce proprietario.
+* **Solo il proprietario** crea un admin (anche dall'import Excel: le righe `admin` degli altri si
+  scartano), cambia il ruolo di chiunque e, sugli admin, cambia password, email, nome e programmi,
+  disattiva, riattiva, elimina; anche "reimposta password" di una richiesta di aiuto. Gli altri admin
+  gestiscono gli utenti normali (`403 "Solo il proprietario della suite gestisce gli amministratori"`).
+  Nessuno disattiva, elimina o declassa il proprietario (`400`).
+* **Rotte nuove del portale (sessione admin, JSON):**
+  * `PUT /api/utenti/<u>/ruolo {"ruolo": "admin"|"utente"}` → `200 {ok, ruolo}` (`invariato: true` se
+    era già così); solo il proprietario; `sv++`: le sessioni aperte di quella persona si chiudono;
+  * `PUT /api/utenti/<u>/nome {"nome"}` → `200 {ok, nome}`; admin per gli utenti normali,
+    proprietario per gli admin; nessuna sessione da rifare (il nome si legge dal disco);
+  * registro accessi: azioni `ruolo-utente` (`per`, `da`, `a`), `nome-utente`, `proprietario`.
+* **`/api/verify`**: `nome` e `ruolo` freschi da `utenti.json`; campo nuovo `proprietario` (bool).
+  `admin` resta "admin per quell'app" (comprende la regola IP del portale): un admin che dura oltre la
+  sessione (account delle app) si dà solo con `ruolo === "admin"`.
+* **`POST /api/suite/profilo`** (server a server, header `X-Suite-Token`, senza token `403`), corpo
+  `{"login": "<username o email>", "app": "<id del registro>"}`; ricerca come `/api/verifica-password`
+  (username, email impostata o `<username>@<SUITE_EMAIL_DOMINIO>`; email di due utenti = nessuno):
+  * `200 {ok: true, trovato: true, username, nome, email, ruolo, admin, proprietario, disattivato,
+    mustChange, abilitato}` con `admin` = `ruolo === "admin"` e account attivo (mai la regola IP),
+    `abilitato` = account attivo e programma fra i suoi (gli admin li hanno tutti);
+  * `200 {ok: true, trovato: false}`: nessun utente del portale → account solo del programma;
+  * `400` login vuoto o programma sconosciuto. Nessun contatore di tentativi (non c'è password).
+  * Funzioni pronte: `cosedil_sso.profilo(login, app_id, timeout=4)` (Python) e
+    `profiloPortale(login, app, {timeout})` (Node, `shared/sso/cosedil-sso.js`); non sollevano mai,
+    `reachable: false` = portale giù o `COSEDIL_SSO=off`.
+* **Cosa fanno i programmi con account propri** (SkyTower, InCampo anche dal telefono, VFP Transfer,
+  Analista Dati), a **ogni login o ingresso** — dal portale, con la password del portale **e** con la
+  password del programma (3b):
+  * chiedono il profilo (`profilo` / `profiloPortale`) per la persona dell'account (email o username);
+  * `trovato: false` → account solo del programma: niente da allineare, regole del programma;
+  * `disattivato` o `!abilitato` → ingresso rifiutato col motivo ("account del portale disattivato",
+    "programma non fra i tuoi nel portale");
+  * admin del programma = `admin` del portale, **dato e tolto** (prima solo dato). Per SkyTower:
+    `is_org_admin` e i `PROJECT_ADMIN` dati per la regola ADR-57; gli altri ruoli di progetto restano (4a);
+  * nome ed email aggiornati dal profilo; il collegamento all'account del portale si tiene con lo
+    username (un cambio di email nel portale non crea un secondo account);
+  * portale irraggiungibile → login locale permesso, con una riga di log (3b); l'ingresso automatico
+    dal portale invece non c'è (manca il portale);
+  * **dare o togliere l'admin dentro il programma** (pagine utenti delle app): solo se chi agisce è il
+    proprietario (`proprietario` dal suo ingresso, o dal profilo chiesto al momento); portale
+    irraggiungibile → rifiutato. Per gli account collegati al portale l'admin lo decide comunque il
+    portale al prossimo ingresso.
+* **Programmi senza account propri** (Scadenzario, Magazzino, Confronto, OCR, Verifica Requisiti,
+  Timbri, Ponte Trimble, Auguri): seguono già il portale a ogni richiesta tramite il gate (cache 30 s).
+  `cosedil_sso.verifica_sessione` porta anche `proprietario` e `diretto`, `req.cosedil` (Node) anche
+  `proprietario`.
+* **VFP Transfer nel registro** (`id: vfp-transfer`, `riservata`, `senzaTessera`): spunta in
+  Amministrazione > Utenti e Abilitazioni, spenta per default; niente tessera, avvio o stato dal
+  portale (gira sul PC dell'ufficio). `APP_FUORI_PORTALE` resta vuoto.
 
 ## Regole per tutti
 
