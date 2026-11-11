@@ -30,8 +30,8 @@ Appendice breve per chi installa e mantiene il Magazzino. I dettagli tecnici son
 | Pratiche dei mezzi a nolo | cartella pratiche di VFP Transfer | `MAGAZZINO_MEZZI_DIR` |
 
 Altre impostazioni: `MAGAZZINO_IMPORT_SEC` (ogni quanti secondi si rileggono DDT e
-pratiche, 0 = solo a mano), `MAGAZZINO_ADMIN` (username amministratori oltre agli admin
-del Portale), `MAGAZZINO_RIEPILOGO_ORA` (ora del riepilogo giornaliero in SkyTower, `19:00`;
+pratiche, 0 = solo a mano), `MAGAZZINO_ADMIN` (se impostato, limita a questi username
+chi è admin per una regola IP del Portale; gli amministratori del Portale restano sempre admin), `MAGAZZINO_RIEPILOGO_ORA` (ora del riepilogo giornaliero in SkyTower, `19:00`;
 `off` = solo a richiesta), `MAGAZZINO_URL_PUBBLICO` (indirizzo del Magazzino nei link verso le
 altre app; di solito `<Lettore DDT>/magazzino`) e `MAGAZZINO_PROGRAMMA_UNICO=0` per usare il
 Magazzino da solo, senza Lettore DDT, con i link al suo indirizzo.

@@ -101,11 +101,22 @@ _lock_presenze = threading.Lock()
 
 
 def e_admin():
+    """Admin del Magazzino. Con SSO spento (sviluppo) si è sempre admin.
+
+    - Amministratore del portale (ruolo "admin" in utenti.json, letto fresco da /api/verify): admin anche
+      qui, sempre, anche se MAGAZZINO_ADMIN è impostata e non lo nomina. Regola della suite del
+      09/11/2026 ("le mie credenziali valgono come admin ovunque"), ribadita l'11/11/2026 (il profilo
+      del portale vale in ogni programma; gli admin li crea e li toglie solo il proprietario, nel
+      portale). Prima l'elenco MAGAZZINO_ADMIN escludeva anche lui; lo Scadenzario aveva già l'eccezione.
+    - Admin dell'app concesso dal portale in altro modo (regole IP di data/ip-admin.json): admin solo se
+      compare in config.ADMIN_UTENTI, quando l'elenco è impostato (come prima)."""
     if not cosedil_sso.ENABLED:
         return True
     u = utente_corrente()
     if not u or not u.get("admin"):
         return False
+    if u.get("ruolo") == "admin":
+        return True
     return not config.ADMIN_UTENTI or (u.get("username") or "").lower() in config.ADMIN_UTENTI
 
 

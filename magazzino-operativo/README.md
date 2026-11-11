@@ -53,8 +53,10 @@ entra. Entra chi è abilitato nel portale a **`magazzino` o a `ddt`** (il gate p
 ordine: il Magazzino si apre dentro il programma unico). Per lo sviluppo in locale
 `COSEDIL_SSO=off` (utente admin fittizio).
 
-Gli **admin** dell'app nel portale (o gli username in `MAGAZZINO_ADMIN`) possono
-eliminare articoli, mezzi, ubicazioni e movimenti e vedono la vista
+Gli **amministratori del portale** sono admin anche qui, sempre (profilo del portale
+valido ovunque, 11/11/2026: `e_admin` in `app.py`). Chi è admin del Magazzino solo per
+una regola IP del portale lo è se compare in `MAGAZZINO_ADMIN`, quando l'elenco è
+impostato. Gli admin possono eliminare articoli, mezzi, ubicazioni e movimenti e vedono la vista
 **Amministrazione**. Tutti gli altri registrano movimenti e aggiornano le anagrafiche.
 
 ### Registro attività e presenze
@@ -283,7 +285,7 @@ con i due motori di oggi (contratto in `shared/suite/CONTRATTI.md` § 11).
 | `MAGAZZINO_MEZZI_DIR` | `../vfp-transfer-DMS/vfp-transfer/moduli_compilati/mezzi` | pratiche mezzi |
 | `MAGAZZINO_IMPORT_SEC` | `120` | intervallo importazione automatica (0 = spenta) |
 | `MAGAZZINO_FOTO_DIR` | `foto/` | cartella delle foto dei mezzi |
-| `MAGAZZINO_ADMIN` | vuoto | username admin oltre agli admin del portale |
+| `MAGAZZINO_ADMIN` | vuoto | se impostato, limita a questi username gli admin per regola IP del portale (gli amministratori del portale restano sempre admin) |
 | `MAGAZZINO_BACKUP_DIR` | `backup/` accanto al database | cartella delle copie del database (meglio un altro disco o il NAS) |
 | `MAGAZZINO_BACKUP_ORE` | `24` | ogni quante ore fare una copia (0 = backup automatico spento) |
 | `MAGAZZINO_BACKUP_TENERE` | `14` | quante copie tenere: le più vecchie si cancellano dopo ogni copia riuscita |
