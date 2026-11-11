@@ -45,6 +45,19 @@ Per crearne una: compila il modulo nella schermata delle sorgenti e premi
 - **Importa da Excel**: un file con la colonna `username` (o `utente`), e
   facoltative `password` e `ruolo`; **Scarica template** dà il modello.
 
+**Amministratori e Portale.** Il profilo del Portale vale anche qui:
+
+- gli **amministratori** li crea, promuove, declassa ed elimina solo il **proprietario della
+  suite**. Gli altri amministratori gestiscono gli utenti semplici: per loro, sugli account
+  admin, il ruolo, la chiave e il cestino sono spenti, e nel modulo *Amministratore* non si
+  può scegliere (in alto c'è la spiegazione, come nell'immagine). Le righe `admin` di un file
+  Excel le importa solo il proprietario: per gli altri finiscono fra gli errori dell'import;
+- gli account con **· deciso dal portale** sono di persone del Portale: il loro ruolo segue il
+  Portale, dato e tolto (chi non è più amministratore del Portale torna utente anche qui al
+  primo passaggio). Si cambia nel Portale, in *Amministrazione > Utenti*, non da questa pagina.
+- Se Analista Dati è installato da solo, senza Portale, gli amministratori gestiscono tutto
+  come prima.
+
 ## 7.4 Consumo Claude e Chiave AI
 
 - **Consumo Claude**: quanto ha usato Claude ogni utente negli ultimi 30

@@ -7,8 +7,13 @@
 
 Dal Portale apri *Analista Dati*: entri **direttamente**, con il tuo utente del Portale e senza un'altra
 password. La prima volta l'account di Analista Dati si crea da solo, con lo stesso nome utente del Portale.
-Se nel Portale sei **amministratore**, lo sei anche qui (anche se il tuo account di Analista Dati era nato
-come utente semplice): un amministratore del Portale vale come amministratore in tutti i programmi.
+Il tuo profilo del Portale vale anche qui: se nel Portale sei **amministratore**, lo sei anche qui (anche se
+il tuo account di Analista Dati era nato come utente semplice); se nel Portale non lo sei più, qui torni
+utente semplice. L'amministratore dato al tuo PC da una regola per indirizzo IP del Portale non basta.
+
+Col Portale aperto entri solo nel **tuo** account: se nella pagina **Accedi** scrivi un altro utente, Analista
+Dati risponde *"Sei entrato nel Portale come … : qui puoi usare solo il tuo account"*. Per usare un altro
+account esci dal Portale e rientra con quell'utente.
 
 La pagina **Accedi** compare solo se apri Analista Dati senza passare dal Portale (o con il Portale spento):
 
