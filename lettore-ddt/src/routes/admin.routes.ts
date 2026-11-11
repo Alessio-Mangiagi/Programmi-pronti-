@@ -23,7 +23,13 @@ import {
 import { logActivity, getRecentActivity, getActiveAccounts } from '../models/activityLog';
 // "><(((º> sabusabu <º)))><"
 import { getDDTValidations } from '../models/database';
-import { requireAdmin, eAdmin, adminSoloDdt } from '../middleware/auth';
+import {
+  requireAdmin,
+  eAdmin,
+  adminSoloDdt,
+  puoGestireAdmin,
+  SOLO_PROPRIETARIO,
+} from '../middleware/auth';
 import { apiKeySource, loadBatchConfig, resolveApiKey } from '../batch/config';
 import {
   deleteStoredApiKey,
@@ -42,8 +48,32 @@ router.get('/admin/api/logs', requireAdmin, (req: Request, res: Response) => {
 });
 
 router.get('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
-  res.json({ users: listUsers() });
+  // puoGestireAdmin: il web mostra la casella "Amministratore" e i comandi sugli account admin solo al
+  // proprietario della suite (decisione dell'11/11/2026); agli altri spiega perché non ci sono.
+  res.json({ users: listUsers(), puoGestireAdmin: puoGestireAdmin(req) });
 });
+
+/**
+ * Account amministratore toccato da chi non è il proprietario della suite (11/11/2026: "gli admin devono
+ * essere creati solo da me, io posso creare e cancellare gli admin"). Vale per creare un account con
+ * isAdmin e per eliminare, disattivare o cambiare la password di un account che ce l'ha: altrimenti un
+ * altro amministratore potrebbe chiudere fuori il proprietario o entrare col suo account DDT.
+ * Risponde 403 e ritorna true; false = si può procedere.
+ */
+function rifiutaSeNonProprietario(
+  req: Request,
+  res: Response,
+  targetAdmin: boolean,
+  azione: string
+): boolean {
+  if (!targetAdmin || puoGestireAdmin(req)) return false;
+  const chi = req.cosedil?.username || req.session.username || '';
+  logActivity('azione_rifiutata', chi, null, clientIp(req), {
+    dettaglio: `${azione} di un account amministratore: solo il proprietario della suite`,
+  });
+  res.status(403).json({ error: SOLO_PROPRIETARIO, codice: 'SOLO_PROPRIETARIO' });
+  return true;
+}
 
 router.post('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
   const { username, password, commessaId, displayName, isAdmin, codiceCommessa } = req.body || {};
@@ -66,6 +96,7 @@ router.post('/admin/api/users', requireAdmin, (req: Request, res: Response) => {
       .status(400)
       .json({ error: `La password deve avere almeno ${MIN_PASSWORD_LENGTH} caratteri` });
   }
+  if (rifiutaSeNonProprietario(req, res, !!isAdmin, 'creazione')) return;
   try {
     const user = createUser(
       uuidv4(),
@@ -93,6 +124,7 @@ router.delete('/admin/api/users/:id', requireAdmin, (req: Request, res: Response
   }
   const target = findUserById(id);
   if (!target) return res.status(404).json({ error: 'Utente non trovato' });
+  if (rifiutaSeNonProprietario(req, res, !!target.isAdmin, 'eliminazione')) return;
   if (target.isAdmin && listUsers().filter((u) => u.isAdmin).length <= 1) {
     return res.status(400).json({ error: "Non puoi revocare l'ultimo account amministratore" });
   }
@@ -185,6 +217,7 @@ router.post('/admin/api/users/:id/password', requireAdmin, (req: Request, res: R
   if (!UUID_RE.test(id)) return res.status(404).json({ error: 'Utente non trovato' });
   const target = findUserById(id);
   if (!target) return res.status(404).json({ error: 'Utente non trovato' });
+  if (rifiutaSeNonProprietario(req, res, !!target.isAdmin, 'cambio password')) return;
   try {
     updatePassword(id, String(password || ''));
     logActivity('password_reset', target.username, target.commessaId, ip);
@@ -205,6 +238,7 @@ router.post('/admin/api/users/:id/disabled', requireAdmin, (req: Request, res: R
   }
   const target = findUserById(id);
   if (!target) return res.status(404).json({ error: 'Utente non trovato' });
+  if (rifiutaSeNonProprietario(req, res, !!target.isAdmin, 'attivazione/disattivazione')) return;
   const willDisable = !!disabled;
   if (
     willDisable &&

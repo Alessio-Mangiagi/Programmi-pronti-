@@ -230,6 +230,24 @@ function creaAccountDalPortale(username: string, nome: string): UserRow {
 }
 
 /**
+ * Nome dell'account allineato al profilo del portale (decisione dell'utente dell'11/11/2026: "il profilo
+ * del portale vale in ogni programma"). Solo per gli account creati dal portale (creatoDalPortale): il
+ * nome di un account fatto a mano da un amministratore del DDT (es. "Cantiere Augusta") resta suo.
+ * Ritorna l'account se il nome è cambiato, null se non c'era niente da fare (account assente, non del
+ * portale, nome vuoto o uguale). Lo chiama middleware/auth.ingressoDalPortale.
+ */
+function aggiornaNomeDalPortale(id: string, nome: string): UserRow | null {
+  const user = getUsersDb().users.find((u) => u.id === id);
+  const n = String(nome || '')
+    .trim()
+    .slice(0, 120);
+  if (!user || !user.creatoDalPortale || !n || user.displayName === n) return null;
+  user.displayName = n;
+  persistUsersDb();
+  return user;
+}
+
+/**
  * Imposta l'elenco delle commesse abilitate di un utente (codici del registro / cartelle precedenti,
  * già validati dalla rotta admin). Elenco vuoto = torna alla commessa di sempre dell'account.
  */
@@ -245,6 +263,7 @@ function setCommesseAbilitate(id: string, commesse: string[]): UserRow | null {
 
 export {
   creaAccountDalPortale,
+  aggiornaNomeDalPortale,
   setCommesseAbilitate,
   setCodiceCommessa,
   findUserByUsername,

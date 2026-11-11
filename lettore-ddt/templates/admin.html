@@ -43,9 +43,12 @@
     <label>Commessa<input type="text" id="commessaId" required></label>
     <label>Codice commessa aziendale (SkyTower)<input type="text" id="codiceCommessa" placeholder="es. 101-003"></label>
     <label>Nome visualizzato<input type="text" id="displayName"></label>
-    <label class="check"><input type="checkbox" id="isAdmin"> Admin</label>
+    <!-- Casella mostrata solo al proprietario della suite (static/admin.js, puoGestireAdmin):
+         dall'11/11/2026 gli amministratori li crea e li toglie solo lui, dal portale. -->
+    <label class="check" id="isAdminWrap"><input type="checkbox" id="isAdmin"> Admin</label>
     <button type="submit" class="btn-primary">Crea account</button>
   </form>
+  <p id="adminNota" class="nota-admin" style="display:none">Gli amministratori li gestisce solo il proprietario della suite, dal portale: qui si creano e si gestiscono gli account normali. Chi è amministratore nel portale lo è anche nel Lettore DDT.</p>
   <div id="err"></div>
   <button id="saveUsers" class="btn-primary" style="margin-bottom: 16px;">Salva lista (CSV)</button>
   <table>

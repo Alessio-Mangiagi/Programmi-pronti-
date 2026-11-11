@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import type { CosedilIdentity } from '../../../shared/sso/cosedil-sso';
-import { creaAccountDalPortale, findUserByUsernameCI } from '../models/users';
+import {
+  aggiornaNomeDalPortale,
+  creaAccountDalPortale,
+  findUserByUsernameCI,
+} from '../models/users';
 import logger from '../utils/logger';
 import { logActivity } from '../models/activityLog';
 import { clientIp } from '../routes/helpers';
@@ -23,6 +27,11 @@ declare module 'express-session' {
     commessaScelta?: boolean;
     /** Codice del registro della suite della commessa scelta ('' per una cartella precedente). */
     commessaCodice?: string;
+    /**
+     * Ultimo nome del portale già confrontato con l'account DDT (allineaNomeDalPortale): evita di
+     * ricontrollare l'archivio utenti a ogni richiesta quando il nome non è cambiato.
+     */
+    nomePortaleVisto?: string;
   }
 }
 
@@ -58,6 +67,79 @@ function puoUsareDdt(req: Request): boolean {
 const USERNAME_PORTALE_RE = /^[A-Za-z0-9_.@-]{1,64}$/;
 
 /**
+ * Il proprietario della suite (utente del portale con proprietario: true, oggi a.mangiagi). Decisione
+ * dell'utente dell'11/11/2026: "gli admin devono essere creati solo da me, io posso creare e cancellare
+ * gli admin". Il campo arriva da /api/verify tramite il gate (req.cosedil.proprietario); con un portale
+ * che non lo manda vale false, cioè nessuno: meglio un comando chiuso che un admin creato da chiunque.
+ */
+export function eProprietario(req: Request): boolean {
+  const id = req.cosedil as (CosedilIdentity & { proprietario?: boolean }) | undefined;
+  return id?.proprietario === true;
+}
+
+/**
+ * Chi può creare, eliminare, disattivare un account DDT amministratore o cambiarne la password.
+ *  - Gate del portale acceso (produzione): solo il proprietario della suite. Gli altri amministratori
+ *    gestiscono gli account normali; gli amministratori li decide il portale (eAdmin), e solo il
+ *    proprietario li crea lì.
+ *  - Gate spento (sviluppo, test, installazioni senza portale): non c'è un proprietario da chiedere,
+ *    vale l'amministratore dell'account DDT come prima.
+ */
+export function puoGestireAdmin(req: Request): boolean {
+  if (gatePortaleAttivo()) return eProprietario(req);
+  return !!req.session?.isAdmin;
+}
+
+/** Messaggio unico per il web e le rotte admin quando chi agisce non è il proprietario. */
+export const SOLO_PROPRIETARIO =
+  'Gli amministratori li gestisce solo il proprietario della suite, dal portale';
+
+/**
+ * Chiude la parte DDT di una sessione quando il portale non abilita più questa persona al Lettore DDT
+ * (spunta "DDT" tolta, resta "Magazzino"). Prima una sessione già aperta continuava fino a 12 ore
+ * (scadenza che si rinnova a ogni richiesta): il portale va ascoltato a ogni richiesta, non solo al
+ * login (decisione dell'11/11/2026, "il profilo del portale vale in ogni programma").
+ * La sessione resta "solo Magazzino": tiene la persona del portale e, se era una commessa del
+ * registro già scelta, anche quella (è il filtro del Magazzino); una cartella precedente del DDT no,
+ * perché fuori dal DDT non ha senso e la finestra "In che commessa lavori?" si riapre.
+ */
+function chiudiParteDdt(req: Request): void {
+  const s = req.session;
+  logActivity('logout', s.username || '', s.commessaId || null, clientIp(req), {
+    dettaglio: 'sessione DDT chiusa: nel portale ora è abilitato solo al Magazzino',
+  });
+  delete s.userId;
+  delete s.username;
+  delete s.displayName;
+  delete s.isAdmin;
+  delete s.nomePortaleVisto;
+  if (!(s.commessaScelta && s.commessaCodice)) {
+    delete s.commessaId;
+    delete s.commessaScelta;
+    delete s.commessaCodice;
+  }
+}
+
+/**
+ * Nome dell'account DDT uguale a quello del portale (profilo del portale valido ovunque, 11/11/2026).
+ * Vale per gli account creati dal portale (models/users.aggiornaNomeDalPortale); il confronto con
+ * l'archivio si fa solo quando il nome del portale cambia rispetto all'ultimo visto in sessione.
+ */
+function allineaNomeDalPortale(req: Request): void {
+  const s = req.session;
+  const nome = String(req.cosedil?.nome || '').trim();
+  if (!s.userId || !nome || s.nomePortaleVisto === nome) return;
+  s.nomePortaleVisto = nome;
+  const user = aggiornaNomeDalPortale(s.userId, nome);
+  if (user) {
+    s.displayName = user.displayName;
+    logActivity('user_updated', user.username, user.commessaId || null, clientIp(req), {
+      dettaglio: `nome allineato al portale: ${user.displayName}`,
+    });
+  }
+}
+
+/**
  * Ingresso dal Portale con UN SOLO login (06/11/2026 password unica; 09/11/2026 un solo accesso per
  * "DDT e Magazzino", anche per chi non aveva un account DDT). Montato in app.ts subito dopo la sessione,
  * quindi dopo il gate SSO che mette in req.cosedil chi è loggato nel portale.
@@ -73,6 +155,9 @@ const USERNAME_PORTALE_RE = /^[A-Za-z0-9_.@-]{1,64}$/;
  *    e si riparte come sopra (anche le sessioni "solo Magazzino", che portano la commessa scelta).
  *    Un login a mano su un altro account DDT resta valido finché nel portale c'è la stessa persona.
  *  - Sessione aperta prima di questa regola (senza portaleUtente): si lega a chi c'è adesso.
+ *  - Stessa persona con la sessione DDT aperta (11/11/2026, profilo del portale valido ovunque): se nel
+ *    portale non è più abilitata al Lettore DDT ma solo al Magazzino la parte DDT si chiude
+ *    (chiudiParteDdt); altrimenti il nome dell'account creato dal portale segue quello del portale.
  * Con il gate spento (COSEDIL_SSO=off, sviluppo e test) non fa niente.
  */
 export { puoUsareDdt };
@@ -83,11 +168,16 @@ export function ingressoDalPortale(req: Request, res: Response, next: NextFuncti
     .trim();
   if (!gatePortaleAttivo() || !chi || !req.session) return next();
   const s = req.session;
-  if (s.userId && !s.portaleUtente) {
-    s.portaleUtente = chi;
+  // sessione aperta prima della regola del portale (senza portaleUtente): si lega a chi c'è adesso
+  if (s.userId && !s.portaleUtente) s.portaleUtente = chi;
+  if (s.userId && s.portaleUtente === chi) {
+    // Stessa persona: il portale si ascolta a OGNI richiesta (il gate rinfresca l'identità ogni 30 s).
+    // Spunta "DDT" tolta ma "Magazzino" ancora spuntata: il gate la fa passare (DDT e Magazzino
+    // comprende il Magazzino), quindi la sessione DDT va chiusa qui; il web la porta al Magazzino.
+    if (!puoUsareDdt(req)) chiudiParteDdt(req);
+    else allineaNomeDalPortale(req);
     return next();
   }
-  if (s.userId && s.portaleUtente === chi) return next();
   let user = findUserByUsernameCI(chi);
   if (!user && puoUsareDdt(req) && USERNAME_PORTALE_RE.test(String(req.cosedil?.username || ''))) {
     try {
@@ -101,7 +191,9 @@ export function ingressoDalPortale(req: Request, res: Response, next: NextFuncti
       logger.error(`Account DDT dal portale non creato per ${chi}: ${(e as Error).message}`);
     }
   }
-  const utilizzabile = !!user && !user.disabled;
+  // Account utilizzabile solo se il portale abilita proprio il Lettore DDT: prima chi aveva già un
+  // account DDT e nel portale solo la spunta Magazzino si trovava aperta lo stesso la sessione DDT.
+  const utilizzabile = !!user && !user.disabled && puoUsareDdt(req);
   const altraPersona = !!s.portaleUtente && s.portaleUtente !== chi;
   if (!s.userId && !utilizzabile && !altraPersona) {
     s.portaleUtente = chi; // sessione "solo Magazzino": si sa di chi è, per il cambio persona
@@ -119,6 +211,7 @@ export function ingressoDalPortale(req: Request, res: Response, next: NextFuncti
       req.session.displayName = user.displayName;
       req.session.isAdmin = !!user.isAdmin;
       logActivity('login_success', user.username, user.commessaId || null, clientIp(req));
+      allineaNomeDalPortale(req); // nome cambiato nel portale dopo la creazione dell'account
     }
     next();
   });

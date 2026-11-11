@@ -5,7 +5,13 @@
 import express, { Request, Response } from 'express';
 import { verifyPassword, updatePassword } from '../models/users';
 import { logActivity } from '../models/activityLog';
-import { requireAuth, eAdmin, adminSoloDdt } from '../middleware/auth';
+import {
+  requireAuth,
+  eAdmin,
+  adminSoloDdt,
+  gatePortaleAttivo,
+  puoUsareDdt,
+} from '../middleware/auth';
 import { clientIp } from './helpers';
 import logger from '../utils/logger';
 
@@ -76,6 +82,15 @@ router.post('/auth/login', (req: Request, res: Response) => {
   const ip = clientIp(req);
   if (!username || !password) {
     return res.status(400).json({ error: 'Username e password obbligatori' });
+  }
+  // Il portale abilita questa persona solo al Magazzino: nessun account DDT, nemmeno a mano (stessa
+  // regola di ingressoDalPortale, che chiuderebbe comunque la sessione alla richiesta dopo; 11/11/2026).
+  if (gatePortaleAttivo() && req.cosedil && !puoUsareDdt(req)) {
+    return res.status(403).json({
+      error:
+        'Nel Portale sei abilitato solo al Magazzino: il Lettore DDT non è fra i tuoi programmi',
+      codice: 'SOLO_MAGAZZINO',
+    });
   }
   const lockKey = `${String(username).toLowerCase()}|${ip}`;
   const lock = loginLockState(lockKey);

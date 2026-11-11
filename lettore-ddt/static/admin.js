@@ -98,8 +98,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success', ddt_firmato: 'badge-pwd', commessa_scelta: 'badge-active', commesse_abilitate: 'badge-pwd' };
-const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato', ddt_firmato: 'DDT firmato (.p7m)', commessa_scelta: 'Commessa scelta', commesse_abilitate: 'Commesse abilitate' };
+const badgeClass = { login_success: 'badge-success', login_failed: 'badge-failed', logout: 'badge-logout', user_created: 'badge-created', user_deleted: 'badge-deleted', login_locked: 'badge-failed', password_changed: 'badge-pwd', password_reset: 'badge-pwd', account_disabled: 'badge-disabled', account_enabled: 'badge-active', apikey_updated: 'badge-pwd', apikey_deleted: 'badge-deleted', ddt_validated: 'badge-success', ddt_firmato: 'badge-pwd', commessa_scelta: 'badge-active', commesse_abilitate: 'badge-pwd', azione_rifiutata: 'badge-failed' };
+const labels = { login_success: 'Login OK', login_failed: 'Login fallito', logout: 'Logout', user_created: 'Account creato', user_deleted: 'Account revocato', login_locked: 'Login bloccato', password_changed: 'Password cambiata', password_reset: 'Password reset', account_disabled: 'Account disabilitato', account_enabled: 'Account abilitato', apikey_updated: 'Chiave API aggiornata', apikey_deleted: 'Chiave API rimossa', ddt_validated: 'DDT convalidato', ddt_firmato: 'DDT firmato (.p7m)', commessa_scelta: 'Commessa scelta', commesse_abilitate: 'Commesse abilitate', azione_rifiutata: 'Azione rifiutata' };
 // DDT firmato digitalmente: il colore segue l'esito della verifica della firma (dettaglio = riepilogo)
 const badgeFirma = { 'valida': 'badge-success', 'non valida': 'badge-failed', 'da verificare': 'badge-pwd' };
 
@@ -193,6 +193,17 @@ async function loadUsers() {
   if (!res.ok) return;
   const data = await res.json();
   utentiAdmin = data.users || [];
+  // Solo il proprietario della suite crea, elimina, disattiva o cambia la password degli account
+  // amministratore (decisione dell'11/11/2026). Agli altri amministratori la casella "Admin" sparisce e
+  // i comandi sulle righe admin restano spenti con la spiegazione; il controllo vero è sul server
+  // (admin.routes.ts, rifiutaSeNonProprietario, 403 SOLO_PROPRIETARIO).
+  const gestisceAdmin = data.puoGestireAdmin !== false;
+  const casella = document.getElementById('isAdmin');
+  document.getElementById('isAdminWrap').style.display = gestisceAdmin ? '' : 'none';
+  if (!gestisceAdmin) casella.checked = false;
+  document.getElementById('adminNota').style.display = gestisceAdmin ? 'none' : 'block';
+  const bloccato = (u) => (u.isAdmin && !gestisceAdmin
+    ? ` disabled title="${esc(SOLO_PROPRIETARIO)}"` : '');
   const rows = document.getElementById('userRows');
   rows.innerHTML = '';
   document.getElementById('usersEmpty').style.display = data.users.length ? 'none' : 'block';
@@ -214,9 +225,9 @@ async function loadUsers() {
       <td><div class="actions">
         <button class="btn-neutral" data-act="commesse" data-id="${id}" data-user="${user}">Commesse</button>
         <button class="btn-neutral" data-act="codice" data-id="${id}" data-user="${user}" data-codice="${esc(u.codiceCommessa || '')}">Codice commessa</button>
-        <button class="btn-warn" data-act="pwd" data-id="${id}" data-user="${user}">Reset password</button>
-        <button class="btn-neutral" data-act="toggle" data-id="${id}" data-user="${user}" data-disabled="${u.disabled ? '1' : '0'}">${toggleLabel}</button>
-        <button class="btn-danger" data-act="revoke" data-id="${id}" data-user="${user}">Revoca</button>
+        <button class="btn-warn" data-act="pwd" data-id="${id}" data-user="${user}"${bloccato(u)}>Reset password</button>
+        <button class="btn-neutral" data-act="toggle" data-id="${id}" data-user="${user}" data-disabled="${u.disabled ? '1' : '0'}"${bloccato(u)}>${toggleLabel}</button>
+        <button class="btn-danger" data-act="revoke" data-id="${id}" data-user="${user}"${bloccato(u)}>Revoca</button>
       </div></td>`;
     rows.appendChild(tr);
   }
@@ -237,6 +248,8 @@ async function loadUsers() {
 // qui; senza elenco vale la commessa di sempre (cartella + codice aziendale). Il controllo vero è sul
 // server (POST /admin/api/users/:id/commesse-abilitate, services/commessaSessione, requireAuth).
 let utentiAdmin = [];
+// Stesso testo di middleware/auth.ts SOLO_PROPRIETARIO (tooltip dei comandi spenti sulle righe admin).
+const SOLO_PROPRIETARIO = 'Gli amministratori li gestisce solo il proprietario della suite, dal portale';
 
 function celleCommesse(u) {
   if (u.isAdmin) return '<span class="sub-cella">tutte (admin)</span>';

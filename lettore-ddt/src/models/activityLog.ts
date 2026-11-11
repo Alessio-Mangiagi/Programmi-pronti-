@@ -26,7 +26,10 @@ export type ActivityEvent = {
     | 'commessa_scelta'
     // Commesse abilitate su un account cambiate da un amministratore (opzione b, 09/11/2026):
     // username = account modificato, dettaglio = chi l'ha fatto, aggiunte e tolte
-    | 'commesse_abilitate';
+    | 'commesse_abilitate'
+    // Comando su un account amministratore rifiutato perché chi agisce non è il proprietario della
+    // suite (11/11/2026: gli admin li crea e li toglie solo lui): dettaglio = cosa e su chi
+    | 'azione_rifiutata';
   username: string;
   commessaId: string | null;
   ip: string;
