@@ -27,13 +27,21 @@ Portale, mettere da parte `data\utenti.json` e riavviare (viene ricreato il solo
 con una password nuova; gli altri utenti vanno poi ripresi dal file messo da parte o
 reimportati).
 
+**Proprietario della suite.** L'amministratore creato al primo avvio è anche il
+**proprietario della suite**: l'unico che crea, cambia ed elimina gli altri amministratori
+(capitolo 4.7). In `utenti.json` ha `"proprietario": true`. Su un Portale installato prima
+dell'11/11/2026 il campo lo prende da solo, al primo avvio, l'unico amministratore attivo
+(con più amministratori il Portale lo scrive nel log e lo si imposta a mano). Per indicarlo,
+o per passare la mano, si avvia il Portale con la variabile `PORTALE_PROPRIETARIO=<username>`,
+che vale più del file; deve essere un amministratore attivo.
+
 ## Dove stanno i dati
 
 Tutto in `data\` dentro la cartella del Portale (o nella cartella indicata da `DATA_DIR`):
 
 | File | Contenuto |
 |---|---|
-| `utenti.json` | Utenti, ruoli, programmi visibili, email. Le password sono salvate cifrate (scrypt), mai in chiaro. |
+| `utenti.json` | Utenti, ruoli, programmi visibili, email, proprietario della suite. Le password sono salvate cifrate (scrypt), mai in chiaro. |
 | `accessi.log` | Registro accessi, una riga per evento (con il dettaglio delle abilitazioni). |
 | `richieste.json` | Richieste di aiuto arrivate dal login. |
 | `avvisi.json` e cartella `avvisi-in\` | Avvisi dei programmi: i programmi lasciano un file nella cartella, il Portale lo raccoglie. |

@@ -21,7 +21,8 @@ Scadenzario e gli altri strumenti senza dover rifare l'accesso in ognuno.
 3. [La plancia](03-plancia.md): stato dei programmi, calendario, utenti e loro attività,
    richieste di aiuto
 4. [Utenti e abilitazioni](04-utenti.md): creare utenti, scegliere i programmi visibili
-   (anche tutti insieme nella pagina *Abilitazioni*), password, disattivazione, importazione da Excel
+   (anche tutti insieme nella pagina *Abilitazioni*), password, disattivazione, importazione da Excel,
+   ruolo e nome, il proprietario della suite che gestisce gli amministratori
 5. [Le commesse della suite](05-commesse.md): l'elenco unico dei codici commessa
 6. [Registro accessi e avvisi](06-registro-e-avvisi.md): chi ha fatto cosa e cosa segnalano
    i programmi
@@ -45,8 +46,9 @@ Scadenzario e gli altri strumenti senza dover rifare l'accesso in ognuno.
 | **Ponte Trimble**, **Auguri** | Strumenti solo per gli amministratori | dentro ciascun programma |
 
 **VFP Transfer** non si apre dal Portale: ha un accesso suo (vedi la
-[guida di VFP Transfer](../../../vfp-transfer-DMS/docs/guida/README.md)). I suoi avvisi però
-arrivano nella pagina *Avvisi* del Portale.
+[guida di VFP Transfer](../../../vfp-transfer-DMS/docs/guida/README.md)). Chi può usarlo però
+lo decide la sua casella nelle pagine *Utenti* e *Abilitazioni* (programma riservato), e i suoi
+avvisi arrivano nella pagina *Avvisi* del Portale.
 
 ## Chi vede cosa
 
@@ -56,8 +58,8 @@ programmi compaiono nella sua pagina iniziale (vedi [Utenti e abilitazioni](04-u
 - Un programma che non ti è stato assegnato **non compare** e non si apre nemmeno scrivendo
   l'indirizzo a mano: il programma risponde che devi chiedere l'abilitazione a un
   amministratore.
-- Alcuni programmi sono **riservati** (oggi Verifica Requisiti, SkyTower e Timbri per VFP): li vede solo chi
-  li ha avuti assegnati espressamente.
+- Alcuni programmi sono **riservati** (oggi Verifica Requisiti, SkyTower, Timbri per VFP e VFP Transfer):
+  li vede solo chi li ha avuti assegnati espressamente.
 - Se un collega vede un programma che tu non hai, non è un guasto: chiedi l'abilitazione a
   un amministratore.
 

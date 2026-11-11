@@ -7,7 +7,11 @@ Dalla plancia, nella colonna di sinistra, premi **Gestione → Utenti**. Qui cre
 scegli quali programmi vede ognuno, reimposti le password e disattivi chi non deve più
 entrare. Per i programmi di tutti insieme c'è la pagina **Abilitazioni** (paragrafo 4.2b).
 
-![La pagina Utenti](img/30-utenti.png)
+Il profilo che dai qui (ruolo, nome, email, programmi, attivo o disattivato) vale **in tutti
+i programmi della suite**. Gli **amministratori** li crea, li cambia e li elimina solo il
+**proprietario della suite** (paragrafo 4.7).
+
+![La pagina Utenti vista dal proprietario della suite](img/30-utenti.png)
 
 In alto quattro numeri: **Utenti** (e quanti sono amministratori), **Attivi**, **Password
 da cambiare** al prossimo accesso, **Disattivati**.
@@ -16,13 +20,13 @@ Nella tabella, per ogni persona:
 
 | Colonna | Cosa contiene |
 |---|---|
-| **Utente** | Nome e cognome, sotto lo username |
+| **Utente** | Nome e cognome, sotto lo username e il pulsante **Nome** per cambiarlo (paragrafo 4.8) |
 | **Email** | L'email con cui InCampo e SkyTower riconoscono la persona. Se c'è scritto *dedotta* non è stata impostata e vale `username@cosedilspa.com`. Il pulsante **Email** la cambia. |
-| **Ruolo** | *Utente* oppure *Admin* |
+| **Ruolo** | *Utente* oppure *Admin*. Il proprietario della suite qui ha un menu per cambiarlo (paragrafo 4.8); sulla sua riga c'è *Proprietario* |
 | **Stato** | *Attivo*, *Password da cambiare* (deve ancora scegliere la sua) o *Disattivato* |
 | **Programmi** | Quanti programmi vede; clic per vederli e cambiarli. Per gli amministratori *Tutti (admin)*. |
 | **Creato** | Data di creazione |
-| (azioni) | **Password**, **Disattiva** / **Riattiva**, **Elimina**. Sulla tua riga c'è scritto *Sei tu*. |
+| (azioni) | **Password**, **Disattiva** / **Riattiva**, **Elimina**. Sulla tua riga c'è scritto *Sei tu*, su quella del proprietario *Proprietario*. |
 
 Per trovare qualcuno usa **Cerca per nome o username**; il menu accanto filtra **Attivi**,
 **Password da cambiare**, **Disattivati** o **Amministratori**.
@@ -36,6 +40,7 @@ Per trovare qualcuno usa **Cerca per nome o username**; il menu accanto filtra *
 3. **Email** è facoltativa ma consigliata se la persona userà InCampo o SkyTower: deve
    essere **esattamente** quella del suo account in quei programmi.
 4. Scegli il **Ruolo**: *Utente* oppure *Amministratore* (vede tutto e gestisce il Portale).
+   *Amministratore* compare solo al proprietario della suite.
 5. In **Programmi visibili** spunta i programmi che deve vedere. All'apertura sono già
    spuntati tutti quelli non riservati: togli quelli che non servono.
 6. Premi **Crea utente**. Compare *Utente creato*.
@@ -62,8 +67,11 @@ Cosa sapere:
 - La modifica vale **subito**: il programma tolto sparisce dalla pagina iniziale della
   persona, e se prova ad aprirlo dall'indirizzo il programma le dice di chiedere
   l'abilitazione (al massimo dopo mezzo minuto).
-- I programmi segnati **riservato** (Verifica Requisiti, SkyTower, Timbri per VFP) non si danno per
-  abitudine: solo a chi ci lavora davvero.
+- I programmi segnati **riservato** (Verifica Requisiti, SkyTower, Timbri per VFP, VFP Transfer) non si
+  danno per abitudine: solo a chi ci lavora davvero.
+- **VFP Transfer** ha la casella ma non la scheda nella pagina iniziale: si apre dal PC
+  dell'ufficio dove è installato. La spunta decide chi può entrarci, con la password del
+  Portale o dal Portale.
 - Ponte Trimble e Auguri non hanno caselle: li vedono solo gli amministratori.
 - Ogni modifica resta scritta nel [Registro accessi](06-registro-e-avvisi.md) come
   *Abilitazioni*, con chi l'ha fatta e quando.
@@ -133,7 +141,14 @@ Reimpostare la password **sblocca** anche chi era bloccato per troppi tentativi 
   usare *Disattiva* se basta impedire l'accesso).
 
 Non puoi disattivare te stesso né l'ultimo amministratore attivo: il Portale resterebbe
-senza nessuno che lo possa gestire.
+senza nessuno che lo possa gestire. Il **proprietario della suite** non si disattiva e non si
+elimina mai, nemmeno da solo. Disattivare, riattivare ed eliminare un **amministratore** lo
+può fare solo il proprietario.
+
+La disattivazione vale in tutti i programmi: quelli che si aprono dal Portale chiudono subito
+la porta; SkyTower, InCampo, VFP Transfer e Analista Dati, che hanno account propri, la
+controllano al **prossimo accesso** della persona, anche se entra con la password del
+programma.
 
 ![Il filtro sugli utenti disattivati](img/36-utenti-disattivati.png)
 
@@ -151,7 +166,9 @@ Per caricare molte persone insieme premi **Importa da Excel**.
 4. Premi **Importa**.
 
 Il Portale dice quanti utenti ha aggiunto e quali righe ha scartato e perché (username
-mancante o non valido, password troppo corta, username già esistente). Tutti gli importati
+mancante o non valido, password troppo corta, username già esistente; per chi non è il
+proprietario della suite anche le righe con ruolo *admin*: gli amministratori li crea solo
+lui). Tutti gli importati
 dovranno cambiare la password al primo accesso e partono con i programmi predefiniti (tutti
 tranne i riservati): sistemali poi con il pulsante *N programmi*.
 
@@ -162,3 +179,42 @@ esattamente** con quella del loro account. Se una persona entra nel Portale ma I
 SkyTower le chiedono di nuovo le credenziali, controlla la colonna **Email**: premi
 **Email** sulla sua riga e scrivi l'indirizzo giusto (lasciando vuoto torna
 `username@cosedilspa.com`).
+
+## 4.7 Amministratori: solo il proprietario della suite
+
+Il **proprietario della suite** è un amministratore speciale: è l'unico che può
+
+- creare un nuovo amministratore (anche dall'import Excel);
+- rendere amministratore un utente o togliere il ruolo a un amministratore;
+- cambiare password, email, nome e programmi di un amministratore, disattivarlo, riattivarlo
+  ed eliminarlo.
+
+Gli altri amministratori gestiscono tutti gli **utenti normali** come sempre, ma sulle righe
+degli amministratori trovano i pulsanti spenti e un lucchetto accanto ad *Admin*: passando
+col mouse compare *Solo il proprietario della suite gestisce gli amministratori*.
+
+![La pagina Utenti vista da un amministratore che non è il proprietario](img/30b-utenti-altro-admin.png)
+
+Il proprietario resta sempre amministratore: nessuno, nemmeno lui, lo può disattivare,
+eliminare o far tornare utente. Chi sia lo decide chi installa il Portale (vedi
+l'[appendice per l'amministratore di sistema](08-amministratore-di-sistema.md)).
+
+Essere amministratore nel Portale vuol dire esserlo **in tutti i programmi della suite**;
+toglierlo nel Portale lo toglie anche nei programmi, dal prossimo accesso della persona.
+
+## 4.8 Cambiare ruolo e nome
+
+**Ruolo** (solo il proprietario della suite): nella colonna **Ruolo** scegli *Utente* o
+*Amministratore* dal menu della riga. Il Portale chiede conferma spiegando cosa cambia:
+
+- chi diventa amministratore vede tutti i programmi e la gestione del Portale, ed è
+  amministratore anche nei programmi della suite;
+- chi torna utente perde subito la gestione del Portale e, dal suo prossimo accesso,
+  l'amministrazione nei programmi.
+
+In entrambi i casi la persona viene scollegata e rientra col ruolo nuovo. Nel Registro
+accessi resta *Cambio ruolo* con chi l'ha fatto e quando.
+
+**Nome**: premi **Nome** sotto lo username e scrivi nome e cognome. Vale subito nel Portale
+e, nei programmi della suite, dopo pochi secondi o al prossimo accesso. Il nome di un
+amministratore lo cambia solo il proprietario. Nel Registro accessi resta *Cambio nome*.

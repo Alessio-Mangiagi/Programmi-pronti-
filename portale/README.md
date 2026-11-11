@@ -42,7 +42,8 @@ Persa prima di cambiarla: fermare il portale, cancellare `data/utenti.json` e ri
 - `PORT` — porta di ascolto (default `8080`).
 - `HOST` — indirizzo di ascolto (default `127.0.0.1`). Per un **server centrale in LAN** usare `0.0.0.0`: gli altri PC si collegano a `http://IP-DEL-SERVER:8080`.
 - `DATA_DIR` — cartella dei dati (default `./data`).
-- `ADMIN_USER` — nome dell'amministratore creato al primo avvio (default `admin`).
+- `ADMIN_USER` — nome dell'amministratore creato al primo avvio (default `admin`); nasce **proprietario della suite**.
+- `PORTALE_PROPRIETARIO` — username del **proprietario della suite** (vince sul campo `proprietario` di `data/utenti.json`; deve essere un admin attivo). Vedi *Proprietario della suite e profilo valido ovunque*.
 - `SUITE_DOMINIO` — dominio del server (es. `esempio.lan`): app su `https://<cartella>.<dominio>`, portale su `https://portale.<dominio>`, cookie di sessione per tutto il dominio. `SUITE_SCHEMA=http` solo se il proxy non fa TLS.
 - `WARM_APPS` — app da **avviare a caldo** e tenere accese, separate da virgola (es. `ocr,agente`), oppure `all`. In alternativa si usa `data/warm.json`.
 - `TRUST_PROXY` — impostare a `1` se il portale è dietro un reverse proxy (nginx/IIS): legge l'IP client da `X-Forwarded-For`.
@@ -84,6 +85,17 @@ Dalla pagina **Utenti** (`/utenti`, voce *Gestione → Utenti* nella barra di si
 
 - **Password** → `POST /api/utenti/<username>/password` con `{ password }` (min 8 caratteri) o vuoto per una temporanea generata, restituita una sola volta. Imposta `mustChange`, incrementa `sv` (scollega le sessioni aperte) e toglie il blocco per tentativi falliti. Registrato come `reset-password`.
 - **Disattiva / Riattiva** → `PUT /api/utenti/<username>/attivo` con `{ attivo }`. Campo `disattivato` in `utenti.json`: il login risponde *Account disattivato* (solo a chi ha la password giusta) e `getSession` scarta i suoi cookie, quindi anche il gate SSO delle app. Non si può disattivare se stessi né l'ultimo admin attivo. Registrato come `disattiva`/`riattiva`.
+- **Ruolo** (solo il proprietario della suite) → `PUT /api/utenti/<username>/ruolo` con `{ ruolo: "admin" | "utente" }`. Incrementa `sv` (la persona rientra col ruolo nuovo). Registrato come `ruolo-utente` (`da`, `a`).
+- **Nome** → `PUT /api/utenti/<username>/nome` con `{ nome }` (max 80 caratteri). Nessuna sessione da rifare: nome e ruolo si leggono dal disco a ogni richiesta. Registrato come `nome-utente`.
+
+### Proprietario della suite e profilo valido ovunque
+
+Dall'11/11/2026 (decisione: "gli admin li creo e li cancello solo io") il profilo del portale vale in tutti i programmi e gli amministratori li gestisce solo il **proprietario della suite**: `"proprietario": true` in `data/utenti.json` o `PORTALE_PROPRIETARIO=<username>`. All'avvio, un `utenti.json` senza proprietario e con un solo admin attivo lo prende da solo (`assicuraProprietario`, riga `proprietario` nel registro); l'admin del primo avvio e quello di `installa-credenziali.js` nascono proprietari.
+
+- Solo il proprietario crea admin (anche dall'import: le righe `admin` degli altri si scartano), cambia ruoli e, sugli admin, password, email, nome, programmi, disattiva/riattiva/elimina, "reimposta" una richiesta di aiuto. Gli altri admin: `403 Solo il proprietario della suite gestisce gli amministratori` (`controlloAmministratori`). Nessuno disattiva, elimina o declassa il proprietario (`400`). La pagina Utenti mostra *Proprietario*, il menu del ruolo solo a lui e, agli altri admin, le righe admin con i comandi spenti.
+- `getSession` legge **ruolo e nome dal disco** (non dal cookie): un admin declassato perde subito l'area amministrazione e `/api/verify` dà alle app i valori di adesso, più `proprietario`.
+- `POST /api/suite/profilo` (token della suite, corpo `{ login, app }`, `profiloPerApp`): `{ ok, trovato, username, nome, email, ruolo, admin, proprietario, disattivato, mustChange, abilitato }` o `{ ok, trovato: false }`. Lo chiedono a ogni login SkyTower, InCampo, VFP Transfer e Analista Dati per dare e togliere l'admin, aggiornare nome ed email e respingere chi è disattivato o senza quel programma. Helper `cosedil_sso.profilo` / `profiloPortale` in `shared/sso`. Contratto completo: `shared/suite/CONTRATTI.md` § 12.
+- **VFP Transfer** è nel registro `APPS` (`riservata`, `senzaTessera`): casella in Utenti e Abilitazioni, niente tessera, avvio o stato dal portale (gira sul PC dell'ufficio).
 
 ### Chi vede quali programmi
 
@@ -164,7 +176,7 @@ Le app della suite condividono la sessione del portale: inoltrano il cookie del 
 La password del portale vale in ogni programma (06/11/2026); le password proprie dei programmi restano valide come riserva.
 
 - **Analista Dati** e **Lettore DDT** aprono da soli la sessione dell'account con lo stesso username del portale (Analista lo crea se manca; DDT no: gli account DDT li crea l'amministratore). In **DDT e Magazzino** la commessa si sceglie all'ingresso dal registro della suite.
-- **SkyTower**, **InCampo** (anche l'app per telefono) e **VFP Transfer**, quando la loro password non coincide, chiedono al portale `POST /api/verifica-password` (header `X-Suite-Token`, corpo `{ login, password, app, ip }`; funzione `verificaPasswordApp` in `server.js`). Il portale riconosce la persona da username o email, applica gli stessi blocchi del login (sull'IP della persona, passato dal programma), rifiuta account disattivati, password temporanee non ancora cambiate e programmi non abilitati, e scrive `login-app` nel registro accessi.
+- **SkyTower**, **InCampo** (anche l'app per telefono) e **VFP Transfer**, quando la loro password non coincide, chiedono al portale `POST /api/verifica-password` (header `X-Suite-Token`, corpo `{ login, password, app, ip }`; funzione `verificaPasswordApp` in `server.js`). Il portale riconosce la persona da username o email, applica gli stessi blocchi del login (sull'IP della persona, passato dal programma), rifiuta account disattivati, password temporanee non ancora cambiate e programmi non abilitati (anche `vfp-transfer`, dall'11/11/2026 nel registro), e scrive `login-app` nel registro accessi. Dall'11/11/2026, a ogni login, anche `POST /api/suite/profilo` (vedi *Proprietario della suite e profilo valido ovunque*).
 - Dettagli e codici di risposta: `shared/suite/CONTRATTI.md` §2b; guida utente §1.8.
 
 ## Amministratore in base all'IP (per-app)
