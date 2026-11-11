@@ -606,11 +606,19 @@ _SEND_LOCK = threading.Lock()
 def api_session_info(sess):
     user = auth.get_user(sess["user"]) or {}
     return {"user": sess["user"], "role": sess["role"], "role_label": auth.ROLES.get(sess["role"], ""),
-            "email": user.get("email", ""), "area": sess.get("area", auth.AREA_PREDEFINITA), "areas": auth.AREE}
+            "email": user.get("email", ""), "area": sess.get("area", auth.AREA_PREDEFINITA), "areas": auth.AREE,
+            "portale": user.get("portale", "")}
 
 
-def api_users():
-    return {"users": auth.list_users(), "roles": auth.ROLES, "areas": auth.AREE, "min_password": auth.MIN_PASSWORD}
+def api_users(sess=None):
+    """Elenco utenti per la pagina Utenti. "proprietario": chi guarda e' il proprietario della suite (chiesto al
+    portale adesso: auth.e_proprietario), l'unico che puo' creare, modificare o eliminare amministratori
+    (decisione dell'utente dell'11/11/2026); la pagina disabilita quei comandi agli altri e lo spiega.
+    "dal_portale": la sessione di chi guarda e' entrata con l'identita' del portale (senza, non si e' mai
+    proprietari: serve entrare dal Portale o con la sua password)."""
+    return {"users": auth.list_users(), "roles": auth.ROLES, "areas": auth.AREE, "min_password": auth.MIN_PASSWORD,
+            "proprietario": auth.e_proprietario(sess), "dal_portale": bool((sess or {}).get("portale")),
+            "msg_proprietario": auth.MSG_SOLO_PROPRIETARIO, "msg_ruolo_portale": auth.MSG_RUOLO_DAL_PORTALE}
 
 
 def api_users_save(body, sess, token=""):
@@ -619,6 +627,13 @@ def api_users_save(body, sess, token=""):
             "update": f"modifica dell'utente {name}", "delete": f"eliminazione dell'utente {name}"}.get(action)
     if not what:
         raise ValueError("Operazione non valida")
+    # amministratori: solo il proprietario della suite; ruolo degli utenti collegati: lo decide il portale.
+    # Prima del codice via email, cosi' non arriva un codice per una modifica che verra' rifiutata.
+    try:
+        auth.controlla_modifica_utente(sess, action, name, body.get("role"))
+    except ValueError as e:
+        attivita.record(sess["user"], "sicurezza", "Modifica utente negata", f"{what}: {e}", "negato", role="admin")
+        raise
     auth.require_approval(token, sess["user"], what,
                           {k: body.get(k) for k in ("action", "name", "role", "email", "password", "area")}, body.get("otp"))
     if action == "add":
@@ -650,7 +665,7 @@ def api_users_save(body, sess, token=""):
         attivita.record(sess["user"], "modifica", "Utente eliminato", name, role="admin")
     else:
         raise ValueError("Operazione non valida")
-    return api_users()
+    return api_users(sess)
 
 
 # Report via email: cosa contiene e oggetto del messaggio, per area di chi lo chiede (None = amministratore)
@@ -1127,7 +1142,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/mail/log": ("admin", lambda: api_posta.mail_log(q)),
             "/api/protocol/check": ("admin", lambda: api_posta.protocol_check(q)),
             "/api/search": ("admin", lambda: api_posta.search(q)),
-            "/api/users": ("admin", lambda: api_users()),
+            "/api/users": ("admin", lambda: api_users(sess)),
             "/api/activity": ("admin", lambda: api_activity(q, self._token())),
             "/api/ai/status": ("admin", lambda: api_ai_status()),
             "/api/modelli/avvisi": ("admin", lambda: api_modelli_avvisi()),

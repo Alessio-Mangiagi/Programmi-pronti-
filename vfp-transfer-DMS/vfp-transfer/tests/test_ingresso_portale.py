@@ -1,9 +1,12 @@
 # "><(((º> sabusabu <º)))><"
 """Un solo login nella suite (09/11/2026): chi apre l'interfaccia con la sessione del Portale entra senza scrivere
-nulla, e l'amministratore del portale e' amministratore anche qui (auth.ingresso_dal_portale, vfp_gui.do_GET).
+nulla (auth.ingresso_dal_portale, vfp_gui.do_GET). Dall'11/11/2026 il profilo del portale vale anche qui: utente
+creato a chi e' abilitato, amministratore dato e tolto dal portale, nome ed email aggiornati, collegamento per
+username (cosi' un cambio di email non crea un secondo utente).
 
-Il portale e' finto (cosedil_sso.verifica_sessione sostituita): quello vero non viene mai chiamato. Gli utenti
-stanno in un dizionario in memoria; il registro attivita' e' spento. Il server HTTP e' vero, su una porta libera."""
+Il portale e' finto (cosedil_sso.verifica_sessione e auth.profilo_portale sostituite): quello vero non viene mai
+chiamato. Gli utenti stanno in un dizionario in memoria; il registro attivita' e' spento. Il server HTTP e' vero,
+su una porta libera."""
 
 import sys
 import threading
@@ -26,7 +29,19 @@ PERSONE = {
     "sid-utente": {"username": "laura", "email": "laura@cosedilspa.com", "ruolo": "utente", "admin": False},
     "sid-ip": {"username": "gino", "email": "gino@cosedilspa.com", "ruolo": "utente", "admin": True},
     "sid-nuovo": {"username": "piero", "email": "piero@cosedilspa.com", "ruolo": "utente", "admin": False},
+    "sid-ex": {"username": "boss", "email": "boss@cosedilspa.com", "ruolo": "utente", "admin": False},
+    "sid-no": {"username": "carlo", "email": "carlo@cosedilspa.com", "ruolo": "utente", "admin": False},
 }
+
+
+def profilo(username, **extra):
+    """Profilo del portale finto, come lo restituisce auth.profilo_portale (POST /api/suite/profilo)."""
+    p = next(x for x in PERSONE.values() if x["username"] == username)
+    base = {"raggiungibile": True, "trovato": True, "errore": "", "username": username,
+            "nome": username.title(), "email": p["email"], "ruolo": p["ruolo"], "admin": p["ruolo"] == "admin",
+            "proprietario": False, "disattivato": False, "must_change": False, "abilitato": username != "carlo"}
+    base.update(extra)
+    return base
 
 
 def utenti_iniziali():
@@ -35,6 +50,7 @@ def utenti_iniziali():
                        "area": "posta"},
         "gino": {"role": "utente", "hash": auth.hash_password("Locale-Gino-1"), "email": "", "area": "mezzi"},
         "A.Capo": {"role": "utente", "hash": auth.hash_password("Locale-Capo-1"), "email": "", "area": "documenti"},
+        "boss": {"role": "admin", "hash": auth.hash_password("Locale-Boss-1"), "email": "", "area": "documenti"},
     }
 
 
@@ -51,7 +67,21 @@ class _Base(unittest.TestCase):
                 return {"ok": False, "reachable": True, "admin": False, "username": None, "ruolo": None, "email": None}
             return {"ok": True, "reachable": True, "nome": p["username"], **p}
 
+        # profilo del portale: quello di PERSONE, cambiabile per test (self.profili[username] = {...})
+        self.profili = {}
+        self.portale_su = True
+
+        def profilo_finto(login, timeout=3):
+            if not self.portale_su:
+                return {"raggiungibile": False, "trovato": False, "errore": "Portale non raggiungibile"}
+            login = (login or "").lower()
+            for x in PERSONE.values():
+                if login in (x["username"], x["email"]):
+                    return self.profili.get(x["username"]) or profilo(x["username"])
+            return {"raggiungibile": True, "trovato": False, "errore": ""}
+
         self.patches = [
+            mock.patch.object(auth, "profilo_portale", profilo_finto),
             mock.patch.object(auth, "load_users", lambda: {k: dict(v) for k, v in self.utenti.items()}),
             mock.patch.object(auth, "_save_users", lambda users: self.utenti.update({k: dict(v) for k, v in users.items()})),
             mock.patch.object(auth.attivita, "record", lambda *a, **k: None),
@@ -73,6 +103,11 @@ class IngressoDalPortale(_Base):
         self.assertEqual((ruolo, nome), ("admin", "A.Capo"))
         self.assertEqual(self.utenti["A.Capo"]["role"], "admin")
         self.assertEqual(auth.session(token)["role"], "admin")
+        self.assertEqual(auth.session(token)["portale"], "a.capo", "la sessione ricorda l'identita' del portale")
+        self.assertEqual(self.utenti["A.Capo"]["portale"], "a.capo")
+        # utente nato qui e promosso dal portale: la sua password di qui non vale piu' (chi l'ha creato la conosceva)
+        with self.assertRaises(auth.AuthError):
+            auth.login("A.Capo", "Locale-Capo-1")
 
     def test_admin_del_portale_senza_utente_qui_viene_creato_amministratore(self):
         del self.utenti["A.Capo"]
@@ -80,6 +115,7 @@ class IngressoDalPortale(_Base):
         self.assertEqual((ruolo, nome), ("admin", "a.capo"))
         self.assertEqual(self.utenti["a.capo"]["role"], "admin")
         self.assertEqual(self.utenti["a.capo"]["email"], "a.capo@cosedilspa.com")
+        self.assertEqual((self.utenti["a.capo"]["origine"], self.utenti["a.capo"]["portale"]), ("portale", "a.capo"))
         # nessuno conosce la password dell'utente creato
         with self.assertRaises(auth.AuthError):
             auth.login("a.capo", "")
@@ -90,9 +126,43 @@ class IngressoDalPortale(_Base):
         self.assertEqual(auth.session(token)["area"], "posta")
         self.assertEqual(self.utenti["segreteria"]["role"], "utente")
 
-    def test_chi_non_ha_utente_qui_e_non_e_admin_resta_fuori(self):
+    def test_utente_abilitato_senza_utente_qui_viene_creato_utente_normale(self):
+        # 11/11/2026: non solo gli amministratori; ruolo utente, area predefinita (le aree le da' l'admin di qui)
+        token, ruolo, nome = auth.ingresso_dal_portale("sid=sid-nuovo")
+        self.assertEqual((ruolo, nome), ("utente", "piero"))
+        u = self.utenti["piero"]
+        self.assertEqual((u["role"], u["area"], u["origine"], u["portale"]), ("utente", "documenti", "portale", "piero"))
+        self.assertEqual((u["email"], u["nome"]), ("piero@cosedilspa.com", "Piero"))
+
+    def test_non_abilitato_o_disattivato_resta_fuori(self):
+        self.assertIsNone(auth.ingresso_dal_portale("sid=sid-no"))   # carlo: VFP Transfer non spuntato
+        self.assertNotIn("carlo", self.utenti)
+        self.profili["laura"] = profilo("laura", disattivato=True)
+        self.assertIsNone(auth.ingresso_dal_portale("sid=sid-utente"))
+
+    def test_admin_tolto_quando_il_portale_non_lo_da_piu(self):
+        token, ruolo, nome = auth.ingresso_dal_portale("sid=sid-ex")
+        self.assertEqual((ruolo, nome), ("utente", "boss"))
+        self.assertEqual(self.utenti["boss"]["role"], "utente")
+        # la password di qui resta (togliere l'admin non apre nessuna strada)
+        self.assertEqual(auth.login("boss", "Locale-Boss-1")[1], "utente")
+
+    def test_email_cambiata_nel_portale_stesso_utente_aggiornato(self):
+        auth.ingresso_dal_portale("sid=sid-utente")                  # laura -> segreteria (stessa email), collegata
+        self.profili["laura"] = profilo("laura", email="laura.nuova@cosedilspa.com", nome="Laura Neri")
+        token, ruolo, nome = auth.ingresso_dal_portale("sid=sid-utente")
+        self.assertEqual(nome, "segreteria", "collegata per username: niente secondo utente")
+        self.assertEqual(self.utenti["segreteria"]["email"], "laura.nuova@cosedilspa.com")
+        self.assertEqual(self.utenti["segreteria"]["nome"], "Laura Neri")
+        self.assertNotIn("laura", self.utenti)
+
+    def test_portale_senza_rotta_del_profilo_come_prima(self):
+        # portale di una versione precedente: si entra con i dati di /api/verify, un utente nuovo solo all'admin
+        self.portale_su = False
         self.assertIsNone(auth.ingresso_dal_portale("sid=sid-nuovo"))
         self.assertNotIn("piero", self.utenti)
+        token, ruolo, nome = auth.ingresso_dal_portale("sid=sid-utente")
+        self.assertEqual((ruolo, nome), ("utente", "segreteria"))
 
     def test_admin_solo_da_regola_ip_non_promosso(self):
         token, ruolo, nome = auth.ingresso_dal_portale("sid=sid-ip")

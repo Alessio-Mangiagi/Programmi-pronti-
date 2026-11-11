@@ -13,10 +13,22 @@ Le sessioni sono solo in memoria: chiudendo il programma tutti devono rientrare.
 Password del portale: chi ha un utente qui entra anche con la password del Portale Suite Cosedil
 (una password per tutti i programmi, scelta del 06/11/2026). Se la password di VFP Transfer non coincide,
 login() chiede al portale (shared/sso/cosedil_sso.verifica_password) se e' quella del portale; l'utente di
-qui e' quello con lo stesso nome dello username del portale o con la stessa email. Gli utenti si creano
-qui (con il codice all'amministratore); unica eccezione dal 09/11/2026: l'amministratore del portale che apre
-l'interfaccia con la sessione del portale entra da solo ed e' amministratore anche qui, creato se manca
-(ingresso_dal_portale, un solo login nella suite).
+qui e' quello collegato a quello username del portale (campo "portale"), altrimenti quello con lo stesso nome
+o con la stessa email. Chi apre l'interfaccia con la sessione del portale entra da solo (ingresso_dal_portale,
+un solo login nella suite, 09/11/2026).
+
+Profilo del portale valido anche qui (decisione dell'utente dell'11/11/2026, "2b 3b 4a" e "gli admin li creo e
+li cancello solo io"):
+  - chi e' abilitato a VFP Transfer nel portale e non ha un utente qui lo riceve al primo ingresso dal portale
+    (ruolo utente, area predefinita: le aree le assegna l'amministratore di qui), collegato per username;
+  - per gli utenti collegati al portale il ruolo amministratore lo decide il portale: dato E tolto a ogni
+    ingresso; nome ed email si aggiornano dal portale;
+  - a ogni login, anche con la password di qui, si chiede il profilo al portale (POST /api/suite/profilo):
+    utente disattivato o VFP Transfer non spuntato -> accesso rifiutato; portale spento -> si entra lo stesso
+    e resta traccia nel registro (le password di qui restano valide). Le sessioni gia' aperte non si
+    ricontrollano (scelta 2b: solo al login);
+  - dare o togliere l'amministratore, creare, modificare o eliminare un amministratore: solo il proprietario
+    della suite (utente del portale con "proprietario": true), chiesto al portale nel momento in cui agisce.
 
 Ogni modifica a utenti e credenziali richiede un codice monouso inviato via email SOLO all'amministratore
 (ADMIN_EMAIL): valido 10 minuti, legato a quella modifica, 5 tentativi. Finche' l'invio email non e'
@@ -39,6 +51,8 @@ import secrets
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 
 import attivita
 import cassaforte
@@ -47,6 +61,11 @@ import mail_send
 
 # Modulo SSO condiviso della suite (shared/sso, due cartelle sopra): serve per la password del portale.
 _SSO = env_config.BASE_DIR.resolve().parents[1] / "shared" / "sso"
+APP_ID = "vfp-transfer"  # id del programma nel portale (spunta in Amministrazione > Utenti del portale)
+
+MSG_SOLO_PROPRIETARIO = "Solo il proprietario della suite gestisce gli amministratori"
+MSG_RUOLO_DAL_PORTALE = ("Ruolo deciso dal Portale: il proprietario della suite lo cambia in "
+                         "Amministrazione > Utenti del Portale")
 
 USERS_PATH = env_config.BASE_DIR / "utenti.json"
 ROLES = {"admin": "Amministratore", "utente": "Utente"}
@@ -233,9 +252,12 @@ def _log_line(text):
 
 
 def list_users():
+    # "portale": username del portale a cui l'utente e' collegato (vuoto = utente solo di qui); "nome": nome e
+    # cognome dal portale. Servono alla pagina Utenti per mostrare "dal Portale" e bloccare il ruolo.
     return [{"name": n, "role": u["role"], "role_label": ROLES[u["role"]], "email": u.get("email", ""),
              "area": area_di(u), "area_label": AREE[area_di(u)],
-             "created": u.get("created", ""), "last_login": u.get("last_login", "")}
+             "created": u.get("created", ""), "last_login": u.get("last_login", ""),
+             "portale": u.get("portale", ""), "nome": u.get("nome", ""), "origine": u.get("origine", "")}
             for n, u in sorted(load_users().items())]
 
 
@@ -328,26 +350,91 @@ def get_user(name):
 
 # --------------------------------------------------------------------------- accesso e sessioni
 
-def _utente_dal_portale(users, name, password, ip):
-    """Nome dell'utente di VFP Transfer per cui ``password`` e' la password del portale, oppure None.
-
-    Il portale riconosce la persona da cio' che ha scritto (username o email del portale), controlla la
-    password con i suoi blocchi sull'IP della persona e risponde con username ed email: qui vale l'utente
-    con lo stesso nome dello username, altrimenti quello con la stessa email (uno solo). Portale spento,
-    COSEDIL_SSO=off, password sbagliata o nessun utente corrispondente: None, e il login fallisce come prima.
-    """
+def _sso():
+    """Modulo SSO condiviso della suite (shared/sso/cosedil_sso.py), oppure None per una copia del programma fuori
+    dalla suite (allora valgono solo gli utenti e le password di qui)."""
     try:
-        import sys
         if str(_SSO) not in sys.path:
             sys.path.insert(0, str(_SSO))
         import cosedil_sso
-        v = cosedil_sso.verifica_password(name, password, "vfp-transfer", ip=ip)
-    except Exception:  # modulo condiviso assente (copia del programma fuori dalla suite): solo password locale
+        return cosedil_sso
+    except Exception:
         return None
-    if not v.get("ok"):
-        return None
-    username = (v.get("username") or "").lower()
-    email = (v.get("email") or "").lower()
+
+
+def profilo_portale(login, timeout=3):
+    """Profilo della persona nel Portale Suite Cosedil (POST /api/suite/profilo, contratto in
+    shared/suite/CONTRATTI.md). ``login`` e' lo username del portale o la sua email.
+
+    Chiamata da server a server con il token della suite (header X-Suite-Token): il browser non c'entra. Non
+    solleva mai. Ritorna un dict con:
+      raggiungibile  False se il portale e' spento, lo SSO e' spento (COSEDIL_SSO=off), il token e' rifiutato o
+                     il portale e' di una versione senza questa rotta (404): chi chiama decide cosa fare;
+      trovato        True se il portale conosce la persona; allora anche username, nome, email, ruolo,
+                     admin (ruolo admin e non disattivato), proprietario, disattivato, must_change, abilitato
+                     (puo' usare VFP Transfer: spunta del programma, o amministratore del portale);
+      errore         il motivo quando raggiungibile e' False (per il registro).
+    """
+    esito = {"raggiungibile": False, "trovato": False, "errore": ""}
+    sso = _sso()
+    if sso is None:
+        esito["errore"] = "modulo SSO della suite assente"
+        return esito
+    if not sso.ENABLED:
+        esito["errore"] = "verifica col portale spenta (COSEDIL_SSO=off)"
+        return esito
+    login = (login or "").strip()
+    if not login:
+        esito["raggiungibile"] = True
+        return esito
+    corpo = json.dumps({"login": login, "app": APP_ID}).encode("utf-8")
+    try:
+        req = urllib.request.Request(sso.PORTAL + "/api/suite/profilo", data=corpo, method="POST",
+                                     headers={"Content-Type": "application/json", "Accept": "application/json",
+                                              "X-Suite-Token": sso._token_suite()})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            dati = json.loads(resp.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        esito["errore"] = {403: "token della suite rifiutato dal portale",
+                           404: "il portale non ha ancora /api/suite/profilo (versione precedente)"}.get(
+            e.code, f"risposta {e.code} del portale")
+        return esito
+    except Exception:  # portale spento, rete, JSON rotto, token della suite non leggibile
+        esito["errore"] = "Portale non raggiungibile"
+        return esito
+    if not isinstance(dati, dict) or not dati.get("ok"):
+        esito["errore"] = "risposta del portale non valida"
+        return esito
+    esito["raggiungibile"] = True
+    if not dati.get("trovato") or not str(dati.get("username") or "").strip():
+        return esito
+    disattivato = bool(dati.get("disattivato"))
+    esito.update(trovato=True, username=str(dati["username"]).strip(), nome=str(dati.get("nome") or "").strip(),
+                 email=str(dati.get("email") or "").strip(), ruolo=dati.get("ruolo"),
+                 admin=bool(dati.get("admin")) and dati.get("ruolo") == "admin" and not disattivato,
+                 proprietario=bool(dati.get("proprietario")) and not disattivato, disattivato=disattivato,
+                 must_change=bool(dati.get("mustChange")), abilitato=bool(dati.get("abilitato")))
+    return esito
+
+
+def _motivo_rifiuto(p):
+    """Perche' il portale non lascia entrare questa persona in VFP Transfer (None = puo' entrare).
+    ``abilitato`` None vuol dire "non si sa" (portale di una versione senza /api/suite/profilo)."""
+    if p.get("disattivato"):
+        return "Account del Portale disattivato: rivolgiti a un amministratore"
+    if p.get("abilitato") is False:
+        return ("VFP Transfer non è fra i tuoi programmi del Portale: chiedi l'abilitazione a un amministratore")
+    return None
+
+
+def _nome_per_portale(users, username, email):
+    """Utente di qui per la persona del portale: prima quello collegato a quello username (campo "portale",
+    cosi' un cambio di email nel portale non crea un secondo utente), poi lo stesso nome, poi la stessa email
+    (una sola: un'email condivisa da due utenti non identifica nessuno)."""
+    username, email = (username or "").lower(), (email or "").lower()
+    collegati = [n for n, u in users.items() if username and (u.get("portale") or "").lower() == username]
+    if collegati:
+        return collegati[0]
     per_nome = [n for n in users if n.lower() == username]
     if per_nome:
         return per_nome[0]
@@ -355,11 +442,132 @@ def _utente_dal_portale(users, name, password, ip):
     return per_email[0] if len(per_email) == 1 else None
 
 
+def _allinea_account(users, nome, p, identita):
+    """Allinea l'utente di qui ``nome`` al profilo ``p`` del portale (trovato). Modifica ``users`` (che chi chiama
+    salva) e ritorna gli eventi da scrivere nel registro, come coppie (azione, dettaglio).
+
+    ``identita`` e' True solo quando il portale ha confermato chi e' la persona (sessione del portale o sua
+    password). Allora l'utente si collega allo username del portale, nome ed email si aggiornano e il ruolo
+    amministratore si puo' DARE. Con la sola password di qui (identita False) l'amministratore si puo' solo
+    TOGLIERE: altrimenti un utente creato qui con il nome di un amministratore del portale diventerebbe
+    amministratore senza che nessuno l'abbia deciso.
+
+    Quando il portale promuove un utente nato qui (non creato dal portale), la sua password di qui viene sostituita
+    con una casuale: chi l'aveva scelta o la conosceva (un altro amministratore che l'ha creato) non deve ritrovarsi
+    amministratore. Si continua a entrare dal portale o con la password del portale.
+    """
+    u = users[nome]
+    eventi = []
+    if identita:
+        if (u.get("portale") or "") != p["username"]:
+            u["portale"] = p["username"]
+            eventi.append(("Utente collegato al Portale", p["username"]))
+        if p.get("email") and (u.get("email") or "").strip().lower() != p["email"].lower():
+            u["email"] = p["email"]
+            eventi.append(("Email aggiornata dal Portale", p["email"]))
+        if p.get("nome"):
+            u["nome"] = p["nome"]
+        if p.get("admin") and u["role"] != "admin":
+            u["role"] = "admin"
+            eventi.append(("Ruolo amministratore dal Portale", "amministratore del Portale"))
+            if u.get("origine") != "portale":
+                u["hash"] = hash_password(secrets.token_urlsafe(32))
+                eventi.append(("Password di qui sostituita", "diventato amministratore dal Portale: si entra dal "
+                                                             "Portale o con la password del Portale"))
+    if not p.get("admin") and u["role"] == "admin":
+        u["role"] = "utente"
+        eventi.append(("Ruolo amministratore tolto dal Portale", "non è amministratore nel Portale"))
+    return eventi
+
+
+def _registra(nome, eventi, role=""):
+    for azione, dettaglio in eventi:
+        attivita.record(nome, "sicurezza", azione, dettaglio, role=role or "")
+
+
+def _utente_dal_portale(users, name, password, ip):
+    """(nome dell'utente di qui, esito del portale) se ``password`` e' la password del portale di chi ha scritto
+    ``name``, altrimenti None.
+
+    Il portale riconosce la persona da cio' che ha scritto (username o email del portale), controlla la password
+    con i suoi blocchi sull'IP della persona (e rifiuta chi e' disattivato o non abilitato) e risponde con username
+    ed email: qui vale l'utente trovato da _nome_per_portale. Portale spento, COSEDIL_SSO=off, password sbagliata
+    o nessun utente corrispondente: None, e il login fallisce come prima.
+    """
+    sso = _sso()
+    if sso is None:  # copia del programma fuori dalla suite: solo password locale
+        return None
+    try:
+        v = sso.verifica_password(name, password, APP_ID, ip=ip)
+    except Exception:
+        return None
+    if not v.get("ok"):
+        return None
+    nome = _nome_per_portale(users, v.get("username"), v.get("email"))
+    return (nome, v) if nome else None
+
+
+def _controllo_al_login(nome, v=None):
+    """Profilo del portale al login (scelte 2b e 3b dell'11/11/2026). Solleva AuthError se il portale non lascia
+    entrare la persona; altrimenti allinea l'utente di qui e ritorna lo username del portale quando l'identita'
+    e' confermata (va nella sessione: serve per riconoscere il proprietario), altrimenti None.
+
+    ``v``: esito di cosedil_sso.verifica_password quando si e' entrati con la password del portale (identita'
+    confermata). Senza ``v`` si e' entrati con la password di qui: si cerca nel portale l'utente collegato, poi lo
+    stesso nome, poi la stessa email; se il portale non lo conosce l'utente e' solo di qui e nulla cambia.
+    """
+    users = load_users()
+    u = users.get(nome) or {}
+    if v:
+        p = profilo_portale(v.get("username"))
+        if not p["raggiungibile"]:
+            # portale senza /api/suite/profilo: valgono i dati della verifica della password (il portale ha gia'
+            # rifiutato chi e' disattivato o non abilitato)
+            p = {"raggiungibile": False, "trovato": True, "username": v.get("username"), "nome": v.get("nome") or "",
+                 "email": v.get("email") or "", "admin": v.get("ruolo") == "admin" and bool(v.get("admin")),
+                 "disattivato": False, "abilitato": None}
+        identita = True
+    else:
+        chiavi = [u.get("portale")] if u.get("portale") else [nome, u.get("email")]
+        p = {"raggiungibile": True, "trovato": False}
+        for chiave in [c for c in chiavi if c]:
+            p = profilo_portale(chiave)
+            if not p["raggiungibile"] or p["trovato"]:
+                break
+        identita = False
+        if not p["raggiungibile"]:
+            # 3b: le password di qui restano valide anche a portale spento, ma resta traccia
+            _log_line(f"accesso di {nome} senza verifica del profilo nel Portale ({p.get('errore')})")
+            attivita.record(nome, "sicurezza", "Accesso senza verifica del Portale", p.get("errore") or "")
+            return None
+        if not p["trovato"]:
+            if u.get("portale"):  # era collegato a un utente che il portale non ha piu' (eliminato)
+                attivita.record(nome, "sicurezza", "Accesso negato", "utente del Portale non piu' presente",
+                                "negato")
+                raise AuthError("Il tuo utente del Portale non esiste più: rivolgiti a un amministratore")
+            return None  # utente solo di qui: nessun profilo da seguire
+    motivo = _motivo_rifiuto(p)
+    if motivo:
+        attivita.record(nome, "sicurezza", "Accesso negato dal Portale", motivo, "negato")
+        raise AuthError(motivo)
+    with _lock:
+        users = load_users()
+        if nome not in users:
+            raise AuthError("Nome utente o password non corretti")
+        eventi = _allinea_account(users, nome, p, identita)
+        if eventi:
+            _save_users(users)
+        role = users[nome]["role"]
+    _registra(nome, eventi, role)
+    return p["username"] if identita else None
+
+
 def login(name, password, ip=None):
     """Restituisce (token, ruolo). Blocca l'utente per 15 minuti dopo 5 tentativi sbagliati.
 
     Vale la password di VFP Transfer oppure quella del portale (vedi _utente_dal_portale); ``ip`` e' l'indirizzo
-    di chi entra, passato al portale per i suoi blocchi sui tentativi.
+    di chi entra, passato al portale per i suoi blocchi sui tentativi. Con la password giusta si chiede comunque
+    il profilo al portale (_controllo_al_login): disattivato o non abilitato -> AuthError con il motivo.
     """
     global _DUMMY_HASH
     name = (name or "").strip()[:64]
@@ -380,94 +588,142 @@ def login(name, password, ip=None):
             _DUMMY_HASH = hash_password(secrets.token_hex(8))
         verify_password(password or "", _DUMMY_HASH)  # stesso tempo di risposta di un utente esistente
         ok = False
+    v = None
     if not ok and password:
         # non e' la password di qui: puo' essere quella del portale (anche scrivendo username o email del portale)
         dal_portale = _utente_dal_portale(users, name, password, ip)
         if dal_portale:
-            match, ok = dal_portale, True
-            attivita.record(match, "accesso", "Accesso con la password del Portale", "")
+            (match, v), ok = dal_portale, True
     if not ok:
         with _lock:
             _failures.setdefault(key, []).append(time.time())
         raise AuthError("Nome utente o password non corretti")
     with _lock:
         _failures.pop(key, None)
-        token = secrets.token_urlsafe(32)
-        _sessions[token] = {"user": match, "role": users[match]["role"], "created": now, "seen": now}
+    # la password e' giusta: ora decide il profilo del portale (puo' rifiutare, togliere o dare l'admin)
+    portale = _controllo_al_login(match, v)
+    if v:
+        attivita.record(match, "accesso", "Accesso con la password del Portale", "")
+    with _lock:
         users = load_users()
+        token = secrets.token_urlsafe(32)
+        _sessions[token] = {"user": match, "role": users.get(match, {}).get("role", "utente"), "created": now,
+                            "seen": now, "portale": portale}
         if match in users:
             users[match]["last_login"] = time.strftime("%Y-%m-%dT%H:%M:%S")
             _save_users(users)
     return token, users.get(match, {}).get("role", "utente")
 
 
-def _nome_per_portale(users, username, email):
-    """Utente di qui per la persona del portale: stesso nome dello username, altrimenti la stessa email (una sola)."""
-    username, email = (username or "").lower(), (email or "").lower()
-    per_nome = [n for n in users if n.lower() == username]
-    if per_nome:
-        return per_nome[0]
-    per_email = [n for n, u in users.items() if email and (u.get("email") or "").strip().lower() == email]
-    return per_email[0] if len(per_email) == 1 else None
-
-
 def ingresso_dal_portale(cookie_header, ip=None):
-    """Un solo login nella suite (richiesta dell'utente del 09/11/2026): chi apre l'interfaccia con la sessione del
-    Portale Suite Cosedil (cookie ``sid``, che il browser manda anche qui: stesso host) entra senza scrivere nulla.
+    """Un solo login nella suite (09/11/2026): chi apre l'interfaccia con la sessione del Portale Suite Cosedil
+    (cookie ``sid``, che il browser manda anche qui: stesso host) entra senza scrivere nulla.
 
-    - Utente di qui collegato alla persona del portale (stesso nome o stessa email, come per la password del
-      portale): entra con il suo ruolo e la sua area.
-    - **Amministratore del portale** (ruolo ``admin`` in utenti.json): e' amministratore anche qui, con tutte le
-      aree. Se l'utente di qui era "utente" viene promosso; se manca viene creato (nome = username del portale,
-      password casuale che nessuno conosce: si entra dal portale o con la password del portale). E' la sola
-      eccezione alla regola "gli utenti si creano solo qui con il codice all'amministratore": la decisione e'
-      dell'utente ("le mie credenziali valgono come admin ovunque") e l'identita' l'ha gia' verificata il portale.
-      L'admin concesso da una regola IP del portale non basta (vale solo davanti a quel PC). Solo promozione.
-    - Chiunque altro senza utente qui: None, resta la pagina di accesso di sempre.
+    Dall'11/11/2026 (profilo del portale valido ovunque):
+    - la persona deve essere abilitata a VFP Transfer nel portale (spunta del programma, o amministratore del
+      portale) e non disattivata: altrimenti None e resta la pagina di accesso;
+    - se non ha un utente qui viene creato, collegato al suo username del portale: amministratore se lo e' nel
+      portale, altrimenti utente con l'area predefinita (le aree le assegna l'amministratore di qui). Password
+      casuale che nessuno conosce: si entra dal portale o con la password del portale;
+    - se ce l'ha (collegato, stesso nome o stessa email) il ruolo amministratore segue il portale, dato e tolto,
+      e nome ed email si aggiornano (_allinea_account con identita' confermata).
+    L'admin concesso da una regola IP del portale non basta: conta il ruolo "admin" del profilo.
 
     Al portale va solo ``sid=<valore>`` (non il cookie di sessione di VFP Transfer). Portale spento, COSEDIL_SSO=off
     o modulo condiviso assente (copia fuori dalla suite): None. Ritorna (token, ruolo, nome) oppure None.
     """
-    try:
-        import sys
-        if str(_SSO) not in sys.path:
-            sys.path.insert(0, str(_SSO))
-        import cosedil_sso
-    except Exception:  # copia del programma fuori dalla suite: solo login locale
+    sso = _sso()
+    if sso is None:  # copia del programma fuori dalla suite: solo login locale
         return None
-    sid = cosedil_sso.leggi_sid(cookie_header or "")
-    if not cosedil_sso.ENABLED or not sid:
+    sid = sso.leggi_sid(cookie_header or "")
+    if not sso.ENABLED or not sid:
         return None
-    v = cosedil_sso.verifica_sessione(f"sid={sid}", "vfp-transfer")
+    v = sso.verifica_sessione(f"sid={sid}", APP_ID)
     username = (v.get("username") or "").strip()
     if not v.get("ok") or not username:
         return None
-    admin_portale = v.get("ruolo") == "admin" and bool(v.get("admin"))
-    evento = None
+    p = profilo_portale(username)
+    if not p["raggiungibile"]:
+        # portale di una versione senza /api/suite/profilo: come prima dell'11/11 con i soli dati di /api/verify.
+        # L'abilitazione non si conosce, quindi un utente nuovo nasce solo per l'amministratore del portale.
+        p = {"raggiungibile": False, "trovato": True, "username": username, "nome": v.get("nome") or "",
+             "email": v.get("email") or "", "admin": v.get("ruolo") == "admin" and bool(v.get("admin")),
+             "disattivato": False, "abilitato": None}
+    if not p["trovato"]:
+        return None
+    motivo = _motivo_rifiuto(p)
+    if motivo:
+        attivita.record(username, "accesso", "Ingresso dal Portale negato", motivo, "negato")
+        return None
     with _lock:
         users = load_users()
-        nome = _nome_per_portale(users, username, v.get("email"))
+        nome = _nome_per_portale(users, p["username"], p.get("email"))
         if nome is None:
-            if not admin_portale or not _NAME_RE.match(username):
+            if not _NAME_RE.match(p["username"]) or (p["abilitato"] is None and not p["admin"]):
                 return None
-            nome = username
-            users[nome] = {"role": "admin", "hash": hash_password(secrets.token_urlsafe(32)),
-                           "email": (v.get("email") or "").strip(), "area": AREA_PREDEFINITA,
-                           "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "origine": "portale"}
-            evento = ("Utente creato dal Portale", "amministratore del Portale")
-        elif admin_portale and users[nome]["role"] != "admin":
-            users[nome]["role"] = "admin"
-            evento = ("Ruolo amministratore dal Portale", "amministratore del Portale")
+            nome = p["username"]
+            users[nome] = {"role": "admin" if p["admin"] else "utente",
+                           "hash": hash_password(secrets.token_urlsafe(32)),
+                           "email": p.get("email") or "", "area": AREA_PREDEFINITA, "nome": p.get("nome") or "",
+                           "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "origine": "portale",
+                           "portale": p["username"]}
+            eventi = [("Utente creato dal Portale",
+                       "amministratore del Portale" if p["admin"] else "utente abilitato a VFP Transfer nel Portale")]
+        else:
+            eventi = _allinea_account(users, nome, p, identita=True)
         users[nome]["last_login"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         _save_users(users)
         role = users[nome]["role"]
         token = secrets.token_urlsafe(32)
         now = time.time()
-        _sessions[token] = {"user": nome, "role": role, "created": now, "seen": now}
-    if evento:
-        attivita.record(nome, "sicurezza", evento[0], evento[1], role=role)
+        _sessions[token] = {"user": nome, "role": role, "created": now, "seen": now, "portale": p["username"]}
+    _registra(nome, eventi, role)
     attivita.record(nome, "accesso", "Accesso dal Portale", "", role=role)
     return token, role, nome
+
+
+# --------------------------------------------------------------------------- amministratori: solo il proprietario
+
+def e_proprietario(sess):
+    """True se chi agisce e' il proprietario della suite, chiesto al portale adesso (non in cache).
+
+    Serve una sessione aperta con l'identita' confermata dal portale (ingresso dal portale o password del portale:
+    campo "portale" della sessione). Con la sola password di qui la risposta e' sempre False: un utente di qui
+    con lo stesso nome del proprietario non e' il proprietario. Portale spento: False (si rifiuta)."""
+    login = (sess or {}).get("portale")
+    if not login:
+        return False
+    p = profilo_portale(login)
+    return bool(p["raggiungibile"] and p["trovato"] and p.get("proprietario"))
+
+
+def controlla_modifica_utente(sess, action, name, role=None):
+    """Regole sugli amministratori (decisione dell'utente dell'11/11/2026: "gli admin li creo e li cancello solo
+    io"). Solleva ValueError con il motivo da mostrare; non tocca nulla. Va chiamata PRIMA del codice di
+    autorizzazione via email, cosi' non si manda un codice per una modifica che verra' rifiutata.
+
+    - Ruolo di un utente collegato al portale: lo decide il portale, qui non si cambia (MSG_RUOLO_DAL_PORTALE).
+    - Creare un amministratore, dare o togliere il ruolo amministratore, eliminare un amministratore, cambiare
+      password, email o area di un altro amministratore: solo il proprietario della suite (MSG_SOLO_PROPRIETARIO).
+      Altrimenti un amministratore qualsiasi potrebbe crearne altri, o prendere l'utente di un amministratore
+      cambiandogli la password.
+    - La propria password ognuno la cambia da se'.
+    """
+    users = load_users()
+    target = users.get(name)
+    if action == "update" and role is not None and target and role != target["role"] and target.get("portale"):
+        raise ValueError(MSG_RUOLO_DAL_PORTALE)
+    serve_proprietario = False
+    if action == "add":
+        serve_proprietario = role == "admin"
+    elif target is not None:
+        cambia_ruolo = action == "update" and role is not None and role != target["role"]
+        if cambia_ruolo and "admin" in (role, target["role"]):
+            serve_proprietario = True
+        elif target["role"] == "admin" and name != (sess or {}).get("user"):
+            serve_proprietario = action in ("update", "password", "delete")
+    if serve_proprietario and not e_proprietario(sess):
+        raise ValueError(MSG_SOLO_PROPRIETARIO)
 
 
 def session(token):

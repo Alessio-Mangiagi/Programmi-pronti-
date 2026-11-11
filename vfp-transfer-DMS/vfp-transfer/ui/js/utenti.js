@@ -218,23 +218,49 @@ function renderUsers(d) {
   const scelta = $('#uaArea').value;
   $('#uaArea').innerHTML = Object.entries(d.areas).map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('');
   if (d.areas[scelta]) $('#uaArea').value = scelta;
-  $('#usersHint').textContent = `Password di almeno ${d.min_password} caratteri. Chi cambia ruolo o password deve rientrare.`;
+  // Amministratori (decisione dell'11/11/2026): li crea, modifica ed elimina solo il proprietario della suite,
+  // riconosciuto dal portale (d.proprietario, chiesto dal server adesso). Agli altri amministratori i comandi
+  // restano visibili ma spenti, con il motivo nel suggerimento; il server rifiuta comunque (auth.controlla_modifica_utente).
+  // Il ruolo degli utenti collegati al portale (u.portale) lo decide il portale: qui la tendina e' sempre spenta.
+  const capo = !!d.proprietario;
+  let hint = `Password di almeno ${d.min_password} caratteri. Chi cambia ruolo o password deve rientrare.`;
+  if (!capo) {
+    hint += ` ${d.msg_proprietario}`
+      + (d.dal_portale ? '.' : ': per farti riconoscere entra dal Portale o con la password del Portale.');
+  }
+  $('#usersHint').textContent = hint;
+  const optAdmin = $('#uaRole option[value=admin]');
+  if (optAdmin) {
+    optAdmin.disabled = !capo;
+    optAdmin.title = capo ? '' : d.msg_proprietario;
+    if (!capo && $('#uaRole').value === 'admin') { $('#uaRole').value = 'utente'; syncAreaField(); }
+  }
   $('#usersBody').innerHTML = d.users.map((u) => {
     const me = u.name === state.me.user;
+    const altroAdmin = u.role === 'admin' && !me;
     const roles = Object.entries(d.roles).map(([k, l]) => `<option value="${esc(k)}" ${k === u.role ? 'selected' : ''}>${esc(l)}</option>`).join('');
     const areas = Object.entries(d.areas).map(([k, l]) => `<option value="${esc(k)}" ${k === u.area ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    // perche' la tendina del ruolo e' spenta (vuoto = si puo' cambiare)
+    const ruoloBloccato = me ? 'Non puoi cambiare il tuo ruolo'
+      : u.portale ? d.msg_ruolo_portale
+        : !capo ? d.msg_proprietario : '';
+    const adminBloccato = altroAdmin && !capo ? d.msg_proprietario : '';
     // l'amministratore vede tutte le aree: l'area conta solo per gli utenti normali
     const area = u.role === 'admin' ? '<span class="muted small">Tutte</span>'
       : `<select data-act="area" aria-label="Area di ${esc(u.name)}">${areas}</select>`;
+    const portale = u.portale
+      ? `<span class="badge b-mute me-tag" title="Collegato all'utente ${esc(u.portale)} del Portale: ruolo, nome ed email li decide il Portale">dal Portale</span>`
+        + (u.nome ? `<span class="fdir">${esc(u.nome)}</span>` : '')
+      : '';
     return `<tr data-user="${esc(u.name)}">
-      <td><strong>${esc(u.name)}</strong>${me ? '<span class="badge b-info me-tag">tu</span>' : ''}</td>
-      <td><select data-act="role" aria-label="Ruolo di ${esc(u.name)}" ${me ? 'disabled' : ''}>${roles}</select></td>
+      <td><strong>${esc(u.name)}</strong>${me ? '<span class="badge b-info me-tag">tu</span>' : ''}${portale}</td>
+      <td><select data-act="role" aria-label="Ruolo di ${esc(u.name)}" ${ruoloBloccato ? `disabled title="${esc(ruoloBloccato)}"` : ''}>${roles}</select></td>
       <td>${area}</td>
       <td class="small">${esc(u.email || '—')}</td>
       <td class="nowrap mono small">${u.last_login ? fmtWhen(u.last_login) : 'mai'}</td>
       <td class="num"><span class="user-actions">
-        <button class="btn btn-ghost btn-sm" type="button" data-act="password"><svg class="ic"><use href="#i-key"/></svg>Password</button>
-        ${me ? '' : '<button class="btn btn-danger-outline btn-sm" type="button" data-act="delete"><svg class="ic"><use href="#i-x"/></svg>Elimina</button>'}
+        <button class="btn btn-ghost btn-sm" type="button" data-act="password" ${adminBloccato ? `disabled title="${esc(adminBloccato)}"` : ''}><svg class="ic"><use href="#i-key"/></svg>Password</button>
+        ${me ? '' : `<button class="btn btn-danger-outline btn-sm" type="button" data-act="delete" ${adminBloccato ? `disabled title="${esc(adminBloccato)}"` : ''}><svg class="ic"><use href="#i-x"/></svg>Elimina</button>`}
       </span></td>
     </tr>`;
   }).join('');
