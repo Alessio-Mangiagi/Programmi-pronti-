@@ -23,7 +23,11 @@ import {
   login, logout, sessionUser, mustChangePw, changePassword, defaultAdminPasswordInUse,
   parseCookies, setCookie, clearCookie, COOKIE, sessioneDalPortale,
   createUser, listUsers, deleteUser, userCount, setRole, resetPassword, generateTempPassword,
+  puoGestireAdmin, vietatoSuUtenti, ssoAttivo, MSG_SOLO_PROPRIETARIO, type IdentitaPortale,
 } from './server/auth.ts'
+
+/** Persona del Portale Suite di questa richiesta (req.cosedil messo dal gate SSO), se c'è. */
+const idPortale = (req: express.Request) => (req as express.Request & { cosedil?: IdentitaPortale }).cosedil
 import { usageSummary, CLAUDE_DAILY_TOKEN_BUDGET } from './server/usage.ts'
 import {
   connectionsAvailable, listConnections, saveConnection, deleteConnection, getConnectionConfig,
@@ -142,7 +146,7 @@ app.use(cosedilSSO({ app: 'agente' }) as express.RequestHandler)
  * mostra mai la schermata di login. Senza gate (COSEDIL_SSO=off) non fa niente.
  */
 app.use((req, res, next) => {
-  const id = (req as express.Request & { cosedil?: { username: string | null; nome?: string | null; admin?: boolean; ruolo?: string | null } }).cosedil
+  const id = idPortale(req)
   if (!AUTH_ENABLED || !id?.username) return next()
   const cookies = parseCookies(req.headers.cookie)
   sessioneDalPortale(id, cookies[COOKIE]).then((nuova) => {
@@ -260,9 +264,17 @@ app.post('/api/auth/login', rateLimit, asyncH(async (req, res) => {
   const { username, password } = req.body as { username?: string; password?: string }
   const ctx = ctxFromReq(req)
   if (!username || !password) return res.status(400).json({ error: 'Credenziali mancanti' })
-  // col portale aperto la sessione resta legata a chi è entrato nel portale (vedi sessioneDalPortale)
-  const r = await login(username, password, (req as express.Request & { cosedil?: { username: string | null } }).cosedil?.username ?? null)
+  // col portale aperto si entra solo nel proprio account, e la sessione resta legata a chi è entrato nel
+  // portale (vedi login e sessioneDalPortale in server/auth.ts)
+  const r = await login(username, password, idPortale(req)?.username ?? null)
   if (!r.ok) {
+    if (r.reason === 'altro-account') {
+      log('login_altro_account_rifiutato', ctx, { username: String(username).slice(0, 40), portale: r.portale })
+      return res.status(403).json({
+        error: `Sei entrato nel Portale come «${r.portale}»: qui puoi usare solo il tuo account. ` +
+          "Per entrare con un altro account esci dal Portale e rientra con quell'utente.",
+      })
+    }
     if (r.reason === 'locked') {
       const min = Math.ceil((r.retryInMs || 0) / 60_000)
       log('login_locked', ctx, { username: String(username).slice(0, 40) })
@@ -1089,10 +1101,21 @@ async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T, i: numb
   return out
 }
 
-app.get('/api/users', requireAdmin, (_req, res) => res.json({ users: listUsers() }))
+// ── Utenti (admin) ────────────────────────────────────────────────────────────
+// Profilo del portale valido anche qui (11/11/2026): gli admin li crea, promuove, declassa ed elimina solo il
+// proprietario della suite, e il ruolo degli account delle persone del portale (users.portale = 1) lo decide il
+// portale. Le regole stanno in vietatoSuUtenti (server/auth.ts); qui le si applica a ogni rotta.
+// `gestioneAdmin` dice alla pagina Utenti se mostrare attivi i comandi sugli admin; `sso` se c'è il portale.
+app.get('/api/users', requireAdmin, (req, res) =>
+  res.json({ users: listUsers(), gestioneAdmin: puoGestireAdmin(idPortale(req)), sso: ssoAttivo() }))
 
 app.post('/api/users', requireAdmin, asyncH(async (req, res) => {
   const { username, password, role, mustChange } = req.body as { username?: string; password?: string; role?: string; mustChange?: boolean }
+  const no = vietatoSuUtenti({ azione: 'crea', ruolo: role === 'admin' ? 'admin' : 'user' }, idPortale(req))
+  if (no) {
+    log('user_admin_negato', ctxFromReq(req), { azione: 'crea', username: String(username ?? '').slice(0, 40), by: req.user?.username })
+    return res.status(no.status).json({ error: no.error })
+  }
   try {
     // Default: forza il cambio password al 1° accesso (l'utente sceglie la propria).
     const u = await createUser(String(username), String(password), role === 'admin' ? 'admin' : 'user', mustChange !== false)
@@ -1112,6 +1135,11 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   // "><(((º> sabusabu <º)))><"
   const target = users.find(u => u.id === id)
   if (!target) return res.status(404).json({ error: 'Utente inesistente' })
+  const no = vietatoSuUtenti({ azione: 'ruolo', ruolo: role, target }, idPortale(req))
+  if (no) {
+    log('user_admin_negato', ctxFromReq(req), { azione: 'ruolo', username: target.username, role, by: req.user?.username })
+    return res.status(no.status).json({ error: no.error })
+  }
   if (target.role === 'admin' && role === 'user' && users.filter(u => u.role === 'admin').length <= 1) {
     return res.status(400).json({ error: 'Deve restare almeno un admin' })
   }
@@ -1125,6 +1153,12 @@ app.post('/api/users/:id/reset-password', requireAdmin, asyncH(async (req, res) 
   const id = Number(req.params.id)
   const target = listUsers().find(u => u.id === id)
   if (!target) return res.status(404).json({ error: 'Utente inesistente' })
+  // la password temporanea di un admin la vede chi la chiede: varrebbe come prendersi il suo account
+  const no = vietatoSuUtenti({ azione: 'reset', target }, idPortale(req))
+  if (no) {
+    log('user_admin_negato', ctxFromReq(req), { azione: 'reset', username: target.username, by: req.user?.username })
+    return res.status(no.status).json({ error: no.error })
+  }
   const tempPassword = await resetPassword(id)
   log('user_password_reset', ctxFromReq(req), { username: target.username, by: req.user?.username })
   res.json({ username: target.username, tempPassword })
@@ -1135,6 +1169,11 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
   if (id === req.user?.id) return res.status(400).json({ error: 'Non puoi eliminare il tuo account' })
   const users = listUsers()
   const target = users.find(u => u.id === id)
+  const no = target ? vietatoSuUtenti({ azione: 'elimina', target }, idPortale(req)) : null
+  if (no && target) {
+    log('user_admin_negato', ctxFromReq(req), { azione: 'elimina', username: target.username, by: req.user?.username })
+    return res.status(no.status).json({ error: no.error })
+  }
   if (target?.role === 'admin' && users.filter(u => u.role === 'admin').length <= 1) {
     return res.status(400).json({ error: 'Deve restare almeno un admin' })
   }
@@ -1152,13 +1191,19 @@ app.post('/api/users/import', requireAdmin, asyncH(async (req, res) => {
     return res.status(400).json({ error: 'Nessun utente nel file' })
   }
   if (rows.length > 500) return res.status(400).json({ error: 'Massimo 500 utenti per import' })
+  // righe con ruolo admin: solo per il proprietario della suite; per gli altri la riga va in errore, le altre passano
+  const ammessiAdmin = puoGestireAdmin(idPortale(req))
   // Bounded (4 in parallelo = grandezza threadpool scrypt): niente freeze, nessun flood.
   const results = await mapBounded(rows, 4, async (r, i) => {
     const { username, password, role } = (r || {}) as { username?: unknown; password?: unknown; role?: unknown }
+    const ruolo = String(role).toLowerCase() === 'admin' ? 'admin' : 'user'
+    if (ruolo === 'admin' && !ammessiAdmin) {
+      return { row: i + 1, username: String(username ?? ''), ok: false as const, error: MSG_SOLO_PROPRIETARIO }
+    }
     const provided = String(password ?? '').trim()
     const temp = provided ? '' : generateTempPassword()
     try {
-      const u = await createUser(String(username ?? ''), provided || temp, String(role).toLowerCase() === 'admin' ? 'admin' : 'user', true)
+      const u = await createUser(String(username ?? ''), provided || temp, ruolo, true)
       return { row: i + 1, username: u.username, ok: true as const, generatedPassword: temp || undefined }
     } catch (e) {
       return { row: i + 1, username: String(username ?? ''), ok: false as const, error: (e as Error).message }

@@ -52,8 +52,16 @@ async function downloadWorkbook(rows: Record<string, unknown>[], filename: strin
   XLSX.writeFile(wb, filename)
 }
 
+// Testi delle regole del profilo del portale (11/11/2026), uguali a quelli del server (server/auth.ts).
+const SOLO_PROPRIETARIO = 'Solo il proprietario della suite gestisce gli amministratori'
+const DAL_PORTALE = 'Il ruolo di questo account lo decide il Portale Suite: si cambia nel Portale, in Amministrazione > Utenti'
+
 export function UsersTab({ meId }: { meId: number }) {
   const [users, setUsers] = useState<UserRow[]>([])
+  // gestioneAdmin: chi guarda può creare/promuovere/declassare/eliminare gli admin (solo il proprietario della
+  // suite, o l'agente fuori dalla suite); sso: c'è il portale, quindi gli account del portale seguono il portale.
+  const [gestioneAdmin, setGestioneAdmin] = useState(true)
+  const [sso, setSso] = useState(false)
   const [username, setU] = useState('')
   const [password, setP] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -65,8 +73,16 @@ export function UsersTab({ meId }: { meId: number }) {
   const [preview, setPreview] = useState<PreviewRow[] | null>(null)
   const [importRes, setImportRes] = useState<ImportResult[] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const load = async () => setUsers((await apiFetch('/api/users').then(x => x.json())).users || [])
+  const load = async () => {
+    const d = await apiFetch('/api/users').then(x => x.json())
+    setUsers(d.users || [])
+    setGestioneAdmin(d.gestioneAdmin !== false)   // server vecchio senza il campo: come prima
+    setSso(!!d.sso)
+  }
   useEffect(() => { load() }, [])
+  // il ruolo admin non si può scegliere nel modulo: torna a "Utente" se era rimasto selezionato
+  useEffect(() => { if (!gestioneAdmin) setRole('user') }, [gestioneAdmin])
+  const dalPortale = (u: UserRow) => sso && u.portale === 1
 
   const flash = (msg: string) => { setOk(msg); setTimeout(() => setOk(''), 4000) }
 
@@ -167,26 +183,42 @@ export function UsersTab({ meId }: { meId: number }) {
     <div className="admin-cols">
       <div className="admin-col">
         <h3>Utenti</h3>
-        {users.map(u => (
-          <div key={u.id} className="job-row">
-            <div className="job-main">
-              <div className="job-name">
-                {u.username}
-                {!!u.must_change_pw && <span className="muted" title="Deve cambiare la password"> · 🔑</span>}
+        {!gestioneAdmin && (
+          <div className="muted" style={{ marginBottom: 8 }}>
+            {SOLO_PROPRIETARIO}: qui gestisci gli utenti semplici. Gli account delle persone del Portale
+            hanno il ruolo deciso dal Portale.
+          </div>
+        )}
+        {users.map(u => {
+          // comandi su un admin (ruolo, reset password, elimina): solo per chi gestisce gli admin
+          const bloccatoAdmin = u.role === 'admin' && !gestioneAdmin
+          return (
+            <div key={u.id} className="job-row">
+              <div className="job-main">
+                <div className="job-name">
+                  {u.username}
+                  {!!u.must_change_pw && <span className="muted" title="Deve cambiare la password"> · 🔑</span>}
+                  {dalPortale(u) && <span className="muted" title={DAL_PORTALE}> · deciso dal portale</span>}
+                </div>
+              </div>
+              <div className="job-actions">
+                {u.id !== meId && !dalPortale(u) ? (
+                  <select value={u.role} onChange={e => changeRole(u, e.target.value as 'user' | 'admin')}
+                    disabled={!gestioneAdmin} title={gestioneAdmin ? 'Cambia ruolo' : SOLO_PROPRIETARIO}
+                    style={{ marginRight: 4 }}>
+                    <option value="user">Utente</option><option value="admin">Admin</option>
+                  </select>
+                ) : <span className="muted" style={{ marginRight: 4 }} title={dalPortale(u) ? DAL_PORTALE : undefined}>({u.role})</span>}
+                <button onClick={() => resetPw(u)} disabled={bloccatoAdmin}
+                  title={bloccatoAdmin ? SOLO_PROPRIETARIO : 'Reset password'}><IconKey size={13} /></button>
+                {u.id !== meId && (
+                  <button onClick={() => del(u)} disabled={bloccatoAdmin}
+                    title={bloccatoAdmin ? SOLO_PROPRIETARIO : 'Elimina'}><IconTrash size={13} /></button>
+                )}
               </div>
             </div>
-            <div className="job-actions">
-              {u.id !== meId ? (
-                <select value={u.role} onChange={e => changeRole(u, e.target.value as 'user' | 'admin')}
-                  title="Cambia ruolo" style={{ marginRight: 4 }}>
-                  <option value="user">Utente</option><option value="admin">Admin</option>
-                </select>
-              ) : <span className="muted" style={{ marginRight: 4 }}>({u.role})</span>}
-              <button onClick={() => resetPw(u)} title="Reset password"><IconKey size={13} /></button>
-              {u.id !== meId && <button onClick={() => del(u)} title="Elimina"><IconTrash size={13} /></button>}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       <div className="admin-col">
         <h3>Nuovo utente</h3>
@@ -200,7 +232,8 @@ export function UsersTab({ meId }: { meId: number }) {
           </div></div>
         <div className="field"><label>Ruolo</label>
           <select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}>
-            <option value="user">Utente</option><option value="admin">Amministratore</option>
+            <option value="user">Utente</option>
+            <option value="admin" disabled={!gestioneAdmin}>Amministratore{gestioneAdmin ? '' : ' (solo il proprietario)'}</option>
           </select></div>
         <label className="field" style={{ display: 'flex', alignItems: 'center', gap: 8, flexDirection: 'row' }}>
           <input type="checkbox" checked={mustChange} onChange={e => setMustChange(e.target.checked)} style={{ width: 'auto' }} />
@@ -211,7 +244,8 @@ export function UsersTab({ meId }: { meId: number }) {
         <h3 style={{ marginTop: 24 }}>Importa da Excel</h3>
         <div className="muted" style={{ marginBottom: 8 }}>
           File .xlsx con colonna <code>username</code> (o <code>utente</code>); <code>password</code> è
-          opzionale (vuota → generata dal server); <code>ruolo</code> opzionale (<code>user</code>/<code>admin</code>).
+          opzionale (vuota → generata dal server); <code>ruolo</code> opzionale (<code>user</code>/<code>admin</code>
+          {gestioneAdmin ? '' : ': le righe admin le importa solo il proprietario della suite'}).
           <button className="btn-export" style={{ marginLeft: 6 }} onClick={downloadTemplate}>Scarica template</button>
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" disabled={importing}

@@ -4,7 +4,11 @@
  *  - sessioni via cookie HttpOnly (token casuale), persistite in SQLite;
  *  - bootstrap: al primo avvio crea un admin (da env ADMIN_USER/ADMIN_PASSWORD);
  *  - ingresso dal Portale Suite senza seconda password (sessioneDalPortale): l'utente
- *    del portale trova qui il suo account con lo stesso username, creato se manca.
+ *    del portale trova qui il suo account con lo stesso username, creato se manca;
+ *  - profilo del portale valido anche qui (11/11/2026): il ruolo admin di quell'account segue
+ *    il portale (dato e tolto), col portale aperto si entra solo nel proprio account, e gli
+ *    amministratori li crea, promuove, declassa ed elimina solo il proprietario della suite
+ *    (puoGestireAdmin / vietatoSuUtenti, usate dalle rotte /api/users di server.ts).
  *
  * Auth attiva di default; per lo sviluppo locale monoutente: AUTH_ENABLED=0.
  */
@@ -149,8 +153,10 @@ export function defaultAdminPasswordInUse(): boolean {
   return r.c > 0
 }
 
-export function listUsers(): Array<{ id: number; username: string; role: string; created_at: string; must_change_pw: number }> {
-  return appdb.prepare('SELECT id, username, role, created_at, must_change_pw FROM users ORDER BY username').all() as any
+/** Elenco utenti per l'area admin. `portale` = 1 se l'account è di una persona del Portale Suite (ci è entrata
+ *  almeno una volta dal portale): il suo ruolo lo decide il portale, non la pagina Utenti dell'agente. */
+export function listUsers(): Array<{ id: number; username: string; role: string; created_at: string; must_change_pw: number; portale: number }> {
+  return appdb.prepare('SELECT id, username, role, created_at, must_change_pw, portale FROM users ORDER BY username').all() as any
 }
 
 /** Elimina utente + relative sessioni in una transazione (mai un utente orfano a metà). */
@@ -201,9 +207,12 @@ function noteSuccess(username: string): void {
 }
 
 // ── sessioni (cookie) ─────────────────────────────────────────────────────────
+/** Esito del login a mano. 'altro-account' = col portale aperto si è provato a entrare in un account che non è
+ *  quello della persona del portale (vedi login). */
 export type LoginResult =
   | { ok: true; token: string; user: AuthUser; mustChange: boolean }
   | { ok: false; reason: 'bad' | 'locked'; retryInMs?: number }
+  | { ok: false; reason: 'altro-account'; portale: string }
 
 /** Apre una sessione per l'utente (riga di users) e ritorna il token del cookie. `portale` = utente del portale. */
 function apriSessione(row: { id: number; username: string; role: Role }, portale: string | null): string {
@@ -217,10 +226,19 @@ function apriSessione(row: { id: number; username: string; role: Role }, portale
 
 /**
  * Login con username e password dell'app. `portale` è lo username del Portale Suite di chi
- * sta facendo il login (req.cosedil del gate), se c'è: lega la sessione a quella persona,
- * così l'ingresso automatico dal portale non la sostituisce (vedi sessioneDalPortale).
+ * sta facendo il login (req.cosedil del gate), se c'è: lega la sessione a quella persona.
+ *
+ * Col portale aperto si entra SOLO nel proprio account (stesso username del portale): dall'11/11/2026
+ * il profilo del portale vale in ogni programma, e prima chi era nel portale poteva fare il login a mano
+ * su un altro account dell'agente — anche l'admin iniziale — e ne prendeva il ruolo. Il controllo viene
+ * prima della password: un tentativo su un altro account non dice se la password era giusta e non
+ * consuma i tentativi del blocco anti brute-force di quell'account.
+ * Senza portale (gate spento, portale giù con COSEDIL_SSO_FAIL=open) il login a mano resta libero.
  */
 export async function login(username: string, password: string, portale: string | null = null): Promise<LoginResult> {
+  if (portale && normUsername(username) !== normUsername(portale)) {
+    return { ok: false, reason: 'altro-account', portale: normUsername(portale) }
+  }
   const lock = lockRemainingMs(username)
   if (lock > 0) return { ok: false, reason: 'locked', retryInMs: lock }
 
@@ -239,33 +257,104 @@ export async function login(username: string, password: string, portale: string 
   return { ok: true, token, user: { id: row.id, username: row.username, role: row.role }, mustChange: row.must_change_pw === 1 }
 }
 
-/** Chi arriva dal portale (identità messa dal gate SSO in req.cosedil). `ruolo` = ruolo in utenti.json del
- *  portale ('admin' / 'utente'); `admin` = admin per l'agente (anche da regola IP del portale). */
-export interface IdentitaPortale { username: string | null; nome?: string | null; admin?: boolean; ruolo?: string | null }
-
-/**
- * Amministratore del portale = admin anche qui (regola della suite del 09/11/2026: "le mie credenziali valgono
- * come admin ovunque"). Se il ruolo nel portale è 'admin' e l'account dell'agente non lo è, lo si promuove,
- * insieme alle sue sessioni aperte (il ruolo della sessione è copiato in sessions.role). Solo promozione: chi
- * smette di essere admin nel portale non perde il ruolo qui (lo toglie un admin dalla pagina Utenti), e l'admin
- * per l'agente concesso da una regola IP del portale non basta, perché il ruolo resterebbe anche lontano da quel PC.
- * Ritorna true se ha promosso.
- */
-function promuoviAdminDalPortale(id: IdentitaPortale, userId: number): boolean {
-  if (id.ruolo !== 'admin' || !id.admin) return false
-  const r = appdb.prepare("UPDATE users SET role='admin' WHERE id=? AND role<>'admin'").run(userId)
-  if (Number(r.changes) === 0) return false
-  appdb.prepare("UPDATE sessions SET role='admin' WHERE user_id=?").run(userId)
-  log('ruolo_admin_dal_portale', {}, { userId })
-  return true
+/** Chi arriva dal portale (identità messa dal gate SSO in req.cosedil, da GET /api/verify del portale).
+ *  - `ruolo` = ruolo in utenti.json del portale ('admin' / 'utente'), letto fresco dal portale;
+ *  - `admin` = admin per l'agente secondo il portale, che comprende anche una regola IP (data/ip-admin.json):
+ *    vale per la richiesta, NON basta per un ruolo admin salvato qui;
+ *  - `proprietario` = il proprietario della suite (oggi a.mangiagi): l'unico che crea, promuove, declassa ed
+ *    elimina gli amministratori, nel portale e in ogni programma (decisione dell'utente dell'11/11/2026). */
+export interface IdentitaPortale {
+  username: string | null; nome?: string | null; admin?: boolean; ruolo?: string | null; proprietario?: boolean
 }
 
-/** Sessione già aperta: promuove l'account solo se è proprio quello della persona del portale (stesso username).
- *  Un login a mano su un altro account fatto col portale aperto resta com'è. */
-function allineaAdmin(id: IdentitaPortale, usernameSessione: string, chi: string): void {
-  if (usernameSessione !== chi) return
-  const u = appdb.prepare('SELECT id FROM users WHERE username=?').get(chi) as { id: number } | undefined
-  if (u) promuoviAdminDalPortale(id, u.id)
+/** Ruolo che il portale assegna qui: 'admin' se è amministratore del portale, 'user' per ogni altro ruolo noto;
+ *  null se il portale non ha mandato il ruolo (portale vecchio): allora non si tocca niente, mai declassare
+ *  qualcuno per un dato mancante. */
+function ruoloDalPortale(id: IdentitaPortale): Role | null {
+  if (typeof id.ruolo !== 'string' || !id.ruolo.trim()) return null
+  return id.ruolo.trim().toLowerCase() === 'admin' ? 'admin' : 'user'
+}
+
+/**
+ * Il profilo del portale vale anche qui (regola dell'11/11/2026, che estende quella del 09/11 "le mie credenziali
+ * valgono come admin ovunque"): l'account con lo stesso username della persona del portale ha il ruolo admin SE E
+ * SOLO SE è amministratore del portale. Dato e tolto: chi smette di essere admin nel portale torna 'user' qui al
+ * primo passaggio dal gate (cache del gate 30 s), sessioni aperte comprese (il ruolo della sessione è copiato in
+ * sessions.role e requireAdmin guarda quello). L'admin da regola IP del portale non conta: il ruolo resterebbe
+ * anche lontano da quel PC. L'account viene segnato `portale = 1`: da lì la pagina Utenti dell'agente non ne
+ * cambia più il ruolo. Gli account senza persona del portale (admin iniziale, utenti creati qui) non passano di qui.
+ * Ritorna il ruolo dell'account dopo l'allineamento.
+ */
+function allineaRuoloDalPortale(id: IdentitaPortale, row: { id: number; username: string; role: Role }): Role {
+  const voluto = ruoloDalPortale(id)
+  if (!voluto) {
+    appdb.prepare('UPDATE users SET portale=1 WHERE id=? AND portale<>1').run(row.id)
+    return row.role
+  }
+  const r = appdb.prepare('UPDATE users SET role=?, portale=1 WHERE id=? AND (role<>? OR portale<>1)').run(voluto, row.id, voluto)
+  if (Number(r.changes) > 0 && row.role !== voluto) {
+    appdb.prepare('UPDATE sessions SET role=? WHERE user_id=?').run(voluto, row.id)
+    log(voluto === 'admin' ? 'ruolo_admin_dal_portale' : 'ruolo_admin_tolto_dal_portale', {}, { userId: row.id, username: row.username })
+  }
+  return voluto
+}
+
+/** Sessione già aperta della persona del portale: riallinea il ruolo del suo account (stesso username). */
+function allineaAdmin(id: IdentitaPortale, chi: string): void {
+  const u = appdb.prepare('SELECT id, username, role FROM users WHERE username=?').get(chi) as
+    { id: number; username: string; role: Role } | undefined
+  if (u) allineaRuoloDalPortale(id, u)
+}
+
+/** Il gate SSO del portale è acceso? Stessa regola di shared/sso/cosedil-sso.js (COSEDIL_SSO=off lo spegne).
+ *  Letto a ogni chiamata, non all'avvio, così i test lo possono cambiare. */
+export function ssoAttivo(): boolean {
+  return (process.env.COSEDIL_SSO || 'on').toLowerCase() !== 'off'
+}
+
+export const MSG_SOLO_PROPRIETARIO = 'Solo il proprietario della suite gestisce gli amministratori'
+export const MSG_DECISO_DAL_PORTALE =
+  'Il ruolo di questo account lo decide il Portale Suite: si cambia nel Portale, in Amministrazione > Utenti'
+
+/**
+ * Chi può dare o togliere il ruolo admin, creare o importare un admin, eliminare un admin o azzerarne la
+ * password (che varrebbe come prendersi il suo account). Decisione dell'utente dell'11/11/2026: "gli admin
+ * devono essere creati solo da me, io posso creare e cancellare gli admin" → solo il proprietario della suite,
+ * riconosciuto dal portale (req.cosedil.proprietario). Gli altri admin gestiscono gli utenti semplici.
+ * Eccezioni: autenticazione spenta (AUTH_ENABLED=0, sviluppo monoutente) e gate spento (COSEDIL_SSO=off,
+ * agente installato da solo fuori dalla suite): lì non c'è un portale che dica chi è il proprietario, e gli
+ * admin dell'agente gestiscono tutto come prima. Con il gate acceso ma il portale giù (COSEDIL_SSO_FAIL=open)
+ * il proprietario non si può riconoscere: niente gestione degli admin finché il portale non torna.
+ */
+export function puoGestireAdmin(id: IdentitaPortale | undefined): boolean {
+  if (!AUTH_ENABLED || !ssoAttivo()) return true
+  return id?.proprietario === true
+}
+
+/** Operazione dall'area admin sugli utenti dell'agente (rotte /api/users in server.ts). */
+export type OperazioneUtenti =
+  | { azione: 'crea'; ruolo: Role }
+  | { azione: 'ruolo'; ruolo: Role; target: { role: string; portale?: number } }
+  | { azione: 'elimina' | 'reset'; target: { role: string; portale?: number } }
+
+/**
+ * Regole del profilo del portale sulle rotte /api/users: ritorna lo stato HTTP e il messaggio se l'operazione
+ * non è permessa a chi la chiede, null se si può fare (restano poi le guardie della rotta: "non il tuo ruolo",
+ * "almeno un admin"). Sta qui, e non nelle rotte, per poterla provare nei test senza avviare il server.
+ *  - ruolo di un account del portale: lo decide il portale, mai la pagina Utenti (409), nemmeno per il
+ *    proprietario — lo cambierebbe qui e il portale lo rimetterebbe al prossimo ingresso;
+ *  - creare/importare un admin, dare o togliere admin, eliminare un admin, azzerare la password di un admin:
+ *    solo il proprietario (403).
+ */
+export function vietatoSuUtenti(op: OperazioneUtenti, id: IdentitaPortale | undefined): { status: number; error: string } | null {
+  const proprietario = puoGestireAdmin(id)
+  if (op.azione === 'crea') return op.ruolo === 'admin' && !proprietario ? { status: 403, error: MSG_SOLO_PROPRIETARIO } : null
+  if (op.azione === 'ruolo') {
+    if (op.target.portale === 1 && ssoAttivo()) return { status: 409, error: MSG_DECISO_DAL_PORTALE }
+    const tocca = op.ruolo !== op.target.role && (op.ruolo === 'admin' || op.target.role === 'admin')
+    return tocca && !proprietario ? { status: 403, error: MSG_SOLO_PROPRIETARIO } : null
+  }
+  return op.target.role === 'admin' && !proprietario ? { status: 403, error: MSG_SOLO_PROPRIETARIO } : null
 }
 
 /**
@@ -274,13 +363,16 @@ function allineaAdmin(id: IdentitaPortale, usernameSessione: string, chi: string
  *  - la sessione del cookie è già di questa persona del portale → null, niente da fare;
  *  - la sessione è di un'altra persona del portale (cambio utente sullo stesso browser),
  *    o è vecchia (senza portale) e di un altro username → chiusa, e si riparte;
+ *  - la sessione è di un ALTRO account (login a mano fatto col portale aperto prima
+ *    dell'11/11/2026) → chiusa anche lei: col portale si usa solo il proprio account;
  *  - si cerca l'account con lo stesso username del portale; se manca lo si crea, ruolo
- *    admin solo se il portale lo dice admin per l'agente, con una password casuale che
- *    nessuno conosce (si entra dal portale; il login a mano resta per gli account vecchi).
+ *    admin solo se è amministratore del portale (ruolo 'admin'; la regola IP non basta),
+ *    con una password casuale che nessuno conosce (si entra dal portale; il login a mano
+ *    resta per gli account vecchi e a gate spento);
+ *  - a ogni passaggio il ruolo admin dell'account segue il portale, dato e tolto
+ *    (allineaRuoloDalPortale).
  * Ritorna la nuova sessione da mettere nel cookie, o null se non serve o non si può
  * (username del portale non valido qui, AUTH_ENABLED=0): allora resta il login a mano.
- * Un login a mano su un altro account, fatto col portale aperto, resta valido: è legato
- * alla stessa persona del portale (colonna sessions.portale).
  */
 export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenAttuale?: string):
   Promise<{ token: string; user: AuthUser; creato: boolean } | null> {
@@ -290,16 +382,15 @@ export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenA
     const s = appdb.prepare('SELECT username, portale, expires_at FROM sessions WHERE token=?').get(hashToken(tokenAttuale)) as
       { username: string; portale: string | null; expires_at: string } | undefined
     if (s && new Date(s.expires_at).getTime() >= Date.now()) {
-      if (s.portale === chi) {
-        allineaAdmin(id, s.username, chi)
+      if (s.username === chi && (s.portale === chi || s.portale == null)) {
+        // la sessione è già della persona del portale; quelle vecchie (senza portale) si legano a lei
+        if (s.portale == null) appdb.prepare('UPDATE sessions SET portale=? WHERE token=?').run(chi, hashToken(tokenAttuale))
+        allineaAdmin(id, chi)
         return null
       }
-      if (s.portale == null && s.username === chi) {
-        appdb.prepare('UPDATE sessions SET portale=? WHERE token=?').run(chi, hashToken(tokenAttuale))
-        allineaAdmin(id, s.username, chi)
-        return null
-      }
-      logout(tokenAttuale) // sessione di un'altra persona del portale: non deve restare aperta
+      // sessione di un'altra persona del portale, o di un altro account: non deve restare aperta
+      log('sessione_altro_account_chiusa', {}, { portale: chi, account: s.username })
+      logout(tokenAttuale)
     }
   }
   if (!USERNAME_RE.test(chi)) return null
@@ -308,7 +399,8 @@ export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenA
   let creato = false
   if (!row) {
     try {
-      row = await createUser(chi, generateTempPassword(24), id.admin ? 'admin' : 'user', false)
+      // admin solo per l'amministratore del portale: l'admin da regola IP (id.admin con ruolo 'utente') non basta
+      row = await createUser(chi, generateTempPassword(24), ruoloDalPortale(id) === 'admin' ? 'admin' : 'user', false)
       creato = true
     } catch (e) {
       // due richieste insieme per la stessa persona: l'altra l'ha appena creato
@@ -316,9 +408,8 @@ export async function sessioneDalPortale(id: IdentitaPortale | undefined, tokenA
         { id: number; username: string; role: Role } | undefined
       if (!row) throw e
     }
-  } else if (promuoviAdminDalPortale(id, row.id)) {
-    row = { ...row, role: 'admin' }
   }
+  row = { ...row, role: allineaRuoloDalPortale(id, row) }
   const token = apriSessione(row, chi)
   return { token, user: { id: row.id, username: row.username, role: row.role }, creato }
 }
@@ -376,7 +467,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next()
 }
 
-/** Richiede ruolo admin (gestione utenti/connessioni/job). */
+/** Richiede ruolo admin (gestione utenti/connessioni/job). Guarda il ruolo della sessione (sessions.role): per una
+ *  persona del portale lo tiene allineato sessioneDalPortale a ogni richiesta, quindi un ex amministratore del
+ *  portale non passa più di qui (dall'11/11/2026; prima restava admin finché qualcuno non lo declassava a mano). */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (req.user?.role !== 'admin') { res.status(403).json({ error: 'Riservato agli amministratori' }); return }
   next()

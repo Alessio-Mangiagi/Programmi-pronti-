@@ -166,6 +166,11 @@ addColumn('users', 'must_change_pw INTEGER NOT NULL DEFAULT 0')
 // portale aperto): se nel portale cambia persona sullo stesso browser, la sessione non vale più
 // (vedi sessioneDalPortale in auth.ts). NULL = sessione aperta prima del 06/11/2026 o senza portale.
 addColumn('sessions', 'portale TEXT')
+// Account di una persona del Portale Suite (1 = ci è entrata almeno una volta dal portale, stesso username).
+// Per questi account il ruolo admin lo decide il portale, dato e tolto a ogni ingresso (regola dell'11/11/2026:
+// "il profilo del portale vale in ogni programma"); la pagina Utenti dell'agente non lo può cambiare.
+// 0 = account solo dell'agente (admin iniziale, utenti creati o importati qui): restano gestiti qui.
+addColumn('users', 'portale INTEGER NOT NULL DEFAULT 0')
 // Esempio CONFERMATO dall'utente (👍): pesa di più nel ranking few-shot e
 // sopravvive più a lungo alla retention (un "riuscito" non è per forza corretto).
 addColumn('fewshot', 'confirmed INTEGER NOT NULL DEFAULT 0')

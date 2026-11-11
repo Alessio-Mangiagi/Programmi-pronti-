@@ -15,6 +15,8 @@ export interface Run {
   status: string; filename: string | null; engine: string | null; sections: number | null; error: string | null
 }
 
-export interface UserRow { id: number; username: string; role: string; created_at: string; must_change_pw?: number }
+/** Utente dell'agente (GET /api/users). `portale` = 1: account di una persona del Portale Suite, il ruolo lo
+ *  decide il portale (11/11/2026) e la pagina Utenti lo mostra senza poterlo cambiare. */
+export interface UserRow { id: number; username: string; role: string; created_at: string; must_change_pw?: number; portale?: number }
 
 export interface HealthLite { local?: boolean; claude?: boolean; connectionsStore?: boolean }
