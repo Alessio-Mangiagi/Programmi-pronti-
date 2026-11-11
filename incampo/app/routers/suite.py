@@ -73,6 +73,10 @@ def _utente_suite(db: Session, utente: Optional[str]) -> Optional[models.User]:
     if not utente:
         return None
     u = utente.strip().lower()
+    # prima il collegamento stabile col portale (users.portale_username, dall'11/11/2026)
+    collegato = db.query(models.User).filter(models.User.portale_username == u, models.User.is_active.is_(True)).first()
+    if collegato is not None:
+        return collegato
     for user in db.query(models.User).filter(models.User.is_active.is_(True)).all():
         email = (user.email or "").lower()
         # la parte prima della @ vale solo per le email del dominio della suite: altrimenti uno username del
@@ -123,63 +127,273 @@ def verifica_portale(cookie: str) -> dict:
     return esito
 
 
+# Utente del portale e utente InCampo (regola della suite dell'11/11/2026: "il profilo del portale vale in ogni
+# programma"; scelte dell'utente 2b 3b 4a e "gli admin li creo e li cancello solo io"):
+# - l'account InCampo di una persona del portale è collegato al suo username (users.portale_username);
+# - nome ed email seguono il portale a ogni ingresso;
+# - amministratore = ruolo admin nel portale, DATO E TOLTO a ogni ingresso (la regola IP del portale non basta);
+# - gli altri ruoli (manager, field) restano decisi in InCampo;
+# - disattivato o InCampo tolto nel portale → niente login, controllato SOLO al login (scelta 2b: il JWT da 12 h
+#   non richiede il portale a ogni richiesta);
+# - la password di InCampo resta valida (scelta 3b), ma anche lei passa dal controllo del portale;
+# - dare o togliere l'amministratore dentro InCampo: solo il proprietario della suite (oggi a.mangiagi).
+# Contratto delle rotte del portale: shared/suite/CONTRATTI.md.
+
+MSG_SOLO_PROPRIETARIO = "Solo il proprietario della suite gestisce gli amministratori"
+
+
+def _ruolo_predefinito_portale() -> UserRole:
+    """Ruolo di chi arriva dal portale senza essere admin (INCAMPO_RUOLO_PORTALE, default manager; mai admin)."""
+    try:
+        ruolo = UserRole((os.environ.get("INCAMPO_RUOLO_PORTALE") or "manager").strip().lower())
+    except ValueError:
+        return UserRole.manager
+    return UserRole.manager if ruolo == UserRole.admin else ruolo
+
+
 def _utente_esistente_dal_portale(db: Session, dati: dict) -> Optional[models.User]:
-    """L'utente InCampo già esistente dell'utente del portale (email, poi parte prima della @ = username), o None."""
-    email = dati["email"]
+    """L'utente InCampo già esistente dell'utente del portale, o None.
+
+    Prima il collegamento stabile (``portale_username``), poi, per chi non è ancora collegato, come prima
+    dell'11/11: email uguale, oppure parte prima della @ = username fra le email del dominio della suite. Un
+    account già collegato a un ALTRO utente del portale non si aggancia mai (sarebbe un'altra persona)."""
     username = dati["username"]
+    user = db.query(models.User).filter(models.User.portale_username == username).first()
+    if user is not None:
+        return user
+    email = dati["email"]
     user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        # ripiego sullo username solo fra le email del dominio della suite e mai su un admin: altrimenti un
-        # utente del portale chiamato come la parte locale di un account admin (es. della demo) entrerebbe
-        # come quell'admin senza password (revisione di sicurezza del 03/11/2026)
-        for u in db.query(models.User).all():
-            em = (u.email or "").lower()
-            if em.endswith("@" + EMAIL_DOMINIO) and em.split("@")[0] == username and u.role != UserRole.admin:
-                user = u
-                break
-    return user
+    if user is not None:
+        return user if user.portale_username in (None, username) else None
+    # ripiego sullo username solo fra le email del dominio della suite e mai su un admin: altrimenti un
+    # utente del portale chiamato come la parte locale di un account admin (es. della demo) entrerebbe
+    # come quell'admin senza password (revisione di sicurezza del 03/11/2026)
+    for u in db.query(models.User).filter(models.User.portale_username.is_(None)).all():
+        em = (u.email or "").lower()
+        if em.endswith("@" + EMAIL_DOMINIO) and em.split("@")[0] == username and u.role != UserRole.admin:
+            return u
+    return None
 
 
 def allinea_admin_dal_portale(db: Session, user: models.User, dati: dict, request: Request) -> bool:
-    """Amministratore del portale = admin anche in InCampo (regola della suite del 09/11/2026: "le mie
-    credenziali valgono come admin ovunque"). Prima il ruolo dal portale valeva solo alla creazione dell'utente;
-    ora a ogni ingresso dal portale (cookie, password del portale, apertura del web con /auth/me) un utente
-    attivo il cui ruolo nel portale è ``admin`` diventa admin qui, con evento ``user.updated`` nel registro.
+    """Amministratore di InCampo = ruolo ``admin`` nel portale, nei due sensi (regola dell'11/11/2026).
 
-    Solo promozione: chi non è più admin nel portale non perde il ruolo (lo cambia un admin da Utenti), e
-    l'admin per l'app concesso da una regola IP del portale (``admin`` vero ma ``ruolo`` utente) non basta,
-    perché il ruolo resterebbe anche lontano da quel PC. Non fa commit: lo fa chi chiama. True se ha promosso."""
-    if dati.get("ruolo") != "admin" or not user.is_active or user.role == UserRole.admin:
+    Vale solo per un account COLLEGATO a quell'utente del portale (``portale_username``): gli account solo di
+    InCampo non si toccano. Promozione: il ruolo di prima va in ``ruolo_prima_admin``; quando il portale toglie
+    l'admin l'account riprende quel ruolo (o INCAMPO_RUOLO_PORTALE se è nato admin dal portale). L'admin per
+    l'app concesso da una regola IP del portale (``admin`` vero ma ``ruolo`` utente) non conta: il ruolo
+    resterebbe anche lontano da quel PC. Registro: ``user.updated`` con origine ``admin-del-portale`` o
+    ``admin-tolto-dal-portale``. Non fa commit: lo fa chi chiama. True se ha cambiato il ruolo."""
+    if not user.is_active or not user.portale_username or user.portale_username != dati.get("username"):
         return False
-    prima = user.role.value
-    user.role = UserRole.admin
+    admin_portale = dati.get("ruolo") == "admin"
+    prima = user.role
+    if admin_portale and user.role != UserRole.admin:
+        user.ruolo_prima_admin = user.role.value
+        user.role = UserRole.admin
+        origine = "admin-del-portale"
+    elif not admin_portale and user.role == UserRole.admin:
+        try:
+            ripreso = UserRole(user.ruolo_prima_admin) if user.ruolo_prima_admin else _ruolo_predefinito_portale()
+        except ValueError:
+            ripreso = _ruolo_predefinito_portale()
+        user.role = UserRole.manager if ripreso == UserRole.admin else ripreso
+        user.ruolo_prima_admin = None
+        origine = "admin-tolto-dal-portale"
+    else:
+        return False
     user.updated_at = utcnow()
     audit.record(db, "user.updated", user, entity_type="user", entity_id=user.id, request=request,
-                 details={"email": user.email, "role": {"da": prima, "a": "admin"}, "origine": "admin-del-portale",
+                 details={"email": user.email, "role": {"da": prima.value, "a": user.role.value}, "origine": origine,
                           "utente_portale": dati.get("username")})
     return True
 
 
+def allinea_profilo_dal_portale(db: Session, user: models.User, dati: dict, request: Request) -> bool:
+    """Il profilo del portale (``dati``: username, nome, email, ruolo) vale per l'account InCampo ``user``.
+
+    1. collega l'account allo username del portale se non lo è (solo se nessun altro account lo è già);
+    2. nome ed email come nel portale: un'email già usata da un altro account InCampo non si prende (resta
+       quella di prima, scritto nel registro);
+    3. amministratore come nel portale (allinea_admin_dal_portale).
+    Non fa commit. True se è cambiato qualcosa."""
+    username = dati.get("username")
+    if not username:
+        return False
+    cambiato = False
+    if not user.portale_username:
+        altro = db.query(models.User).filter(models.User.portale_username == username).first()
+        if altro is not None and altro.id != user.id:
+            return False          # quell'utente del portale ha già il suo account InCampo: questo resta com'è
+        user.portale_username = username
+        cambiato = True
+    elif user.portale_username != username:
+        return False
+    modifiche: dict = {}
+    nome = (dati.get("nome") or "").strip()
+    if nome and nome != user.name:
+        modifiche["name"] = {"from": user.name, "to": nome}
+        user.name = nome
+    email = (dati.get("email") or "").strip().lower()
+    if email and email != user.email:
+        occupata = db.query(models.User).filter(models.User.email == email, models.User.id != user.id).first()
+        if occupata is None:
+            modifiche["email_cambiata"] = {"from": user.email, "to": email}
+            user.email = email
+        else:
+            modifiche["email_non_aggiornata"] = {"portale": email, "motivo": "già usata da un altro utente InCampo"}
+    if modifiche:
+        user.updated_at = utcnow()
+        audit.record(db, "user.updated", user, entity_type="user", entity_id=user.id, request=request,
+                     details={"email": user.email, **modifiche, "origine": "profilo-del-portale",
+                              "utente_portale": username})
+        cambiato = True
+    return allinea_admin_dal_portale(db, user, dati, request) or cambiato
+
+
 def _utente_dal_portale(db: Session, dati: dict) -> tuple[models.User, bool]:
-    """L'utente InCampo dell'utente del portale (vedi _utente_esistente_dal_portale);
-    se non c'è lo crea attivo, senza password usabile. Ritorna (utente, creato)."""
+    """L'utente InCampo dell'utente del portale (vedi _utente_esistente_dal_portale); se non c'è lo crea attivo,
+    collegato allo username del portale, senza password usabile. Admin solo se il RUOLO nel portale è admin
+    (la regola IP del portale non basta, come per la promozione). Ritorna (utente, creato).
+    409 se l'email del portale è già di un account InCampo collegato a un altro utente del portale."""
     email = dati["email"]
     username = dati["username"]
     user = _utente_esistente_dal_portale(db, dati)
     if user is not None:
         return user, False
-    if dati.get("admin") or dati.get("ruolo") == "admin":
-        ruolo = UserRole.admin
-    else:
-        try:
-            ruolo = UserRole((os.environ.get("INCAMPO_RUOLO_PORTALE") or "manager").strip().lower())
-        except ValueError:
-            ruolo = UserRole.manager
-    user = models.User(email=email, name=dati.get("nome") or username, role=ruolo,
+    if db.query(models.User).filter(models.User.email == email).first() is not None:
+        raise HTTPException(409, f"L'email {email} è già di un altro utente del portale in InCampo: "
+                                 "chiedi all'amministratore di sistemare l'email nel Portale")
+    predefinito = _ruolo_predefinito_portale()
+    admin = dati.get("ruolo") == "admin"
+    user = models.User(email=email, name=dati.get("nome") or username, role=UserRole.admin if admin else predefinito,
+                       ruolo_prima_admin=predefinito.value if admin else None, portale_username=username,
                        password_hash=auth.hash_password(secrets.token_urlsafe(32)))
     db.add(user)
     db.flush()
     return user, True
+
+
+def _entra_dal_portale(db: Session, dati: dict, request: Request, origine: str) -> models.User:
+    """Parte comune di /auth/portale e del login con la password del portale: trova o crea l'utente, applica il
+    profilo del portale, scrive il registro e fa commit. 401 se l'utente InCampo è disattivato."""
+    user, creato = _utente_dal_portale(db, dati)
+    if not user.is_active:
+        raise HTTPException(401, "Utente InCampo disattivato")
+    if creato:
+        audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
+                     details={"email": user.email, "role": user.role.value, "origine": origine,
+                              "utente_portale": dati["username"]})
+    else:
+        allinea_profilo_dal_portale(db, user, dati, request)
+    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request,
+                 details={"origine": origine, "utente_portale": dati["username"]})
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def profilo_portale(login: str, timeout: float = 3) -> dict:
+    """Il profilo del portale di ``login`` (username o email), chiesto dal server con il token della suite:
+    ``POST <portale>/api/suite/profilo`` {login, app: "incampo"} (contratto: shared/suite/CONTRATTI.md).
+
+    Non solleva mai. Ritorna sempre ``raggiungibile`` (False: portale spento, token rifiutato, risposta strana,
+    COSEDIL_SSO=off) ed ``errore``; se raggiungibile anche ``trovato`` e, se trovato, username, nome, email,
+    ruolo, admin, proprietario, disattivato, mustChange, abilitato (a InCampo)."""
+    esito = {"raggiungibile": False, "trovato": False, "errore": ""}
+    if not SSO_ATTIVO:
+        esito["errore"] = "Verifica col portale spenta (COSEDIL_SSO=off)"
+        return esito
+    corpo = json.dumps({"login": login or "", "app": "incampo"}).encode("utf-8")
+    req = urllib.request.Request(PORTALE + "/api/suite/profilo", data=corpo, method="POST",
+                                 headers={"Content-Type": "application/json", "Accept": "application/json",
+                                          "X-Suite-Token": suite_link.token()})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            dati = json.loads(resp.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        esito["errore"] = ("Il portale ha rifiutato il token della suite" if e.code == 403
+                           else f"Il portale ha risposto {e.code}")
+        return esito
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        esito["errore"] = "Portale non raggiungibile"
+        return esito
+    if not isinstance(dati, dict) or not dati.get("ok"):
+        esito["errore"] = "Risposta del portale non valida"
+        return esito
+    esito["raggiungibile"] = True
+    if not dati.get("trovato") or not str(dati.get("username") or "").strip():
+        return esito
+    username = str(dati["username"]).strip().lower()
+    esito.update(trovato=True, username=username, nome=str(dati.get("nome") or username).strip(),
+                 email=str(dati.get("email") or "").strip().lower() or f"{username}@{EMAIL_DOMINIO}",
+                 ruolo=dati.get("ruolo"), admin=bool(dati.get("admin")), proprietario=bool(dati.get("proprietario")),
+                 disattivato=bool(dati.get("disattivato")), mustChange=bool(dati.get("mustChange")),
+                 abilitato=bool(dati.get("abilitato")))
+    return esito
+
+
+def controlla_login_locale(db: Session, user: models.User, request: Request) -> Optional[dict]:
+    """Login con la password DI INCAMPO (web e app per telefono, POST /auth/login): il portale dice ancora sì?
+
+    Scelte dell'utente dell'11/11/2026: 3b (la password di InCampo resta valida) e 2b (il portale si controlla
+    al login, non a ogni richiesta). Si chiede il profilo per lo username collegato, o per l'email se l'account
+    non è ancora collegato:
+    - account del portale disattivato o InCampo non fra i suoi programmi → 403 col motivo (e tentativo fallito
+      nel registro, così conta per il blocco anti brute force);
+    - account collegato il cui utente del portale non esiste più → 403 (la persona è stata tolta dal portale);
+    - trovato e attivo → collegamento, nome, email e amministratore come nel portale;
+    - nessun utente del portale (account solo di InCampo) → si entra come prima;
+    - portale irraggiungibile → si entra lo stesso (la password di InCampo serve proprio quando il portale è
+      giù), e il registro lo dice.
+    Ritorna i dettagli da scrivere nel registro dell'accesso (o None). Non fa commit, tranne prima di un 403."""
+    if not SSO_ATTIVO:
+        return None
+    p = profilo_portale(user.portale_username or user.email)
+    if not p["raggiungibile"]:
+        return {"portale": "non verificato", "motivo": p["errore"] or "Portale non raggiungibile"}
+    motivo = None
+    if not p["trovato"]:
+        if not user.portale_username:
+            return None
+        motivo = "Il tuo utente del Portale non esiste più: rivolgiti a un amministratore"
+    elif p["disattivato"]:
+        motivo = "Il tuo account del Portale è disattivato: rivolgiti a un amministratore"
+    elif not p["abilitato"]:
+        motivo = "InCampo non è fra i tuoi programmi del Portale: chiedi l'abilitazione a un amministratore"
+    if motivo:
+        audit.record(db, "auth.login_failed", actor_email=user.email, request=request,
+                     details={"reason": "portale", "motivo": motivo,
+                              "utente_portale": p.get("username") or user.portale_username})
+        db.commit()
+        raise HTTPException(403, motivo)
+    allinea_profilo_dal_portale(db, user, p, request)
+    return {"origine": "password-incampo", "utente_portale": p["username"]}
+
+
+def verifica_proprietario(user: models.User) -> tuple[bool, str]:
+    """Chi agisce è il proprietario della suite? Chiesto al portale DAL VIVO (mai dal ruolo salvato qui).
+
+    Serve un account InCampo collegato al portale il cui utente sia attivo e ``proprietario``. Portale
+    irraggiungibile → no (non si dà o toglie un amministratore senza poterlo verificare). Con COSEDIL_SSO=off
+    (InCampo installato senza portale) vale la regola di prima: ogni admin. Ritorna (sì/no, motivo del no)."""
+    if not SSO_ATTIVO:
+        return user.role == UserRole.admin, ""
+    if not user.portale_username:
+        return False, MSG_SOLO_PROPRIETARIO + ": il tuo utente InCampo non è collegato al Portale"
+    p = profilo_portale(user.portale_username)
+    if not p["raggiungibile"]:
+        return False, MSG_SOLO_PROPRIETARIO + ": portale non raggiungibile, non posso verificarlo (riprova più tardi)"
+    if not p["trovato"] or p["disattivato"] or not p["proprietario"]:
+        return False, MSG_SOLO_PROPRIETARIO
+    return True, ""
+
+
+def richiedi_proprietario(user: models.User) -> None:
+    """403 se chi agisce non è il proprietario della suite (vedi verifica_proprietario)."""
+    ok, motivo = verifica_proprietario(user)
+    if not ok:
+        raise HTTPException(403, motivo or MSG_SOLO_PROPRIETARIO)
 
 
 def login_con_password_portale(db: Session, email: str, password: str, request: Request) -> Optional[models.User]:
@@ -189,7 +403,7 @@ def login_con_password_portale(db: Session, email: str, password: str, request: 
     come riserva, ma a ogni persona basta la password del portale (scelta del 06/11/2026).
     Il portale controlla la password con i suoi blocchi sui tentativi, sull'IP della persona,
     e dice se InCampo è fra i suoi programmi. L'utente InCampo è lo stesso dell'ingresso dal
-    portale (_utente_dal_portale: stessa email; creato se manca).
+    portale (_utente_dal_portale: collegato per username; creato se manca) e ne prende il profilo.
 
     Ritorna l'utente, oppure None se il portale dice "credenziali non valide" o non risponde:
     allora /auth/login conta il tentativo fallito come prima. Solleva 429 se il portale ha
@@ -204,48 +418,26 @@ def login_con_password_portale(db: Session, email: str, password: str, request: 
         if v["status"] == 403:
             raise HTTPException(403, v["errore"] or "Accesso non consentito dal portale")
         return None
-    dati = {"username": v["username"], "nome": (v["nome"] or v["username"]).strip(), "ruolo": v["ruolo"],
-            "admin": v["admin"], "email": v["email"] or f"{v['username']}@{EMAIL_DOMINIO}"}
-    user, creato = _utente_dal_portale(db, dati)
-    if not user.is_active:
-        raise HTTPException(401, "Utente InCampo disattivato")
-    if not creato:
-        allinea_admin_dal_portale(db, user, dati, request)
-    if creato:
-        audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
-                     details={"email": user.email, "role": user.role.value, "origine": "password-portale",
-                              "utente_portale": dati["username"]})
-    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request,
-                 details={"origine": "password-portale", "utente_portale": dati["username"]})
-    db.commit()
-    db.refresh(user)
-    return user
+    dati = {"username": str(v["username"]).strip().lower(), "nome": (v["nome"] or v["username"]).strip(),
+            "ruolo": v["ruolo"], "admin": v["admin"],
+            "email": (v["email"] or f"{v['username']}@{EMAIL_DOMINIO}").strip().lower()}
+    return _entra_dal_portale(db, dati, request, "password-portale")
 
 
 @router.post("/auth/portale", response_model=schemas.TokenResponse, responses={401: {"description": "Non collegato al portale"}})
 def login_dal_portale(request: Request, db: Session = Depends(get_db)):
     """Entra con la sessione del Portale Suite Cosedil (cookie ``sid``), senza altra password.
 
-    L'utente InCampo è quello con la stessa email del portale (o lo username prima della @);
-    se manca viene creato: admin del portale → admin, altrimenti ``INCAMPO_RUOLO_PORTALE``
-    (default manager); se c'è e nel portale è amministratore diventa admin (allinea_admin_dal_portale).
-    401 se il portale non risponde, non si è loggati o lo SSO è spento.
+    L'utente InCampo è quello collegato allo username del portale (la prima volta: stessa email o
+    username prima della @); se manca viene creato: ruolo admin nel portale → admin, altrimenti
+    ``INCAMPO_RUOLO_PORTALE`` (default manager). Nome, email e amministratore seguono il portale a ogni
+    ingresso (allinea_profilo_dal_portale). Disattivato o InCampo non abilitato nel portale: /api/verify
+    risponde 401/403 e qui 401. 401 anche se il portale non risponde, non si è loggati o lo SSO è spento.
     """
     dati = verifica_portale(request.headers.get("cookie") or "")
     if not dati["ok"]:
         raise HTTPException(401, dati["errore"])
-    user, creato = _utente_dal_portale(db, dati)
-    if not user.is_active:
-        raise HTTPException(401, "Utente InCampo disattivato")
-    if not creato:
-        allinea_admin_dal_portale(db, user, dati, request)
-    if creato:
-        audit.record(db, "user.created", user, entity_type="user", entity_id=user.id, request=request,
-                     details={"email": user.email, "role": user.role.value, "origine": "portale", "utente_portale": dati["username"]})
-    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request,
-                 details={"origine": "portale", "utente_portale": dati["username"]})
-    db.commit()
-    db.refresh(user)
+    user = _entra_dal_portale(db, dati, request, "portale")
     return schemas.TokenResponse(access_token=auth.create_access_token(user), user=user)
 
 

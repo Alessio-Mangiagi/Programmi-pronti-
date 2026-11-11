@@ -54,23 +54,30 @@ def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends
                      details={"reason": "inactive" if user is not None and not user.is_active else "invalid"})
         db.commit()
         raise HTTPException(401, "Email o password errati")
-    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request)
+    # Password di InCampo giusta: il profilo del portale vale anche qui (scelte 2b e 3b dell'11/11/2026).
+    # Disattivato o InCampo tolto nel portale → 403; altrimenti nome, email e amministratore come nel portale.
+    # Il token si crea DOPO, così porta il ruolo appena allineato.
+    from .suite import controlla_login_locale
+    dettagli = controlla_login_locale(db, user, request)
+    audit.record(db, "auth.login", user, entity_type="user", entity_id=user.id, request=request, details=dettagli)
     db.commit()
+    db.refresh(user)
     return schemas.TokenResponse(access_token=auth.create_access_token(user), user=user)
 
 
 @router.get("/auth/me", response_model=schemas.UserOut)
 def me(request: Request, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    """L'utente del token. Il web la chiama a ogni apertura: se l'utente non è admin ma il browser ha la sessione
-    del portale (cookie ``sid``) di un amministratore del portale che corrisponde a QUESTO utente, lo promuove ad
-    admin (regola della suite del 09/11/2026, suite.allinea_admin_dal_portale). Così vale subito anche per chi
-    aveva già un token salvato e non ripassa da /auth/portale. Una sola chiamata al portale, solo per i non admin."""
-    if user.role != UserRole.admin and "sid=" in (request.headers.get("cookie") or ""):
-        from .suite import _utente_esistente_dal_portale, allinea_admin_dal_portale, verifica_portale
+    """L'utente del token. Il web la chiama a ogni apertura: se il browser ha la sessione del portale (cookie
+    ``sid``) della STESSA persona di questo utente, il profilo del portale (nome, email, amministratore dato e
+    tolto) si applica subito (suite.allinea_profilo_dal_portale), anche per chi aveva già un token salvato e
+    non ripassa da /auth/portale. Una sola chiamata al portale per apertura; senza cookie del portale niente.
+    Non è un login: disattivazioni e programmi tolti nel portale contano al prossimo login (scelta 2b)."""
+    if "sid=" in (request.headers.get("cookie") or ""):
+        from .suite import _utente_esistente_dal_portale, allinea_profilo_dal_portale, verifica_portale
         dati = verifica_portale(request.headers.get("cookie") or "")
-        if dati["ok"] and dati.get("ruolo") == "admin":
+        if dati["ok"]:
             stesso = _utente_esistente_dal_portale(db, dati)
-            if stesso is not None and stesso.id == user.id and allinea_admin_dal_portale(db, user, dati, request):
+            if stesso is not None and stesso.id == user.id and allinea_profilo_dal_portale(db, user, dati, request):
                 db.commit()
                 db.refresh(user)
     return user
@@ -150,14 +157,32 @@ def list_events(project_id: str, limit: int = 100, db: Session = Depends(get_db)
             .order_by(models.Event.created_at.desc()).limit(min(limit, 500)).all())
 
 
+@router.get("/users/gestione-admin", response_model=schemas.GestioneAdminOut)
+def gestione_admin(user: models.User = Depends(require_role())):
+    """Solo admin: posso dare o togliere il ruolo di amministratore? (regola dell'11/11/2026: gli admin li crea
+    e li toglie solo il proprietario della suite, verificato dal vivo col portale). La pagina Utenti la usa per
+    abilitare la voce "Amministratore" e spiegare perché, se è spenta."""
+    from .suite import SSO_ATTIVO, verifica_proprietario
+    ok, motivo = verifica_proprietario(user)
+    return schemas.GestioneAdminOut(puo_gestire_admin=ok, motivo=motivo, portale=SSO_ATTIVO)
+
+
+def _richiedi_proprietario(actor: models.User) -> None:
+    """403 "Solo il proprietario della suite gestisce gli amministratori" se chi agisce non lo è (suite.py)."""
+    from .suite import richiedi_proprietario
+    richiedi_proprietario(actor)
+
+
 @router.post("/users", response_model=schemas.UserOut, status_code=201)
 def create_user(payload: schemas.UserCreate, request: Request, db: Session = Depends(get_db),
                 admin: models.User = Depends(require_role())):
-    """Solo admin."""
+    """Solo admin. Un utente col ruolo di amministratore lo crea solo il proprietario della suite."""
     try:
         role = UserRole(payload.role)
     except ValueError:
         raise HTTPException(422, f"invalid role {payload.role!r}")
+    if role == UserRole.admin:
+        _richiedi_proprietario(admin)
     email = payload.email.lower().strip()
     if db.query(models.User).filter(models.User.email == email).first():
         raise HTTPException(409, "email already registered")
@@ -197,12 +222,26 @@ def update_user(user_id: str, payload: schemas.UserUpdate, request: Request, db:
     """
     Solo admin: nome, ruolo, attivo/disattivo, reset password. Un admin non può
     disattivarsi né togliersi il ruolo admin (altrimenti resta un sistema senza amministratori).
+
+    Regola dell'11/11/2026 ("gli admin li creo e li cancello solo io"):
+    - dare o togliere il ruolo di amministratore, disattivare/riattivare un amministratore o reimpostarne la
+      password: solo il proprietario della suite (verificato dal vivo col portale);
+    - per un account collegato al portale l'amministratore non si cambia qui (409): lo decide il ruolo nel
+      Portale, a ogni ingresso. I ruoli manager/field restano decisi qui (scelta 4a).
     """
     target = db.get(models.User, user_id)
     if target is None:
         raise HTTPException(404, "user not found")
     changes = payload.model_dump(exclude_unset=True)
     details: dict = {}
+    proprietario_verificato = False
+
+    def solo_proprietario():
+        nonlocal proprietario_verificato
+        if not proprietario_verificato:
+            _richiedi_proprietario(admin)
+            proprietario_verificato = True
+
     if "role" in changes and changes["role"] is not None:
         try:
             role = UserRole(changes["role"])
@@ -210,9 +249,21 @@ def update_user(user_id: str, payload: schemas.UserUpdate, request: Request, db:
             raise HTTPException(422, f"invalid role {changes['role']!r}")
         if target.id == admin.id and role != UserRole.admin:
             raise HTTPException(409, "cannot remove your own admin role")
+        if role != target.role and UserRole.admin in (role, target.role):
+            if target.dal_portale:
+                raise HTTPException(409, "Per gli utenti del Portale l'amministratore si decide nel Portale")
+            solo_proprietario()
         if role != target.role:
             details["role"] = {"from": target.role.value, "to": role.value}
+            if target.role == UserRole.admin:
+                target.ruolo_prima_admin = None
             target.role = role
+    if target.role == UserRole.admin and target.id != admin.id and (
+            changes.get("password") or ("is_active" in changes and changes["is_active"] is not None
+                                        and changes["is_active"] != target.is_active)):
+        # la password o lo stato di un ALTRO amministratore: chi li cambia ne prende il posto, quindi come
+        # crearne uno
+        solo_proprietario()
     if "name" in changes and changes["name"] is not None:
         if not changes["name"].strip():
             raise HTTPException(422, "name must not be empty")

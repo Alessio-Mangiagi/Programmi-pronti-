@@ -259,7 +259,8 @@ def test_login_portale_admin_e_username_senza_email(client, portale_finto, monke
 
 # Regola della suite del 09/11/2026: "le mie credenziali valgono come admin ovunque". Prima il ruolo dal
 # portale valeva solo alla creazione dell'utente InCampo; ora un amministratore del portale diventa admin a
-# ogni ingresso (cookie, password del portale, /auth/me con un token già salvato). Solo promozione.
+# ogni ingresso (cookie, password del portale, /auth/me con un token già salvato). Dall'11/11/2026 anche
+# declassamento (test_profilo_portale.py).
 
 def test_admin_del_portale_promuove_utente_esistente(client, portale_finto):
     from tests.conftest import make_user
@@ -303,10 +304,11 @@ def test_auth_me_promuove_chi_ha_gia_il_token_solo_se_e_la_stessa_persona(client
     h = login(client, "c.token@cosedilspa.com")
     assert client.get("/auth/me", headers=h).json()["role"] == "manager"            # senza cookie del portale: com'era
     assert client.get("/auth/me", headers={**h, "Cookie": "sid=c"}).json()["role"] == "admin"
-    # un admin non richiama più il portale
+    # dall'11/11/2026 il portale si richiama anche per un admin (l'amministratore si toglie, non solo si dà):
+    # una chiamata per apertura, e l'admin resta finché il portale lo dice
     chiamate = len(portale_finto["chiamate"])
-    client.get("/auth/me", headers={**h, "Cookie": "sid=c"})
-    assert len(portale_finto["chiamate"]) == chiamate
+    assert client.get("/auth/me", headers={**h, "Cookie": "sid=c"}).json()["role"] == "admin"
+    assert len(portale_finto["chiamate"]) == chiamate + 1
 
 
 def test_login_portale_rifiuti(client, portale_finto, monkeypatch):

@@ -1,3 +1,4 @@
+// "><(((º> sabusabu <º)))><"
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
@@ -235,6 +236,11 @@ function LabelForm({ label, onDone }: { label?: InviteLabel; onDone: () => void 
           ))}
         </select>
         <div className="muted small">{ROLE_HINT[role]}</div>
+        {/* regola della suite dell'11/11/2026: un'etichetta da amministratore crea amministratori, quindi la
+            salva (e la usa negli inviti) solo il proprietario della suite; agli altri il server risponde 403 */}
+        {role === 'admin' && (
+          <div className="muted small">Solo il proprietario della suite può salvare e usare un'etichetta da amministratore.</div>
+        )}
       </div>
 
       <div className="field">

@@ -12,6 +12,7 @@ import { PASSWORD_MIN, ROLE_LABEL } from '../../labels'
 import { useLoad } from '../../hooks/useLoad'
 
 type Activity = components['schemas']['UserActivityOut']
+type GestioneAdmin = components['schemas']['GestioneAdminOut']
 type Role = 'admin' | 'manager' | 'field'
 
 const ROLES: Role[] = ['admin', 'manager', 'field']
@@ -23,6 +24,11 @@ const fmtDateTime = (iso: string | null | undefined) =>
  * Spazio admin → Utenti: elenco con ruolo, stato, ultimo accesso e operazioni;
  * creazione, modifica (nome/ruolo), reset password, disattivazione/riattivazione.
  * Ogni azione finisce nel registro operazioni (`/admin/audit`).
+ *
+ * Regola della suite dell'11/11/2026: gli amministratori li crea e li toglie solo il proprietario della suite
+ * (GET /users/gestione-admin, verificato dal vivo col Portale). Per chi non lo è la voce "Amministratore", la
+ * password e la disattivazione degli altri amministratori sono spente con la spiegazione. Gli utenti collegati
+ * al Portale (`dal_portale`) hanno nome, email e amministratore decisi dal Portale a ogni ingresso.
  */
 export default function UsersPage() {
   const { user: me } = useAuth()
@@ -35,15 +41,19 @@ export default function UsersPage() {
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [resetting, setResetting] = useState<User | null>(null)
+  const [gestione, setGestione] = useState<GestioneAdmin | null>(null)
 
   const load = useCallback(async () => {
-    const [u, a] = await Promise.all([
+    const [u, a, g] = await Promise.all([
       api.GET('/users', { params: { query: { include_inactive: true } } }),
       api.GET('/users/activity'),
+      api.GET('/users/gestione-admin'),
     ])
     if (u.error) return toast.error(errorMessage(u.error))
     setUsers(u.data ?? [])
     if (a.data) setActivity(Object.fromEntries(a.data.map((x) => [x.user_id, x])))
+    // se la verifica non risponde si resta prudenti: niente gestione degli amministratori
+    setGestione(g.data ?? { puo_gestire_admin: false, motivo: 'Verifica non riuscita', portale: true })
   }, [toast])
 
   useLoad(load)
@@ -69,6 +79,11 @@ export default function UsersPage() {
   }
 
   const counts = { total: users?.length ?? 0, active: users?.filter((u) => u.is_active).length ?? 0 }
+  const puoAdmin = !!gestione?.puo_gestire_admin
+  // password e stato di un ALTRO amministratore: chi li cambia ne prende il posto, quindi solo il proprietario
+  const bloccatoAdmin = (u: User) => u.role === 'admin' && u.id !== me.id && !puoAdmin
+  const MOTIVO_ADMIN = 'Gli amministratori li gestisce solo il proprietario della suite'
+  const motivoExtra = gestione?.motivo && !gestione.motivo.startsWith('Solo il proprietario') ? ` (${gestione.motivo})` : ''
 
   return (
     <>
@@ -116,6 +131,12 @@ export default function UsersPage() {
           </span>
         </div>
       </div>
+      {gestione && !puoAdmin && (
+        <p className="muted small admin-note" role="note">
+          Gli amministratori li crea e li toglie solo il proprietario della suite{gestione.portale ? ', dal Portale' : ''}.
+          {motivoExtra}
+        </p>
+      )}
       <div className="content">
         {users === null ? (
           <Loading />
@@ -143,10 +164,16 @@ export default function UsersPage() {
                       <td>
                         <strong>{u.name}</strong>
                         {u.id === me.id && <span className="badge">tu</span>}
+                        {u.dal_portale && (
+                          <span className="badge" title="Collegato al Portale: nome, email e amministratore li decide il Portale">
+                            Portale
+                          </span>
+                        )}
                         <div className="muted small">{u.email}</div>
                       </td>
                       <td>
                         <span className={`badge role-${u.role}`}>{ROLE_LABEL[u.role] ?? u.role}</span>
+                        {u.dal_portale && u.role === 'admin' && <div className="muted small">deciso dal Portale</div>}
                       </td>
                       <td>
                         {u.is_active ? <span className="badge status-resolved">Attivo</span> : <span className="badge status-open">Disattivato</span>}
@@ -161,16 +188,31 @@ export default function UsersPage() {
                         <button className="btn small" onClick={() => setEditing(u)}>
                           Modifica
                         </button>
-                        <button className="btn small" onClick={() => setResetting(u)}>
+                        <button
+                          className="btn small"
+                          onClick={() => setResetting(u)}
+                          disabled={bloccatoAdmin(u)}
+                          title={bloccatoAdmin(u) ? MOTIVO_ADMIN : undefined}
+                        >
                           Password
                         </button>
                         {u.id !== me.id &&
                           (u.is_active ? (
-                            <button className="btn small btn-danger" onClick={() => setActive(u, false)}>
+                            <button
+                              className="btn small btn-danger"
+                              onClick={() => setActive(u, false)}
+                              disabled={bloccatoAdmin(u)}
+                              title={bloccatoAdmin(u) ? MOTIVO_ADMIN : undefined}
+                            >
                               Disattiva
                             </button>
                           ) : (
-                            <button className="btn small" onClick={() => setActive(u, true)}>
+                            <button
+                              className="btn small"
+                              onClick={() => setActive(u, true)}
+                              disabled={bloccatoAdmin(u)}
+                              title={bloccatoAdmin(u) ? MOTIVO_ADMIN : undefined}
+                            >
                               Riattiva
                             </button>
                           ))}
@@ -187,6 +229,7 @@ export default function UsersPage() {
       {creating && (
         <Modal title="Nuovo utente" onClose={() => setCreating(false)} width={480}>
           <UserForm
+            puoAdmin={puoAdmin}
             onDone={() => {
               setCreating(false)
               load()
@@ -199,6 +242,7 @@ export default function UsersPage() {
           <UserForm
             user={editing}
             isSelf={editing.id === me.id}
+            puoAdmin={puoAdmin}
             onDone={() => {
               setEditing(null)
               load()
@@ -221,7 +265,9 @@ export default function UsersPage() {
   )
 }
 
-function UserForm({ user, isSelf, onDone }: { user?: User; isSelf?: boolean; onDone: () => void }) {
+/** Crea o modifica un utente. La voce "Amministratore" e il cambio da/verso amministratore: solo col
+ *  proprietario della suite (`puoAdmin`); per un utente collegato al Portale l'amministratore si decide lì. */
+function UserForm({ user, isSelf, puoAdmin, onDone }: { user?: User; isSelf?: boolean; puoAdmin: boolean; onDone: () => void }) {
   const toast = useToast()
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
@@ -229,6 +275,17 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf?: boolean; onD
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const dalPortale = !!user?.dal_portale
+  // admin "toccabile" qui: mai per gli account del Portale, altrimenti solo il proprietario della suite
+  const adminModificabile = puoAdmin && !dalPortale
+  const ruoloBloccato = !!isSelf || (user?.role === 'admin' && !adminModificabile)
+  const notaRuolo = isSelf
+    ? 'Non puoi cambiare il tuo ruolo.'
+    : dalPortale
+      ? "Utente del Portale: l'amministratore si decide nel Portale; Ufficio e Cantiere si scelgono qui."
+      : !puoAdmin
+        ? 'Gli amministratori li crea e li toglie solo il proprietario della suite.'
+        : null
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -252,18 +309,24 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf?: boolean; onD
       <div className="field">
         <label htmlFor="uf-email">Email (login)</label>
         <input id="uf-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={!!user} />
-        {user && <p className="muted small dyn-help">L'email non si cambia: crea un nuovo utente e disattiva questo.</p>}
+        {user && (
+          <p className="muted small dyn-help">
+            {dalPortale
+              ? 'Nome ed email arrivano dal Portale e si aggiornano a ogni ingresso.'
+              : "L'email non si cambia: crea un nuovo utente e disattiva questo."}
+          </p>
+        )}
       </div>
       <div className="field">
         <label htmlFor="uf-role">Ruolo</label>
-        <select id="uf-role" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={isSelf}>
+        <select id="uf-role" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={ruoloBloccato}>
           {ROLES.map((r) => (
-            <option key={r} value={r}>
+            <option key={r} value={r} disabled={r === 'admin' && role !== 'admin' && !adminModificabile}>
               {ROLE_LABEL[r]}
             </option>
           ))}
         </select>
-        {isSelf && <p className="muted small dyn-help">Non puoi cambiare il tuo ruolo.</p>}
+        {notaRuolo && <p className="muted small dyn-help">{notaRuolo}</p>}
       </div>
       {!user && (
         <div className="field">

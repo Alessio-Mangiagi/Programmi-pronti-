@@ -1,3 +1,4 @@
+/* "><(((º> sabusabu <º)))><" */
 @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Inter:wght@500;600&family=Open+Sans:wght@400;600&display=swap');
 
 /* Design tokens: brand Cosedil (palette e font del sito istituzionale), alta leggibilità su tablet. */
@@ -344,6 +345,8 @@ input:focus, select:focus, textarea:focus {
   padding: 0.6rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border);
 }
 .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
+/* Utenti: nota "gli amministratori li gestisce solo il proprietario della suite" (regola dell'11/11/2026) */
+.admin-note { margin: 0; padding: 0.5rem 1.5rem; max-width: none; background: var(--surface); border-bottom: 1px solid var(--border); }
 .filter-label { font-family: var(--font-ui); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
 .filters select, .filters input { padding: 0.35rem 0.55rem; font-size: 0.9rem; min-width: 130px; width: auto; }
 .filter-dates { display: flex; align-items: center; gap: 0.35rem; }

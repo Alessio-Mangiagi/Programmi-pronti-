@@ -103,7 +103,8 @@ def test_invite_validations(client, users):
     assert client.post("/invites", json={"email": "doppio@test.local", "label_id": lab["id"]}).status_code == 409
 
 
-def test_manager_cannot_invite_above_own_role(client, users):
+def test_manager_cannot_invite_above_own_role(client, users, proprietario):
+    # l'etichetta da amministratore la crea solo il proprietario della suite (regola dell'11/11/2026)
     field_label = make_label(client, "Operaio", role="field")
     admin_label = make_label(client, "Amministratore", role="admin")
     mgr = users["manager"]["headers"]

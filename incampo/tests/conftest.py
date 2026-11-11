@@ -97,6 +97,62 @@ def portale_password_spento(monkeypatch):
                         lambda *a, **k: {"ok": False, "reachable": False, "status": 0, "errore": "", "motivo": ""})
 
 
+class PortaleProfiliFinto:
+    """Finto ``POST /api/suite/profilo`` del portale (suite.profilo_portale): nei test il portale vero non va
+    mai chiamato. Di default nessun utente del portale (ogni account è "solo InCampo", come prima dell'11/11);
+    ``aggiungi`` registra un utente del portale ritrovabile per username o per email; ``giu`` lo spegne."""
+
+    def __init__(self):
+        self.profili: dict[str, dict] = {}
+        self.giu = False
+        self.chiamate: list[str] = []
+
+    def aggiungi(self, username, email=None, *, ruolo="utente", nome=None, proprietario=False, disattivato=False,
+                 abilitato=True):
+        email = (email or f"{username}@cosedilspa.com").lower()
+        p = {"username": username, "nome": nome or username, "email": email, "ruolo": ruolo,
+             "admin": ruolo == "admin", "proprietario": proprietario, "disattivato": disattivato,
+             "mustChange": False, "abilitato": abilitato}
+        self.profili[username.lower()] = p
+        self.profili[email] = p
+        return p
+
+    def togli(self, username):
+        p = self.profili.pop(username.lower(), None)
+        if p:
+            self.profili.pop(p["email"], None)
+
+    def __call__(self, login, timeout=3):
+        self.chiamate.append(login)
+        if self.giu:
+            return {"raggiungibile": False, "trovato": False, "errore": "Portale non raggiungibile"}
+        p = self.profili.get(str(login or "").strip().lower())
+        if p is None:
+            return {"raggiungibile": True, "trovato": False, "errore": ""}
+        return {"raggiungibile": True, "trovato": True, "errore": "", **p}
+
+
+@pytest.fixture(autouse=True)
+def profili_portale(monkeypatch):
+    """Il profilo del portale (login con la password di InCampo, proprietario della suite): sempre il finto."""
+    from app.routers import suite as suite_router
+    finto = PortaleProfiliFinto()
+    monkeypatch.setattr(suite_router, "profilo_portale", finto)
+    monkeypatch.setattr(suite_router, "SSO_ATTIVO", True)
+    return finto
+
+
+@pytest.fixture()
+def proprietario(client, profili_portale):
+    """L'admin del client (admin@test.local) è collegato all'utente del portale "a.mangiagi", proprietario della
+    suite: può dare e togliere il ruolo di amministratore (regola dell'11/11/2026)."""
+    with client.session_factory() as s:
+        u = s.query(models.User).filter_by(email="admin@test.local").one()
+        u.portale_username = "a.mangiagi"
+        s.commit()
+    return profili_portale.aggiungi("a.mangiagi", "admin@test.local", ruolo="admin", proprietario=True)
+
+
 @pytest.fixture(autouse=True)
 def tmp_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(st.storage, "root", tmp_path / "storage")

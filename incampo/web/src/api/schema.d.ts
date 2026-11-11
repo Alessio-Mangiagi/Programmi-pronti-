@@ -28,7 +28,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Me */
+        /**
+         * Me
+         * @description L'utente del token. Il web la chiama a ogni apertura: se il browser ha la sessione del portale (cookie
+         *     ``sid``) della STESSA persona di questo utente, il profilo del portale (nome, email, amministratore dato e
+         *     tolto) si applica subito (suite.allinea_profilo_dal_portale), anche per chi aveva già un token salvato e
+         *     non ripassa da /auth/portale. Una sola chiamata al portale per apertura; senza cookie del portale niente.
+         *     Non è un login: disattivazioni e programmi tolti nel portale contano al prossimo login (scelta 2b).
+         */
         get: operations["me_auth_me_get"];
         put?: never;
         post?: never;
@@ -158,6 +165,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/gestione-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gestione Admin
+         * @description Solo admin: posso dare o togliere il ruolo di amministratore? (regola dell'11/11/2026: gli admin li crea
+         *     e li toglie solo il proprietario della suite, verificato dal vivo col portale). La pagina Utenti la usa per
+         *     abilitare la voce "Amministratore" e spiegare perché, se è spenta.
+         */
+        get: operations["gestione_admin_users_gestione_admin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -173,7 +202,7 @@ export interface paths {
         put?: never;
         /**
          * Create User
-         * @description Solo admin.
+         * @description Solo admin. Un utente col ruolo di amministratore lo crea solo il proprietario della suite.
          */
         post: operations["create_user_users_post"];
         delete?: never;
@@ -199,6 +228,12 @@ export interface paths {
          * Update User
          * @description Solo admin: nome, ruolo, attivo/disattivo, reset password. Un admin non può
          *     disattivarsi né togliersi il ruolo admin (altrimenti resta un sistema senza amministratori).
+         *
+         *     Regola dell'11/11/2026 ("gli admin li creo e li cancello solo io"):
+         *     - dare o togliere il ruolo di amministratore, disattivare/riattivare un amministratore o reimpostarne la
+         *       password: solo il proprietario della suite (verificato dal vivo col portale);
+         *     - per un account collegato al portale l'amministratore non si cambia qui (409): lo decide il ruolo nel
+         *       Portale, a ogni ingresso. I ruoli manager/field restano decisi qui (scelta 4a).
          */
         patch: operations["update_user_users__user_id__patch"];
         trace?: never;
@@ -1373,9 +1408,11 @@ export interface paths {
          * Login Dal Portale
          * @description Entra con la sessione del Portale Suite Cosedil (cookie ``sid``), senza altra password.
          *
-         *     L'utente InCampo è quello con la stessa email del portale (o lo username prima della @);
-         *     se manca viene creato: admin del portale → admin, altrimenti ``INCAMPO_RUOLO_PORTALE``
-         *     (default manager). 401 se il portale non risponde, non si è loggati o lo SSO è spento.
+         *     L'utente InCampo è quello collegato allo username del portale (la prima volta: stessa email o
+         *     username prima della @); se manca viene creato: ruolo admin nel portale → admin, altrimenti
+         *     ``INCAMPO_RUOLO_PORTALE`` (default manager). Nome, email e amministratore seguono il portale a ogni
+         *     ingresso (allinea_profilo_dal_portale). Disattivato o InCampo non abilitato nel portale: /api/verify
+         *     risponde 401/403 e qui 401. 401 anche se il portale non risponde, non si è loggati o lo SSO è spento.
          */
         post: operations["login_dal_portale_auth_portale_post"];
         delete?: never;
@@ -1861,6 +1898,26 @@ export interface components {
             } | null;
             /** Archived */
             archived?: boolean | null;
+        };
+        /**
+         * GestioneAdminOut
+         * @description GET /users/gestione-admin: chi apre la pagina Utenti può dare o togliere il ruolo di amministratore?
+         *     Solo il proprietario della suite (regola dell'11/11/2026); ``motivo`` spiega il no; ``portale`` False se
+         *     InCampo gira senza portale (COSEDIL_SSO=off: allora ogni admin, come prima).
+         */
+        GestioneAdminOut: {
+            /** Puo Gestire Admin */
+            puo_gestire_admin: boolean;
+            /**
+             * Motivo
+             * @default
+             */
+            motivo: string;
+            /**
+             * Portale
+             * @default true
+             */
+            portale: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2974,6 +3031,11 @@ export interface components {
              * @default true
              */
             notify_push: boolean;
+            /**
+             * Dal Portale
+             * @default false
+             */
+            dal_portale: boolean;
         };
         /**
          * UserUpdate
@@ -3370,6 +3432,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gestione_admin_users_gestione_admin_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GestioneAdminOut"];
                 };
             };
         };

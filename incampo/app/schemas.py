@@ -44,6 +44,18 @@ class UserOut(BaseModel):
     is_active: bool
     notify_email: bool = True
     notify_push: bool = True
+    # Collegato a un utente del Portale (users.portale_username): allora amministratore, nome ed email li decide
+    # il portale a ogni ingresso, e la pagina Utenti lo dice ("deciso dal portale").
+    dal_portale: bool = False
+
+
+class GestioneAdminOut(BaseModel):
+    """GET /users/gestione-admin: chi apre la pagina Utenti può dare o togliere il ruolo di amministratore?
+    Solo il proprietario della suite (regola dell'11/11/2026); ``motivo`` spiega il no; ``portale`` False se
+    InCampo gira senza portale (COSEDIL_SSO=off: allora ogni admin, come prima)."""
+    puo_gestire_admin: bool
+    motivo: str = ""
+    portale: bool = True
 
 
 class UserUpdate(BaseModel):

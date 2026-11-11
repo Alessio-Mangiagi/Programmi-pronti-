@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 Modello dati per il sistema tipo "Field View".
 
@@ -98,8 +99,22 @@ class User(Base):
     # Preferenze di notifica minime (giorno 26): canali attivi.
     notify_email = Column(Boolean, default=True, nullable=False)
     notify_push = Column(Boolean, default=True, nullable=False)
+    # Collegamento stabile con l'utente del Portale Suite Cosedil (regola dell'11/11/2026, "il profilo del
+    # portale vale in ogni programma"). Si scrive al primo ingresso dal portale (trovato per email o per
+    # username@dominio come prima) e da lì l'utente si ritrova per username: un cambio di email nel portale
+    # aggiorna questo account invece di crearne un doppione. NULL = account solo di InCampo (installazione,
+    # demo, persone invitate senza portale): il portale non lo tocca.
+    portale_username = Column(String, nullable=True, unique=True, index=True)
+    # Ruolo da riprendere quando il portale toglie l'amministratore: è il ruolo che l'account aveva prima che il
+    # portale lo promuovesse (o INCAMPO_RUOLO_PORTALE se è nato admin dal portale). Vuoto se non è admin dal portale.
+    ruolo_prima_admin = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    @property
+    def dal_portale(self) -> bool:
+        """True se l'account è collegato a un utente del portale: allora l'amministratore lo decide il portale."""
+        return bool(self.portale_username)
 
 
 class ProjectMember(Base):

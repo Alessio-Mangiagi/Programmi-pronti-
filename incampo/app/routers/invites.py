@@ -41,6 +41,13 @@ def _parse_role(value: str) -> UserRole:
         raise HTTPException(422, f"invalid role {value!r}")
 
 
+def _solo_proprietario(actor: models.User) -> None:
+    """Un'etichetta col ruolo di amministratore, o un invito con quell'etichetta, crea amministratori: regola
+    dell'11/11/2026, solo il proprietario della suite (verificato dal vivo col portale, vedi suite.py)."""
+    from .suite import richiedi_proprietario
+    richiedi_proprietario(actor)
+
+
 def _check_ids(db: Session, model, ids: list[str], what: str) -> list[str]:
     """Toglie i duplicati e rifiuta gli id inesistenti: un'etichetta non punta nel vuoto."""
     clean = list(dict.fromkeys(ids or []))
@@ -74,6 +81,8 @@ def create_invite_label(payload: schemas.InviteLabelCreate, request: Request, db
     if db.query(models.InviteLabel).filter(models.InviteLabel.name == name).first():
         raise HTTPException(409, "label name already used")
     role = _parse_role(payload.role)
+    if role == UserRole.admin:
+        _solo_proprietario(admin)
     last = db.query(func.max(models.InviteLabel.position)).scalar() or 0
     lab = models.InviteLabel(
         name=name, description=(payload.description or None), role=role,
@@ -115,6 +124,8 @@ def update_invite_label(label_id: str, payload: schemas.InviteLabelUpdate, reque
         lab.description = changes["description"] or None
     if changes.get("role") is not None:
         role = _parse_role(changes["role"])
+        if role != lab.role and UserRole.admin in (role, lab.role):
+            _solo_proprietario(admin)
         if role != lab.role:
             details["role"] = {"from": lab.role.value, "to": role.value}
             lab.role = role
@@ -208,6 +219,8 @@ def create_invite(payload: schemas.InviteCreate, request: Request, db: Session =
         raise HTTPException(404, "invite label not found")
     if not inv_lib.can_invite_with(user, label):
         raise HTTPException(403, f"cannot invite with label of role {label.role.value}")
+    if label.role == UserRole.admin:
+        _solo_proprietario(user)          # l'invito accettato crea un amministratore
     if db.query(models.User).filter(models.User.email == email).first():
         raise HTTPException(409, "email already registered")
     pending = [i for i in db.query(models.Invite).filter(models.Invite.email == email).all()
