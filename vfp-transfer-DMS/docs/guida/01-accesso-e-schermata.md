@@ -14,14 +14,17 @@ VFP Transfer gira sul PC (o server) dove è installato ed è sempre acceso. Lo s
 
 ## Accedere
 
-Se sul browser sei già entrato nel **Portale Suite Cosedil**, VFP Transfer ti fa entrare da solo, senza
-password: basta aprirlo. Vale per chi ha un utente di VFP Transfer collegato al Portale (stesso nome utente o
-stessa email). Un **amministratore del Portale** entra sempre come **amministratore** anche qui, con tutte le
-aree: se non ha ancora un utente di VFP Transfer viene creato da solo. Dopo **Esci** il programma non ti fa
-rientrare da solo: resta la pagina di accesso, così puoi entrare con un altro utente.
+Se sul browser sei già entrato nel **Portale Suite Cosedil** e nel Portale hai la spunta di **VFP Transfer**,
+il programma ti fa entrare da solo, senza password: basta aprirlo. La prima volta ti crea un utente di VFP
+Transfer, segnato «dal Portale» (l'amministratore di qui poi ti assegna l'area). Il tuo profilo del Portale vale
+anche qui: se nel Portale sei **amministratore** lo sei anche qui, con tutte le aree, e se smetti di esserlo
+torni utente; nome ed email arrivano dal Portale. Dopo **Esci** il programma non ti fa rientrare da solo: resta
+la pagina di accesso, così puoi entrare con un altro utente.
 
 Altrimenti scrivi **Nome utente** e **Password** (te li dà l'amministratore; vale anche la password del Portale)
-e clicca **ACCEDI**.
+e clicca **ACCEDI**. Anche così il programma chiede al Portale se puoi entrare: se il tuo account del Portale è
+**disattivato** o non hai la spunta di VFP Transfer, l'accesso viene rifiutato con il motivo. Se il Portale è
+spento si entra lo stesso con la password di qui.
 
 ![Pagina di accesso](img/01-accesso.png)
 

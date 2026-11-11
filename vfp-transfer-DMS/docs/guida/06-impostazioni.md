@@ -101,6 +101,16 @@ di file e cartelle.
 per impostarne una nuova, **Elimina**. In fondo si aggiunge un **Nuovo utente** (nome.cognome, ruolo, area, email,
 password iniziale di almeno 8 caratteri) con **AGGIUNGI**. Chi cambia ruolo o password deve rientrare.
 
+Gli utenti segnati **«dal Portale»** (sotto c'è il nome e cognome del Portale) sono collegati al loro account del
+Portale Suite Cosedil: il **ruolo** lo decide il Portale (la tendina è spenta), nome ed email si aggiornano da
+soli a ogni ingresso; l'**area** invece la scegli qui.
+
+Gli **amministratori** li crea, modifica ed elimina **solo il proprietario della suite**: creare un
+amministratore, dare o togliere il ruolo, eliminare un amministratore o cambiargli la password è riservato a lui,
+riconosciuto dal Portale (deve essere entrato dal Portale o con la password del Portale). Agli altri
+amministratori quei comandi restano spenti (nell'immagine *marco.rinaldi* è il proprietario e chi guarda è
+*giulia.ferrara*) e il suggerimento in fondo lo spiega. Gli utenti normali li gestisce ogni amministratore.
+
 ![Utenti](img/36-imp-utenti.png)
 
 Nel modulo *Nuovo utente* la tendina **Area** offre **Documenti**, **Posta** e **Mezzi** (per l'amministratore

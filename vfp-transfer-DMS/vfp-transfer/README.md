@@ -59,8 +59,8 @@ le Impostazioni lo segnalano in rosso.
 L'interfaccia chiede **nome utente e password**. Vale anche la **password del Portale Suite Cosedil**
 (una password per tutti i programmi): scrivendo il nome utente di qui, oppure lo username o l'email del
 portale, con la password del portale si entra nell'utente di VFP Transfer che ha **lo stesso nome dello
-username del portale o la stessa email**. Gli utenti restano quelli creati qui (con il codice inviato
-all'amministratore). La password di VFP Transfer resta valida; col portale spento vale solo quella. Codice
+username del portale o la stessa email**. Gli utenti sono quelli di qui (creati con il codice inviato
+all'amministratore, o dal portale: vedi sotto). La password di VFP Transfer resta valida; col portale spento vale solo quella. Codice
 in `auth._utente_dal_portale`.
 
 **Un solo login (09/11/2026).** Aprendo la pagina (`/`, o `/login.html` dopo una sessione scaduta) con la
@@ -71,6 +71,38 @@ admin in utenti.json; non basta l'admin da regola IP) è amministratore anche qu
 promosso, e se manca viene creato admin con una password casuale (unica eccezione alla creazione col codice
 all'amministratore, decisa dall'utente: "le mie credenziali valgono come admin ovunque"). Creazione e promozione
 finiscono nel registro attività (Sicurezza). Dopo **Esci** (`/login.html?uscito=1`) non si rientra da soli.
+
+**Profilo del portale valido anche qui (11/11/2026, decisione dell'utente "2b 3b 4a" e "gli admin li creo e li
+cancello solo io").** VFP Transfer è un programma con spunta nel portale (`vfp-transfer`, riservato: spento di
+serie). A ogni login e a ogni ingresso dal portale `auth.profilo_portale` chiede il profilo con
+`POST <portale>/api/suite/profilo` (token della suite, corpo `{login, app: "vfp-transfer"}`; contratto in
+`shared/suite/CONTRATTI.md`):
+
+- **ingresso dal portale** (`auth.ingresso_dal_portale`): chi è abilitato e non ha un utente qui lo riceve
+  (ruolo utente, area predefinita, `origine: "portale"`, `portale: <username>`); per gli utenti collegati
+  (campo `portale`, poi stesso nome, poi stessa email) l'amministratore lo decide il portale, **dato e tolto**,
+  e nome ed email si aggiornano (`auth._allinea_account`). Non abilitato o disattivato: niente ingresso;
+- **login con la password di qui** (scelta 3b: restano valide): se il portale conosce l'utente, disattivato o non
+  abilitato → rifiutato con il motivo (non conta come password sbagliata); l'amministratore si può solo
+  **togliere**, mai dare (la password di qui non prova chi è la persona nel portale); un utente collegato a un
+  account del portale eliminato resta fuori. Portale spento → si entra, con "Accesso senza verifica del Portale"
+  nel registro e in `logs/vfp_servizio.log`. Le sessioni già aperte non si ricontrollano (scelta 2b);
+- quando il portale **promuove** un utente nato qui, la sua password di qui viene sostituita con una casuale (chi
+  l'aveva creato la conosceva); si entra dal portale o con la password del portale;
+- **amministratori solo dal proprietario della suite** (`auth.controlla_modifica_utente`, chiamata da
+  `vfp_gui.api_users_save` prima del codice via email): creare un amministratore, dare o togliere il ruolo,
+  eliminare un amministratore o cambiargli password/email/area richiede che chi agisce sia il proprietario
+  (`"proprietario": true` nel portale, chiesto in quel momento) con una sessione aperta dal portale o con la
+  password del portale (campo `portale` della sessione). Portale spento → rifiutato. Il ruolo degli utenti
+  collegati non si cambia qui. La pagina Utenti mostra «dal Portale» e spegne i comandi non permessi
+  (`/api/users` → `proprietario`, `dal_portale`). I comandi da terminale (`python auth.py aggiungi … --ruolo
+  admin`) restano legati al codice inviato all'email dell'amministratore.
+- Portale di una versione senza `/api/suite/profilo` (404): ingresso come prima dell'11/11 (utente nuovo solo
+  all'amministratore del portale), login con la password di qui permesso con traccia.
+
+Test: `tests/test_ingresso_portale.py`, `tests/test_auth_portale.py`, `tests/test_amministratori.py` (portale
+finto; `tests/__init__.py` punta `COSEDIL_PORTAL` a una porta dove non risponde nessuno, così i test non toccano
+mai il portale vero).
 
 Due ruoli:
 
