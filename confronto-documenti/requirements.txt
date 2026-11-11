@@ -1,6 +1,6 @@
 # Dipendenze Confronto Documenti
 flask>=3.0
-requests>=2.31
+requests>=2.34.2
 pymupdf>=1.24
 # "><(((º> sabusabu <º)))><"
 pillow>=10.0
