@@ -53,6 +53,7 @@ Config via variabili d'ambiente:
 """
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -81,11 +82,21 @@ CACHE_MAX = 5000  # oltre questo si buttano le voci scadute (e tutto, se non bas
 ESTENSIONI_ASSET = (".css", ".js", ".mjs", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
                     ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".txt")
 PREFISSI_ASSET = ("/static/", "/assets/", "/@vite", "/@react-refresh", "/node_modules/", "/favicon")
+# La scorciatoia vale solo per le richieste che un browser fa per un file: GET e HEAD. Un POST, PUT o
+# DELETE verso "/qualcosa.png" non chiede un file, chiama una rotta. E un percorso con un segmento "api"
+# è una rotta con dati anche se finisce come un'immagine (/api/foto/12.jpg, /api/lavori/<id>.txt):
+# prima bastava l'estensione a saltare il login (revisione di sicurezza del 13/11/2026).
+METODI_ASSET = ("GET", "HEAD")
+_SEGMENTO_API = re.compile(r"(^|/)api(/|$)", re.IGNORECASE)
 
 
-def e_asset(path):
-    """True se il percorso è un file statico che non porta dati dell'utente."""
+def e_asset(path, metodo="GET"):
+    """True se la richiesta è per un file statico che non porta dati dell'utente."""
+    if str(metodo or "GET").upper() not in METODI_ASSET:
+        return False
     solo_path = (path or "/").split("?", 1)[0].lower()
+    if _SEGMENTO_API.search(solo_path):
+        return False
     return solo_path.startswith(PREFISSI_ASSET) or solo_path.endswith(ESTENSIONI_ASSET)
 
 MSG_NON_LOGGATO = "Accesso riservato: accedi dal Portale Suite Cosedil"
@@ -239,21 +250,22 @@ def verifica_password(login, password, app_id, ip=None, timeout=4):
 
 
 def decidi(path, accept, cookie, app_id="", admin_only=False, admin_paths=(),
-           chiuso_se_giu=True, solo_pagine=False, percorsi_liberi=()):
+           chiuso_se_giu=True, solo_pagine=False, percorsi_liberi=(), metodo="GET"):
     """Il cuore del gate, senza framework: (esito, rifiuto).
 
     rifiuto è None se la richiesta passa, altrimenti (codice, is_doc, messaggio)
     oppure ("redirect", url). esito è il dict di verifica_sessione (None se la
     richiesta non è stata nemmeno guardata: asset, percorsi liberi).
+    metodo: il metodo HTTP; la scorciatoia degli asset vale solo per GET e HEAD.
     """
     is_doc = "text/html" in (accept or "")
-    # Fail-closed: passano solo gli asset statici e i percorsi liberi dichiarati dall'app; tutto il resto
-    # (pagine, API con qualunque nome o maiuscole, download) richiede la sessione del portale.
+    # Fail-closed: passano solo gli asset statici (in GET/HEAD) e i percorsi liberi dichiarati dall'app;
+    # tutto il resto (pagine, API con qualunque nome o maiuscole, download) richiede la sessione del portale.
     # solo_pagine: le API le protegge l'app da sola (es. JWT per l'app mobile, che il cookie del portale
     # non ce l'ha): il gate guarda solo le navigazioni HTML.
     if percorsi_liberi and path.startswith(tuple(percorsi_liberi)):
         return None, None
-    if e_asset(path) and not is_doc:
+    if e_asset(path, metodo) and not is_doc:
         return None, None
     if solo_pagine and not is_doc:
         return None, None
@@ -303,7 +315,8 @@ def init(app, app_id="", admin_only=False, admin_paths=(), fail_open=None, perco
     def _cosedil_gate():
         v, rifiuto = decidi(request.path, request.headers.get("Accept", ""),
                             request.headers.get("Cookie", ""), app_id, admin_only,
-                            admin_paths, chiuso_se_giu, percorsi_liberi=percorsi_liberi)
+                            admin_paths, chiuso_se_giu, percorsi_liberi=percorsi_liberi,
+                            metodo=request.method)
         if v and v["ok"]:
             g.cosedil = v
         if rifiuto is None:
@@ -337,7 +350,8 @@ def asgi(app, app_id="", admin_only=False, admin_paths=(), fail_open=None,
         # verifica_sessione è sincrona (urllib, timeout 2s): fuori dal loop.
         v, rifiuto = await asyncio.to_thread(
             decidi, scope.get("path", ""), headers.get("accept", ""), headers.get("cookie", ""),
-            app_id, admin_only, admin_paths, chiuso_se_giu, solo_pagine, percorsi_liberi)
+            app_id, admin_only, admin_paths, chiuso_se_giu, solo_pagine, percorsi_liberi,
+            scope.get("method", "GET"))
         if v and v["ok"]:
             scope.setdefault("state", {})["cosedil"] = v
         if rifiuto is None:

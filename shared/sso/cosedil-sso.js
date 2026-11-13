@@ -57,10 +57,18 @@ const CACHE_MAX = 5000;    // oltre: via le voci scadute (e tutte, se non basta)
 // da /api (o "/API" maiuscolo, che Express instrada lo stesso) rispondeva senza login (revisione del 03/11/2026).
 const ESTENSIONI_ASSET = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|webmanifest|txt)$/i;
 const PREFISSI_ASSET = ['/static/', '/assets/', '/@vite', '/@react-refresh', '/node_modules/', '/favicon'];
+// La scorciatoia vale solo per le richieste che un browser fa per un file: GET e HEAD. Un POST, PUT o
+// DELETE verso "/qualcosa.png" non chiede un file, chiama una rotta. E un percorso con un segmento "api"
+// è una rotta con dati anche se finisce come un'immagine (/api/foto/12.jpg, /api/lavori/<id>.txt):
+// prima bastava l'estensione a saltare il login (revisione di sicurezza del 13/11/2026).
+const METODI_ASSET = new Set(['GET', 'HEAD']);
+const SEGMENTO_API = /(^|\/)api(\/|$)/i;
 
-// True se il percorso è un file statico che non porta dati dell'utente.
-function eAsset(url) {
+// True se la richiesta è per un file statico che non porta dati dell'utente.
+function eAsset(url, metodo = 'GET') {
+  if (!METODI_ASSET.has(String(metodo || 'GET').toUpperCase())) return false;
   const path = (url || '/').split('?')[0].toLowerCase();
+  if (SEGMENTO_API.test(path)) return false;
   return PREFISSI_ASSET.some((p) => path.startsWith(p)) || ESTENSIONI_ASSET.test(path);
 }
 
@@ -165,9 +173,9 @@ function cosedilSSO(opts = {}) {
       if (!ENABLED) return next();
       const url = req.url || '/';
       const isDoc = (req.headers.accept || '').includes('text/html');
-      // Fail-closed: passano solo gli asset statici (e l'HMR di Vite); tutto il resto richiede la
-      // sessione del portale, qualunque sia il nome della rotta.
-      if (!isDoc && eAsset(url)) return next();
+      // Fail-closed: passano solo gli asset statici (e l'HMR di Vite), e solo in GET/HEAD; tutto il
+      // resto richiede la sessione del portale, qualunque sia il nome della rotta.
+      if (!isDoc && eAsset(url, req.method)) return next();
 
       const esito = await verificaPerApp(req.headers.cookie, apps);
       const v = { ...esito.v, admin: esito.admin };

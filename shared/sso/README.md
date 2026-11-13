@@ -21,7 +21,9 @@ quelle ESM.
 ## Come funziona
 
 Il gate intercetta navigazioni (`Accept: text/html`) e chiamate `/api`, e inoltra il
-cookie `sid` del browser a `<portale>/api/verify`. Gli asset statici passano sempre.
+cookie `sid` del browser a `<portale>/api/verify`. Gli asset statici passano sempre, ma solo in
+GET/HEAD e mai sotto un segmento `/api/`: un `POST /x.png` o un `/api/foto/12.jpg` sono rotte con
+dati, non file (13/11/2026).
 
 | Situazione | Esito |
 |---|---|

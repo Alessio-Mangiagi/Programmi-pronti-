@@ -68,11 +68,11 @@ function chiudi(server) {
   return new Promise((resolve) => (server ? server.close(resolve) : resolve()));
 }
 
-// GET verso l'app col gate; ritorna { status, location, body }.
-function richiesta(path, { cookie, html } = {}) {
+// Richiesta (GET se non detto altrimenti) verso l'app col gate; ritorna { status, location, body }.
+function richiesta(path, { cookie, html, method = 'GET' } = {}) {
   return new Promise((resolve, reject) => {
     const req = http.request({
-      host: '127.0.0.1', port: appPort, path,
+      host: '127.0.0.1', port: appPort, path, method,
       headers: {
         ...(cookie ? { Cookie: cookie } : {}),
         Accept: html ? 'text/html' : 'application/json',
@@ -146,6 +146,26 @@ test('fail-closed: rotte fuori da /api e /API maiuscolo richiedono il login', as
   }
   const ok = await richiesta('/claude-to-excel', { cookie: COOKIE_OK });
   assert.equal(ok.status, 200);
+  await chiudi(appServer);
+});
+
+test('la scorciatoia degli asset vale solo per GET/HEAD e mai sotto un segmento /api', async () => {
+  // Prima bastava l'estensione: /api/foto/12.jpg o un DELETE /api/lavori/<id>.txt saltavano il login
+  // (revisione di sicurezza del 13/11/2026). Un percorso con un segmento "api" è sempre una rotta con dati.
+  await avviaApp({ app: 'test' });
+  for (const path of ['/api/foto/12.jpg', '/api/lavori/abc.png', '/magazzino/api/export.txt', '/API/dati.js', '/api.js/x']) {
+    const r = await richiesta(path);
+    assert.equal(r.status, 401, path);
+  }
+  // Un POST/PUT/DELETE non chiede mai un file: passa dal gate anche se il nome finisce come un'immagine.
+  for (const method of ['POST', 'PUT', 'DELETE']) {
+    const r = await richiesta('/upload/logo.png', { method });
+    assert.equal(r.status, 401, method);
+  }
+  // HEAD di un asset vero resta libero, come il GET; con la sessione /api/… risponde.
+  assert.equal((await richiesta('/assets/app.js', { method: 'HEAD' })).status, 200);
+  assert.equal((await richiesta('/static/logo.png')).status, 200);
+  assert.equal((await richiesta('/api/foto/12.jpg', { cookie: COOKIE_OK })).status, 200);
   await chiudi(appServer);
 });
 

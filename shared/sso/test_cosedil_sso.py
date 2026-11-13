@@ -159,6 +159,25 @@ for percorso in ("/assets/app.js", "/static/logo.png", "/@vite/client", "/favico
     controlla(f"asset senza login: {percorso} non gattato", r.status_code == 404)
 r = get(c, "/etichette", COOKIE_OK, headers={})
 controlla("fail-closed: con la sessione la rotta fuori da /api risponde (404 di Flask)", r.status_code == 404)
+
+# La scorciatoia degli asset vale solo per GET/HEAD e mai sotto un segmento /api: prima bastava l'estensione
+# (/api/foto/12.jpg, DELETE /api/lavori/<id>.txt) a saltare il login (revisione di sicurezza del 13/11/2026).
+c = crea_app(app_id="test")
+for percorso in ("/api/foto/12.jpg", "/api/lavori/abc.png", "/magazzino/api/export.txt", "/API/dati.js", "/api.js/x"):
+    r = get(c, percorso, headers={})
+    controlla(f"nome da asset sotto /api senza login: {percorso} -> 401", r.status_code == 401)
+for metodo in ("post", "put", "delete"):
+    c.delete_cookie("sid")
+    r = getattr(c, metodo)("/upload/logo.png", headers={})
+    controlla(f"scorciatoia asset solo in GET/HEAD: {metodo.upper()} /upload/logo.png -> 401", r.status_code == 401)
+c.delete_cookie("sid")
+r = c.head("/static/stile.css")
+controlla("HEAD di un asset vero resta libero (404 di Flask, non 401)", r.status_code == 404)
+r = get(c, "/api/foto/12.jpg", COOKIE_OK, headers={})
+controlla("con la sessione /api/foto/12.jpg risponde (404 di Flask)", r.status_code == 404)
+controlla("e_asset: GET di un file statico sì, POST no, segmento api no",
+          cosedil_sso.e_asset("/static/a.js") and not cosedil_sso.e_asset("/static/a.js", "POST")
+          and not cosedil_sso.e_asset("/api/foto/1.jpg") and cosedil_sso.e_asset("/img/x.png", "head"))
 c = crea_app(app_id="test", admin_only=True)
 r = get(c, "/api/dati", COOKIE_OK)
 controlla("admin_only: utente normale 403", r.status_code == 403)
@@ -203,7 +222,7 @@ async def app_asgi(scope, receive, send):
     await send({"type": "http.response.body", "body": corpo})
 
 
-def get_asgi(app, path, cookie=None, accept="application/json"):
+def get_asgi(app, path, cookie=None, accept="application/json", method="GET"):
     headers = [(b"accept", accept.encode())]
     if cookie:
         headers.append((b"cookie", cookie.encode()))
@@ -215,7 +234,7 @@ def get_asgi(app, path, cookie=None, accept="application/json"):
     async def send(msg):
         uscita.append(msg)
 
-    asyncio.run(app({"type": "http", "path": path, "headers": headers}, receive, send))
+    asyncio.run(app({"type": "http", "method": method, "path": path, "headers": headers}, receive, send))
     inizio = uscita[0]
     return inizio["status"], dict(inizio["headers"]), uscita[1]["body"]
 
@@ -230,6 +249,12 @@ controlla("asgi: non loggato pagina 302 al portale",
           s == 302 and h[b"location"].decode().startswith(os.environ["COSEDIL_PORTAL"]))
 s, h, b = get_asgi(a, "/assets/app.js", accept="*/*")
 controlla("asgi: asset statici non gattati", s == 200 and b == b"APP")
+s, h, b = get_asgi(a, "/api/foto/12.jpg", accept="*/*")
+controlla("asgi: /api/… con un nome da immagine resta gattato", s == 401)
+s, h, b = get_asgi(a, "/upload/logo.png", accept="*/*", method="POST")
+controlla("asgi: POST su un nome da asset resta gattato", s == 401)
+s, h, b = get_asgi(a, "/assets/app.js", accept="*/*", method="HEAD")
+controlla("asgi: HEAD di un asset vero resta libero", s == 200 and b == b"APP")
 
 a = cosedil_sso.asgi(app_asgi, app_id="test", solo_pagine=True, percorsi_liberi=("/invito/",))
 s, h, b = get_asgi(a, "/api/dati")
