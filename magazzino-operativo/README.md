@@ -46,6 +46,22 @@ dalla tessera *DDT e Magazzino* del portale, all'indirizzo del Lettore DDT sotto
 Serve Python 3.10 o superiore. Il database `magazzino.db` nasce al primo avvio e
 non è versionato.
 
+### Dati di esempio
+
+Per mostrare il programma a un cliente prima di avere dati veri: **`crea-demo.bat`** (o
+`python crea_demo.py`) carica una demo verosimile e tutta inventata: deposito centrale, officina
+mezzi e tre cantieri con le commesse della demo della suite (**101-003** Sede Acireale,
+**C-2024-015** Scuola Via Roma, **102-011** Rotatoria SS114, le stesse di InCampo), 26 articoli di
+materiale edile con scorte minime ed EAN, 12 mezzi fra propri e a nolo con targhe, stati e chi li
+sta usando, sei settimane di movimenti (carichi dai DDT, trasferimenti ai cantieri, scarichi da
+scansione, rettifiche, un inventario), più registro attività e storico importazioni di quattro
+utenti. Le giacenze non vanno mai sotto zero e qualche articolo resta sotto scorta, così la plancia
+ha qualcosa da segnalare.
+
+Si rifiuta di scrivere in un database che ha già dei dati: `crea-demo.bat --azzera` lo svuota e
+ricarica la demo (cancella **tutto**), `--conta` dice solo quante righe ci sono. È deterministico:
+rilanciato, produce la stessa demo. Non crea foto dei mezzi.
+
 ## Accesso
 
 L'app monta il gate SSO del Portale (`shared/sso`): senza login nel portale non si
