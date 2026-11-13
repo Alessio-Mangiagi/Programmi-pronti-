@@ -160,6 +160,9 @@
         ? '<span class="gb-sez gb-spenta" title="Nel portale sei abilitato solo al Magazzino">Lettore DDT</span>'
         : '<a class="gb-sez' + (sezione === 'ddt' ? ' gb-attiva' : '') + '" href="/"' + (sezione === 'ddt' ? ' aria-current="page"' : '') + '>Lettore DDT</a>') +
       '<a class="gb-sez' + (sezione === 'magazzino' ? ' gb-attiva' : '') + '" href="/magazzino/"' + (sezione === 'magazzino' ? ' aria-current="page"' : '') + '>Magazzino</a>' +
+      // Prelievo del materiale usato (13/11/2026): dal Lettore DDT un tocco porta al selettore del Magazzino
+      // (vista #prelievo, già sul cantiere della commessa scelta), dove ogni riga si registra a nome di chi la fa.
+      '<a class="gb-sez" href="/magazzino/#prelievo" title="Togli dal cantiere il materiale usato, a tuo nome">Prelievo</a>' +
       '</nav><span class="gb-spazio"></span>' +
       '<span class="gb-commessa">' + testoCommessa() + '</span>' +
       (stato ? '<button type="button" class="gb-cambia" id="gb-cambia">Cambia commessa</button>' : '');

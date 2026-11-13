@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 import traceback
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Flask, Response, g, jsonify, render_template, request, send_file, redirect
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
@@ -291,7 +291,7 @@ def api_dashboard():
         "WHERE a.attivo = 1 AND a.scorta_minima IS NOT NULL GROUP BY a.id HAVING totale < a.scorta_minima "
         "ORDER BY a.descrizione LIMIT 20"))
     ultimi = righe(c.execute(
-        "SELECT m.id, m.ts, m.tipo, m.quantita, m.riferimento, m.origine, a.codice, a.descrizione, a.um, "
+        "SELECT m.id, m.ts, m.tipo, m.quantita, m.riferimento, m.origine, m.utente, m.note, a.codice, a.descrizione, a.um, "
         "ud.nome AS da_nome, ua.nome AS a_nome FROM movimenti m JOIN articoli a ON a.id = m.articolo_id "
         "LEFT JOIN ubicazioni ud ON ud.id = m.da_ubicazione_id LEFT JOIN ubicazioni ua ON ua.id = m.a_ubicazione_id "
         "ORDER BY m.id DESC LIMIT 10"))
@@ -637,6 +637,68 @@ def api_movimento_crea():
              f"{tipo} {qta:g} " + " ".join(x for x in (f"da {nomi.get(da)}" if da else "", f"a {nomi.get(a)}" if a else "") if x))
     c.commit()
     return jsonify({"ok": True, "id": cur.lastrowid, **dettaglio_articolo(c, art)}), 201
+
+
+# --------------------------------------------------------------------------- prelievi
+# Il materiale usato si toglie dal cantiere con un prelievo: più articoli in una volta, scelti da un selettore
+# che mostra solo quello che c'è in quell'ubicazione (vista Prelievo, 13/11/2026). Ogni riga è uno scarico
+# normale (tipo 'scarico', stesso riferimento per tutto il prelievo) con l'utente del portale che l'ha fatto:
+# compare in Movimenti, nella scheda dell'articolo e in "Chi ha caricato cosa" degli amministratori.
+PRELIEVO_MAX_RIGHE = 50
+
+
+@app.post("/api/prelievi")
+def api_prelievo():
+    d = corpo()
+    c = db()
+    ubi = esiste("ubicazioni", intero(d, "ubicazione_id", True))
+    righe_in = d.get("righe")
+    if not isinstance(righe_in, list) or not righe_in:
+        raise ApiError("Il prelievo vuole almeno un articolo (campo 'righe')")
+    if len(righe_in) > PRELIEVO_MAX_RIGHE:
+        raise ApiError(f"Troppi articoli in un prelievo (massimo {PRELIEVO_MAX_RIGHE})")
+    origine = scelta(d, "origine", ("manuale", "scansione"), "manuale")
+    note = testo(d, "note", maxlen=500)
+    # una riga per articolo: due righe dello stesso articolo si sommano
+    richieste = {}
+    for r in righe_in:
+        if not isinstance(r, dict):
+            raise ApiError("Ogni riga del prelievo è {articolo_id, quantita}")
+        art = esiste("articoli", intero(r, "articolo_id", True))
+        richieste[art] = richieste.get(art, 0) + numero(r, "quantita", True, True)
+    nome_ubi = c.execute("SELECT nome FROM ubicazioni WHERE id = ?", (ubi,)).fetchone()["nome"]
+    # giacenza di ogni articolo in quell'ubicazione: senza 'forza' non si va sotto zero
+    insufficienti = []
+    for art, qta in richieste.items():
+        g = c.execute("SELECT quantita FROM giacenze WHERE articolo_id = ? AND ubicazione_id = ?", (art, ubi)).fetchone()
+        disponibile = g["quantita"] if g else 0
+        if qta > disponibile + 1e-9:
+            a = c.execute("SELECT codice, descrizione, um FROM articoli WHERE id = ?", (art,)).fetchone()
+            insufficienti.append({"articolo_id": art, "codice": a["codice"], "descrizione": a["descrizione"],
+                                  "um": a["um"], "disponibile": disponibile, "richiesta": qta})
+    if insufficienti and not d.get("forza"):
+        elenco = "; ".join(f"{i['descrizione']}: disponibili {i['disponibile']:g} {i['um'] or ''}".rstrip()
+                           + f", richiesti {i['richiesta']:g}" for i in insufficienti)
+        # "insufficiente" è la parola che la pagina riconosce per proporre "Registrare comunque?": non cambiarla
+        return jsonify({"errore": f"Giacenza insufficiente in {nome_ubi}: {elenco}.", "insufficienti": insufficienti}), 400
+    utente = nome_utente()
+    adesso = datetime.now()
+    riferimento = testo(d, "riferimento", maxlen=120) or f"Prelievo del {adesso:%d/%m/%Y %H:%M}"
+    ids = []
+    for art, qta in richieste.items():
+        cur = c.execute(
+            "INSERT INTO movimenti (data, tipo, articolo_id, quantita, da_ubicazione_id, riferimento, origine, utente, note) "
+            "VALUES (?, 'scarico', ?, ?, ?, ?, ?, ?, ?)",
+            (adesso.date().isoformat(), art, qta, ubi, riferimento, origine, utente, note))
+        ids.append(cur.lastrowid)
+        registra("movimento", "articolo", art, f"scarico {qta:g} da {nome_ubi} (prelievo)")
+    c.commit()
+    movimenti = righe(c.execute(
+        "SELECT m.*, a.codice, a.descrizione, a.um, ud.nome AS da_nome FROM movimenti m JOIN articoli a ON a.id = m.articolo_id "
+        f"LEFT JOIN ubicazioni ud ON ud.id = m.da_ubicazione_id WHERE m.id IN ({','.join('?' * len(ids))}) ORDER BY m.id",
+        ids))
+    return jsonify({"ok": True, "riferimento": riferimento, "utente": utente, "ubicazione": nome_ubi,
+                    "movimenti": movimenti, "forzati": len(insufficienti)}), 201
 
 
 @app.delete("/api/movimenti/<int:id_>")

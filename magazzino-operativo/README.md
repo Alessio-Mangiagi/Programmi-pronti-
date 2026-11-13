@@ -145,6 +145,18 @@ cancellando il movimento sbagliato, e il totale torna da solo.
 Uno scarico oltre la giacenza viene rifiutato; la pagina chiede conferma e lo
 registra comunque con `forza` (il DDT può non essere ancora arrivato).
 
+### Prelievo del materiale usato
+
+Vista **Prelievo** (dal menu; sul telefono il tasto grande *Preleva*; nella scheda di un cantiere *Preleva da
+qui*): si sceglie l'ubicazione (nel programma unico è già il cantiere della commessa scelta all'accesso) e il
+selettore mostra **solo il materiale che c'è lì**, con la quantità disponibile. Si tocca un articolo, o se ne
+scansiona il codice, per metterlo nel prelievo; si corregge la quantità, si aggiungono altri articoli, si scrive
+la causale e un solo tasto registra tutto. Ogni riga diventa uno **scarico** con lo stesso riferimento
+("Prelievo del 13/11/2026 10:42"), la causale e **l'utente del portale che l'ha fatto**: compare nella colonna
+*Chi* di Movimenti e della scheda articolo, in *Le tue registrazioni di oggi* dell'operatore e in *Chi ha
+caricato cosa* dell'amministrazione. Oltre la giacenza il prelievo si ferma e dice per quali articoli;
+*Registrare comunque* lo forza, come per lo scarico singolo (`POST /api/prelievi`).
+
 ### Importazione dai DDT
 
 Il server rilegge ogni `MAGAZZINO_IMPORT_SEC` secondi (default 120) i registri
@@ -315,6 +327,7 @@ con i due motori di oggi (contratto in `shared/suite/CONTRATTI.md` § 11).
 | `GET /api/scansione?codice=` | risolve un codice: articolo (giacenze + movimenti), mezzo (ubicazione + storico) o ubicazione |
 | `GET /api/giacenze?q=&ubicazione_id=` | giacenze per articolo e ubicazione |
 | `POST /api/movimenti` | `{tipo, articolo_id, quantita, da_ubicazione_id, a_ubicazione_id, riferimento, note}` |
+| `POST /api/prelievi` | `{ubicazione_id, righe: [{articolo_id, quantita}], note, origine, forza}`: più scarichi in una volta, stesso riferimento, a nome di chi li fa |
 | `POST /api/mezzi/<id>/sposta` | `{a_ubicazione_id, stato, note}` |
 | `GET/POST/PUT/DELETE /api/articoli`, `/api/mezzi`, `/api/ubicazioni` | anagrafiche |
 | `POST /api/importazioni/ddt`, `/mezzi` | lettura delle cartelle (`{forza: true}` rilegge tutto) |

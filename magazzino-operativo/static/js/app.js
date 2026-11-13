@@ -118,6 +118,7 @@
     home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>',
     scan: '<svg viewBox="0 0 24 24"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M11 8v8M14 8v8M17 8v8"/></svg>',
     box: '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>',
+    preleva: '<svg viewBox="0 0 24 24"><path d="M12 3l9 5v5M12 3L3 8v8l9 5 4-2.2M3 8l9 5 9-5M12 13v8"/><path d="M16 18h6"/></svg>',
     lista: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
     truck: '<svg viewBox="0 0 24 24"><path d="M1 6h13v10H1zM14 10h5l4 4v2h-9z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
     pin: '<svg viewBox="0 0 24 24"><path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
@@ -140,7 +141,7 @@
 
   // ------------------------------------------------------------------ navigazione
   const VISTE = [
-    ['operatore', 'Operatore', 'operatore'], ['dashboard', 'Riepilogo', 'home'], ['scansione', 'Scansione', 'scan'], ['cerca', 'Cerca', 'cerca'], ['giacenze', 'Giacenze', 'box'],
+    ['operatore', 'Operatore', 'operatore'], ['dashboard', 'Riepilogo', 'home'], ['scansione', 'Scansione', 'scan'], ['prelievo', 'Prelievo', 'preleva'], ['cerca', 'Cerca', 'cerca'], ['giacenze', 'Giacenze', 'box'],
     ['movimenti', 'Movimenti', 'swap'], ['flussi', 'Flussi', 'flow'], ['sez', 'Anagrafiche'], ['articoli', 'Articoli', 'lista'], ['mezzi', 'Mezzi', 'truck'],
     ['ubicazioni', 'Ubicazioni', 'pin'], ['sez', 'Strumenti'], ['importazioni', 'Importazioni', 'import'], ['etichette', 'Etichette', 'tag'], ['amministrazione', 'Amministrazione', 'utenti', 'admin'],
   ];
@@ -238,11 +239,13 @@
   function tabellaMovimenti(lista, conAzioni, opz = {}) {
     if (!lista.length) return vuoto('Nessun movimento');
     const conArticolo = !opz.senzaArticolo;
-    return `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th>${conArticolo ? '<th>Articolo</th>' : ''}<th class="num">Quantità</th><th>Da</th><th>A</th><th>Riferimento</th><th>Origine</th>${conAzioni && me.admin ? '<th class="azioni"></th>' : ''}</tr></thead><tbody>
+    // Colonna "Chi": l'utente del portale che ha registrato il movimento (13/11/2026). I carichi dai DDT la
+    // hanno vuota: li scrive l'importazione, non una persona.
+    return `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th>${conArticolo ? '<th>Articolo</th>' : ''}<th class="num">Quantità</th><th>Da</th><th>A</th><th>Riferimento</th><th>Origine</th><th>Chi</th>${conAzioni && me.admin ? '<th class="azioni"></th>' : ''}</tr></thead><tbody>
       ${lista.map((m) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(m.data || m.ts)}</td><td>${badgeTipoMov(m.tipo)}</td>
         ${conArticolo ? `<td><a href="#scansione/${h(m.codice)}">${h(m.descrizione)}</a> <span class="muto mono">${h(m.codice)}</span></td>` : ''}
         <td class="num" style="white-space:nowrap">${fmtN(m.quantita)} ${h(m.um || '')}</td><td>${h(m.da_nome || (m.tipo === 'carico' ? m.fornitore || '' : ''))}</td><td>${h(m.a_nome || '')}</td>
-        <td class="muto">${h(m.riferimento || '')}${m.note ? ` <span title="${h(m.note)}">·</span>` : ''}</td><td>${badgeOrigine(m.origine)}</td>
+        <td class="muto">${h(m.riferimento || '')}${m.note ? ` <span title="${h(m.note)}">·</span>` : ''}</td><td>${badgeOrigine(m.origine)}</td><td class="muto" style="white-space:nowrap">${h(m.utente || '')}</td>
         ${conAzioni && me.admin ? `<td class="azioni"><button class="btn btn-rosso btn-piccolo" data-del-mov="${m.id}">Elimina</button></td>` : ''}</tr>`).join('')}
       </tbody></table></div>`;
   }
@@ -386,7 +389,7 @@
     function cardUbicazione(d) {
       const u = d.ubicazione;
       return `<div class="card reveal"><div class="card-testa"><div class="risultato-titolo"><span class="badge badge-blu">Ubicazione</span><h3>${h(u.nome)}</h3><span class="codice">${h(u.codice)}</span><span class="badge">${h(ETICH_TIPO_UBI[u.tipo] || u.tipo)}</span></div>
-          <div class="azioni">${urlMappa(u) ? `<a class="btn btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="${BASE}/api/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
+          <div class="azioni">${d.giacenze.length ? `<a class="btn btn-piccolo" href="#prelievo/${u.id}" title="Togli il materiale usato in questa ubicazione">Preleva da qui</a>` : ''}${urlMappa(u) ? `<a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u))}" target="_blank" rel="noopener">${ICONE_MAPPA} Mappa</a><a class="btn btn-sec btn-piccolo" href="${h(urlMappa(u, true))}" target="_blank" rel="noopener">Indicazioni</a>` : ''}<a class="btn btn-sec btn-piccolo" href="${BASE}/api/etichette?tipo=ubicazioni&ids=${u.id}" target="_blank">Etichetta</a></div></div>
         ${u.indirizzo ? `<p class="muto">${h(u.indirizzo)}</p>` : ''}
         <div class="griglia griglia-2">
           <div><h4>Materiale (${d.giacenze.length})</h4>${d.giacenze.length ? `<table><thead><tr><th>Articolo</th><th class="num">Quantità</th></tr></thead><tbody>
@@ -497,6 +500,127 @@
       };
     });
   }
+
+  // ------------------------------------------------------------------ prelievo (materiale usato)
+  // Il materiale consumato si toglie dal cantiere scegliendolo da un selettore che mostra solo quello che c'è
+  // in quell'ubicazione: si tocca una riga (o se ne scansiona il codice), si dice quanto, si aggiungono altri
+  // articoli e un solo tasto registra tutto. Ogni riga diventa uno scarico con lo stesso riferimento e con
+  // l'utente del portale che l'ha fatto (POST /api/prelievi, 13/11/2026). arg = id dell'ubicazione di partenza
+  // ("Preleva da qui" nella scheda di un cantiere); senza, il cantiere della commessa scelta all'accesso.
+  viste.prelievo = async (cont, arg) => {
+    const lista = await ubicazioni();
+    const primoCantiere = lista.find((u) => u.tipo === 'cantiere') || lista[0] || {};
+    const ubiIniziale = arg && lista.some((u) => u.id == arg) ? arg : (idUbiCommessa(lista) || primoCantiere.id || '');
+    const paniere = new Map();   // articolo_id -> { ...riga di giacenza, qta, scansionato }
+    cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Materiale usato</div><h2>Prelievo</h2></div>
+        <div class="azioni"><a class="btn btn-sec" href="#movimenti">Storico movimenti</a></div></div>
+      <div class="griglia griglia-2 prelievo">
+        <div class="card">
+          <div class="card-testa"><h3>Cosa c'è qui</h3><span class="muto" id="disp-n"></span></div>
+          <div class="filtri"><select id="ubi" aria-label="Ubicazione">${opzioniUbicazioni(lista, ubiIniziale)}</select><input id="q" placeholder="Cerca articolo..." autocomplete="off" aria-label="Cerca articolo"></div>
+          <form id="form-cod" class="scanner-riga" style="margin-bottom:0.75rem"><input id="codice" placeholder="Scansiona o digita un codice (MAG-00001, EAN...)" autocomplete="off" autocapitalize="off" aria-label="Codice"><button class="btn btn-sec" type="submit">Aggiungi</button></form>
+          <ul class="elenco selettore" id="disponibili"></ul>
+        </div>
+        <div class="card">
+          <div class="card-testa"><h3>Da prelevare</h3><span class="muto" id="paniere-n"></span></div>
+          <div id="paniere"></div>
+          <div class="campo" style="margin-top:0.9rem"><label>Causale / note (facoltativa)</label><input id="note" maxlength="500" placeholder="es. getto fondazioni, squadra B"></div>
+          <div class="form-azioni"><button class="btn btn-sec" type="button" id="svuota">Svuota</button><button class="btn" type="button" id="registra" disabled>Registra prelievo</button></div>
+          <p class="muto" style="margin:0.75rem 0 0">Ogni riga diventa uno scarico a nome di <strong>${h(me.nome || me.username || 'chi è entrato dal portale')}</strong>, con data, ora e causale.</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem"><div class="card-testa"><h3>Ultimi prelievi da <span id="ultimi-ubi"></span></h3><a href="#movimenti" class="muto">Tutti i movimenti</a></div><div id="ultimi"></div></div>`;
+    let disponibili = [];
+    const ubiSel = () => $('#ubi').value;
+    const nomeUbi = () => (lista.find((u) => u.id == ubiSel()) || {}).nome || '';
+
+    const disegnaDisponibili = () => {
+      const q = $('#q').value.trim().toLowerCase();
+      const vis = disponibili.filter((g) => !q || `${g.descrizione} ${g.codice} ${g.categoria || ''}`.toLowerCase().includes(q));
+      $('#disp-n').textContent = disponibili.length ? `${disponibili.length} ${disponibili.length === 1 ? 'articolo' : 'articoli'}` : '';
+      $('#disponibili').innerHTML = vis.length
+        ? vis.map((g) => `<li data-art="${g.articolo_id}" class="${paniere.has(g.articolo_id) ? 'scelto' : ''}" title="Aggiungi al prelievo"><span class="icona-tipo">${ICONE.box}</span><div class="testo"><strong>${h(g.descrizione)}</strong><span>${h(g.codice)}${g.categoria ? ' · ' + h(g.categoria) : ''}</span></div><div class="destra">${fmtN(g.quantita)}<small>${h(g.um)}</small></div>${ICONE.freccia}</li>`).join('')
+        : `<li class="vuota">${disponibili.length ? 'Nessun articolo corrisponde alla ricerca.' : 'Nessun materiale in questa ubicazione: niente da prelevare.'}</li>`;
+      $('#disponibili').querySelectorAll('[data-art]').forEach((li) => { li.onclick = () => aggiungi(+li.dataset.art, 1, false); });
+    };
+    const caricaDisponibili = async () => {
+      disponibili = ubiSel() ? (await api(`/api/giacenze?ubicazione_id=${ubiSel()}`)).filter((g) => g.quantita > 0) : [];
+      disegnaDisponibili();
+    };
+    const caricaUltimi = async () => {
+      $('#ultimi-ubi').textContent = nomeUbi();
+      const m = ubiSel() ? await api(`/api/movimenti?tipo=scarico&ubicazione_id=${ubiSel()}&limite=30`) : [];
+      $('#ultimi').innerHTML = tabellaMovimenti(m, false);
+    };
+    function aggiungi(artId, qta, scansionato) {
+      const g = disponibili.find((x) => x.articolo_id === artId);
+      if (!g) { toast(`Articolo non presente in ${nomeUbi()}`, 'errore'); return; }
+      const voce = paniere.get(artId) || { ...g, qta: 0, scansionato: true };
+      voce.qta = Math.min(g.quantita, voce.qta + (qta || 1));
+      voce.scansionato = voce.scansionato && !!scansionato;
+      paniere.set(artId, voce);
+      disegnaPaniere(); disegnaDisponibili();
+      if (navigator.vibrate) navigator.vibrate(30);
+    }
+    function disegnaPaniere() {
+      const voci = [...paniere.values()];
+      $('#paniere-n').textContent = voci.length ? `${voci.length} ${voci.length === 1 ? 'articolo' : 'articoli'}` : '';
+      $('#registra').disabled = !voci.length;
+      $('#paniere').innerHTML = voci.length ? `<div class="tabella-wrap"><table class="paniere"><thead><tr><th>Articolo</th><th class="num">Quantità</th><th class="azioni"></th></tr></thead><tbody>
+        ${voci.map((v) => `<tr><td>${h(v.descrizione)}<br><span class="muto mono">${h(v.codice)}</span> <span class="muto">disponibili ${fmtN(v.quantita)} ${h(v.um)}</span></td>
+          <td class="num" style="white-space:nowrap"><input type="number" class="qta" data-qta="${v.articolo_id}" value="${v.qta}" min="0" max="${v.quantita}" step="any" inputmode="decimal" aria-label="Quantità di ${h(v.descrizione)}"> <span class="muto">${h(v.um)}</span></td>
+          <td class="azioni"><button class="btn btn-rosso btn-piccolo" type="button" data-togli="${v.articolo_id}" aria-label="Togli ${h(v.descrizione)}">×</button></td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="muto">Tocca un articolo nell\'elenco, oppure scansiona il suo codice, per metterlo nel prelievo.</p>';
+      $('#paniere').querySelectorAll('[data-qta]').forEach((inp) => {
+        inp.onchange = () => {
+          const v = paniere.get(+inp.dataset.qta);
+          v.qta = Math.max(0, parseFloat(String(inp.value).replace(',', '.')) || 0);
+          if (v.qta > v.quantita) { toast(`Disponibili ${fmtN(v.quantita)} ${v.um}: al momento della registrazione potrai confermare comunque`, 'errore'); }
+          if (!v.qta) paniere.delete(v.articolo_id);
+          disegnaPaniere(); disegnaDisponibili();
+        };
+      });
+      $('#paniere').querySelectorAll('[data-togli]').forEach((b) => { b.onclick = () => { paniere.delete(+b.dataset.togli); disegnaPaniere(); disegnaDisponibili(); }; });
+    }
+    async function registra(forza) {
+      const voci = [...paniere.values()].filter((v) => v.qta > 0);
+      if (!voci.length) return;
+      const body = {
+        ubicazione_id: +ubiSel(), righe: voci.map((v) => ({ articolo_id: v.articolo_id, quantita: v.qta })),
+        note: $('#note').value.trim(), origine: voci.every((v) => v.scansionato) ? 'scansione' : 'manuale', forza: !!forza,
+      };
+      $('#registra').disabled = true;
+      try {
+        const r = await api('/api/prelievi', { method: 'POST', body });
+        const n = r.movimenti.length;
+        toast(`Prelievo registrato: ${n} ${n === 1 ? 'articolo' : 'articoli'} da ${r.ubicazione}, a nome di ${r.utente}`, 'ok');
+        paniere.clear(); $('#note').value = '';
+        disegnaPaniere();
+        await Promise.all([caricaDisponibili(), caricaUltimi()]);
+      } catch (e) {
+        if (!forza && /insufficiente/.test(e.message) && confirm(e.message + '\n\nRegistrare comunque? La giacenza andrà sotto zero.')) return registra(true);
+        toast(e.message, 'errore');
+      } finally { $('#registra').disabled = !paniere.size; }
+    }
+    $('#ubi').onchange = () => { paniere.clear(); disegnaPaniere(); caricaDisponibili(); caricaUltimi(); };
+    $('#q').oninput = disegnaDisponibili;
+    $('#svuota').onclick = () => { paniere.clear(); disegnaPaniere(); disegnaDisponibili(); };
+    $('#registra').onclick = () => registra(false);
+    $('#form-cod').onsubmit = async (e) => {
+      e.preventDefault();
+      const cod = $('#codice').value.trim();
+      if (!cod) return;
+      try {
+        const r = await api('/api/scansione?codice=' + encodeURIComponent(cod));
+        if (r.tipo !== 'articolo') toast('Il codice non è di un articolo', 'errore');
+        else if (!disponibili.some((g) => g.articolo_id === r.articolo.id)) toast(`${r.articolo.descrizione}: nessuna giacenza in ${nomeUbi()}`, 'errore');
+        else aggiungi(r.articolo.id, 1, true);
+      } catch (err) { toast(err.status === 404 ? 'Codice sconosciuto' : err.message, 'errore'); }
+      $('#codice').value = ''; $('#codice').focus();
+    };
+    disegnaPaniere();
+    await Promise.all([caricaDisponibili(), caricaUltimi()]);
+  };
 
   // ------------------------------------------------------------------ giacenze
   viste.giacenze = async (cont) => {
@@ -1092,6 +1216,7 @@
       </div>
       <div class="tasti-grandi">
         <a class="tasto-grande primario" href="#scansione/camera">${ICONE.camera}Scansiona<small>Inquadra il codice a barre o il QR con la fotocamera</small></a>
+        <a class="tasto-grande" href="#prelievo">${ICONE.preleva}Preleva<small>Materiale usato: togli dal cantiere quello che hai consumato</small></a>
         <a class="tasto-grande" href="#cerca">${ICONE.cerca}Cerca<small>Articolo, mezzo, targa o ubicazione</small></a>
         <a class="tasto-grande" href="#scansione">${ICONE.scan}Digita codice<small>Lettore Bluetooth o codice a mano</small></a>
         <a class="tasto-grande" href="#mezzi">${ICONE.truck}Mezzi<small>Dove sono e chi li usa</small></a>
