@@ -162,6 +162,11 @@ interna (default la sottorete del server, profili Dominio e Privato) e si può r
 `-Rete 192.168.1.0/24` per una sottorete precisa, `-ReteAdmin <IP>` per la plancia admin
 (8090) solo da certi PC, `-Rimuovi` per richiudere. Va lanciato una volta sul server.
 
+**Ollama.** `avvia-ollama.bat` lo accende in background, `spegni-ollama.bat` lo spegne e libera
+la GPU (server, modelli caricati e icona vicino all'orologio, che altrimenti lo riaccenderebbe).
+Doppio clic, oppure `/q` da riga di comando per saltare la pausa finale. Analista Dati, se è
+aperto, lo riaccende da solo alla prima domanda fatta con Ollama.
+
 ## Verifiche automatiche
 
 Ogni app si controlla da sola, e la CI le controlla tutte.
