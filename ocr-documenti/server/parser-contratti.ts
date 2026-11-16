@@ -529,8 +529,76 @@ export const estraiRigheCelle = (testoIntero: string): Record<string, string>[] 
     chiudi()
   }
   chiudi()
+  completaPosizioni(righe)
+  uniformaCodiciOcr(righe)
+  prezziCoerentiPerCodice(righe)
   righe.forEach((r, i) => { r.progressivo = String(i + 1) })
   return righe
+}
+
+// In un elenco prezzi lo stesso articolo ha lo stesso prezzo (o pochi prezzi, per quota
+// o parte d'opera). I prezzi che ricorrono in almeno due voci dello stesso codice sono
+// quelli dell'elenco; contro di loro si controllano le altre voci del codice:
+// - prezzo all'85-99,5% di un prezzo ricorrente = il solo P.U. lavori, oneri persi
+//   dall'OCR (28,91 contro 30,00): diventa il prezzo complessivo;
+// - prezzo fuori da metà-doppio di TUTTI i prezzi ricorrenti = numero di un'altra colonna
+//   (6,12 o 438,99 per un conglomerato da 16,50, allegato A Progetto Costruzioni): la
+//   voce resta col codice e i valori vuoti, da completare a mano.
+export const prezziCoerentiPerCodice = (righe: Record<string, string>[]): void => {
+  const tondo = (s: string) => Math.round(numIt(s) * 100) / 100
+  const conteggi = new Map<string, Map<number, number>>()
+  for (const r of righe) {
+    if (!r.codice_epu || !r.prezzo_lordo || !isFinite(numIt(r.prezzo_lordo))) continue
+    const m = conteggi.get(r.codice_epu) ?? new Map<number, number>()
+    m.set(tondo(r.prezzo_lordo), (m.get(tondo(r.prezzo_lordo)) ?? 0) + 1)
+    conteggi.set(r.codice_epu, m)
+  }
+  for (const r of righe) {
+    const perPrezzo = conteggi.get(r.codice_epu) ?? new Map<number, number>()
+    const ricorrenti = [...perPrezzo].filter(([, n]) => n >= 2).map(([p]) => p)
+    if (!ricorrenti.length || !r.prezzo_lordo) continue
+    const p = numIt(r.prezzo_lordo)
+    // il P.U. dei soli lavori può ricorrere anch'esso (15,90 in due voci): cede al prezzo
+    // complessivo se questo ricorre di più
+    const nP = perPrezzo.get(tondo(r.prezzo_lordo)) ?? 0
+    const pieno = ricorrenti.find(P => p / P >= 0.85 && p / P < 0.995 && (perPrezzo.get(P) ?? 0) > nP)
+    if (pieno === undefined && ricorrenti.some(P => Math.abs(p - P) <= P * 0.005)) continue
+    if (pieno !== undefined) {
+      r.prezzo_lordo = itStr(pieno)
+      r.importo = r.quantita ? itStr(numIt(r.quantita) * pieno) : ''
+    } else if (!ricorrenti.some(P => p / P >= 0.5 && p / P <= 2)) {
+      r.quantita = ''; r.prezzo_lordo = ''; r.importo = ''
+    }
+  }
+}
+
+// La lettera in testa al codice letta come cifra: "8.04.001" per B.04.001, "1.01.009" per
+// I.01.009 (allegato A Progetto Costruzioni). Si corregge solo in un documento i cui
+// codici di tariffa sono "Lettera.dd.ddd" (almeno 3): un prezzario con codici che
+// cominciano davvero per cifra non ne ha. 8→B e 1→I sono gli scambi tipici dell'OCR
+// (0→O e 5→S per completezza).
+const LETTERA_DA_CIFRA: Record<string, string> = { 8: 'B', 1: 'I', 0: 'O', 5: 'S' }
+export const uniformaCodiciOcr = (righe: Record<string, string>[]): void => {
+  if (righe.filter(r => /^[A-Z]\.\d{2}\.\d{3}/.test(r.codice_epu ?? '')).length < 3) return
+  for (const r of righe) {
+    r.codice_epu = (r.codice_epu ?? '').replace(/^([8105])\.(?=\d{2}\.\d{3})/, (_, c: string) => `${LETTERA_DA_CIFRA[c]}.`)
+  }
+}
+
+// Numeri "Pos." non letti: l'OCR salta spesso la cifra isolata nella prima colonna
+// ("1", "2" del subappalto 030). In una tabella numerata per posizione (nessun codice
+// vero, solo numeri 1-3 cifre), un buco di r righe senza numero fra la posizione a e la
+// b (a = 0 in testa) si riempie con a+1 … b-1 solo se b - a - 1 = r: i conti tornano
+// esatti, nessun numero inventato. Buchi che non tornano restano vuoti.
+export const completaPosizioni = (righe: Record<string, string>[]): void => {
+  const pos = righe.map(r => /^\d{1,3}$/.test(r.codice_epu ?? '') ? Number(r.codice_epu) : r.codice_epu ? NaN : 0)
+  if (pos.some(p => Number.isNaN(p)) || pos.filter(p => p > 0).length < 2) return
+  let a = 0, buco: number[] = []
+  for (let i = 0; i < righe.length; i++) {
+    if (!pos[i]) { buco.push(i); continue }
+    if (buco.length && pos[i] - a - 1 === buco.length) buco.forEach((k, j) => { righe[k].codice_epu = String(a + 1 + j) })
+    a = pos[i]; buco = []
+  }
 }
 
 // Tabelle markdown/pipe: "| BA.CZ.A.3 09.B | ACCIAIO … | kg | 151.000,00 | 0,750 € | 113.250,00 € |"
@@ -1008,19 +1076,43 @@ export const sistemaValori = (v1?: string, v2?: string, v3?: string): { quantita
   return q
 }
 
+// Voce OPZIONALE della tabella prezzi: "9 Personale in economia ove richiesto
+// dall'APPALTATRICE ora opzionale 42,00 €", "10 Maggiorazione per lavoro notturno … %
+// opzionale 30%". Solo il prezzo unitario, niente quantità né importo: è una voce da
+// usare se richiesta e il modulo la riporta con il solo PREZZO (Sabbie d'oro). La parola
+// "opzionale" nella colonna Note è l'ancora: un solo numero in coda, da solo, non basta.
+export const RE_VOCE_OPZIONALE = new RegExp(
+  String.raw`^\s*(\d{1,3})[).\s]+(.*?[A-Za-zÀ-ü]{3,}.*?)\s+(${UM_GRIGLIA})\.?\s+(?:voce\s+)?opzional[ei]\s+` +
+  String.raw`(?:${EURO_SRC})?(${NUM_SRC})\s*(?:€|%)?\s*$`, 'i')
+
 // Griglia elenco prezzi: una riga = descrizione + coda valori. Le righe senza coda
 // valori sono continuazioni della cella descrizione (l'OCR manda a capo le celle
 // larghe) e vengono accodate alla voce precedente finché la descrizione resta
 // leggibile; se invece la voce ha una descrizione cortissima ("Noleggio", "Vendita"
 // nei noli) si recupera anche il blocco che la PRECEDE, che è l'intestazione del gruppo.
+// Colonna "Note" fra quantità e prezzo ("mc 40,00 Solo Posa 16,00 € 640,00 €", subappalti
+// Sabbie d'oro e 030): spezzava la coda valori, che prendeva solo prezzo e importo e
+// perdeva unità di misura e quantità. Si toglie solo quando sta fra due numeri.
+const RE_NOTA_VALORI = /(\d)\s+(?:solo\s+posa|solo\s+fornitura|fornitura\s+e\s+posa|solo\s+nolo)\s+(?=(?:€\s*)?\d)/gi
+
 export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
   const righe: Record<string, string>[] = []
+  const posizioni = new Map<Record<string, string>, string>()   // riga → numero "Pos." letto in testa
   let sospese: string[] = []          // righe di sola descrizione non ancora assegnate
   for (const raw of regione) {
-    const line = raw.trim()
+    const line = raw.trim().replace(RE_NOTA_VALORI, '$1 ')
     if (!line || RE_RIGA_SERVIZIO.test(line)) continue
     if (RE_RIGA_TOTALE.test(line)) { sospese = []; continue }
     if (isHeaderGriglia(line) || RE_PROSA_MODELLO.test(line)) { sospese = []; continue }
+    const opz = RE_VOCE_OPZIONALE.exec(line)
+    if (opz) {
+      const riga = { progressivo: String(righe.length + 1), codice_epu: '', descrizione: pulisciDescrArticolo(opz[2]),
+        udm: opz[3].toLowerCase().replace(/\s+/g, ''), quantita: '', prezzo_lordo: opz[4], importo: '' }
+      righe.push(riga)
+      posizioni.set(riga, opz[1])
+      sospese = []
+      continue
+    }
     const m = RE_CODA_VALORI.exec(line)
     if (!m) {
       // continuazione della descrizione della voce precedente (finché resta compatta)
@@ -1036,9 +1128,9 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
     const [tutto, um, v1, v2, v3] = m
     let testa = line.slice(0, m.index + (tutto.startsWith(' ') || tutto.startsWith('|') ? 1 : 0)).trim()
     const cod = RE_COD_GRIGLIA.exec(testa)
-    let codice = ''
-    if (cod) { codice = cod[2].replace(/[.,]+$/, ''); testa = testa.slice(cod[0].length) }
-    else testa = testa.replace(/^\s*\d{1,3}[).\s]+/, '')
+    let codice = '', pos = ''
+    if (cod) { codice = cod[2].replace(/[.,]+$/, ''); pos = cod[1] ?? ''; testa = testa.slice(cod[0].length) }
+    else testa = testa.replace(/^\s*(\d{1,3})[).\s]+/, (_, n: string) => { pos = n; return '' })
     let descrizione = pulisciDescrArticolo(testa)
     // voce con etichetta cortissima ("Noleggio", "Vendita", "Posa in opera"): il senso
     // sta nel blocco che la precede (tabelle dei noli, raggruppate per attrezzatura)
@@ -1064,8 +1156,22 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
     const q = numIt(riga.quantita), p = numIt(riga.prezzo_lordo)
     if (!isFinite(q) || !isFinite(p) || q <= 0 || p <= 0) continue
     righe.push(riga)
+    posizioni.set(riga, pos)
   }
+  posizioneComeCodice(righe, posizioni)
   return righe.filter(r => (r.descrizione ?? '').length >= 3 || r.codice_epu)
+}
+
+// Colonna "Pos." (1, 2, 3…) come ARTICOLO quando la tabella NON ha codici: è l'unico
+// identificativo della voce e i moduli di riferimento la riportano così (subappalti
+// 030 e Sabbie d'oro: "Pos. | DESCRIZIONE | Unità di misura | QTY | Note | Prezzo").
+// Solo se nessuna riga ha un codice vero e almeno due righe hanno il numero, crescente:
+// un numero isolato in testa alla riga può essere altro (una quantità, un piano).
+export const posizioneComeCodice = (righe: Record<string, string>[], posizioni: Map<Record<string, string>, string>): void => {
+  if (righe.some(r => r.codice_epu)) return
+  const nums = righe.map(r => posizioni.get(r) ?? '').filter(Boolean).map(Number)
+  if (nums.length < 2 || nums.some((n, i) => i > 0 && n <= nums[i - 1])) return
+  for (const r of righe) { const p = posizioni.get(r); if (p) r.codice_epu = p }
 }
 
 export const estraiRigheElencoPrezzi = (text: string): Record<string, string>[] => {
@@ -1303,6 +1409,10 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
       quantita: qta,
       prezzo_lordo: pu,
       importo: imp,
+      // Ogni riga SOMMANO è una voce del computo: due voci identiche in quadri diversi
+      // (stesso articolo, stessa quantità) sono due voci vere. Il segno dice al dedup fra
+      // pagine del frontend (deduplicaRighe, src/lib/import-contratti.ts) di non toccarle.
+      voce_computo: '1',
     })
   }
   return righe
