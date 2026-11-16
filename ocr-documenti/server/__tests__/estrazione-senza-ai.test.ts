@@ -15,7 +15,7 @@ import {
 } from '../parser-contratti.ts'
 import { strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchDivisione } from '../alyante.ts'
-import { valoriRiga } from '../tabella-tsv.ts'
+import { tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
 import { TITOLO_CELLE, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
 
@@ -252,6 +252,24 @@ describe('tabella dalle celle', () => {
     expect(leggi(['', '', '3', '4'])).toEqual(['1', '2', '3', '4'])
     expect(leggi(['', '4', '5'])).toEqual(['', '4', '5'])                 // 1 riga per 3 posizioni: resta vuota
     expect(leggi(['A.01', '', '3'])).toEqual(['A.01', '', '3'])           // codici veri: niente numerazione
+  })
+})
+
+describe('codice andato a capo nella sua colonna', () => {
+  it('".03.003" sotto "SIC24_14.01" completa il codice (GFM)', () => {
+    const riga = (top: number, parole: [string, number][]) =>
+      parole.map(([text, left]) => ({ text, left, top, width: text.length * 8, height: 18 }))
+    const words = [
+      ...riga(100, [['SIC24_14.01.01.001', 50], ['Derivazione', 200], ['per', 300], ['punto', 350], ['luce', 420], ['cad', 900], ['628', 980], ['28,55', 1060], ['17.929,40', 1160]]),
+      ...riga(125, [['interrotto', 200], ['o', 290], ['commutato,', 310], ['a', 400], ['parete', 420]]),
+      ...riga(150, [['soffitto', 200], ['e', 280], ['altro', 300], ['onere.', 360]]),
+      ...riga(200, [['SIC24_14.01', 50], ['Fornitura', 200], ['e', 290], ['posa', 310], ['in', 370], ['opera', 400], ['cad', 900], ['67', 980], ['47,07', 1060], ['3.153,69', 1160]]),
+      ...riga(225, [['.03.003', 50], ['comando', 200], ['per', 300], ['punto', 350], ['luce', 420]]),
+      ...riga(250, [['semplice', 200], ['deviato', 300], ['a', 380], ['pulsante', 400]]),
+      ...riga(275, [['eseguito', 200], ['a', 290], ['regola', 310], ["d'arte", 380]]),
+    ]
+    const codici = tabellaColonne(words).split('\n').map(l => l.split('|')[1].trim())
+    expect(codici).toEqual(['SIC24_14.01.01.001', 'SIC24_14.01.03.003'])
   })
 })
 
