@@ -133,7 +133,7 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
 
 // `fedele`: i valori vengono da un MODULO CONTRATTO compilato a mano (src/lib/modulo-contratto.ts),
 // non dall'OCR. Le riparazioni pensate per gli errori di lettura — codici ricostruiti,
-// valori slittati, righe doppie — lì sarebbero alterazioni: tre voci identiche nel modulo
+// valori slittati — lì sarebbero alterazioni: tre voci identiche nel modulo
 // sono tre voci volute, un codice "14,01" è scritto così. Con `fedele` le righe passano
 // com'erano; restano anagrafiche, elenchi ufficiali e numerazione.
 export interface OpzioniStruttura { fedele?: boolean }
@@ -145,9 +145,14 @@ export const strutturaAlyante = (e: Estratto, opz: OpzioniStruttura = {}): strin
   // quando l'OCR spezza una cella articolo — nell'Excel diventerebbero righe inutili.
   const filtrate = opz.fedele ? e.righe : e.righe.filter(r =>
     (r.descrizione ?? '').trim().length >= 3 || r.quantita || r.prezzo_lordo || r.importo)
-  // Dedup: stessa pagina scansionata in più tile → stessi articoli due volte
+  // Righe uguali: nel documento sono voci vere e restano tutte. Misura del 16/11/2026 sui
+  // 31 contratti del banco: ogni coppia identica trovata dai parser è nel riferimento
+  // (lo stesso articolo in due quadri del computo PF Future, gli oneri della sicurezza
+  // di due servizi, due "SOLO POSA di quadro" GFM). Il dedup resta per le righe scritte
+  // dall'assist AI (campi_assist_ai "righe (n)"), che può ripetere una voce.
+  const righeDaAi = (e.campi_assist_ai ?? []).some(c => c.startsWith('righe'))
   const visti = new Set<string>()
-  const righe = opz.fedele ? filtrate : filtrate.filter(r => {
+  const righe = opz.fedele || !righeDaAi ? filtrate : filtrate.filter(r => {
     const k = [r.codice_epu, r.udm, r.quantita, r.prezzo_lordo, r.importo, (r.descrizione ?? '').slice(0, 60)].join('|')
     if (visti.has(k)) return false
     visti.add(k)

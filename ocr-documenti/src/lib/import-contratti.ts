@@ -150,13 +150,20 @@ export const chiaveRiga = (r: Record<string, string>): string => [
   r.quantita ?? '', r.prezzo_lordo ?? '',
   String(r.descrizione ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 50),
 ].join('|')
+// Si toglie solo la COPIA di una voce già vista su un'altra pagina (pagina_origine): le
+// righe uguali della stessa pagina sono voci vere del documento (due "SOLO POSA di
+// quadro" GFM, gli oneri di due servizi) e il server le manda tutte. Le voci di computo
+// metrico (riga SOMMANO, segnate voce_computo dal server) restano anche fra pagine: lo
+// stesso articolo con la stessa quantità in due quadri del computo sono due voci vere
+// (PF Future), non la stessa tabella letta due volte. Righe senza pagina: dedup pieno.
 export const deduplicaRighe = (righe: Record<string, string>[]): Record<string, string>[] => {
-  const visti = new Set<string>()
+  const paginaDi = new Map<string, string>()          // chiave → pagina della prima copia
   const out = righe.filter(r => {
-    const k = chiaveRiga(r)
-    if (visti.has(k)) return false
-    visti.add(k)
-    return true
+    if (r.voce_computo) return true
+    const k = chiaveRiga(r), pag = String(r.pagina_origine ?? '')
+    const prima = paginaDi.get(k)
+    if (prima === undefined) { paginaDi.set(k, pag); return true }
+    return pag !== '' && prima === pag
   })
   out.forEach((r, i) => { r.progressivo = String(i + 1) })
   return out
@@ -199,10 +206,10 @@ export const parseAlyante = (source: string): Record<string, unknown> | null => 
           .find(o => o.length > 15 && !/^contratto\s+di\b/i.test(o))
         if (vero) tt.oggetto = vero
       }
-      // Dedup TRA pagine, con la stessa chiave già usata dal backend dentro la singola
-      // pagina: l'elenco prezzi compare spesso due volte (nell'art. 5 e nell'allegato in
-      // coda) e l'ultima pagina di una tabella ripete l'intestazione con le prime voci.
-      // Righe davvero ripetute (tre monoblocchi identici) vanno reinserite in edit mode.
+      // Dedup TRA pagine: l'elenco prezzi compare spesso due volte (nell'art. 5 e
+      // nell'allegato in coda) e l'ultima pagina di una tabella ripete l'intestazione con
+      // le prime voci. Le righe uguali della stessa pagina e le voci di computo restano
+      // (vedi deduplicaRighe).
       merged.righe = deduplicaRighe(merged.righe as Record<string, string>[])
       merged.anagrafiche_articoli = deduplicaAnagrafiche(merged.anagrafiche_articoli as Record<string, string>[])
       return merged
