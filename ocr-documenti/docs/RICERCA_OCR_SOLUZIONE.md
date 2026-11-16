@@ -9,8 +9,10 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
   contratti le voci con quantità e prezzo giusti salgono dal 66% al 72%, le voci esatte
-  dal 50% al 56%. Progetto Costruzioni passa da 0 a 41 voci giuste su 142. Le sue 12 pagine
-  sono tutte tabelle di traverso, non capovolte come detto al §9.
+  dal 50% al 59%. Progetto Costruzioni passa da 0 a 41 voci giuste su 142, GFM da 54 a 86
+  voci esatte. Le 12 pagine di Progetto Costruzioni sono tutte tabelle di traverso, non
+  capovolte come detto al §9. PP-StructureV3 provato sulle pagine difficili: non aiuta,
+  non è collegato.
 - **Aggiornamento della sera (§9): i passi 1-6 sono fatti, senza AI.** Sugli stessi 30
   contratti:
   - testata dal 73% al 94%;
@@ -373,13 +375,13 @@ contratti/moduli-da-md`):
 | Misura | 09/11 | 16/11 |
 |---|---|---|
 | Campi di testata giusti | 399/425 (94%) | 399/425 (94%) |
-| Voci esatte (codice, quantità, prezzo) | 470/948 (50%) | **532/948 (56%)** |
+| Voci esatte (codice, quantità, prezzo) | 470/948 (50%) | **564/948 (59%)** |
 | Voci con quantità e prezzo giusti | 627/948 (66%) | **679/948 (72%)** |
-| Voci mancanti | 224 | 172 |
-| Voci con valori diversi | 97 | 97 |
-| Voci in più | 46 | 52 |
+| Voci mancanti | 224 | 171 |
+| Voci con valori diversi | 97 | 98 |
+| Voci in più | 46 | 51 |
 
-Senza Progetto Costruzioni, sui 30 contratti del §9: voci esatte 492/806 (61%), quantità e
+Senza Progetto Costruzioni, sui 30 contratti del §9: voci esatte 524/806 (65%), quantità e
 prezzo giusti 638/806 (79%), contro 470 e 627.
 
 Per contratto:
@@ -387,7 +389,8 @@ Per contratto:
   illeggibili anche per il riferimento (28 DA VERIFICARE) o i conti che non tornano: escono
   col codice e i valori vuoti;
 - **Sabbie d'oro**: da 0 a 10 voci esatte su 10 (colonna «Pos.», voci opzionali, colonna Note);
-- **030**: ritrovata la voce 3, rimasta sopra la prima linea della pagina 4;
+- **030**: da 10 a 13 voci esatte su 13 (la voce 3 stava sopra la prima linea della pagina 4; le posizioni 1 e 2 ricostruite);
+- **GFM**: da 54 a 86 voci esatte su 108 (codici andati a capo, vedi sotto);
 - **PF Future 1537**: 6 voci in più giuste (stesso articolo in due quadri del computo);
 - **Jonico** (le due copie): una voce esatta in più ciascuna.
 
@@ -411,12 +414,35 @@ Per contratto:
 5. **Colonna «Pos.»**: numero di posizione come ARTICOLO nelle tabelle senza codici. Le
    posizioni saltate dall'OCR si ricostruiscono solo quando il buco torna esatto.
 
+**PP-StructureV3 sulle pagine difficili** (prova del 16/11, CPU, 30-53 s a pagina):
+
+| Pagina | Esito |
+|---|---|
+| Progetto Costruzioni, allegato A pag. 3 e 5 | struttura mescolata fra le righe, cifre storpiate come prima («413:00», «40:84Z771», «8:00») |
+| Gecob pag. 5 | nessuna tabella riconosciuta |
+| SICS pag. 4 | righe giuste, ma il programma quella pagina la legge già giusta |
+| GFM pag. 11 (prova del 09/11) | codici interi («SIC24_14.01.03.001») dove il programma li tronca |
+
+Non è stato collegato al programma: dove serve davvero (i codici GFM) basta una regola.
+Il pezzo di codice andato a capo nella colonna dei codici («.03.003» sotto «SIC24_14.01»)
+ora si accoda al codice (`RE_CODA_CODICE` in `server/tabella-tsv.ts`). GFM passa da 54 a
+**86 voci esatte su 108**, senza tempo in più; con PP-StructureV3 sarebbero ~90 s a pagina
+su 52 pagine. Dopo questa regola, sui 31 contratti: voci esatte **564/948 (59%)**, quantità
+e prezzo giusti 679/948 (72%), testata 399/425 (94%). Il subappalto 030 è a 13 voci
+esatte su 13.
+
+Le cifre illeggibili di Progetto Costruzioni non dipendono dalla struttura: PP-StructureV3
+usa gli stessi modelli di riconoscimento del programma. Le pagine sono rese a 2333×3300
+pixel (circa 280 dpi): il limite è la scansione. Un riconoscitore più grande
+(PP-OCRv5_server_rec) sarebbe da provare, con un altro scaricamento.
+
 **Cosa resta**, in ordine di peso:
 - l'allegato A di Progetto Costruzioni: 101 voci su 142 senza quantità o prezzo giusti, per
-  cifre illeggibili («3963.», «21176,255»). Il prossimo passo utile è PP-StructureV3 solo
-  su quelle pagine (§8), o un OCR a risoluzione più alta della sola colonna dei valori;
-- voci senza linee e senza codici di tariffa (GFM, parte di Gecob);
-- SICS (voci composte), Ulma (voci a corpo senza codice), condizioni di pagamento (8 campi);
+  cifre illeggibili («3963.», «21176,255»);
+- Gecob (18 voci mancanti: la tabella non ha linee e PP-StructureV3 non la vede);
+- SICS: 19 voci composte (calcestruzzo + P.01 pompaggio + P.02 piazzamento per classe), da
+  regole, non da OCR;
+- Ulma (voci a corpo senza codice), condizioni di pagamento (8 campi);
 - 4 voci in più di Progetto Costruzioni: riga di totale dell'ultima pagina, `NP02` senza
   valori, due codici spezzati male (`B.04.001_C`, `B.04.001_0p01`).
 

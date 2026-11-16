@@ -310,6 +310,10 @@ contratti/moduli-da-md`, totali in fondo all'output).
   quando il buco torna esatto, cioè 2 righe vuote prima della «3» (`completaPosizioni`).
   Valgono anche le voci «opzionali» con il solo prezzo (`RE_VOCE_OPZIONALE`) e la colonna
   «Note» fra quantità e prezzo («Solo Posa») non spezza più la coda valori.
+- **Codice andato a capo** (`RE_CODA_CODICE` in `server/tabella-tsv.ts`): nella
+  ricostruzione geometrica il pezzo «.03.003» sotto «SIC24_14.01», nella colonna dei
+  codici, cominciava col punto e veniva scartato. Ora si accoda al codice sopra: GFM da 54
+  a 86 voci esatte su 108.
 - **Voci uguali**: vedi §4.3.
 
 ---
