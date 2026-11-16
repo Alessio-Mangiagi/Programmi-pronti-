@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest'
 import {
   RE_COD_GRIGLIA, codiceContratto, dataContratto, estrai, estraiImporti, estraiRigheCelle,
   estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
-  prezziCoerentiPerCodice, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore,
+  prezziCoerentiPerCodice, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore,
   uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
 import { strutturaAlyante } from '../struttura.ts'
@@ -270,6 +270,51 @@ describe('codice andato a capo nella sua colonna', () => {
     ]
     const codici = tabellaColonne(words).split('\n').map(l => l.split('|')[1].trim())
     expect(codici).toEqual(['SIC24_14.01.01.001', 'SIC24_14.01.03.003'])
+  })
+})
+
+describe('elenco prezzi a voci composte (SICS)', () => {
+  it('codice in due pezzi, importo spezzato, titolo col codice sopra la riga di fornitura', () => {
+    const r = righeDaRegione([
+      'BA.CZ.A.3 01.D Conglomerato cementizio per strutture di m³ 580,00 103,00 € 59.740,00 €',
+      'BA.CZ.A.3 02.F Conglomerato cementizio per strutture in m³ 3.258,00 115,00 € · 374.670,00 €',
+      'BA.CZA.3 01.D Conglomerato cementizio per strutture di m³ 17.777,00 103,00 € 1.831,03 1,00 €',
+      'P.01 Quota fissa pompaggio CLS (braccio sino m³ 26.792,00 4,50 € 120.564,00 €',
+      'BA.PD.A.3 03.C Pali in conglomerato cementizio, classe di resistenza C25/30 N/mm2, scavati per il',
+      'sostegno del foro del diametro est. non inferiore a 600 mm',
+      'Fonitura di Conglomerato cementizio RCK 30 XC2 m³ 43,00 109,00 € 4.687,00 €',
+      'P,02 Quota fissa piazzamento (braccio da 36 mt 44 cad 4,00 114,00 € 456,00 €',
+    ])
+    expect(r.map(x => [x.codice_epu, x.quantita, x.prezzo_lordo, x.importo])).toEqual([
+      ['BA.CZ.A.3 01.D', '580,00', '103,00', '59.740,00'],
+      ['BA.CZ.A.3 02.F', '3.258,00', '115,00', '374.670,00'],
+      ['BA.CZA.3 01.D', '17.777,00', '103,00', '1.831.031,00'],
+      ['P.01', '26.792,00', '4,50', '120.564,00'],
+      ['BA.PD.A.3 03.C', '43,00', '109,00', '4.687,00'],
+      ['P.02', '4,00', '114,00', '456,00'],
+    ])
+    expect(r[4].descrizione).toMatch(/^Pali in conglomerato .* - Fonitura di Conglomerato/)
+    // "BMK240." a fine frase non è un titolo con codice: la riga resta alla voce sopra (Ulma)
+    const u = righeDaRegione(['Noleggio mese 4,00 250,00 € 1.000,00 €', 'BMK240. Rimane a carico dell\'Utilizzatrice il legname', 'Vendita a.c. 1,00 1.850,00 € 1.850,00 €'])
+    expect(u.map(x => x.codice_epu)).toEqual(['', ''])
+    expect(ricuciImportoSpezzato('mc 7.895,00 132,00 € 1.042,14 0,00 €')).toBe('mc 7.895,00 132,00 € 1.042.140,00 €')
+    expect(ricuciImportoSpezzato('mc 7.895,00 132,00 € 1.042,14 9,00 €')).toBe('mc 7.895,00 132,00 € 1.042,14 9,00 €')   // non torna: com'era
+  })
+  it('pagina senza griglia: vincono le righe del testo se hanno più conti che tornano', () => {
+    const doc = [
+      'pagina 1', TITOLO_CELLE, '| P.01 | Quota fissa pompaggio | m³ | 11.926,00 | 4,50 | 53.667,00 |', '',
+      'BA.CZ.A.3 01.A Conglomerato per strutture di m³ 3.274,00 86,00 € 281.564,00 €',
+      'BA.CZ.A.3 01.C Conglomerato per strutture di m³ 59,00 100,00 € 5.900,00 €',
+      'BA.CZ.A.3 01.D Conglomerato per strutture di m³ 580,00 103,00 € 59.740,00 €',
+      '', '### TABELLA ARTICOLI (ricostruita dalla scansione)',
+      '|  | BA.CZ.A.3 01.A Conglomerato BA.CZ.A.3 01.C Conglomerato BA.CZ.A.3 01.D Conglomerato | m³ | 580,00 | 103,00 | 59.740,00 |', '',
+    ].join('\n')
+    expect(estraiRigheCelle(doc).map(r => r.codice_epu)).toEqual(['P.01', 'BA.CZ.A.3 01.A', 'BA.CZ.A.3 01.C', 'BA.CZ.A.3 01.D'])
+  })
+  it('stesso prefisso con i separatori storpiati: vince la grafia più frequente', () => {
+    const r = ['BA.CZ.A.3 01.A', 'BA.CZ.A.3 02.F', 'BA.CZA.3 01.C', 'BA.CZ-A.3 01.E', '1.01.01', '10.1.01'].map(codice_epu => ({ codice_epu }))
+    uniformaCodiciOcr(r)
+    expect(r.map(x => x.codice_epu)).toEqual(['BA.CZ.A.3 01.A', 'BA.CZ.A.3 02.F', 'BA.CZ.A.3 01.C', 'BA.CZ.A.3 01.E', '1.01.01', '10.1.01'])
   })
 })
 
