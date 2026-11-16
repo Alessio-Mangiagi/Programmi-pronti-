@@ -7,6 +7,10 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
+- **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
+  contratti le voci con quantità e prezzo giusti salgono dal 66% al 72%, le voci esatte
+  dal 50% al 56%. Progetto Costruzioni passa da 0 a 41 voci giuste su 142. Le sue 12 pagine
+  sono tutte tabelle di traverso, non capovolte come detto al §9.
 - **Aggiornamento della sera (§9): i passi 1-6 sono fatti, senza AI.** Sugli stessi 30
   contratti:
   - testata dal 73% al 94%;
@@ -354,6 +358,67 @@ voci esatte e 627/948 (66%) di voci con quantità e prezzo giusti.
 - codici SIC24 letti senza i punti («SIC24 143145»), che senza il prezzario non si
   ricompongono con certezza;
 - voci uguali dello stesso computo in quadri diversi: il dedup ne tiene una sola.
+
+---
+
+## 10. Elenco WBS, voci uguali, colonna «Pos.» (16/11/2026)
+
+Scelte dell'utente: modello per l'elenco WBS di Progetto Costruzioni Ragusana-1, voci uguali
+tenute tutte, colonna «Pos.» come ARTICOLO. Sempre senza AI e senza modelli nuovi. Dettagli
+tecnici in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.3 e §4.5.
+
+**Risultato sui 31 contratti** (`npm run harness`, poi `npm run confronta-moduli --
+contratti/moduli-da-md`):
+
+| Misura | 09/11 | 16/11 |
+|---|---|---|
+| Campi di testata giusti | 399/425 (94%) | 399/425 (94%) |
+| Voci esatte (codice, quantità, prezzo) | 470/948 (50%) | **532/948 (56%)** |
+| Voci con quantità e prezzo giusti | 627/948 (66%) | **679/948 (72%)** |
+| Voci mancanti | 224 | 172 |
+| Voci con valori diversi | 97 | 97 |
+| Voci in più | 46 | 52 |
+
+Senza Progetto Costruzioni, sui 30 contratti del §9: voci esatte 492/806 (61%), quantità e
+prezzo giusti 638/806 (79%), contro 470 e 627.
+
+Per contratto:
+- **Progetto Costruzioni Ragusana-1**: da 0 a 41 voci giuste su 142. Le altre hanno le cifre
+  illeggibili anche per il riferimento (28 DA VERIFICARE) o i conti che non tornano: escono
+  col codice e i valori vuoti;
+- **Sabbie d'oro**: da 0 a 10 voci esatte su 10 (colonna «Pos.», voci opzionali, colonna Note);
+- **030**: ritrovata la voce 3, rimasta sopra la prima linea della pagina 4;
+- **PF Future 1537**: 6 voci in più giuste (stesso articolo in due quadri del computo);
+- **Jonico** (le due copie): una voce esatta in più ciascuna.
+
+**Cosa è stato fatto.**
+1. **Pagine di traverso.** La correzione del §9 era sbagliata per metà: le 12 pagine
+   dell'allegato A sono tutte tabelle stampate di traverso (270°), nessuna è capovolta. Le 7
+   «capovolte» erano state lette a 180° all'85% di confidenza, ma con le righe in verticale:
+   ogni «riga» letta era una colonna della tabella. Ora una lettura con i blocchi in
+   maggioranza verticali non vince più (`frazione_verticale` in `ocr_worker.py`). Le 7
+   pagine rilette a 270° sono all'86-89%.
+2. **Voci divise sui codici** (`tabellaDaAncore`): l'allegato ha le linee fra le colonne ma
+   non fra le voci, e su due pagine nessuna griglia. Le voci si dividono sui codici di
+   tariffa; i valori vanno nelle colonne lavori e oneri per posizione; prezzo e importo
+   escono complessivi, come nel riferimento (15,90 + 0,60 = 16,50).
+3. **Stesso articolo, stesso prezzo** (`prezziCoerentiPerCodice`): un P.U. dei soli lavori
+   diventa il complessivo dell'elenco; un prezzo preso da un'altra colonna si svuota. Le
+   cifre in testa al codice si rimettono lettere (8→B, 1→I) dove il documento usa codici
+   «Lettera.dd.ddd».
+4. **Voci uguali**: il backend non le toglie più (solo quelle scritte dall'assist AI). Il
+   frontend toglie solo la copia su un'altra pagina, e mai le voci del computo SOMMANO.
+5. **Colonna «Pos.»**: numero di posizione come ARTICOLO nelle tabelle senza codici. Le
+   posizioni saltate dall'OCR si ricostruiscono solo quando il buco torna esatto.
+
+**Cosa resta**, in ordine di peso:
+- l'allegato A di Progetto Costruzioni: 101 voci su 142 senza quantità o prezzo giusti, per
+  cifre illeggibili («3963.», «21176,255»). Il prossimo passo utile è PP-StructureV3 solo
+  su quelle pagine (§8), o un OCR a risoluzione più alta della sola colonna dei valori;
+- voci senza linee e senza codici di tariffa (GFM, parte di Gecob);
+- SICS (voci composte), Ulma (voci a corpo senza codice), condizioni di pagamento (8 campi);
+- 4 voci in più di Progetto Costruzioni: riga di totale dell'ultima pagina, `NP02` senza
+  valori, due codici spezzati male (`B.04.001_C`, `B.04.001_0p01`).
 
 ## Fonti
 

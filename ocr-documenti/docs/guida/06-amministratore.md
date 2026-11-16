@@ -20,14 +20,24 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
 
 **Lettura senza AI.** Due aiuti all'OCR girano da soli, senza modelli in più né rete:
 - le pagine scansionate **capovolte** o di traverso si rileggono ruotate, solo quando la
-  lettura esce troppo incerta (`PADDLE_SOGLIA_ROTAZIONE`, `0` la spegne). Una pagina così
-  costa da 2 a 4 letture invece di una;
+  lettura esce troppo incerta o con le righe in verticale (`PADDLE_SOGLIA_ROTAZIONE`, `0`
+  la spegne). Una pagina così costa da 2 a 4 letture invece di una;
 - nelle tabelle **con i bordi** le linee si trovano con OpenCV e le voci si leggono cella
-  per cella, con le colonne giuste (`PADDLE_GRIGLIA=0` lo spegne).
+  per cella, con le colonne giuste (`PADDLE_GRIGLIA=0` lo spegne);
+- nelle tabelle **senza linee fra le voci** (elenchi prezzi ANAS con WBS, lavori e oneri)
+  le voci si dividono sui codici di tariffa (`B.03.031.c`). Prezzo e importo escono
+  complessivi (lavori + oneri della sicurezza). Una voce con le cifre illeggibili esce
+  con codice e unità di misura e i valori vuoti, da completare a mano.
 
 Le pagine già lette prima di questi aiuti restano in `.ocr-cache/`: alla prima riapertura
 si cercano solo le linee della tabella, senza rifare l'OCR. Per rileggere ruotata una
-pagina capovolta già in cache, svuota `.ocr-cache/`.
+pagina capovolta o di traverso già in cache, svuota `.ocr-cache/`.
+
+**Voci uguali.** Due voci identiche nella stessa pagina, o due voci del computo metrico
+(riga SOMMANO) in quadri diversi, restano tutte: sono voci del documento. Si toglie solo la
+copia della stessa voce su un'altra pagina (l'elenco prezzi ripetuto nell'art. 5 e
+nell'allegato). Nelle tabelle senza codici, con la colonna «Pos.» (1, 2, 3…), il numero di
+posizione diventa l'ARTICOLO.
 
 **PaddleOCR bloccato.** Tipico: Windows App Control (WDAC) rifiuta le librerie
 non firmate del venv (`WinError 4551`). Non si risolve reinstallando: serve l'IT.

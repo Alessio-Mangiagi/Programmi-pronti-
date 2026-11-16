@@ -228,12 +228,19 @@ descrizione — e le misure che la seguono restano fuori. Prima si prendeva l'in
 
 ### 4.3 Voci ripetute fra pagine
 
-Il backend deduplica dentro la singola pagina; il frontend, che le concatena, non lo faceva.
-L'elenco prezzi compare però spesso **due volte** (nell'articolo 5 e nell'allegato in coda) e
-l'ultima pagina di una tabella ripete l'intestazione con le prime voci. La fusione
-(`parseAlyante`) ora deduplica con la stessa chiave del backend — codice, u.m., valori e
-inizio descrizione normalizzata (maiuscole e punteggiatura via: la stessa voce letta su due
-pagine esce con storpiature OCR diverse). Vale anche per le anagrafiche articolo.
+L'elenco prezzi compare spesso **due volte** (nell'articolo 5 e nell'allegato in coda) e
+l'ultima pagina di una tabella ripete l'intestazione con le prime voci. La fusione delle
+pagine nel frontend (`parseAlyante` → `deduplicaRighe`) toglie la copia di una voce già
+vista su un'**altra** pagina, con chiave codice, u.m., valori e inizio descrizione
+normalizzata (maiuscole e punteggiatura via: la stessa voce letta su due pagine esce con
+storpiature OCR diverse). Vale anche per le anagrafiche articolo.
+
+Dal 16/11/2026 le voci uguali **della stessa pagina** restano tutte, e il backend non
+deduplica più le righe dei parser (solo quelle scritte dall'assist AI): sui 31 contratti
+del banco ogni coppia identica era una voce vera del riferimento (oneri della sicurezza di
+due servizi, due «SOLO POSA di quadro» GFM). Le voci del computo metrico (riga `SOMMANO`)
+portano `voce_computo` e restano anche fra pagine: lo stesso articolo con la stessa
+quantità in due quadri del computo PF Future sono due voci.
 
 Le pipeline preesistenti non sono state toccate: sui loro documenti (catalogo ANAS per
 opera, prestazioni a lettere, tabelle pipe, blocchi Sidersipe) vincono come prima.
@@ -267,6 +274,43 @@ contratti/moduli-da-md`, totali in fondo all'output).
 - **Modelli per formato** (`MODELLI_CONTRATTO`, alla invoice2data): «Ordine fornitore»
   (codice = numero ordine, PROGETTO = cantiere) e la maschera **listino materiali**
   (`estraiRigheListino`: prima parola = codice, anche `CH` o `429`).
+
+### 4.5 Aggiunte del 16/11/2026 (elenco WBS, voci uguali, colonna «Pos.»)
+
+- **Pagine di traverso** (`ocr_worker.py`, `frazione_verticale`): una lettura con i blocchi
+  in maggioranza più alti che larghi è di traverso, anche al 85% di confidenza (ogni
+  «riga» letta è una colonna della tabella). Non vince più la scelta della rotazione, e
+  una pagina così si rilegge prima a 90° e 270°. Le 7 pagine pari dell'allegato A di
+  Progetto Costruzioni erano finite a 180° così; ora sono a 270°, all'86-89%.
+- **Voci divise sui codici** (`tabellaDaAncore` in `server/tabella-griglia.ts`): tabelle
+  con le sole linee verticali, o senza griglia, con un codice di tariffa per voce
+  (`B.03.031.c`). La colonna dei codici si riconosce dall'allineamento; il confine fra due
+  voci è a metà strada fra i codici; unità di misura e valori si prendono a destra, sulla
+  riga del codice. I valori vanno nelle 5 colonne quantità, P.U., importo, P.U. oneri e
+  importo oneri, imparate dalla posizione dei numeri sulla pagina: letti in fila,
+  «354,20 | 0,68 | 239,18» sembravano lavori ed erano oneri. Prezzo e importo escono
+  complessivi; il prezzo ricavato da importo / quantità ha 4 decimali, come nei moduli
+  («16,4999»). La quota oneri delle voci complete della pagina (3,65%) completa le voci
+  con i soli lavori, se il prezzo esce tondo. Nelle celle di queste scansioni i separatori
+  storpiati si riparano: «11.688 46», «16.82881», «1:18042», «17 82e». La pagina vale
+  come tabella solo con almeno due voci i cui conti tornano: l'art. 5 con codici e
+  descrizioni e basta non diventa un elenco di voci vuote.
+- **Stesso articolo, stesso prezzo** (`prezziCoerentiPerCodice`): fra le voci dello stesso
+  codice, i prezzi che ricorrono almeno due volte sono quelli dell'elenco. Un prezzo
+  all'85-99,5% di uno più frequente è il solo P.U. lavori e diventa il complessivo (28,91 →
+  30,00). Un prezzo fuori da metà-doppio di tutti quelli ricorrenti viene svuotato (6,12
+  per un conglomerato da 16,50). La B letta 8 in testa al codice si corregge se il
+  documento ha codici `B.dd.` (`uniformaCodiciOcr`).
+- **Riga sopra la prima linea** (`conRigaSopra`): sulla pagina di prosecuzione la tabella
+  riprende senza bordo superiore e la prima voce restava fuori (030, voce 3). Se sopra la
+  prima linea ci sono almeno due valori, diventa una riga in più.
+- **Colonna «Pos.» come ARTICOLO**: nella griglia elenco prezzi, se nessuna riga ha un
+  codice vero e i numeri di posizione crescono, il numero diventa il codice
+  (`posizioneComeCodice`). Nelle celle i numeri saltati dall'OCR si ricostruiscono solo
+  quando il buco torna esatto, cioè 2 righe vuote prima della «3» (`completaPosizioni`).
+  Valgono anche le voci «opzionali» con il solo prezzo (`RE_VOCE_OPZIONALE`) e la colonna
+  «Note» fra quantità e prezzo («Solo Posa») non spezza più la coda valori.
+- **Voci uguali**: vedi §4.3.
 
 ---
 
