@@ -8,9 +8,9 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 ## 1. In breve
 
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
-  contratti le voci con quantità e prezzo giusti salgono dal 66% al 72%, le voci esatte
-  dal 50% al 59%. Progetto Costruzioni passa da 0 a 41 voci giuste su 142, GFM da 54 a 86
-  voci esatte. Le 12 pagine di Progetto Costruzioni sono tutte tabelle di traverso, non
+  contratti le voci con quantità e prezzo giusti salgono dal 66% al 74%, le voci esatte
+  dal 50% al 64%. Progetto Costruzioni passa da 0 a 41 voci giuste su 142; voci esatte GFM
+  da 54 a 92, SICS da 4 a 27 su 29. Le 12 pagine di Progetto Costruzioni sono tutte tabelle di traverso, non
   capovolte come detto al §9. PP-StructureV3 provato sulle pagine difficili: non aiuta,
   non è collegato.
 - **Aggiornamento della sera (§9): i passi 1-6 sono fatti, senza AI.** Sugli stessi 30
@@ -375,14 +375,14 @@ contratti/moduli-da-md`):
 | Misura | 09/11 | 16/11 |
 |---|---|---|
 | Campi di testata giusti | 399/425 (94%) | 399/425 (94%) |
-| Voci esatte (codice, quantità, prezzo) | 470/948 (50%) | **564/948 (59%)** |
-| Voci con quantità e prezzo giusti | 627/948 (66%) | **679/948 (72%)** |
-| Voci mancanti | 224 | 171 |
-| Voci con valori diversi | 97 | 98 |
-| Voci in più | 46 | 51 |
+| Voci esatte (codice, quantità, prezzo) | 470/948 (50%) | **608/948 (64%)** |
+| Voci con quantità e prezzo giusti | 627/948 (66%) | **699/948 (74%)** |
+| Voci mancanti | 224 | 155 |
+| Voci con valori diversi | 97 | 94 |
+| Voci in più | 46 | 50 |
 
-Senza Progetto Costruzioni, sui 30 contratti del §9: voci esatte 524/806 (65%), quantità e
-prezzo giusti 638/806 (79%), contro 470 e 627.
+Senza Progetto Costruzioni, sui 30 contratti del §9: voci esatte 568/806 (70%), quantità e
+prezzo giusti 658/806 (82%), contro 470 e 627.
 
 Per contratto:
 - **Progetto Costruzioni Ragusana-1**: da 0 a 41 voci giuste su 142. Le altre hanno le cifre
@@ -390,7 +390,10 @@ Per contratto:
   col codice e i valori vuoti;
 - **Sabbie d'oro**: da 0 a 10 voci esatte su 10 (colonna «Pos.», voci opzionali, colonna Note);
 - **030**: da 10 a 13 voci esatte su 13 (la voce 3 stava sopra la prima linea della pagina 4; le posizioni 1 e 2 ricostruite);
-- **GFM**: da 54 a 86 voci esatte su 108 (codici andati a capo, vedi sotto);
+- **GFM**: da 54 a 92 voci esatte su 108 (codici andati a capo, vedi sotto);
+- **SICS**: da 4 a 27 voci esatte su 29, tutte e 29 con quantità e prezzo giusti (vedi
+  sotto, «SICS e pagine senza griglia»);
+- **Warm**: da 130 a 138 voci esatte su 146; **AQ3** (185-088): da 5 a 10;
 - **PF Future 1537**: 6 voci in più giuste (stesso articolo in due quadri del computo);
 - **Jonico** (le due copie): una voce esatta in più ciascuna.
 
@@ -434,15 +437,33 @@ esatte su 13.
 Le cifre illeggibili di Progetto Costruzioni non dipendono dalla struttura: PP-StructureV3
 usa gli stessi modelli di riconoscimento del programma. Le pagine sono rese a 2333×3300
 pixel (circa 280 dpi): il limite è la scansione. Un riconoscitore più grande
-(PP-OCRv5_server_rec) sarebbe da provare, con un altro scaricamento.
+(PP-OCRv5_server_rec) sarebbe da provare, con un altro scaricamento. I modelli della prova
+(885 MB) sono stati cancellati; restano i due che usa il programma.
+
+**SICS e pagine senza griglia.** Le voci «composte» di SICS (calcestruzzo + P.01
+pompaggio + P.02 piazzamento) erano un problema di regole, non di OCR:
+- **pagina per pagina** (`estraiRigheCelle`): nei documenti con celle, su una pagina senza
+  griglia vince, fra la tabella ricostruita dalle coordinate e le righe del testo lette come
+  griglia elenco prezzi, chi ha più voci con quantità × prezzo = importo. A pag. 5 la
+  ricostruzione fondeva sei voci in una cella; nel testo ogni voce sta intera su una riga;
+- **codici in due pezzi** («BA.CZ.A.3 02.F», `RE_COD_GRIGLIA`), anche in testa a una cella
+  con l'etichetta della voce; le grafie storpiate dello stesso prefisso («BA.CZA.3»,
+  «BA.CZ-A.3») prendono quella più frequente (`uniformaCodiciOcr`); «P,02» → P.02;
+- **importo spezzato** («1.831,03 1,00 €» = 1.831.031,00, `ricuciImportoSpezzato`),
+  ricucito solo se quantità × prezzo torna al centesimo;
+- **titolo con il codice** senza valori sopra la riga di fornitura dei pali: codice e
+  titolo vanno a quella voce, come nel riferimento.
 
 **Cosa resta**, in ordine di peso:
 - l'allegato A di Progetto Costruzioni: 101 voci su 142 senza quantità o prezzo giusti, per
   cifre illeggibili («3963.», «21176,255»);
+- PF Future 1536 e 1537: ~40 voci della seconda tabella (forniture «n 1 135,41 €»), ignorate
+  perché il computo SOMMANO vince da solo su tutto il documento;
 - Gecob (18 voci mancanti: la tabella non ha linee e PP-StructureV3 non la vede);
-- SICS: 19 voci composte (calcestruzzo + P.01 pompaggio + P.02 piazzamento per classe), da
-  regole, non da OCR;
 - Ulma (voci a corpo senza codice), condizioni di pagamento (8 campi);
+- l'app legge i PDF pagina per pagina, il banco il documento intero: le regole che
+  guardano tutto il documento (prezzi per codice, codici uniformati, posizioni) nell'app
+  valgono solo dentro la pagina. Da misurare;
 - 4 voci in più di Progetto Costruzioni: riga di totale dell'ultima pagina, `NP02` senza
   valori, due codici spezzati male (`B.04.001_C`, `B.04.001_0p01`).
 

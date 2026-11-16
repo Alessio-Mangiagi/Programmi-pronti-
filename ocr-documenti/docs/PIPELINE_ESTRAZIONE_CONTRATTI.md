@@ -314,6 +314,23 @@ contratti/moduli-da-md`, totali in fondo all'output).
   ricostruzione geometrica il pezzo «.03.003» sotto «SIC24_14.01», nella colonna dei
   codici, cominciava col punto e veniva scartato. Ora si accoda al codice sopra: GFM da 54
   a 86 voci esatte su 108.
+- **Pagina per pagina nei documenti con celle** (`estraiRigheCelle`): su una pagina senza
+  griglia, fra la tabella ricostruita dalle coordinate e le righe del testo della stessa
+  pagina lette con `righeDaRegione`, vince chi ha più voci con quantità × prezzo = importo
+  (almeno 3). Dal testo si tengono le voci col codice o coi conti che tornano. SICS pag. 5:
+  la ricostruzione fondeva sei voci in una cella.
+- **Griglia elenco prezzi** (`righeDaRegione`):
+  - codice in due pezzi «BA.CZ.A.3 02.F» (`RE_COD_GRIGLIA`, secondo pezzo «cifre.LETTERA»);
+  - «P,02» → P.02; «·» isolato fra le colonne ignorato;
+  - importo spezzato «1.831,03 1,00 €» ricucito se le cifre attaccate danno quantità ×
+    prezzo (`ricuciImportoSpezzato`);
+  - una riga di titolo che apre con un codice vero (lettera e punto interno) e non ha
+    valori tiene il codice in sospeso. La prima riga con valori senza codice prende codice
+    e titolo (pali SICS). «BMK240.» a fine frase non conta.
+- **Codice in testa alla cella** (`leggiCelle`): «BA.CZ.A.3 02.F BAGGIOLI/RITEGNI» → codice e
+  etichetta in testa alla descrizione.
+- **Grafie dello stesso prefisso** (`uniformaCodiciOcr`): «BA.CZA.3» e «BA.CZ-A.3» prendono la
+  grafia più frequente, solo per prefissi con almeno 3 lettere.
 - **Voci uguali**: vedi §4.3.
 
 ---
