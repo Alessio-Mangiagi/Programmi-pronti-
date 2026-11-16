@@ -595,3 +595,14 @@ td.azioni > span.muto { display: block; font-size: 0.78rem; }
   .contenuto { padding: 0; }
   .card { box-shadow: none; }
 }
+
+/* Prelievo del materiale usato (13/11/2026): selettore con le giacenze dell'ubicazione e paniere delle righe */
+.selettore { max-height: 60vh; overflow-y: auto; }
+.selettore li.scelto { background: var(--cosedil-blue-ghost); }
+.selettore li.scelto strong { color: var(--cosedil-blue); }
+.selettore li.vuota { cursor: default; color: var(--cosedil-muted); justify-content: center; }
+.paniere .qta { width: 6.5rem; text-align: right; }
+@media (max-width: 768px) {
+  .prelievo { grid-template-columns: minmax(0, 1fr); }
+  .selettore { max-height: none; }
+}

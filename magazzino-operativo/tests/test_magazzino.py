@@ -549,3 +549,43 @@ def test_gate_sso_protegge_le_etichette_con_qualunque_accept(monkeypatch):
     assert cosedil_sso.decidi("/static/js/app.js", "*/*", "", app_id="magazzino")[1] is None
     assert cosedil_sso.decidi("/api/suite/da-fare", "*/*", "", app_id="magazzino",
                               percorsi_liberi=("/api/suite/",))[1] is None
+
+
+def test_api_prelievo_piu_articoli_con_utente(client, conn):
+    """Prelievo del materiale usato (13/11/2026): più articoli in una volta da un'ubicazione, ogni riga uno
+    scarico con l'utente che l'ha fatto; due righe dello stesso articolo si sommano; giacenza insufficiente
+    rifiutata con l'elenco e poi forzata."""
+    importa_ddt.importa_righe(conn, [riga(), riga(ddt="119", materiale="Pietrisco 20/40", quantita=8)], "demo", "e.json")
+    conn.commit()
+    cantiere = client.get("/api/scansione?codice=MAG-00001").json["giacenze"][0]["ubicazione_id"]
+    nome_cantiere = conn.execute("SELECT nome FROM ubicazioni WHERE id = ?", (cantiere,)).fetchone()[0]
+    r = client.post("/api/prelievi", json={"ubicazione_id": cantiere, "note": "getto fondazioni",
+                                           "righe": [{"articolo_id": 1, "quantita": 4}, {"articolo_id": 2, "quantita": 3},
+                                                     {"articolo_id": 1, "quantita": 1}]})
+    assert r.status_code == 201, r.json
+    assert r.json["utente"] == "sviluppo" and r.json["ubicazione"] == nome_cantiere and len(r.json["movimenti"]) == 2
+    per_art = {m["articolo_id"]: m for m in r.json["movimenti"]}
+    assert per_art[1]["quantita"] == 5 and per_art[2]["quantita"] == 3
+    assert all(m["tipo"] == "scarico" and m["utente"] == "sviluppo" and m["note"] == "getto fondazioni"
+               and m["da_nome"] == nome_cantiere and m["riferimento"].startswith("Prelievo del ")
+               for m in r.json["movimenti"])
+    assert client.get("/api/scansione?codice=MAG-00001").json["totale"] == 9
+    # la vista Movimenti e la plancia dicono chi ha fatto lo scarico
+    mov = client.get("/api/movimenti?tipo=scarico").json
+    assert len(mov) == 2 and {m["utente"] for m in mov} == {"sviluppo"}
+    assert client.get("/api/dashboard").json["ultimi_movimenti"][0]["utente"] == "sviluppo"
+    # il registro attività ha una riga per articolo prelevato, a nome dell'utente
+    att = conn.execute("SELECT utente, descrizione FROM attivita WHERE azione = 'movimento' ORDER BY id").fetchall()
+    assert [tuple(a) for a in att] == [("sviluppo", f"scarico 5 da {nome_cantiere} (prelievo)"),
+                                       ("sviluppo", f"scarico 3 da {nome_cantiere} (prelievo)")]
+    # oltre la giacenza: rifiutato con l'elenco degli articoli, poi forzato
+    r = client.post("/api/prelievi", json={"ubicazione_id": cantiere, "righe": [{"articolo_id": 2, "quantita": 50}]})
+    assert r.status_code == 400 and "insufficiente" in r.json["errore"]
+    assert r.json["insufficienti"][0]["disponibile"] == 5 and r.json["insufficienti"][0]["richiesta"] == 50
+    r = client.post("/api/prelievi", json={"ubicazione_id": cantiere, "righe": [{"articolo_id": 2, "quantita": 50}], "forza": True})
+    assert r.status_code == 201 and r.json["forzati"] == 1
+    # richieste sbagliate: senza righe, quantità non positiva, ubicazione o articolo inesistenti
+    assert client.post("/api/prelievi", json={"ubicazione_id": cantiere, "righe": []}).status_code == 400
+    assert client.post("/api/prelievi", json={"ubicazione_id": cantiere, "righe": [{"articolo_id": 1, "quantita": 0}]}).status_code == 400
+    assert client.post("/api/prelievi", json={"ubicazione_id": 999, "righe": [{"articolo_id": 1, "quantita": 1}]}).status_code in (400, 404)
+    assert client.post("/api/prelievi", json={"ubicazione_id": cantiere, "righe": [{"articolo_id": 999, "quantita": 1}]}).status_code in (400, 404)

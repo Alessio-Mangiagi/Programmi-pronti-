@@ -63,6 +63,27 @@ Utile per la **Rettifica**, che dalla scheda non c'è.
 
 4. Compila la finestra come sopra e conferma.
 
+## Prelevare il materiale usato (più articoli in una volta)
+
+Quando a fine giornata, o a fine lavorazione, si deve togliere dal cantiere quello che si è consumato, non
+serve fare uno scarico per volta. La vista **Prelievo** (dal menu; sul telefono il tasto grande **Preleva**;
+nella scheda di un cantiere il tasto **Preleva da qui**) lavora così:
+
+1. in alto a sinistra c'è l'**ubicazione**: nel programma unico DDT e Magazzino è già il cantiere della
+   commessa scelta all'ingresso, altrimenti si sceglie dall'elenco;
+2. sotto compare **solo il materiale che c'è in quell'ubicazione**, con la quantità disponibile; la casella
+   *Cerca articolo* lo filtra. Si tocca un articolo per metterlo nel prelievo, oppure se ne scansiona il
+   codice (lettore o fotocamera) nella riga *Scansiona o digita un codice*;
+3. a destra, nel riquadro **Da prelevare**, si corregge la quantità di ogni riga e si scrive una causale, per
+   esempio "getto fondazioni, squadra B"; una riga si toglie con la ×, *Svuota* ricomincia da capo;
+4. **Registra prelievo** scrive uno scarico per ogni riga, tutti con lo stesso riferimento ("Prelievo del
+   13/11/2026 10:42"), la causale e **il nome di chi lo ha fatto**, cioè l'utente entrato dal portale.
+
+Chi ha fatto cosa si legge nella colonna **Chi** della vista Movimenti e della scheda articolo, in *Le tue
+registrazioni di oggi* della pagina Operatore e, per gli amministratori, in *Chi ha caricato cosa*. Sotto il
+riquadro restano gli **ultimi prelievi** fatti da quell'ubicazione. Se una quantità supera la giacenza il
+prelievo si ferma e dice per quali articoli; *Registrare comunque* lo forza, come per lo scarico singolo.
+
 ## La vista Movimenti
 
 ![Elenco movimenti](img/movimenti.png)
