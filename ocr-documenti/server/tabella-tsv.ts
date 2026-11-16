@@ -229,6 +229,8 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
 
   // "@" incluso: è la lettura OCR tipica di "Ø" nei codici articolo ("@.1000")
   const codeRe = /^[A-Za-zØø@0-9][A-Za-zØø@0-9°.\-_\/]*$/
+  // pezzo di codice andato a capo: ".03.003", "_002" (solo se la colonna è quella dei codici)
+  const RE_CODA_CODICE = /^[._]\d{1,3}(?:[._][A-Za-z0-9]{1,4}){0,3}$/
   const capsRe = /^[A-Z0-9ÀÈÉÌÒÙ.,'()\-\/]+$/
   type Art = { codice: string[]; descr: string[]; um: string; num: string[] }
   // PASSATA 1 — scompone ogni riga in codice / descrizione / coda valori. Serve
@@ -278,8 +280,11 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
         continue
       }
     }
+    // Anche la CONTINUAZIONE del codice andato a capo nella sua colonna (".03.003" sotto
+    // "SIC24_14.01", GFM): comincia col punto o col trattino basso e codeRe la scartava,
+    // così il codice usciva tronco su 47 voci. Si accoda al codice sopra (passata 2).
     const codici = ws.slice(0, iVal).filter(w =>
-      w.left < xDescr - 20 && codeRe.test(w.text) && /\d/.test(w.text) &&
+      w.left < xDescr - 20 && (codeRe.test(w.text) || RE_CODA_CODICE.test(w.text)) && /\d/.test(w.text) &&
       !/^art[.\s\-]*\d*[.\s\-]*$/i.test(w.text))   // "ART.5-" è il titolo dell'articolo di contratto, non un codice
     const descrWs = ws.slice(0, iVal).filter(w => w.left >= xDescr - 20)
     analizzate.push({
@@ -324,7 +329,13 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
       (caps && cur.um !== '' && cur.descr.length > 0))                       // titolo MAIUSCOLO dopo cella completa
     if (!cur || nuovo) { cur = { codice: [], descr: [], um: '', num: [] }; arts.push(cur) }
     prevTop = a.top
-    cur.codice.push(...codici.map(w => w.text))
+    for (const w of codici) {
+      // ".03.003" continua il codice sopra ("SIC24_14.01" → "SIC24_14.01.03.003")
+      const ultimo = cur.codice.length - 1
+      if (RE_CODA_CODICE.test(w.text) && ultimo >= 0 && !/[._]$/.test(cur.codice[ultimo])) cur.codice[ultimo] += w.text
+      else if (RE_CODA_CODICE.test(w.text) && ultimo >= 0) cur.codice[ultimo] += w.text.slice(1)
+      else cur.codice.push(w.text)
+    }
     cur.descr.push(...descrWs.map(w => w.text))
     // si chiude solo una cella già "riempita" (col codice o coi valori): senza questa
     // condizione un paragrafo di prosa corto spezzerebbe l'articolo a metà
