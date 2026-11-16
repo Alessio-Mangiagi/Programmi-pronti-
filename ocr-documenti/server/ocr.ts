@@ -168,15 +168,16 @@ export const testoGarbled = (testo: string): boolean => {
 // idempotente, quindi ripeterla qui è sicuro.
 // Con la griglia della tabella (pagina con i bordi) la tabella si legge dalle celle
 // (server/tabella-griglia.ts) e quella ricostruita dalle sole coordinate non serve: le
-// due insieme darebbero ogni voce due volte. Senza griglia, o se le celle non danno voci
-// (più voci nella stessa cella), resta la ricostruzione geometrica di sempre.
+// due insieme darebbero ogni voce due volte. Senza linee fra le voci (o senza griglia) le
+// voci si dividono sui codici della colonna tariffa (tabellaDaAncore); se nemmeno così
+// escono voci resta la ricostruzione geometrica di sempre.
 export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null): string => {
   for (const b of blocchi) b.text = normalizzaNumeriOcr(b.text)
   const righe = righeDaBlocchi(blocchi)
   const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')
   const celle = (() => { try { return tabellaDaGriglia(blocchi, griglia) } catch { return '' } })()
   if (celle) {
-    console.log(`[Tabella celle] ${celle.split('\n').length} voci dalle celle (${griglia!.xs.length - 1}×${griglia!.ys.length - 1})`)
+    console.log(`[Tabella celle] ${celle.split('\n').length} voci dalle celle (${griglia ? `${griglia.xs.length - 1}×${griglia.ys.length - 1}` : 'senza griglia, sui codici'})`)
     return `${testo.trimEnd()}\n\n${TITOLO_CELLE}\n${celle}\n`
   }
   const tabella = (() => { try { return tabellaDaTsv(tsvDaBlocchi(righe)) } catch { return '' } })()
