@@ -77,6 +77,13 @@ describe('parseAlyante', () => {
     const r = deduplicaRighe([{ descrizione: 'FORNiTuRA tubi', quantita: '1' }, { descrizione: 'fornitura   TUBI', quantita: '1' }])
     expect(r).toHaveLength(1)
   })
+  it('deduplicaRighe toglie solo la copia su un\'altra pagina; computo e stessa pagina restano', () => {
+    const voce = { codice_epu: 'PA.IE.006', descrizione: 'SOLO POSA di quadro', quantita: '1', prezzo_lordo: '637,21' }
+    expect(deduplicaRighe([{ ...voce, pagina_origine: '3' }, { ...voce, pagina_origine: '3' }])).toHaveLength(2)
+    expect(deduplicaRighe([{ ...voce, pagina_origine: '3' }, { ...voce, pagina_origine: '9' }])).toHaveLength(1)
+    const computo = { ...voce, voce_computo: '1' }
+    expect(deduplicaRighe([{ ...computo, pagina_origine: '3' }, { ...computo, pagina_origine: '9' }])).toHaveLength(2)
+  })
 })
 
 describe('righe Import_Contratti', () => {

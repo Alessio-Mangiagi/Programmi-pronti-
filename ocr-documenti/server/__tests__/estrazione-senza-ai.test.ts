@@ -10,11 +10,13 @@ import { describe, it, expect } from 'vitest'
 import {
   RE_COD_GRIGLIA, codiceContratto, dataContratto, estrai, estraiImporti, estraiRigheCelle,
   estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
-  ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore,
+  prezziCoerentiPerCodice, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore,
+  uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
+import { strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchDivisione } from '../alyante.ts'
 import { valoriRiga } from '../tabella-tsv.ts'
-import { TITOLO_CELLE, tabellaDaGriglia } from '../tabella-griglia.ts'
+import { TITOLO_CELLE, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
 
 describe('testata', () => {
@@ -176,5 +178,108 @@ describe('tabella dalle celle', () => {
   it('senza griglia o con troppe poche linee: nessuna tabella', () => {
     expect(tabellaDaGriglia([b('x', 1, 1)], null)).toBe('')
     expect(tabellaDaGriglia([b('x', 1, 1)], { xs: [0, 10], ys: [0, 10, 20] })).toBe('')
+  })
+  it('pagina di prosecuzione senza bordo sopra: la voce sopra la prima linea entra', () => {
+    const sotto = { xs: griglia.xs, ys: [300, 370, 440, 510] }
+    const blocchi = [
+      b('Cod. Ident. Contratto', 600, 100),                                        // intestazione di pagina: fuori
+      b('3', 10, 245), b('Posa in opera C32/40 per opere in elevazione', 60, 240), b('mc', 410, 245), b('3.117,94', 470, 245), b('30,00 €', 670, 245), b('93.538,32', 770, 245),
+      b('4', 10, 320), b('Posa in opera Acciaio in barre', 60, 320), b('kg', 410, 320), b('219.000,00', 470, 320), b('0,38 €', 670, 320), b('83.220,00', 770, 320),
+    ]
+    expect(tabellaDaGriglia(blocchi, sotto).split('\n').map(l => l.split('|')[1].trim())).toEqual(['3', '4'])
+    // sopra la prima linea solo prosa, nessun valore: niente riga in più
+    expect(tabellaDaGriglia([b('come da tabella seguente', 60, 245), ...blocchi.slice(7)], sotto).split('\n')).toHaveLength(1)
+  })
+  it('solo linee verticali: voci divise sui codici, numeri riparati, oneri sommati', () => {
+    // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
+    const verticali = { xs: [0, 60, 200, 500, 560, 680, 780, 900, 980, 1100], ys: [0, 40, 600] }
+    const riga = (y: number, celle: string[]) => celle.map((t, c) => b(t, verticali.xs[c] + 5, y)).filter(x => x.text)
+    const blocchi = [
+      ...riga(10, ['Nr', 'Tariffa', 'Voci di misurazione', 'UM']),
+      b('POSA IN OPERA DI CALCESTRUZZI', 205, 80),
+      ...riga(110, ['5104', 'B.03,031.c', 'CLASSE C32/40', 'm³', '735,23', '15,90€', '11.688 46€', '', '442,79 €']),
+      b('POSA IN OPERA DI ACCIAIO', 205, 200),
+      ...riga(230, ['5105', '8.05.030', 'B450C', 'kg', '60.228,72', '', '16.82881€', '', '637,52€']),
+      ...riga(350, ['5131', 'B.05.030', 'B450C', 'kg', '33.487:05', '0,28 €', '9.356,78€']),            // oneri persi
+      ...riga(470, ['5132', 'B.04.001', 'CASSEFORME', 'm²', '3963.', '', '1:18042']),                      // illeggibile
+    ]
+    const righe = tabellaDaGriglia(blocchi, verticali).split('\n').map(l => l.split('|').map(x => x.trim()))
+    expect(righe.map(c => [c[1], c[4], c[5], c[6]])).toEqual([
+      ['B.03.031.c', '735,23', '16,4999', '12131,25'],
+      ['8.05.030', '60.228,72', '0,29', '17466,33'],
+      ['B.05.030', '33.487,05', '0,29', '9711,245'],     // quota oneri delle altre voci: 0,28 / (1 - 3,65%)
+      ['B.04.001', '', '', ''],
+    ])
+    expect(estraiRigheCelle(`${TITOLO_CELLE}\n${righe.map(c => c.join(' | ')).join('\n')}\n`).map(r => r.codice_epu))
+      .toEqual(['B.03.031.c', 'B.05.030', 'B.05.030', 'B.04.001'])
+    expect(valoriLavoriOneri(['28916', '0,4831', '13.968,90'])).toBeNull()   // 28916 × 0,4831: terna per coincidenza
+  })
+  it('senza griglia: colonna dei codici dall\'allineamento, valori assegnati alle colonne per posizione', () => {
+    // pagina girata senza linee: Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
+    const X = [60, 200, 500, 640, 760, 880, 980, 1100]          // bordo destro dei valori = X + 40
+    const voce = (y: number, celle: string[]) => celle.map((t, c) => b(t, X[c], y)).filter(x => x.text)
+    const blocchi = [
+      ...voce(100, ['B.03.031.c', 'CALCESTRUZZI C32/40', 'm³', '735,23', '15,90 €', '11.688,46 €', '0,60 €', '442,79 €']),
+      ...voce(200, ['B.03.035.c', 'ELEVAZIONE', 'm³', '366,97', '17,82 €', '6.541,10 €', '0,68 €', '247,79 €']),
+      ...voce(300, ['B.03.035.c', 'ELEVAZIONE', 'm³', '354,20', '', '', '0,68 €', '239,18 €']),   // lavori illeggibili
+      ...voce(400, ['B.04.001_n', 'Come sopra da quota 4,01', 'm²', '', '32,76 €', '', '1,24 €', '']),
+      b('p01', 60, 425),
+    ]
+    const righe = tabellaDaGriglia(blocchi, null).split('\n').map(l => l.split('|').map(x => x.trim()))
+    expect(righe.map(c => [c[1], c[4], c[5]])).toEqual([
+      ['B.03.031.c', '735,23', '16,50'],
+      ['B.03.035.c', '366,97', '18,50'],
+      ['B.03.035.c', '', ''],                   // in fila sarebbe 354,20 × 0,68 = 239,18: sono gli oneri
+      ['B.04.001_np01', '', '34,00'],           // solo prezzo: 32,76 + 1,24
+    ])
+    // un elenco di soli codici e descrizioni (art. 5 del contratto) non è una tabella di voci
+    expect(tabellaDaGriglia([...voce(100, ['B.03.031.c', 'CALCESTRUZZI']), ...voce(200, ['B.04.001', 'CASSEFORME']), ...voce(300, ['B.05.030', 'ACCIAIO'])], null)).toBe('')
+  })
+  it('stesso articolo, stesso prezzo: P.U. dei soli lavori completato, prezzo di un\'altra colonna svuotato', () => {
+    const r = [['16,50', ''], ['16,50', ''], ['16,50', ''], ['15,90', ''], ['15,90', '10,00'], ['6,12', '22,08'], ['17,10', '']]
+      .map(([prezzo_lordo, quantita]) => ({ codice_epu: 'B.03.025.a', prezzo_lordo, quantita, importo: '' }))
+    prezziCoerentiPerCodice(r)
+    expect(r.map(x => [x.quantita, x.prezzo_lordo, x.importo])).toEqual([
+      ['', '16,50', ''], ['', '16,50', ''], ['', '16,50', ''], ['', '16,50', ''], ['10,00', '16,50', '165,00'], ['', '', ''], ['', '17,10', ''],
+    ])
+    const codici = [{ codice_epu: 'B.03.025.a' }, { codice_epu: 'B.05.030' }, { codice_epu: 'B.04.001' }, { codice_epu: '8.04.001' }, { codice_epu: '1.01.009' }, { codice_epu: '8.04' }] as Record<string, string>[]
+    uniformaCodiciOcr(codici)
+    expect(codici.map(x => x.codice_epu)).toEqual(['B.03.025.a', 'B.05.030', 'B.04.001', 'B.04.001', 'I.01.009', '8.04'])
+  })
+  it('posizioni non lette dall\'OCR: il buco si riempie solo se i conti tornano', () => {
+    const voce = (codice: string) => `| ${codice} | Posa in opera calcestruzzo | mc | 10,00 | 16,00 | 160,00 |`
+    const leggi = (codici: string[]) => estraiRigheCelle(`${TITOLO_CELLE}\n${codici.map(voce).join('\n')}\n`).map(r => r.codice_epu)
+    expect(leggi(['', '', '3', '4'])).toEqual(['1', '2', '3', '4'])
+    expect(leggi(['', '4', '5'])).toEqual(['', '4', '5'])                 // 1 riga per 3 posizioni: resta vuota
+    expect(leggi(['A.01', '', '3'])).toEqual(['A.01', '', '3'])           // codici veri: niente numerazione
+  })
+})
+
+describe('tabella numerata per posizione e voci uguali', () => {
+  it('elenco senza codici: la colonna "Pos." diventa ARTICOLO, anche per le voci opzionali', () => {
+    const r = righeDaRegione([
+      '1 Conglomerato cementizio per strutture non armate mc 40,00 Solo Posa 16,00 € 640,00 €',
+      '2 Acciaio in barre a aderenza migliorata kg 110.000,00 Solo Posa 0,45 € 49.500,00 €',
+      "9 Personale in economia ove richiesto dall'APPALTATRICE ora opzionale 42,00 €",
+      "10 Maggiorazione per lavoro notturno ove richiesto dall'APPALTATRICE % opzionale 30%",
+    ])
+    expect(r.map(x => [x.codice_epu, x.udm, x.quantita, x.prezzo_lordo])).toEqual([
+      ['1', 'mc', '40,00', '16,00'], ['2', 'kg', '110.000,00', '0,45'], ['9', 'ora', '', '42,00'], ['10', '%', '', '30'],
+    ])
+  })
+  it('elenco con codici veri: il numero d\'ordine in testa non sostituisce il codice', () => {
+    const r = righeDaRegione(['1 A.01.001 Scavo di sbancamento mc 10,00 3,73 37,30', '2 Rinterro con materiale mc 5,00 1,40 7,00'])
+    expect(r.map(x => x.codice_epu)).toEqual(['A.01.001', ''])
+  })
+  it('voci identiche del documento restano tutte; il dedup vale solo per le righe dell\'AI', () => {
+    const voce = { progressivo: '1', codice_epu: 'A.N.E.006', descrizione: 'Fornitura e montaggio su profilati', udm: 'cad', quantita: '0,5', prezzo_lordo: '267,282584', importo: '133,64' }
+    const e = { testata: {}, importi: {}, righe: [{ ...voce }, { ...voce }] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(e)).righe).toHaveLength(2)
+    const daAi = { ...e, righe: [{ ...voce }, { ...voce }], campi_assist_ai: ['righe (2)'] } as Estratto
+    expect(JSON.parse(strutturaAlyante(daAi)).righe).toHaveLength(1)
+  })
+  it('computo: ogni riga SOMMANO è segnata voce_computo', () => {
+    const [r] = estraiRigheSommano('A.N.E.006\nFornitura e montaggio su profilati\nSOMMANO cad 0,5 267,282584 133,64 €')
+    expect(r.voce_computo).toBe('1')
   })
 })
