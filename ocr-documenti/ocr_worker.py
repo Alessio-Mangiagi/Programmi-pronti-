@@ -244,12 +244,13 @@ def ocr_pagina(ocr, path):
 
 # ── Pagine capovolte o di traverso ──────────────────────────────────────────
 # Il classificatore d'orientamento di PaddleOCR è spento (vedi costruisci_ocr) e il suo
-# modello andrebbe scaricato. Le pagine scansionate al contrario però esistono: l'elenco
-# prezzi del subappalto Progetto Costruzioni Ragusana ha 12 pagine capovolte, lette così
-# al 39-48% di confidenza media e illeggibili per i parser (misura del 09/11/2026 sui 31
-# contratti: tutte le altre pagine stanno sopra l'85%). Ruotata di 180° la stessa pagina
-# sale all'82%. Si rilegge quindi ruotata SOLO la pagina sotto soglia e si tiene la
-# lettura migliore: le pagine normali non costano nulla in più.
+# modello andrebbe scaricato. Le pagine scansionate girate però esistono: l'elenco
+# prezzi del subappalto Progetto Costruzioni Ragusana ha 12 pagine con la tabella in
+# orizzontale, lette così al 39-48% di confidenza media e illeggibili per i parser
+# (misura del 09/11/2026 sui 31 contratti: tutte le altre pagine stanno sopra l'85%).
+# Ruotate di 270° le stesse pagine salgono all'85-89%. Si rilegge quindi ruotata SOLO la
+# pagina sotto soglia o di traverso e si tiene la lettura migliore: le pagine normali
+# non costano nulla in più.
 # PADDLE_SOGLIA_ROTAZIONE=0 spegne la prova.
 SOGLIA_ROTAZIONE = float(os.environ.get("PADDLE_SOGLIA_ROTAZIONE", "60"))
 # Sotto questo numero di blocchi la pagina è quasi vuota (firme, timbri): la confidenza
@@ -278,30 +279,58 @@ def testo_sicuro(lines):
                if sum(c.isalnum() for c in b["text"]) >= 2)
 
 
+def frazione_verticale(lines):
+    """Quota dei blocchi di testo (almeno 3 lettere o cifre) più alti che larghi. Una
+    riga di testo dritta è sempre più larga che alta: se la maggioranza dei blocchi è
+    verticale la pagina è letta DI TRAVERSO. Il rilevatore di PaddleOCR trova anche le
+    righe verticali e il riconoscitore le legge bene (85% di confidenza), ma ogni "riga"
+    è allora una COLONNA della tabella: "Elevazione 072 ST.F- Elevazione 072 ST.F- …"
+    (elenco prezzi Progetto Costruzioni Ragusana, pagine pari dell'allegato A)."""
+    lunghi = [b for b in lines if sum(c.isalnum() for c in b["text"]) >= 3]
+    return sum(1 for b in lunghi if b["h"] > b["w"]) / len(lunghi) if lunghi else 0.0
+
+
+def punteggio_orientamento(lines):
+    """Testo letto bene (testo_sicuro) contato solo sui blocchi orizzontali: una lettura
+    di traverso legge molto testo ma con righe e colonne scambiate, e non deve vincere
+    sulla rotazione giusta (misura del 16/11/2026, pag. 40 dell'allegato A: a 180°
+    confidenza 85% con il 93% dei blocchi verticali, a 270° 89% con il 4%)."""
+    return testo_sicuro(lines) * (1 - frazione_verticale(lines))
+
+
+# Oltre questa quota di blocchi verticali la lettura è di traverso (frazione_verticale).
+SOGLIA_TRAVERSO = 0.5
+
+
 def ocr_orientato(ocr, path):
-    """OCR della pagina come arriva; se la lettura è sotto SOGLIA_ROTAZIONE la si rifà
-    ruotata di 180°, poi di 90° e 270° solo se non basta. Vince la rotazione con più
-    testo letto bene (testo_sicuro), se supera la pagina com'era di MARGINE_ROTAZIONE.
+    """OCR della pagina come arriva; se la lettura è sotto SOGLIA_ROTAZIONE, o è di
+    traverso (blocchi in maggioranza verticali, anche con confidenza alta), la si rifà
+    ruotata. Pagina capovolta: prima 180°, poi 90° e 270°. Pagina di traverso: prima
+    90° e 270°, poi 180°. Vince la rotazione con più testo letto bene in righe
+    orizzontali (punteggio_orientamento), se supera la pagina com'era di
+    MARGINE_ROTAZIONE; ci si ferma alla prima rotazione dritta e leggibile.
     Restituisce (blocchi, gradi): gradi = rotazione antioraria applicata all'immagine
     (0 = nessuna). Le coordinate dei blocchi sono quelle dell'immagine ruotata, cioè della
     pagina raddrizzata: i parser e la ricostruzione delle tabelle lavorano solo sulle
     posizioni relative (e la griglia della tabella si calcola sulla stessa immagine)."""
     lines = ocr_pagina(ocr, path)
     media = confidenza_media(lines)
-    if SOGLIA_ROTAZIONE <= 0 or len(lines) < MIN_BLOCCHI_ROTAZIONE or media >= SOGLIA_ROTAZIONE:
+    traverso = frazione_verticale(lines) > SOGLIA_TRAVERSO
+    if SOGLIA_ROTAZIONE <= 0 or len(lines) < MIN_BLOCCHI_ROTAZIONE or (media >= SOGLIA_ROTAZIONE and not traverso):
         return lines, 0
-    base = testo_sicuro(lines)
+    base = punteggio_orientamento(lines)
     migliore = (base, 0, lines, media)
-    for gradi in (180, 90, 270):
+    for gradi in ((90, 270, 180) if traverso else (180, 90, 270)):
         ruotata = ruota_su_file(path, gradi)
         try:
             letta = ocr_pagina(ocr, ruotata)
         finally:
             os.remove(ruotata)
-        punti, m = testo_sicuro(letta), confidenza_media(letta)
+        punti, m = punteggio_orientamento(letta), confidenza_media(letta)
         if punti > migliore[0]:
             migliore = (punti, gradi, letta, m)
-        if migliore[1] and migliore[3] >= SOGLIA_ROTAZIONE and migliore[0] >= base * MARGINE_ROTAZIONE:
+        if (migliore[1] and migliore[3] >= SOGLIA_ROTAZIONE and migliore[0] >= base * MARGINE_ROTAZIONE
+                and frazione_verticale(migliore[2]) <= SOGLIA_TRAVERSO):
             break                    # pagina raddrizzata: le altre rotazioni non servono
     if migliore[1] and migliore[0] >= base * MARGINE_ROTAZIONE:
         print(f"[worker] pagina ruotata di {migliore[1]}°: confidenza {media:.0f}% → {migliore[3]:.0f}%, "
