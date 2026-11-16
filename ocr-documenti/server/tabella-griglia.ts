@@ -22,7 +22,7 @@
 // Uscita: righe "| codice | descrizione | um | qta | prezzo | importo |", lette alla
 // lettera da estraiRigheCelle (server/parser-contratti.ts).
 import type { BloccoOcr } from './ocr.ts'
-import { NUM_SRC, UM_SRC, contoTorna, itStr, normalizzaValoriTabella, numIt } from './parser-contratti.ts'
+import { NUM_SRC, RE_COD_GRIGLIA, UM_SRC, contoTorna, itStr, normalizzaValoriTabella, numIt } from './parser-contratti.ts'
 import { valoriRiga } from './tabella-tsv.ts'
 
 export interface Griglia { xs: number[]; ys: number[] }
@@ -138,8 +138,16 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
     const prima = testi.findIndex(t => !!t)
     const formaCodice = (k: number) => !!testi[k] && RE_COD.test(testi[k]) && numeroCella(testi[k]) === null
     const kCod = [0, 1, 2].find(k => k < nc && formaCodice(k))
+    // codice in testa alla cella, seguito dall'etichetta della voce: "BA.CZ.A.3 02.F
+    // BAGGIOLI/RITEGNI" (SICS). Codice in due pezzi, con lettera e punto interno; il resto
+    // della cella va in testa alla descrizione, come nel modulo di riferimento.
+    const inTesta = kCod === undefined && prima >= 0 && prima <= 2 ? RE_COD_GRIGLIA.exec(testi[prima]) : null
+    let etichetta = ''
     if (kCod !== undefined) { codice = testi[kCod]; iCod = kCod }
     else if (prima >= 0 && prima <= 1 && /^\d{1,3}$/.test(testi[prima])) { codice = testi[prima]; iCod = prima }
+    else if (inTesta && /[A-Za-z]/.test(inTesta[2]) && /[A-Za-z0-9]\.[A-Za-z0-9]/.test(inTesta[2])) {
+      codice = inTesta[2].replace(/[.,]+$/, ''); iCod = prima; etichetta = testi[prima].slice(inTesta[0].length).trim()
+    }
     for (let c = 0; c < nc; c++) {
       if (c === iCod || !testi[c]) continue
       const t = testi[c]
@@ -149,6 +157,7 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
       if (!um && RE_UM.test(t.replace(/[^A-Za-z0-9²³°.]/g, ''))) { um = t.replace(/[^A-Za-z0-9²³°]/g, '').toLowerCase(); continue }
       if (t.length > descr.length) descr = t
     }
+    if (etichetta) descr = descr ? `${etichetta} - ${descr}` : etichetta
     // riga di intestazione o di totale: niente da esportare
     if (/^(?:totale|sommano|importo\s+totale)\b/i.test(descr) && !codice) continue
     if (!nums.length && !codice) {

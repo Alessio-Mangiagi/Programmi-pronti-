@@ -509,6 +509,9 @@ export const estraiRigheCelle = (testoIntero: string): Record<string, string>[] 
   const righe: Record<string, string>[] = []
   let blocco: string[] | null = null
   let celle = false
+  let pagina: string[] = []          // testo piatto della pagina, prima del suo blocco tabella
+  const coerenti = (rs: Record<string, string>[]) =>
+    rs.filter(r => contoTorna(numIt(r.quantita), numIt(r.prezzo_lordo), numIt(r.importo))).length
   const chiudi = () => {
     if (!blocco) return
     if (celle) {
@@ -520,13 +523,28 @@ export const estraiRigheCelle = (testoIntero: string): Record<string, string>[] 
         if (!descrizione && !codice) continue
         righe.push({ progressivo: '', codice_epu: codice, descrizione, udm: udm.toLowerCase(), quantita, prezzo_lordo: prezzo, importo })
       }
-    } else righe.push(...estraiRighePipe(blocco.join('\n')))
+    } else {
+      // Pagina senza griglia: la tabella ricostruita dalle coordinate contro le righe del
+      // testo della stessa pagina lette come griglia elenco prezzi (righeDaRegione). Vince
+      // chi ha più voci con quantità × prezzo = importo. Sulle tabelle senza linee fra le
+      // voci la ricostruzione può fondere sei voci in una cella (SICS pag. 5: 6 voci contro
+      // 16), mentre nel testo ogni voce sta intera su una riga. Dal testo si tengono le voci
+      // col codice o coi conti che tornano: le righe di prosa con due numeri in coda no.
+      const pipe = estraiRighePipe(blocco.join('\n'))
+      const dalTesto = righeDaRegione(normalizzaValoriTabella(pagina.join('\n')).split('\n'))
+      const nTesto = coerenti(dalTesto)
+      righe.push(...(nTesto >= 3 && nTesto > coerenti(pipe)
+        ? dalTesto.filter(r => r.codice_epu || contoTorna(numIt(r.quantita), numIt(r.prezzo_lordo), numIt(r.importo)))
+        : pipe))
+    }
     blocco = null
+    pagina = []
   }
   for (const l of normalizzaNumeriOcr(testoIntero).split('\n')) {
     if (/^###[^\S\n]*TABELLA ARTICOLI/.test(l)) { chiudi(); blocco = []; celle = RE_TITOLO_CELLE.test(l); continue }
     if (blocco && /^\s*\|/.test(l)) { blocco.push(l); continue }
     chiudi()
+    pagina.push(l)
   }
   chiudi()
   completaPosizioni(righe)
@@ -579,9 +597,32 @@ export const prezziCoerentiPerCodice = (righe: Record<string, string>[]): void =
 // (0→O e 5→S per completezza).
 const LETTERA_DA_CIFRA: Record<string, string> = { 8: 'B', 1: 'I', 0: 'O', 5: 'S' }
 export const uniformaCodiciOcr = (righe: Record<string, string>[]): void => {
-  if (righe.filter(r => /^[A-Z]\.\d{2}\.\d{3}/.test(r.codice_epu ?? '')).length < 3) return
+  if (righe.filter(r => /^[A-Z]\.\d{2}\.\d{3}/.test(r.codice_epu ?? '')).length >= 3) {
+    for (const r of righe) {
+      r.codice_epu = (r.codice_epu ?? '').replace(/^([8105])\.(?=\d{2}\.\d{3})/, (_, c: string) => `${LETTERA_DA_CIFRA[c]}.`)
+    }
+  }
+  // Prefisso del prezzario coi separatori storpiati: "BA.CZA.3" e "BA.CZ-A.3" accanto a
+  // dieci "BA.CZ.A.3" (SICS). Le stesse lettere e cifre senza separatori = lo stesso
+  // prefisso: vince la grafia più frequente nel documento, se ricorre almeno due volte.
+  // Solo prefissi con almeno 3 lettere: fra codici di sole cifre ("1.01.01", "10.1.01")
+  // i separatori distinguono codici diversi.
+  const scheletro = (t: string) => t.replace(/[.\-_,]/g, '')
+  const grafie = new Map<string, Map<string, number>>()
+  const prefisso = (c: string) => c.split(' ')[0]
   for (const r of righe) {
-    r.codice_epu = (r.codice_epu ?? '').replace(/^([8105])\.(?=\d{2}\.\d{3})/, (_, c: string) => `${LETTERA_DA_CIFRA[c]}.`)
+    const p = prefisso(r.codice_epu ?? '')
+    if ((p.match(/[A-Za-z]/g) ?? []).length < 3 || !/[.\-]/.test(p)) continue
+    const m = grafie.get(scheletro(p)) ?? new Map<string, number>()
+    m.set(p, (m.get(p) ?? 0) + 1)
+    grafie.set(scheletro(p), m)
+  }
+  for (const r of righe) {
+    const p = prefisso(r.codice_epu ?? '')
+    const m = grafie.get(scheletro(p))
+    if (!m) continue
+    const [migliore, n] = [...m].sort((a, b) => b[1] - a[1])[0]
+    if (migliore !== p && n >= 2 && n > (m.get(p) ?? 0)) r.codice_epu = migliore + r.codice_epu.slice(p.length)
   }
 }
 
@@ -1029,7 +1070,10 @@ export const RE_CODA_VALORI = new RegExp(
 // codice finiva nella descrizione e ne veniva ripescato solo "C.12.350.0010.H".
 // Un numero di 1-3 cifre da solo resta un progressivo, non un codice. La cifra può
 // venire dopo un punto ("NP.06"): prima doveva stare prima del primo punto.
-export const RE_COD_GRIGLIA = /^\s*(?:(\d{1,3})(?:[).]?\s+|\)))?((?!\d{1,3}(?:\s|$))(?=[A-Z0-9._]*[\d\-])[A-Z0-9][A-Z0-9._,\-\/]{1,22})(?=\s+\S|\s*$)/
+// Codice in due pezzi separati da uno spazio, come i prezzari ANAS "BA.CZ.A.3 02.F"
+// (SICS): il secondo pezzo è "cifre.LETTERA". Con la lettera obbligatoria un numero dopo
+// il codice ("A.01.001 12.5") non entra nel codice.
+export const RE_COD_GRIGLIA = /^\s*(?:(\d{1,3})(?:[).]?\s+|\)))?((?!\d{1,3}(?:\s|$))(?=[A-Z0-9._]*[\d\-])[A-Z0-9][A-Z0-9._,\-\/]{1,22}(?:\s\d{2}\.[A-Z](?=\s|$))?)(?=\s+\S|\s*$)/
 
 export const numIt = (s?: string): number =>
   s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : NaN
@@ -1095,15 +1139,38 @@ export const RE_VOCE_OPZIONALE = new RegExp(
 // perdeva unità di misura e quantità. Si toglie solo quando sta fra due numeri.
 const RE_NOTA_VALORI = /(\d)\s+(?:solo\s+posa|solo\s+fornitura|fornitura\s+e\s+posa|solo\s+nolo)\s+(?=(?:€\s*)?\d)/gi
 
+// Importo spezzato dall'OCR in due numeri: "17.777,00 103,00 € 1.831,03 1,00 €" è
+// 1.831.031,00 (SICS). Le cifre dei due pezzi, attaccate, danno quantità × prezzo al
+// centesimo: solo allora i due pezzi si ricuciono in un importo, altrimenti la riga
+// resta com'è.
+const RE_IMPORTO_SPEZZATO = new RegExp(
+  String.raw`(${NUM_SRC})\s*€?\s+(${NUM_SRC})\s*€?\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3},\d{2})\s*€?\s*$`)
+export const ricuciImportoSpezzato = (line: string): string => {
+  const m = RE_IMPORTO_SPEZZATO.exec(line)
+  if (!m) return line
+  const atteso = numIt(m[1]) * numIt(m[2])
+  const cifre = Number((m[3] + m[4]).replace(/\D/g, '')) / 100
+  if (!isFinite(atteso) || Math.abs(atteso - cifre) > 0.01) return line
+  const importo = itStr(cifre).replace(/^(\d+)/, (n: string) => n.replace(/\B(?=(\d{3})+$)/g, '.'))
+  return `${line.slice(0, m.index)}${m[1]} ${m[2]} € ${importo} €`
+}
+
 export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
   const righe: Record<string, string>[] = []
   const posizioni = new Map<Record<string, string>, string>()   // riga → numero "Pos." letto in testa
   let sospese: string[] = []          // righe di sola descrizione non ancora assegnate
+  // Codice su una riga di TITOLO senza valori ("BA.PD.A.3 03.C Pali in conglomerato…"),
+  // con i valori sulla riga di fornitura sotto ("Fonitura di Conglomerato … m³ 43,00
+  // 109,00 € 4.687,00 €"): il codice e il titolo vanno a quella voce (SICS, come nel
+  // modulo di riferimento), non in coda alla descrizione della voce precedente.
+  let codiceSospeso = ''
   for (const raw of regione) {
-    const line = raw.trim().replace(RE_NOTA_VALORI, '$1 ')
+    // "·" isolato fra le colonne ("115,00 € · 374.670,00 €") e "P,02" per P.02
+    const line = ricuciImportoSpezzato(raw.trim().replace(RE_NOTA_VALORI, '$1 ')
+      .replace(/\s[·•]\s/g, ' ').replace(/^([A-Z]{1,2}),(\d{2})\b/, '$1.$2'))
     if (!line || RE_RIGA_SERVIZIO.test(line)) continue
-    if (RE_RIGA_TOTALE.test(line)) { sospese = []; continue }
-    if (isHeaderGriglia(line) || RE_PROSA_MODELLO.test(line)) { sospese = []; continue }
+    if (RE_RIGA_TOTALE.test(line)) { sospese = []; codiceSospeso = ''; continue }
+    if (isHeaderGriglia(line) || RE_PROSA_MODELLO.test(line)) { sospese = []; codiceSospeso = ''; continue }
     const opz = RE_VOCE_OPZIONALE.exec(line)
     if (opz) {
       const riga = { progressivo: String(righe.length + 1), codice_epu: '', descrizione: pulisciDescrArticolo(opz[2]),
@@ -1115,9 +1182,20 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
     }
     const m = RE_CODA_VALORI.exec(line)
     if (!m) {
+      // riga di titolo che apre con un codice vero (lettera e punto INTERNO: "BA.PD.A.3
+      // 03.C"; "BMK240." è una parola a fine frase, Ulma): codice in sospeso
+      const titolo = RE_COD_GRIGLIA.exec(line)
+      if (titolo && /[A-Za-z]/.test(titolo[2]) && /[A-Za-z0-9]\.[A-Za-z0-9]/.test(titolo[2]) && line.length > titolo[0].length + 8) {
+        codiceSospeso = titolo[2].replace(/[.,]+$/, '')
+        sospese = [line.slice(titolo[0].length).trim()]
+        continue
+      }
       // continuazione della descrizione della voce precedente (finché resta compatta)
       const ultima = righe[righe.length - 1]
-      if (ultima && (ultima.descrizione ?? '').length < 160 && !/^[\d\s.,€%-]+$/.test(line)) {
+      if (codiceSospeso) {
+        if (line.length >= 3) sospese.push(line)
+        if (sospese.length > 4) sospese.shift()
+      } else if (ultima && (ultima.descrizione ?? '').length < 160 && !/^[\d\s.,€%-]+$/.test(line)) {
         ultima.descrizione = pulisciDescrArticolo(`${ultima.descrizione} ${line}`)
       } else if (line.length >= 3) {
         sospese.push(line)
@@ -1132,12 +1210,17 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
     if (cod) { codice = cod[2].replace(/[.,]+$/, ''); pos = cod[1] ?? ''; testa = testa.slice(cod[0].length) }
     else testa = testa.replace(/^\s*(\d{1,3})[).\s]+/, (_, n: string) => { pos = n; return '' })
     let descrizione = pulisciDescrArticolo(testa)
-    // voce con etichetta cortissima ("Noleggio", "Vendita", "Posa in opera"): il senso
-    // sta nel blocco che la precede (tabelle dei noli, raggruppate per attrezzatura)
-    if (descrizione.length < 25 && sospese.length) {
+    if (codiceSospeso && !codice) {
+      // la voce del titolo sopra: suo il codice, titolo in testa alla descrizione
+      codice = codiceSospeso
+      descrizione = pulisciDescrArticolo(`${sospese.join(' ')} - ${descrizione}`).slice(0, 240)
+    } else if (descrizione.length < 25 && sospese.length) {
+      // voce con etichetta cortissima ("Noleggio", "Vendita", "Posa in opera"): il senso
+      // sta nel blocco che la precede (tabelle dei noli, raggruppate per attrezzatura)
       descrizione = pulisciDescrArticolo(`${sospese.join(' ')} — ${descrizione}`).slice(0, 240)
     }
     sospese = []
+    codiceSospeso = ''
     if (!descrizione && !codice) continue
     // tre valori = qta, prezzo, importo; due = qta, prezzo (contratti quadro senza importo).
     // sistemaValori rimette in ordine le colonne quando l'importo dice che non tornano.
