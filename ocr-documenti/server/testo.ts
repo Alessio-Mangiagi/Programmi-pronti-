@@ -31,10 +31,17 @@ export const unisciMigliaiaSpazio = (t: string): string =>
   t.replace(/(?<=(?:€|\d,\d{1,3})[ \u00a0])\d{1,3}(?:[ \u00a0]\d{3})+(?=,\d{1,3}(?!\d))/g, m => m.replace(/[ \u00a0]/g, '.'))
 
 // "><(((º> sabusabu <º)))><"
+//   3) "€" letto come lettera o cifra in fondo a un importo: "135,41 e", "367,76 6",
+//      "163,75 8", "77,03 C" (PF Future, seconda tabella). Solo su un blocco OCR che
+//      contiene SOLO quell'importo (regola ancorata a tutta la stringa: sul testo di più
+//      righe non scatta): lì il carattere staccato in coda non è una quantità ("6" dopo il
+//      prezzo nella sua cella), e con due decimali non è nemmeno una cifra dell'importo.
+//      Altrimenti "22,59 6" dava quantità 22,59 × prezzo 6.
 export const normalizzaNumeriOcr = (t: string): string => t
   .replace(/\b(\d{1,3}(?:\.\d{3})+,\d{2})(\d+,\d{1,3})(?!\d)/g, '$1 $2')
   .replace(/\b\d{1,3}(?:,\d{3})+,\d{2}(?!\d)/g, m =>
     m.slice(0, m.lastIndexOf(',')).replace(/,/g, '.') + m.slice(m.lastIndexOf(',')))
+  .replace(/^(\s*(?:€\s*)?\d{1,3}(?:\.\d{3})*,\d{2}) [68eEcC]\s*$/, '$1 €')
 
 // Spezza un markdown multi-pagina in tiles per pagina. Riconosce il separatore dell'app
 // (riga di soli "---") e l'eventuale marcatore "--- PAGE n ---". Vuoti scartati.
