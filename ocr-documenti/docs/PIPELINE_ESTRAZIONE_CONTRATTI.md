@@ -606,6 +606,31 @@ Risultato: PF Future villette 29 → **33/34**, uffici 44 → **65/70**, residen
 («VT27U a DoZzelte…» → «Fornitura e posa in opera su scavo…»). Nessun altro contratto
 cambia.
 
+### 4.13 Griglia con la descrizione centrata e quantità 1,00 (Ulma, 17/11/2026)
+
+Il nolo Ulma (art. 5: «Note | Descrizione | UM | Quantità | Prezzo unitario | Prezzo
+TOTALE», senza codici) usciva con 14 voci giuste su 26. Tre cause:
+
+- **riga di valori senza descrizione**: la cella della descrizione è centrata in altezza
+  e l'OCR mette le sue righe sopra e sotto quella dei valori («Mat. Consumo TUBO PVC /
+  DW15 DI20 L2000 - / a.c. 1,00 2.500,00 € 2.500,00 € / ROSETTA PVC…»). Le righe sopra
+  finivano in coda alla voce precedente e la riga dei valori, senza testo, si scartava.
+  In `righeDaRegione` le righe accodate all'ultima voce dopo i suoi valori (`codaUltima`)
+  passano alla voce che arriva senza descrizione, e l'ultima voce torna com'era. «- €» in
+  fondo alla riga è il totale non stampato di una voce opzionale e si toglie;
+- **doppioni**: `estraiRigheElencoPrezzi` toglieva le voci uguali (codice, unità, quantità,
+  prezzo, descrizione) in tutto il documento, per la griglia ripetuta nell'art. 5 e
+  nell'allegato. Ora solo fra finestre di testo diverse: dentro la stessa tabella «Vendita
+  a.c. 1,00 2.500,00 €» del fusto pila e del sottovia sono due voci;
+- **quantità 1,00 scambiata col prezzo**: con due soli valori «1,00 2.450,00» diventava
+  2.450 × 1,00, sia in `sistemaValori` (prezzo e importo quando il secondo è mille volte
+  il primo) sia in `strutturaAlyante` (`server/struttura.ts`: «[28,21 | 56,42] → 2 ×
+  28,21», e con 1,00 ogni prezzo è un multiplo intero). Ora 1,00 resta una quantità.
+
+L'ultima correzione valeva anche altrove: L.Catania 37 → **43/46**, Nigro 41 → **49/52**
+(voci «1,00 | 30,00» lette 30 × 1,00). Ulma 14 → **23/26**. Nessun altro contratto
+cambia. Resta «Ricondizionamento % 0,3 Listino» (prezzo a listino, non un numero).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

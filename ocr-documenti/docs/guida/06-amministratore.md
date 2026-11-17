@@ -46,7 +46,11 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
 - nei **computi** (righe SOMMANO) i codici storpiati dall'OCR si ricompongono con i codici
   che il documento scrive giusti: punti persi («SIC24 144.16.5» → 14.4.16.5), sigla letta
   male («S1C24» → SIC24), lettere puntate perse («A.NE.012» → A.N.E.012). Un codice che non
-  porta a un solo codice del documento resta com'è letto, da controllare.
+  porta a un solo codice del documento resta com'è letto, da controllare;
+- nelle tabelle con la descrizione **centrata in altezza** (noli a corpo) la riga dei
+  valori senza testo prende la descrizione scritta sopra di lei; due voci uguali della
+  stessa tabella restano entrambe, si toglie solo la copia della tabella ripetuta
+  nell'allegato.
 
 Le pagine già lette prima di questi aiuti restano in `.ocr-cache/`: alla prima riapertura
 si cercano solo le linee della tabella, senza rifare l'OCR. Per rileggere ruotata una

@@ -7,12 +7,13 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§16): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§17): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
-  sigla, elenchi a corpo senza quantità, codici del computo ricomposti.** Sui 31
-  contratti testata dal 94% al 96%, voci con quantità e prezzo giusti dal 74% all'83%,
-  voci esatte dal 64% al 77%; nessun contratto peggiora. Progetto Costruzioni da 41 a 57
-  voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da 35 a 65 e da 45 a 65 su 70.
+  sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
+  descrizione centrata.** Sui 31 contratti testata dal 94% al 96%, voci con quantità e
+  prezzo giusti dal 74% all'85%, voci esatte dal 64% al 79%; nessun contratto peggiora.
+  Progetto Costruzioni da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da
+  35 a 65 e da 45 a 65 su 70, Ulma da 14 a 23 su 26.
   «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
@@ -638,6 +639,20 @@ residence 56 → 65/70. Nessun altro contratto cambia.
 dalla descrizione «N.2 BAT2.1» come codice, tre voci di computo non lette nel residence,
 due quantità non stampate (7 × 163,60, non dedotte per scelta), «22,59» con prezzo e
 importo su due righe di testo, il cavo 2.100 m degli uffici sotto la griglia di pag. 21.
+
+## 17. Griglia con la descrizione centrata, quantità 1,00 (17/11/2026)
+
+Ulma perdeva le voci la cui riga di valori arriva senza descrizione (cella centrata in
+altezza: il testo sta sopra e sotto), e due voci uguali della stessa tabella diventavano
+una sola. Ora la descrizione accodata alla voce precedente dopo i suoi valori passa alla
+voce senza testo, e i doppioni si tolgono solo fra finestre di testo diverse (la griglia
+ripetuta in art. 5 e allegato). Una quantità «1,00» con due soli valori veniva presa per
+prezzo (2.450 × 1,00, e in struttura 30 × 0,03): sistemato in parser e struttura.
+Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.13.
+
+**Risultato** sui 31 contratti: voci esatte 729 → **752** (79%), quantità e prezzo giusti
+783 → **806** (85%), testata invariata. Ulma 14 → 23/26, L.Catania 37 → 43/46, Nigro 41 →
+49/52. Nessun altro contratto cambia.
 
 ## Fonti
 
