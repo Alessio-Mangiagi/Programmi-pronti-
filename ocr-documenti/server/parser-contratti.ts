@@ -410,7 +410,26 @@ export const senzaTabellaRicostruita = (s: string): string =>
 export const senzaBlocchiCelle = (s: string): string =>
   s.replace(/^###[^\S\n]*TABELLA ARTICOLI \(dalle celle[^\n]*\n(?:[^\S\n]*\|[^\n]*\n?)*/gm, '')
 
-export const estraiRighe = (testoIntero: string): Record<string, string>[] => {
+// Quantità sottintesa: negli elenchi a corpo (PF Future, seconda tabella: «Serigrafia da 8
+// aree. 135,41 € 135,41 €») la quantità 1 non è stampata e restano due numeri uguali,
+// prezzo e importo, che i parser leggono come quantità e prezzo («135,41 × 135,41 =
+// vuoto»). Prezzo e importo uguali vogliono dire quantità 1: la voce diventa 1 × p = p.
+// Così anche quando una quantità letta non torna e prezzo e importo sono uguali («2
+// 251,92 € 251,92 €»: il 2 viene dalla descrizione). Solo con due numeri identici a due
+// decimali: una quantità uguale al prezzo per caso («10,00 10,00» = 10 m a 10 €) non si
+// distingue, ma è rara quanto un prezzo e un importo diversi letti uguali.
+export const quantitaSottintesa = (righe: Record<string, string>[]): Record<string, string>[] => {
+  const dueDecimali = (s: string) => /^\d{1,3}(?:\.?\d{3})*,\d{2}$/.test(s)
+  for (const r of righe) {
+    const q = String(r.quantita ?? '').trim(), p = String(r.prezzo_lordo ?? '').trim(), i = String(r.importo ?? '').trim()
+    if (!i && q && q === p && dueDecimali(p)) { r.quantita = '1'; r.importo = p; continue }
+    if (p && i && dueDecimali(p) && numIt(p) === numIt(i) && (!q || !contoTorna(numIt(q), numIt(p), numIt(i)))) r.quantita = '1'
+  }
+  return righe
+}
+
+export const estraiRighe = (testoIntero: string): Record<string, string>[] => quantitaSottintesa(estraiRigheGrezze(testoIntero))
+const estraiRigheGrezze = (testoIntero: string): Record<string, string>[] => {
   // il testo può arrivare anche incollato (percorso `text`), senza la correzione
   // fatta sui blocchi OCR: rinormalizza qui, l'operazione è idempotente
   const text = normalizzaNumeriOcr(testoDaTabellaArticoli(testoIntero))
