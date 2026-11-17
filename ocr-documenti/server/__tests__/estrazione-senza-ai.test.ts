@@ -90,6 +90,16 @@ describe('testata', () => {
   it('CUP con uno spazio dentro', () => {
     expect(estraiTestata('CUp: B31 E20000230001\nCIG: 1234567890').cup).toBe('B31E20000230001')
   })
+  it('CIG con uno spazio dentro; anticipo scritto in cifre; oneri "oneriper la"', () => {
+    // il primo CIG è quello del contratto, il secondo dell'accordo quadro citato dopo
+    expect(estraiTestata('CIG: B61 A803B31\nart. 34 … Codice CIG 9524823497 "Accordi"').cig).toBe('B61A803B31')
+    expect(estraiTestata('C.I.G. n. 9524823497').cig).toBe('9524823497')
+    expect(estraiTestata('CIG del contratto, ove presente').cig).toBeFalsy()  // parole, non un CIG
+    // importo scritto: vince sul 20% calcolato; o letta al posto dello zero
+    expect(estraiImporti('L\'AFFIDATARIA corrisponde un acconto pari al 20% (venti-per-cento) dell\'importo\ncontrattuale complessivo di cui all\'Art. 4, pari ad € € 118.145,80 (Euro').importo_anticipi).toBe('118.145,80')
+    expect(estraiImporti('un acconto a titolo di anticipazione pari a €\n30.00o,0o (Euro trentamila/o0).').importo_anticipi).toBe('30.000,00')
+    expect(estraiImporti('comprenslvo dl € 186.192,00 (euro centoottantaseimilacentonovantadue/00) di oneriper la\nsicurezza.').importo_oneri_sicurezza).toBe('186.192,00')
+  })
 
   it('servizi: incarico e subaffidamento di un servizio → Passivo a Misura, divisione 08', () => {
     const trasporto = 'CONTRATTO DI SUBAFFIDAMENTO\nArt. 2 - OGGETTO\nLe prestazioni oggetto del presente Contratto riguardano il servizio di trasporto di materiale\nArt. 3'

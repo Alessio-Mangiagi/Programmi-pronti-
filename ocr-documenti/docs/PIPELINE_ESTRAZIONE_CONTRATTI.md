@@ -665,6 +665,21 @@ P.IVA non si prende. Gli oneri «9.201,26 (…) di oneri per ia sicurezza» (l l
 si trovavano: `estraiImporti` accetta «per ia». Testata del Ticopter 13 → **15/15**;
 sui 31 contratti 410 → 412/425.
 
+Altri quattro campi della testata, stesse cause di lettura:
+- **anticipo scritto in cifre** (`anticipoScritto` in `estraiImporti`): dopo «anticip…»
+  sulla stessa riga o dopo «acconto pari» anche a capo, con «€ €» doppio e la o per lo
+  zero («pari a € / 30.00o,0o», subappalto 030: era 0). L'importo scritto vince sul
+  calcolo dalla percentuale: Muzzolon 118.145,80 scritto, il 20% darebbe 118.145,81;
+- **oneri «di oneriper la / sicurezza»** (SICS): parole incollate e a capo;
+- **CIG con uno spazio dentro** («CIG: B61 A803B31», Beton): prima si prendeva il CIG
+  dell'accordo quadro citato all'art. 34. Lo spazio vale solo con almeno 3 cifre, così
+  «CIG del contratto» non diventa un CIG (`cigDa`).
+
+Testata sui 31 contratti 412 → **417/425 (98%)**. Restano: codice «1.537/99» (stampato
+così), «SUBAP-2025-0» come codice GEMMALPE nel riferimento, due condizioni di pagamento
+scritte a parole senza codice in elenco, due oggetti riassunti a mano, ditta e fornitore
+del Contratto_fornitura.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
