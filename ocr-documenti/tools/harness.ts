@@ -69,7 +69,7 @@ const noCache = process.argv.includes('--no-cache')
 const noNativo = process.argv.includes('--no-nativo')
 const filtri = process.argv.slice(2).filter((a, k, tutti) => !a.startsWith('--') && tutti[k - 1] !== '--cartella')
 
-const { ocrPaddle, componiTesto, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo } =
+const { ocrPaddle, componiTesto, completaRiletture, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo } =
   await import('../server.ts')
 
 const { moduloDaRisultato, eModulo, descriviErrori } = await import('../src/lib/modulo-contratto.ts')
@@ -115,22 +115,28 @@ const ocrConCache = async (png: string): Promise<string> => {
     // "[]" = pagina che il motore non ha letto (GPU non supportata): si rifà, come in server/ocr.ts
     const inCache = letturaDaCache(dato)
     if (inCache) {
+      let cambiata = false
       if (inCache.griglia === undefined) {
         inCache.griglia = await grigliaPagina(png, inCache.rotazione ?? 0)
-        await fs.writeFile(cache, letturaPerCache(inCache), 'utf8')
+        cambiata = true
       }
-      return componiTesto(inCache.blocchi, inCache.griglia)
+      // celle numeriche rilette (voci i cui conti non tornano), come in server/ocr.ts:
+      // una volta per pagina, poi dalla cache
+      if (await completaRiletture(inCache, png)) cambiata = true
+      if (cambiata) await fs.writeFile(cache, letturaPerCache(inCache), 'utf8')
+      return componiTesto(inCache.blocchi, inCache.griglia, inCache.celle)
     }
   }
   let blocchi: Parameters<typeof componiTesto>[0] | null = null
   let griglia: Parameters<typeof componiTesto>[1] = null
   let rotazione = 0
-  setDumpBlocchi((b, g, r) => { blocchi = b; griglia = g ?? null; rotazione = r ?? 0 })
+  let celle: Parameters<typeof componiTesto>[2]
+  setDumpBlocchi((b, g, r, c) => { blocchi = b; griglia = g ?? null; rotazione = r ?? 0; celle = c })
   const testo = await ocrPaddle((await fs.readFile(png)).toString('base64'))
   setDumpBlocchi(null)
   await fs.mkdir(path.dirname(cache), { recursive: true })
   if (blocchi && (blocchi as unknown[]).length) {
-    await fs.writeFile(cache, letturaPerCache({ blocchi, griglia, rotazione }), 'utf8')
+    await fs.writeFile(cache, letturaPerCache({ blocchi, griglia, rotazione, celle }), 'utf8')
   } else if (blocchi) {
     // Pagina bianca (retro, separatore): zero blocchi da un motore che ha superato la
     // prova di lettura all'avvio (ocr_worker.py, prova_lettura). Solo nel banco si segna

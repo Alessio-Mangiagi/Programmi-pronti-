@@ -10,6 +10,9 @@ poi ogni pagina costa solo l'inferenza. Protocollo a righe JSON:
            (+ "griglia": {"xs": [...], "ys": [...]} linee della tabella con i bordi, o null)
   stdin  → {"id": 2, "path": "...", "solo_griglia": true, "rotazione": 0}
   stdout → {"id": 2, "griglia": {...} | null}   pagina già in cache: solo le linee
+  stdin  → {"id": 3, "path": "...", "rileggi": [[x0, y0, x1, y1], ...], "rotazione": 270}
+  stdout → {"id": 3, "celle": [[{"text": "15,90", "conf": 86.0}, ...], ...]}
+           celle numeriche rilette una per una (vedi rileggi_celle), tre letture per cella
   stdout → {"id": 1, "error": "..."}          in caso di problema sulla singola pagina
   stdout → {"ready": true, "engine": "..."}   una volta, a modello caricato
 
@@ -362,7 +365,8 @@ def _posizioni(profilo, minimo):
 def griglia_tabella(path):
     """{"xs": [...], "ys": [...]} = linee verticali e orizzontali della tabella più grande
     della pagina (coordinate dell'immagine, come i blocchi), o None se la pagina non ha una
-    tabella con i bordi (almeno 3 linee per verso). Si cercano prima le verticali lunghe
+    tabella con i bordi (almeno 3 linee per verso; con meno di 3 orizzontali bastano 6
+    verticali, e ys resta corta). Si cercano prima le verticali lunghe
     almeno 1/25 della pagina; la tabella è il gruppo di verticali che si sovrappongono in
     altezza con più linee; le orizzontali valide sono quelle dentro quell'altezza che
     coprono almeno il 30% della larghezza della tabella (le linee sottili escono
@@ -409,7 +413,11 @@ def griglia_tabella(path):
     fascia = oriz[max(0, tab["cima"] - 10):tab["fondo"] + 11, x0:x1 + 1]
     ys = [y + max(0, tab["cima"] - 10) for y in _posizioni((fascia > 0).sum(axis=1), (x1 - x0) * 0.3)]
     if len(ys) < 3:
-        return None
+        # Righe tratteggiate fra le voci (allegato A di Progetto Costruzioni, pag. 40 e 48):
+        # le orizzontali non si trovano ma le colonne sì. Con almeno 6 verticali si rendono
+        # lo stesso: il server non legge per celle (servono 3 orizzontali) ma usa le
+        # colonne per ritagliare le celle dei valori da rileggere.
+        return {"xs": xs, "ys": ys} if len(xs) >= 6 else None
     return {"xs": xs, "ys": ys}
 
 
@@ -432,6 +440,86 @@ def ruota_su_file(path, gradi):
     with Image.open(path) as img:
         img.rotate(gradi, expand=True).save(ruotata)
     return ruotata
+
+
+# ── Celle numeriche rilette una per una ─────────────────────────────────────
+# Le tabelle con i numeri su fondo grigio retinato (allegato A del subappalto Progetto
+# Costruzioni: quantità, prezzi e importi in celle ombreggiate) escono male dalla
+# lettura della pagina intera: il rilevamento salta celle intere ("357,27 €" non c'è) e
+# il riconoscimento perde la virgola ("23035" per 230,35). Il retino è fatto di puntini
+# neri isolati, le cifre di tratti pieni: ritagliando la cella, togliendo i puntini e
+# ingrandendo 2x, il solo riconoscimento (senza rilevamento) le legge quasi tutte.
+# Prova del 17/11/2026 sulla pag. 49: "sfoca" (gaussiana σ 1,5 + soglia fissa) legge
+# 14,49 / 15,90 / 230,35 / 0,60 / 8,73 dove la pagina intera dava 14.49 / 15,90€ /
+# 23035 / — / 8.73€. Nessuna pulizia è giusta sempre: si rendono tre letture per cella
+# e sceglie il server, tenendo solo la combinazione che fa tornare i conti
+# (server/tabella-griglia.ts, rilettureDellaVoce). Quali celle rileggere lo decide il
+# server: qui si ritaglia e si legge e basta.
+_REC = None
+
+
+def riconoscitore(device):
+    """Modello di solo riconoscimento (lo stesso della pagina), caricato al primo uso:
+    i worker che non rileggono celle non lo caricano mai."""
+    global _REC
+    if _REC is None:
+        from paddleocr import TextRecognition
+        _REC = TextRecognition(
+            model_name=os.environ.get("PADDLE_REC_MODEL", "latin_PP-OCRv5_mobile_rec"),
+            device=device, enable_mkldnn=False)
+    return _REC
+
+
+def pulisci_cella(cella, modo):
+    """Ritaglio in scala di grigi → immagine BGR ingrandita 2x per il riconoscimento.
+    mediana: toglie i puntini più piccoli; sfoca: il retino diventa grigio chiaro e la
+    soglia lascia solo le cifre; puntini: tiene le macchie nere di almeno 25 pixel."""
+    import cv2
+    import numpy as np
+    if modo == "mediana":
+        out = cv2.medianBlur(cella, 3)
+    elif modo == "sfoca":
+        _, out = cv2.threshold(cv2.GaussianBlur(cella, (0, 0), 1.5), 110, 255, cv2.THRESH_BINARY)
+    else:
+        nero = (cella < 128).astype(np.uint8)
+        n, lab, st, _ = cv2.connectedComponentsWithStats(nero, connectivity=8)
+        tieni = np.zeros(n, bool)
+        tieni[1:] = st[1:, cv2.CC_STAT_AREA] >= 25
+        out = np.where(tieni[lab], 0, 255).astype(np.uint8)
+    out = cv2.resize(out, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    return cv2.cvtColor(out, cv2.COLOR_GRAY2BGR)
+
+
+MODI_CELLA = ("mediana", "sfoca", "puntini")
+
+
+def rileggi_celle(path, gradi, celle, device):
+    """Per ogni rettangolo [x0, y0, x1, y1] (coordinate della pagina raddrizzata, come
+    i blocchi) le letture delle tre pulizie: [{"text", "conf"}, ...]. Rettangolo fuori
+    pagina o vuoto → nessuna lettura."""
+    import numpy as np
+    from PIL import Image
+    with Image.open(path) as img:
+        pagina = img.convert("L")
+        if gradi:
+            pagina = pagina.rotate(gradi, expand=True)
+        a = np.asarray(pagina)
+    immagini, dove = [], []
+    for k, (x0, y0, x1, y1) in enumerate(celle):
+        x0, y0 = max(0, int(x0)), max(0, int(y0))
+        x1, y1 = min(a.shape[1], int(x1)), min(a.shape[0], int(y1))
+        if x1 - x0 < 8 or y1 - y0 < 8:
+            continue
+        for modo in MODI_CELLA:
+            immagini.append(pulisci_cella(a[y0:y1, x0:x1], modo))
+            dove.append(k)
+    risposta = [[] for _ in celle]
+    if immagini:
+        for k, r in zip(dove, riconoscitore(device).predict(immagini, batch_size=16)):
+            testo = (r.get("rec_text") or "").strip()
+            if testo:
+                risposta[k].append({"text": testo, "conf": round(float(r.get("rec_score") or 0) * 100, 1)})
+    return risposta
 
 
 def spiega_errore_avvio(e):
@@ -460,6 +548,7 @@ def main():
         manda({"fatal": spiega_errore_avvio(e)})
         sys.exit(1)
     manda({"ready": True, "engine": engine})
+    device = "gpu" if "GPU" in engine else "cpu"
     # utf-8-sig: tollera il BOM che PowerShell/Windows a volte antepone allo stream
     stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8-sig")
     for raw in stdin:
@@ -479,6 +568,11 @@ def main():
                 finally:
                     if gradi:
                         os.remove(path)
+                continue
+            # solo le celle numeriche indicate dal server, pagina già letta
+            if req.get("rileggi") is not None:
+                manda({"id": req["id"], "celle": rileggi_celle(
+                    req["path"], int(req.get("rotazione") or 0), req["rileggi"], device)})
                 continue
             lines, gradi = ocr_orientato(ocr, req["path"])
             risposta = {"id": req["id"], "lines": lines}

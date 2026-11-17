@@ -9,7 +9,7 @@ import { createHash } from 'crypto'
 import { spawn } from 'child_process'
 import { OCR_WORKER, PYTHON_BIN, VISION_FALLBACK, ROOT } from './config.ts'
 import { tabellaDaTsv } from './tabella-tsv.ts'
-import { TITOLO_CELLE, tabellaDaGriglia, type Griglia } from './tabella-griglia.ts'
+import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, type CellaRiletta, type Griglia, type LetturaCella } from './tabella-griglia.ts'
 import { normalizzaNumeriOcr } from './testo.ts'
 import { modelloVisionAttivo, ocrVisionArticoli, visionOff } from './ollama.ts'
 
@@ -23,7 +23,9 @@ export type BloccoOcr = { text: string; conf: number; x: number; y: number; w: n
 // Lettura di una pagina: blocchi OCR più, se la pagina ha una tabella con i bordi, le sue
 // linee (ocr_worker.py, griglia_tabella) e la rotazione applicata (pagina capovolta).
 // griglia: null = cercata e assente; undefined = non ancora cercata (cache vecchia).
-export type LetturaOcr = { blocchi: BloccoOcr[]; griglia?: Griglia | null; rotazione?: number }
+// celle: celle numeriche rilette una per una (completaRiletture); undefined = mai chieste.
+// letture: risposta grezza del worker a una richiesta "rileggi" (una lista per cella).
+export type LetturaOcr = { blocchi: BloccoOcr[]; griglia?: Griglia | null; rotazione?: number; celle?: CellaRiletta[]; letture?: LetturaCella[][] }
 export type SlotWorker = {
   proc: ReturnType<typeof spawn>
   ready: Promise<void>
@@ -72,7 +74,7 @@ export const creaWorker = (): SlotWorker => {
         if (!p) continue
         slot.pending.delete(msg.id)
         if (msg.error) p.reject(new Error(`PaddleOCR: ${msg.error}`))
-        else p.resolve({ blocchi: (msg.lines ?? []) as BloccoOcr[], griglia: msg.griglia ?? null, rotazione: msg.rotazione ?? 0 })
+        else p.resolve({ blocchi: (msg.lines ?? []) as BloccoOcr[], griglia: msg.griglia ?? null, rotazione: msg.rotazione ?? 0, ...(msg.celle ? { letture: msg.celle as LetturaCella[][] } : {}) })
       } catch { /* riga non-JSON (log sfuggito) → ignora */ }
     }
   })
@@ -171,11 +173,13 @@ export const testoGarbled = (testo: string): boolean => {
 // due insieme darebbero ogni voce due volte. Senza linee fra le voci (o senza griglia) le
 // voci si dividono sui codici della colonna tariffa (tabellaDaAncore); se nemmeno così
 // escono voci resta la ricostruzione geometrica di sempre.
-export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null): string => {
+// `rilette`: celle numeriche rilette una per una (completaRiletture), per le voci i cui
+// conti non tornano nella lettura della pagina intera.
+export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null, rilette?: CellaRiletta[]): string => {
   for (const b of blocchi) b.text = normalizzaNumeriOcr(b.text)
   const righe = righeDaBlocchi(blocchi)
   const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')
-  const celle = (() => { try { return tabellaDaGriglia(blocchi, griglia) } catch { return '' } })()
+  const celle = (() => { try { return tabellaDaGriglia(blocchi, griglia, rilette) } catch { return '' } })()
   if (celle) {
     console.log(`[Tabella celle] ${celle.split('\n').length} voci dalle celle (${griglia ? `${griglia.xs.length - 1}×${griglia.ys.length - 1}` : 'senza griglia, sui codici'})`)
     return `${testo.trimEnd()}\n\n${TITOLO_CELLE}\n${celle}\n`
@@ -194,7 +198,7 @@ export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null): st
 // ricostruito (che invece cambia ad ogni modifica dei parser).
 // Riceve anche griglia e rotazione: la cache del banco deve sapere se la pagina era
 // capovolta, altrimenti una griglia ricalcolata dopo andrebbe sull'immagine non ruotata.
-type DumpBlocchi = (b: BloccoOcr[], griglia?: Griglia | null, rotazione?: number) => void
+type DumpBlocchi = (b: BloccoOcr[], griglia?: Griglia | null, rotazione?: number, celle?: CellaRiletta[]) => void
 export let dumpBlocchi: DumpBlocchi | null = null
 export const setDumpBlocchi = (f: DumpBlocchi | null) => { dumpBlocchi = f }
 
@@ -209,17 +213,18 @@ export type EsitoOcr = { testo: string; incerte: BloccoIncerto[] }
 // e un riprocesso dopo un riavvio costano zero. OCR_CACHE=0 la spegne; la cartella si
 // può svuotare quando si vuole (si rigenera da sola).
 export const OCR_CACHE_DIR = process.env.OCR_CACHE === '0' ? '' : (process.env.OCR_CACHE_DIR || path.join(ROOT, '.ocr-cache', 'blocchi'))
-// Formato del file: { v: 2, blocchi, griglia, rotazione }. I file scritti prima della
-// griglia sono il solo array dei blocchi: valgono ancora, la griglia si chiede a parte
-// (grigliaPagina) senza rifare l'OCR.
+// Formato del file: { v: 2, blocchi, griglia, rotazione, celle? }. I file scritti prima
+// della griglia sono il solo array dei blocchi: valgono ancora, la griglia si chiede a
+// parte (grigliaPagina) senza rifare l'OCR; le celle rilette mancanti si chiedono allo
+// stesso modo (completaRiletture).
 export const letturaDaCache = (dato: unknown): LetturaOcr | null => {
   if (Array.isArray(dato)) return dato.length ? { blocchi: dato as BloccoOcr[] } : null
   const l = dato as (Partial<LetturaOcr> & { v?: number }) | null
   if (!l || !Array.isArray(l.blocchi) || !l.blocchi.length) return null
-  return { blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0 }
+  return { blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0, ...(Array.isArray(l.celle) ? { celle: l.celle } : {}) }
 }
 export const letturaPerCache = (l: LetturaOcr): string =>
-  JSON.stringify({ v: 2, blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0 })
+  JSON.stringify({ v: 2, blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0, ...(l.celle ? { celle: l.celle } : {}) })
 const leggiCache = async (chiave: string): Promise<LetturaOcr | null> => {
   if (!OCR_CACHE_DIR) return null
   const f = path.join(OCR_CACHE_DIR, `${chiave}.json`)
@@ -266,6 +271,37 @@ export const grigliaPagina = async (pngPath: string, rotazione = 0): Promise<Gri
   } catch { return null }
 }
 
+// ── Celle numeriche rilette una per una ──────────────────────────────────────────
+// Per le voci della lettura per codici i cui conti non tornano (server/tabella-griglia.ts,
+// celleDaRileggere) il worker rilegge le sole celle dei valori, ritagliate e ripulite dal
+// retino (ocr_worker.py, rileggi_celle). Le letture stanno in cache con i blocchi: la
+// pagina si rilegge una volta sola, e se le regole cambiano si chiedono solo le celle
+// nuove. PADDLE_RILEGGI_CELLE=0 spegne il passo. Errore o worker assente → la pagina si
+// compone come prima.
+export const RILEGGI_CELLE = process.env.PADDLE_RILEGGI_CELLE !== '0'
+/** true se ha aggiunto celle a `lettura.celle` (la cache va riscritta). */
+export const completaRiletture = async (lettura: LetturaOcr, pngPath: string): Promise<boolean> => {
+  if (!RILEGGI_CELLE) return false
+  const gia = new Set((lettura.celle ?? []).map(c => c.r.join(',')))
+  const mancano = celleDaRileggere(lettura.blocchi, lettura.griglia).filter(r => !gia.has(r.join(',')))
+  if (!mancano.length) {
+    if (lettura.celle) return false
+    lettura.celle = []                       // cercate, nessuna da rileggere: non si ripete
+    return true
+  }
+  try {
+    const t0 = Date.now()
+    const risposta = await chiediAlWorker({ path: pngPath, rileggi: mancano, rotazione: lettura.rotazione ?? 0 })
+    const letture = risposta.letture ?? []
+    lettura.celle = [...(lettura.celle ?? []), ...mancano.map((r, k) => ({ r, letture: letture[k] ?? [] }))]
+    console.log(`[OCR] ${mancano.length} celle numeriche rilette (${Math.round((Date.now() - t0) / 1000)} s)`)
+    return true
+  } catch (e) {
+    console.error(`[OCR] celle numeriche non rilette: ${e instanceof Error ? e.message : e}`)
+    return false
+  }
+}
+
 // Blocchi sotto soglia con almeno due caratteri alfanumerici (un "|" o un "." letto
 // male non interessa a nessuno).
 const blocchiIncerti = (blocchi: BloccoOcr[]): BloccoIncerto[] =>
@@ -289,14 +325,18 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
     const inCache = await leggiCache(chiave)
     const lettura = inCache ?? await chiediAlWorker({ path: tmp })
     const blocchi = lettura.blocchi
+    let daScrivere = !inCache
     if (inCache) {
       console.log(`[OCR] pagina dalla cache (${chiave.slice(0, 8)}, ${blocchi.length} blocchi)`)
       // cache scritta prima della griglia: si cercano ora le linee, una volta sola
       if (inCache.griglia === undefined) {
         lettura.griglia = await grigliaPagina(tmp, inCache.rotazione ?? 0)
-        await scriviCache(chiave, { ...lettura, blocchi: blocchi.map(b => ({ ...b })) })
+        daScrivere = true
       }
-    } else await scriviCache(chiave, { ...lettura, blocchi: blocchi.map(b => ({ ...b })) })    // blocchi grezzi, prima della normalizzazione
+    }
+    // celle numeriche da rileggere (voci i cui conti non tornano): una volta per pagina
+    if (await completaRiletture(lettura, tmp)) daScrivere = true
+    if (daScrivere) await scriviCache(chiave, { ...lettura, blocchi: blocchi.map(b => ({ ...b })) })    // blocchi grezzi, prima della normalizzazione
     for (const b of blocchi) b.text = normalizzaNumeriOcr(b.text)
     const incerte = blocchiIncerti(blocchi)
     // Banco di prova (tools/harness): con OCR_DUMP_DIR i blocchi riconosciuti finiscono
@@ -308,7 +348,7 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
     }
     const righe = righeDaBlocchi(blocchi)
     const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')
-    if (dumpBlocchi) dumpBlocchi(blocchi, lettura.griglia, lettura.rotazione)
+    if (dumpBlocchi) dumpBlocchi(blocchi, lettura.griglia, lettura.rotazione, lettura.celle)
     // Scansione illeggibile (grana/retino) → PaddleOCR restituisce salad. Se è attivo un
     // modello vision locale, lo si usa per ri-trascrivere la TABELLA ARTICOLI da questa
     // pagina (codice tariffa + descrizione + UM; i prezzi non interessano). Costa solo
@@ -321,7 +361,7 @@ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Pr
       }
       console.log(`[Vision] pagina illeggibile: recupero vision non riuscito — resta il testo PaddleOCR`)
     }
-    return { testo: componiTesto(blocchi, lettura.griglia), incerte }
+    return { testo: componiTesto(blocchi, lettura.griglia, lettura.celle), incerte }
   } finally {
     fs.unlink(tmp).catch(() => {})
   }

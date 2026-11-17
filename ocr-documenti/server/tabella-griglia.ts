@@ -24,8 +24,15 @@
 import type { BloccoOcr } from './ocr.ts'
 import { NUM_SRC, RE_COD_GRIGLIA, UM_SRC, contoTorna, itStr, normalizzaValoriTabella, numIt } from './parser-contratti.ts'
 import { valoriRiga } from './tabella-tsv.ts'
+import { normalizzaNumeriOcr } from './testo.ts'
+import { DBG_TABELLA } from './config.ts'
 
 export interface Griglia { xs: number[]; ys: number[] }
+// Cella numerica riletta da sola dal worker (ocr_worker.py, rileggi_celle): rettangolo
+// [x0, y0, x1, y1] nelle coordinate della pagina raddrizzata e le letture delle tre
+// pulizie del retino. Sta in cache con i blocchi della pagina (server/ocr.ts).
+export interface LetturaCella { text: string; conf: number }
+export interface CellaRiletta { r: number[]; letture: LetturaCella[] }
 
 // Intestazione del blocco nel testo: senzaTabellaRicostruita la toglie dal testo che va
 // alle maschere, come le altre tabelle ricostruite.
@@ -92,12 +99,14 @@ const conRigaSopra = (blocchi: BloccoOcr[], g: Griglia): Griglia => {
 // attorno a un riquadro di totali, o più voci impilate nella stessa riga perché mancano
 // le linee fra le voci) o manca del tutto, le voci si dividono sui codici
 // (tabellaDaAncore). Nessuna delle due → '' e vale la ricostruzione geometrica.
-export const tabellaDaGriglia = (blocchi: BloccoOcr[], griglia: Griglia | null | undefined): string => {
-  if (!griglia || griglia.xs.length < 3 || griglia.ys.length < 3) return tabellaDaAncore(blocchi, null)
+// `rilette`: celle numeriche rilette una per una (celleDaRileggere): servono solo alla
+// lettura per ancore, che le usa sulle voci i cui conti non tornano.
+export const tabellaDaGriglia = (blocchi: BloccoOcr[], griglia: Griglia | null | undefined, rilette?: CellaRiletta[]): string => {
+  if (!griglia || griglia.xs.length < 3 || griglia.ys.length < 3) return tabellaDaAncore(blocchi, null, griglia?.xs, rilette)
   const g = conRigaSopra(blocchi, griglia)
   // vince la lettura con più voci: una griglia parziale può dare una voce spuria dalle
   // celle e nascondere le dieci che si leggono sui codici (allegato A, pag. 3 e 7)
-  const celle = leggiCelle(blocchi, g), ancore = tabellaDaAncore(blocchi, g)
+  const celle = leggiCelle(blocchi, g), ancore = tabellaDaAncore(blocchi, g, g.xs, rilette)
   const n = (t: string) => (t ? t.split('\n').length : 0)
   return n(ancore) > n(celle) ? ancore : celle
 }
@@ -301,7 +310,8 @@ const valoriDaColonne = (numeri: NumeroX[], colonne: number[]): ValoriVoce | nul
 // La colonna dei codici si riconosce dall'allineamento dei codici stessi, non dalle linee:
 // sulle pagine girate la griglia trovata è spesso solo il riquadro dei totali, o manca.
 // Le linee orizzontali che ci sono valgono come confini fra le voci.
-const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null): string => {
+type VoceAncora = { codice: string; descr: string; um: string; xUm?: number; numeri: NumeroX[]; y: number; h: number }
+const vociDaAncore = (blocchi: BloccoOcr[], g: Griglia | null): VoceAncora[] | null => {
   const centroX = (b: BloccoOcr) => b.x + b.w / 2
   const eAncora = (b: BloccoOcr) => RE_ANCORA.test(b.text.trim()) && numeroCella(b.text, true) === null
   // colonna dei codici: il gruppo più numeroso di codici con il centro allineato (±80 px)
@@ -313,7 +323,7 @@ const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null): string => {
     else gruppi.push([b])
   }
   const colonna = gruppi.reduce<BloccoOcr[]>((m, x) => (x.length > m.length ? x : m), [])
-  if (colonna.length < 3) return ''
+  if (colonna.length < 3) return null
   const xL = Math.min(...colonna.map(b => b.x)), xR = Math.max(...colonna.map(b => b.x + b.w))
   // un codice per voce: i pezzi sulla stessa riga di testo sono uno
   const ancore: BloccoOcr[] = []
@@ -355,21 +365,202 @@ const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null): string => {
     // da sinistra a destra (a sinistra ci sono WBS e numero d'ordine)
     const destra = nellaVoce.filter(b => b.x >= xR - 5 && !pezzi.includes(b))
     const numeri: { n: string; x: number }[] = []
-    let um = '', xValori = Infinity
+    let um = '', xValori = Infinity, xUm: number | undefined
     for (const b of destra.filter(sullaRiga).sort((p, q) => p.x - q.x)) {
       const t = b.text.trim()
       if (RE_PCT.test(t)) continue
       const n = numeroCella(t, true)
       if (n !== null) { numeri.push({ n, x: b.x + b.w }); xValori = Math.min(xValori, b.x); continue }
       const forma = t.replace(/[^A-Za-z0-9²³°.]/g, '')
-      if (!um && RE_UM.test(forma)) { um = forma.replace(/\.$/, '').toLowerCase(); xValori = Math.min(xValori, b.x) }
+      if (!um && RE_UM.test(forma)) { um = forma.replace(/\.$/, '').toLowerCase(); xValori = Math.min(xValori, b.x); xUm = centroX(b) }
     }
     // descrizione: il testo fra il codice e i valori, su tutte le righe della voce
     const descr = testoCella(destra.filter(b => b.x + b.w <= xValori + 5 && numeroCella(b.text, true) === null))
-    return { codice, descr, um, numeri }
+    return { codice, descr, um, xUm, numeri, y, h: a.h }
   })
+  return voci
+}
+// Valori di ogni voce dai numeri letti sulla riga del codice: per colonne se la pagina
+// ne ha cinque riconoscibili, altrimenti in fila.
+const valoriDelleVoci = (voci: VoceAncora[]) => {
   const colonne = colonneDeiValori(voci.map(x => x.numeri))
-  const voci2 = voci.map(x => ({ ...x, v: colonne ? valoriDaColonne(x.numeri, colonne) : valoriLavoriOneri(x.numeri.map(z => z.n)) }))
+  return { colonne, valori: voci.map(x => colonne ? valoriDaColonne(x.numeri, colonne) : valoriLavoriOneri(x.numeri.map(z => z.n))) }
+}
+// Voce da rileggere: nessun conto che torna, quantità mancante o oneri persi.
+const daRileggere = (v: ValoriVoce | null): boolean => !v || !v.q || !!v.soloLavori
+
+// ── Celle numeriche rilette una per una (17/11/2026) ─────────────────────────────
+// Allegato A del subappalto Progetto Costruzioni: quantità, prezzi e importi in celle
+// grigie retinate, che la lettura della pagina intera salta o storpia (101 voci su 142
+// senza quantità o prezzo giusti). Per le voci i cui conti non tornano il server fa
+// rileggere al worker le sole celle dei valori, ritagliate, ripulite dal retino e
+// ingrandite (ocr_worker.py, rileggi_celle), e qui tiene la combinazione di letture con
+// cui tornano sia i lavori (quantità × P.U. = importo) sia gli oneri (quantità × costo
+// O.S. = importo O.S.). Nessuna combinazione che torna → la voce resta com'era.
+// Le colonne dei valori sono gli intervalli della griglia (linee verticali) che
+// contengono le cinque colonne di numeri della pagina; in mancanza, la colonna
+// «Quantità» dell'intestazione e le quattro dopo; se anche l'intestazione non si legge
+// (pag. 39, 41, 43, 49 dell'allegato A), le cinque dopo la colonna dove sta l'unità di
+// misura delle voci. Serve la griglia: i bordi delle celle non si indovinano. Le linee
+// doppie a pochi pixel (bordo spesso letto due volte: "202, 211") contano una volta.
+const intervalliValori = (blocchi: BloccoOcr[], xsGrezze: number[] | undefined, colonne: number[] | null, voci: VoceAncora[]): number[][] | null => {
+  const xs = (xsGrezze ?? []).filter((x, i, a) => !i || x - a[i - 1] > 15)
+  if (xs.length < 6) return null
+  let idx: number[] = []
+  const cinqueDa = (i: number) => (i >= 0 ? [i, i + 1, i + 2, i + 3, i + 4] : [])
+  if (colonne) idx = colonne.map(c => indiceIn(xs, c - 3))       // c = bordo destro dei numeri
+  const q = blocchi.find(b => /quantit/i.test(b.text))
+  if (idx.length !== 5 && q) idx = cinqueDa(indiceIn(xs, q.x + q.w / 2))
+  if (idx.length !== 5) {
+    // colonna dell'unità di misura: quella dove cade l'u.m. del maggior numero di voci
+    const conta = new Map<number, number>()
+    for (const v of voci) if (v.xUm !== undefined) { const i = indiceIn(xs, v.xUm); conta.set(i, (conta.get(i) ?? 0) + 1) }
+    const [iUm, n] = [...conta.entries()].sort((a, b) => b[1] - a[1])[0] ?? [-1, 0]
+    if (n >= 2) idx = cinqueDa(iUm + 1)
+  }
+  if (idx.length !== 5 || idx.some(i => i < 0 || i + 1 >= xs.length) || new Set(idx).size !== 5) return null
+  return idx.map(i => [xs[i], xs[i + 1]])
+}
+// Rettangolo di una cella: l'intervallo della colonna, alto quanto la riga del codice
+// (i numeri stanno centrati come il codice).
+const rettangoloCella = (voce: VoceAncora, [x0, x1]: number[]): number[] => {
+  const mezza = Math.round(Math.max(26, voce.h * 1.3))
+  return [Math.round(x0 + 4), Math.round(voce.y - mezza), Math.round(x1 - 4), Math.round(voce.y + mezza)]
+}
+const chiaveCella = (r: number[]) => r.join(',')
+
+/**
+ * Celle numeriche da far rileggere al worker: per ogni voce della lettura per ancore i
+ * cui conti non tornano, i rettangoli delle cinque colonne dei valori. Stessa analisi di
+ * tabellaDaGriglia (blocchi normalizzati, riga sopra la prima linea), così i rettangoli
+ * coincidono con quelli che la composizione cercherà. Nessuna griglia, nessuna voce da
+ * rileggere o colonne non riconosciute → [].
+ */
+export const celleDaRileggere = (blocchi: BloccoOcr[], griglia: Griglia | null | undefined): number[][] => {
+  if (!griglia || griglia.xs.length < 6) return []
+  const bs = blocchi.map(b => ({ ...b, text: normalizzaNumeriOcr(b.text) }))
+  const g = griglia.ys.length >= 3 ? conRigaSopra(bs, griglia) : null
+  const voci = vociDaAncore(bs, g)
+  if (!voci) return []
+  const { colonne, valori } = valoriDelleVoci(voci)
+  const intervalli = intervalliValori(bs, griglia.xs, colonne, voci)
+  if (!intervalli) return []
+  return voci.flatMap((voce, k) => daRileggere(valori[k]) ? intervalli.map(iv => rettangoloCella(voce, iv)) : [])
+}
+
+// Candidati di una cella riletta: la lettura ripulita dai residui ai bordi (punti di
+// retino, € letto come lettera) e, se ha perso la virgola, la stessa con due decimali:
+// "23035" → 230,35. Anche senza l'ultima cifra, perché il "€" finale esce spesso come
+// cifra ("357276" = 357,27 €, "0.600" = 0,60 €). Quale sia giusto lo dicono i conti.
+// Peso: 1 la lettura com'è o con la virgola rimessa a una lettura di sole cifre, ½ quella
+// senza l'ultima cifra e quella con la virgola spostata ("28.9 €" non è 2,89).
+// Senza questa differenza anche tutta la voce divisa per 10 (39,63 × 28,91 = 1.145,90,
+// oneri 1,10 e 43,60) faceva tornare i conti con gli stessi voti di quella giusta.
+const candidatiLettura = (t: string): Map<string, number> => {
+  const s = t.replace(/^[^\d]+/, '').replace(/[^\d]+$/, '')
+  const out = new Map<string, number>()
+  const metti = (c: string | null, peso: number) => { if (c !== null && !out.has(c)) out.set(c, peso) }
+  metti(numeroCella(s, true), 1)
+  const cifre = s.replace(/\D/g, '')
+  const soloCifre = /^\d+$/.test(s)
+  for (const [d, peso] of [[cifre, soloCifre ? 1 : 0.5], [cifre.slice(0, -1), 0.5]] as const) {
+    if (d.length >= 3) metti(numeroCella(`${d.slice(0, -2)},${d.slice(-2)}`, true), peso)
+  }
+  return out
+}
+
+/**
+ * Valori di una voce dalle celle rilette. Per ogni colonna i candidati (numero già letto
+ * sulla pagina + letture delle tre pulizie, con le varianti di candidatiLettura) votati
+ * per numero di letture concordi; poi la combinazione che regge DUE conti indipendenti:
+ * lavori (quantità × P.U. = importo, P.U. al più 2 decimali) E oneri (quantità × costo
+ * O.S. = importo O.S., entrambi letti). Un valore dei lavori che manca del tutto
+ * (quantità o importo non letti) si ricava dagli altri due: lo conferma il conto degli
+ * oneri. A parità vince la combinazione con più letture concordi. null se nessuna regge.
+ * Misurato sull'allegato A: accettare anche "importo O.S. = quota plausibile dei
+ * lavori" al posto del secondo conto riempiva voci per coincidenza (39,37 × 226,5055).
+ * Con tante letture per cella i conti al 2% tornano anche per caso (8,80 × 867 = 7.631):
+ * qui ogni valore deve avere due decimali, come nelle tabelle stampate, e lo scarto
+ * ammesso è quello degli arrotondamenti di stampa: mezzo centesimo su quantità e prezzo,
+ * cioè (quantità + prezzo) × 0,005 (21.292,40 × 0,28 = 5.961,87 contro 5.949,42
+ * stampati: P.U. vero 0,2794; 4,57 × 15,90 = 72,66 contro 72,61: quantità vera 4,5667).
+ * Al più una colonna può reggersi su un candidato debole (nessuna lettura lo dà intero:
+ * solo varianti senza l'ultima cifra) o su un valore ricavato: due insieme facevano
+ * 4,57 × 1,59 = 7,26 dal "15,90 €" e dal "72,61 €" accorciati.
+ */
+const rilettureDellaVoce = (voce: VoceAncora, intervalli: number[][], letture: (LetturaCella[] | undefined)[]): ValoriVoce | null => {
+  const slot = intervalli.map(([x0, x1], k) => {
+    const voti = new Map<string, { n: string; voti: number; forte: boolean }>()
+    const vota = (n: string, peso: number) => {
+      const chiave = numIt(n).toFixed(4)
+      const v = voti.get(chiave)
+      if (v) { v.voti += peso; v.forte ||= peso >= 1 }
+      else voti.set(chiave, { n, voti: peso, forte: peso >= 1 })
+    }
+    // numero letto sulla pagina: nella colonna che contiene il suo bordo destro (i numeri
+    // sono allineati a destra), in una sola: con un margine finiva anche nella colonna dopo
+    for (const z of voce.numeri) if (z.x - 3 >= x0 && z.x - 3 < x1) vota(z.n, 1)
+    for (const l of letture[k] ?? []) for (const [n, peso] of candidatiLettura(l.text)) vota(n, peso)
+    const tutti = [...voti.values()].filter(v => numIt(v.n) > 0).sort((a, b) => b.voti - a.voti)
+    // valore letto intero da almeno due pulizie: le varianti accorciate della stessa cella
+    // non entrano (con "17,82 €" letto tre volte, "1,78" faceva tornare un importo monco)
+    const sicuro = tutti[0]?.forte && tutti[0].voti >= 2
+    return tutti.filter(v => !sicuro || v.forte).slice(0, 6)
+  })
+  const due = (s: string) => /^\d{1,3}(?:\.?\d{3})*,\d{2}$/.test(s)
+  const torna = (q: number, p: number, i: number) => isFinite(q * p * i) && i > 0 && Math.abs(q * p - i) <= (q + p) * 0.005 + 0.011
+  const tondo = (n: number) => Math.round(n * 100) / 100
+  const oppureNiente = (s: { n: string; voti: number; forte: boolean }[]) => (s.length ? s : [null])
+  let migliore: { numeri: string[]; punti: number } | null = null
+  for (const cq of oppureNiente(slot[0])) for (const cp of oppureNiente(slot[1])) for (const ci of oppureNiente(slot[2])) {
+    const mancanti = [cq, cp, ci].filter(c => !c).length
+    if (mancanti > 1) continue
+    // il valore mancante dei lavori si ricava dagli altri due
+    const q = cq ? numIt(cq.n) : tondo(numIt(ci!.n) / numIt(cp!.n))
+    const p = cp ? numIt(cp.n) : tondo(numIt(ci!.n) / q)
+    const i = ci ? numIt(ci.n) : tondo(q * p)
+    const [sq, sp, si] = [cq ? cq.n : itStr(q), cp ? cp.n : itStr(p), ci ? ci.n : itStr(i)]
+    if (!(q > 0) || !due(sq) || !due(sp) || !due(si) || !torna(q, p, i)) continue
+    const votiLavori = (cq?.voti ?? 0) + (cp?.voti ?? 0) + (ci?.voti ?? 0)
+    const deboliLavori = [cq, cp, ci].filter(c => !c?.forte).length
+    for (const cx of slot[3]) for (const cy of slot[4]) {
+      if (!due(cx.n) || !due(cy.n) || !torna(q, numIt(cx.n), numIt(cy.n))) continue
+      if (deboliLavori + [cx, cy].filter(c => !c.forte).length > 1) continue
+      const punti = votiLavori + cx.voti + cy.voti
+      if (!migliore || punti > migliore.punti) migliore = { numeri: [sq, sp, si, cx.n, cy.n], punti }
+    }
+  }
+  const colonne = intervalli.map(([, x1]) => x1 - 8)
+  if (migliore) return valoriDaColonne(migliore.numeri.map((n, k) => ({ n, x: colonne[k] })), colonne)
+  // Voce senza quantità né importo stampati ("Come sopra B.04.001 da quota 4,01 a 8,00"):
+  // celle di quantità e importo vuote, P.U. letto uguale da almeno due pulizie → solo il
+  // prezzo dei lavori (soloLavori), che la quota oneri della pagina completa (32,76 →
+  // 34,00). Il costo O.S. letto non si somma: senza un conto che lo confermi, "1,24 €"
+  // letto "1,20" tre volte dava 33,96.
+  const sicuro = (c?: { n: string; voti: number; forte: boolean }) => !!c && c.forte && c.voti >= 2 && due(c.n)
+  if (DBG_TABELLA) console.error(`[celle]   candidati ${voce.codice}: ${slot.map(c => c.map(x => `${x.n}${x.forte ? '' : '?'}×${x.voti}`).join(' ') || '—').join(' | ')}`)
+  if (!slot[0].length && !slot[2].length && sicuro(slot[1][0])) return { q: '', p: slot[1][0].n, i: '', soloLavori: true }
+  return null
+}
+
+const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null, xs?: number[], rilette?: CellaRiletta[]): string => {
+  const voci = vociDaAncore(blocchi, g)
+  if (!voci) return ''
+  const { colonne, valori } = valoriDelleVoci(voci)
+  // voci i cui conti non tornano: valori dalle celle rilette, se ce ne sono per loro
+  const intervalli = rilette?.length ? intervalliValori(blocchi, xs, colonne, voci) : null
+  if (intervalli) {
+    const perChiave = new Map(rilette!.map(c => [chiaveCella(c.r), c.letture]))
+    voci.forEach((voce, k) => {
+      if (!daRileggere(valori[k])) return
+      const letture = intervalli.map(iv => perChiave.get(chiaveCella(rettangoloCella(voce, iv))))
+      if (letture.every(l => !l)) return
+      const v = rilettureDellaVoce(voce, intervalli, letture)
+      if (DBG_TABELLA) console.error(`[celle] ${voce.codice} ${v ? `→ ${v.q} × ${v.p} = ${v.i}` : 'nessuna combinazione'} | ${letture.map(l => (l ?? []).map(x => x.text).join(' / ')).join(' | ')}`)
+      if (v) valori[k] = v
+    })
+  }
+  const voci2 = voci.map((x, k) => ({ ...x, v: valori[k] }))
   // Pagina di elenco prezzi solo se almeno due voci hanno valori che tornano: un elenco
   // di codici con la descrizione e basta (art. 5 del contratto, catalogo dei lavori) non
   // è una tabella di voci, e le sue righe vuote finivano in più nell'import.
