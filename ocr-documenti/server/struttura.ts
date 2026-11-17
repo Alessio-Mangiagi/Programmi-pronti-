@@ -18,7 +18,8 @@ export const normalizzaCodice = (raw: string): string => {
     .replace(/,/g, '.')                       // nei codici la virgola è sempre un punto letto male
     .replace(/@/g, 'Ø')                       // "@" = lettura OCR di "Ø" ("@.1000" → "Ø.1000")
     .replace(/\s{2,}/g, ' ')
-  c = c.replace(/^[\W\d]{0,2}(?:[$5S][iIl1]?|[iIl1])?C[zZ2aA]{0,2}4(?=[\s._-])/, 'SIC24')
+  // anche "S/C24" (la I letta come barra, AQ3)
+  c = c.replace(/^[\W\d]{0,2}(?:[$5S][iIl1/|]?|[iIl1])?C[zZ2aA]{0,2}4(?=[\s._-])/, 'SIC24')
   // "SIC2418.1.3.1": l'OCR incolla sigla e tariffa. Senza separatore lo stesso articolo
   // usciva con due codici diversi da una pagina all'altra ("SIC24_18.1.3.1" e
   // "SIC2418.1.3.1") e le anagrafiche si sdoppiavano.

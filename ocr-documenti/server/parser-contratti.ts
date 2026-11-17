@@ -1192,7 +1192,10 @@ export const RE_CODA_VALORI = new RegExp(
 // Codice in due pezzi separati da uno spazio, come i prezzari ANAS "BA.CZ.A.3 02.F"
 // (SICS): il secondo pezzo è "cifre.LETTERA". Con la lettera obbligatoria un numero dopo
 // il codice ("A.01.001 12.5") non entra nel codice.
-export const RE_COD_GRIGLIA = /^\s*(?:(\d{1,3})(?:[).]?\s+|\)))?((?!\d{1,3}(?:\s|$))(?=[A-Z0-9._]*[\d\-])[A-Z0-9][A-Z0-9._,\-\/]{1,22}(?:\s\d{2}\.[A-Z](?=\s|$))?)(?=\s+\S|\s*$)/
+// Prezzario regionale con lo spazio al posto del "_" dopo sigla e anno ("SIC24 26.01.04.002",
+// "11 SIC24 26.01.16", AQ3): il codice è tutto, non la sola sigla "SIC24" (che usciva come
+// codice, o la voce restava senza). normalizzaCodice (server/struttura.ts) rimette il "_".
+export const RE_COD_GRIGLIA = /^\s*(?:(\d{1,3})(?:[).]?\s+|\)))?((?:[A-Z]{2,6}\d{2}\s\d{1,3}(?:\.\d{1,3}){1,4}(?=\s|$))|(?!\d{1,3}(?:\s|$))(?=[A-Z0-9._]*[\d\-])[A-Z0-9][A-Z0-9._,\-\/]{1,22}(?:\s\d{2}\.[A-Z](?=\s|$))?)(?=\s+\S|\s*$)/
 
 export const numIt = (s?: string): number =>
   s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : NaN
@@ -2621,11 +2624,19 @@ const stessaVoce = (a: Record<string, string>, b: Record<string, string>): boole
 }
 // valori della pagina che completano la voce senza contraddirla: ogni valore già letto
 // dal documento intero (quantità, prezzo, importo) è uguale a quello della pagina
-const compatibili = (w: Record<string, string>, r: Record<string, string>): boolean =>
-  (['quantita', 'prezzo_lordo', 'importo'] as const).every(k => {
+// Con UN solo valore letto basta che quel numero stia nella riga della pagina, in una
+// colonna qualsiasi: un numero solo in una cella finisce spesso nella colonna sbagliata
+// (AQ3, «SIC24 26.01.04.002»: la quantità 2800,00 letta come prezzo dalle celle, la riga
+// del testo 2800,00 × 7,87 = 22.038,30).
+const compatibili = (w: Record<string, string>, r: Record<string, string>): boolean => {
+  const colonne = ['quantita', 'prezzo_lordo', 'importo'] as const
+  const letti = colonne.map(k => numIt(w[k])).filter(v => isFinite(v))
+  if (letti.length === 1) return colonne.some(k => numIt(r[k]) === letti[0])
+  return colonne.every(k => {
     const v = numIt(w[k])
     return !isFinite(v) || v === numIt(r[k])
   })
+}
 export const completaDallePagine = (righe: Record<string, string>[], pagine: string[]): Record<string, string>[] => {
   if (pagine.length < 2) return righe
   const coerente = (r: Record<string, string>) => contoTorna(numIt(r.quantita), numIt(r.prezzo_lordo), numIt(r.importo))
