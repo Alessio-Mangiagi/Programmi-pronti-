@@ -599,6 +599,13 @@ export const estraiRigheCelle = (testoIntero: string): Record<string, string>[] 
 // - prezzo fuori da metà-doppio di TUTTI i prezzi ricorrenti = numero di un'altra colonna
 //   (6,12 o 438,99 per un conglomerato da 16,50, allegato A Progetto Costruzioni): la
 //   voce resta col codice e i valori vuoti, da completare a mano.
+// Rapporto lavori / complessivo del documento: con gli oneri della sicurezza in quota
+// fissa il P.U. lavori sta al prezzo complessivo sempre nello stesso rapporto (allegato A:
+// 15,90/16,50, 28,91/30,00, 32,76/34,00 = 0,9635). Un rapporto che torna (±0,001) in
+// almeno due codici diversi è quello del documento: il prezzo che ci sta con un prezzo
+// ricorrente del suo codice è il solo P.U. lavori anche a parità di ricorrenze ("Come
+// sopra" B.04.001_np01: quattro 34,00 e quattro 32,76). Rapporti di un solo codice (0,29 e
+// 0,32 dell'acciaio, prezzi di parti d'opera diverse) non contano.
 export const prezziCoerentiPerCodice = (righe: Record<string, string>[]): void => {
   const tondo = (s: string) => Math.round(numIt(s) * 100) / 100
   const conteggi = new Map<string, Map<number, number>>()
@@ -608,15 +615,24 @@ export const prezziCoerentiPerCodice = (righe: Record<string, string>[]): void =
     m.set(tondo(r.prezzo_lordo), (m.get(tondo(r.prezzo_lordo)) ?? 0) + 1)
     conteggi.set(r.codice_epu, m)
   }
+  const inRapporto = (p: number, P: number) => p / P >= 0.85 && p / P < 0.995
+  const rapporti: { codice: string; r: number }[] = []
+  for (const [codice, m] of conteggi) {
+    for (const [P, nP] of m) if (nP >= 2) for (const p of m.keys()) if (inRapporto(p, P)) rapporti.push({ codice, r: p / P })
+  }
+  const rapportoDoc = rapporti.find(a =>
+    new Set(rapporti.filter(b => Math.abs(b.r - a.r) <= 0.001).map(b => b.codice)).size >= 2)?.r
   for (const r of righe) {
     const perPrezzo = conteggi.get(r.codice_epu) ?? new Map<number, number>()
     const ricorrenti = [...perPrezzo].filter(([, n]) => n >= 2).map(([p]) => p)
     if (!ricorrenti.length || !r.prezzo_lordo) continue
     const p = numIt(r.prezzo_lordo)
     // il P.U. dei soli lavori può ricorrere anch'esso (15,90 in due voci): cede al prezzo
-    // complessivo se questo ricorre di più
+    // complessivo se questo ricorre di più, o tanto quanto se sta nel rapporto del documento
     const nP = perPrezzo.get(tondo(r.prezzo_lordo)) ?? 0
-    const pieno = ricorrenti.find(P => p / P >= 0.85 && p / P < 0.995 && (perPrezzo.get(P) ?? 0) > nP)
+    const nelRapporto = (P: number) => rapportoDoc !== undefined && Math.abs(p / P - rapportoDoc) <= 0.001
+    const pieno = ricorrenti.find(P => inRapporto(p, P) &&
+      ((perPrezzo.get(P) ?? 0) > nP || ((perPrezzo.get(P) ?? 0) === nP && nelRapporto(P))))
     if (pieno === undefined && ricorrenti.some(P => Math.abs(p - P) <= P * 0.005)) continue
     if (pieno !== undefined) {
       r.prezzo_lordo = itStr(pieno)
