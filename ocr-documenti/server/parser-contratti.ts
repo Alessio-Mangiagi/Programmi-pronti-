@@ -451,7 +451,16 @@ export const quantitaSottintesa = (righe: Record<string, string>[]): Record<stri
   return righe
 }
 
-export const estraiRighe = (testoIntero: string): Record<string, string>[] => quantitaSottintesa(estraiRigheGrezze(testoIntero))
+// Righe dell'elenco dei mezzi lette come voci (Beton: "kg 15,944 2007 32000" = portata,
+// anno di immatricolazione, massa; 15,944 × 2007 ≈ 32.000 torna per caso). Un "prezzo"
+// che è un anno senza decimali con la quantità a tre decimali, o un numero con lo zero
+// davanti ("062", pezzo di targa), non è un prezzo: la riga non è una voce.
+const nonPrezzo = (r: Record<string, string>): boolean => {
+  const p = String(r.prezzo_lordo ?? '').trim(), q = String(r.quantita ?? '').trim()
+  return /^0\d+$/.test(p) || (/^(?:19[5-9]\d|20[0-4]\d)$/.test(p) && /,\d{3}$/.test(q))
+}
+export const estraiRighe = (testoIntero: string): Record<string, string>[] =>
+  quantitaSottintesa(estraiRigheGrezze(testoIntero)).filter(r => !nonPrezzo(r))
 const estraiRigheGrezze = (testoIntero: string): Record<string, string>[] => {
   // il testo può arrivare anche incollato (percorso `text`), senza la correzione
   // fatta sui blocchi OCR: rinormalizza qui, l'operazione è idempotente

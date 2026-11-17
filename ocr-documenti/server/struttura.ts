@@ -59,7 +59,13 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
           r.descrizione = r.descrizione.slice(0, mu.index).trim()
         }
       }
-      if (r.codice_epu && r.descrizione.startsWith(r.codice_epu + ' ')) {
+      // codice spezzato al punto, il resto in testa alla descrizione ("B.03" + "025.a
+      // CONGLOMERATO…", Beton): lettera e segmento di due cifre, poi tre cifre e suffisso
+      const coda = /^[A-Z]\.\d{2}$/.test(r.codice_epu ?? '') ? /^(\d{3}(?:\.[a-z0-9]{1,2})?)\s+(\S.{8,})$/.exec(r.descrizione) : null
+      if (coda) {
+        r.codice_epu = `${r.codice_epu}.${coda[1]}`
+        r.descrizione = coda[2].trim()
+      } else if (r.codice_epu && r.descrizione.startsWith(r.codice_epu + ' ')) {
         r.descrizione = r.descrizione.slice(r.codice_epu.length).replace(/^[\s—-]+/, '').trim()
       } else if (!r.codice_epu && /^[\W\d]{0,2}(?:[$5S][iIl1]?|[iIl1])?C[zZ2aA]{0,2}4[\s._,-]/.test(r.descrizione)) {
         // codice SIC in testa alla descrizione, anche storpiato e spezzato
