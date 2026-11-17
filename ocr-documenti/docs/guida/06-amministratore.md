@@ -36,7 +36,10 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
   a capo nella sua cella («B.04.001_n» sopra, «p01» sotto) si ricompone, e una lettera
   persa o storpiata sul bordo della cella prende la grafia degli altri codici uguali del
   documento (`B.04.001_np01`); un codice che resta incerto («B.04.001_C»: CS01 o CS02?)
-  esce com'è letto, da controllare.
+  esce com'è letto, da controllare. Valgono anche i codici a sigla («NP.01», «PA.OC.0077»)
+  quando la tabella ha i valori dei lavori e degli oneri; un codice con più righe di
+  valori sotto (pali per spalla e pila) dà una voce per riga, con la descrizione comune
+  seguita da quella della riga.
 
 Le pagine già lette prima di questi aiuti restano in `.ocr-cache/`: alla prima riapertura
 si cercano solo le linee della tabella, senza rifare l'OCR. Per rileggere ruotata una

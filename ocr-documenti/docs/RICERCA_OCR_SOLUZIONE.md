@@ -7,11 +7,11 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§13): documento intero con le pagine, testata,
-  riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe.** Sui 31
-  contratti testata dal 94% al 96%, voci con quantità e prezzo giusti dal 74% al 78%, voci
-  esatte dal 64% al 68%; nessun contratto peggiora. Progetto Costruzioni da 41 a 57 voci
-  giuste su 142. «Scan senza
+- **Aggiornamento del 17/11 (§11-§14): documento intero con le pagine, testata,
+  riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
+  sigla.** Sui 31 contratti testata dal 94% al 96%, voci con quantità e prezzo giusti dal
+  74% all'80%, voci esatte dal 64% al 71%; nessun contratto peggiora. Progetto Costruzioni
+  da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -577,6 +577,26 @@ contratto cambia.
 **Cosa resta**: «CS02» a inizio pag. 44 letto senza la radice; 8 voci «Come sopra» senza
 prezzo (cifre del P.U. troppo rovinate anche rilette); «B.03.031.e» letto per
 «B.03.031.c» (lettera finale: fra lettere non si corregge, i prezzari hanno .c e .e veri).
+
+## 14. Gecob: codici a sigla, voci con più righe di valori (17/11/2026)
+
+L'elenco prezzi di Gecob (WBS, codice, descrizione, valori dei lavori e degli oneri, quasi
+senza linee fra le voci) usciva con 3 voci giuste su 34. Non era l'OCR: i blocchi letti
+sono puliti. La lettura per codici non partiva perché i codici sono sigle («PA.OC.0077»,
+«NP.01») e non codici di tariffa; e il codice PA.OC.0077 ha sotto sei righe di valori
+(Spalla 1, Pila 1…), una voce ciascuna nel riferimento.
+
+Ora la lettura per codici accetta le sigle, ma solo nelle tabelle lavori + oneri (con le
+sigle nelle tabelle a tre colonne GFM e SICS perdevano voci); il confine fra due voci sta
+nello stacco fra le celle invece che a metà strada fra i codici; un codice senza valori
+sulla sua riga e con più righe di valori sotto dà una voce per riga. Sulla pag. 7 il
+testo piatto riletto da solo aggiungeva 8 righe senza codice che tornavano per caso: nel
+confronto con la pagina da sola le voci col codice contano doppio. Dettaglio in
+`PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.10.
+
+**Risultato** sui 31 contratti: voci esatte 644 → **675** (71%), quantità e prezzo giusti
+739 → **760** (80%), voci in più 50 → 42, testata invariata. Gecob 3 → **34 su 34**, totale
+delle voci uguale al contratto (842.241,99). Nessun altro contratto cambia.
 
 ## Fonti
 

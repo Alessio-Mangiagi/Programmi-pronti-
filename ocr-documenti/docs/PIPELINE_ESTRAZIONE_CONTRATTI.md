@@ -496,6 +496,45 @@ Risultato: voci «Come sopra» trovate 12 → 20 su 21 (manca «CS02» a inizio 
 senza la radice), tutte col codice giusto. Progetto Costruzioni 50 → 57 voci esatte,
 mancanti 25 → 9; nessun altro contratto cambia.
 
+### 4.10 Codici a sigla e voci con più righe di valori (17/11/2026)
+
+L'elenco prezzi del subappalto Gecob (art. 5, pag. 6-9) ha le colonne WBS | Articolo |
+Descrizione | UM | Quantità | P.U. lavori | Importo lavori | P.U. O.S. | Importo O.S., e
+quasi nessuna linea fra le voci. Il programma ne leggeva 3 su 34: la ricostruzione dalle
+coordinate mescolava WBS, codice e descrizione, e la lettura per codici (§4.8-4.9) non
+partiva, perché i codici non hanno la forma «B.03.031.c». Tre aggiunte a `vociDaAncore`
+(`server/tabella-griglia.ts`):
+
+- **codici a sigla** («PA.OC.0077», «NP.01», `RE_ANCORA_SIGLA`), insieme a «B.05.030».
+  Valgono solo se con i codici di tariffa la colonna non si trova, e solo nelle tabelle
+  lavori + oneri (cinque colonne di valori). Nelle tabelle a tre colonne le sigle
+  facevano perdere voci: GFM («PA.IE.001» accanto a «SIC24_24.04», che la sigla non
+  copre) 94 → 92, SICS («P.01» pompaggio sotto il calcestruzzo) 27 → 18;
+- **confine fra due voci** nello stacco più alto fra le righe di testo che stanno fra i
+  due codici, se è alto almeno 0,6 righe (lo spazio fra due celle). Prima stava a metà
+  strada fra i codici: con il codice a metà altezza della voce e voci di altezze molto
+  diverse (PA.OC.0077 con 25 righe di descrizione e 6 di valori, B.05.030 con 3) il
+  confine tagliava la voce lunga. Senza uno stacco così vale ancora la metà strada. La
+  prima voce comincia dallo stacco sotto l'intestazione della tabella, se è sulla pagina;
+- **sotto-righe**: un codice senza valori sulla sua riga e con almeno due righe di valori
+  sotto («SPALLA 1: N° 7 PALI / PROFONDITA' ML. 36,00», «PILA 1…») dà una voce per riga,
+  con lo stesso codice e la descrizione «comune - testo della riga», come nel
+  riferimento. Una sola riga di valori lontana dal codice non basta: può essere di una
+  voce col codice illeggibile.
+
+Il resto c'era già: prezzo e importo complessivi (P.U. lavori + P.U. O.S.), voci col solo
+prezzo («NP.12»: 6,22 + 0,24 = 6,46), voci a percentuale («-10% del prezzo unitario»)
+con codice e unità di misura e i valori vuoti.
+
+**Pagina da sola** (`completaDallePagine`, §4.6): sulla pag. 7 il testo piatto dava 11
+righe senza codice che tornavano per caso («1,00 × 180,00 = 180,00»: quantità 1 e P.U.
+oneri = importo oneri), contro le 8 della lettura per codici, e le aggiungeva. Ora nel
+confronto le voci che tornano e hanno il codice contano doppio: la pagina da sola vince
+solo se trova più voci senza perdere i codici.
+
+Risultato: Gecob 3 → **34 voci esatte su 34**, nessuna in più, totale delle voci
+842.241,99 come il contratto. Nessun altro contratto cambia, descrizioni comprese.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
