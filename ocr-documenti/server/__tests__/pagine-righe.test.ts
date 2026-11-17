@@ -76,6 +76,22 @@ describe('voci recuperate dalle pagine', () => {
     expect(out[0]).toMatchObject({ codice_epu: 'B.03.025.a', quantita: '3,60' })
     expect(out).toHaveLength(3)
   })
+  it('pagina che da sola trova più voci che tornano ma senza codici: restano le voci col codice', () => {
+    // Gecob pag. 7: nel testo piatto WBS, valori dei lavori e oneri finiscono su righe
+    // diverse e tornano per caso (quantità 1, P.U. oneri = importo oneri)
+    const pagina = [
+      'ELENCO PREZZI UNITARI',
+      'VIADOTTO TRASPORTO GRUPPO DI PERFORAZIONE 1,00 11.820,00 €',
+      'LEONARDO corpo 11.820,00 € 180,00 € 180,00 €',
+      'VIADOTTO SPOSTAMENTI GRUPPO CON CARRELLONE 1,00 6.744,50 €',
+      'LEONARDO corpo 6.744,50 € 255,50 € 255,50 €',
+    ].join('\n')
+    const conCodici = [
+      voce('NP.04', 'TRASPORTO GRUPPO DI PERFORAZIONE', 'corpo', '1,00', '12000,00', '12000,00'),
+      voce('NP.05', 'SPOSTAMENTI GRUPPO CON CARRELLONE', 'corpo', '1,00', '7000,00', '7000,00'),
+    ]
+    expect(completaDallePagine(conCodici, [PROSA, pagina])).toBe(conCodici)
+  })
   it('voci del documento intero già giuste o pagina con una sola voce che torna → nulla cambia', () => {
     const giuste = TABELLA.split('\n').slice(1).map(l => {
       const m = /^(\S+) (.+) mc (\S+) (\S+) (\S+)$/.exec(l)!

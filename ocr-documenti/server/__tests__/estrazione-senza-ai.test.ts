@@ -291,6 +291,42 @@ describe('tabella dalle celle', () => {
       ['B.04.001_ap01', 'Come sopra da quota 4,01'],
     ])
   })
+  it('codici a sigla, tabella lavori + oneri: voce con più righe di valori sotto il codice (Gecob)', () => {
+    // WBS | Articolo | Descrizione | UM | Quantità | P.U. lavori | Importo lavori | P.U. O.S. | Importo O.S.
+    const X = [60, 200, 500, 640, 760, 880, 980, 1100]
+    const voce = (y: number, celle: string[]) => celle.map((t, c) => b(t, X[c], y)).filter(x => x.text)
+    const blocchi = [
+      ...voce(20, ['Articolo', 'DESCRIZIONE', 'Unità', 'Quantità', 'P.U. LAVORI', 'IMPORTO', 'P.U. O.S.', 'IMPORTO']),
+      // codice a metà della voce: la descrizione comune comincia sopra (fin sotto
+      // l'intestazione) e le righe dei valori stanno sotto, ognuna con il suo testo
+      b('PALI DI FONDAZIONE', 200, 70), b('DIAMETRO MM 1200', 200, 100), b('PA.OC.0077', 60, 115),
+      b('C32/40 - XA2', 200, 130), b('con metodo contractor', 200, 160),
+      b('SPALLA 1: N° 7 PALI', 200, 190), ...voce(202, ['', '', 'ml', '252,00', '206,67 €', '52.080,84 €', '7,83 €', '1.973,16 €']),
+      b('PROFONDITA\' ML. 36,00', 200, 215),
+      b('PILA 1: N° 8 PALI', 200, 250), ...voce(262, ['', '', 'ml', '288,00', '187,88 €', '54.109,44 €', '7,12 €', '2.050,56 €']),
+      b('PROFONDITA\' ML. 17,70', 200, 275),
+      ...voce(340, ['B.05.030', 'Scarico e posa di gabbie', 'kg', '162.110,70', '0,09 €', '14.589,96 €', '0,01 €', '1.621,11 €']),
+      ...voce(400, ['NP.01', 'Posa in opera tubi cross hole', '', '1.000,00', '3,37 €', '3.370,00 €', '0,13 €', '130,00 €']),
+      ...voce(460, ['NP.02', 'Attraversamento a vuoto', 'ml', '', '-10% del prezzo']),
+    ]
+    const righe = tabellaDaGriglia(blocchi, null).split('\n').map(l => l.split('|').map(x => x.trim()))
+    const comune = 'PALI DI FONDAZIONE DIAMETRO MM 1200 C32/40 - XA2 con metodo contractor'
+    expect(righe.map(c => c.slice(1, 6))).toEqual([
+      ['PA.OC.0077', `${comune} - SPALLA 1: N° 7 PALI PROFONDITA' ML. 36,00`, 'ml', '252,00', '214,50'],
+      ['PA.OC.0077', `${comune} - PILA 1: N° 8 PALI PROFONDITA' ML. 17,70`, 'ml', '288,00', '195,00'],
+      ['B.05.030', 'Scarico e posa di gabbie', 'kg', '162.110,70', '0,10'],
+      ['NP.01', 'Posa in opera tubi cross hole', '', '1.000,00', '3,50'],
+      ['NP.02', 'Attraversamento a vuoto', 'ml', '', ''],
+    ])
+    // sigle in una tabella a tre colonne (quantità, prezzo, importo): la lettura per codici
+    // non parte, resta la ricostruzione di sempre
+    const tre = [
+      ...voce(100, ['PA.IE.001', 'Quadro generale', 'cad', '2', '1.069,91 €', '2.139,82 €']),
+      ...voce(200, ['PA.IE.002', 'Quadro sottocontatore', 'cad', '24', '32,53 €', '780,72 €']),
+      ...voce(300, ['PA.IE.003', 'Quadro appartamento', 'cad', '24', '212,80 €', '5.107,20 €']),
+    ]
+    expect(tabellaDaGriglia(tre, null)).toBe('')
+  })
   it('suffisso spezzato: la grafia completa del documento, la seconda riga non cambia', () => {
     const codici = ['B.04.001_np01', 'B.04.001_np01', 'B.04.001_0p01', 'B.04.001_ap01', 'B.04.001_p01', 'B.04.001_n',
       'B.04.001_CS01', 'B.04.001_cS01', 'B.04.001_CS01', 'B.04.001_CS02', 'B.04.001_S02', 'B.04.001_C']
