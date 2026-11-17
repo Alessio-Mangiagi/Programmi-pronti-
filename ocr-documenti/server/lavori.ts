@@ -152,6 +152,9 @@ export const ascolta = (id: string, f: (l: Lavoro) => void): (() => void) => {
 }
 
 export const streamFile = (id: string) => existsSync(fileDi(id)) ? createReadStream(fileDi(id)) : null
+// Percorso del PDF caricato per il lavoro, null se non c'è più (server/riferimenti.ts lo
+// copia nel banco di prova accanto al riferimento corretto a mano).
+export const fileLavoro = (id: string): string | null => existsSync(fileDi(id)) ? fileDi(id) : null
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
 

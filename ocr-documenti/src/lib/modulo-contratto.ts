@@ -588,6 +588,7 @@ export interface EsitoConversione {
 export interface OpzioniConversione {
   origine?: string            // nome del documento di partenza, scritto in testa al modulo
   generato?: string           // data della conversione (la passa il chiamante: funzione pura)
+  nota?: string               // riga di commento in più nell'intestazione (es. chi ha corretto i valori)
 }
 
 // Chiavi del risultato che il modulo non riporta perché le ricava il programma:
@@ -700,6 +701,7 @@ export const moduloDaRisultato = (risultato: unknown, opz: OpzioniConversione = 
 
   out.push(
     `# Modulo compilato dal programma${opz.origine ? ` leggendo "${unaRiga(opz.origine)}"` : ''}${opz.generato ? ` il ${unaRiga(opz.generato)}` : ''}.`,
+    ...(opz.nota ? [`# ${unaRiga(opz.nota)}`] : []),
     '# Controlla i valori col documento originale e correggi qui: il programma rilegge il',
     '# modulo alla lettera. Le righe "# DA VERIFICARE" segnano ciò che non è stato possibile',
     '# riportare così come letto (valore fuori formato, conti che non tornano).',

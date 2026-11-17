@@ -16,6 +16,7 @@ import { TIPOLOGIE_VALIDE, estraiAssistito } from './server/assist.ts'
 import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
 import { timbraPagineRighe } from './server/pagine-righe.ts'
+import { montaRotteRiferimenti } from './server/riferimenti.ts'
 import { descriviErrori, eModulo } from './src/lib/modulo-contratto.ts'
 import { risultatoDaModulo } from './server/modulo.ts'
 import { chiDa } from './server/accessoLavori.ts'
@@ -283,7 +284,16 @@ app.post('/api/ocr', async (req, res) => {
 // (src/lib/scansione-cartella.ts: chiave in IndexedDB). L'identità la mette il gate SSO
 // del Portale; senza gate (sviluppo, COSEDIL_SSO=off) `utente` è null e il browser usa
 // le impostazioni «locale».
-app.get('/api/utente', (req, res) => res.json({ utente: chiDa(req).utente ?? null }))
+// `admin`: admin dell'app nel Portale (o nessun gate: una persona sola sul suo PC). Il
+// frontend lo usa solo per mostrare «Salva come riferimento»; il controllo vero è sulla
+// rotta (server/riferimenti.ts).
+app.get('/api/utente', (req, res) => {
+  const chi = chiDa(req)
+  res.json({ utente: chi.utente ?? null, admin: !chi.identificato || chi.admin })
+})
+
+// Correzioni fatte in Modifica → riferimento del banco di prova (solo admin)
+montaRotteRiferimenti(app)
 
 // Elenchi ufficiali per il frontend: colonne DITTA (codice numerico), PROGETTO
 // (validazione commessa), FAM/SFAM (validazione codici) del template Import_Contratti.

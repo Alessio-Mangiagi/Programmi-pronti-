@@ -129,6 +129,8 @@ export default function App() {
   const [error, setError] = useState('')
   // esito positivo di un'azione (es. modulo contratto salvato): banner verde, si chiude a mano
   const [notizia, setNotizia] = useState('')
+  // admin dell'app nel Portale (/api/utente): vede «Salva come riferimento» in Modifica
+  const [adminApp, setAdminApp] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   // istante d'inizio della scansione in corso, per stimare il tempo che manca
   const [inizioScan, setInizioScan] = useState(0)
@@ -747,6 +749,27 @@ export default function App() {
   }
   const cancelEdit = () => { setEditMode(false); setEditData(null); setStoriaEdit([]) }
 
+  // «Salva come riferimento» (solo admin): le correzioni di Modifica diventano il valore
+  // giusto del banco di prova (server/riferimenti.ts scrive il modulo contratto in
+  // contratti/moduli-da-md e, se manca, copia il PDF del lavoro nel banco). Salva anche
+  // le modifiche, come «✓ SALVA»: il riferimento e il risultato a video coincidono.
+  const salvaComeRiferimento = async () => {
+    if (!editData || !file) return
+    if (!window.confirm(`Salvare queste correzioni come riferimento del banco di prova per «${file.name}»?\nIl riferimento precedente, se c'è, resta nello storico.`)) return
+    try {
+      const r = await fetch('/api/riferimenti', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documento: file.name, json: JSON.stringify(editData), lavoroId: queue[activeIdx]?.lavoroId }),
+      })
+      if (!r.ok) throw new Error(await messaggioErrore(r))
+      const e = (await r.json()) as { file: string; sostituito: boolean; pdfCopiato: boolean; avvisi: number }
+      saveEdit()
+      setNotizia(`Riferimento ${e.sostituito ? 'aggiornato' : 'salvato'}: ${e.file}${e.pdfCopiato ? ' — PDF copiato nel banco di prova' : ''}${e.avvisi ? ` — ${e.avvisi} valori segnati "DA VERIFICARE" nel modulo` : ''}.`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'riferimento non salvato')
+    }
+  }
+
   // Ogni modifica impila lo stato PRECEDENTE: Ctrl+Z lo ripristina. Profondità 50 —
   // basta a rimediare a una serie di correzioni sbagliate senza tenere in memoria
   // cinquanta copie di un JSON grande.
@@ -1323,20 +1346,24 @@ export default function App() {
     setError('')
     setResult('')
     try {
+      // PDF nei formati contratto: l'elenco prezzi si estrae sul documento INTERO, con il
+      // lavoro sul server come «Scansiona → Excel». Pagina per pagina (runScan) le regole
+      // che guardano tutto il documento — stesso articolo stesso prezzo, grafie dei codici,
+      // posizioni ricostruite, titolo delle voci sotto — valevano solo dentro la pagina.
+      if (health?.lavori && fileKind === 'pdf' && (format === 'contratti' || format === 'contract')) {
+        await elaboraSulServer(activeIdx, null, scriviVoce(activeIdx), true)
+        return
+      }
       const text = await runScan()
       // in .MD il testo mostrato è quello unito con la bozza Word, se c'è
       if (format === 'md' && fileKind === 'pdf') {
         const { testo, confronto } = await confrontaConBozza(file, text)
-        const i = activeIdx
-        setQueue(q => {
-          if (!q[i]) return q
-          const copy = q.slice()
-          copy[i] = { ...copy[i], result: testo, formato: 'md', confronto }
-          return copy
-        })
+        scriviVoce(activeIdx)({ result: testo, formato: 'md', confronto })
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      // «Annulla» (anche del lavoro sul server) non è un errore da mostrare
+      if (!(err instanceof Error && err.name === 'AbortError'))
+        setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
       setProgress({ current: 0, total: 0 })
@@ -1590,7 +1617,17 @@ export default function App() {
     setQueue(q => q.map(v => chiaveFile(v.file) === chiave ? { ...v, faseServer: undefined, lavoroId: undefined } : v))
   }
 
-  const elaboraSulServer = async (i: number, dir: DirHandle | null, scrivi: (v: Partial<VoceCoda>) => void): Promise<string> => {
+  // Aggiorna la voce i della coda (risultato, testo, fase del lavoro…) senza toccare le altre.
+  const scriviVoce = (i: number) => (voce: Partial<VoceCoda>) => setQueue(q => {
+    if (!q[i]) return q
+    const copy = q.slice()
+    copy[i] = { ...copy[i], ...voce }
+    return copy
+  })
+
+  // `senzaExcel`: «Scan senza Excel» — stessa estrazione sul documento intero, risultato
+  // solo a video (l'Excel si scrive poi con «↓ Excel»).
+  const elaboraSulServer = async (i: number, dir: DirHandle | null, scrivi: (v: Partial<VoceCoda>) => void, senzaExcel = false): Promise<string> => {
     const f = queue[i].file
     abortRef.current = new AbortController()
     const signal = abortRef.current.signal
@@ -1620,7 +1657,7 @@ export default function App() {
     } finally {
       setFaseLavoro('')
     }
-    return applicaLavoro(f, lavoro, dir, scrivi, allegati)
+    return applicaLavoro(f, lavoro, dir, scrivi, allegati, senzaExcel)
   }
 
   // ── Sessione: IndexedDB ricorda coda e risultati fra un'apertura e l'altra ──
@@ -1679,12 +1716,7 @@ export default function App() {
     setActiveIdx(i)
     loadPreview(f, i)                       // il pannello segue il file in lavorazione
     setSchedaOriginale(false)               // avanzamento, poi risultato
-    const scrivi = (voce: Partial<VoceCoda>) => setQueue(q => {
-      if (!q[i]) return q
-      const copy = q.slice()
-      copy[i] = { ...copy[i], ...voce }
-      return copy
-    })
+    const scrivi = scriviVoce(i)
     // PDF nei formati contratto/testo: sul server, se il server lo sa fare
     if (health?.lavori && detectKind(f) === 'pdf' && (format === 'contratti' || format === 'contract' || format === 'md')) {
       return elaboraSulServer(i, dir, scrivi)
@@ -1818,7 +1850,11 @@ export default function App() {
       let utente = 'locale'
       try {
         const r = await fetch('/api/utente')
-        if (r.ok) utente = ((await r.json()) as { utente?: string | null }).utente || 'locale'
+        if (r.ok) {
+          const u = (await r.json()) as { utente?: string | null; admin?: boolean }
+          utente = u.utente || 'locale'
+          if (vivo) setAdminApp(!!u.admin)
+        }
       } catch { /* server senza la rotta: impostazioni di questo browser */ }
       const imp = await leggiImpostazioni(utente)
       if (!vivo) return
@@ -3117,6 +3153,16 @@ export default function App() {
                   <button onClick={cancelEdit} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${C.red}50`, background: 'transparent', color: C.red, cursor: 'pointer', fontSize: 10, letterSpacing: '0.06em', fontFamily: 'inherit', fontWeight: 700 }}>
                     ✕ CHIUDI SENZA SALVARE
                   </button>
+                  {/* solo admin: le correzioni diventano il valore giusto del banco di prova */}
+                  {adminApp && format === 'contratti' && (
+                    <button
+                      onClick={() => void salvaComeRiferimento()}
+                      title="Salva le correzioni e le usa come riferimento del banco di prova (contratti/moduli-da-md): le prossime misure dell'estrazione si confrontano con questi valori"
+                      style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${C.accent}60`, background: 'transparent', color: C.accent, cursor: 'pointer', fontSize: 10, letterSpacing: '0.06em', fontFamily: 'inherit', fontWeight: 700 }}
+                    >
+                      ★ SALVA COME RIFERIMENTO
+                    </button>
+                  )}
                 </span>
               )}
             </div>
