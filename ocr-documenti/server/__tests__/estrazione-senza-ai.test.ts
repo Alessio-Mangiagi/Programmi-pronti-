@@ -16,7 +16,7 @@ import {
 import { strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchCondPagamento, matchDivisione } from '../alyante.ts'
 import { tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
-import { TITOLO_CELLE, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
+import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
 
 describe('testata', () => {
@@ -213,6 +213,38 @@ describe('tabella dalle celle', () => {
     expect(estraiRigheCelle(`${TITOLO_CELLE}\n${righe.map(c => c.join(' | ')).join('\n')}\n`).map(r => r.codice_epu))
       .toEqual(['B.03.031.c', 'B.05.030', 'B.05.030', 'B.04.001'])
     expect(valoriLavoriOneri(['28916', '0,4831', '13.968,90'])).toBeNull()   // 28916 × 0,4831: terna per coincidenza
+  })
+  it('celle rilette: la voce illeggibile prende la combinazione con cui tornano lavori e oneri', () => {
+    // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
+    const verticali = { xs: [0, 60, 200, 500, 560, 680, 780, 900, 980, 1100], ys: [0, 40, 600] }
+    const riga = (y: number, celle: string[]) => celle.map((t, c) => b(t, verticali.xs[c] + 5, y)).filter(x => x.text)
+    const blocchi = [
+      ...riga(10, ['Nr', 'Tariffa', 'Voci di misurazione', 'UM', 'Quantità']),
+      ...riga(110, ['5104', 'B.03.031.c', 'CLASSE C32/40', 'm³', '735,23', '15,90€', '11.688,46€', '0,60€', '441,14€']),
+      ...riga(230, ['5105', 'B.05.030', 'B450C', 'kg', '33.487,05', '0,28 €', '9.376,37€', '0,01€', '334,87€']),
+      ...riga(350, ['5132', 'B.04.001', 'CASSEFORME', 'm²', '3963.', '', '1:18042']),        // retino: illeggibile
+      ...riga(470, ['5133', 'B.04.002', 'Come sopra da quota 4,01', 'm²']),                   // solo prezzo, non letto
+    ]
+    // solo le voci i cui conti non tornano, una cella per colonna dei valori
+    const celle = celleDaRileggere(blocchi, verticali)
+    expect(celle).toHaveLength(10)
+    expect(tabellaDaGriglia(blocchi, verticali).split('\n')[2].split('|').map(x => x.trim()).slice(1, 7))
+      .toEqual(['B.04.001', 'CASSEFORME', 'm²', '', '', ''])
+    // le tre pulizie del worker leggono la stessa cella in modi diversi (virgola persa, € letto);
+    // con le varianti accorciate tornerebbe anche 39,63 × 28,91 = 1.145,90 con 43,60: pesano meno
+    const letture = [['39637', '396,37', '3963'], ['28,91€', '2891'], ['11459,06', '1145906'], ['1,10'], ['436,01 €', '43601'],
+      [], ['32,76', '32,76€', '76'], [], ['1,20', '1,20'], []]
+    const rilette = celle.map((r, k) => ({ r, letture: letture[k].map(text => ({ text, conf: 80 })) }))
+    const righe = tabellaDaGriglia(blocchi, verticali, rilette).split('\n').map(l => l.split('|').map(x => x.trim()))
+    expect([righe[2][1], righe[2][4], righe[2][5], righe[2][6]]).toEqual(['B.04.001', '396,37', '30,01', '11895,07'])   // lavori + oneri
+    // senza quantità né importo: il P.U. letto uguale due volte, completato dalla quota oneri
+    // della pagina (3,6%), non dal costo O.S. letto che nessun conto conferma (1,20 per 1,24)
+    expect([righe[3][1], righe[3][4], righe[3][5]]).toEqual(['B.04.002', '', '34,00'])
+    // letture con cui i conti non tornano: la voce resta vuota, niente numeri inventati
+    const storte = celle.map(r => ({ r, letture: [{ text: '12', conf: 50 }] }))
+    expect(tabellaDaGriglia(blocchi, verticali, storte).split('\n')[2].split('|')[4].trim()).toBe('')
+    // senza griglia i bordi delle celle non si conoscono: nessuna rilettura
+    expect(celleDaRileggere(blocchi, null)).toEqual([])
   })
   it('senza griglia: colonna dei codici dall\'allineamento, valori assegnati alle colonne per posizione', () => {
     // pagina girata senza linee: Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
