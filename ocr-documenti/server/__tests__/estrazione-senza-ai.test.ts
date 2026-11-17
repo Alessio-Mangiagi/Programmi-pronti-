@@ -267,6 +267,57 @@ describe('tabella dalle celle', () => {
     // un elenco di soli codici e descrizioni (art. 5 del contratto) non è una tabella di voci
     expect(tabellaDaGriglia([...voce(100, ['B.03.031.c', 'CALCESTRUZZI']), ...voce(200, ['B.04.001', 'CASSEFORME']), ...voce(300, ['B.05.030', 'ACCIAIO'])], null)).toBe('')
   })
+  it('codice spezzato su due righe: separatore in fondo, codice e descrizione in un blocco, seconda riga storpiata', () => {
+    const X = [60, 200, 500, 640, 760, 880, 980, 1100]
+    const voce = (y: number, celle: string[]) => celle.map((t, c) => b(t, X[c], y)).filter(x => x.text)
+    const blocchi = [
+      ...voce(100, ['B.03.031.c', 'CALCESTRUZZI C32/40', 'm³', '735,23', '15,90 €', '11.688,46 €', '0,60 €', '442,79 €']),
+      ...voce(200, ['B.03.035.c', 'ELEVAZIONE', 'm³', '366,97', '17,82 €', '6.541,10 €', '0,68 €', '247,79 €']),
+      ...voce(300, ['B.04.001_', 'Come sopra da quota 4,01', 'm²', '', '32,76 €', '', '1,24 €', '']),
+      b('p01', 60, 325),
+      // cella del codice e inizio della descrizione letti come un blocco solo
+      b('B.04.001_C Come sopra per fondazione', 60, 400, 360), ...voce(400, ['', '', 'm²']),
+      b('SOZ', 60, 425),
+      // bordo della cella letto come "|"; descrizione che comincia dentro il codice più largo
+      ...voce(500, ['B.04.001_a|', '', 'm²', '', '32,76 €', '', '1,24 €', '']), b('Come sopra da quota 4,01', 150, 500),
+      b('pD1', 60, 525),
+    ]
+    const righe = tabellaDaGriglia(blocchi, null).split('\n').map(l => l.split('|').map(x => x.trim()))
+    expect(righe.map(c => [c[1], c[2]])).toEqual([
+      ['B.03.031.c', 'CALCESTRUZZI C32/40'],
+      ['B.03.035.c', 'ELEVAZIONE'],
+      ['B.04.001_p01', 'Come sopra da quota 4,01'],
+      ['B.04.001_CS02', 'Come sopra per fondazione'],
+      ['B.04.001_ap01', 'Come sopra da quota 4,01'],
+    ])
+  })
+  it('suffisso spezzato: la grafia completa del documento, la seconda riga non cambia', () => {
+    const codici = ['B.04.001_np01', 'B.04.001_np01', 'B.04.001_0p01', 'B.04.001_ap01', 'B.04.001_p01', 'B.04.001_n',
+      'B.04.001_CS01', 'B.04.001_cS01', 'B.04.001_CS01', 'B.04.001_CS02', 'B.04.001_S02', 'B.04.001_C']
+      .map(codice_epu => ({ codice_epu })) as Record<string, string>[]
+    uniformaCodiciOcr(codici)
+    expect(codici.map(x => x.codice_epu)).toEqual([
+      'B.04.001_np01', 'B.04.001_np01', 'B.04.001_np01', 'B.04.001_np01', 'B.04.001_np01', 'B.04.001_np01',
+      'B.04.001_CS01', 'B.04.001_CS01', 'B.04.001_CS01', 'B.04.001_CS02', 'B.04.001_CS02',
+      'B.04.001_C',                       // CS01 o CS02: resta com'è
+    ])
+  })
+  it('P.U. dei soli lavori a parità di ricorrenze: decide il rapporto lavori/complessivo del documento', () => {
+    const voci = (coppie: [string, string][]) => coppie.map(([codice_epu, prezzo_lordo]) => ({ codice_epu, prezzo_lordo, quantita: '', importo: '' }))
+    const r = voci([
+      ['B.04.001', '30,00'], ['B.04.001', '30,00'], ['B.04.001', '28,91'],
+      ['B.03.025.a', '16,50'], ['B.03.025.a', '16,50'], ['B.03.025.a', '15,90'],
+      ['B.04.001_np01', '34,00'], ['B.04.001_np01', '32,76'], ['B.04.001_np01', '34,00'], ['B.04.001_np01', '32,76'],
+      ['B.05.030', '0,32'], ['B.05.030', '0,29'], ['B.05.030', '0,32'], ['B.05.030', '0,29'],
+    ])
+    prezziCoerentiPerCodice(r)
+    expect(r.map(x => x.prezzo_lordo)).toEqual(['30,00', '30,00', '30,00', '16,50', '16,50', '16,50',
+      '34,00', '34,00', '34,00', '34,00', '0,32', '0,29', '0,32', '0,29'])   // 0,29/0,32: un solo codice, prezzi veri
+    // il pareggio da solo, senza il rapporto confermato da altri codici, non decide
+    const soli = voci([['B.04.001_np01', '34,00'], ['B.04.001_np01', '32,76'], ['B.04.001_np01', '34,00'], ['B.04.001_np01', '32,76']])
+    prezziCoerentiPerCodice(soli)
+    expect(soli.map(x => x.prezzo_lordo)).toEqual(['34,00', '32,76', '34,00', '32,76'])
+  })
   it('stesso articolo, stesso prezzo: P.U. dei soli lavori completato, prezzo di un\'altra colonna svuotato', () => {
     const r = [['16,50', ''], ['16,50', ''], ['16,50', ''], ['15,90', ''], ['15,90', '10,00'], ['6,12', '22,08'], ['17,10', '']]
       .map(([prezzo_lordo, quantita]) => ({ codice_epu: 'B.03.025.a', prezzo_lordo, quantita, importo: '' }))
