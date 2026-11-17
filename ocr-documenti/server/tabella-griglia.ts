@@ -159,8 +159,12 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
     }
     for (let c = 0; c < nc; c++) {
       if (c === iCod || !testi[c]) continue
-      const t = testi[c]
-      if (RE_PCT.test(t)) continue                         // incidenza % (colonna degli oneri)
+      // incidenza % (colonna degli oneri): si toglie la percentuale e resta l'eventuale
+      // numero della stessa cella. Senza la linea fra "% O.S." e "P.U. O.S." la cella è
+      // "3,448% 0,05 €" (Jonico) e scartandola tutta il P.U. oneri si perdeva (1,40
+      // invece di 1,45)
+      const t = RE_PCT.test(testi[c]) ? testi[c].replace(/\S*\d\s*%/g, '').trim() : testi[c]
+      if (!t) continue
       const n = numeroCella(t)
       if (n !== null) { if (!colonneValori || colonneValori.has(c)) nums.push(n); continue }
       if (!um && RE_UM.test(t.replace(/[^A-Za-z0-9²³°.]/g, ''))) { um = t.replace(/[^A-Za-z0-9²³°]/g, '').toLowerCase(); continue }
