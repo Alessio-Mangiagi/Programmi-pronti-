@@ -475,7 +475,7 @@ export const buildImportContrattiRowsFromAlyante = (source: string): CellaImport
       riga.codice_epu ?? '',
       descr,                                                      // DES ARTICOLO
       umCell(riga.udm),                                           // UM (minuscolo, senza caratteri speciali)
-      numOr(riga.quantita),                                       // QTA (numero)
+      numOr(String(quantitaRiga(riga))),                          // QTA (numero; "2.100" = 2100 se il conto lo dice)
       numOr(riga.prezzo_lordo ?? riga.prezzo_netto),              // PREZZO (numero)
       0,                                                          // NODO
       famG,                                                       // FAM (da lista FAM_BY_DESCRIZIONE)
@@ -496,6 +496,20 @@ export const numIt = (s?: string): number => {
   const norm = hasC && hasD ? x.replace(/\./g, '').replace(',', '.') : hasC ? x.replace(',', '.') : x
   return parseFloat(norm)
 }
+// Quantità col solo punto ("2.100", "151.000"): numIt legge il punto come decimale, e
+// nelle colonne lette dall'OCR "151.000" è davvero 151 (vedi sistemaValori nel parser);
+// nei moduli e nei numeri italiani "2.100" è invece duemilacento (cavo dati di PF Future:
+// 2.100 m × 1,03424 = 2.171,90), e in Alyante arrivava 2,1. Decide il conto della riga:
+// se quantità × prezzo = importo torna solo col punto delle migliaia, vale quella lettura.
+export const quantitaRiga = (r: Record<string, string>): number => {
+  const s = String(r.quantita ?? '').trim()
+  const q = numIt(s)
+  if (!/^\d{1,3}(?:\.\d{3})+$/.test(s)) return q
+  const p = numIt(r.prezzo_lordo || r.prezzo_netto), imp = numIt(r.importo)
+  const torna = (x: number) => !isNaN(p) && !isNaN(imp) && imp !== 0 && Math.abs(x * p - imp) / Math.abs(imp) <= 0.01
+  const migliaia = Number(s.replace(/\./g, ''))
+  return torna(migliaia) && !torna(q) ? migliaia : q
+}
 // ── Diagnostica di una singola riga ──────────────────────────────────────────
 // Una sola funzione per due usi: gli avvisi pre-import e l'evidenziazione nella
 // tabella di modifica. Prima i controlli stavano solo dentro l'elenco testuale e
@@ -504,7 +518,7 @@ export const numIt = (s?: string): number => {
 export type ProblemaRiga = { campo: string; testo: string; grave: boolean }
 export const problemiRiga = (r: Record<string, string>): ProblemaRiga[] => {
   const out: ProblemaRiga[] = []
-  const q = numIt(r.quantita), p = numIt(r.prezzo_netto ?? r.prezzo_lordo), imp = numIt(r.importo)
+  const q = quantitaRiga(r), p = numIt(r.prezzo_netto ?? r.prezzo_lordo), imp = numIt(r.importo)
   if (!r.codice_epu && !r.descrizione) out.push({ campo: 'descrizione', testo: 'priva di codice e descrizione', grave: true })
   if (isNaN(q) || q === 0) out.push({ campo: 'quantita', testo: 'quantità mancante o zero', grave: true })
   if (isNaN(p) || p === 0) out.push({ campo: 'prezzo_lordo', testo: 'prezzo mancante o zero', grave: true })
@@ -538,7 +552,7 @@ export const validateAlyanteImport = (a: Record<string, unknown> | null): Avviso
       if (!p.grave) continue        // i minori (ARTICOLO/UM) si vedono in tabella, non in elenco
       w.push({ testo: `riga ${prog}: ${p.testo}`, riga: i, campo: p.campo, grave: true })
     }
-    const q = numIt(r.quantita), p2 = numIt(r.prezzo_netto ?? r.prezzo_lordo), imp = numIt(r.importo)
+    const q = quantitaRiga(r), p2 = numIt(r.prezzo_netto ?? r.prezzo_lordo), imp = numIt(r.importo)
     somma += !isNaN(imp) ? imp : (!isNaN(q) && !isNaN(p2) ? q * p2 : 0)
   })
   const tot = numIt(im.importo_lavori ?? im.importo_netto)
