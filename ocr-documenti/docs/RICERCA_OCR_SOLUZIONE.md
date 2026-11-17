@@ -7,7 +7,7 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§21): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§22): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
   descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s, migliaia con lo
@@ -689,6 +689,14 @@ Senza la linea fra «% O.S.» e «P.U. O.S.» la cella «3,448% 0,05 €» si sc
 il prezzo restava quello dei soli lavori. Ora si toglie solo la percentuale. Jonico 30 →
 31/35 (×2), GFM 98 → 99/108. Sui 31 contratti voci esatte 771 → **774** (82%), quantità e
 prezzo giusti 810 → **812** (86%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.17.
+
+## 22. Elenco dei mezzi, codice spezzato al punto (17/11/2026)
+
+Il parco macchine in coda al contratto Beton (portata, anno, massa) usciva come sei voci,
+perché portata × anno ≈ massa torna per caso; ora un anno senza decimali o un numero con lo
+zero davanti non vale come prezzo. «B.03» + «025.a CONGLOMERATO…» si ricompone in
+B.03.025.a. Beton 7/7, righe in più sui 31 contratti 38 → **33**, voci esatte 775/948.
+Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.18.
 
 ## Fonti
 

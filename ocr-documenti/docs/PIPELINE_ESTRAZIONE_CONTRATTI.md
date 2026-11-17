@@ -704,6 +704,17 @@ O.S.» la cella è «3,448% 0,05 €» e il P.U. oneri si perdeva: prezzo 1,40 i
 (lavori + oneri). Ora si toglie solo la percentuale e resta il numero. Jonico 30 → 31/35
 (due copie del contratto), GFM 98 → 99/108. Nessun altro contratto cambia.
 
+### 4.18 Elenco dei mezzi e codice spezzato al punto (Beton, 17/11/2026)
+
+In coda al contratto Beton c'è il parco macchine («AUTOBETONIERA … kg 15,944 2007 32000»:
+portata, anno, massa) e 15,944 × 2007 ≈ 32.000 torna per caso: sei righe di mezzi
+uscivano come voci. In coda a `estraiRighe` (`nonPrezzo`) una riga col «prezzo» uguale a
+un anno senza decimali e la quantità a tre decimali, o col «prezzo» con lo zero davanti
+(«062», pezzo di targa), non è una voce. In `recuperaCodiciRighe` (`server/struttura.ts`)
+il codice spezzato al punto con il resto in testa alla descrizione («B.03» + «025.a
+CONGLOMERATO…») si ricompone. Beton 6 → **7/7**, righe in più 6 → 1. Nessun altro
+contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

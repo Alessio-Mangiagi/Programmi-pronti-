@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  RE_COD_GRIGLIA, codiceContratto, condPagamento, dataContratto, estrai, estraiImporti, estraiRigheCelle,
+  RE_COD_GRIGLIA, codiceContratto, condPagamento, dataContratto, estrai, estraiImporti, estraiRighe, estraiRigheCelle,
   estraiRigheElencoPrezzi, estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
   pivaValida, prezziCoerentiPerCodice, quantitaSottintesa, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
   uniformaCodiciOcr, type Estratto,
@@ -576,6 +576,15 @@ describe('tabella numerata per posizione e voci uguali', () => {
       ['NP.35', 'cad', '32,00', '99,32'],
       ['', 'cad', '2', '211,73'],
     ])
+  })
+  it('elenco dei mezzi in coda: anno e targa non sono prezzi; codice spezzato al punto (Beton)', () => {
+    const t = ['Descrizione UM Quantità Prezzo unitario Importo',
+      'Conglomerato cementizio per magrone mc 36,00 97,00 3.492,00',
+      'AUTOBETONIERA telaio WDB9333141 targa GX 038 CT kg 15,944 2007 32000',   // 15,944 × 2007 ≈ 32.000 per caso
+      'BETOMPOMPA telaio WDB9333141 Proprietà DZ 264 YV kg 28000 062'].join('\n')
+    expect(estraiRighe(t).map(r => r.prezzo_lordo)).toEqual(['97,00'])
+    const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: 'B.03', descrizione: '025.a CONGLOMERATO CEMENTIZIO PER MAGRONE', udm: 'm³', quantita: '36,63', prezzo_lordo: '97,00', importo: '3.553,23' }] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(e)).righe[0]).toMatchObject({ codice_epu: 'B.03.025.a', descrizione: 'CONGLOMERATO CEMENTIZIO PER MAGRONE' })
   })
   it('stessa tabella, due voci uguali (fusto pila e sottovia): restano tutte e due', () => {
     const t = ['Descrizione UM Quantità Prezzo unitario Prezzo TOTALE',
