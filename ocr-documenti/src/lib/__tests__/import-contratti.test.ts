@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildImportContrattiRowsFromAlyante, buildImportContrattiRowsFromContract, dateCell, deduplicaRighe,
-  divisioneFromTipo, IMPORT_CONTRATTI_COLS, numIt, numOr, parseAlyante, problemiRiga, ritenuteRgRi,
+  divisioneFromTipo, IMPORT_CONTRATTI_COLS, numIt, numOr, parseAlyante, problemiRiga, quantitaRiga, ritenuteRgRi,
   rowsHaveData, umCell, validateAlyanteImport, descrContrattoLabel,
 } from '../import-contratti'
 
@@ -18,6 +18,12 @@ describe('celle', () => {
     expect(numIt('151.000')).toBe(151.000)
     expect(numIt('€ 1.234,00')).toBe(1234)
     expect(numIt('')).toBeNaN()
+  })
+  it('quantità col solo punto: decide il conto della riga (2.100 m = 2100, 151.000 = 151)', () => {
+    expect(quantitaRiga({ quantita: '2.100', prezzo_lordo: '1,03424', importo: '2.171,90' })).toBe(2100)
+    expect(quantitaRiga({ quantita: '151.000', prezzo_lordo: '0,750', importo: '113,25' })).toBe(151)
+    expect(quantitaRiga({ quantita: '2.100', prezzo_lordo: '1,03' })).toBe(2.1)        // senza importo: come prima
+    expect(quantitaRiga({ quantita: '0,313', prezzo_lordo: '2.260,66', importo: '707,59' })).toBe(0.313)
   })
   it('numOr: default sui non numeri', () => {
     expect(numOr('abc', 0)).toBe(0)

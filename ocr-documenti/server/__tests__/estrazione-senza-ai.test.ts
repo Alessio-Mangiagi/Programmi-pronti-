@@ -10,12 +10,13 @@ import { describe, it, expect } from 'vitest'
 import {
   RE_COD_GRIGLIA, codiceContratto, condPagamento, dataContratto, estrai, estraiImporti, estraiRigheCelle,
   estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
-  prezziCoerentiPerCodice, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
+  prezziCoerentiPerCodice, quantitaSottintesa, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
   uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
 import { strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchCondPagamento, matchDivisione } from '../alyante.ts'
 import { tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
+import { normalizzaNumeriOcr } from '../testo.ts'
 import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
 
@@ -129,6 +130,24 @@ describe('righe', () => {
       ['SIC24 14.3.17.40', 'cad', '0,5', '80,9631758'],
       ['A.N.E.002', 'cad', '1', '211,27041'],
       ['SIC24 14.3.21.2', 'm', '230,5', '5,4229474'],
+    ])
+  })
+
+  it('elenco a corpo: "€" letto come lettera o cifra, quantità 1 sottintesa (PF Future)', () => {
+    // blocco OCR con il solo importo: il carattere in coda è il "€"
+    expect(['135,41 e', '367,76 6', '163,75 8', '1.045,13 e', '77,03 C'].map(normalizzaNumeriOcr))
+      .toEqual(['135,41 €', '367,76 €', '163,75 €', '1.045,13 €', '77,03 €'])
+    // non sul testo di più righe, non dopo un numero senza due decimali, non dentro una riga
+    for (const t of ['135,41 e\n22,59 6', '12 6', 'aree. 135,41 € 135,41 e']) expect(normalizzaNumeriOcr(t)).toBe(t)
+    const r = quantitaSottintesa([
+      { quantita: '270,94', prezzo_lordo: '270,94', importo: '' },      // prezzo e importo letti come q e p
+      { quantita: '2', prezzo_lordo: '251,92', importo: '251,92' },     // "2" dalla descrizione
+      { quantita: '', prezzo_lordo: '51,83', importo: '51,83' },
+      { quantita: '4', prezzo_lordo: '91,40', importo: '365,58' },      // quantità vera: resta
+      { quantita: '10', prezzo_lordo: '10', importo: '' },              // senza decimali: resta
+    ])
+    expect(r.map(x => [x.quantita, x.prezzo_lordo, x.importo])).toEqual([
+      ['1', '270,94', '270,94'], ['1', '251,92', '251,92'], ['1', '51,83', '51,83'], ['4', '91,40', '365,58'], ['10', '10', ''],
     ])
   })
 
