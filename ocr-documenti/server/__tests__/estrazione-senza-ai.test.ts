@@ -362,6 +362,18 @@ describe('tabella dalle celle', () => {
       ['B.04.001_ap01', 'Come sopra da quota 4,01'],
     ])
   })
+  it('cella con la percentuale e il P.U. oneri insieme: resta il numero (Jonico)', () => {
+    // manca la linea fra "% O.S." e "P.U. O.S.": le due stanno nella stessa cella
+    const g = { xs: [0, 100, 400, 450, 550, 650, 800, 950, 1100], ys: [0, 50, 100, 150] }
+    const riga = (y: number, celle: string[]) => celle.map((t, c) => b(t, g.xs[c] + 5, y)).filter(x => x.text)
+    const blocchi = [
+      ...riga(15, ['A.01.001', 'SCAVO DI SBANCAMENTO', 'mc', '9.959,59', '3,73 €', '37.149,27 €', '3,368% 0,13 €', '1.294,75 €']),
+      ...riga(65, ['A.02.007.c', 'SISTEMAZIONE IN RILEVATO', 'mc', '1.413,10', '1,40 €', '1.978,34 €', '3,448% 0,05 €', '70,66 €']),
+      ...riga(115, ['E.01.030.b', 'FORNITURA E STESA DI TELI', 'mq', '462,00', '0,56 €', '258,72 €', '3,448% 0,02 €', '9,24 €']),
+    ]
+    const righe = tabellaDaGriglia(blocchi, g).split('\n').map(l => l.split('|').map(x => x.trim()))
+    expect(righe.map(c => [c[1], c[5]])).toEqual([['A.01.001', '3,86'], ['A.02.007.c', '1,45'], ['E.01.030.b', '0,58']])
+  })
   it('codici a sigla, tabella lavori + oneri: voce con più righe di valori sotto il codice (Gecob)', () => {
     // WBS | Articolo | Descrizione | UM | Quantità | P.U. lavori | Importo lavori | P.U. O.S. | Importo O.S.
     const X = [60, 200, 500, 640, 760, 880, 980, 1100]

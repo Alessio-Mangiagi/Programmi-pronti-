@@ -696,6 +696,14 @@ titolo, un «codice» senza punto interno in testa alla riga dei valori resta de
 
 Risultato: Warm 138 → **146/146**. Nessun altro contratto cambia.
 
+### 4.17 Cella con la percentuale e il P.U. oneri insieme (Jonico, 17/11/2026)
+
+Nelle tabelle «% O.S.» lette dalle celle (`leggiCelle`, `server/tabella-griglia.ts`) la
+cella con una percentuale si scartava intera. Quando manca la linea fra «% O.S.» e «P.U.
+O.S.» la cella è «3,448% 0,05 €» e il P.U. oneri si perdeva: prezzo 1,40 invece di 1,45
+(lavori + oneri). Ora si toglie solo la percentuale e resta il numero. Jonico 30 → 31/35
+(due copie del contratto), GFM 98 → 99/108. Nessun altro contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

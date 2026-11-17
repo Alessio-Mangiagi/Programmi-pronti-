@@ -7,12 +7,12 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§20): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§21): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
   descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s, migliaia con lo
   spazio.** Sui 31 contratti testata dal 94% al 98%, voci con quantità e prezzo giusti dal
-  74% all'85%, voci esatte dal 64% all'81%; nessun contratto peggiora. Progetto Costruzioni
+  74% all'86%, voci esatte dal 64% all'82%; nessun contratto peggiora. Progetto Costruzioni
   da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da 35 a 65 e da 45 a 65
   su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
@@ -682,6 +682,13 @@ codice della riga di titolo (NP.35) non cede più a un pezzo di descrizione («2
 «IP30») in testa alla riga dei valori. Warm 138 → **146/146**. Sui 31 contratti voci
 esatte 763 → **771** (81%), quantità e prezzo giusti 806 → **810** (85%). Dettaglio in
 `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.16.
+
+## 21. Cella con percentuale e P.U. oneri (17/11/2026)
+
+Senza la linea fra «% O.S.» e «P.U. O.S.» la cella «3,448% 0,05 €» si scartava intera e
+il prezzo restava quello dei soli lavori. Ora si toglie solo la percentuale. Jonico 30 →
+31/35 (×2), GFM 98 → 99/108. Sui 31 contratti voci esatte 771 → **774** (82%), quantità e
+prezzo giusti 810 → **812** (86%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.17.
 
 ## Fonti
 
