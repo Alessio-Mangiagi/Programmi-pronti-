@@ -129,6 +129,26 @@ export const RUOLO_APPALTATRICE = String.raw`APPAL[TRI]A[TRI]R[il1]CE`
 export const RUOLO_ESECUTRICE_SRC = String.raw`SUB[\s\-]?APP?AL[TRI]A[TRI]R[il1]CE|SUB[\s\-]?AFF?IDATARI[AO]|PROFESSIONIST[AI]|FORNI[TR]ORE|FORNI[TR]R?[il1]CE|ESECU[TR]R[il1]CE|NOLEGGIANTE|NOLEGGIA[TR]R[il1]CE`
 export const RE_RUOLO_ESECUTRICE = new RegExp(
   String.raw`denominat[ao]\s*(?:per\s+brevit[aà]\s*)?(?:impresa|ditta|societ[àa]|l['a])?\s*["“]?\s*(${RUOLO_ESECUTRICE_SRC})\s*["”]?`, 'gi')
+// Cifra di controllo della partita IVA italiana: cifre dispari sommate, cifre pari
+// raddoppiate (meno 9 se superano 9); l'undicesima chiude la somma a un multiplo di 10.
+export const pivaValida = (p: string): boolean => {
+  if (!/^\d{11}$/.test(p)) return false
+  let somma = 0
+  for (let i = 0; i < 10; i++) {
+    const d = Number(p[i])
+    somma += i % 2 === 0 ? d : (d * 2 > 9 ? d * 2 - 9 : d * 2)
+  }
+  return (10 - (somma % 10)) % 10 === Number(p[10])
+}
+// P.IVA letta con s/S al posto di 5 o 8: le combinazioni con la cifra di controllo giusta;
+// una sola → quella, nessuna o più di una → ''. Senza s la lettura resta com'è.
+const pivaDaLettura = (letta: string): string => {
+  if (!/[sS]/.test(letta)) return letta
+  let candidati = ['']
+  for (const c of letta) candidati = candidati.flatMap(x => (/[sS]/.test(c) ? [x + '5', x + '8'] : [x + c]))
+  const valide = candidati.filter(pivaValida)
+  return valide.length === 1 ? valide[0] : ''
+}
 export const trovaFornitore = (t: string): { nome: string; piva: string } => {
   // toglie i connettivi/sostantivi in testa al nome catturato ("E La società MADA…" →
   // "MADA…", "denominata ditta MADA…" → "MADA…")
@@ -207,8 +227,11 @@ export const trovaFornitore = (t: string): { nome: string; piva: string } => {
   // si accettano quelle lettere purché le cifre vere siano almeno 6 (subito dopo
   // l'etichetta P.IVA non c'è altro di 11 caratteri fatto così), poi si riportano a cifre.
   // Prima la P.IVA si perdeva e FORNITORE restava il nome (Gecob, SICS, Muzzolon).
-  const pive = [...t.matchAll(/(?:p(?:artita)?\.?\s*[ilíì]\.?\s?v\.?a\.?(?:\s*e\s*cod(?:ice)?\.?\s*fisc(?:ale)?\.?)?|c\.?f\.?\s*\/?\s*p\.?\s*[il]va|cod(?:ice)?\.?\s*fisc(?:ale)?\.?)\D{0,15}((?=(?:[oOlI]*\d){6})[\doOlI]{11})(?![\doOlI])/gi)]
-    .map(m => ({ piva: m[1].replace(/[oO]/g, '0').replace(/[lI]/g, '1'), idx: m.index ?? 0 }))
+  // Anche la s, che può essere 5 o 8 ("o3so9380o45" = 03809380045, Ticopter): vale la sola
+  // lettura con la cifra di controllo giusta, altrimenti la P.IVA non si prende.
+  const pive = [...t.matchAll(/(?:p(?:artita)?\.?\s*[ilíì]\.?\s?v\.?a\.?(?:\s*e\s*cod(?:ice)?\.?\s*fisc(?:ale)?\.?)?|c\.?f\.?\s*\/?\s*p\.?\s*[il]va|cod(?:ice)?\.?\s*fisc(?:ale)?\.?)\D{0,15}((?=(?:[oOlIsS]*\d){6})[\doOlIsS]{11})(?![\doOlIsS])/gi)]
+    .map(m => ({ piva: pivaDaLettura(m[1].replace(/[oO]/g, '0').replace(/[lI]/g, '1')), idx: m.index ?? 0 }))
+    .filter(p => p.piva)
   // Ogni P.IVA appartiene alla società NOMINATA PRIMA di essa (entro 400 char): è così
   // che i contratti presentano le parti ("ACME S.r.l. … P.IVA 01234567890"). Prendere
   // semplicemente la P.IVA più vicina DOPO il nome del fornitore restituiva quella
@@ -2161,8 +2184,9 @@ export const estraiImporti = (t: string): Record<string, string> => {
     // 145.720,94 (euro centoquaranta…) di oneri per la sicurezza"): il numero più
     // vicino è quello che precede "oneri sicurezza", non quello che segue. Il
     // pattern "prima" ha priorità; "dopo" resta come fallback per altri template.
-    importo_oneri_sicurezza: numDer(new RegExp(String.raw`(${NUM_SRC})\s*(?:€|euro)?\s*(?:\([^)]{0,80}\)\s*)?di\s+oneri\s+(?:per\s+la\s+|della\s+)?sicurezza`, 'i'))
-      || numDer(new RegExp(String.raw`oneri\s+(?:per\s+la\s+|della\s+)?sicurezza\D{0,60}?(${NUM_SRC})`, 'i'))
+    // "per ia sicurezza": la l letta i (Ticopter)
+    importo_oneri_sicurezza: numDer(new RegExp(String.raw`(${NUM_SRC})\s*(?:€|euro)?\s*(?:\([^)]{0,80}\)\s*)?di\s+oneri\s+(?:per\s+[li1]a\s+|della\s+)?sicurezza`, 'i'))
+      || numDer(new RegExp(String.raw`oneri\s+(?:per\s+[li1]a\s+|della\s+)?sicurezza\D{0,60}?(${NUM_SRC})`, 'i'))
       // totale in coda all'elenco prezzi ("SOMMANO ONERI DI SICUREZZA 15.107,94€"):
       // nei subappalti a misura l'importo non sta nell'articolo importi ma nel computo
       || numDer(new RegExp(String.raw`(?:sommano|totale)\s+oneri\s+(?:di\s+|per\s+la\s+|della\s+)?sicurezza\D{0,20}?(${NUM_SRC})`, 'i')),
