@@ -7,13 +7,14 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§17): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§18): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
-  descrizione centrata.** Sui 31 contratti testata dal 94% al 96%, voci con quantità e
-  prezzo giusti dal 74% all'85%, voci esatte dal 64% al 79%; nessun contratto peggiora.
+  descrizione centrata, codici del prezzario con lo spazio.** Sui 31 contratti testata
+  dal 94% al 96%, voci con quantità e prezzo giusti dal 74% all'85%, voci esatte dal 64%
+  all'80%; nessun contratto peggiora.
   Progetto Costruzioni da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da
-  35 a 65 e da 45 a 65 su 70, Ulma da 14 a 23 su 26.
+  35 a 65 e da 45 a 65 su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31.
   «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
@@ -653,6 +654,17 @@ Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.13.
 **Risultato** sui 31 contratti: voci esatte 729 → **752** (79%), quantità e prezzo giusti
 783 → **806** (85%), testata invariata. Ulma 14 → 23/26, L.Catania 37 → 43/46, Nigro 41 →
 49/52. Nessun altro contratto cambia.
+
+## 18. Codici del prezzario con lo spazio (17/11/2026)
+
+AQ3 leggeva metà dei codici «SIC24 26.01.04.002» con lo spazio al posto del «_»: il
+codice usciva «SIC24» o vuoto. Ora la forma è un codice intero, e una voce delle celle con
+un solo numero si completa dalla riga del testo che torna e lo contiene. Dettaglio in
+`PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.14.
+
+**Risultato** sui 31 contratti: voci esatte 752 → **760** (80%), quantità e prezzo giusti
+806 (85%), testata invariata. AQ3 11 → 18/31, GFM 94 → 95/108. Nessun altro contratto
+cambia.
 
 ## Fonti
 

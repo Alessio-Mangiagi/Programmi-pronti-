@@ -631,6 +631,24 @@ L'ultima correzione valeva anche altrove: L.Catania 37 → **43/46**, Nigro 41 �
 (voci «1,00 | 30,00» lette 30 × 1,00). Ulma 14 → **23/26**. Nessun altro contratto
 cambia. Resta «Ricondizionamento % 0,3 Listino» (prezzo a listino, non un numero).
 
+### 4.14 Codici del prezzario regionale con lo spazio (AQ3, 17/11/2026)
+
+Nel nolo a caldo AQ3 metà dei codici è letta «SIC24 26.01.04.002» (spazio al posto del
+«_») e `RE_COD_GRIGLIA` prendeva solo «SIC24», oppure nelle celle la voce restava senza
+codice. Ora la forma «sigla + anno, spazio, tariffa puntata» è un codice intero, anche
+dopo il numero d'ordine («11 SIC24 26.01.16»); `normalizzaCodice` (`server/struttura.ts`)
+rimette il «_» e legge «S/C24» come SIC24.
+
+Con il codice giusto la voce delle celle (un solo numero, 2.800,00 messo come prezzo) e la
+riga del testo (2.800,00 × 7,87 = 22.038,30) diventano la stessa voce, e
+`completaDallePagine` non la completava perché il prezzo letto era diverso. Ora una voce
+con un solo valore letto si completa se quel numero sta nella riga della pagina, in una
+colonna qualsiasi.
+
+Risultato: AQ3 11 → **18/31**, GFM 94 → 95/108. Nessun altro contratto cambia. Restano
+righe molto sporche («cad 3,00116,43 €», valori su righe diverse dal codice) e i codici
+della colonna «Tariffa» senza cifre («Miniapala»).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
