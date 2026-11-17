@@ -133,6 +133,32 @@ describe('righe', () => {
     ])
   })
 
+  it('computo: codici storpiati ricomposti con le famiglie di codici del documento (PF Future)', () => {
+    const t = [
+      'SIC24 14.4.5.15', 'Fornitura e posa in opera di interruttore magnetotermico', 'SOMMANO cad 0,5 71,590652 35,80 €',
+      'SIC24 14.4.6.15', 'Fornitura e posa in opera di blocco differenziale', 'SOMMANO cad 0,5 53,4265784 26,71 €',
+      'SIC24 14.3.17.55', 'Fornitura e collocazione entro tubi di conduttori', 'SOMMANO m 45 26,3390582 1.185,26 €',
+      '6 SIC24 144.16.5', 'Fornitura in opera in quadro elettrico di accessori', 'SOMMANO cad 0,5 17,3234932 8,66 €',
+      '25 27 SIC24 144.637 a', 'Fornitura e posa in opera di blocco differenziale tetrapolare', 'SOMMANO cad 1 113,861483 113,86 €',
+      'S1C24 1445.16', 'Fornitura e posa in opera all\'interno di quadro elettrico', 'SOMMANO cad 0,5 102,471252 51,24 €',
+      'A.N.E.001', 'Fornitura montaggio su interruttore di sganciatore', 'SOMMANO cad 0,5 80,9631758 40,48 €',
+      'A.N.E.002', 'Fornitura e posa in opera di quadro di cantiere', 'SOMMANO cad 0,5 508,069614 254,03 €',
+      'A.N.E.006', 'Fornitura e montaggio su profilati DIN', 'SOMMANO cad 0,5 267,282584 133,64 €',
+      // norma in coda alla descrizione: non è la riga del codice
+      'AN.E.D09', 'Fornitura e montaggio entro quadro elettrico di portafusibili', 'EN 64-8', 'SOMMANO cad 0,5 59,500112 29,75 €',
+      // lettere senza famiglia: nessun codice inventato
+      'N F 00', 'Fornitura e posa in opera di morsettiera da 160 A', 'SOMMANO cad 0,5 165,627836 82,81 €',
+    ].join('\n')
+    const r = estraiRigheSommano(t)
+    expect(r.map(x => x.codice_epu)).toEqual([
+      'SIC24 14.4.5.15', 'SIC24 14.4.6.15', 'SIC24 14.3.17.55',
+      'SIC24 14.4.16.5',      // punto perso dopo 14
+      'SIC24 14.4.6.37',      // due punti persi: 14.4.6 c'è nel documento, 14.4.63 no
+      'SIC24 14.4.5.16',      // sigla con 1 per I
+      'A.N.E.001', 'A.N.E.002', 'A.N.E.006', 'A.N.E.009', '',
+    ])
+    expect(r[9].descrizione).toMatch(/^Fornitura e montaggio entro quadro/)
+  })
   it('elenco a corpo: "€" letto come lettera o cifra, quantità 1 sottintesa (PF Future)', () => {
     // blocco OCR con il solo importo: il carattere in coda è il "€"
     expect(['135,41 e', '367,76 6', '163,75 8', '1.045,13 e', '77,03 C'].map(normalizzaNumeriOcr))
