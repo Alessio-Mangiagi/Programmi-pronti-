@@ -76,6 +76,12 @@ describe('voci recuperate dalle pagine', () => {
     expect(out[0]).toMatchObject({ codice_epu: 'B.03.025.a', quantita: '3,60' })
     expect(out).toHaveLength(3)
   })
+  it('un solo valore letto, nella colonna sbagliata: la riga della pagina che torna lo completa (AQ3)', () => {
+    // dalle celle la quantità 36,00 è finita nella colonna del prezzo
+    const monca = [voce('B.03.025.a', 'Conglomerato cementizio per magrone', 'mc', '', '36,00', '')]
+    const out = completaDallePagine(monca, [PROSA, TABELLA])
+    expect(out[0]).toMatchObject({ codice_epu: 'B.03.025.a', quantita: '36,00', prezzo_lordo: '97,00', importo: '3.492,00' })
+  })
   it('pagina che da sola trova più voci che tornano ma senza codici: restano le voci col codice', () => {
     // Gecob pag. 7: nel testo piatto WBS, valori dei lavori e oneri finiscono su righe
     // diverse e tornano per caso (quantità 1, P.U. oneri = importo oneri)

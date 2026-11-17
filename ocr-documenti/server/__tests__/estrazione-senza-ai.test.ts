@@ -13,7 +13,7 @@ import {
   prezziCoerentiPerCodice, quantitaSottintesa, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
   uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
-import { strutturaAlyante } from '../struttura.ts'
+import { normalizzaCodice, strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchCondPagamento, matchDivisione } from '../alyante.ts'
 import { tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
 import { normalizzaNumeriOcr } from '../testo.ts'
@@ -108,6 +108,11 @@ describe('righe', () => {
     expect(RE_COD_GRIGLIA.exec('NP.06')?.[2]).toBe('NP.06')
     expect(RE_COD_GRIGLIA.exec('1 A.01.001 Scavo')?.[2]).toBe('A.01.001')
     expect(RE_COD_GRIGLIA.exec('12')).toBeNull()
+    // prezzario regionale con lo spazio al posto del "_" (AQ3): il codice è tutto
+    expect(RE_COD_GRIGLIA.exec('SIC24 26.01.04.002 m 2800,00 7,87 € 22.038,30 €')?.[2]).toBe('SIC24 26.01.04.002')
+    expect(RE_COD_GRIGLIA.exec('11 SIC24 26.01.16 vuoto mediante la lavoro')?.slice(1, 3)).toEqual(['11', 'SIC24 26.01.16'])
+    expect(normalizzaCodice('SIC24 26.01.04.002')).toBe('SIC24_26.01.04.002')
+    expect(normalizzaCodice('S/C24_26.01.18.002')).toBe('SIC24_26.01.18.002')
   })
 
   it('terna coerente: un numero spurio non sposta le colonne', () => {
