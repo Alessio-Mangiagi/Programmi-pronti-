@@ -458,6 +458,44 @@ Risultato: Progetto Costruzioni 40 → 50 voci esatte, 41 → 51 con quantità e
 nessun altro contratto cambia. Diagnostica: `DBG_TABELLA=1` scrive per ogni voce riletta i
 candidati e la combinazione scelta (`[celle]`).
 
+### 4.9 Codici spezzati su due righe (17/11/2026)
+
+Nell'allegato A di Progetto Costruzioni le voci «Come sopra B.04.001 da quota 4,01 a 8,00»
+hanno il codice su due righe della sua cella: «B.04.001_n» sopra, «p01» sotto
+(`B.04.001_np01`, `_CS01`, `_CS02`). Nel testo OCR sono 21, come nel riferimento; il
+programma ne trovava 12. Le forme perse, tutte nella ricucitura del codice
+(`vociDaAncore`, `server/tabella-griglia.ts`):
+
+- prima riga che finisce col separatore («B.04.001_» + «p01»): non valeva come codice;
+- bordo della cella letto come carattere («B.04.001_a|»): si toglie prima del confronto;
+- cella del codice e inizio della descrizione in un blocco solo («B.04.001_C Comesopra
+  8.04.001…», anche «8,03,025.a |- - CON CEMENTO…»): `spezzaCodiceInTesta` lo divide in
+  due, larghezze in proporzione ai caratteri;
+- seconda riga con lo zero letto O o D e il 2 letto Z («SOZ» = S02, «pD1» = p01);
+- descrizione che comincia dentro il codice più largo della colonna (x 1209 contro 1216):
+  il bordo è quello del codice della voce, altrimenti la voce senza testo né valori si
+  scartava come riga vuota.
+
+La lettera in fondo alla prima riga sta sul bordo della cella e l'OCR la perde o la
+storpia («_p01», «_0p01», «_ap01», «_op01»), o perde la seconda riga («_n»).
+`uniformaSuffissiSpezzati` (`server/parser-contratti.ts`, dentro `uniformaCodiciOcr`)
+raggruppa i codici del documento per radice e seconda riga e dà a tutti la grafia più
+frequente: chi ha la lettera cambia solo se quella grafia ricorre almeno due volte e più
+della sua, chi l'ha persa prende l'unica in testa, chi ha perso la seconda riga si
+completa solo se radice e lettera portano a un solo codice («B.04.001_C» resta: CS01 o
+CS02). La seconda riga non cambia mai.
+
+Il prezzo delle voci «Come sopra» si rilegge spesso come il solo P.U. lavori (32,76 senza
+gli oneri 1,24, che l'OCR legge spesso 1,20). `prezziCoerentiPerCodice` lo portava al
+complessivo solo se il complessivo ricorreva di più; ora anche a pari ricorrenze quando
+il rapporto fra i due (0,9635) è quello del documento, cioè torna (±0,001) in almeno due
+codici diversi (28,91/30,00, 15,90/16,50). I rapporti di un solo codice (0,29 e 0,32
+dell'acciaio, prezzi veri di parti d'opera diverse) non contano.
+
+Risultato: voci «Come sopra» trovate 12 → 20 su 21 (manca «CS02» a inizio pag. 44, letto
+senza la radice), tutte col codice giusto. Progetto Costruzioni 50 → 57 voci esatte,
+mancanti 25 → 9; nessun altro contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

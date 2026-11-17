@@ -32,7 +32,11 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
 - nelle tabelle **senza linee fra le voci** (elenchi prezzi ANAS con WBS, lavori e oneri)
   le voci si dividono sui codici di tariffa (`B.03.031.c`). Prezzo e importo escono
   complessivi (lavori + oneri della sicurezza). Una voce con le cifre illeggibili esce
-  con codice e unità di misura e i valori vuoti, da completare a mano.
+  con codice e unità di misura e i valori vuoti, da completare a mano. Un codice andato
+  a capo nella sua cella («B.04.001_n» sopra, «p01» sotto) si ricompone, e una lettera
+  persa o storpiata sul bordo della cella prende la grafia degli altri codici uguali del
+  documento (`B.04.001_np01`); un codice che resta incerto («B.04.001_C»: CS01 o CS02?)
+  esce com'è letto, da controllare.
 
 Le pagine già lette prima di questi aiuti restano in `.ocr-cache/`: alla prima riapertura
 si cercano solo le linee della tabella, senza rifare l'OCR. Per rileggere ruotata una

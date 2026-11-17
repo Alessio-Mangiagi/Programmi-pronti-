@@ -7,10 +7,11 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§12): documento intero con le pagine, testata,
-  riferimenti dall'app, celle numeriche rilette.** Sui 31 contratti testata dal 94% al 96%,
-  voci con quantità e prezzo giusti dal 74% al 77%, voci esatte dal 64% al 67%; nessun
-  contratto peggiora. Progetto Costruzioni da 41 a 51 voci giuste su 142. «Scan senza
+- **Aggiornamento del 17/11 (§11-§13): documento intero con le pagine, testata,
+  riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe.** Sui 31
+  contratti testata dal 94% al 96%, voci con quantità e prezzo giusti dal 74% al 78%, voci
+  esatte dal 64% al 68%; nessun contratto peggiora. Progetto Costruzioni da 41 a 57 voci
+  giuste su 142. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -551,8 +552,31 @@ rilette 14 trovano una combinazione che regge entrambi i conti (le altre restano
 mai numeri inventati) e 5 voci «Come sopra» prendono il solo prezzo, completato a 34,00.
 
 **Cosa resta su Progetto Costruzioni**: 60 voci rilette con letture troppo rovinate per far
-tornare i conti, i codici `_np01`/`_CS01` non letti (12 voci mancanti), il riferimento
-compilato alla cieca dal testo (prezzi a 4 decimali calcolati, 28 righe «DA VERIFICARE»).
+tornare i conti, i codici `_np01`/`_CS01` non letti (12 voci mancanti, vedi §13), il
+riferimento compilato alla cieca dal testo (prezzi a 4 decimali calcolati, 28 righe «DA
+VERIFICARE»).
+
+## 13. Codici spezzati su due righe (17/11/2026)
+
+Le voci «Come sopra B.04.001 da quota 4,01 a 8,00» dell'allegato A hanno il codice su due
+righe della cella («B.04.001_n» / «p01»). Nel testo OCR ci sono tutte e 21; il programma
+ne trovava 12. Perse nella ricucitura del codice: prima riga che finisce con «_», bordo
+della cella letto «|», codice e descrizione in un blocco solo, «SOZ» per S02 e «pD1» per
+p01, descrizione che comincia 7 px dentro il codice più largo. Poi la lettera sul bordo
+della cella, persa o storpiata («_p01», «_0p01», «_ap01»), si rimette con la grafia più
+frequente nel documento a parità di radice e seconda riga. Infine il P.U. dei soli lavori
+(32,76) passa al complessivo (34,00) anche a pari ricorrenze, se il rapporto fra i due è
+quello che torna in almeno altri due codici. Dettaglio in
+`PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.9.
+
+**Risultato** sui 31 contratti: voci esatte 637 → **644** (68%), quantità e prezzo giusti
+733 → **739** (78%), testata invariata. Progetto Costruzioni 50 → 57 esatte, mancanti
+25 → 9; voci «Come sopra» trovate 12 → 20 su 21, tutte col codice giusto. Nessun altro
+contratto cambia.
+
+**Cosa resta**: «CS02» a inizio pag. 44 letto senza la radice; 8 voci «Come sopra» senza
+prezzo (cifre del P.U. troppo rovinate anche rilette); «B.03.031.e» letto per
+«B.03.031.c» (lettera finale: fra lettere non si corregge, i prezzari hanno .c e .e veri).
 
 ## Fonti
 
