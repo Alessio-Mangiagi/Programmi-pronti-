@@ -190,9 +190,9 @@ sono l'azione da premere. Tutto il resto sta nel pannello di destra, sotto
 | **↓ Excel** · **Rivedi** | riga della coda | Riesporta l'Excel senza riscansionare · apre il risultato nel pannello |
 | **⋮** | riga della coda | Menu del file: **Apri in un'altra finestra** (il file com'è, in una nuova scheda del browser) · **Rimuovi dalla coda** |
 | **Rifai da capo** | Altre azioni | Riscansiona il file selezionato |
-| **Scan senza Excel** | Altre azioni | PDF completo, si ferma all'output: per guardarlo prima di generare l'Excel |
+| **Scan senza Excel** | Altre azioni | PDF completo, si ferma all'output: per guardarlo prima di generare l'Excel. Sui contratti è la stessa lettura di **Scansiona** (sul server, documento intero) |
 | **Scansiona con AI** | Altre azioni | Scansioni che PaddleOCR non legge (serve un modello vision in Ollama) |
-| **Scan pagina** · **Scan e avanza →** · **Scan intervallo** | Altre azioni → *Solo pagine* | Rilavorare un punto preciso |
+| **Scan pagina** · **Scan e avanza →** · **Scan intervallo** | Altre azioni → *Solo pagine* | Rilavorare un punto preciso: ogni pagina si legge da sola, quindi le regole che guardano tutto il contratto (stesso articolo stesso prezzo, codici uniformati) valgono solo dentro la pagina |
 
 > La scansione è ad alta risoluzione (~300 DPI): più lenta ma molto più precisa su codici
 > e numeri. Per PDF lunghi usare l'intervallo a blocchi.
@@ -290,6 +290,13 @@ editabili e allarga da sola il pannello. Nella tabella delle righe:
 
 In modifica gli export sono nascosti: prima **✓ Salva**, poi si esporta.
 
+Solo per gli **admin dell'app**: **★ Salva come riferimento** salva come **✓ Salva** e in
+più consegna le correzioni al banco di prova come valore giusto di quel contratto
+(`contratti/moduli-da-md/<nome>_modulo.txt`; il PDF va in `contratti/` se mancava, il
+riferimento precedente in `_storico/`). Le misure successive (`npm run harness` +
+`npm run confronta-moduli -- contratti/moduli-da-md`) contano anche quel documento. Solo
+dopo aver controllato tutto sull'originale: un riferimento sbagliato falsa le misure.
+
 ---
 
 ## Altri strumenti
@@ -318,7 +325,9 @@ Tutti nel pannello di destra, in basso, sul file selezionato:
 - DESCR.CONTR = OGGETTO
 - RG/RI dalla ritenuta di garanzia: 5% → RG05 + R005, 10% → RG10 + R005; forniture senza
   ritenuta → vuoti
-- COND.PAG a codice da `Elenchi/cond_pagamento.json` (es. Bonifico → BB, RiBa → RB)
+- COND.PAG a codice da `Elenchi/cond_pagamento.json` (es. Bonifico → BB, RiBa → RB); se
+  l'elenco non ha quella condizione, o il contratto dà solo i giorni senza dire bonifico,
+  ricevuta o tratta, resta il testo letto (cella rossa) invece di un codice a caso
 - DIVISIONE da `Elenchi/DIVISIONE.xlsx` (03 subappalto, 02 fornitura, …)
 
 ---

@@ -39,6 +39,22 @@ copia della stessa voce su un'altra pagina (l'elenco prezzi ripetuto nell'art. 5
 nell'allegato). Nelle tabelle senza codici, con la colonna «Pos.» (1, 2, 3…), il numero di
 posizione diventa l'ARTICOLO.
 
+**Documento intero.** L'elenco prezzi si estrae sul testo di tutte le pagine insieme:
+alcune regole guardano l'intero contratto (stesso articolo stesso prezzo, grafie dei
+codici, posizioni, titolo che vale per le voci sotto). Poi ogni pagina si rilegge da sola:
+dove trova più voci con i conti giusti (quantità × prezzo = importo) aggiunge quelle
+mancanti e completa i valori vuoti delle altre (un valore già letto non si cambia). Le voci portano la pagina da cui vengono
+(colonna **Pag.** in Modifica) quando il programma la ritrova nel testo.
+
+**Riferimenti del banco di prova.** In Modifica gli admin dell'app vedono
+**★ Salva come riferimento**: il risultato corretto diventa il modulo di riferimento di
+quel contratto in `contratti/moduli-da-md/<nome>_modulo.txt`, e il PDF del lavoro va in
+`contratti/` se non c'era. Il riferimento precedente finisce in
+`contratti/moduli-da-md/_storico/` con data e ora. `OCR_DIR_BANCO` sposta la cartella
+`contratti/`. Per misurare: `npm run harness`, poi
+`npm run confronta-moduli -- contratti/moduli-da-md`. Sono dati aziendali: la cartella
+non va mai nel repository.
+
 **PaddleOCR bloccato.** Tipico: Windows App Control (WDAC) rifiuta le librerie
 non firmate del venv (`WinError 4551`). Non si risolve reinstallando: serve l'IT.
 

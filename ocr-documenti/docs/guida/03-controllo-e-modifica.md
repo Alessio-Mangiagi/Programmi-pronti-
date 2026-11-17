@@ -53,6 +53,15 @@ cambiano riga, **Ctrl+Z** (o **↶ Indietro**) annulla, **Esc** chiude senza sal
 Finito: **✓ Salva** (oppure **✕ Chiudi senza salvare**). In modifica gli export
 sono nascosti: prima si salva, poi si esporta.
 
+![I pulsanti in alto a destra della scheda Modifica](img/21-salva-riferimento.png)
+
+**★ Salva come riferimento** (solo per gli amministratori dell'app, formato IMPORT P6):
+salva le correzioni come **✓ Salva** e in più le consegna al banco di prova del
+programma come valore giusto di quel contratto. Da lì in poi ogni miglioramento della
+lettura si misura anche su quel documento. Usalo solo quando testata e voci sono
+controllate riga per riga sull'originale: un riferimento sbagliato falsa le misure.
+Il riferimento precedente dello stesso contratto non si perde (resta nello storico).
+
 ## 3.4 Export e altre azioni
 
 In fondo al pannello:
@@ -66,10 +75,10 @@ In fondo al pannello:
 | Pulsante | Quando usarlo |
 |---|---|
 | **Rifai da capo** | rilegge il file selezionato |
-| **Scan senza Excel** | legge tutto ma si ferma prima dell'Excel, per guardare il risultato |
+| **Scan senza Excel** | legge tutto ma si ferma prima dell'Excel, per guardare il risultato (sui PDF dei contratti stessa lettura di **Scansiona → Excel**, sul documento intero) |
 | **Scansiona con AI** | scansioni che il motore normale non legge (serve un modello di visione installato) |
 | **PDF → Word** | per PDF "nati al computer": estrae il testo senza OCR |
 | **↺ Riprocessa in \<formato\>** | cambia formato senza rileggere il documento |
-| **Solo pagine**: **Scan pagina**, **Scan e avanza →**, **Scan intervallo** | rilavorare una pagina o un intervallo preciso (utile sui PDF lunghi) |
+| **Solo pagine**: **Scan pagina**, **Scan e avanza →**, **Scan intervallo** | rilavorare una pagina o un intervallo preciso (utile sui PDF lunghi). Qui ogni pagina si legge da sola: le regole che guardano tutto il contratto (stesso articolo stesso prezzo, codici uniformati) valgono solo dentro la pagina |
 
 [← Da contratto a Excel](02-contratto-excel.md) · [Avanti: Formati e Claude →](04-formati-e-claude.md)

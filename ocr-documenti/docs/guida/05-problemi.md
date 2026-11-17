@@ -16,6 +16,7 @@
 | Una pagina scansionata **capovolta** o **di traverso** esce illeggibile | Il programma la rilegge ruotata da solo quando la lettura è troppo incerta o le righe escono in verticale. Se era già stata letta prima di questo aiuto, è rimasta in memoria così: chiedi all'amministratore di svuotare la cache (capitolo 6) e rifai il documento. |
 | Voci con il **codice ma senza quantità o prezzo** (elenchi prezzi scansionati male) | Le cifre di quella voce non si leggevano o i conti quantità × prezzo = importo non tornavano: il programma non le inventa. Completale in **Modifica** guardando l'originale. |
 | Due **voci uguali** nell'Excel | Sono nel documento (stessa pagina, o due quadri dello stesso computo): restano tutte. Se una è davvero una copia, cancellala in **Modifica**. |
+| **COND.PAG** rossa con un testo («30 GG», «Bonifico Bancario vista fattura», «BB 30 + 10 GG DFFM») | La condizione letta non ha un codice nell'elenco ufficiale, o il contratto non dice lo strumento (bonifico, ricevuta, tratta): il programma non sceglie un codice a caso. Scegli il codice in **Modifica** guardando l'articolo dei pagamenti. |
 | Celle rosse su PROGETTO/EPU | Commessa non nell'elenco ufficiale: correggi il codice o chiedi di aggiornare l'elenco. |
 | Riquadro giallo con *somma righe ≠ importo lavori* | Mancano righe o l'importo di testata è diverso: controlla l'originale e correggi in **Modifica**. |
 | In **⚙ Impostazioni** i pulsanti *Scegli…* sono spenti | Stai usando Firefox (o Safari): le cartelle del PC si usano solo in **Chrome** o **Edge**. |

@@ -45,6 +45,7 @@ Pipeline ibrida:
 | `OLLAMA_BASE` | `http://localhost:11434` | endpoint Ollama |
 | `ASSIST_MODEL` | `qwen2.5:3b` | modello assist |
 | `OCR_CACHE` | `1` | `0` spegne la cache dei blocchi OCR (`.ocr-cache/`, per hash di pagina) |
+| `OCR_DIR_BANCO` | `./contratti` | cartella del banco di prova: lì «★ Salva come riferimento» (Modifica, solo admin, `POST /api/riferimenti`) copia il PDF e scrive il modulo di riferimento in `moduli-da-md/` (`server/riferimenti.ts`) |
 | `OCR_BIND_HOST` | `127.0.0.1` | interfaccia del backend; se non locale (o `NODE_ENV=production`) il gate SSO del portale si attiva anche qui |
 | `PADDLE_INSECURE_SSL` | auto | `1`/`0` forza/vieta il download dei modelli senza verifica dei certificati (reti con ispezione SSL). Auto = solo finché `~/.paddlex` non esiste |
 
@@ -116,6 +117,10 @@ Multi-file: si possono trascinare più file insieme, ognuno tiene il proprio ris
 4. **Parser righe in gara** (vince chi trova più voci): riga-singola, pipe (`estraiRighePipe`,
    con fusione righe spezzate), blocchi (`estraiRigheTabellari`). Log backend:
    `[Righe] singola:N pipe:N blocchi:N` e `[Tabella TSV] ricostruiti N articoli`.
+   La gara è sul **documento intero**; poi ogni pagina si rilegge da sola e, dove trova più
+   voci con qta × prezzo = importo, aggiunge quelle mancanti e completa i valori vuoti
+   delle altre (`completaDallePagine`, log `[Righe] dalle pagine: …`, dettaglio con
+   `DBG_PAGINE=1`). Le voci si timbrano con la pagina d'origine (`server/pagine-righe.ts`).
 5. **Imbuto finale**: `normalizzaCodice` (storpiature OCR tipo SIC24, Ø, segmenti puntati),
    `recuperaCodiciRighe`, `pulisciDescrArticolo`, riparazione qta/prezzo/importo slittati
    (solo se importo = qta × prezzo esatto), dedup.
@@ -275,6 +280,13 @@ npm run harness -- --no-nativo  # ignora il layer di testo: tutto all'OCR (misur
 npm run harness -- --assist     # abilita l'assist LLM (default OFF: non deterministico)
 ```
 
+Come `server/lavori.ts`, l'estrazione riceve anche il testo pagina per pagina
+(`estraiAssistito(testo, pagine)`): banco e app misurano la stessa cosa.
+
+I riferimenti con cui si confronta (`npm run confronta-moduli -- contratti/moduli-da-md`)
+sono moduli contratto per documento; oltre a scriverli a mano, un admin li crea dall'app
+con **★ Salva come riferimento** in Modifica (vecchia versione in `moduli-da-md/_storico/`).
+
 Output in `tests/out/<contratto>/`: `ocr.txt` (input esatto dei parser), `alyante.json`,
 `contratto.json`; più `tests/out/_report.json` con pagine, righe, campi vuoti per file.
 Per confrontare un prima/dopo basta copiare `tests/out` prima di modificare i parser.
@@ -288,7 +300,7 @@ Strumenti di supporto:
 |---|---|
 | `npx tsx tools/dbg_pagina.ts <nome> <pagina>` | Geometria OCR di una pagina: ogni riga con Y, X inizio/fine, testo, poi il testo ricomposto. Serve quando una tabella esce sbagliata |
 | `node tools/dump_xlsx.mjs <file.xlsx>` | Legge un Import_Contratti compilato per confrontarlo con l'output |
-| `DBG_TABELLA=1` / `DBG_FORN=1` | Diagnostica su stderr: confini di cella calcolati / candidati ragione sociale |
+| `DBG_TABELLA=1` / `DBG_FORN=1` / `DBG_PAGINE=1` | Diagnostica su stderr: confini di cella calcolati / candidati ragione sociale / voci aggiunte o completate dalla pagina letta da sola |
 
 ## Risoluzione problemi
 

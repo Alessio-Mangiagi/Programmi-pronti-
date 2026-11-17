@@ -333,6 +333,89 @@ contratti/moduli-da-md`, totali in fondo all'output).
   grafia più frequente, solo per prefissi con almeno 3 lettere.
 - **Voci uguali**: vedi §4.3.
 
+### 4.6 Documento intero, poi pagina per pagina (17/11/2026)
+
+**Dove si estrae.** Tre strade dell'app arrivano all'elenco prezzi:
+
+| Strada | Come estrae |
+|---|---|
+| «Scansiona → Excel», «Elabora tutti», cartella | lavoro sul server (`server/lavori.ts`): testo di tutte le pagine unito, documento intero |
+| «Scan senza Excel» | dal 17/11 la stessa strada, senza scrivere l'Excel (prima: una richiesta `/api/ocr` per pagina e fusione nel browser) |
+| «Scan pagina», «Scan intervallo» | una richiesta per pagina, fusione nel browser (§4.3): scelta esplicita di rileggere un pezzo |
+
+Misurato sul banco (31 contratti, riferimenti `contratti/moduli-da-md`) estraendo
+pagina per pagina e fondendo come il browser: testata 349/425 contro 399 (la fusione
+prende la prima pagina che ha un valore: date di leggi citate, condizioni sbagliate),
+voci esatte 589 contro 608. Ma su qualche contratto la pagina da sola trovava di più: PF
+Future 1536/1537 (la seconda tabella, spenta dal computo `SOMMANO`), Beton Strade (sul
+documento intero vinceva l'elenco dei mezzi, 0 voci giuste su 7), AQ3, GFM.
+
+**`completaDallePagine`** (`server/parser-contratti.ts`) tiene il documento intero e ci
+aggiunge il meglio della pagina: quando il chiamante passa il testo pagina per pagina
+(`estrai(testo, pagine)`: lavori sul server, banco di prova, `/api/ocr` con più pagine
+separate da `---`), ogni pagina si rilegge da sola con `estraiRighe` e, **se ha più voci
+coerenti (qta × prezzo = importo, almeno due)** di quelle che il documento intero le ha
+attribuito:
+
+- pagina senza voci → entrano le sue righe coerenti o con codice, dopo l'ultima voce di
+  una pagina precedente;
+- pagina con voci → le due letture si abbinano (stesso codice, stessi primi 40 caratteri
+  della descrizione o stesso importo): la voce del documento intero che non torna prende
+  dalla pagina i valori che le mancano, solo se quelli già letti sono uguali (codice e
+  descrizione restano, con le grafie uniformate); le voci coerenti della pagina senza
+  abbinamento si aggiungono al loro posto.
+
+Le voci del documento intero non si tolgono e i loro valori letti non si sovrascrivono:
+la prima prova sostituiva la pagina intera e perdeva le voci giuste senza importo (Ulma e
+Gecob −4 ciascuno); con 20 caratteri di descrizione le voci SICS («Conglomerato
+cementizio…») si abbinavano fra loro; un prezzo già letto (30,00) sostituito da quello
+della pagina (22,50) faceva perdere una voce giusta a Progetto Costruzioni. Una voce con
+la stessa quantità e lo stesso prezzo di una già presa non entra (elenco ripetuto
+nell'art. 5 e nell'allegato). Diagnostica: `DBG_PAGINE=1` scrive su stderr ogni voce
+aggiunta o completata, con la pagina.
+
+**Pagina d'origine** (`server/pagine-righe.ts`). Unito il testo, le voci non sanno più da
+che pagina vengono: `paginaDelleRighe` le ritrova nel testo delle pagine (inizio o fine
+della descrizione, codice, valori; serve una descrizione o un codice più una cifra) e
+`timbraPagineRighe` scrive `pagina_origine` e `origine_lettura` (nativo/OCR), come faceva il
+browser pagina per pagina. In Modifica torna il clic **Pag.** → anteprima anche sui
+contratti fatti dal lavoro sul server.
+
+### 4.7 Testata: condizione di pagamento e oggetto (17/11/2026)
+
+Misurate sui 31 riferimenti: COND.PAG giusta 23 → 29, OGGETTO uguale o simile 24 → 29.
+
+**Condizione di pagamento** (`condPagamento`, `matchCondPagamento`). La firma forte
+`RE_SCADENZA_FORTE` («NN gg d.f.f.m.») ora accetta anche:
+
+| Nel contratto | Prima | Ora |
+|---|---|---|
+| «Bonifico Bancario con scadenza a 90 GG.F.M.» | primo «15 giorni» del documento → BB 15 (440) | BB 90 GG FM → 404 |
+| «a mezzo Bonifico Bancario 30 dffm» (senza «gg», `RE_SCADENZA_SIGLA`) | «30 GG» → tratta (111) | BB 30 GG DFFM → 407 |
+| «a 90 GG. D.F.F.M, + 10» / «30 + 10 giorni data fattura fine mese» | BB 90 (404) / BB 10 (454) | «90 + 10» → 435; «30 + 10» nessun codice in elenco → resta il testo |
+| a) noleggio 120-150, b) vendita 60-90-120, c) servizi 120 giorni (voci di elenco) | BB 150 → 446 | scadenze unite BB 60/90/120/150 → 486 |
+| «a mezzo Bonifico Bancario vista fattura» | «30 giorni» di un'altra clausola → 111 | «Bonifico Bancario vista fattura» (testo, come il riferimento) |
+
+E in `matchCondPagamento` una condizione con i soli giorni, senza strumento né scadenza
+(«30 GG» pescato in una finestra generica), non sceglie più un codice: fra bonifico,
+ricevuta e tratta il codice era a caso. Resta il testo, cella rossa da completare.
+
+**Oggetto** (`corpoOggetto`):
+
+- una sigla a fine riga («opere in c.a.», «dal D.M.») non chiude più la frase;
+- riga con i due punti seguita da un **elenco** → introduzione + voci: puntate
+  (`• IMPIANTI ELETTRICI E SPECIALI;` → separate da «; »), numerate (solo i titoli dei punti
+  1, 2, 3…, saltando le righe di spiegazione e il piè di pagina in mezzo), o brevi chiuse da
+  «;»; con «si impegna a fornire:» l'oggetto diventa «Fornitura di utensileria, ferramenta,
+  …»;
+- la formula di rito spezzata da un inciso («Le prestazioni oggetto del presente Contratto
+  ricadenti nelle categorie OS03 e OS30, riguardano:») si toglie;
+- i numeri di pagina in calce («2 / 20») non entrano; tetto 500 caratteri con un elenco,
+  400 senza, tagliato all'ultima voce intera.
+
+Restano diversi due riferimenti riassunti a mano (Sidersipe: tre paragrafi «La fornitura…»
+condensati; Progetto Costruzioni: l'elenco delle opere CV06, ST01…).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

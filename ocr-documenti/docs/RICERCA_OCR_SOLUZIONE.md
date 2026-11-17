@@ -7,6 +7,11 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
+- **Aggiornamento del 17/11 (§11): documento intero con le pagine, testata, riferimenti
+  dall'app.** Sui 31 contratti testata dal 94% al 96%, voci con quantità e prezzo giusti
+  dal 74% al 76%, voci esatte dal 64% al 66%; nessun contratto peggiora. «Scan senza
+  Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
+  correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
   contratti le voci con quantità e prezzo giusti salgono dal 66% al 74%, le voci esatte
   dal 50% al 64%. Progetto Costruzioni passa da 0 a 41 voci giuste su 142; voci esatte GFM
@@ -463,9 +468,62 @@ pompaggio + P.02 piazzamento) erano un problema di regole, non di OCR:
 - Ulma (voci a corpo senza codice), condizioni di pagamento (8 campi);
 - l'app legge i PDF pagina per pagina, il banco il documento intero: le regole che
   guardano tutto il documento (prezzi per codice, codici uniformati, posizioni) nell'app
-  valgono solo dentro la pagina. Da misurare;
+  valgono solo dentro la pagina. Da misurare (fatto il 17/11: vedi §11);
 - 4 voci in più di Progetto Costruzioni: riga di totale dell'ultima pagina, `NP02` senza
   valori, due codici spezzati male (`B.04.001_C`, `B.04.001_0p01`).
+
+## 11. Documento intero, testata, riferimenti dall'app (17/11/2026)
+
+**Cosa legge davvero l'app.** Verificato in `src/App.tsx`: «Scansiona → Excel», «Elabora
+tutti» e la cartella passano già dal lavoro sul server (`server/lavori.ts`), che estrae sul
+documento intero come il banco. Pagina per pagina andavano solo «Scan senza Excel», «Scan
+pagina/intervallo» e il ripiego senza lavori. Misurato con una copia del banco che estrae
+ogni pagina da sola e fonde come il browser (31 contratti):
+
+| | Documento intero | Pagina per pagina |
+|---|---|---|
+| Testata giusta | 399/425 | 349/425 (la fusione prende la prima pagina con un valore: date di leggi, condizioni sbagliate) |
+| Voci esatte | 608 | 589 (SICS 27 → 8: regole sul documento perse) |
+| Voci con quantità e prezzo giusti | 699 | 704 |
+
+Pagina per pagina usciva però di più su PF Future 1536/1537 (seconda tabella, spenta dal
+computo SOMMANO), Beton Strade (sul documento intero vinceva l'elenco dei mezzi: 0 voci
+giuste su 7), AQ3 e GFM. Da qui le scelte:
+
+- **«Scan senza Excel»** sui PDF di contratto passa dal lavoro sul server, come gli altri;
+- **`completaDallePagine`**: documento intero, poi ogni pagina da sola; dove trova più voci
+  coerenti aggiunge le mancanti e completa i valori vuoti, senza mai togliere voci né
+  cambiare valori già letti (le prove «sostituisci la pagina» e «la pagina vince»
+  perdevano Ulma −4, Gecob −4, SICS −1, Progetto −1);
+- **pagina d'origine** di ogni voce ritrovata nel testo (`server/pagine-righe.ts`): torna
+  il clic «Pag.» in Modifica anche sui contratti fatti dal server;
+- **testata**: condizione di pagamento (sigla «F.M.», «30 dffm», «90 + 10», scadenze per
+  voce unite, «vista fattura», nessun codice dai soli giorni) e oggetto (elenchi puntati,
+  numerati e «si impegna a fornire:», sigle «c.a.» a fine riga). Dettaglio in
+  `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.6-4.7;
+- **«★ Salva come riferimento»** in Modifica, solo per gli admin dell'app: le correzioni
+  diventano il modulo di riferimento in `contratti/moduli-da-md/` (precedente in
+  `_storico/`, PDF del lavoro copiato nel banco se manca). Il banco cresce con i contratti
+  rivisti davvero, non solo con quelli compilati a mano.
+
+**Risultato** (31 contratti, `npm run harness` + `npm run confronta-moduli -- contratti/moduli-da-md`):
+
+| | 16/11 | 17/11 |
+|---|---|---|
+| Testata giusta | 399/425 (94%) | **410/425 (96%)** |
+| COND.PAG giusta | 23/31 | 29/31 |
+| OGGETTO uguale o simile | 24/31 | 29/31 |
+| Voci esatte | 608/948 (64%) | **627/948 (66%)** |
+| Voci con quantità e prezzo giusti | 699/948 (74%) | **723/948 (76%)** |
+| Voci mancanti · in più | 155 · 50 | 127 · 52 |
+
+Per contratto: PF Future 1536 51 → 56 e 1537 49 → 54 voci con quantità e prezzo giusti,
+AQ3 17 → 22, Beton Strade 0 → 7, GFM 102 → 104. Nessun contratto peggiora.
+
+**Cosa resta**: Progetto Costruzioni (cifre illeggibili dell'allegato A), Gecob (tabella
+senza linee), Ulma (voci a corpo), i due COND.PAG senza codice in elenco («30 + 10 giorni»,
+pagamento a percentuali) e i due OGGETTO riassunti a mano nel riferimento (Sidersipe,
+Progetto Costruzioni).
 
 ## Fonti
 
