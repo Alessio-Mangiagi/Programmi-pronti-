@@ -2443,11 +2443,17 @@ export const completaDallePagine = (righe: Record<string, string>[], pagine: str
   const inTesta: Record<string, string>[] = []
   const metti = (m: Map<number, Record<string, string>[]>, i: number, r: Record<string, string>) => m.set(i, [...(m.get(i) ?? []), r])
   let aggiunte = 0
+  // Voci che tornano, e quelle col codice contano doppio: la pagina da sola vince solo se
+  // trova più voci senza perdere i codici. Gecob pag. 7: la lettura per codici dà 8 voci
+  // (NP.04…NP.11, 7 che tornano), il testo piatto 11 senza codice che tornano per caso
+  // («1,00 × 180,00 = 180,00»: quantità 1 e P.U. oneri = importo oneri).
+  const punti = (rs: Record<string, string>[]) =>
+    rs.filter(coerente).length + rs.filter(r => coerente(r) && String(r.codice_epu ?? '').trim()).length
   for (let p = 1; p <= pagine.length; p++) {
     const qui = pag.flatMap((x, i) => x === p ? [i] : [])
     const proprie = estraiRighe(pagine[p - 1])
     const buone = proprie.filter(coerente)
-    if (buone.length < 2 || buone.length <= qui.filter(i => coerente(righe[i])).length) continue
+    if (buone.length < 2 || punti(buone) <= punti(qui.map(i => righe[i]))) continue
     if (!qui.length) {
       // pagina senza voci: le sue, dopo l'ultima voce di una pagina precedente
       const sue = proprie.filter(r => (coerente(r) || String(r.codice_epu ?? '').trim()) && nuovo(r))
