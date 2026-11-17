@@ -1360,12 +1360,34 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
       }
       continue
     }
-    const [tutto, um, v1, v2, v3] = m
+    const [tutto, , , v2, v3] = m
+    let [, um, v1] = m
     let testa = line.slice(0, m.index + (tutto.startsWith(' ') || tutto.startsWith('|') ? 1 : 0)).trim()
+    // Migliaia della quantità separate da uno spazio ("m 2 730,00 0,90 € 2.460,05 €", Warm):
+    // la coda prende 730,00 come quantità e il "2" resta nella descrizione con l'unità. Si
+    // uniscono solo se così quantità × prezzo = importo torna e senza no: "2 211,73" può
+    // essere anche quantità 2 e prezzo 211,73 (vedi unisciMigliaiaSpazio in server/testo.ts).
+    const migliaia = v3 && /^\d{3},\d+$/.test(v1) ? new RegExp(String.raw`(?:^|\s)(?:(${UM_GRIGLIA})\.?\s+)?(\d{1,3})$`, 'i').exec(testa) : null
+    if (migliaia && !contoTorna(numIt(v1), numIt(v2), numIt(v3)) && contoTorna(numIt(`${migliaia[2]}.${v1}`), numIt(v2), numIt(v3))) {
+      v1 = `${migliaia[2]}.${v1}`
+      um = um || migliaia[1]
+      testa = testa.slice(0, migliaia.index).trim()
+    }
+    // …e "m 2 730,00" letto come unità m² e quantità 730,00: è "m" e 2.730,00
+    const mq = um && v3 && /^\d{3},\d+$/.test(v1) ? /^m\s+([23])$/i.exec(um.trim()) : null
+    if (mq && !contoTorna(numIt(v1), numIt(v2), numIt(v3)) && contoTorna(numIt(`${mq[1]}.${v1}`), numIt(v2), numIt(v3))) {
+      v1 = `${mq[1]}.${v1}`
+      um = 'm'
+    }
     const cod = RE_COD_GRIGLIA.exec(testa)
     let codice = '', pos = ''
-    if (cod) { codice = cod[2].replace(/[.,]+$/, ''); pos = cod[1] ?? ''; testa = testa.slice(cod[0].length) }
-    else testa = testa.replace(/^\s*(\d{1,3})[).\s]+/, (_, n: string) => { pos = n; return '' })
+    // Con il codice in sospeso dal titolo ("NP.35 For. e posa di apparecchio…"), un
+    // "codice" senza punto interno in testa alla riga dei valori è descrizione: articolo
+    // del produttore, potenza, grado IP ("11260019 flusso luminoso…", "24W IP65…", "IP30
+    // con porta di vetro…", Warm). Prima prendeva il posto di NP.35.
+    const daDescrizione = !!cod && !!codiceSospeso && !/[A-Za-z0-9]\.[A-Za-z0-9]/.test(cod[2])
+    if (cod && !daDescrizione) { codice = cod[2].replace(/[.,]+$/, ''); pos = cod[1] ?? ''; testa = testa.slice(cod[0].length) }
+    else if (!cod) testa = testa.replace(/^\s*(\d{1,3})[).\s]+/, (_, n: string) => { pos = n; return '' })
     let descrizione = pulisciDescrArticolo(testa)
     if (codiceSospeso && !codice) {
       // la voce del titolo sopra: suo il codice, titolo in testa alla descrizione
