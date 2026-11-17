@@ -661,6 +661,53 @@ export const uniformaCodiciOcr = (righe: Record<string, string>[]): void => {
     const [migliore, n] = [...m].sort((a, b) => b[1] - a[1])[0]
     if (migliore !== p && n >= 2 && n > (m.get(p) ?? 0)) r.codice_epu = migliore + r.codice_epu.slice(p.length)
   }
+  uniformaSuffissiSpezzati(righe)
+}
+
+// Codice spezzato su due righe nella sua cella ("B.04.001_n" sopra, "p01" sotto, allegato
+// A Progetto Costruzioni): la lettera a fine prima riga sta sul bordo della cella e l'OCR
+// la perde o la storpia ("B.04.001_p01", "B.04.001_0p01", "B.04.001_ap01"), oppure perde
+// la seconda riga ("B.04.001_n"). Fra i codici del documento con la stessa radice e la
+// stessa seconda riga ("B.04.001_" … "p01") vince la grafia più frequente: per chi ha la
+// lettera solo se ricorre almeno due volte e più della sua, per chi l'ha persa basta che
+// sia l'unica in testa. Il codice senza seconda riga si completa solo se radice e lettera
+// portano a una sola seconda riga. La seconda riga non si cambia mai: "CS01" e "CS02"
+// restano codici diversi.
+const RE_SPEZZATO = /^(.+_)([A-Za-z0-9]?)([A-Za-z]\d{2})$/
+const RE_SENZA_SECONDA = /^(.+_)([A-Za-z0-9])$/
+const uniformaSuffissiSpezzati = (righe: Record<string, string>[]): void => {
+  // radice + seconda riga → grafia completa (con la lettera) → quante volte
+  const famiglie = new Map<string, Map<string, number>>()
+  const chiave = (radice: string, seconda: string) => `${radice}|${seconda}`.toUpperCase()
+  for (const r of righe) {
+    const m = RE_SPEZZATO.exec(r.codice_epu ?? '')
+    if (!m?.[2]) continue
+    const f = famiglie.get(chiave(m[1], m[3])) ?? new Map<string, number>()
+    f.set(m[0], (f.get(m[0]) ?? 0) + 1)
+    famiglie.set(chiave(m[1], m[3]), f)
+  }
+  // grafia in testa alla famiglia, se è una sola
+  const inTesta = (f: Map<string, number>): [string, number] | null => {
+    const [a, b] = [...f].sort((x, y) => y[1] - x[1])
+    return a && (!b || a[1] > b[1]) ? a : null
+  }
+  for (const r of righe) {
+    const c = r.codice_epu ?? ''
+    const m = RE_SPEZZATO.exec(c)
+    if (m) {
+      const f = famiglie.get(chiave(m[1], m[3]))
+      const testa = f && inTesta(f)
+      if (!testa || testa[0] === c) continue
+      if (!m[2] || (testa[1] >= 2 && testa[1] > (f.get(c) ?? 0))) r.codice_epu = testa[0]
+      continue
+    }
+    const s = RE_SENZA_SECONDA.exec(c)
+    if (!s) continue
+    // famiglie con la stessa radice e una grafia che ha la stessa lettera
+    const compatibili = [...famiglie.values()].filter(f => [...f.keys()].some(g => g.toUpperCase().startsWith(c.toUpperCase())))
+    const testa = compatibili.length === 1 ? inTesta(compatibili[0]) : null
+    if (testa) r.codice_epu = testa[0]
+  }
 }
 
 // Numeri "Pos." non letti: l'OCR salta spesso la cifra isolata nella prima colonna

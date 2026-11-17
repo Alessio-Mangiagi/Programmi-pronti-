@@ -208,8 +208,28 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
 // misura con i valori vuoti, da completare a mano, mai numeri inventati.
 
 // Codice di tariffa con almeno due separatori ("B.03.025.a", "8.04.001", "B.03,031.c",
-// "1.01.009"); i numeri ("60.228,72") li esclude numeroCella.
-const RE_ANCORA = /^[A-Z0-9]{1,3}[.,]\d{2}[.,]\d{3}(?:[._,][A-Za-z0-9]{1,4})?[.,]?$/
+// "1.01.009"); i numeri ("60.228,72") li esclude numeroCella. Anche la prima riga di un
+// codice spezzato che finisce col separatore ("B.04.001_" sopra, "p01" sotto).
+const RE_ANCORA = /^[A-Z0-9]{1,3}[.,]\d{2}[.,]\d{3}(?:[._,][A-Za-z0-9]{0,4})?[.,]?$/
+// Testo del codice senza il bordo della cella letto come carattere ("B.04.001_a|")
+const testoAncora = (t: string) => t.trim().replace(/[\s|[\]]+$/, '')
+
+// Codice e descrizione nello stesso blocco: l'OCR legge insieme la cella del codice e
+// l'inizio della descrizione quando stanno vicine ("B.04.001_C Comesopra 8.04.001 da
+// quota…", "8,03,025.a |- - CON CEMENTO: 150 Kg/mc", allegato A Progetto Costruzioni).
+// Il blocco si divide in due, con le larghezze in proporzione ai caratteri: il codice
+// entra nella colonna dei codici, il resto nella descrizione.
+const RE_CODICE_IN_TESTA = /^([A-Z0-9]{1,3}[.,]\d{2}[.,]\d{3}(?:[._,][A-Za-z0-9]{0,4})?)[\s|[\]]+(\S.*)$/
+const spezzaCodiceInTesta = (b: BloccoOcr): BloccoOcr[] => {
+  const t = b.text.trim()
+  const m = RE_CODICE_IN_TESTA.exec(t)
+  if (!m || numeroCella(m[1], true) !== null) return [b]
+  const xResto = b.x + Math.round(b.w * (t.length - m[2].length) / t.length)
+  return [
+    { ...b, text: m[1], w: Math.round(b.w * m[1].length / t.length) },
+    { ...b, text: m[2], x: xResto, w: b.x + b.w - xResto },
+  ]
+}
 
 const centroY = (b: BloccoOcr) => b.y + b.h / 2
 const mediana = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)]
@@ -311,9 +331,10 @@ const valoriDaColonne = (numeri: NumeroX[], colonne: number[]): ValoriVoce | nul
 // sulle pagine girate la griglia trovata è spesso solo il riquadro dei totali, o manca.
 // Le linee orizzontali che ci sono valgono come confini fra le voci.
 type VoceAncora = { codice: string; descr: string; um: string; xUm?: number; numeri: NumeroX[]; y: number; h: number }
-const vociDaAncore = (blocchi: BloccoOcr[], g: Griglia | null): VoceAncora[] | null => {
+const vociDaAncore = (blocchiOcr: BloccoOcr[], g: Griglia | null): VoceAncora[] | null => {
+  const blocchi = blocchiOcr.flatMap(spezzaCodiceInTesta)
   const centroX = (b: BloccoOcr) => b.x + b.w / 2
-  const eAncora = (b: BloccoOcr) => RE_ANCORA.test(b.text.trim()) && numeroCella(b.text, true) === null
+  const eAncora = (b: BloccoOcr) => RE_ANCORA.test(testoAncora(b.text)) && numeroCella(b.text, true) === null
   // colonna dei codici: il gruppo più numeroso di codici con il centro allineato (±80 px)
   const candidati = blocchi.filter(eAncora).sort((a, b) => centroX(a) - centroX(b))
   const gruppi: BloccoOcr[][] = []
@@ -347,23 +368,28 @@ const vociDaAncore = (blocchi: BloccoOcr[], g: Griglia | null): VoceAncora[] | n
     const sullaRiga = (b: BloccoOcr) => Math.abs(centroY(b) - y) <= Math.max(a.h, b.h) * 0.8
     // Codice spezzato nella sua colonna, solo nelle forme viste: la lettera dopo un codice
     // che finisce col separatore ("B.04.001_" + "a"), il suffisso con trattino basso
-    // ("B.04.001," + "_c"), la variante "p01"/"$01"/"S02" sotto un codice con "_".
+    // ("B.04.001," + "_c"), la variante "p01"/"$01"/"S02" sotto un codice con "_", anche
+    // con lo zero letto O o D e il 2 letto Z ("SOZ" = S02, "pD1" = p01).
     // Il resto ("i", "mmmam", "NHL": sporco della colonna) non entra nel codice.
     const pezzi: BloccoOcr[] = []
-    let testoCod = a.text.trim()
+    let testoCod = testoAncora(a.text)
     for (const b of nellaVoce.filter(b => centroX(b) >= xL - 20 && centroX(b) <= xR + 20 && centroY(b) > y - a.h * 0.5)
       .sort((p, q) => centroY(p) - centroY(q) || p.x - q.x)) {
       const t = b.text.trim()
-      const ok = (/^[A-Za-z]$/.test(t) && /[._,]$/.test(testoCod)) || /^_[A-Za-z]{1,2}$/.test(t) ||
-        (/^[A-Za-z$]?[0O]\d$/.test(t) && testoCod.includes('_'))
+      const variante = /^[A-Za-z$]?[0OD][\dZ]$/.test(t) && testoCod.includes('_')
+      const ok = (/^[A-Za-z]$/.test(t) && /[._,]$/.test(testoCod)) || /^_[A-Za-z]{1,2}$/.test(t) || variante
       if (!ok || pezzi.length >= 2) continue
       pezzi.push(b)
-      testoCod += t
+      testoCod += variante ? t.replace(/^([A-Za-z$]?)[OD]/, '$10').replace(/Z$/, '2') : t
     }
     const codice = pulisciCodice(testoCod.replace(/[.,](?=_)/, '').replace(/(?<=_[A-Za-z]{0,2})[O](?=\d)/, '0'))
     // a destra della colonna dei codici, sulla riga del codice: unità di misura e valori
-    // da sinistra a destra (a sinistra ci sono WBS e numero d'ordine)
-    const destra = nellaVoce.filter(b => b.x >= xR - 5 && !pezzi.includes(b))
+    // da sinistra a destra (a sinistra ci sono WBS e numero d'ordine). Il bordo è quello
+    // del codice della voce, se più a sinistra di quello della colonna: la descrizione può
+    // cominciare dentro il codice più largo ("Come sopra…" a x 1209, "8.04.001_0" fino a
+    // 1216, allegato A pag. 47) e senza testo né valori la voce si perdeva come riga vuota.
+    const xDopoCodice = Math.min(xR, a.x + a.w)
+    const destra = nellaVoce.filter(b => b.x >= xDopoCodice - 5 && !pezzi.includes(b))
     const numeri: { n: string; x: number }[] = []
     let um = '', xValori = Infinity, xUm: number | undefined
     for (const b of destra.filter(sullaRiga).sort((p, q) => p.x - q.x)) {
