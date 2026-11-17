@@ -113,6 +113,10 @@ describe('righe', () => {
     expect(RE_COD_GRIGLIA.exec('11 SIC24 26.01.16 vuoto mediante la lavoro')?.slice(1, 3)).toEqual(['11', 'SIC24 26.01.16'])
     expect(normalizzaCodice('SIC24 26.01.04.002')).toBe('SIC24_26.01.04.002')
     expect(normalizzaCodice('S/C24_26.01.18.002')).toBe('SIC24_26.01.18.002')
+    // GFM: sporco davanti, due codici attaccati (vale l'ultimo), K per I, spazio per un punto
+    expect(['03.103.SIC24.14.13.01', 'SIC24_14.02.06.003 SIC24.14.03.02.002', 'SKC24_14.13.03', 'SIC24_14.03 15.001'].map(normalizzaCodice))
+      .toEqual(['SIC24_14.13.01', 'SIC24_14.03.02.002', 'SIC24_14.13.03', 'SIC24_14.03.15.001'])
+    expect(normalizzaCodice('BA.CZ.A.3 09.B Ø.1000')).toBe('BA.CZ.A.3 09.B Ø.1000')   // codice a due pezzi: resta
   })
 
   it('terna coerente: un numero spurio non sposta le colonne', () => {

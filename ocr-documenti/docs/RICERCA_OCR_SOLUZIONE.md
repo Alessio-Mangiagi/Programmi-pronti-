@@ -662,9 +662,10 @@ codice usciva «SIC24» o vuoto. Ora la forma è un codice intero, e una voce de
 un solo numero si completa dalla riga del testo che torna e lo contiene. Dettaglio in
 `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.14.
 
-**Risultato** sui 31 contratti: voci esatte 752 → **760** (80%), quantità e prezzo giusti
-806 (85%), testata invariata. AQ3 11 → 18/31, GFM 94 → 95/108. Nessun altro contratto
-cambia.
+**Risultato** sui 31 contratti: voci esatte 752 → **763** (80%), quantità e prezzo giusti
+806 (85%), testata invariata. AQ3 11 → 18/31, GFM 94 → 98/108 (con le grafie SIC24 di
+GFM: sporco davanti, due codici attaccati, «SKC24», spazio per un punto). Nessun altro
+contratto cambia.
 
 ## Fonti
 

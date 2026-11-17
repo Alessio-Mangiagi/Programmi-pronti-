@@ -649,6 +649,12 @@ Risultato: AQ3 11 → **18/31**, GFM 94 → 95/108. Nessun altro contratto cambi
 righe molto sporche («cad 3,00116,43 €», valori su righe diverse dal codice) e i codici
 della colonna «Tariffa» senza cifre («Miniapala»).
 
+Sempre in `normalizzaCodice`, per GFM: sporco davanti alla sigla («03.103.SIC24.14.13.01»),
+due codici attaccati di cui vale l'ultimo («SIC24_14.02.06.003 SIC24.14.03.02.002»: il
+primo è della voce sopra), «SKC24» per SIC24, uno spazio al posto di un punto della
+tariffa («SIC24_14.03 15.001»). GFM 95 → **98/108**. Restano i codici troncati
+(«SIC24_14.03» col resto su un'altra riga).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
