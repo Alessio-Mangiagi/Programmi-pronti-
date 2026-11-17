@@ -201,8 +201,10 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
 // hanno le linee, le voci no. Ogni riga della griglia contiene allora più voci e i numeri
 // si impilano nella stessa cella. Le voci si dividono sui CODICI della colonna tariffa
 // ("B.03.031.c"), uno per voce e scritti a metà altezza della voce come i valori: il
-// confine fra due voci sta a metà strada fra i due codici, e quantità, prezzi e importi si
-// prendono sulla riga di testo del codice. Su una scansione così sporca i numeri passano
+// confine fra due voci sta nello stacco fra le loro celle (o a metà strada fra i due
+// codici), e quantità, prezzi e importi si prendono sulla riga di testo del codice, o
+// sulle righe di valori sotto un codice che non ne ha (Gecob, PA.OC.0077 con sei righe
+// di pali). Su una scansione così sporca i numeri passano
 // per la riparazione dei separatori (numeroCella con `ripara`) e la voce tiene i valori
 // solo se i conti tornano (valoriLavoriOneri): altrimenti escono codice e unità di
 // misura con i valori vuoti, da completare a mano, mai numeri inventati.
@@ -211,6 +213,11 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
 // "1.01.009"); i numeri ("60.228,72") li esclude numeroCella. Anche la prima riga di un
 // codice spezzato che finisce col separatore ("B.04.001_" sopra, "p01" sotto).
 const RE_ANCORA = /^[A-Z0-9]{1,3}[.,]\d{2}[.,]\d{3}(?:[._,][A-Za-z0-9]{0,4})?[.,]?$/
+// Codice a sigla ("PA.OC.0077", "NP.01", "NP.27": elenco prezzi del subappalto Gecob,
+// insieme a "B.05.030"): lettere, al più un secondo gruppo di lettere, poi le cifre. Vale
+// solo se con la forma di sopra la colonna dei codici non si trova: le sigle si
+// confondono più facilmente con il resto della pagina ("D.LGS.50").
+const RE_ANCORA_SIGLA = /^[A-Z]{1,3}(?:\.[A-Z]{1,3})?\.\d{2,4}$/
 // Testo del codice senza il bordo della cella letto come carattere ("B.04.001_a|")
 const testoAncora = (t: string) => t.trim().replace(/[\s|[\]]+$/, '')
 
@@ -334,16 +341,22 @@ type VoceAncora = { codice: string; descr: string; um: string; xUm?: number; num
 const vociDaAncore = (blocchiOcr: BloccoOcr[], g: Griglia | null): VoceAncora[] | null => {
   const blocchi = blocchiOcr.flatMap(spezzaCodiceInTesta)
   const centroX = (b: BloccoOcr) => b.x + b.w / 2
-  const eAncora = (b: BloccoOcr) => RE_ANCORA.test(testoAncora(b.text)) && numeroCella(b.text, true) === null
-  // colonna dei codici: il gruppo più numeroso di codici con il centro allineato (±80 px)
-  const candidati = blocchi.filter(eAncora).sort((a, b) => centroX(a) - centroX(b))
-  const gruppi: BloccoOcr[][] = []
-  for (const b of candidati) {
-    const ultimo = gruppi[gruppi.length - 1]
-    if (ultimo && centroX(b) - centroX(ultimo[ultimo.length - 1]) <= 80) ultimo.push(b)
-    else gruppi.push([b])
+  // colonna dei codici: il gruppo più numeroso di codici con il centro allineato (±80 px);
+  // prima con i soli codici di tariffa, poi anche con le sigle (RE_ANCORA_SIGLA)
+  const colonnaDi = (forma: (t: string) => boolean): BloccoOcr[] => {
+    const candidati = blocchi.filter(b => forma(testoAncora(b.text)) && numeroCella(b.text, true) === null)
+      .sort((a, b) => centroX(a) - centroX(b))
+    const gruppi: BloccoOcr[][] = []
+    for (const b of candidati) {
+      const ultimo = gruppi[gruppi.length - 1]
+      if (ultimo && centroX(b) - centroX(ultimo[ultimo.length - 1]) <= 80) ultimo.push(b)
+      else gruppi.push([b])
+    }
+    return gruppi.reduce<BloccoOcr[]>((m, x) => (x.length > m.length ? x : m), [])
   }
-  const colonna = gruppi.reduce<BloccoOcr[]>((m, x) => (x.length > m.length ? x : m), [])
+  let colonna = colonnaDi(t => RE_ANCORA.test(t))
+  const sigle = colonna.length < 3
+  if (sigle) colonna = colonnaDi(t => RE_ANCORA.test(t) || RE_ANCORA_SIGLA.test(t))
   if (colonna.length < 3) return null
   const xL = Math.min(...colonna.map(b => b.x)), xR = Math.max(...colonna.map(b => b.x + b.w))
   // un codice per voce: i pezzi sulla stessa riga di testo sono uno
@@ -357,13 +370,72 @@ const vociDaAncore = (blocchiOcr: BloccoOcr[], g: Griglia | null): VoceAncora[] 
   // "B.03,031.c" → "B.03.031.c"; la B letta 8 si corregge sul documento intero
   // (uniformaCodiciOcr in server/parser-contratti.ts): una pagina può averle tutte storpiate
   const pulisciCodice = (t: string) => t.trim().replace(/,/g, '.').replace(/[.$]+$/, '').replace(/\$/g, 'S')
-  const voci = ancore.map((a, k) => {
+  // Confine fra due righe (due codici, o l'intestazione e il primo codice): lo stacco più
+  // alto fra le righe di testo che stanno in mezzo, se alto almeno 0,6 righe (lo spazio
+  // fra due celle; dentro una cella le righe distano pochi pixel). Nel subappalto Gecob il
+  // codice sta a metà altezza della voce e le voci hanno altezze molto diverse: a metà
+  // strada fra PA.OC.0077 (25 righe di descrizione e 6 righe di valori) e B.05.030 (3
+  // righe) il confine tagliava le ultime tre righe di valori della prima. Nessuno stacco
+  // così alto → null, e vale la metà strada.
+  const riga = (a: BloccoOcr) => blocchi.filter(b => Math.abs(centroY(b) - centroY(a)) <= Math.max(a.h, b.h) * 0.8)
+  const sogliaStacco = mediana(blocchi.map(b => b.h)) * 0.6
+  const stacco = (sopra: BloccoOcr, sotto: BloccoOcr): number | null => {
+    const da = Math.max(...riga(sopra).map(b => b.y + b.h)), fino = Math.min(...riga(sotto).map(b => b.y))
+    const fasce = blocchi.filter(b => centroY(b) > da && centroY(b) < fino).sort((p, q) => p.y - q.y)
+      .map(b => [b.y, b.y + b.h]).concat([[fino, fino]])
+    let fine = da, alto = 0, yStacco = 0
+    for (const [inizio, fondo] of fasce) {
+      if (inizio - fine > alto) { alto = inizio - fine; yStacco = (inizio + fine) / 2 }
+      fine = Math.max(fine, fondo)
+    }
+    return alto >= sogliaStacco ? yStacco : null
+  }
+  const confini = ancore.slice(1).map((a, k) => stacco(ancore[k], a) ?? (centroY(ancore[k]) + centroY(a)) / 2)
+  // Prima voce: dallo stacco sotto l'intestazione della tabella, se è sulla pagina (riga
+  // con «Descrizione» e almeno due intestazioni di valori): la descrizione di PA.OC.0077
+  // comincia 17 righe sopra il codice. Altrimenti mezzo passo sopra il codice.
+  const y0 = centroY(ancore[0])
+  const intestazione = blocchi.filter(b => centroY(b) < y0 && RE_INTEST_DESCR.test(b.text) &&
+    riga(b).filter(c => RE_INTEST_VALORE.test(c.text) && numeroCella(c.text) === null).length >= 2)
+    .sort((p, q) => q.y - p.y)[0]
+  const primoSu = (intestazione ? stacco(intestazione, ancore[0]) : null) ?? y0 - passo / 2
+  // Unità di misura e numeri di una riga di valori, da sinistra a destra. xValori: dove
+  // cominciano (la descrizione sta a sinistra).
+  const valoriDi = (bs: BloccoOcr[]) => {
+    const numeri: NumeroX[] = []
+    let um = '', xValori = Infinity, xUm: number | undefined
+    for (const b of [...bs].sort((p, q) => p.x - q.x)) {
+      const t = b.text.trim()
+      if (RE_PCT.test(t)) continue
+      const n = numeroCella(t, true)
+      if (n !== null) { numeri.push({ n, x: b.x + b.w }); xValori = Math.min(xValori, b.x); continue }
+      const forma = t.replace(/[^A-Za-z0-9²³°.]/g, '')
+      if (!um && RE_UM.test(forma)) { um = forma.replace(/\.$/, '').toLowerCase(); xValori = Math.min(xValori, b.x); xUm = centroX(b) }
+    }
+    return { numeri, um, xValori, xUm }
+  }
+  // descrizione: il testo fra il codice e i valori
+  const testoDescr = (bs: BloccoOcr[], xValori: number) =>
+    testoCella(bs.filter(b => b.x + b.w <= xValori + 5 && numeroCella(b.text, true) === null))
+  // Righe di valori sotto il codice (centri a più di 0,8 righe l'uno dall'altro), con
+  // almeno due numeri: il centro di ciascuna.
+  const righeDiValori = (bs: BloccoOcr[]): number[] => {
+    const righe: BloccoOcr[][] = []
+    for (const b of bs.filter(b => numeroCella(b.text, true) !== null && !RE_PCT.test(b.text)).sort((p, q) => centroY(p) - centroY(q))) {
+      const ultima = righe[righe.length - 1]
+      if (ultima && centroY(b) - centroY(ultima[0]) <= Math.max(b.h, ultima[0].h) * 0.8) ultima.push(b)
+      else righe.push([b])
+    }
+    return righe.filter(r => r.length >= 2).map(r => mediana(r.map(centroY)))
+  }
+  const voci = ancore.flatMap((a, k): VoceAncora[] => {
     const y = centroY(a)
-    // confini: a metà strada dai codici vicini, mai oltre una linea della griglia né oltre
-    // mezzo passo (le righe di totale "Complessivamente …" in coda restano fuori)
+    // confini: lo stacco fra le righe (o la metà strada) dai codici vicini, mai oltre una
+    // linea della griglia né oltre mezzo passo dopo l'ultimo codice (le righe di totale
+    // "Complessivamente …" in coda restano fuori)
     const lineaSu = Math.max(-Infinity, ...linee.filter(l => l <= y)), lineaGiu = Math.min(Infinity, ...linee.filter(l => l > y))
-    const su = Math.max(lineaSu, k ? (centroY(ancore[k - 1]) + y) / 2 : y - passo / 2)
-    const giu = Math.min(lineaGiu, k + 1 < ancore.length ? (y + centroY(ancore[k + 1])) / 2 : y + passo / 2)
+    const su = Math.max(lineaSu, k ? confini[k - 1] : primoSu)
+    const giu = Math.min(lineaGiu, k + 1 < ancore.length ? confini[k] : y + passo / 2)
     const nellaVoce = blocchi.filter(b => b !== a && centroY(b) >= su && centroY(b) < giu)
     const sullaRiga = (b: BloccoOcr) => Math.abs(centroY(b) - y) <= Math.max(a.h, b.h) * 0.8
     // Codice spezzato nella sua colonna, solo nelle forme viste: la lettera dopo un codice
@@ -390,20 +462,34 @@ const vociDaAncore = (blocchiOcr: BloccoOcr[], g: Griglia | null): VoceAncora[] 
     // 1216, allegato A pag. 47) e senza testo né valori la voce si perdeva come riga vuota.
     const xDopoCodice = Math.min(xR, a.x + a.w)
     const destra = nellaVoce.filter(b => b.x >= xDopoCodice - 5 && !pezzi.includes(b))
-    const numeri: { n: string; x: number }[] = []
-    let um = '', xValori = Infinity, xUm: number | undefined
-    for (const b of destra.filter(sullaRiga).sort((p, q) => p.x - q.x)) {
-      const t = b.text.trim()
-      if (RE_PCT.test(t)) continue
-      const n = numeroCella(t, true)
-      if (n !== null) { numeri.push({ n, x: b.x + b.w }); xValori = Math.min(xValori, b.x); continue }
-      const forma = t.replace(/[^A-Za-z0-9²³°.]/g, '')
-      if (!um && RE_UM.test(forma)) { um = forma.replace(/\.$/, '').toLowerCase(); xValori = Math.min(xValori, b.x); xUm = centroX(b) }
+    const r = valoriDi(destra.filter(sullaRiga))
+    // Sotto-righe: codice senza valori sulla sua riga e almeno due righe di valori sotto
+    // (Gecob, PA.OC.0077: «SPALLA 1: N° 7 PALI / PROFONDITA' ML. 36,00» con quantità e
+    // prezzi propri, poi PILA 1, PILA 2…). Ogni riga di valori è una voce con lo stesso
+    // codice; la descrizione è quella comune sopra le righe, " - ", il testo della riga
+    // (le righe di testo fino a metà strada dalle righe di valori vicine), come nei moduli
+    // di riferimento. Una sola riga di valori lontana dal codice non basta: potrebbe essere
+    // di una voce col codice illeggibile.
+    const sotto = r.numeri.length ? [] : righeDiValori(destra.filter(b => centroY(b) > y + a.h * 0.8))
+    if (sotto.length >= 2) {
+      const mezzo = mediana(sotto.slice(1).map((v, j) => v - sotto[j])) / 2
+      const righe = sotto.map(v => valoriDi(destra.filter(b => Math.abs(centroY(b) - v) <= Math.max(a.h, b.h) * 0.8)))
+      const xValori = Math.min(...righe.map(x => x.xValori))
+      const comune = testoDescr(destra.filter(b => centroY(b) < sotto[0] - mezzo), xValori)
+      return sotto.map((v, j) => {
+        const fascia = destra.filter(b => centroY(b) >= v - mezzo && (j + 1 === sotto.length || centroY(b) < v + mezzo))
+        const descr = [comune, testoDescr(fascia, xValori)].filter(Boolean).join(' - ')
+        return { codice, descr, um: righe[j].um, xUm: righe[j].xUm, numeri: righe[j].numeri, y: v, h: a.h }
+      })
     }
     // descrizione: il testo fra il codice e i valori, su tutte le righe della voce
-    const descr = testoCella(destra.filter(b => b.x + b.w <= xValori + 5 && numeroCella(b.text, true) === null))
-    return { codice, descr, um, xUm, numeri, y, h: a.h }
+    return [{ codice, descr: testoDescr(destra, r.xValori), um: r.um, xUm: r.xUm, numeri: r.numeri, y, h: a.h }]
   })
+  // Con le sigle, solo nelle tabelle lavori + oneri (le cinque colonne di valori di
+  // Gecob). Nelle tabelle a tre colonne (GFM: «PA.IE.001» accanto a «SIC24_24.04» che la
+  // sigla non copre; SICS: «P.01» pompaggio sotto il calcestruzzo) le voci le legge già
+  // la ricostruzione di sempre, e le pagine perdevano voci.
+  if (sigle && !colonneDeiValori(voci.map(x => x.numeri))) return null
   return voci
 }
 // Valori di ogni voce dai numeri letti sulla riga del codice: per colonne se la pagina
