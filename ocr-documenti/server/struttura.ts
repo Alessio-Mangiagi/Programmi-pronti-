@@ -18,13 +18,20 @@ export const normalizzaCodice = (raw: string): string => {
     .replace(/,/g, '.')                       // nei codici la virgola è sempre un punto letto male
     .replace(/@/g, 'Ø')                       // "@" = lettura OCR di "Ø" ("@.1000" → "Ø.1000")
     .replace(/\s{2,}/g, ' ')
-  // anche "S/C24" (la I letta come barra, AQ3)
-  c = c.replace(/^[\W\d]{0,2}(?:[$5S][iIl1/|]?|[iIl1])?C[zZ2aA]{0,2}4(?=[\s._-])/, 'SIC24')
+  // GFM: numeri d'ordine e pezzi di riga davanti alla sigla ("03.103.SIC24.14.13.01") e
+  // due codici attaccati, quello della voce sopra e il suo ("SIC24_14.02.06.003
+  // SIC24.14.03.02.002"): vale l'ultimo, quello sulla riga della voce
+  c = c.replace(/^[\d.\s]+(?=SIC24[\s._-]\d)/, '')
+  c = c.replace(/^(?:SIC24[\s._-][\d.]+\s+)+(?=SIC24[\s._-]\d)/, '')
+  // anche "S/C24" (la I letta come barra, AQ3) e "SKC24" (GFM)
+  c = c.replace(/^[\W\d]{0,2}(?:[$5S][iIl1/|K]?|[iIl1])?C[zZ2aA]{0,2}4(?=[\s._-])/, 'SIC24')
   // "SIC2418.1.3.1": l'OCR incolla sigla e tariffa. Senza separatore lo stesso articolo
   // usciva con due codici diversi da una pagina all'altra ("SIC24_18.1.3.1" e
   // "SIC2418.1.3.1") e le anagrafiche si sdoppiavano.
   c = c.replace(/^SIC24(?=\d{1,2}\.)/, 'SIC24_')
   c = c.replace(/^SIC24[\s._-]+/, 'SIC24_')
+  // tariffa con uno spazio al posto di un punto: "SIC24_14.03 15.001" → "SIC24_14.03.15.001"
+  if (/^SIC24_[\d.]+ \d+(?:\.\d+)*$/.test(c)) return c.replace(' ', '.')
   // "><(((º> sabusabu <º)))><"
   if (/^\d{2,4} \d{2,3}[a-z]{0,2}$/.test(c)) return c.replace(' ', '')      // numero spezzato in due
   const toks = c.split(' ')
