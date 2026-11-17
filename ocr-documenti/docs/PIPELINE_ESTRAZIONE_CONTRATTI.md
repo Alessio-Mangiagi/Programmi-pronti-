@@ -535,6 +535,41 @@ solo se trova più voci senza perdere i codici.
 Risultato: Gecob 3 → **34 voci esatte su 34**, nessuna in più, totale delle voci
 842.241,99 come il contratto. Nessun altro contratto cambia, descrizioni comprese.
 
+### 4.11 Elenco a corpo senza quantità (PF Future, 17/11/2026)
+
+PF Future 1536 e 1537 hanno il computo `SOMMANO` (voci SIC24 e A.N.E.) e poi una seconda
+tabella a corpo (allarme, TVCC): descrizione lunga e in fondo «P. Unitario | P. Totale»,
+quasi sempre senza la quantità («Serigrafia da 8 aree. 135,41 € 135,41 €»). Sul
+documento intero comanda il computo; la seconda tabella entra pagina per pagina
+(`completaDallePagine`, §4.6), ma solo con le voci che tornano, e queste non tornavano:
+
+- **«€» letto come lettera o cifra** in fondo all'importo («135,41 e», «367,76 6», «163,75
+  8», «1.045,13 e»): «22,59 6» diventava quantità 22,59 × prezzo 6. `normalizzaNumeriOcr`
+  (`server/testo.ts`) rimette il «€» solo su un blocco OCR che contiene SOLO un importo a
+  due decimali seguito da uno di quei caratteri (regola ancorata a tutta la stringa);
+- **quantità 1 sottintesa** (`quantitaSottintesa`, `server/parser-contratti.ts`, in coda a
+  `estraiRighe`, quindi sul documento intero e su ogni pagina): due numeri uguali a due
+  decimali letti come quantità e prezzo («270,94 × 270,94», importo vuoto) diventano
+  1 × 270,94 = 270,94; prezzo e importo uguali con una quantità che non torna («2 251,92 €
+  251,92 €», il 2 dalla descrizione) o mancante danno quantità 1.
+
+Così le voci della seconda tabella tornano ed entrano dalle pagine, dove il computo non le
+ha già (la regola di §4.6: voci nuove con quantità e prezzo non ancora presi). Il
+computo resta com'era.
+
+**Excel per Alyante.** Il riferimento scrive «2.100» (2100 m di cavo dati × 1,03424 =
+2.171,90), e `numIt` di `src/lib/import-contratti.ts` lo leggeva 2,1: col solo punto lo
+prende per decimale, perché dall'OCR arrivano anche quantità come «151.000» = 151.
+`quantitaRiga` decide col conto della riga: vale 2100 se quantità × prezzo = importo
+torna solo così. La usano la colonna QTA dell'Excel e gli avvisi pre-import.
+
+Risultato: PF Future 1536 35 → **44** voci esatte, mancanti 14 → 4; 1537 45 → **56**,
+mancanti 16 → 4, nessuna in più. Nessun altro contratto cambia. Restano: «163,60 €
+1.145,23 €» (quantità 7 non stampata: dedurla dal rapporto confonderebbe «2,50 12,50» =
+2,50 × 12,50 senza importo), «22,59» con prezzo e importo su due righe di testo diverse,
+quattro voci di computo non lette e 31 codici storpiati o persi («SIC24_144.16.5» per
+«SIC24 14.4.16.5», «NE.012» per «A.N.E.012», «S1IC24 .4.3.18.41»).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

@@ -7,11 +7,12 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§14): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§15): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
-  sigla.** Sui 31 contratti testata dal 94% al 96%, voci con quantità e prezzo giusti dal
-  74% all'80%, voci esatte dal 64% al 71%; nessun contratto peggiora. Progetto Costruzioni
-  da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34. «Scan senza
+  sigla, elenchi a corpo senza quantità.** Sui 31 contratti testata dal 94% al 96%, voci
+  con quantità e prezzo giusti dal 74% all'82%, voci esatte dal 64% al 73%; nessun
+  contratto peggiora. Progetto Costruzioni da 41 a 57 voci giuste su 142, Gecob da 3 a 34
+  su 34, PF Future da 35 a 44 e da 45 a 56 su 70. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -597,6 +598,24 @@ confronto con la pagina da sola le voci col codice contano doppio. Dettaglio in
 **Risultato** sui 31 contratti: voci esatte 644 → **675** (71%), quantità e prezzo giusti
 739 → **760** (80%), voci in più 50 → 42, testata invariata. Gecob 3 → **34 su 34**, totale
 delle voci uguale al contratto (842.241,99). Nessun altro contratto cambia.
+
+## 15. PF Future: elenco a corpo senza quantità (17/11/2026)
+
+Si pensava che la seconda tabella di PF Future 1536/1537 (allarme, TVCC: ~30 voci) fosse
+spenta dal computo `SOMMANO`. In realtà entrava già pagina per pagina, ma solo con le voci
+che tornano, e quasi tutte avevano «prezzo € importo €» senza quantità, spesso col «€»
+letto «e», «6» o «8» («367,76 6»). Ora il «€» si rimette sul blocco OCR del solo importo,
+e prezzo e importo uguali danno quantità 1. Il computo non cambia. Nell'Excel per
+Alyante una quantità «2.100» passava come 2,1: ora decide il conto della riga. Dettaglio
+in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.11.
+
+**Risultato** sui 31 contratti: voci esatte 675 → **695** (73%), quantità e prezzo giusti
+760 → **782** (82%), testata invariata. PF Future 1536 35 → 44, 1537 45 → 56; mancanti
+14 → 4 e 16 → 4. Nessun altro contratto cambia.
+
+**Cosa resta** su PF Future: 31 codici storpiati o persi nel computo («SIC24_144.16.5»,
+«NE.012», «S1IC24 .4.3.18.41»), con quantità e prezzo già giusti; quattro voci di computo
+non lette; una quantità non stampata da dedurre (7 × 163,60).
 
 ## Fonti
 

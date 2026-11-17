@@ -39,7 +39,10 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
   esce com'è letto, da controllare. Valgono anche i codici a sigla («NP.01», «PA.OC.0077»)
   quando la tabella ha i valori dei lavori e degli oneri; un codice con più righe di
   valori sotto (pali per spalla e pila) dà una voce per riga, con la descrizione comune
-  seguita da quella della riga.
+  seguita da quella della riga;
+- negli elenchi **a corpo** senza la colonna della quantità («135,41 € 135,41 €») prezzo
+  e importo uguali danno quantità 1, anche col «€» letto «e», «6» o «8» in fondo
+  all'importo («367,76 6»).
 
 Le pagine già lette prima di questi aiuti restano in `.ocr-cache/`: alla prima riapertura
 si cercano solo le linee della tabella, senza rifare l'OCR. Per rileggere ruotata una

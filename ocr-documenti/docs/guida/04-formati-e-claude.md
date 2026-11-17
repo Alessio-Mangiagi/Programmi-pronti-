@@ -117,7 +117,10 @@ salva e premi di nuovo **Scansiona** sulla riga del modulo.
 ![Un modulo con due errori: data e importo](img/12-modulo-errori.png)
 
 Fra i controlli c'è anche il conto delle righe: se scrivi l'importo, deve essere
-quantità × prezzo. Codici articolo, descrizioni e voci ripetute restano esattamente
+quantità × prezzo. Una quantità col solo punto come `2.100` vale duemilacento quando il
+conto della riga lo conferma (2.100 × 1,03424 = 2.171,90); senza importo resta 2,1, quindi
+per le migliaia scrivi anche l'importo, o la virgola dei decimali (`2.100,00`).
+Codici articolo, descrizioni e voci ripetute restano esattamente
 come le hai scritte. La commessa scritta resta quella; se non è nell'elenco ufficiale
 la cella esce rossa nell'Excel, come per ogni contratto. Le condizioni di pagamento
 scritte a parole vengono tradotte nel codice Alyante (es. *60 gg DFFM bonifico* → `DA`).
