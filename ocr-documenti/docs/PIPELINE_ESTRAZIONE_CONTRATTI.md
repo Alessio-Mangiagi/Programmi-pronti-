@@ -655,6 +655,16 @@ primo è della voce sopra), «SKC24» per SIC24, uno spazio al posto di un punto
 tariffa («SIC24_14.03 15.001»). GFM 95 → **98/108**. Restano i codici troncati
 («SIC24_14.03» col resto su un'altra riga).
 
+### 4.15 Testata: partita IVA con la «s», oneri «per ia sicurezza» (17/11/2026)
+
+Nel subappalto Ticopter la partita IVA del fornitore è letta «o3so9380o45»: la o per lo
+zero c'era già, la s può essere 5 o 8. `trovaFornitore` prova le combinazioni e tiene la
+sola con la cifra di controllo giusta (`pivaValida`: dispari sommate, pari raddoppiate
+meno 9 se oltre 9, l'undicesima chiude a un multiplo di 10); nessuna o più di una → la
+P.IVA non si prende. Gli oneri «9.201,26 (…) di oneri per ia sicurezza» (l letta i) non
+si trovavano: `estraiImporti` accetta «per ia». Testata del Ticopter 13 → **15/15**;
+sui 31 contratti 410 → 412/425.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest'
 import {
   RE_COD_GRIGLIA, codiceContratto, condPagamento, dataContratto, estrai, estraiImporti, estraiRigheCelle,
   estraiRigheElencoPrezzi, estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
-  prezziCoerentiPerCodice, quantitaSottintesa, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
+  pivaValida, prezziCoerentiPerCodice, quantitaSottintesa, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
   uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
 import { normalizzaCodice, strutturaAlyante } from '../struttura.ts'
@@ -79,6 +79,13 @@ describe('testata', () => {
   it('P.IVA del fornitore con "o" al posto dello zero', () => {
     const t = 'La COSEDIL S.p.A. … Partita IVA n. 00512340878 … denominata "APPALTATRICE"\nE\nLa Società Alfa S.r.l., con sede in Catania, Partita\nIVA n. 05oo77oo874, … denominata impresa, "SUBAPPALTATRICE"'
     expect(trovaFornitore(t).piva).toBe('05007700874')
+  })
+  it('P.IVA con la s per 5 o 8: decide la cifra di controllo; oneri "per ia sicurezza"', () => {
+    expect(pivaValida('03809380045')).toBe(true)
+    expect(pivaValida('03509380045')).toBe(false)
+    const t = 'Il R.T.I. costituito tra TICOPTER S.r.l. (mandataria), Partita IVA e Codice Fiscale o3so9380o45, nella persona del legale'
+    expect(trovaFornitore(t).piva).toBe('03809380045')
+    expect(estraiImporti('di cui euro 9.201,26 (euro Novemiladuecentouno/26) di oneri per ia sicurezza.').importo_oneri_sicurezza).toBe('9.201,26')
   })
   it('CUP con uno spazio dentro', () => {
     expect(estraiTestata('CUp: B31 E20000230001\nCIG: 1234567890').cup).toBe('B31E20000230001')

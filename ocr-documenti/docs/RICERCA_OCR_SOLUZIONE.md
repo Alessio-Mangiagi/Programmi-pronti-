@@ -7,11 +7,11 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§18): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§19): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
-  descrizione centrata, codici del prezzario con lo spazio.** Sui 31 contratti testata
-  dal 94% al 96%, voci con quantità e prezzo giusti dal 74% all'85%, voci esatte dal 64%
+  descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s.** Sui 31
+  contratti testata dal 94% al 97%, voci con quantità e prezzo giusti dal 74% all'85%, voci esatte dal 64%
   all'80%; nessun contratto peggiora.
   Progetto Costruzioni da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da
   35 a 65 e da 45 a 65 su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31.
@@ -666,6 +666,13 @@ un solo numero si completa dalla riga del testo che torna e lo contiene. Dettagl
 806 (85%), testata invariata. AQ3 11 → 18/31, GFM 94 → 98/108 (con le grafie SIC24 di
 GFM: sporco davanti, due codici attaccati, «SKC24», spazio per un punto). Nessun altro
 contratto cambia.
+
+## 19. Testata: partita IVA con la «s», oneri «per ia» (17/11/2026)
+
+Ticopter: la partita IVA letta «o3so9380o45» si ricompone provando 5 e 8 per la s e
+tenendo la sola lettura con la cifra di controllo giusta; gli oneri «di oneri per ia
+sicurezza» ora si leggono. Testata sui 31 contratti 410 → **412/425 (97%)**, voci
+invariate. Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.15.
 
 ## Fonti
 
