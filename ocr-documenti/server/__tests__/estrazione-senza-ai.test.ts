@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   RE_COD_GRIGLIA, codiceContratto, condPagamento, dataContratto, estrai, estraiImporti, estraiRigheCelle,
-  estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
+  estraiRigheElencoPrezzi, estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
   prezziCoerentiPerCodice, quantitaSottintesa, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
   uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
@@ -497,6 +497,36 @@ describe('tabella numerata per posizione e voci uguali', () => {
   it('elenco con codici veri: il numero d\'ordine in testa non sostituisce il codice', () => {
     const r = righeDaRegione(['1 A.01.001 Scavo di sbancamento mc 10,00 3,73 37,30', '2 Rinterro con materiale mc 5,00 1,40 7,00'])
     expect(r.map(x => x.codice_epu)).toEqual(['A.01.001', ''])
+  })
+  it('griglia con la descrizione centrata: la riga di valori senza testo prende le righe sopra (Ulma)', () => {
+    const r = righeDaRegione([
+      'Noleggio mese 2,00 7.500,00 € 15.000,00 €',
+      'Vendita',
+      'a.c. 1,00 2.500,00 € 2.500,00 €',
+      'Solaio Torri T60 H 7,79 Mq. 465',
+      'Noleggio',
+      'mese 2,00 7.000,00 € 14.000,00 €',
+      'Opzionale pre-',
+      'a.c. 1,00 2.450,00 €',                        // voce opzionale senza totale
+      'montaggio',
+      'Panneli3S 50x200 sp27 mq 600,00 22,00 € - €',  // "- €" = totale non stampato
+    ])
+    expect(r.map(x => [x.descrizione, x.udm, x.quantita, x.prezzo_lordo])).toEqual([
+      ['Noleggio', 'mese', '2,00', '7.500,00'],
+      ['Vendita', 'a.c.', '1,00', '2.500,00'],
+      ['Solaio Torri T60 H 7,79 Mq. 465 Noleggio', 'mese', '2,00', '7.000,00'],
+      ['Opzionale pre montaggio', 'a.c.', '1,00', '2.450,00'],
+      ['Panneli3S 50x200 sp27', 'mq', '600,00', '22,00'],
+    ])
+    // "1,00" con i decimali resta una quantità anche nella struttura per Alyante
+    const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: '', descrizione: 'Opzionale pre-montaggio', udm: 'a.c.', quantita: '1,00', prezzo_lordo: '2.450,00', importo: '' }] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(e)).righe[0]).toMatchObject({ quantita: '1,00', prezzo_lordo: '2.450,00' })
+  })
+  it('stessa tabella, due voci uguali (fusto pila e sottovia): restano tutte e due', () => {
+    const t = ['Descrizione UM Quantità Prezzo unitario Prezzo TOTALE',
+      'Vendita a.c. 1,00 2.500,00 € 2.500,00 €', 'Cassero speciale vendita a.c. 1,00 7.700,00 € 7.700,00 €',
+      'Vendita a.c. 1,00 2.500,00 € 2.500,00 €'].join('\n')
+    expect(estraiRigheElencoPrezzi(t).map(x => x.prezzo_lordo)).toEqual(['2.500,00', '7.700,00', '2.500,00'])
   })
   it('voci identiche del documento restano tutte; il dedup vale solo per le righe dell\'AI', () => {
     const voce = { progressivo: '1', codice_epu: 'A.N.E.006', descrizione: 'Fornitura e montaggio su profilati', udm: 'cad', quantita: '0,5', prezzo_lordo: '267,282584', importo: '133,64' }
