@@ -1232,8 +1232,10 @@ export const sistemaValori = (v1?: string, v2?: string, v3?: string): { quantita
   // Due soli valori: normalmente (quantità, prezzo). Sono invece (prezzo, importo)
   // quando il primo ha una parte decimale ED è tre ordini di grandezza sotto il
   // secondo — un prezzo unitario di 2,55 con "importo" 367.061,85 non è una quantità
-  // di 2,55 kg. Il vincolo dei decimali protegge le voci a corpo vere ("cad 1 6.000,00").
-  if (v1.includes(',') && a < 100 && b >= 1000 && b / a >= 1000) {
+  // di 2,55 kg. Il vincolo dei decimali protegge le voci a corpo vere ("cad 1 6.000,00"),
+  // e anche "1,00" scritto coi decimali resta una quantità (Ulma: "a.c. 1,00 2.450,00 €",
+  // voce opzionale senza totale, usciva 2.450 × 1,00).
+  if (v1.includes(',') && a < 100 && a !== 1 && b >= 1000 && b / a >= 1000) {
     return { quantita: itStr(b / a), prezzo_lordo: v1, importo: v2 }
   }
   return q
@@ -1283,13 +1285,21 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
   // 109,00 € 4.687,00 €"): il codice e il titolo vanno a quella voce (SICS, come nel
   // modulo di riferimento), non in coda alla descrizione della voce precedente.
   let codiceSospeso = ''
+  // Righe di sola descrizione accodate all'ultima voce DOPO la sua riga di valori, e la
+  // sua descrizione di prima. Nelle tabelle con la cella della descrizione centrata in
+  // altezza (Ulma: «Mat. Consumo TUBO PVC / DW15 DI20 L2000 - / a.c. 1,00 2.500,00 € /
+  // ROSETTA PVC…») la riga dei valori arriva senza descrizione e le righe sopra sono già
+  // finite nella voce precedente: sono invece di questa voce, che prima si scartava.
+  let codaUltima: string[] = []
+  let baseUltima = ''
   for (const raw of regione) {
-    // "·" isolato fra le colonne ("115,00 € · 374.670,00 €") e "P,02" per P.02
+    // "·" isolato fra le colonne ("115,00 € · 374.670,00 €") e "P,02" per P.02; "- €" in
+    // fondo = totale non stampato (voce opzionale, Ulma: "mq 600,00 22,00 € - €")
     const line = ricuciImportoSpezzato(raw.trim().replace(RE_NOTA_VALORI, '$1 ')
-      .replace(/\s[·•]\s/g, ' ').replace(/^([A-Z]{1,2}),(\d{2})\b/, '$1.$2'))
+      .replace(/\s[·•]\s/g, ' ').replace(/^([A-Z]{1,2}),(\d{2})\b/, '$1.$2').replace(/\s+-\s*€\s*$/, ''))
     if (!line || RE_RIGA_SERVIZIO.test(line)) continue
-    if (RE_RIGA_TOTALE.test(line)) { sospese = []; codiceSospeso = ''; continue }
-    if (isHeaderGriglia(line) || RE_PROSA_MODELLO.test(line)) { sospese = []; codiceSospeso = ''; continue }
+    if (RE_RIGA_TOTALE.test(line)) { sospese = []; codiceSospeso = ''; codaUltima = []; continue }
+    if (isHeaderGriglia(line) || RE_PROSA_MODELLO.test(line)) { sospese = []; codiceSospeso = ''; codaUltima = []; continue }
     const opz = RE_VOCE_OPZIONALE.exec(line)
     if (opz) {
       const riga = { progressivo: String(righe.length + 1), codice_epu: '', descrizione: pulisciDescrArticolo(opz[2]),
@@ -1315,6 +1325,8 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
         if (line.length >= 3) sospese.push(line)
         if (sospese.length > 4) sospese.shift()
       } else if (ultima && (ultima.descrizione ?? '').length < 160 && !/^[\d\s.,€%-]+$/.test(line)) {
+        if (!codaUltima.length) baseUltima = ultima.descrizione ?? ''
+        codaUltima.push(line)
         ultima.descrizione = pulisciDescrArticolo(`${ultima.descrizione} ${line}`)
       } else if (line.length >= 3) {
         sospese.push(line)
@@ -1338,8 +1350,16 @@ export const righeDaRegione = (regione: string[]): Record<string, string>[] => {
       // sta nel blocco che la precede (tabelle dei noli, raggruppate per attrezzatura)
       descrizione = pulisciDescrArticolo(`${sospese.join(' ')} — ${descrizione}`).slice(0, 240)
     }
+    // riga di valori senza descrizione: sua la descrizione accodata alla voce precedente
+    // dopo i valori di quella (vedi codaUltima), che torna com'era
+    const ultima = righe[righe.length - 1]
+    if (!descrizione && !codice && !sospese.length && codaUltima.length && ultima) {
+      descrizione = pulisciDescrArticolo(codaUltima.join(' ')).slice(0, 240)
+      ultima.descrizione = baseUltima
+    }
     sospese = []
     codiceSospeso = ''
+    codaUltima = []
     if (!descrizione && !codice) continue
     // tre valori = qta, prezzo, importo; due = qta, prezzo (contratti quadro senza importo).
     // sistemaValori rimette in ordine le colonne quando l'importo dice che non tornano.
@@ -1404,20 +1424,28 @@ export const estraiRigheElencoPrezzi = (text: string): Record<string, string>[] 
     if (conValori >= 3) attiva.fill(true)
   }
   const righe: Record<string, string>[] = []
+  const regioneDi = new Map<Record<string, string>, number>()   // voce → finestra da cui viene
   let blocco: string[] = []
+  let nRegione = 0
   for (let i = 0; i <= lines.length; i++) {
     if (i < lines.length && attiva[i]) { blocco.push(lines[i]); continue }
-    if (blocco.length) { righe.push(...righeDaRegione(blocco)); blocco = [] }
+    if (blocco.length) {
+      for (const r of righeDaRegione(blocco)) { regioneDi.set(r, nRegione); righe.push(r) }
+      nRegione++
+      blocco = []
+    }
   }
-  // dedup: la stessa griglia può stare sia dentro l'art. 5 sia nell'allegato in coda
-  const visti = new Set<string>()
+  // dedup: la stessa griglia può stare sia dentro l'art. 5 sia nell'allegato in coda.
+  // Solo fra finestre DIVERSE: dentro la stessa tabella due voci uguali sono due voci
+  // (Ulma: «Vendita a.c. 1,00 2.500,00 €» per il fusto pila e per il sottovia).
+  const visti = new Map<string, number>()
   const out = righe.filter(r => {
     // descrizione INTERA nella chiave: negli allegati mezzi due voci si distinguono solo
     // per la matricola in coda ("… Manitou MRT2660 | K01106394" vs "… | A01106708")
     const k = [r.codice_epu, r.udm, r.quantita, r.prezzo_lordo, r.descrizione].join('|')
-    if (visti.has(k)) return false
-    visti.add(k)
-    return true
+    const prima = visti.get(k), qui = regioneDi.get(r) ?? 0
+    if (prima === undefined) { visti.set(k, qui); return true }
+    return prima === qui
   })
   out.forEach((r, i) => { r.progressivo = String(i + 1) })
   return out
