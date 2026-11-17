@@ -8,13 +8,13 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  RE_COD_GRIGLIA, codiceContratto, dataContratto, estrai, estraiImporti, estraiRigheCelle,
+  RE_COD_GRIGLIA, codiceContratto, condPagamento, dataContratto, estrai, estraiImporti, estraiRigheCelle,
   estraiRigheListino, estraiRigheSommano, estraiRigheWbsOs, estraiTestata, modelloContratto,
-  prezziCoerentiPerCodice, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore,
+  prezziCoerentiPerCodice, ricuciImportoSpezzato, righeDaRegione, ternaCoerente, tipologiaContratto, trovaDitta, trovaFornitore, trovaOggetto,
   uniformaCodiciOcr, type Estratto,
 } from '../parser-contratti.ts'
 import { strutturaAlyante } from '../struttura.ts'
-import { ELENCHI, commessaDaPremesse, matchDivisione } from '../alyante.ts'
+import { ELENCHI, commessaDaPremesse, matchCondPagamento, matchDivisione } from '../alyante.ts'
 import { tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
 import { TITOLO_CELLE, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
@@ -344,5 +344,51 @@ describe('tabella numerata per posizione e voci uguali', () => {
   it('computo: ogni riga SOMMANO è segnata voce_computo', () => {
     const [r] = estraiRigheSommano('A.N.E.006\nFornitura e montaggio su profilati\nSOMMANO cad 0,5 267,282584 133,64 €')
     expect(r.voce_computo).toBe('1')
+  })
+})
+
+// Testata del 17/11/2026 (banco: COND.PAG 23→29 su 31, OGGETTO simile 24→29 su 31).
+describe('condizione di pagamento: le forme che sfuggivano', () => {
+  it('"90 GG.F.M." vince sul primo "15 giorni" del documento (termine di consegna)', () => {
+    const t = 'Entro i primi 15 giorni di ogni mese verrà redatta la contabilità.\nIl pagamento avverrà a mezzo\nBonifico Bancario con scadenza a 90 GG.F.M.;'
+    expect(condPagamento(t)).toBe('BB 90 GG FM')
+  })
+  it('sigla "dffm" senza "gg"', () => {
+    expect(condPagamento('Il pagamento avverrà nei seguenti termini:\na mezzo Bonifico Bancario 30 dffm')).toBe('BB 30 GG DFFM')
+  })
+  it('giorni in più, dopo la scadenza o prima di "giorni"', () => {
+    expect(condPagamento('Bonifico Bancario a 90 GG. D.F.F.M, + 10.')).toBe('BB 90 + 10 GG DFFM')
+    expect(condPagamento('Bonifico bancario con scadenza a 30 + 10 giorni data fattura fine mese')).toBe('BB 30 + 10 GG DFFM')
+  })
+  it('scadenze diverse per voce di elenco → una condizione con tutte le scadenze', () => {
+    const t = 'avverrà mediante bonifico bancario nei seguenti termini:\na) Noleggio: bonifico bancario con scadenza a 120-150 giorni data fattura fine mese;\nb) Vendita: bonifico bancario con scadenza a 60-90-120 giorni data fattura fine mese;\nc) Servizi: bonifico bancario con scadenza a 120 giorni data fattura fine mese'
+    expect(condPagamento(t)).toBe('BB 60/90/120/150 GG DFFM')
+  })
+  it('"vista fattura": nessun giorno, niente "30 giorni" pescato altrove', () => {
+    const t = 'Il professionista consegna la relazione entro 30 giorni.\nIl pagamento avverrà mediante bonifico bancario nei seguenti termini:\na mezzo Bonifico Bancario vista fattura'
+    expect(condPagamento(t)).toBe('Bonifico Bancario vista fattura')
+  })
+  it('solo giorni, senza strumento né scadenza: nessun codice a caso', () => {
+    expect(matchCondPagamento('30 GG')).toBe('30 GG')
+    if (ELENCHI.condPagamento.some(c => c.codice === '407')) expect(matchCondPagamento('BB 30 GG DFFM')).toBe('407')
+  })
+})
+
+describe('oggetto: elenchi e sigle', () => {
+  it('"si impegna a fornire:" + voci → "Fornitura di …"', () => {
+    const t = 'Art. 2 - OGGETTO\nLe prestazioni oggetto del presente Contratto riguardano:\ncommercio di ferramenta e colori,\nla Fornitrice si impegna a fornire:\nUtensileria;\nColori e vernici;\nLegname.\nInoltre:\nA) Tutte le fasi…'
+    expect(trovaOggetto(t)).toBe('Fornitura di utensileria, colori e vernici, legname')
+  })
+  it('introduzione con un inciso e voci puntate', () => {
+    const t = 'Art. 2 - OGGETTO\nLe prestazioni oggetto del presente Contratto ricadenti nelle categorie OS03 e OS30, riguardano:\n• IMPIANTI ELETTRICI E SPECIALI;\n• IMPIANTO ANTINCENDIO;\nNei LAVORI è altresì compreso:\n- Approvvigionamento dei materiali;'
+    expect(trovaOggetto(t)).toBe('Prestazioni ricadenti nelle categorie OS03 e OS30: IMPIANTI ELETTRICI E SPECIALI; IMPIANTO ANTINCENDIO')
+  })
+  it('punti numerati: solo i titoli, saltando spiegazioni e piè di pagina', () => {
+    const t = 'Art. 2 - OGGETTO\nLe prestazioni oggetto del presente Contratto riguardano l\'esecuzione delle sole lavorazioni\nrelative alle seguenti attività in cemento armato:\n1. Realizzazione di armature per casserature\nMontaggio di armature metalliche o lignee.\n2/37 SUBAP-2025-0\nCod. Ident. Contratto\n2. Posa in opera di casseforme piane\nMontaggio di carpenterie.\n3. Getto di calcestruzzi strutturali\nArt. 3 - DURATA'
+    expect(trovaOggetto(t)).toBe('Esecuzione delle sole lavorazioni relative alle seguenti attività in cemento armato: realizzazione di armature per casserature, posa in opera di casseforme piane, getto di calcestruzzi strutturali')
+  })
+  it('"c.a." a fine riga non chiude la frase', () => {
+    const t = 'Art. 2 - OGGETTO\nI lavori oggetto del presente Contratto riguardano il pompaggio di conglomerati per le opere in c.a.\n(specifiche e generiche) e dei pali di fondazione.\nInoltre:'
+    expect(trovaOggetto(t)).toBe('Pompaggio di conglomerati per le opere in c.a. (specifiche e generiche) e dei pali di fondazione')
   })
 })
