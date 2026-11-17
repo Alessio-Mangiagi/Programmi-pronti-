@@ -2169,6 +2169,19 @@ export const estraiImporti = (t: string): Record<string, string> => {
   }
   // percentuali: valgono anche i numeri piccoli ("5", "5,5", "100")
   const pct = (re: RegExp) => (der ? primoMatch(der, re) : '') || primoMatch(t, re)
+  // anticipo scritto in cifre dopo "anticip…" (sulla stessa riga) o "acconto pari" (anche
+  // a capo), deroghe prima; le o lette al posto degli zeri tornano cifre
+  const anticipoScritto = (): string => {
+    const re = new RegExp(String.raw`(?:anticip\w*[^\n]{0,120}?|\bacconto\s+pari\b[\s\S]{0,160}?)pari\s+ad?\s*(?:€\s*)*(\d[\d.,oO]*[\doO])`, 'gi')
+    for (const testo of [der, t]) {
+      if (!testo) continue
+      for (const m of testo.matchAll(re)) {
+        const v = m[1].replace(/[oO]/g, '0')
+        if (new RegExp(String.raw`^(?:${NUM_SRC})$`).test(v) && importoValido(v)) return v
+      }
+    }
+    return ''
+  }
   const imp: Record<string, string> = {
     // \D{0,120}: fra l'etichetta e la cifra c'è tutta la formula del template
     // ("è determinato a misura tra le Parti in € …") — con 60 non ci arrivava
@@ -2177,7 +2190,10 @@ export const estraiImporti = (t: string): Record<string, string> => {
       || pct(/(\d{1,2}(?:,\d{1,2})?)\s*%\s*(?:a\s+titolo\s+di\s+)?(?:ritenuta|garanzia)/i),
     // anticipi (art. 7 Pagamenti — appunti): spesso in % con importo "pari a €…";
     // preferisci l'importo esplicito, poi il primo numero dopo "anticipazion…".
-    importo_anticipi: numDer(new RegExp(String.raw`anticip\w*[^\n]{0,120}?pari\s+ad?\s*€?\s*(${NUM_SRC})`, 'i'))
+    // L'importo scritto vince sul calcolo dalla percentuale ("acconto pari al 20% … pari ad
+    // € € 118.145,80", Muzzolon: il 20% darebbe 118.145,81), e può avere la o per lo zero
+    // ("pari a € / 30.00o,0o", subappalto 030)
+    importo_anticipi: anticipoScritto()
       || numDer(new RegExp(String.raw`anticip\w*\D{0,60}?(${NUM_SRC})`, 'i')),
     percent_recupero_anticipazioni: pct(/recupero\D{0,40}?(\d{1,3}(?:,\d{1,2})?)\s*%/i),
     // Il template COSEDIL cita l'importo PRIMA dell'etichetta ("comprensivo di euro
@@ -2185,7 +2201,7 @@ export const estraiImporti = (t: string): Record<string, string> => {
     // vicino è quello che precede "oneri sicurezza", non quello che segue. Il
     // pattern "prima" ha priorità; "dopo" resta come fallback per altri template.
     // "per ia sicurezza": la l letta i (Ticopter)
-    importo_oneri_sicurezza: numDer(new RegExp(String.raw`(${NUM_SRC})\s*(?:€|euro)?\s*(?:\([^)]{0,80}\)\s*)?di\s+oneri\s+(?:per\s+[li1]a\s+|della\s+)?sicurezza`, 'i'))
+    importo_oneri_sicurezza: numDer(new RegExp(String.raw`(${NUM_SRC})\s*(?:€|euro)?\s*(?:\([^)]{0,80}\)\s*)?di\s+oneri\s*(?:per\s+[li1]a\s+|della\s+)?\s*sicurezza`, 'i'))
       || numDer(new RegExp(String.raw`oneri\s+(?:per\s+[li1]a\s+|della\s+)?sicurezza\D{0,60}?(${NUM_SRC})`, 'i'))
       // totale in coda all'elenco prezzi ("SOMMANO ONERI DI SICUREZZA 15.107,94€"):
       // nei subappalti a misura l'importo non sta nell'articolo importi ma nel computo
@@ -2515,6 +2531,17 @@ export const dataContratto = (full: string): string => {
   return ''
 }
 
+// CIG = 10 caratteri alfanumerici, anche questo a volte con uno spazio dentro ("CIG: B61
+// A803B31", Beton): senza, si prendeva il CIG dell'accordo quadro citato più avanti. Lo
+// spazio interno vale solo con almeno 3 cifre: "CIG del contratto" non è un CIG.
+const cigDa = (full: string): string => {
+  for (const m of full.matchAll(/\bC\.?I\.?G\.?\b\D{0,10}?((?:[A-Z0-9] ?){9}[A-Z0-9])(?![A-Z0-9])/gi)) {
+    const c = m[1].replace(/ /g, '')
+    if (!m[1].includes(' ') || (c.match(/\d/g) ?? []).length >= 3) return c
+  }
+  return ''
+}
+
 // CUP = 15 caratteri alfanumerici. L'OCR ci infila a volte uno spazio ("CUp: B31
 // E20000230001"): si accettano due pezzi sulla stessa riga purché insieme facciano 15.
 const cupDa = (full: string): string => {
@@ -2568,7 +2595,7 @@ export const estraiTestata = (full: string): Record<string, string> => {
     data_contratto: dataContratto(full) || date[date.length - 1] || '',
     cond_pagamento: condPagamento(full),
     oggetto: trovaOggetto(full),
-    cig: primoMatch(full, /\bC\.?I\.?G\.?\b\D{0,10}([A-Z0-9]{10})\b/i),
+    cig: cigDa(full),
     cup: cupDa(full),
     // Dt. Doc SOLO se etichettata: prendere la prima data del documento pescava
     // date di leggi/norme citate nel preambolo (viste in output: 29/03/1957,
