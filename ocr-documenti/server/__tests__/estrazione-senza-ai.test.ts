@@ -548,6 +548,23 @@ describe('tabella numerata per posizione e voci uguali', () => {
     const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: '', descrizione: 'Opzionale pre-montaggio', udm: 'a.c.', quantita: '1,00', prezzo_lordo: '2.450,00', importo: '' }] } as unknown as Estratto
     expect(JSON.parse(strutturaAlyante(e)).righe[0]).toMatchObject({ quantita: '1,00', prezzo_lordo: '2.450,00' })
   })
+  it('migliaia della quantità separate da uno spazio, codice del titolo sopra (Warm)', () => {
+    const r = righeDaRegione([
+      '1E.02.40.0095.C Costruzione CPR, di rame ricotto isolato con materiale isola ... ità m 1 108,00 3,15 € 3.494,53 €',
+      'rimozione delle tubazioni a vista;- accatastament ... tituiscono il m 2 730,00 0,90 € 2.460,05 €',  // "m 2" non è m²
+      'NP.35 For. e posa di apparecchio di illuminazione tipo Disano 745 OBLO J',
+      '2.0 LED 16W CLD bianco con sensore on-off incorporato art.',
+      '11260019 flusso luminoso 2026 Lumen, CCT 4000 K CRI ... cad 32,00 99,32 € 3.178,37 €',
+      // senza conto che torni le cifre non si uniscono: quantità 2, prezzo 211,73
+      'Posa di plafoniera a soffitto cad 2 211,73 € 423,46 €',
+    ])
+    expect(r.map(x => [x.codice_epu, x.udm, x.quantita, x.prezzo_lordo])).toEqual([
+      ['1E.02.40.0095.C', 'm', '1.108,00', '3,15'],
+      ['', 'm', '2.730,00', '0,90'],
+      ['NP.35', 'cad', '32,00', '99,32'],
+      ['', 'cad', '2', '211,73'],
+    ])
+  })
   it('stessa tabella, due voci uguali (fusto pila e sottovia): restano tutte e due', () => {
     const t = ['Descrizione UM Quantità Prezzo unitario Prezzo TOTALE',
       'Vendita a.c. 1,00 2.500,00 € 2.500,00 €', 'Cassero speciale vendita a.c. 1,00 7.700,00 € 7.700,00 €',

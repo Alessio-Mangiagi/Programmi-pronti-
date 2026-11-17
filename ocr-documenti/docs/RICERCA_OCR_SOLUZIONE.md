@@ -7,15 +7,14 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§19): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§20): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
-  descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s.** Sui 31
-  contratti testata dal 94% al 98%, voci con quantità e prezzo giusti dal 74% all'85%, voci esatte dal 64%
-  all'80%; nessun contratto peggiora.
-  Progetto Costruzioni da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da
-  35 a 65 e da 45 a 65 su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31.
-  «Scan senza
+  descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s, migliaia con lo
+  spazio.** Sui 31 contratti testata dal 94% al 98%, voci con quantità e prezzo giusti dal
+  74% all'85%, voci esatte dal 64% all'81%; nessun contratto peggiora. Progetto Costruzioni
+  da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da 35 a 65 e da 45 a 65
+  su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -675,6 +674,14 @@ sicurezza» ora si leggono. Poi l'anticipo scritto in cifre (vince sul calcolo d
 percentuale, anche con la o per lo zero), gli oneri «oneriper la / sicurezza» e il CIG con
 uno spazio dentro. Testata sui 31 contratti 410 → **417/425 (98%)**, voci invariate.
 Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.15.
+
+## 20. Warm: migliaia con lo spazio, codice del titolo (17/11/2026)
+
+Le quantità «m 1 108,00» si uniscono solo quando il conto della riga lo conferma, e il
+codice della riga di titolo (NP.35) non cede più a un pezzo di descrizione («24W»,
+«IP30») in testa alla riga dei valori. Warm 138 → **146/146**. Sui 31 contratti voci
+esatte 763 → **771** (81%), quantità e prezzo giusti 806 → **810** (85%). Dettaglio in
+`PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.16.
 
 ## Fonti
 

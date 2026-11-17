@@ -680,6 +680,22 @@ così), «SUBAP-2025-0» come codice GEMMALPE nel riferimento, due condizioni di
 scritte a parole senza codice in elenco, due oggetti riassunti a mano, ditta e fornitore
 del Contratto_fornitura.
 
+### 4.16 Migliaia separate da uno spazio, codice del titolo (Warm, 17/11/2026)
+
+Nel computo Warm la quantità ha le migliaia separate da uno spazio («m 1 108,00 3,15 €
+3.494,53 €»): la coda dei valori prendeva 108,00 come quantità e, con l'importo, la
+ricalcolava (1.109,375); con «m 2 730,00» il «m 2» diventava anche m². In `righeDaRegione`
+la cifra davanti si unisce alla quantità solo se così quantità × prezzo = importo torna e
+senza no: «cad 2 211,73 € 423,46 €» resta 2 × 211,73 (il motivo per cui sull'OCR gli spazi
+non si uniscono a priori, vedi `unisciMigliaiaSpazio`).
+
+Le voci NP.35-NP.42 hanno il codice sulla riga di titolo e la riga dei valori comincia con
+un pezzo di descrizione in forma di codice («11260019 flusso luminoso…», «24W IP65…»,
+«IP30 con porta di vetro…»), che prendeva il posto di NP.35. Con un codice in sospeso dal
+titolo, un «codice» senza punto interno in testa alla riga dei valori resta descrizione.
+
+Risultato: Warm 138 → **146/146**. Nessun altro contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
