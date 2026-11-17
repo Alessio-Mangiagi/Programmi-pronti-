@@ -1498,6 +1498,150 @@ export const staccaQtaIncollata = (v1: string, v2: string): [string, string, str
   }
   return null
 }
+// ── Codici del computo storpiati dall'OCR (PF Future, 17/11/2026) ──────────────
+// Nei computi PF Future 31 voci su 140 avevano quantità e prezzo giusti e il codice
+// storpiato o perso. La riga del codice porta sporco prima e dopo ("28 2.7 SIC24
+// 14.4.7.19", "25 27 SIC24 14.4.6.37 a", "42 A.N.E.010 •*+990"), perde i punti della
+// tariffa ("SIC24 144.16.5", "SIC24 1446.20", "SIC24 14411"), legge la I della sigla 1
+// o 0 ("S1C24", "S1024") e storpia le lettere puntate ("A.NE.012", "AN.E.D09").
+// Le correzioni usano SOLO le famiglie di codici che il documento scrive già giuste
+// (almeno tre volte): un codice si ricompone se sigla e cifre portano a un solo codice
+// di una famiglia; altrimenti resta com'è letto, da controllare. Le cifre non cambiano
+// mai: si aggiungono i separatori persi, si ripara la sigla e si rimette la parte delle
+// lettere puntate persa.
+
+// codice "sigla + anno + tariffa" in una riga sporca: la sigla può avere 1 o 0 per I o C,
+// i separatori della tariffa possono essere spazi ("SIC24 14.4 5.34")
+const RE_CODICE_SIGLA = /([A-Z][A-Z01]{1,5})(\d{2})[\s_]?(\d{1,5}(?:[.\s]\d{1,3}){0,3})(?![\d,\-/])/
+// lettere puntate + numero, con punti persi o spazi e lo zero letto O o D ("AN.E.D09")
+const RE_CODICE_PUNTATO = /[A-Z][A-Z.\s]*?[.\s]?[\dOD]{2,3}(?![\dA-Za-z,\-/])/
+// Riga che porta solo il codice, anche con sporco intorno: corta, con un codice, e
+// nessun'altra parola di 3 lettere o più (le righe di descrizione e di misura ne hanno).
+// Le lettere puntate valgono con almeno 3 lettere e 3 cifre: "EN 64-8" (norma CEI in
+// coda alla descrizione) passava per riga di codice e la voce restava senza descrizione.
+const eRigaCodiceSporca = (l: string): boolean => {
+  if (l.length > 45) return false
+  const s = RE_CODICE_SIGLA.exec(l)
+  const p = s ? null : RE_CODICE_PUNTATO.exec(l)
+  const m = s ?? p
+  if (!m || !/\d/.test(m[0])) return false
+  if (p && !/^[A-Z]{3,}[\dOD]{3}$/.test(p[0].replace(/[.\s]/g, ''))) return false
+  return !/[A-Za-zÀ-ü]{3,}/.test(l.slice(0, m.index) + ' ' + l.slice(m.index + m[0].length))
+}
+const eRigaCodice = (l: string): boolean => RE_LINEA_COD_NEP.test(l) || eRigaCodiceSporca(l)
+
+// Sigla letta con le cifre al posto delle lettere: stessa lunghezza, differenze solo
+// fra caratteri che l'OCR confonde (1/I, 0/O, 0/C).
+const CONFUSI = new Set(['1I', 'I1', '0O', 'O0', '0C', 'C0'])
+const siglaCompatibile = (letta: string, vera: string): boolean =>
+  letta.length === vera.length && [...letta].every((c, i) => c === vera[i] || CONFUSI.has(c + vera[i]))
+// Tutti i modi di spezzare i segmenti della tariffa in `k` segmenti senza cambiare le cifre
+const spezzature = (segs: string[], k: number): string[][] => {
+  const out = new Map<string, string[]>()
+  const giro = (s: string[]) => {
+    if (s.length === k) { out.set(s.join('.'), s); return }
+    for (let i = 0; i < s.length; i++) for (let j = 1; j < s[i].length; j++)
+      giro([...s.slice(0, i), s[i].slice(0, j), s[i].slice(j), ...s.slice(i + 1)])
+  }
+  if (segs.length <= k) giro(segs)
+  return [...out.values()]
+}
+
+/**
+ * Ripara i codici del computo con le famiglie del documento. `grezze[i]` è la riga del
+ * codice della voce i (con lo sporco), se trovata. Famiglie, dai codici letti giusti:
+ * - sigla + anno + tariffa ("SIC24 14.3.17.55"): tariffa col numero di segmenti più
+ *   frequente; i prefissi della tariffa (14, 14.4, 14.4.6) e la lunghezza massima di
+ *   ogni segmento dicono come spezzare le cifre di un codice che ha perso i punti.
+ *   Vince la sola spezzatura col prefisso conosciuto più lungo (almeno due segmenti):
+ *   "144.637" → 14.4.6.37 (14.4.6 c'è), non 14.4.63.7;
+ * - lettere puntate + numero ("A.N.E.009"): un codice le cui lettere sono la coda di
+ *   quelle della famiglia e le cifre (O e D lette 0) quante quelle della famiglia;
+ * - solo cifre ("143145"): il codice giusto del documento con le stesse cifre.
+ * Un codice che rispetta già una famiglia non si tocca; uno che non porta a un solo
+ * codice di famiglia resta com'è.
+ */
+export const riparaCodiciComputo = (righe: Record<string, string>[], grezze: (string | undefined)[]): void => {
+  const RE_SIGLA_GIUSTO = /^([A-Z]{2,6}\d{2}) (\d{1,3}(?:\.\d{1,3})+)$/
+  const RE_PUNTATO_GIUSTO = /^([A-Z](?:\.[A-Z]){1,3})[.\s](\d{2,3})$/
+  // famiglie a sigla: sigla → segmenti più frequenti, prefissi, lunghezze, codici
+  const perSigla = new Map<string, string[][]>()
+  const perLettere = new Map<string, { lettere: string; cifre: number; n: number }>()
+  for (const r of righe) {
+    const c = (r.codice_epu ?? '').trim()
+    const s = RE_SIGLA_GIUSTO.exec(c)
+    if (s) perSigla.set(s[1], [...(perSigla.get(s[1]) ?? []), s[2].split('.')])
+    const p = RE_PUNTATO_GIUSTO.exec(c)
+    if (p) {
+      const chiave = `${p[1]}|${p[2].length}`
+      const f = perLettere.get(chiave) ?? { lettere: p[1], cifre: p[2].length, n: 0 }
+      f.n++
+      perLettere.set(chiave, f)
+    }
+  }
+  type FamigliaSigla = { sigla: string; k: number; prefissi: Set<string>; lung: number[]; codici: string[] }
+  const famiglie: FamigliaSigla[] = []
+  for (const [sigla, tariffe] of perSigla) {
+    const conta = new Map<number, number>()
+    for (const t of tariffe) conta.set(t.length, (conta.get(t.length) ?? 0) + 1)
+    const [k] = [...conta].sort((a, b) => b[1] - a[1])[0]
+    const giuste = tariffe.filter(t => t.length === k)
+    if (giuste.length < 3) continue
+    const prefissi = new Set(giuste.flatMap(t => t.slice(0, -1).map((_, i) => t.slice(0, i + 1).join('.'))))
+    const lung = Array.from({ length: k }, (_, i) => Math.max(...giuste.map(t => t[i].length)))
+    famiglie.push({ sigla, k, prefissi, lung, codici: giuste.map(t => `${sigla} ${t.join('.')}`) })
+  }
+  const puntate = [...perLettere.values()].filter(f => f.n >= 3)
+  const giustoSigla = (c: string) => famiglie.some(f => { const m = RE_SIGLA_GIUSTO.exec(c); return m?.[1] === f.sigla && m[2].split('.').length === f.k })
+  const giustoPuntato = (c: string) => puntate.some(f => { const m = RE_PUNTATO_GIUSTO.exec(c); return m?.[1] === f.lettere && m[2].length === f.cifre })
+
+  // sigla + tariffa letta → codice di famiglia, o null
+  const daSigla = (t: string): string | null => {
+    const m = RE_CODICE_SIGLA.exec(t)
+    if (!m) return null
+    const segs = m[3].split(/[.\s]/).filter(Boolean)
+    for (const f of famiglie) {
+      if (!siglaCompatibile(m[1] + m[2], f.sigla)) continue
+      const valide = spezzature(segs, f.k).filter(s => s.every((x, i) => x.length <= f.lung[i]))
+      const profondita = (s: string[]) => { let d = 0; while (d < f.k - 1 && f.prefissi.has(s.slice(0, d + 1).join('.'))) d++; return d }
+      const migliore = Math.max(-1, ...valide.map(profondita))
+      const vincenti = valide.filter(s => profondita(s) === migliore)
+      if (migliore >= 2 && vincenti.length === 1) return `${f.sigla} ${vincenti[0].join('.')}`
+    }
+    return null
+  }
+  // lettere puntate lette male → codice di famiglia, o null
+  const daPuntato = (t: string): string | null => {
+    const m = RE_CODICE_PUNTATO.exec(t)
+    if (!m) return null
+    const pulito = m[0].replace(/[.\s]/g, '')
+    for (const f of puntate) {
+      const lettere = f.lettere.replace(/\./g, '')
+      for (let i = 1; i < pulito.length; i++) {
+        const testa = pulito.slice(0, i), coda = pulito.slice(i).replace(/[OD]/g, '0')
+        if (/^[A-Z]+$/.test(testa) && lettere.endsWith(testa) && new RegExp(`^\\d{${f.cifre}}$`).test(coda)) return `${f.lettere}.${coda}`
+      }
+    }
+    return null
+  }
+  // solo cifre: il codice giusto del documento con le stesse cifre, se uno solo
+  const daCifre = (t: string): string | null => {
+    if (!/^\d{5,}$/.test(t)) return null
+    const uguali = new Set(famiglie.flatMap(f => f.codici.filter(c => c.split(' ')[1].replace(/\./g, '') === t)))
+    return uguali.size === 1 ? [...uguali][0] : null
+  }
+  righe.forEach((r, i) => {
+    const c = (r.codice_epu ?? '').trim()
+    if (giustoSigla(c)) return
+    if (giustoPuntato(c)) { r.codice_epu = c.replace(/\s(?=\d+$)/, '.'); return }
+    for (const t of [grezze[i], c]) {
+      if (!t) continue
+      const nuovo = daSigla(t) ?? daPuntato(t) ?? daCifre(t.trim())
+      if (nuovo) { r.codice_epu = nuovo; return }
+    }
+  })
+}
+
 export const estraiRigheSommano = (text: string): Record<string, string>[] => {
   // I valori si leggono dal testo normalizzato, le righe di codice e descrizione da
   // quello originale: la normalizzazione trasforma "…40" finale in decimale e rovinava
@@ -1506,6 +1650,7 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
   const originali = text.split('\n')
   const lines = normalizzaValoriTabella(text).split('\n')
   const righe: Record<string, string>[] = []
+  const grezze: (string | undefined)[] = []      // riga del codice di ogni voce, con lo sporco
   let blocco: string[] = []
   for (const [n, raw] of lines.entries()) {
     const line = raw.trim()
@@ -1515,7 +1660,9 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
     if (!m) {
       const orig = (originali[n] ?? raw).trim()
       if (orig && !RE_RIGA_SERVIZIO.test(orig) && !RE_PROSA_MODELLO.test(orig)) blocco.push(orig)
-      if (blocco.length > 30) blocco.shift()
+      // 60 righe: le voci dei quadri elettrici PF Future hanno descrizione e misure
+      // oltre le 30, e con 30 la riga del codice usciva dal blocco (voce senza codice)
+      if (blocco.length > 60) blocco.shift()
       continue
     }
     const um = m[1]
@@ -1574,8 +1721,9 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
     // descrizione: nel computo il codice N.E.P. apre la voce e la descrizione lo segue —
     // le righe prima del codice sono le misure della voce precedente
     const utili = blocco.filter(l =>
-      /[A-Za-zÀ-ü]{4,}/.test(l) || RE_LINEA_COD_NEP.test(l))
-    const iCod = utili.map(l => RE_LINEA_COD_NEP.test(l)).lastIndexOf(true)
+      /[A-Za-zÀ-ü]{4,}/.test(l) || eRigaCodice(l))
+    // la riga del codice apre la voce: dopo di lei viene la descrizione
+    const iCod = utili.map((l, k) => eRigaCodice(l) && utili.slice(k + 1).some(x => /[A-Za-zÀ-ü]{4,}/.test(x))).lastIndexOf(true)
     // Senza riga-codice non si sa dove comincia la voce: prendere tutto il blocco
     // (fino a 30 righe) faceva entrare nella descrizione le clausole del contratto
     // che precedono l'allegato ("…nella più completa ed approfondita conoscenza
@@ -1603,6 +1751,7 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
       (codice ? testo.replace(codice, ' ') : testo).replace(/^[\s\d.,;:*+-]+/, '')).slice(0, 240)
     blocco = []
     if (descrizione.length < 8) continue
+    grezze.push(iCod >= 0 ? utili[iCod] : undefined)
     righe.push({
       progressivo: String(righe.length + 1),
       codice_epu: codice,
@@ -1617,6 +1766,7 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
       voce_computo: '1',
     })
   }
+  riparaCodiciComputo(righe, grezze)
   return righe
 }
 
