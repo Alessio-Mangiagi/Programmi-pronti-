@@ -166,9 +166,11 @@ export const strutturaAlyante = (e: Estratto, opz: OpzioniStruttura = {}): strin
     const a = itNum(r.quantita), b = itNum(r.prezzo_lordo)
     if (!isFinite(a) || !isFinite(b) || a <= 0 || b <= 0) continue
     if (r.quantita.includes(',') && r.prezzo_lordo.includes(',')) {
-      // [28,21 | 56,42] → qta 2, prezzo 28,21, importo 56,42
+      // [28,21 | 56,42] → qta 2, prezzo 28,21, importo 56,42. Con la quantità "1,00" ogni
+      // prezzo sarebbe un multiplo intero: resta 1 × prezzo (Ulma, "a.c. 1,00 2.450,00 €"
+      // della voce opzionale senza totale usciva 2.450 × 1,00)
       const n = b / a
-      if (n >= 1 && n <= 100000 && Math.abs(n - Math.round(n)) < 0.005) {
+      if (a !== 1 && n >= 1 && n <= 100000 && Math.abs(n - Math.round(n)) < 0.005) {
         r.importo = r.prezzo_lordo; r.prezzo_lordo = r.quantita; r.quantita = String(Math.round(n))
       }
     } else if (r.quantita.includes(',')) {
