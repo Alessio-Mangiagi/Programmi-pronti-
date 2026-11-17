@@ -570,6 +570,42 @@ mancanti 16 → 4, nessuna in più. Nessun altro contratto cambia. Restano: «16
 quattro voci di computo non lette e 31 codici storpiati o persi («SIC24_144.16.5» per
 «SIC24 14.4.16.5», «NE.012» per «A.N.E.012», «S1IC24 .4.3.18.41»).
 
+### 4.12 Codici del computo storpiati (PF Future, 17/11/2026)
+
+Nei computi PF Future 31 voci avevano quantità e prezzo giusti e il codice storpiato o
+perso. Tre cause, in `estraiRigheSommano` (`server/parser-contratti.ts`):
+
+- **riga del codice con sporco intorno** («28 2.7 SIC24 14.4.7.19», «25 27 SIC24 14.4.6.37
+  a», «42 A.N.E.010 •*+990», «40: 16 SIC24…»): non valeva come riga di codice e la voce
+  prendeva un codice dalla descrizione («UE.305» da «CPR UE 305/11») o nessuno.
+  `eRigaCodiceSporca` accetta una riga corta (≤ 45 caratteri) con un codice e nessun'altra
+  parola di 3 lettere o più; le lettere puntate solo con almeno 3 lettere e 3 cifre e
+  niente «-» o «/» dopo («EN 64-8», norma CEI in coda alla descrizione, toglieva la
+  descrizione alla voce). La riga del codice deve avere della descrizione dopo di sé;
+- **riga del codice uscita dal blocco**: le voci dei quadri elettrici hanno descrizione e
+  misure oltre le 30 righe tenute in memoria. Ora 60; la descrizione parte comunque dalla
+  riga del codice (senza codice, dalle ultime 10 righe come prima);
+- **codice storpiato**: `riparaCodiciComputo` ricompone i codici con le famiglie che il
+  documento scrive già giuste (almeno tre volte):
+  - sigla + anno + tariffa («SIC24 14.3.17.55»): numero di segmenti più frequente, prefissi
+    conosciuti (14, 14.4, 14.4.6) e lunghezza massima di ogni segmento. Le cifre non
+    cambiano, si rimettono i punti persi: vince la sola spezzatura col prefisso
+    conosciuto più lungo, di almeno due segmenti («144.637» → 14.4.6.37 perché 14.4.6
+    c'è, non 14.4.63.7; «14411» → 14.4.1.1; «14.4 5.34» → 14.4.5.34). La sigla può avere
+    1 o 0 al posto di I o C («S1C24», «S1024»);
+  - lettere puntate + numero («A.N.E.009»): lettere che sono la coda di quelle della
+    famiglia e cifre (O e D lette 0) quante quelle della famiglia («A.NE.012», «AN.E.D09»);
+  - solo cifre («143145»): il codice giusto del documento con le stesse cifre, se uno solo.
+
+  Un codice che rispetta già una famiglia non si tocca; uno che non porta a un solo
+  codice di famiglia resta com'è letto («S1IC24 .4.3.18.41» ha perso anche una cifra;
+  «N F 00» non ha famiglia).
+
+Risultato: PF Future villette 29 → **33/34**, uffici 44 → **65/70**, residence 56 →
+**65/70**; le descrizioni cominciano dall'inizio della voce invece che dalle misure
+(«VT27U a DoZzelte…» → «Fornitura e posa in opera su scavo…»). Nessun altro contratto
+cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

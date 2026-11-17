@@ -7,12 +7,13 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§15): documento intero con le pagine, testata,
+- **Aggiornamento del 17/11 (§11-§16): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
-  sigla, elenchi a corpo senza quantità.** Sui 31 contratti testata dal 94% al 96%, voci
-  con quantità e prezzo giusti dal 74% all'82%, voci esatte dal 64% al 73%; nessun
-  contratto peggiora. Progetto Costruzioni da 41 a 57 voci giuste su 142, Gecob da 3 a 34
-  su 34, PF Future da 35 a 44 e da 45 a 56 su 70. «Scan senza
+  sigla, elenchi a corpo senza quantità, codici del computo ricomposti.** Sui 31
+  contratti testata dal 94% al 96%, voci con quantità e prezzo giusti dal 74% all'83%,
+  voci esatte dal 64% al 77%; nessun contratto peggiora. Progetto Costruzioni da 41 a 57
+  voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da 35 a 65 e da 45 a 65 su 70.
+  «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -616,6 +617,27 @@ in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.11.
 **Cosa resta** su PF Future: 31 codici storpiati o persi nel computo («SIC24_144.16.5»,
 «NE.012», «S1IC24 .4.3.18.41»), con quantità e prezzo già giusti; quattro voci di computo
 non lette; una quantità non stampata da dedurre (7 × 163,60).
+
+## 16. Codici del computo ricomposti con le famiglie del documento (17/11/2026)
+
+I 31 codici di PF Future non erano illeggibili: la riga del codice aveva sporco intorno
+(numeri d'ordine, «a», «•*+990») e non veniva riconosciuta; con le descrizioni lunghe dei
+quadri usciva dalle 30 righe tenute in memoria; oppure l'OCR perdeva i punti della
+tariffa («SIC24 144.637») o leggeva la I della sigla 1 o 0. Ora la riga del codice
+accetta lo sporco, la memoria è di 60 righe, e i codici si ricompongono con le famiglie
+che il documento scrive già giuste: si rimettono i punti persi solo se portano a un solo
+codice coi prefissi conosciuti, si ripara la sigla, si rimettono le lettere puntate perse
+(«A.NE.012» → A.N.E.012). Le cifre non cambiano mai; un codice che non porta a un solo
+codice di famiglia resta com'è. Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.12.
+
+**Risultato** sui 31 contratti: voci esatte 695 → **729** (77%), quantità e prezzo giusti
+782 → **783** (83%), testata invariata. PF Future villette 29 → 33/34, uffici 44 → 65/70,
+residence 56 → 65/70. Nessun altro contratto cambia.
+
+**Cosa resta** su PF Future: «S1IC24 .4.3.18.41» (persa anche una cifra), «N.2» preso
+dalla descrizione «N.2 BAT2.1» come codice, tre voci di computo non lette nel residence,
+due quantità non stampate (7 × 163,60, non dedotte per scelta), «22,59» con prezzo e
+importo su due righe di testo, il cavo 2.100 m degli uffici sotto la griglia di pag. 21.
 
 ## Fonti
 
