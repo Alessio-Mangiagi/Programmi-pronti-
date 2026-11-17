@@ -1,7 +1,8 @@
 // Parser deterministici del contratto: testata, importi, elenco prezzi (più
 // maschere), famiglia di contratto. Tutto regex + euristiche, niente LLM.
-import { DBG_FORN } from './config.ts'
+import { DBG_FORN, DBG_PAGINE } from './config.ts'
 import { normalizzaNumeriOcr } from './testo.ts'
+import { paginaDelleRighe } from './pagine-righe.ts'
 import { ELENCHI, commessaDaPremesse } from './alyante.ts'
 import { candidatiCommessa, commessaDaCandidati, normDitta } from '../src/lib/elenchi.ts'
 
@@ -2207,7 +2208,123 @@ export interface Estratto {
   righe: Record<string, string>[]
   campi_assist_ai?: string[]
 }
-export const estrai = (full: string): Estratto => {
+// Voci delle pagine che l'estrazione sul documento INTERO lascia indietro.
+//
+// estraiRighe mette in gara i parser sull'intero documento e ne vince UNO: dove il
+// documento mescola tabelle di forma diversa, le pagine dell'altra forma restano senza
+// voci. Misurato sul banco (estrazione pagina per pagina contro documento intero):
+// Beton Strade vinceva l'elenco dei mezzi e la tabella prezzi due pagine prima si
+// perdeva (0 voci giuste su 7); PF Future il computo SOMMANO spegneva la seconda
+// tabella. Pagina per pagina quelle voci uscivano, ma si perdevano le regole che
+// guardano tutto il documento (SICS da 27 voci giuste a 8) e la testata.
+// Qui si tiene il documento intero e si guarda, pagina per pagina, se l'estrazione
+// della pagina da sola trova più voci che TORNANO (qta × prezzo = importo) di quelle
+// che il documento intero ha messo su quella pagina (paginaDelleRighe). Se sì:
+// - la voce del documento intero che non torna, e che nella pagina c'è con i conti
+//   giusti (stesso codice, stessa descrizione o stesso importo), prende quei valori,
+//   ma solo dove i suoi sono vuoti o uguali: con un valore diverso già letto non si sa
+//   quale delle due letture è giusta (Progetto Costruzioni: prezzo 30,00 diventava
+//   22,50 e la voce giusta si perdeva);
+// - le voci della pagina che il documento intero non ha si aggiungono al loro posto.
+// Le voci del documento intero non si tolgono mai: una prima versione sostituiva la
+// pagina intera e perdeva le voci giuste senza importo (Ulma e Gecob −4 ciascuno).
+// Della pagina si prendono solo righe coerenti, o con un codice articolo se la pagina
+// non aveva voci (le altre sono quasi sempre prosa con dei numeri, come i libretti dei
+// mezzi), e servono almeno due righe coerenti: una sola può essere un caso. Una voce
+// con la stessa quantità e lo stesso prezzo di una già presa non entra: è l'elenco
+// ripetuto in un'altra pagina (art. 5 e allegato), non una voce nuova.
+const testoChiave = (s: unknown, n: number): string => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, n)
+const stessaVoce = (a: Record<string, string>, b: Record<string, string>): boolean => {
+  const ca = testoChiave(a.codice_epu, 40)
+  if (ca.length >= 3 && ca === testoChiave(b.codice_epu, 40)) return true
+  // 40 caratteri, non 20: nei calcestruzzi SICS ogni voce inizia con «Conglomerato
+  // cementizio…» e con 20 la voce senza codice prendeva i valori di un'altra
+  const da = testoChiave(a.descrizione, 40)
+  if (da.length >= 30 && da === testoChiave(b.descrizione, 40)) return true
+  const ia = numIt(a.importo)
+  return ia > 0 && ia === numIt(b.importo)
+}
+// valori della pagina che completano la voce senza contraddirla: ogni valore già letto
+// dal documento intero (quantità, prezzo, importo) è uguale a quello della pagina
+const compatibili = (w: Record<string, string>, r: Record<string, string>): boolean =>
+  (['quantita', 'prezzo_lordo', 'importo'] as const).every(k => {
+    const v = numIt(w[k])
+    return !isFinite(v) || v === numIt(r[k])
+  })
+export const completaDallePagine = (righe: Record<string, string>[], pagine: string[]): Record<string, string>[] => {
+  if (pagine.length < 2) return righe
+  const coerente = (r: Record<string, string>) => contoTorna(numIt(r.quantita), numIt(r.prezzo_lordo), numIt(r.importo))
+  const valori = (r: Record<string, string>) => `${numIt(r.quantita)}|${numIt(r.prezzo_lordo)}`
+  const pag = paginaDelleRighe(righe, pagine)
+  // quantità e prezzo già presi: quelli del documento intero e via via le aggiunte
+  const presi = new Set(righe.filter(r => numIt(r.quantita) && numIt(r.prezzo_lordo)).map(valori))
+  const nuovo = (r: Record<string, string>) => !(numIt(r.quantita) && numIt(r.prezzo_lordo) && presi.has(valori(r)))
+  const sostituite = new Map<number, Record<string, string>>()      // indice riga → valori dalla pagina
+  const prima = new Map<number, Record<string, string>[]>()         // aggiunte da mettere prima della riga
+  const dopo = new Map<number, Record<string, string>[]>()          // …e dopo la riga
+  const inTesta: Record<string, string>[] = []
+  const metti = (m: Map<number, Record<string, string>[]>, i: number, r: Record<string, string>) => m.set(i, [...(m.get(i) ?? []), r])
+  let aggiunte = 0
+  for (let p = 1; p <= pagine.length; p++) {
+    const qui = pag.flatMap((x, i) => x === p ? [i] : [])
+    const proprie = estraiRighe(pagine[p - 1])
+    const buone = proprie.filter(coerente)
+    if (buone.length < 2 || buone.length <= qui.filter(i => coerente(righe[i])).length) continue
+    if (!qui.length) {
+      // pagina senza voci: le sue, dopo l'ultima voce di una pagina precedente
+      const sue = proprie.filter(r => (coerente(r) || String(r.codice_epu ?? '').trim()) && nuovo(r))
+      if (sue.filter(coerente).length < 2) continue
+      let ancora = -1
+      pag.forEach((x, i) => { if (x && x < p) ancora = i })
+      for (const r of sue) {
+        presi.add(valori(r))
+        if (DBG_PAGINE) console.error(`[pagine] p.${p} (senza voci) aggiunta «${r.codice_epu} ${r.descrizione.slice(0, 50)}» ${r.quantita} × ${r.prezzo_lordo} = ${r.importo}`)
+        if (ancora < 0) inTesta.push(r); else metti(dopo, ancora, r)
+      }
+      aggiunte += sue.length
+      continue
+    }
+    // pagina con voci: si abbinano le due letture nell'ordine della pagina
+    const usate = new Set<number>()
+    let ultima = -1                                                  // ultima riga abbinata
+    for (const r of buone) {
+      const w = qui.find(i => !usate.has(i) && stessaVoce(righe[i], r))
+      if (w !== undefined) {
+        usate.add(w)
+        ultima = w
+        if (!coerente(righe[w]) && compatibili(righe[w], r)) {
+          sostituite.set(w, r)
+          if (DBG_PAGINE) console.error(`[pagine] p.${p} valori ${r.quantita} × ${r.prezzo_lordo} = ${r.importo} → voce ${w + 1} «${righe[w].codice_epu} ${righe[w].descrizione.slice(0, 50)}» (era ${righe[w].quantita} × ${righe[w].prezzo_lordo} = ${righe[w].importo})`)
+        }
+        continue
+      }
+      if (!nuovo(r)) continue
+      presi.add(valori(r))
+      if (DBG_PAGINE) console.error(`[pagine] p.${p} aggiunta «${r.codice_epu} ${r.descrizione.slice(0, 50)}» ${r.quantita} × ${r.prezzo_lordo} = ${r.importo}`)
+      if (ultima < 0) metti(prima, qui[0], r)
+      else metti(dopo, ultima, r)
+      aggiunte++
+    }
+  }
+  if (!sostituite.size && !aggiunte) return righe
+  const out: Record<string, string>[] = [...inTesta]
+  righe.forEach((r, i) => {
+    out.push(...(prima.get(i) ?? []))
+    const s = sostituite.get(i)
+    // dalla pagina vengono i valori; codice e descrizione restano quelli del documento
+    // intero, se ci sono (lì valgono le grafie uniformate e le voci composte)
+    out.push(s ? { ...r, udm: s.udm || r.udm, quantita: s.quantita, prezzo_lordo: s.prezzo_lordo, importo: s.importo, codice_epu: r.codice_epu || s.codice_epu, descrizione: r.descrizione || s.descrizione } : r)
+    out.push(...(dopo.get(i) ?? []))
+  })
+  out.forEach((r, i) => { r.progressivo = String(i + 1) })
+  console.log(`[Righe] dalle pagine: ${aggiunte} voci aggiunte, ${sostituite.size} con i valori della pagina → ${out.length} voci (prima ${righe.length})`)
+  return out
+}
+
+// `pagine`: il testo pagina per pagina, quando chi chiama lo conosce (lavori sul server,
+// banco di prova, richieste con più pagine): serve a completaDallePagine. Senza, si
+// estrae solo sul documento intero come sempre.
+export const estrai = (full: string, pagine?: string[]): Estratto => {
   // I marcatori di colonna " | " servono SOLO al parser delle righe articoli;
   // testata e importi leggono il testo scorrevole senza pipe (le etichette tipo
   // "OGGETTO | …" spezzerebbero le regex).
@@ -2218,6 +2335,6 @@ export const estrai = (full: string): Estratto => {
   return {
     testata: estraiTestata(scorrevole),
     importi: estraiImporti(scorrevole),
-    righe: estraiRighe(full),
+    righe: pagine && pagine.length > 1 ? completaDallePagine(estraiRighe(full), pagine) : estraiRighe(full),
   }
 }

@@ -192,6 +192,8 @@ const analizza = async (documento: string): Promise<Esito> => {
   const esito: Esito = { file: nome, pagine: 0, pagineNative: 0, paginePerse: 0, caratteri: 0, righe: 0, righeSenzaCodice: 0, righeSenzaImporto: 0, testataVuota: [], importiVuoti: [] }
   try {
     let full: string
+    // testo pagina per pagina (PDF), come lo passa server/lavori.ts all'estrazione
+    let pagineTesto: string[] | undefined
     if (/\.docx$/i.test(documento)) {
       // Word: nessuna pagina e nessun OCR — il documento è già strutturato, e le tabelle
       // arrivano ai parser come righe intere invece che cella per cella.
@@ -219,6 +221,7 @@ const analizza = async (documento: string): Promise<Esito> => {
         testi.push(t)
       }
       full = testi.join('\n\n')
+      pagineTesto = testi
     }
     esito.caratteri = full.length
 
@@ -240,7 +243,7 @@ const analizza = async (documento: string): Promise<Esito> => {
       alyante = a.result
       contratto = c.result
     } else {
-      const e = await estraiAssistito(full)
+      const e = await estraiAssistito(full, pagineTesto)
       voci = e.righe as Record<string, string>[]
       alyante = normalizzaRisultatoAlyante(strutturaAlyante(e))
       contratto = strutturaContratto(e, full)

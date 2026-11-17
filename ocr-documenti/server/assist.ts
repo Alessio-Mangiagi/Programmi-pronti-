@@ -17,8 +17,9 @@ export const CAMPI_TESTATA = ['codice', 'codice_progetto', 'fornitore', 'fornito
 export const CAMPI_IMPORTI = ['importo_lavori', 'ritenuta_garanzia_percent', 'importo_anticipi', 'percent_recupero_anticipazioni', 'importo_oneri_sicurezza', 'importo_netto']
 
 // Estrazione deterministica + assist Ollama sui soli campi mancanti, verificati.
-export const estraiAssistito = async (full: string): Promise<Estratto> => {
-  const e = estrai(full)
+// `pagine`: testo pagina per pagina, se noto (vedi estrai / completaDallePagine).
+export const estraiAssistito = async (full: string, pagine?: string[]): Promise<Estratto> => {
+  const e = estrai(full, pagine)
   if (!(await ollamaAttivo())) return e
 
   const mancTestata = CAMPI_TESTATA.filter(k => !String(e.testata[k] ?? '').trim())

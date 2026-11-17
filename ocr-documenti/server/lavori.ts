@@ -25,6 +25,7 @@ import { testoDaTextContent, type ItemPdfTesto } from '../src/lib/testo-nativo.t
 import { cleanMarkdown } from '../src/lib/markdown.ts'
 import { chiDa, puoVedere } from './accessoLavori.ts'
 import { risultatoDaModulo } from './modulo.ts'
+import { timbraPagineRighe } from './pagine-righe.ts'
 import { descriviErrori, eModulo } from '../src/lib/modulo-contratto.ts'
 
 export type FormatoLavoro = 'contratti' | 'contract' | 'md'
@@ -274,7 +275,9 @@ const esegui = async (l: Lavoro): Promise<void> => {
     if (modulo) {
       json = modulo.result!
     } else {
-      const e = await estraiAssistito(joined)
+      // le pagine servono a completaDallePagine: voci delle pagine che la gara dei parser
+      // sul documento intero lascia indietro
+      const e = await estraiAssistito(joined, testi)
       controlla()
       if (l.formato === 'contratti') {
         json = normalizzaRisultatoAlyante(strutturaAlyante(e))
@@ -282,6 +285,9 @@ const esegui = async (l: Lavoro): Promise<void> => {
         let righe = 0
         try { righe = ((JSON.parse(json) as { righe?: unknown[] }).righe ?? []).length } catch { /* json non parsabile: si tiene */ }
         if (!righe) { json = strutturaContratto(e, joined); formato = 'contract' }
+        // voci estratte sul documento intero: ognuna ritrova la sua pagina, per il clic
+        // «riga → anteprima» e le note sulle letture incerte in Modifica
+        else json = timbraPagineRighe(json, testi, Array.from({ length: pagine }, (_, i) => !!nativi[i]))
       } else {
         json = strutturaContratto(e, joined)
       }

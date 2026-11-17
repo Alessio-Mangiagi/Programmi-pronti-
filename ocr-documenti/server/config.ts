@@ -25,3 +25,6 @@ export const VISION_FALLBACK = process.env.PADDLE_VISION_FALLBACK !== '0'
 // con la loro posizione nel testo (DBG_TABELLA=1 / DBG_FORN=1, es. con npm run harness).
 export const DBG_TABELLA = !!process.env.DBG_TABELLA
 export const DBG_FORN = !!process.env.DBG_FORN
+// DBG_PAGINE=1: voci che completaDallePagine prende dalla pagina letta da sola (aggiunte e
+// valori dati a una voce del documento intero), con la pagina e la voce abbinata.
+export const DBG_PAGINE = !!process.env.DBG_PAGINE

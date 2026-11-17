@@ -15,6 +15,7 @@ import { ASSIST_MODEL, OLLAMA_BASE, modelloAttivo, ocrVisionPagina, ollamaAttivo
 import { TIPOLOGIE_VALIDE, estraiAssistito } from './server/assist.ts'
 import { strutturaAlyante, strutturaContratto } from './server/struttura.ts'
 import { montaRotteLavori, caricaLavori, lavoriInCorso } from './server/lavori.ts'
+import { timbraPagineRighe } from './server/pagine-righe.ts'
 import { descriviErrori, eModulo } from './src/lib/modulo-contratto.ts'
 import { risultatoDaModulo } from './server/modulo.ts'
 import { chiDa } from './server/accessoLavori.ts'
@@ -249,10 +250,12 @@ app.post('/api/ocr', async (req, res) => {
     const joined = [tiles.join('\n\n'), testoAllegati?.trim()].filter(Boolean).join('\n\n')
 
     let result: string
+    // più pagine nella stessa richiesta: anche le voci che restano solo pagina per pagina
+    const pagine = tiles.length > 1 ? tiles : undefined
     if (format === 'contratti') {
-      result = strutturaAlyante(await estraiAssistito(joined))
+      result = strutturaAlyante(await estraiAssistito(joined, pagine))
     } else if (format === 'contract') {
-      result = strutturaContratto(await estraiAssistito(joined), joined)
+      result = strutturaContratto(await estraiAssistito(joined, pagine), joined)
     } else if (format === 'json') {
       result = JSON.stringify({
         tipo_documento: 'Documento',
@@ -265,6 +268,9 @@ app.post('/api/ocr', async (req, res) => {
     // Aggancio elenchi ufficiali: il JSON estratto viene riportato ai valori ESATTI
     // delle anagrafiche Alyante (divisione, cond. pagamento, commessa, conto, fam/sfam).
     if (format === 'contratti') result = normalizzaRisultatoAlyante(result)
+    // Testo di più pagine in una richiesta (separatore "---", es. «Compila Excel» dal .MD):
+    // l'estrazione è sul documento intero, le voci ritrovano qui la loro pagina.
+    if (format === 'contratti' && tiles.length > 1) result = timbraPagineRighe(result, tiles, origine ? tiles.map(() => origine === 'nativo') : undefined)
 
     res.json(incerte.length ? { result, incerte } : { result })
   } catch (err: unknown) {
