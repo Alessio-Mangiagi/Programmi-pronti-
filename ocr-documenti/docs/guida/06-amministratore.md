@@ -24,6 +24,11 @@ al primo avvio (`shared\firma\installa.bat`, serve la rete); se la pagina dice
   la spegne). Una pagina così costa da 2 a 4 letture invece di una;
 - nelle tabelle **con i bordi** le linee si trovano con OpenCV e le voci si leggono cella
   per cella, con le colonne giuste (`PADDLE_GRIGLIA=0` lo spegne);
+- nelle tabelle con i numeri su **fondo grigio retinato** le voci i cui conti non tornano si
+  rileggono cella per cella: il programma ritaglia solo le celle dei valori, toglie il
+  retino, le ingrandisce e le rilegge, e tiene i numeri solo se tornano sia i lavori sia
+  gli oneri della sicurezza (`PADDLE_RILEGGI_CELLE=0` lo spegne). Costa 10-25 secondi per
+  pagina, una volta sola: le letture restano in cache con la pagina;
 - nelle tabelle **senza linee fra le voci** (elenchi prezzi ANAS con WBS, lavori e oneri)
   le voci si dividono sui codici di tariffa (`B.03.031.c`). Prezzo e importo escono
   complessivi (lavori + oneri della sicurezza). Una voce con le cifre illeggibili esce

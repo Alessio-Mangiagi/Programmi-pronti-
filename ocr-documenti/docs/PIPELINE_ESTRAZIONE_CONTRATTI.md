@@ -416,6 +416,48 @@ ricevuta e tratta il codice era a caso. Resta il testo, cella rossa da completar
 Restano diversi due riferimenti riassunti a mano (Sidersipe: tre paragrafi «La fornitura…»
 condensati; Progetto Costruzioni: l'elenco delle opere CV06, ST01…).
 
+### 4.8 Celle numeriche rilette una per una (17/11/2026)
+
+Allegato A del subappalto Progetto Costruzioni: 12 pagine di traverso con quantità, prezzi
+e importi in celle grigie retinate. La lettura della pagina intera salta celle intere
+(«357,27 €» non c'è) e perde la virgola («23035» per 230,35): 101 voci su 142 senza
+quantità o prezzo giusti. Il retino è fatto di puntini isolati, le cifre di tratti pieni.
+
+1. **Quali celle** (`celleDaRileggere`, `server/tabella-griglia.ts`): nella lettura per
+   codici (`tabellaDaAncore`) le voci senza conti che tornano (nessun valore, quantità
+   mancante, oneri persi); per ognuna le cinque celle dei valori. Le colonne sono gli
+   intervalli fra le linee verticali della griglia che contengono le cinque colonne di
+   numeri, o la colonna «Quantità» e le quattro dopo, o le cinque dopo la colonna
+   dell'unità di misura. Linee doppie a meno di 15 px contano una volta. La riga è alta
+   quanto il codice (±1,3 volte la sua altezza).
+2. **Rilettura** (`rileggi_celle`, `ocr_worker.py`, richiesta `{"rileggi": [[x0, y0, x1,
+   y1], ...]}`): ritaglio, tre pulizie (mediana 3×3; gaussiana σ 1,5 + soglia 110; via le
+   macchie sotto 25 pixel), ingrandimento 2×, solo riconoscimento (modello
+   `latin_PP-OCRv5_mobile_rec`, caricato al primo uso). Le letture vanno in cache con la
+   pagina (`celle` nel file della cache); se le regole cambiano si chiedono solo le celle
+   nuove (`completaRiletture`, `server/ocr.ts`, anche dal banco).
+3. **Scelta** (`rilettureDellaVoce`): per colonna i candidati — la lettura ripulita, con
+   la virgola rimessa se ha solo cifre («23035» → 230,35, peso 1), senza l'ultima cifra
+   per il «€» letto come cifra («357276» → 357,27, peso ½). Si tiene la combinazione con
+   cui tornano **lavori e oneri** letti: tutti i valori a due decimali, scarto massimo
+   (quantità + prezzo) × 0,005 per gli arrotondamenti di stampa, al più una colonna su
+   un candidato debole o ricavato dalle altre due. Un valore letto intero da due pulizie
+   esclude le sue varianti accorciate. Voce senza quantità né importo («Come sopra … da
+   quota 4,01»): il P.U. letto uguale due volte, completato dalla quota oneri della pagina.
+
+Prove scartate: accettare «importo O.S. = quota plausibile» al posto del secondo conto
+(coincidenze come 39,37 × 226,5055), il 2% di tolleranza dei parser (8,80 × 867 = 7.631),
+sommare il costo O.S. letto alle voci di solo prezzo (1,20 letto per 1,24).
+
+Il worker rende anche le sole linee verticali quando le orizzontali sono meno di tre (righe
+tratteggiate fra le voci, pag. 40 e 48): la lettura per celle resta spenta, le colonne
+servono a ritagliare. Le pagine già in cache con la griglia assente non si ricalcolano da
+sole.
+
+Risultato: Progetto Costruzioni 40 → 50 voci esatte, 41 → 51 con quantità e prezzo giusti;
+nessun altro contratto cambia. Diagnostica: `DBG_TABELLA=1` scrive per ogni voce riletta i
+candidati e la combinazione scelta (`[celle]`).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

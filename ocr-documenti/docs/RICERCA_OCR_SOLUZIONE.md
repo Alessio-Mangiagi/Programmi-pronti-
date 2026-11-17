@@ -7,9 +7,10 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11): documento intero con le pagine, testata, riferimenti
-  dall'app.** Sui 31 contratti testata dal 94% al 96%, voci con quantità e prezzo giusti
-  dal 74% al 76%, voci esatte dal 64% al 66%; nessun contratto peggiora. «Scan senza
+- **Aggiornamento del 17/11 (§11-§12): documento intero con le pagine, testata,
+  riferimenti dall'app, celle numeriche rilette.** Sui 31 contratti testata dal 94% al 96%,
+  voci con quantità e prezzo giusti dal 74% al 77%, voci esatte dal 64% al 67%; nessun
+  contratto peggiora. Progetto Costruzioni da 41 a 51 voci giuste su 142. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -520,10 +521,38 @@ giuste su 7), AQ3 e GFM. Da qui le scelte:
 Per contratto: PF Future 1536 51 → 56 e 1537 49 → 54 voci con quantità e prezzo giusti,
 AQ3 17 → 22, Beton Strade 0 → 7, GFM 102 → 104. Nessun contratto peggiora.
 
-**Cosa resta**: Progetto Costruzioni (cifre illeggibili dell'allegato A), Gecob (tabella
-senza linee), Ulma (voci a corpo), i due COND.PAG senza codice in elenco («30 + 10 giorni»,
-pagamento a percentuali) e i due OGGETTO riassunti a mano nel riferimento (Sidersipe,
-Progetto Costruzioni).
+**Cosa resta**: Progetto Costruzioni (cifre illeggibili dell'allegato A, vedi §12), Gecob
+(tabella senza linee), Ulma (voci a corpo), i due COND.PAG senza codice in elenco («30 + 10
+giorni», pagamento a percentuali) e i due OGGETTO riassunti a mano nel riferimento
+(Sidersipe, Progetto Costruzioni).
+
+## 12. Celle numeriche rilette una per una (17/11/2026)
+
+**Il problema.** L'allegato A di Progetto Costruzioni è scansionato a 300 DPI (2480×3508,
+il programma lo legge a 2332×3300): rendere più fitto non aggiunge informazione. Le cifre
+stanno su fondo grigio retinato e la lettura della pagina intera ne salta o storpia molte.
+Prova sulla pag. 49, cella per cella con il solo riconoscimento:
+
+| Pulizia | Esempio (14,49 / 15,90 / 230,35 / 0,60 / 8,73) |
+|---|---|
+| pagina intera | 14.49 / 15,90€ / 23035 / — / 8.73€ |
+| cella grezza ingrandita | 14409 / 15,90 / 23035 / 0,60 / 873 |
+| mediana 3×3 | 149 / 15,90 / 23035 / 0,600 / 8730 |
+| gaussiana σ 1,5 + soglia 110 | 14,49 / 15,90 / 230,35 / 0,60 / 8,73 |
+| macchie < 25 px tolte | 1449 / 15,90 / 23035 / 30,60 / 8,73 |
+
+Nessuna pulizia è giusta sempre; con tre letture per cella e due conti indipendenti
+(lavori e oneri) si sceglie. Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.8.
+
+**Risultato** sui 31 contratti: voci esatte 627 → **637** (67%), quantità e prezzo giusti
+723 → **733** (77%), testata invariata. Progetto Costruzioni 40 → 50 esatte e 41 → 51 con
+quantità e prezzo giusti, mancanti 36 → 25; nessun altro contratto cambia. Su 79 voci
+rilette 14 trovano una combinazione che regge entrambi i conti (le altre restano vuote,
+mai numeri inventati) e 5 voci «Come sopra» prendono il solo prezzo, completato a 34,00.
+
+**Cosa resta su Progetto Costruzioni**: 60 voci rilette con letture troppo rovinate per far
+tornare i conti, i codici `_np01`/`_CS01` non letti (12 voci mancanti), il riferimento
+compilato alla cieca dal testo (prezzi a 4 decimali calcolati, 28 righe «DA VERIFICARE»).
 
 ## Fonti
 

@@ -41,6 +41,7 @@ Pipeline ibrida:
 | `PADDLE_WORKERS` | `3` | processi OCR in parallelo (~1 GB RAM ciascuno); partono solo se la coda li richiede |
 | `PADDLE_SOGLIA_ROTAZIONE` | `60` | pagina letta sotto questa confidenza media (%), o con le righe in verticale (di traverso) → riletta a 180°/90°/270°, vince la lettura con più testo letto bene in righe orizzontali (pagine scansionate capovolte o di traverso). `0` spegne la prova |
 | `PADDLE_GRIGLIA` | acceso | linee della tabella trovate con OpenCV: le voci si leggono dalle celle (`server/tabella-griglia.ts`). `0` spegne il passo |
+| `PADDLE_RILEGGI_CELLE` | acceso | per le voci i cui conti non tornano il worker rilegge le sole celle dei valori, ritagliate e ripulite dal retino (`rileggi_celle` in `ocr_worker.py`, scelta in `tabella-griglia.ts`); letture in cache con la pagina. `0` spegne il passo |
 | `PORT` | `3007` | porta backend Express |
 | `OLLAMA_BASE` | `http://localhost:11434` | endpoint Ollama |
 | `ASSIST_MODEL` | `qwen2.5:3b` | modello assist |
@@ -300,7 +301,7 @@ Strumenti di supporto:
 |---|---|
 | `npx tsx tools/dbg_pagina.ts <nome> <pagina>` | Geometria OCR di una pagina: ogni riga con Y, X inizio/fine, testo, poi il testo ricomposto. Serve quando una tabella esce sbagliata |
 | `node tools/dump_xlsx.mjs <file.xlsx>` | Legge un Import_Contratti compilato per confrontarlo con l'output |
-| `DBG_TABELLA=1` / `DBG_FORN=1` / `DBG_PAGINE=1` | Diagnostica su stderr: confini di cella calcolati / candidati ragione sociale / voci aggiunte o completate dalla pagina letta da sola |
+| `DBG_TABELLA=1` / `DBG_FORN=1` / `DBG_PAGINE=1` | Diagnostica su stderr: confini di cella calcolati e, per le celle rilette, candidati e combinazione scelta (`[celle]`) / candidati ragione sociale / voci aggiunte o completate dalla pagina letta da sola |
 
 ## Risoluzione problemi
 
