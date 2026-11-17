@@ -260,6 +260,10 @@ export const matchCondPagamento = (valore: unknown): string => {
     const fz = migliorePerDescrizione(cur, ELENCHI.condPagamento, 0.6)
     return fz ? fz.codice : cur
   }
+  // solo giorni, senza strumento né scadenza ("30 GG" pescato in una clausola qualsiasi):
+  // troppo poco per scegliere fra bonifico, ricevuta e tratta → resta il testo, da
+  // completare a mano, invece di un codice a caso (prima "30 GG" diventava 111 = tratta)
+  if (!f.strumento && !f.scadenza) return cur
   let best: VoceElenco | null = null, bs = 0
   for (const c of ELENCHI.condPagamento) {
     let g = cacheCondFeatures.get(c.codice)

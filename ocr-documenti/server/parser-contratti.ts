@@ -322,22 +322,58 @@ export const correggiGiorniOcr = (s: string): string =>
 // documento. Le finestre generiche attorno a "pagamento" pescavano invece il primo
 // numero di giorni qualsiasi (slittamenti, preavvisi) → codice sbagliato.
 // tollera la ripetizione in lettere ("30/60 (trenta/sessanta) giorni") e la scadenza
-// scritta per esteso ("data fattura fine mese") oltre alla sigla "d.f.f.m."
-export const RE_SCADENZA_FORTE = /(\d{2,3})\s*(?:\/\s*(\d{2,3})\s*)?(?:\([^)]{0,40}\)\s*)?(?:gg|giorni)\.?\s*[,;]?\s*(?:d\.?\s?f\.?\s?f?\.?\s?m?\.?|data\s+fattura(?:\s+fine\s+mese)?|fine\s+mese)/gi
+// scritta per esteso ("data fattura fine mese") oltre alla sigla "d.f.f.m.".
+// Dal 17/11/2026 (testata sui 31 contratti del banco) anche:
+//  • scadenze in serie col trattino, "120-150 giorni", "60-90-120 giorni" (Ulma);
+//  • la sigla "F.M." da sola: "90 GG.F.M." (L.Catania, Nigro: prima vinceva il primo
+//    "15 giorni" del documento, un termine di consegna → BB 15);
+//  • i giorni in più, dopo la scadenza ("90 GG. D.F.F.M, + 10": SICS, codice 435) o prima
+//    di "giorni" ("30 + 10 giorni data fattura fine mese": LGM, prima diventava BB 10).
+const GIORNI_SRC = String.raw`(\d{2,3}(?:\s*[\/-]\s*\d{2,3}){0,4})(?:\s*\+\s*(\d{1,2})(?!\d))?`
+const PIU_SRC = String.raw`(?:\s*[,;]?\s*\+\s*(\d{1,2})(?!\d))?`
+export const RE_SCADENZA_FORTE = new RegExp(String.raw`${GIORNI_SRC}\s*(?:\([^)]{0,40}\)\s*)?(?:gg|giorni)\.?\s*[,;]?\s*(?:d\.?\s?f\.?\s?f?\.?\s?m?\.?|data\s+fattura(?:\s+fine\s+mese)?|fine\s+mese|f\.\s?m\.)${PIU_SRC}`, 'gi')
+// La sigla intera "dffm" senza "gg" davanti: "a mezzo Bonifico Bancario 30 dffm" (Sabbie
+// d'oro). Solo la sigla completa: "30 df" da solo può essere qualsiasi cosa.
+export const RE_SCADENZA_SIGLA = new RegExp(String.raw`${GIORNI_SRC}\s*d\.?\s?f\.?\s?f\.?\s?m\b\.?${PIU_SRC}`, 'gi')
+// Voce di elenco: "a) Noleggio: …", "- Vendita: …"
+const RE_VOCE_ELENCO = /^\s*(?:[a-z]\)|[-•–])\s/i
+const rigaDi = (src: string, i: number): string => src.slice(src.lastIndexOf('\n', i - 1) + 1, i)
 export const condPagamento = (t: string): string => {
   const testo = correggiGiorniOcr(t)
   const der = sezioneDeroghe(testo)
-  // 1) firma forte: la deroga vince, poi la prima occorrenza nel corpo
-  for (const src of [der, testo]) {
-    if (!src) continue
-    for (const m of src.matchAll(RE_SCADENZA_FORTE)) {
+  const giorniDi = (m: RegExpMatchArray) => m[1].split(/\s*[\/-]\s*/)
+  // 1) firma forte (poi la sigla senza "gg"): la deroga vince, poi la prima occorrenza
+  for (const re of [RE_SCADENZA_FORTE, RE_SCADENZA_SIGLA]) {
+    for (const src of [der, testo]) {
+      if (!src) continue
+      const tutte = [...src.matchAll(re)]
+      const m = tutte[0]
+      if (!m) continue
       const i = m.index ?? 0
       // giorni dal match stesso (mai da altri numeri della finestra); strumento
       // dall'intorno, perché il bonifico può stare nella frase precedente
       const ctx = src.slice(Math.max(0, i - 300), i + m[0].length + 60)
-      return condCanonica(m[2] ? [m[1], m[2]] : [m[1]], ctx, m[0])
+      let gg = giorniDi(m)
+      // scadenze diverse per voce ("a) Noleggio: 120-150 giorni…", "b) Vendita: 60-90-120
+      // giorni…", "c) Servizi: 120 giorni…"): in Alyante è UNA condizione con tutte le
+      // scadenze (Ulma: BB 60/90/120/150 = codice 486). Solo voci di elenco consecutive.
+      if (RE_VOCE_ELENCO.test(rigaDi(src, i))) {
+        for (const altra of tutte.slice(1)) {
+          const j = altra.index ?? 0
+          if (j - i > 600 || !RE_VOCE_ELENCO.test(rigaDi(src, j))) break
+          gg = gg.concat(giorniDi(altra))
+        }
+        gg = [...new Set(gg.map(Number))].sort((a, b) => a - b).map(String)
+      }
+      const piu = m[2] ?? m[3]
+      const giorni = piu ? [`${gg.join('/')} + ${piu}`] : gg
+      return condCanonica(giorni, ctx, m[0])
     }
   }
+  // "a mezzo Bonifico Bancario vista fattura" (consulenze): nessun giorno da leggere, e le
+  // finestre sotto pescherebbero il primo "30 giorni" di un'altra clausola (→ tratta 30 gg)
+  const vista = /(bonifico\s+bancario\s+)?(?:a\s+)?vista\s+fattura/i.exec(der || testo)
+  if (vista) return `${vista[1] ? 'Bonifico Bancario ' : ''}vista fattura`
   // 2) finestre attorno alle occorrenze di pagamento/bonifico
   const finestre: string[] = []
   if (der) finestre.push(der)
@@ -1990,6 +2026,54 @@ export const ripulisciOggetto = (s: string): string => {
 }
 
 // Corpo dell'Art. 2 / "Costituisce oggetto del presente contratto:" → descrizione.
+// Fine frase: un punto o un punto e virgola in fondo alla riga, ma non quello di una
+// sigla ("opere in c.a." a fine riga chiudeva l'oggetto a metà: SICS; "dal D.M." Sidersipe).
+const RE_SIGLA_FINALE = /\b(?:c\.a(?:\.p)?|d\.m|d\.lgs|d\.p\.r|art|n|nn|ecc|s\.p\.a|s\.r\.l|km)\.\s*$/i
+const fineFrase = (l: string): boolean => /[.;]\s*$/.test(l) && !RE_SIGLA_FINALE.test(l)
+// Voci di un elenco che segue una riga con i due punti (17/11/2026, testata del banco):
+// puntato ("• IMPIANTI ELETTRICI E SPECIALI;": Warm), numerato con una spiegazione sotto
+// ogni punto ("1. Realizzazione di armature…" + righe di dettaglio: subappalti a misura),
+// o voci brevi chiuse da ";" ("Utensileria;", "Legname;": forniture di materiali vari).
+// Dei punti numerati si prendono solo i titoli, in ordine (1, 2, 3…): le righe sotto e le
+// interruzioni di pagina in mezzo si saltano. Si ferma all'articolo dopo, alle clausole a
+// lettere del modello ("A) …"), a "Inoltre" o alla prima riga che non è una voce.
+const RE_PUNTO = /^[•·\-–*]\s+/
+const RE_NUMERO = /^(\d{1,2})[.)]\s+/
+const vociElenco = (lines: string[], da: number): { voci: string[]; numerato: boolean; puntato: boolean } => {
+  const voci: string[] = []
+  let numerato = false, puntato = false, senzaVoce = 0
+  for (let j = da; j < Math.min(lines.length, da + 80); j++) {
+    const l = lines[j]
+    if (!l) continue
+    if (/^art(?:icolo)?\.?\s*\d/i.test(l) || /^[A-Z]\)\s/.test(l) || /^inoltre\b/i.test(l)) break
+    const n = RE_NUMERO.exec(l)
+    if (n && (voci.length ? numerato && Number(n[1]) === voci.length + 1 : Number(n[1]) === 1)) {
+      numerato = true
+      senzaVoce = 0
+      voci.push(l.replace(RE_NUMERO, '').replace(/[;.,:]\s*$/, ''))
+      continue
+    }
+    if (numerato) {
+      // riga di spiegazione sotto il punto, o piè di pagina: si salta, ma non per sempre
+      if (++senzaVoce > 15) break
+      continue
+    }
+    if (RE_PUNTO.test(l) && (puntato || !voci.length)) {
+      puntato = true
+      voci.push(l.replace(RE_PUNTO, '').replace(/[;.,]\s*$/, ''))
+      continue
+    }
+    if (!puntato && l.length <= 90 && /[;.]\s*$/.test(l)) {
+      voci.push(l.replace(/[;.]\s*$/, ''))
+      if (/\.\s*$/.test(l)) break
+      continue
+    }
+    break
+  }
+  return { voci, numerato, puntato }
+}
+// voce dentro una frase: iniziale minuscola, salvo le voci tutte in maiuscolo (sigle, titoli)
+const inFrase = (v: string): string => /[a-zà-ü]/.test(v) ? v.charAt(0).toLowerCase() + v.slice(1) : v
 export const corpoOggetto = (full: string): string => {
   const lines = full.split('\n').map(l => l.trim())
   const start = lines.findIndex(l =>
@@ -1998,6 +2082,7 @@ export const corpoOggetto = (full: string): string => {
     /^(?:art(?:icolo)?\.?\s*)?2\s*[-–—.):]?\s*oggetto\b/i.test(l))
   if (start < 0) return ''
   const contenuto: string[] = []
+  let conElenco = ''
   // L'oggetto è la frase intera dell'Art. 2, fino al punto: tagliarlo a 120 caratteri
   // lasciava fuori metà della descrizione in 14 contratti su 31 (misura del 09/11/2026,
   // i moduli compilati dal testo la riportano intera). Tetto a ~380 caratteri.
@@ -2013,14 +2098,44 @@ export const corpoOggetto = (full: string): string => {
     // clausole a lettere del modello ("A) Tutte le fasi lavorative…", "D) L'esecuzione…"):
     // sono le condizioni di esecuzione uguali per tutti i contratti, non l'oggetto
     if (contenuto.length && /^[A-Z]\)\s/.test(l)) break
-    if (/[:：]\s*$/.test(l) || /^costituisce\s+oggetto/i.test(l)) continue
+    // numero di pagina in calce ("2 / 20", "2/37 SUBAP-2025-0"): non è testo dell'oggetto
+    if (/^\d{1,3}\s*\/\s*\d{1,3}(?:\s|$)/.test(l)) continue
+    if (/[:：]\s*$/.test(l) || /^costituisce\s+oggetto/i.test(l)) {
+      // riga-etichetta ("Costituisce oggetto del presente Contratto:", "Le prestazioni
+      // oggetto del presente Contratto riguardano:"): solo la formula, si salta
+      const intro = l.replace(/[:：]\s*$/, '')
+      if (/^costituisce\s+oggetto/i.test(l) || !intro.replace(RE_FORMULA_OGGETTO, '').trim()) continue
+      // introduzione di un elenco: l'oggetto è l'introduzione più le voci
+      const { voci, numerato, puntato } = vociElenco(lines, j + 1)
+      if (voci.length < 2) { contenuto.push(l); continue }
+      contenuto.push(intro)
+      // prima la formula di rito intera ("Le prestazioni oggetto del presente Contratto
+      // riguardano l'esecuzione…"), poi quella spezzata da un inciso ("Le prestazioni
+      // oggetto del presente Contratto ricadenti nelle categorie OS03 e OS30, riguardano")
+      const testa = ripulisciOggetto(contenuto.join(' '))
+        .replace(/\s+oggetto\s+del\s+presente\s+contratt\w*\s*/i, ' ')
+        .replace(/,?\s+(?:riguardano|sono|consistono\s+in)\s*$/i, '')
+      conElenco = /\ba\s+fornire\s*$/i.test(testa)
+        // "…si impegna a fornire: Utensileria; Ferramenta; …" → "Fornitura di utensileria, ferramenta, …"
+        ? `Fornitura di ${voci.map(v => v.toLowerCase()).join(', ')}`
+        : `${ripulisciOggetto(testa).replace(/^(?:le|i|il|la|gli|lo)\s+(?=prestazion|lavor|attivit|fornitur)/i, '')}: ${voci.map(inFrase).join(puntato && !numerato ? '; ' : ', ')}`
+      break
+    }
     contenuto.push(l)
-    if (contenuto.join(' ').length > 380 || /[.;]\s*$/.test(l)) break
+    if (contenuto.join(' ').length > 380 || fineFrase(l)) break
   }
-  const testo = contenuto.join(' ').replace(/\s{2,}/g, ' ').trim()
+  const testo = (conElenco || contenuto.join(' ')).replace(/\s{2,}/g, ' ').trim()
   if (testo.length < 10) return ''
-  // punto finale via e iniziale maiuscola: nell'Excel è un titolo ("Servizio di trasporto…")
-  const o = ripulisciOggetto(testo).replace(/[.;\s]+$/, '').slice(0, 400)
+  // punto finale via e iniziale maiuscola: nell'Excel è un titolo ("Servizio di trasporto…").
+  // Oltre il tetto si taglia all'ultima voce o parola intera, non a metà parola. Con un
+  // elenco il tetto è 500: sono titoli brevi, e a 400 restava fuori l'ultima lavorazione.
+  let o = ripulisciOggetto(testo).replace(/[.;\s]+$/, '')
+  const tetto = conElenco ? 500 : 400
+  if (o.length > tetto) {
+    const taglio = o.slice(0, tetto)
+    const fine = Math.max(taglio.lastIndexOf(', '), taglio.lastIndexOf('; '))
+    o = fine > tetto * 0.75 ? taglio.slice(0, fine) : taglio.slice(0, taglio.lastIndexOf(' '))
+  }
   return o.charAt(0).toUpperCase() + o.slice(1)
 }
 
