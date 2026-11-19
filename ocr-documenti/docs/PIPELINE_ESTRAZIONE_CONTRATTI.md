@@ -747,6 +747,23 @@ modulo di riferimento le gabbie ora sono «… 09.B Ø.1000» come le scrive il 
   scartare il cronoprogramma del 195-137 («L 1 7»). La tabella del parco mezzi Beton
   spariva e l'elenco dal testo tornava a leggere i mezzi come voci (+20 righe in più).
 
+### 4.21 Elenco dal testo che contiene la tabella ricostruita (Eureka, 19/11/2026)
+
+La griglia «ELENCO DEI PREZZI» letta dal testo non entra in gara dove la ricostruzione
+geometrica (pipe) ha già righe (misure di Sidersipe, GFM, Warm, vedi sopra). Su Eureka però
+la tabella della pagina 4 teneva solo «Posa in opera»: «Imballaggio Cad 1 € 750,00» e
+«Trasporto» hanno una parola sola di descrizione e `tabellaColonne` le scarta, mentre il
+testo le legge tutte e quattro. In `estraiRigheGrezze` la griglia entra anche con la pipe
+quando:
+- ne contiene tutte le voci (stessa quantità e stesso prezzo);
+- non ha meno codici;
+- ogni voce in più ha l'unità di misura e il conto quantità × prezzo = importo.
+
+Sidersipe resta alla tabella, perché le due voci in più del testo («1,20 10 12», dalla
+tabella degli extra per diametro) non hanno unità. In `recuperaCodiciRighe` una misura per
+unità in testa alla descrizione («15/mq», resto di «peso … kg 15/mq») non è più un codice.
+Eureka 1 → **4/4**, Ticopter (Contratto_fornitura) 1 → 2/4; nessun altro contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

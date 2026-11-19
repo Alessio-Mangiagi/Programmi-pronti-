@@ -635,6 +635,21 @@ describe('tabella numerata per posizione e voci uguali', () => {
     const sics = { testata: {}, importi: {}, righe: [riga('P.01'), riga('P.01'), riga('F.01'), riga('P.02')] } as unknown as Estratto
     expect(JSON.parse(strutturaAlyante(sics)).righe.map((r: Record<string, string>) => r.codice_epu)).toEqual(['P.01', 'P.01', 'P.01', 'P.02'])
   })
+  it('elenco dal testo che contiene la tabella ricostruita e ha voci in più con UM e conto → vince (Eureka)', () => {
+    const testo = (tabella: string[], extra: string[]) => ['ART. 5 - ELENCO DEI PREZZI UNITARI', 'DESCRIZIONE U.M Quantità P.U. Importo',
+      'Fornitura pannelli di parapetti modulari zincati Mq 2400 € 163,00 € 391.200,00',
+      'Posa in opera Mq 2400 € 44,00 € 105.600,00', ...extra, 'Totale € 503.550,00', '',
+      '### TABELLA ARTICOLI (ricostruita dalla scansione)', ...tabella].join('\n')
+    const tabella = ['|  | Fornitura pannelli di parapetti modulari zincati | Mq | 2400 | 163,00 | 391.200,00 |', '|  | Posa in opera | Mq | 2400 | 44,00 | 105.600,00 |']
+    expect(estraiRighe(testo(tabella, ['Imballaggio Cad 1 € 750,00 € 750,00', 'Trasporto Cad 1 € 6.000,00 € 6.000,00'])).map(r => r.prezzo_lordo))
+      .toEqual(['163,00', '44,00', '750,00', '6.000,00'])
+    // voce in più senza unità di misura (tabella degli extra, Sidersipe): resta la tabella
+    expect(estraiRighe(testo(tabella, ['Diametro 5 6 10X10 1,20 10 12'])).map(r => r.prezzo_lordo)).toEqual(['163,00', '44,00'])
+  })
+  it('misura per unità in testa alla descrizione non è un codice ("kg 15/mq", Eureka)', () => {
+    const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: '', descrizione: '15/mq CORRIMANO NASCOSTO INTERNO Posa in opera', udm: 'mq', quantita: '2400', prezzo_lordo: '44,00', importo: '105.600,00' }] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(e)).righe[0].codice_epu).toBe('')
+  })
   it('stessa tabella, due voci uguali (fusto pila e sottovia): restano tutte e due', () => {
     const t = ['Descrizione UM Quantità Prezzo unitario Prezzo TOTALE',
       'Vendita a.c. 1,00 2.500,00 € 2.500,00 €', 'Cassero speciale vendita a.c. 1,00 7.700,00 € 7.700,00 €',
