@@ -146,14 +146,15 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
   armonizzaCodiciGemelli(righe)
 }
 
-// Coppie di caratteri che l'OCR scambia nei codici articolo ("09.B" letto "09.8", "O9.B").
-const CONFONDIBILI = new Set(['8B', 'B8', '0O', 'O0', '5S', 'S5', '1I', 'I1', '2Z', 'Z2', '6G', 'G6'])
+// Coppie di caratteri che l'OCR scambia nei codici articolo ("09.B" letto "09.8", "O9.B",
+// "P.01" letto "F.01" nei calcestruzzi SICS, "Z10" letto "710" nei listini regionali).
+const CONFONDIBILI = new Set(['8B', 'B8', '0O', 'O0', '5S', 'S5', '1I', 'I1', '2Z', 'Z2', '6G', 'G6', 'FP', 'PF', '7Z', 'Z7'])
 
 // Terza passata: lo stesso codice di listino ripetuto su più voci e letto male UNA volta
 // (Sidersipe: "BA.CZ.A.3 09.B" su tre voci, "BA.CZ.A.3 09.8 Ø.1500" sulla quarta). Si
 // confronta il codice BASE, senza il dettaglio diametro "Ø.1000": un codice che compare
 // una volta sola e differisce da uno che compare almeno due volte per UN solo carattere
-// confondibile (8/B, 0/O, 5/S, 1/I, 2/Z, 6/G) prende la forma ripetuta. Vince sempre la
+// confondibile (8/B, 0/O, 5/S, 1/I, 2/Z, 6/G, F/P, 7/Z) prende la forma ripetuta. Vince sempre la
 // maggioranza, così due codici veri che si somigliano (una volta ciascuno) restano com'erano.
 const armonizzaCodiciGemelli = (righe: Record<string, string>[]): void => {
   const dettaglio = /\s+Ø\.\d{3,4}$/
