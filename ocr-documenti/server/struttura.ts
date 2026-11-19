@@ -240,6 +240,23 @@ export const strutturaAlyante = (e: Estratto, opz: OpzioniStruttura = {}): strin
       }
     }
   }
+  // Prezzo stampato arrotondato ai centesimi: "m 6600 0,30 € 1.947,00 €" (GFM) è
+  // 6600 × 0,295. Se quantità × prezzo non dà l'importo, ma importo / quantità ha al più
+  // tre decimali e arrotondato ai centesimi è il prezzo stampato, il prezzo vero è quello:
+  // l'importo è la cifra del contratto e Alyante ricalcola quantità × prezzo.
+  const euro3 = (millesimi: number) => {
+    const [int, dec] = (millesimi / 1000).toFixed(3).split('.')
+    return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`
+  }
+  for (const r of opz.fedele ? [] : righe) {
+    if (!r.quantita || !r.importo || !/^\d{1,3}(?:\.\d{3})*,\d{2}$/.test(r.prezzo_lordo ?? '')) continue
+    const q = itNum(r.quantita), p = itNum(r.prezzo_lordo), i = itNum(r.importo)
+    if (!(q > 0 && p > 0 && i > 0) || Math.abs(q * p - i) < 0.01) continue
+    const millesimi = Math.round(i / q * 1000)
+    if (Math.abs(i / q * 1000 - millesimi) > 1e-6 || millesimi % 10 === 0) continue
+    if (Math.abs(millesimi / 10 - Math.round(p * 100)) > 0.5) continue
+    r.prezzo_lordo = euro3(millesimi)
+  }
   righe.forEach((r, i) => { r.progressivo = String(i + 1) })
   // anagrafiche coerenti, una per codice articolo; FAM/SFAM dal classificatore deterministico
   const seen = new Set<string>()
