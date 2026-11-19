@@ -784,6 +784,18 @@ quantità 3.839,61 / 30.012,79 = 0,128, che passava il controllo largo sui mille
 Ora prova prima `staccaQtaIncollata`, che accetta il taglio solo se la testa staccata è
 importo / prezzo entro l'1‰. PF Future villette 33 → **34/34**.
 
+### 4.24 Continuazione del codice con un segno davanti o dopo una riga corta (GFM, 19/11/2026)
+
+In `tabellaColonne` (`server/tabella-tsv.ts`) la continuazione del codice nella sua colonna
+si perdeva in due casi, e il codice restava tronco («SIC24_14.03», «SIC24_14.12»):
+- il bordo o una macchia letti come segno davanti («:17.007», «-17.051»): nella colonna
+  codice il segno si toglie prima di riconoscere il pezzo;
+- la riga sopra, quella dei valori, era corta e chiudeva la cella, così «.03» apriva un
+  articolo suo. Una riga che nella colonna codice porta solo la continuazione resta
+  nell'articolo sopra.
+
+GFM 102 → **105/108**; nessun altro contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

@@ -732,7 +732,8 @@ GFM 102/108. Sui 31 contratti voci esatte **789/948** (83%), quantità e prezzo 
 **820/948** (86%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.22. Con la
 quantità incollata al prezzo staccata anche nelle righe SOMMANO senza quantità (§4.23)
 PF Future villette arriva a 34/34: voci esatte **790/948** (83%), quantità e prezzo giusti
-**821/948** (87%).
+**821/948** (87%). Con le continuazioni del codice GFM recuperate (§4.24: «:17.007»,
+«.03» dopo una riga corta) GFM sale a 105/108 e le voci esatte a **793/948** (84%).
 
 ## Fonti
 

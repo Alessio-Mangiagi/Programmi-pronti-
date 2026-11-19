@@ -515,6 +515,24 @@ describe('codice andato a capo nella sua colonna', () => {
     const codici = tabellaColonne(words).split('\n').map(l => l.split('|')[1].trim())
     expect(codici).toEqual(['SIC24_14.01.01.001', 'SIC24_14.01.03.003'])
   })
+  // testo giustificato: righe piene fino a x≈560, la riga dei valori finisce corta
+  const riga = (top: number, parole: [string, number][]) =>
+    parole.map(([text, left]) => ({ text, left, top, width: text.length * 8, height: 18 }))
+  const piena = (top: number) => riga(top, [['conduttori', 200], ['elettrici', 300], ['in', 390], ['rame', 420], ['con', 470], ['isolante', 500]])
+  it('segno davanti alla continuazione (":17.007", GFM) e continuazione dopo una riga corta (".03")', () => {
+    const words = [
+      ...riga(100, [['SIC24_14.03', 50], ['Fornitura', 200], ['e', 290], ['collocazione', 310], ['entro', 420], ['tubi,', 470], ['posati', 515], ['m', 900], ['100', 980], ['5,52', 1060], ['552,00', 1160]]),
+      ...riga(125, [[':17.007', 50], ['di', 200], ['conduttori', 230], ['elettrici', 330], ['in', 420], ['rame', 450], ['con', 500]]),
+      ...piena(150), ...piena(175), ...piena(200),
+      ...riga(225, [['magistero.', 200], ['cavo', 290], ['FG16', 340]]),
+      ...riga(250, [['SIC24_14.12', 50], ['Fornitura', 200], ['e', 290], ['posa', 310], ['m', 900], ['830', 980], ['1,35', 1060], ['1.120,50', 1160]]),
+      ...riga(275, [['.03', 50], ['entro', 200], ['canali', 260], ['di', 320], ['cavo', 350], ['citofonico', 400], ['a', 500], ['due', 520]]),
+      ...piena(300), ...piena(325), ...piena(350),
+      ...riga(375, [['citofonico', 200], ['da', 290], ['realizzare.', 320]]),
+    ]
+    const codici = tabellaColonne(words).split('\n').map(l => l.split('|')[1].trim())
+    expect(codici).toEqual(['SIC24_14.03 17.007', 'SIC24_14.12.03'])
+  })
 })
 
 describe('elenco prezzi a voci composte (SICS)', () => {
