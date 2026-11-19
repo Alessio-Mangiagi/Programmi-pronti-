@@ -711,8 +711,9 @@ delle gabbie «Ø.1000» come il programma. Sidersipe 5/5, voci esatte sui 31 co
 Nella tabella senza bordi di World service la cifra finale del codice andata a capo
 («PR23.NP.ARC.04» / «0») torna nel codice, e l'unità «m^²» chiude la voce NP2 che prima
 spariva: World service 7/7. Sotto le griglie le righe di riepilogo senza codice né unità
-con un solo importo («folale», «Oneri della sicurezza») non sono più voci. Sui 31
-contratti voci esatte **781/948** (82%), quantità e prezzo giusti 813/948 (86%), righe in
+con un solo importo («folale», «Oneri della sicurezza») non sono più voci. La regola dei
+codici gemelli (§23) vale anche per F/P: SICS «F.01» → «P.01», 28/29. Sui 31
+contratti voci esatte **782/948** (82%), quantità e prezzo giusti 813/948 (86%), righe in
 più 33 → **28**. Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.20.
 
 ## Fonti

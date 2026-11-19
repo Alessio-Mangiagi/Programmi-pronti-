@@ -631,6 +631,9 @@ describe('tabella numerata per posizione e voci uguali', () => {
     // due codici simili presenti una volta ciascuno: nessuna maggioranza, restano
     const pari = { testata: {}, importi: {}, righe: [riga('A.08.001'), riga('A.0B.001')] } as unknown as Estratto
     expect(JSON.parse(strutturaAlyante(pari)).righe.map((r: Record<string, string>) => r.codice_epu)).toEqual(['A.08.001', 'A.0B.001'])
+    // F/P: "Quota fissa pompaggio" P.01 su più voci, una letta F.01 (SICS)
+    const sics = { testata: {}, importi: {}, righe: [riga('P.01'), riga('P.01'), riga('F.01'), riga('P.02')] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(sics)).righe.map((r: Record<string, string>) => r.codice_epu)).toEqual(['P.01', 'P.01', 'P.01', 'P.02'])
   })
   it('stessa tabella, due voci uguali (fusto pila e sottovia): restano tutte e due', () => {
     const t = ['Descrizione UM Quantità Prezzo unitario Prezzo TOTALE',

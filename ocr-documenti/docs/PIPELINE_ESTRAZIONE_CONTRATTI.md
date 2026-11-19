@@ -720,12 +720,13 @@ contratto cambia.
 Nel contratto Sidersipe tre voci hanno «BA.CZ.A.3 09.B» e la quarta è letta «BA.CZ.A.3
 09.8 Ø.1500». In coda a `recuperaCodiciRighe` (`armonizzaCodiciGemelli`, `server/struttura.ts`)
 un codice che compare una sola volta e differisce da un codice ripetuto almeno due volte
-nello stesso documento per un solo carattere confondibile (8/B, 0/O, 5/S, 1/I, 2/Z, 6/G)
-prende la forma ripetuta. Si confronta il codice senza il dettaglio diametro «Ø.1000»; con
+nello stesso documento per un solo carattere confondibile (8/B, 0/O, 5/S, 1/I, 2/Z, 6/G,
+F/P, 7/Z) prende la forma ripetuta. Si confronta il codice senza il dettaglio diametro «Ø.1000»; con
 due codici simili presenti una volta ciascuno non c'è maggioranza e restano com'erano. Nel
 modulo di riferimento le gabbie ora sono «… 09.B Ø.1000» come le scrive il programma (era
-«0.1000», lo stesso Ø che l'OCR legge 0). Sidersipe 2 → **5/5**, nessun altro contratto
-cambia.
+«0.1000», lo stesso Ø che l'OCR legge 0). Sidersipe 2 → **5/5**. Con F/P anche SICS
+(«P.01» su cinque voci, una letta «F.01») 27 → **28/29**. Muzzolon «20.A90.Z10.010» letto
+«…710…» resta: le due forme compaiono una volta ciascuna e non c'è maggioranza.
 
 ### 4.20 Codice andato a capo, unità «m^²», riepilogo sotto l'elenco (19/11/2026)
 
