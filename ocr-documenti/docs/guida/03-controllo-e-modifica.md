@@ -18,6 +18,12 @@ che non torna e che Alyante rifiuterebbe o importerebbe sbagliato:
 
 Ogni voce è **cliccabile** e porta alla cella da correggere.
 
+Prezzo arrotondato nel contratto: quando il PDF stampa il prezzo ai centesimi ma
+l'importo della riga è fatto col prezzo a tre decimali (*m 6600 · 0,30 € · 1.947,00 €*,
+cioè 6600 × 0,295), nell'Excel va il prezzo esatto **0,295**. Così quantità × prezzo
+torna con l'importo del contratto. Succede solo se importo ÷ quantità ha al più tre
+decimali e, arrotondato, è proprio il prezzo stampato.
+
 ## 3.2 Le celle rosse nell'Excel
 
 Una cella **rossa** su PROGETTO/EPU vuol dire che il codice commessa trovato

@@ -7,7 +7,7 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17-19/11 (§11-§25): documento intero con le pagine, testata,
+- **Aggiornamento del 17-19/11 (§11-§26): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
   descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s, migliaia con lo
@@ -723,6 +723,13 @@ Quando la tabella ricostruita dalle coordinate perde voci con la descrizione di 
 voce in più ha l'unità di misura e il conto che torna. Eureka 4/4, Ticopter 2/4. Sui 31
 contratti voci esatte **786/948** (83%), quantità e prezzo giusti **817/948** (86%), righe
 in più 28. Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.21.
+
+## 26. Prezzo esatto dall'importo (19/11/2026)
+
+Dove il contratto stampa il prezzo ai centesimi ma l'importo è fatto col prezzo a tre
+decimali (GFM: 6600 × 0,295 = 1.947,00, stampato 0,30), nell'Excel va il prezzo esatto.
+GFM 102/108. Sui 31 contratti voci esatte **789/948** (83%), quantità e prezzo giusti
+**820/948** (86%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.22.
 
 ## Fonti
 

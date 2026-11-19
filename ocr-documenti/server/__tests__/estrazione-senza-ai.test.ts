@@ -646,6 +646,13 @@ describe('tabella numerata per posizione e voci uguali', () => {
     // voce in più senza unità di misura (tabella degli extra, Sidersipe): resta la tabella
     expect(estraiRighe(testo(tabella, ['Diametro 5 6 10X10 1,20 10 12'])).map(r => r.prezzo_lordo)).toEqual(['163,00', '44,00'])
   })
+  it('prezzo stampato ai centesimi, importo col prezzo a tre decimali → prezzo esatto (GFM)', () => {
+    const riga = (quantita: string, prezzo_lordo: string, importo: string) => ({ progressivo: '1', codice_epu: 'SIC24_14.03.15.001', descrizione: 'SOLO POSA di conduttori', udm: 'm', quantita, prezzo_lordo, importo })
+    const e = { testata: {}, importi: {}, righe: [riga('6600', '0,30', '1.947,00'), riga('2600', '0,89', '2.301,00'), riga('420', '1,55', '648,90'),
+      riga('10', '2,00', '20,00'),           // il conto torna: resta
+      riga('3', '1,50', '7,00')] } as unknown as Estratto   // 7 / 3 non ha tre decimali esatti: resta
+    expect(JSON.parse(strutturaAlyante(e)).righe.map((r: Record<string, string>) => r.prezzo_lordo)).toEqual(['0,295', '0,885', '1,545', '2,00', '1,50'])
+  })
   it('misura per unità in testa alla descrizione non è un codice ("kg 15/mq", Eureka)', () => {
     const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: '', descrizione: '15/mq CORRIMANO NASCOSTO INTERNO Posa in opera', udm: 'mq', quantita: '2400', prezzo_lordo: '44,00', importo: '105.600,00' }] } as unknown as Estratto
     expect(JSON.parse(strutturaAlyante(e)).righe[0].codice_epu).toBe('')

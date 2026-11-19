@@ -764,6 +764,18 @@ tabella degli extra per diametro) non hanno unità. In `recuperaCodiciRighe` una
 unità in testa alla descrizione («15/mq», resto di «peso … kg 15/mq») non è più un codice.
 Eureka 1 → **4/4**, Ticopter (Contratto_fornitura) 1 → 2/4; nessun altro contratto cambia.
 
+### 4.22 Prezzo stampato ai centesimi, importo a tre decimali (GFM, 19/11/2026)
+
+GFM stampa «m 6600 0,30 € 1.947,00 €»: l'importo è 6600 × 0,295 e il prezzo è arrotondato
+ai centesimi. In `strutturaAlyante` (`server/struttura.ts`, dopo la riparazione dei valori
+slittati) il prezzo diventa importo / quantità a tre condizioni:
+- quantità × prezzo non dà l'importo;
+- il rapporto ha al più tre decimali esatti;
+- arrotondato ai centesimi è il prezzo stampato.
+
+Così nell'Excel quantità × prezzo torna con l'importo del contratto, come nel modulo di
+riferimento. GFM 99 → **102/108** (0,295, 0,885, 1,545); nessun altro contratto cambia.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
