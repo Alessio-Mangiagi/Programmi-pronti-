@@ -63,7 +63,12 @@ export const tabellaDaTsv = (tsv: string): string => {
 }
 
 export const tabellaArticoliElenco = (lines: RigaTsv[]): string => {
-  const umRe = new RegExp(String.raw`^(${UM_SRC})\.?$`, 'i')
+  const umRe0 = new RegExp(String.raw`^(${UM_SRC})\.?$`, 'i')
+  // l'esponente letto dall'OCR come formula ("m^²", "$m^{}$"): senza i segni "$^{}" è
+  // l'unità di sempre. Prima la riga "NP2 Smontaggio ponteggi m^² 200,00 € 3,50 € 700,00"
+  // non era una riga di valori e la voce spariva dentro la precedente (World service).
+  const senzaFormula = (t: string) => t.replace(/[$^{}]/g, '')
+  const umRe = { test: (t: string) => umRe0.test(senzaFormula(t)) }
   const numRe = new RegExp(String.raw`^(${NUM_SRC})€?$`)
   const isNum = (w: string) => numRe.test(w.replace(/€/g, '').trim())
   // intestazione tabella: riga con "Articolo" e "Descrizione"
@@ -98,9 +103,18 @@ export const tabellaArticoliElenco = (lines: RigaTsv[]): string => {
   const bordi = lines.slice(iHead + 1).map((_, i) => fineRiga(iHead + 1 + i)).filter(x => x > 0).sort((a, b) => a - b)
   const margineDx = bordi.length ? bordi[Math.floor(bordi.length * 0.9)] : 0
   const sogliaCorta = Math.max(30, (margineDx - xDescr) * 0.05)
+  // Coda del codice andata a capo nella sua colonna: la cella è stretta e "PR23.NP.ARC.040"
+  // esce "PR23.NP.ARC.04" con "0" sulla riga sotto (World service). Una riga che nella
+  // colonna codice ha SOLO 1-3 cifre continua la cella sopra, anche se la descrizione
+  // riparte con la maiuscola ("C25/30 per il riempimento…"), e la cifra si attacca al codice.
+  const soloCodaCodice = (i: number): boolean => {
+    const nelCodice = (lines[i]?.words ?? []).filter(w => w.left < xDescr - 15)
+    return nelCodice.length > 0 && nelCodice.every(w => /^\d{1,3}$/.test(w.text))
+  }
   const fineParagrafo = (i: number): boolean => {
     const fine = fineRiga(i)
     if (fine <= 0 || fine >= margineDx - sogliaCorta) return false
+    if (soloCodaCodice(i + 1)) return false
     const dopo = parole(i + 1)[0]
     return !!dopo && /^[A-ZÀ-Ü]/.test(dopo.text)
   }
@@ -113,8 +127,11 @@ export const tabellaArticoliElenco = (lines: RigaTsv[]): string => {
     let fineCella = it
     const limite = Math.min(totali[n + 1] ?? lines.length, lines.length) - 1
     for (let j = it; j < limite; j++) if (fineParagrafo(j)) { fineCella = j; break }
+    // la riga con la sola coda del codice ("0") resta comunque in questa cella
+    while (fineCella < limite && soloCodaCodice(fineCella + 1)) fineCella++
     if (DBG_TABELLA) console.error(`[cella] it=${it} limite=${limite} fine=${fineCella} margine=${margineDx} soglia=${sogliaCorta.toFixed(0)} bordi=${lines.slice(it, limite + 1).map((_, k) => fineRiga(it + k)).join(',')}`)
     const codice: string[] = [], descr: string[] = [], dett: string[] = []
+    let rigaCodice = -1                    // riga dell'ultimo pezzo di codice raccolto
     for (let j = inizio; j <= fineCella; j++) {
       const ws = lines[j].words
       const testoRiga = ws.map(w => w.text).join(' ')
@@ -127,7 +144,15 @@ export const tabellaArticoliElenco = (lines: RigaTsv[]): string => {
         // sotto-prezzo: numero isolato col suo € accanto → non è descrizione
         if (isNum(w.text) && (ws[k + 1]?.text === '€' || /€$/.test(w.text))) continue
         if (w.left >= xDett - 15) { dett.push(w.text); continue }
-        if (w.left < xDescr - 15) { codice.push(w.text); continue }
+        if (w.left < xDescr - 15) {
+          // "0" sotto "PR23.NP.ARC.04": coda del codice puntato della riga prima
+          const ultimo = codice.length - 1
+          if (j > rigaCodice && rigaCodice >= 0 && ultimo >= 0 && /^\d{1,3}$/.test(w.text) && soloCodaCodice(j) &&
+              /[.]\d+$/.test(codice[ultimo])) codice[ultimo] += w.text
+          else codice.push(w.text)
+          rigaCodice = j
+          continue
+        }
         descr.push(w.text)
       }
     }
@@ -148,7 +173,7 @@ export const tabellaArticoliElenco = (lines: RigaTsv[]): string => {
     const descrTot = [descr.join(' '), dett.join(' ')].filter(Boolean).join(' — ').replace(/\s{2,}/g, ' ').trim()
     if (codice.length || descrTot) {
       const v = valoriRiga(numeri)
-      out.push(`| ${codice.join(' ').trim()} | ${descrTot} | ${wsTot[iu].text.replace(/\.$/, '')} | ${v[0] ?? ''} | ${v[1] ?? ''} | ${v[2] ?? ''} |`)
+      out.push(`| ${codice.join(' ').trim()} | ${descrTot} | ${senzaFormula(wsTot[iu].text).replace(/\.$/, '')} | ${v[0] ?? ''} | ${v[1] ?? ''} | ${v[2] ?? ''} |`)
     }
     inizio = fineCella + 1
   }
