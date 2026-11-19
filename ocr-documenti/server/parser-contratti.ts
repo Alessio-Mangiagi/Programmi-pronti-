@@ -548,7 +548,21 @@ const estraiRigheGrezze = (testoIntero: string): Record<string, string>[] => {
   // codice → 7 senza, GFM 103 codici su 106 → 57, Warm "cad 30,00 34,74 1.042,25" →
   // "42,25 1 042,25". Dove pipe non trova nulla (contratti digitali, allegati Excel)
   // la griglia resta l'unica fonte e lavora come previsto.
-  if (elenco.length && !wbsOs.length && !pipe.length && punti(elenco) >= punti(best)) best = elenco
+  // Eccezione: la griglia entra anche con la ricostruzione geometrica quando ne CONTIENE
+  // tutte le voci (stessa quantità e stesso prezzo), non ha meno codici e ogni voce in
+  // più ha l'unità di misura e il conto che torna. Eureka: la tabella della pagina 4
+  // teneva solo «Posa in opera», perché «Imballaggio Cad 1 € 750,00» e «Trasporto»
+  // hanno una parola sola di descrizione; il testo le legge tutte e quattro. Sidersipe
+  // resta alla tabella: le due voci in più del testo («1,20 10 12», dalla tabella degli
+  // extra per diametro) non hanno l'unità di misura.
+  const stessiValori = (a: Record<string, string>, b: Record<string, string>) =>
+    numIt(a.quantita) === numIt(b.quantita) && numIt(a.prezzo_lordo) === numIt(b.prezzo_lordo)
+  const conCodice = (rs: Record<string, string>[]) => rs.filter(r => String(r.codice_epu ?? '').trim()).length
+  const aggiunte = elenco.filter(x => !pipe.some(r => stessiValori(x, r)))
+  const elencoCopre = pipe.length > 0 && aggiunte.length > 0 &&
+    pipe.every(r => elenco.some(x => stessiValori(x, r))) && conCodice(elenco) >= conCodice(pipe) &&
+    aggiunte.every(x => !!x.udm && contoTorna(numIt(x.quantita), numIt(x.prezzo_lordo), numIt(x.importo)))
+  if (elenco.length && !wbsOs.length && (!pipe.length || elencoCopre) && punti(elenco) >= punti(best)) best = elenco
   // Righe dalle celle della tabella (pagine con i bordi): colonne certe, quindi vincono
   // anche con qualche voce in meno degli altri parser (che contano pure righe spurie o
   // spezzate), ma non se ne hanno molte meno: un documento con le linee solo su alcune
