@@ -1775,11 +1775,17 @@ export const estraiRigheSommano = (text: string): Record<string, string>[] => {
     else if (!v2) { blocco = []; continue }
     // prezzo da prezzario (≥4 decimali) seguito dall'importo: la quantità è andata
     // persa ("SOMMANO cad 211,27041 211,27 €") e vale importo / prezzo se esce pulita
+    // Prima però la quantità incollata al prezzo: "SOMMANO ) m 30012,7987002 3.839,61€" è
+    // 300 × 12,7987002 (PF Future villette). Senza questo passo il rapporto 3.839,61 /
+    // 30.012,79 = 0,128 passava per quantità.
     else if (decimali(v1) >= 4 && decimali(v2) <= 2 && !v3) {
-      const q = numIt(v2) / numIt(v1)
-      if (!isFinite(q) || q <= 0 || Math.abs(q * 1000 - Math.round(q * 1000)) > 5) { blocco = []; continue }
-      qta = String(Math.round(q * 1000) / 1000).replace('.', ',')
-      pu = v1; imp = v2
+      const incollata = staccaQtaIncollata(v1, v2)
+      if (incollata) { [qta, pu, imp] = incollata } else {
+        const q = numIt(v2) / numIt(v1)
+        if (!isFinite(q) || q <= 0 || Math.abs(q * 1000 - Math.round(q * 1000)) > 5) { blocco = []; continue }
+        qta = String(Math.round(q * 1000) / 1000).replace('.', ',')
+        pu = v1; imp = v2
+      }
     }
     else if (!v3) {
       // Quantità e prezzo INCOLLATI dall'OCR ("6 63,7689624" letto "663,7689624"):
