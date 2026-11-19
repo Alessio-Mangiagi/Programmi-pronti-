@@ -4,7 +4,8 @@
 Serve per i report che il Magazzino manda a SkyTower (giacenze e mezzi di un
 cantiere). Testo in WinAnsi (Latin-1): i caratteri fuori tabella diventano "?".
 Più sezioni (ognuna parte su una pagina nuova), più pagine, intestazione di
-tabella ripetuta, colonne numeriche a destra."""
+tabella ripetuta, colonne numeriche a destra. A4 verticale o orizzontale (dal 19/11/2026: lo stato
+della flotta mezzi ha nove colonne e in verticale tagliava anche i codici)."""
 from datetime import datetime
 
 A4 = (595.28, 841.89)
@@ -17,9 +18,27 @@ def _esc(testo):
     return b.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
 
 
+_STRETTI = set(" .,:;'|!ijlfrtI()[]-/")
+
+
+def _em(ch):
+    """Larghezza di un carattere Helvetica in em, per classi (dalle metriche AFM, arrotondate per eccesso).
+    Fino al 19/11/2026 era 0,52 per tutti: le intestazioni in MAIUSCOLO allineate a destra ("COSTO")
+    uscivano dal margine perché le maiuscole sono larghe ~0,7 em."""
+    if ch in _STRETTI:
+        return 0.3
+    if ch.isupper():
+        return 0.7
+    if ch.isdigit() or ch in "€$%#":
+        return 0.56
+    if ch in "mwMW@":
+        return 0.85
+    return 0.52
+
+
 def _larghezza(testo, dim):
-    # Helvetica: stima media 0.52 em per carattere (bastante per tagliare le celle)
-    return len(str(testo or "")) * dim * 0.52
+    """Larghezza stimata in punti di un testo Helvetica (basta per tagliare le celle e allineare a destra)."""
+    return sum(_em(ch) for ch in str(testo or "")) * dim
 
 
 def _taglia(testo, dim, max_pt):
@@ -34,16 +53,17 @@ def _taglia(testo, dim, max_pt):
 class _Pagine:
     """Accumula il contenuto pagina per pagina."""
 
-    def __init__(self):
+    def __init__(self, foglio=A4):
+        self.larghezza, self.altezza = foglio     # punti: A4 verticale o, girato, orizzontale
         self.pagine = []
         self.corrente = []
-        self.y = A4[1] - MARGINE
+        self.y = self.altezza - MARGINE
 
     def nuova(self):
         if self.corrente:
             self.pagine.append(b"\n".join(self.corrente))
             self.corrente = []
-        self.y = A4[1] - MARGINE
+        self.y = self.altezza - MARGINE
 
     def chiudi(self):
         if self.corrente or not self.pagine:
@@ -66,7 +86,7 @@ class _Pagine:
 
 
 def _sezione(p, titolo, intestazioni, righe, sottotitolo="", numeriche=(), larghezze=None):
-    larg_utile = A4[0] - 2 * MARGINE
+    larg_utile = p.larghezza - 2 * MARGINE
     n = len(intestazioni)
     pesi = list(larghezze) if larghezze else [1] * n
     tot = float(sum(pesi)) or 1.0
@@ -104,13 +124,21 @@ def _sezione(p, titolo, intestazioni, righe, sottotitolo="", numeriche=(), largh
         p.y -= RIGA
 
 
-def documento_pdf(sezioni, piede=""):
-    """PDF A4 con una o più sezioni: ognuna {titolo, intestazioni, righe, sottotitolo?, numeriche?, larghezze?}
-    e parte su una pagina nuova. Ritorna i byte."""
-    p = _Pagine()
+def documento_pdf(sezioni, piede="", orizzontale=False):
+    """PDF A4 con una o più sezioni: ognuna {titolo, intestazioni, righe, sottotitolo?, numeriche?, larghezze?,
+    stessa_pagina?}. Ogni sezione parte su una pagina nuova, salvo `stessa_pagina=True`: allora continua
+    sotto la precedente se resta posto per titolo e qualche riga (la scheda di un mezzo, con anagrafica,
+    scadenze, manutenzioni e spostamenti, sta così in una o due pagine invece di quattro).
+    `larghezze` sono pesi relativi: scritti in punti tipografici (515 utili in verticale, 762 in orizzontale)
+    si vede subito se un testo ci sta. `orizzontale` = A4 girato, per le tabelle con molte colonne. Ritorna i byte."""
+    foglio = (A4[1], A4[0]) if orizzontale else A4
+    p = _Pagine(foglio)
     for i, s in enumerate(sezioni):
         if i:
-            p.nuova()
+            if s.get("stessa_pagina") and p.y > MARGINE + 120:
+                p.y -= 18      # stacco fra la tabella sopra e il titolo della sezione
+            else:
+                p.nuova()
         _sezione(p, s["titolo"], s["intestazioni"], s["righe"], s.get("sottotitolo", ""),
                  tuple(s.get("numeriche") or ()), s.get("larghezze"))
     pagine = p.chiudi()
@@ -125,7 +153,7 @@ def documento_pdf(sezioni, piede=""):
         corpo += b"\nBT 0.42 0.42 0.42 rg /F1 7.5 Tf %.2f %.2f Td (" % (MARGINE, MARGINE - 16) + _esc(piede_t) + b") Tj ET"
         n_pag = len(oggetti) + 1
         kids.append(b"%d 0 R" % n_pag)
-        oggetti.append(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents %d 0 R >>" % (A4[0], A4[1], n_pag + 1))
+        oggetti.append(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents %d 0 R >>" % (foglio[0], foglio[1], n_pag + 1))
         oggetti.append(b"<< /Length %d >>\nstream\n" % len(corpo) + corpo + b"\nendstream")
     oggetti[1] = b"<< /Type /Pages /Kids [" + b" ".join(kids) + b"] /Count %d >>" % len(kids)
 
