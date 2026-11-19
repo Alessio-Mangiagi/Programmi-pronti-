@@ -586,6 +586,15 @@ describe('tabella numerata per posizione e voci uguali', () => {
     const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: 'B.03', descrizione: '025.a CONGLOMERATO CEMENTIZIO PER MAGRONE', udm: 'm³', quantita: '36,63', prezzo_lordo: '97,00', importo: '3.553,23' }] } as unknown as Estratto
     expect(JSON.parse(strutturaAlyante(e)).righe[0]).toMatchObject({ codice_epu: 'B.03.025.a', descrizione: 'CONGLOMERATO CEMENTIZIO PER MAGRONE' })
   })
+  it('codice ripetuto letto male una volta prende la forma ripetuta (Sidersipe 09.8 → 09.B)', () => {
+    const riga = (codice_epu: string) => ({ progressivo: '1', codice_epu, descrizione: 'Gabbie per armature di pali di fondazione', udm: 'kg', quantita: '1.000,00', prezzo_lordo: '0,750', importo: '750,00' })
+    const e = { testata: {}, importi: {}, righe: [riga('BA.CZ.A.3 09.B Ø.1000'), riga('BA.CZ.A.3 09.B Ø.1200'), riga('BA.CZ.A.3 09.8 Ø.1500'), riga('BA.CZ.A.3 10.A')] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(e)).righe.map((r: Record<string, string>) => r.codice_epu))
+      .toEqual(['BA.CZ.A.3 09.B Ø.1000', 'BA.CZ.A.3 09.B Ø.1200', 'BA.CZ.A.3 09.B Ø.1500', 'BA.CZ.A.3 10.A'])
+    // due codici simili presenti una volta ciascuno: nessuna maggioranza, restano
+    const pari = { testata: {}, importi: {}, righe: [riga('A.08.001'), riga('A.0B.001')] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(pari)).righe.map((r: Record<string, string>) => r.codice_epu)).toEqual(['A.08.001', 'A.0B.001'])
+  })
   it('stessa tabella, due voci uguali (fusto pila e sottovia): restano tutte e due', () => {
     const t = ['Descrizione UM Quantità Prezzo unitario Prezzo TOTALE',
       'Vendita a.c. 1,00 2.500,00 € 2.500,00 €', 'Cassero speciale vendita a.c. 1,00 7.700,00 € 7.700,00 €',

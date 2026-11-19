@@ -7,14 +7,14 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
 
 ## 1. In breve
 
-- **Aggiornamento del 17/11 (§11-§22): documento intero con le pagine, testata,
+- **Aggiornamento del 17-19/11 (§11-§23): documento intero con le pagine, testata,
   riferimenti dall'app, celle numeriche rilette, codici spezzati su due righe, codici a
   sigla, elenchi a corpo senza quantità, codici del computo ricomposti, griglie con la
   descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s, migliaia con lo
   spazio.** Sui 31 contratti testata dal 94% al 98%, voci con quantità e prezzo giusti dal
   74% all'86%, voci esatte dal 64% all'82%; nessun contratto peggiora. Progetto Costruzioni
   da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da 35 a 65 e da 45 a 65
-  su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146. «Scan senza
+  su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146, Sidersipe 5 su 5. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -697,6 +697,14 @@ perché portata × anno ≈ massa torna per caso; ora un anno senza decimali o u
 zero davanti non vale come prezzo. «B.03» + «025.a CONGLOMERATO…» si ricompone in
 B.03.025.a. Beton 7/7, righe in più sui 31 contratti 38 → **33**, voci esatte 775/948.
 Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.18.
+
+## 23. Codice ripetuto letto male una volta (19/11/2026)
+
+Lo stesso codice di listino su più voci, letto male su una sola («09.8» al posto di
+«09.B»), prende la forma che compare più volte; vale solo per un carattere che l'OCR
+scambia (8/B, 0/O, 5/S, 1/I, 2/Z, 6/G). Il riferimento Sidersipe scrive ora il diametro
+delle gabbie «Ø.1000» come il programma. Sidersipe 5/5, voci esatte sui 31 contratti
+775 → **778/948** (82%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.19.
 
 ## Fonti
 
