@@ -143,6 +143,45 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
     const m = SOTTOVOCE_RE.exec(r.descrizione)
     if (m) r.codice_epu = basePerSottovoce.get(m[1].toUpperCase()) ?? ''
   }
+  armonizzaCodiciGemelli(righe)
+}
+
+// Coppie di caratteri che l'OCR scambia nei codici articolo ("09.B" letto "09.8", "O9.B").
+const CONFONDIBILI = new Set(['8B', 'B8', '0O', 'O0', '5S', 'S5', '1I', 'I1', '2Z', 'Z2', '6G', 'G6'])
+
+// Terza passata: lo stesso codice di listino ripetuto su più voci e letto male UNA volta
+// (Sidersipe: "BA.CZ.A.3 09.B" su tre voci, "BA.CZ.A.3 09.8 Ø.1500" sulla quarta). Si
+// confronta il codice BASE, senza il dettaglio diametro "Ø.1000": un codice che compare
+// una volta sola e differisce da uno che compare almeno due volte per UN solo carattere
+// confondibile (8/B, 0/O, 5/S, 1/I, 2/Z, 6/G) prende la forma ripetuta. Vince sempre la
+// maggioranza, così due codici veri che si somigliano (una volta ciascuno) restano com'erano.
+const armonizzaCodiciGemelli = (righe: Record<string, string>[]): void => {
+  const dettaglio = /\s+Ø\.\d{3,4}$/
+  const conta = new Map<string, number>()
+  for (const r of righe) {
+    if (!r.codice_epu) continue
+    const base = r.codice_epu.replace(dettaglio, '')
+    conta.set(base, (conta.get(base) ?? 0) + 1)
+  }
+  const ripetuti = [...conta].filter(([, n]) => n >= 2).map(([b]) => b)
+  if (!ripetuti.length) return
+  for (const r of righe) {
+    if (!r.codice_epu) continue
+    const base = r.codice_epu.replace(dettaglio, '')
+    if (conta.get(base) !== 1) continue
+    const gemelli = ripetuti.filter(b => {
+      if (b.length !== base.length) return false
+      let diff = 0, ok = true
+      for (let i = 0; i < b.length && ok; i++) {
+        if (b[i] === base[i]) continue
+        diff++
+        ok = CONFONDIBILI.has(base[i] + b[i])
+      }
+      return ok && diff === 1
+    })
+    // un solo gemello possibile, altrimenti non si sceglie
+    if (gemelli.length === 1) r.codice_epu = gemelli[0] + r.codice_epu.slice(base.length)
+  }
 }
 
 // `fedele`: i valori vengono da un MODULO CONTRATTO compilato a mano (src/lib/modulo-contratto.ts),
