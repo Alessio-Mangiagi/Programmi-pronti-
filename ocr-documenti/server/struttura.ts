@@ -147,6 +147,24 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
     if (m) r.codice_epu = basePerSottovoce.get(m[1].toUpperCase()) ?? ''
   }
   armonizzaCodiciGemelli(righe)
+  completaCodiciTronchi(righe)
+}
+
+// Quarta passata: codice tronco dell'ultimo segmento ("E.01.027.1." con la "a" andata a
+// capo e persa, Jonico). Se nel documento ci sono codici figli "E.01.027.1.<x>" e UNO
+// SOLO di loro ha una voce con lo stesso prezzo, la voce tronca è quel figlio (34,74 =
+// E.01.027.1.a, 44,40 = E.01.027.1.b). Con più figli allo stesso prezzo, o nessuno,
+// resta com'è.
+const completaCodiciTronchi = (righe: Record<string, string>[]): void => {
+  const codici = new Set(righe.map(r => r.codice_epu).filter(Boolean))
+  for (const r of righe) {
+    const c = r.codice_epu
+    if (!c || !r.prezzo_lordo || !/\d$/.test(c)) continue
+    const figli = [...codici].filter(f => f.startsWith(`${c}.`) && /^[A-Za-z0-9]{1,2}$/.test(f.slice(c.length + 1)))
+    if (!figli.length) continue
+    const conPrezzo = figli.filter(f => righe.some(x => x.codice_epu === f && x.prezzo_lordo === r.prezzo_lordo))
+    if (conPrezzo.length === 1) r.codice_epu = conPrezzo[0]
+  }
 }
 
 // Coppie di caratteri che l'OCR scambia nei codici articolo ("09.B" letto "09.8", "O9.B",
@@ -200,8 +218,15 @@ export const strutturaAlyante = (e: Estratto, opz: OpzioniStruttura = {}): strin
   if (!opz.fedele) recuperaCodiciRighe(e.righe)
   // Scarta le righe "vuote" (solo codice, o né descrizione né valori): capitano
   // quando l'OCR spezza una cella articolo — nell'Excel diventerebbero righe inutili.
+  // Scarta anche le intestazioni di gruppo WBS con il loro subtotale: "Lotto 4 ID.A
+  // Sistemazione Fiume Barbalanni * 203.658,37 € 7.151,66 €" (importo lavori e importo
+  // oneri del lotto, subappalti Ragusana) usciva come voce con quantità 203.658,37. Senza
+  // codice, senza unità, senza importo e con la descrizione da gruppo ("Lotto …", "… *",
+  // "complessivamente"): nei moduli di riferimento nessuna voce ha questa forma.
+  const gruppoWbs = (r: Record<string, string>) => !r.codice_epu && !r.udm && !r.importo &&
+    /^\s*lotto\b|\*\s*$|\bcomplessivamente\b/i.test(r.descrizione ?? '')
   const filtrate = opz.fedele ? e.righe : e.righe.filter(r =>
-    (r.descrizione ?? '').trim().length >= 3 || r.quantita || r.prezzo_lordo || r.importo)
+    ((r.descrizione ?? '').trim().length >= 3 || r.quantita || r.prezzo_lordo || r.importo) && !gruppoWbs(r))
   // Righe uguali: nel documento sono voci vere e restano tutte. Misura del 16/11/2026 sui
   // 31 contratti del banco: ogni coppia identica trovata dai parser è nel riferimento
   // (lo stesso articolo in due quadri del computo PF Future, gli oneri della sicurezza
