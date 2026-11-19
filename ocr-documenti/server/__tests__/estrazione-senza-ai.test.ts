@@ -15,10 +15,11 @@ import {
 } from '../parser-contratti.ts'
 import { normalizzaCodice, strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchCondPagamento, matchDivisione } from '../alyante.ts'
-import { tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
+import { tabellaArticoliElenco, tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
 import { normalizzaNumeriOcr } from '../testo.ts'
 import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
+import type { RigaTsv } from '../tabella-tsv.ts'
 
 describe('testata', () => {
   it('data = quella delle firme ("lì"), anche dopo decine di pagine di allegati', () => {
@@ -220,6 +221,35 @@ describe('righe', () => {
   })
 })
 
+describe('tabella ARTICOLO/DESCRIZIONE senza bordi (World service)', () => {
+  // riga TSV: [testo, x, larghezza] alla quota `top`
+  const riga = (top: number, parole: [string, number, number][]): RigaTsv =>
+    ({ key: String(top), words: parole.map(([text, left, width]) => ({ text, left, width, top, height: 36 })) })
+  const valori = (um: string, q: string, p: string, i: string): [string, number, number][] =>
+    [[um, 1460, 40], [q, 1587, 108], [p, 1741, 100], [i, 1855, 190]]
+  it('cifra andata a capo nella colonna codice e unità «m^²»', () => {
+    const lines = [
+      riga(1700, [['ARTICOLO', 258, 150], ['DESCRIZIONE', 524, 200], ['UM', 1450, 50], ["QUANTITA'", 1580, 130], ['P.U.', 1740, 60], ['IMPORTO', 1870, 130]]),
+      riga(1770, [['Realizzazione di vespaio aerato per una altezza totale di 100', 524, 876]]),
+      riga(1853, [['PR23.NP.ARC.04', 258, 258], ['rapida formazione, a secco, di una piattaforma pedonabile', 524, 876]]),
+      riga(1866, [['autoportante sopra cui eseguire la gettata di calcestruzzo di', 524, 836], ...valori('m²', '800,00', '21,00', '16.800,00')]),
+      riga(1910, [['0', 377, 25], ['C25/30 per il riempimento del cassero fino alla sua sommità (a', 525, 881]]),
+      riga(1950, [["l'opera completa a perfetta regola d'arte.", 525, 475]]),
+      riga(2118, [['NP1', 356, 69], ['Montaggio ponteggi', 527, 276], ...valori('m²', '200,00', '6,00', '1.200,00')]),
+      riga(2160, [['NP2', 357, 71], ['Smontaggio ponteggi', 527, 300], ...valori('m^²', '200,00', '3,50', '700,00')]),
+    ]
+    const out = tabellaArticoliElenco(lines).split('\n').map(r => r.split(' | ').map(c => c.replace(/^\| |\s*\|$/g, '')))
+    expect(out.map(c => [c[0], c[2], c[3], c[4], c[5]])).toEqual([
+      ['PR23.NP.ARC.040', 'm²', '800,00', '21,00', '16.800,00'],
+      ['NP1', 'm²', '200,00', '6,00', '1.200,00'],
+      ['NP2', 'm²', '200,00', '3,50', '700,00'],
+    ])
+    expect(out[0][1]).toContain('C25/30 per il riempimento')
+    expect(out[1][1]).toContain('Montaggio ponteggi')
+    expect(out[2][1]).toBe('Smontaggio ponteggi')
+  })
+})
+
 describe('tabella dalle celle', () => {
   const b = (text: string, x: number, y: number, w = 40, h = 20): BloccoOcr => ({ text, conf: 99, x, y, w, h })
   // colonne: Pos | Descrizione | UM | Q.tà | Note | Prezzo | Importo
@@ -245,6 +275,13 @@ describe('tabella dalle celle', () => {
   it('tabella di soli interi (elenco automezzi: portata, anno) → non è un elenco prezzi', () => {
     const blocchi = [b('MB 4140 B KG 32000', 60, 60), b('290', 470, 60), b('2001', 670, 60), b('MB 3336 B KG 26000', 60, 140), b('265', 470, 140), b('2005', 670, 140)]
     expect(tabellaDaGriglia(blocchi, griglia)).toBe('')
+  })
+  it('riepilogo sotto l\'elenco (senza codice né unità, un solo importo) → non è una voce', () => {
+    const blocchi = [
+      b('B.05.030', 10, 70), b('Acciaio in barre tonde', 60, 70), b('kg', 410, 70), b('651.456,00', 470, 70), b('0,278 €', 670, 70), b('180.779,04', 770, 70),
+      b('Oneri della sicurezza', 60, 140), b('18.609,56', 770, 140),
+    ]
+    expect(tabellaDaGriglia(blocchi, griglia).split('\n')).toEqual(['| B.05.030 | Acciaio in barre tonde | kg | 651.456,00 | 0,278 | 180.779,04 |'])
   })
   it('senza griglia o con troppe poche linee: nessuna tabella', () => {
     expect(tabellaDaGriglia([b('x', 1, 1)], null)).toBe('')

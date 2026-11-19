@@ -727,6 +727,25 @@ modulo di riferimento le gabbie ora sono «… 09.B Ø.1000» come le scrive il 
 «0.1000», lo stesso Ø che l'OCR legge 0). Sidersipe 2 → **5/5**, nessun altro contratto
 cambia.
 
+### 4.20 Codice andato a capo, unità «m^²», riepilogo sotto l'elenco (19/11/2026)
+
+- **World service** (tabella ARTICOLO/DESCRIZIONE senza bordi, `tabellaArticoliElenco` in
+  `server/tabella-tsv.ts`): la cella codice è stretta e «PR23.NP.ARC.040» esce
+  «PR23.NP.ARC.04» con «0» sulla riga sotto. Una riga che nella colonna codice ha solo
+  1-3 cifre continua la cella sopra (anche se la descrizione riparte con la maiuscola) e
+  la cifra si attacca al codice. Prima lo «0» apriva una voce «0 NP1». L'unità scritta
+  dall'OCR come formula («m^²», «$m^{}$») senza i segni `$^{}` è l'unità di sempre: la
+  riga «NP2 Smontaggio ponteggi m^² 200,00 € 3,50 € 700,00» ora chiude la sua voce invece
+  di sparire nella precedente. World service 4 → **7/7**.
+- **Riepilogo sotto la griglia** (`leggiCelle` in `server/tabella-griglia.ts`): una riga
+  senza codice e senza unità di misura con un solo numero non è una voce. Erano «Totale»
+  letto «folale» (Muzzolon), «Lavorazioni al netto della sicurezza» e «Oneri della
+  sicurezza» (subappalto 195-137), Contratto.pdf e Contratto_subappalto. Righe in più
+  sui 31 contratti 33 → **28**.
+- Provato e tolto: chiedere i decimali alle righe senza codice di `tabellaColonne`, per
+  scartare il cronoprogramma del 195-137 («L 1 7»). La tabella del parco mezzi Beton
+  spariva e l'elenco dal testo tornava a leggere i mezzi come voci (+20 righe in più).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
