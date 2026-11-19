@@ -30,7 +30,8 @@ aggiorna da sola ogni 15 secondi.
   L'utente *importazione* sono i carichi entrati da soli dai DDT. **Dettaglio** filtra
   il registro qui sotto su quell'utente.
 - **Registro attività**: ogni azione con data, utente, IP, tipo di azione (scansione,
-  movimento, creazione, modifica, eliminazione, spostamento mezzo, importazione…),
+  movimento, creazione, modifica, eliminazione, spostamento mezzo, manutenzione mezzo,
+  manutenzioni da Excel, importazione…),
   oggetto (cliccabile) e dettaglio. Filtri per utente, azione, oggetto e testo libero.
   **Esporta CSV** scarica le righe filtrate (si apre con Excel).
 

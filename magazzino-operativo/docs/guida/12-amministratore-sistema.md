@@ -36,6 +36,13 @@ chi è admin per una regola IP del Portale; gli amministratori del Portale resta
 altre app; di solito `<Lettore DDT>/magazzino`) e `MAGAZZINO_PROGRAMMA_UNICO=0` per usare il
 Magazzino da solo, senza Lettore DDT, con i link al suo indirizzo.
 
+Manutenzioni dei mezzi ([capitolo 13](13-manutenzioni.md)): quanto prima della scadenza un
+intervento diventa "In scadenza" si regola con `MAGAZZINO_MANUT_PREAVVISO_GIORNI` (`30`),
+`MAGAZZINO_MANUT_PREAVVISO_ORE` (`50`) e `MAGAZZINO_MANUT_PREAVVISO_KM` (`1000`). Le manutenzioni
+stanno nel database (tabella `manutenzioni_mezzi`), le ultime letture di contaore e
+contachilometri nella tabella `mezzi`. Un file Excel caricato non resta sul server: entrano solo
+le righe confermate.
+
 Il registro dei riepiloghi mandati a SkyTower sta nel database (tabella `riepiloghi`).
 
 ## Backup

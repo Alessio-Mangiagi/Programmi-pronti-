@@ -74,6 +74,8 @@ subito la voce mancante:
 - **Segnala in InCampo** — compare se il mezzo è in un cantiere con codice commessa:
   apre un task in InCampo (vedi [Collegamenti con la suite](09-suite.md)).
 - **Storico spostamenti**: da dove a dove, con quale stato e chi l'ha registrato.
+- **Manutenzioni**: scadenze, interventi, costi, **Registra manutenzione**, **Carica da Excel**
+  e lo stato del mezzo in PDF o Excel: vedi [Manutenzioni dei mezzi](13-manutenzioni.md).
 - **Foto del mezzo**: vedi [Anagrafiche](04-anagrafiche.md#foto-dei-mezzi).
 
 ## La scheda di un'ubicazione

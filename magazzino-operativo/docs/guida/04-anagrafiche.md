@@ -39,7 +39,8 @@ DDT"): conviene poi completarli con categoria e scorta minima.
 
 Per ogni mezzo: codice, foto (o un'icona che cerca il mezzo su internet), targa e
 matricola, **Proprio** o **Nolo** (con la ditta), ubicazione, stato e chi lo usa, fine
-nolo. Filtri per testo, **stato** e **proprietà**.
+nolo, e la colonna **Manutenzione** (scadenza più urgente). Filtri per testo, **stato**,
+**proprietà** e **manutenzioni** (scadute, in scadenza, mai registrate).
 
 Su ogni riga: **Sposta** (vedi [Spostare un mezzo](03-movimenti.md#spostare-un-mezzo)),
 **Modifica** ed **Elimina** (solo admin: cancella il mezzo, il suo storico e le foto). La
@@ -52,12 +53,17 @@ In alto:
   [Importazioni](06-importazioni.md)); compare "Importazione mezzi: N pratiche lette";
 - **Nuovo mezzo**.
 
+Sotto i filtri: **Manutenzioni da Excel**, **Stato flotta PDF** e **Stato flotta Excel**:
+vedi [Manutenzioni dei mezzi](13-manutenzioni.md).
+
 ![Nuovo mezzo](img/mezzo-nuovo.png)
 
 Compila **Tipo di mezzo** (obbligatorio, con suggerimenti: escavatore, autocarro, gru…),
 **Proprietà** (Di proprietà / A nolo), marca, modello, targa, matricola; per i mezzi a
 nolo ditta proprietaria, partita IVA e date del nolo. Alla creazione scegli anche
-l'**Ubicazione iniziale** e lo **Stato**. Poi **Salva** ("Mezzo salvato").
+l'**Ubicazione iniziale** e lo **Stato**. **Contaore attuale** e **Contachilometri attuale**
+(facoltativi) dicono al Magazzino se le manutenzioni "a ore" o "a km" sono scadute: vedi
+[Manutenzioni dei mezzi](13-manutenzioni.md#come-funzionano-le-scadenze). Poi **Salva** ("Mezzo salvato").
 
 ### Leggere la targa da una foto
 

@@ -21,6 +21,9 @@ stanno i mezzi**, scansionando un codice a barre.
   ridotte sul server, con miniatura nelle liste e foto principale. **Targa letta da una
   foto** (OCR nel browser, l'utente conferma fra i candidati). Senza foto, un tasto cerca
   il mezzo su internet (Google Immagini con marca, modello e tipo).
+- **Manutenzioni dei mezzi** (19/11/2026): registro degli interventi per mezzo con contaore/km,
+  officina, costo e prossima scadenza (data, ore o km); manutenzioni passate caricate da Excel con
+  anteprima e senza doppioni; stato del mezzo e della flotta in PDF ed Excel.
 - **Amministrazione** (solo admin): chi è collegato adesso e su quale vista, chi sta
   usando quale mezzo, chi ha caricato cosa (movimenti, scansioni, importazioni,
   modifiche per utente) e il registro di ogni azione con utente e IP, esportabile in CSV.
@@ -55,7 +58,8 @@ mezzi e tre cantieri con le commesse della demo della suite (**101-003** Sede Ac
 materiale edile con scorte minime ed EAN, 12 mezzi fra propri e a nolo con targhe, stati e chi li
 sta usando, sei settimane di movimenti (carichi dai DDT, trasferimenti ai cantieri, scarichi da
 scansione, rettifiche, un inventario), più registro attività e storico importazioni di quattro
-utenti. Le giacenze non vanno mai sotto zero e qualche articolo resta sotto scorta, così la plancia
+utenti e il registro manutenzioni dei mezzi propri (una revisione scaduta, scadenze vicine, un
+mezzo fermo in officina, mezzi mai registrati). Le giacenze non vanno mai sotto zero e qualche articolo resta sotto scorta, così la plancia
 ha qualcosa da segnalare.
 
 Si rifiuta di scrivere in un database che ha già dei dati: `crea-demo.bat --azzera` lo svuota e
@@ -129,6 +133,27 @@ mano. Inquadrare la targa da vicino, dritta e ben illuminata.
 
 **Cerca su internet**: con marca, modello e tipo apre Google Immagini, utile quando
 il mezzo non ha ancora una foto.
+
+### Manutenzioni dei mezzi
+
+Tabella `manutenzioni_mezzi` (una riga per intervento) e logica in `manutenzioni.py`; stato
+scaricabile in `stato_mezzi.py`. Guida per chi lo usa: [capitolo 13](docs/guida/13-manutenzioni.md).
+
+- **Scadenze**: non sono una tabella. La "prossima" (data, ore, km) scritta sull'ultimo
+  intervento di ogni tipo è la scadenza aperta di quel tipo; un intervento più recente dello
+  stesso tipo la chiude. Stato: `scaduta`, `in_scadenza` (entro i preavvisi
+  `MAGAZZINO_MANUT_PREAVVISO_*`) o `ok`; con più criteri vale il peggiore.
+- **Letture**: `mezzi.ore_lettura`/`km_lettura`/`lettura_il`, dal form del mezzo o alzate da sole
+  da una manutenzione con un valore più alto (i contatori vanno solo avanti).
+- **Doppioni**: `chiave` UNIQUE = impronta di mezzo, data, tipo, descrizione, ore, km, costo. Lo
+  stesso Excel ricaricato non duplica niente; la stessa manutenzione a mano viene rifiutata.
+- **Mezzo fermo**: con `fermo` il mezzo passa a `manutenzione` con una riga in `movimenti_mezzi`.
+- **Excel**: lettura senza dipendenze (`xlsx_semplice.leggi_xlsx`: stringhe condivise, date
+  dallo stile della cella, tetto ai byte decompressi) o CSV con `;`/`,`. Intestazioni
+  riconosciute per nome (alias in `manutenzioni.COLONNE`), anche sotto righe di titolo. Due
+  passi con lo stesso file: anteprima riga per riga, poi `conferma=1` salva le righe valide.
+- **Permessi**: registrare, correggere le proprie e caricare da Excel: chi usa il Magazzino;
+  correggere quelle degli altri ed eliminare: admin.
 
 ### Giacenze
 
@@ -319,6 +344,7 @@ con i due motori di oggi (contratto in `shared/suite/CONTRATTI.md` § 11).
 | `MAGAZZINO_BACKUP_TENERE` | `14` | quante copie tenere: le più vecchie si cancellano dopo ogni copia riuscita |
 | `MAGAZZINO_RIEPILOGO_ORA` | `19:00` | ora del riepilogo giornaliero automatico in SkyTower (`off` = solo a richiesta) |
 | `MAGAZZINO_URL_PUBBLICO` | vuoto | indirizzo del Magazzino nei link verso le altre app (default `<Lettore DDT>/magazzino`) |
+| `MAGAZZINO_MANUT_PREAVVISO_GIORNI`, `_ORE`, `_KM` | `30`, `50`, `1000` | quanto prima della scadenza una manutenzione diventa "in scadenza" |
 | `MAGAZZINO_PROGRAMMA_UNICO` | `1` | `0` = link all'indirizzo proprio del Magazzino (uso da solo, senza Lettore DDT) |
 | `COSEDIL_SSO`, `COSEDIL_PORTAL`, `COSEDIL_SSO_FAIL` | vedi `shared/sso` | gate SSO |
 
@@ -340,6 +366,13 @@ con i due motori di oggi (contratto in `shared/suite/CONTRATTI.md` § 11).
 | `GET/POST /api/mezzi/<id>/foto` | elenco / carica (multipart `foto`, ripetibile, `nota`) |
 | `GET /api/mezzi/<id>/foto/<fid>?dim=min` | la foto (o la miniatura) |
 | `POST .../foto/<fid>/principale`, `DELETE .../foto/<fid>` | foto principale / eliminazione (admin) |
+| `GET /api/mezzi?manutenzione=scadute\|da_fare\|nessuna` | lista mezzi con il quadro manutenzioni (`manutenzione`) e il filtro per scadenza |
+| `GET/POST /api/mezzi/<id>/manutenzioni` | registro e quadro del mezzo / nuova manutenzione `{data, tipo, descrizione, ore, km, officina, eseguita_da, costo, prossima_data, prossime_ore, prossimi_km, note, fermo}` |
+| `PUT/DELETE /api/mezzi/<id>/manutenzioni/<mid>` | correzione (autore o admin) / eliminazione (admin) |
+| `POST /api/mezzi/manutenzioni/importa` | multipart `file` (.xlsx/.csv), `mezzo_id?`, `conferma?`: anteprima o salvataggio delle manutenzioni passate |
+| `GET /api/mezzi/manutenzioni/modello?mezzo_id=` | modello Excel da compilare |
+| `GET /api/mezzi/<id>/stato?formato=pdf\|xlsx` | stato generale del mezzo |
+| `GET /api/mezzi/flotta?formato=pdf\|xlsx&tutti=1` | stato di tutta la flotta (`tutti` = anche i dismessi) |
 | `POST /api/presenza` | battito della pagina `{vista}` |
 | `GET /api/admin/riepilogo?giorni=` | per utente: movimenti per tipo, scansioni, importazioni, anagrafiche; mezzi in uso; collegati |
 | `GET /api/admin/attivita?giorni=&utente=&azione=&oggetto=&q=` | registro attività filtrabile |
@@ -360,13 +393,15 @@ con i due motori di oggi (contratto in `shared/suite/CONTRATTI.md` § 11).
 | `codici.py` | Code 128 in SVG, QR (segno), codici progressivi, riconoscimento scansioni |
 | `importa_ddt.py` | lettura dei registri e degli export del Lettore DDT |
 | `importa_mezzi.py` | lettura delle pratiche mezzi di VFP Transfer |
+| `manutenzioni.py` | manutenzioni dei mezzi: validazione, scadenze, doppioni, caricamento da Excel/CSV |
+| `stato_mezzi.py` | stato del mezzo e della flotta in PDF/Excel, modello Excel delle manutenzioni |
 | `statistiche.py` | dati per i grafici e stato delle importazioni |
 | `foto.py` | foto dei mezzi: raddrizzamento, riduzione, miniature |
 | `suite_rotte.py` | dialogo con InCampo e SkyTower (rotte `/api/suite`, `/api/incampo`, `/api/skytower`) |
 | `backup.py` | copie coerenti di `magazzino.db` con rotazione (thread di sfondo e pulsante admin) |
 | `messaggi.py` | testi d'errore per l'utente al posto di quelli tecnici (che restano nel log) |
-| `pdf_semplice.py` | PDF di tabelle senza dipendenze (report giacenze e riepilogo per SkyTower) |
-| `xlsx_semplice.py` | Excel di tabelle senza dipendenze (riepilogo per SkyTower) |
+| `pdf_semplice.py` | PDF di tabelle senza dipendenze, A4 verticale o orizzontale (report giacenze, riepilogo per SkyTower, stato mezzi) |
+| `xlsx_semplice.py` | Excel di tabelle senza dipendenze, scrittura e lettura (riepilogo per SkyTower, stato mezzi, manutenzioni da Excel) |
 | `riepilogo.py` | riepilogo giornaliero dei movimenti in SkyTower (automatico e a richiesta) |
 | `prefisso.py` | il Magazzino sotto `/magazzino/` dietro il proxy del Lettore DDT (programma unico) |
 | `static/js/targa.js` | lettura della targa da foto (Tesseract.js + formati targhe italiane) |

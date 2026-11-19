@@ -27,4 +27,10 @@
 | Il lettore USB scrive nel posto sbagliato | il cursore non è nel campo di scansione | apri **Scansione** e clicca in un punto vuoto della pagina: il campo torna a fuoco |
 | Una giacenza è sbagliata | manca un movimento o ce n'è uno di troppo | controlla in **Movimenti**; correggi con una **rettifica** o un **inventario** (o fai eliminare il movimento sbagliato da un amministratore) |
 | Un DDT non è arrivato nel Magazzino | il DDT non è ancora stato esportato dal Lettore DDT, oppure la lettura è fallita | guarda **Importazioni**: stato dell'export ed **Errori recenti**; prova **Leggi adesso** |
+| "Questa manutenzione è già registrata…" | c'è già un intervento uguale (stesso mezzo, data, tipo, descrizione, ore, km e costo) | controlla la tabella **Manutenzioni** del mezzo: se è davvero un altro intervento cambia la descrizione |
+| "La prossima data deve venire dopo la data dell'intervento" (o ore, km) | la scadenza scritta è prima dell'intervento | correggi la data o le ore/km della prossima manutenzione |
+| Nel caricamento da Excel: "Non trovo la riga delle intestazioni…" | il file non ha le intestazioni del modello (Data, Tipo, Descrizione lavori…) | scarica il **modello Excel** e copia lì le righe ([capitolo 13](13-manutenzioni.md#caricare-le-manutenzioni-passate-da-excel)) |
+| Nel caricamento da Excel: "Nel file manca la colonna «Mezzo…»" | il file non dice di quale mezzo sono le righe | aggiungi la colonna Mezzo, oppure carica il file dalla scheda di quel mezzo |
+| Nel caricamento da Excel: "Mezzo «…» non trovato" o "Data non valida" su una riga | il codice/targa non esiste o la data è scritta male | correggi la riga nel file e ricaricalo: le righe già entrate non si raddoppiano |
+| "I file .xls (Excel 97-2003) non si leggono" | il file è nel formato vecchio di Excel | aprilo in Excel e salvalo come .xlsx |
 | Le etichette escono senza QR | manca un componente sul server | avvisa l'amministratore di sistema |

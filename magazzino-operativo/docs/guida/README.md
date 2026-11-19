@@ -26,6 +26,7 @@ e cosa fare se qualcosa non va.
 10. [Amministrazione](10-amministrazione.md) — chi fa cosa, chi usa i mezzi, registro attività
 11. [Se qualcosa non va](11-problemi.md) — messaggi frequenti e cosa fare
 12. [Per l'amministratore di sistema](12-amministratore-sistema.md) — avvio, dati, backup
+13. [Manutenzioni dei mezzi](13-manutenzioni.md) — registro, scadenze, manutenzioni passate da Excel, stato del mezzo e della flotta in PDF ed Excel
 
 ## In due parole
 
