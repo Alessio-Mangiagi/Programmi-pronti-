@@ -326,6 +326,7 @@
         caricaAndamento(d.articolo, 90);
       }
       if (d.tipo === 'mezzo') {
+        agganciaManutenzioni(ris, d, () => cerca(d.mezzo.codice));
         agganciaGalleria(ris, d.mezzo, () => cerca(d.mezzo.codice));
         const seg = ris.querySelector('[data-segnala]');
         if (seg) seg.onclick = async () => {
@@ -383,7 +384,7 @@
           <div><h4>Storico spostamenti</h4>${d.storico.length ? `<table><thead><tr><th>Data</th><th>Da</th><th>A</th><th>Stato</th><th>Chi</th></tr></thead><tbody>
             ${d.storico.map((s) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(s.ts)}</td><td>${h(s.da_nome || '—')}</td><td>${h(s.a_nome || '—')}</td><td>${s.stato ? badgeStato(s.stato) : ''}</td><td class="muto">${h(s.utente || '')}${s.note ? ` <span title="${h(s.note)}">·</span>` : ''}</td></tr>`).join('')}
             </tbody></table>` : '<p class="muto">Nessuno spostamento registrato.</p>'}</div>
-        </div>${galleriaMezzo(m, d.foto)}</div>`;
+        </div>${sezioneManutenzioni(d)}${galleriaMezzo(m, d.foto)}</div>`;
     }
 
     function cardUbicazione(d) {
@@ -740,13 +741,18 @@
     cont.innerHTML = `<div class="vista-testa"><div><div class="sopratitolo">Anagrafica</div><h2>Mezzi</h2></div>
       <div class="azioni"><a class="btn btn-sec" href="${BASE}/api/etichette?tipo=mezzi" target="_blank">Stampa tutte le etichette</a><button class="btn btn-sec" id="btn-vfp">Importa da VFP Transfer</button><button class="btn" id="btn-nuovo">Nuovo mezzo</button></div></div>
       <div class="filtri"><input id="q" placeholder="Cerca tipo, marca, targa, matricola, ditta..."><select id="stato"><option value="">Tutti gli stati</option>${['disponibile', 'in_uso', 'manutenzione', 'fermo', 'restituito'].map((s) => `<option value="${s}">${s.replace('_', ' ')}</option>`).join('')}</select>
-      <select id="prop"><option value="">Proprietà e nolo</option><option value="proprio">Di proprietà</option><option value="nolo">A nolo</option></select></div>
+      <select id="prop"><option value="">Proprietà e nolo</option><option value="proprio">Di proprietà</option><option value="nolo">A nolo</option></select>
+      <select id="manut" title="Filtra per scadenza delle manutenzioni"><option value="">Manutenzioni: tutte</option><option value="da_fare">Scadute e in scadenza</option><option value="scadute">Solo scadute</option><option value="nessuna">Mai registrate</option></select></div>
+      <div class="azioni-rapide barra-flotta"><button class="btn btn-sec" type="button" id="btn-manut-excel" title="Carica le manutenzioni passate di uno o più mezzi da un file Excel">Manutenzioni da Excel</button>
+        <a class="btn btn-sec" href="${BASE}/api/mezzi/flotta" target="_blank" rel="noopener" title="Stato di tutti i mezzi attivi, da stampare">Stato flotta PDF</a>
+        <a class="btn btn-sec" href="${BASE}/api/mezzi/flotta?formato=xlsx" title="Stato di tutti i mezzi attivi con scadenze e manutenzioni, in Excel">Stato flotta Excel</a></div>
       <div class="card" id="tab"></div>`;
     const carica = async () => {
-      const l = await api(`/api/mezzi?q=${encodeURIComponent($('#q').value)}&stato=${$('#stato').value}&proprieta=${$('#prop').value}`);
-      $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Nolo fino al</th><th class="azioni"></th></tr></thead><tbody>
+      const l = await api(`/api/mezzi?q=${encodeURIComponent($('#q').value)}&stato=${$('#stato').value}&proprieta=${$('#prop').value}&manutenzione=${$('#manut').value}`);
+      $('#tab').innerHTML = l.length ? `<div class="tabella-wrap"><table><thead><tr><th>Codice</th><th>Mezzo</th><th>Targa / matricola</th><th>Proprietà</th><th>Ubicazione</th><th>Stato</th><th>Manutenzione</th><th>Nolo fino al</th><th class="azioni"></th></tr></thead><tbody>
         ${l.map((m) => `<tr><td class="mono"><a href="#scansione/${h(m.codice)}">${h(m.codice)}</a></td><td><div style="display:flex;align-items:center;gap:.6rem">${m.foto_id ? `<img class="foto-mini" src="${BASE}/api/mezzi/${m.id}/foto/${m.foto_id}?dim=min" alt="" loading="lazy">` : `<a class="foto-mini foto-vuota" href="${h(urlRicercaMezzo(m))}" target="_blank" rel="noopener" title="Nessuna foto: cerca su internet">${ICONE_FOTO}</a>`}<span>${h([m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' '))}${m.n_foto ? `<br><span class="muto">${m.n_foto} foto</span>` : ''}</span></div></td><td class="mono">${h(m.targa || '')}${m.matricola ? `<br><span class="muto">${h(m.matricola)}</span>` : ''}</td>
           <td>${m.proprieta === 'nolo' ? `<span class="badge badge-ambra">Nolo</span><br><span class="muto">${h(m.ditta || '')}</span>` : '<span class="badge badge-verde">Proprio</span>'}</td><td>${h(m.ubicazione || '—')}</td><td>${badgeStato(m.stato)}${m.assegnato_a ? `<br><span class="muto">${h(m.assegnato_a)}</span>` : ''}</td>
+          <td>${cellaManutenzione(m.manutenzione)}</td>
           <td class="muto">${m.nolo_al ? fmtData(m.nolo_al) : ''}</td>
           <td class="azioni"><button class="btn btn-piccolo" data-sposta="${m.id}">Sposta</button> <button class="btn btn-sec btn-piccolo" data-mod="${m.id}">Modifica</button> ${me.admin ? `<button class="btn btn-rosso btn-piccolo" data-del="${m.id}">Elimina</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : vuoto('Nessun mezzo. Importa le pratiche di nolo o registrane uno.');
@@ -757,12 +763,15 @@
       });
     };
     let t; $('#q').oninput = () => { clearTimeout(t); t = setTimeout(carica, 250); };
-    $('#stato').onchange = carica; $('#prop').onchange = carica;
+    $('#stato').onchange = carica; $('#prop').onchange = carica; $('#manut').onchange = carica;
+    $('#btn-manut-excel').onclick = () => modaleImportaManutenzioni(null, carica);
     $('#btn-nuovo').onclick = () => formMezzo(null, carica);
     $('#btn-vfp').onclick = async () => { try { const r = await api('/api/importazioni/mezzi', { method: 'POST', body: {} }); toast(`Importazione mezzi: ${r.totale} pratiche lette`, 'ok'); carica(); } catch (e) { toast(e.message, 'errore'); } };
     await carica();
   };
 
+  // Anagrafica del mezzo. Contaore e contachilometri sono l'ultima lettura nota: dicono se le manutenzioni
+  // "a ore" o "a km" sono scadute (il server li alza da solo quando una manutenzione registra un valore più alto).
   async function formMezzo(m, dopo) {
     m = m || {};
     const lista = await ubicazioni();
@@ -779,6 +788,8 @@
       ${campo('Nolo al', input('nolo_al', m.nolo_al, 'type="date"'))}
       ${!m.id ? campo('Ubicazione iniziale', `<select name="ubicazione_id">${opzioniUbicazioni(lista, '', 'Non ancora assegnata')}</select>`) : ''}
       ${!m.id ? campo('Stato', select('stato', [['disponibile', 'Disponibile'], ['in_uso', 'In uso'], ['manutenzione', 'In manutenzione'], ['fermo', 'Fermo']], 'disponibile')) : campo('Attivo', select('attivo', [['1', 'Sì'], ['0', 'No (dismesso)']], m.attivo ? '1' : '0'))}
+      ${campo('Contaore attuale (ore)', input('ore_lettura', m.ore_lettura, 'type="number" min="0" step="any" inputmode="decimal"'))}
+      ${campo('Contachilometri attuale (km)', input('km_lettura', m.km_lettura, 'type="number" min="0" step="any" inputmode="decimal"'))}
       ${campo('Note', `<textarea name="note">${h(m.note || '')}</textarea>`, 'pieno')}
       <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Annulla</button><button class="btn" type="submit">Salva</button></div></form>`;
     modale(m.id ? `Modifica ${m.codice}` : 'Nuovo mezzo', html, (box) => {
@@ -1020,7 +1031,9 @@
   // ------------------------------------------------------------------ amministrazione (chi ha fatto cosa, chi usa cosa)
   const AZIONI = { scansione: ['', 'Scansione'], movimento: ['verde', 'Movimento'], crea: ['blu', 'Creazione'], modifica: ['blu', 'Modifica'],
     elimina: ['rosso', 'Eliminazione'], elimina_movimento: ['rosso', 'Movimento eliminato'], disattiva: ['ambra', 'Disattivazione'],
-    sposta: ['blu', 'Spostamento mezzo'], importazione: ['ambra', 'Importazione'], backup: ['verde', 'Backup del database'] };
+    sposta: ['blu', 'Spostamento mezzo'], importazione: ['ambra', 'Importazione'], backup: ['verde', 'Backup del database'],
+    manutenzione: ['ambra', 'Manutenzione mezzo'], modifica_manutenzione: ['blu', 'Manutenzione corretta'],
+    elimina_manutenzione: ['rosso', 'Manutenzione eliminata'], importa_manutenzioni: ['ambra', 'Manutenzioni da Excel'] };
   const badgeAzione = (a) => { const [c, t] = AZIONI[a] || ['', a]; return `<span class="badge ${c ? 'badge-' + c : ''}">${h(t)}</span>`; };
   let timerAdmin = null;
   viste.amministrazione = async (cont) => {
@@ -1096,6 +1109,181 @@
     await Promise.all([caricaRiepilogo(), caricaRegistro(), caricaBackup()]);
     timerAdmin = setInterval(() => { if (location.hash.startsWith('#amministrazione')) caricaRiepilogo(); else clearInterval(timerAdmin); }, 15000);
   };
+
+  // ------------------------------------------------------------------ manutenzioni dei mezzi
+  // Registro degli interventi nella scheda del mezzo, caricamento da Excel delle manutenzioni passate (con
+  // anteprima prima di salvare) e colonna "Manutenzione" della lista Mezzi. Regole e conti stanno nel server
+  // (manutenzioni.py, stato_mezzi.py): qui solo come si mostrano. La scadenza di un tipo è la "prossima"
+  // scritta sull'ultimo intervento di quel tipo; data, ore e km: vale quello che arriva prima.
+  const STATI_MANUT = { scaduta: ['rosso', 'Scaduta'], in_scadenza: ['ambra', 'In scadenza'], ok: ['verde', 'In regola'] };
+  const badgeManut = (s) => { const [c, t] = STATI_MANUT[s] || ['', s]; return `<span class="badge ${c ? 'badge-' + c : ''}">${h(t)}</span>`; };
+  const fmtEuro = (n) => (n == null ? '' : Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }));
+  // data di oggi nel fuso del browser (toISOString da sola darebbe la data UTC: dopo mezzanotte sarebbe ieri)
+  const oggiIso = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const testoScadenza = (s) => [s.prossima_data ? 'entro ' + fmtData(s.prossima_data) : '', s.prossime_ore != null ? `a ${fmtN(s.prossime_ore)} h` : '',
+    s.prossimi_km != null ? `a ${fmtN(s.prossimi_km)} km` : ''].filter(Boolean).join(' o ');
+  const mancanoScadenza = (s) => [
+    s.giorni != null ? (s.giorni < 0 ? `scaduta da ${-s.giorni} gg` : s.giorni === 0 ? 'scade oggi' : `fra ${s.giorni} gg`) : '',
+    s.ore_mancanti != null ? (s.ore_mancanti <= 0 ? `oltre di ${fmtN(-s.ore_mancanti)} h` : `mancano ${fmtN(s.ore_mancanti)} h`) : '',
+    s.km_mancanti != null ? (s.km_mancanti <= 0 ? `oltre di ${fmtN(-s.km_mancanti)} km` : `mancano ${fmtN(s.km_mancanti)} km`) : '',
+  ].filter(Boolean).join(' · ');
+  const oreKm = (x) => [x.ore != null ? `${fmtN(x.ore)} h` : '', x.km != null ? `${fmtN(x.km)} km` : ''].filter(Boolean).join(' · ');
+  // Correggere: chi l'ha registrata (o caricata da Excel) o l'amministratore; cancellare: solo l'amministratore.
+  // Il server fa lo stesso controllo (app.api_manutenzione_modifica): qui si evita solo il bottone inutile.
+  const puoCorreggere = (x) => me.admin || (x.utente && x.utente === me.username);
+
+  // Colonna "Manutenzione" della lista Mezzi: la scadenza più urgente, o la data dell'ultima se non ce ne sono.
+  function cellaManutenzione(q) {
+    if (!q || !q.n) return '<span class="muto">—</span>';
+    const p = q.prossima;
+    return p ? `${badgeManut(p.stato)}<br><span class="muto">${h(p.tipo_nome)} ${h(testoScadenza(p))}</span>`
+      : `<span class="muto">ultima ${fmtData(q.ultima.data)}</span>`;
+  }
+
+  function sezioneManutenzioni(d) {
+    const m = d.mezzo;
+    const r = d.manutenzione || {};
+    const lista = d.manutenzioni || [];
+    const tipi = d.tipi_manutenzione || {};
+    const letture = [r.ore_attuali != null ? `contaore ${fmtN(r.ore_attuali)} h` : '', r.km_attuali != null ? `${fmtN(r.km_attuali)} km` : '']
+      .filter(Boolean).join(' · ') + (m.lettura_il && (r.ore_attuali != null || r.km_attuali != null) ? ` (lettura del ${fmtData(m.lettura_il)})` : '');
+    const costi = r.n ? `costo totale ${fmtEuro(r.costo_totale)} · nel ${r.anno} ${fmtEuro(r.costo_anno)}` : '';
+    return `<div id="manutenzioni" style="margin-top:1.25rem"><div class="card-testa"><h4>Manutenzioni${lista.length ? ` (${lista.length})` : ''}</h4>
+        <div class="azioni"><button class="btn btn-piccolo" type="button" data-manut-nuova>Registra manutenzione</button>
+          <button class="btn btn-sec btn-piccolo" type="button" data-manut-excel title="Carica le manutenzioni passate di questo mezzo da un file Excel">Carica da Excel</button>
+          <a class="btn btn-sec btn-piccolo" href="${BASE}/api/mezzi/${m.id}/stato" target="_blank" rel="noopener" title="Stato generale del mezzo, da stampare">Stato PDF</a>
+          <a class="btn btn-sec btn-piccolo" href="${BASE}/api/mezzi/${m.id}/stato?formato=xlsx" title="Stato generale del mezzo con tutte le manutenzioni, in Excel">Stato Excel</a></div></div>
+      ${m.stato === 'manutenzione' ? '<div class="avviso">Il mezzo è in manutenzione. Quando torna operativo usa <strong>Sposta / cambia stato</strong> e scegli Disponibile o In uso.</div>' : ''}
+      ${r.scadenze && r.scadenze.length ? `<ul class="scadenze-manut">${r.scadenze.map((s) => `<li>${badgeManut(s.stato)} <strong>${h(s.tipo_nome)}</strong> ${h(testoScadenza(s))} <span class="muto">${h(mancanoScadenza(s))}</span></li>`).join('')}</ul>` : ''}
+      ${letture || costi ? `<p class="muto">${h([letture, costi].filter(Boolean).join(' · '))}</p>` : ''}
+      ${lista.length ? `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Lavori</th><th>Ore / km</th><th>Officina</th><th class="num">Costo</th><th>Prossima</th><th class="azioni"></th></tr></thead><tbody>
+        ${lista.map((x) => `<tr><td style="white-space:nowrap">${fmtData(x.data)}</td><td>${h(tipi[x.tipo] || x.tipo)}</td>
+          <td>${h(x.descrizione)}${x.note ? `<br><span class="muto">${h(x.note)}</span>` : ''}</td><td class="muto">${h(oreKm(x))}</td>
+          <td>${h(x.officina || '')}${x.eseguita_da ? `<br><span class="muto">${h(x.eseguita_da)}</span>` : ''}</td><td class="num">${fmtEuro(x.costo)}</td>
+          <td class="muto">${h(testoScadenza(x))}</td>
+          <td class="azioni">${puoCorreggere(x) ? `<button class="btn btn-sec btn-piccolo" type="button" data-manut-mod="${x.id}">Correggi</button>` : ''}${me.admin ? ` <button class="btn btn-rosso btn-piccolo" type="button" data-manut-del="${x.id}">Elimina</button>` : ''}</td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="muto">Nessuna manutenzione registrata: registrala qui o carica quelle passate da Excel.</p>'}</div>`;
+  }
+
+  function agganciaManutenzioni(box, d, dopo) {
+    const sez = $('#manutenzioni', box);
+    if (!sez) return;
+    $('[data-manut-nuova]', sez).onclick = () => formManutenzione(d, null, dopo);
+    $('[data-manut-excel]', sez).onclick = () => modaleImportaManutenzioni(d.mezzo, dopo);
+    sez.querySelectorAll('[data-manut-mod]').forEach((b) => { b.onclick = () => formManutenzione(d, d.manutenzioni.find((x) => x.id == b.dataset.manutMod), dopo); });
+    sez.querySelectorAll('[data-manut-del]').forEach((b) => {
+      b.onclick = async () => {
+        if (!confirm('Eliminare questa manutenzione? Non si può annullare.')) return;
+        try { await api(`/api/mezzi/${d.mezzo.id}/manutenzioni/${b.dataset.manutDel}`, { method: 'DELETE' }); toast('Manutenzione eliminata', 'ok'); dopo(); } catch (e) { toast(e.message, 'errore'); }
+      };
+    });
+  }
+
+  // Nuova manutenzione (x vuoto) o correzione di una registrata. "Mezzo fermo in officina" solo sulle nuove:
+  // il server porta il mezzo nello stato "manutenzione" e scrive la riga nello storico spostamenti.
+  function formManutenzione(d, x, dopo) {
+    const m = d.mezzo;
+    x = x || {};
+    const r = d.manutenzione || {};
+    const tipi = Object.entries(d.tipi_manutenzione || {});
+    const officine = [...new Set((d.manutenzioni || []).map((y) => y.officina).filter(Boolean))];
+    const html = `<form id="f" class="form">
+      ${campo('Data', input('data', x.data || oggiIso(), 'type="date" required'))}
+      ${campo('Tipo', select('tipo', tipi, x.tipo || 'ordinaria'))}
+      ${campo('Lavori eseguiti', `<textarea name="descrizione" required placeholder="Es. cambio olio motore e filtri, ingrassaggio">${h(x.descrizione || '')}</textarea>`, 'pieno')}
+      ${campo('Ore motore', input('ore', x.ore, `type="number" min="0" step="any" inputmode="decimal" placeholder="${r.ore_attuali != null ? 'ultima lettura ' + fmtN(r.ore_attuali) : ''}"`))}
+      ${campo('Km', input('km', x.km, `type="number" min="0" step="any" inputmode="decimal" placeholder="${r.km_attuali != null ? 'ultima lettura ' + fmtN(r.km_attuali) : ''}"`))}
+      ${campo('Officina / fornitore', input('officina', x.officina, 'list="officine-manut"') + `<datalist id="officine-manut">${officine.map((o) => `<option value="${h(o)}">`).join('')}</datalist>`)}
+      ${campo('Eseguita da', input('eseguita_da', x.eseguita_da, 'placeholder="meccanico, operatore"'))}
+      ${campo('Costo €', input('costo', x.costo, 'type="number" min="0" step="0.01" inputmode="decimal"'))}
+      <div class="pieno sottosezione">Prossima manutenzione dello stesso tipo <span class="muto">(facoltativa: vale quella che arriva prima)</span></div>
+      ${campo('Entro il', input('prossima_data', x.prossima_data, 'type="date"'))}
+      ${campo('A ore motore', input('prossime_ore', x.prossime_ore, 'type="number" min="0" step="any" inputmode="decimal"'))}
+      ${campo('A km', input('prossimi_km', x.prossimi_km, 'type="number" min="0" step="any" inputmode="decimal"'))}
+      ${campo('Note', `<textarea name="note">${h(x.note || '')}</textarea>`, 'pieno')}
+      ${!x.id && m.stato !== 'manutenzione' ? `<label class="pieno"><input type="checkbox" name="fermo"> Il mezzo è fermo in officina: passa allo stato <strong>In manutenzione</strong></label>` : ''}
+      <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Annulla</button><button class="btn" type="submit">Salva</button></div></form>`;
+    modale(x.id ? `Correggi manutenzione · ${m.codice}` : `Manutenzione · ${nomeMezzoBreve(m)}`, html, (box) => {
+      $('#annulla', box).onclick = chiudiModale;
+      $('#f', box).onsubmit = async (e) => {
+        e.preventDefault();
+        const bottone = e.target.querySelector('[type="submit"]');
+        bottone.disabled = true;
+        try {
+          const dati = datiForm(e.target);
+          await api(`/api/mezzi/${m.id}/manutenzioni${x.id ? '/' + x.id : ''}`, { method: x.id ? 'PUT' : 'POST', body: dati });
+          toast(x.id ? 'Manutenzione corretta' : 'Manutenzione registrata', 'ok'); chiudiModale(); dopo && dopo();
+        } catch (err) { toast(err.message, 'errore'); bottone.disabled = false; }
+      };
+    });
+  }
+  const nomeMezzoBreve = (m) => `${[m.tipo_mezzo, m.marca, m.modello].filter(Boolean).join(' ')}${m.targa ? ' ' + m.targa : ''}`;
+
+  // Manutenzioni passate da Excel/CSV, in due passi con lo stesso file: anteprima (niente salvato, riga per riga
+  // cosa entra, cosa è già registrato e cosa ha errori), poi "Salva" che rimanda il file con conferma=1.
+  // mezzo = dalla scheda (le righe senza mezzo valgono per lui, modello con il codice già scritto); null = flotta.
+  function modaleImportaManutenzioni(mezzo, dopo) {
+    const modello = `${BASE}/api/mezzi/manutenzioni/modello${mezzo ? '?mezzo_id=' + mezzo.id : ''}`;
+    const html = `<div class="form">
+      <p class="pieno" style="margin:0">${mezzo ? `Le righe con la colonna «Mezzo» vuota valgono per <strong>${h(nomeMezzoBreve(mezzo))}</strong> (${h(mezzo.codice)}).`
+        : 'Ogni riga dice il mezzo con il codice MEZ-…, la targa o la matricola: un solo file per tutta la flotta.'}
+        Prima di salvare vedi l'anteprima; le righe già registrate si saltano, quindi lo stesso file si può ricaricare.</p>
+      <div class="pieno"><a class="btn btn-sec" href="${modello}">Scarica il modello Excel</a></div>
+      ${campo('File compilato (.xlsx o .csv)', '<input type="file" id="manut-file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">', 'pieno')}
+      <div class="pieno" id="manut-esito"></div>
+      <div class="form-azioni"><button class="btn btn-sec" type="button" id="annulla">Chiudi</button><button class="btn" type="button" id="manut-salva" disabled>Salva le righe valide</button></div></div>`;
+    modale(mezzo ? `Manutenzioni passate · ${mezzo.codice}` : 'Manutenzioni passate da Excel', html, (box) => {
+      const file = $('#manut-file', box);
+      const salva = $('#manut-salva', box);
+      const invia = (conferma) => {
+        const fd = new FormData();
+        fd.append('file', file.files[0]);
+        if (mezzo) fd.append('mezzo_id', mezzo.id);
+        if (conferma) fd.append('conferma', '1');
+        return api('/api/mezzi/manutenzioni/importa', { method: 'POST', body: fd });
+      };
+      $('#annulla', box).onclick = chiudiModale;
+      file.onchange = async () => {
+        const esito = $('#manut-esito', box);
+        salva.disabled = true;
+        if (!file.files.length) { esito.innerHTML = ''; return; }
+        esito.innerHTML = '<div class="avviso">Controllo del file…</div>';
+        try {
+          const a = await invia(false);
+          esito.innerHTML = anteprimaManutenzioni(a);
+          salva.disabled = !a.valide;
+          salva.textContent = a.valide ? `Salva ${a.valide} ${a.valide === 1 ? 'manutenzione' : 'manutenzioni'}` : 'Niente da salvare';
+        } catch (e) { esito.innerHTML = `<div class="avviso avviso-errore">${h(e.message)}</div>`; }
+      };
+      salva.onclick = async () => {
+        salva.disabled = true;
+        try {
+          const r = await invia(true);
+          toast(`${r.salvate} manutenzioni salvate${r.doppioni ? `, ${r.doppioni} già presenti` : ''}${r.errori ? `, ${r.errori} righe con errori non caricate` : ''}`, 'ok');
+          chiudiModale(); dopo && dopo();
+        } catch (e) { toast(e.message, 'errore'); salva.disabled = false; }
+      };
+    });
+  }
+
+  function anteprimaManutenzioni(a) {
+    const MAX = 200;   // oltre, la tabella dentro la finestra diventa illeggibile: i conteggi restano completi
+    const esiti = { ok: ['verde', 'Da salvare'], doppione: ['', 'Già presente'], errore: ['rosso', 'Errore'] };
+    const tipi = a.tipi || {};
+    return `<p><span class="badge badge-verde">${a.valide} da salvare</span> <span class="badge">${a.doppioni} già presenti</span> <span class="badge ${a.errori ? 'badge-rosso' : ''}">${a.errori} con errori</span></p>
+      ${a.colonne.ignorate.length ? `<p class="muto">Colonne non usate: ${h(a.colonne.ignorate.join(', '))}</p>` : ''}
+      ${a.righe.length ? `<div class="tabella-wrap anteprima-manut"><table><thead><tr><th class="num">Riga</th><th>Mezzo</th><th>Data</th><th>Tipo</th><th>Lavori</th><th class="num">Costo</th><th>Esito</th></tr></thead><tbody>
+        ${a.righe.slice(0, MAX).map((v) => {
+          const [c, t] = esiti[v.esito];
+          // riga con errore: niente dati puliti, si mostra in grigio quello che c'è scritto nel file
+          const g = v.grezzi || {};
+          const cella = (pulito, grezzo) => (v.dati ? pulito : `<span class="muto">${h(grezzo || '')}</span>`);
+          return `<tr><td class="num">${v.riga}</td><td class="mono">${v.mezzo ? h(v.mezzo.codice) : `<span class="muto">${h(g.mezzo || '')}</span>`}</td>
+          <td>${cella(v.dati && fmtData(v.dati.data), g.data)}</td><td>${cella(v.dati && h(tipi[v.dati.tipo] || v.dati.tipo), g.tipo)}</td><td>${cella(v.dati && h(v.dati.descrizione), g.descrizione)}</td>
+          <td class="num">${cella(v.dati && fmtEuro(v.dati.costo), g.costo)}</td><td><span class="badge ${c ? 'badge-' + c : ''}">${t}</span>${v.esito === 'errore' ? `<br><span class="muto">${h(v.errore)}</span>` : ''}</td></tr>`;
+        }).join('')}
+        </tbody></table></div>${a.righe.length > MAX ? `<p class="muto">Mostrate le prime ${MAX} righe su ${a.righe.length}.</p>` : ''}` : '<p class="muto">Nessuna riga con dati sotto le intestazioni.</p>'}`;
+  }
 
   // ------------------------------------------------------------------ foto dei mezzi e lettura targa
   const urlRicercaMezzo = (m) => `https://www.google.com/search?tbm=isch&q=${encodeURIComponent([m.marca, m.modello, m.tipo_mezzo].filter(Boolean).join(' '))}`;

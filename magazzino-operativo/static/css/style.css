@@ -343,6 +343,16 @@ td.azioni > span.muto { display: block; font-size: 0.78rem; }
 .galleria .foto img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
 .galleria figcaption { padding: 0.5rem 0.6rem 0.6rem; font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .foto-azioni { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+/* ---------- manutenzioni dei mezzi (scheda del mezzo, lista Mezzi, caricamento da Excel) ---------- */
+.scadenze-manut { list-style: none; margin: 0.25rem 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.scadenze-manut li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+/* titoletto dentro i form a due colonne (es. "Prossima manutenzione dello stesso tipo") */
+.form .sottosezione { font-family: var(--font-ui); font-weight: 600; font-size: 0.85rem; color: var(--cosedil-blue); border-top: 1px solid var(--cosedil-border-soft); padding-top: 0.75rem; }
+.barra-flotta { margin: -0.35rem 0 1.1rem; }
+/* anteprima del file: la finestra non si allunga all'infinito, la tabella scorre dentro */
+.anteprima-manut { max-height: 45dvh; overflow: auto; border: 1px solid var(--cosedil-border-soft); border-radius: 6px; }
+.anteprima-manut table { font-size: 0.82rem; }
 .candidati { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
 .candidato { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; border: 1px solid var(--cosedil-blue); background: #fff; color: var(--cosedil-blue); border-radius: var(--radius-btn); padding: 0.5rem 0.85rem; cursor: pointer; font-family: var(--font-body); transition: background 0.2s; }
 .candidato .mono { font-size: 1.25rem; font-weight: 600; letter-spacing: 0.1em; }
