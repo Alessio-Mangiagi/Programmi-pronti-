@@ -11,6 +11,9 @@ Cosa mette (tutto inventato, ma verosimile per un'impresa edile):
     link verso InCampo e SkyTower trovano gli stessi codici;
   - 26 articoli di materiale edile con unità, categoria, fornitore, scorta minima e qualche EAN;
   - 12 mezzi fra propri e a nolo, con targhe, matricole, stato, chi li sta usando e lo storico;
+  - il registro delle manutenzioni dei mezzi propri (tagliandi, revisioni, riparazioni) con contaore e
+    contachilometri: una scadenza già passata, qualcuna vicina, un mezzo fermo in officina e uno mai
+    registrato, così la colonna "Manutenzione" e lo stato della flotta hanno tutti i casi;
   - sei settimane di movimenti: carichi dai DDT, trasferimenti verso i cantieri, scarichi per consumo
     (da scansione), rettifiche e un inventario; le giacenze non vanno mai sotto zero in nessun
     momento e qualche articolo resta sotto scorta, così la plancia ha qualcosa da segnalare;
@@ -32,6 +35,7 @@ from datetime import date, datetime, time, timedelta, timezone
 import codici
 import config
 import database
+import manutenzioni
 
 SEME = 20261113
 UTENTI = ["marta.colombo", "fabio.restivo", "salvatore.grasso", "a.mangiagi"]
@@ -141,6 +145,43 @@ MEZZI = [
      -44, -14, "restituito", None, None, "Restituita a fine getti del secondo solaio"),
 ]
 
+# Manutenzioni dei mezzi propri, con le date contate da oggi così le scadenze restano "vive" a ogni rilancio:
+# (indice in MEZZI, giorni fa, tipo, descrizione, ore, km, officina, eseguita da, costo,
+#  prossima data fra n giorni (negativo = già passata), prossime ore, prossimi km, mezzo fermo)
+MANUTENZIONI = [
+    (0, 400, "ordinaria", "Tagliando 500 h: olio motore, filtri olio, aria e gasolio", 500, None,
+     "Etna Macchine Movimento Terra", "Carmelo Pappalardo", 680, None, 1000, None, False),
+    (0, 300, "verifica", "Verifica periodica INAIL apparecchio di sollevamento (gancio)", 820, None,
+     "Studio tecnico Verifiche Sud", None, 250, 65, None, None, False),
+    (0, 220, "ordinaria", "Tagliando 1000 h: anche olio e filtri idraulici", 1000, None,
+     "Etna Macchine Movimento Terra", "Carmelo Pappalardo", 1450, None, 1500, None, False),
+    (0, 120, "gomme", "Sostituzione pattini cingolo sinistro", 1300, None, "Etna Macchine Movimento Terra", None,
+     3200, None, None, None, False),
+    (0, 35, "ordinaria", "Tagliando 1500 h: olio motore e filtri", 1500, None,
+     "Etna Macchine Movimento Terra", "Carmelo Pappalardo", 720, None, 2000, None, False),
+    (1, 200, "ordinaria", "Tagliando 500 h", 500, None, "Officina interna", "Carmelo Pappalardo", 390,
+     None, 1000, None, False),
+    (3, 345, "revisione", "Revisione annuale alla Motorizzazione", None, 84200, "Centro revisioni Acireale", None,
+     180, 20, None, None, False),
+    (3, 150, "ordinaria", "Tagliando 90.000 km", None, 90100, "Iveco Officina Autorizzata Catania", None, 520,
+     None, None, 120000, False),
+    (3, 60, "straordinaria", "Pastiglie e dischi freno anteriori", None, 97800, "Iveco Officina Autorizzata Catania",
+     None, 640, None, None, None, False),
+    (4, 380, "revisione", "Revisione", None, 61000, "Centro revisioni Acireale", None, 79, -15, None, None, False),
+    (4, 90, "ordinaria", "Tagliando 75.000 km", None, 75200, "Officina interna", "Carmelo Pappalardo", 310,
+     None, None, 105000, False),
+    (5, 260, "ordinaria", "Tagliando 2000 h", 2000, None, "Officina interna", "Carmelo Pappalardo", 560,
+     None, 2250, None, False),
+    (5, 4, "straordinaria", "Perdita olio idraulico: tubo di mandata da sostituire, ricambio ordinato", 2140, None,
+     "Officina interna", "Carmelo Pappalardo", None, None, None, None, True),
+    (7, 500, "ordinaria", "Tagliando annuale: olio, filtri, prova a carico", 3100, None, "Pramac Service", None,
+     240, -135, None, None, False),
+    (7, 10, "straordinaria", "Diagnosi: non parte, alternatore da verificare", 3260, None, "Elettrauto Sciuto", None,
+     90, None, None, None, False),
+]
+# Ultima lettura di contaore e contachilometri (indice in MEZZI: ore, km, giorni fa)
+LETTURE = {0: (1760, None, 2), 1: (985, None, 1), 3: (None, 101500, 3), 4: (None, 79400, 5)}
+
 
 class Demo:
     """Genera gli eventi (movimenti, spostamenti, attività), poi li scrive in ordine di data."""
@@ -157,7 +198,8 @@ class Demo:
         self.eventi = []     # (ts, progressivo, dict) dei movimenti di materiale, da applicare in ordine
         self.spostamenti = []  # (ts, progressivo, tupla) per movimenti_mezzi
         self.attivita_buf = []  # (ts, progressivo, tupla) per attivita
-        self.n = {"movimenti": 0, "movimenti_mezzi": 0, "attivita": 0}
+        self.id_mezzi = []   # id dei mezzi nell'ordine di MEZZI
+        self.n = {"movimenti": 0, "movimenti_mezzi": 0, "attivita": 0, "manutenzioni": 0}
 
     # ----------------------------------------------------------------- utilità
     def quando(self, giorni_fa, ora=None):
@@ -235,6 +277,7 @@ class Demo:
                 (codice, tipo, marca, modello, targa, matricola, prop, ditta, piva, iso(dal), iso(al), stato, ubi,
                  assegnato if stato == "in_uso" else None, note, ts))
             mid = cur.lastrowid
+            self.id_mezzi.append(mid)
             utente = "marta.colombo" if prop == "proprio" else "a.mangiagi"
             # arrivo in anagrafica: i propri al deposito, i noli direttamente dove servono
             prima = self.ubi["deposito"] if prop == "proprio" else (ubi or self.ubi["deposito"])
@@ -264,6 +307,34 @@ class Demo:
                 self.attivita(ts, utente, "sposta", "mezzo", mid,
                               st + (f" a {self.nomi_ubi[a]}" if a else "") + (f", {nota}" if nota.startswith("in uso") else ""))
                 da = a
+
+    def manutenzioni(self):
+        """Registro manutenzioni (MANUTENZIONI) e letture dei contatori (LETTURE), passando dalle stesse regole
+        dell'app (manutenzioni.valida e chiave) così la demo non contiene niente che l'app rifiuterebbe.
+        Si chiama per ultima fra i generatori: usa self.r (orari) e non deve cambiare la sequenza casuale
+        degli altri, che resta quella di prima del 19/11/2026."""
+        c = self.c
+        for (i, giorni_fa, tipo, descr, ore, km, officina, chi, costo, tra, p_ore, p_km, fermo) in MANUTENZIONI:
+            mid = self.id_mezzi[i]
+            ts = self.quando(giorni_fa, (15, self.r.randint(0, 59)))
+            dati = manutenzioni.valida({
+                "data": ts[:10], "tipo": tipo, "descrizione": descr, "ore": ore, "km": km, "officina": officina,
+                "eseguita_da": chi, "costo": costo, "prossime_ore": p_ore, "prossimi_km": p_km,
+                "prossima_data": (self.oggi + timedelta(days=tra)).isoformat() if tra is not None else None})
+            c.execute(
+                "INSERT INTO manutenzioni_mezzi (mezzo_id, data, tipo, descrizione, ore, km, officina, eseguita_da, costo, "
+                "prossima_data, prossime_ore, prossimi_km, fermo, note, origine, chiave, utente, creato_il) VALUES (:mezzo_id, "
+                ":data, :tipo, :descrizione, :ore, :km, :officina, :eseguita_da, :costo, :prossima_data, :prossime_ore, "
+                ":prossimi_km, :fermo, :note, 'manuale', :chiave, 'marta.colombo', :ts)",
+                {**dati, "mezzo_id": mid, "fermo": 1 if fermo else 0, "chiave": manutenzioni.chiave(mid, dati), "ts": ts})
+            self.attivita(ts, "marta.colombo", "manutenzione", "mezzo", mid,
+                          f"{manutenzioni.TIPI[tipo]} del {manutenzioni.fmt_data(dati['data'])}: {descr}")
+            self.n["manutenzioni"] += 1
+            manutenzioni.aggiorna_letture(c, mid, dati["ore"], dati["km"], dati["data"])
+        for i, (ore, km, giorni_fa) in LETTURE.items():
+            c.execute("UPDATE mezzi SET ore_lettura = COALESCE(?, ore_lettura), km_lettura = COALESCE(?, km_lettura), "
+                      "lettura_il = ? WHERE id = ?",
+                      (ore, km, (self.oggi - timedelta(days=giorni_fa)).isoformat(), self.id_mezzi[i]))
 
     # ----------------------------------------------------------------- eventi di materiale (solo generati)
     def consegne(self):
@@ -417,6 +488,7 @@ class Demo:
         self.consumi()
         self.rettifiche()
         self.sotto_scorta()
+        self.manutenzioni()
         self.scrivi()
         self.c.commit()
 
@@ -425,14 +497,15 @@ class Demo:
 
 def conta(conn):
     out = {}
-    for t in ("ubicazioni", "articoli", "mezzi", "movimenti", "movimenti_mezzi", "importazioni", "attivita"):
+    for t in ("ubicazioni", "articoli", "mezzi", "movimenti", "movimenti_mezzi", "manutenzioni_mezzi", "importazioni",
+              "attivita"):
         out[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
     return out
 
 
 def azzera(conn):
-    for t in ("riepiloghi", "foto_mezzi", "attivita", "importazioni", "movimenti_mezzi", "movimenti", "mezzi",
-              "articoli", "ubicazioni"):
+    for t in ("riepiloghi", "foto_mezzi", "attivita", "importazioni", "movimenti_mezzi", "manutenzioni_mezzi",
+              "movimenti", "mezzi", "articoli", "ubicazioni"):
         conn.execute(f"DELETE FROM {t}")
     conn.execute("DELETE FROM sqlite_sequence")
     conn.commit()
@@ -490,6 +563,7 @@ def main(argv=None):
         print(f"  {n['ubicazioni']} ubicazioni, {n['articoli']} articoli, {n['mezzi']} mezzi")
         print(f"  {n['movimenti']} movimenti di materiale, {n['movimenti_mezzi']} spostamenti di mezzi, "
               f"{n['importazioni']} importazioni, {n['attivita']} righe di attività")
+        print(f"  {n['manutenzioni_mezzi']} manutenzioni dei mezzi")
         print(f"  {sotto_scorta} articoli sotto scorta; giacenze sotto zero nel tempo: {sotto_zero}")
         return 0 if sotto_zero == 0 else 2
     finally:
