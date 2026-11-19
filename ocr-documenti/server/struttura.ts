@@ -49,6 +49,7 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
   // senza ARTICOLO. Lo spazio è ammesso solo DENTRO la sequenza puntata, mai in coda.
   const codIniziale = /^([0-9][A-Za-z0-9ØøΦ°.\-_\/]{2,19}|[A-Za-z0-9ØøΦ°_]{1,8}(?:\.\s?[A-Za-z0-9ØøΦ°_]{1,8}){1,6})\s+(.{10,})$/
   const umCoda = new RegExp(String.raw`[\s.,—-]+(${UM_SRC})[.\s]*$`, 'i')
+  const misuraPerUnita = new RegExp(String.raw`^\d+(?:[.,]\d+)?\/(?:${UM_SRC})$`, 'i')     // "15/mq"
   for (const r of righe) {
     if (r.descrizione) {
       // u.m. rimasta in coda alla descrizione ("… per} cad") e colonna UM vuota → spostala
@@ -77,8 +78,10 @@ export const recuperaCodiciRighe = (righe: Record<string, string>[]): void => {
         if (m) {
           const tok = m[1]
           const cifre = (tok.match(/\d/g) ?? []).length
+          // numeri puri, date e misure ("2,5mm", "15/mq": peso per metro quadro rimasto in
+          // testa alla descrizione, Eureka) non sono codici
           if (cifre >= 2 && !numTot.test(tok) && !dataTok.test(tok) &&
-              !/^\d{1,3},\d{1,3}[a-z]{0,3}$/i.test(tok)) {   // numeri puri, date e misure ("2,5mm") non sono codici
+              !/^\d{1,3},\d{1,3}[a-z]{0,3}$/i.test(tok) && !misuraPerUnita.test(tok)) {
             r.codice_epu = tok
             r.descrizione = m[2].trim()
           }
