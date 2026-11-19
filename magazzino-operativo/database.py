@@ -151,6 +151,35 @@ CREATE TABLE IF NOT EXISTS foto_mezzi (
 );
 CREATE INDEX IF NOT EXISTS idx_foto_mezzo ON foto_mezzi(mezzo_id);
 
+-- Registro delle manutenzioni dei mezzi (manutenzioni.py, dal 19/11/2026): una riga per intervento,
+-- inserita dalla scheda del mezzo o caricata da Excel (manutenzioni passate). Le scadenze non sono una
+-- tabella: la "prossima" scritta sull'ultimo intervento di ogni tipo è la scadenza aperta di quel tipo
+-- (un intervento più recente dello stesso tipo la chiude), come le giacenze sono la somma dei movimenti.
+CREATE TABLE IF NOT EXISTS manutenzioni_mezzi (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mezzo_id INTEGER NOT NULL REFERENCES mezzi(id),
+  data TEXT NOT NULL,                     -- AAAA-MM-GG dell'intervento
+  tipo TEXT NOT NULL CHECK (tipo IN ('ordinaria','straordinaria','revisione','verifica','gomme','altro')),
+  descrizione TEXT NOT NULL,
+  ore REAL,                               -- contaore del mezzo al momento dell'intervento
+  km REAL,                                -- contachilometri al momento dell'intervento
+  officina TEXT,                          -- officina o fornitore che ha fatto il lavoro
+  eseguita_da TEXT,                       -- persona (meccanico, operatore)
+  costo REAL,                             -- euro
+  prossima_data TEXT,                     -- prossimo intervento dello stesso tipo: entro questa data...
+  prossime_ore REAL,                      -- ...o a queste ore di contaore...
+  prossimi_km REAL,                       -- ...o a questi km, quello che arriva prima
+  fermo INTEGER NOT NULL DEFAULT 0,       -- registrata col mezzo fermo in officina (stato -> manutenzione)
+  note TEXT,
+  origine TEXT NOT NULL DEFAULT 'manuale' CHECK (origine IN ('manuale','excel')),
+  file_origine TEXT,                      -- nome del file Excel da cui è stata caricata
+  chiave TEXT UNIQUE,                     -- impronta mezzo+data+tipo+descrizione+ore+km+costo: niente doppioni
+  utente TEXT,
+  creato_il TEXT NOT NULL DEFAULT (datetime('now')),
+  modificato_il TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_manut_mezzo ON manutenzioni_mezzi(mezzo_id, data);
+
 CREATE TABLE IF NOT EXISTS attivita (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL DEFAULT (datetime('now')),
@@ -194,6 +223,13 @@ def init_db(path=None):
         colonne = {r[1] for r in conn.execute("PRAGMA table_info(mezzi)")}
         if "assegnato_a" not in colonne:
             conn.execute("ALTER TABLE mezzi ADD COLUMN assegnato_a TEXT")  # chi lo sta usando
+        if "ore_lettura" not in colonne:
+            # Ultima lettura nota di contaore e contachilometri (19/11/2026): servono per dire se una
+            # manutenzione "a ore" o "a km" è scaduta. Si aggiornano dalla scheda del mezzo e da sole
+            # quando una manutenzione registra un valore più alto (i contatori vanno solo avanti).
+            conn.execute("ALTER TABLE mezzi ADD COLUMN ore_lettura REAL")
+            conn.execute("ALTER TABLE mezzi ADD COLUMN km_lettura REAL")
+            conn.execute("ALTER TABLE mezzi ADD COLUMN lettura_il TEXT")   # AAAA-MM-GG dell'ultima lettura
         colonne = {r[1] for r in conn.execute("PRAGMA table_info(ubicazioni)")}
         if "lat" not in colonne:
             # Coordinate per aprire la mappa: opzionali, basta anche l'indirizzo.

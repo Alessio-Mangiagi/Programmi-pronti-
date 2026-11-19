@@ -10,6 +10,7 @@ Avvio: python app.py (o avvia.bat). API JSON sotto /api, pagina unica in /.
 Dal 09/11/2026 è una parte del programma unico "DDT e Magazzino": lo avvia il Lettore DDT e
 gli utenti lo vedono sotto <Lettore DDT>/magazzino/ (proxy, prefisso.py; CONTRATTI § 11).
 """
+import io
 import json
 import logging
 import os
@@ -30,9 +31,11 @@ import foto
 import importa_ddt
 import importa_mezzi
 import backup
+import manutenzioni
 import prefisso
 import riepilogo
 import statistiche
+import stato_mezzi
 
 # Codice condiviso della suite (cartelle sorelle, non pacchetti installati).
 _SHARED = os.path.join(config.SUITE_DIR, "shared")
@@ -356,7 +359,11 @@ def dettaglio_mezzo(c, id_):
         "SELECT s.*, ud.nome AS da_nome, ua.nome AS a_nome FROM movimenti_mezzi s "
         "LEFT JOIN ubicazioni ud ON ud.id = s.da_ubicazione_id LEFT JOIN ubicazioni ua ON ua.id = s.a_ubicazione_id "
         "WHERE s.mezzo_id = ? ORDER BY s.id DESC LIMIT 20", (id_,)))
-    return {"tipo": "mezzo", "mezzo": dict(m), "storico": storico, "foto": _foto_mezzo(c, id_)}
+    # Manutenzioni tutte (la scheda le mostra e il riepilogo ne fa i conti) e il loro quadro:
+    # letture di contaore/km, scadenze aperte, ultima, costi (manutenzioni.riepilogo).
+    man = manutenzioni.elenco(c, id_)
+    return {"tipo": "mezzo", "mezzo": dict(m), "storico": storico, "foto": _foto_mezzo(c, id_),
+            "manutenzioni": man, "manutenzione": manutenzioni.riepilogo(m, man), "tipi_manutenzione": manutenzioni.TIPI}
 
 
 def dettaglio_ubicazione(c, id_):
@@ -745,7 +752,21 @@ def api_mezzi():
             sql += f"AND m.{campo} = ? "
             p.append(v)
     sql += "ORDER BY m.tipo_mezzo, m.marca LIMIT 500"
-    return jsonify(righe(db().execute(sql, p)))
+    lista = righe(db().execute(sql, p))
+    # Quadro manutenzioni di ogni mezzo (stato della scadenza più urgente, ultima, costi) per la colonna
+    # "Manutenzione" della pagina Mezzi; ?manutenzione= filtra: scadute | da_fare (scadute e in scadenza) | nessuna.
+    rie = manutenzioni.riepiloghi(db(), lista)
+    for m in lista:
+        r = rie[m["id"]]
+        m["manutenzione"] = {k: r[k] for k in ("stato", "prossima", "ultima", "n", "costo_totale", "ore_attuali", "km_attuali")}
+    filtro = request.args.get("manutenzione")
+    if filtro == "scadute":
+        lista = [m for m in lista if m["manutenzione"]["stato"] == "scaduta"]
+    elif filtro == "da_fare":
+        lista = [m for m in lista if m["manutenzione"]["stato"] in ("scaduta", "in_scadenza")]
+    elif filtro == "nessuna":
+        lista = [m for m in lista if not m["manutenzione"]["n"]]
+    return jsonify(lista)
 
 
 def _dati_mezzo(d):
@@ -757,10 +778,36 @@ def _dati_mezzo(d):
             "note": testo(d, "note", maxlen=500), "attivo": 0 if d.get("attivo") in (0, False, "0") else 1}
 
 
+def _letture(d):
+    """Contaore e contachilometri dal form del mezzo, solo i campi presenti nel corpo: chi aggiorna il
+    mezzo da un'altra parte della pagina (es. la targa letta da foto) non li manda e non li deve azzerare."""
+    out = {}
+    for campo in ("ore_lettura", "km_lettura"):
+        if campo in d:
+            out[campo] = numero(d, campo)
+            if out[campo] is not None and out[campo] < 0:
+                raise ApiError("Contaore e contachilometri non possono essere negativi")
+    return out
+
+
+def _salva_letture(c, id_, letture):
+    """Scrive le letture cambiate e la data della lettura (oggi). Una correzione verso il basso è ammessa:
+    la fa una persona dalla scheda, a differenza delle manutenzioni che le spingono solo in avanti."""
+    if not letture:
+        return
+    attuali = c.execute("SELECT ore_lettura, km_lettura FROM mezzi WHERE id = ?", (id_,)).fetchone()
+    cambiate = {k: v for k, v in letture.items() if v != attuali[k]}
+    if cambiate:
+        assegna = ", ".join(f"{k} = ?" for k in cambiate)
+        c.execute(f"UPDATE mezzi SET {assegna}, lettura_il = ? WHERE id = ?",
+                  [*cambiate.values(), date.today().isoformat(), id_])
+
+
 @app.post("/api/mezzi")
 def api_mezzo_crea():
     d0 = corpo()
     d = _dati_mezzo(d0)
+    letture = _letture(d0)
     c = db()
     d["codice"] = codici.prossimo_codice(c, "mezzi", config.PREFISSO_MEZZO)
     d["stato"] = scelta(d0, "stato", STATI_MEZZO, "disponibile")
@@ -772,6 +819,7 @@ def api_mezzo_crea():
     if d["ubicazione_id"]:
         c.execute("INSERT INTO movimenti_mezzi (mezzo_id, a_ubicazione_id, stato, utente, note) VALUES (?, ?, ?, ?, ?)",
                   (cur.lastrowid, d["ubicazione_id"], d["stato"], nome_utente(), "Registrazione in anagrafica"))
+    _salva_letture(c, cur.lastrowid, letture)
     registra("crea", "mezzo", cur.lastrowid, d["tipo_mezzo"])
     c.commit()
     return jsonify(dettaglio_mezzo(c, cur.lastrowid)), 201
@@ -780,12 +828,15 @@ def api_mezzo_crea():
 @app.put("/api/mezzi/<int:id_>")
 def api_mezzo_aggiorna(id_):
     esiste("mezzi", id_)
-    d = _dati_mezzo(corpo())
+    d0 = corpo()
+    d = _dati_mezzo(d0)
     d["id"] = id_
+    letture = _letture(d0)
     c = db()
     c.execute("UPDATE mezzi SET tipo_mezzo=:tipo_mezzo, marca=:marca, modello=:modello, targa=:targa, "
               "matricola=:matricola, proprieta=:proprieta, ditta=:ditta, piva=:piva, nolo_dal=:nolo_dal, "
               "nolo_al=:nolo_al, note=:note, attivo=:attivo WHERE id=:id", d)
+    _salva_letture(c, id_, letture)
     registra("modifica", "mezzo", id_, d["tipo_mezzo"])
     c.commit()
     return jsonify(dettaglio_mezzo(c, id_))
@@ -832,12 +883,153 @@ def api_mezzo_elimina(id_):
     esiste("mezzi", id_)
     c = db()
     c.execute("DELETE FROM movimenti_mezzi WHERE mezzo_id = ?", (id_,))
+    c.execute("DELETE FROM manutenzioni_mezzi WHERE mezzo_id = ?", (id_,))   # FK: prima delle righe del mezzo
     c.execute("DELETE FROM foto_mezzi WHERE mezzo_id = ?", (id_,))
     foto.elimina_tutte(id_)
     c.execute("DELETE FROM mezzi WHERE id = ?", (id_,))
     registra("elimina", "mezzo", id_)
     c.commit()
     return jsonify({"ok": True})
+
+
+# --------------------------------------------------------------------------- manutenzioni dei mezzi
+# Registro degli interventi (manutenzioni.py), caricamento da Excel delle manutenzioni passate e stato del
+# mezzo/flotta da scaricare (stato_mezzi.py). Registrare, correggere le proprie e caricare da Excel: tutti
+# gli utenti del Magazzino (il caricamento aggiunge soltanto, con anteprima e senza doppioni: scelta
+# dell'utente del 19/11/2026). Cancellare: solo l'amministratore (gate_admin blocca ogni DELETE).
+
+def _manutenzione(c, id_, mid):
+    r = c.execute("SELECT * FROM manutenzioni_mezzi WHERE id = ? AND mezzo_id = ?", (mid, id_)).fetchone()
+    if not r:
+        raise ApiError("Manutenzione non trovata", 404)
+    return r
+
+
+def _descrivi_manutenzione(dati):
+    return f"{manutenzioni.TIPI[dati['tipo']]} del {manutenzioni.fmt_data(dati['data'])}: {dati['descrizione']}"
+
+
+@app.get("/api/mezzi/<int:id_>/manutenzioni")
+def api_manutenzioni(id_):
+    d = dettaglio_mezzo(db(), id_)
+    return jsonify({k: d[k] for k in ("manutenzioni", "manutenzione", "tipi_manutenzione")})
+
+
+@app.post("/api/mezzi/<int:id_>/manutenzioni")
+def api_manutenzione_crea(id_):
+    """Nuova manutenzione dalla scheda del mezzo. Corpo JSON: data, tipo, descrizione, ore, km, officina,
+    eseguita_da, costo, prossima_data, prossime_ore, prossimi_km, note e `fermo` (vero = mezzo fermo in
+    officina: lo stato passa a "manutenzione" con una riga nello storico). Risponde con la scheda del mezzo."""
+    esiste("mezzi", id_)
+    d = corpo()
+    c = db()
+    fermo = d.get("fermo") in (True, 1, "1", "on", "true")
+    try:
+        dati = manutenzioni.valida(d)
+        manutenzioni.inserisci(c, id_, dati, nome_utente(), fermo=fermo)
+    except manutenzioni.DatiNonValidi as e:
+        raise ApiError(str(e))
+    if fermo:
+        manutenzioni.segna_fermo(c, id_, dati["descrizione"], nome_utente())
+    registra("manutenzione", "mezzo", id_, _descrivi_manutenzione(dati) + (" (mezzo fermo)" if fermo else ""))
+    c.commit()
+    return jsonify(dettaglio_mezzo(c, id_)), 201
+
+
+@app.put("/api/mezzi/<int:id_>/manutenzioni/<int:mid>")
+def api_manutenzione_modifica(id_, mid):
+    """Corregge una manutenzione: solo chi l'ha registrata (o caricata da Excel) o l'amministratore."""
+    c = db()
+    r = _manutenzione(c, id_, mid)
+    if not e_admin() and (r["utente"] or "") != nome_utente():
+        raise ApiError("La può correggere solo chi l'ha registrata o l'amministratore del magazzino", 403)
+    try:
+        dati = manutenzioni.valida(corpo())
+        manutenzioni.modifica(c, mid, id_, dati)
+    except manutenzioni.DatiNonValidi as e:
+        raise ApiError(str(e))
+    registra("modifica_manutenzione", "mezzo", id_, _descrivi_manutenzione(dati))
+    c.commit()
+    return jsonify(dettaglio_mezzo(c, id_))
+
+
+@app.delete("/api/mezzi/<int:id_>/manutenzioni/<int:mid>")
+def api_manutenzione_elimina(id_, mid):
+    c = db()
+    r = _manutenzione(c, id_, mid)
+    c.execute("DELETE FROM manutenzioni_mezzi WHERE id = ?", (mid,))
+    registra("elimina_manutenzione", "mezzo", id_, _descrivi_manutenzione(dict(r)))
+    c.commit()
+    return jsonify(dettaglio_mezzo(c, id_))
+
+
+@app.post("/api/mezzi/manutenzioni/importa")
+def api_manutenzioni_importa():
+    """Manutenzioni passate da un file Excel (.xlsx) o CSV, in due passi con lo stesso file (multipart):
+    - senza `conferma`: anteprima, riga per riga (valida, doppione, errore e perché), niente salvato;
+    - con `conferma=1`: salva le righe valide e risponde quante sono entrate.
+    `mezzo_id` (facoltativo, dalla scheda del mezzo) vale per le righe con la colonna Mezzo vuota."""
+    f = request.files.get("file")
+    if not f or not f.filename:
+        raise ApiError("Nessun file")
+    mezzo_id = esiste("mezzi", intero(request.form, "mezzo_id"))
+    nome = os.path.basename(f.filename)[:200]
+    c = db()
+    try:
+        analisi = manutenzioni.analizza(c, manutenzioni.righe_da_file(nome, f.read()), mezzo_id)
+    except manutenzioni.DatiNonValidi as e:
+        raise ApiError(str(e))
+    if request.form.get("conferma") not in ("1", "true", "on"):
+        return jsonify({"anteprima": True, "file": nome, "tipi": manutenzioni.TIPI, **analisi})
+    salvate = manutenzioni.salva_analisi(c, analisi, nome_utente(), nome)
+    registra("importa_manutenzioni", "mezzo", mezzo_id,
+             f"{nome}: {salvate} manutenzioni caricate, {analisi['doppioni']} doppioni, {analisi['errori']} righe con errori")
+    c.commit()
+    return jsonify({"anteprima": False, "file": nome, "salvate": salvate, **analisi})
+
+
+def _formato():
+    f = (request.args.get("formato") or "pdf").lower()
+    if f not in stato_mezzi.MIME:
+        raise ApiError("Formato: pdf oppure xlsx")
+    return f
+
+
+def _scarica(dati, nome_file, formato):
+    """PDF aperto nel browser (si stampa da lì), Excel scaricato come file."""
+    return send_file(io.BytesIO(dati), mimetype=stato_mezzi.MIME[formato], as_attachment=formato == "xlsx",
+                     download_name=nome_file, max_age=0)
+
+
+@app.get("/api/mezzi/manutenzioni/modello")
+def api_manutenzioni_modello():
+    """Modello Excel da compilare. ?mezzo_id= → con il codice del mezzo già scritto nella colonna Mezzo."""
+    mezzo = None
+    mid = intero(request.args, "mezzo_id")
+    if mid:
+        mezzo = db().execute("SELECT * FROM mezzi WHERE id = ?", (mid,)).fetchone()
+        if not mezzo:
+            raise ApiError("Mezzo non trovato", 404)
+    dati, nome_file = stato_mezzi.modello_xlsx(db(), mezzo)
+    return _scarica(dati, nome_file, "xlsx")
+
+
+@app.get("/api/mezzi/<int:id_>/stato")
+def api_mezzo_stato(id_):
+    """Stato generale di un mezzo, ?formato=pdf (predefinito) o xlsx."""
+    formato = _formato()
+    r = stato_mezzi.stato_mezzo(db(), id_, formato)
+    if not r:
+        raise ApiError("Mezzo non trovato", 404)
+    return _scarica(*r, formato)
+
+
+@app.get("/api/mezzi/flotta")
+def api_mezzi_flotta():
+    """Stato di tutta la flotta, ?formato=pdf|xlsx; ?tutti=1 include i mezzi dismessi."""
+    formato = _formato()
+    dati, nome_file = stato_mezzi.stato_flotta(db(), formato, tutti=request.args.get("tutti") == "1")
+    return _scarica(dati, nome_file, formato)
 
 
 # --------------------------------------------------------------------------- foto dei mezzi

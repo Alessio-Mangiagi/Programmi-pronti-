@@ -72,6 +72,15 @@ FOTO_MAX_PER_CARICO = 10
 FOTO_LATO_MAX = 1600                    # lato lungo della foto salvata
 FOTO_LATO_MINIATURA = 320
 
+# Manutenzioni dei mezzi (manutenzioni.py): quanto prima della scadenza un intervento diventa
+# "in scadenza" (badge ambra nella lista Mezzi e negli stati scaricati). Ore e km si confrontano con
+# l'ultima lettura di contaore/contachilometri del mezzo.
+MANUT_PREAVVISO_GIORNI = int(os.environ.get("MAGAZZINO_MANUT_PREAVVISO_GIORNI", "30"))
+MANUT_PREAVVISO_ORE = float(os.environ.get("MAGAZZINO_MANUT_PREAVVISO_ORE", "50"))
+MANUT_PREAVVISO_KM = float(os.environ.get("MAGAZZINO_MANUT_PREAVVISO_KM", "1000"))
+# Righe al massimo in un file Excel di manutenzioni passate (oltre: dividere il file).
+MANUT_IMPORT_MAX_RIGHE = 5000
+
 # Utenti admin del magazzino oltre agli admin del portale: lista separata da
 # virgole (username). Vuota = basta essere admin dell'app nel portale.
 ADMIN_UTENTI = {u.strip().lower() for u in os.environ.get("MAGAZZINO_ADMIN", "").split(",") if u.strip()}
