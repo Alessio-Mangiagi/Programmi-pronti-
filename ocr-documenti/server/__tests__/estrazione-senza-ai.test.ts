@@ -676,6 +676,18 @@ describe('tabella numerata per posizione e voci uguali', () => {
       riga('3', '1,50', '7,00')] } as unknown as Estratto   // 7 / 3 non ha tre decimali esatti: resta
     expect(JSON.parse(strutturaAlyante(e)).righe.map((r: Record<string, string>) => r.prezzo_lordo)).toEqual(['0,295', '0,885', '1,545', '2,00', '1,50'])
   })
+  it('intestazione di gruppo WBS col subtotale non è una voce; codice tronco completato dal prezzo (Jonico)', () => {
+    const riga = (codice_epu: string, udm: string, quantita: string, prezzo_lordo: string, importo: string, descrizione = 'GABBIONI IN RETE METALLICA A DOPPIA TORSIONE') =>
+      ({ progressivo: '1', codice_epu, descrizione, udm, quantita, prezzo_lordo, importo })
+    const e = { testata: {}, importi: {}, righe: [
+      riga('', '', '203.658,37', '7.151,66', '', 'Lotto 4 ID.A Sistemazione Fiume Barbalanni *'),
+      riga('E.01.027.1.a', 'mc', '436,00', '34,74', '15.146,64'), riga('E.01.027.1.b', 'mc', '506,00', '44,40', '22.466,40'),
+      riga('E.01.027.1', 'mc', '10,00', '34,74', '347,40'),          // "a" andata a capo e persa
+      riga('E.01.027.1', 'mc', '10,00', '50,00', '500,00'),          // nessun figlio con questo prezzo: resta
+    ] } as unknown as Estratto
+    expect(JSON.parse(strutturaAlyante(e)).righe.map((r: Record<string, string>) => r.codice_epu))
+      .toEqual(['E.01.027.1.a', 'E.01.027.1.b', 'E.01.027.1.a', 'E.01.027.1'])
+  })
   it('misura per unità in testa alla descrizione non è un codice ("kg 15/mq", Eureka)', () => {
     const e = { testata: {}, importi: {}, righe: [{ progressivo: '1', codice_epu: '', descrizione: '15/mq CORRIMANO NASCOSTO INTERNO Posa in opera', udm: 'mq', quantita: '2400', prezzo_lordo: '44,00', importo: '105.600,00' }] } as unknown as Estratto
     expect(JSON.parse(strutturaAlyante(e)).righe[0].codice_epu).toBe('')

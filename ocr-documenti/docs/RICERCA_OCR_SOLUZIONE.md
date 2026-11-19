@@ -734,6 +734,8 @@ quantità incollata al prezzo staccata anche nelle righe SOMMANO senza quantità
 PF Future villette arriva a 34/34: voci esatte **790/948** (83%), quantità e prezzo giusti
 **821/948** (87%). Con le continuazioni del codice GFM recuperate (§4.24: «:17.007»,
 «.03» dopo una riga corta) GFM sale a 105/108 e le voci esatte a **793/948** (84%).
+Senza le intestazioni di gruppo WBS e con i codici tronchi completati dal prezzo (§4.25)
+Jonico arriva a 32/35: voci esatte **795/948** (84%), righe in più **25**.
 
 ## Fonti
 

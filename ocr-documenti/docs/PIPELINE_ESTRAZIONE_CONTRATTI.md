@@ -796,6 +796,21 @@ si perdeva in due casi, e il codice restava tronco («SIC24_14.03», «SIC24_14.
 
 GFM 102 → **105/108**; nessun altro contratto cambia.
 
+### 4.25 Gruppi WBS col subtotale e codice tronco dell'ultimo segmento (Jonico, 19/11/2026)
+
+In `strutturaAlyante` / `recuperaCodiciRighe` (`server/struttura.ts`):
+- **Intestazioni di gruppo WBS**: nei subappalti Ragusana la riga «Lotto 4 ID.A
+  Sistemazione Fiume Barbalanni * 203.658,37 € 7.151,66 €» porta importo lavori e
+  importo oneri del lotto, e usciva come voce con quantità 203.658,37. Una riga senza
+  codice, unità e importo, con la descrizione da gruppo («Lotto …», «… *»,
+  «complessivamente»), si scarta. Nei moduli di riferimento nessuna voce ha questa forma.
+- **Codice tronco**: «E.01.027.1.» con la «a» andata a capo e persa. Se nel documento ci
+  sono codici figli «E.01.027.1.<x>» e uno solo ha una voce con lo stesso prezzo, la voce
+  tronca è quel figlio (`completaCodiciTronchi`: 34,74 = .a, 44,40 = .b).
+
+Jonico 31 → **32/35** (tutte e due le copie); righe in più 28 → **25** (Jonico ×2,
+Progetto Costruzioni).
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
