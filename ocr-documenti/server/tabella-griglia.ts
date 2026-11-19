@@ -189,8 +189,12 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
   const prezzi = (v: Voce) => v.nums.some(n => n.includes(','))
   const conValori = voci.filter(v => v.nums.length >= 2 && prezzi(v))
   if (!conValori.length || conValori.length < voci.filter(v => v.nums.length >= 2).length / 2) return ''
+  // Un solo numero vale come prezzo di una voce solo se la riga ha il codice o l'unità di
+  // misura. Senza tutti e due è il riepilogo sotto l'elenco: «Totale» letto «folale»
+  // (Muzzolon), «Lavorazioni al netto della sicurezza» e «Oneri della sicurezza» col loro
+  // importo (subappalto 195-137), che uscivano come voci in più.
   return voci
-    .filter(v => (v.nums.length >= 1 && prezzi(v)) || (v.codice && v.um))
+    .filter(v => (v.nums.length >= 2 && prezzi(v)) || (v.nums.length === 1 && prezzi(v) && !!(v.codice || v.um)) || (v.codice && v.um))
     .map(v => {
       // un solo numero (voce "opzionale" senza quantità, listino): è il prezzo unitario
       const [q = '', p = '', i = ''] = v.nums.length === 1 ? ['', v.nums[0], ''] : valoriRiga(v.nums)
