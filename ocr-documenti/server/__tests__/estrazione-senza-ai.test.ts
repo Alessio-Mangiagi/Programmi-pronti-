@@ -224,6 +224,15 @@ describe('righe', () => {
     expect(r[1].codice_epu).toBe('429')
     expect(estraiRigheListino(righe.slice(0, 5).join('\n'))).toEqual([])   // meno di 10 righe: non è un listino
   })
+  it('listino: rotolo "RT" (Nigro) e "Mr" letto per MT (L.Catania)', () => {
+    const righe = Array.from({ length: 10 }, (_, i) => `CH${i} CHIODI ACCIAIO 3,7X50 PZ 1,00 13,920 €`)
+    righe[2] = 'MASNET141X50 RETE RECINZIONE ARANCIO 140GR/MQ 1.00X50 RT 1,00 24,50 €'
+    righe[3] = 'DIST40 DISTANZIATORE CEMENTO TRIANGOLO H.4OMM Mr 1,00 1,920 €'
+    const r = estraiRigheListino(righe.join('\n'))
+    expect(r.slice(2, 4).map(x => [x.codice_epu, x.udm, x.quantita, x.prezzo_lordo])).toEqual([
+      ['MASNET141X50', 'rt', '1,00', '24,50'], ['DIST40', 'mt', '1,00', '1,920'],
+    ])
+  })
 })
 
 describe('tabella ARTICOLO/DESCRIZIONE senza bordi (World service)', () => {

@@ -811,6 +811,13 @@ In `strutturaAlyante` / `recuperaCodiciRighe` (`server/struttura.ts`):
 Jonico 31 → **32/35** (tutte e due le copie); righe in più 28 → **25** (Jonico ×2,
 Progetto Costruzioni).
 
+### 4.26 Listino di materiali: rotolo «RT» e «Mr» per MT (Nigro, L.Catania, 19/11/2026)
+
+`RE_RIGA_LISTINO` (`estraiRigheListino`) ha la sua lista di unità. Mancava RT (rotolo):
+«MASNET141X50 RETE RECINZIONE … RT 1,00 24,50 €» e «8002020011 NASTRO SEGNALETICO … RT»
+restavano fuori dal listino. «Mr» è MT letto dall'OCR («DIST40 … Mr 1,00 1,920 €») e ora
+vale mt. Nigro 49 → **52/52**, L.Catania 43 → 44/46.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`

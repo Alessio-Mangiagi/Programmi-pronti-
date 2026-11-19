@@ -14,7 +14,7 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
   spazio.** Sui 31 contratti testata dal 94% al 98%, voci con quantità e prezzo giusti dal
   74% all'86%, voci esatte dal 64% all'82%; nessun contratto peggiora. Progetto Costruzioni
   da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future villette 34 su 34, gli altri due da 35 a 65 e da 45 a 65
-  su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146, Sidersipe 5 su 5, World service 7 su 7, Eureka 4 su 4. «Scan senza
+  su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146, Sidersipe 5 su 5, World service 7 su 7, Eureka 4 su 4, Nigro 52 su 52. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
 - **Aggiornamento del 16/11 (§10): elenco WBS, voci uguali, colonna «Pos.».** Sui 31
@@ -736,6 +736,8 @@ PF Future villette arriva a 34/34: voci esatte **790/948** (83%), quantità e pr
 «.03» dopo una riga corta) GFM sale a 105/108 e le voci esatte a **793/948** (84%).
 Senza le intestazioni di gruppo WBS e con i codici tronchi completati dal prezzo (§4.25)
 Jonico arriva a 32/35: voci esatte **795/948** (84%), righe in più **25**.
+Con il rotolo «RT» e «Mr» per MT nel listino di materiali (§4.26) Nigro arriva a 52/52 e
+L.Catania a 44/46: voci esatte **799/948** (84%), quantità e prezzo giusti **825/948** (87%).
 
 ## Fonti
 
