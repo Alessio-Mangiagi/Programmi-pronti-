@@ -308,9 +308,13 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
     // Anche la CONTINUAZIONE del codice andato a capo nella sua colonna (".03.003" sotto
     // "SIC24_14.01", GFM): comincia col punto o col trattino basso e codeRe la scartava,
     // così il codice usciva tronco su 47 voci. Si accoda al codice sopra (passata 2).
-    const codici = ws.slice(0, iVal).filter(w =>
-      w.left < xDescr - 20 && (codeRe.test(w.text) || RE_CODA_CODICE.test(w.text)) && /\d/.test(w.text) &&
-      !/^art[.\s\-]*\d*[.\s\-]*$/i.test(w.text))   // "ART.5-" è il titolo dell'articolo di contratto, non un codice
+    // Il bordo o una macchia davanti alla continuazione si legge come segno (":17.007",
+    // "-17.051" sotto "SIC24_14.03", GFM): nella colonna codice si toglie prima di
+    // riconoscerla, altrimenti il codice restava "SIC24_14.03".
+    const codici = ws.slice(0, iVal).filter(w => w.left < xDescr - 20)
+      .map(w => /^[:;\-–—'`]+\d{2}\.\d{3}$/.test(w.text) ? { ...w, text: w.text.replace(/^[:;\-–—'`]+/, '') } : w)
+      .filter(w => (codeRe.test(w.text) || RE_CODA_CODICE.test(w.text)) && /\d/.test(w.text) &&
+        !/^art[.\s\-]*\d*[.\s\-]*$/i.test(w.text))   // "ART.5-" è il titolo dell'articolo di contratto, non un codice
     const descrWs = ws.slice(0, iVal).filter(w => w.left >= xDescr - 20)
     analizzate.push({
       top: r.top, codici, descr: descrWs, val: ws.slice(iVal),
@@ -346,7 +350,11 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
     const caps = descrWs.length >= 2 && descrWs.slice(0, 2).every(w => capsRe.test(w.text))
     const salto = prevTop >= 0 && a.top - prevTop > passo * 1.75
     const salto12 = prevTop >= 0 && a.top - prevTop > passo * 1.2
-    const nuovo = cur !== null && (
+    // riga che nella colonna codice porta SOLO la continuazione (".03" sotto "SIC24_14.12",
+    // GFM): è la stessa cella anche se la riga sopra sembrava chiuderla
+    const continuaCodice = cur !== null && cur.codice.length > 0 && codici.length > 0 &&
+      codici.every(w => RE_CODA_CODICE.test(w.text))
+    const nuovo = cur !== null && !continuaCodice && (
       chiudiCella ||                                                         // cella chiusa dalla riga corta precedente
       (codici.length > 0 && caps && cur.descr.length > 0) ||                 // nuova cella: codice + titolo MAIUSCOLO
       (codici.length > 0 && cur.num.length >= 2 && salto12) ||               // codice dopo valori raccolti, con stacco verticale
