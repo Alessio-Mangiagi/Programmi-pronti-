@@ -13,7 +13,7 @@ Come si arriva a un programma che funziona **senza AI**, con l'AI solo di suppor
   descrizione centrata, codici del prezzario con lo spazio, P.IVA con la s, migliaia con lo
   spazio.** Sui 31 contratti testata dal 94% al 98%, voci con quantità e prezzo giusti dal
   74% all'86%, voci esatte dal 64% all'82%; nessun contratto peggiora. Progetto Costruzioni
-  da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future da 35 a 65 e da 45 a 65
+  da 41 a 57 voci giuste su 142, Gecob da 3 a 34 su 34, PF Future villette 34 su 34, gli altri due da 35 a 65 e da 45 a 65
   su 70, Ulma da 14 a 23 su 26, AQ3 nolo da 11 a 18 su 31, Warm 146 su 146, Sidersipe 5 su 5, World service 7 su 7, Eureka 4 su 4. «Scan senza
   Excel» legge come gli altri sul documento intero; in Modifica gli admin salvano le
   correzioni come riferimento del banco.
@@ -729,7 +729,10 @@ in più 28. Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.21.
 Dove il contratto stampa il prezzo ai centesimi ma l'importo è fatto col prezzo a tre
 decimali (GFM: 6600 × 0,295 = 1.947,00, stampato 0,30), nell'Excel va il prezzo esatto.
 GFM 102/108. Sui 31 contratti voci esatte **789/948** (83%), quantità e prezzo giusti
-**820/948** (86%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.22.
+**820/948** (86%). Dettaglio in `PIPELINE_ESTRAZIONE_CONTRATTI.md` §4.22. Con la
+quantità incollata al prezzo staccata anche nelle righe SOMMANO senza quantità (§4.23)
+PF Future villette arriva a 34/34: voci esatte **790/948** (83%), quantità e prezzo giusti
+**821/948** (87%).
 
 ## Fonti
 

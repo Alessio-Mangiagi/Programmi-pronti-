@@ -160,6 +160,11 @@ describe('righe', () => {
     ])
   })
 
+  it('computo: quantità incollata al prezzo senza la propria colonna (PF Future villette)', () => {
+    const t = ['SIC24 14.3.17.53', 'Fornitura e collocazione entro tubi di conduttori elettrici in rame', 'SOMMANO ) m 30012,7987002 3.839,61€'].join('\n')
+    expect(estraiRigheSommano(t).map(x => [x.quantita, x.prezzo_lordo, x.importo])).toEqual([['300', '12,7987002', '3.839,61']])
+  })
+
   it('computo: codici storpiati ricomposti con le famiglie di codici del documento (PF Future)', () => {
     const t = [
       'SIC24 14.4.5.15', 'Fornitura e posa in opera di interruttore magnetotermico', 'SOMMANO cad 0,5 71,590652 35,80 €',

@@ -776,6 +776,14 @@ slittati) il prezzo diventa importo / quantità a tre condizioni:
 Così nell'Excel quantità × prezzo torna con l'importo del contratto, come nel modulo di
 riferimento. GFM 99 → **102/108** (0,295, 0,885, 1,545); nessun altro contratto cambia.
 
+### 4.23 Quantità incollata al prezzo senza la propria colonna (PF Future, 19/11/2026)
+
+«SOMMANO ) m 30012,7987002 3.839,61€» è 300 × 12,7987002 con lo spazio perso. Il ramo di
+`estraiRigheSommano` per «prezzo da prezzario + importo, quantità persa» ricavava la
+quantità 3.839,61 / 30.012,79 = 0,128, che passava il controllo largo sui millesimi.
+Ora prova prima `staccaQtaIncollata`, che accetta il taglio solo se la testa staccata è
+importo / prezzo entro l'1‰. PF Future villette 33 → **34/34**.
+
 ---
 
 ## 5. Risultato sui contratti in `contratti/`
