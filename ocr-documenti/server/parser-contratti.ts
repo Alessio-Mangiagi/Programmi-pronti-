@@ -2152,7 +2152,10 @@ export const modelloContratto = (full: string): ModelloContratto | null => {
 // o ne ha solo tre ("429"): le regole generiche lo scambiavano per descrizione o per
 // numero d'ordine e 36 voci su 98 uscivano senza codice (misura del 09/11/2026).
 // Vale solo se le righe così sono almeno 10: allora il documento È un listino.
-const RE_RIGA_LISTINO = /^\s*(?:\|\s*)?([A-Z0-9][A-Za-z0-9.\/\-_]{0,24})\s+(.{3,}?)\s+(PZ|NR|KG|MT|ML|MQ|M2|LT|CF|CONF|ROT|SC|CT|PA|CP|BR|MC|N)\.?\s+(\d{1,3}(?:\.\d{3})*,\d{2,3})\s+(\d{1,3}(?:\.\d{3})*,\d{2,4})\s*€?\s*\|?\s*$/
+// RT = rotolo ("MASNET141X50 RETE RECINZIONE … RT 1,00 24,50 €", Nigro): senza, quelle
+// voci restavano fuori dal listino. "Mr" è MT letto dall'OCR ("DIST40 … Mr 1,00 1,920 €",
+// L.Catania) e vale mt.
+const RE_RIGA_LISTINO = /^\s*(?:\|\s*)?([A-Z0-9][A-Za-z0-9.\/\-_]{0,24})\s+(.{3,}?)\s+(PZ|NR|KG|MT|Mr|ML|MQ|M2|LT|CF|CONF|ROT|RT|SC|CT|PA|CP|BR|MC|N)\.?\s+(\d{1,3}(?:\.\d{3})*,\d{2,3})\s+(\d{1,3}(?:\.\d{3})*,\d{2,4})\s*€?\s*\|?\s*$/
 export const estraiRigheListino = (text: string): Record<string, string>[] => {
   const righe: Record<string, string>[] = []
   for (const l of text.split('\n')) {
@@ -2162,7 +2165,7 @@ export const estraiRigheListino = (text: string): Record<string, string>[] => {
     const [, codice, descr, um, qta, prezzo] = m
     righe.push({
       progressivo: String(righe.length + 1), codice_epu: codice, descrizione: pulisciDescrArticolo(descr),
-      udm: um.toLowerCase(), quantita: qta, prezzo_lordo: prezzo, importo: '',
+      udm: um === 'Mr' ? 'mt' : um.toLowerCase(), quantita: qta, prezzo_lordo: prezzo, importo: '',
     })
   }
   return righe.length >= 10 ? righe : []
