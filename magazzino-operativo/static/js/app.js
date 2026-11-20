@@ -241,11 +241,11 @@
     const conArticolo = !opz.senzaArticolo;
     // Colonna "Chi": l'utente del portale che ha registrato il movimento (13/11/2026). I carichi dai DDT la
     // hanno vuota: li scrive l'importazione, non una persona.
-    return `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th>${conArticolo ? '<th>Articolo</th>' : ''}<th class="num">Quantità</th><th>Da</th><th>A</th><th>Riferimento</th><th>Origine</th><th>Chi</th>${conAzioni && me.admin ? '<th class="azioni"></th>' : ''}</tr></thead><tbody>
+    return `<div class="tabella-wrap"><table><thead><tr><th>Data</th><th>Tipo</th>${conArticolo ? '<th>Articolo</th>' : ''}<th class="num">Quantità</th><th>Da</th><th>A</th><th>Chi</th><th>Riferimento</th><th>Origine</th>${conAzioni && me.admin ? '<th class="azioni"></th>' : ''}</tr></thead><tbody>
       ${lista.map((m) => `<tr><td class="muto" style="white-space:nowrap">${fmtData(m.data || m.ts)}</td><td>${badgeTipoMov(m.tipo)}</td>
         ${conArticolo ? `<td><a href="#scansione/${h(m.codice)}">${h(m.descrizione)}</a> <span class="muto mono">${h(m.codice)}</span></td>` : ''}
-        <td class="num" style="white-space:nowrap">${fmtN(m.quantita)} ${h(m.um || '')}</td><td>${h(m.da_nome || (m.tipo === 'carico' ? m.fornitore || '' : ''))}</td><td>${h(m.a_nome || '')}</td>
-        <td class="muto">${h(m.riferimento || '')}${m.note ? ` <span title="${h(m.note)}">·</span>` : ''}</td><td>${badgeOrigine(m.origine)}</td><td class="muto" style="white-space:nowrap">${h(m.utente || '')}</td>
+        <td class="num" style="white-space:nowrap">${fmtN(m.quantita)} ${h(m.um || '')}</td><td>${h(m.da_nome || (m.tipo === 'carico' ? m.fornitore || '' : ''))}</td><td>${h(m.a_nome || '')}</td><td style="white-space:nowrap">${h(m.utente || '')}</td>
+        <td class="muto">${h(m.riferimento || '')}${m.note ? ` <span title="${h(m.note)}">·</span>` : ''}</td><td>${badgeOrigine(m.origine)}</td>
         ${conAzioni && me.admin ? `<td class="azioni"><button class="btn btn-rosso btn-piccolo" data-del-mov="${m.id}">Elimina</button></td>` : ''}</tr>`).join('')}
       </tbody></table></div>`;
   }
