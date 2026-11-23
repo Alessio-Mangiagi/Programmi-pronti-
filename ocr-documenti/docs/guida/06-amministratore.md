@@ -11,6 +11,16 @@ Dettagli tecnici nel [README](../../README.md).
 scansioni (al primo avvio scarica i modelli, ~30 MB); Ollama facoltativo per
 l'Assist AI (`ollama pull qwen2.5:3b`).
 
+**Scheda video.** Con una scheda NVIDIA l'OCR legge una pagina in meno di un secondo
+invece di circa 35 (misura del 23/11/2026 su RTX 5060 Ti: 0,7 s/pagina, testo uguale a
+quello letto senza scheda). Le schede **RTX serie 50** vogliono il PaddleOCR per CUDA 12.9:
+`avvia.bat` lo installa da solo al primo avvio nella cartella `.venv-cu129` (circa 3 GB
+da scaricare); le schede più vecchie usano `.venv-gpu`. In `avvio.log` la riga
+*PaddleOCR GPU (CUDA 12.9) pronto* dice che la scheda è in uso; nella pagina il motore
+compare come *PP-OCRv5, GPU*. Se l'installazione non riesce il programma usa il
+processore, più lento ma con lo stesso risultato: per ritentare si cancella la cartella
+e si riavvia.
+
 **Firma digitale (.p7m).** I contratti firmati li apre e li verifica il motore
 comune della suite `shared\firma` (ambiente Python suo, elenchi ufficiali degli enti
 certificatori scaricati in `shared\firma\cache`). `avvia.bat` lo installa da solo
@@ -85,6 +95,13 @@ non firmate del venv (`WinError 4551`). Non si risolve reinstallando: serve l'IT
 RIPARTIZIONE COMMESSE, Piano dei conti, famiglie e sottofamiglie,
 `cond_pagamento.json`. Un file aggiornato viene riletto da solo; in alternativa
 si riavvia il programma. Sono dati aziendali: tenerli aggiornati evita le celle rosse.
+
+**Scansione della cartella sul server** ([7.1](07-scansione-cartella.md#71-sul-server-in-ogni-browser-anche-a-pagina-chiusa)).
+La imposta l'amministratore dalla scheda *Sul server* di ⚙ Impostazioni; le impostazioni
+stanno in `_cartella/impostazioni.json` (o nella cartella `OCR_CARTELLA_DIR`). I contratti
+letti risultano lavori dell'amministratore che ha salvato le impostazioni. Le cartelle
+devono essere raggiungibili dall'utente Windows con cui gira OCR Documenti (per le
+cartelle di rete: permessi di lettura e scrittura a quell'utente).
 
 **Dati.** I lavori in corso stanno in `_lavori/` (o nella cartella `LAVORI_DIR`)
 e ripartono dopo un riavvio; la cache della lettura in `.ocr-cache/`

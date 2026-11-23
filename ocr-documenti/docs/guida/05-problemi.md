@@ -33,6 +33,8 @@
 | La scheda **Originale** è vuota | Il browser non riesce a mostrare il PDF dentro la pagina: usa **⋮ → Apri in un'altra finestra**. |
 | Un contratto della coda è in rosso | Leggi il motivo sulla riga; gli altri vanno avanti. Rifallo con **Scansiona**. |
 | Risultato vecchio senza tabella articoli | Rileggi il documento (**Rifai da capo**): **Riprocessa** non basta. |
+| Nella scheda **Sul server** di ⚙: «… non esiste sul PC dove gira OCR Documenti» | Il percorso va scritto com'è sul PC del server (es. `D:\Contratti\Da leggere` o `\server\Contratti`), non come lo vedi dal tuo PC se è diverso. Chiedi all'amministratore. |
+| Nella scheda **Sul server**, in giallo: «Restano nella cartella, da caricare dalla pagina» | Sono file che il server non legge da solo (immagini, Word senza PDF, .doc): trascinali nella pagina come sempre. |
 | Gli Excel finiscono nei Download invece che nella cartella scelta | Il browser non permette di scegliere la cartella (solo Chrome/Edge lo fanno). |
 | La pagina non risponde | Ricarica; se non basta, riavvia OCR Documenti dal Portale. |
 

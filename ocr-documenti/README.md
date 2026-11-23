@@ -46,6 +46,7 @@ Pipeline ibrida:
 | `OLLAMA_BASE` | `http://localhost:11434` | endpoint Ollama |
 | `ASSIST_MODEL` | `qwen2.5:3b` | modello assist |
 | `OCR_CACHE` | `1` | `0` spegne la cache dei blocchi OCR (`.ocr-cache/`, per hash di pagina) |
+| `OCR_CARTELLA_DIR` | `./_cartella` | impostazioni della scansione della cartella **sul server** (`impostazioni.json`, `server/cartella.ts`) |
 | `OCR_DIR_BANCO` | `./contratti` | cartella del banco di prova: lì «★ Salva come riferimento» (Modifica, solo admin, `POST /api/riferimenti`) copia il PDF e scrive il modulo di riferimento in `moduli-da-md/` (`server/riferimenti.ts`) |
 | `OCR_BIND_HOST` | `127.0.0.1` | interfaccia del backend; se non locale (o `NODE_ENV=production`) il gate SSO del portale si attiva anche qui |
 | `PADDLE_INSECURE_SSL` | auto | `1`/`0` forza/vieta il download dei modelli senza verifica dei certificati (reti con ispezione SSL). Auto = solo finché `~/.paddlex` non esiste |
@@ -180,7 +181,23 @@ scrive in chat. Il modulo incollato nell'app passa da `moduloDaRisposta` → `le
 
 ## Scansione automatica di una cartella (⚙ Impostazioni)
 
-Nel browser, con la File System Access API (**solo Chrome/Edge**): l'utente sceglie la
+Due schede nella finestra ⚙: **Sul server** (dal 23/11/2026) e **In questo browser**.
+
+**Sul server** ([server/cartella.ts](server/cartella.ts), scheda [src/ScansioneServer.tsx](src/ScansioneServer.tsx)):
+il server legge una cartella del PC dove gira, con un orologio suo (ogni 30 s): funziona in
+ogni browser, anche Firefox, e anche a pagina chiusa. Percorsi completi (anche di rete),
+impostati solo dall'admin dell'app (`GET/PUT /api/cartella`, `POST /api/cartella/avvia`;
+chi non è admin vede solo se è attiva) e salvati in `_cartella/impostazioni.json`. Ogni PDF
+diventa un lavoro lato server (`creaLavoro` + `ricevutoFile`, stessa filiera e cache di
+«Elabora → Excel»), le buste `.p7m` si aprono col motore comune, i moduli `.txt` si leggono
+alla lettera; Excel e bozza Word col nome simile vanno col PDF (`nomiSimili`). L'Excel è lo
+stesso del browser (`byteImportContrattiXlsx`), come il modulo e il registro. Immagini, Word
+senza PDF e `.doc` restano nella cartella e la scheda li elenca. Regole comuni (quando partire,
+nomi liberi, registro) in [src/lib/regole-cartella.ts](src/lib/regole-cartella.ts); test in
+`server/__tests__/cartella.test.ts`. Provato dal vivo su due contratti del banco (Eureka 4 voci,
+Consulenza 1 voce) con la cache OCR del banco.
+
+**In questo browser**: con la File System Access API (**solo Chrome/Edge**): l'utente sceglie la
 cartella dei contratti e quella di destinazione sul suo PC e il modo di avvio (a mano, a
 un orario nei giorni scelti, all'arrivo di un file con controllo ogni N minuti). Regole,
 accesso alle cartelle e memoria in [src/lib/scansione-cartella.ts](src/lib/scansione-cartella.ts)
@@ -199,9 +216,14 @@ accesso alle cartelle e memoria in [src/lib/scansione-cartella.ts](src/lib/scans
   selettore: a mano, all'arrivo (preso dopo 120 s), all'orario (dopo 33 s).
 
 **GPU RTX serie 50**: paddlepaddle-gpu cu126 non le supporta e legge le pagine vuote senza
-errori. Il worker se ne accorge all'avvio (`prova_lettura` in `ocr_worker.py`) e passa alla
-CPU, più lenta (~35 s/pagina). Per tornare alla GPU serve un paddle per CUDA 12.8 o
-successivo (indice `cu129`).
+errori (il worker se ne accorge all'avvio, `prova_lettura` in `ocr_worker.py`, e passa alla
+CPU, ~35 s/pagina). Dal 23/11/2026 c'è `.venv-cu129` con paddlepaddle-gpu 3.3.1 per CUDA 12.9:
+`avvia.bat` la crea sui PC con una RTX serie 50 e il server la preferisce alle altre
+(`server/config.ts`). Misura su RTX 5060 Ti 16 GB: **0,7 s/pagina** (prima ~35), testo uguale
+al 99,8% a quello della CPU; banco intero (825 pagine) riletto in 281 s, risultato 417/425 ·
+798/948 · 824/948 contro 417 · 799 · 825 con la lettura della CPU (una voce di differenza).
+Processi in parallelo (`PADDLE_WORKERS`) su 52 pagine, avvio dei modelli compreso: 1 → 24 s,
+2 → 19 s, 3 → 20 s; resta 3.
 
 ## Export Import_Contratti (regole)
 
