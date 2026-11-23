@@ -14,6 +14,7 @@
  */
 import express from 'express';
 import type { PrismaClient } from '../generated/prisma/client';
+import { oggiIso } from '../comune/date';
 import { durataMinuti } from '../comune/orari';
 import { gestoreErrori } from './errori';
 import { caricaUtente, controlloCsrf, richiediAdmin, richiediLogin } from './middleware';
@@ -22,7 +23,11 @@ import { rotteDipendenti } from './rotte/dipendenti';
 import { rotteProgetti } from './rotte/progetti';
 import { rotteRegistrazioni } from './rotte/registrazioni';
 
-export function creaApp(prisma: PrismaClient) {
+/** Opzioni per i test: `oggi` fissa la data corrente (regole sulle date future, dashboard). */
+export type OpzioniApp = { oggi?: () => string };
+
+export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
+  const oggi = opzioni.oggi ?? (() => oggiIso());
   const app = express();
   app.disable('x-powered-by');
   // Dietro un proxy (Vite in sviluppo, Caddy in produzione) req.ip deve essere quello
@@ -45,7 +50,7 @@ export function creaApp(prisma: PrismaClient) {
   api.use(richiediLogin);
   api.use('/dipendenti', rotteDipendenti(prisma));
   api.use('/progetti', rotteProgetti(prisma));
-  api.use('/registrazioni', rotteRegistrazioni(prisma));
+  api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
 
   /** Conteggi del database (verifica del Giorno 1), riservati a HR. */
   api.get('/stato-dati', richiediAdmin, async (_req, res) => {

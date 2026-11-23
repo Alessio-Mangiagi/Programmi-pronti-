@@ -8,7 +8,7 @@
  */
 import type { AddressInfo } from 'node:net';
 import type { PrismaClient } from '../../generated/prisma/client';
-import { creaApp } from '../app';
+import { creaApp, type OpzioniApp } from '../app';
 
 export type Risposta = { stato: number; corpo: any; intestazioni: Headers };
 
@@ -16,8 +16,11 @@ export type ClientProva = {
   chiama: (metodo: string, percorso: string, corpo?: unknown, opzioni?: { senzaCsrf?: boolean; grezzo?: Buffer }) => Promise<Risposta>;
 };
 
-export async function avviaServer(prisma: PrismaClient) {
-  const server = creaApp(prisma).listen(0, '127.0.0.1');
+/** Data "di oggi" usata nei test: la stessa del seed, così i risultati non cambiano nel tempo. */
+export const OGGI_PROVA = '2026-11-23';
+
+export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { oggi: () => OGGI_PROVA }) {
+  const server = creaApp(prisma, opzioni).listen(0, '127.0.0.1');
   await new Promise((ok) => server.once('listening', ok));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 

@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 3 — Anagrafiche ✅ completato
+- **Giorno corrente:** 4 — Registrazione ore ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 4 — Registrazione ore (più fasce, calcolo, blocco sovrapposizioni)
+- **Prossimo:** Giorno 5 — Calendario (mese e settimana, filtri)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -45,6 +45,10 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Dipendente cessato → account disattivato e sessioni chiuse; la riattivazione NON riapre l'account | Scelta prudente: HR riapre l'accesso esplicitamente |
 | 23/11 | Costo lordo ≥ costo netto (controllo) | Evita inversioni dei due campi |
 | 23/11 | Tabelle con ricerca/ordinamento/paginazione lato browser | Anagrafiche di poche centinaia di righe: immediato e senza API in più |
+| 23/11 | Fasce contigue (12:00 e 12:00) ammesse; sovrapposizione = almeno un minuto in comune | Pausa pranzo e cambi progetto senza buchi |
+| 23/11 | Niente ore nei giorni futuri, nei giorni di ferie/malattia approvate, fuori dal periodo di assunzione o di apertura del progetto; progetti CHIUSI solo se già presenti quel giorno | Dati coerenti; si possono ancora correggere ore vecchie |
+| 23/11 | L'editor salva la giornata intera in modo atomico (`PUT /api/registrazioni/giornata`) | Nessun giorno lasciato a metà se una riga è sbagliata |
+| 23/11 | Regole di contesto in `server/servizi/regole-ore.ts` con errori in elenco | Riusate dall'import Excel per gli errori riga per riga |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -117,3 +121,20 @@ Fatto:
 Verifiche:
 - `npm test`: 60/60 (nuovi `schemi.test.ts` e `anagrafiche.test.ts`).
 - Dal vivo: POST di un dipendente con CF sbagliato → 400 con l'errore sul campo `codiceFiscale`.
+
+### Giorno 4 — Registrazione ore (23/11/2026) ✅
+
+Fatto:
+- `comune/registrazioni.ts`: sovrapposizioni, totali, schemi di fascia e giornata.
+- `server/servizi/regole-ore.ts`: regole di contesto (dipendente/progetto esistenti, date,
+  ferie/malattia, giorni futuri).
+- API `/api/registrazioni`: POST, PUT /:id, DELETE /:id, PUT /giornata; 409 con messaggio
+  che indica la fascia in conflitto; il dipendente lavora solo sulle proprie.
+- `creaApp(prisma, { oggi })`: la data corrente si può fissare nei test.
+- Interfaccia: `EditorGiornata` (più fasce, ore per riga e totale, righe sovrapposte in
+  rosso, salvataggio della giornata intera); si apre dal calendario (Giorno 5).
+
+Verifiche:
+- `npm test`: 84/84 (nuovi `registrazioni.test.ts` sulla logica e `ore.test.ts` sulle API).
+- Dal vivo: mario.rossi prova 10:00-11:00 il 20/11 → "La fascia 10:00-11:00 si sovrappone a
+  quella già registrata 07:30-12:30 (progetto PRG-001) del 20/11/2026".
