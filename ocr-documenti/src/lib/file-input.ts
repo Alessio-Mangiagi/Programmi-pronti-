@@ -182,14 +182,9 @@ export function detectKind(f: File): FileKind {
 // Chiave stabile di un file in coda (lo stesso PDF caricato due volte è lo stesso file)
 export const chiaveFile = (f: File) => `${f.name}|${f.size}|${f.lastModified}`
 
-// Parole significative del nome di un file, per abbinare fra loro i file dello stesso
-// contratto ("…NOLO A FREDDO OTTOMARZO…"), che è come sono nominati in pratica.
-export const paroleNome = (n: string) => new Set(n.replace(/\.[^.]+$/, '').toLowerCase()
-  .split(/[^a-zà-ü0-9]+/).filter(w => w.length >= 4))
-export const nomiSimili = (a: string, b: string) => {
-  const pa = paroleNome(a)
-  return [...paroleNome(b)].filter(w => pa.has(w)).length >= 2
-}
+// Abbinamento dei file dello stesso contratto dal nome: in nomi-file.ts, condiviso col
+// server (scansione della cartella); qui si riesporta per chi lo importa da qui.
+export { paroleNome, nomiSimili } from './nomi-file'
 
 // Miniatura della prima pagina e numero di pagine di un file della coda. Non rigetta
 // mai: un file illeggibile resta senza miniatura, la coda non si ferma per questo.

@@ -581,6 +581,17 @@ export const cellaCsv = (v: CellaImport): string | number =>
 // nomeBase/dir servono alla scansione continua: ogni contratto della coda produce il
 // PROPRIO xlsx, con il nome del suo file, nella cartella scelta a inizio scansione.
 export const scriviImportContrattiXlsx = async (rows: CellaImport[][], nomeBase: string, dir: DirHandle | null | undefined) => {
+  await salvaFile(
+    new Blob([await byteImportContrattiXlsx(rows)], { type: 'application/octet-stream' }),
+    `${nomeBase}_Import_Contratti.xlsx`,
+    dir)
+}
+
+// I byte dell'xlsx Import_Contratti (stesse regole di colore di sopra), senza salvarlo:
+// separati da scriviImportContrattiXlsx perché li scrive anche il server, nella cartella
+// di destinazione della scansione sul server (server/cartella.ts, dal 23/11/2026), e lì
+// non ci sono Blob da scaricare né cartelle del browser. Stesso file nei due casi.
+export const byteImportContrattiXlsx = async (rows: CellaImport[][]): Promise<Uint8Array<ArrayBuffer>> => {
   const ELENCHI = getElenchi()
   const XLSXS = (await import('xlsx-js-style')).default
   const wb = XLSXS.utils.book_new()
@@ -615,10 +626,7 @@ export const scriviImportContrattiXlsx = async (rows: CellaImport[][], nomeBase:
     }
   })
   XLSXS.utils.book_append_sheet(wb, ws, 'Contratti')
-  await salvaFile(
-    new Blob([XLSXS.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' }),
-    `${nomeBase}_Import_Contratti.xlsx`,
-    dir)
+  return new Uint8Array(XLSXS.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer) as Uint8Array<ArrayBuffer>
 }
 
 // Una riga Import_Contratti è "vuota" se contiene solo valori costanti o derivati
