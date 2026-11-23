@@ -11,6 +11,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { FornitoreAuth, useAuth } from './auth';
 import { Layout } from './componenti/Layout';
 import { Caricamento, InArrivo } from './componenti/ui';
+import { Assenze } from './pagine/Assenze';
 import { Calendario } from './pagine/Calendario';
 import { Dashboard } from './pagine/Dashboard';
 import { Dipendenti } from './pagine/Dipendenti';
@@ -35,7 +36,7 @@ function Rotte() {
         <Route path="dipendenti" element={<SoloAdmin><Dipendenti /></SoloAdmin>} />
         <Route path="dipendenti/:id" element={<SoloAdmin><SchedaDipendente /></SoloAdmin>} />
         <Route path="progetti" element={<SoloAdmin><Progetti /></SoloAdmin>} />
-        <Route path="assenze" element={<InArrivo titolo="Assenze" giorno={6} />} />
+        <Route path="assenze" element={<Assenze />} />
         <Route path="importa" element={<SoloAdmin><InArrivo titolo="Importa" giorno={7} /></SoloAdmin>} />
         <Route path="esporta" element={<SoloAdmin><InArrivo titolo="Esporta" giorno={8} /></SoloAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />

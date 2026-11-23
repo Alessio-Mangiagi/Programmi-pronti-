@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 5 — Calendario ✅ completato
+- **Giorno corrente:** 6 — Assenze e festività ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 6 — Assenze e festività (richieste, approvazione HR, gestione festività)
+- **Prossimo:** Giorno 7 — Importazione Excel (modello, anteprima, errori riga per riga, conferma)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -52,6 +52,11 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Totali sempre da `comune/riepiloghi.ts#calcolaTotali` (calendario oggi, report Excel al Giorno 8) | I totali dei report coincidono per costruzione con quelli del calendario |
 | 23/11 | Calendario: assenze APPROVATE piene, RICHIESTE tratteggiate "(in attesa)", RIFIUTATE mai | La richiesta in attesa è utile da vedere; la rifiutata no (criterio del Giorno 6) |
 | 23/11 | Vista HR "Tutti i dipendenti": clic sul giorno → riepilogo per dipendente → editor | Con un dipendente filtrato il clic apre subito l'editor |
+| 23/11 | Permesso = un solo giorno con durata (15 min – 10 h); ferie/malattia = giorni interi | Modello semplice e chiaro per chi compila |
+| 23/11 | Malattia: niente note del dipendente (solo protocollo) | Evita che si scrivano informazioni sanitarie nel campo libero |
+| 23/11 | Rifiuto sempre con motivo; HR può cambiare decisione e registrare assenze già approvate | Tracciabilità; malattia comunicata a voce |
+| 23/11 | Non si approvano ferie/malattia su giorni con ore registrate (409 con l'elenco dei giorni) | Niente giorni con ore e assenza insieme |
+| 23/11 | Festività "del paese" = tipo LOCALE inserito da HR, una festività per giorno | Interpretazione di "paese specifico" come città della sede (da confermare) |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -158,3 +163,19 @@ Verifiche:
   totali del giorno uguali a quelli ricalcolati dal database).
 - Screenshot reale (Edge headless) del mese di novembre come admin: totali giornalieri,
   progetti colorati, Ognissanti, ferie in attesa tratteggiate, totale mese 576:00.
+
+### Giorno 6 — Assenze e festività (23/11/2026) ✅
+
+Fatto:
+- `comune/assenze.ts`: schemi di assenza, decisione e festività; sovrapposizione di periodi.
+- API `/api/assenze`: elenco (con giorni lavorativi coperti), richiesta, modifica, decisione
+  HR (`POST /:id/decisione`), ritiro/eliminazione; controlli di sovrapposizione e di ore
+  già registrate.
+- API `/api/festivita`: elenco per anno, crea/modifica/elimina (HR), `carica-nazionali`.
+- Pagina Assenze: per il dipendente le sue richieste; per HR schede "Da approvare",
+  "Tutte", "Festività" con approva/rifiuta/modifica e gestione delle festività.
+
+Verifiche:
+- `npm test`: 106/106 (nuovo `assenze.test.ts`: approvata → nel calendario come APPROVATA,
+  rifiutata → assente dal calendario; controlli su malattia, permessi, sovrapposizioni).
+- Screenshot reale della scheda "Da approvare" (2 richieste demo).
