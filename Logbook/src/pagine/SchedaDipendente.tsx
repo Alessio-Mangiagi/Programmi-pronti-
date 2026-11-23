@@ -141,7 +141,7 @@ export function SchedaDipendente() {
       />
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
 
-      <form onSubmit={salva} className="rounded border border-gray-200 bg-white p-4" noValidate>
+      <form onSubmit={salva} className="scheda p-4" noValidate>
         <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Anagrafica</h2>
         <div className="grid gap-3 md:grid-cols-3">
           <Campo etichetta="Matricola" obbligatorio errore={err('matricola')}>
@@ -262,7 +262,7 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
   };
 
   return (
-    <form onSubmit={salva} className="rounded border border-gray-200 bg-white p-4">
+    <form onSubmit={salva} className="scheda p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Account di accesso</h2>
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
       {!esistente && <p className="mb-3 text-sm text-gray-600">Il dipendente non ha ancora un account per entrare in Logbook.</p>}
@@ -278,7 +278,7 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
         <input type="checkbox" checked={attivo} onChange={(e) => setAttivo(e.target.checked)} />
         Account attivo (può entrare)
       </label>
-      {errori.attivo && <p className="text-xs text-red-700">{errori.attivo}</p>}
+      {errori.attivo && <p className="text-xs text-errore">{errori.attivo}</p>}
       <div className="mt-3 flex justify-end">
         <Pulsante type="submit" variante="primario">
           {esistente ? 'Aggiorna account' : 'Crea account'}
@@ -304,7 +304,7 @@ function BloccoStato({ dipendente, onAggiornato }: { dipendente: Dipendente; onA
   };
 
   return (
-    <div className="rounded border border-gray-200 bg-white p-4">
+    <div className="scheda p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Stato del rapporto</h2>
       {errore && <Avviso tipo="errore" className="mb-3">{errore}</Avviso>}
       {dipendente.stato === 'ATTIVO' ? (

@@ -11,7 +11,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno corrente:** 10 — Test e consegna ✅ completato: **piano di 10 giorni concluso**
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
 - **Giorno 11 (23/11):** richieste aggiuntive ✅ (data minima 2020, ore massime per progetto, estratti mensili)
-- **Prossimo:** Giorno 12 — nuova estetica con la skill Cosedilfrontend (richiesta del 23/11)
+- **Giorno 12 (23/11):** nuova estetica Cosedil ✅
+- **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti"
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -76,6 +77,9 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Ore massime giornaliere sul progetto (`maxMinutiGiorno`), per dipendente, salvataggio bloccato oltre il limite (risposta 2b) da interfaccia, API e import | Richiesta dell'utente; visibili in scheda progetto, calendario ed editor |
 | 23/11 | Estratti mensili "mese a calendario" e "giorni e costi" in Excel + anteprima + stampa/PDF dal browser (risposta 3abc) | Un solo calcolo (`comune/estratto-mese.ts`) per tutte e tre le uscite; PDF dalla stampa per avere lo stesso aspetto dell'anteprima senza librerie in più |
 | 23/11 | Costo del giorno netto e lordo; ferie/malattia valorizzate a ore di contratto nei giorni lavorativi, permessi alla loro durata, festività senza costo (risposta 4c) | Richiesta dell'utente; festività senza costo è una scelta mia, da confermare |
+| 23/11 | Estetica secondo la skill Cosedilfrontend: palette del marchio, grigi di Tailwind ridefiniti coi neutri Cosedil, font Ubuntu/Inter/Open Sans, schede con ombra blu, bottoni maiuscoli, icone SVG al posto delle emoji, logo della Suite Cosedil | Richiesta dell'utente ("ristruttura l'estetica usando /Cosedilfrontend") |
+| 23/11 | Font del marchio installati in locale (@fontsource) invece di Google Fonts | Funzionano su rete aziendale chiusa e non mandano richieste a servizi esterni |
+| 23/11 | Festività in verde (prima viola) e tavolozza progetti senza viola/magenta | Il design system vieta il viola |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -309,3 +313,20 @@ Verifiche:
   ore dell'estratto = calendario, ferie e permessi valorizzati, struttura dei due Excel).
 - Anteprima reale e PDF di stampa generato da Edge: una pagina A4 orizzontale per
   dipendente, menu nascosti, colori di ferie e festivi stampati.
+
+### Giorno 12 — Estetica Cosedil (23/11/2026) ✅
+
+Fatto:
+- `src/index.css`: token del marchio (@theme), scala dei grigi Cosedil, classi `scheda`,
+  `scheda-attiva`, `sopratitolo`, `intestazione-tabella`, `scheletro` (caricamento).
+- Font Ubuntu/Inter/Open Sans da @fontsource in `src/main.tsx`; logo e favicon della
+  Suite Cosedil (`public/`, copiati da `portale/assets/icon`).
+- `ui.tsx` (bottoni, campi, avvisi, etichette, modale, caricamento a segnaposto),
+  `icone.tsx` (icone SVG), `Layout.tsx` (menu blu con logo e icone, intestazione
+  bianca), `Login.tsx` (pannello del marchio), colori di calendario e assenze, schede e
+  tabelle in tutte le pagine; nessuna emoji.
+- Screenshot della guida rifatti.
+
+Verifiche: `npm test` 138/138, typecheck ok, controllo a vista di login, dashboard,
+calendario, progetti, estratti mensili. Nota: lo script degli screenshot salva sul DB
+demo due fasce di Mario Rossi del 23/11 (07:30-12:30 e 13:30-16:30, PRG-001).

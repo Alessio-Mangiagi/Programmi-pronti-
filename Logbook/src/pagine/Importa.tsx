@@ -15,6 +15,7 @@ import { formattaData } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { api, ErroreApi, scaricaFile } from '../api';
 import { Avviso, Caricamento, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
+import { Icona } from '../componenti/icone';
 
 type RigaImport = {
   riga: number; matricola: string; data: string | null; oraInizio: string | null; oraFine: string | null;
@@ -79,14 +80,14 @@ export function Importa() {
       <IntestazionePagina titolo="Importa ore da Excel" sottotitolo="Le righe vengono controllate tutte prima di importare: con un solo errore non si importa nulla" />
 
       <div className="mb-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded border border-gray-200 bg-white p-4">
+        <div className="scheda p-4">
           <div className="mb-1 text-xs font-semibold uppercase text-gray-500">1 · Modello</div>
           <p className="mb-3 text-sm text-gray-600">Colonne: matricola, data, ora inizio, ora fine, codice progetto, note. Contiene istruzioni ed elenchi di dipendenti e progetti validi.</p>
           <Pulsante onClick={() => scaricaFile('/api/importa/modello').catch((e: Error) => setMessaggio({ tipo: 'errore', testo: e.message }))}>
-            ⤓ Scarica il modello .xlsx
+            <Icona nome="scarica" dimensione={16} /> Scarica il modello .xlsx
           </Pulsante>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-4">
+        <div className="scheda p-4">
           <div className="mb-1 text-xs font-semibold uppercase text-gray-500">2 · File compilato</div>
           <p className="mb-3 text-sm text-gray-600">Scegli il file: vedrai l'anteprima con gli eventuali errori riga per riga.</p>
           <input
@@ -111,7 +112,7 @@ export function Importa() {
           {esito.erroreFile && <Avviso tipo="errore">{esito.erroreFile}</Avviso>}
           {esito.righe.length > 0 && (
             <>
-              <div className="flex flex-wrap items-center gap-3 rounded border border-gray-200 bg-white p-3 text-sm">
+              <div className="flex flex-wrap items-center gap-3 scheda p-3 text-sm">
                 <span className="text-xs font-semibold uppercase text-gray-500">3 · Anteprima</span>
                 <span>{esito.riepilogo.totali} righe</span>
                 <Etichetta colore="verde">{esito.riepilogo.valide} corrette</Etichetta>
@@ -127,14 +128,14 @@ export function Importa() {
                       {lavoro === 'import' ? 'Import in corso…' : `Conferma e importa ${esito.riepilogo.valide} righe (${formattaOre(esito.riepilogo.minuti)} ore)`}
                     </Pulsante>
                   ) : (
-                    <span className="font-medium text-red-700">File rifiutato: correggi le righe in rosso e ricaricalo</span>
+                    <span className="font-medium text-errore">File rifiutato: correggi le righe in rosso e ricaricalo</span>
                   )}
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded border border-gray-200 bg-white">
+              <div className="overflow-x-auto scheda">
                 <table className="cifre w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+                  <thead className="intestazione-tabella">
                     <tr>
                       {['Riga', 'Matricola', 'Dipendente', 'Data', 'Dalle', 'Alle', 'Ore', 'Progetto', 'Esito'].map((t) => (
                         <th key={t} className="border-b border-gray-200 px-3 py-2 text-left font-semibold">
@@ -145,7 +146,7 @@ export function Importa() {
                   </thead>
                   <tbody>
                     {righe.map((r) => (
-                      <tr key={r.riga} className={`border-b border-gray-100 align-top ${r.errori.length ? 'bg-red-50' : r.ignorata ? 'text-gray-400' : ''}`}>
+                      <tr key={r.riga} className={`border-b border-gray-100 align-top ${r.errori.length ? 'bg-[#fdf3f2]' : r.ignorata ? 'text-gray-400' : ''}`}>
                         <td className="px-3 py-1.5 font-medium">{r.riga}</td>
                         <td className="px-3 py-1.5">{r.matricola}</td>
                         <td className="px-3 py-1.5">{r.dipendente ?? '—'}</td>
@@ -158,13 +159,13 @@ export function Importa() {
                           {r.ignorata ? (
                             r.ignorata
                           ) : r.errori.length ? (
-                            <ul className="list-disc pl-4 text-red-800">
+                            <ul className="list-disc pl-4 text-[#8e2a1f]">
                               {r.errori.map((e) => (
                                 <li key={e}>{e}</li>
                               ))}
                             </ul>
                           ) : (
-                            <span className="text-green-700">✓ corretta</span>
+                            <span className="inline-flex items-center gap-1 text-verde-testo"><Icona nome="spunta" dimensione={14} /> corretta</span>
                           )}
                         </td>
                       </tr>

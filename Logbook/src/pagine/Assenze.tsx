@@ -426,7 +426,7 @@ function GestioneFestivita() {
       </div>
       {messaggio && <Avviso tipo={messaggio.tipo}>{messaggio.testo}</Avviso>}
 
-      <form onSubmit={aggiungi} className="flex flex-wrap items-end gap-2 rounded border border-gray-200 bg-white p-3" noValidate>
+      <form onSubmit={aggiungi} className="flex flex-wrap items-end gap-2 scheda p-3" noValidate>
         <Campo etichetta="Data" errore={errori.data}>
           <input type="date" min={DATA_MINIMA} className={classiInput(errori.data)} value={nuova.data} onChange={(e) => setNuova({ ...nuova, data: e.target.value })} />
         </Campo>

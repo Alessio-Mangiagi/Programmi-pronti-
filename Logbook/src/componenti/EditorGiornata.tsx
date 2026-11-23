@@ -19,6 +19,7 @@ import { api, ErroreApi } from '../api';
 import { coloreProgetto } from '../colori';
 import type { Progetto, Registrazione } from '../tipi';
 import { Avviso, Caricamento, classiInput, Modale, Pulsante } from './ui';
+import { Icona } from './icone';
 
 type Riga = { chiave: number; progettoId: string; oraInizio: string; oraFine: string; note: string };
 
@@ -172,7 +173,7 @@ export function EditorGiornata({
                 const progetto = progetti.find((p) => String(p.id) === r.progettoId);
                 const errRiga = err(i, 'progettoId') || err(i, 'oraInizio') || err(i, 'oraFine') || err(i, 'note');
                 return (
-                  <tr key={r.chiave} className={`align-top ${sovrapposte.has(i) ? 'bg-red-50' : ''}`}>
+                  <tr key={r.chiave} className={`align-top ${sovrapposte.has(i) ? 'bg-[#fdf3f2]' : ''}`}>
                     <td className="px-1 py-1">
                       <div className="flex items-center gap-1.5">
                         <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: progetto ? coloreProgetto(progetto) : '#e5e7eb' }} />
@@ -195,11 +196,11 @@ export function EditorGiornata({
                     <td className="px-1 py-2 text-right font-medium">{durata === null ? '—' : formattaOre(durata)}</td>
                     <td className="px-1 py-1">
                       <input aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
-                      {(errRiga || sovrapposte.has(i)) && <div className="mt-0.5 text-xs text-red-700">{errRiga ?? 'Fascia sovrapposta a un\'altra riga'}</div>}
+                      {(errRiga || sovrapposte.has(i)) && <div className="mt-0.5 text-xs text-errore">{errRiga ?? 'Fascia sovrapposta a un\'altra riga'}</div>}
                     </td>
                     <td className="px-1 py-1">
-                      <button type="button" aria-label={`Elimina riga ${i + 1}`} className="rounded px-2 py-1 text-red-600 hover:bg-red-50" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
-                        ✕
+                      <button type="button" aria-label={`Elimina riga ${i + 1}`} className="rounded px-2 py-1 text-errore hover:bg-[#fdf3f2]" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
+                        <Icona nome="chiudi" dimensione={16} />
                       </button>
                     </td>
                   </tr>
@@ -236,7 +237,7 @@ export function EditorGiornata({
               if (!p) return null;
               const oltre = p.maxMinutiGiorno != null && minuti > p.maxMinutiGiorno;
               return (
-                <span key={id} className={`cifre inline-flex items-center gap-1.5 rounded border px-2 py-1 ${oltre ? 'border-red-300 bg-red-50 text-red-800' : 'border-gray-200 text-gray-700'}`}>
+                <span key={id} className={`cifre inline-flex items-center gap-1.5 rounded border px-2 py-1 ${oltre ? 'border-[#eba79f] bg-[#fdf3f2] text-[#8e2a1f]' : 'border-gray-200 text-gray-700'}`}>
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: coloreProgetto(p) }} />
                   {p.codice} <b>{formattaOre(minuti)}</b>
                   {p.maxMinutiGiorno != null ? <span>/ max {formattaOre(p.maxMinutiGiorno)}</span> : <span className="text-gray-400">nessun limite</span>}

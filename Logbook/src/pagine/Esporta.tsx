@@ -15,6 +15,7 @@ import { EstrattiMensili } from '../componenti/EstrattiMensili';
 import { Avviso, Campo, classiInput, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Dipendente, Progetto } from '../tipi';
 import { usaDati } from '../usaDati';
+import { Icona } from '../componenti/icone';
 
 type Riepilogo = { dipendenti: number; fasce: number; minuti: number; perDipendente: { id: number; nome: string; minuti: number }[] };
 
@@ -39,7 +40,7 @@ function Selezione<T extends { id: number }>({
   titolo: string; elementi: T[]; scelti: number[]; setScelti: (v: number[]) => void; etichetta: (e: T) => string;
 }) {
   return (
-    <div className="rounded border border-gray-200 bg-white p-3">
+    <div className="scheda p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase text-gray-500">{titolo}</span>
         <span className="text-xs text-gray-500">{scelti.length ? `${scelti.length} scelti` : 'tutti'}</span>
@@ -106,7 +107,7 @@ export function Esporta() {
       <div className="no-print">
       <IntestazionePagina titolo="Esporta" sottotitolo="Report del periodo in Excel ed estratti mensili per dipendente (Excel, stampa, PDF)" />
 
-      <div className="mb-3 rounded border border-gray-200 bg-white p-3">
+      <div className="mb-3 scheda p-3">
         <div className="flex flex-wrap items-end gap-3">
           <Campo etichetta="Dal">
             <input type="date" min={DATA_MINIMA} className={classiInput()} value={da} onChange={(e) => setDa(e.target.value)} />
@@ -132,7 +133,7 @@ export function Esporta() {
       {errore && <Avviso tipo="errore" className="mb-3">{errore}</Avviso>}
 
       {riepilogo && (
-        <div className="mb-3 rounded border border-gray-200 bg-white p-3 text-sm">
+        <div className="mb-3 scheda p-3 text-sm">
           <div className="mb-2 flex flex-wrap items-baseline gap-4">
             <span className="text-xs font-semibold uppercase text-gray-500">Riepilogo {formattaData(da)} – {formattaData(a)}</span>
             <span>{riepilogo.dipendenti} dipendenti</span>
@@ -150,18 +151,18 @@ export function Esporta() {
       )}
 
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded border border-gray-200 bg-white p-4">
+        <div className="scheda p-4">
           <h2 className="font-semibold text-marchio">Calendario lavorato</h2>
           <p className="mb-3 text-sm text-gray-600">Un foglio per dipendente: anagrafica, ogni giorno con fasce, progetto, ore, assenze e festività, totali del periodo e ore contrattuali attese.</p>
           <Pulsante variante="primario" disabled={!!scaricamento || !riepilogo} onClick={() => scarica('calendario')}>
-            {scaricamento === 'calendario' ? 'Preparazione…' : '⤓ Scarica calendario lavorato'}
+            {scaricamento === 'calendario' ? 'Preparazione…' : <><Icona nome="scarica" dimensione={16} /> Scarica calendario lavorato</>}
           </Pulsante>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-4">
+        <div className="scheda p-4">
           <h2 className="font-semibold text-marchio">Ore per progetto</h2>
           <p className="mb-3 text-sm text-gray-600">Per ogni dipendente i progetti lavorati con ore e costo lordo, totale complessivo e riepilogo dipendenti × progetti.</p>
           <Pulsante variante="primario" disabled={!!scaricamento || !riepilogo} onClick={() => scarica('progetti')}>
-            {scaricamento === 'progetti' ? 'Preparazione…' : '⤓ Scarica ore per progetto'}
+            {scaricamento === 'progetti' ? 'Preparazione…' : <><Icona nome="scarica" dimensione={16} /> Scarica ore per progetto</>}
           </Pulsante>
         </div>
       </div>

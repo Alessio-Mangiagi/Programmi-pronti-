@@ -125,7 +125,7 @@ export function Calendario() {
       <IntestazionePagina titolo="Calendario" sottotitolo={admin ? 'Ore e assenze di tutti i dipendenti' : 'Le tue ore e le tue assenze'} />
 
       {/* Barra degli strumenti: vista, navigazione, filtri */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-white p-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2 scheda p-2">
         <div className="inline-flex overflow-hidden rounded border border-gray-300 text-sm" role="group" aria-label="Vista">
           {(['mese', 'settimana'] as const).map((v) => (
             <button key={v} type="button" onClick={() => setVista(v)} className={`px-3 py-1.5 capitalize ${vista === v ? 'bg-marchio text-white' : 'bg-white hover:bg-gray-50'}`}>
@@ -196,7 +196,7 @@ export function Calendario() {
                   key={d}
                   onClick={() => apriGiorno(d)}
                   aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore`}
-                  className={`flex flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs hover:bg-marchio/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
+                  className={`flex flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs hover:bg-ghiaccio focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
                     vista === 'mese' ? 'min-h-24' : 'min-h-64'
                   } ${fuoriMese ? 'bg-gray-50 text-gray-400' : isFineSettimana(d) || fest ? 'bg-gray-50/80' : 'bg-white'}`}
                 >
@@ -251,10 +251,10 @@ export function Calendario() {
           </div>
 
           {/* Totali del periodo e legenda dei colori */}
-          <div className="mt-3 flex flex-wrap items-start gap-4 rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="mt-3 flex flex-wrap items-start gap-4 scheda p-3 text-sm">
             <div>
               <div className="text-xs uppercase text-gray-500">Totale {vista === 'mese' ? 'del mese' : 'della settimana'}</div>
-              <div className="cifre text-xl font-semibold text-marchio">{formattaOre(totaliPeriodo.totale)}</div>
+              <div className="cifre font-display text-xl font-medium text-marchio">{formattaOre(totaliPeriodo.totale)}</div>
             </div>
             <div className="flex flex-wrap gap-2">
               {progetti

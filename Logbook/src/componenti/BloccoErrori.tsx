@@ -26,10 +26,10 @@ export class BloccoErrori extends Component<{ children: ReactNode; chiave: strin
   render() {
     if (!this.state.errore) return this.props.children;
     return (
-      <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+      <div role="alert" className="rounded border border-[#eba79f] bg-[#fdf3f2] p-4 text-sm text-[#8e2a1f]">
         <p className="font-semibold">Si è verificato un errore in questa pagina.</p>
         <p className="mt-1">{this.state.errore.message}</p>
-        <button type="button" className="mt-3 rounded border border-red-300 bg-white px-3 py-1.5" onClick={() => this.setState({ errore: null })}>
+        <button type="button" className="mt-3 rounded border border-[#eba79f] bg-white px-3 py-1.5" onClick={() => this.setState({ errore: null })}>
           Riprova
         </button>
       </div>

@@ -21,6 +21,7 @@ import { inizioSettimana } from '../../comune/riepiloghi';
 import { api, scaricaFile } from '../api';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
 import { Avviso, Caricamento, Pulsante } from './ui';
+import { Icona } from './icone';
 
 type Risposta = { mese: string; nomeMese: string; estratti: EstrattoDipendente[] };
 
@@ -67,7 +68,7 @@ function MeseACalendario({ e, nomeMese }: { e: EstrattoDipendente; nomeMese: str
   }
   const t = e.totali;
   return (
-    <section className="pagina-stampa mb-6 rounded border border-gray-200 bg-white p-4">
+    <section className="pagina-stampa mb-6 scheda p-4">
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="min-w-0 flex-1">
           <h3 className="mb-2 text-lg font-semibold text-marchio">Ore di {nomeMese}</h3>
@@ -168,7 +169,7 @@ function MeseACalendario({ e, nomeMese }: { e: EstrattoDipendente; nomeMese: str
 function GiorniECosti({ e, nomeMese }: { e: EstrattoDipendente; nomeMese: string }) {
   const t = e.totali;
   return (
-    <section className="pagina-stampa mb-6 rounded border border-gray-200 bg-white p-4">
+    <section className="pagina-stampa mb-6 scheda p-4">
       <h3 className="text-lg font-semibold text-marchio">
         {e.dipendente.cognome} {e.dipendente.nome} — giorni e costi di {nomeMese}
       </h3>
@@ -257,7 +258,7 @@ export function EstrattiMensili({ dipendenteIds, progettoIds }: { dipendenteIds:
 
   return (
     <div className="mt-6">
-      <div className="no-print mb-3 rounded border border-gray-200 bg-white p-4">
+      <div className="no-print mb-3 scheda p-4">
         <h2 className="font-semibold text-marchio">Estratti mensili</h2>
         <p className="mb-3 text-sm text-gray-600">Un dipendente per pagina, con anteprima qui sotto. Dipendenti e progetti sono quelli scelti sopra.</p>
         <div className="flex flex-wrap items-end gap-2">
@@ -278,10 +279,10 @@ export function EstrattiMensili({ dipendenteIds, progettoIds }: { dipendenteIds:
             ))}
           </div>
           <Pulsante onClick={() => scarica(vista === 'calendario' ? '/api/esporta/mese/calendario' : '/api/esporta/mese/giorni')} disabled={!dati}>
-            ⤓ Excel
+            <Icona nome="scarica" dimensione={16} /> Excel
           </Pulsante>
           <Pulsante onClick={() => window.print()} disabled={!dati}>
-            🖶 Stampa / PDF
+            <Icona nome="stampa" dimensione={16} /> Stampa / PDF
           </Pulsante>
         </div>
         <p className="mt-2 text-xs text-gray-500">Per il PDF: "Stampa / PDF" e, come stampante, "Salva come PDF" (orientamento orizzontale).</p>

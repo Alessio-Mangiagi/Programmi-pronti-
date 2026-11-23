@@ -98,7 +98,7 @@ c'è da intervenire:
 - Filtri per **dipendente**, **progetto** e **tipo di assenza**. Col filtro progetto i
   totali dei giorni sono le ore di quel progetto.
 - Ogni progetto ha il suo colore; ferie in azzurro, permessi in giallo, malattia in rosso,
-  festività in viola.
+  festività in verde.
 - Con "Tutti i dipendenti" il clic su un giorno apre il riepilogo per dipendente; da lì
   **Modifica** apre la giornata di quella persona.
 
@@ -190,7 +190,7 @@ dipendenti e i progetti nelle caselle in alto. Sotto compare l'anteprima, un dip
 pagina, in due versioni:
 
 **Mese a calendario**: a sinistra il calendario del mese con le ore di ogni giorno e i
-progetti (ferie in azzurro, malattia in rosso, permessi in giallo, festivi in grigio/viola),
+progetti (ferie in azzurro, malattia in rosso, permessi in giallo, festivi in grigio, festività in verde),
 a destra l'anagrafica e il riepilogo del mese (ore lavorate e attese, ferie, malattia,
 permessi, costo netto e lordo), in basso la descrizione dei progetti lavorati con le ore
 massime al giorno e le ore del mese.

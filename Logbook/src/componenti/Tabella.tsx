@@ -108,9 +108,9 @@ export function Tabella<T>({
           </span>
         </div>
       )}
-      <div className="overflow-x-auto rounded border border-gray-200 bg-white">
+      <div className="overflow-x-auto scheda">
         <table className="cifre w-full text-sm">
-          <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+          <thead className="intestazione-tabella">
             <tr>
               {colonne.map((c) => (
                 <th
@@ -130,7 +130,7 @@ export function Tabella<T>({
             {visibili.map((r) => (
               <tr
                 key={chiaveRiga(r)}
-                className={`border-b border-gray-100 last:border-0 odd:bg-white even:bg-gray-50/60 ${onRiga ? 'cursor-pointer hover:bg-marchio/5' : ''}`}
+                className={`border-b border-gray-100 last:border-0 odd:bg-white even:bg-fondo ${onRiga ? 'cursor-pointer hover:bg-ghiaccio' : ''}`}
                 onClick={onRiga ? () => onRiga(r) : undefined}
               >
                 {colonne.map((c) => (

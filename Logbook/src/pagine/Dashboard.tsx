@@ -42,9 +42,9 @@ const periodo = (a: AssenzaBreve) =>
 /** Riquadro numerico in cima alla pagina; `allarme` lo colora quando c'è da intervenire. */
 function Tessera({ titolo, valore, dettaglio, allarme, a }: { titolo: string; valore: string; dettaglio?: string; allarme?: boolean; a?: string }) {
   const corpo = (
-    <div className={`h-full rounded border bg-white px-4 py-3 ${allarme ? 'border-amber-300 bg-amber-50' : 'border-gray-200'} ${a ? 'hover:border-marchio' : ''}`}>
-      <div className="text-xs font-semibold uppercase text-gray-500">{titolo}</div>
-      <div className={`cifre text-2xl font-semibold ${allarme ? 'text-amber-800' : 'text-marchio'}`}>{valore}</div>
+    <div className={`scheda h-full border-t-[3px] px-4 py-3 ${allarme ? '!border-t-[#e9c46a] !bg-[#fdf8eb]' : '!border-t-marchio'} ${a ? 'scheda-attiva' : ''}`}>
+      <div className="sopratitolo !text-gray-500">{titolo}</div>
+      <div className={`cifre font-display text-[1.75rem] font-medium leading-tight ${allarme ? 'text-[#6b4a00]' : 'text-marchio'}`}>{valore}</div>
       {dettaglio && <div className="text-xs text-gray-500">{dettaglio}</div>}
     </div>
   );
@@ -57,7 +57,7 @@ function Barra({ lavorati, attesi }: { lavorati: number; attesi: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="h-2 w-28 overflow-hidden rounded bg-gray-200">
-        <div className={`h-full ${percentuale >= 95 ? 'bg-marchio-verde' : percentuale >= 75 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(100, percentuale)}%` }} />
+        <div className={`h-full ${percentuale >= 95 ? 'bg-marchio-verde' : percentuale >= 75 ? 'bg-[#e9c46a]' : 'bg-[#e07a6e]'}`} style={{ width: `${Math.min(100, percentuale)}%` }} />
       </div>
       <span className="cifre w-10 text-right text-xs text-gray-600">{attesi ? `${percentuale}%` : '—'}</span>
     </div>
@@ -66,9 +66,9 @@ function Barra({ lavorati, attesi }: { lavorati: number; attesi: number }) {
 
 function Pannello({ titolo, azione, children }: { titolo: string; azione?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded border border-gray-200 bg-white">
+    <section className="scheda">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
-        <h2 className="text-sm font-semibold text-marchio">{titolo}</h2>
+        <h2 className="font-display text-[0.98rem] font-medium text-marchio">{titolo}</h2>
         {azione}
       </div>
       <div className="p-3">{children}</div>
@@ -170,7 +170,7 @@ export function Dashboard() {
                 {conGiorniMancanti.map((d) => (
                   <li key={d.id} className="py-1.5">
                     <span className="font-medium">{d.nome}</span>
-                    <span className="ml-2 text-amber-800">{d.giorniSenzaOre.length} {d.giorniSenzaOre.length === 1 ? 'giorno' : 'giorni'}:</span>
+                    <span className="ml-2 text-[#6b4a00]">{d.giorniSenzaOre.length} {d.giorniSenzaOre.length === 1 ? 'giorno' : 'giorni'}:</span>
                     <span className="ml-1 text-gray-600">{d.giorniSenzaOre.map((g) => formattaData(g).slice(0, 5)).join(', ')}</span>
                   </li>
                 ))}

@@ -1,18 +1,20 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Componenti di base dell'interfaccia, stile gestionale (denso, bordi netti, colori
- * del marchio): pulsanti, campi dei moduli con errore, avvisi, caricamento, finestre.
- * Tutte le pagine li usano, così l'aspetto resta uniforme.
+ * Componenti di base dell'interfaccia nello stile del marchio Cosedil (skill
+ * Cosedilfrontend): bottoni Ubuntu maiuscoli blu #0c4577, campi con etichetta Inter e
+ * bordo #d2d2d2, avvisi e etichette con i toni del marchio, schede con ombra blu diffusa,
+ * caricamento a segnaposto. Tutte le pagine li usano, così l'aspetto resta uniforme.
  */
 import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { Icona } from './icone';
 
 type VariantePulsante = 'primario' | 'secondario' | 'pericolo' | 'leggero';
 
 const CLASSI_PULSANTE: Record<VariantePulsante, string> = {
-  primario: 'bg-marchio text-white hover:bg-marchio-scuro border-marchio',
-  secondario: 'bg-white text-gray-800 hover:bg-gray-50 border-gray-300',
-  pericolo: 'bg-white text-red-700 hover:bg-red-50 border-red-300',
-  leggero: 'bg-transparent text-marchio hover:bg-marchio/10 border-transparent',
+  primario: 'bg-marchio text-white border-marchio hover:bg-marchio-hover hover:border-marchio-hover hover:-translate-y-px',
+  secondario: 'bg-white text-marchio border-marchio hover:bg-marchio hover:text-white',
+  pericolo: 'bg-white text-errore border-errore/60 hover:bg-errore hover:text-white hover:border-errore',
+  leggero: 'bg-transparent text-marchio border-transparent hover:bg-ghiaccio normal-case tracking-normal',
 };
 
 export function Pulsante({
@@ -24,12 +26,12 @@ export function Pulsante({
     <button
       type="button"
       {...props}
-      className={`inline-flex items-center justify-center gap-1.5 rounded border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${CLASSI_PULSANTE[variante]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded border px-3.5 py-1.5 font-display text-[0.8rem] font-medium uppercase tracking-[0.05em] transition-[transform,background-color,color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marchio-chiaro ${CLASSI_PULSANTE[variante]} ${className}`}
     />
   );
 }
 
-/** Etichetta + controllo + messaggio d'errore sotto (in rosso). */
+/** Etichetta (Inter) + controllo + messaggio d'errore sotto. */
 export function Campo({
   etichetta,
   errore,
@@ -47,62 +49,68 @@ export function Campo({
 }) {
   return (
     <label className={`block text-sm ${className}`}>
-      <span className="mb-1 block font-medium text-gray-700">
+      <span className="mb-1 block font-ui text-[0.82rem] font-semibold text-gray-600">
         {etichetta}
-        {obbligatorio && <span className="text-red-600"> *</span>}
+        {obbligatorio && <span className="text-errore"> *</span>}
       </span>
       {children}
       {aiuto && !errore && <span className="mt-0.5 block text-xs text-gray-500">{aiuto}</span>}
-      {errore && <span className="mt-0.5 block text-xs text-red-700">{errore}</span>}
+      {errore && <span className="mt-0.5 block text-xs text-errore">{errore}</span>}
     </label>
   );
 }
 
 /** Classi comuni di input, select e textarea (bordo rosso se c'è un errore). */
 export const classiInput = (errore?: string) =>
-  `w-full rounded border bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-marchio/30 ${
-    errore ? 'border-red-400' : 'border-gray-300 focus:border-marchio'
+  `w-full rounded border bg-white px-2.5 py-1.5 text-sm text-testo transition-colors focus:outline-none focus:ring-2 focus:ring-marchio-chiaro ${
+    errore ? 'border-errore' : 'border-gray-300 focus:border-marchio-chiaro'
   }`;
 
 type TipoAvviso = 'errore' | 'successo' | 'info' | 'attenzione';
 const CLASSI_AVVISO: Record<TipoAvviso, string> = {
-  errore: 'border-red-300 bg-red-50 text-red-800',
-  successo: 'border-green-300 bg-green-50 text-green-800',
-  info: 'border-blue-200 bg-blue-50 text-blue-900',
-  attenzione: 'border-amber-300 bg-amber-50 text-amber-900',
+  errore: 'border-[#eba79f] bg-[#fbe4e1] text-[#8e2a1f]',
+  successo: 'border-[#a9d7b5] bg-[#e7f4ea] text-[#2f6b40]',
+  info: 'border-[#c9dcee] bg-ghiaccio text-marchio',
+  attenzione: 'border-[#e9c46a] bg-[#fdf1d6] text-[#6b4a00]',
 };
 
 export function Avviso({ tipo = 'info', children, className = '' }: { tipo?: TipoAvviso; children: ReactNode; className?: string }) {
   return (
-    <div role={tipo === 'errore' ? 'alert' : 'status'} className={`rounded border px-3 py-2 text-sm ${CLASSI_AVVISO[tipo]} ${className}`}>
-      {children}
+    <div role={tipo === 'errore' ? 'alert' : 'status'} className={`flex items-start gap-2 rounded border px-3 py-2 text-sm ${CLASSI_AVVISO[tipo]} ${className}`}>
+      {(tipo === 'errore' || tipo === 'attenzione') && <Icona nome="avviso" dimensione={16} className="mt-0.5 shrink-0" />}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
 
+/** Caricamento: segnaposto a righe con riflesso (skeleton), testo per i lettori di schermo. */
 export function Caricamento({ testo = 'Caricamento…' }: { testo?: string }) {
   return (
-    <div className="flex items-center gap-2 py-6 text-sm text-gray-500" aria-live="polite">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-marchio" />
-      {testo}
+    <div className="space-y-2 py-4" aria-live="polite" aria-busy="true">
+      <span className="sr-only">{testo}</span>
+      <div className="scheletro h-8 w-1/3" />
+      <div className="scheletro h-4 w-full" />
+      <div className="scheletro h-4 w-11/12" />
+      <div className="scheletro h-4 w-4/5" />
     </div>
   );
 }
 
-/** Titolo della pagina con azioni a destra (es. "Nuovo dipendente"). */
-export function IntestazionePagina({ titolo, sottotitolo, azioni }: { titolo: string; sottotitolo?: string; azioni?: ReactNode }) {
+/** Titolo della pagina con sopratitolo facoltativo e azioni a destra. */
+export function IntestazionePagina({ titolo, sottotitolo, sopratitolo, azioni }: { titolo: string; sottotitolo?: string; sopratitolo?: string; azioni?: ReactNode }) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200 pb-3">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-bordo pb-3">
       <div>
-        <h1 className="text-xl font-semibold text-marchio">{titolo}</h1>
-        {sottotitolo && <p className="text-sm text-gray-500">{sottotitolo}</p>}
+        {sopratitolo && <div className="sopratitolo mb-0.5">{sopratitolo}</div>}
+        <h1 className="font-display text-[1.65rem] font-normal leading-tight tracking-[-0.01em] text-testo-forte">{titolo}</h1>
+        {sottotitolo && <p className="mt-0.5 text-sm text-gray-500">{sottotitolo}</p>}
       </div>
-      {azioni && <div className="flex flex-wrap gap-2">{azioni}</div>}
+      {azioni && <div className="flex flex-wrap items-center gap-2">{azioni}</div>}
     </div>
   );
 }
 
-/** Finestra modale semplice; Esc o clic sullo sfondo la chiudono. */
+/** Finestra modale; Esc o clic sullo sfondo la chiudono. */
 export function Modale({
   titolo,
   aperta,
@@ -124,36 +132,30 @@ export function Modale({
   }, [aperta, onChiudi]);
   if (!aperta) return null;
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-16" onMouseDown={onChiudi}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={titolo}
-        className={`w-full ${larghezza} rounded bg-white shadow-xl`}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2.5">
-          <h2 className="font-semibold text-marchio">{titolo}</h2>
-          <button type="button" onClick={onChiudi} className="rounded px-2 text-xl leading-none text-gray-500 hover:bg-gray-100" aria-label="Chiudi">
-            ×
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[#212326]/45 p-4 pt-16" onMouseDown={onChiudi}>
+      <div role="dialog" aria-modal="true" aria-label={titolo} className={`scheda w-full ${larghezza} shadow-[0_12px_40px_rgba(12,69,119,0.18)]`} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-bordo px-5 py-3">
+          <h2 className="font-display text-lg font-medium text-testo-forte">{titolo}</h2>
+          <button type="button" onClick={onChiudi} className="rounded p-1 text-gray-500 transition-colors hover:bg-fondo-alt hover:text-testo-forte" aria-label="Chiudi">
+            <Icona nome="chiudi" />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="p-5">{children}</div>
       </div>
     </div>
   );
 }
 
-/** Etichetta colorata per stati (attivo, approvata, rifiutata, …). */
+/** Etichetta di stato a pillola (attivo, approvata, rifiutata, …) con i toni del marchio. */
 export function Etichetta({ colore, children }: { colore: 'verde' | 'rosso' | 'giallo' | 'grigio' | 'blu'; children: ReactNode }) {
   const classi = {
-    verde: 'bg-green-100 text-green-800',
-    rosso: 'bg-red-100 text-red-800',
-    giallo: 'bg-amber-100 text-amber-900',
-    grigio: 'bg-gray-100 text-gray-700',
-    blu: 'bg-blue-100 text-blue-800',
+    verde: 'bg-[#e7f4ea] text-verde-testo',
+    rosso: 'bg-[#fbe4e1] text-[#8e2a1f]',
+    giallo: 'bg-[#fdf1d6] text-[#6b4a00]',
+    grigio: 'bg-fondo-alt text-gray-600',
+    blu: 'bg-ghiaccio text-marchio',
   }[colore];
-  return <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${classi}`}>{children}</span>;
+  return <span className={`inline-block rounded-full px-2 py-0.5 font-ui text-[0.72rem] font-semibold ${classi}`}>{children}</span>;
 }
 
 /** Placeholder per le pagine non ancora sviluppate (indica il giorno del piano). */

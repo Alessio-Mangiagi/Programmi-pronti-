@@ -1,28 +1,30 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Struttura di tutte le pagine dopo il login: menu laterale a sinistra, intestazione
- * con utente collegato, cambio password e logout, contenuto della pagina a destra.
+ * Struttura di tutte le pagine dopo il login, nello stile Cosedil: menu laterale blu
+ * #0c4577 con il logo della Suite Cosedil e icone lineari, intestazione bianca con utente,
+ * cambio password ed esci, contenuto su fondo #f9f9fb.
  *
  * Il menu dipende dal ruolo: l'admin (HR) vede tutte le voci, il dipendente solo
- * Dashboard, Calendario e le proprie assenze. Su schermi stretti il menu si apre col
- * pulsante ☰.
+ * Dashboard, Calendario e le proprie assenze. Sotto i 768px il menu si apre col pulsante
+ * a tre righe.
  */
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { BloccoErrori } from './BloccoErrori';
 import { CambiaPassword } from './CambiaPassword';
+import { Icona, type NomeIcona } from './icone';
 
-type VoceMenu = { a: string; etichetta: string; soloAdmin?: boolean; etichettaDipendente?: string };
+type VoceMenu = { a: string; etichetta: string; icona: NomeIcona; soloAdmin?: boolean; etichettaDipendente?: string };
 
 export const MENU: VoceMenu[] = [
-  { a: '/', etichetta: 'Dashboard' },
-  { a: '/calendario', etichetta: 'Calendario' },
-  { a: '/dipendenti', etichetta: 'Dipendenti', soloAdmin: true },
-  { a: '/progetti', etichetta: 'Progetti', soloAdmin: true },
-  { a: '/assenze', etichetta: 'Assenze', etichettaDipendente: 'Le mie assenze' },
-  { a: '/importa', etichetta: 'Importa', soloAdmin: true },
-  { a: '/esporta', etichetta: 'Esporta', soloAdmin: true },
+  { a: '/', etichetta: 'Dashboard', icona: 'dashboard' },
+  { a: '/calendario', etichetta: 'Calendario', icona: 'calendario' },
+  { a: '/dipendenti', etichetta: 'Dipendenti', icona: 'dipendenti', soloAdmin: true },
+  { a: '/progetti', etichetta: 'Progetti', icona: 'progetti', soloAdmin: true },
+  { a: '/assenze', etichetta: 'Assenze', icona: 'assenze', etichettaDipendente: 'Le mie assenze' },
+  { a: '/importa', etichetta: 'Importa', icona: 'importa', soloAdmin: true },
+  { a: '/esporta', etichetta: 'Esporta', icona: 'esporta', soloAdmin: true },
 ];
 
 export function Layout() {
@@ -33,18 +35,21 @@ export function Layout() {
   const voci = MENU.filter((v) => admin || !v.soloAdmin);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-[100dvh]">
       {/* Menu laterale */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-56 transform bg-marchio text-white transition-transform md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 flex w-60 transform flex-col bg-marchio text-white transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:static md:translate-x-0 ${
           menuAperto ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-12 items-center gap-2 border-b border-white/15 px-4">
-          <span className="text-lg font-semibold tracking-wide">Logbook</span>
-          <span className="rounded bg-marchio-verde px-1.5 text-[10px] font-bold uppercase text-marchio-scuro">ore</span>
+        <div className="flex items-center gap-3 border-b border-white/15 px-4 py-4">
+          <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
+          <div className="leading-tight">
+            <div className="font-display text-xl font-medium tracking-wide">Logbook</div>
+            <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/65">Ore e presenze</div>
+          </div>
         </div>
-        <nav className="py-2" aria-label="Menu principale">
+        <nav className="flex-1 py-3" aria-label="Menu principale">
           {voci.map((v) => (
             <NavLink
               key={v.a}
@@ -52,39 +57,45 @@ export function Layout() {
               end={v.a === '/'}
               onClick={() => setMenuAperto(false)}
               className={({ isActive }) =>
-                `block border-l-4 px-4 py-2 text-sm ${
-                  isActive ? 'border-marchio-verde bg-white/10 font-semibold' : 'border-transparent text-white/85 hover:bg-white/5'
+                `mx-2 mb-0.5 flex items-center gap-3 rounded border-l-[3px] px-3 py-2 font-display text-[0.92rem] transition-colors duration-300 ${
+                  isActive ? 'border-marchio-verde bg-white/12 text-white' : 'border-transparent text-white/80 hover:bg-white/6 hover:text-white'
                 }`
               }
             >
+              <Icona nome={v.icona} dimensione={18} />
               {!admin && v.etichettaDipendente ? v.etichettaDipendente : v.etichetta}
             </NavLink>
           ))}
         </nav>
-        <div className="absolute bottom-0 w-full border-t border-white/15 px-4 py-2 text-xs text-white/60">
+        <div className="border-t border-white/15 px-4 py-3 font-ui text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-white/55">
           {admin ? 'Amministrazione / HR' : 'Area dipendente'}
+          <div className="mt-0.5 font-sans text-[0.7rem] normal-case tracking-normal text-white/45">Suite Cosedil</div>
         </div>
       </aside>
-      {menuAperto && <div className="fixed inset-0 z-20 bg-black/30 md:hidden" onClick={() => setMenuAperto(false)} />}
+      {menuAperto && <div className="fixed inset-0 z-20 bg-[#212326]/40 md:hidden" onClick={() => setMenuAperto(false)} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Intestazione */}
-        <header className="flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
-          <button type="button" className="rounded px-2 text-xl md:hidden" onClick={() => setMenuAperto(true)} aria-label="Apri menu">
-            ☰
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-bordo bg-white/95 px-4 backdrop-blur md:px-6">
+          <button type="button" className="rounded p-1.5 text-marchio hover:bg-ghiaccio md:hidden" onClick={() => setMenuAperto(true)} aria-label="Apri menu">
+            <Icona nome="menu" dimensione={22} />
           </button>
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="hidden text-gray-500 sm:inline">{admin ? 'HR' : 'Dipendente'}</span>
-            <span className="font-medium text-gray-800">{utente?.nomeVisualizzato}</span>
-            <button type="button" className="text-marchio hover:underline" onClick={() => setCambioPassword(true)}>
-              Cambia password
+          <div className="ml-auto flex items-center gap-4 text-sm">
+            <span className="hidden rounded-full bg-ghiaccio px-2.5 py-0.5 font-ui text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-marchio sm:inline">
+              {admin ? 'HR' : 'Dipendente'}
+            </span>
+            <span className="font-display font-medium text-testo-forte">{utente?.nomeVisualizzato}</span>
+            <button type="button" className="inline-flex items-center gap-1.5 text-marchio transition-colors hover:text-marchio-hover" onClick={() => setCambioPassword(true)}>
+              <Icona nome="chiave" dimensione={16} />
+              <span className="hidden sm:inline">Cambia password</span>
             </button>
-            <button type="button" className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50" onClick={logout}>
+            <button type="button" className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-2.5 py-1 text-gray-600 transition-colors hover:border-marchio hover:text-marchio" onClick={logout}>
+              <Icona nome="esci" dimensione={16} />
               Esci
             </button>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6">
+        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 md:px-8 md:py-6">
           <BloccoErrori chiave={posizione.pathname}>
             <Outlet />
           </BloccoErrori>
