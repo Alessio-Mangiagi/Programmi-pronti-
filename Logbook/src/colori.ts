@@ -7,10 +7,13 @@
 /** Tavolozza per i progetti senza colore: scelta in base all'id, quindi stabile. */
 const TAVOLOZZA = ['#0c4577', '#65bc7b', '#d97706', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f', '#b45309'];
 
-export function coloreProgetto(p: { id?: number; progettoId?: number; colore: string | null }): string {
-  if (p.colore) return p.colore;
-  const id = p.id ?? p.progettoId ?? 0;
-  return TAVOLOZZA[id % TAVOLOZZA.length];
+export function coloreProgetto(p: { id: number; colore: string | null }): string {
+  return p.colore || TAVOLOZZA[p.id % TAVOLOZZA.length];
+}
+
+/** Colore di una fascia oraria = colore del suo progetto (attenzione: non l'id della fascia). */
+export function coloreFascia(f: { progettoId: number; progetto: { colore: string | null } }): string {
+  return coloreProgetto({ id: f.progettoId, colore: f.progetto.colore });
 }
 
 /** Colori delle assenze (sfondo chiaro + testo scuro) e delle festività. */

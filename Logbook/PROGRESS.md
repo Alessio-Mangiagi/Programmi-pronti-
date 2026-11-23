@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 4 — Registrazione ore ✅ completato
+- **Giorno corrente:** 5 — Calendario ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 5 — Calendario (mese e settimana, filtri)
+- **Prossimo:** Giorno 6 — Assenze e festività (richieste, approvazione HR, gestione festività)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -49,6 +49,9 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Niente ore nei giorni futuri, nei giorni di ferie/malattia approvate, fuori dal periodo di assunzione o di apertura del progetto; progetti CHIUSI solo se già presenti quel giorno | Dati coerenti; si possono ancora correggere ore vecchie |
 | 23/11 | L'editor salva la giornata intera in modo atomico (`PUT /api/registrazioni/giornata`) | Nessun giorno lasciato a metà se una riga è sbagliata |
 | 23/11 | Regole di contesto in `server/servizi/regole-ore.ts` con errori in elenco | Riusate dall'import Excel per gli errori riga per riga |
+| 23/11 | Totali sempre da `comune/riepiloghi.ts#calcolaTotali` (calendario oggi, report Excel al Giorno 8) | I totali dei report coincidono per costruzione con quelli del calendario |
+| 23/11 | Calendario: assenze APPROVATE piene, RICHIESTE tratteggiate "(in attesa)", RIFIUTATE mai | La richiesta in attesa è utile da vedere; la rifiutata no (criterio del Giorno 6) |
+| 23/11 | Vista HR "Tutti i dipendenti": clic sul giorno → riepilogo per dipendente → editor | Con un dipendente filtrato il clic apre subito l'editor |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -138,3 +141,20 @@ Verifiche:
 - `npm test`: 84/84 (nuovi `registrazioni.test.ts` sulla logica e `ore.test.ts` sulle API).
 - Dal vivo: mario.rossi prova 10:00-11:00 il 20/11 → "La fascia 10:00-11:00 si sovrappone a
   quella già registrata 07:30-12:30 (progetto PRG-001) del 20/11/2026".
+
+### Giorno 5 — Calendario (23/11/2026) ✅
+
+Fatto:
+- `comune/riepiloghi.ts`: `calcolaTotali` (per giorno, progetto, dipendente,
+  dipendente+progetto), giorni lavorativi, inizio settimana.
+- API `GET /api/calendario?da&a&dipendenteId&progettoId&tipoAssenza` (max 62 giorni):
+  fasce, assenze (approvate e in attesa), festività e totali sulle fasce filtrate.
+- Pagina Calendario: vista mese e settimana, navigazione, filtri dipendente/progetto/tipo
+  di assenza, colori per progetto, assenze e festività, legenda, totali del mese per
+  progetto, clic sul giorno → editor della giornata (Giorno 4) con gli avvisi del giorno.
+
+Verifiche:
+- `npm test`: 91/91 (nuovo `calendario.test.ts`: col filtro progetto solo quel progetto e
+  totali del giorno uguali a quelli ricalcolati dal database).
+- Screenshot reale (Edge headless) del mese di novembre come admin: totali giornalieri,
+  progetti colorati, Ognissanti, ferie in attesa tratteggiate, totale mese 576:00.

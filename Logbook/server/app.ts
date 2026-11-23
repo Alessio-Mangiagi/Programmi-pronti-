@@ -19,6 +19,7 @@ import { durataMinuti } from '../comune/orari';
 import { gestoreErrori } from './errori';
 import { caricaUtente, controlloCsrf, richiediAdmin, richiediLogin } from './middleware';
 import { rotteAuth } from './rotte/auth';
+import { rotteCalendario } from './rotte/calendario';
 import { rotteDipendenti } from './rotte/dipendenti';
 import { rotteProgetti } from './rotte/progetti';
 import { rotteRegistrazioni } from './rotte/registrazioni';
@@ -51,6 +52,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/dipendenti', rotteDipendenti(prisma));
   api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
+  api.use('/calendario', rotteCalendario(prisma));
 
   /** Conteggi del database (verifica del Giorno 1), riservati a HR. */
   api.get('/stato-dati', richiediAdmin, async (_req, res) => {
