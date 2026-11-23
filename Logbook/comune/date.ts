@@ -10,6 +10,19 @@
 /** Espressione regolare di una data ISO di calendario. */
 const RE_DATA_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
+/**
+ * Data più vecchia che si può inserire in Logbook (richiesta del 23/11/2026, risposta 1b):
+ * vale per TUTTI gli inserimenti — ore, assenze, festività, import, date di assunzione e
+ * cessazione, date dei progetti. La lettura di dati già presenti non è limitata.
+ */
+export const DATA_MINIMA = '2020-01-01';
+export const MESSAGGIO_DATA_MINIMA = 'Non si possono inserire date precedenti al 01/01/2020';
+
+/** true se la data è valida e non precede DATA_MINIMA. */
+export function isDataAmmessa(iso: string): boolean {
+  return isDataValida(iso) && iso >= DATA_MINIMA;
+}
+
 /** Compone "AAAA-MM-GG" da anno, mese (1-12) e giorno. */
 export function dataIso(anno: number, mese: number, giorno: number): string {
   return `${String(anno).padStart(4, '0')}-${String(mese).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`;

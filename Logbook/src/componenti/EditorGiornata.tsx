@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formattaData, giornoSettimana } from '../../comune/date';
 import { durataMinuti, formattaOre, isOrarioValido, minutiDaOrario, orarioDaMinuti } from '../../comune/orari';
-import { coppieSovrapposte, schemaGiornata } from '../../comune/registrazioni';
+import { coppieSovrapposte, messaggioMassimo, schemaGiornata, superamentiMassimo } from '../../comune/registrazioni';
 import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
 import { coloreProgetto } from '../colori';
@@ -79,6 +79,19 @@ export function EditorGiornata({
     }
     return indici;
   }, [righe]);
+
+  // Ore per progetto nel giorno e progetti oltre le ore massime giornaliere (regola 2b:
+  // il server rifiuta il salvataggio, qui lo si mostra e si disattiva "Salva").
+  const perProgetto = useMemo(() => {
+    const fasce = (righe ?? []).filter((r) => r.progettoId).map((r) => ({ progettoId: Number(r.progettoId), oraInizio: r.oraInizio, oraFine: r.oraFine }));
+    const minuti = new Map<number, number>();
+    for (const f of fasce) {
+      if (!isOrarioValido(f.oraInizio) || !isOrarioValido(f.oraFine) || f.oraFine <= f.oraInizio) continue;
+      minuti.set(f.progettoId, (minuti.get(f.progettoId) ?? 0) + durataMinuti(f.oraInizio, f.oraFine));
+    }
+    const oltre = superamentiMassimo(fasce, new Map(progetti.map((p) => [p.id, p.maxMinutiGiorno])));
+    return { minuti, oltre };
+  }, [righe, progetti]);
 
   if (!righe) {
     return (
@@ -216,9 +229,31 @@ export function EditorGiornata({
           </table>
         </div>
 
+        {perProgetto.minuti.size > 0 && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            {[...perProgetto.minuti.entries()].map(([id, minuti]) => {
+              const p = progetti.find((x) => x.id === id);
+              if (!p) return null;
+              const oltre = p.maxMinutiGiorno != null && minuti > p.maxMinutiGiorno;
+              return (
+                <span key={id} className={`cifre inline-flex items-center gap-1.5 rounded border px-2 py-1 ${oltre ? 'border-red-300 bg-red-50 text-red-800' : 'border-gray-200 text-gray-700'}`}>
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: coloreProgetto(p) }} />
+                  {p.codice} <b>{formattaOre(minuti)}</b>
+                  {p.maxMinutiGiorno != null ? <span>/ max {formattaOre(p.maxMinutiGiorno)}</span> : <span className="text-gray-400">nessun limite</span>}
+                </span>
+              );
+            })}
+          </div>
+        )}
+        {perProgetto.oltre.map((o) => (
+          <Avviso key={o.progettoId} tipo="errore">
+            {messaggioMassimo(progetti.find((p) => p.id === o.progettoId)?.codice ?? '?', o.minuti, o.massimo)}
+          </Avviso>
+        ))}
+
         <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
           <Pulsante onClick={onChiudi}>Annulla</Pulsante>
-          <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0}>
+          <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0 || perProgetto.oltre.length > 0}>
             {invio ? 'Salvataggio…' : 'Salva giornata'}
           </Pulsante>
         </div>

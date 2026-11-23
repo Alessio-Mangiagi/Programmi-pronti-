@@ -48,6 +48,8 @@ export type Progetto = {
   dataFine: string | null;
   stato: 'ATTIVO' | 'SOSPESO' | 'CHIUSO';
   colore: string | null;
+  /** Ore massime per dipendente al giorno, in minuti (null = nessun limite). */
+  maxMinutiGiorno: number | null;
 };
 
 export type Registrazione = {
@@ -59,7 +61,7 @@ export type Registrazione = {
   oraFine: string;
   note: string | null;
   minuti: number;
-  progetto: { codice: string; nome: string; colore: string | null };
+  progetto: { codice: string; nome: string; colore: string | null; maxMinutiGiorno: number | null };
 };
 
 export type TipoAssenza = 'FERIE' | 'PERMESSO' | 'MALATTIA';

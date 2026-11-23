@@ -13,7 +13,7 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import type { Dipendente, PrismaClient } from '../../generated/prisma/client';
-import { isDataValida, oggiIso } from '../../comune/date';
+import { isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA, oggiIso } from '../../comune/date';
 import { schemaAccount, schemaDipendente, type DatiDipendente } from '../../comune/schemi';
 import { controllaPasswordNuova, creaImpronta } from '../auth/password';
 import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
@@ -96,6 +96,7 @@ export function rotteDipendenti(prisma: PrismaClient) {
     const id = idDaParametro(req.params.id)!;
     const { dataCessazione = oggiIso() } = z.object({ dataCessazione: z.string().optional() }).parse(req.body ?? {});
     if (!isDataValida(dataCessazione)) throw richiestaNonValida('Data di cessazione non valida', { dataCessazione: 'Data non valida' });
+    if (!isDataAmmessa(dataCessazione)) throw richiestaNonValida(MESSAGGIO_DATA_MINIMA, { dataCessazione: MESSAGGIO_DATA_MINIMA });
     const d = await prisma.dipendente.findUnique({ where: { id } });
     if (!d) throw nonTrovato('Dipendente');
     if (dataCessazione < d.dataAssunzione) {

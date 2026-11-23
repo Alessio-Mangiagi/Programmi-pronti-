@@ -54,9 +54,9 @@ export const usernameDemo = (d: { nome: string; cognome: string }) => `${d.nome}
 const cf = (primi15: string) => primi15 + carattereControllo(primi15);
 
 const PROGETTI = [
-  { codice: 'PRG-001', nome: 'Ristrutturazione scuola media', cliente: 'Comune di Esempio', colore: '#0c4577' },
-  { codice: 'PRG-002', nome: 'Nuovo capannone logistico', cliente: 'Logistica Demo S.r.l.', colore: '#65bc7b' },
-  { codice: 'PRG-003', nome: 'Manutenzione rete idrica', cliente: 'Acque Esempio S.p.A.', colore: '#d97706' },
+  { codice: 'PRG-001', nome: 'Ristrutturazione scuola media', cliente: 'Comune di Esempio', colore: '#0c4577', maxMinutiGiorno: 540 },
+  { codice: 'PRG-002', nome: 'Nuovo capannone logistico', cliente: 'Logistica Demo S.r.l.', colore: '#65bc7b', maxMinutiGiorno: 540 },
+  { codice: 'PRG-003', nome: 'Manutenzione rete idrica', cliente: 'Acque Esempio S.p.A.', colore: '#d97706', maxMinutiGiorno: null },
 ] as const;
 
 /**
@@ -68,7 +68,7 @@ const DIPENDENTI = [
     dati: {
       matricola: '0001', nome: 'Mario', cognome: 'Rossi', codiceFiscale: cf('RSSMRA85C15C351'),
       email: 'mario.rossi@esempio.it', telefono: '333 000 0001', mansione: 'Capocantiere', reparto: 'Produzione',
-      dataAssunzione: '2012-04-02', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
+      dataAssunzione: '2020-02-03', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1450, costoOrarioLordoCent: 2780,
     },
     fasce: [['07:30', '12:30'], ['13:30', '16:30']], progetti: [0, 2],
@@ -77,7 +77,7 @@ const DIPENDENTI = [
     dati: {
       matricola: '0002', nome: 'Giulia', cognome: 'Bianchi', codiceFiscale: cf('BNCGLI90L62F205'),
       email: 'giulia.bianchi@esempio.it', telefono: '333 000 0002', mansione: 'Ingegnere di cantiere', reparto: 'Ufficio tecnico',
-      dataAssunzione: '2018-09-10', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
+      dataAssunzione: '2020-09-14', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1620, costoOrarioLordoCent: 3150,
     },
     fasce: [['08:30', '13:00'], ['14:00', '17:30']], progetti: [0, 1],
@@ -86,7 +86,7 @@ const DIPENDENTI = [
     dati: {
       matricola: '0003', nome: 'Luca', cognome: 'Esposito', codiceFiscale: cf('SPSLCU78S03F839'),
       email: 'luca.esposito@esempio.it', telefono: '333 000 0003', mansione: 'Operaio specializzato', reparto: 'Produzione',
-      dataAssunzione: '2015-02-16', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
+      dataAssunzione: '2021-03-01', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1180, costoOrarioLordoCent: 2290,
     },
     fasce: [['07:00', '12:00'], ['13:00', '16:00']], progetti: [0, 1],

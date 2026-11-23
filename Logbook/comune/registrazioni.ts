@@ -8,8 +8,8 @@
  * (08:00-12:00 e 12:00-13:00) sono ammesse.
  */
 import { z } from 'zod';
-import { formattaData, isDataValida } from './date';
-import { durataMinuti, isOrarioValido, minutiDaOrario } from './orari';
+import { formattaData, isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
+import { durataMinuti, formattaOre, isOrarioValido, minutiDaOrario } from './orari';
 
 export type Fascia = { id?: number; oraInizio: string; oraFine: string };
 
@@ -50,6 +50,34 @@ export function totaleMinuti(fasce: Fascia[]): number {
   return fasce.reduce((s, f) => s + durataMinuti(f.oraInizio, f.oraFine), 0);
 }
 
+/**
+ * Ore massime giornaliere per progetto (risposta 2b del 23/11/2026): un dipendente non può
+ * superare in un giorno il massimo fissato nella scheda del progetto. Riceve le fasce di
+ * UN dipendente in UN giorno (quelle già salvate più le nuove) e i massimi per progetto
+ * (null = nessun limite); restituisce i progetti oltre il limite.
+ */
+export function superamentiMassimo(
+  fasce: (Fascia & { progettoId: number })[],
+  massimi: Map<number, number | null | undefined>,
+): { progettoId: number; minuti: number; massimo: number }[] {
+  const perProgetto = new Map<number, number>();
+  for (const f of fasce) {
+    if (!isOrarioValido(f.oraInizio) || !isOrarioValido(f.oraFine) || f.oraFine <= f.oraInizio) continue;
+    perProgetto.set(f.progettoId, (perProgetto.get(f.progettoId) ?? 0) + durataMinuti(f.oraInizio, f.oraFine));
+  }
+  const oltre: { progettoId: number; minuti: number; massimo: number }[] = [];
+  for (const [progettoId, minuti] of perProgetto) {
+    const massimo = massimi.get(progettoId);
+    if (massimo != null && minuti > massimo) oltre.push({ progettoId, minuti, massimo });
+  }
+  return oltre;
+}
+
+/** Messaggio per l'utente quando un progetto supera le ore massime del giorno. */
+export function messaggioMassimo(codice: string, minuti: number, massimo: number): string {
+  return `Sul progetto ${codice} il massimo è ${formattaOre(massimo)} ore al giorno per dipendente: così sarebbero ${formattaOre(minuti)}`;
+}
+
 const orario = (etichetta: string) =>
   z.string({ error: `${etichetta}: campo obbligatorio` }).refine(isOrarioValido, `${etichetta}: usa il formato HH:MM (24 ore)`);
 
@@ -71,7 +99,7 @@ export const schemaFascia = z
 export const schemaRegistrazione = z.intersection(
   z.object({
     dipendenteId: z.coerce.number().int().positive('Dipendente non valido'),
-    data: z.string().refine(isDataValida, 'Data non valida'),
+    data: z.string().refine(isDataValida, 'Data non valida').refine(isDataAmmessa, MESSAGGIO_DATA_MINIMA),
   }),
   schemaFascia,
 );
@@ -84,7 +112,7 @@ export const schemaRegistrazione = z.intersection(
 export const schemaGiornata = z
   .object({
     dipendenteId: z.coerce.number().int().positive('Dipendente non valido'),
-    data: z.string().refine(isDataValida, 'Data non valida'),
+    data: z.string().refine(isDataValida, 'Data non valida').refine(isDataAmmessa, MESSAGGIO_DATA_MINIMA),
     fasce: z.array(schemaFascia).max(24, 'Troppe fasce nello stesso giorno'),
   })
   .superRefine((g, ctx) => {

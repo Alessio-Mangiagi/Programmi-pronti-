@@ -5,7 +5,8 @@
  * per nuove ore, ma quelle già registrate restano nei report.
  */
 import { useState, type FormEvent } from 'react';
-import { formattaData, oggiIso } from '../../comune/date';
+import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
+import { formattaOre } from '../../comune/orari';
 import { erroriPerCampo, schemaProgetto, STATI_PROGETTO } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
 import { Tabella, type Colonna } from '../componenti/Tabella';
@@ -20,7 +21,11 @@ const ETICHETTE_STATO: Record<Progetto['stato'], { testo: string; colore: 'verde
   CHIUSO: { testo: 'Chiuso', colore: 'grigio' },
 };
 
-type Modulo = { codice: string; nome: string; cliente: string; dataInizio: string; dataFine: string; stato: Progetto['stato']; colore: string };
+/** Valori del modulo; `maxOre` è il testo del campo in ore ("9" o "7,5"), convertito in minuti all'invio. */
+type Modulo = { codice: string; nome: string; cliente: string; dataInizio: string; dataFine: string; stato: Progetto['stato']; colore: string; maxOre: string };
+
+/** "7,5" → 450 minuti; "" → null; testo non numerico → NaN (lo segnala lo schema). */
+const minutiDaOre = (testo: string) => (testo.trim() === '' ? null : Math.round(Number(testo.replace(',', '.')) * 60));
 
 export function Progetti() {
   const { dati, errore, caricamento, ricarica } = usaDati<Progetto[]>('/api/progetti');
@@ -43,6 +48,13 @@ export function Progetti() {
     { chiave: 'cliente', titolo: 'Cliente', valore: (p) => p.cliente },
     { chiave: 'inizio', titolo: 'Inizio', valore: (p) => p.dataInizio, render: (p) => formattaData(p.dataInizio) },
     { chiave: 'fine', titolo: 'Fine', valore: (p) => p.dataFine, render: (p) => (p.dataFine ? formattaData(p.dataFine) : '—') },
+    {
+      chiave: 'max',
+      titolo: 'Max ore/giorno',
+      valore: (p) => p.maxMinutiGiorno,
+      render: (p) => (p.maxMinutiGiorno != null ? formattaOre(p.maxMinutiGiorno) : <span className="text-gray-400">nessun limite</span>),
+      allinea: 'destra',
+    },
     {
       chiave: 'stato',
       titolo: 'Stato',
@@ -102,8 +114,12 @@ export function Progetti() {
 function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto | null; onChiudi: () => void; onSalvato: () => void }) {
   const [modulo, setModulo] = useState<Modulo>(
     progetto
-      ? { codice: progetto.codice, nome: progetto.nome, cliente: progetto.cliente ?? '', dataInizio: progetto.dataInizio, dataFine: progetto.dataFine ?? '', stato: progetto.stato, colore: progetto.colore ?? '' }
-      : { codice: '', nome: '', cliente: '', dataInizio: oggiIso(), dataFine: '', stato: 'ATTIVO', colore: '' },
+      ? {
+          codice: progetto.codice, nome: progetto.nome, cliente: progetto.cliente ?? '', dataInizio: progetto.dataInizio, dataFine: progetto.dataFine ?? '',
+          stato: progetto.stato, colore: progetto.colore ?? '',
+          maxOre: progetto.maxMinutiGiorno != null ? String(progetto.maxMinutiGiorno / 60).replace('.', ',') : '',
+        }
+      : { codice: '', nome: '', cliente: '', dataInizio: oggiIso(), dataFine: '', stato: 'ATTIVO', colore: '', maxOre: '' },
   );
   const [errori, setErrori] = useState<Record<string, string>>({});
   const [messaggio, setMessaggio] = useState<string | null>(null);
@@ -113,7 +129,9 @@ function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto 
     onChange: (e: { target: { value: string } }) => setModulo((m) => ({ ...m, [nome]: e.target.value })),
   });
 
-  const invia = async (corpo: Modulo) => {
+  const invia = async (valori: Modulo) => {
+    const { maxOre, ...resto } = valori;
+    const corpo = { ...resto, maxMinutiGiorno: minutiDaOre(maxOre) };
     const controllo = schemaProgetto.safeParse(corpo);
     if (!controllo.success) {
       setErrori(erroriPerCampo(controllo.error));
@@ -158,15 +176,20 @@ function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto 
         <Campo etichetta="Nome" obbligatorio errore={errori.nome}>
           <input className={classiInput(errori.nome)} {...campo('nome')} />
         </Campo>
-        <Campo etichetta="Cliente" errore={errori.cliente}>
-          <input className={classiInput(errori.cliente)} {...campo('cliente')} />
-        </Campo>
+        <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
+          <Campo etichetta="Cliente" errore={errori.cliente}>
+            <input className={classiInput(errori.cliente)} {...campo('cliente')} />
+          </Campo>
+          <Campo etichetta="Ore massime al giorno" errore={errori.maxMinutiGiorno} aiuto="Per dipendente; vuoto = nessun limite">
+            <input inputMode="decimal" placeholder="es. 8" className={`${classiInput(errori.maxMinutiGiorno)} text-right`} {...campo('maxOre')} />
+          </Campo>
+        </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <Campo etichetta="Data inizio" obbligatorio errore={errori.dataInizio}>
-            <input type="date" className={classiInput(errori.dataInizio)} {...campo('dataInizio')} />
+            <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataInizio)} {...campo('dataInizio')} />
           </Campo>
           <Campo etichetta="Data fine" errore={errori.dataFine}>
-            <input type="date" className={classiInput(errori.dataFine)} {...campo('dataFine')} />
+            <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataFine)} {...campo('dataFine')} />
           </Campo>
           <Campo etichetta="Colore nel calendario" errore={errori.colore}>
             <input type="color" className="h-[34px] w-full rounded border border-gray-300" value={modulo.colore || '#0c4577'} onChange={(e) => setModulo((m) => ({ ...m, colore: e.target.value }))} />

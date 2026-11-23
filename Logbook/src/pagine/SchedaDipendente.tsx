@@ -11,7 +11,7 @@
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { formattaData, oggiIso } from '../../comune/date';
+import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { centesimiDaEuro, euroDaCentesimi } from '../../comune/importi';
 import { erroriPerCampo, ETICHETTE_CONTRATTO, schemaDipendente, TIPI_CONTRATTO } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
@@ -182,7 +182,7 @@ export function SchedaDipendente() {
             </select>
           </Campo>
           <Campo etichetta="Data assunzione" obbligatorio errore={err('dataAssunzione')}>
-            <input type="date" className={classiInput(err('dataAssunzione'))} {...campo('dataAssunzione')} />
+            <input type="date" min={DATA_MINIMA} className={classiInput(err('dataAssunzione'))} {...campo('dataAssunzione')} />
           </Campo>
           <Campo etichetta="Ore contrattuali settimanali" obbligatorio errore={err('oreSettimanali')}>
             <input type="number" min={1} max={60} step={0.5} className={classiInput(err('oreSettimanali'))} {...campo('oreSettimanali')} />
@@ -195,7 +195,7 @@ export function SchedaDipendente() {
           </Campo>
           {modulo.stato === 'CESSATO' && (
             <Campo etichetta="Data cessazione" obbligatorio errore={err('dataCessazione')}>
-              <input type="date" className={classiInput(err('dataCessazione'))} {...campo('dataCessazione')} />
+              <input type="date" min={DATA_MINIMA} className={classiInput(err('dataCessazione'))} {...campo('dataCessazione')} />
             </Campo>
           )}
         </div>
@@ -310,7 +310,7 @@ function BloccoStato({ dipendente, onAggiornato }: { dipendente: Dipendente; onA
       {dipendente.stato === 'ATTIVO' ? (
         <div className="flex flex-wrap items-end gap-3">
           <Campo etichetta="Data di cessazione">
-            <input type="date" className={classiInput()} value={data} onChange={(e) => setData(e.target.value)} />
+            <input type="date" min={DATA_MINIMA} className={classiInput()} value={data} onChange={(e) => setData(e.target.value)} />
           </Campo>
           <Pulsante variante="pericolo" onClick={() => esegui('disattiva')}>
             Disattiva dipendente

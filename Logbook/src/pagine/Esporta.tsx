@@ -8,9 +8,10 @@
  * API: POST /api/esporta/riepilogo | /calendario | /progetti (server/rotte/esporta.ts).
  */
 import { useEffect, useState } from 'react';
-import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, oggiIso } from '../../comune/date';
+import { DATA_MINIMA, aggiungiGiorni, dataIso, formattaData, giorniNelMese, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { api, scaricaFile } from '../api';
+import { EstrattiMensili } from '../componenti/EstrattiMensili';
 import { Avviso, Campo, classiInput, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Dipendente, Progetto } from '../tipi';
 import { usaDati } from '../usaDati';
@@ -101,12 +102,14 @@ export function Esporta() {
 
   return (
     <>
-      <IntestazionePagina titolo="Esporta in Excel" sottotitolo="Report del calendario lavorato e delle ore per progetto" />
+      {/* "no-print": in stampa resta solo l'anteprima degli estratti mensili (EstrattiMensili). */}
+      <div className="no-print">
+      <IntestazionePagina titolo="Esporta" sottotitolo="Report del periodo in Excel ed estratti mensili per dipendente (Excel, stampa, PDF)" />
 
       <div className="mb-3 rounded border border-gray-200 bg-white p-3">
         <div className="flex flex-wrap items-end gap-3">
           <Campo etichetta="Dal">
-            <input type="date" className={classiInput()} value={da} onChange={(e) => setDa(e.target.value)} />
+            <input type="date" min={DATA_MINIMA} className={classiInput()} value={da} onChange={(e) => setDa(e.target.value)} />
           </Campo>
           <Campo etichetta="Al">
             <input type="date" className={classiInput()} value={a} min={da} onChange={(e) => setA(e.target.value)} />
@@ -162,6 +165,9 @@ export function Esporta() {
           </Pulsante>
         </div>
       </div>
+      </div>
+
+      <EstrattiMensili dipendenteIds={dipendenteIds} progettoIds={progettoIds} />
     </>
   );
 }

@@ -85,6 +85,8 @@ come testo sia come valori data/ora di Excel.
 | Festività | Nazionali calcolate per anno, locali (patrono) e aziendali inserite da HR |
 | Import | Modello Excel, anteprima con errori riga per riga, import "tutto o niente" |
 | Export | Calendario lavorato (un foglio per dipendente) e ore per progetto (con costo lordo) |
+| Estratti mensili | Per mese e dipendente: "mese a calendario" (calendario + anagrafica + progetti) e "giorni e costi" (una riga per giorno con costo netto/lordo, ferie e malattia comprese); anteprima, Excel e stampa/PDF |
+| Limiti | Nessun inserimento prima del 01/01/2020; ore massime al giorno per progetto (per dipendente, salvataggio bloccato oltre il limite) |
 
 ## Accesso e sicurezza
 

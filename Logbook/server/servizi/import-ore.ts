@@ -15,9 +15,9 @@
  */
 import ExcelJS from 'exceljs';
 import type { PrismaClient } from '../../generated/prisma/client';
-import { aggiungiGiorni, formattaData, isFineSettimana } from '../../comune/date';
+import { aggiungiGiorni, DATA_MINIMA, formattaData, isFineSettimana, MESSAGGIO_DATA_MINIMA } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
-import { siSovrappongono } from '../../comune/registrazioni';
+import { messaggioMassimo, siSovrappongono } from '../../comune/registrazioni';
 import { caricaContestoOre, erroriRegole } from './regole-ore';
 import { caricaLibro, dataCella, orarioCella, stileIntestazione, testoCella } from './excel';
 
@@ -193,6 +193,7 @@ export async function analizzaFile(prisma: PrismaClient, dati: Buffer, oggi: str
     if (!codiceProgetto) riga.errori.push('Codice progetto mancante');
     if (!testoData) riga.errori.push('Data mancante');
     else if (!riga.data) riga.errori.push(`Data non valida: "${testoData}" (usa gg/mm/aaaa)`);
+    else if (riga.data < DATA_MINIMA) riga.errori.push(MESSAGGIO_DATA_MINIMA);
     if (!testoInizio) riga.errori.push('Ora inizio mancante');
     else if (!riga.oraInizio) riga.errori.push(`Ora inizio non valida: "${testoInizio}" (usa HH:MM)`);
     if (!testoFine) riga.errori.push('Ora fine mancante');
@@ -253,6 +254,19 @@ export async function analizzaFile(prisma: PrismaClient, dati: Buffer, oggi: str
         (altra) => altra !== r && altra.riga < r.riga && altra.matricola === r.matricola && altra.data === r.data && altra.oraInizio && altra.oraFine && altra.minuti && siSovrappongono(fascia, { oraInizio: altra.oraInizio, oraFine: altra.oraFine }),
       );
       if (nelFile) r.errori.push(`Si sovrappone alla riga ${nelFile.riga} del file (${nelFile.oraInizio}-${nelFile.oraFine})`);
+
+      // Ore massime giornaliere del progetto: ore già nel database + righe precedenti del
+      // file per lo stesso dipendente, giorno e progetto + questa riga.
+      if (prog.maxMinutiGiorno != null) {
+        const giaInDbMinuti = esistenti
+          .filter((e) => e.dipendenteId === dip.id && e.data === r.data && e.progettoId === prog.id)
+          .reduce((s, e) => s + durataMinuti(e.oraInizio, e.oraFine), 0);
+        const precedentiNelFile = daControllare
+          .filter((x) => x.riga < r.riga && x.matricola === r.matricola && x.data === r.data && x.codiceProgetto === r.codiceProgetto && x.minuti)
+          .reduce((s, x) => s + (x.minuti ?? 0), 0);
+        const totale = giaInDbMinuti + precedentiNelFile + r.minuti;
+        if (totale > prog.maxMinutiGiorno) r.errori.push(messaggioMassimo(prog.codice, totale, prog.maxMinutiGiorno));
+      }
     }
   }
 

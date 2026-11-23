@@ -140,6 +140,10 @@ model Progetto {
   stato         StatoProgetto         @default(ATTIVO)
   /// Colore del progetto nel calendario ("#RRGGBB"); se vuoto il frontend ne sceglie uno.
   colore        String?
+  /// Ore massime che UN dipendente può registrare su questo progetto in UN giorno, in
+  /// minuti (richiesta del 23/11/2026, risposta 2b: oltre il limite il salvataggio è
+  /// bloccato). Vuoto = nessun limite.
+  maxMinutiGiorno Int?
   registrazioni RegistrazioneOraria[]
   creatoIl      DateTime              @default(now())
   aggiornatoIl  DateTime              @updatedAt

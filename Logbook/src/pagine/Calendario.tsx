@@ -24,7 +24,7 @@ import { usaDati } from '../usaDati';
 
 type FasciaCal = {
   id: number; dipendenteId: number; progettoId: number; data: string; oraInizio: string; oraFine: string; note: string | null; minuti: number;
-  progetto: { codice: string; nome: string; colore: string | null }; dipendente: { nome: string; cognome: string };
+  progetto: { codice: string; nome: string; colore: string | null; maxMinutiGiorno: number | null }; dipendente: { nome: string; cognome: string };
 };
 type AssenzaCal = {
   id: number; dipendenteId: number; tipo: TipoAssenza; dataInizio: string; dataFine: string; minutiPermesso: number | null; stato: StatoAssenza;
@@ -228,9 +228,13 @@ export function Calendario() {
                   ))}
                   {vista === 'mese'
                     ? [...perProgetto.values()].map(({ minuti, f }) => (
-                        <span key={f.progettoId} className="flex items-center justify-between gap-1 truncate rounded px-1 text-white" style={{ backgroundColor: coloreFascia(f) }} title={`${f.progetto.codice} ${f.progetto.nome}`}>
+                        <span key={f.progettoId} className="flex items-center justify-between gap-1 truncate rounded px-1 text-white" style={{ backgroundColor: coloreFascia(f) }} title={`${f.progetto.codice} ${f.progetto.nome}${f.progetto.maxMinutiGiorno != null ? ` — massimo ${formattaOre(f.progetto.maxMinutiGiorno)} ore al giorno per dipendente` : ''}`}>
                           <span className="truncate">{f.progetto.codice}</span>
-                          <span className="cifre">{formattaOre(minuti)}</span>
+                          <span className="cifre">
+                            {formattaOre(minuti)}
+                            {/* Ore massime del progetto: si vede solo con un dipendente scelto (il limite è per persona) */}
+                            {f.progetto.maxMinutiGiorno != null && dipendenteId && <span className="opacity-70">/{formattaOre(f.progetto.maxMinutiGiorno)}</span>}
+                          </span>
                         </span>
                       ))
                     : fasce.map((f) => (
@@ -260,6 +264,7 @@ export function Calendario() {
                     <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: coloreProgetto(p) }} />
                     {p.codice}
                     <span className="cifre font-semibold">{formattaOre(totaliPeriodo.perProgetto[p.id])}</span>
+                    {p.maxMinutiGiorno != null && <span className="cifre text-xs text-gray-500">· max {formattaOre(p.maxMinutiGiorno)}/giorno</span>}
                   </span>
                 ))}
             </div>

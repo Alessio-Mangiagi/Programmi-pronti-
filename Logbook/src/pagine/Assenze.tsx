@@ -13,7 +13,7 @@
  */
 import { useMemo, useState, type FormEvent } from 'react';
 import { ETICHETTE_ASSENZA, ETICHETTE_FESTIVITA, ETICHETTE_STATO_ASSENZA, schemaAssenza, schemaFestivita, TIPI_ASSENZA, TIPI_FESTIVITA } from '../../comune/assenze';
-import { formattaData, oggiIso } from '../../comune/date';
+import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
@@ -271,7 +271,7 @@ function ModuloAssenza({
           </Campo>
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo etichetta={m.tipo === 'PERMESSO' ? 'Giorno' : 'Dal'} obbligatorio errore={errori.dataInizio}>
-              <input type="date" className={classiInput(errori.dataInizio)} value={m.dataInizio} onChange={(e) => imposta('dataInizio', e.target.value)} />
+              <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataInizio)} value={m.dataInizio} onChange={(e) => imposta('dataInizio', e.target.value)} />
             </Campo>
             {m.tipo === 'PERMESSO' ? (
               <Campo etichetta="Durata (ore)" obbligatorio errore={errori.minutiPermesso} aiuto="Es. 2 oppure 1,5">
@@ -428,7 +428,7 @@ function GestioneFestivita() {
 
       <form onSubmit={aggiungi} className="flex flex-wrap items-end gap-2 rounded border border-gray-200 bg-white p-3" noValidate>
         <Campo etichetta="Data" errore={errori.data}>
-          <input type="date" className={classiInput(errori.data)} value={nuova.data} onChange={(e) => setNuova({ ...nuova, data: e.target.value })} />
+          <input type="date" min={DATA_MINIMA} className={classiInput(errori.data)} value={nuova.data} onChange={(e) => setNuova({ ...nuova, data: e.target.value })} />
         </Campo>
         <Campo etichetta="Descrizione" errore={errori.descrizione} className="min-w-64 flex-1">
           <input className={classiInput(errori.descrizione)} placeholder="Es. Santo patrono" value={nuova.descrizione} onChange={(e) => setNuova({ ...nuova, descrizione: e.target.value })} />

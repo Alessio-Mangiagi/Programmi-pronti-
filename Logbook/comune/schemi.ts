@@ -10,7 +10,7 @@
  */
 import { z } from 'zod';
 import { validaCodiceFiscale } from './codiceFiscale';
-import { isDataValida } from './date';
+import { DATA_MINIMA, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
 
 /** Testo facoltativo: spazi tolti, "" o assente → null. */
 const testoFacoltativo = (max: number) =>
@@ -27,13 +27,26 @@ const testoObbligatorio = (etichetta: string, max: number) =>
     .min(1, `${etichetta}: campo obbligatorio`)
     .max(max, `Massimo ${max} caratteri`);
 
-/** Data "AAAA-MM-GG" obbligatoria. */
+/**
+ * Data "AAAA-MM-GG" obbligatoria, non precedente al 01/01/2020 (DATA_MINIMA).
+ * Usata da tutti i moduli di inserimento: anagrafiche, ore, assenze, festività.
+ */
 export const dataObbligatoria = (etichetta: string) =>
-  z.string({ error: `${etichetta}: campo obbligatorio` }).refine(isDataValida, `${etichetta}: data non valida`);
+  z
+    .string({ error: `${etichetta}: campo obbligatorio` })
+    .refine(isDataValida, `${etichetta}: data non valida`)
+    .refine((d) => d >= DATA_MINIMA, `${etichetta}: ${MESSAGGIO_DATA_MINIMA.toLowerCase()}`);
 
-/** Data "AAAA-MM-GG" facoltativa ("" → null). */
+/** Data "AAAA-MM-GG" facoltativa ("" → null), con lo stesso limite minimo. */
 const dataFacoltativa = (etichetta: string) =>
-  z.preprocess((v) => v || null, z.string().refine(isDataValida, `${etichetta}: data non valida`).nullable());
+  z.preprocess(
+    (v) => v || null,
+    z
+      .string()
+      .refine(isDataValida, `${etichetta}: data non valida`)
+      .refine((d) => d >= DATA_MINIMA, `${etichetta}: ${MESSAGGIO_DATA_MINIMA.toLowerCase()}`)
+      .nullable(),
+  );
 
 /** Importo in centesimi facoltativo, non negativo. */
 const centesimiFacoltativi = z.preprocess(
@@ -122,6 +135,16 @@ export const schemaProgetto = z
     dataFine: dataFacoltativa('Data fine'),
     stato: z.enum(STATI_PROGETTO).default('ATTIVO'),
     colore: z.preprocess((v) => v || null, z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Colore non valido (#RRGGBB)').nullable()),
+    /** Ore massime per dipendente al giorno su questo progetto, in minuti (vuoto = nessun limite). */
+    maxMinutiGiorno: z.preprocess(
+      (v) => (v === '' || v === undefined ? null : v),
+      z.coerce
+        .number({ error: 'Ore massime: numero non valido' })
+        .int('Ore massime: numero non valido')
+        .min(15, 'Ore massime: almeno 15 minuti')
+        .max(24 * 60, 'Ore massime: al massimo 24 ore')
+        .nullable(),
+    ),
   })
   .superRefine((p, ctx) => {
     if (p.dataFine && p.dataFine < p.dataInizio) {

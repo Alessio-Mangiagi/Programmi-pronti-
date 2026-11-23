@@ -24,3 +24,34 @@ body {
 .cifre {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Stampa / PDF degli estratti mensili (pagina Esporta): spariscono menu, intestazione e
+ * comandi (.no-print); ogni dipendente (.pagina-stampa) va su una pagina A4 orizzontale.
+ * I colori di sfondo (ferie, malattia, festivi) si stampano grazie a print-color-adjust.
+ */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  body {
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  aside.fixed,
+  header,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .pagina-stampa {
+    break-after: page;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

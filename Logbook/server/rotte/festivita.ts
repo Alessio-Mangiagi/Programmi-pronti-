@@ -56,7 +56,7 @@ export function rotteFestivita(prisma: PrismaClient) {
 
   /** Aggiunge le festività nazionali dell'anno che mancano; non tocca quelle già presenti. */
   router.post('/carica-nazionali', richiediAdmin, async (req, res) => {
-    const { anno } = z.object({ anno: z.coerce.number().int().min(2000, 'Anno non valido').max(2100, 'Anno non valido') }).parse(req.body);
+    const { anno } = z.object({ anno: z.coerce.number().int().min(2020, 'Non si possono inserire anni precedenti al 2020').max(2100, 'Anno non valido') }).parse(req.body);
     const presenti = new Set((await prisma.festivita.findMany({ where: { data: { gte: `${anno}-01-01`, lte: `${anno}-12-31` } } })).map((f) => f.data));
     const nuove = festivitaNazionali(anno).filter((f) => !presenti.has(f.data));
     if (nuove.length) await prisma.festivita.createMany({ data: nuove.map((f) => ({ ...f, tipo: 'NAZIONALE' as const })) });

@@ -52,6 +52,11 @@ Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata.
 
 - Una fascia non può passare la mezzanotte: un turno di notte va diviso in due giorni.
 - Non si registrano ore nei giorni futuri né nei giorni di ferie o malattia approvate.
+- Non si inserisce **nulla prima del 01/01/2020** (ore, assenze, festività, date di
+  assunzione e dei progetti, righe dell'import).
+- Se il progetto ha **ore massime al giorno**, sotto le righe compare per ogni progetto
+  "ore del giorno / max": oltre il limite il riquadro diventa rosso e **Salva giornata** si
+  disattiva (il limite vale per ciascun dipendente).
 - **Salva giornata** salva tutte le righe insieme; con la ✕ si toglie una riga.
 
 ### Chiedere ferie, permessi o malattia
@@ -121,8 +126,12 @@ per ordinare; filtro attivi/cessati. Clic su una riga per aprire la scheda.
 
 ![Progetti](img/07-progetti.png)
 
-Codice (unico), nome, cliente, date e colore nel calendario. **Chiudi progetto** lo toglie
-dai progetti selezionabili per nuove ore; quelle già registrate restano.
+Codice (unico), nome, cliente, date, colore nel calendario e **ore massime al giorno**
+per dipendente (vuoto = nessun limite). Il limite compare nella tabella dei progetti, nel
+calendario (con un dipendente filtrato le caselle mostrano "ore/massimo", la legenda
+"max …/giorno") e nell'editor della giornata; oltre il limite le ore non si salvano, né da
+interfaccia né da import. **Chiudi progetto** lo toglie dai progetti selezionabili per
+nuove ore; quelle già registrate restano.
 
 ### Assenze
 
@@ -173,3 +182,29 @@ calendario. Poi:
   il totale complessivo e un foglio riassuntivo dipendenti × progetti.
 
 Le ore nei file Excel sono in formato ore:minuti (es. 7:30) e si possono sommare.
+
+### Estratti mensili (Excel, stampa e PDF)
+
+In fondo alla pagina **Esporta**: scegliete il **mese** (da gennaio 2020) e, se serve, i
+dipendenti e i progetti nelle caselle in alto. Sotto compare l'anteprima, un dipendente per
+pagina, in due versioni:
+
+**Mese a calendario**: a sinistra il calendario del mese con le ore di ogni giorno e i
+progetti (ferie in azzurro, malattia in rosso, permessi in giallo, festivi in grigio/viola),
+a destra l'anagrafica e il riepilogo del mese (ore lavorate e attese, ferie, malattia,
+permessi, costo netto e lordo), in basso la descrizione dei progetti lavorati con le ore
+massime al giorno e le ore del mese.
+
+![Estratto: mese a calendario](img/15-estratto-mese-calendario.png)
+
+**Giorni e costi**: in testa tutti i dati del dipendente, poi una riga per ogni giorno con
+ore, progetti, fasce, assenze (ferie, malattia, permessi), festività, ore retribuite e
+**costo netto e lordo del giorno**. Ferie e malattia nei giorni lavorativi valgono le ore
+del contratto di quel giorno (ore settimanali / 5), i permessi la loro durata; le festività
+sono indicate senza costo.
+
+![Estratto: giorni e costi](img/16-estratto-giorni-costi.png)
+
+- **⤓ Excel** scarica la versione scelta (un foglio per dipendente).
+- **🖶 Stampa / PDF** apre la stampa del browser: scegliete "Salva come PDF" (orientamento
+  orizzontale). In stampa spariscono menu e comandi e ogni dipendente va su una pagina.

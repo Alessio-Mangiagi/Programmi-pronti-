@@ -10,7 +10,8 @@ sessione per riprendere da dove si era rimasti.
 
 - **Giorno corrente:** 10 — Test e consegna ✅ completato: **piano di 10 giorni concluso**
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti" per i punti da decidere
+- **Giorno 11 (23/11):** richieste aggiuntive ✅ (data minima 2020, ore massime per progetto, estratti mensili)
+- **Prossimo:** Giorno 12 — nuova estetica con la skill Cosedilfrontend (richiesta del 23/11)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -71,6 +72,10 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Produzione = un solo server sulla 5210 (`npm start`: prepara DB + build + Express serve `dist/`); `avvia.bat`/`avvia.vbs` usano questa modalità | Una porta, nessun Vite in esercizio; il Portale avvia le app con un .vbs |
 | 23/11 | Card nel Portale: id `logbook`, `dir: 'logbook'` minuscolo, blocco Caddy `logbook.{$SUITE_DOMINIO}` | `sottodominio()` del Portale vuole la cartella in minuscolo; su Windows il percorso la trova lo stesso |
 | 23/11 | `allowScripts` in package.json per better-sqlite3, esbuild, prisma, @prisma/engines | npm 11 avvisa (e in futuro bloccherà) gli script d'installazione non approvati: senza, il modulo nativo SQLite non si compilerebbe |
+| 23/11 | Nessun inserimento prima del 01/01/2020, ovunque (risposta 1b): ore, assenze, festività, import, assunzione/cessazione, date dei progetti. `DATA_MINIMA` in `comune/date.ts` | Richiesta dell'utente; la lettura di dati vecchi resta possibile |
+| 23/11 | Ore massime giornaliere sul progetto (`maxMinutiGiorno`), per dipendente, salvataggio bloccato oltre il limite (risposta 2b) da interfaccia, API e import | Richiesta dell'utente; visibili in scheda progetto, calendario ed editor |
+| 23/11 | Estratti mensili "mese a calendario" e "giorni e costi" in Excel + anteprima + stampa/PDF dal browser (risposta 3abc) | Un solo calcolo (`comune/estratto-mese.ts`) per tutte e tre le uscite; PDF dalla stampa per avere lo stesso aspetto dell'anteprima senza librerie in più |
+| 23/11 | Costo del giorno netto e lordo; ferie/malattia valorizzate a ore di contratto nei giorni lavorativi, permessi alla loro durata, festività senza costo (risposta 4c) | Richiesta dell'utente; festività senza costo è una scelta mia, da confermare |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -276,3 +281,31 @@ Verifiche:
   pagine; mario.rossi ha solo Dashboard / Calendario / Le mie assenze; nell'editor una
   fascia sovrapposta blocca il salvataggio; corretta, le due fasce vengono salvate
   (07:30-12:30 e 13:30-16:30 del 23/11, verificate via API).
+
+### Giorno 11 — Richieste aggiuntive (23/11/2026) ✅
+
+Richiesta: niente inserimenti prima del 01/01/2020; ore massime giornaliere visibili in
+calendario e scheda progetto; estratto del mese a calendario con anagrafica a destra e
+progetti in basso; estratto con giorni in verticale, ore, costo del giorno, ferie e malattia.
+Risposte: 1b 2b 3abc 4c.
+
+Fatto:
+- `DATA_MINIMA` (01/01/2020) in tutti gli schemi di inserimento, import, disattivazione,
+  festività nazionali; `min` sui campi data dei moduli.
+- Migrazione `ore_massime_progetto` (`Progetto.maxMinutiGiorno`); controllo in
+  `PUT /giornata`, `POST`/`PUT` fascia e import (`superamentiMassimo`, `messaggioMassimo`);
+  campo e colonna in Progetti, riepilogo per progetto e blocco nell'editor, limite nel
+  calendario (caselle con dipendente filtrato, tooltip, legenda).
+- `comune/estratto-mese.ts` (calcolo puro), `server/servizi/estratto-mese.ts` (due Excel),
+  `POST /api/esporta/mese`, `/mese/calendario`, `/mese/giorni`; componente
+  `EstrattiMensili` con anteprima dei due layout e stampa (regole `@media print`).
+- Seed: assunzioni dal 2020, PRG-001/PRG-002 con massimo 9:00; DB demo in uso aggiornato
+  senza cancellare nulla.
+- Guida (nuove sezioni e screenshot 15-16) e README.
+
+Verifiche:
+- `npm test`: 138/138 (nuovi `regole-giorno11.test.ts` ed `estratto-mese.test.ts`: date
+  prima del 2020 rifiutate ovunque, giornata/fascia/import oltre il massimo bloccati,
+  ore dell'estratto = calendario, ferie e permessi valorizzati, struttura dei due Excel).
+- Anteprima reale e PDF di stampa generato da Edge: una pagina A4 orizzontale per
+  dipendente, menu nascosti, colori di ferie e festivi stampati.

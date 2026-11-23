@@ -10,7 +10,7 @@
  *   del dipendente non sono ammesse per la malattia, così nessuno le usa per scriverle.
  */
 import { z } from 'zod';
-import { isDataValida } from './date';
+import { isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
 
 export const TIPI_ASSENZA = ['FERIE', 'PERMESSO', 'MALATTIA'] as const;
 export const ETICHETTE_ASSENZA: Record<(typeof TIPI_ASSENZA)[number], string> = { FERIE: 'Ferie', PERMESSO: 'Permesso', MALATTIA: 'Malattia' };
@@ -24,8 +24,8 @@ export const schemaAssenza = z
   .object({
     dipendenteId: z.coerce.number().int().positive().optional(),
     tipo: z.enum(TIPI_ASSENZA, { error: "Scegli il tipo di assenza" }),
-    dataInizio: z.string({ error: 'Data inizio: campo obbligatorio' }).refine(isDataValida, 'Data inizio non valida'),
-    dataFine: z.string({ error: 'Data fine: campo obbligatorio' }).refine(isDataValida, 'Data fine non valida'),
+    dataInizio: z.string({ error: 'Data inizio: campo obbligatorio' }).refine(isDataValida, 'Data inizio non valida').refine(isDataAmmessa, MESSAGGIO_DATA_MINIMA),
+    dataFine: z.string({ error: 'Data fine: campo obbligatorio' }).refine(isDataValida, 'Data fine non valida').refine(isDataAmmessa, MESSAGGIO_DATA_MINIMA),
     minutiPermesso: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.coerce.number().int().nullable()),
     noteDipendente: testoFacoltativo(500),
     protocolloCertificato: z.preprocess(
@@ -73,7 +73,7 @@ export const ETICHETTE_FESTIVITA: Record<(typeof TIPI_FESTIVITA)[number], string
 };
 
 export const schemaFestivita = z.object({
-  data: z.string({ error: 'Data: campo obbligatorio' }).refine(isDataValida, 'Data non valida'),
+  data: z.string({ error: 'Data: campo obbligatorio' }).refine(isDataValida, 'Data non valida').refine(isDataAmmessa, MESSAGGIO_DATA_MINIMA),
   descrizione: z.string({ error: 'Descrizione: campo obbligatorio' }).trim().min(2, 'Descrizione: almeno 2 caratteri').max(120),
   tipo: z.enum(TIPI_FESTIVITA, { error: 'Scegli il tipo' }),
 });

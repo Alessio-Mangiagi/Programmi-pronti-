@@ -18,7 +18,7 @@ import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { isDataValida } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
-import { messaggioSovrapposizione, primaSovrapposizione, schemaGiornata, schemaRegistrazione } from '../../comune/registrazioni';
+import { messaggioMassimo, messaggioSovrapposizione, primaSovrapposizione, schemaGiornata, schemaRegistrazione, superamentiMassimo } from '../../comune/registrazioni';
 import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
 import { dipendenteAmmesso, idDaParametro } from '../middleware';
 import { caricaContestoOre, erroriRegole } from '../servizi/regole-ore';
@@ -30,7 +30,7 @@ export function dataDaQuery(valore: unknown, nome: string): string | undefined {
   return valore;
 }
 
-const conProgetto = { progetto: { select: { codice: true, nome: true, colore: true } } } as const;
+const conProgetto = { progetto: { select: { codice: true, nome: true, colore: true, maxMinutiGiorno: true } } } as const;
 
 export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   const router = Router();
@@ -50,6 +50,23 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
         throw richiestaNonValida(errori[0].messaggio, campi);
       }
     }
+  }
+
+  /**
+   * Ore massime giornaliere dei progetti (risposta 2b): `fasce` sono TUTTE le fasce che il
+   * dipendente avrebbe nel giorno dopo il salvataggio. Oltre il limite → 400 con l'errore
+   * sul progetto (per la giornata intera, su ogni riga di quel progetto).
+   */
+  async function controllaMassimi(fasce: { progettoId: number; oraInizio: string; oraFine: string }[], perRiga: boolean) {
+    const progetti = await prisma.progetto.findMany({ where: { id: { in: [...new Set(fasce.map((f) => f.progettoId))] } } });
+    const oltre = superamentiMassimo(fasce, new Map(progetti.map((p) => [p.id, p.maxMinutiGiorno])));
+    if (!oltre.length) return;
+    const { progettoId, minuti, massimo } = oltre[0];
+    const messaggio = messaggioMassimo(progetti.find((p) => p.id === progettoId)!.codice, minuti, massimo);
+    const campi = perRiga
+      ? Object.fromEntries(fasce.flatMap((f, i) => (f.progettoId === progettoId ? [[`fasce.${i}.progettoId`, messaggio]] : [])))
+      : { progettoId: messaggio };
+    throw richiestaNonValida(messaggio, campi);
   }
 
   router.get('/', async (req, res) => {
@@ -74,6 +91,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     dipendenteAmmesso(req, g.dipendenteId);
     const esistenti = await fasceDelGiorno(g.dipendenteId, g.data);
     await controllaRegole(g.dipendenteId, g.data, g.fasce.map((f) => f.progettoId), new Set(esistenti.map((e) => e.progettoId)));
+    await controllaMassimi(g.fasce, true);
     // Sostituzione atomica: o tutte le fasce nuove o nessuna modifica.
     await prisma.$transaction([
       prisma.registrazioneOraria.deleteMany({ where: { dipendenteId: g.dipendenteId, data: g.data } }),
@@ -93,6 +111,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
       const messaggio = messaggioSovrapposizione(r, conflitto, r.data);
       throw new ErroreHttp(409, messaggio, { oraInizio: messaggio });
     }
+    await controllaMassimi([...esistenti, r], false);
     const creata = await prisma.registrazioneOraria.create({ data: r, include: conProgetto });
     res.status(201).json({ ...creata, minuti: durataMinuti(creata.oraInizio, creata.oraFine) });
   });
@@ -112,6 +131,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
       const messaggio = messaggioSovrapposizione(r, conflitto, r.data);
       throw new ErroreHttp(409, messaggio, { oraInizio: messaggio });
     }
+    await controllaMassimi([...esistenti.filter((e) => e.id !== id), r], false);
     const aggiornata = await prisma.registrazioneOraria.update({ where: { id }, data: r, include: conProgetto });
     res.json({ ...aggiornata, minuti: durataMinuti(aggiornata.oraInizio, aggiornata.oraFine) });
   });

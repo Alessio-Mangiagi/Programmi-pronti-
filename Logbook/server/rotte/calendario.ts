@@ -47,7 +47,7 @@ export function rotteCalendario(prisma: PrismaClient) {
       prisma.registrazioneOraria.findMany({
         where: { data: { gte: da, lte: a }, ...(dipendenteId ? { dipendenteId } : {}), ...(progettoId ? { progettoId } : {}) },
         include: {
-          progetto: { select: { codice: true, nome: true, colore: true } },
+          progetto: { select: { codice: true, nome: true, colore: true, maxMinutiGiorno: true } },
           dipendente: { select: { nome: true, cognome: true } },
         },
         orderBy: [{ data: 'asc' }, { oraInizio: 'asc' }],
