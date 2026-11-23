@@ -48,8 +48,24 @@ model Utente {
   dipendenteId  Int?        @unique
   /// Richieste di assenza approvate o rifiutate da questo utente (HR).
   assenzeDecise Assenza[]   @relation("DecisioneAssenza")
+  sessioni      Sessione[]
   creatoIl      DateTime    @default(now())
   aggiornatoIl  DateTime    @updatedAt
+}
+
+/// Sessione di accesso aperta col login (server/auth/sessioni.ts).
+/// Nel browser c'è un cookie HttpOnly con un token casuale; qui si salva solo
+/// l'impronta SHA-256 del token, così chi legge il database non può riusarlo.
+/// Il logout o la disattivazione dell'utente cancellano le sue sessioni.
+model Sessione {
+  /// SHA-256 esadecimale del token del cookie.
+  id       String   @id
+  utente   Utente   @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  utenteId Int
+  scadeIl  DateTime
+  creatoIl DateTime @default(now())
+
+  @@index([utenteId])
 }
 
 // ---------------------------------------------------------------------------

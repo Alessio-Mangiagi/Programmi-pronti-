@@ -7,14 +7,13 @@
  * novembre (15), 9 fasce al giorno (Ferrari è part-time, una fascia sola), meno le
  * ferie di Rossi (3 giorni × 2 fasce) e la malattia di Esposito (2 giorni × 2 fasce).
  */
-import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { semina } from '../../prisma/seed';
+import { CREDENZIALI_DEMO, semina } from '../../prisma/seed';
 import { validaCodiceFiscale } from '../../comune/codiceFiscale';
 import { festivitaNazionali } from '../../comune/festivita';
 import { isFineSettimana } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
-import { creaApp } from '../app';
+import { avviaServer } from './client-prova';
 import { creaDbProva, type DbProva } from './db-prova';
 
 const OGGI = '2026-11-23';
@@ -81,22 +80,19 @@ describe('dati di esempio', () => {
 });
 
 describe('API', () => {
-  it('GET /api/stato-dati restituisce i conteggi letti dal database', async () => {
-    const server = creaApp(db.prisma).listen(0, '127.0.0.1');
-    await new Promise((ok) => server.once('listening', ok));
+  it('GET /api/stato-dati (da admin) restituisce i conteggi letti dal database', async () => {
+    const server = await avviaServer(db.prisma);
     try {
-      const { port } = server.address() as AddressInfo;
-      const r = await fetch(`http://127.0.0.1:${port}/api/stato-dati`);
-      expect(r.status).toBe(200);
-      const dati = (await r.json()) as { minutiTotali: number; periodo: unknown };
-      expect(dati).toMatchObject({ dipendenti: 5, progetti: 3, registrazioni: 323, assenze: 6 });
-      expect(dati.periodo).toEqual({ da: '2026-10-01', a: '2026-11-20' });
-      expect(dati.minutiTotali).toBeGreaterThan(0);
+      const admin = await server.accedi(CREDENZIALI_DEMO.admin.username, CREDENZIALI_DEMO.admin.password);
+      const r = await admin.chiama('GET', '/api/stato-dati');
+      expect(r.stato).toBe(200);
+      expect(r.corpo).toMatchObject({ dipendenti: 5, progetti: 3, registrazioni: 323, assenze: 6, utenti: 6 });
+      expect(r.corpo.periodo).toEqual({ da: '2026-10-01', a: '2026-11-20' });
+      expect(r.corpo.minutiTotali).toBeGreaterThan(0);
 
-      const sconosciuta = await fetch(`http://127.0.0.1:${port}/api/non-esiste`);
-      expect(sconosciuta.status).toBe(404);
+      expect((await admin.chiama('GET', '/api/non-esiste')).stato).toBe(404);
     } finally {
-      server.close();
+      await server.chiudi();
     }
   });
 });

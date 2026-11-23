@@ -7,6 +7,7 @@
  *    prima volta e aggiorna la struttura dopo un aggiornamento dell'app. Non cancella
  *    mai dati: le migrazioni sono solo quelle già scritte in prisma/migrations.
  * 3. Se non c'è nessun dipendente carica i dati di esempio (prisma/seed.ts).
+ * 4. Se non c'è nessun amministratore attivo ne crea uno (vedi sotto).
  *
  * Così "npm run dev" su una copia appena scaricata parte già con dati da guardare,
  * e su un database in uso non tocca nulla.
@@ -48,6 +49,17 @@ try {
     );
   } else {
     console.log('[logbook] database pronto.');
+  }
+
+  // Senza nessun amministratore nessuno potrebbe creare account: se manca (es. tutti
+  // disattivati per errore, o database migrato da una versione senza utenti) se ne crea
+  // uno con la password di LOGBOOK_ADMIN_PASSWORD o quella di prova, da cambiare subito.
+  if ((await prisma.utente.count({ where: { ruolo: 'ADMIN', attivo: true } })) === 0) {
+    const { creaImpronta } = await import('../server/auth/password');
+    const password = process.env.LOGBOOK_ADMIN_PASSWORD || 'Admin2026!';
+    const username = (await prisma.utente.findUnique({ where: { username: 'admin' } })) ? `admin${Date.now() % 10000}` : 'admin';
+    await prisma.utente.create({ data: { username, passwordHash: await creaImpronta(password), ruolo: 'ADMIN' } });
+    console.log(`[logbook] ATTENZIONE: creato l'amministratore "${username}". Cambiare subito la password dall'app.`);
   }
 } finally {
   await prisma.$disconnect();

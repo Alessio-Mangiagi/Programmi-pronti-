@@ -8,8 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 1 — Fondamenta ✅ completato, **in attesa di conferma** per passare al Giorno 2
-- **Prossimo:** Giorno 2 — Accesso e layout (login, ruoli, protezione API, menu laterale)
+- **Giorno corrente:** 2 — Accesso e layout ✅ completato
+- **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
+- **Prossimo:** Giorno 3 — Anagrafiche (dipendenti e progetti)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -35,6 +36,10 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Festività nazionali calcolate (Pasqua con algoritmo), 4 ottobre dal 2026 | Nessuna lista da aggiornare a mano |
 | 23/11 | `npm run dev` prepara il DB da solo (migrazioni + seed solo se vuoto) | "Un solo comando"; non tocca mai dati esistenti |
 | 23/11 | Override npm `effect` ≥3.22.5 e `uuid` ≥11.1.1 | `npm audit` a 0 vulnerabilità (venivano da Prisma CLI ed ExcelJS) |
+| 23/11 | Sessioni lato server (tabella `Sessione`, solo impronta SHA-256 del token), cookie HttpOnly 12 h, scrypt per le password | Revocabili (logout, utente disattivato), niente dipendenze esterne |
+| 23/11 | CSRF: intestazione `X-Logbook: 1` obbligatoria su POST/PUT/PATCH/DELETE | Un sito esterno non può aggiungerla senza CORS |
+| 23/11 | Limite login: 5 errori in 15 min per IP+utente → 429 | Contro i tentativi a forza bruta |
+| 23/11 | Menu dipendente: Dashboard, Calendario, Le mie assenze | Il resto è HR; i permessi veri sono nelle API |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -45,8 +50,9 @@ sessione per riprendere da dove si era rimasti.
 - Da confermare: "festività del paese specifico" interpretato come **paese/città della sede**
   (patrono). Se invece si intendeva lo **Stato** (dipendenti all'estero), serve un campo
   "paese" su festività e dipendente.
-- `/api/stato-dati` è aperta a chiunque raggiunga la 3012 (solo da questo PC): dal
-  Giorno 2 diventa riservata all'amministratore.
+- `prisma migrate reset` lanciato da un assistente AI viene bloccato da Prisma finché
+  l'utente non dà il consenso: il DB di sviluppo del Giorno 1 è stato aggiornato senza
+  reset (account aggiunti, nessun dato cancellato).
 
 ## Registro giornaliero
 
@@ -72,3 +78,21 @@ Verifiche:
 - Prova dal vivo: cancellato `data/logbook.db`, `npm run dev` → DB ricreato e popolato,
   API su 3012, interfaccia su 5210, `/api/stato-dati` tramite Vite: 5 dipendenti,
   3 progetti, 323 fasce, 6 assenze, 13 festività, 1377 ore totali.
+
+### Giorno 2 — Accesso e layout (23/11/2026) ✅
+
+Fatto:
+- Migrazione `sessioni`; `server/auth/` (password scrypt, sessioni), `server/middleware.ts`
+  (caricaUtente, richiediLogin, richiediAdmin, dipendenteAmmesso, controlloCsrf),
+  `server/errori.ts` (risposte d'errore uniformi con errori per campo).
+- API: `/api/auth/login|logout|io|password`; `/api/dipendenti` e `/api/registrazioni` in
+  lettura con filtro per ruolo; `/api/stato-dati` solo HR.
+- Seed: account `admin` + uno per dipendente; `prepara-db` crea un admin se manca.
+- Interfaccia: login, layout con menu laterale diverso per ruolo, intestazione con utente,
+  cambio password e logout, pagine segnaposto per i giorni successivi.
+
+Verifiche:
+- `npm test`: 42/42 (nuovo `accesso.test.ts`: 401 senza login, 403 sui dati altrui,
+  CSRF, blocco dopo 5 tentativi, logout, utente disattivato, cambio password).
+- Dal vivo tramite Vite: mario.rossi vede 1 dipendente, 403 su scheda e ore di un collega
+  e su `/api/stato-dati`; admin vede 5 dipendenti.

@@ -15,7 +15,7 @@
  *   per non mescolare dati di prova e dati veri.
  *
  * Nomi, codici fiscali (con carattere di controllo valido), telefoni e clienti sono
- * inventati. Gli account di accesso si aggiungono al Giorno 2.
+ * inventati. Account di accesso: vedi CREDENZIALI_DEMO.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +24,7 @@ import { carattereControllo } from '../comune/codiceFiscale';
 import { aggiungiGiorni, dataIso, giorniNelMese, intervalloDate, isFineSettimana, oggiIso } from '../comune/date';
 import { festivitaNazionali } from '../comune/festivita';
 import { minutiDaOrario, orarioDaMinuti } from '../comune/orari';
+import { creaImpronta } from '../server/auth/password';
 
 /** Generatore pseudo-casuale mulberry32: stessi numeri a ogni esecuzione col seme dato. */
 function generatore(seme: number) {
@@ -36,6 +37,18 @@ function generatore(seme: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/**
+ * Credenziali dei dati di esempio (riportate nel README). Solo per prova: su un
+ * database vero si cambiano subito da "Cambia password".
+ */
+export const CREDENZIALI_DEMO = {
+  admin: { username: 'admin', password: 'Admin2026!' },
+  passwordDipendenti: 'Logbook2026!',
+} as const;
+
+/** Username dei dipendenti di esempio: nome.cognome in minuscolo (es. mario.rossi). */
+export const usernameDemo = (d: { nome: string; cognome: string }) => `${d.nome}.${d.cognome}`.toLowerCase();
 
 /** Codice fiscale completo dai primi 15 caratteri (calcola il carattere di controllo). */
 const cf = (primi15: string) => primi15 + carattereControllo(primi15);
@@ -158,24 +171,36 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   for (const d of DIPENDENTI) dipendenti.push(await prisma.dipendente.create({ data: { ...d.dati } }));
   const [rossi, bianchi, esposito, ferrari, russo] = dipendenti;
 
+  // --- Account di accesso: un admin (HR) e un account per ogni dipendente ---------------
+  const hr = await prisma.utente.create({
+    data: { username: CREDENZIALI_DEMO.admin.username, passwordHash: await creaImpronta(CREDENZIALI_DEMO.admin.password), ruolo: 'ADMIN' },
+  });
+  const improntaDipendenti = await creaImpronta(CREDENZIALI_DEMO.passwordDipendenti);
+  for (const d of dipendenti) {
+    await prisma.utente.create({
+      data: { username: usernameDemo(d), passwordHash: improntaDipendenti, ruolo: 'DIPENDENTE', dipendenteId: d.id },
+    });
+  }
+
   // --- Assenze: una per stato e per tipo, in giorni lavorativi veri ---------------------
   const lavPrec = giorniLavorativi(annoPrec, mesePrec, festivi);
   const lavOggi = giorniLavorativi(annoOggi, meseOggi, festivi);
   const lavSucc = giorniLavorativi(annoSucc, meseSucc, festivi);
   const decisoIl = new Date(`${inizio}T09:00:00`);
+  const decisoDaId = hr.id;
   const assenze = [
-    { dipendenteId: rossi.id, tipo: 'FERIE', dataInizio: lavPrec[5], dataFine: lavPrec[7], stato: 'APPROVATA', decisoIl },
+    { dipendenteId: rossi.id, tipo: 'FERIE', dataInizio: lavPrec[5], dataFine: lavPrec[7], stato: 'APPROVATA', decisoIl, decisoDaId },
     {
       dipendenteId: esposito.id, tipo: 'MALATTIA', dataInizio: lavPrec[12], dataFine: lavPrec[13], stato: 'APPROVATA',
-      protocolloCertificato: '7710453829', decisoIl,
+      protocolloCertificato: '7710453829', decisoIl, decisoDaId,
     },
     {
       dipendenteId: bianchi.id, tipo: 'PERMESSO', dataInizio: lavPrec[9], dataFine: lavPrec[9], minutiPermesso: 120,
-      stato: 'APPROVATA', noteDipendente: 'Visita medica nel pomeriggio', decisoIl,
+      stato: 'APPROVATA', noteDipendente: 'Visita medica nel pomeriggio', decisoIl, decisoDaId,
     },
     {
       dipendenteId: russo.id, tipo: 'PERMESSO', dataInizio: lavOggi[2], dataFine: lavOggi[2], minutiPermesso: 240,
-      stato: 'RIFIUTATA', noteHr: 'Quel giorno è prevista una consegna in cantiere: proporre un altro giorno', decisoIl,
+      stato: 'RIFIUTATA', noteHr: 'Quel giorno è prevista una consegna in cantiere: proporre un altro giorno', decisoIl, decisoDaId,
     },
     { dipendenteId: ferrari.id, tipo: 'FERIE', dataInizio: lavSucc[3], dataFine: lavSucc[5], stato: 'RICHIESTA', noteDipendente: 'Viaggio' },
     { dipendenteId: bianchi.id, tipo: 'PERMESSO', dataInizio: lavSucc[1], dataFine: lavSucc[1], minutiPermesso: 60, stato: 'RICHIESTA' },
