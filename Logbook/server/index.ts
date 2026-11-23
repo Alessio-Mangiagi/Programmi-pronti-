@@ -33,7 +33,11 @@ const porta = Number(produzione ? (process.env.LOGBOOK_PORT ?? 5210) : (process.
 const host = process.env.LOGBOOK_API_HOST ?? process.env.HOST ?? '127.0.0.1';
 
 const app = creaApp(prisma, produzione ? { cartellaInterfaccia: path.join(RADICE_APP, 'dist') } : {});
-const server = app.listen(porta, host, () => {
+// Express 5 chiama questa funzione anche quando l'ascolto fallisce, passandole l'errore:
+// in quel caso si tace e ci pensa il gestore 'error' qui sotto (altrimenti il log direbbe
+// "in ascolto" subito prima di "porta occupata").
+const server = app.listen(porta, host, (errore?: Error) => {
+  if (errore) return;
   console.log(`[logbook] ${produzione ? 'Logbook' : 'API'} in ascolto su http://${host}:${porta}`);
 });
 
