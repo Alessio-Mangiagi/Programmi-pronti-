@@ -7,12 +7,20 @@ import { fileURLToPath } from 'url'
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-// Preferisce il venv GPU (paddlepaddle-gpu) se presente: su pagina reale la CPU
-// senza oneDNN fa ~55s, la GPU secondi. Il worker fa comunque fallback CPU se
-// la GPU non è utilizzabile. Override esplicito sempre possibile via PYTHON_BIN.
+// Preferisce un venv GPU (paddlepaddle-gpu) se presente: su pagina reale la CPU
+// senza oneDNN fa ~35-55 s, la GPU meno di un secondo. In ordine:
+// - .venv-cu129: paddle per CUDA 12.9, l'unico che legge sulle RTX serie 50 (sm_120).
+//   Misura del 23/11/2026 su RTX 5060 Ti: 0,7 s/pagina, testo uguale al 99,8% a quello
+//   della CPU (avvia.bat lo crea sui PC con una RTX serie 50);
+// - .venv-gpu: paddle per CUDA 12.6, per le schede più vecchie;
+// - .venv: solo CPU.
+// Il worker fa comunque fallback CPU se la GPU non legge (ocr_worker.py, prova_lettura).
+// Override esplicito sempre possibile via PYTHON_BIN.
+export const VENV_CU129_BIN = path.join(ROOT, '.venv-cu129', 'Scripts', 'python.exe')
 export const VENV_GPU_BIN = path.join(ROOT, '.venv-gpu', 'Scripts', 'python.exe')
 export const PYTHON_BIN = process.env.PYTHON_BIN
-  || (existsSync(VENV_GPU_BIN) ? VENV_GPU_BIN : path.join(ROOT, '.venv', 'Scripts', 'python.exe'))
+  || [VENV_CU129_BIN, VENV_GPU_BIN].find(p => existsSync(p))
+  || path.join(ROOT, '.venv', 'Scripts', 'python.exe')
 export const OCR_WORKER = path.join(ROOT, 'ocr_worker.py')
 
 // Fallback vision: quando PaddleOCR non riesce a leggere una scansione (grana/retino),

@@ -32,6 +32,10 @@ Stato al 2026-09-18. La versione precedente di questo file descriveva un `server
 
 ## Da fare
 
+### ✅ (23/11/2026) GPU di nuovo in uso, PADDLE_WORKERS misurato
+paddle per CUDA 12.9 in `.venv-cu129`: 0,7 s/pagina sulla RTX 5060 Ti; 1/2/3 worker = 24/19/20 s
+su 52 pagine (avvio compreso), resta 3. WDAC risolto dall'IT il 04/11 (sotto, per storia).
+
 ### 🔴 OCR bloccato da Windows App Control (WDAC)
 Policy aziendale in vigore dal 31/08/2026: rifiuta le DLL non firmate dei venv Paddle
 (`WinError 4551`, evento Code Integrity 3077). Nessuna scansione finché l'IT non autorizza

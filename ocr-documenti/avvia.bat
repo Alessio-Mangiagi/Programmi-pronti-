@@ -52,9 +52,17 @@ set "OLLAMA_KV_CACHE_TYPE=q8_0"
 :: ── 3b. PaddleOCR (motore OCR immagine -> testo, worker Python) ──
 :: Con GPU NVIDIA: venv dedicato .venv-gpu con paddlepaddle-gpu (misurato su pagina
 :: reale: 0,65s/pagina contro i ~63s della CPU, stessa identica qualita').
-:: Il server preferisce .venv-gpu se esiste, altrimenti usa .venv (CPU).
+:: Il server preferisce .venv-cu129, poi .venv-gpu, altrimenti usa .venv (CPU).
+:: RTX serie 50 (Blackwell, sm_120): il paddle per CUDA 12.6 legge pagine VUOTE senza errori
+:: e il worker ripiega sulla CPU (~35 s/pagina). Serve il paddle per CUDA 12.9, in un venv a
+:: parte (.venv-cu129) per non toccare quello delle schede piu' vecchie. Misurato il 23/11/2026
+:: su RTX 5060 Ti: 0,7 s/pagina, testo uguale al 99,8% a quello letto dalla CPU.
 nvidia-smi >nul 2>&1
 if errorlevel 1 goto venv_cpu
+if exist ".venv-cu129\Scripts\python.exe" goto venv_cu129_ok
+set "GPU_NOME="
+for /f "delims=" %%g in ('nvidia-smi --query-gpu^=name --format^=csv^,noheader 2^>nul') do if not defined GPU_NOME set "GPU_NOME=%%g"
+echo %GPU_NOME% | findstr /i /c:"RTX 50" >nul && goto crea_cu129
 if exist ".venv-gpu\Scripts\python.exe" goto venv_gpu_ok
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -74,6 +82,27 @@ echo  [OK] PaddleOCR GPU pronto: .venv-gpu\Scripts\python.exe
 goto paddle_ok
 :venv_gpu_fallita
 echo  [AVVISO] Setup GPU non riuscito — uso la CPU (piu' lenta). Per ritentare: cancella .venv-gpu e riavvia.
+goto venv_cpu
+
+:crea_cu129
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo  [ERRORE] Python non trovato. Installalo da https://www.python.org (>= 3.10^) e riavvia.
+    pause & exit /b 1
+)
+echo  [SETUP] %GPU_NOME%: creo .venv-cu129 con PaddleOCR per CUDA 12.9 (prima volta, ~3GB)...
+python -m venv .venv-cu129
+.venv-cu129\Scripts\python.exe -m pip install --retries 10 --timeout 120 paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu129/ --trusted-host www.paddlepaddle.org.cn
+if errorlevel 1 goto venv_cu129_fallita
+.venv-cu129\Scripts\python.exe -m pip install paddleocr==3.7.0 opencv-contrib-python pypdfium2 --trusted-host pypi.org --trusted-host files.pythonhosted.org
+if errorlevel 1 goto venv_cu129_fallita
+:venv_cu129_ok
+.venv-cu129\Scripts\python.exe -c "import paddle, paddleocr; assert paddle.device.is_compiled_with_cuda()" >nul 2>&1
+if errorlevel 1 goto venv_cu129_fallita
+echo  [OK] PaddleOCR GPU (CUDA 12.9) pronto: .venv-cu129\Scripts\python.exe
+goto paddle_ok
+:venv_cu129_fallita
+echo  [AVVISO] Setup GPU CUDA 12.9 non riuscito — uso la CPU (piu' lenta). Per ritentare: cancella .venv-cu129 e riavvia.
 :venv_cpu
 if exist ".venv\Scripts\python.exe" goto venv_ok
 python --version >nul 2>&1
