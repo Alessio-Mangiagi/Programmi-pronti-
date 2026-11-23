@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 8 — Estrazioni ✅ completato
+- **Giorno corrente:** 9 — Dashboard e rifiniture ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 9 — Dashboard e rifiniture (ore del mese, assenze da approvare, stati di caricamento/errore)
+- **Prossimo:** Giorno 10 — Test e consegna (verifica flussi, README completo, guida d'uso, card nel Portale)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -66,6 +66,8 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Report: solo assenze APPROVATE; dipendenti = scelti, oppure attivi nel periodo o con ore | Le richieste in attesa non sono assenze |
 | 23/11 | Report progetti con costo lordo (ore × costo orario lordo della scheda) e foglio dipendenti × progetti | Usa i costi chiesti il 23/11; utile a HR per le commesse |
 | 23/11 | Calendario lavorato con ore contrattuali attese (giorni lavorativi × ore sett. / 5) | Confronto rapido lavorato/atteso; nessuna "differenza" calcolata per non dare numeri ambigui |
+| 23/11 | Dashboard: "giorni senza ore" fino a ieri (oggi può essere in corso); ore attese = giorni lavorativi a oggi × ore sett./5, meno ferie/malattia e permessi | HR vede subito chi deve ancora registrare |
+| 23/11 | Il dipendente registra i giorni mancanti direttamente dalla dashboard | Un clic dal promemoria all'editor della giornata |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -223,3 +225,22 @@ Verifiche:
 - `npm test`: 119/119 (nuovo `esporta.test.ts`: totali di entrambi i report riletti dal
   file .xlsx e confrontati con `/api/calendario`, anche col filtro progetto).
 - Dal vivo, ottobre 2026: riepilogo report 48060 minuti = totale calendario 48060.
+
+### Giorno 9 — Dashboard e rifiniture (23/11/2026) ✅
+
+Fatto:
+- API `GET /api/dashboard`: ore del mese lavorate e attese per dipendente, giorni senza
+  ore, richieste in attesa, assenze dei prossimi 14 giorni, prossime festività, ore per
+  progetto (HR: tutti gli attivi; dipendente: sé stesso).
+- Dashboard HR: quattro riquadri (ore del mese, richieste da approvare, giorni senza ore,
+  assenti oggi) evidenziati quando serve intervenire; pannelli con richieste, giorni
+  mancanti per dipendente, avanzamento lavorate/attese, assenze e festività in arrivo.
+- Dashboard dipendente: le proprie ore e i giorni da registrare con "Registra ore".
+- `BloccoErrori`: un errore in una pagina mostra un messaggio con "Riprova" invece della
+  pagina bianca. Stati di caricamento ed errore già presenti in tutte le pagine (`usaDati`).
+
+Verifiche:
+- `npm test`: 123/123 (nuovo `dashboard.test.ts`: totali uguali al calendario, giorni
+  mancanti, ore attese anche part-time, visibilità per ruolo).
+- Screenshot reale della dashboard HR: 2 richieste da approvare evidenziate, 576:00 ore
+  su 608:00 attese, nessun giorno mancante.

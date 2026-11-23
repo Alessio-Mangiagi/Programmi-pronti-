@@ -8,8 +8,9 @@
  * pulsante ☰.
  */
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { BloccoErrori } from './BloccoErrori';
 import { CambiaPassword } from './CambiaPassword';
 
 type VoceMenu = { a: string; etichetta: string; soloAdmin?: boolean; etichettaDipendente?: string };
@@ -28,6 +29,7 @@ export function Layout() {
   const { utente, admin, logout } = useAuth();
   const [menuAperto, setMenuAperto] = useState(false);
   const [cambioPassword, setCambioPassword] = useState(false);
+  const posizione = useLocation();
   const voci = MENU.filter((v) => admin || !v.soloAdmin);
 
   return (
@@ -83,7 +85,9 @@ export function Layout() {
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6">
-          <Outlet />
+          <BloccoErrori chiave={posizione.pathname}>
+            <Outlet />
+          </BloccoErrori>
         </main>
       </div>
       <CambiaPassword aperta={cambioPassword} onChiudi={() => setCambioPassword(false)} />
