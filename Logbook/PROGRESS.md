@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 7 — Importazione Excel ✅ completato
+- **Giorno corrente:** 8 — Estrazioni ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 8 — Estrazioni (report calendario lavorato e report progetti in .xlsx)
+- **Prossimo:** Giorno 9 — Dashboard e rifiniture (ore del mese, assenze da approvare, stati di caricamento/errore)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -62,6 +62,10 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Riga di esempio del modello marcata "RIGA DI ESEMPIO" e ignorata all'import | Dimenticarsi di cancellarla non crea ore finte |
 | 23/11 | Colonne riconosciute per nome (anche in ordine diverso); date/orari accettati come testo o valori Excel | File compilati a mano o esportati da altri programmi |
 | 23/11 | Import solo per HR | Il menu Importa è di HR; i dipendenti inseriscono dal calendario |
+| 23/11 | Ore nei report come durate Excel `[h]:mm` (minuti/1440) | Si leggono come nel calendario (7:30) e si sommano in Excel |
+| 23/11 | Report: solo assenze APPROVATE; dipendenti = scelti, oppure attivi nel periodo o con ore | Le richieste in attesa non sono assenze |
+| 23/11 | Report progetti con costo lordo (ore × costo orario lordo della scheda) e foglio dipendenti × progetti | Usa i costi chiesti il 23/11; utile a HR per le commesse |
+| 23/11 | Calendario lavorato con ore contrattuali attese (giorni lavorativi × ore sett. / 5) | Confronto rapido lavorato/atteso; nessuna "differenza" calcolata per non dare numeri ambigui |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -202,3 +206,20 @@ Verifiche:
   con l'errore giusto per ogni riga e nessuna scrittura; file corretto con date/orari come
   valori Excel e colonne in altro ordine importato e visibile nel calendario).
 - Dal vivo: modello scaricato tramite Vite; la sua anteprima ignora la riga di esempio.
+
+### Giorno 8 — Estrazioni (23/11/2026) ✅
+
+Fatto:
+- `server/servizi/report.ts`: filtri (periodo max 400 giorni, dipendenti, progetti),
+  caricamento dati con `calcolaTotali`, report "Calendario lavorato" (un foglio per
+  dipendente: anagrafica, giorno per giorno con fasce/progetto/ore/assenze/festività,
+  totali per progetto, giorni lavorativi, ore attese, ferie, malattia, permessi) e report
+  "Ore per progetto" (blocchi per dipendente con costo lordo + foglio Riepilogo).
+- API `/api/esporta/riepilogo`, `/calendario`, `/progetti` (solo HR).
+- Pagina Esporta: periodo con scorciatoie, scelta di dipendenti e progetti, riepilogo
+  aggiornato in automatico, due pulsanti di download.
+
+Verifiche:
+- `npm test`: 119/119 (nuovo `esporta.test.ts`: totali di entrambi i report riletti dal
+  file .xlsx e confrontati con `/api/calendario`, anche col filtro progetto).
+- Dal vivo, ottobre 2026: riepilogo report 48060 minuti = totale calendario 48060.

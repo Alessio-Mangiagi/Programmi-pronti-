@@ -10,11 +10,12 @@ import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { FornitoreAuth, useAuth } from './auth';
 import { Layout } from './componenti/Layout';
-import { Caricamento, InArrivo } from './componenti/ui';
+import { Caricamento } from './componenti/ui';
 import { Assenze } from './pagine/Assenze';
 import { Calendario } from './pagine/Calendario';
 import { Dashboard } from './pagine/Dashboard';
 import { Dipendenti } from './pagine/Dipendenti';
+import { Esporta } from './pagine/Esporta';
 import { Importa } from './pagine/Importa';
 import { Login } from './pagine/Login';
 import { Progetti } from './pagine/Progetti';
@@ -39,7 +40,7 @@ function Rotte() {
         <Route path="progetti" element={<SoloAdmin><Progetti /></SoloAdmin>} />
         <Route path="assenze" element={<Assenze />} />
         <Route path="importa" element={<SoloAdmin><Importa /></SoloAdmin>} />
-        <Route path="esporta" element={<SoloAdmin><InArrivo titolo="Esporta" giorno={8} /></SoloAdmin>} />
+        <Route path="esporta" element={<SoloAdmin><Esporta /></SoloAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
