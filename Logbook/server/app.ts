@@ -19,6 +19,7 @@ import { gestoreErrori } from './errori';
 import { caricaUtente, controlloCsrf, richiediAdmin, richiediLogin } from './middleware';
 import { rotteAuth } from './rotte/auth';
 import { rotteDipendenti } from './rotte/dipendenti';
+import { rotteProgetti } from './rotte/progetti';
 import { rotteRegistrazioni } from './rotte/registrazioni';
 
 export function creaApp(prisma: PrismaClient) {
@@ -43,6 +44,7 @@ export function creaApp(prisma: PrismaClient) {
   // Da qui in poi serve il login.
   api.use(richiediLogin);
   api.use('/dipendenti', rotteDipendenti(prisma));
+  api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma));
 
   /** Conteggi del database (verifica del Giorno 1), riservati a HR. */

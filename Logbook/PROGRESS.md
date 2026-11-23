@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 2 — Accesso e layout ✅ completato
+- **Giorno corrente:** 3 — Anagrafiche ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 3 — Anagrafiche (dipendenti e progetti)
+- **Prossimo:** Giorno 4 — Registrazione ore (più fasce, calcolo, blocco sovrapposizioni)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -40,6 +40,11 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | CSRF: intestazione `X-Logbook: 1` obbligatoria su POST/PUT/PATCH/DELETE | Un sito esterno non può aggiungerla senza CORS |
 | 23/11 | Limite login: 5 errori in 15 min per IP+utente → 429 | Contro i tentativi a forza bruta |
 | 23/11 | Menu dipendente: Dashboard, Calendario, Le mie assenze | Il resto è HR; i permessi veri sono nelle API |
+| 23/11 | Regole dei moduli in `comune/schemi.ts` (Zod), usate da server e interfaccia | Stessi messaggi d'errore ovunque; il server resta l'unico controllo vincolante |
+| 23/11 | Niente cancellazione di dipendenti e progetti: "disattiva" = CESSATO / CHIUSO | Le ore storiche restano nei report |
+| 23/11 | Dipendente cessato → account disattivato e sessioni chiuse; la riattivazione NON riapre l'account | Scelta prudente: HR riapre l'accesso esplicitamente |
+| 23/11 | Costo lordo ≥ costo netto (controllo) | Evita inversioni dei due campi |
+| 23/11 | Tabelle con ricerca/ordinamento/paginazione lato browser | Anagrafiche di poche centinaia di righe: immediato e senza API in più |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -96,3 +101,19 @@ Verifiche:
   CSRF, blocco dopo 5 tentativi, logout, utente disattivato, cambio password).
 - Dal vivo tramite Vite: mario.rossi vede 1 dipendente, 403 su scheda e ore di un collega
   e su `/api/stato-dati`; admin vede 5 dipendenti.
+
+### Giorno 3 — Anagrafiche (23/11/2026) ✅
+
+Fatto:
+- `comune/schemi.ts` (dipendente, account, progetto) e `comune/importi.ts` (euro ↔ centesimi).
+- API dipendenti: crea, modifica, disattiva/riattiva, account di accesso (crea, reimposta
+  password, attiva/disattiva); unicità di matricola e CF con errore sul campo (409).
+- API progetti: elenco (anche ai dipendenti, per scegliere il progetto), crea, modifica,
+  chiusura via stato; codice unico in maiuscolo.
+- Interfaccia: componente `Tabella` (ricerca su più parole senza accenti, ordinamento,
+  paginazione), elenco e scheda dipendente con costi in euro e blocchi account/stato,
+  pagina progetti con finestra di modifica e colore nel calendario.
+
+Verifiche:
+- `npm test`: 60/60 (nuovi `schemi.test.ts` e `anagrafiche.test.ts`).
+- Dal vivo: POST di un dipendente con CF sbagliato → 400 con l'errore sul campo `codiceFiscale`.
