@@ -1,0 +1,232 @@
+// "><(((º> sabusabu <º)))><"
+// Schema del database di Logbook (SQLite, Prisma 7).
+//
+// Convenzioni valide per tutto lo schema:
+// - Le DATE di calendario (giorno lavorato, assunzione, ferie, festività) sono stringhe
+//   "AAAA-MM-GG". Non DateTime: un DateTime è un istante e, convertito fra fuso del
+//   server, del browser e UTC, sposta i giorni di ±1 a cavallo della mezzanotte. Una
+//   stringa ISO resta il giorno scritto, si confronta e si ordina come testo.
+// - Gli ORARI sono stringhe "HH:MM" a 24 ore, sempre con lo zero davanti, così anche
+//   il confronto come testo è corretto ("08:00" < "13:30").
+// - Le ORE lavorate non sono salvate: si calcolano da ora inizio/fine (comune/orari.ts),
+//   così non possono mai essere in disaccordo con gli orari.
+// - Gli IMPORTI sono interi in centesimi di euro: niente errori di arrotondamento dei float.
+// - DateTime solo per i timbri tecnici (creato/aggiornato/deciso il).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Accesso
+// ---------------------------------------------------------------------------
+
+/// Ruolo di chi entra in Logbook.
+/// ADMIN = Amministratore/HR: vede e gestisce tutto.
+/// DIPENDENTE = vede e inserisce solo i propri dati.
+enum Ruolo {
+  ADMIN
+  DIPENDENTE
+}
+
+/// Account di accesso. Login proprio di Logbook (scelta 1c del 23/11/2026: nessun
+/// collegamento al Portale della suite). Un account DIPENDENTE è legato a una sola
+/// scheda dipendente; un ADMIN può non averne.
+model Utente {
+  id            Int         @id @default(autoincrement())
+  username      String      @unique
+  /// Impronta della password (scrypt, mai la password in chiaro). Formato deciso al Giorno 2.
+  passwordHash  String
+  ruolo         Ruolo       @default(DIPENDENTE)
+  attivo        Boolean     @default(true)
+  dipendente    Dipendente? @relation(fields: [dipendenteId], references: [id])
+  dipendenteId  Int?        @unique
+  /// Richieste di assenza approvate o rifiutate da questo utente (HR).
+  assenzeDecise Assenza[]   @relation("DecisioneAssenza")
+  creatoIl      DateTime    @default(now())
+  aggiornatoIl  DateTime    @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Anagrafiche
+// ---------------------------------------------------------------------------
+
+enum StatoDipendente {
+  ATTIVO
+  CESSATO
+}
+
+enum TipoContratto {
+  INDETERMINATO
+  DETERMINATO
+  APPRENDISTATO
+  SOMMINISTRAZIONE
+  COLLABORAZIONE
+  TIROCINIO
+}
+
+/// Scheda anagrafica del dipendente.
+model Dipendente {
+  id                   Int                   @id @default(autoincrement())
+  /// Matricola aziendale, unica.
+  matricola            String                @unique
+  nome                 String
+  cognome              String
+  /// Codice fiscale in maiuscolo, validato (comune/codiceFiscale.ts) prima del salvataggio.
+  codiceFiscale        String                @unique
+  email                String?
+  telefono             String?
+  mansione             String?
+  reparto              String?
+  /// "AAAA-MM-GG"
+  dataAssunzione       String
+  /// "AAAA-MM-GG", valorizzata quando lo stato passa a CESSATO.
+  dataCessazione       String?
+  tipoContratto        TipoContratto
+  /// Ore contrattuali settimanali (es. 40, 30 per un part-time).
+  oreSettimanali       Float
+  /// Costo orario netto in centesimi di euro (richiesta del 23/11/2026). Visibile solo a HR.
+  costoOrarioNettoCent Int?
+  /// Costo orario lordo (costo aziendale) in centesimi di euro. Visibile solo a HR.
+  costoOrarioLordoCent Int?
+  stato                StatoDipendente       @default(ATTIVO)
+  utente               Utente?
+  registrazioni        RegistrazioneOraria[]
+  assenze              Assenza[]
+  creatoIl             DateTime              @default(now())
+  aggiornatoIl         DateTime              @updatedAt
+
+  @@index([cognome, nome])
+}
+
+enum StatoProgetto {
+  ATTIVO
+  SOSPESO
+  CHIUSO
+}
+
+/// Progetto (o commessa) su cui si registrano le ore.
+model Progetto {
+  id            Int                   @id @default(autoincrement())
+  /// Codice progetto, unico (es. "PRG-001").
+  codice        String                @unique
+  nome          String
+  cliente       String?
+  /// "AAAA-MM-GG"
+  dataInizio    String
+  /// "AAAA-MM-GG", vuota se il progetto non ha una fine prevista.
+  dataFine      String?
+  stato         StatoProgetto         @default(ATTIVO)
+  /// Colore del progetto nel calendario ("#RRGGBB"); se vuoto il frontend ne sceglie uno.
+  colore        String?
+  registrazioni RegistrazioneOraria[]
+  creatoIl      DateTime              @default(now())
+  aggiornatoIl  DateTime              @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Ore lavorate
+// ---------------------------------------------------------------------------
+
+/// Da dove arriva una registrazione: utile per ritrovare (o annullare) un import Excel.
+enum OrigineRegistrazione {
+  INTERFACCIA
+  IMPORT_EXCEL
+}
+
+/// Una fascia oraria lavorata: un dipendente, un giorno, un progetto, dalle-alle.
+/// Più fasce nello stesso giorno sono ammesse; le sovrapposizioni dello stesso
+/// dipendente sono bloccate dal server (non esprimibili come vincolo SQL).
+/// Le fasce non attraversano la mezzanotte: un turno 22:00-06:00 va spezzato in due.
+model RegistrazioneOraria {
+  id           Int                  @id @default(autoincrement())
+  dipendente   Dipendente           @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
+  dipendenteId Int
+  progetto     Progetto             @relation(fields: [progettoId], references: [id], onDelete: Restrict)
+  progettoId   Int
+  /// "AAAA-MM-GG"
+  data         String
+  /// "HH:MM" 24h
+  oraInizio    String
+  /// "HH:MM" 24h, sempre successiva a oraInizio
+  oraFine      String
+  note         String?
+  origine      OrigineRegistrazione @default(INTERFACCIA)
+  creatoIl     DateTime             @default(now())
+  aggiornatoIl DateTime             @updatedAt
+
+  @@index([dipendenteId, data])
+  @@index([progettoId, data])
+  @@index([data])
+}
+
+// ---------------------------------------------------------------------------
+// Assenze e festività
+// ---------------------------------------------------------------------------
+
+enum TipoAssenza {
+  FERIE
+  PERMESSO
+  MALATTIA
+}
+
+enum StatoAssenza {
+  RICHIESTA
+  APPROVATA
+  RIFIUTATA
+}
+
+/// Richiesta di assenza del dipendente, decisa da HR.
+/// Per la MALATTIA si salva solo il numero di protocollo del certificato: per scelta
+/// (privacy, GDPR art. 9) non esiste alcun campo per diagnosi o informazioni sanitarie.
+model Assenza {
+  id                    Int          @id @default(autoincrement())
+  dipendente            Dipendente   @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
+  dipendenteId          Int
+  tipo                  TipoAssenza
+  /// "AAAA-MM-GG"
+  dataInizio            String
+  /// "AAAA-MM-GG", uguale a dataInizio per un giorno solo
+  dataFine              String
+  /// Durata del permesso in minuti (solo PERMESSO; vuota per ferie e malattia).
+  minutiPermesso        Int?
+  stato                 StatoAssenza @default(RICHIESTA)
+  /// Note scritte dal dipendente nella richiesta.
+  noteDipendente        String?
+  /// Note di HR (motivo del rifiuto, modifiche fatte).
+  noteHr                String?
+  /// Numero di protocollo del certificato medico (solo MALATTIA).
+  protocolloCertificato String?
+  decisoDa              Utente?      @relation("DecisioneAssenza", fields: [decisoDaId], references: [id])
+  decisoDaId            Int?
+  decisoIl              DateTime?
+  creatoIl              DateTime     @default(now())
+  aggiornatoIl          DateTime     @updatedAt
+
+  @@index([dipendenteId, dataInizio])
+  @@index([stato])
+}
+
+/// NAZIONALE = festività civili e religiose valide in tutta Italia (precaricate).
+/// LOCALE = festività del paese/città della sede, es. il santo patrono (inserite da HR).
+/// AZIENDALE = chiusure decise dall'azienda (inserite da HR).
+enum TipoFestivita {
+  NAZIONALE
+  LOCALE
+  AZIENDALE
+}
+
+/// Giorno festivo: non lavorativo per tutti i dipendenti.
+model Festivita {
+  id          Int           @id @default(autoincrement())
+  /// "AAAA-MM-GG", una sola festività per giorno.
+  data        String        @unique
+  descrizione String
+  tipo        TipoFestivita
+  creatoIl    DateTime      @default(now())
+}

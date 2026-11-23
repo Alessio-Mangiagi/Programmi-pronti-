@@ -1,0 +1,21 @@
+# "><(((º> sabusabu <º)))><"
+# Logbook: cosa NON va nel repository.
+
+# Dipendenze e build
+node_modules/
+dist/
+
+# Client Prisma generato da `prisma generate` (si rigenera a ogni npm install)
+generated/
+
+# Database SQLite locale con i dati veri o di esempio: mai versionato
+data/
+*.db
+*.db-journal
+
+# Configurazione locale e segreti
+.env
+
+# Varie
+*.log
+coverage/

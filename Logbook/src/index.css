@@ -1,0 +1,26 @@
+/* "><(((º> sabusabu <º)))><" */
+/*
+ * Stili globali di Logbook: Tailwind 4 + i colori del marchio Cosedil come token.
+ * I token (@theme) diventano classi Tailwind: bg-marchio, text-marchio-verde, ecc.
+ * Font di sistema (nessun font scaricato da internet: l'app deve funzionare anche
+ * su una rete aziendale chiusa).
+ */
+@import 'tailwindcss';
+
+@theme {
+  --color-marchio: #0c4577;
+  --color-marchio-scuro: #08324f;
+  --color-marchio-verde: #65bc7b;
+  --color-fondo: #f4f6f9;
+  --font-sans: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--color-fondo);
+  color: #1f2937;
+}
+
+/* Numeri allineati in colonna nelle tabelle dense (ore, totali, importi). */
+.cifre {
+  font-variant-numeric: tabular-nums;
+}
