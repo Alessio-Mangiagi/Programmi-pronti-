@@ -22,6 +22,7 @@ import { rotteAuth } from './rotte/auth';
 import { rotteAssenze } from './rotte/assenze';
 import { rotteCalendario } from './rotte/calendario';
 import { rotteFestivita } from './rotte/festivita';
+import { rotteImporta } from './rotte/importa';
 import { rotteDipendenti } from './rotte/dipendenti';
 import { rotteProgetti } from './rotte/progetti';
 import { rotteRegistrazioni } from './rotte/registrazioni';
@@ -57,6 +58,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/calendario', rotteCalendario(prisma));
   api.use('/assenze', rotteAssenze(prisma));
   api.use('/festivita', rotteFestivita(prisma));
+  api.use('/importa', rotteImporta(prisma, oggi));
 
   /** Conteggi del database (verifica del Giorno 1), riservati a HR. */
   api.get('/stato-dati', richiediAdmin, async (_req, res) => {

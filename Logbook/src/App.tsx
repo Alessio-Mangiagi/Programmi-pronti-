@@ -15,6 +15,7 @@ import { Assenze } from './pagine/Assenze';
 import { Calendario } from './pagine/Calendario';
 import { Dashboard } from './pagine/Dashboard';
 import { Dipendenti } from './pagine/Dipendenti';
+import { Importa } from './pagine/Importa';
 import { Login } from './pagine/Login';
 import { Progetti } from './pagine/Progetti';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
@@ -37,7 +38,7 @@ function Rotte() {
         <Route path="dipendenti/:id" element={<SoloAdmin><SchedaDipendente /></SoloAdmin>} />
         <Route path="progetti" element={<SoloAdmin><Progetti /></SoloAdmin>} />
         <Route path="assenze" element={<Assenze />} />
-        <Route path="importa" element={<SoloAdmin><InArrivo titolo="Importa" giorno={7} /></SoloAdmin>} />
+        <Route path="importa" element={<SoloAdmin><Importa /></SoloAdmin>} />
         <Route path="esporta" element={<SoloAdmin><InArrivo titolo="Esporta" giorno={8} /></SoloAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

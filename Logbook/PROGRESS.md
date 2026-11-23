@@ -8,9 +8,9 @@ sessione per riprendere da dove si era rimasti.
 
 ## Stato
 
-- **Giorno corrente:** 6 — Assenze e festività ✅ completato
+- **Giorno corrente:** 7 — Importazione Excel ✅ completato
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
-- **Prossimo:** Giorno 7 — Importazione Excel (modello, anteprima, errori riga per riga, conferma)
+- **Prossimo:** Giorno 8 — Estrazioni (report calendario lavorato e report progetti in .xlsx)
 - **Ultimo aggiornamento:** 23/11/2026
 
 ## Cosa c'era nella cartella
@@ -57,6 +57,11 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Rifiuto sempre con motivo; HR può cambiare decisione e registrare assenze già approvate | Tracciabilità; malattia comunicata a voce |
 | 23/11 | Non si approvano ferie/malattia su giorni con ore registrate (409 con l'elenco dei giorni) | Niente giorni con ore e assenza insieme |
 | 23/11 | Festività "del paese" = tipo LOCALE inserito da HR, una festività per giorno | Interpretazione di "paese specifico" come città della sede (da confermare) |
+| 23/11 | Import "tutto o niente": con un solo errore non si importa nulla | Criterio della specifica; niente file importati a metà |
+| 23/11 | Il file viaggia due volte (anteprima e conferma), nessuno stato sul server | La conferma ricontrolla sui dati aggiornati |
+| 23/11 | Riga di esempio del modello marcata "RIGA DI ESEMPIO" e ignorata all'import | Dimenticarsi di cancellarla non crea ore finte |
+| 23/11 | Colonne riconosciute per nome (anche in ordine diverso); date/orari accettati come testo o valori Excel | File compilati a mano o esportati da altri programmi |
+| 23/11 | Import solo per HR | Il menu Importa è di HR; i dipendenti inseriscono dal calendario |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 
 ## Problemi aperti
@@ -179,3 +184,21 @@ Verifiche:
 - `npm test`: 106/106 (nuovo `assenze.test.ts`: approvata → nel calendario come APPROVATA,
   rifiutata → assente dal calendario; controlli su malattia, permessi, sovrapposizioni).
 - Screenshot reale della scheda "Da approvare" (2 richieste demo).
+
+### Giorno 7 — Importazione Excel (23/11/2026) ✅
+
+Fatto:
+- `server/servizi/excel.ts`: stile intestazioni, download, lettura tollerante di testo,
+  date e orari dalle celle.
+- `server/servizi/import-ore.ts`: modello (fogli Ore con esempio e menu a tendina,
+  Istruzioni, Dipendenti, Progetti) e analisi riga per riga: campi mancanti, date e orari
+  non validi, dipendente/progetto inesistenti, regole di contesto (riuso di regole-ore),
+  sovrapposizioni con il database e fra righe del file.
+- API `/api/importa/modello`, `/anteprima`, `/conferma` (solo HR).
+- Pagina Importa: modello, scelta del file, anteprima con errori per riga, conferma.
+
+Verifiche:
+- `npm test`: 112/112 (nuovo `importa.test.ts`: file con 8 righe sbagliate su 9 rifiutato
+  con l'errore giusto per ogni riga e nessuna scrittura; file corretto con date/orari come
+  valori Excel e colonne in altro ordine importato e visibile nel calendario).
+- Dal vivo: modello scaricato tramite Vite; la sua anteprima ignora la riga di esempio.
