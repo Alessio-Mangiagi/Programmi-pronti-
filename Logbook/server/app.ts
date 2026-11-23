@@ -29,8 +29,13 @@ import { rotteDipendenti } from './rotte/dipendenti';
 import { rotteProgetti } from './rotte/progetti';
 import { rotteRegistrazioni } from './rotte/registrazioni';
 
-/** Opzioni per i test: `oggi` fissa la data corrente (regole sulle date future, dashboard). */
-export type OpzioniApp = { oggi?: () => string };
+/**
+ * Opzioni:
+ * - `oggi` fissa la data corrente (test: regole sulle date future, dashboard);
+ * - `cartellaInterfaccia`: in produzione la cartella dist/ con l'interfaccia già
+ *   compilata, servita dallo stesso server delle API (una sola porta, niente Vite).
+ */
+export type OpzioniApp = { oggi?: () => string; cartellaInterfaccia?: string };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const oggi = opzioni.oggi ?? (() => oggiIso());
@@ -95,6 +100,20 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   });
 
   app.use('/api', api);
+
+  // Produzione: file dell'interfaccia e, per ogni altro indirizzo (es. /calendario
+  // ricaricato dal browser), index.html — le pagine le gestisce React Router.
+  if (opzioni.cartellaInterfaccia) {
+    const cartella = opzioni.cartellaInterfaccia;
+    app.use(express.static(cartella, { index: false, maxAge: '1h' }));
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      // index.html mai in cache: dopo un aggiornamento il browser prende subito i file nuovi.
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile('index.html', { root: cartella });
+    });
+  }
+
   app.use(gestoreErrori);
   return app;
 }

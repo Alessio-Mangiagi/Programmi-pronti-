@@ -20,6 +20,7 @@ Ogni cartella ha il nome dell'app, e sul server lo stesso nome diventa il suo in
 | `timbri-vfp/` | Timbri per VFP — da PNG a timbro `.stamp` per le annotazioni di VFP (riservata) | 5205 | HTML + Node.js zero-dip |
 | `ponte-trimble/` | Ponte Trimble — PCQ, computi e SAL da PDF a Trimble (solo admin) | 3011 | Node.js |
 | `auguri/` | Auguri — compleanni su WhatsApp (solo admin) | 3000 | Node.js |
+| `Logbook/` (`logbook`) | Logbook — ore e presenze dei dipendenti, ferie/permessi, import/export Excel; login proprio | 5210 | Node.js + React |
 
 Gli `id` interni del registro (`ddt`, `agente`, `confronta`, `ocr`, `trimble`...) non sono
 cambiati col rinomino delle cartelle: sono chiavi salvate nei dati del portale (utenti,
@@ -64,6 +65,7 @@ reverse proxy, ogni app ha un indirizzo col proprio nome:
 | `https://magazzino-operativo.<dominio>` | Magazzino Operativo |
 | `https://timbri-vfp.<dominio>` | Timbri per VFP |
 | `https://ponte-trimble.<dominio>` | Ponte Trimble |
+| `https://logbook.<dominio>` | Logbook |
 
 Si attiva con una sola variabile, letta dal portale e dal Caddyfile:
 

@@ -71,6 +71,8 @@ const ICONE_APP = {
   trimble: '<path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9Z"/><path d="M13 3v5a1 1 0 0 0 1 1h5"/><path d="M12 18v-6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/>',
   // Auguri: torta con la candelina
   auguri: '<path d="M4 21h16v-8H4v8Z"/><path d="M4 15c1.5 0 1.5-1.5 3-1.5S8.5 15 10 15s1.5-1.5 3-1.5S15.5 15 17 15s1.5-1.5 3-1.5"/><path d="M12 8v5"/><circle cx="12" cy="5.5" r="1.3"/>',
+  // Logbook (23/11/2026): calendario con le lancette di un orologio (ore e presenze)
+  logbook: '<rect x="3" y="5" width="14" height="14" rx="2"/><path d="M3 9h14M7 3v4M13 3v4"/><circle cx="17" cy="17" r="4"/><path d="M17 15.5V17l1 1"/>',
   // VFP Transfer (nel registro dall'11/11/2026, senza tessera: spunte, abilitazioni, registro): la
   // cartella del DMS con la freccia verso Viewpoint For Projects
   'vfp-transfer': '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/><path d="M3 7v10a2 2 0 0 0 2 2h7"/><path d="M15 17h6M18.5 14.5 21 17l-2.5 2.5"/>',

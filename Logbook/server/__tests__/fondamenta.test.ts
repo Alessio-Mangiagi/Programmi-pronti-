@@ -7,6 +7,9 @@
  * novembre (15), 9 fasce al giorno (Ferrari è part-time, una fascia sola), meno le
  * ferie di Rossi (3 giorni × 2 fasce) e la malattia di Esposito (2 giorni × 2 fasce).
  */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CREDENZIALI_DEMO, semina } from '../../prisma/seed';
 import { validaCodiceFiscale } from '../../comune/codiceFiscale';
@@ -76,6 +79,24 @@ describe('dati di esempio', () => {
 
   it('rifiuta di ripartire su un database che ha già dei dipendenti', async () => {
     await expect(semina(db.prisma, OGGI)).rejects.toThrow(/db:reset/);
+  });
+});
+
+describe('modalità produzione', () => {
+  it("serve l'interfaccia compilata e index.html per le pagine, le API restano JSON", async () => {
+    const cartella = fs.mkdtempSync(path.join(os.tmpdir(), 'logbook-dist-'));
+    fs.writeFileSync(path.join(cartella, 'index.html'), '<!doctype html><div id="radice"></div>');
+    fs.writeFileSync(path.join(cartella, 'app.js'), 'console.log(1)');
+    const server = await avviaServer(db.prisma, { cartellaInterfaccia: cartella });
+    try {
+      expect(String((await server.anonimo.chiama('GET', '/calendario')).corpo)).toContain('radice');
+      expect(String((await server.anonimo.chiama('GET', '/app.js')).corpo)).toContain('console.log');
+      expect((await server.anonimo.chiama('GET', '/api/non-esiste')).corpo).toMatchObject({ errore: expect.any(String) });
+      expect((await server.anonimo.chiama('GET', '/api/salute')).corpo).toEqual({ ok: true, app: 'logbook' });
+    } finally {
+      await server.chiudi();
+      fs.rmSync(cartella, { recursive: true, force: true });
+    }
   });
 });
 
