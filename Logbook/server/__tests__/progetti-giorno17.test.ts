@@ -6,9 +6,9 @@
  * - Assegnazioni (risposte 2a 3a 4a): senza assegnazione niente ore (giornata, fascia,
  *   import); HR assegna un dipendente alla volta; togliere non cancella le ore; la
  *   migrazione assegna chi aveva già ore.
- * - Documentazione (2c): il dipendente carica solo sui progetti attivi a cui è assegnato
- *   e vede solo la sua; HR vede tutto, segna "visto" e risponde; invio a SkyTower con
- *   collegamento e commessa (finto SkyTower in ascolto locale).
+ * - Documentazione: dal Giorno 20 la carica solo HR (risposta 2), già "vista"; HR la può
+ *   riaprire, rispondere, eliminare; invio a SkyTower con collegamento e commessa (finto
+ *   SkyTower in ascolto locale). Le ore le scrive solo HR (risposta 1b).
  * - Note interne: solo HR.
  * Seed: Mario Rossi è assegnato a PRG-001 e PRG-003, non a PRG-002.
  */
@@ -27,7 +27,6 @@ let db: DbProva;
 let server: Awaited<ReturnType<typeof avviaServer>>;
 let admin: ClientProva;
 let mario: ClientProva;
-let giulia: ClientProva;
 let idMario: number;
 let idGiulia: number;
 let prg1: number;
@@ -43,7 +42,6 @@ beforeAll(async () => {
   server = await avviaServer(db.prisma);
   admin = await server.accedi(CREDENZIALI_DEMO.admin.username, CREDENZIALI_DEMO.admin.password);
   mario = await server.accedi('mario.rossi', CREDENZIALI_DEMO.passwordDipendenti);
-  giulia = await server.accedi('giulia.bianchi', CREDENZIALI_DEMO.passwordDipendenti);
   idMario = (await db.prisma.dipendente.findFirstOrThrow({ where: { cognome: 'Rossi' } })).id;
   idGiulia = (await db.prisma.dipendente.findFirstOrThrow({ where: { cognome: 'Bianchi' } })).id;
   prg1 = (await db.prisma.progetto.findUniqueOrThrow({ where: { codice: 'PRG-001' } })).id;
@@ -69,8 +67,8 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
   });
 
   it('senza assegnazione niente ore, da nessuna parte', async () => {
-    // Oggi, così il dipendente può scrivere: il no arriva dall'assegnazione.
-    const r = await mario.chiama('POST', '/api/registrazioni', fascia(OGGI_PROVA, prg2, '18:00', '19:00'));
+    // Il no arriva dall'assegnazione, anche per HR.
+    const r = await admin.chiama('POST', '/api/registrazioni', fascia(OGGI_PROVA, prg2, '18:00', '19:00'));
     expect(r.stato).toBe(400);
     expect(r.corpo.campi.progettoId).toMatch(/non è assegnato al progetto PRG-002/);
     // Anche HR per conto di Mario
@@ -128,51 +126,43 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
   });
 });
 
-describe('documentazione di avanzamento (risposta 2c)', () => {
+describe('documentazione di avanzamento (dal Giorno 20 la carica solo HR)', () => {
   let idDoc: number;
 
-  it('il dipendente carica sui suoi progetti attivi, con file, nota e percentuale', async () => {
-    const file = (await carica(mario, 'Foto getto solaio.pdf')).corpo.id;
-    const r = await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: OGGI_PROVA, titolo: 'Getto solaio piano 1', nota: 'Completato il getto', percentuale: 40, fileId: file });
+  it('HR carica con file, nota e percentuale; nasce già vista', async () => {
+    const file = (await carica(admin, 'Foto getto solaio.pdf')).corpo.id;
+    const r = await admin.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-20', titolo: 'Getto solaio piano 1', nota: 'Completato il getto', percentuale: 40, fileId: file });
     expect(r.stato).toBe(201);
-    expect(r.corpo).toMatchObject({ titolo: 'Getto solaio piano 1', percentuale: 40, visto: false, autore: { nome: 'Rossi Mario' }, file: { nome: 'Foto getto solaio.pdf' } });
+    expect(r.corpo).toMatchObject({ titolo: 'Getto solaio piano 1', percentuale: 40, visto: true, autore: { nome: CREDENZIALI_DEMO.admin.username }, file: { nome: 'Foto getto solaio.pdf' } });
     idDoc = r.corpo.id;
+    expect((await admin.chiama('GET', '/api/dashboard')).corpo.documentazioneDaVedere).toEqual([]);
   });
 
-  it('niente su progetti non assegnati, date future o aggiornamenti vuoti', async () => {
-    expect((await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg2, data: '2026-11-20', titolo: 'X', nota: 'y' })).stato).toBe(403);
-    expect((await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-30', titolo: 'X', nota: 'y' })).stato).toBe(400);
-    const vuoto = await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-20', titolo: 'Solo titolo' });
+  it('il dipendente non carica e non elimina (risposta 2: tutti i dati li inserisce HR)', async () => {
+    expect((await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: OGGI_PROVA, titolo: 'X', nota: 'y' })).stato).toBe(403);
+    expect((await mario.chiama('DELETE', `/api/documenti-progetto/${idDoc}`)).stato).toBe(403);
+    expect((await mario.chiama('GET', `/api/documenti-progetto?progettoId=${prg1}`)).corpo).toEqual([]);
+  });
+
+  it('niente date future, progetti chiusi o aggiornamenti vuoti', async () => {
+    expect((await admin.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-30', titolo: 'X', nota: 'y' })).stato).toBe(400);
+    const vuoto = await admin.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-20', titolo: 'Solo titolo' });
     expect(vuoto.stato).toBe(400);
     expect(vuoto.corpo.campi.nota).toBeDefined();
   });
 
-  it('ognuno vede solo il suo; HR tutto e lo trova in dashboard', async () => {
-    await giulia.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-23', titolo: 'Verifica impianti', percentuale: 45 });
-    const diMario = await mario.chiama('GET', `/api/documenti-progetto?progettoId=${prg1}`);
-    expect(diMario.corpo.map((d: { titolo: string }) => d.titolo)).toEqual(['Getto solaio piano 1']);
-    const diHr = await admin.chiama('GET', `/api/documenti-progetto?progettoId=${prg1}`);
-    expect(diHr.corpo.map((d: { titolo: string }) => d.titolo)).toEqual(['Verifica impianti', 'Getto solaio piano 1']);
-    const dash = await admin.chiama('GET', '/api/dashboard');
-    expect(dash.corpo.documentazioneDaVedere).toHaveLength(2);
-    expect(dash.corpo.documentazioneDaVedere[0]).toMatchObject({ titolo: 'Getto solaio piano 1', autore: 'Rossi Mario', progetto: { codice: 'PRG-001' } });
-    expect((await mario.chiama('GET', '/api/dashboard')).corpo.documentazioneDaVedere).toEqual([]);
-  });
-
-  it('HR segna visto e risponde; dopo, chi l\'ha caricato non lo elimina più', async () => {
-    expect((await mario.chiama('PATCH', `/api/documenti-progetto/${idDoc}/revisione`, { visto: true })).stato).toBe(403);
+  it('HR riapre "da vedere", risponde e la ritrova in dashboard', async () => {
+    expect((await mario.chiama('PATCH', `/api/documenti-progetto/${idDoc}/revisione`, { visto: false })).stato).toBe(403);
+    expect((await admin.chiama('PATCH', `/api/documenti-progetto/${idDoc}/revisione`, { visto: false })).corpo.visto).toBe(false);
+    expect((await admin.chiama('GET', '/api/dashboard')).corpo.documentazioneDaVedere).toHaveLength(1);
     const r = await admin.chiama('PATCH', `/api/documenti-progetto/${idDoc}/revisione`, { visto: true, rispostaHr: 'Bene, avanti col piano 2' });
     expect(r.corpo).toMatchObject({ visto: true, rispostaHr: 'Bene, avanti col piano 2', vistoDa: { username: CREDENZIALI_DEMO.admin.username } });
-    expect((await mario.chiama('GET', `/api/documenti-progetto?progettoId=${prg1}`)).corpo[0].rispostaHr).toBe('Bene, avanti col piano 2');
-    expect((await mario.chiama('DELETE', `/api/documenti-progetto/${idDoc}`)).stato).toBe(409);
-    expect((await admin.chiama('GET', '/api/dashboard')).corpo.documentazioneDaVedere).toHaveLength(1);
   });
 
-  it('chi l\'ha caricato elimina il suo finché non è visto, anche il file', async () => {
-    const file = (await carica(mario, 'sbagliato.pdf')).corpo.id;
-    const d = (await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-23', titolo: 'Sbagliato', fileId: file })).corpo.id;
-    expect((await giulia.chiama('DELETE', `/api/documenti-progetto/${d}`)).stato).toBe(403);
-    expect((await mario.chiama('DELETE', `/api/documenti-progetto/${d}`)).stato).toBe(204);
+  it('HR elimina, anche il file', async () => {
+    const file = (await carica(admin, 'sbagliato.pdf')).corpo.id;
+    const d = (await admin.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: OGGI_PROVA, titolo: 'Sbagliato', fileId: file })).corpo.id;
+    expect((await admin.chiama('DELETE', `/api/documenti-progetto/${d}`)).stato).toBe(204);
     expect(await db.prisma.fileCaricato.findUnique({ where: { id: file } })).toBeNull();
   });
 });

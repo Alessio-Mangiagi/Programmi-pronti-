@@ -30,6 +30,8 @@ const TRATTI = {
   allegato: 'M20 11.5 12.5 19a5 5 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4L15 7',
   documento: 'M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5L14 3ZM14 3v4.5h4.5M9 13h6M9 16.5h6',
   attestato: 'M12 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM8.5 12.5 7 21l5-3 5 3-1.5-8.5',
+  // Giorno 20: campanella delle segnalazioni (notifiche di HR).
+  campanella: 'M6 9.5a6 6 0 1 1 12 0c0 4.5 2 6 2 6H4s2-1.5 2-6ZM10 19a2 2 0 0 0 4 0',
 } as const;
 
 export type NomeIcona = keyof typeof TRATTI;

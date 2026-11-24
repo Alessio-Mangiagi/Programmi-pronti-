@@ -18,6 +18,7 @@ import { formattaData, oggiIso } from '../../comune/date';
 import { useAuth } from '../auth';
 import { BloccoErrori } from './BloccoErrori';
 import { CambiaPassword } from './CambiaPassword';
+import { Notifiche } from './Segnalazioni';
 import { Icona, type NomeIcona } from './icone';
 
 type VoceMenu = { a: string; etichetta: string; icona: NomeIcona; soloAdmin?: boolean; etichettaDipendente?: string };
@@ -94,6 +95,8 @@ export function Layout() {
             <span className="hidden rounded-full bg-ghiaccio px-2.5 py-0.5 font-ui text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-marchio sm:inline">
               {admin ? 'HR' : 'Dipendente'}
             </span>
+            {/* Giorno 20: segnalazioni dei dipendenti (solo HR, finestra anche all'accesso). */}
+            <Notifiche />
             <span className="truncate font-display font-medium text-testo-forte">{utente?.nomeVisualizzato}</span>
             <button type="button" className="inline-flex shrink-0 items-center gap-1.5 rounded p-1.5 text-marchio transition-colors hover:text-marchio-hover" onClick={() => setCambioPassword(true)} aria-label="Cambia password">
               <Icona nome="chiave" dimensione={16} />

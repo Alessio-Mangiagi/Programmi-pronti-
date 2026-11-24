@@ -1,12 +1,12 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Giorno 19 (24/11/2026) — "solo gli admin devono poter inserire i dati nelle giornate già
- * passate … per evitare pagamenti errati".
+ * Giorni 19 e 20 (24/11/2026) — chi scrive le ore.
  *
- * Il dipendente scrive ore (e documentazione di progetto) solo nella giornata di oggi;
- * aggiungere, modificare o togliere ore dei giorni passati spetta a HR. "Oggi" è la data del
- * server (qui OGGI_PROVA = lunedì 23/11/2026), esposta in GET /api/oggi per l'interfaccia.
- * Mario Rossi è assegnato a PRG-001 e PRG-003.
+ * Giorno 19: "solo gli admin devono poter inserire i dati nelle giornate già passate …
+ * per evitare pagamenti errati", con la data di Logbook presa dal server (GET /api/oggi).
+ * Giorno 20 (risposte 1b e 2): "tutti i dati li inserisce HR" — il dipendente non scrive
+ * più ore né documentazione, nemmeno oggi; vede le sue giornate e, se qualcosa non torna,
+ * le segnala (test in giorno20.test.ts). Qui OGGI_PROVA = lunedì 23/11/2026.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CREDENZIALI_DEMO, semina } from '../../prisma/seed';
@@ -38,7 +38,7 @@ afterAll(async () => {
 
 const giornata = (data: string) => ({ dipendenteId: idMario, data, fasce: [{ progettoId: prg1, oraInizio: '08:00', oraFine: '12:00', note: '' }] });
 
-describe('giorni passati solo a HR', () => {
+describe('le ore le inserisce solo HR', () => {
   it('la data di Logbook è quella del server', async () => {
     const r = await mario.chiama('GET', '/api/oggi');
     expect(r.stato).toBe(200);
@@ -46,40 +46,37 @@ describe('giorni passati solo a HR', () => {
     expect(Date.parse(r.corpo.adesso)).not.toBeNaN();
   });
 
-  it('il dipendente registra oggi', async () => {
-    expect((await mario.chiama('PUT', '/api/registrazioni/giornata', giornata(OGGI_PROVA))).stato).toBe(200);
-  });
-
-  it('il dipendente non scrive nei giorni passati: né giornata, né fascia, né modifiche o cancellazioni', async () => {
-    const giorno = await mario.chiama('PUT', '/api/registrazioni/giornata', giornata(IERI));
-    expect(giorno.stato).toBe(403);
-    expect(giorno.corpo.errore).toMatch(/20\/11\/2026 è un giorno passato.*solo HR/);
-    expect((await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: IERI, progettoId: prg1, oraInizio: '18:00', oraFine: '19:00' })).stato).toBe(403);
+  it('il dipendente non scrive: né oggi né nei giorni passati, né modifiche o cancellazioni', async () => {
+    expect((await mario.chiama('PUT', '/api/registrazioni/giornata', giornata(OGGI_PROVA))).stato).toBe(403);
+    expect((await mario.chiama('PUT', '/api/registrazioni/giornata', giornata(IERI))).stato).toBe(403);
+    expect((await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '18:00', oraFine: '19:00' })).stato).toBe(403);
     const vecchia = await db.prisma.registrazioneOraria.findFirstOrThrow({ where: { dipendenteId: idMario, data: IERI } });
     expect((await mario.chiama('PUT', `/api/registrazioni/${vecchia.id}`, { dipendenteId: idMario, data: IERI, progettoId: vecchia.progettoId, oraInizio: vecchia.oraInizio, oraFine: '12:00' })).stato).toBe(403);
-    // Spostare a oggi una fascia di un giorno passato non è un modo per aggirare la regola.
-    expect((await mario.chiama('PUT', `/api/registrazioni/${vecchia.id}`, { dipendenteId: idMario, data: OGGI_PROVA, progettoId: vecchia.progettoId, oraInizio: '13:00', oraFine: '14:00' })).stato).toBe(403);
     expect((await mario.chiama('DELETE', `/api/registrazioni/${vecchia.id}`)).stato).toBe(403);
     expect(await db.prisma.registrazioneOraria.findUnique({ where: { id: vecchia.id } })).not.toBeNull();
   });
 
-  it('HR scrive e corregge i giorni passati', async () => {
+  it('il dipendente legge le sue ore', async () => {
+    const r = await mario.chiama('GET', `/api/registrazioni?dipendenteId=${idMario}&da=${IERI}&a=${IERI}`);
+    expect(r.stato).toBe(200);
+    expect(r.corpo.length).toBeGreaterThan(0);
+  });
+
+  it('HR scrive oggi e i giorni passati', async () => {
+    expect((await admin.chiama('PUT', '/api/registrazioni/giornata', giornata(OGGI_PROVA))).stato).toBe(200);
     expect((await admin.chiama('PUT', '/api/registrazioni/giornata', giornata(IERI))).stato).toBe(200);
     const fasce = await db.prisma.registrazioneOraria.findMany({ where: { dipendenteId: idMario, data: IERI } });
     expect(fasce.map((f) => `${f.oraInizio}-${f.oraFine}`)).toEqual(['08:00-12:00']);
   });
 
-  it('i giorni futuri restano chiusi a tutti, con il loro messaggio', async () => {
-    const futuro = await mario.chiama('PUT', '/api/registrazioni/giornata', giornata('2026-11-24'));
+  it('i giorni futuri restano chiusi anche a HR, con il loro messaggio', async () => {
+    const futuro = await admin.chiama('PUT', '/api/registrazioni/giornata', giornata('2026-11-24'));
     expect(futuro.stato).toBe(400);
     expect(futuro.corpo.campi.data).toMatch(/futuri/);
-    expect((await admin.chiama('PUT', '/api/registrazioni/giornata', giornata('2026-11-24'))).stato).toBe(400);
   });
 
-  it('documentazione di progetto: il dipendente solo con la data di oggi', async () => {
-    const passata = await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: IERI, titolo: 'Rapportino', nota: 'Fatto' });
-    expect(passata.stato).toBe(403);
-    expect((await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: OGGI_PROVA, titolo: 'Rapportino', nota: 'Fatto' })).stato).toBe(201);
+  it('documentazione di progetto: la carica solo HR, anche con date passate', async () => {
+    expect((await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: OGGI_PROVA, titolo: 'Rapportino', nota: 'Fatto' })).stato).toBe(403);
     expect((await admin.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: IERI, titolo: 'Verbale HR', nota: 'Recupero' })).stato).toBe(201);
   });
 });

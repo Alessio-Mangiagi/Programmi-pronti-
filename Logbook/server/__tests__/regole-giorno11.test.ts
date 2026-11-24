@@ -71,7 +71,7 @@ describe('data minima 01/01/2020', () => {
 
 describe('ore massime giornaliere del progetto', () => {
   it('la giornata oltre il massimo viene bloccata con l\'errore sulle righe del progetto', async () => {
-    const r = await mario.chiama('PUT', '/api/registrazioni/giornata', {
+    const r = await admin.chiama('PUT', '/api/registrazioni/giornata', {
       dipendenteId: idMario,
       data: OGGI_PROVA,
       fasce: [
@@ -85,7 +85,7 @@ describe('ore massime giornaliere del progetto', () => {
   });
 
   it("esattamente il massimo va bene; su un progetto senza limite non c'è blocco", async () => {
-    const ok = await mario.chiama('PUT', '/api/registrazioni/giornata', {
+    const ok = await admin.chiama('PUT', '/api/registrazioni/giornata', {
       dipendenteId: idMario,
       data: OGGI_PROVA,
       fasce: [
@@ -98,7 +98,7 @@ describe('ore massime giornaliere del progetto', () => {
   });
 
   it('anche la fascia singola e l\'import contano le ore già registrate', async () => {
-    const singola = await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '21:00', oraFine: '21:30' });
+    const singola = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '21:00', oraFine: '21:30' });
     expect(singola.stato).toBe(400);
     expect(singola.corpo.campi.progettoId).toMatch(/PRG-001/);
 

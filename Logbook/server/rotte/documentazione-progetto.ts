@@ -7,11 +7,12 @@
  * /api/documenti-progetto
  * - GET    ?progettoId=&daVedere=1   HR vede tutto (daVedere = solo i non ancora visti);
  *                                    il dipendente vede solo quello che ha caricato lui
+ *                                    (dal Giorno 20 nulla di nuovo: carica solo HR)
  * - POST   { progettoId, data, titolo, nota?, percentuale?, fileId?, origine? }
- *          il dipendente solo sui progetti ATTIVI a cui è assegnato e solo con la data di
- *          oggi (Giorno 19); nessuna data futura per nessuno
+ *          solo HR dal Giorno 20 (risposta 2 "tutti i dati li inserisce HR"), su progetti
+ *          non chiusi, mai con data futura. Quello che carica HR nasce già "visto".
  * - PATCH  /:id/revisione { visto?, rispostaHr? }   solo HR: "visto" e risposta
- * - DELETE /:id   HR sempre; chi l'ha caricato finché HR non l'ha segnato visto (anche il file)
+ * - DELETE /:id   solo HR (anche il file)
  * - POST   /:id/skytower   solo HR: invia il file nella commessa SkyTower del progetto
  *          (serve il collegamento in Impostazioni e il codice commessa nel progetto)
  *
@@ -22,12 +23,12 @@
  * stesso utente, non già usato).
  */
 import fs from 'node:fs';
-import { Router, type Request } from 'express';
+import { Router } from 'express';
 import type { Prisma, PrismaClient } from '../../generated/prisma/client';
 import { formattaData } from '../../comune/date';
 import { schemaDocumentoProgetto, schemaNotaProgetto, schemaRevisioneDocumento } from '../../comune/documenti';
-import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
-import { dipendenteAmmesso, idDaParametro, isAdmin, richiediAdmin } from '../middleware';
+import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
+import { idDaParametro, isAdmin, richiediAdmin } from '../middleware';
 import { eliminaFile, fileCollegabile, percorsoFile, vistaFile } from '../servizi/archivio-file';
 import { inviaDocumento, leggiCollegamento } from '../servizi/skytower';
 
@@ -61,21 +62,11 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
     return d;
   }
 
-  /**
-   * Un dipendente può caricare solo sui progetti ATTIVI a cui è assegnato (risposta 2c).
-   * HR può caricare su qualsiasi progetto non chiuso.
-   */
-  async function controllaProgetto(req: Request, progettoId: number) {
+  /** HR carica su qualsiasi progetto non chiuso. */
+  async function controllaProgetto(progettoId: number) {
     const p = await prisma.progetto.findUnique({ where: { id: progettoId } });
     if (!p) throw nonTrovato('Progetto');
-    if (isAdmin(req)) {
-      if (p.stato === 'CHIUSO') throw richiestaNonValida(`Il progetto ${p.codice} è chiuso`, { progettoId: 'Progetto chiuso' });
-      return p;
-    }
-    const mioId = dipendenteAmmesso(req)!;
-    const assegnato = await prisma.assegnazioneProgetto.findUnique({ where: { progettoId_dipendenteId: { progettoId, dipendenteId: mioId } } });
-    if (!assegnato) throw vietato(`Non sei assegnato al progetto ${p.codice}`);
-    if (p.stato !== 'ATTIVO') throw richiestaNonValida(`Il progetto ${p.codice} non è attivo: non si carica documentazione`, { progettoId: 'Progetto non attivo' });
+    if (p.stato === 'CHIUSO') throw richiestaNonValida(`Il progetto ${p.codice} è chiuso`, { progettoId: 'Progetto chiuso' });
     return p;
   }
 
@@ -95,15 +86,16 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
     res.json(elenco.map((d) => vista(d)));
   });
 
-  router.post('/', async (req, res) => {
+  router.post('/', richiediAdmin, async (req, res) => {
     const d = schemaDocumentoProgetto.parse(req.body);
-    await controllaProgetto(req, d.progettoId);
+    await controllaProgetto(d.progettoId);
     if (d.data > oggi()) throw richiestaNonValida('La documentazione non può avere una data futura', { data: 'Data futura' });
-    // Giorno 19: come per le ore, il dipendente documenta solo la giornata di oggi; date
-    // passate solo HR (nessun lavoro dichiarato a posteriori).
-    if (!isAdmin(req) && d.data < oggi()) throw vietato('La documentazione dei giorni passati la inserisce solo HR: usa la data di oggi');
     if (d.fileId) await fileCollegabile(prisma, d.fileId, req.utente!.id);
-    const creato = await prisma.documentoProgetto.create({ data: { ...d, autoreId: req.utente!.id }, include: COLLEGATI });
+    // Caricato da HR: è già "visto" (nessuno deve rivederlo), resta riapribile con "Segna da vedere".
+    const creato = await prisma.documentoProgetto.create({
+      data: { ...d, autoreId: req.utente!.id, visto: true, vistoIl: new Date(), vistoDaId: req.utente!.id },
+      include: COLLEGATI,
+    });
     res.status(201).json(vista(creato));
   });
 
@@ -122,12 +114,8 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
     res.json(vista(aggiornato));
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', richiediAdmin, async (req, res) => {
     const d = await documento(idDaParametro(req.params.id)!);
-    if (!isAdmin(req)) {
-      if (d.autoreId !== req.utente!.id) throw vietato('Puoi eliminare solo la documentazione che hai caricato tu');
-      if (d.visto) throw new ErroreHttp(409, 'HR ha già visto questo documento: per toglierlo rivolgiti a HR');
-    }
     await prisma.documentoProgetto.delete({ where: { id: d.id } });
     await eliminaFile(prisma, cartella, d.fileId);
     res.status(204).end();

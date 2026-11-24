@@ -80,6 +80,13 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     await api.post('/api/auth/login', { username, password });
+    // Giorno 20: a ogni accesso HR rivede la finestra delle segnalazioni aperte
+    // (componenti/Segnalazioni.tsx la mostra una volta e lo ricorda in sessionStorage).
+    try {
+      for (const k of Object.keys(sessionStorage)) if (k.startsWith('logbook.segnalazioni.mostrate.')) sessionStorage.removeItem(k);
+    } catch {
+      /* archivio del browser non disponibile */
+    }
     await ricarica();
   };
 

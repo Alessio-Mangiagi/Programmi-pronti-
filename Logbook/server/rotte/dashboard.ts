@@ -15,6 +15,7 @@
  * Solo HR (dal 24/11/2026, risposta 1c): attestati scaduti o in scadenza nei prossimi
  * 30 giorni (GIORNI_PREAVVISO_ATTESTATI), i più urgenti prima.
  * Solo HR (Giorno 17): documentazione di progetto caricata e non ancora vista.
+ * Giorno 20: segnalazioni dei dipendenti; HR vede le aperte, il dipendente le sue ultime.
  */
 import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
@@ -71,6 +72,13 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
           orderBy: { dataScadenza: 'asc' },
         })
       : [];
+    // Segnalazioni (Giorno 20): HR tutte le aperte, la più vecchia prima; il dipendente le sue ultime 10.
+    const segnalazioni = await prisma.segnalazione.findMany({
+      where: isAdmin(req) ? { stato: 'APERTA' } : { dipendenteId: { in: ids } },
+      include: { dipendente: { select: { nome: true, cognome: true } } },
+      orderBy: isAdmin(req) ? { creatoIl: 'asc' } : { creatoIl: 'desc' },
+      take: isAdmin(req) ? undefined : 10,
+    });
     // Documentazione di progetto non ancora vista da HR (Giorno 17, risposta 2c), la più vecchia prima.
     const documentazione = isAdmin(req)
       ? await prisma.documentoProgetto.findMany({
@@ -124,6 +132,10 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
       attestatiDaRinnovare: attestati.map((a) => ({
         id: a.id, tipo: a.tipo, titolo: a.titolo, dataScadenza: a.dataScadenza, stato: statoAttestato(a.dataScadenza, giorno),
         dipendenteId: a.dipendenteId, dipendente: nome(a.dipendenteId, a.dipendente),
+      })),
+      segnalazioni: segnalazioni.map((s) => ({
+        id: s.id, data: s.data, testo: s.testo, stato: s.stato, rispostaHr: s.rispostaHr, creatoIl: s.creatoIl,
+        dipendenteId: s.dipendenteId, dipendente: nome(s.dipendenteId, s.dipendente),
       })),
       documentazioneDaVedere: documentazione.map((d) => ({
         id: d.id, titolo: d.titolo, data: d.data, percentuale: d.percentuale, conFile: d.fileId != null,

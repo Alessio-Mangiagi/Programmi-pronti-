@@ -57,6 +57,8 @@ model Utente {
   documentiVisti    DocumentoProgetto[] @relation("VistoDocumentoProgetto")
   /// Note interne sui progetti scritte da questo utente (HR).
   noteProgetto      NotaProgetto[]
+  /// Segnalazioni dei dipendenti chiuse da questo utente (HR).
+  segnalazioniRisolte Segnalazione[] @relation("SegnalazioniRisolte")
   creatoIl      DateTime    @default(now())
   aggiornatoIl  DateTime    @updatedAt
 }
@@ -126,6 +128,8 @@ model Dipendente {
   documenti            DocumentoDipendente[]
   /// Progetti a cui HR ha assegnato il dipendente: solo su questi può registrare ore.
   assegnazioni         AssegnazioneProgetto[]
+  /// Segnalazioni del dipendente a HR sulle proprie giornate.
+  segnalazioni         Segnalazione[]
   creatoIl             DateTime              @default(now())
   aggiornatoIl         DateTime              @updatedAt
 
@@ -430,4 +434,38 @@ model Impostazione {
   chiave       String   @id
   valore       String
   aggiornatoIl DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Segnalazioni (Giorno 20, 24/11/2026, risposte 1b e 4)
+// ---------------------------------------------------------------------------
+
+enum StatoSegnalazione {
+  APERTA
+  RISOLTA
+}
+
+/// Segnalazione di un dipendente su una sua giornata ("manca un'ora", "orario sbagliato").
+/// Dal Giorno 20 le ore le inserisce solo HR (risposta 1b): il dipendente non corregge da
+/// sé, segnala; "HR decide e interviene su segnalazione ma il sistema notifica a HR quando
+/// accede" (risposta 4): le APERTE compaiono a HR in una finestra all'accesso, nel contatore
+/// dell'intestazione e in dashboard. HR corregge le ore e la chiude con una risposta.
+model Segnalazione {
+  id           Int               @id @default(autoincrement())
+  dipendente   Dipendente        @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  /// Giorno a cui si riferisce, "AAAA-MM-GG" (mai futuro).
+  data         String
+  testo        String
+  stato        StatoSegnalazione @default(APERTA)
+  /// Risposta di HR, visibile al dipendente.
+  rispostaHr   String?
+  risoltaDa    Utente?           @relation("SegnalazioniRisolte", fields: [risoltaDaId], references: [id])
+  risoltaDaId  Int?
+  risoltaIl    DateTime?
+  creatoIl     DateTime          @default(now())
+  aggiornatoIl DateTime          @updatedAt
+
+  @@index([stato])
+  @@index([dipendenteId, data])
 }

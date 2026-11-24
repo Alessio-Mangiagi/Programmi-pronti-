@@ -6,8 +6,8 @@
  *   clic su una riga aprono la pagina del progetto (/progetti/nuovo, /progetti/:id) con
  *   dati, dipendenti assegnati, documentazione e note (Giorno 17, 24/11/2026: prima era
  *   una finestra).
- * - Dipendente ("I miei progetti"): solo i progetti a cui è assegnato; dalla pagina del
- *   progetto carica la documentazione di avanzamento (risposta 2c).
+ * - Dipendente ("I miei progetti"): solo i progetti a cui è assegnato, in sola lettura
+ *   (dal Giorno 20 la documentazione la carica solo HR).
  *
  * `?apri=<id>` (link dalla Dashboard) porta direttamente alla pagina del progetto.
  */
@@ -81,7 +81,7 @@ export function Progetti() {
     <>
       <IntestazionePagina
         titolo={admin ? 'Progetti' : 'I miei progetti'}
-        sottotitolo={admin ? 'Progetti e commesse: dati, dipendenti assegnati, documentazione e note' : 'I progetti a cui sei assegnato: apri un progetto per caricare la documentazione di avanzamento'}
+        sottotitolo={admin ? 'Progetti e commesse: dati, dipendenti assegnati, documentazione e note' : 'I progetti a cui sei assegnato: sono quelli su cui HR registra le tue ore'}
         azioni={
           admin && (
             <Pulsante variante="primario" onClick={() => naviga('/progetti/nuovo')}>

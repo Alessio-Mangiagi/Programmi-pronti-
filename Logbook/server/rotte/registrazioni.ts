@@ -9,11 +9,12 @@
  * - PUT    /:id             modifica una fascia
  * - DELETE /:id             cancella una fascia
  *
- * Il dipendente lavora solo sulle proprie fasce (dipendenteAmmesso → 403); l'admin su
- * tutte. Dal Giorno 19 (24/11/2026) il dipendente scrive solo nella giornata di OGGI (data
- * del server, non del PC): i giorni passati li inserisce o corregge solo HR, così nessuno
- * può aggiungere a posteriori ore non lavorate che finirebbero in busta paga (richiesta:
- * "solo gli admin devono poter inserire i dati nelle giornate già passate"). Ogni scrittura controlla forma e sovrapposizioni (comune/registrazioni.ts) e le
+ * Lettura: il dipendente vede solo le proprie fasce (dipendenteAmmesso → 403), l'admin
+ * tutte. Scrittura (giornata, fascia, modifica, cancellazione): SOLO HR, dal Giorno 20
+ * (24/11/2026, risposta 1b "tutti i dati li inserisce HR"). Il Giorno 19 permetteva al
+ * dipendente la sola giornata di oggi; ora nemmeno quella: se qualcosa non torna il
+ * dipendente lo segnala (/api/segnalazioni) e HR interviene. Così nessuno può dichiarare
+ * ore non lavorate che finirebbero nei pagamenti. Ogni scrittura controlla forma e sovrapposizioni (comune/registrazioni.ts) e le
  * regole di contesto (servizi/regole-ore.ts). Una sovrapposizione risponde 409 con il
  * messaggio che indica la fascia in conflitto.
  */
@@ -22,9 +23,8 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import { isDataValida } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
 import { messaggioMassimo, messaggioSovrapposizione, primaSovrapposizione, schemaGiornata, schemaRegistrazione, superamentiMassimo } from '../../comune/registrazioni';
-import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
-import { formattaData } from '../../comune/date';
-import { dipendenteAmmesso, idDaParametro, isAdmin } from '../middleware';
+import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
+import { dipendenteAmmesso, idDaParametro, richiediAdmin } from '../middleware';
 import { caricaContestoOre, erroriRegole } from '../servizi/regole-ore';
 
 /** Legge un parametro data opzionale; 400 se presente ma non "AAAA-MM-GG". */
@@ -38,15 +38,6 @@ const conProgetto = { progetto: { select: { codice: true, nome: true, colore: tr
 
 export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   const router = Router();
-
-  /**
-   * Giorni passati: solo HR. Il dipendente scrive (aggiunge, modifica, toglie) solo oggi;
-   * i giorni futuri li rifiutano le regole (erroriRegole) per tutti, con il loro messaggio.
-   */
-  function soloOggiPerDipendente(req: Parameters<typeof isAdmin>[0], data: string) {
-    if (isAdmin(req) || data >= oggi()) return;
-    throw vietato(`Il ${formattaData(data)} è un giorno passato: le ore dei giorni passati le inserisce o corregge solo HR`);
-  }
 
   /** Fasce già registrate da un dipendente in un giorno (con progetto per i messaggi). */
   const fasceDelGiorno = (dipendenteId: number, data: string) =>
@@ -99,10 +90,8 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     res.json(fasce.map((f) => ({ ...f, minuti: durataMinuti(f.oraInizio, f.oraFine) })));
   });
 
-  router.put('/giornata', async (req, res) => {
+  router.put('/giornata', richiediAdmin, async (req, res) => {
     const g = schemaGiornata.parse(req.body);
-    dipendenteAmmesso(req, g.dipendenteId);
-    soloOggiPerDipendente(req, g.data);
     const esistenti = await fasceDelGiorno(g.dipendenteId, g.data);
     await controllaRegole(g.dipendenteId, g.data, g.fasce.map((f) => f.progettoId), new Set(esistenti.map((e) => e.progettoId)));
     await controllaMassimi(g.fasce, true);
@@ -115,10 +104,8 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     res.json(nuove.map((f) => ({ ...f, minuti: durataMinuti(f.oraInizio, f.oraFine) })));
   });
 
-  router.post('/', async (req, res) => {
+  router.post('/', richiediAdmin, async (req, res) => {
     const r = schemaRegistrazione.parse(req.body);
-    dipendenteAmmesso(req, r.dipendenteId);
-    soloOggiPerDipendente(req, r.data);
     const esistenti = await fasceDelGiorno(r.dipendenteId, r.data);
     await controllaRegole(r.dipendenteId, r.data, [r.progettoId], new Set());
     const conflitto = primaSovrapposizione(r, esistenti);
@@ -131,15 +118,11 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     res.status(201).json({ ...creata, minuti: durataMinuti(creata.oraInizio, creata.oraFine) });
   });
 
-  router.put('/:id', async (req, res) => {
+  router.put('/:id', richiediAdmin, async (req, res) => {
     const id = idDaParametro(req.params.id)!;
     const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });
     if (!vecchia) throw nonTrovato('Registrazione');
-    dipendenteAmmesso(req, vecchia.dipendenteId);
-    soloOggiPerDipendente(req, vecchia.data); // non si sposta a oggi una fascia di un giorno passato
     const r = schemaRegistrazione.parse(req.body);
-    dipendenteAmmesso(req, r.dipendenteId);
-    soloOggiPerDipendente(req, r.data);
     const esistenti = await fasceDelGiorno(r.dipendenteId, r.data);
     const stessoGiorno = vecchia.dipendenteId === r.dipendenteId && vecchia.data === r.data;
     await controllaRegole(r.dipendenteId, r.data, [r.progettoId], new Set(stessoGiorno ? [vecchia.progettoId] : []));
@@ -153,12 +136,10 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     res.json({ ...aggiornata, minuti: durataMinuti(aggiornata.oraInizio, aggiornata.oraFine) });
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', richiediAdmin, async (req, res) => {
     const id = idDaParametro(req.params.id)!;
     const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });
     if (!vecchia) throw nonTrovato('Registrazione');
-    dipendenteAmmesso(req, vecchia.dipendenteId);
-    soloOggiPerDipendente(req, vecchia.data);
     await prisma.registrazioneOraria.delete({ where: { id } });
     res.json({ ok: true });
   });

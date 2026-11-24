@@ -11,8 +11,10 @@
  * Dal Giorno 17 il menu dei progetti propone solo quelli a cui il dipendente è assegnato
  * (GET /api/progetti?assegnatiA=), più quelli già presenti nel giorno.
  *
- * `solaLettura` (Giorno 19): motivo per cui il giorno si guarda soltanto (giorno passato
- * per il dipendente, giorno futuro per tutti). Campi spenti, niente righe nuove né
+ * `solaLettura` (Giorni 19-20): motivo per cui il giorno si guarda soltanto (sempre per il
+ * dipendente, dal Giorno 20 le ore le inserisce solo HR; giorno futuro per tutti).
+ * In fondo, le segnalazioni del giorno (componenti/Segnalazioni.tsx): il dipendente segnala
+ * cosa non torna, HR le legge qui mentre corregge e le chiude. Campi spenti, niente righe nuove né
  * eliminate, niente "Salva": resta solo "Chiudi". Il server rifiuta comunque (403/400).
  *
  * `avvisi` sono righe informative passate dal calendario (festività, assenze del giorno).
@@ -32,6 +34,7 @@ import { coloreProgetto } from '../colori';
 import type { Progetto, Registrazione } from '../tipi';
 import { Avviso, Caricamento, classiInput, Modale, Pulsante } from './ui';
 import { Icona } from './icone';
+import { SegnalazioniGiorno } from './Segnalazioni';
 
 type Riga = { chiave: number; progettoId: string; oraInizio: string; oraFine: string; note: string };
 
@@ -284,6 +287,8 @@ export function EditorGiornata({
             {messaggioMassimo(progetti.find((p) => p.id === o.progettoId)?.codice ?? '?', o.minuti, o.massimo)}
           </Avviso>
         ))}
+
+        <SegnalazioniGiorno dipendenteId={dipendenteId} data={data} />
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
           <Pulsante onClick={onChiudi}>{soloVista ? 'Chiudi' : 'Annulla'}</Pulsante>

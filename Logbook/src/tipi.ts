@@ -159,3 +159,21 @@ export type DocumentoProgetto = {
 
 /** GET /api/note-progetto — nota interna di HR. */
 export type NotaProgetto = { id: number; progettoId: number; testo: string; creatoIl: string; autore: string };
+
+// ---------------------------------------------------------------------------
+// Giorno 20 (24/11/2026): segnalazioni dei dipendenti a HR
+// ---------------------------------------------------------------------------
+
+/** GET /api/segnalazioni */
+export type Segnalazione = {
+  id: number;
+  dipendenteId: number;
+  data: string;
+  testo: string;
+  stato: 'APERTA' | 'RISOLTA';
+  rispostaHr: string | null;
+  risoltaIl: string | null;
+  creatoIl: string;
+  dipendente: { id: number; nome: string; cognome: string; matricola: string; codiceFiscale: string };
+  risoltaDa: { username: string } | null;
+};

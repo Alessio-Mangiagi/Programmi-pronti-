@@ -27,73 +27,46 @@ Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.
 ## 2. Per i dipendenti
 
 Il menu ha quattro voci: **Dashboard**, **Calendario**, **I miei progetti**, **Le mie
-assenze**. Ognuno vede e modifica solo i propri dati.
+assenze**. Ognuno vede solo i propri dati.
+
+**Le ore le inserisce HR.** Il dipendente le vede nel calendario ma non le scrive né le
+corregge: così nessuno può dichiarare ore non lavorate che finirebbero nei pagamenti. Se
+qualcosa non torna, si manda una **segnalazione** a HR (vedi sotto).
 
 ### Dashboard
 
 ![Dashboard del dipendente](img/12-dashboard-dipendente.png)
 
-Mostra le ore del mese (lavorate e attese in base al contratto), le richieste in attesa e i
-**giorni passati senza ore**: giorni lavorativi fino a ieri senza ore, da segnalare a HR
-(i giorni passati li compila HR, vedi sotto). **Registra le ore di oggi** apre la giornata
-di oggi.
+Mostra le ore del mese (lavorate e attese in base al contratto), le richieste in attesa, i
+**giorni passati senza ore** (giorni lavorativi fino a ieri senza ore: il clic apre il
+giorno, da cui si può segnalare) e **Le mie segnalazioni**, con lo stato e la risposta di HR.
 
-### Registrare le ore
+### Le tue ore e le segnalazioni
 
-**Le ore si registrano solo nella giornata di oggi.** I giorni passati si possono aprire per
-vedere le ore, ma non si modificano: le ore dei giorni passati le inserisce o corregge solo
-HR. Così nessuno può aggiungere a posteriori ore non lavorate, che finirebbero nei pagamenti.
-Se vi siete dimenticati di registrare un giorno, avvisate HR.
+Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata in **sola
+lettura**, con le fasce (progetto, dalle, alle, note) e il totale. In fondo c'è il riquadro
+**Qualcosa non torna? Segnalalo a HR**: scrivete cosa non va (es. «ho lavorato fino alle
+17:30, non alle 16:30») e premete **Invia segnalazione**.
 
-![Giorno passato in sola lettura](img/32-giorno-passato.png)
+![Giorno in sola lettura con la segnalazione](img/32-giorno-passato.png)
 
-«Oggi» è la data di Logbook, non quella del computer: cambiare la data del PC non apre i
-giorni passati. Se il PC ha una data diversa, in cima alla pagina compare un avviso giallo.
+- HR vede la segnalazione appena entra in Logbook, corregge le ore se serve e la chiude con
+  una risposta, che compare sotto la segnalazione e in dashboard.
+- Finché è **aperta** la potete ritirare; una volta **risolta** resta come promemoria.
+- Si segnala sui giorni fino a oggi, non su quelli futuri.
+
+«Oggi» è la data di Logbook, non quella del computer. Se il PC ha una data diversa, in cima
+alla pagina compare un avviso giallo.
 
 ![Avviso: data del PC diversa da quella di Logbook](img/33-avviso-data-pc.png)
 
-Dal **Calendario** si fa clic su oggi: si apre il dettaglio della giornata.
+### I miei progetti
 
-![Dettaglio della giornata](img/14-editor-giornata.png)
-
-- **+ Aggiungi fascia** crea una riga: progetto, ora di inizio, ora di fine (24 ore), note.
-- Le **ore si calcolano da sole**, riga per riga, insieme al totale del giorno.
-- Più fasce nello stesso giorno vanno bene (mattina e pomeriggio, progetti diversi),
-  purché **non si sovrappongano**. Se si sovrappongono le righe diventano rosse e non si
-  può salvare:
-
-![Fasce sovrapposte](img/13-editor-sovrapposizione.png)
-
-- Nel menu dei progetti ci sono **solo i progetti a cui HR vi ha assegnato**. Se non ne
-  avete nessuno compare un avviso: chiedete a HR di assegnarvi.
-- Una fascia non può passare la mezzanotte: un turno di notte va diviso in due giorni.
-- Non si registrano ore nei giorni futuri né nei giorni di ferie o malattia approvate.
-- **Sabato, domenica e festivi non accettano ore**: nel calendario quei giorni non si aprono
-  (passandoci sopra compare il motivo, es. «Sabato: non si registrano ore»). Se in uno di
-  quei giorni sono rimaste ore inserite prima di questa regola, il dettaglio si apre solo
-  per toglierle.
-- Non si inserisce **nulla prima del 01/01/2020** (ore, assenze, festività, date di
-  assunzione e dei progetti, righe dell'import).
-- Se il progetto ha **ore massime al giorno**, sotto le righe compare per ogni progetto
-  "ore del giorno / max": oltre il limite il riquadro diventa rosso e **Salva giornata** si
-  disattiva (il limite vale per ciascun dipendente).
-- **Salva giornata** salva tutte le righe insieme; con la ✕ si toglie una riga.
-
-### I miei progetti: caricare la documentazione
-
-**I miei progetti** elenca i progetti a cui siete assegnati. Aprendone uno si vedono i dati
-del progetto, l'andamento dell'avanzamento che avete dichiarato e la vostra documentazione.
+**I miei progetti** elenca i progetti a cui siete assegnati: sono quelli su cui HR registra le
+vostre ore. Aprendone uno si vedono codice, cliente, ore massime al giorno e descrizione.
+Avanzamento e documentazione del progetto li gestisce HR.
 
 ![Pagina del progetto per il dipendente](img/28-progetto-dipendente.png)
-
-- Compilate **Titolo** e **Giorno**, poi almeno uno fra **Avanzamento (%)**, **Nota** e
-  **File** (foto, verbale, rapportino… fino a 20 MB) e premete **Carica documentazione**.
-- Ogni percentuale diventa un punto del grafico **Avanzamento**: passandoci sopra si leggono
-  giorno, titolo e autore.
-- Vedete solo quello che avete caricato voi. HR lo segna **Visto** e può rispondere: la
-  risposta compare sotto il documento.
-- Finché HR non l'ha visto potete **eliminarlo** (anche il file).
-- Si carica solo sui progetti **attivi**; giorni futuri non sono ammessi.
 
 ### Chiedere ferie, permessi o malattia
 
@@ -114,8 +87,49 @@ compaiono tratteggiate, quelle approvate piene, quelle rifiutate non compaiono.
 ## 3. Per HR (amministrazione)
 
 HR vede tutte le voci del menu e i dati di tutti i dipendenti. **Solo HR inserisce e
-corregge le ore dei giorni passati** (dal calendario o con l'import Excel); i dipendenti
-scrivono solo nella giornata di oggi.
+corregge le ore** (dal calendario o con l'import Excel) e la documentazione dei progetti; i
+dipendenti vedono le loro ore e mandano segnalazioni.
+
+### Segnalazioni dei dipendenti
+
+Nell'intestazione, la **campanella** mostra quante segnalazioni sono aperte. **Appena si
+entra in Logbook**, se ce ne sono, si apre da sola la finestra con l'elenco: chi, che giorno,
+cosa non torna. **Apri il giorno →** porta al dettaglio di quella giornata: si correggono le
+fasce, si scrive la risposta e si preme **Segna risolta**. La finestra si riapre con la
+campanella; in dashboard c'è anche il riquadro **Segnalazioni aperte**.
+
+![Finestra delle segnalazioni all'accesso](img/34-segnalazioni-hr.png)
+
+### Registrare le ore
+
+Dal **Calendario** (filtrato su un dipendente, o dal riepilogo del giorno con **Modifica**)
+si apre il dettaglio della giornata. Le ore si scrivono anche nei giorni passati; mai in
+quelli futuri.
+
+![Dettaglio della giornata](img/14-editor-giornata.png)
+
+- **+ Aggiungi fascia** crea una riga: progetto, ora di inizio, ora di fine (24 ore), note.
+- Le **ore si calcolano da sole**, riga per riga, insieme al totale del giorno.
+- Più fasce nello stesso giorno vanno bene (mattina e pomeriggio, progetti diversi),
+  purché **non si sovrappongano**. Se si sovrappongono le righe diventano rosse e non si
+  può salvare:
+
+![Fasce sovrapposte](img/13-editor-sovrapposizione.png)
+
+- Nel menu dei progetti ci sono **solo i progetti a cui il dipendente è assegnato**. Se non
+  ne ha nessuno compare un avviso: assegnatelo dalla pagina del progetto o dalla sua scheda.
+- Una fascia non può passare la mezzanotte: un turno di notte va diviso in due giorni.
+- Non si registrano ore nei giorni futuri né nei giorni di ferie o malattia approvate.
+- **Sabato, domenica e festivi non accettano ore**: nel calendario quei giorni non si aprono
+  (passandoci sopra compare il motivo, es. «Sabato: non si registrano ore»). Se in uno di
+  quei giorni sono rimaste ore inserite prima di questa regola, il dettaglio si apre solo
+  per toglierle.
+- Non si inserisce **nulla prima del 01/01/2020** (ore, assenze, festività, date di
+  assunzione e dei progetti, righe dell'import).
+- Se il progetto ha **ore massime al giorno**, sotto le righe compare per ogni progetto
+  "ore del giorno / max": oltre il limite il riquadro diventa rosso e **Salva giornata** si
+  disattiva (il limite vale per ciascun dipendente).
+- **Salva giornata** salva tutte le righe insieme; con la ✕ si toglie una riga.
 
 ### Dashboard HR
 
@@ -131,9 +145,10 @@ c'è da intervenire:
 - **Assenti oggi** (clic: tutte le assenze).
 - **Attestati da rinnovare**: scaduti o in scadenza entro 30 giorni; il pannello sotto li
   elenca e il clic apre la scheda Attestati del dipendente.
-- **Documentazione da vedere**: documentazione di progetto caricata dai dipendenti e non
-  ancora vista; il pannello sotto la elenca (progetto, titolo, percentuale, autore) e il
-  clic apre la pagina del progetto.
+- **Segnalazioni aperte**: cosa i dipendenti segnalano sulle loro ore; il pannello sotto le
+  elenca e il clic apre quel giorno di quel dipendente.
+- **Documentazione da vedere** (compare solo se c'è): documenti di progetto rimessi «da
+  vedere»; il clic apre la pagina del progetto.
 
 Ogni voce dei pannelli sotto porta al suo elemento:
 
@@ -260,12 +275,12 @@ toglie: le ore fatte restano (e restano correggibili nella loro giornata), ma no
 possono aggiungere altre. Con l'aggiornamento del 24/11/2026 chi aveva già ore su un
 progetto ne è diventato assegnato automaticamente.
 
-**Avanzamento e documentazione**: HR vede la documentazione di tutti, con il filtro a
-caratteri e **Solo da vedere**. Su ogni documento: **Segna visto**, **Rispondi** (la
-risposta segna anche visto), **Elimina** e, se in Impostazioni c'è il collegamento e il
-progetto ha la commessa, **Invia a SkyTower** (solo per i documenti con un file; si invia
-una volta, poi compare il link al documento in SkyTower). Anche HR può caricare
-documentazione dalla stessa pagina.
+**Avanzamento e documentazione** (solo HR): titolo, giorno, percentuale di avanzamento, nota
+e file (foto, verbale, rapportino…). Ogni percentuale diventa un punto del grafico
+**Avanzamento**. L'elenco ha il filtro a caratteri; ogni documento si può **commentare**,
+segnare **da vedere** (per ricordarsi di riguardarlo), **eliminare** e, se in Impostazioni
+c'è il collegamento e il progetto ha la commessa, **inviare a SkyTower** (solo i documenti
+con un file, una volta sola; poi compare il link al documento in SkyTower).
 
 **Note interne**: appunti di HR sul progetto, che i dipendenti non vedono.
 

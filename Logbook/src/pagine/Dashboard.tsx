@@ -5,9 +5,10 @@
  * HR: richieste di assenza da approvare, dipendenti con giorni lavorativi senza ore,
  * ore del mese lavorate vs attese per dipendente, ore per progetto, assenze e festività
  * dei prossimi giorni.
- * Dipendente: le proprie ore del mese, i giorni passati senza ore (da segnalare a HR: dal
- * Giorno 19 i giorni passati li compila solo HR), il collegamento alle ore di oggi, le
- * proprie richieste e assenze.
+ * Dipendente: le proprie ore del mese, i giorni passati senza ore e le proprie
+ * segnalazioni (dal Giorno 20 le ore le inserisce solo HR: il dipendente apre il giorno e,
+ * se qualcosa non torna, lo segnala), le proprie richieste e assenze.
+ * HR (Giorno 20): segnalazioni aperte dei dipendenti, con il clic che apre quel giorno.
  *
  * Dati: GET /api/dashboard (server/rotte/dashboard.ts).
  *
@@ -49,6 +50,8 @@ type DatiDashboard = {
   prossimeFestivita: Festivita[];
   /** Solo HR: attestati scaduti o in scadenza entro 30 giorni (vuoto per il dipendente). */
   attestatiDaRinnovare: { id: number; tipo: TipoAttestato; titolo: string; dataScadenza: string; stato: StatoAttestato; dipendenteId: number; dipendente: string }[];
+  /** Giorno 20: HR le aperte (la più vecchia prima), il dipendente le sue ultime 10. */
+  segnalazioni: { id: number; data: string; testo: string; stato: 'APERTA' | 'RISOLTA'; rispostaHr: string | null; creatoIl: string; dipendenteId: number; dipendente: string }[];
   /** Solo HR (Giorno 17): documentazione di progetto caricata e non ancora vista, la più vecchia prima. */
   documentazioneDaVedere: {
     id: number; titolo: string; data: string; percentuale: number | null; conFile: boolean; autore: string;
@@ -177,6 +180,15 @@ export function Dashboard() {
         )}
         {admin && (
           <Tessera
+            titolo="Segnalazioni aperte"
+            valore={String(dati.segnalazioni.length)}
+            dettaglio={dati.segnalazioni.length ? 'dei dipendenti, da verificare' : 'nessuna'}
+            allarme={dati.segnalazioni.length > 0}
+            vai={dati.segnalazioni.length ? scorriA('segnalazioni') : undefined}
+          />
+        )}
+        {admin && dati.documentazioneDaVedere.length > 0 && (
+          <Tessera
             titolo="Documentazione da vedere"
             valore={String(dati.documentazioneDaVedere.length)}
             dettaglio={dati.documentazioneDaVedere.length ? `su ${new Set(dati.documentazioneDaVedere.map((d) => d.progetto.id)).size} progetti` : 'tutto visto'}
@@ -206,26 +218,20 @@ export function Dashboard() {
             )}
           </Pannello>
         ) : (
-          <Pannello
-            titolo="Giorni passati senza ore"
-            id="giorni-senza-ore"
-            azione={
-              <Link className="text-sm text-marchio hover:underline" to={`/calendario?data=${dati.oggi}&giorno=${dati.oggi}`}>
-                Registra le ore di oggi →
-              </Link>
-            }
-          >
+          <Pannello titolo="Giorni passati senza ore" id="giorni-senza-ore">
             {!io || io.giorniSenzaOre.length === 0 ? (
               <p className="text-sm text-gray-500">Tutto in ordine: nessun giorno lavorativo senza ore.</p>
             ) : (
               <>
-                {/* Giorno 19: i giorni passati li inserisce solo HR (evita ore dichiarate a posteriori). */}
-                <p className="mb-2 text-sm text-gray-600">Le ore dei giorni passati le inserisce HR: se in questi giorni hai lavorato, avvisa HR.</p>
+                {/* Giorno 20: le ore le inserisce HR; il dipendente apre il giorno e segnala. */}
+                <p className="mb-2 text-sm text-gray-600">Le ore le inserisce HR. Se in uno di questi giorni hai lavorato, aprilo e manda una segnalazione.</p>
                 <ul className="divide-y divide-gray-100 text-sm">
                   {io.giorniSenzaOre.map((g) => (
-                    <li key={g} className="py-1.5">
-                      {new Intl.DateTimeFormat('it-IT', { weekday: 'long' }).format(new Date(`${g}T12:00:00`))} {formattaData(g)}
-                    </li>
+                    <RigaLink key={g} a={`/calendario?data=${g}&giorno=${g}`}>
+                      <span className="capitalize">{new Intl.DateTimeFormat('it-IT', { weekday: 'long' }).format(new Date(`${g}T12:00:00`))}</span>
+                      <span className="cifre">{formattaData(g)}</span>
+                      <span className="ml-auto text-xs text-marchio">Apri e segnala →</span>
+                    </RigaLink>
                   ))}
                 </ul>
               </>
@@ -319,6 +325,29 @@ export function Dashboard() {
                   <span className="text-gray-700">{a.titolo}</span>
                   <span className="text-xs text-gray-500">{ETICHETTE_ATTESTATO[a.tipo]}</span>
                   <span className="ml-auto text-gray-600">{formattaData(a.dataScadenza)}</span>
+                </RigaLink>
+              ))}
+            </ul>
+          </Pannello>
+        )}
+
+        {/* Segnalazioni (Giorno 20): HR le aperte, clic → quel giorno di quel dipendente;
+            il dipendente le sue ultime, con lo stato e la risposta di HR. */}
+        {(admin ? dati.segnalazioni.length > 0 : true) && (
+          <Pannello titolo={admin ? 'Segnalazioni dei dipendenti' : 'Le mie segnalazioni'} id="segnalazioni">
+            {dati.segnalazioni.length === 0 && <p className="text-sm text-gray-500">Nessuna segnalazione. Se nelle tue ore qualcosa non torna, apri il giorno nel calendario e segnalalo.</p>}
+            <ul className="divide-y divide-gray-100 text-sm">
+              {dati.segnalazioni.map((s) => (
+                <RigaLink key={s.id} a={admin ? `/calendario?dipendente=${s.dipendenteId}&data=${s.data}&giorno=${s.data}` : `/calendario?data=${s.data}&giorno=${s.data}`}>
+                  {admin && <span className="font-medium text-marchio">{s.dipendente}</span>}
+                  <span className="cifre text-gray-600">{formattaData(s.data)}</span>
+                  {!admin && (
+                    <span className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${s.stato === 'APERTA' ? 'bg-[#fdf1d6] text-[#6b4a00]' : 'bg-[#e7f4ea] text-verde-testo'}`}>
+                      {s.stato === 'APERTA' ? 'In attesa di HR' : 'Risolta'}
+                    </span>
+                  )}
+                  <span className="min-w-0 basis-full truncate text-gray-700 sm:basis-auto sm:flex-1">{s.testo}</span>
+                  {!admin && s.rispostaHr && <span className="basis-full text-xs text-marchio">HR: {s.rispostaHr}</span>}
                 </RigaLink>
               ))}
             </ul>

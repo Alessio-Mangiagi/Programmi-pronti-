@@ -19,7 +19,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 17 (24/11):** assegnazione dei dipendenti ai progetti, pagina del progetto con documentazione di avanzamento, grafico e note ✅
 - **Giorno 18 (24/11):** scheda dipendente in una sola pagina, omonimi distinti dal codice fiscale, scelte con ricerca a caratteri, assenze in pagina ✅
 - **Giorno 19 (24/11):** il dipendente registra solo oggi, i giorni passati solo HR; "oggi" è la data del server, avviso se il PC ha un'altra data ✅
-- **Prossimo:** pannello laterale del calendario con più giorni (Ctrl/Maiusc) per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 20 (24/11):** le ore e la documentazione le inserisce solo HR; segnalazioni dei dipendenti con finestra a HR all'accesso e campanella ✅
+- **Prossimo:** Giorno 21 allegati alle assenze (3b); poi verifica di sicurezza, codice non chiamato e librerie non usate (richiesta del 24/11); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -106,6 +107,10 @@ sessione per riprendere da dove si era rimasti.
 | 24/11 | Assenze in una pagina (/assenze/nuova, /assenze/:id) con le altre assenze del dipendente a destra; nessun allegato alle assenze per ora | "vale ugualmente per assenze e ferie"; allegati non chiesti (domanda aperta) |
 | 24/11 | Il dipendente scrive ore e documentazione solo con la data di oggi; i giorni passati (aggiungere, modificare, togliere) solo HR; i futuri nessuno | "solo gli admin devono poter inserire i dati nelle giornate già passate … per evitare pagamenti errati" (precisa il messaggio "solo gli admin possono inserire elementi nelle giornate") |
 | 24/11 | "Oggi" = data del server (GET /api/oggi); l'interfaccia la usa e avvisa se il PC ha un'altra data | "sincronizzando il calendario del pc con quello dell'app": cambiare la data del PC non deve aprire i giorni passati |
+| 24/11 | Le ore le inserisce **solo HR**, anche oggi; il dipendente vede in sola lettura | Risposta 1b (supera la regola "solo oggi" del Giorno 19) |
+| 24/11 | Documentazione di progetto solo HR, nasce già "vista"; il dipendente vede i suoi progetti senza documentazione | Risposta 2 "tutti i dati li inserisce HR" |
+| 24/11 | Segnalazioni del dipendente su un suo giorno (mai futuro); HR le vede in una finestra all'accesso (una volta per sessione e dopo ogni login), nella campanella e in dashboard; le chiude con una risposta | Risposta 4 "HR decide e interviene su segnalazione ma il sistema notifica a HR quando accede" |
+| 24/11 | Le richieste di ferie/permessi/malattia restano al dipendente | Flusso di richiesta e approvazione, non dati nelle giornate (detto all'utente) |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -566,3 +571,32 @@ scritture nei giorni passati ora le fa l'admin), typecheck e build ok; Playwrigh
 11/11 (giorno passato del dipendente in sola lettura, oggi scrivibile, 403 dal server, dashboard
 senza "Registra ore" sul passato, HR scrive il passato, PC con data 10/11: avviso con le due
 date e calendario sul 24/11 di Logbook). Guida: immagini 32 e 33.
+
+### Giorno 20 — Ore e documentazione solo HR, segnalazioni con notifica all'accesso (24/11/2026) ✅
+
+Risposte del 24/11: "1b 2 tutti i dati li inserisce hr 3 b 4 hr decide e interviene su
+segnalazione ma il sistema notifica a hr quando accede".
+
+Fatto:
+- `server/rotte/registrazioni.ts`: scritture (giornata, fascia, modifica, cancellazione) con
+  `richiediAdmin`; tolta la regola "solo oggi" del Giorno 19. La lettura resta al dipendente
+  per le sue ore.
+- `server/rotte/documentazione-progetto.ts`: carica ed elimina solo HR; il documento di HR
+  nasce "visto".
+- Segnalazioni: modello `Segnalazione` (migrazione `20261124140000_segnalazioni`),
+  `comune/segnalazioni.ts`, `server/rotte/segnalazioni.ts` (elenco, conteggio, nuova,
+  chiusura con risposta, ritiro), dashboard con `segnalazioni`.
+- Interfaccia: `componenti/Segnalazioni.tsx` — `SegnalazioniGiorno` nella finestra della
+  giornata (il dipendente segnala, HR chiude) e `Notifiche` (campanella nell'intestazione,
+  finestra all'accesso); calendario sempre in sola lettura per il dipendente; dashboard con
+  "Segnalazioni aperte" (HR) e "Le mie segnalazioni" (dipendente); pagina del progetto senza
+  documentazione per il dipendente; `DocumentazioneProgetto` senza i rami del dipendente.
+- `ui.tsx`: `Modale` disegnata in un portale su <body>: dentro l'intestazione sfocata
+  (backdrop-filter) la finestra delle segnalazioni restava chiusa nell'intestazione.
+- Guida riscritta per dipendenti e HR (immagini 12, 28, 32 rifatte, 34 nuova).
+
+Verifiche: `npm test` 195/195 (4 in `giorno20.test.ts`, `giorno19.test.ts` riscritto per
+la regola "solo HR"; nei test vecchi le scritture di ore le fa l'admin), typecheck e build
+ok; Playwright su Edge 13/13 (giornata del dipendente in sola lettura anche oggi,
+segnalazione inviata, progetto senza documentazione, finestra a HR all'accesso e non al
+ricaricamento, campanella, chiusura con risposta letta dal dipendente).

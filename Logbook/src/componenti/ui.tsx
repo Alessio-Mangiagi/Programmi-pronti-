@@ -6,6 +6,7 @@
  * caricamento a segnaposto. Tutte le pagine li usano, così l'aspetto resta uniforme.
  */
 import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icona } from './icone';
 
 type VariantePulsante = 'primario' | 'secondario' | 'pericolo' | 'leggero';
@@ -114,6 +115,10 @@ export function IntestazionePagina({ titolo, sottotitolo, sopratitolo, azioni }:
  * Finestra modale; Esc o clic sullo sfondo la chiudono.
  * Sul telefono occupa quasi tutto lo schermo (margini di 8px) e scorre in verticale;
  * da 640px in su è una finestra centrata larga al massimo `larghezza`.
+ *
+ * Si disegna direttamente in <body> (portale, Giorno 20): dentro un contenitore con
+ * backdrop-filter o transform, come l'intestazione sfocata del Layout, una finestra "fixed"
+ * resterebbe chiusa nel contenitore invece di coprire tutta la pagina.
  */
 export function Modale({
   titolo,
@@ -135,7 +140,7 @@ export function Modale({
     return () => window.removeEventListener('keydown', tasto);
   }, [aperta, onChiudi]);
   if (!aperta) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[#212326]/45 p-2 sm:p-4 sm:pt-16" onMouseDown={onChiudi}>
       <div role="dialog" aria-modal="true" aria-label={titolo} className={`scheda w-full min-w-0 ${larghezza} shadow-[0_12px_40px_rgba(12,69,119,0.18)]`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2 border-b border-bordo px-4 py-3 sm:px-5">
@@ -146,7 +151,8 @@ export function Modale({
         </div>
         <div className="p-4 sm:p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

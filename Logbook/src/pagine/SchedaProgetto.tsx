@@ -12,7 +12,8 @@
  *   solo gli assegnati registrano ore) e si tolgono (le ore fatte restano);
  * - Avanzamento e Documentazione (componenti/DocumentazioneProgetto.tsx);
  * - Note interne, visibili solo a HR.
- * Dipendente: dati in sola lettura, il suo avanzamento e la sua documentazione.
+ * Dipendente: dati in sola lettura. Dal Giorno 20 (risposta 2 "tutti i dati li inserisce
+ * HR") avanzamento e documentazione li gestisce solo HR.
  *
  * Un progetto nuovo mostra solo i dati: il resto compare dopo il primo salvataggio.
  */
@@ -112,8 +113,10 @@ export function SchedaProgetto() {
           {admin && progetto && <NoteInterne progettoId={progetto.id} />}
         </div>
         <div className="flex min-w-0 flex-[1.3_1_32rem] flex-col gap-4">
-          {progetto ? (
-            <DocumentazioneProgetto progetto={progetto} admin={admin} skytowerAttivo={skytowerAttivo} />
+          {progetto && !admin ? (
+            <Avviso tipo="info">Avanzamento e documentazione del progetto li gestisce HR.</Avviso>
+          ) : progetto ? (
+            <DocumentazioneProgetto progetto={progetto} skytowerAttivo={skytowerAttivo} />
           ) : (
             <Avviso tipo="info">Dopo il salvataggio qui compariranno l'avanzamento, la documentazione caricata dai dipendenti e le note interne.</Avviso>
           )}

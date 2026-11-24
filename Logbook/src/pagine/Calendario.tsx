@@ -23,9 +23,10 @@
  * accettano ore: la cella senza ore non si apre, e se ci sono ore di prima l'editor
  * permette solo di toglierle (regola anche nel server, server/servizi/regole-ore.ts).
  *
- * Giorni passati (Giorno 19): il dipendente registra ore solo nella giornata di oggi; i
- * giorni passati li apre in sola lettura (le ore le inserisce o corregge HR). "Oggi" è la
- * data di Logbook (useAuth().oggi, dal server), non quella del PC.
+ * Chi scrive le ore (Giorni 19-20): solo HR (risposta 1b "tutti i dati li inserisce HR").
+ * Il dipendente apre i suoi giorni in sola lettura e, se qualcosa non torna, manda una
+ * segnalazione dalla stessa finestra. "Oggi" è la data di Logbook (useAuth().oggi, dal
+ * server), non quella del PC.
  *
  * Collegamenti dalla Dashboard (24/11/2026): `?dipendente=<id>&progetto=<id>&data=<AAAA-MM-GG>`
  * preimpostano filtri e periodo; con `&giorno=<AAAA-MM-GG>` (e un dipendente) si apre
@@ -159,12 +160,12 @@ export function Calendario() {
   };
 
   /**
-   * Perché il giorno si guarda soltanto, o null se si può scrivere: futuro per tutti;
-   * passato per il dipendente (lo completa HR: niente ore aggiunte a posteriori).
+   * Perché il giorno si guarda soltanto, o null se si può scrivere: per il dipendente sempre
+   * (le ore le inserisce HR), per HR i giorni futuri.
    */
   const motivoSolaLettura = (data: string): string | null => {
+    if (!admin) return 'Le ore le inserisce HR. Se qualcosa non torna, segnalalo qui sotto: HR lo vedrà appena entra in Logbook.';
     if (data > oggi) return 'Giorno futuro: le ore si registrano a giornata fatta.';
-    if (!admin && data < oggi) return 'Giorno passato: le ore dei giorni passati le inserisce o corregge solo HR. Se manca qualcosa, avvisa HR.';
     return null;
   };
 
