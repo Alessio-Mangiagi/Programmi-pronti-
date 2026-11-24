@@ -113,7 +113,7 @@ describe('separazione dei dati per ruolo', () => {
   });
 
   it('il dipendente non accede alle funzioni HR', async () => {
-    expect((await mario.chiama('GET', '/api/stato-dati')).stato).toBe(403);
+    expect((await mario.chiama('GET', '/api/impostazioni')).stato).toBe(403);
   });
 
   it('l\'admin vede tutti i dipendenti, con i costi, e le ore di tutti', async () => {

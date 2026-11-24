@@ -15,9 +15,8 @@
 import express from 'express';
 import type { PrismaClient } from '../generated/prisma/client';
 import { oggiIso } from '../comune/date';
-import { durataMinuti } from '../comune/orari';
 import { gestoreErrori } from './errori';
-import { caricaUtente, controlloCsrf, richiediAdmin, richiediLogin } from './middleware';
+import { caricaUtente, controlloCsrf, richiediLogin } from './middleware';
 import { rotteAuth } from './rotte/auth';
 import { rotteAssenze } from './rotte/assenze';
 import { rotteCalendario } from './rotte/calendario';
@@ -104,31 +103,6 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/note-progetto', rotteNoteProgetto(prisma));
   // Giorno 20: segnalazioni dei dipendenti a HR (le ore le inserisce solo HR).
   api.use('/segnalazioni', rotteSegnalazioni(prisma, oggi));
-
-  /** Conteggi del database (verifica del Giorno 1), riservati a HR. */
-  api.get('/stato-dati', richiediAdmin, async (_req, res) => {
-    const [dipendenti, progetti, registrazioni, assenze, festivita, utenti, fasce] = await Promise.all([
-      prisma.dipendente.count(),
-      prisma.progetto.count(),
-      prisma.registrazioneOraria.count(),
-      prisma.assenza.count(),
-      prisma.festivita.count(),
-      prisma.utente.count(),
-      prisma.registrazioneOraria.findMany({ select: { oraInizio: true, oraFine: true, data: true } }),
-    ]);
-    const minutiTotali = fasce.reduce((somma, f) => somma + durataMinuti(f.oraInizio, f.oraFine), 0);
-    const date = fasce.map((f) => f.data).sort();
-    res.json({
-      dipendenti,
-      progetti,
-      registrazioni,
-      assenze,
-      festivita,
-      utenti,
-      minutiTotali,
-      periodo: date.length ? { da: date[0], a: date[date.length - 1] } : null,
-    });
-  });
 
   /** Qualsiasi altra /api: 404 in JSON (non la pagina HTML di Express). */
   api.use((_req, res) => {

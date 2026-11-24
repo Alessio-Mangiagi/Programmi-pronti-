@@ -97,10 +97,7 @@ describe('ore massime giornaliere del progetto', () => {
     expect(ok.stato).toBe(200);
   });
 
-  it('anche la fascia singola e l\'import contano le ore già registrate', async () => {
-    const singola = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '21:00', oraFine: '21:30' });
-    expect(singola.stato).toBe(400);
-    expect(singola.corpo.campi.progettoId).toMatch(/PRG-001/);
+  it('l\'import conta le ore già registrate', async () => {
 
     const libro = new ExcelJS.Workbook();
     const f = libro.addWorksheet('Ore');

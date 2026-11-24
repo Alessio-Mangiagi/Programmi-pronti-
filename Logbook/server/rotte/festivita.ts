@@ -6,6 +6,9 @@
  * per anno con un clic (POST /carica-nazionali, calcolate da comune/festivita.ts); quelle
  * del paese della sede (patrono, tipo LOCALE) e le chiusure aziendali le inserisce HR a
  * mano (scelta 4b del 23/11/2026). Una sola festività per giorno.
+ *
+ * Non c'è la modifica (tolta il 24/11/2026, risposta 2: l'interfaccia non la usava): una
+ * festività sbagliata si elimina e si inserisce di nuovo.
  */
 import { Router } from 'express';
 import { z } from 'zod';
@@ -19,9 +22,9 @@ import { idDaParametro, richiediAdmin } from '../middleware';
 export function rotteFestivita(prisma: PrismaClient) {
   const router = Router();
 
-  async function controllaGiornoLibero(data: string, escludiId?: number) {
+  async function controllaGiornoLibero(data: string) {
     const altra = await prisma.festivita.findUnique({ where: { data } });
-    if (altra && altra.id !== escludiId) {
+    if (altra) {
       throw new ErroreHttp(409, `Il ${formattaData(data)} c'è già: ${altra.descrizione}`, { data: `Già presente: ${altra.descrizione}` });
     }
   }
@@ -37,14 +40,6 @@ export function rotteFestivita(prisma: PrismaClient) {
     const dati = schemaFestivita.parse(req.body);
     await controllaGiornoLibero(dati.data);
     res.status(201).json(await prisma.festivita.create({ data: dati }));
-  });
-
-  router.put('/:id', richiediAdmin, async (req, res) => {
-    const id = idDaParametro(req.params.id)!;
-    if (!(await prisma.festivita.findUnique({ where: { id } }))) throw nonTrovato('Festività');
-    const dati = schemaFestivita.parse(req.body);
-    await controllaGiornoLibero(dati.data, id);
-    res.json(await prisma.festivita.update({ where: { id }, data: dati }));
   });
 
   router.delete('/:id', richiediAdmin, async (req, res) => {

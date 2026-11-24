@@ -41,7 +41,7 @@ describe('niente ore nei giorni non lavorativi', () => {
     const sab = await admin.chiama('PUT', '/api/registrazioni/giornata', giornata('2026-11-21'));
     expect(sab.stato).toBe(400);
     expect(sab.corpo.campi.data).toMatch(/sabato/);
-    const dom = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: '2026-11-22', progettoId: prg3, oraInizio: '08:00', oraFine: '09:00' });
+    const dom = await admin.chiama('PUT', '/api/registrazioni/giornata', giornata('2026-11-22'));
     expect(dom.stato).toBe(400);
     expect(dom.corpo.campi.data).toMatch(/domenica/);
   });

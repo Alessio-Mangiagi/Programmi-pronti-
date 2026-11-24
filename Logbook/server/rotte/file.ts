@@ -9,7 +9,10 @@
  *                           nell'intestazione X-Nome-File (encodeURIComponent); qualunque
  *                           utente collegato. Risposta: { id, nome, tipo, dimensione }.
  * - GET    /api/file/:id    il file; ?scarica=1 lo scarica invece di aprirlo nel browser.
- * - DELETE /api/file/:id    toglie un file caricato e non ancora collegato (ripensamento).
+ *
+ * Non c'è la cancellazione diretta (tolta il 24/11/2026, risposta 2: l'interfaccia non la
+ * usava): un file caricato e poi non salvato in una scheda lo toglie la pulizia dopo un
+ * giorno; quello di una scheda si cancella con la scheda.
  *
  * Chi può leggere un file: HR tutti; un dipendente solo quelli che ha caricato lui
  * (risposta 2c: il dipendente vede solo la sua documentazione). Attestati e documenti
@@ -21,7 +24,7 @@ import { pipeline } from 'node:stream';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { ErroreHttp, nonTrovato, vietato } from '../errori';
 import { idDaParametro, isAdmin } from '../middleware';
-import { MAX_BYTE_FILE, percorsoFile, salvaFile, SI_APRE_NEL_BROWSER, vistaFile, eliminaFile } from '../servizi/archivio-file';
+import { MAX_BYTE_FILE, percorsoFile, salvaFile, SI_APRE_NEL_BROWSER, vistaFile } from '../servizi/archivio-file';
 
 /** Content-Disposition con il nome originale (anche accentato): filename ASCII + filename* UTF-8. */
 function intestazioneNomeFile(tipo: 'inline' | 'attachment', nome: string): string {
@@ -89,21 +92,6 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
     pipeline(fs.createReadStream(percorso), res, (errore) => {
       if (errore && errore.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.warn(`[logbook] lettura del file ${file.id} non riuscita:`, errore.message);
     });
-  });
-
-  router.delete('/:id', async (req, res) => {
-    const id = idDaParametro(req.params.id)!;
-    const file = await prisma.fileCaricato.findUnique({
-      where: { id },
-      include: { attestato: true, documentoDipendente: true, documentoProgetto: true, assenza: true },
-    });
-    if (!file) throw nonTrovato('File');
-    if (file.caricatoDaId !== req.utente!.id) throw vietato('Puoi togliere solo i file che hai caricato tu');
-    if (file.attestato || file.documentoDipendente || file.documentoProgetto || file.assenza) {
-      throw new ErroreHttp(409, 'Il file è già collegato a un documento: elimina il documento');
-    }
-    await eliminaFile(prisma, cartella, id);
-    res.status(204).end();
   });
 
   return router;

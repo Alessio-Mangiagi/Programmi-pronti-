@@ -40,66 +40,70 @@ afterAll(async () => {
   await db.chiudi();
 });
 
-describe('fasce singole', () => {
+describe('fasce e regole (giornata intera, Giorno 24: niente più rotte per la fascia singola)', () => {
+  /** Giornata di Mario del 23/11 con queste fasce. */
+  const giornata = (fasce: object[], data = OGGI_PROVA) => admin.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data, fasce });
   let idFascia: number;
 
-  it('HR registra una fascia: le ore sono calcolate', async () => {
-    const r = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '07:30', oraFine: '12:15' });
-    expect(r.stato).toBe(201);
-    expect(r.corpo.minuti).toBe(285);
-    idFascia = r.corpo.id;
+  it('HR registra la giornata: le ore sono calcolate riga per riga', async () => {
+    const r = await giornata([{ progettoId: prg1, oraInizio: '07:30', oraFine: '12:15' }]);
+    expect(r.stato).toBe(200);
+    expect(r.corpo[0].minuti).toBe(285);
+    idFascia = r.corpo[0].id;
   });
 
-  it('una fascia sovrapposta viene bloccata con messaggio chiaro (409)', async () => {
-    const r = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg3, oraInizio: '12:00', oraFine: '13:00' });
-    expect(r.stato).toBe(409);
-    expect(r.corpo.errore).toBe('La fascia 12:00-13:00 si sovrappone a quella già registrata 07:30-12:15 (progetto PRG-001) del 23/11/2026');
-    expect(r.corpo.campi.oraInizio).toBeDefined();
-  });
-
-  it('una fascia contigua è ammessa', async () => {
-    const r = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg3, oraInizio: '12:15', oraFine: '13:00' });
-    expect(r.stato).toBe(201);
-  });
-
-  it('in modifica non si scontra con sé stessa, ma sì con le altre', async () => {
-    const ok = await admin.chiama('PUT', `/api/registrazioni/${idFascia}`, { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '07:00', oraFine: '12:15' });
+  it('una fascia sovrapposta viene bloccata con messaggio chiaro sulla riga; una contigua è ammessa', async () => {
+    const ko = await giornata([
+      { progettoId: prg1, oraInizio: '07:30', oraFine: '12:15' },
+      { progettoId: prg3, oraInizio: '12:00', oraFine: '13:00' },
+    ]);
+    expect(ko.stato).toBe(400);
+    expect(ko.corpo.campi['fasce.1.oraInizio']).toBe('Si sovrappone alla fascia 07:30-12:15 (riga 1)');
+    const ok = await giornata([
+      { progettoId: prg1, oraInizio: '07:30', oraFine: '12:15' },
+      { progettoId: prg3, oraInizio: '12:15', oraFine: '13:00' },
+    ]);
     expect(ok.stato).toBe(200);
-    const ko = await admin.chiama('PUT', `/api/registrazioni/${idFascia}`, { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '07:00', oraFine: '12:30' });
-    expect(ko.stato).toBe(409);
+    idFascia = ok.corpo[0].id;
   });
 
   it('rifiuta orari rovesciati, giorni futuri e progetti inesistenti', async () => {
-    const rovesciata = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '18:00', oraFine: '17:00' });
+    const rovesciata = await giornata([{ progettoId: prg1, oraInizio: '18:00', oraFine: '17:00' }]);
     expect(rovesciata.stato).toBe(400);
-    expect(rovesciata.corpo.campi.oraFine).toMatch(/dopo/);
-    const futuro = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: '2026-11-24', progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' });
+    expect(rovesciata.corpo.campi['fasce.0.oraFine']).toMatch(/dopo/);
+    const futuro = await giornata([{ progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' }], '2026-11-24');
     expect(futuro.stato).toBe(400);
     expect(futuro.corpo.errore).toMatch(/futuri/);
-    const inesistente = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: 9999, oraInizio: '18:00', oraFine: '19:00' });
+    const inesistente = await giornata([{ progettoId: 9999, oraInizio: '18:00', oraFine: '19:00' }]);
     expect(inesistente.stato).toBe(400);
-    expect(inesistente.corpo.campi.progettoId).toMatch(/inesistente/);
+    expect(inesistente.corpo.errore).toMatch(/inesistente/);
   });
 
   it('rifiuta ore in un giorno di ferie approvate', async () => {
     const ferie = await db.prisma.assenza.findFirstOrThrow({ where: { dipendenteId: idMario, tipo: 'FERIE', stato: 'APPROVATA' } });
     // Giorno passato: dal Giorno 19 lo scrive solo HR, che riceve comunque il no per le ferie.
-    const r = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: ferie.dataInizio, progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' });
+    const r = await giornata([{ progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' }], ferie.dataInizio);
     expect(r.stato).toBe(400);
     expect(r.corpo.errore).toMatch(/ferie/);
   });
 
-  it('il dipendente non scrive, modifica o cancella ore: né sue né di altri (Giorno 20: solo HR)', async () => {
-    expect((await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '20:00', oraFine: '21:00' })).stato).toBe(403);
-    expect((await mario.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data: OGGI_PROVA, fasce: [] })).stato).toBe(403);
-    expect((await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idGiulia, data: OGGI_PROVA, progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' })).stato).toBe(403);
-    const fasciaGiulia = await db.prisma.registrazioneOraria.findFirstOrThrow({ where: { dipendenteId: idGiulia } });
-    expect((await mario.chiama('PUT', `/api/registrazioni/${fasciaGiulia.id}`, { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '20:00', oraFine: '21:00' })).stato).toBe(403);
-    expect((await mario.chiama('DELETE', `/api/registrazioni/${fasciaGiulia.id}`)).stato).toBe(403);
+  it('le rotte della fascia singola non esistono più (404)', async () => {
+    expect((await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '20:00', oraFine: '21:00' })).stato).toBe(404);
+    expect((await admin.chiama('PUT', `/api/registrazioni/${idFascia}`, { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '20:00', oraFine: '21:00' })).stato).toBe(404);
   });
 
-  it('HR cancella una fascia', async () => {
+  it('il dipendente non scrive né cancella ore: né sue né di altri (Giorno 20: solo HR)', async () => {
+    expect((await mario.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data: OGGI_PROVA, fasce: [] })).stato).toBe(403);
+    const fasciaGiulia = await db.prisma.registrazioneOraria.findFirstOrThrow({ where: { dipendenteId: idGiulia } });
+    expect((await mario.chiama('DELETE', `/api/registrazioni/${fasciaGiulia.id}`)).stato).toBe(403);
+    expect((await mario.chiama('DELETE', `/api/registrazioni/${idFascia}`)).stato).toBe(403);
+  });
+
+  it('HR cancella una sola fascia: le altre del giorno restano', async () => {
     expect((await admin.chiama('DELETE', `/api/registrazioni/${idFascia}`)).stato).toBe(200);
+    const rimaste = await db.prisma.registrazioneOraria.findMany({ where: { dipendenteId: idMario, data: OGGI_PROVA } });
+    expect(rimaste.map((f) => `${f.oraInizio}-${f.oraFine}`)).toEqual(['12:15-13:00']);
+    expect((await admin.chiama('DELETE', `/api/registrazioni/${idFascia}`)).stato).toBe(404);
   });
 });
 

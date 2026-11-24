@@ -1,10 +1,11 @@
 // "><(((º> sabusabu <º)))><"
 /**
  * Giorno 4 — logica di calcolo delle ore e delle sovrapposizioni (comune/registrazioni.ts).
+ * Il 24/11/2026 (Giorno 24) è stata tolta primaSovrapposizione con le rotte della fascia singola.
  */
 import { describe, expect, it } from 'vitest';
 import { erroriPerCampo } from '../schemi';
-import { coppieSovrapposte, primaSovrapposizione, schemaFascia, schemaGiornata, siSovrappongono, totaleMinuti } from '../registrazioni';
+import { coppieSovrapposte, schemaFascia, schemaGiornata, siSovrappongono, totaleMinuti } from '../registrazioni';
 
 const f = (oraInizio: string, oraFine: string, id?: number) => ({ id, oraInizio, oraFine });
 
@@ -20,20 +21,6 @@ describe('siSovrappongono', () => {
   ])('%s-%s vs %s-%s → %s', (a1, a2, b1, b2, atteso) => {
     expect(siSovrappongono(f(a1, a2), f(b1, b2))).toBe(atteso);
     expect(siSovrappongono(f(b1, b2), f(a1, a2))).toBe(atteso); // simmetrica
-  });
-});
-
-describe('primaSovrapposizione', () => {
-  const esistenti = [f('08:00', '12:00', 1), f('13:00', '17:00', 2)];
-
-  it('trova la fascia in conflitto', () => {
-    expect(primaSovrapposizione(f('11:30', '13:30'), esistenti)?.id).toBe(1);
-    expect(primaSovrapposizione(f('12:00', '13:00'), esistenti)).toBeUndefined();
-  });
-
-  it('in modifica ignora la fascia stessa', () => {
-    expect(primaSovrapposizione(f('08:00', '12:30', 1), esistenti)).toBeUndefined();
-    expect(primaSovrapposizione(f('08:00', '13:30', 1), esistenti)?.id).toBe(2);
   });
 });
 

@@ -101,17 +101,16 @@ describe('modalità produzione', () => {
 });
 
 describe('API', () => {
-  it('GET /api/stato-dati (da admin) restituisce i conteggi letti dal database', async () => {
+  // /api/stato-dati (verifica del Giorno 1) è stata tolta il 24/11/2026: l'interfaccia non
+  // la usava. I conteggi del seed li controlla il test "dati di esempio" qui sopra.
+  it('le API rispondono e una rotta inesistente (anche la vecchia /api/stato-dati) dà 404 in JSON', async () => {
     const server = await avviaServer(db.prisma);
     try {
       const admin = await server.accedi(CREDENZIALI_DEMO.admin.username, CREDENZIALI_DEMO.admin.password);
-      const r = await admin.chiama('GET', '/api/stato-dati');
-      expect(r.stato).toBe(200);
-      expect(r.corpo).toMatchObject({ dipendenti: 5, progetti: 3, registrazioni: 323, assenze: 6, utenti: 6 });
-      expect(r.corpo.periodo).toEqual({ da: '2026-10-01', a: '2026-11-20' });
-      expect(r.corpo.minutiTotali).toBeGreaterThan(0);
-
-      expect((await admin.chiama('GET', '/api/non-esiste')).stato).toBe(404);
+      expect((await admin.chiama('GET', '/api/stato-dati')).stato).toBe(404);
+      const r = await admin.chiama('GET', '/api/non-esiste');
+      expect(r.stato).toBe(404);
+      expect(r.corpo).toEqual({ errore: 'Risorsa non trovata' });
     } finally {
       await server.chiudi();
     }

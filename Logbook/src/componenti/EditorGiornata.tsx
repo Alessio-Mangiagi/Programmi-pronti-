@@ -19,6 +19,11 @@
  *
  * `avvisi` sono righe informative passate dal calendario (festività, assenze del giorno).
  *
+ * Elimina fascia (Giorno 24, risposta 2 del 24/11/2026): la × di una fascia GIÀ SALVATA la
+ * cancella subito (DELETE /api/registrazioni/:id, dopo una conferma), senza toccare le altre
+ * righe né le modifiche in corso; il calendario si aggiorna con `onModificato`. La × di una
+ * riga nuova, mai salvata, la toglie solo dal modulo.
+ *
  * `nonLavorativo` (dal 24/11/2026): motivo per cui il giorno non accetta ore (sabato,
  * domenica, festività). La finestra si apre solo se il giorno ha già ore registrate da
  * prima della regola: si possono togliere, non aggiungere né cambiare (lo stesso controllo
@@ -36,7 +41,8 @@ import { Avviso, Caricamento, classiInput, Modale, Pulsante } from './ui';
 import { Icona } from './icone';
 import { SegnalazioniGiorno } from './Segnalazioni';
 
-type Riga = { chiave: number; progettoId: string; oraInizio: string; oraFine: string; note: string };
+/** Riga del modulo; `id` c'è solo per le fasce già salvate (servono a "Elimina fascia"). */
+type Riga = { chiave: number; id?: number; progettoId: string; oraInizio: string; oraFine: string; note: string };
 
 const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 let contatore = 0;
@@ -57,6 +63,7 @@ export function EditorGiornata({
   solaLettura,
   onChiudi,
   onSalvato,
+  onModificato,
 }: {
   dipendenteId: number;
   nomeDipendente: string;
@@ -66,6 +73,8 @@ export function EditorGiornata({
   solaLettura?: string | null;
   onChiudi: () => void;
   onSalvato: () => void;
+  /** Una fascia eliminata subito: il calendario ricarica senza chiudere la finestra. */
+  onModificato?: () => void;
 }) {
   const soloVista = Boolean(solaLettura);
   // Giorno non lavorativo: si possono solo togliere le ore rimaste; sola lettura: niente di niente.
@@ -77,6 +86,7 @@ export function EditorGiornata({
   const [errori, setErrori] = useState<Record<string, string>>({});
   const [messaggio, setMessaggio] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  const [fatto, setFatto] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -87,7 +97,7 @@ export function EditorGiornata({
       .then(([fasce, prog, suoi]) => {
         setProgetti(prog);
         setAssegnati(new Set(suoi.map((p) => p.id)));
-        setRighe(fasce.map((f) => nuovaRiga({ progettoId: String(f.progettoId), oraInizio: f.oraInizio, oraFine: f.oraFine, note: f.note ?? '' })));
+        setRighe(fasce.map((f) => nuovaRiga({ id: f.id, progettoId: String(f.progettoId), oraInizio: f.oraInizio, oraFine: f.oraFine, note: f.note ?? '' })));
       })
       .catch((e: Error) => setMessaggio(e.message));
   }, [dipendenteId, data]);
@@ -172,6 +182,30 @@ export function EditorGiornata({
 
   const err = (i: number, campo: string) => errori[`fasce.${i}.${campo}`];
 
+  /**
+   * × di una riga: se la fascia è già salvata la cancella subito sul server (con conferma),
+   * altrimenti la toglie solo dal modulo. Le altre righe, anche se modificate, restano come sono.
+   */
+  const elimina = async (r: Riga) => {
+    setFatto(null);
+    if (!r.id) {
+      setRighe(righe.filter((x) => x.chiave !== r.chiave));
+      return;
+    }
+    const progetto = progetti.find((p) => String(p.id) === r.progettoId);
+    if (!window.confirm(`Eliminare subito la fascia ${r.oraInizio}-${r.oraFine}${progetto ? ` (${progetto.codice})` : ''}? Le altre righe restano come sono.`)) return;
+    setMessaggio(null);
+    try {
+      await api.delete(`/api/registrazioni/${r.id}`);
+      setRighe((rr) => rr!.filter((x) => x.chiave !== r.chiave));
+      setErrori({});
+      setFatto(`Fascia ${r.oraInizio}-${r.oraFine} eliminata.`);
+      onModificato?.();
+    } catch (e) {
+      setMessaggio(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <Modale titolo={`${nomeDipendente} — ${GIORNI[giornoSettimana(data)]} ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-4xl">
       <div className="space-y-3">
@@ -181,6 +215,7 @@ export function EditorGiornata({
           </Avviso>
         ))}
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
+        {fatto && <Avviso tipo="successo">{fatto}</Avviso>}
         {errori.data && <Avviso tipo="errore">{errori.data}</Avviso>}
         {soloVista && <Avviso tipo="info">{solaLettura}</Avviso>}
         {!bloccato && assegnati.size === 0 && (
@@ -190,7 +225,7 @@ export function EditorGiornata({
         )}
         {bloccato && !soloVista && (
           <Avviso tipo="attenzione">
-            {nonLavorativo}: non si registrano ore. Le ore rimaste da prima si possono solo togliere, poi «Salva giornata».
+            {nonLavorativo}: non si registrano ore. Le ore rimaste da prima si possono solo togliere: la × elimina subito la fascia.
           </Avviso>
         )}
 
@@ -246,7 +281,14 @@ export function EditorGiornata({
                     <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Note</span>
                     <input disabled={bloccato} aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
                   </label>
-                  <button type="button" disabled={soloVista} aria-label={`Elimina riga ${i + 1}`} className="flex-[0_0_2.25rem] rounded px-2 py-1.5 text-errore hover:bg-[#fdf3f2] disabled:invisible" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
+                  <button
+                    type="button"
+                    disabled={soloVista}
+                    aria-label={r.id ? `Elimina fascia ${r.oraInizio}-${r.oraFine}` : `Togli riga ${i + 1}`}
+                    title={r.id ? 'Elimina subito questa fascia' : 'Togli questa riga (non ancora salvata)'}
+                    className="flex-[0_0_2.25rem] rounded px-2 py-1.5 text-errore hover:bg-[#fdf3f2] disabled:invisible"
+                    onClick={() => elimina(r)}
+                  >
                     <Icona nome="chiudi" dimensione={16} />
                   </button>
                   {(errRiga || sovrapposte.has(i)) && <div className="basis-full text-xs text-errore">{errRiga ?? 'Fascia sovrapposta a un\'altra riga'}</div>}

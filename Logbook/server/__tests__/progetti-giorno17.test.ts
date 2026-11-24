@@ -34,7 +34,15 @@ let prg2: number;
 
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
 const carica = (c: ClientProva, nome: string) => c.chiama('POST', '/api/file', undefined, { grezzo: PDF, intestazioni: { 'X-Nome-File': encodeURIComponent(nome) } });
-const fascia = (data: string, progettoId: number, oraInizio = '08:00', oraFine = '10:00') => ({ dipendenteId: idMario, data, progettoId, oraInizio, oraFine });
+/**
+ * HR aggiunge a Mario una fascia nel giorno: si risalva la giornata con le fasce già
+ * presenti più quella nuova (dal Giorno 24 non c'è più la rotta della fascia singola).
+ */
+async function aggiungiFascia(data: string, progettoId: number, oraInizio = '08:00', oraFine = '10:00') {
+  const presenti = await db.prisma.registrazioneOraria.findMany({ where: { dipendenteId: idMario, data } });
+  const fasce = [...presenti.map((f) => ({ progettoId: f.progettoId, oraInizio: f.oraInizio, oraFine: f.oraFine, note: f.note ?? '' })), { progettoId, oraInizio, oraFine, note: '' }];
+  return admin.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data, fasce });
+}
 
 beforeAll(async () => {
   db = await creaDbProva();
@@ -68,11 +76,11 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
 
   it('senza assegnazione niente ore, da nessuna parte', async () => {
     // Il no arriva dall'assegnazione, anche per HR.
-    const r = await admin.chiama('POST', '/api/registrazioni', fascia(OGGI_PROVA, prg2, '18:00', '19:00'));
+    const r = await aggiungiFascia(OGGI_PROVA, prg2, '18:00', '19:00');
     expect(r.stato).toBe(400);
-    expect(r.corpo.campi.progettoId).toMatch(/non è assegnato al progetto PRG-002/);
+    expect(r.corpo.errore).toMatch(/non è assegnato al progetto PRG-002/);
     // Anche HR per conto di Mario
-    expect((await admin.chiama('POST', '/api/registrazioni', fascia('2026-11-20', prg2, '18:00', '19:00'))).stato).toBe(400);
+    expect((await aggiungiFascia('2026-11-20', prg2, '18:00', '19:00')).stato).toBe(400);
     // E l'import Excel
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Ore');
@@ -99,7 +107,7 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
     expect(r.stato).toBe(201);
     expect((await admin.chiama('POST', `/api/progetti/${prg2}/dipendenti`, { dipendenteId: idMario })).stato).toBe(409);
     // Giorno passato: lo scrive HR (Giorno 19).
-    expect((await admin.chiama('POST', '/api/registrazioni', fascia('2026-11-20', prg2, '18:00', '19:00'))).stato).toBe(201);
+    expect((await aggiungiFascia('2026-11-20', prg2, '18:00', '19:00')).stato).toBe(200);
     const elenco = await admin.chiama('GET', `/api/progetti/${prg2}/dipendenti`);
     const rossi = elenco.corpo.find((a: { dipendente: { id: number } }) => a.dipendente.id === idMario);
     expect(rossi.minuti).toBe(60);
@@ -114,7 +122,7 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
     const fasce = giorno.map((f) => ({ progettoId: f.progettoId, oraInizio: f.oraInizio, oraFine: f.progettoId === prg2 ? '18:30' : f.oraFine, note: '' }));
     expect((await admin.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data: '2026-11-20', fasce })).stato).toBe(200);
     // Un altro giorno: bloccato
-    expect((await admin.chiama('POST', '/api/registrazioni', fascia('2026-11-19', prg2, '18:00', '19:00'))).stato).toBe(400);
+    expect((await aggiungiFascia('2026-11-19', prg2, '18:00', '19:00')).stato).toBe(400);
   });
 
   it('un dipendente cessato non si assegna', async () => {

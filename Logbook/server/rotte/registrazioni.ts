@@ -5,12 +5,14 @@
  * - GET    /                ?da&a&dipendenteId&progettoId — elenco con `minuti` calcolati
  * - PUT    /giornata        sostituisce tutte le fasce di un dipendente in un giorno
  *                           (è quello che usa l'editor della giornata nel calendario)
- * - POST   /                aggiunge una fascia
- * - PUT    /:id             modifica una fascia
- * - DELETE /:id             cancella una fascia
+ * - DELETE /:id             cancella una sola fascia, subito (pulsante "Elimina fascia"
+ *                           dell'editor della giornata, Giorno 24)
+ *
+ * Giorno 24 (risposta 2 del 24/11/2026): tolte le rotte POST / e PUT /:id per la fascia
+ * singola, mai usate dall'interfaccia: le ore si scrivono solo a giornata intera.
  *
  * Lettura: il dipendente vede solo le proprie fasce (dipendenteAmmesso → 403), l'admin
- * tutte. Scrittura (giornata, fascia, modifica, cancellazione): SOLO HR, dal Giorno 20
+ * tutte. Scrittura (giornata e cancellazione): SOLO HR, dal Giorno 20
  * (24/11/2026, risposta 1b "tutti i dati li inserisce HR"). Il Giorno 19 permetteva al
  * dipendente la sola giornata di oggi; ora nemmeno quella: se qualcosa non torna il
  * dipendente lo segnala (/api/segnalazioni) e HR interviene. Così nessuno può dichiarare
@@ -22,8 +24,8 @@ import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { isDataValida } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
-import { messaggioMassimo, messaggioSovrapposizione, primaSovrapposizione, schemaGiornata, schemaRegistrazione, superamentiMassimo } from '../../comune/registrazioni';
-import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
+import { messaggioMassimo, schemaGiornata, superamentiMassimo } from '../../comune/registrazioni';
+import { nonTrovato, richiestaNonValida } from '../errori';
 import { dipendenteAmmesso, idDaParametro, richiediAdmin } from '../middleware';
 import { caricaContestoOre, erroriRegole } from '../servizi/regole-ore';
 
@@ -59,17 +61,15 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   /**
    * Ore massime giornaliere dei progetti (risposta 2b): `fasce` sono TUTTE le fasce che il
    * dipendente avrebbe nel giorno dopo il salvataggio. Oltre il limite → 400 con l'errore
-   * sul progetto (per la giornata intera, su ogni riga di quel progetto).
+   * su ogni riga di quel progetto.
    */
-  async function controllaMassimi(fasce: { progettoId: number; oraInizio: string; oraFine: string }[], perRiga: boolean) {
+  async function controllaMassimi(fasce: { progettoId: number; oraInizio: string; oraFine: string }[]) {
     const progetti = await prisma.progetto.findMany({ where: { id: { in: [...new Set(fasce.map((f) => f.progettoId))] } } });
     const oltre = superamentiMassimo(fasce, new Map(progetti.map((p) => [p.id, p.maxMinutiGiorno])));
     if (!oltre.length) return;
     const { progettoId, minuti, massimo } = oltre[0];
     const messaggio = messaggioMassimo(progetti.find((p) => p.id === progettoId)!.codice, minuti, massimo);
-    const campi = perRiga
-      ? Object.fromEntries(fasce.flatMap((f, i) => (f.progettoId === progettoId ? [[`fasce.${i}.progettoId`, messaggio]] : [])))
-      : { progettoId: messaggio };
+    const campi = Object.fromEntries(fasce.flatMap((f, i) => (f.progettoId === progettoId ? [[`fasce.${i}.progettoId`, messaggio]] : [])));
     throw richiestaNonValida(messaggio, campi);
   }
 
@@ -94,7 +94,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     const g = schemaGiornata.parse(req.body);
     const esistenti = await fasceDelGiorno(g.dipendenteId, g.data);
     await controllaRegole(g.dipendenteId, g.data, g.fasce.map((f) => f.progettoId), new Set(esistenti.map((e) => e.progettoId)));
-    await controllaMassimi(g.fasce, true);
+    await controllaMassimi(g.fasce);
     // Sostituzione atomica: o tutte le fasce nuove o nessuna modifica.
     await prisma.$transaction([
       prisma.registrazioneOraria.deleteMany({ where: { dipendenteId: g.dipendenteId, data: g.data } }),
@@ -104,38 +104,10 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     res.json(nuove.map((f) => ({ ...f, minuti: durataMinuti(f.oraInizio, f.oraFine) })));
   });
 
-  router.post('/', richiediAdmin, async (req, res) => {
-    const r = schemaRegistrazione.parse(req.body);
-    const esistenti = await fasceDelGiorno(r.dipendenteId, r.data);
-    await controllaRegole(r.dipendenteId, r.data, [r.progettoId], new Set());
-    const conflitto = primaSovrapposizione(r, esistenti);
-    if (conflitto) {
-      const messaggio = messaggioSovrapposizione(r, conflitto, r.data);
-      throw new ErroreHttp(409, messaggio, { oraInizio: messaggio });
-    }
-    await controllaMassimi([...esistenti, r], false);
-    const creata = await prisma.registrazioneOraria.create({ data: r, include: conProgetto });
-    res.status(201).json({ ...creata, minuti: durataMinuti(creata.oraInizio, creata.oraFine) });
-  });
-
-  router.put('/:id', richiediAdmin, async (req, res) => {
-    const id = idDaParametro(req.params.id)!;
-    const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });
-    if (!vecchia) throw nonTrovato('Registrazione');
-    const r = schemaRegistrazione.parse(req.body);
-    const esistenti = await fasceDelGiorno(r.dipendenteId, r.data);
-    const stessoGiorno = vecchia.dipendenteId === r.dipendenteId && vecchia.data === r.data;
-    await controllaRegole(r.dipendenteId, r.data, [r.progettoId], new Set(stessoGiorno ? [vecchia.progettoId] : []));
-    const conflitto = primaSovrapposizione({ ...r, id }, esistenti);
-    if (conflitto) {
-      const messaggio = messaggioSovrapposizione(r, conflitto, r.data);
-      throw new ErroreHttp(409, messaggio, { oraInizio: messaggio });
-    }
-    await controllaMassimi([...esistenti.filter((e) => e.id !== id), r], false);
-    const aggiornata = await prisma.registrazioneOraria.update({ where: { id }, data: r, include: conProgetto });
-    res.json({ ...aggiornata, minuti: durataMinuti(aggiornata.oraInizio, aggiornata.oraFine) });
-  });
-
+  /**
+   * Cancella una sola fascia, subito. Togliere ore è sempre possibile (anche nei giorni
+   * festivi o su progetti chiusi): le regole valgono solo per le ore che si aggiungono.
+   */
   router.delete('/:id', richiediAdmin, async (req, res) => {
     const id = idDaParametro(req.params.id)!;
     const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });

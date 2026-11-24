@@ -461,6 +461,7 @@ export function Calendario() {
             setEditor(null);
             ricarica();
           }}
+          onModificato={ricarica}
         />
       )}
     </>

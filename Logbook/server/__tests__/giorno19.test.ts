@@ -46,12 +46,10 @@ describe('le ore le inserisce solo HR', () => {
     expect(Date.parse(r.corpo.adesso)).not.toBeNaN();
   });
 
-  it('il dipendente non scrive: né oggi né nei giorni passati, né modifiche o cancellazioni', async () => {
+  it('il dipendente non scrive: né oggi né nei giorni passati, né cancellazioni', async () => {
     expect((await mario.chiama('PUT', '/api/registrazioni/giornata', giornata(OGGI_PROVA))).stato).toBe(403);
     expect((await mario.chiama('PUT', '/api/registrazioni/giornata', giornata(IERI))).stato).toBe(403);
-    expect((await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg1, oraInizio: '18:00', oraFine: '19:00' })).stato).toBe(403);
     const vecchia = await db.prisma.registrazioneOraria.findFirstOrThrow({ where: { dipendenteId: idMario, data: IERI } });
-    expect((await mario.chiama('PUT', `/api/registrazioni/${vecchia.id}`, { dipendenteId: idMario, data: IERI, progettoId: vecchia.progettoId, oraInizio: vecchia.oraInizio, oraFine: '12:00' })).stato).toBe(403);
     expect((await mario.chiama('DELETE', `/api/registrazioni/${vecchia.id}`)).stato).toBe(403);
     expect(await db.prisma.registrazioneOraria.findUnique({ where: { id: vecchia.id } })).not.toBeNull();
   });

@@ -8,7 +8,7 @@
  * (08:00-12:00 e 12:00-13:00) sono ammesse.
  */
 import { z } from 'zod';
-import { formattaData, isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
+import { isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
 import { durataMinuti, formattaOre, isOrarioValido, minutiDaOrario } from './orari';
 
 type Fascia = { id?: number; oraInizio: string; oraFine: string };
@@ -31,18 +31,6 @@ export function coppieSovrapposte(fasce: Fascia[]): [number, number][] {
     }
   }
   return coppie;
-}
-
-/** Prima fascia esistente che si sovrappone alla nuova (escludendo la fascia stessa se ha id). */
-export function primaSovrapposizione<T extends Fascia>(nuova: Fascia, esistenti: T[]): T | undefined {
-  return esistenti.find((e) => (nuova.id === undefined || e.id !== nuova.id) && siSovrappongono(nuova, e));
-}
-
-/** Messaggio chiaro per l'utente quando una fascia si sovrappone a un'altra. */
-export function messaggioSovrapposizione(nuova: Fascia, esistente: Fascia & { progetto?: { codice: string } }, data?: string): string {
-  const giorno = data ? ` del ${formattaData(data)}` : '';
-  const progetto = esistente.progetto ? ` (progetto ${esistente.progetto.codice})` : '';
-  return `La fascia ${nuova.oraInizio}-${nuova.oraFine} si sovrappone a quella già registrata ${esistente.oraInizio}-${esistente.oraFine}${progetto}${giorno}`;
 }
 
 /** Somma dei minuti di un elenco di fasce valide. */
@@ -94,15 +82,6 @@ export const schemaFascia = z
       ctx.addIssue({ code: 'custom', path: ['oraFine'], message: "L'ora di fine deve essere dopo l'ora di inizio" });
     }
   });
-
-/** Una fascia singola completa (POST/PUT /api/registrazioni). */
-export const schemaRegistrazione = z.intersection(
-  z.object({
-    dipendenteId: z.coerce.number().int().positive('Dipendente non valido'),
-    data: z.string().refine(isDataValida, 'Data non valida').refine(isDataAmmessa, MESSAGGIO_DATA_MINIMA),
-  }),
-  schemaFascia,
-);
 
 /**
  * Una giornata intera (PUT /api/registrazioni/giornata): sostituisce tutte le fasce di
