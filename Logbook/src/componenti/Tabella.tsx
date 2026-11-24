@@ -13,6 +13,7 @@
  * cliccare. Da 640px in su resta la tabella classica, larga quanto lo spazio disponibile.
  */
 import { useMemo, useState, type ReactNode } from 'react';
+import { corrisponde } from './SceltaConRicerca';
 
 export type Colonna<T> = {
   chiave: string;
@@ -26,7 +27,6 @@ export type Colonna<T> = {
   principale?: boolean;
 };
 
-const normalizza = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export function Tabella<T>({
   righe,
@@ -56,14 +56,11 @@ export function Tabella<T>({
   const [pagina, setPagina] = useState(0);
 
   const filtrate = useMemo(() => {
-    const parole = normalizza(ricerca).split(/\s+/).filter(Boolean);
     let risultato = righe;
-    if (parole.length && testoRicerca) {
-      // Tutte le parole devono comparire (in qualunque ordine): "rossi mario" trova Mario Rossi.
-      risultato = righe.filter((r) => {
-        const testo = normalizza(testoRicerca(r));
-        return parole.every((p) => testo.includes(p));
-      });
+    if (ricerca.trim() && testoRicerca) {
+      // Tutte le parole devono comparire, in qualunque ordine e senza badare ad accenti:
+      // "rossi mario" trova Mario Rossi (stessa regola di SceltaConRicerca).
+      risultato = righe.filter((r) => corrisponde(testoRicerca(r), ricerca));
     }
     const colonna = ordine && colonne.find((c) => c.chiave === ordine.chiave);
     if (colonna?.valore) {

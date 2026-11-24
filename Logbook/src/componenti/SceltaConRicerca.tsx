@@ -15,10 +15,10 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { classiInput } from './ui';
 
-export type OpzioneRicerca = { valore: string; etichetta: string; dettaglio?: string; colore?: string };
+type OpzioneRicerca = { valore: string; etichetta: string; dettaglio?: string; colore?: string };
 
 /** Minuscole e senza accenti, per confronti "come li scrive una persona". */
-export const normalizzaRicerca = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const normalizzaRicerca = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** true se tutte le parole di `ricerca` compaiono in `testo`. */
 export function corrisponde(testo: string, ricerca: string): boolean {

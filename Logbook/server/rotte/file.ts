@@ -23,7 +23,7 @@ import { idDaParametro, isAdmin } from '../middleware';
 import { MAX_BYTE_FILE, percorsoFile, salvaFile, SI_APRE_NEL_BROWSER, vistaFile, eliminaFile } from '../servizi/archivio-file';
 
 /** Content-Disposition con il nome originale (anche accentato): filename ASCII + filename* UTF-8. */
-export function intestazioneNomeFile(tipo: 'inline' | 'attachment', nome: string): string {
+function intestazioneNomeFile(tipo: 'inline' | 'attachment', nome: string): string {
   const ascii = nome.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
   return `${tipo}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nome)}`;
 }

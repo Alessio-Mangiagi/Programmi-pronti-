@@ -17,7 +17,7 @@ const P = 1;
 const LUNGHEZZA = 64;
 
 /** Lunghezza minima richiesta per una password nuova. */
-export const PASSWORD_MIN = 8;
+const PASSWORD_MIN = 8;
 
 export async function creaImpronta(password: string): Promise<string> {
   const sale = randomBytes(16);

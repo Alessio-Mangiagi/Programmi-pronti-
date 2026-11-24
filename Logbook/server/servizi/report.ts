@@ -23,7 +23,7 @@ import { calcolaTotali, giorniLavorativi, type Totali } from '../../comune/riepi
 import { ETICHETTE_CONTRATTO } from '../../comune/schemi';
 import { stileIntestazione } from './excel';
 
-export const MAX_GIORNI_REPORT = 400;
+const MAX_GIORNI_REPORT = 400;
 
 /** Filtri dei report (corpo JSON di POST /api/esporta/...). Liste vuote = tutti. */
 export const schemaFiltriReport = z
@@ -41,9 +41,9 @@ export const schemaFiltriReport = z
     }
   });
 
-export type FiltriReport = z.output<typeof schemaFiltriReport>;
+type FiltriReport = z.output<typeof schemaFiltriReport>;
 
-export type DatiReport = {
+type DatiReport = {
   filtri: FiltriReport;
   dipendenti: Dipendente[];
   progetti: Map<number, Progetto>;

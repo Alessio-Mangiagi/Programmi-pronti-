@@ -32,6 +32,7 @@ import { formattaOre } from '../../comune/orari';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
 import { Icona } from '../componenti/icone';
+import { linkGiorno } from '../componenti/Segnalazioni';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Festivita, StatoAttestato, TipoAssenza, TipoAttestato } from '../tipi';
 import { ETICHETTE_ATTESTATO } from '../../comune/documenti';
@@ -338,7 +339,7 @@ export function Dashboard() {
             {dati.segnalazioni.length === 0 && <p className="text-sm text-gray-500">Nessuna segnalazione. Se nelle tue ore qualcosa non torna, apri il giorno nel calendario e segnalalo.</p>}
             <ul className="divide-y divide-gray-100 text-sm">
               {dati.segnalazioni.map((s) => (
-                <RigaLink key={s.id} a={admin ? `/calendario?dipendente=${s.dipendenteId}&data=${s.data}&giorno=${s.data}` : `/calendario?data=${s.data}&giorno=${s.data}`}>
+                <RigaLink key={s.id} a={admin ? linkGiorno(s) : `/calendario?data=${s.data}&giorno=${s.data}`}>
                   {admin && <span className="font-medium text-marchio">{s.dipendente}</span>}
                   <span className="cifre text-gray-600">{formattaData(s.data)}</span>
                   {!admin && (

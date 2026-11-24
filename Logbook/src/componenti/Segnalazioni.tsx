@@ -20,7 +20,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { formattaData } from '../../comune/date';
 import { api, ErroreApi } from '../api';
-import { useAuth } from '../auth';
+import { ETICHETTE_SEGNALAZIONE } from '../../comune/segnalazioni';
+import { PREFISSO_NOTIFICHE_MOSTRATE, useAuth } from '../auth';
 import type { Segnalazione } from '../tipi';
 import { usaDati } from '../usaDati';
 import { Icona } from './icone';
@@ -105,7 +106,14 @@ function VoceSegnalazione({ segnalazione: s, admin, onCambio, onErrore }: { segn
     <li className="rounded border border-gray-200 bg-white p-2 text-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
         <span>inviata il {formattaData(s.creatoIl.slice(0, 10))}</span>
-        {s.stato === 'APERTA' ? <Etichetta colore="giallo">Aperta</Etichetta> : <Etichetta colore="verde">Risolta{s.risoltaDa ? ` da ${s.risoltaDa.username}` : ''}</Etichetta>}
+        {s.stato === 'APERTA' ? (
+          <Etichetta colore="giallo">{ETICHETTE_SEGNALAZIONE.APERTA}</Etichetta>
+        ) : (
+          <Etichetta colore="verde">
+            {ETICHETTE_SEGNALAZIONE.RISOLTA}
+            {s.risoltaDa ? ` da ${s.risoltaDa.username}` : ''}
+          </Etichetta>
+        )}
       </div>
       <p className="mt-1 whitespace-pre-line text-gray-800">{s.testo}</p>
       {!admin && s.rispostaHr && (
@@ -136,12 +144,8 @@ function VoceSegnalazione({ segnalazione: s, admin, onCambio, onErrore }: { segn
   );
 }
 
-/**
- * Chiave del "già mostrata" della finestra all'accesso: una volta per sessione del browser.
- * Il prefisso è anche in src/auth.tsx, che al login toglie queste chiavi.
- */
-export const PREFISSO_MOSTRATE = 'logbook.segnalazioni.mostrate.';
-const chiaveMostrata = (utenteId: number) => `${PREFISSO_MOSTRATE}${utenteId}`;
+/** Chiave del "già mostrata" della finestra all'accesso: una volta per sessione del browser. */
+const chiaveMostrata = (utenteId: number) => `${PREFISSO_NOTIFICHE_MOSTRATE}${utenteId}`;
 
 /**
  * Campanella di HR con il numero di segnalazioni aperte e finestra all'accesso.

@@ -27,7 +27,7 @@ import { Icona, type NomeIcona } from './icone';
 
 type VoceMenu = { a: string; etichetta: string; icona: NomeIcona; soloAdmin?: boolean; etichettaDipendente?: string };
 
-export const MENU: VoceMenu[] = [
+const MENU: VoceMenu[] = [
   { a: '/', etichetta: 'Dashboard', icona: 'dashboard' },
   { a: '/calendario', etichetta: 'Calendario', icona: 'calendario' },
   { a: '/dipendenti', etichetta: 'Dipendenti', icona: 'dipendenti', soloAdmin: true },

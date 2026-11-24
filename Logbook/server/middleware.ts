@@ -12,7 +12,7 @@ import { utenteDaSessione } from './auth/sessioni';
 import { ErroreHttp, vietato } from './errori';
 
 /** Identità dell'utente collegato, disponibile in req.utente dopo `caricaUtente`. */
-export type UtenteSessione = {
+type UtenteSessione = {
   id: number;
   username: string;
   ruolo: 'ADMIN' | 'DIPENDENTE';

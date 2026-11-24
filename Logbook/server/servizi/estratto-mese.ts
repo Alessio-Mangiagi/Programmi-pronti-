@@ -29,7 +29,7 @@ export const schemaFiltriMese = z.object({
   dipendenteIds: z.array(z.coerce.number().int().positive()).default([]),
   progettoIds: z.array(z.coerce.number().int().positive()).default([]),
 });
-export type FiltriMese = z.output<typeof schemaFiltriMese>;
+type FiltriMese = z.output<typeof schemaFiltriMese>;
 
 /** Estratti di tutti i dipendenti scelti per il mese. */
 export async function caricaEstratti(prisma: PrismaClient, filtri: FiltriMese): Promise<EstrattoDipendente[]> {
@@ -81,7 +81,7 @@ function nomeFoglio(libro: ExcelJS.Workbook, desiderato: string) {
 }
 
 /** Testo breve di un giorno: assenze, festività, progetti con ore. */
-export function notaGiorno(g: GiornoEstratto): string {
+function notaGiorno(g: GiornoEstratto): string {
   const parti: string[] = [];
   for (const x of g.assenze) parti.push(x.tipo === 'PERMESSO' ? `Permesso ${formattaOre(x.minuti)}` : x.tipo === 'FERIE' ? 'Ferie' : 'Malattia');
   if (g.festivita) parti.push(g.festivita);
@@ -99,7 +99,7 @@ function coloreGiorno(g: GiornoEstratto): string | null {
 }
 
 /** Righe "etichetta: valore" dell'anagrafica, usate da entrambi i layout. */
-export function righeAnagrafica(e: EstrattoDipendente): [string, string][] {
+function righeAnagrafica(e: EstrattoDipendente): [string, string][] {
   const d = e.dipendente;
   return [
     ['Dipendente', `${d.cognome} ${d.nome}`],

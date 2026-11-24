@@ -14,7 +14,7 @@
  * Su un database che ha già dipendenti non cambia nulla: i dati non si toccano mai.
  */
 
-export type ModoAvvio = 'sviluppo' | 'produzione';
+type ModoAvvio = 'sviluppo' | 'produzione';
 
 const SI = ['1', 'si', 'sì', 'true', 'yes', 'on'];
 const NO = ['0', 'no', 'false', 'off'];

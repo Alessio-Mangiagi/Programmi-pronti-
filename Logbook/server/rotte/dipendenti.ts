@@ -24,7 +24,7 @@ type DipendenteConAccount = Dipendente & {
 };
 
 /** Toglie i campi riservati a HR quando chi legge non è admin. */
-export function vistaDipendente(d: DipendenteConAccount, admin: boolean) {
+function vistaDipendente(d: DipendenteConAccount, admin: boolean) {
   if (admin) return d;
   const { costoOrarioNettoCent: _n, costoOrarioLordoCent: _l, utente: _u, ...resto } = d;
   return resto;

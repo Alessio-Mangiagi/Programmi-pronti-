@@ -14,8 +14,8 @@ import ExcelJS from 'exceljs';
 import { daDataItaliana, daDateUtc, isDataValida } from '../../comune/date';
 import { isOrarioValido, orarioDaMinuti } from '../../comune/orari';
 
-export const COLORE_INTESTAZIONE = 'FF0C4577'; // blu del marchio (ARGB)
-export const COLORE_TESTO_INTESTAZIONE = 'FFFFFFFF';
+const COLORE_INTESTAZIONE = 'FF0C4577'; // blu del marchio (ARGB)
+const COLORE_TESTO_INTESTAZIONE = 'FFFFFFFF';
 
 /** Applica lo stile "intestazione di tabella" a una riga. */
 export function stileIntestazione(riga: ExcelJS.Row) {

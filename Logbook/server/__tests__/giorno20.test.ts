@@ -4,7 +4,7 @@
  * su segnalazione ma il sistema notifica a HR quando accede").
  *
  * Il dipendente segnala su un suo giorno (mai futuro), vede solo le sue e le ritira finché
- * sono aperte; HR vede tutte, il conteggio delle aperte (contatore e finestra all'accesso),
+ * sono aperte; HR vede tutte (contatore e finestra all'accesso),
  * le chiude con una risposta che il dipendente legge, e le trova in dashboard.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -54,8 +54,6 @@ describe('segnalazioni', () => {
     await giulia.chiama('POST', '/api/segnalazioni', { data: OGGI_PROVA, testo: 'Manca la mattina su PRG-002' });
     expect((await mario.chiama('GET', '/api/segnalazioni')).corpo.map((s: { testo: string }) => s.testo)).toEqual(['Ho lavorato fino alle 17:30, non alle 16:30']);
     expect((await admin.chiama('GET', '/api/segnalazioni?stato=APERTA')).corpo).toHaveLength(2);
-    expect((await admin.chiama('GET', '/api/segnalazioni/conteggio')).corpo).toEqual({ aperte: 2 });
-    expect((await mario.chiama('GET', '/api/segnalazioni/conteggio')).stato).toBe(403);
     const dash = await admin.chiama('GET', '/api/dashboard');
     expect(dash.corpo.segnalazioni.map((s: { dipendente: string }) => s.dipendente)).toEqual(['Rossi Mario', 'Bianchi Giulia']);
     // Filtro per dipendente e giorno (lo usa la finestra della giornata)
@@ -69,7 +67,7 @@ describe('segnalazioni', () => {
     expect(r.corpo).toMatchObject({ stato: 'RISOLTA', rispostaHr: 'Corretto: 07:30-12:30 e 13:30-17:30', risoltaDa: { username: CREDENZIALI_DEMO.admin.username } });
     expect((await mario.chiama('GET', '/api/segnalazioni')).corpo[0].rispostaHr).toBe('Corretto: 07:30-12:30 e 13:30-17:30');
     expect((await mario.chiama('DELETE', `/api/segnalazioni/${idSegnalazione}`)).stato).toBe(409);
-    expect((await admin.chiama('GET', '/api/segnalazioni/conteggio')).corpo).toEqual({ aperte: 1 });
+    expect((await admin.chiama('GET', '/api/segnalazioni?stato=APERTA')).corpo).toHaveLength(1);
     // Dashboard del dipendente: le sue ultime segnalazioni con lo stato
     const dash = await mario.chiama('GET', '/api/dashboard');
     expect(dash.corpo.segnalazioni[0]).toMatchObject({ stato: 'RISOLTA', rispostaHr: 'Corretto: 07:30-12:30 e 13:30-17:30' });
@@ -79,6 +77,6 @@ describe('segnalazioni', () => {
     const sua = (await giulia.chiama('GET', '/api/segnalazioni')).corpo[0].id;
     expect((await mario.chiama('DELETE', `/api/segnalazioni/${sua}`)).stato).toBe(403);
     expect((await giulia.chiama('DELETE', `/api/segnalazioni/${sua}`)).stato).toBe(204);
-    expect((await admin.chiama('GET', '/api/segnalazioni/conteggio')).corpo).toEqual({ aperte: 0 });
+    expect((await admin.chiama('GET', '/api/segnalazioni?stato=APERTA')).corpo).toHaveLength(0);
   });
 });

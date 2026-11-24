@@ -27,7 +27,7 @@ export const ESTENSIONI_FILE = ['pdf', 'p7m', 'jpg', 'jpeg', 'png', 'webp', 'doc
 export const MAX_MB_FILE = 20;
 
 export const TIPI_ATTESTATO = ['SICUREZZA', 'PRIMO_SOCCORSO', 'ANTINCENDIO', 'PATENTINO', 'VISITA_MEDICA', 'ALTRO'] as const;
-export type TipoAttestato = (typeof TIPI_ATTESTATO)[number];
+type TipoAttestato = (typeof TIPI_ATTESTATO)[number];
 
 export const ETICHETTE_ATTESTATO: Record<TipoAttestato, string> = {
   SICUREZZA: 'Formazione sicurezza',
@@ -75,7 +75,6 @@ export const schemaAttestato = z
     path: ['dataScadenza'],
     message: 'La scadenza non può essere prima del rilascio',
   });
-export type DatiAttestato = z.infer<typeof schemaAttestato>;
 
 export const schemaDocumentoDipendente = z.object({
   dipendenteId: z.number({ error: 'Dipendente obbligatorio' }).int().positive(),
@@ -104,7 +103,6 @@ export const schemaDocumentoProgetto = z
     path: ['nota'],
     message: 'Allega un file, scrivi una nota o indica la percentuale di avanzamento',
   });
-export type DatiDocumentoProgetto = z.infer<typeof schemaDocumentoProgetto>;
 
 /** HR: segna vista e/o risponde. */
 export const schemaRevisioneDocumento = z.object({

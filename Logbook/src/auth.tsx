@@ -31,6 +31,12 @@ type StatoAuth = {
 
 const ContestoAuth = createContext<StatoAuth | null>(null);
 
+/**
+ * Prefisso delle chiavi di sessionStorage che ricordano "finestra delle segnalazioni già
+ * mostrata" (componenti/Segnalazioni.tsx). Il login le toglie: a ogni accesso HR la rivede.
+ */
+export const PREFISSO_NOTIFICHE_MOSTRATE = 'logbook.segnalazioni.mostrate.';
+
 export function FornitoreAuth({ children }: { children: ReactNode }) {
   const [utente, setUtente] = useState<UtenteCollegato | null>(null);
   const [caricamento, setCaricamento] = useState(true);
@@ -83,7 +89,7 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
     // Giorno 20: a ogni accesso HR rivede la finestra delle segnalazioni aperte
     // (componenti/Segnalazioni.tsx la mostra una volta e lo ricorda in sessionStorage).
     try {
-      for (const k of Object.keys(sessionStorage)) if (k.startsWith('logbook.segnalazioni.mostrate.')) sessionStorage.removeItem(k);
+      for (const k of Object.keys(sessionStorage)) if (k.startsWith(PREFISSO_NOTIFICHE_MOSTRATE)) sessionStorage.removeItem(k);
     } catch {
       /* archivio del browser non disponibile */
     }

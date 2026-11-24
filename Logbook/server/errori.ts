@@ -26,7 +26,7 @@ export const vietato = (messaggio = 'Non hai i permessi per questa operazione') 
 export const richiestaNonValida = (messaggio: string, campi?: Record<string, string>) => new ErroreHttp(400, messaggio, campi);
 
 /** Trasforma gli errori di Zod in { campo: primo messaggio } (percorsi annidati con il punto). */
-export function campiDaZod(err: ZodError): Record<string, string> {
+function campiDaZod(err: ZodError): Record<string, string> {
   const campi: Record<string, string> = {};
   for (const problema of err.issues) {
     const chiave = problema.path.join('.') || '_';

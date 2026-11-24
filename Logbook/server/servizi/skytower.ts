@@ -23,7 +23,7 @@
 import type { PrismaClient } from '../../generated/prisma/client';
 import { ErroreHttp } from '../errori';
 
-export type CollegamentoSkytower = { url: string; token: string; email: string | null };
+type CollegamentoSkytower = { url: string; token: string; email: string | null };
 
 export const CHIAVI_SKYTOWER = { url: 'skytower.url', token: 'skytower.token', email: 'skytower.email' } as const;
 
@@ -57,7 +57,7 @@ type OpzioniChiamata = {
 };
 
 /** Chiamata all'API della suite di SkyTower. Errori → ErroreHttp con un messaggio per HR. */
-export async function chiamaSkytower<T>(c: CollegamentoSkytower, metodo: 'GET' | 'POST', percorso: string, o: OpzioniChiamata = {}): Promise<T> {
+async function chiamaSkytower<T>(c: CollegamentoSkytower, metodo: 'GET' | 'POST', percorso: string, o: OpzioniChiamata = {}): Promise<T> {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(o.parametri ?? {})) if (v) q.set(k, v);
   const url = `${c.url}${percorso}${q.size ? `?${q}` : ''}`;
@@ -84,7 +84,7 @@ export async function chiamaSkytower<T>(c: CollegamentoSkytower, metodo: 'GET' |
   return (testo ? JSON.parse(testo) : null) as T;
 }
 
-export type CommessaSkytower = { code: string; name: string; commessa: string; url?: string };
+type CommessaSkytower = { code: string; name: string; commessa: string; url?: string };
 
 /** Commesse di SkyTower (anche per la prova del collegamento e il menu nella scheda progetto). */
 export function commesseSkytower(c: CollegamentoSkytower) {

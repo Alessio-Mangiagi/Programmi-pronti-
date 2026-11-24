@@ -88,7 +88,7 @@ export type EstrattoDipendente = {
   };
 };
 
-export type DatiEstratto = {
+type DatiEstratto = {
   /** "AAAA-MM" */
   mese: string;
   dipendente: DipendenteEstratto;

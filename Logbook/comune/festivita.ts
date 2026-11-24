@@ -9,7 +9,7 @@
  */
 import { dataIso, aggiungiGiorni } from './date';
 
-export type FestivitaCalcolata = { data: string; descrizione: string };
+type FestivitaCalcolata = { data: string; descrizione: string };
 
 /**
  * Domenica di Pasqua (calendario gregoriano), algoritmo anonimo di Meeus/Jones/Butcher.

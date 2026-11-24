@@ -168,12 +168,3 @@ export function Etichetta({ colore, children }: { colore: 'verde' | 'rosso' | 'g
   return <span className={`inline-block rounded-full px-2 py-0.5 font-ui text-[0.72rem] font-semibold ${classi}`}>{children}</span>;
 }
 
-/** Placeholder per le pagine non ancora sviluppate (indica il giorno del piano). */
-export function InArrivo({ titolo, giorno }: { titolo: string; giorno: number }) {
-  return (
-    <>
-      <IntestazionePagina titolo={titolo} />
-      <Avviso tipo="info">Questa sezione arriva al Giorno {giorno} del piano di sviluppo.</Avviso>
-    </>
-  );
-}

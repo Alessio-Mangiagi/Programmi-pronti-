@@ -19,7 +19,7 @@
 import type { Assenza, Dipendente, PrismaClient, Progetto } from '../../generated/prisma/client';
 import { formattaData, isFineSettimana } from '../../comune/date';
 
-export type ContestoOre = {
+type ContestoOre = {
   dipendenti: Map<number, Dipendente>;
   progetti: Map<number, Progetto>;
   /** Ferie e malattie APPROVATE dei dipendenti nel periodo: giorni senza ore. */
@@ -32,7 +32,7 @@ export type ContestoOre = {
   oggi: string;
 };
 
-export type ErroreRegola = { campo: 'dipendenteId' | 'progettoId' | 'data'; messaggio: string };
+type ErroreRegola = { campo: 'dipendenteId' | 'progettoId' | 'data'; messaggio: string };
 
 /** Carica quanto serve per controllare fasce di questi dipendenti fra `da` e `a`. */
 export async function caricaContestoOre(

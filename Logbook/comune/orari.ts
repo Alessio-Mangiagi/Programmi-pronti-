@@ -48,7 +48,3 @@ export function formattaOre(minuti: number): string {
   return `${segno}${Math.floor(assoluti / 60)}:${String(assoluti % 60).padStart(2, '0')}`;
 }
 
-/** 450 → 7.5 (ore decimali, per Excel e grafici). */
-export function oreDecimali(minuti: number): number {
-  return Math.round((minuti / 60) * 100) / 100;
-}

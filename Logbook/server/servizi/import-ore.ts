@@ -21,8 +21,8 @@ import { messaggioMassimo, siSovrappongono } from '../../comune/registrazioni';
 import { caricaContestoOre, erroriRegole } from './regole-ore';
 import { caricaLibro, dataCella, orarioCella, stileIntestazione, testoCella } from './excel';
 
-export const MARCATORE_ESEMPIO = 'RIGA DI ESEMPIO';
-export const MAX_RIGHE = 5000;
+const MARCATORE_ESEMPIO = 'RIGA DI ESEMPIO';
+const MAX_RIGHE = 5000;
 
 /** Colonne del foglio: chiave interna, intestazione nel modello, nomi riconosciuti all'import. */
 const COLONNE = [

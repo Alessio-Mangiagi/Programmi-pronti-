@@ -9,7 +9,7 @@
 import { aggiungiGiorni, isFineSettimana } from './date';
 import { durataMinuti } from './orari';
 
-export type FasciaPerTotali = { data: string; progettoId: number; dipendenteId: number; oraInizio: string; oraFine: string };
+type FasciaPerTotali = { data: string; progettoId: number; dipendenteId: number; oraInizio: string; oraFine: string };
 
 export type Totali = {
   /** minuti per data "AAAA-MM-GG" */

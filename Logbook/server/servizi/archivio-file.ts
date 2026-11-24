@@ -40,7 +40,7 @@ const DER = (b: Buffer) => b[0] === 0x30; // busta CAdES .p7m (struttura ASN.1 D
 const TESTO = (b: Buffer) => !b.subarray(0, 4096).includes(0);
 
 /** Formati ammessi: estensione → tipo MIME servito e controllo dei primi byte. */
-export const FORMATI: Record<string, { mime: string; firma: Firma }> = {
+const FORMATI: Record<string, { mime: string; firma: Firma }> = {
   pdf: { mime: 'application/pdf', firma: PDF },
   p7m: { mime: 'application/pkcs7-mime', firma: DER },
   jpg: { mime: 'image/jpeg', firma: inizia(0xff, 0xd8, 0xff) },
@@ -63,7 +63,7 @@ export const ESTENSIONI_AMMESSE = Object.keys(FORMATI);
 export const SI_APRE_NEL_BROWSER = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 
 /** Estensione in minuscolo senza punto ("Foto.JPG" → "jpg"); '' se manca. */
-export function estensione(nome: string): string {
+function estensione(nome: string): string {
   const m = /\.([a-z0-9]{1,5})$/i.exec(nome.trim());
   return m ? m[1].toLowerCase() : '';
 }
@@ -72,14 +72,14 @@ export function estensione(nome: string): string {
  * Nome scelto dall'utente, ripulito: niente percorsi, caratteri di controllo o lunghezze
  * assurde. Serve solo per mostrarlo e come nome del file scaricato.
  */
-export function pulisciNome(nome: string): string {
+function pulisciNome(nome: string): string {
   const base = nome.split(/[\\/]/).pop() ?? '';
   const pulito = base.replace(/[\u0000-\u001f\u007f"<>|:*?]/g, '').trim();
   return (pulito || 'documento').slice(-150);
 }
 
 /** Controlla dimensione, formato e contenuto; restituisce il formato riconosciuto. */
-export function controllaFile(dati: Buffer, nome: string): { ext: string; mime: string } {
+function controllaFile(dati: Buffer, nome: string): { ext: string; mime: string } {
   if (!dati.length) throw new ErroreHttp(400, 'Il file è vuoto');
   if (dati.length > MAX_BYTE_FILE) throw new ErroreHttp(413, `File troppo grande: massimo ${MAX_BYTE_FILE / 1024 / 1024} MB`);
   const ext = estensione(nome);

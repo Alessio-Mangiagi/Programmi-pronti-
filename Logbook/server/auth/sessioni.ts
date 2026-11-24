@@ -10,13 +10,13 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
 
-export const NOME_COOKIE = 'logbook_sessione';
-export const DURATA_SESSIONE_MS = 12 * 60 * 60 * 1000;
+const NOME_COOKIE = 'logbook_sessione';
+const DURATA_SESSIONE_MS = 12 * 60 * 60 * 1000;
 
 const impronta = (token: string) => createHash('sha256').update(token).digest('hex');
 
 /** Legge un cookie dall'intestazione della richiesta (senza dipendenza cookie-parser). */
-export function leggiCookie(req: Request, nome: string): string | undefined {
+function leggiCookie(req: Request, nome: string): string | undefined {
   const intestazione = req.headers.cookie;
   if (!intestazione) return undefined;
   for (const parte of intestazione.split(';')) {

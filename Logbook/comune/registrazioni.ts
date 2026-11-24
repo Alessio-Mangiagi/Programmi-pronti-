@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { formattaData, isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
 import { durataMinuti, formattaOre, isOrarioValido, minutiDaOrario } from './orari';
 
-export type Fascia = { id?: number; oraInizio: string; oraFine: string };
+type Fascia = { id?: number; oraInizio: string; oraFine: string };
 
 /** true se le due fasce hanno almeno un minuto in comune. */
 export function siSovrappongono(a: Fascia, b: Fascia): boolean {
@@ -125,5 +125,3 @@ export const schemaGiornata = z
     }
   });
 
-export type DatiFascia = z.output<typeof schemaFascia>;
-export type DatiGiornata = z.output<typeof schemaGiornata>;

@@ -16,7 +16,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { formattaData } from "../../comune/date";
 
-export type PuntoAvanzamento = {
+type PuntoAvanzamento = {
   id: number;
   data: string;
   percentuale: number;

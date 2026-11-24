@@ -6,7 +6,6 @@
  * nell'intestazione, src/componenti/Notifiche.tsx) e in dashboard.
  *
  * - GET    /            ?stato=APERTA|RISOLTA&dipendenteId=&data=  HR tutte, dipendente le sue
- * - GET    /conteggio   { aperte } (solo HR): per il contatore, leggero da chiedere spesso
  * - POST   /            { data, testo } il dipendente per sé; HR con dipendenteId
  * - PATCH  /:id         { stato?, rispostaHr? } solo HR: RISOLTA registra chi e quando
  * - DELETE /:id         il dipendente le sue finché sono aperte; HR sempre
@@ -38,10 +37,6 @@ export function rotteSegnalazioni(prisma: PrismaClient, oggi: () => string) {
       orderBy: [{ stato: 'asc' }, { creatoIl: 'asc' }],
     });
     res.json(elenco);
-  });
-
-  router.get('/conteggio', richiediAdmin, async (_req, res) => {
-    res.json({ aperte: await prisma.segnalazione.count({ where: { stato: 'APERTA' } }) });
   });
 
   router.post('/', async (req, res) => {

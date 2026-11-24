@@ -30,10 +30,10 @@ const VALORI_DISPARI: Record<string, number> = {
 const RE_STRUTTURA = /^[A-Z]{6}[\dLMNPQRSTUV]{2}[A-Z][\dLMNPQRSTUV]{2}[A-Z][\dLMNPQRSTUV]{3}[A-Z]$/;
 
 /** Esito della validazione, con il motivo leggibile in caso di errore. */
-export type EsitoCodiceFiscale = { valido: true; codice: string } | { valido: false; errore: string };
+type EsitoCodiceFiscale = { valido: true; codice: string } | { valido: false; errore: string };
 
 /** Toglie spazi e porta in maiuscolo: forma con cui il codice si salva nel database. */
-export function normalizzaCodiceFiscale(testo: string): string {
+function normalizzaCodiceFiscale(testo: string): string {
   return testo.replace(/\s+/g, '').toUpperCase();
 }
 
