@@ -253,6 +253,25 @@ def installa_timbri(d: Path) -> str:
     richiedi_node("Timbri per VFP")
     return "nessuna dipendenza (Node puro). Porta 5205"
 
+def installa_logbook(d: Path) -> str:
+    """Logbook, ore e presenze (React + Express + Prisma/SQLite), aggiunto il 24/11/2026.
+
+    npm ci installa le dipendenze e genera il client del database (postinstall: prisma
+    generate). Il database lo crea il primo avvio (avvia.bat -> npm start -> prepara-db
+    --produzione): vuoto, con il solo amministratore e senza dati di esempio. Login proprio,
+    non quello del portale (scelta dell'utente del 23/11).
+    """
+    richiedi_node("Logbook")                            # Prisma 7: Node >= 20.19
+    npm_install(d)
+    envf = d / ".env"
+    if not envf.exists() and (d / ".env.example").exists() and not DRY:
+        # .env con i soli commenti: lì si mettono LOGBOOK_ADMIN_PASSWORD e HOST=0.0.0.0
+        # (necessario perché gli altri PC e i telefoni lo raggiungano).
+        shutil.copyfile(d / ".env.example", envf)
+        say("    creato .env da .env.example: impostare LOGBOOK_ADMIN_PASSWORD e, per la rete, HOST=0.0.0.0")
+    return ("dipendenze + client del database. Porta 5210. Primo avvio: database vuoto con l'utente 'admin'"
+            " (password LOGBOOK_ADMIN_PASSWORD del .env, altrimenti Admin2026! da cambiare subito)")
+
 def installa_incampo(d: Path) -> str:
     vpy = crea_venv(d)                                  # come installa.bat
     richiedi_node("Il frontend di InCampo")
@@ -335,6 +354,7 @@ APPS = [
     ("skytower",    "SkyTower - documenti di commessa CDE ISO 19650 (porta 5195)", "skytower",          installa_skytower),
     ("magazzino",   "Magazzino Operativo - parte di DDT e Magazzino (porta interna 5200)", "magazzino-operativo", installa_magazzino),
     ("timbri",      "Timbri per VFP - da PNG a timbro .stamp (porta 5205)",       "timbri-vfp",          installa_timbri),
+    ("logbook",     "Logbook - ore, presenze e assenze dei dipendenti (porta 5210)", "Logbook",           installa_logbook),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),

@@ -51,6 +51,9 @@ $porte = @(
     @{ Nome = 'SkyTower';            Porta = 5195 },
     @{ Nome = 'Magazzino Operativo'; Porta = 5200 },
     @{ Nome = 'Timbri per VFP';      Porta = 5205 },
+    # Logbook (ore e presenze, aggiunto il 24/11/2026): perche' sia raggiungibile dagli
+    # altri PC e dai telefoni va avviato anche con HOST=0.0.0.0 (vedi Logbook\.env.example).
+    @{ Nome = 'Logbook';             Porta = 5210 },
     @{ Nome = 'Ponte Trimble';       Porta = 3011 },
     @{ Nome = 'Auguri';              Porta = 3000 }
 )
