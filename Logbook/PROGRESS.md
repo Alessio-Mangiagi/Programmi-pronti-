@@ -26,7 +26,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 24 (24/11):** password provvisoria da cambiare al primo accesso, tolte le rotte mai usate (HR elimina la singola fascia), better-sqlite3 dichiarato ✅
 - **Giorno 25 (24/11):** sabato e domenica esclusi da tutte le estrazioni (report, estratti, Excel, stampa) ✅
 - **Giorno 26 (24/11):** matricola sigla del contratto + numero, mansioni da elenco che si arricchisce ✅
-- **Prossimo:** pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 27 (24/11):** pannello a destra del calendario: più giorni (Ctrl/Maiusc) e più dipendenti insieme, tutto o niente ✅
+- **Prossimo:** allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -778,3 +779,32 @@ Verifiche:
   - proposta IND-0006, che diventa DET-0006 cambiando contratto;
   - elenco delle mansioni e avviso per "Gruista".
 - Guida: immagine 38.
+
+### Giorno 27 — Pannello a destra del calendario: più giorni e più dipendenti insieme (24/11/2026) ✅
+
+Risposta 1a del 24/11: "clic su un giorno, oppure su più giorni tenendo premuto Ctrl o Maiusc; nel pannello a destra scegli progetto, dipendenti e orari, che vengono inseriti su tutti i giorni scelti". Le ore le inserisce solo HR (Giorno 20).
+
+**Server**
+- `POST /api/registrazioni/blocco`, solo HR, con `schemaBlocco` in `comune/registrazioni.ts`: progetto, da 1 a 200 dipendenti, da 1 a 62 giorni, da 1 a 6 fasce che non si sovrappongono fra loro, e una nota.
+- Per ogni dipendente e ogni giorno si controllano le regole della giornata (`erroriRegole`): assegnazione, giorni futuri, festivi, ferie e malattia. Si controllano anche la sovrapposizione con le ore già registrate e il massimo del progetto.
+- Tutto o niente: con anche un solo problema la risposta è 400, con `problemi` (chi, quale giorno, perché) e nessuna riga inserita. Altrimenti le fasce si aggiungono a quelle esistenti, in una transazione.
+
+**Interfaccia**
+- Calendario, solo per HR: clic sceglie un giorno, Ctrl+clic ne aggiunge o toglie uno, Maiusc+clic sceglie l'intervallo (solo i giorni che ricevono ore). Le celle scelte sono evidenziate.
+- `src/componenti/PannelloGiorni.tsx`: affiancato da 1280px, sotto il calendario sugli schermi più stretti. Contiene:
+  - i giorni scelti, con i giorni esclusi (futuri, non lavorativi) indicati;
+  - progetto con ricerca, dipendenti assegnati e attivi (Tutti, Nessuno, filtro), fasce, nota e il conto delle ore;
+  - l'elenco dei problemi del server;
+  - con un solo giorno, "Ore del giorno" con "Apri" verso l'editor della giornata.
+- Il pannello sostituisce la vecchia finestra "riepilogo del giorno". Il collegamento `?giorno=` della dashboard apre ancora l'editor.
+- `ErroreApi` porta anche il corpo della risposta (`dati`).
+
+**Verifiche**
+- `npm test` 233/233, di cui 5 nuovi in `giorno27.test.ts`: inserimento, tutto o niente con tre motivi diversi, assegnazione, massimo del progetto, forma e 403 per il dipendente. Typecheck ok.
+- Playwright su Edge 10/10, su una copia del database:
+  - clic, Ctrl+clic e Maiusc+clic;
+  - giorno futuro escluso;
+  - inserimento di PRG-003 08:00-12:00 per Mario, visibile subito nella cella;
+  - doppione rifiutato con il motivo;
+  - "Apri" verso l'editor.
+- Guida: immagine 39.

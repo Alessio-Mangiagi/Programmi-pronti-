@@ -115,9 +115,28 @@ campanella; in dashboard c'è anche il riquadro **Segnalazioni aperte**.
 
 ### Registrare le ore
 
-Dal **Calendario** (filtrato su un dipendente, o dal riepilogo del giorno con **Modifica**)
-si apre il dettaglio della giornata. Le ore si scrivono anche nei giorni passati; mai in
-quelli futuri.
+**Più giorni e più dipendenti insieme: il pannello a destra.** Nel **Calendario** un clic su un
+giorno lo sceglie e apre il pannello a destra (sotto il calendario sugli schermi più stretti):
+
+- **Ctrl + clic** aggiunge o toglie un giorno; **Maiusc + clic** sceglie tutti i giorni fra
+  quello cliccato prima e questo (solo quelli che ricevono ore).
+- Nel pannello si sceglie il **progetto** (scrivendo alcune lettere), si spuntano i
+  **dipendenti assegnati** a quel progetto (**Tutti** / **Nessuno**, filtro se sono tanti),
+  si indicano le **fasce orarie** (di partenza 08:00-12:00 e 13:00-17:00) e una nota.
+- Sotto c'è il conto (es. 3 dipendenti × 4 giorni × 8:00 = 96:00 ore) e **Inserisci**: le
+  fasce **si aggiungono** a quelle già presenti, per ogni dipendente in ogni giorno.
+- **Tutto o niente**: se anche una sola giornata non va bene (fascia sovrapposta a ore già
+  registrate, ferie, dipendente non assegnato, massimo del progetto…) non si inserisce
+  nulla e il pannello elenca chi, quale giorno e perché.
+- Giorni futuri, sabati, domeniche e festivi restano nell'elenco in grigio ma non ricevono ore.
+- Con un solo giorno scelto, **Ore del giorno** mostra chi ha lavorato; **Apri** porta al
+  dettaglio della giornata di quella persona, per correggere o eliminare una fascia.
+
+![Pannello a destra del calendario](img/39-pannello-calendario.png)
+
+**Una giornata alla volta.** Dal pannello (**Apri**) o dai collegamenti della dashboard si apre
+il dettaglio della giornata di un dipendente. Le ore si scrivono anche nei giorni passati; mai
+in quelli futuri.
 
 ![Dettaglio della giornata](img/14-editor-giornata.png)
 
@@ -195,8 +214,9 @@ della festività.
 ![Filtro del dipendente con la ricerca](img/31-calendario-ricerca.png)
 - Ogni progetto ha il suo colore; ferie in azzurro, permessi in giallo, malattia in rosso,
   festività in verde.
-- Con "Tutti i dipendenti" il clic su un giorno apre il riepilogo per dipendente; da lì
-  **Modifica** apre la giornata di quella persona.
+- Per HR il clic su un giorno apre il **pannello a destra** (vedi «Registrare le ore»): più
+  giorni con Ctrl o Maiusc, ore per più dipendenti insieme, e **Apri** verso la giornata di
+  ciascuno. Il dipendente invece apre il suo giorno in sola lettura.
 
 ![Vista settimana](img/04-calendario-settimana.png)
 
