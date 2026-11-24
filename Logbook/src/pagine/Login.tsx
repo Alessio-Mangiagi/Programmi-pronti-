@@ -30,9 +30,18 @@ export function Login() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-fondo p-4">
-      <div className="scheda grid w-full max-w-3xl overflow-hidden md:grid-cols-[1.05fr_1fr]">
-        <div className="relative hidden flex-col justify-between bg-marchio p-8 text-white md:flex">
+    // Due pannelli in flexbox: affiancati da 768px, sul telefono resta il modulo con una
+    // fascia blu del marchio in cima (il pannello grande a sinistra è nascosto).
+    <div className="flex min-h-[100dvh] items-center justify-center bg-fondo p-3 sm:p-4">
+      <div className="scheda flex w-full max-w-3xl flex-col overflow-hidden md:flex-row">
+        <div className="flex items-center gap-3 bg-marchio px-5 py-4 text-white md:hidden">
+          <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
+          <div className="leading-tight">
+            <div className="font-display text-xl font-medium">Logbook</div>
+            <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>
+          </div>
+        </div>
+        <div className="relative hidden min-w-0 flex-[1.05_1_0%] flex-col justify-between gap-6 bg-marchio p-8 text-white md:flex">
           <div className="flex items-center gap-3">
             <img src="/logo-cosedil-chiaro.png" alt="" className="h-12 w-12 rounded-lg" />
             <div className="font-ui text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>
@@ -44,7 +53,7 @@ export function Login() {
           <div className="font-display text-sm text-white/60">Costruiamo il tuo domani</div>
           <div className="absolute inset-x-0 bottom-0 h-1 bg-marchio-verde" />
         </div>
-        <form onSubmit={entra} className="space-y-4 p-8">
+        <form onSubmit={entra} className="min-w-0 flex-1 space-y-4 p-5 sm:p-8">
           <div>
             <div className="sopratitolo">Accesso</div>
             <h1 className="font-display text-2xl font-normal text-testo-forte">Entra in Logbook</h1>

@@ -13,6 +13,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 11 (23/11):** richieste aggiuntive ✅ (data minima 2020, ore massime per progetto, estratti mensili)
 - **Giorno 12 (23/11):** nuova estetica Cosedil ✅
 - **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti"
+- **Giorno 13 (24/11):** interfaccia adattabile in flexbox, dal cellulare agli schermi ultra wide ✅
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -83,6 +84,8 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Festività in verde (prima viola) e tavolozza progetti senza viola/magenta | Il design system vieta il viola |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
 | 24/11 | 4 ottobre (San Francesco) festa nazionale dal 2026 in `comune/festivita.ts` | Legge approvata a ottobre 2025; confermato dall'utente |
+| 24/11 | Layout in flexbox con a capo automatico (base per blocco, nessuna colonna fissa), `<main>` senza larghezza massima, tabelle a schede sotto i 640px | Richiesta dell'utente: cellulare e ultra wide; la base per blocco evita di scrivere un layout per ogni punto di rottura |
+| 24/11 | Sul telefono restano a scorrimento orizzontale (dentro il riquadro) solo l'anteprima dell'import e la tabella "giorni e costi" | Hanno 9-10 colonne da confrontare riga per riga: a schede si leggerebbero peggio; la pagina non sfora |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -90,8 +93,12 @@ sessione per riprendere da dove si era rimasti.
 - Il branch `feat/estrazione-dms` contiene anche lavoro OCR (5 commit non ancora in `main`
   e modifiche non committate non mie): nei commit di Logbook si aggiungono **solo** file
   di `Logbook/`.
-- Report della suite: Logbook non è ancora nel foglio "Stato avanzamento programmi.xlsx"
-  (radice del repo, fermo al 23/11): va aggiunto al prossimo aggiornamento.
+- Avvio in esercizio: con il database vuoto `scripts/prepara-db.ts` carica i dati di
+  esempio (5 dipendenti, ore finte). Prima dell'uso vero serve un interruttore per
+  partire vuoti (attività aperta nel foglio "Stato avanzamento programmi.xlsx", dove
+  Logbook è stato aggiunto il 24/11, commit a21d9fd).
+- Server: la porta 5210 è in Caddy e nel portale ma non ancora in `firewall-suite.ps1`
+  né in `installa-suite.py`.
 - Portale: le modifiche al registro sono nel repository; il portale in esercizio gira da
   una copia esterna (`Documents\suite cosedil`) e va aggiornato per vedere la card.
 - Cartella `Logbook/` → `logbook/`: si può rinominare quando nessun programma la tiene
@@ -330,3 +337,37 @@ Fatto:
 Verifiche: `npm test` 138/138, typecheck ok, controllo a vista di login, dashboard,
 calendario, progetti, estratti mensili. Nota: lo script degli screenshot salva sul DB
 demo due fasce di Mario Rossi del 23/11 (07:30-12:30 e 13:30-16:30, PRG-001).
+
+### Giorno 13 — Interfaccia adattabile: cellulare e ultra wide (24/11/2026) ✅
+
+Richiesta: "l'interfaccia deve adattarsi anche da cellulare e deve essere in flexbox per
+adattarsi anche a schermi ultra wide".
+
+Fatto:
+- Regola unica, spiegata in `src/index.css` ("Layout adattabile"): blocchi affiancati in
+  contenitori `flex flex-wrap`, ogni blocco con una base (`flex-[1_1_30rem]`…) che cresce
+  per riempire la riga. Nessun numero fisso di colonne: uno per riga sul telefono, due o
+  tre su un monitor, tutti affiancati su un ultra wide. Tolte tutte le `grid` delle pagine.
+- `<main>` senza larghezza massima (era 1400px): a 3440px il contenuto usa 3200px invece di
+  1400. Punti di rottura nuovi `3xl` (1920px) e `4xl` (2560px) solo per margini e altezze.
+- Telefono: intestazione con il nome del programma e utente troncato; finestre modali
+  quasi a tutto schermo; `Tabella` diventa un elenco di schede sotto i 640px (colonna
+  `principale` come titolo, menu "Ordina per"); calendario del mese con numero, totale e
+  pallini colorati, settimana come elenco verticale; editor della giornata con una fascia
+  per riquadro (progetto, orari, note); login con fascia del marchio.
+- Ultra wide: dashboard con i pannelli affiancati, scheda dipendente con anagrafica,
+  contratto e costi affiancati, estratti mensili due o tre per riga (in stampa `print:block`
+  e `print:flex-nowrap`: sempre un dipendente per pagina A4, calendario e anagrafica
+  affiancati).
+- Guida: capitolo 4 "Dal cellulare e sugli schermi grandi" con le immagini 17-20.
+
+Verifiche:
+- Script Playwright (Edge) su tutte le pagine, HR e dipendente, a 360, 768, 1440 e 3440 px:
+  nessuna pagina sfora in orizzontale e nessun elemento esce dalla finestra. Prima della
+  modifica non sforava nulla, ma a 3440px il contenuto restava a 1400px e sul telefono
+  settimana ed editor della giornata erano illeggibili (colonne da 40px, menu dei progetti
+  largo un carattere).
+- Controllo a vista delle schermate (telefono: calendario, editor, elenco dipendenti;
+  1440: scheda dipendente; 3440: dashboard ed estratti).
+- PDF di stampa degli estratti rifatto da Edge: stessa impaginazione di prima.
+- `npm test` 138/138, typecheck ok, build ok.

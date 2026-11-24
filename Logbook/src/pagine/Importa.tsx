@@ -79,7 +79,8 @@ export function Importa() {
     <>
       <IntestazionePagina titolo="Importa ore da Excel" sottotitolo="Le righe vengono controllate tutte prima di importare: con un solo errore non si importa nulla" />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
+      {/* Passi 1 e 2 affiancati quando c'è spazio (flexbox, base 22rem), uno sotto l'altro sul telefono. */}
+      <div className="mb-4 flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_22rem]">
         <div className="scheda p-4">
           <div className="mb-1 text-xs font-semibold uppercase text-gray-500">1 · Modello</div>
           <p className="mb-3 text-sm text-gray-600">Colonne: matricola, data, ora inizio, ora fine, codice progetto, note. Contiene istruzioni ed elenchi di dipendenti e progetti validi.</p>

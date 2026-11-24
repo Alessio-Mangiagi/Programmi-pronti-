@@ -7,6 +7,10 @@
  * Il menu dipende dal ruolo: l'admin (HR) vede tutte le voci, il dipendente solo
  * Dashboard, Calendario e le proprie assenze. Sotto i 768px il menu si apre col pulsante
  * a tre righe.
+ *
+ * Il contenuto (<main>) usa tutta la larghezza disponibile, anche sugli schermi ultra
+ * wide: le pagine dispongono i blocchi in flexbox con a capo automatico (src/index.css,
+ * "Layout adattabile"). Fino al 23/11 era fermo a 1400px al centro.
  */
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -76,26 +80,28 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Intestazione */}
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-bordo bg-white/95 px-4 backdrop-blur md:px-6">
-          <button type="button" className="rounded p-1.5 text-marchio hover:bg-ghiaccio md:hidden" onClick={() => setMenuAperto(true)} aria-label="Apri menu">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-2 border-b border-bordo bg-white/95 px-3 backdrop-blur sm:px-4 md:px-6">
+          <button type="button" className="flex items-center gap-2 rounded p-1.5 text-marchio hover:bg-ghiaccio md:hidden" onClick={() => setMenuAperto(true)} aria-label="Apri menu">
             <Icona nome="menu" dimensione={22} />
+            {/* Sul telefono il menu laterale è chiuso: il nome del programma resta visibile qui. */}
+            <span className="font-display text-base font-medium">Logbook</span>
           </button>
-          <div className="ml-auto flex items-center gap-4 text-sm">
+          <div className="ml-auto flex min-w-0 items-center gap-2 text-sm sm:gap-4">
             <span className="hidden rounded-full bg-ghiaccio px-2.5 py-0.5 font-ui text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-marchio sm:inline">
               {admin ? 'HR' : 'Dipendente'}
             </span>
-            <span className="font-display font-medium text-testo-forte">{utente?.nomeVisualizzato}</span>
-            <button type="button" className="inline-flex items-center gap-1.5 text-marchio transition-colors hover:text-marchio-hover" onClick={() => setCambioPassword(true)}>
+            <span className="truncate font-display font-medium text-testo-forte">{utente?.nomeVisualizzato}</span>
+            <button type="button" className="inline-flex shrink-0 items-center gap-1.5 rounded p-1.5 text-marchio transition-colors hover:text-marchio-hover" onClick={() => setCambioPassword(true)} aria-label="Cambia password">
               <Icona nome="chiave" dimensione={16} />
               <span className="hidden sm:inline">Cambia password</span>
             </button>
-            <button type="button" className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-2.5 py-1 text-gray-600 transition-colors hover:border-marchio hover:text-marchio" onClick={logout}>
+            <button type="button" className="inline-flex shrink-0 items-center gap-1.5 rounded border border-gray-300 px-2.5 py-1 text-gray-600 transition-colors hover:border-marchio hover:text-marchio" onClick={logout}>
               <Icona nome="esci" dimensione={16} />
               Esci
             </button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 md:px-8 md:py-6">
+        <main className="w-full min-w-0 flex-1 px-3 py-4 sm:px-4 md:px-6 md:py-6 xl:px-8 4xl:px-12">
           <BloccoErrori chiave={posizione.pathname}>
             <Outlet />
           </BloccoErrori>

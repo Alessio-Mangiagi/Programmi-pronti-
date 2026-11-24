@@ -87,6 +87,7 @@ come testo sia come valori data/ora di Excel.
 | Export | Calendario lavorato (un foglio per dipendente) e ore per progetto (con costo lordo) |
 | Estratti mensili | Per mese e dipendente: "mese a calendario" (calendario + anagrafica + progetti) e "giorni e costi" (una riga per giorno con costo netto/lordo, ferie e malattia comprese); anteprima, Excel e stampa/PDF |
 | Limiti | Nessun inserimento prima del 01/01/2020; ore massime al giorno per progetto (per dipendente, salvataggio bloccato oltre il limite) |
+| Schermi | Interfaccia in flexbox che si adatta da sola: dal cellulare (360px: tabelle a schede, calendario con pallini, editor a riquadri) agli schermi ultra wide (contenuto a tutta larghezza, riquadri affiancati). Regola spiegata in `src/index.css` |
 
 ## Accesso e sicurezza
 

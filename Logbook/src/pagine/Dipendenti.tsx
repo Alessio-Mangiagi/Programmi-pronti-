@@ -14,7 +14,8 @@ import { usaDati } from '../usaDati';
 
 const COLONNE: Colonna<Dipendente>[] = [
   { chiave: 'matricola', titolo: 'Matricola', valore: (d) => d.matricola },
-  { chiave: 'nome', titolo: 'Cognome e nome', valore: (d) => `${d.cognome} ${d.nome}`, render: (d) => <span className="font-medium">{d.cognome} {d.nome}</span> },
+  // principale: sul telefono il nome fa da titolo della scheda (componenti/Tabella.tsx).
+  { chiave: 'nome', titolo: 'Cognome e nome', valore: (d) => `${d.cognome} ${d.nome}`, render: (d) => <span className="font-medium">{d.cognome} {d.nome}</span>, principale: true },
   { chiave: 'cf', titolo: 'Codice fiscale', valore: (d) => d.codiceFiscale, classe: 'font-mono text-xs' },
   { chiave: 'mansione', titolo: 'Mansione', valore: (d) => d.mansione },
   { chiave: 'reparto', titolo: 'Reparto', valore: (d) => d.reparto },

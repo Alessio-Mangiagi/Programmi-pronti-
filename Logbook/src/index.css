@@ -47,7 +47,31 @@
   --shadow-scheda: 0 2px 12px rgba(12, 69, 119, 0.06);
   --shadow-scheda-su: 0 8px 24px rgba(12, 69, 119, 0.1);
   --ease-cosedil: cubic-bezier(0.16, 1, 0.3, 1);
+  /*
+   * Punti di rottura in più per gli schermi ultra wide (richiesta del 24/11/2026).
+   * Tailwind arriva a 2xl = 1536px; 3xl e 4xl servono solo per margini e altezze
+   * (es. celle del calendario più alte). La disposizione dei blocchi invece non dipende
+   * dai punti di rottura: vedi "Layout adattabile" più sotto.
+   */
+  --breakpoint-3xl: 120rem; /* 1920px: monitor Full HD e oltre */
+  --breakpoint-4xl: 160rem; /* 2560px: ultra wide 21:9 (2560, 3440, 3840) */
 }
+
+/*
+ * Layout adattabile (richiesta del 24/11/2026: "l'interfaccia deve adattarsi anche da
+ * cellulare e deve essere in flexbox per adattarsi anche a schermi ultra wide").
+ *
+ * Regola usata in tutte le pagine: i blocchi affiancati stanno in un contenitore
+ * `flex flex-wrap` e ogni blocco ha una larghezza di partenza e cresce per riempire la
+ * riga (classi Tailwind `min-w-0 flex-[1_1_30rem]` e simili). Quanti blocchi stanno su una
+ * riga lo decide lo spazio disponibile, non un numero fisso di colonne:
+ *   - cellulare (360px): un blocco sotto l'altro;
+ *   - monitor normale: due o tre per riga;
+ *   - ultra wide (3440px): tutti affiancati, senza fasce vuote ai lati.
+ * Il contenuto principale (<main> in componenti/Layout.tsx) non ha più una larghezza
+ * massima. Sotto i 640px le tabelle diventano schede (componenti/Tabella.tsx) e le
+ * finestre modali occupano quasi tutto lo schermo (componenti/ui.tsx).
+ */
 
 body {
   background-color: var(--color-fondo);

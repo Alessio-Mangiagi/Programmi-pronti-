@@ -96,7 +96,7 @@ export function EditorGiornata({
 
   if (!righe) {
     return (
-      <Modale titolo={`Ore del ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-3xl">
+      <Modale titolo={`Ore del ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-4xl">
         {messaggio ? <Avviso tipo="errore">{messaggio}</Avviso> : <Caricamento />}
       </Modale>
     );
@@ -145,7 +145,7 @@ export function EditorGiornata({
   const err = (i: number, campo: string) => errori[`fasce.${i}.${campo}`];
 
   return (
-    <Modale titolo={`${nomeDipendente} — ${GIORNI[giornoSettimana(data)]} ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-3xl">
+    <Modale titolo={`${nomeDipendente} — ${GIORNI[giornoSettimana(data)]} ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-4xl">
       <div className="space-y-3">
         {avvisi.map((a) => (
           <Avviso key={a.testo} tipo={a.tipo}>
@@ -155,79 +155,76 @@ export function EditorGiornata({
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
         {errori.data && <Avviso tipo="errore">{errori.data}</Avviso>}
 
-        <div className="overflow-x-auto">
-          <table className="cifre w-full text-sm">
-            <thead className="text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-1 py-1 text-left">Progetto</th>
-                <th className="w-28 px-1 py-1 text-left">Dalle</th>
-                <th className="w-28 px-1 py-1 text-left">Alle</th>
-                <th className="w-16 px-1 py-1 text-right">Ore</th>
-                <th className="px-1 py-1 text-left">Note</th>
-                <th className="w-8" />
-              </tr>
-            </thead>
-            <tbody>
-              {righe.map((r, i) => {
-                const durata = durataRiga(r);
-                const progetto = progetti.find((p) => String(p.id) === r.progettoId);
-                const errRiga = err(i, 'progettoId') || err(i, 'oraInizio') || err(i, 'oraFine') || err(i, 'note');
-                return (
-                  <tr key={r.chiave} className={`align-top ${sovrapposte.has(i) ? 'bg-[#fdf3f2]' : ''}`}>
-                    <td className="px-1 py-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: progetto ? coloreProgetto(progetto) : '#e5e7eb' }} />
-                        <select aria-label={`Progetto riga ${i + 1}`} className={classiInput(err(i, 'progettoId'))} value={r.progettoId} onChange={(e) => aggiorna(r.chiave, 'progettoId', e.target.value)}>
-                          <option value="">— scegli —</option>
-                          {progettiScelta.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.codice} · {p.nome}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="time" step={300} aria-label={`Inizio riga ${i + 1}`} className={classiInput(err(i, 'oraInizio') || (sovrapposte.has(i) ? 'x' : undefined))} value={r.oraInizio} onChange={(e) => aggiorna(r.chiave, 'oraInizio', e.target.value)} />
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="time" step={300} aria-label={`Fine riga ${i + 1}`} className={classiInput(err(i, 'oraFine'))} value={r.oraFine} onChange={(e) => aggiorna(r.chiave, 'oraFine', e.target.value)} />
-                    </td>
-                    <td className="px-1 py-2 text-right font-medium">{durata === null ? '—' : formattaOre(durata)}</td>
-                    <td className="px-1 py-1">
-                      <input aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
-                      {(errRiga || sovrapposte.has(i)) && <div className="mt-0.5 text-xs text-errore">{errRiga ?? 'Fascia sovrapposta a un\'altra riga'}</div>}
-                    </td>
-                    <td className="px-1 py-1">
-                      <button type="button" aria-label={`Elimina riga ${i + 1}`} className="rounded px-2 py-1 text-errore hover:bg-[#fdf3f2]" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
-                        <Icona nome="chiudi" dimensione={16} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {righe.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-1 py-4 text-center text-gray-500">
-                    Nessuna fascia registrata in questo giorno.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-gray-200">
-                <td colSpan={3} className="px-1 py-2">
-                  <Pulsante variante="leggero" onClick={aggiungi}>
-                    + Aggiungi fascia
-                  </Pulsante>
-                </td>
-                <td className="px-1 py-2 text-right font-semibold text-marchio">{formattaOre(totale)}</td>
-                <td colSpan={2} className="px-1 py-2 text-sm text-gray-500">
-                  totale del giorno
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+        {/*
+          Fasce in flexbox (24/11/2026). Ogni riga è un contenitore flex che va a capo: da
+          1024px progetto, orari, ore, note ed elimina stanno su una riga sotto l'intestazione;
+          sotto i 1024px l'intestazione sparisce, ogni campo mostra la sua etichetta e sul
+          telefono progetto e note prendono una riga intera.
+        */}
+        <div className="cifre text-sm">
+          <div className="hidden gap-2 px-1 pb-1 text-xs font-semibold uppercase text-gray-500 lg:flex">
+            <span className="min-w-0 flex-[2_1_14rem]">Progetto</span>
+            <span className="flex-[0_0_7rem]">Dalle</span>
+            <span className="flex-[0_0_7rem]">Alle</span>
+            <span className="flex-[0_0_3.5rem] text-right">Ore</span>
+            <span className="min-w-0 flex-[3_1_8rem]">Note</span>
+            <span className="flex-[0_0_2.25rem]" />
+          </div>
+          <ul className="space-y-2 lg:space-y-1">
+            {righe.map((r, i) => {
+              const durata = durataRiga(r);
+              const progetto = progetti.find((p) => String(p.id) === r.progettoId);
+              const errRiga = err(i, 'progettoId') || err(i, 'oraInizio') || err(i, 'oraFine') || err(i, 'note');
+              return (
+                <li
+                  key={r.chiave}
+                  className={`flex flex-wrap items-end gap-2 rounded border p-2 lg:items-start lg:border-transparent lg:p-1 ${sovrapposte.has(i) ? 'border-[#eba79f] bg-[#fdf3f2]' : 'border-gray-200'}`}
+                >
+                  <label className="min-w-0 flex-[2_1_14rem]">
+                    <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Progetto</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: progetto ? coloreProgetto(progetto) : '#e5e7eb' }} />
+                      <select aria-label={`Progetto riga ${i + 1}`} className={classiInput(err(i, 'progettoId'))} value={r.progettoId} onChange={(e) => aggiorna(r.chiave, 'progettoId', e.target.value)}>
+                        <option value="">— scegli —</option>
+                        {progettiScelta.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.codice} · {p.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </span>
+                  </label>
+                  <label className="min-w-0 flex-[1_0_6.5rem] lg:flex-[0_0_7rem]">
+                    <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Dalle</span>
+                    <input type="time" step={300} aria-label={`Inizio riga ${i + 1}`} className={classiInput(err(i, 'oraInizio') || (sovrapposte.has(i) ? 'x' : undefined))} value={r.oraInizio} onChange={(e) => aggiorna(r.chiave, 'oraInizio', e.target.value)} />
+                  </label>
+                  <label className="min-w-0 flex-[1_0_6.5rem] lg:flex-[0_0_7rem]">
+                    <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Alle</span>
+                    <input type="time" step={300} aria-label={`Fine riga ${i + 1}`} className={classiInput(err(i, 'oraFine'))} value={r.oraFine} onChange={(e) => aggiorna(r.chiave, 'oraFine', e.target.value)} />
+                  </label>
+                  <span className="flex-[0_0_3.5rem] py-1.5 text-right font-medium">{durata === null ? '—' : formattaOre(durata)}</span>
+                  <label className="min-w-0 flex-[3_1_8rem]">
+                    <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Note</span>
+                    <input aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
+                  </label>
+                  <button type="button" aria-label={`Elimina riga ${i + 1}`} className="flex-[0_0_2.25rem] rounded px-2 py-1.5 text-errore hover:bg-[#fdf3f2]" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
+                    <Icona nome="chiudi" dimensione={16} />
+                  </button>
+                  {(errRiga || sovrapposte.has(i)) && <div className="basis-full text-xs text-errore">{errRiga ?? 'Fascia sovrapposta a un\'altra riga'}</div>}
+                </li>
+              );
+            })}
+            {righe.length === 0 && <li className="px-1 py-4 text-center text-gray-500">Nessuna fascia registrata in questo giorno.</li>}
+          </ul>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-1 pt-2">
+            <Pulsante variante="leggero" onClick={aggiungi}>
+              + Aggiungi fascia
+            </Pulsante>
+            <span>
+              <span className="mr-2 text-gray-500">totale del giorno</span>
+              <span className="font-semibold text-marchio">{formattaOre(totale)}</span>
+            </span>
+          </div>
         </div>
 
         {perProgetto.minuti.size > 0 && (
@@ -252,7 +249,7 @@ export function EditorGiornata({
           </Avviso>
         ))}
 
-        <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
           <Pulsante onClick={onChiudi}>Annulla</Pulsante>
           <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0 || perProgetto.oltre.length > 0}>
             {invio ? 'Salvataggio…' : 'Salva giornata'}

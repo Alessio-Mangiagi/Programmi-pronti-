@@ -10,6 +10,13 @@
  *   "Tutti" si apre il riepilogo del giorno per dipendente, da cui si entra nell'editor.
  *
  * Dati: GET /api/calendario (server/rotte/calendario.ts).
+ *
+ * Layout adattabile (24/11/2026), tutto in flexbox: il mese è una pila di righe-settimana
+ * con sette celle che si dividono la larghezza, così su un ultra wide le celle si
+ * allargano e si alzano. Sul telefono (sotto i 640px) una cella è larga circa 48px:
+ * mostra numero e totale e, al posto delle etichette, un pallino colorato per ogni
+ * progetto o assenza. Il dettaglio si legge aprendo il giorno. La settimana sul
+ * telefono è un elenco verticale di giorni; da 768px torna a sette colonne affiancate.
  */
 import { useMemo, useState } from 'react';
 import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, isFineSettimana, oggiIso } from '../../comune/date';
@@ -72,7 +79,10 @@ export function Calendario() {
   const giorni = useMemo(() => {
     const elenco: string[] = [];
     for (let d = da; d <= a; d = aggiungiGiorni(d, 1)) elenco.push(d);
-    return elenco;
+    // A gruppi di sette: ogni gruppo è una riga flex (il periodo parte sempre di lunedì).
+    const settimane: string[][] = [];
+    for (let i = 0; i < elenco.length; i += 7) settimane.push(elenco.slice(i, i + 7));
+    return settimane;
   }, [da, a]);
 
   // Indici per giorno: fasce, assenze, festività.
@@ -138,7 +148,8 @@ export function Calendario() {
         <Pulsante onClick={() => sposta(1)} aria-label="Periodo successivo">›</Pulsante>
         <span className="min-w-44 px-2 font-semibold capitalize text-marchio">{periodo}</span>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
+        {/* Filtri: sul telefono uno per riga a tutta larghezza, da 640px in fila a destra. */}
+        <div className="flex w-full flex-col gap-2 text-sm sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           {admin && (
             <select aria-label="Dipendente" className="rounded border border-gray-300 px-2 py-1.5" value={dipendenteId} onChange={(e) => setDipendenteId(e.target.value)}>
               <option value="">Tutti i dipendenti</option>
@@ -173,81 +184,113 @@ export function Calendario() {
 
       {dati && (
         <div className={caricamento ? 'opacity-60 transition-opacity' : ''}>
-          <div className="grid grid-cols-7 overflow-hidden rounded-t border border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase text-gray-600">
+          {/* Nomi dei giorni: nella settimana sul telefono non servono (ogni riga dice il suo giorno). */}
+          <div className={`${vista === 'settimana' ? 'hidden md:flex' : 'flex'} overflow-hidden rounded-t border border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase text-gray-600`}>
             {NOMI_GIORNI.map((g) => (
-              <div key={g} className="py-1.5">
+              <div key={g} className="min-w-0 flex-1 basis-0 py-1.5">
                 {g}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 border-l border-gray-200">
-            {giorni.map((d) => {
-              const fuoriMese = vista === 'mese' && (d < primoDelMese || d > ultimoDelMese);
-              const fest = perGiorno.festivita.get(d);
-              const fasce = perGiorno.fasce.get(d) ?? [];
-              const assenze = perGiorno.assenze(d);
-              const totale = dati.totali.perGiorno[d] ?? 0;
-              // Ore per progetto nel giorno (vista mese) o fasce una per una (vista settimana).
-              const perProgetto = new Map<number, { minuti: number; f: FasciaCal }>();
-              for (const f of fasce) perProgetto.set(f.progettoId, { minuti: (perProgetto.get(f.progettoId)?.minuti ?? 0) + f.minuti, f });
-              return (
-                <button
-                  type="button"
-                  key={d}
-                  onClick={() => apriGiorno(d)}
-                  aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore`}
-                  className={`flex flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs hover:bg-ghiaccio focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
-                    vista === 'mese' ? 'min-h-24' : 'min-h-64'
-                  } ${fuoriMese ? 'bg-gray-50 text-gray-400' : isFineSettimana(d) || fest ? 'bg-gray-50/80' : 'bg-white'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`cifre font-semibold ${d === oggi ? 'rounded bg-marchio px-1.5 text-white' : ''}`}>
-                      {vista === 'settimana' ? formattaData(d).slice(0, 5) : Number(d.slice(8))}
-                    </span>
-                    {totale > 0 && <span className="cifre font-bold text-marchio">{formattaOre(totale)}</span>}
-                  </div>
-                  {fest && (
-                    <span className="truncate rounded px-1" style={{ backgroundColor: COLORE_FESTIVITA.sfondo, color: COLORE_FESTIVITA.testo }} title={fest.descrizione}>
-                      {fest.descrizione}
-                    </span>
-                  )}
-                  {assenze.map((x) => (
-                    <span
-                      key={x.id}
-                      className="truncate rounded border px-1"
-                      title={testoAssenza(x, true)}
-                      style={{
-                        backgroundColor: COLORI_ASSENZA[x.tipo].sfondo,
-                        color: COLORI_ASSENZA[x.tipo].testo,
-                        borderColor: COLORI_ASSENZA[x.tipo].bordo,
-                        borderStyle: x.stato === 'RICHIESTA' ? 'dashed' : 'solid',
-                      }}
+          <div className={`border-l border-gray-200 ${vista === 'settimana' ? 'border-t md:border-t-0' : ''}`}>
+            {giorni.map((settimana) => (
+              <div key={settimana[0]} className={`flex ${vista === 'settimana' ? 'flex-col md:flex-row' : ''}`}>
+                {settimana.map((d, posizione) => {
+                  const fuoriMese = vista === 'mese' && (d < primoDelMese || d > ultimoDelMese);
+                  const fest = perGiorno.festivita.get(d);
+                  const fasce = perGiorno.fasce.get(d) ?? [];
+                  const assenze = perGiorno.assenze(d);
+                  const totale = dati.totali.perGiorno[d] ?? 0;
+                  // Ore per progetto nel giorno (vista mese) o fasce una per una (vista settimana).
+                  const perProgetto = new Map<number, { minuti: number; f: FasciaCal }>();
+                  for (const f of fasce) perProgetto.set(f.progettoId, { minuti: (perProgetto.get(f.progettoId)?.minuti ?? 0) + f.minuti, f });
+                  return (
+                    <button
+                      type="button"
+                      key={d}
+                      onClick={() => apriGiorno(d)}
+                      aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore`}
+                      className={`flex min-w-0 flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs hover:bg-ghiaccio focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
+                        vista === 'mese'
+                          ? 'min-h-16 flex-1 basis-0 sm:min-h-24 3xl:min-h-28 4xl:min-h-32'
+                          : 'min-h-14 md:min-h-64 md:flex-1 md:basis-0 4xl:min-h-80'
+                      } ${fuoriMese ? 'bg-gray-50 text-gray-400' : isFineSettimana(d) || fest ? 'bg-gray-50/80' : 'bg-white'}`}
                     >
-                      {testoAssenza(x, !dipendenteId)}
-                    </span>
-                  ))}
-                  {vista === 'mese'
-                    ? [...perProgetto.values()].map(({ minuti, f }) => (
-                        <span key={f.progettoId} className="flex items-center justify-between gap-1 truncate rounded px-1 text-white" style={{ backgroundColor: coloreFascia(f) }} title={`${f.progetto.codice} ${f.progetto.nome}${f.progetto.maxMinutiGiorno != null ? ` — massimo ${formattaOre(f.progetto.maxMinutiGiorno)} ore al giorno per dipendente` : ''}`}>
-                          <span className="truncate">{f.progetto.codice}</span>
-                          <span className="cifre">
-                            {formattaOre(minuti)}
-                            {/* Ore massime del progetto: si vede solo con un dipendente scelto (il limite è per persona) */}
-                            {f.progetto.maxMinutiGiorno != null && dipendenteId && <span className="opacity-70">/{formattaOre(f.progetto.maxMinutiGiorno)}</span>}
-                          </span>
+                      {/* Numero e totale: affiancati, ma uno sotto l'altro nelle celle strette del mese sul telefono. */}
+                      <div className={`flex justify-between ${vista === 'mese' ? 'flex-col items-start sm:flex-row sm:items-center' : 'items-center'}`}>
+                        <span className={`cifre font-semibold ${d === oggi ? 'rounded bg-marchio px-1.5 text-white' : ''}`}>
+                          {vista === 'settimana' ? (
+                            <>
+                              <span className="md:hidden">{NOMI_GIORNI[posizione]} </span>
+                              {formattaData(d).slice(0, 5)}
+                            </>
+                          ) : (
+                            Number(d.slice(8))
+                          )}
                         </span>
-                      ))
-                    : fasce.map((f) => (
-                        <span key={f.id} className="rounded border-l-4 bg-gray-50 px-1 py-0.5 text-gray-800" style={{ borderLeftColor: coloreFascia(f) }} title={f.note ?? undefined}>
-                          <span className="cifre block font-medium">
-                            {f.oraInizio}–{f.oraFine}
+                        {totale > 0 && <span className="cifre font-bold text-marchio">{formattaOre(totale)}</span>}
+                      </div>
+
+                      {/* Telefono, vista mese: solo pallini colorati (festività, assenze, progetti). */}
+                      {vista === 'mese' && (fest || assenze.length > 0 || perProgetto.size > 0) && (
+                        <div className="flex flex-wrap gap-0.5 sm:hidden" aria-hidden="true">
+                          {fest && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: COLORE_FESTIVITA.testo }} />}
+                          {assenze.map((x) => (
+                            <span key={x.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: COLORI_ASSENZA[x.tipo].bordo }} />
+                          ))}
+                          {[...perProgetto.values()].map(({ f }) => (
+                            <span key={f.progettoId} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: coloreFascia(f) }} />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Etichette per esteso: sempre nella settimana, nel mese da 640px. */}
+                      <div className={`min-w-0 gap-0.5 ${vista === 'mese' ? 'hidden flex-col sm:flex' : 'flex flex-wrap md:flex-col'}`}>
+                        {fest && (
+                          <span className="truncate rounded px-1" style={{ backgroundColor: COLORE_FESTIVITA.sfondo, color: COLORE_FESTIVITA.testo }} title={fest.descrizione}>
+                            {fest.descrizione}
                           </span>
-                          <span className="block truncate">{f.progetto.codice}{!dipendenteId && ` · ${breve(f.dipendente)}`}</span>
-                        </span>
-                      ))}
-                </button>
-              );
-            })}
+                        )}
+                        {assenze.map((x) => (
+                          <span
+                            key={x.id}
+                            className="truncate rounded border px-1"
+                            title={testoAssenza(x, true)}
+                            style={{
+                              backgroundColor: COLORI_ASSENZA[x.tipo].sfondo,
+                              color: COLORI_ASSENZA[x.tipo].testo,
+                              borderColor: COLORI_ASSENZA[x.tipo].bordo,
+                              borderStyle: x.stato === 'RICHIESTA' ? 'dashed' : 'solid',
+                            }}
+                          >
+                            {testoAssenza(x, !dipendenteId)}
+                          </span>
+                        ))}
+                        {vista === 'mese'
+                          ? [...perProgetto.values()].map(({ minuti, f }) => (
+                              <span key={f.progettoId} className="flex items-center justify-between gap-1 truncate rounded px-1 text-white" style={{ backgroundColor: coloreFascia(f) }} title={`${f.progetto.codice} ${f.progetto.nome}${f.progetto.maxMinutiGiorno != null ? ` — massimo ${formattaOre(f.progetto.maxMinutiGiorno)} ore al giorno per dipendente` : ''}`}>
+                                <span className="truncate">{f.progetto.codice}</span>
+                                <span className="cifre">
+                                  {formattaOre(minuti)}
+                                  {/* Ore massime del progetto: si vede solo con un dipendente scelto (il limite è per persona) */}
+                                  {f.progetto.maxMinutiGiorno != null && dipendenteId && <span className="opacity-70">/{formattaOre(f.progetto.maxMinutiGiorno)}</span>}
+                                </span>
+                              </span>
+                            ))
+                          : fasce.map((f) => (
+                              <span key={f.id} className="min-w-0 rounded border-l-4 bg-gray-50 px-1 py-0.5 text-gray-800" style={{ borderLeftColor: coloreFascia(f) }} title={f.note ?? undefined}>
+                                <span className="cifre block font-medium">
+                                  {f.oraInizio}–{f.oraFine}
+                                </span>
+                                <span className="block truncate">{f.progetto.codice}{!dipendenteId && ` · ${breve(f.dipendente)}`}</span>
+                              </span>
+                            ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           {/* Totali del periodo e legenda dei colori */}
@@ -315,7 +358,11 @@ export function Calendario() {
   );
 }
 
-/** Riepilogo di un giorno con tutti i dipendenti (vista HR "Tutti"). */
+/**
+ * Riepilogo di un giorno con tutti i dipendenti (vista HR "Tutti").
+ * Una riga flex per dipendente: nome, ore e "Modifica" in alto, le fasce sotto (sul
+ * telefono) o in mezzo (da 640px), così la finestra si legge anche su uno schermo stretto.
+ */
 function RiepilogoGiorno({
   data, fasce, assenze, festivita, dipendenti, onChiudi, onModifica,
 }: {
@@ -325,49 +372,38 @@ function RiepilogoGiorno({
   return (
     <Modale titolo={`Giorno ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-2xl">
       {festivita && <Avviso tipo="attenzione" className="mb-3">Festività: {festivita.descrizione}</Avviso>}
-      <table className="cifre w-full text-sm">
-        <thead className="text-xs uppercase text-gray-500">
-          <tr>
-            <th className="py-1 text-left">Dipendente</th>
-            <th className="py-1 text-left">Fasce</th>
-            <th className="py-1 text-right">Ore</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {dipendenti.map((d) => {
-            const sue = fasce.filter((f) => f.dipendenteId === d.id);
-            const sueAssenze = assenze.filter((x) => x.dipendenteId === d.id);
-            return (
-              <tr key={d.id} className="border-t border-gray-100 align-top">
-                <td className="py-1.5 font-medium">
-                  {d.cognome} {d.nome}
-                </td>
-                <td className="py-1.5">
-                  {sue.map((f) => (
-                    <div key={f.id} className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: coloreFascia(f) }} />
-                      {f.oraInizio}–{f.oraFine} {f.progetto.codice}
-                    </div>
-                  ))}
-                  {sueAssenze.map((x) => (
-                    <div key={x.id} style={{ color: COLORI_ASSENZA[x.tipo].testo }}>
-                      {testoAssenza(x, false)}
-                    </div>
-                  ))}
-                  {sue.length === 0 && sueAssenze.length === 0 && <span className="text-gray-400">—</span>}
-                </td>
-                <td className="py-1.5 text-right font-semibold">{formattaOre(sue.reduce((s, f) => s + f.minuti, 0))}</td>
-                <td className="py-1.5 pl-2 text-right">
-                  <Pulsante variante="leggero" onClick={() => onModifica(d)}>
-                    Modifica
-                  </Pulsante>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <ul className="cifre divide-y divide-gray-100 text-sm">
+        {dipendenti.map((d) => {
+          const sue = fasce.filter((f) => f.dipendenteId === d.id);
+          const sueAssenze = assenze.filter((x) => x.dipendenteId === d.id);
+          return (
+            <li key={d.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
+              <span className="min-w-0 flex-1 font-medium sm:flex-[0_0_12rem]">
+                {d.cognome} {d.nome}
+              </span>
+              {/* Fasce: sul telefono vanno a capo sotto il nome (order), da 640px stanno in mezzo. */}
+              <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-0">
+                {sue.map((f) => (
+                  <div key={f.id} className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: coloreFascia(f) }} />
+                    {f.oraInizio}–{f.oraFine} {f.progetto.codice}
+                  </div>
+                ))}
+                {sueAssenze.map((x) => (
+                  <div key={x.id} style={{ color: COLORI_ASSENZA[x.tipo].testo }}>
+                    {testoAssenza(x, false)}
+                  </div>
+                ))}
+                {sue.length === 0 && sueAssenze.length === 0 && <span className="text-gray-400">—</span>}
+              </div>
+              <span className="w-12 text-right font-semibold">{formattaOre(sue.reduce((s, f) => s + f.minuti, 0))}</span>
+              <Pulsante variante="leggero" className="!px-2 !py-0.5" onClick={() => onModifica(d)}>
+                Modifica
+              </Pulsante>
+            </li>
+          );
+        })}
+      </ul>
     </Modale>
   );
 }

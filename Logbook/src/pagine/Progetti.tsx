@@ -159,7 +159,8 @@ function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto 
     <Modale titolo={progetto ? `Progetto ${progetto.codice}` : 'Nuovo progetto'} aperta onChiudi={onChiudi}>
       <form onSubmit={salva} className="space-y-3" noValidate>
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* Campi in righe flex che vanno a capo (24/11/2026): affiancati nella finestra, uno sotto l'altro sul telefono. */}
+        <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_10rem]">
           <Campo etichetta="Codice" obbligatorio errore={errori.codice}>
             <input className={`${classiInput(errori.codice)} uppercase`} {...campo('codice')} />
           </Campo>
@@ -176,7 +177,7 @@ function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto 
         <Campo etichetta="Nome" obbligatorio errore={errori.nome}>
           <input className={classiInput(errori.nome)} {...campo('nome')} />
         </Campo>
-        <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
+        <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*:first-child]:flex-[2_1_14rem] [&>*:last-child]:flex-[1_1_10rem]">
           <Campo etichetta="Cliente" errore={errori.cliente}>
             <input className={classiInput(errori.cliente)} {...campo('cliente')} />
           </Campo>
@@ -184,7 +185,7 @@ function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto 
             <input inputMode="decimal" placeholder="es. 8" className={`${classiInput(errori.maxMinutiGiorno)} text-right`} {...campo('maxOre')} />
           </Campo>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_9rem]">
           <Campo etichetta="Data inizio" obbligatorio errore={errori.dataInizio}>
             <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataInizio)} {...campo('dataInizio')} />
           </Campo>

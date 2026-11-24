@@ -6,6 +6,11 @@
  * Lavora sui dati già caricati nel browser: per le anagrafiche di un'azienda (decine o
  * centinaia di righe) è immediato e non richiede altre API. Ogni colonna dice come
  * mostrarsi (`render`) e su quale valore ordinare (`valore`).
+ *
+ * Sul telefono (sotto i 640px) la tabella diventa un elenco di schede: la colonna
+ * `principale` (o la prima) fa da titolo, le altre seguono come "etichetta: valore" e vanno a capo da sole
+ * (flexbox). L'ordinamento si sceglie da un menu, perché non ci sono intestazioni da
+ * cliccare. Da 640px in su resta la tabella classica, larga quanto lo spazio disponibile.
  */
 import { useMemo, useState, type ReactNode } from 'react';
 
@@ -17,6 +22,8 @@ export type Colonna<T> = {
   render?: (riga: T) => ReactNode;
   allinea?: 'destra' | 'centro';
   classe?: string;
+  /** Titolo della scheda sul telefono (es. il nome del dipendente). Assente = la prima colonna. */
+  principale?: boolean;
 };
 
 const normalizza = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -84,31 +91,81 @@ export function Tabella<T>({
   };
 
   const allineamento = (c: Colonna<T>) => (c.allinea === 'destra' ? 'text-right' : c.allinea === 'centro' ? 'text-center' : 'text-left');
+  const ordinabili = colonne.filter((c) => c.valore);
+  const titolo = colonne.find((c) => c.principale) ?? colonne[0];
+  const dettagli = colonne.filter((c) => c !== titolo);
+  const contenuto = (c: Colonna<T>, r: T) => (c.render ? c.render(r) : (c.valore?.(r) ?? ''));
+  const nessuna = ricerca ? 'Nessun risultato per la ricerca' : vuoto;
 
   return (
     <div>
-      {(testoRicerca || strumenti) && (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {testoRicerca && (
-            <input
-              type="search"
-              placeholder="Cerca…"
-              aria-label="Cerca nella tabella"
-              value={ricerca}
-              onChange={(e) => {
-                setRicerca(e.target.value);
-                setPagina(0);
-              }}
-              className="w-64 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-marchio focus:outline-none"
-            />
-          )}
-          {strumenti}
-          <span className="ml-auto text-xs text-gray-500">
-            {filtrate.length} {filtrate.length === 1 ? 'elemento' : 'elementi'}
-          </span>
-        </div>
-      )}
-      <div className="overflow-x-auto scheda">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        {testoRicerca && (
+          <input
+            type="search"
+            placeholder="Cerca…"
+            aria-label="Cerca nella tabella"
+            value={ricerca}
+            onChange={(e) => {
+              setRicerca(e.target.value);
+              setPagina(0);
+            }}
+            className="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-marchio focus:outline-none sm:w-64"
+          />
+        )}
+        {strumenti}
+        {/* Solo sul telefono: le intestazioni non ci sono, l'ordinamento si sceglie qui. */}
+        {ordinabili.length > 0 && (
+          <select
+            aria-label="Ordina per"
+            className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm sm:hidden"
+            value={ordine ? `${ordine.chiave}:${ordine.verso}` : ''}
+            onChange={(e) => {
+              const [chiave, verso] = e.target.value.split(':');
+              setOrdine(chiave ? { chiave, verso: Number(verso) as 1 | -1 } : null);
+            }}
+          >
+            <option value="">Ordine: come arriva</option>
+            {ordinabili.flatMap((c) => [
+              <option key={`${c.chiave}:1`} value={`${c.chiave}:1`}>
+                {c.titolo} ▲
+              </option>,
+              <option key={`${c.chiave}:-1`} value={`${c.chiave}:-1`}>
+                {c.titolo} ▼
+              </option>,
+            ])}
+          </select>
+        )}
+        <span className="ml-auto text-xs text-gray-500">
+          {filtrate.length} {filtrate.length === 1 ? 'elemento' : 'elementi'}
+        </span>
+      </div>
+
+      {/* Telefono: una scheda per riga. */}
+      <ul className="space-y-2 sm:hidden">
+        {visibili.map((r) => (
+          <li
+            key={chiaveRiga(r)}
+            data-scheda-riga
+            className={`scheda px-3 py-2 text-sm ${onRiga ? 'cursor-pointer active:bg-ghiaccio' : ''}`}
+            onClick={onRiga ? () => onRiga(r) : undefined}
+          >
+            {titolo && <div className="font-semibold text-testo-forte">{contenuto(titolo, r)}</div>}
+            <dl className="cifre mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {dettagli.map((c) => (
+                <div key={c.chiave} className="flex min-w-0 max-w-full items-baseline gap-1.5">
+                  <dt className="shrink-0 font-ui text-[0.68rem] font-semibold uppercase tracking-[0.03em] text-gray-500">{c.titolo}</dt>
+                  <dd className="min-w-0 break-words">{contenuto(c, r)}</dd>
+                </div>
+              ))}
+            </dl>
+          </li>
+        ))}
+        {visibili.length === 0 && <li className="scheda px-3 py-6 text-center text-sm text-gray-500">{nessuna}</li>}
+      </ul>
+
+      {/* Da 640px: tabella classica. */}
+      <div className="hidden overflow-x-auto scheda sm:block">
         <table className="cifre w-full text-sm">
           <thead className="intestazione-tabella">
             <tr>
@@ -135,7 +192,7 @@ export function Tabella<T>({
               >
                 {colonne.map((c) => (
                   <td key={c.chiave} className={`px-3 py-1.5 ${allineamento(c)} ${c.classe ?? ''}`}>
-                    {c.render ? c.render(r) : (c.valore?.(r) ?? '')}
+                    {contenuto(c, r)}
                   </td>
                 ))}
               </tr>
@@ -143,7 +200,7 @@ export function Tabella<T>({
             {visibili.length === 0 && (
               <tr>
                 <td colSpan={colonne.length} className="px-3 py-6 text-center text-gray-500">
-                  {ricerca ? 'Nessun risultato per la ricerca' : vuoto}
+                  {nessuna}
                 </td>
               </tr>
             )}
@@ -151,7 +208,7 @@ export function Tabella<T>({
         </table>
       </div>
       {pagine > 1 && (
-        <div className="mt-2 flex items-center justify-end gap-2 text-sm">
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-sm">
           <button type="button" className="rounded border border-gray-300 bg-white px-2 py-1 disabled:opacity-40" disabled={paginaVera === 0} onClick={() => setPagina(paginaVera - 1)}>
             ‹ Precedente
           </button>

@@ -7,7 +7,8 @@ progetti, e gestisce **ferie, permessi, malattia e festività**. HR può anche i
 da Excel ed estrarre i report.
 
 Si apre dal browser all'indirizzo che vi ha dato l'ufficio (sul PC: **http://127.0.0.1:5210**)
-oppure dalla card **Logbook** del Portale della suite.
+oppure dalla card **Logbook** del Portale della suite. Funziona anche dal **cellulare** e
+sfrutta tutta la larghezza degli schermi **ultra wide** (vedi il capitolo 4).
 
 ---
 
@@ -205,6 +206,46 @@ sono indicate senza costo.
 
 ![Estratto: giorni e costi](img/16-estratto-giorni-costi.png)
 
-- **⤓ Excel** scarica la versione scelta (un foglio per dipendente).
-- **🖶 Stampa / PDF** apre la stampa del browser: scegliete "Salva come PDF" (orientamento
+- **Excel** scarica la versione scelta (un foglio per dipendente).
+- **Stampa / PDF** apre la stampa del browser: scegliete "Salva come PDF" (orientamento
   orizzontale). In stampa spariscono menu e comandi e ogni dipendente va su una pagina.
+
+---
+
+## 4. Dal cellulare e sugli schermi grandi
+
+Logbook si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
+aprire lo stesso indirizzo dal browser del telefono.
+
+**Sul cellulare**
+
+- Il menu si apre col pulsante **☰ Logbook** in alto a sinistra.
+- Nel **calendario del mese** ogni giorno mostra il numero, le ore totali e un **pallino
+  colorato** per ogni progetto, ferie, permesso, malattia o festività. Toccate il giorno per
+  vedere e modificare il dettaglio.
+- La **settimana** diventa un elenco di giorni, uno sotto l'altro.
+
+![Calendario dal cellulare](img/17-telefono-calendario.png)
+
+- Nel **dettaglio della giornata** ogni fascia è un riquadro con progetto, orari e note uno
+  sotto l'altro; le regole sono le stesse del computer (sovrapposizioni e ore massime
+  bloccano il salvataggio).
+
+![Ore del giorno dal cellulare](img/18-telefono-giornata.png)
+
+- Gli **elenchi** (dipendenti, progetti, assenze, festività) diventano schede: il nome in
+  alto e gli altri dati sotto. Per l'ordine si usa il menu accanto alla ricerca.
+
+![Elenco dipendenti dal cellulare](img/19-telefono-dipendenti.png)
+
+- Le tabelle molto larghe (anteprima dell'import, estratto "giorni e costi") scorrono in
+  orizzontale dentro il loro riquadro: si sposta il dito sulla tabella.
+
+**Sugli schermi grandi e ultra wide**
+
+La pagina usa tutta la larghezza e affianca i riquadri finché c'è spazio: la dashboard mette
+i pannelli uno accanto all'altro, la scheda del dipendente affianca anagrafica, contratto e
+costi, gli estratti mensili mostrano due o tre dipendenti per riga. La stampa non cambia:
+sempre un dipendente per pagina A4.
+
+![Dashboard su uno schermo ultra wide (3440 px)](img/20-ultra-wide-dashboard.png)

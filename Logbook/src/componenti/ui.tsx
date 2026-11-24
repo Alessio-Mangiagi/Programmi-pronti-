@@ -99,10 +99,10 @@ export function Caricamento({ testo = 'Caricamento…' }: { testo?: string }) {
 /** Titolo della pagina con sopratitolo facoltativo e azioni a destra. */
 export function IntestazionePagina({ titolo, sottotitolo, sopratitolo, azioni }: { titolo: string; sottotitolo?: string; sopratitolo?: string; azioni?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-bordo pb-3">
-      <div>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-bordo pb-3 sm:mb-5">
+      <div className="min-w-0">
         {sopratitolo && <div className="sopratitolo mb-0.5">{sopratitolo}</div>}
-        <h1 className="font-display text-[1.65rem] font-normal leading-tight tracking-[-0.01em] text-testo-forte">{titolo}</h1>
+        <h1 className="font-display text-[1.4rem] font-normal leading-tight tracking-[-0.01em] text-testo-forte sm:text-[1.65rem]">{titolo}</h1>
         {sottotitolo && <p className="mt-0.5 text-sm text-gray-500">{sottotitolo}</p>}
       </div>
       {azioni && <div className="flex flex-wrap items-center gap-2">{azioni}</div>}
@@ -110,7 +110,11 @@ export function IntestazionePagina({ titolo, sottotitolo, sopratitolo, azioni }:
   );
 }
 
-/** Finestra modale; Esc o clic sullo sfondo la chiudono. */
+/**
+ * Finestra modale; Esc o clic sullo sfondo la chiudono.
+ * Sul telefono occupa quasi tutto lo schermo (margini di 8px) e scorre in verticale;
+ * da 640px in su è una finestra centrata larga al massimo `larghezza`.
+ */
 export function Modale({
   titolo,
   aperta,
@@ -132,15 +136,15 @@ export function Modale({
   }, [aperta, onChiudi]);
   if (!aperta) return null;
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[#212326]/45 p-4 pt-16" onMouseDown={onChiudi}>
-      <div role="dialog" aria-modal="true" aria-label={titolo} className={`scheda w-full ${larghezza} shadow-[0_12px_40px_rgba(12,69,119,0.18)]`} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-bordo px-5 py-3">
-          <h2 className="font-display text-lg font-medium text-testo-forte">{titolo}</h2>
-          <button type="button" onClick={onChiudi} className="rounded p-1 text-gray-500 transition-colors hover:bg-fondo-alt hover:text-testo-forte" aria-label="Chiudi">
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[#212326]/45 p-2 sm:p-4 sm:pt-16" onMouseDown={onChiudi}>
+      <div role="dialog" aria-modal="true" aria-label={titolo} className={`scheda w-full min-w-0 ${larghezza} shadow-[0_12px_40px_rgba(12,69,119,0.18)]`} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2 border-b border-bordo px-4 py-3 sm:px-5">
+          <h2 className="min-w-0 font-display text-lg font-medium text-testo-forte">{titolo}</h2>
+          <button type="button" onClick={onChiudi} className="shrink-0 rounded p-1 text-gray-500 transition-colors hover:bg-fondo-alt hover:text-testo-forte" aria-label="Chiudi">
             <Icona nome="chiudi" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>
   );

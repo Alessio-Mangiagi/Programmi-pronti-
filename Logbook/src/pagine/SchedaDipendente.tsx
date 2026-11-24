@@ -141,76 +141,89 @@ export function SchedaDipendente() {
       />
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
 
-      <form onSubmit={salva} className="scheda p-4" noValidate>
-        <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Anagrafica</h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Campo etichetta="Matricola" obbligatorio errore={err('matricola')}>
-            <input className={classiInput(err('matricola'))} {...campo('matricola')} />
-          </Campo>
-          <Campo etichetta="Nome" obbligatorio errore={err('nome')}>
-            <input className={classiInput(err('nome'))} {...campo('nome')} />
-          </Campo>
-          <Campo etichetta="Cognome" obbligatorio errore={err('cognome')}>
-            <input className={classiInput(err('cognome'))} {...campo('cognome')} />
-          </Campo>
-          <Campo etichetta="Codice fiscale" obbligatorio errore={err('codiceFiscale')}>
-            <input className={`${classiInput(err('codiceFiscale'))} font-mono uppercase`} maxLength={16} {...campo('codiceFiscale')} />
-          </Campo>
-          <Campo etichetta="Email" errore={err('email')}>
-            <input type="email" className={classiInput(err('email'))} {...campo('email')} />
-          </Campo>
-          <Campo etichetta="Telefono" errore={err('telefono')}>
-            <input className={classiInput(err('telefono'))} {...campo('telefono')} />
-          </Campo>
+      {/*
+        Layout in flexbox (24/11/2026): le tre sezioni (anagrafica, contratto, costi) partono
+        da 24rem e si affiancano quando c'è spazio (tutte e tre su un ultra wide); dentro
+        ogni sezione i campi partono da 12rem e vanno a capo da soli (uno per riga sul telefono).
+      */}
+      <form onSubmit={salva} className="scheda p-3 sm:p-4" noValidate>
+        <div className="flex flex-wrap gap-x-6 gap-y-5">
+          <section className="min-w-0 flex-[1_1_24rem]">
+            <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Anagrafica</h2>
+            <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
+              <Campo etichetta="Matricola" obbligatorio errore={err('matricola')}>
+                <input className={classiInput(err('matricola'))} {...campo('matricola')} />
+              </Campo>
+              <Campo etichetta="Nome" obbligatorio errore={err('nome')}>
+                <input className={classiInput(err('nome'))} {...campo('nome')} />
+              </Campo>
+              <Campo etichetta="Cognome" obbligatorio errore={err('cognome')}>
+                <input className={classiInput(err('cognome'))} {...campo('cognome')} />
+              </Campo>
+              <Campo etichetta="Codice fiscale" obbligatorio errore={err('codiceFiscale')}>
+                <input className={`${classiInput(err('codiceFiscale'))} font-mono uppercase`} maxLength={16} {...campo('codiceFiscale')} />
+              </Campo>
+              <Campo etichetta="Email" errore={err('email')}>
+                <input type="email" className={classiInput(err('email'))} {...campo('email')} />
+              </Campo>
+              <Campo etichetta="Telefono" errore={err('telefono')}>
+                <input className={classiInput(err('telefono'))} {...campo('telefono')} />
+              </Campo>
+            </div>
+          </section>
+
+          <section className="min-w-0 flex-[1_1_24rem]">
+            <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Contratto</h2>
+            <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
+              <Campo etichetta="Mansione" errore={err('mansione')}>
+                <input className={classiInput(err('mansione'))} {...campo('mansione')} />
+              </Campo>
+              <Campo etichetta="Reparto" errore={err('reparto')}>
+                <input className={classiInput(err('reparto'))} {...campo('reparto')} />
+              </Campo>
+              <Campo etichetta="Tipo contratto" obbligatorio errore={err('tipoContratto')}>
+                <select className={classiInput(err('tipoContratto'))} {...campo('tipoContratto')}>
+                  {TIPI_CONTRATTO.map((t) => (
+                    <option key={t} value={t}>
+                      {ETICHETTE_CONTRATTO[t]}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo etichetta="Data assunzione" obbligatorio errore={err('dataAssunzione')}>
+                <input type="date" min={DATA_MINIMA} className={classiInput(err('dataAssunzione'))} {...campo('dataAssunzione')} />
+              </Campo>
+              <Campo etichetta="Ore contrattuali settimanali" obbligatorio errore={err('oreSettimanali')}>
+                <input type="number" min={1} max={60} step={0.5} className={classiInput(err('oreSettimanali'))} {...campo('oreSettimanali')} />
+              </Campo>
+              <Campo etichetta="Stato" errore={err('stato')}>
+                <select className={classiInput(err('stato'))} {...campo('stato')}>
+                  <option value="ATTIVO">Attivo</option>
+                  <option value="CESSATO">Cessato</option>
+                </select>
+              </Campo>
+              {modulo.stato === 'CESSATO' && (
+                <Campo etichetta="Data cessazione" obbligatorio errore={err('dataCessazione')}>
+                  <input type="date" min={DATA_MINIMA} className={classiInput(err('dataCessazione'))} {...campo('dataCessazione')} />
+                </Campo>
+              )}
+            </div>
+          </section>
+
+          <section className="min-w-0 flex-[1_1_24rem]">
+            <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Costi (riservati a HR)</h2>
+            <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
+              <Campo etichetta="Costo orario netto (€)" errore={err('costoOrarioNettoCent')} aiuto="Es. 14,50">
+                <input inputMode="decimal" className={`${classiInput(err('costoOrarioNettoCent'))} text-right`} {...campo('costoNetto')} />
+              </Campo>
+              <Campo etichetta="Costo orario lordo (€)" errore={err('costoOrarioLordoCent')} aiuto="Costo aziendale, es. 27,80">
+                <input inputMode="decimal" className={`${classiInput(err('costoOrarioLordoCent'))} text-right`} {...campo('costoLordo')} />
+              </Campo>
+            </div>
+          </section>
         </div>
 
-        <h2 className="mb-3 mt-5 text-sm font-semibold uppercase text-gray-500">Contratto</h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Campo etichetta="Mansione" errore={err('mansione')}>
-            <input className={classiInput(err('mansione'))} {...campo('mansione')} />
-          </Campo>
-          <Campo etichetta="Reparto" errore={err('reparto')}>
-            <input className={classiInput(err('reparto'))} {...campo('reparto')} />
-          </Campo>
-          <Campo etichetta="Tipo contratto" obbligatorio errore={err('tipoContratto')}>
-            <select className={classiInput(err('tipoContratto'))} {...campo('tipoContratto')}>
-              {TIPI_CONTRATTO.map((t) => (
-                <option key={t} value={t}>
-                  {ETICHETTE_CONTRATTO[t]}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo etichetta="Data assunzione" obbligatorio errore={err('dataAssunzione')}>
-            <input type="date" min={DATA_MINIMA} className={classiInput(err('dataAssunzione'))} {...campo('dataAssunzione')} />
-          </Campo>
-          <Campo etichetta="Ore contrattuali settimanali" obbligatorio errore={err('oreSettimanali')}>
-            <input type="number" min={1} max={60} step={0.5} className={classiInput(err('oreSettimanali'))} {...campo('oreSettimanali')} />
-          </Campo>
-          <Campo etichetta="Stato" errore={err('stato')}>
-            <select className={classiInput(err('stato'))} {...campo('stato')}>
-              <option value="ATTIVO">Attivo</option>
-              <option value="CESSATO">Cessato</option>
-            </select>
-          </Campo>
-          {modulo.stato === 'CESSATO' && (
-            <Campo etichetta="Data cessazione" obbligatorio errore={err('dataCessazione')}>
-              <input type="date" min={DATA_MINIMA} className={classiInput(err('dataCessazione'))} {...campo('dataCessazione')} />
-            </Campo>
-          )}
-        </div>
-
-        <h2 className="mb-3 mt-5 text-sm font-semibold uppercase text-gray-500">Costi (riservati a HR)</h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Campo etichetta="Costo orario netto (€)" errore={err('costoOrarioNettoCent')} aiuto="Es. 14,50">
-            <input inputMode="decimal" className={`${classiInput(err('costoOrarioNettoCent'))} text-right`} {...campo('costoNetto')} />
-          </Campo>
-          <Campo etichetta="Costo orario lordo (€)" errore={err('costoOrarioLordoCent')} aiuto="Costo aziendale, es. 27,80">
-            <input inputMode="decimal" className={`${classiInput(err('costoOrarioLordoCent'))} text-right`} {...campo('costoLordo')} />
-          </Campo>
-        </div>
-
-        <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-3">
+        <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
           <Pulsante onClick={() => naviga('/dipendenti')}>Annulla</Pulsante>
           <Pulsante type="submit" variante="primario" disabled={invio}>
             {invio ? 'Salvataggio…' : nuovo ? 'Crea dipendente' : 'Salva modifiche'}
@@ -219,7 +232,7 @@ export function SchedaDipendente() {
       </form>
 
       {!nuovo && dipendente && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4 flex flex-wrap gap-4 [&>*]:min-w-0 [&>*]:flex-[1_1_26rem]">
           <BloccoAccount dipendente={dipendente} onAggiornato={(utente) => setDipendente({ ...dipendente, utente })} />
           <BloccoStato
             dipendente={dipendente}
@@ -266,7 +279,7 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Account di accesso</h2>
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
       {!esistente && <p className="mb-3 text-sm text-gray-600">Il dipendente non ha ancora un account per entrare in Logbook.</p>}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
         <Campo etichetta="Nome utente" obbligatorio errore={errori.username}>
           <input className={classiInput(errori.username)} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />
         </Campo>

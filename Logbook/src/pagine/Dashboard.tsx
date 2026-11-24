@@ -9,6 +9,10 @@
  * apre direttamente l'editor della giornata), le proprie richieste e assenze.
  *
  * Dati: GET /api/dashboard (server/rotte/dashboard.ts).
+ *
+ * Layout in flexbox con a capo automatico (24/11/2026): i quattro riquadri partono da
+ * 10rem (due per riga sul telefono, quattro su un monitor), i pannelli da 30rem (uno per
+ * riga sul telefono, due su un monitor, tutti affiancati su un ultra wide).
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -42,13 +46,15 @@ const periodo = (a: AssenzaBreve) =>
 /** Riquadro numerico in cima alla pagina; `allarme` lo colora quando c'è da intervenire. */
 function Tessera({ titolo, valore, dettaglio, allarme, a }: { titolo: string; valore: string; dettaglio?: string; allarme?: boolean; a?: string }) {
   const corpo = (
-    <div className={`scheda h-full border-t-[3px] px-4 py-3 ${allarme ? '!border-t-[#e9c46a] !bg-[#fdf8eb]' : '!border-t-marchio'} ${a ? 'scheda-attiva' : ''}`}>
+    <div className={`scheda h-full border-t-[3px] px-3 py-3 sm:px-4 ${allarme ? '!border-t-[#e9c46a] !bg-[#fdf8eb]' : '!border-t-marchio'} ${a ? 'scheda-attiva' : ''}`}>
       <div className="sopratitolo !text-gray-500">{titolo}</div>
-      <div className={`cifre font-display text-[1.75rem] font-medium leading-tight ${allarme ? 'text-[#6b4a00]' : 'text-marchio'}`}>{valore}</div>
+      <div className={`cifre font-display text-[1.5rem] font-medium leading-tight sm:text-[1.75rem] ${allarme ? 'text-[#6b4a00]' : 'text-marchio'}`}>{valore}</div>
       {dettaglio && <div className="text-xs text-gray-500">{dettaglio}</div>}
     </div>
   );
-  return a ? <Link to={a}>{corpo}</Link> : corpo;
+  // Il riquadro è un figlio del contenitore flex: parte da 10rem e cresce fino a riempire la riga.
+  const classi = 'min-w-0 flex-[1_1_10rem]';
+  return a ? <Link to={a} className={classi}>{corpo}</Link> : <div className={classi}>{corpo}</div>;
 }
 
 /** Barra lavorato/atteso: verde fino al 100%, la parte oltre resta piena. */
@@ -56,7 +62,7 @@ function Barra({ lavorati, attesi }: { lavorati: number; attesi: number }) {
   const percentuale = attesi ? Math.round((lavorati / attesi) * 100) : 0;
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 w-28 overflow-hidden rounded bg-gray-200">
+      <div className="h-2 w-16 overflow-hidden rounded bg-gray-200 sm:w-28 4xl:w-48">
         <div className={`h-full ${percentuale >= 95 ? 'bg-marchio-verde' : percentuale >= 75 ? 'bg-[#e9c46a]' : 'bg-[#e07a6e]'}`} style={{ width: `${Math.min(100, percentuale)}%` }} />
       </div>
       <span className="cifre w-10 text-right text-xs text-gray-600">{attesi ? `${percentuale}%` : '—'}</span>
@@ -66,8 +72,8 @@ function Barra({ lavorati, attesi }: { lavorati: number; attesi: number }) {
 
 function Pannello({ titolo, azione, children }: { titolo: string; azione?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="scheda">
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
+    <section className="scheda min-w-0 flex-[1_1_30rem]">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-gray-100 px-4 py-2">
         <h2 className="font-display text-[0.98rem] font-medium text-marchio">{titolo}</h2>
         {azione}
       </div>
@@ -105,7 +111,7 @@ export function Dashboard() {
       />
 
       {/* Numeri principali */}
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-4 flex flex-wrap gap-3">
         <Tessera titolo={admin ? 'Ore del mese' : 'Le mie ore del mese'} valore={formattaOre(dati.totaleMinuti)} dettaglio={`attese a oggi ${formattaOre(dati.totaleAttesi)}`} a="/calendario" />
         <Tessera
           titolo={admin ? 'Richieste da approvare' : 'Richieste in attesa'}
@@ -123,7 +129,7 @@ export function Dashboard() {
         <Tessera titolo="Assenti oggi" valore={String(assentiOggi.length)} dettaglio={assentiOggi.map((a) => a.dipendente).join(', ') || 'nessuno'} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="flex flex-wrap gap-4">
         {/* Cose da fare */}
         {admin ? (
           <Pannello titolo="Richieste da approvare" azione={<Link className="text-sm text-marchio hover:underline" to="/assenze">Vai alle assenze →</Link>}>

@@ -79,7 +79,8 @@ export function Assenze() {
         }
       />
       {admin && (
-        <div className="mb-3 flex gap-1 border-b border-gray-200" role="tablist">
+        // Sul telefono le tre schede possono non starci: la barra scorre in orizzontale invece di sforare.
+        <div className="mb-3 flex gap-1 overflow-x-auto whitespace-nowrap border-b border-gray-200" role="tablist">
           {(
             [
               ['attesa', `Da approvare (${inAttesa.length})`],
@@ -269,7 +270,7 @@ function ModuloAssenza({
               ))}
             </div>
           </Campo>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_11rem]">
             <Campo etichetta={m.tipo === 'PERMESSO' ? 'Giorno' : 'Dal'} obbligatorio errore={errori.dataInizio}>
               <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataInizio)} value={m.dataInizio} onChange={(e) => imposta('dataInizio', e.target.value)} />
             </Campo>
@@ -430,7 +431,7 @@ function GestioneFestivita() {
         <Campo etichetta="Data" errore={errori.data}>
           <input type="date" min={DATA_MINIMA} className={classiInput(errori.data)} value={nuova.data} onChange={(e) => setNuova({ ...nuova, data: e.target.value })} />
         </Campo>
-        <Campo etichetta="Descrizione" errore={errori.descrizione} className="min-w-64 flex-1">
+        <Campo etichetta="Descrizione" errore={errori.descrizione} className="min-w-0 flex-[1_1_14rem]">
           <input className={classiInput(errori.descrizione)} placeholder="Es. Santo patrono" value={nuova.descrizione} onChange={(e) => setNuova({ ...nuova, descrizione: e.target.value })} />
         </Campo>
         <Campo etichetta="Tipo" errore={errori.tipo}>

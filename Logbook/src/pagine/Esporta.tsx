@@ -6,6 +6,9 @@
  * - Ore per progetto: progetti lavorati da ogni dipendente, con costo lordo e riepilogo.
  *
  * API: POST /api/esporta/riepilogo | /calendario | /progetti (server/rotte/esporta.ts).
+ *
+ * Layout in flexbox (24/11/2026): le caselle di dipendenti e progetti e i due report
+ * partono da 20rem e si affiancano quando c'è spazio, uno sotto l'altro sul telefono.
  */
 import { useEffect, useState } from 'react';
 import { DATA_MINIMA, aggiungiGiorni, dataIso, formattaData, giorniNelMese, oggiIso } from '../../comune/date';
@@ -125,7 +128,7 @@ export function Esporta() {
         </div>
       </div>
 
-      <div className="mb-3 grid gap-3 md:grid-cols-2">
+      <div className="mb-3 flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_20rem]">
         <Selezione titolo="Dipendenti" elementi={dipendenti ?? []} scelti={dipendenteIds} setScelti={setDipendenteIds} etichetta={(d) => `${d.cognome} ${d.nome}${d.stato === 'CESSATO' ? ' (cessato)' : ''}`} />
         <Selezione titolo="Progetti" elementi={progetti ?? []} scelti={progettoIds} setScelti={setProgettoIds} etichetta={(p) => `${p.codice} · ${p.nome}`} />
       </div>
@@ -150,7 +153,7 @@ export function Esporta() {
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_20rem]">
         <div className="scheda p-4">
           <h2 className="font-semibold text-marchio">Calendario lavorato</h2>
           <p className="mb-3 text-sm text-gray-600">Un foglio per dipendente: anagrafica, ogni giorno con fasce, progetto, ore, assenze e festività, totali del periodo e ore contrattuali attese.</p>
