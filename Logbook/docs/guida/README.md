@@ -368,12 +368,15 @@ progetti (nessuna spunta = tutti). Il riepilogo mostra subito le ore totali, le 
 calendario. Poi:
 
 - **Calendario lavorato**: un foglio per dipendente con anagrafica, ogni giorno del
-  periodo (fasce, progetto, ore, assenze, festività), totali, ore contrattuali attese,
+  periodo da lunedì a venerdì (fasce, progetto, ore, assenze, festività), totali, ore contrattuali attese,
   giorni di ferie e malattia, ore di permesso.
 - **Ore per progetto**: per ogni dipendente i progetti lavorati con ore e **costo lordo**,
   il totale complessivo e un foglio riassuntivo dipendenti × progetti.
 
 Le ore nei file Excel sono in formato ore:minuti (es. 7:30) e si possono sommare.
+
+**Sabato e domenica non compaiono mai** nelle estrazioni (report, estratti mensili, Excel,
+stampa e PDF): nel fine settimana non si registrano ore.
 
 ### Estratti mensili (Excel, stampa e PDF)
 
@@ -381,7 +384,7 @@ In fondo alla pagina **Esporta**: scegliete il **mese** (da gennaio 2020) e, se 
 dipendenti e i progetti nelle caselle in alto. Sotto compare l'anteprima, un dipendente per
 pagina, in due versioni:
 
-**Mese a calendario**: a sinistra il calendario del mese con le ore di ogni giorno e i
+**Mese a calendario**: a sinistra il calendario del mese, **da lunedì a venerdì**, con le ore di ogni giorno e i
 progetti (ferie in azzurro, malattia in rosso, permessi in giallo, festivi in grigio, festività in verde),
 a destra l'anagrafica e il riepilogo del mese (ore lavorate e attese, ferie, malattia,
 permessi, costo netto e lordo), in basso la descrizione dei progetti lavorati con le ore
@@ -389,7 +392,8 @@ massime al giorno e le ore del mese.
 
 ![Estratto: mese a calendario](img/15-estratto-mese-calendario.png)
 
-**Giorni e costi**: in testa tutti i dati del dipendente, poi una riga per ogni giorno con
+**Giorni e costi**: in testa tutti i dati del dipendente, poi una riga per ogni giorno da
+lunedì a venerdì con
 ore, progetti, fasce, assenze (ferie, malattia, permessi), festività, ore retribuite e
 **costo netto e lordo del giorno**. Ferie e malattia nei giorni lavorativi valgono le ore
 del contratto di quel giorno (ore settimanali / 5), i permessi la loro durata; le festività
