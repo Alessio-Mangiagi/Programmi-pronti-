@@ -38,29 +38,29 @@ enum Ruolo {
 /// collegamento al Portale della suite). Un account DIPENDENTE è legato a una sola
 /// scheda dipendente; un ADMIN può non averne.
 model Utente {
-  id            Int         @id @default(autoincrement())
-  username      String      @unique
+  id                  Int                 @id @default(autoincrement())
+  username            String              @unique
   /// Impronta della password (scrypt, mai la password in chiaro). Formato deciso al Giorno 2.
-  passwordHash  String
-  ruolo         Ruolo       @default(DIPENDENTE)
-  attivo        Boolean     @default(true)
-  dipendente    Dipendente? @relation(fields: [dipendenteId], references: [id])
-  dipendenteId  Int?        @unique
+  passwordHash        String
+  ruolo               Ruolo               @default(DIPENDENTE)
+  attivo              Boolean             @default(true)
+  dipendente          Dipendente?         @relation(fields: [dipendenteId], references: [id])
+  dipendenteId        Int?                @unique
   /// Richieste di assenza approvate o rifiutate da questo utente (HR).
-  assenzeDecise Assenza[]   @relation("DecisioneAssenza")
-  sessioni      Sessione[]
+  assenzeDecise       Assenza[]           @relation("DecisioneAssenza")
+  sessioni            Sessione[]
   /// File caricati da questo utente (attestati, documenti, documentazione dei progetti).
-  fileCaricati      FileCaricato[]      @relation("FileCaricati")
+  fileCaricati        FileCaricato[]      @relation("FileCaricati")
   /// Documentazione di progetto scritta da questo utente.
-  documentiProgetto DocumentoProgetto[] @relation("AutoreDocumentoProgetto")
+  documentiProgetto   DocumentoProgetto[] @relation("AutoreDocumentoProgetto")
   /// Documentazione di progetto segnata come "vista" da questo utente (HR).
-  documentiVisti    DocumentoProgetto[] @relation("VistoDocumentoProgetto")
+  documentiVisti      DocumentoProgetto[] @relation("VistoDocumentoProgetto")
   /// Note interne sui progetti scritte da questo utente (HR).
-  noteProgetto      NotaProgetto[]
+  noteProgetto        NotaProgetto[]
   /// Segnalazioni dei dipendenti chiuse da questo utente (HR).
-  segnalazioniRisolte Segnalazione[] @relation("SegnalazioniRisolte")
-  creatoIl      DateTime    @default(now())
-  aggiornatoIl  DateTime    @updatedAt
+  segnalazioniRisolte Segnalazione[]      @relation("SegnalazioniRisolte")
+  creatoIl            DateTime            @default(now())
+  aggiornatoIl        DateTime            @updatedAt
 }
 
 /// Sessione di accesso aperta col login (server/auth/sessioni.ts).
@@ -98,13 +98,13 @@ enum TipoContratto {
 
 /// Scheda anagrafica del dipendente.
 model Dipendente {
-  id                   Int                   @id @default(autoincrement())
+  id                   Int                    @id @default(autoincrement())
   /// Matricola aziendale, unica.
-  matricola            String                @unique
+  matricola            String                 @unique
   nome                 String
   cognome              String
   /// Codice fiscale in maiuscolo, validato (comune/codiceFiscale.ts) prima del salvataggio.
-  codiceFiscale        String                @unique
+  codiceFiscale        String                 @unique
   email                String?
   telefono             String?
   mansione             String?
@@ -120,7 +120,7 @@ model Dipendente {
   costoOrarioNettoCent Int?
   /// Costo orario lordo (costo aziendale) in centesimi di euro. Visibile solo a HR.
   costoOrarioLordoCent Int?
-  stato                StatoDipendente       @default(ATTIVO)
+  stato                StatoDipendente        @default(ATTIVO)
   utente               Utente?
   registrazioni        RegistrazioneOraria[]
   assenze              Assenza[]
@@ -130,8 +130,8 @@ model Dipendente {
   assegnazioni         AssegnazioneProgetto[]
   /// Segnalazioni del dipendente a HR sulle proprie giornate.
   segnalazioni         Segnalazione[]
-  creatoIl             DateTime              @default(now())
-  aggiornatoIl         DateTime              @updatedAt
+  creatoIl             DateTime               @default(now())
+  aggiornatoIl         DateTime               @updatedAt
 
   @@index([cognome, nome])
 }
@@ -144,34 +144,34 @@ enum StatoProgetto {
 
 /// Progetto (o commessa) su cui si registrano le ore.
 model Progetto {
-  id            Int                   @id @default(autoincrement())
+  id               Int                    @id @default(autoincrement())
   /// Codice progetto, unico (es. "PRG-001").
-  codice        String                @unique
-  nome          String
-  cliente       String?
+  codice           String                 @unique
+  nome             String
+  cliente          String?
   /// "AAAA-MM-GG"
-  dataInizio    String
+  dataInizio       String
   /// "AAAA-MM-GG", vuota se il progetto non ha una fine prevista.
-  dataFine      String?
-  stato         StatoProgetto         @default(ATTIVO)
+  dataFine         String?
+  stato            StatoProgetto          @default(ATTIVO)
   /// Colore del progetto nel calendario ("#RRGGBB"); se vuoto il frontend ne sceglie uno.
-  colore        String?
+  colore           String?
   /// Ore massime che UN dipendente può registrare su questo progetto in UN giorno, in
   /// minuti (richiesta del 23/11/2026, risposta 2b: oltre il limite il salvataggio è
   /// bloccato). Vuoto = nessun limite.
-  maxMinutiGiorno Int?
+  maxMinutiGiorno  Int?
   /// Descrizione libera del progetto (scheda "Dati", dal 24/11/2026).
-  descrizione   String?
+  descrizione      String?
   /// Codice della commessa di SkyTower in cui inviare la documentazione (pulsante "Invia a
   /// SkyTower", visibile solo se in Impostazioni c'è il collegamento). Vuoto = non si invia.
   commessaSkytower String?
-  registrazioni RegistrazioneOraria[]
-  documenti     DocumentoProgetto[]
-  note          NotaProgetto[]
+  registrazioni    RegistrazioneOraria[]
+  documenti        DocumentoProgetto[]
+  note             NotaProgetto[]
   /// Dipendenti assegnati (sezione "Dipendenti" della pagina del progetto).
-  assegnazioni  AssegnazioneProgetto[]
-  creatoIl      DateTime              @default(now())
-  aggiornatoIl  DateTime              @updatedAt
+  assegnazioni     AssegnazioneProgetto[]
+  creatoIl         DateTime               @default(now())
+  aggiornatoIl     DateTime               @updatedAt
 }
 
 /// Assegnazione di un dipendente a un progetto (richiesta del 24/11/2026, risposte 2a e 3a:
@@ -248,8 +248,8 @@ enum StatoAssenza {
 /// Per la MALATTIA si salva solo il numero di protocollo del certificato: per scelta
 /// (privacy, GDPR art. 9) non esiste alcun campo per diagnosi o informazioni sanitarie.
 model Assenza {
-  id                    Int          @id @default(autoincrement())
-  dipendente            Dipendente   @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
+  id                    Int           @id @default(autoincrement())
+  dipendente            Dipendente    @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
   dipendenteId          Int
   tipo                  TipoAssenza
   /// "AAAA-MM-GG"
@@ -258,18 +258,23 @@ model Assenza {
   dataFine              String
   /// Durata del permesso in minuti (solo PERMESSO; vuota per ferie e malattia).
   minutiPermesso        Int?
-  stato                 StatoAssenza @default(RICHIESTA)
+  stato                 StatoAssenza  @default(RICHIESTA)
   /// Note scritte dal dipendente nella richiesta.
   noteDipendente        String?
   /// Note di HR (motivo del rifiuto, modifiche fatte).
   noteHr                String?
   /// Numero di protocollo del certificato medico (solo MALATTIA).
   protocolloCertificato String?
-  decisoDa              Utente?      @relation("DecisioneAssenza", fields: [decisoDaId], references: [id])
+  /// Allegato facoltativo (Giorno 22, risposta 3b), es. il giustificativo di un permesso.
+  /// Per la malattia solo l'attestato per il datore di lavoro, mai referti o diagnosi: lo
+  /// dice l'interfaccia, il file non si può controllare nel contenuto.
+  file                  FileCaricato? @relation(fields: [fileId], references: [id])
+  fileId                Int?          @unique
+  decisoDa              Utente?       @relation("DecisioneAssenza", fields: [decisoDaId], references: [id])
   decisoDaId            Int?
   decisoIl              DateTime?
-  creatoIl              DateTime     @default(now())
-  aggiornatoIl          DateTime     @updatedAt
+  creatoIl              DateTime      @default(now())
+  aggiornatoIl          DateTime      @updatedAt
 
   @@index([dipendenteId, dataInizio])
   @@index([stato])
@@ -319,6 +324,7 @@ model FileCaricato {
   attestato           Attestato?
   documentoDipendente DocumentoDipendente?
   documentoProgetto   DocumentoProgetto?
+  assenza             Assenza?
 }
 
 /// Tipo di attestato (risposta 1c: elenco fisso, ALTRO per tutto il resto).

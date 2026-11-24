@@ -32,6 +32,8 @@ export const schemaAssenza = z
       (v) => (typeof v === 'string' ? v.trim() : v) || null,
       z.string().regex(/^[A-Za-z0-9/-]{3,40}$/, 'Protocollo: da 3 a 40 caratteri, solo lettere, numeri, / e -').nullable(),
     ),
+    /** Allegato facoltativo (Giorno 22, risposta 3b): id di un file già caricato con POST /api/file. */
+    fileId: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.number().int().positive().nullable()),
   })
   .superRefine((a, ctx) => {
     if (isDataValida(a.dataInizio) && isDataValida(a.dataFine) && a.dataFine < a.dataInizio) {

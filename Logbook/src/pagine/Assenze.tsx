@@ -19,6 +19,7 @@ import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA } from '../colori';
+import { Icona } from '../componenti/icone';
 import { Tabella, type Colonna } from '../componenti/Tabella';
 import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
 import { nomiSenzaOmonimie } from '../../comune/omonimi';
@@ -56,6 +57,12 @@ export function Assenze() {
     { chiave: 'tipo', titolo: 'Tipo', valore: (a) => a.tipo, render: (a) => <ChipTipoAssenza tipo={a.tipo} /> },
     { chiave: 'periodo', titolo: 'Periodo', valore: (a) => a.dataInizio, render: periodoAssenza },
     { chiave: 'note', titolo: 'Note', valore: (a) => a.noteDipendente ?? (a.protocolloCertificato ? `Prot. ${a.protocolloCertificato}` : null), classe: 'max-w-64 truncate' },
+    {
+      chiave: 'allegato',
+      titolo: 'Allegato',
+      allinea: 'centro',
+      render: (a) => (a.file ? <Icona nome="allegato" dimensione={15} className="inline text-marchio" aria-label={`Allegato: ${a.file.nome}`} /> : null),
+    },
     { chiave: 'stato', titolo: 'Stato', valore: (a) => a.stato, render: (a) => <Etichetta colore={COLORE_STATO_ASSENZA[a.stato]}>{ETICHETTE_STATO_ASSENZA[a.stato]}</Etichetta> },
     { chiave: 'hr', titolo: 'Note HR', valore: (a) => a.noteHr, classe: 'max-w-64 truncate text-gray-600' },
     { chiave: 'richiesta', titolo: 'Richiesta il', valore: (a) => a.creatoIl, render: (a) => formattaData(a.creatoIl.slice(0, 10)) },

@@ -81,7 +81,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
   api.use('/calendario', rotteCalendario(prisma));
-  api.use('/assenze', rotteAssenze(prisma));
+  api.use('/assenze', rotteAssenze(prisma, cartellaDocumenti));
   api.use('/festivita', rotteFestivita(prisma));
   api.use('/importa', rotteImporta(prisma, oggi));
   api.use('/esporta', rotteEsporta(prisma));

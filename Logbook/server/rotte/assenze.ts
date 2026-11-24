@@ -11,6 +11,10 @@
  * - HR: vede tutte; può creare per chiunque (anche già APPROVATA, es. malattia comunicata
  *   per telefono), modificare, decidere e cancellare.
  *
+ * Allegato (Giorno 22, risposta 3b): facoltativo, caricato prima con POST /api/file e
+ * collegato qui per id; sostituirlo o eliminare l'assenza cancella il file vecchio. Il
+ * dipendente lo cambia solo finché la richiesta è in attesa (come il resto).
+ *
  * Controlli: ferie/malattia non si sovrappongono ad altre ferie/malattia non rifiutate;
  * un permesso non cade in un giorno di ferie/malattia; per approvare ferie/malattia non
  * devono esserci ore registrate in quei giorni (prima vanno tolte o spostate).
@@ -23,23 +27,27 @@ import { formattaData } from '../../comune/date';
 import { giorniLavorativi } from '../../comune/riepiloghi';
 import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
 import { dipendenteAmmesso, idDaParametro, isAdmin, richiediAdmin } from '../middleware';
+import { eliminaFile, fileCollegabile, vistaFile } from '../servizi/archivio-file';
 import { dataDaQuery } from './registrazioni';
 
 const include = {
   dipendente: { select: { nome: true, cognome: true, matricola: true } },
   decisoDa: { select: { username: true } },
+  file: true,
 } as const;
 
-export function rotteAssenze(prisma: PrismaClient) {
+/** `cartella`: dove stanno i file caricati (per cancellare l'allegato sostituito o dell'assenza eliminata). */
+export function rotteAssenze(prisma: PrismaClient, cartella: string) {
   const router = Router();
 
   /** Aggiunge a ogni assenza il numero di giorni lavorativi che copre (festivi e weekend esclusi). */
-  async function conGiorni<T extends Assenza>(assenze: T[]) {
+  async function conGiorni<T extends Assenza & { file?: Parameters<typeof vistaFile>[0] }>(assenze: T[]) {
     if (!assenze.length) return [];
     const da = assenze.reduce((m, a) => (a.dataInizio < m ? a.dataInizio : m), assenze[0].dataInizio);
     const a = assenze.reduce((m, x) => (x.dataFine > m ? x.dataFine : m), assenze[0].dataFine);
     const festivi = new Set((await prisma.festivita.findMany({ where: { data: { gte: da, lte: a } }, select: { data: true } })).map((f) => f.data));
-    return assenze.map((x) => ({ ...x, giorniLavorativi: giorniLavorativi(x.dataInizio, x.dataFine, festivi).length }));
+    // Il file si mostra senza dati interni (nome su disco, impronta).
+    return assenze.map((x) => ({ ...x, file: vistaFile(x.file), giorniLavorativi: giorniLavorativi(x.dataInizio, x.dataFine, festivi).length }));
   }
 
   /** Conflitti con altre assenze non rifiutate dello stesso dipendente. */
@@ -119,6 +127,7 @@ export function rotteAssenze(prisma: PrismaClient) {
     const completa = { ...dati, dipendenteId };
     await controllaSovrapposizioni(completa);
     if (stato === 'APPROVATA') await controllaOreNelPeriodo(completa);
+    if (dati.fileId) await fileCollegabile(prisma, dati.fileId, req.utente!.id);
     const creata = await prisma.assenza.create({
       data: { ...completa, stato, ...(stato === 'APPROVATA' ? { decisoDaId: req.utente!.id, decisoIl: new Date() } : {}) },
       include,
@@ -134,16 +143,19 @@ export function rotteAssenze(prisma: PrismaClient) {
     const completa = { ...dati, dipendenteId: vecchia.dipendenteId };
     await controllaSovrapposizioni(completa, vecchia.id);
     if (vecchia.stato === 'APPROVATA') await controllaOreNelPeriodo(completa);
+    if (dati.fileId && dati.fileId !== vecchia.fileId) await fileCollegabile(prisma, dati.fileId, req.utente!.id);
     const aggiornata = await prisma.assenza.update({
       where: { id: vecchia.id },
       data: {
         tipo: completa.tipo, dataInizio: completa.dataInizio, dataFine: completa.dataFine, minutiPermesso: completa.minutiPermesso,
-        noteDipendente: completa.noteDipendente, protocolloCertificato: completa.protocolloCertificato,
+        noteDipendente: completa.noteDipendente, protocolloCertificato: completa.protocolloCertificato, fileId: completa.fileId,
         // HR che modifica una richiesta può lasciare una nota (es. "date spostate d'accordo").
         ...(admin && typeof req.body?.noteHr === 'string' ? { noteHr: req.body.noteHr.trim() || null } : {}),
       },
       include,
     });
+    // File sostituito o tolto: il vecchio non serve più.
+    if (vecchia.fileId && vecchia.fileId !== completa.fileId) await eliminaFile(prisma, cartella, vecchia.fileId);
     res.json((await conGiorni([aggiornata]))[0]);
   });
 
@@ -167,6 +179,7 @@ export function rotteAssenze(prisma: PrismaClient) {
     const vecchia = await caricaVisibile(req);
     if (!isAdmin(req) && vecchia.stato !== 'RICHIESTA') throw vietato('Si possono ritirare solo le richieste in attesa');
     await prisma.assenza.delete({ where: { id: vecchia.id } });
+    await eliminaFile(prisma, cartella, vecchia.fileId);
     res.json({ ok: true });
   });
 

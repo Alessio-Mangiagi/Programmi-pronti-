@@ -83,6 +83,8 @@ export type Assenza = {
   noteDipendente: string | null;
   noteHr: string | null;
   protocolloCertificato: string | null;
+  /** Allegato facoltativo (Giorno 22). Il tipo VistaFile è più sotto nel file. */
+  file: VistaFile | null;
   decisoIl: string | null;
   creatoIl: string;
   dipendente: { nome: string; cognome: string; matricola: string };

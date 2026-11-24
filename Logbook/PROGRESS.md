@@ -21,7 +21,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 19 (24/11):** il dipendente registra solo oggi, i giorni passati solo HR; "oggi" è la data del server, avviso se il PC ha un'altra data ✅
 - **Giorno 20 (24/11):** le ore e la documentazione le inserisce solo HR; segnalazioni dei dipendenti con finestra a HR all'accesso e campanella ✅
 - **Giorno 21 (24/11):** menu laterale fermo durante lo scorrimento, voci sempre visibili ✅
-- **Prossimo:** Giorno 22 allegati alle assenze (3b); poi verifica di sicurezza, codice non chiamato e librerie non usate (richiesta del 24/11); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 22 (24/11):** allegato facoltativo alle assenze ✅
+- **Prossimo:** poi verifica di sicurezza, codice non chiamato e librerie non usate (richiesta del 24/11); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -112,6 +113,7 @@ sessione per riprendere da dove si era rimasti.
 | 24/11 | Documentazione di progetto solo HR, nasce già "vista"; il dipendente vede i suoi progetti senza documentazione | Risposta 2 "tutti i dati li inserisce HR" |
 | 24/11 | Segnalazioni del dipendente su un suo giorno (mai futuro); HR le vede in una finestra all'accesso (una volta per sessione e dopo ogni login), nella campanella e in dashboard; le chiude con una risposta | Risposta 4 "HR decide e interviene su segnalazione ma il sistema notifica a HR quando accede" |
 | 24/11 | Le richieste di ferie/permessi/malattia restano al dipendente | Flusso di richiesta e approvazione, non dati nelle giornate (detto all'utente) |
+| 24/11 | Allegato facoltativo alle assenze; il dipendente lo cambia solo a richiesta in attesa; lo aprono HR, chi l'ha caricato e il dipendente dell'assenza | Risposta 3b; per la malattia avviso "mai diagnosi" (GDPR art. 9) |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -609,3 +611,23 @@ scelte ben visibili". `componenti/Layout.tsx`: da 768px il menu è sticky in alt
 quanto la finestra; le voci scorrono dentro il menu se lo schermo è basso. Sul telefono
 resta il menu a scomparsa. Verifica Playwright su Edge 6/6 (1440×900, 1280×560 e
 3440×1440: menu fermo in alto e «Impostazioni» visibile con la pagina scorsa in fondo).
+
+### Giorno 22 — Allegato alle assenze (24/11/2026) ✅
+
+Risposta 3b: allegato facoltativo alle assenze, mai certificati con diagnosi.
+
+Fatto:
+- Schema: `Assenza.fileId` (migrazione `20261124160000_allegato_assenze`, tabella ricreata
+  da Prisma copiando le righe); `schemaAssenza` con `fileId`.
+- `server/rotte/assenze.ts`: collega il file (`fileCollegabile`), lo sostituisce cancellando
+  il vecchio, lo cancella con l'assenza; risposte con il file "pulito" (`vistaFile`).
+- `server/rotte/file.ts`: il dipendente apre l'allegato della sua assenza anche se l'ha
+  caricato HR; `archivio-file.ts`: un file di un'assenza conta come "usato" (niente riuso,
+  niente pulizia degli orfani).
+- Interfaccia: "Allegato" nella pagina dell'assenza con l'avviso per la malattia;
+  graffetta nell'elenco. Guida aggiornata.
+
+Verifiche: `npm test` 200/200 (5 in `giorno22.test.ts`), typecheck e build ok; migrazione
+applicata al database demo all'avvio; Playwright su Edge 6/6 (avviso per la malattia,
+richiesta con allegato, il dipendente apre il file, graffetta e allegato per HR, ritiro).
+Guida: immagine 35.

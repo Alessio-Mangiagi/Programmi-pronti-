@@ -77,6 +77,11 @@ le vostre altre assenze):
 - **Permesso**: un giorno e la durata in ore (es. 2 oppure 1,5).
 - **Malattia**: le date e solo il **numero di protocollo del certificato**. Non scrivete
   diagnosi né altre informazioni sanitarie: Logbook non ha campi per questo, di proposito.
+- **Allegato** (facoltativo): con **Allega file…** si aggiunge un file, es. il giustificativo
+  di un permesso. Per la malattia solo l'attestato per il datore di lavoro, **mai referti o
+  certificati con la diagnosi**. Finché la richiesta è in attesa si può togliere o sostituire.
+
+![Richiesta di permesso con allegato](img/35-assenza-allegato.png)
 
 La richiesta resta **In attesa** finché HR non la approva o la rifiuta (con il motivo).
 Finché è in attesa si può modificare o ritirare. Nel calendario le richieste in attesa
@@ -299,6 +304,9 @@ vedendo il resto dell'anno. La ricerca dell'elenco trova anche matricola e codic
 - **+ Nuova assenza** registra un'assenza per un dipendente, anche già approvata (es.
   malattia comunicata per telefono). Il dipendente si sceglie scrivendo nome, matricola o
   codice fiscale.
+- Gli **allegati** si vedono con la graffetta nell'elenco e si aprono dalla pagina
+  dell'assenza. HR può allegarne o sostituirne uno anche a una richiesta già decisa; il
+  dipendente lo apre dalla sua richiesta.
 
 ### Festività
 

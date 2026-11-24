@@ -46,9 +46,12 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
   });
 
   router.get('/:id', async (req, res) => {
-    const file = await prisma.fileCaricato.findUnique({ where: { id: idDaParametro(req.params.id)! } });
+    const file = await prisma.fileCaricato.findUnique({ where: { id: idDaParametro(req.params.id)! }, include: { assenza: { select: { dipendenteId: true } } } });
     if (!file) throw nonTrovato('File');
-    if (!isAdmin(req) && file.caricatoDaId !== req.utente!.id) throw vietato('Non puoi aprire questo file');
+    // Lo aprono HR, chi l'ha caricato e (Giorno 22) il dipendente della cui assenza è
+    // l'allegato, anche se l'ha caricato HR.
+    const suaAssenza = file.assenza != null && req.utente!.dipendenteId === file.assenza.dipendenteId;
+    if (!isAdmin(req) && file.caricatoDaId !== req.utente!.id && !suaAssenza) throw vietato('Non puoi aprire questo file');
     const percorso = percorsoFile(cartella, file.nomeDisco);
     if (!fs.existsSync(percorso)) throw new ErroreHttp(404, 'Il file non è più nella cartella dei documenti: avvisa l\'amministratore');
     const nelBrowser = SI_APRE_NEL_BROWSER.has(file.tipoMime) && req.query.scarica !== '1';
@@ -68,11 +71,11 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
     const id = idDaParametro(req.params.id)!;
     const file = await prisma.fileCaricato.findUnique({
       where: { id },
-      include: { attestato: true, documentoDipendente: true, documentoProgetto: true },
+      include: { attestato: true, documentoDipendente: true, documentoProgetto: true, assenza: true },
     });
     if (!file) throw nonTrovato('File');
     if (file.caricatoDaId !== req.utente!.id) throw vietato('Puoi togliere solo i file che hai caricato tu');
-    if (file.attestato || file.documentoDipendente || file.documentoProgetto) {
+    if (file.attestato || file.documentoDipendente || file.documentoProgetto || file.assenza) {
       throw new ErroreHttp(409, 'Il file è già collegato a un documento: elimina il documento');
     }
     await eliminaFile(prisma, cartella, id);

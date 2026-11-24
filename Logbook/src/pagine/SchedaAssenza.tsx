@@ -6,7 +6,9 @@
  *
  * - A sinistra il modulo: dipendente (solo HR, scelta con ricerca a caratteri e omonimi
  *   distinti dal codice fiscale), tipo, date o durata del permesso, note o protocollo del
- *   certificato per la malattia (niente dati sanitari: comune/assenze.ts), note di HR.
+ *   certificato per la malattia (niente dati sanitari: comune/assenze.ts), note di HR e,
+ *   dal Giorno 22 (risposta 3b), un allegato facoltativo (es. il giustificativo di un
+ *   permesso; per la malattia solo l'attestato senza diagnosi).
  *   HR approva, rifiuta (motivo obbligatorio), modifica o elimina; il dipendente modifica o
  *   ritira la sua richiesta finché è in attesa.
  * - A destra le altre assenze dello stesso dipendente: si decide vedendo il resto
@@ -24,10 +26,11 @@ import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
 import { useAuth } from '../auth';
 import { COLORI_ASSENZA } from '../colori';
+import { CaricaFile, LinkFile } from '../componenti/File';
 import { SceltaConRicerca } from '../componenti/SceltaConRicerca';
 import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
 import { dettaglioDipendente, nomiSenzaOmonimie } from '../../comune/omonimi';
-import type { Assenza, Dipendente, StatoAssenza } from '../tipi';
+import type { Assenza, Dipendente, StatoAssenza, VistaFile } from '../tipi';
 import { usaDati } from '../usaDati';
 
 export type AssenzaConGiorni = Assenza & { giorniLavorativi: number };
@@ -148,6 +151,8 @@ function ModuloAssenza({
   const [errori, setErrori] = useState<Record<string, string>>({});
   const [messaggio, setMessaggio] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  // Allegato: si carica subito (POST /api/file) e qui si tiene solo per collegarlo al salvataggio.
+  const [file, setFile] = useState<VistaFile | null>(assenza?.file ?? null);
   const nomi = useMemo(() => nomiSenzaOmonimie(dipendenti), [dipendenti]);
 
   const imposta = (campo: keyof typeof m, valore: string | boolean) => setM((x) => ({ ...x, [campo]: valore }));
@@ -161,6 +166,8 @@ function ModuloAssenza({
     minutiPermesso: m.tipo === 'PERMESSO' && m.ore ? Math.round(Number(m.ore.replace(',', '.')) * 60) : null,
     noteDipendente: m.tipo === 'MALATTIA' ? null : m.noteDipendente,
     protocolloCertificato: m.tipo === 'MALATTIA' ? m.protocolloCertificato : null,
+    // Sempre presente: la modifica sostituisce l'assenza intera (senza file = file tolto).
+    fileId: file?.id ?? null,
   });
 
   /** Esegue un'azione sul server; gli errori tornano sui campi e in cima al modulo. */
@@ -288,6 +295,22 @@ function ModuloAssenza({
             <textarea rows={2} className={classiInput(errori.noteDipendente)} value={m.noteDipendente} onChange={(e) => imposta('noteDipendente', e.target.value)} maxLength={500} />
           </Campo>
         )}
+        {/* Allegato facoltativo (Giorno 22). Dentro il fieldset: a richiesta decisa si guarda soltanto. */}
+        <div className="text-sm">
+          <span className="mb-1 block font-ui text-[0.82rem] font-semibold text-gray-600">Allegato</span>
+          {modificabile ? (
+            <CaricaFile file={file} onFile={setFile} errore={errori.fileId} testoPulsante="Allega file…" />
+          ) : file ? (
+            <LinkFile file={file} />
+          ) : (
+            <span className="text-gray-500">Nessun allegato</span>
+          )}
+          {m.tipo === 'MALATTIA' ? (
+            <span className="mt-1 block text-xs text-[#6b4a00]">Solo l'attestato per il datore di lavoro: non allegare referti o certificati con la diagnosi.</span>
+          ) : (
+            <span className="mt-1 block text-xs text-gray-500">Facoltativo, es. il giustificativo di un permesso.</span>
+          )}
+        </div>
       </fieldset>
 
       {admin && (
