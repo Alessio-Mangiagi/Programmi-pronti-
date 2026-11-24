@@ -21,7 +21,14 @@ function leggiCookie(req: Request, nome: string): string | undefined {
   if (!intestazione) return undefined;
   for (const parte of intestazione.split(';')) {
     const [chiave, ...valore] = parte.trim().split('=');
-    if (chiave === nome) return decodeURIComponent(valore.join('='));
+    if (chiave !== nome) continue;
+    // Un cookie malformato (es. "%E0%A4%A", che un'altra app sullo stesso indirizzo può
+    // impostare) non deve far fallire con 500 ogni chiamata: vale come "nessuna sessione".
+    try {
+      return decodeURIComponent(valore.join('='));
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }

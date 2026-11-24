@@ -17,6 +17,7 @@
  */
 import express, { Router } from 'express';
 import fs from 'node:fs';
+import { pipeline } from 'node:stream';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { ErroreHttp, nonTrovato, vietato } from '../errori';
 import { idDaParametro, isAdmin } from '../middleware';
@@ -28,12 +29,31 @@ function intestazioneNomeFile(tipo: 'inline' | 'attachment', nome: string): stri
   return `${tipo}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nome)}`;
 }
 
+/**
+ * Quanti file caricati e non ancora collegati può avere ogni utente (verifica di sicurezza
+ * del Giorno 23). Nell'uso normale se ne ha uno per modulo aperto; senza tetto uno script
+ * poteva caricare migliaia di file da 20 MB e riempire il disco del database. Quelli mai
+ * collegati li toglie la pulizia dopo un giorno (server/index.ts).
+ */
+const MAX_FILE_IN_SOSPESO = 20;
+
 export function rotteFile(prisma: PrismaClient, cartella: string) {
   const router = Router();
   // Un po' di margine oltre i 20 MB: il limite preciso (con il messaggio giusto) lo dà controllaFile.
   const corpoFile = express.raw({ type: 'application/octet-stream', limit: MAX_BYTE_FILE + 1024 });
 
-  router.post('/', corpoFile, async (req, res) => {
+  /** Prima di leggere il corpo (fino a 20 MB in memoria): troppi file in sospeso → 429 subito. */
+  const controllaSospesi: express.RequestHandler = async (req, _res, next) => {
+    const inSospeso = await prisma.fileCaricato.count({
+      where: { caricatoDaId: req.utente!.id, attestato: null, documentoDipendente: null, documentoProgetto: null, assenza: null },
+    });
+    if (inSospeso >= MAX_FILE_IN_SOSPESO) {
+      throw new ErroreHttp(429, `Hai già ${inSospeso} file caricati e non ancora salvati in una scheda: salva o chiudi i moduli aperti, oppure riprova domani`);
+    }
+    next();
+  };
+
+  router.post('/', controllaSospesi, corpoFile, async (req, res) => {
     const dati = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     let nome = 'documento';
     try {
@@ -64,7 +84,11 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
     // visualizzatore PDF dei browser non funziona dentro una sandbox.
     if (file.tipoMime !== 'application/pdf') res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.setHeader('Cache-Control', 'private, no-store');
-    fs.createReadStream(percorso).pipe(res);
+    // pipeline e non .pipe(): un errore di lettura (file sparito, bloccato dall'antivirus)
+    // senza gestore farebbe cadere l'intero server. Così si chiude solo questa risposta.
+    pipeline(fs.createReadStream(percorso), res, (errore) => {
+      if (errore && errore.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.warn(`[logbook] lettura del file ${file.id} non riuscita:`, errore.message);
+    });
   });
 
   router.delete('/:id', async (req, res) => {

@@ -24,7 +24,8 @@ import { z } from 'zod';
 import type { Assenza, PrismaClient } from '../../generated/prisma/client';
 import { periodiSovrapposti, schemaAssenza, schemaDecisione, type DatiAssenza } from '../../comune/assenze';
 import { formattaData } from '../../comune/date';
-import { giorniLavorativi } from '../../comune/riepiloghi';
+import { ESTENSIONI_ALLEGATO_ASSENZA } from '../../comune/documenti';
+import { contaGiorniLavorativi } from '../../comune/riepiloghi';
 import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
 import { dipendenteAmmesso, idDaParametro, isAdmin, richiediAdmin } from '../middleware';
 import { eliminaFile, fileCollegabile, vistaFile } from '../servizi/archivio-file';
@@ -47,7 +48,21 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string) {
     const a = assenze.reduce((m, x) => (x.dataFine > m ? x.dataFine : m), assenze[0].dataFine);
     const festivi = new Set((await prisma.festivita.findMany({ where: { data: { gte: da, lte: a } }, select: { data: true } })).map((f) => f.data));
     // Il file si mostra senza dati interni (nome su disco, impronta).
-    return assenze.map((x) => ({ ...x, file: vistaFile(x.file), giorniLavorativi: giorniLavorativi(x.dataInizio, x.dataFine, festivi).length }));
+    // Conteggio senza ciclo giorno per giorno: un'assenza lunghissima non blocca il server.
+    return assenze.map((x) => ({ ...x, file: vistaFile(x.file), giorniLavorativi: contaGiorniLavorativi(x.dataInizio, x.dataFine, festivi) }));
+  }
+
+  /**
+   * Allegato di un'assenza: oltre ai controlli comuni (stesso utente, non già usato) solo
+   * PDF, .p7m e immagini. Word ed Excel no: i vecchi .doc/.xls possono contenere macro, e il
+   * file lo carica il dipendente ma lo apre HR (verifica di sicurezza del Giorno 23).
+   */
+  async function allegatoAmmesso(fileId: number, utenteId: number) {
+    const f = await fileCollegabile(prisma, fileId, utenteId);
+    const ext = f.nomeDisco.split('.').pop() ?? '';
+    if (!(ESTENSIONI_ALLEGATO_ASSENZA as readonly string[]).includes(ext)) {
+      throw new ErroreHttp(415, `Alle assenze si allegano solo PDF, .p7m o immagini (${ESTENSIONI_ALLEGATO_ASSENZA.map((e) => `.${e}`).join(', ')})`, { fileId: 'Formato non ammesso' });
+    }
   }
 
   /** Conflitti con altre assenze non rifiutate dello stesso dipendente. */
@@ -127,7 +142,7 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string) {
     const completa = { ...dati, dipendenteId };
     await controllaSovrapposizioni(completa);
     if (stato === 'APPROVATA') await controllaOreNelPeriodo(completa);
-    if (dati.fileId) await fileCollegabile(prisma, dati.fileId, req.utente!.id);
+    if (dati.fileId) await allegatoAmmesso(dati.fileId, req.utente!.id);
     const creata = await prisma.assenza.create({
       data: { ...completa, stato, ...(stato === 'APPROVATA' ? { decisoDaId: req.utente!.id, decisoIl: new Date() } : {}) },
       include,
@@ -143,14 +158,16 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string) {
     const completa = { ...dati, dipendenteId: vecchia.dipendenteId };
     await controllaSovrapposizioni(completa, vecchia.id);
     if (vecchia.stato === 'APPROVATA') await controllaOreNelPeriodo(completa);
-    if (dati.fileId && dati.fileId !== vecchia.fileId) await fileCollegabile(prisma, dati.fileId, req.utente!.id);
+    if (dati.fileId && dati.fileId !== vecchia.fileId) await allegatoAmmesso(dati.fileId, req.utente!.id);
+    // Nota di HR facoltativa, stesso limite di 500 caratteri della decisione.
+    const { noteHr } = z.object({ noteHr: z.string().trim().max(500, 'Nota di HR: massimo 500 caratteri').optional() }).parse({ noteHr: admin && typeof req.body?.noteHr === 'string' ? req.body.noteHr : undefined });
     const aggiornata = await prisma.assenza.update({
       where: { id: vecchia.id },
       data: {
         tipo: completa.tipo, dataInizio: completa.dataInizio, dataFine: completa.dataFine, minutiPermesso: completa.minutiPermesso,
         noteDipendente: completa.noteDipendente, protocolloCertificato: completa.protocolloCertificato, fileId: completa.fileId,
         // HR che modifica una richiesta può lasciare una nota (es. "date spostate d'accordo").
-        ...(admin && typeof req.body?.noteHr === 'string' ? { noteHr: req.body.noteHr.trim() || null } : {}),
+        ...(noteHr !== undefined ? { noteHr: noteHr || null } : {}),
       },
       include,
     });

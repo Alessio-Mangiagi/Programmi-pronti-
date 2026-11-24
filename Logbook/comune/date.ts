@@ -39,12 +39,23 @@ export function oggiIso(adesso: Date = new Date()): string {
 }
 
 /**
- * true se la stringa è una data "AAAA-MM-GG" esistente (rifiuta 2026-02-30, 2026-13-01).
+ * Anno più lontano accettato (verifica di sicurezza del Giorno 23, 24/11/2026). Senza un
+ * tetto un dipendente poteva chiedere ferie fino al 9999-12-31: il giorno dopo ("10000-01-01")
+ * nel confronto fra stringhe risulta PRIMA di "9999-12-31", i cicli giorno per giorno non
+ * finivano più e l'elenco delle assenze di HR andava in errore. Le festività avevano già
+ * lo stesso limite (server/rotte/festivita.ts).
+ */
+const ANNO_MASSIMO = 2100;
+
+/**
+ * true se la stringa è una data "AAAA-MM-GG" esistente (rifiuta 2026-02-30, 2026-13-01)
+ * e non oltre il 31/12/2100 (ANNO_MASSIMO).
  */
 export function isDataValida(iso: string): boolean {
   const m = RE_DATA_ISO.exec(iso);
   if (!m) return false;
   const [anno, mese, giorno] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (anno > ANNO_MASSIMO) return false;
   const d = new Date(Date.UTC(anno, mese - 1, giorno));
   return d.getUTCFullYear() === anno && d.getUTCMonth() === mese - 1 && d.getUTCDate() === giorno;
 }

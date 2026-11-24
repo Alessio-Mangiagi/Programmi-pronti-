@@ -6,7 +6,7 @@
  * Excel (Giorno 8): così i totali dei report coincidono per costruzione con quelli del
  * calendario, invece di essere calcolati due volte in due modi diversi.
  */
-import { aggiungiGiorni, isFineSettimana } from './date';
+import { aDateUtc, aggiungiGiorni, giornoSettimana, isFineSettimana } from './date';
 import { durataMinuti } from './orari';
 
 type FasciaPerTotali = { data: string; progettoId: number; dipendenteId: number; oraInizio: string; oraFine: string };
@@ -47,6 +47,29 @@ export function giorniLavorativi(da: string, a: string, festivi: Set<string>): s
     if (!isFineSettimana(d) && !festivi.has(d)) giorni.push(d);
   }
   return giorni;
+}
+
+/**
+ * Quanti giorni lavorativi (lun-ven non festivi) ci sono fra due date comprese: stesso
+ * risultato di giorniLavorativi(...).length, ma senza scorrere i giorni uno per uno.
+ * Lo usa l'elenco delle assenze (server/rotte/assenze.ts), che lo calcola per ogni assenza
+ * a ogni apertura: con il ciclo un'assenza lunghissima bloccava il server per secondi
+ * (verifica di sicurezza del Giorno 23). Qui il costo dipende solo dal numero di festivi.
+ */
+export function contaGiorniLavorativi(da: string, a: string, festivi: Set<string>): number {
+  if (a < da) return 0;
+  const giorno = 24 * 60 * 60 * 1000;
+  const totale = Math.round((aDateUtc(a).getTime() - aDateUtc(da).getTime()) / giorno) + 1;
+  // Settimane intere: 5 lavorativi ciascuna; i giorni rimasti (al massimo 6) si contano uno a uno.
+  let lavorativi = Math.floor(totale / 7) * 5;
+  const primo = giornoSettimana(da);
+  for (let i = 0; i < totale % 7; i++) {
+    const g = (primo + i) % 7;
+    if (g !== 0 && g !== 6) lavorativi++;
+  }
+  // Festivi del periodo che cadono in un giorno feriale (quelli di sabato o domenica non contano due volte).
+  for (const f of festivi) if (f >= da && f <= a && !isFineSettimana(f)) lavorativi--;
+  return lavorativi;
 }
 
 /** Lunedì della settimana che contiene la data. */

@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ETICHETTE_ASSENZA, ETICHETTE_STATO_ASSENZA, schemaAssenza, TIPI_ASSENZA } from '../../comune/assenze';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
+import { ESTENSIONI_ALLEGATO_ASSENZA } from '../../comune/documenti';
 import { formattaOre } from '../../comune/orari';
 import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
@@ -299,7 +300,7 @@ function ModuloAssenza({
         <div className="text-sm">
           <span className="mb-1 block font-ui text-[0.82rem] font-semibold text-gray-600">Allegato</span>
           {modificabile ? (
-            <CaricaFile file={file} onFile={setFile} errore={errori.fileId} testoPulsante="Allega file…" />
+            <CaricaFile file={file} onFile={setFile} errore={errori.fileId} testoPulsante="Allega file…" estensioni={ESTENSIONI_ALLEGATO_ASSENZA} aiutoFormati="PDF o immagini" />
           ) : file ? (
             <LinkFile file={file} />
           ) : (

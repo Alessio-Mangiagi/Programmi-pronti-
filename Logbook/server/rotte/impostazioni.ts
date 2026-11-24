@@ -11,20 +11,26 @@
  * - GET    /api/impostazioni/skytower/commesse   commesse per il menu della scheda progetto
  *
  * Il token di servizio non viene mai restituito: il browser sa solo se è impostato.
+ * Verifica di sicurezza del Giorno 23: se cambia il server (schema, host o porta) il token
+ * va inserito di nuovo. Altrimenti bastava puntare l'indirizzo a un proprio server e
+ * premere "Prova" per ricevere il token della suite, che vale anche per le altre app.
  */
 import { Router } from 'express';
 import { z } from 'zod';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { ErroreHttp } from '../errori';
 import { richiediAdmin } from '../middleware';
-import { CHIAVI_SKYTOWER, commesseSkytower, leggiCollegamento } from '../servizi/skytower';
+import { CHIAVI_SKYTOWER, commesseSkytower, leggiCollegamento, origineDi, problemaIndirizzo } from '../servizi/skytower';
 
 const schemaSkytower = z.object({
   url: z
     .string({ error: 'Indirizzo obbligatorio' })
     .trim()
-    .url('Indirizzo non valido (es. http://127.0.0.1:8100)')
-    .refine((u) => /^https?:\/\//i.test(u), 'L\'indirizzo deve iniziare con http:// o https://'),
+    .max(300, 'Indirizzo troppo lungo')
+    .superRefine((u, ctx) => {
+      const problema = problemaIndirizzo(u);
+      if (problema) ctx.addIssue({ code: 'custom', message: problema });
+    }),
   email: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v) || null, z.string().email('Email non valida').nullable()),
   token: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v) || null, z.string().min(16, 'Token troppo corto: copialo intero').max(500).nullable()),
 });
@@ -49,6 +55,11 @@ export function rotteImpostazioni(prisma: PrismaClient) {
     const d = schemaSkytower.parse(req.body);
     const tokenSalvato = (await prisma.impostazione.findUnique({ where: { chiave: CHIAVI_SKYTOWER.token } }))?.valore;
     if (!d.token && !tokenSalvato) throw new ErroreHttp(400, 'Serve il token di servizio della suite', { token: 'Token obbligatorio la prima volta' });
+    // Il token salvato resta solo se il server è lo stesso (cambiare il percorso va bene).
+    const urlSalvato = (await prisma.impostazione.findUnique({ where: { chiave: CHIAVI_SKYTOWER.url } }))?.valore ?? '';
+    if (!d.token && origineDi(urlSalvato) !== origineDi(d.url)) {
+      throw new ErroreHttp(400, 'Hai cambiato server: inserisci di nuovo il token di servizio', { token: 'Reinserisci il token per il nuovo indirizzo' });
+    }
     await prisma.$transaction([
       salva(CHIAVI_SKYTOWER.url, d.url.replace(/\/+$/, '')),
       salva(CHIAVI_SKYTOWER.email, d.email ?? ''),

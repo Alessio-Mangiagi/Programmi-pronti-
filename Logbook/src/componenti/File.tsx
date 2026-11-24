@@ -17,7 +17,8 @@ import type { VistaFile } from '../tipi';
 import { Icona } from './icone';
 import { Pulsante } from './ui';
 
-const ACCEPT = ESTENSIONI_FILE.map((e) => `.${e}`).join(',');
+/** Testo d'aiuto sotto il pulsante con tutti i formati (attestati, documenti, documentazione). */
+const AIUTO_TUTTI = 'PDF, immagini, Word, Excel';
 
 export function LinkFile({ file, compatto = false }: { file: VistaFile; compatto?: boolean }) {
   return (
@@ -41,11 +42,16 @@ export function CaricaFile({
   onFile,
   errore,
   testoPulsante = 'Scegli file…',
+  estensioni = ESTENSIONI_FILE,
+  aiutoFormati = AIUTO_TUTTI,
 }: {
   file: VistaFile | null;
   onFile: (f: VistaFile | null) => void;
   errore?: string;
   testoPulsante?: string;
+  /** Formati ammessi qui (default tutti); per le assenze solo PDF e immagini (comune/documenti.ts). */
+  estensioni?: readonly string[];
+  aiutoFormati?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [stato, setStato] = useState<{ caricamento: boolean; errore: string | null }>({ caricamento: false, errore: null });
@@ -54,7 +60,7 @@ export function CaricaFile({
     if (input.current) input.current.value = ''; // lo stesso file si può riscegliere
     if (!f) return;
     const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!(ESTENSIONI_FILE as readonly string[]).includes(ext)) {
+    if (!estensioni.includes(ext)) {
       setStato({ caricamento: false, errore: `Formato .${ext} non ammesso` });
       return;
     }
@@ -90,12 +96,12 @@ export function CaricaFile({
             <Icona nome="allegato" dimensione={15} /> {stato.caricamento ? 'Caricamento…' : testoPulsante}
           </Pulsante>
         )}
-        <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => scegli(e.target.files?.[0])} />
+        <input ref={input} type="file" accept={estensioni.map((e) => `.${e}`).join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => scegli(e.target.files?.[0])} />
       </div>
       {messaggio ? (
         <span className="mt-0.5 block text-xs text-errore">{messaggio}</span>
       ) : (
-        !file && <span className="mt-0.5 block text-xs text-gray-500">PDF, immagini, Word, Excel; massimo {MAX_MB_FILE} MB</span>
+        !file && <span className="mt-0.5 block text-xs text-gray-500">{aiutoFormati}; massimo {MAX_MB_FILE} MB</span>
       )}
     </div>
   );

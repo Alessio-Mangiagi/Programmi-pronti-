@@ -23,6 +23,9 @@ const COLLEGATI = {
   risoltaDa: { select: { username: true } },
 } as const;
 
+/** Segnalazioni aperte che un dipendente può avere insieme. */
+const MAX_APERTE = 20;
+
 export function rotteSegnalazioni(prisma: PrismaClient, oggi: () => string) {
   const router = Router();
 
@@ -45,6 +48,11 @@ export function rotteSegnalazioni(prisma: PrismaClient, oggi: () => string) {
     if (!dipendenteId) throw richiestaNonValida('Indica il dipendente', { dipendenteId: 'Scegli il dipendente' });
     if (s.data > oggi()) throw richiestaNonValida('Non si segnala un giorno futuro', { data: 'Giorno futuro' });
     if (!(await prisma.dipendente.findUnique({ where: { id: dipendenteId } }))) throw nonTrovato('Dipendente');
+    // Tetto alle segnalazioni aperte di un dipendente (verifica di sicurezza del Giorno 23):
+    // HR se le vede tutte nella finestra all'accesso, e uno script non deve poterla riempire.
+    if (!isAdmin(req) && (await prisma.segnalazione.count({ where: { dipendenteId, stato: 'APERTA' } })) >= MAX_APERTE) {
+      throw new ErroreHttp(429, `Hai già ${MAX_APERTE} segnalazioni aperte: aspetta che HR le chiuda o ritirane qualcuna`);
+    }
     const creata = await prisma.segnalazione.create({ data: { dipendenteId, data: s.data, testo: s.testo }, include: COLLEGATI });
     res.status(201).json(creata);
   });

@@ -149,7 +149,8 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
     });
     const aggiornato = await prisma.documentoProgetto.update({
       where: { id: d.id },
-      data: { skytowerId: esito.identificativo, skytowerUrl: esito.url, skytowerInviatoIl: new Date() },
+      // Il link torna da SkyTower e diventa un <a href> nell'interfaccia: solo http(s).
+      data: { skytowerId: esito.identificativo, skytowerUrl: esito.url && /^https?:\/\//i.test(esito.url) ? esito.url : null, skytowerInviatoIl: new Date() },
       include: COLLEGATI,
     });
     res.json(vista(aggiornato));

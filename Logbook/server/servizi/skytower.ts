@@ -37,17 +37,51 @@ export async function leggiCollegamento(prisma: PrismaClient): Promise<Collegame
   return { url, token, email: valore(CHIAVI_SKYTOWER.email) || null };
 }
 
-/** Messaggio leggibile dall'errore di SkyTower (FastAPI: {"detail": ...} o {"message": ...}). */
-function messaggioDa(testo: string): string {
+/**
+ * Controlla l'indirizzo di SkyTower salvato in Impostazioni: solo http(s), senza utente e
+ * password, parametri (?…) o frammento (#…). Con "?" o "#" in fondo il percorso fisso
+ * aggiunto dopo (/suite/commesse) finiva nei parametri o veniva scartato, e Logbook
+ * chiamava col token un indirizzo qualunque (verifica di sicurezza del Giorno 23).
+ * Restituisce il messaggio d'errore, oppure null se l'indirizzo va bene.
+ */
+export function problemaIndirizzo(indirizzo: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(indirizzo);
+  } catch {
+    return 'Indirizzo non valido (es. http://127.0.0.1:8100)';
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return "L'indirizzo deve iniziare con http:// o https://";
+  if (u.username || u.password) return "Niente nome utente o password nell'indirizzo: il token va nel suo campo";
+  if (u.search || u.hash || /[?#]/.test(indirizzo)) return "L'indirizzo non deve contenere ? o #";
+  return null;
+}
+
+/** Origine (schema://host:porta) dell'indirizzo, oppure null se non è un indirizzo valido. */
+export function origineDi(indirizzo: string): string | null {
+  try {
+    return new URL(indirizzo).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Messaggio leggibile dall'errore di SkyTower (FastAPI: {"detail": ...} o {"message": ...}).
+ * Tagliato a 200 caratteri e con il token sempre oscurato: il messaggio arriva al browser e
+ * un server che "ripete" le intestazioni ricevute non deve poter far uscire il token.
+ */
+function messaggioDa(testo: string, token: string): string {
+  let m = testo.slice(0, 160);
   try {
     const j = JSON.parse(testo);
     const v = j?.message ?? j?.detail ?? j?.errore;
-    if (typeof v === 'string') return v;
-    if (v && typeof v === 'object' && typeof v.message === 'string') return v.message;
+    if (typeof v === 'string') m = v;
+    else if (v && typeof v === 'object' && typeof v.message === 'string') m = v.message;
   } catch {
     /* non JSON */
   }
-  return testo.slice(0, 160);
+  return (token ? m.split(token).join('***') : m).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 200);
 }
 
 type OpzioniChiamata = {
@@ -58,9 +92,13 @@ type OpzioniChiamata = {
 
 /** Chiamata all'API della suite di SkyTower. Errori → ErroreHttp con un messaggio per HR. */
 async function chiamaSkytower<T>(c: CollegamentoSkytower, metodo: 'GET' | 'POST', percorso: string, o: OpzioniChiamata = {}): Promise<T> {
-  const q = new URLSearchParams();
-  for (const [k, v] of Object.entries(o.parametri ?? {})) if (v) q.set(k, v);
-  const url = `${c.url}${percorso}${q.size ? `?${q}` : ''}`;
+  // Indirizzo salvato prima di questi controlli e poi diventato non valido: non si chiama.
+  const problema = problemaIndirizzo(c.url);
+  if (problema) throw new ErroreHttp(400, `Indirizzo di SkyTower in Impostazioni non valido: ${problema}`);
+  // Percorso e parametri si compongono con URL, non concatenando stringhe.
+  const url = new URL(c.url);
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}${percorso}`;
+  for (const [k, v] of Object.entries(o.parametri ?? {})) if (v) url.searchParams.set(k, v);
   const intestazioni: Record<string, string> = { 'X-Suite-Token': c.token, 'X-Suite-App': 'logbook', Accept: 'application/json' };
   if (c.email) intestazioni['X-Suite-Email'] = c.email;
   let body: Uint8Array | undefined;
@@ -71,16 +109,17 @@ async function chiamaSkytower<T>(c: CollegamentoSkytower, metodo: 'GET' | 'POST'
   }
   let r: Response;
   try {
-    r = await fetch(url, { method: metodo, headers: intestazioni, body, signal: AbortSignal.timeout(o.timeout ?? 10000) });
+    // redirect 'error': un reindirizzamento verso un altro server si porterebbe dietro il token.
+    r = await fetch(url, { method: metodo, headers: intestazioni, body, redirect: 'error', signal: AbortSignal.timeout(o.timeout ?? 10000) });
   } catch (e) {
     const motivo = (e as { cause?: { code?: string }; name?: string }).cause?.code ?? (e as Error).name;
     throw new ErroreHttp(502, `SkyTower non raggiungibile all'indirizzo ${c.url} (${motivo}): è acceso? L'indirizzo è giusto?`);
   }
   const testo = await r.text();
   if (r.status === 401 || r.status === 403) {
-    throw new ErroreHttp(502, `SkyTower ha rifiutato l'accesso (${r.status}): controlla il token di servizio e l'email dell'utente in Impostazioni. ${messaggioDa(testo)}`.trim());
+    throw new ErroreHttp(502, `SkyTower ha rifiutato l'accesso (${r.status}): controlla il token di servizio e l'email dell'utente in Impostazioni. ${messaggioDa(testo, c.token)}`.trim());
   }
-  if (!r.ok) throw new ErroreHttp(502, `SkyTower ha risposto ${r.status}: ${messaggioDa(testo)}`);
+  if (!r.ok) throw new ErroreHttp(502, `SkyTower ha risposto ${r.status}: ${messaggioDa(testo, c.token)}`);
   return (testo ? JSON.parse(testo) : null) as T;
 }
 

@@ -36,11 +36,16 @@ const host = process.env.LOGBOOK_API_HOST ?? process.env.HOST ?? '127.0.0.1';
 const app = creaApp(prisma, produzione ? { cartellaInterfaccia: path.join(RADICE_APP, 'dist') } : {});
 
 // File caricati ma mai collegati a un documento (finestra chiusa a metà) da più di un
-// giorno: si tolgono all'avvio. Un errore qui non deve impedire l'avvio.
+// giorno: si tolgono all'avvio e poi ogni 6 ore (verifica di sicurezza del Giorno 23: con
+// il server acceso per settimane non si accumulano). Un errore qui non ferma il server.
 const { cartellaDocumentiPredefinita, pulisciFileOrfani } = await import('./servizi/archivio-file');
-pulisciFileOrfani(prisma, cartellaDocumentiPredefinita())
-  .then((n) => n && console.log(`[logbook] tolti ${n} file caricati e mai usati`))
-  .catch((e) => console.warn('[logbook] pulizia dei file non riuscita:', e));
+const pulisci = () =>
+  pulisciFileOrfani(prisma, cartellaDocumentiPredefinita())
+    .then((n) => n && console.log(`[logbook] tolti ${n} file caricati e mai usati`))
+    .catch((e) => console.warn('[logbook] pulizia dei file non riuscita:', e));
+pulisci();
+// unref: il timer non tiene acceso il processo alla chiusura.
+setInterval(pulisci, 6 * 60 * 60 * 1000).unref();
 // Express 5 chiama questa funzione anche quando l'ascolto fallisce, passandole l'errore:
 // in quel caso si tace e ci pensa il gestore 'error' qui sotto (altrimenti il log direbbe
 // "in ascolto" subito prima di "porta occupata").

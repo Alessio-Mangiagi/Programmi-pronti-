@@ -50,6 +50,13 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const cartellaDocumenti = opzioni.cartellaDocumenti ?? cartellaDocumentiPredefinita();
   const app = express();
   app.disable('x-powered-by');
+  // Intestazioni di sicurezza su ogni risposta (verifica del Giorno 23): niente indirizzo
+  // della pagina mandato ad altri siti, niente "indovinare" il tipo dei file.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+  });
   // Dietro un proxy (Vite in sviluppo, Caddy in produzione) req.ip deve essere quello
   // del browser, non del proxy: serve al limite dei tentativi di login.
   app.set('trust proxy', 'loopback');
@@ -66,8 +73,9 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
 
   /**
    * Data di Logbook (Giorno 19): l'interfaccia decide cos'è "oggi" con questa, non con
-   * l'orologio del PC, e avvisa se il PC ha un'altra data. Il dipendente registra ore solo
-   * oggi: spostare la data del computer non apre i giorni passati (li controlla il server).
+   * l'orologio del PC, e avvisa se il PC ha un'altra data. Dal Giorno 20 le ore le inserisce
+   * solo HR e i giorni futuri restano chiusi: spostare la data del computer non apre nulla,
+   * perché il controllo lo fa il server. Senza login di proposito: è solo la data.
    */
   api.get('/oggi', (_req, res) => {
     res.json({ oggi: oggi(), adesso: new Date().toISOString() });
@@ -133,6 +141,22 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   // ricaricato dal browser), index.html — le pagine le gestisce React Router.
   if (opzioni.cartellaInterfaccia) {
     const cartella = opzioni.cartellaInterfaccia;
+    // Pagine dell'interfaccia (verifica di sicurezza del Giorno 23):
+    // - frame-ancestors 'none' + X-Frame-Options: nessun sito (nemmeno un'altra app della
+    //   suite sullo stesso indirizzo) può mostrare Logbook dentro un riquadro e far cliccare
+    //   l'utente collegato senza che se ne accorga. Il Portale apre Logbook in una scheda sua;
+    // - script, fogli di stile e chiamate solo da Logbook stesso; 'unsafe-inline' sugli
+    //   stili serve alle proprietà style di React. I file caricati hanno una politica loro
+    //   (server/rotte/file.ts).
+    app.use((_req, res, next) => {
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; " +
+          "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      );
+      res.setHeader('X-Frame-Options', 'DENY');
+      next();
+    });
     app.use(express.static(cartella, { index: false, maxAge: '1h' }));
     app.use((req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();

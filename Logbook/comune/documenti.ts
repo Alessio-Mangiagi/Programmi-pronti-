@@ -26,6 +26,13 @@ import { dataObbligatoria, testoFacoltativo, testoObbligatorio } from './schemi'
 export const ESTENSIONI_FILE = ['pdf', 'p7m', 'jpg', 'jpeg', 'png', 'webp', 'docx', 'xlsx', 'odt', 'ods', 'doc', 'xls', 'txt'] as const;
 export const MAX_MB_FILE = 20;
 
+/**
+ * Formati ammessi per l'allegato di un'assenza (verifica di sicurezza del Giorno 23): solo
+ * PDF, .p7m e immagini. Lo carica il dipendente e lo apre HR: niente Word ed Excel, che
+ * possono contenere macro. Controllato dal server (server/rotte/assenze.ts) e dal campo file.
+ */
+export const ESTENSIONI_ALLEGATO_ASSENZA = ['pdf', 'p7m', 'jpg', 'jpeg', 'png', 'webp'] as const;
+
 export const TIPI_ATTESTATO = ['SICUREZZA', 'PRIMO_SOCCORSO', 'ANTINCENDIO', 'PATENTINO', 'VISITA_MEDICA', 'ALTRO'] as const;
 type TipoAttestato = (typeof TIPI_ATTESTATO)[number];
 

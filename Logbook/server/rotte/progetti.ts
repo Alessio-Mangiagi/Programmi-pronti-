@@ -14,8 +14,10 @@
  * - DELETE /:id/dipendenti/:dipendenteId   toglie l'assegnazione (admin); le ore già
  *                                registrate restano, ma non se ne possono aggiungere altre
  *
- * Lettura dell'elenco: tutti gli utenti collegati (nel calendario servono codice e colore
- * dei progetti delle ore già registrate). Niente cancellazione dei progetti: uno finito si
+ * Lettura dell'elenco: HR tutti; un DIPENDENTE (verifica di sicurezza del Giorno 23) solo
+ * i progetti a cui è assegnato più quelli su cui ha ore registrate (nel calendario servono
+ * codice e colore delle sue ore anche se nel frattempo è stato tolto dal progetto), senza
+ * commessa SkyTower e numero di assegnati, che sono dati di HR. Niente cancellazione dei progetti: uno finito si
  * mette in stato CHIUSO e non compare più fra quelli selezionabili, ma le ore già
  * registrate restano nei report.
  */
@@ -48,15 +50,21 @@ export function rotteProgetti(prisma: PrismaClient) {
     // ?assegnatiA: per il dipendente vale sempre e solo il suo id (dipendenteAmmesso → 403 se ne chiede un altro).
     const richiesto = idDaParametro(req.query.assegnatiA, 'assegnatiA');
     const assegnatiA = richiesto !== undefined ? dipendenteAmmesso(req, richiesto) : undefined;
+    const admin = isAdmin(req);
+    // Dipendente senza ?assegnatiA: i suoi progetti, cioè assegnati oppure con sue ore.
+    const mioId = admin ? undefined : dipendenteAmmesso(req);
     const elenco = await prisma.progetto.findMany({
       where: {
         ...(stato === 'ATTIVO' || stato === 'SOSPESO' || stato === 'CHIUSO' ? { stato } : {}),
         ...(assegnatiA ? { assegnazioni: { some: { dipendenteId: assegnatiA } } } : {}),
+        ...(!admin && !assegnatiA
+          ? { OR: [{ assegnazioni: { some: { dipendenteId: mioId ?? -1 } } }, { registrazioni: { some: { dipendenteId: mioId ?? -1 } } }] }
+          : {}),
       },
       include: { _count: { select: { assegnazioni: true } } },
       orderBy: { codice: 'asc' },
     });
-    res.json(elenco.map(({ _count, ...p }) => ({ ...p, assegnati: _count.assegnazioni })));
+    res.json(elenco.map(({ _count, commessaSkytower, ...p }) => (admin ? { ...p, commessaSkytower, assegnati: _count.assegnazioni } : p)));
   });
 
   router.get('/:id', async (req, res) => {
@@ -65,6 +73,10 @@ export function rotteProgetti(prisma: PrismaClient) {
       const mioId = dipendenteAmmesso(req)!;
       const assegnato = await prisma.assegnazioneProgetto.findUnique({ where: { progettoId_dipendenteId: { progettoId: p.id, dipendenteId: mioId } } });
       if (!assegnato) throw vietato('Non sei assegnato a questo progetto');
+      // Come nell'elenco: la commessa SkyTower è un dato di HR.
+      const { commessaSkytower: _nascosta, ...perDipendente } = p;
+      res.json(perDipendente);
+      return;
     }
     res.json(p);
   });
