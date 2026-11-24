@@ -13,7 +13,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 11 (23/11):** richieste aggiuntive ✅ (data minima 2020, ore massime per progetto, estratti mensili)
 - **Giorno 12 (23/11):** nuova estetica Cosedil ✅
 - **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti"
-- **Ultimo aggiornamento:** 24/11/2026 (aggiunte le domande aperte sul costo delle festività e sul report della suite)
+- **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
+- **Ultimo aggiornamento:** 24/11/2026
 
 ## Cosa c'era nella cartella
 
@@ -58,7 +59,7 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Malattia: niente note del dipendente (solo protocollo) | Evita che si scrivano informazioni sanitarie nel campo libero |
 | 23/11 | Rifiuto sempre con motivo; HR può cambiare decisione e registrare assenze già approvate | Tracciabilità; malattia comunicata a voce |
 | 23/11 | Non si approvano ferie/malattia su giorni con ore registrate (409 con l'elenco dei giorni) | Niente giorni con ore e assenza insieme |
-| 23/11 | Festività "del paese" = tipo LOCALE inserito da HR, una festività per giorno | Interpretazione di "paese specifico" come città della sede (da confermare) |
+| 23/11 | Festività "del paese" = tipo LOCALE inserito da HR, una festività per giorno | Interpretazione di "paese specifico" come città della sede, confermata dall'utente il 24/11 |
 | 23/11 | Import "tutto o niente": con un solo errore non si importa nulla | Criterio della specifica; niente file importati a metà |
 | 23/11 | Il file viaggia due volte (anteprima e conferma), nessuno stato sul server | La conferma ricontrolla sui dati aggiornati |
 | 23/11 | Riga di esempio del modello marcata "RIGA DI ESEMPIO" e ignorata all'import | Dimenticarsi di cancellarla non crea ore finte |
@@ -76,25 +77,19 @@ sessione per riprendere da dove si era rimasti.
 | 23/11 | Nessun inserimento prima del 01/01/2020, ovunque (risposta 1b): ore, assenze, festività, import, assunzione/cessazione, date dei progetti. `DATA_MINIMA` in `comune/date.ts` | Richiesta dell'utente; la lettura di dati vecchi resta possibile |
 | 23/11 | Ore massime giornaliere sul progetto (`maxMinutiGiorno`), per dipendente, salvataggio bloccato oltre il limite (risposta 2b) da interfaccia, API e import | Richiesta dell'utente; visibili in scheda progetto, calendario ed editor |
 | 23/11 | Estratti mensili "mese a calendario" e "giorni e costi" in Excel + anteprima + stampa/PDF dal browser (risposta 3abc) | Un solo calcolo (`comune/estratto-mese.ts`) per tutte e tre le uscite; PDF dalla stampa per avere lo stesso aspetto dell'anteprima senza librerie in più |
-| 23/11 | Costo del giorno netto e lordo; ferie/malattia valorizzate a ore di contratto nei giorni lavorativi, permessi alla loro durata, festività senza costo (risposta 4c) | Richiesta dell'utente; festività senza costo è una scelta mia, da confermare |
+| 23/11 | Costo del giorno netto e lordo; ferie/malattia valorizzate a ore di contratto nei giorni lavorativi, permessi alla loro durata, festività senza costo (risposta 4c) | Richiesta dell'utente; festività senza costo confermata dall'utente il 24/11 |
 | 23/11 | Estetica secondo la skill Cosedilfrontend: palette del marchio, grigi di Tailwind ridefiniti coi neutri Cosedil, font Ubuntu/Inter/Open Sans, schede con ombra blu, bottoni maiuscoli, icone SVG al posto delle emoji, logo della Suite Cosedil | Richiesta dell'utente ("ristruttura l'estetica usando /Cosedilfrontend") |
 | 23/11 | Font del marchio installati in locale (@fontsource) invece di Google Fonts | Funzionano su rete aziendale chiusa e non mandano richieste a servizi esterni |
 | 23/11 | Festività in verde (prima viola) e tavolozza progetti senza viola/magenta | Il design system vieta il viola |
 | 23/11 | Cartella lasciata `Logbook/` (maiuscola) | È la cartella aperta in VS Code: rinominarla ora romperebbe la sessione. Da decidere al Giorno 10 con la card del Portale |
+| 24/11 | 4 ottobre (San Francesco) festa nazionale dal 2026 in `comune/festivita.ts` | Legge approvata a ottobre 2025; confermato dall'utente |
+| 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
 
 - Il branch `feat/estrazione-dms` contiene anche lavoro OCR (5 commit non ancora in `main`
   e modifiche non committate non mie): nei commit di Logbook si aggiungono **solo** file
   di `Logbook/`.
-- Da confermare: "festività del paese specifico" interpretato come **paese/città della sede**
-  (patrono). Se invece si intendeva lo **Stato** (dipendenti all'estero), serve un campo
-  "paese" su festività e dipendente.
-- Da confermare: 4 ottobre (San Francesco) festa nazionale dal 2026 secondo la legge
-  approvata a ottobre 2025; se l'azienda non lo applica, HR lo elimina dalle festività.
-- Da confermare: negli estratti "giorni e costi" le **festività non hanno costo** (scelta del
-  Giorno 11). Se vanno pagate come giornata di contratto (ore settimanali / 5), basta
-  cambiare il calcolo in `comune/estratto-mese.ts`.
 - Report della suite: Logbook non è ancora nel foglio "Stato avanzamento programmi.xlsx"
   (radice del repo, fermo al 23/11): va aggiunto al prossimo aggiornamento.
 - Portale: le modifiche al registro sono nel repository; il portale in esercizio gira da
