@@ -24,6 +24,10 @@
  * righe né le modifiche in corso; il calendario si aggiorna con `onModificato`. La × di una
  * riga nuova, mai salvata, la toglie solo dal modulo.
  *
+ * Documentazione del giorno (Giorno 28, risposta 3c): per HR, sotto le fasce, allegati e nota
+ * sui progetti delle fasce GIÀ SALVATE, che finiscono nella documentazione del progetto
+ * (componenti/DocumentazioneGiorno.tsx). Si salva col suo pulsante, non con "Salva giornata".
+ *
  * `nonLavorativo` (dal 24/11/2026): motivo per cui il giorno non accetta ore (sabato,
  * domenica, festività). La finestra si apre solo se il giorno ha già ore registrate da
  * prima della regola: si possono togliere, non aggiungere né cambiare (lo stesso controllo
@@ -39,10 +43,15 @@ import { coloreProgetto } from '../colori';
 import type { Progetto, Registrazione } from '../tipi';
 import { Avviso, Caricamento, classiInput, Modale, Pulsante } from './ui';
 import { Icona } from './icone';
+import { DocumentazioneGiorno } from './DocumentazioneGiorno';
 import { SegnalazioniGiorno } from './Segnalazioni';
 
-/** Riga del modulo; `id` c'è solo per le fasce già salvate (servono a "Elimina fascia"). */
-type Riga = { chiave: number; id?: number; progettoId: string; oraInizio: string; oraFine: string; note: string };
+/**
+ * Riga del modulo; `id` e `progettoSalvato` ci sono solo per le fasce già salvate: servono a
+ * "Elimina fascia" e alla documentazione del giorno, che va sul progetto SALVATO della fascia
+ * (non su quello appena cambiato nel menu e non ancora salvato).
+ */
+type Riga = { chiave: number; id?: number; progettoSalvato?: string; progettoId: string; oraInizio: string; oraFine: string; note: string };
 
 const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 let contatore = 0;
@@ -97,7 +106,7 @@ export function EditorGiornata({
       .then(([fasce, prog, suoi]) => {
         setProgetti(prog);
         setAssegnati(new Set(suoi.map((p) => p.id)));
-        setRighe(fasce.map((f) => nuovaRiga({ id: f.id, progettoId: String(f.progettoId), oraInizio: f.oraInizio, oraFine: f.oraFine, note: f.note ?? '' })));
+        setRighe(fasce.map((f) => nuovaRiga({ id: f.id, progettoSalvato: String(f.progettoId), progettoId: String(f.progettoId), oraInizio: f.oraInizio, oraFine: f.oraFine, note: f.note ?? '' })));
       })
       .catch((e: Error) => setMessaggio(e.message));
   }, [dipendenteId, data]);
@@ -329,6 +338,15 @@ export function EditorGiornata({
             {messaggioMassimo(progetti.find((p) => p.id === o.progettoId)?.codice ?? '?', o.minuti, o.massimo)}
           </Avviso>
         ))}
+
+        {/* Solo chi può scrivere (HR, giorno non futuro): progetti delle fasce salvate e non chiusi. */}
+        {!soloVista && (
+          <DocumentazioneGiorno
+            data={data}
+            nomeDipendente={nomeDipendente}
+            progetti={progetti.filter((p) => p.stato !== 'CHIUSO' && righe.some((r) => r.progettoSalvato === String(p.id)))}
+          />
+        )}
 
         <SegnalazioniGiorno dipendenteId={dipendenteId} data={data} />
 

@@ -5,7 +5,8 @@
  * parte degli utenti in modo da poter supervisionare l'avanzamento".
  *
  * /api/documenti-progetto
- * - GET    ?progettoId=&daVedere=1   HR vede tutto (daVedere = solo i non ancora visti);
+ * - GET    ?progettoId=&data=&daVedere=1   HR vede tutto (data = un giorno, usata dalla
+ *                                    finestra delle ore; daVedere = solo i non ancora visti);
  *                                    il dipendente vede solo quello che ha caricato lui
  *                                    (dal Giorno 20 nulla di nuovo: carica solo HR)
  * - POST   { progettoId, data, titolo, nota?, percentuale?, fileId?, origine? }
@@ -31,6 +32,7 @@ import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
 import { idDaParametro, isAdmin, richiediAdmin } from '../middleware';
 import { eliminaFile, fileCollegabile, percorsoFile, vistaFile } from '../servizi/archivio-file';
 import { inviaDocumento, leggiCollegamento } from '../servizi/skytower';
+import { dataDaQuery } from './registrazioni';
 
 /** Relazioni da includere per mostrare un documento: file, autore (con nome), chi l'ha visto, progetto. */
 const COLLEGATI = {
@@ -73,9 +75,12 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
   router.get('/', async (req, res) => {
     const progettoId = idDaParametro(req.query.progettoId, 'progettoId');
     const daVedere = req.query.daVedere === '1';
+    // Giorno 28: ?data= per la documentazione del giorno nella finestra delle ore (risposta 3c).
+    const data = dataDaQuery(req.query.data, 'data');
     const elenco = await prisma.documentoProgetto.findMany({
       where: {
         ...(progettoId ? { progettoId } : {}),
+        ...(data ? { data } : {}),
         // Il dipendente vede solo il suo (risposta 2c); HR tutto.
         ...(isAdmin(req) ? {} : { autoreId: req.utente!.id }),
         ...(daVedere ? { visto: false } : {}),
