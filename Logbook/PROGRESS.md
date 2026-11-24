@@ -22,7 +22,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 20 (24/11):** le ore e la documentazione le inserisce solo HR; segnalazioni dei dipendenti con finestra a HR all'accesso e campanella ✅
 - **Giorno 21 (24/11):** menu laterale fermo durante lo scorrimento, voci sempre visibili ✅
 - **Giorno 22 (24/11):** allegato facoltativo alle assenze ✅
-- **Prossimo:** poi verifica di sicurezza, codice non chiamato e librerie non usate (richiesta del 24/11); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 23 (24/11):** verifica di codice, librerie e sicurezza; corrette le falle confermate, tranne la password dell'admin predefinito (da decidere) ✅
+- **Prossimo:** scelta sulla password dell'admin predefinito; pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -631,3 +632,58 @@ Verifiche: `npm test` 200/200 (5 in `giorno22.test.ts`), typecheck e build ok; m
 applicata al database demo all'avvio; Playwright su Edge 6/6 (avviso per la malattia,
 richiesta con allegato, il dipendente apre il file, graffetta e allegato per HR, ritiro).
 Guida: immagine 35.
+
+### Giorno 23 — Verifica del codice e della sicurezza (24/11/2026) ✅
+
+Richiesta: "una volta finito di implementare avvia una verifica per trovare le falle di
+sicurezza e le parti di codice che non vengono chiamate e le librerie non in uso".
+
+**Parte 1, codice e librerie** (commit `5d2cc3d`):
+- `npm audit` non trova vulnerabilità, né nelle librerie di produzione né in quelle di sviluppo.
+- knip 5 segnala come inutilizzata solo `@prisma/client`: è un falso allarme, perché la importa il client generato.
+- Codice morto eliminato: `oreDecimali`, `InArrivo`, la rotta `/api/segnalazioni/conteggio` e quattro tipi.
+- Duplicati unificati: la ricerca delle tabelle usa `corrisponde()`, poi il prefisso delle notifiche, le etichette e il link al giorno.
+- Tolti 36 `export` inutili.
+
+**Parte 2, sicurezza.** Una revisione indipendente in sola lettura ha trovato 14 punti, tutti ricontrollati sul codice.
+
+Corretti:
+- **Assenze fino al 9999.** Un dipendente poteva bloccare il server per secondi e rompere l'elenco di HR. Ora:
+  - le date oltre il 31/12/2100 non sono valide (`isDataValida`);
+  - i giorni lavorativi di un'assenza si contano senza ciclo (`contaGiorniLavorativi`).
+- **Login.**
+  - Il tentativo si conta prima di ogni `await`: prima, 500 richieste in parallelo valevano come una.
+  - Il nome utente ha un massimo di 60 caratteri e il registro dei tentativi ha un tetto, per non riempire la memoria.
+  - Per un utente inesistente si verifica una password finta, così il tempo di risposta è lo stesso.
+  - Il cambio password ha lo stesso limite di 5 tentativi.
+- **Cookie malformato.** Prima ogni chiamata dava 500, ora vale come "non collegato".
+- **SkyTower.**
+  - L'indirizzo non può contenere `?`, `#` o credenziali.
+  - Se cambia il server, il token va reinserito.
+  - URL composto con `URL` e `redirect: 'error'`.
+  - Il token viene oscurato nei messaggi d'errore, tagliati a 200 caratteri.
+  - Il link restituito da SkyTower si salva solo se è http(s).
+- **Progetti.** Il dipendente vede solo quelli assegnati o con sue ore, senza commessa SkyTower e numero di assegnati.
+- **File.**
+  - Al massimo 20 file caricati e non ancora collegati per utente, controllati prima di leggere il corpo.
+  - La pulizia degli orfani gira anche ogni 6 ore.
+  - Il download usa `pipeline`: prima un errore di lettura faceva cadere il server.
+- **Allegati delle assenze.** Solo PDF, .p7m e immagini (`ESTENSIONI_ALLEGATO_ASSENZA`): niente .doc/.xls con macro aperti da HR.
+- **Limiti di quantità.**
+  - Al massimo 20 segnalazioni aperte per dipendente.
+  - La nota di HR sulle assenze ha un massimo di 500 caratteri.
+- **Intestazioni.**
+  - Su ogni risposta: `nosniff` e `Referrer-Policy`.
+  - Sull'interfaccia: Content-Security-Policy con `frame-ancestors 'none'` e `X-Frame-Options: DENY`.
+
+Non corretti, e perché:
+- **Amministratore `admin` / `Admin2026!`.** Viene creato all'avvio se manca un admin e la password è scritta nel README. È una domanda aperta all'utente: obbligare il cambio al primo accesso, oppure esigere `LOGBOOK_ADMIN_PASSWORD`. Il database demo ha anche gli account di prova.
+- **`trust proxy 'loopback'`.** Il limite dei tentativi si può aggirare solo dietro un proxy sullo stesso PC che inoltra `X-Forwarded-For` senza riscriverlo. Vale per Vite in sviluppo, raggiungibile solo in locale.
+- **Cookie senza `Secure` su HTTP in rete.** È un tema di configurazione, da risolvere con HTTPS e `LOGBOOK_COOKIE_SECURE=1`.
+- **Email di SkyTower.** Chi è admin di Logbook sceglie con quale utente SkyTower agire. È così per contratto della suite.
+
+Verifiche:
+- `npm test` 216/216, di cui 16 nuovi in `sicurezza-giorno23.test.ts`. Fra questi: 20 login in parallelo, di cui 5 rifiutati con 401 e 15 con 429, e un finto SkyTower che ripete il token o reindirizza.
+- Typecheck ok.
+- Nel database demo nessuna data oltre il 2100.
+- Playwright su Edge 7/7: nessun blocco della CSP su 11 pagine (HR e dipendente), font caricati, Mario vede solo PRG-001 e PRG-003, e l'allegato delle assenze accetta solo PDF e immagini.

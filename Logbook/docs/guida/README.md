@@ -78,7 +78,8 @@ le vostre altre assenze):
 - **Malattia**: le date e solo il **numero di protocollo del certificato**. Non scrivete
   diagnosi né altre informazioni sanitarie: Logbook non ha campi per questo, di proposito.
 - **Allegato** (facoltativo): con **Allega file…** si aggiunge un file, es. il giustificativo
-  di un permesso. Per la malattia solo l'attestato per il datore di lavoro, **mai referti o
+  di un permesso: **solo PDF o immagini** (niente Word o Excel, che possono contenere
+  macro). Per la malattia solo l'attestato per il datore di lavoro, **mai referti o
   certificati con la diagnosi**. Finché la richiesta è in attesa si può togliere o sostituire.
 
 ![Richiesta di permesso con allegato](img/35-assenza-allegato.png)
@@ -235,7 +236,8 @@ accanto al nome (es. «Rossi Mario (CF RSSMRA8)»).
 ![Documenti del dipendente](img/24-documenti-dipendente.png)
 
 I file si caricano con **Scegli file…**: PDF, immagini, Word, Excel, OpenDocument, testo e
-PDF firmati (.p7m), fino a 20 MB. Clic sul nome per aprirlo. Attestati e documenti del
+PDF firmati (.p7m), fino a 20 MB. Clic sul nome per aprirlo. Un file caricato e mai salvato
+in una scheda si cancella da solo dopo un giorno; ognuno può averne al massimo 20 in sospeso. Attestati e documenti del
 dipendente li vede solo HR.
 
 ### Progetti
