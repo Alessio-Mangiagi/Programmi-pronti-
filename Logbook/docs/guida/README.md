@@ -87,9 +87,22 @@ In alto, i quattro riquadri dicono cosa richiede attenzione e diventano **gialli
 c'è da intervenire:
 
 - **Richieste da approvare**: clic per andare alle assenze.
-- **Giorni senza ore**: dipendenti che non hanno registrato giorni lavorativi fino a ieri.
+- **Giorni senza ore**: dipendenti che non hanno registrato giorni lavorativi fino a ieri
+  (clic: si scende all'elenco).
 - **Ore del mese**: lavorate e attese, con l'avanzamento per dipendente e per progetto.
-- **Assenti oggi**.
+- **Assenti oggi** (clic: tutte le assenze).
+
+Ogni voce dei pannelli sotto porta al suo elemento:
+
+- una **richiesta** o un'**assenza in arrivo** apre quella richiesta nella pagina Assenze;
+- il **nome** di chi ha giorni senza ore apre il suo calendario; il singolo **giorno** apre
+  subito il dettaglio di quel giorno per registrare le ore;
+- un dipendente nelle **ore del mese** apre il suo calendario;
+- un **progetto** apre la sua scheda;
+- una **festività** apre la scheda Festività.
+
+Il dipendente, dalla sua dashboard, va al calendario filtrato sul progetto o sul giorno
+della festività.
 
 ### Calendario
 
@@ -133,6 +146,12 @@ calendario (con un dipendente filtrato le caselle mostrano "ore/massimo", la leg
 "max …/giorno") e nell'editor della giornata; oltre il limite le ore non si salvano, né da
 interfaccia né da import. **Chiudi progetto** lo toglie dai progetti selezionabili per
 nuove ore; quelle già registrate restano.
+
+Il **colore nel calendario** si sceglie da un menu con i colori del marchio, ognuno col suo
+nome. **Automatico** lascia scegliere a Logbook (sempre lo stesso colore per quel
+progetto); **Altro colore…** serve solo per un codice colore particolare.
+
+![Menu dei colori del progetto](img/21-menu-colori.png)
 
 ### Assenze
 

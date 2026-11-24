@@ -14,6 +14,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 12 (23/11):** nuova estetica Cosedil ✅
 - **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti"
 - **Giorno 13 (24/11):** interfaccia adattabile in flexbox, dal cellulare agli schermi ultra wide ✅
+- **Giorno 14 (24/11):** produzione senza dati di esempio, porta 5210 in firewall e installer, dashboard cliccabile, menu dei colori ✅
+- **In attesa di risposta (24/11):** sezioni di dipendenti e progetti, attestati, documentazione dei progetti caricata dagli utenti, documenti e note nel menu di inserimento
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -86,6 +88,10 @@ sessione per riprendere da dove si era rimasti.
 | 24/11 | 4 ottobre (San Francesco) festa nazionale dal 2026 in `comune/festivita.ts` | Legge approvata a ottobre 2025; confermato dall'utente |
 | 24/11 | Layout in flexbox con a capo automatico (base per blocco, nessuna colonna fissa), `<main>` senza larghezza massima, tabelle a schede sotto i 640px | Richiesta dell'utente: cellulare e ultra wide; la base per blocco evita di scrivere un layout per ogni punto di rottura |
 | 24/11 | Sul telefono restano a scorrimento orizzontale (dentro il riquadro) solo l'anteprima dell'import e la tabella "giorni e costi" | Hanno 9-10 colonne da confrontare riga per riga: a schede si leggerebbero peggio; la pagina non sfora |
+| 24/11 | Dati di esempio su DB vuoto: sì in sviluppo, no in produzione, `LOGBOOK_DATI_DEMO` per forzare | Uso vero per HR senza dati finti, ma chi sviluppa o prova da una copia nuova ha ancora qualcosa da guardare |
+| 24/11 | Dashboard: collegamenti con parametri nell'indirizzo (`?apri=`, `?dipendente=&data=&giorno=`), tolti dopo l'apertura | Link normali (anche apribili in una nuova scheda); chiudendo la finestra non si riapre |
+| 24/11 | Ore del mese per dipendente → calendario del dipendente (non la scheda anagrafica) | Dal numero di ore ci si aspetta il dettaglio delle ore |
+| 24/11 | Menu dei colori con 10 colori del marchio con nome + Automatico + Altro colore | Uniforme alla piattaforma; il codice libero resta possibile ma secondario |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -93,12 +99,10 @@ sessione per riprendere da dove si era rimasti.
 - Il branch `feat/estrazione-dms` contiene anche lavoro OCR (5 commit non ancora in `main`
   e modifiche non committate non mie): nei commit di Logbook si aggiungono **solo** file
   di `Logbook/`.
-- Avvio in esercizio: con il database vuoto `scripts/prepara-db.ts` carica i dati di
-  esempio (5 dipendenti, ore finte). Prima dell'uso vero serve un interruttore per
-  partire vuoti (attività aperta nel foglio "Stato avanzamento programmi.xlsx", dove
-  Logbook è stato aggiunto il 24/11, commit a21d9fd).
-- Server: la porta 5210 è in Caddy e nel portale ma non ancora in `firewall-suite.ps1`
-  né in `installa-suite.py`.
+- `InstallaSuite.exe` (radice del repo) non include ancora Logbook: va ricostruito da
+  `installa-suite.py` con PyInstaller.
+- Il DB demo in uso (`data/logbook.db`) ha ancora i dati di esempio: per l'uso vero va
+  spostato e Logbook riavviato (parte vuoto con il solo admin).
 - Portale: le modifiche al registro sono nel repository; il portale in esercizio gira da
   una copia esterna (`Documents\suite cosedil`) e va aggiornato per vedere la card.
 - Cartella `Logbook/` → `logbook/`: si può rinominare quando nessun programma la tiene
@@ -371,3 +375,37 @@ Verifiche:
   1440: scheda dipendente; 3440: dashboard ed estratti).
 - PDF di stampa degli estratti rifatto da Edge: stessa impaginazione di prima.
 - `npm test` 138/138, typecheck ok, build ok.
+
+### Giorno 14 — Avvio senza dati di esempio, dashboard cliccabile, menu dei colori (24/11/2026) ✅
+
+Richiesta: "fai entrambe" (partenza senza dati finti; porta 5210 in firewall e installer),
+"la scelta del colore deve avere un menù più simile esteticamente alla piattaforma",
+"cliccando sugli elementi della dashboard devo poter andare all'elemento". La parte su
+sezioni, attestati, documenti e note è in attesa delle risposte alle domande del 24/11.
+
+Fatto:
+- `server/dati-demo.ts` (`decidiDatiDemo`): su database vuoto i dati di esempio si
+  caricano di default in sviluppo e NON in produzione; `LOGBOOK_DATI_DEMO=1/0` forza la
+  scelta. `prepara-db.ts --produzione` (da `prestart`), README, `.env.example`, `avvia.bat`.
+- Fuori da Logbook: porta 5210 in `firewall-suite.ps1`, `installa_logbook` in
+  `installa-suite.py` (npm ci + .env da .env.example). `InstallaSuite.exe` in radice va
+  ricostruito con PyInstaller per includerlo.
+- Dashboard: richieste e assenze in arrivo → `/assenze?apri=<id>`; giorni senza ore →
+  `/calendario?dipendente=&data=` e, sul singolo giorno, `&giorno=` che apre l'editor;
+  ore del mese → calendario del dipendente; progetti → `/progetti?apri=<id>` (HR) o
+  calendario filtrato (dipendente); festività → scheda Festività o calendario sul giorno;
+  tessere "Giorni senza ore" (scorre al pannello) e "Assenti oggi" cliccabili. Assenze,
+  Calendario e Progetti leggono i parametri e li tolgono dopo l'apertura.
+- `componenti/SceltaColore.tsx`: menu a scheda con i 10 colori del marchio con nome
+  (`COLORI_PROGETTO` in `src/colori.ts`), "Automatico" e "Altro colore…"; Esc chiude il
+  menu e non la finestra del progetto.
+
+Verifiche:
+- `npm test` 143/143 (5 nuovi in `dati-demo.test.ts`), typecheck e build ok.
+- `prepara-db` su quattro database nuovi nello scratchpad: produzione → vuoto + admin;
+  sviluppo → dati di esempio; `LOGBOOK_DATI_DEMO=1` in produzione → dati di esempio;
+  `=0` in sviluppo → vuoto + admin.
+- `installa-suite.py --dry-run --app logbook` ok; `firewall-suite.ps1` analizzato dal
+  parser di PowerShell senza errori (non eseguito: tocca il firewall del PC).
+- Playwright su Edge (HR e dipendente): 12 verifiche sui collegamenti della dashboard e
+  sul menu dei colori, tutte ok; nessun dato salvato (progetto chiuso con Annulla).

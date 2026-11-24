@@ -3,8 +3,11 @@
  * Progetti (solo HR): elenco con ricerca e filtro di stato, finestra per creare o
  * modificare. "Chiudi" mette il progetto in stato CHIUSO: non si può più scegliere
  * per nuove ore, ma quelle già registrate restano nei report.
+ *
+ * `?apri=<id>` (link dalla Dashboard, 24/11/2026) apre subito la scheda di quel progetto.
  */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { erroriPerCampo, schemaProgetto, STATI_PROGETTO } from '../../comune/schemi';
@@ -14,6 +17,7 @@ import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina,
 import type { Progetto } from '../tipi';
 import { usaDati } from '../usaDati';
 import { coloreProgetto } from '../colori';
+import { SceltaColore } from '../componenti/SceltaColore';
 
 const ETICHETTE_STATO: Record<Progetto['stato'], { testo: string; colore: 'verde' | 'giallo' | 'grigio' }> = {
   ATTIVO: { testo: 'Attivo', colore: 'verde' },
@@ -31,6 +35,22 @@ export function Progetti() {
   const { dati, errore, caricamento, ricarica } = usaDati<Progetto[]>('/api/progetti');
   const [filtroStato, setFiltroStato] = useState<Progetto['stato'] | ''>('');
   const [modifica, setModifica] = useState<Progetto | 'nuovo' | null>(null);
+
+  // ?apri=<id>: apre il progetto appena arriva l'elenco, poi toglie il parametro (chiudendo non si riapre).
+  const [parametri, setParametri] = useSearchParams();
+  const daAprire = Number(parametri.get('apri')) || null;
+  useEffect(() => {
+    if (!daAprire || !dati) return;
+    const trovato = dati.find((p) => p.id === daAprire);
+    if (trovato) setModifica(trovato);
+    setParametri(
+      (p) => {
+        p.delete('apri');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [daAprire, dati, setParametri]);
 
   const colonne: Colonna<Progetto>[] = [
     {
@@ -192,9 +212,17 @@ function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto 
           <Campo etichetta="Data fine" errore={errori.dataFine}>
             <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataFine)} {...campo('dataFine')} />
           </Campo>
-          <Campo etichetta="Colore nel calendario" errore={errori.colore}>
-            <input type="color" className="h-[34px] w-full rounded border border-gray-300" value={modulo.colore || '#0c4577'} onChange={(e) => setModulo((m) => ({ ...m, colore: e.target.value }))} />
-          </Campo>
+          {/* Niente <Campo> (che è un <label>): il menu dei colori contiene più pulsanti. */}
+          <div className="text-sm">
+            <span className="mb-1 block font-ui text-[0.82rem] font-semibold text-gray-600">Colore nel calendario</span>
+            <SceltaColore
+              valore={modulo.colore}
+              onCambia={(colore) => setModulo((m) => ({ ...m, colore }))}
+              automatico={coloreProgetto({ id: progetto?.id ?? 0, colore: null })}
+              errore={errori.colore}
+            />
+            {errori.colore && <span className="mt-0.5 block text-xs text-errore">{errori.colore}</span>}
+          </div>
         </div>
         <div className="flex justify-between gap-2 border-t border-gray-100 pt-3">
           <div>

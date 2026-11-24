@@ -10,8 +10,13 @@
  *
  * Per la malattia il modulo chiede solo il protocollo del certificato: niente note,
  * nessuna informazione sanitaria (vedi comune/assenze.ts).
+ *
+ * Collegamenti dalla Dashboard (24/11/2026): `?apri=<id>` apre subito quella richiesta,
+ * `?scheda=festivita|tutte` sceglie la scheda. Il parametro `apri` si toglie
+ * dall'indirizzo dopo l'apertura, così chiudendo la finestra non si riapre.
  */
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ETICHETTE_ASSENZA, ETICHETTE_FESTIVITA, ETICHETTE_STATO_ASSENZA, schemaAssenza, schemaFestivita, TIPI_ASSENZA, TIPI_FESTIVITA } from '../../comune/assenze';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
@@ -37,11 +42,35 @@ function periodo(a: AssenzaConGiorni) {
 
 export function Assenze() {
   const { admin } = useAuth();
-  const [scheda, setScheda] = useState<'attesa' | 'tutte' | 'festivita'>(admin ? 'attesa' : 'tutte');
+  const [parametri, setParametri] = useSearchParams();
+  const [scheda, setScheda] = useState<'attesa' | 'tutte' | 'festivita'>(() => {
+    const richiesta = parametri.get('scheda');
+    if (admin && richiesta === 'festivita') return 'festivita';
+    return richiesta === 'tutte' || !admin ? 'tutte' : 'attesa';
+  });
   const { dati, errore, caricamento, ricarica } = usaDati<AssenzaConGiorni[]>('/api/assenze');
   const { dati: dipendenti } = usaDati<Dipendente[]>(admin ? '/api/dipendenti' : null);
   const [aperta, setAperta] = useState<AssenzaConGiorni | 'nuova' | null>(null);
   const [filtroTipo, setFiltroTipo] = useState('');
+
+  // ?apri=<id> (dalla Dashboard): appena arrivano i dati apre quella richiesta; se non è
+  // più in attesa passa alla scheda "Tutte", dove compare nell'elenco.
+  const daAprire = Number(parametri.get('apri')) || null;
+  useEffect(() => {
+    if (!daAprire || !dati) return;
+    const trovata = dati.find((a) => a.id === daAprire);
+    if (trovata) {
+      setAperta(trovata);
+      if (trovata.stato !== 'RICHIESTA') setScheda('tutte');
+    }
+    setParametri(
+      (p) => {
+        p.delete('apri');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [daAprire, dati, setParametri]);
 
   const inAttesa = (dati ?? []).filter((a) => a.stato === 'RICHIESTA');
   const righe = (scheda === 'attesa' ? inAttesa : dati ?? []).filter((a) => !filtroTipo || a.tipo === filtroTipo);

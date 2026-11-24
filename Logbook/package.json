@@ -8,7 +8,7 @@
     "predev": "tsx scripts/prepara-db.ts",
     "dev": "concurrently -k -n api,web -c blue,green \"tsx watch --clear-screen=false server/index.ts\" \"vite\"",
     "build": "npm run typecheck && vite build",
-    "prestart": "tsx scripts/prepara-db.ts && vite build --logLevel warn",
+    "prestart": "tsx scripts/prepara-db.ts --produzione && vite build --logLevel warn",
     "start": "tsx server/index.ts --produzione",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",

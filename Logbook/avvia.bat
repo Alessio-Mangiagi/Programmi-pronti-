@@ -2,7 +2,8 @@
 REM "><(((º> sabusabu <º)))><"
 REM Avvia Logbook sul PC: un solo server su http://127.0.0.1:5210 (API + interfaccia).
 REM Doppio clic: la prima volta installa le dipendenze, poi prepara il database
-REM (migrazioni + dati di esempio se vuoto, vedi scripts\prepara-db.ts), compila
+REM (migrazioni; un database nuovo parte vuoto col solo admin, niente dati di esempio:
+REM vedi scripts\prepara-db.ts e LOGBOOK_DATI_DEMO in .env.example), compila
 REM l'interfaccia e apre il browser. Per fermare: chiudere questa finestra o Ctrl+C.
 REM
 REM Avviato dal Portale della suite (avvia.vbs, finestra nascosta) riceve:

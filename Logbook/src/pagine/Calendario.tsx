@@ -17,9 +17,14 @@
  * mostra numero e totale e, al posto delle etichette, un pallino colorato per ogni
  * progetto o assenza. Il dettaglio si legge aprendo il giorno. La settimana sul
  * telefono è un elenco verticale di giorni; da 768px torna a sette colonne affiancate.
+ *
+ * Collegamenti dalla Dashboard (24/11/2026): `?dipendente=<id>&progetto=<id>&data=<AAAA-MM-GG>`
+ * preimpostano filtri e periodo; con `&giorno=<AAAA-MM-GG>` (e un dipendente) si apre
+ * subito l'editor di quel giorno. `giorno` si toglie dall'indirizzo dopo l'apertura.
  */
-import { useMemo, useState } from 'react';
-import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, isFineSettimana, oggiIso } from '../../comune/date';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, isDataValida, isFineSettimana, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { calcolaTotali, inizioSettimana } from '../../comune/riepiloghi';
 import { useAuth } from '../auth';
@@ -54,10 +59,13 @@ function testoAssenza(a: AssenzaCal, conNome: boolean) {
 
 export function Calendario() {
   const { utente, admin } = useAuth();
+  const [parametri, setParametri] = useSearchParams();
+  const dataDaLink = parametri.get('data') ?? '';
   const [vista, setVista] = useState<'mese' | 'settimana'>('mese');
-  const [riferimento, setRiferimento] = useState(oggiIso());
-  const [dipendenteId, setDipendenteId] = useState<string>(admin ? '' : String(utente?.dipendenteId ?? ''));
-  const [progettoId, setProgettoId] = useState('');
+  const [riferimento, setRiferimento] = useState(isDataValida(dataDaLink) ? dataDaLink : oggiIso());
+  // Il dipendente non sceglie: vede sempre e solo se stesso (lo impone anche il server).
+  const [dipendenteId, setDipendenteId] = useState<string>(admin ? (parametri.get('dipendente') ?? '') : String(utente?.dipendenteId ?? ''));
+  const [progettoId, setProgettoId] = useState(parametri.get('progetto') ?? '');
   const [tipoAssenza, setTipoAssenza] = useState('');
   const [giornoAperto, setGiornoAperto] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ dipendenteId: number; nome: string; data: string } | null>(null);
@@ -115,6 +123,23 @@ export function Calendario() {
     if (dipendenteId) setEditor({ dipendenteId: Number(dipendenteId), nome: nomeDipendenteScelto(), data });
     else setGiornoAperto(data);
   };
+
+  // ?giorno=<data> (dalla Dashboard, "giorni senza ore"): apre l'editor appena si conosce
+  // il nome del dipendente (per HR serve l'elenco dei dipendenti), poi toglie il parametro.
+  const giornoDaLink = parametri.get('giorno');
+  const nomePronto = !admin || !!dipendenti;
+  useEffect(() => {
+    if (!giornoDaLink || !nomePronto) return;
+    if (isDataValida(giornoDaLink)) apriGiorno(giornoDaLink);
+    setParametri(
+      (p) => {
+        p.delete('giorno');
+        return p;
+      },
+      { replace: true },
+    );
+    // apriGiorno cambia a ogni render: l'effetto deve scattare solo all'arrivo del link.
+  }, [giornoDaLink, nomePronto]);
 
   /** Righe informative per l'editor: festività e assenze di quel dipendente in quel giorno. */
   const avvisiGiorno = (data: string, idDip: number) => {

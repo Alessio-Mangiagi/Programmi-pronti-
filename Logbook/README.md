@@ -28,10 +28,17 @@ Su Windows basta il doppio clic su **`avvia.bat`**: la prima volta installa le d
 poi avvia tutto e apre il browser. **`avvia.vbs`** fa lo stesso senza finestra (è il
 launcher usato dal Portale della suite).
 
-Al primo avvio viene creato `data/logbook.db` con i **dati di esempio** (5 dipendenti,
-3 progetti, ore dal primo giorno del mese scorso a ieri, qualche assenza, festività
-nazionali). Agli avvii successivi i dati non vengono toccati: le nuove versioni applicano
-solo le migrazioni mancanti.
+Al primo avvio viene creato `data/logbook.db`:
+
+- con **`npm start` / `avvia.bat`** (produzione) il database parte **vuoto**, con il solo
+  amministratore `admin` (password di `LOGBOOK_ADMIN_PASSWORD`, oppure `Admin2026!` da
+  cambiare subito): HR inserisce dipendenti e progetti veri;
+- con **`npm run dev`** (sviluppo) arrivano i **dati di esempio** (5 dipendenti, 3 progetti,
+  ore dal primo giorno del mese scorso a ieri, qualche assenza, festività nazionali).
+
+`LOGBOOK_DATI_DEMO=1` carica i dati di esempio anche in produzione (copia dimostrativa),
+`LOGBOOK_DATI_DEMO=0` li esclude anche in sviluppo. Agli avvii successivi i dati non
+vengono mai toccati: le nuove versioni applicano solo le migrazioni mancanti.
 
 ### Credenziali di prova (dati di esempio)
 
@@ -46,10 +53,10 @@ la password di `LOGBOOK_ADMIN_PASSWORD` o `Admin2026!`).
 
 ### Partire senza dati di esempio
 
-Per un uso reale: avviare una volta (si crea il DB con i dati di esempio), poi da HR
-disattivare dipendenti e chiudere progetti di prova, oppure cancellare `data/logbook.db`,
-avviare e rimuovere i dati demo. In alternativa `npm run db:reset` riporta il database ai
-**soli** dati di esempio (**cancella tutto**).
+È il comportamento di `npm start` / `avvia.bat` su un database nuovo (dal 24/11/2026). Un
+database che contiene già i dati di esempio non viene svuotato da solo: per ripartire
+puliti, fermare Logbook, spostare altrove `data/logbook.db` e riavviare.
+`npm run db:reset` invece riporta il database ai **soli** dati di esempio (**cancella tutto**).
 
 ## Il modello Excel per importare le ore
 
@@ -126,6 +133,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
 | `LOGBOOK_ADMIN_PASSWORD` | `Admin2026!` | Password dell'admin creato solo se non ne esiste nessuno |
+| `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
 | `LOGBOOK_COOKIE_SECURE` | — | `1` dietro HTTPS: il cookie viaggia solo cifrato |
 
 ## Nella suite Cosedil

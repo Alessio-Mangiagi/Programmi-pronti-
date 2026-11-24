@@ -1,21 +1,28 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Prepara il database prima dell'avvio (eseguito da solo prima di `npm run dev`).
+ * Prepara il database prima dell'avvio (eseguito da solo prima di `npm run dev` e, con
+ * l'argomento --produzione, prima di `npm start` / avvia.bat).
  *
  * 1. Se manca il client Prisma generato (es. npm install con --ignore-scripts) lo genera.
  * 2. Applica le migrazioni mancanti (`prisma migrate deploy`): crea data/logbook.db la
  *    prima volta e aggiorna la struttura dopo un aggiornamento dell'app. Non cancella
  *    mai dati: le migrazioni sono solo quelle già scritte in prisma/migrations.
- * 3. Se non c'è nessun dipendente carica i dati di esempio (prisma/seed.ts).
+ * 3. Se non c'è nessun dipendente carica i dati di esempio (prisma/seed.ts), ma solo
+ *    dove serve: di default in sviluppo sì, in produzione no (LOGBOOK_DATI_DEMO cambia
+ *    la scelta, vedi server/dati-demo.ts).
  * 4. Se non c'è nessun amministratore attivo ne crea uno (vedi sotto).
  *
  * Così "npm run dev" su una copia appena scaricata parte già con dati da guardare,
- * e su un database in uso non tocca nulla.
+ * l'installazione per HR parte vuota e su un database in uso non si tocca nulla.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { RADICE_APP } from '../server/database-url';
+import { decidiDatiDemo } from '../server/dati-demo';
+
+// package.json: "prestart" passa --produzione, "predev" no.
+const modo = process.argv.includes('--produzione') ? 'produzione' : 'sviluppo';
 
 try {
   process.loadEnvFile(path.join(RADICE_APP, '.env'));
@@ -42,11 +49,20 @@ const { semina } = await import('../prisma/seed');
 const prisma = creaPrisma();
 try {
   if ((await prisma.dipendente.count()) === 0) {
-    const r = await semina(prisma);
-    console.log(
-      `[logbook] database vuoto: caricati i dati di esempio (${r.dipendenti} dipendenti, ${r.progetti} progetti, ` +
-        `${r.registrazioni} fasce orarie dal ${r.periodo.da} al ${r.periodo.a}).`,
-    );
+    const demo = decidiDatiDemo(process.env.LOGBOOK_DATI_DEMO, modo);
+    if (demo.avviso) console.warn(`[logbook] ${demo.avviso}`);
+    if (demo.carica) {
+      const r = await semina(prisma);
+      console.log(
+        `[logbook] database vuoto: caricati i dati di esempio (${r.dipendenti} dipendenti, ${r.progetti} progetti, ` +
+          `${r.registrazioni} fasce orarie dal ${r.periodo.da} al ${r.periodo.a}).`,
+      );
+    } else {
+      console.log(
+        `[logbook] database vuoto, nessun dato di esempio (${modo}): entrare come amministratore e inserire ` +
+          'dipendenti e progetti. Per i dati di prova: LOGBOOK_DATI_DEMO=1.',
+      );
+    }
   } else {
     console.log('[logbook] database pronto.');
   }
