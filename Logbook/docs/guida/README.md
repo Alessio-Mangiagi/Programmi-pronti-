@@ -223,6 +223,19 @@ accanto al nome (es. «Rossi Mario (CF RSSMRA8)»).
 
 - **Anagrafica**: il **codice fiscale** viene controllato (un codice sbagliato non si
   salva); matricola e codice fiscale devono essere unici.
+- **Matricola**: è la **sigla del contratto + un numero**, così si riconosce subito il tipo
+  di rapporto: IND (indeterminato), DET (determinato), APP (apprendistato), SOM
+  (somministrazione), COL (collaborazione), TIR (tirocinio). Esempi: IND-0001, DET-0004.
+  Per un dipendente nuovo Logbook propone il **prossimo numero libero**, che si può
+  correggere (basta scrivere il numero, la sigla la mette Logbook). Se cambia il contratto
+  **cambia solo la sigla** e il numero resta (DET-0004 diventa IND-0004). Il numero è unico:
+  IND-0004 e DET-0004 non possono esistere insieme.
+- **Mansione**: si sceglie dall'**elenco**, scrivendo alcune lettere. Se se ne scrive una
+  nuova compare l'avviso «Nuova mansione» e al salvataggio entra nell'elenco per tutti. Una
+  mansione già presente scritta con altre maiuscole prende la grafia dell'elenco.
+
+![Matricola proposta e mansione nuova](img/38-matricola-mansione.png)
+
 - **Contratto e costi**: contratto, assunzione, ore settimanali e costo orario **netto** e
   **lordo** in euro (es. 14,50). I costi li vede solo HR e servono ai report.
 - **Account**: crea il nome utente e la password del dipendente, o ne reimposta la
@@ -349,6 +362,8 @@ collegamento il pulsante non c'è. Il token, una volta salvato, non si rilegge p
 1. **Importa → Scarica il modello .xlsx**. Il foglio "Ore" ha le colonne Matricola, Data
    (gg/mm/aaaa), Ora inizio e Ora fine (HH:MM), Codice progetto, Note. Gli altri fogli
    spiegano le regole ed elencano matricole e codici validi (anche nei menu a tendina).
+   Il dipendente si riconosce dal **numero** della matricola: valgono anche i file vecchi
+   con «0004» o con la sigla del contratto di prima.
 2. Compilate una riga per ogni fascia oraria. La riga di esempio viene ignorata.
 3. Scegliete il file: Logbook mostra l'**anteprima** e controlla ogni riga.
 

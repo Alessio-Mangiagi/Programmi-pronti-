@@ -24,7 +24,9 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 22 (24/11):** allegato facoltativo alle assenze ✅
 - **Giorno 23 (24/11):** verifica di codice, librerie e sicurezza; corrette le falle confermate, tranne la password dell'admin predefinito (da decidere) ✅
 - **Giorno 24 (24/11):** password provvisoria da cambiare al primo accesso, tolte le rotte mai usate (HR elimina la singola fascia), better-sqlite3 dichiarato ✅
-- **Prossimo:** matricola legata al tipo di contratto e mansioni da elenco (domande aperte); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 25 (24/11):** sabato e domenica esclusi da tutte le estrazioni (report, estratti, Excel, stampa) ✅
+- **Giorno 26 (24/11):** matricola sigla del contratto + numero, mansioni da elenco che si arricchisce ✅
+- **Prossimo:** pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -732,3 +734,47 @@ Verifiche:
 **Domande aperte** (nuove richieste dello stesso messaggio):
 - la matricola alfanumerica con riferimento al tipo di contratto;
 - il tipo di mansione da scegliere da un elenco, con le mansioni nuove che restano disponibili.
+
+### Giorno 25 — Estrazioni senza sabato e domenica (24/11/2026) ✅
+
+Richiesta: "nelle estrazioni per la stampa deve sempre essere escluso sabato e domenica".
+- `costruisciEstratto` (`comune/estratto-mese.ts`) restituisce solo i giorni da lunedì a venerdì. Vale per i due Excel mensili, l'anteprima e la stampa/PDF.
+- La griglia "mese a calendario" ha cinque colonne (`GIORNI_GRIGLIA`, `settimaneDelMese`). In Excel anagrafica e riepilogo sono passati in G-H.
+- Il report "calendario lavorato" non ha più righe di sabato e domenica.
+- I totali restano calcolati su tutto il periodo: dal Giorno 16 nel fine settimana non si registrano ore.
+
+Commit `5f72a70` e `27adc99` (guida, immagini 15 e 16 rifatte). Test 219/219. Playwright su Edge, a schermo e in stampa: griglia Lun-Ven e 22 righe in ottobre 2026.
+
+### Giorno 26 — Matricola legata al contratto, mansioni da elenco (24/11/2026) ✅
+
+Richiesta: "la matricola deve essere alfanumerica con riferimento al tipo di contratto per identificare prima il personale; deve essere possibile inserire il tipo di mansione e anche segnalarla come nuovo campo disponibile dopo l'inserimento". Risposte "tutti i suggeriti" (1a 2a 3a 4a).
+
+**Matricola** (`comune/matricola.ts`):
+- forma SIGLA-NUMERO: IND, DET, APP, SOM, COL, TIR, più un numero di almeno 4 cifre;
+- il numero è unico fra tutti i dipendenti, qualunque sia la sigla;
+- `schemaDipendente` accetta anche il solo numero ("7" diventa "IND-0007") e mette sempre la sigla del contratto;
+- `GET /api/dipendenti/prossima-matricola` propone il prossimo numero libero;
+- nella scheda, cambiando il contratto cambia subito la sigla;
+- l'import delle ore riconosce il dipendente dal numero: valgono anche "0004" e "DET-0004" per chi ora è IND-0004.
+
+**Mansioni**:
+- nuova tabella `Mansione`;
+- `GET /api/dipendenti/mansioni`;
+- nella scheda la mansione si sceglie da un `datalist` con ricerca; per una mansione nuova compare l'avviso e al salvataggio entra nell'elenco;
+- una mansione già presente scritta con altre maiuscole prende la grafia dell'elenco.
+
+**Migrazione `20261124200000_matricola_contratto_mansioni`**:
+- crea `Mansione` e la riempie con le mansioni già presenti, senza doppioni per maiuscole;
+- converte le matricole solo numeriche nella forma nuova;
+- salta quelle non numeriche e quelle che darebbero un numero doppio.
+
+Seed: IND-0001, IND-0002, IND-0003, DET-0004, IND-0005 e l'elenco delle mansioni.
+
+Verifiche:
+- `npm test` 228/228, di cui 9 nuovi in `giorno26.test.ts`; fra questi c'è la migrazione eseguita sul database di prova;
+- typecheck ok;
+- Playwright su Edge, su una copia del database:
+  - matricole convertite (Ferrari DET-0004);
+  - proposta IND-0006, che diventa DET-0006 cambiando contratto;
+  - elenco delle mansioni e avviso per "Gruista".
+- Guida: immagine 38.
