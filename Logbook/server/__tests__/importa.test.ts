@@ -113,7 +113,7 @@ describe('file corretto', () => {
     const file = await creaFile(
       [
         ['PRG-001', new Date(Date.UTC(2026, 10, 23)), 8 / 24, 12 / 24, '0001', 'Da Excel'],
-        ['PRG-002', '23/11/2026', '13:00', '17:00', '0001', null],
+        ['PRG-003', '23/11/2026', '13:00', '17:00', '0001', null], // PRG-003: Mario è assegnato a 001 e 003
         ['prg-002', '23.11.2026', '8.30', '12:30', '0002', 'Testo e minuscole'],
       ],
       ['Codice progetto', 'Data', 'Ora inizio', 'Ora fine', 'Matricola', 'Note'],

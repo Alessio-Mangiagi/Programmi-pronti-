@@ -171,6 +171,12 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   for (const d of DIPENDENTI) dipendenti.push(await prisma.dipendente.create({ data: { ...d.dati } }));
   const [rossi, bianchi, esposito, ferrari, russo] = dipendenti;
 
+  // --- Assegnazioni ai progetti (Giorno 17): ognuno ai due progetti su cui lavora --------
+  // Senza assegnazione non si registrano ore (server/servizi/regole-ore.ts).
+  await prisma.assegnazioneProgetto.createMany({
+    data: DIPENDENTI.flatMap((modello, i) => modello.progetti.map((p) => ({ dipendenteId: dipendenti[i].id, progettoId: progetti[p].id }))),
+  });
+
   // --- Account di accesso: un admin (HR) e un account per ogni dipendente ---------------
   const hr = await prisma.utente.create({
     data: { username: CREDENZIALI_DEMO.admin.username, passwordHash: await creaImpronta(CREDENZIALI_DEMO.admin.password), ruolo: 'ADMIN' },

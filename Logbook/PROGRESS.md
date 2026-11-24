@@ -16,7 +16,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 14 (24/11):** produzione senza dati di esempio, porta 5210 in firewall e installer, dashboard cliccabile, menu dei colori ✅
 - **Giorno 15 (24/11):** file, attestati, documenti del dipendente a schede, Impostazioni con collegamento a SkyTower ✅
 - **Giorno 16 (24/11):** calendario Lun–Ven e niente ore il sabato, la domenica e i festivi ✅
-- **Prossimo:** (dopo le risposte) pannello laterale e assegnazioni ai progetti; documentazione dei progetti (2c, 3c); grafici in dashboard
+- **Giorno 17 (24/11):** assegnazione dei dipendenti ai progetti, pagina del progetto con documentazione di avanzamento, grafico e note ✅
+- **Prossimo:** Giorno 18 scheda dipendente su una sola pagina, omonimi distinti dal codice fiscale, scelte con ricerca a caratteri, assenze in pagina; Giorno 19 pannello laterale del calendario con più giorni; poi allegati e note nella giornata (3c) e grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -93,6 +94,11 @@ sessione per riprendere da dove si era rimasti.
 | 24/11 | Dashboard: collegamenti con parametri nell'indirizzo (`?apri=`, `?dipendente=&data=&giorno=`), tolti dopo l'apertura | Link normali (anche apribili in una nuova scheda); chiudendo la finestra non si riapre |
 | 24/11 | Ore del mese per dipendente → calendario del dipendente (non la scheda anagrafica) | Dal numero di ore ci si aspetta il dettaglio delle ore |
 | 24/11 | Menu dei colori con 10 colori del marchio con nome + Automatico + Altro colore | Uniforme alla piattaforma; il codice libero resta possibile ma secondario |
+| 24/11 | Assegnazione dipendente-progetto **obbligatoria** per registrare ore (calendario, import, anche HR), semplice dentro/fuori senza date; la migrazione assegna chi aveva già ore | Risposte 1a 2a 3a 4a del 24/11 |
+| 24/11 | Togliere un'assegnazione lascia le ore fatte e le lascia correggibili nella loro giornata | Stessa tolleranza dei progetti chiusi: niente ore "bloccate" da correggere |
+| 24/11 | Progetto in **pagina** (non finestra), tutto visibile senza schede: dati, assegnati, note interne, avanzamento, documentazione | "l'inserimento progetto deve aprire una nuova pagina…" + "tutte le aree nella stessa pagina" |
+| 24/11 | Documentazione: il dipendente carica sui progetti ATTIVI assegnati, elimina il suo finché HR non l'ha visto; la risposta di HR segna anche "visto" | Risposta 2c; scelte mie sui casi limite |
+| 24/11 | "Invia a SkyTower" solo per documenti con file, una volta sola | Mia scelta: SkyTower archivia file; nessun doppione |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -462,3 +468,37 @@ Fatto:
 Verifiche: `npm test` 166/166 (5 nuovi in `giorni-lavorativi.test.ts`), typecheck e build
 ok; Playwright su Edge 8/8 (sabato e domenica chiusi, Lun–Ven a cinque colonne e
 ricordato, venerdì normale).
+
+### Giorno 17 — Assegnazioni, pagina del progetto, documentazione di avanzamento (24/11/2026) ✅
+
+Risposte dell'utente: 1a 2a 3a 4a; in più "l'inserimento progetto deve aprire una nuova
+pagina in cui sono presenti anche le note e la documentazione del progetto" e "quando sono
+presenti più soggetti dobbiamo poter filtrare tramite filtro a inserimento di caratteri".
+
+Fatto:
+- Schema: tabella `AssegnazioneProgetto` (progetto, dipendente, unica per coppia).
+  Migrazione `20261124120000_assegnazioni` che assegna chi ha già ore (4a). Seed: ognuno
+  ai suoi due progetti.
+- `server/servizi/regole-ore.ts`: niente ore su progetti non assegnati (giornata, fascia,
+  import, anche HR); tolleranza per le ore già presenti nel giorno.
+- `server/rotte/progetti.ts`: `?assegnatiA=`, conteggio `assegnati`, GET/POST/DELETE
+  `/:id/dipendenti`; il dipendente legge solo i progetti a cui è assegnato. Schema progetto
+  con `descrizione` e `commessaSkytower`.
+- `server/rotte/documentazione-progetto.ts`: `/api/documenti-progetto` (elenco, carica,
+  revisione HR, elimina, invio a SkyTower) e `/api/note-progetto` (solo HR). Dashboard HR:
+  `documentazioneDaVedere`.
+- Interfaccia: `pagine/SchedaProgetto.tsx` (dati, assegnati, note, avanzamento,
+  documentazione), `Progetti.tsx` apre la pagina e per il dipendente è "I miei progetti",
+  `componenti/SceltaConRicerca.tsx` (scelta con ricerca a caratteri),
+  `componenti/GraficoAvanzamento.tsx` (SVG fatto a mano, regole dataviz),
+  `componenti/DocumentazioneProgetto.tsx`, `omonimi.ts` (nome + codice fiscale per gli
+  omonimi); l'editor della giornata propone solo i progetti assegnati; dashboard con riquadro
+  e pannello "Documentazione da vedere".
+- Guida (immagini 26, 27, 28).
+
+Verifiche: `npm test` 179/179 (13 nuovi in `progetti-giorno17.test.ts`, due test vecchi
+spostati su progetti assegnati), typecheck e build ok; Playwright su Edge 21/21 (sezioni
+della pagina, ricerca "ros" con codice fiscale, assegnazione, "I miei progetti",
+documentazione con grafico, dashboard, risposta HR letta dal dipendente, telefono senza
+scorrimento orizzontale). Corretto durante la prova: la tabella per i lettori di schermo
+del grafico allargava la pagina sul telefono.

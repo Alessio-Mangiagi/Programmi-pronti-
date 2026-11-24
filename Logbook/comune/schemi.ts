@@ -145,6 +145,13 @@ export const schemaProgetto = z
         .max(24 * 60, 'Ore massime: al massimo 24 ore')
         .nullable(),
     ),
+    /** Descrizione libera (pagina del progetto, Giorno 17). */
+    descrizione: testoFacoltativo(2000),
+    /**
+     * Codice della commessa di SkyTower in cui inviare la documentazione (es. "101-003").
+     * Vuoto = il pulsante "Invia a SkyTower" non compare per questo progetto.
+     */
+    commessaSkytower: testoFacoltativo(60),
   })
   .superRefine((p, ctx) => {
     if (p.dataFine && p.dataFine < p.dataInizio) {
@@ -153,6 +160,11 @@ export const schemaProgetto = z
   });
 
 export type DatiProgetto = z.output<typeof schemaProgetto>;
+
+/** Assegnazione di UN dipendente a un progetto (Giorno 17: si aggiungono uno alla volta). */
+export const schemaAssegnazione = z.object({
+  dipendenteId: z.number({ error: 'Scegli il dipendente' }).int().positive('Scegli il dipendente'),
+});
 
 /** Trasforma un errore Zod in { campo: messaggio } per i moduli dell'interfaccia. */
 export function erroriPerCampo(errore: z.ZodError): Record<string, string> {

@@ -50,6 +50,11 @@ export type Progetto = {
   colore: string | null;
   /** Ore massime per dipendente al giorno, in minuti (null = nessun limite). */
   maxMinutiGiorno: number | null;
+  /** Dal Giorno 17: descrizione e commessa SkyTower in cui inviare la documentazione. */
+  descrizione?: string | null;
+  commessaSkytower?: string | null;
+  /** Quanti dipendenti sono assegnati (solo nell'elenco GET /api/progetti). */
+  assegnati?: number;
 };
 
 export type Registrazione = {
@@ -117,3 +122,40 @@ export type DocumentoDipendente = { id: number; dipendenteId: number; titolo: st
 
 /** GET /api/impostazioni (solo admin): il token non arriva mai, solo se è impostato. */
 export type Impostazioni = { skytower: { url: string; email: string; tokenImpostato: boolean; attivo: boolean } };
+
+// ---------------------------------------------------------------------------
+// Giorno 17 (24/11/2026): assegnazioni, documentazione e note dei progetti
+// ---------------------------------------------------------------------------
+
+/** GET /api/progetti/:id/dipendenti — un dipendente assegnato, con le ore fatte sul progetto. */
+export type Assegnato = {
+  id: number;
+  creatoIl: string;
+  minuti: number;
+  dipendente: Pick<Dipendente, 'id' | 'matricola' | 'nome' | 'cognome' | 'codiceFiscale' | 'mansione' | 'stato'>;
+};
+
+/** GET /api/documenti-progetto — documentazione di avanzamento. */
+export type DocumentoProgetto = {
+  id: number;
+  progettoId: number;
+  data: string;
+  titolo: string;
+  nota: string | null;
+  percentuale: number | null;
+  origine: 'PROGETTO' | 'GIORNATA';
+  file: VistaFile | null;
+  visto: boolean;
+  vistoIl: string | null;
+  vistoDa: { username: string } | null;
+  rispostaHr: string | null;
+  skytowerId: string | null;
+  skytowerUrl: string | null;
+  skytowerInviatoIl: string | null;
+  creatoIl: string;
+  autore: { id: number; nome: string };
+  progetto: { id: number; codice: string; nome: string; colore: string | null; commessaSkytower: string | null };
+};
+
+/** GET /api/note-progetto — nota interna di HR. */
+export type NotaProgetto = { id: number; progettoId: number; testo: string; creatoIl: string; autore: string };

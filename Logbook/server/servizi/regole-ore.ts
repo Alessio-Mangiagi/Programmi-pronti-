@@ -6,6 +6,8 @@
  * domenica e i giorni festivi (richiesta: "nei giorni festivi, sabato e domenica non deve
  * poter essere possibile inserire nulla"). Togliere le ore già presenti in quei giorni
  * resta possibile: la regola scatta solo sulle fasce che si salvano.
+ * Giorno 17: le ore si registrano solo sui progetti a cui il dipendente è assegnato
+ * (tabella AssegnazioneProgetto, risposta 2a), da qualunque parte arrivino.
  *
  * Usato da due punti con esigenze diverse:
  * - le rotte /api/registrazioni (una giornata alla volta);
@@ -24,6 +26,8 @@ export type ContestoOre = {
   assenzeIntere: Assenza[];
   /** Festività del periodo (data → descrizione): giorni senza ore. */
   festivita: Map<string, string>;
+  /** Assegnazioni dipendente-progetto, chiave `${dipendenteId}:${progettoId}` (Giorno 17). */
+  assegnazioni: Set<string>;
   /** Data di oggi (AAAA-MM-GG): non si registrano ore nei giorni futuri. */
   oggi: string;
 };
@@ -35,7 +39,7 @@ export async function caricaContestoOre(
   prisma: PrismaClient,
   opzioni: { dipendenteIds: number[]; da: string; a: string; oggi: string },
 ): Promise<ContestoOre> {
-  const [dipendenti, progetti, assenzeIntere, festivita] = await Promise.all([
+  const [dipendenti, progetti, assenzeIntere, festivita, assegnazioni] = await Promise.all([
     prisma.dipendente.findMany({ where: { id: { in: opzioni.dipendenteIds } } }),
     prisma.progetto.findMany(),
     prisma.assenza.findMany({
@@ -48,12 +52,14 @@ export async function caricaContestoOre(
       },
     }),
     prisma.festivita.findMany({ where: { data: { gte: opzioni.da, lte: opzioni.a } } }),
+    prisma.assegnazioneProgetto.findMany({ where: { dipendenteId: { in: opzioni.dipendenteIds } } }),
   ]);
   return {
     dipendenti: new Map(dipendenti.map((d) => [d.id, d])),
     progetti: new Map(progetti.map((p) => [p.id, p])),
     assenzeIntere,
     festivita: new Map(festivita.map((f) => [f.data, f.descrizione])),
+    assegnazioni: new Set(assegnazioni.map((a) => `${a.dipendenteId}:${a.progettoId}`)),
     oggi: opzioni.oggi,
   };
 }
@@ -104,6 +110,15 @@ export function erroriRegole(
     }
     if (riga.data < prog.dataInizio || (prog.dataFine && riga.data > prog.dataFine)) {
       errori.push({ campo: 'progettoId', messaggio: `Il progetto ${prog.codice} non è aperto il ${formattaData(riga.data)}` });
+    }
+    // Giorno 17 (risposta 2a): ore solo sui progetti a cui HR ha assegnato il dipendente.
+    // Come per i progetti chiusi, le ore già presenti quel giorno su un progetto da cui il
+    // dipendente è stato tolto restano modificabili (si può correggere l'orario vecchio).
+    if (dip && !ctx.assegnazioni.has(`${dip.id}:${prog.id}`) && !progettiGiaPresenti.has(prog.id)) {
+      errori.push({
+        campo: 'progettoId',
+        messaggio: `${dip.nome} ${dip.cognome} non è assegnato al progetto ${prog.codice}: HR deve prima aggiungerlo dalla pagina del progetto`,
+      });
     }
   }
   return errori;

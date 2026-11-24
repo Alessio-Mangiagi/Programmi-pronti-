@@ -19,7 +19,8 @@
  * - giorni senza ore → Calendario di quel dipendente; il singolo giorno apre l'editor
  *   (?dipendente=&data=&giorno=);
  * - ore del mese per dipendente → Calendario filtrato su di lui;
- * - progetti → scheda del progetto (HR) o Calendario filtrato sul progetto (dipendente);
+ * - progetti → pagina del progetto (HR) o Calendario filtrato sul progetto (dipendente);
+ * - documentazione da vedere (HR, Giorno 17) → pagina del progetto;
  * - festività → scheda Festività (HR) o Calendario su quel giorno (dipendente).
  */
 import { useState } from 'react';
@@ -30,6 +31,7 @@ import { formattaOre } from '../../comune/orari';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
 import { EditorGiornata } from '../componenti/EditorGiornata';
+import { Icona } from '../componenti/icone';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Festivita, StatoAttestato, TipoAssenza, TipoAttestato } from '../tipi';
 import { ETICHETTE_ATTESTATO } from '../../comune/documenti';
@@ -48,6 +50,11 @@ type DatiDashboard = {
   prossimeFestivita: Festivita[];
   /** Solo HR: attestati scaduti o in scadenza entro 30 giorni (vuoto per il dipendente). */
   attestatiDaRinnovare: { id: number; tipo: TipoAttestato; titolo: string; dataScadenza: string; stato: StatoAttestato; dipendenteId: number; dipendente: string }[];
+  /** Solo HR (Giorno 17): documentazione di progetto caricata e non ancora vista, la più vecchia prima. */
+  documentazioneDaVedere: {
+    id: number; titolo: string; data: string; percentuale: number | null; conFile: boolean; autore: string;
+    progetto: { id: number; codice: string; colore: string | null };
+  }[];
 };
 
 const nomeMese = (iso: string) => new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(`${iso}T12:00:00`));
@@ -170,6 +177,15 @@ export function Dashboard() {
             vai={dati.attestatiDaRinnovare.length ? scorriA('attestati-da-rinnovare') : undefined}
           />
         )}
+        {admin && (
+          <Tessera
+            titolo="Documentazione da vedere"
+            valore={String(dati.documentazioneDaVedere.length)}
+            dettaglio={dati.documentazioneDaVedere.length ? `su ${new Set(dati.documentazioneDaVedere.map((d) => d.progetto.id)).size} progetti` : 'tutto visto'}
+            allarme={dati.documentazioneDaVedere.length > 0}
+            vai={dati.documentazioneDaVedere.length ? scorriA('documentazione-da-vedere') : undefined}
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4">
@@ -271,7 +287,7 @@ export function Dashboard() {
               {dati.perProgetto.map((p) => (
                 <Link
                   key={p.id}
-                  to={admin ? `/progetti?apri=${p.id}` : `/calendario?progetto=${p.id}`}
+                  to={admin ? `/progetti/${p.id}` : `/calendario?progetto=${p.id}`}
                   className="inline-flex items-center gap-1.5 rounded border border-gray-200 px-2 py-0.5 transition-colors hover:border-marchio hover:bg-ghiaccio focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marchio-chiaro"
                   title={admin ? `Apri il progetto ${p.nome}` : `Le tue ore su ${p.nome}`}
                 >
@@ -296,6 +312,27 @@ export function Dashboard() {
                   <span className="text-gray-700">{a.titolo}</span>
                   <span className="text-xs text-gray-500">{ETICHETTE_ATTESTATO[a.tipo]}</span>
                   <span className="ml-auto text-gray-600">{formattaData(a.dataScadenza)}</span>
+                </RigaLink>
+              ))}
+            </ul>
+          </Pannello>
+        )}
+
+        {/* Documentazione da vedere (HR, risposta 2c): clic → pagina del progetto. */}
+        {admin && dati.documentazioneDaVedere.length > 0 && (
+          <Pannello titolo="Documentazione di progetto da vedere" id="documentazione-da-vedere">
+            <ul className="divide-y divide-gray-100 text-sm">
+              {dati.documentazioneDaVedere.map((d) => (
+                <RigaLink key={d.id} a={`/progetti/${d.progetto.id}`}>
+                  <span className="inline-flex items-center gap-1.5 font-medium text-marchio">
+                    <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: coloreProgetto(d.progetto) }} />
+                    {d.progetto.codice}
+                  </span>
+                  <span className="min-w-0 text-gray-700">{d.titolo}</span>
+                  {d.percentuale != null && <span className="cifre rounded bg-ghiaccio px-1.5 text-xs font-semibold text-marchio">{d.percentuale}%</span>}
+                  {d.conFile && <Icona nome="allegato" dimensione={14} className="text-gray-500" aria-label="con file" />}
+                  <span className="text-xs text-gray-500">{d.autore}</span>
+                  <span className="cifre ml-auto text-gray-600">{formattaData(d.data)}</span>
                 </RigaLink>
               ))}
             </ul>

@@ -31,6 +31,7 @@ import { rotteRegistrazioni } from './rotte/registrazioni';
 import { rotteAttestati, rotteDocumentiDipendente } from './rotte/attestati';
 import { rotteFile } from './rotte/file';
 import { rotteImpostazioni } from './rotte/impostazioni';
+import { rotteDocumentiProgetto, rotteNoteProgetto } from './rotte/documentazione-progetto';
 import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
 
 /**
@@ -80,6 +81,9 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/attestati', rotteAttestati(prisma, cartellaDocumenti, oggi));
   api.use('/documenti-dipendente', rotteDocumentiDipendente(prisma, cartellaDocumenti));
   api.use('/impostazioni', rotteImpostazioni(prisma));
+  // Giorno 17 (24/11/2026): documentazione di avanzamento e note interne dei progetti.
+  api.use('/documenti-progetto', rotteDocumentiProgetto(prisma, cartellaDocumenti, oggi));
+  api.use('/note-progetto', rotteNoteProgetto(prisma));
 
   /** Conteggi del database (verifica del Giorno 1), riservati a HR. */
   api.get('/stato-dati', richiediAdmin, async (_req, res) => {

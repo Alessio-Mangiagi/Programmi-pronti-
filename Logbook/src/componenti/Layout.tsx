@@ -5,7 +5,7 @@
  * cambio password ed esci, contenuto su fondo #f9f9fb.
  *
  * Il menu dipende dal ruolo: l'admin (HR) vede tutte le voci, il dipendente solo
- * Dashboard, Calendario e le proprie assenze. Sotto i 768px il menu si apre col pulsante
+ * Dashboard, Calendario, i propri progetti e le proprie assenze. Sotto i 768px il menu si apre col pulsante
  * a tre righe.
  *
  * Il contenuto (<main>) usa tutta la larghezza disponibile, anche sugli schermi ultra
@@ -25,7 +25,8 @@ export const MENU: VoceMenu[] = [
   { a: '/', etichetta: 'Dashboard', icona: 'dashboard' },
   { a: '/calendario', etichetta: 'Calendario', icona: 'calendario' },
   { a: '/dipendenti', etichetta: 'Dipendenti', icona: 'dipendenti', soloAdmin: true },
-  { a: '/progetti', etichetta: 'Progetti', icona: 'progetti', soloAdmin: true },
+  // Dal Giorno 17 il dipendente vede "I miei progetti" per caricare la documentazione di avanzamento.
+  { a: '/progetti', etichetta: 'Progetti', icona: 'progetti', etichettaDipendente: 'I miei progetti' },
   { a: '/assenze', etichetta: 'Assenze', icona: 'assenze', etichettaDipendente: 'Le mie assenze' },
   { a: '/importa', etichetta: 'Importa', icona: 'importa', soloAdmin: true },
   { a: '/esporta', etichetta: 'Esporta', icona: 'esporta', soloAdmin: true },

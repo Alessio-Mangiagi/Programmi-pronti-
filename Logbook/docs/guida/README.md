@@ -26,8 +26,8 @@ Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.
 
 ## 2. Per i dipendenti
 
-Il menu ha tre voci: **Dashboard**, **Calendario**, **Le mie assenze**. Ognuno vede e
-modifica solo i propri dati.
+Il menu ha quattro voci: **Dashboard**, **Calendario**, **I miei progetti**, **Le mie
+assenze**. Ognuno vede e modifica solo i propri dati.
 
 ### Dashboard
 
@@ -51,6 +51,8 @@ Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata.
 
 ![Fasce sovrapposte](img/13-editor-sovrapposizione.png)
 
+- Nel menu dei progetti ci sono **solo i progetti a cui HR vi ha assegnato**. Se non ne
+  avete nessuno compare un avviso: chiedete a HR di assegnarvi.
 - Una fascia non può passare la mezzanotte: un turno di notte va diviso in due giorni.
 - Non si registrano ore nei giorni futuri né nei giorni di ferie o malattia approvate.
 - **Sabato, domenica e festivi non accettano ore**: nel calendario quei giorni non si aprono
@@ -63,6 +65,22 @@ Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata.
   "ore del giorno / max": oltre il limite il riquadro diventa rosso e **Salva giornata** si
   disattiva (il limite vale per ciascun dipendente).
 - **Salva giornata** salva tutte le righe insieme; con la ✕ si toglie una riga.
+
+### I miei progetti: caricare la documentazione
+
+**I miei progetti** elenca i progetti a cui siete assegnati. Aprendone uno si vedono i dati
+del progetto, l'andamento dell'avanzamento che avete dichiarato e la vostra documentazione.
+
+![Pagina del progetto per il dipendente](img/28-progetto-dipendente.png)
+
+- Compilate **Titolo** e **Giorno**, poi almeno uno fra **Avanzamento (%)**, **Nota** e
+  **File** (foto, verbale, rapportino… fino a 20 MB) e premete **Carica documentazione**.
+- Ogni percentuale diventa un punto del grafico **Avanzamento**: passandoci sopra si leggono
+  giorno, titolo e autore.
+- Vedete solo quello che avete caricato voi. HR lo segna **Visto** e può rispondere: la
+  risposta compare sotto il documento.
+- Finché HR non l'ha visto potete **eliminarlo** (anche il file).
+- Si carica solo sui progetti **attivi**; giorni futuri non sono ammessi.
 
 ### Chiedere ferie, permessi o malattia
 
@@ -97,6 +115,9 @@ c'è da intervenire:
 - **Assenti oggi** (clic: tutte le assenze).
 - **Attestati da rinnovare**: scaduti o in scadenza entro 30 giorni; il pannello sotto li
   elenca e il clic apre la scheda Attestati del dipendente.
+- **Documentazione da vedere**: documentazione di progetto caricata dai dipendenti e non
+  ancora vista; il pannello sotto la elenca (progetto, titolo, percentuale, autore) e il
+  clic apre la pagina del progetto.
 
 Ogni voce dei pannelli sotto porta al suo elemento:
 
@@ -104,7 +125,7 @@ Ogni voce dei pannelli sotto porta al suo elemento:
 - il **nome** di chi ha giorni senza ore apre il suo calendario; il singolo **giorno** apre
   subito il dettaglio di quel giorno per registrare le ore;
 - un dipendente nelle **ore del mese** apre il suo calendario;
-- un **progetto** apre la sua scheda;
+- un **progetto** apre la sua pagina;
 - una **festività** apre la scheda Festività.
 
 Il dipendente, dalla sua dashboard, va al calendario filtrato sul progetto o sul giorno
@@ -169,7 +190,15 @@ dipendente li vede solo HR.
 
 ![Progetti](img/07-progetti.png)
 
-Codice (unico), nome, cliente, date, colore nel calendario e **ore massime al giorno**
+L'elenco ha la ricerca a caratteri, il filtro di stato e la colonna **Dipendenti** (quanti
+sono assegnati; "nessuno" in rosso = nessuno può registrare ore). **+ Nuovo progetto** e il
+clic su una riga aprono la **pagina del progetto**, con tutto nella stessa pagina: a
+sinistra dati, dipendenti assegnati e note interne, a destra avanzamento e documentazione.
+Un progetto nuovo mostra solo i dati: il resto compare dopo **Crea progetto**.
+
+![Pagina del progetto per HR](img/26-progetto-hr.png)
+
+**Dati del progetto**: codice (unico), nome, cliente, date, colore nel calendario e **ore massime al giorno**
 per dipendente (vuoto = nessun limite). Il limite compare nella tabella dei progetti, nel
 calendario (con un dipendente filtrato le caselle mostrano "ore/massimo", la legenda
 "max …/giorno") e nell'editor della giornata; oltre il limite le ore non si salvano, né da
@@ -181,6 +210,32 @@ nome. **Automatico** lascia scegliere a Logbook (sempre lo stesso colore per que
 progetto); **Altro colore…** serve solo per un codice colore particolare.
 
 ![Menu dei colori del progetto](img/21-menu-colori.png)
+
+Nei dati ci sono anche la **descrizione** e la **commessa SkyTower** (es. 101-003): serve
+per inviare la documentazione all'archivio della suite; con il collegamento attivo il campo
+suggerisce le commesse di SkyTower.
+
+**Dipendenti assegnati**: **solo chi è assegnato può registrare ore sul progetto**, dal
+calendario, dall'import Excel e anche quando le inserisce HR. I dipendenti si aggiungono
+**uno alla volta**: si scrivono alcune lettere del nome, della matricola o del codice
+fiscale, si sceglie dall'elenco e si preme **Assegna**. Sotto ogni nome compaiono matricola
+e codice fiscale: con due omonimi è il codice fiscale che li distingue.
+
+![Assegnare un dipendente con la ricerca](img/27-assegna-dipendente.png)
+
+Accanto a ogni assegnato ci sono le ore che ha già registrato sul progetto. **Togli** lo
+toglie: le ore fatte restano (e restano correggibili nella loro giornata), ma non se ne
+possono aggiungere altre. Con l'aggiornamento del 24/11/2026 chi aveva già ore su un
+progetto ne è diventato assegnato automaticamente.
+
+**Avanzamento e documentazione**: HR vede la documentazione di tutti, con il filtro a
+caratteri e **Solo da vedere**. Su ogni documento: **Segna visto**, **Rispondi** (la
+risposta segna anche visto), **Elimina** e, se in Impostazioni c'è il collegamento e il
+progetto ha la commessa, **Invia a SkyTower** (solo per i documenti con un file; si invia
+una volta, poi compare il link al documento in SkyTower). Anche HR può caricare
+documentazione dalla stessa pagina.
+
+**Note interne**: appunti di HR sul progetto, che i dipendenti non vedono.
 
 ### Assenze
 

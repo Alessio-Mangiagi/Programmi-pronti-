@@ -14,6 +14,7 @@
  *
  * Solo HR (dal 24/11/2026, risposta 1c): attestati scaduti o in scadenza nei prossimi
  * 30 giorni (GIORNI_PREAVVISO_ATTESTATI), i più urgenti prima.
+ * Solo HR (Giorno 17): documentazione di progetto caricata e non ancora vista.
  */
 import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
@@ -66,6 +67,17 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
           orderBy: { dataScadenza: 'asc' },
         })
       : [];
+    // Documentazione di progetto non ancora vista da HR (Giorno 17, risposta 2c), la più vecchia prima.
+    const documentazione = isAdmin(req)
+      ? await prisma.documentoProgetto.findMany({
+          where: { visto: false },
+          include: {
+            progetto: { select: { id: true, codice: true, colore: true } },
+            autore: { select: { username: true, dipendente: { select: { nome: true, cognome: true } } } },
+          },
+          orderBy: { creatoIl: 'asc' },
+        })
+      : [];
 
     const perDipendente = dipendenti.map((d) => {
       const inizio = d.dataAssunzione > inizioMese ? d.dataAssunzione : inizioMese;
@@ -108,6 +120,11 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
       attestatiDaRinnovare: attestati.map((a) => ({
         id: a.id, tipo: a.tipo, titolo: a.titolo, dataScadenza: a.dataScadenza, stato: statoAttestato(a.dataScadenza, giorno),
         dipendenteId: a.dipendenteId, dipendente: `${a.dipendente.cognome} ${a.dipendente.nome}`,
+      })),
+      documentazioneDaVedere: documentazione.map((d) => ({
+        id: d.id, titolo: d.titolo, data: d.data, percentuale: d.percentuale, conFile: d.fileId != null,
+        progetto: d.progetto,
+        autore: d.autore.dipendente ? `${d.autore.dipendente.cognome} ${d.autore.dipendente.nome}` : d.autore.username,
       })),
     });
   });

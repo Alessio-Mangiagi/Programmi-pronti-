@@ -124,6 +124,8 @@ model Dipendente {
   assenze              Assenza[]
   attestati            Attestato[]
   documenti            DocumentoDipendente[]
+  /// Progetti a cui HR ha assegnato il dipendente: solo su questi può registrare ore.
+  assegnazioni         AssegnazioneProgetto[]
   creatoIl             DateTime              @default(now())
   aggiornatoIl         DateTime              @updatedAt
 
@@ -162,8 +164,28 @@ model Progetto {
   registrazioni RegistrazioneOraria[]
   documenti     DocumentoProgetto[]
   note          NotaProgetto[]
+  /// Dipendenti assegnati (sezione "Dipendenti" della pagina del progetto).
+  assegnazioni  AssegnazioneProgetto[]
   creatoIl      DateTime              @default(now())
   aggiornatoIl  DateTime              @updatedAt
+}
+
+/// Assegnazione di un dipendente a un progetto (richiesta del 24/11/2026, risposte 2a e 3a:
+/// "i dipendenti vanno inseriti singolarmente nei progetti prima di tutto"). Senza
+/// assegnazione il dipendente non può registrare ore sul progetto: né dal calendario, né
+/// dall'import Excel, né tramite HR (server/servizi/regole-ore.ts). Assegnazione semplice,
+/// dentro o fuori, senza date (3a). Togliere un dipendente non cancella le ore già fatte.
+/// La migrazione che crea la tabella assegna chi aveva già ore sul progetto (risposta 4a).
+model AssegnazioneProgetto {
+  id           Int        @id @default(autoincrement())
+  progetto     Progetto   @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  progettoId   Int
+  dipendente   Dipendente @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  creatoIl     DateTime   @default(now())
+
+  @@unique([progettoId, dipendenteId])
+  @@index([dipendenteId])
 }
 
 // ---------------------------------------------------------------------------

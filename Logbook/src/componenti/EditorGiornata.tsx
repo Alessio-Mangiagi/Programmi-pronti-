@@ -8,6 +8,9 @@
  * ricontrolla tutto e, se qualcosa non va, il giorno resta com'era e gli errori tornano
  * sulle righe giuste ("fasce.N.campo").
  *
+ * Dal Giorno 17 il menu dei progetti propone solo quelli a cui il dipendente è assegnato
+ * (GET /api/progetti?assegnatiA=), più quelli già presenti nel giorno.
+ *
  * `avvisi` sono righe informative passate dal calendario (festività, assenze del giorno).
  *
  * `nonLavorativo` (dal 24/11/2026): motivo per cui il giorno non accetta ore (sabato,
@@ -58,6 +61,8 @@ export function EditorGiornata({
   const bloccato = Boolean(nonLavorativo);
   const [righe, setRighe] = useState<Riga[] | null>(null);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
+  // Progetti a cui il dipendente è assegnato (Giorno 17): solo su questi si aggiungono ore.
+  const [assegnati, setAssegnati] = useState<Set<number>>(new Set());
   const [errori, setErrori] = useState<Record<string, string>>({});
   const [messaggio, setMessaggio] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
@@ -66,19 +71,23 @@ export function EditorGiornata({
     Promise.all([
       api.get<Registrazione[]>(`/api/registrazioni?dipendenteId=${dipendenteId}&da=${data}&a=${data}`),
       api.get<Progetto[]>('/api/progetti'),
+      api.get<Progetto[]>(`/api/progetti?assegnatiA=${dipendenteId}`),
     ])
-      .then(([fasce, prog]) => {
+      .then(([fasce, prog, suoi]) => {
         setProgetti(prog);
+        setAssegnati(new Set(suoi.map((p) => p.id)));
         setRighe(fasce.map((f) => nuovaRiga({ progettoId: String(f.progettoId), oraInizio: f.oraInizio, oraFine: f.oraFine, note: f.note ?? '' })));
       })
       .catch((e: Error) => setMessaggio(e.message));
   }, [dipendenteId, data]);
 
-  // Progetti selezionabili: attivi/sospesi, più quelli chiusi già usati in questo giorno.
+  // Progetti selezionabili: quelli assegnati al dipendente e non chiusi, più quelli già
+  // usati in questo giorno (ore di prima su un progetto chiuso o da cui è stato tolto:
+  // restano correggibili, stessa tolleranza del server).
   const progettiScelta = useMemo(() => {
     const usati = new Set((righe ?? []).map((r) => r.progettoId));
-    return progetti.filter((p) => p.stato !== 'CHIUSO' || usati.has(String(p.id)));
-  }, [progetti, righe]);
+    return progetti.filter((p) => (assegnati.has(p.id) && p.stato !== 'CHIUSO') || usati.has(String(p.id)));
+  }, [progetti, assegnati, righe]);
 
   const sovrapposte = useMemo(() => {
     const indici = new Set<number>();
@@ -162,6 +171,11 @@ export function EditorGiornata({
         ))}
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
         {errori.data && <Avviso tipo="errore">{errori.data}</Avviso>}
+        {!bloccato && assegnati.size === 0 && (
+          <Avviso tipo="attenzione">
+            {nomeDipendente} non è assegnato a nessun progetto: HR lo assegna dalla pagina del progetto (Progetti → progetto → Dipendenti assegnati).
+          </Avviso>
+        )}
         {bloccato && (
           <Avviso tipo="attenzione">
             {nonLavorativo}: non si registrano ore. Le ore rimaste da prima si possono solo togliere, poi «Salva giornata».

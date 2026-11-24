@@ -19,6 +19,8 @@ let idMario: number;
 let idGiulia: number;
 let prg1: number;
 let prg2: number;
+/** PRG-003: assegnato a Mario nel seed (PRG-002 no, Giorno 17). */
+let prg3: number;
 
 beforeAll(async () => {
   db = await creaDbProva();
@@ -30,6 +32,7 @@ beforeAll(async () => {
   idGiulia = (await db.prisma.dipendente.findFirstOrThrow({ where: { cognome: 'Bianchi' } })).id;
   prg1 = (await db.prisma.progetto.findUniqueOrThrow({ where: { codice: 'PRG-001' } })).id;
   prg2 = (await db.prisma.progetto.findUniqueOrThrow({ where: { codice: 'PRG-002' } })).id;
+  prg3 = (await db.prisma.progetto.findUniqueOrThrow({ where: { codice: 'PRG-003' } })).id;
 });
 
 afterAll(async () => {
@@ -48,14 +51,14 @@ describe('fasce singole', () => {
   });
 
   it('una fascia sovrapposta viene bloccata con messaggio chiaro (409)', async () => {
-    const r = await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg2, oraInizio: '12:00', oraFine: '13:00' });
+    const r = await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg3, oraInizio: '12:00', oraFine: '13:00' });
     expect(r.stato).toBe(409);
     expect(r.corpo.errore).toBe('La fascia 12:00-13:00 si sovrappone a quella già registrata 07:30-12:15 (progetto PRG-001) del 23/11/2026');
     expect(r.corpo.campi.oraInizio).toBeDefined();
   });
 
   it('una fascia contigua è ammessa', async () => {
-    const r = await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg2, oraInizio: '12:15', oraFine: '13:00' });
+    const r = await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: OGGI_PROVA, progettoId: prg3, oraInizio: '12:15', oraFine: '13:00' });
     expect(r.stato).toBe(201);
   });
 

@@ -1,56 +1,39 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Progetti (solo HR): elenco con ricerca e filtro di stato, finestra per creare o
- * modificare. "Chiudi" mette il progetto in stato CHIUSO: non si può più scegliere
- * per nuove ore, ma quelle già registrate restano nei report.
+ * Elenco dei progetti.
  *
- * `?apri=<id>` (link dalla Dashboard, 24/11/2026) apre subito la scheda di quel progetto.
+ * - HR: tutti i progetti, con ricerca a caratteri e filtro di stato; "Nuovo progetto" e il
+ *   clic su una riga aprono la pagina del progetto (/progetti/nuovo, /progetti/:id) con
+ *   dati, dipendenti assegnati, documentazione e note (Giorno 17, 24/11/2026: prima era
+ *   una finestra).
+ * - Dipendente ("I miei progetti"): solo i progetti a cui è assegnato; dalla pagina del
+ *   progetto carica la documentazione di avanzamento (risposta 2c).
+ *
+ * `?apri=<id>` (link dalla Dashboard) porta direttamente alla pagina del progetto.
  */
-import { useEffect, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
+import { useState } from 'react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { formattaData } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
-import { erroriPerCampo, schemaProgetto, STATI_PROGETTO } from '../../comune/schemi';
-import { api, ErroreApi } from '../api';
+import { STATI_PROGETTO } from '../../comune/schemi';
+import { useAuth } from '../auth';
+import { coloreProgetto } from '../colori';
 import { Tabella, type Colonna } from '../componenti/Tabella';
-import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Modale, Pulsante } from '../componenti/ui';
+import { Avviso, Caricamento, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Progetto } from '../tipi';
 import { usaDati } from '../usaDati';
-import { coloreProgetto } from '../colori';
-import { SceltaColore } from '../componenti/SceltaColore';
-
-const ETICHETTE_STATO: Record<Progetto['stato'], { testo: string; colore: 'verde' | 'giallo' | 'grigio' }> = {
-  ATTIVO: { testo: 'Attivo', colore: 'verde' },
-  SOSPESO: { testo: 'Sospeso', colore: 'giallo' },
-  CHIUSO: { testo: 'Chiuso', colore: 'grigio' },
-};
-
-/** Valori del modulo; `maxOre` è il testo del campo in ore ("9" o "7,5"), convertito in minuti all'invio. */
-type Modulo = { codice: string; nome: string; cliente: string; dataInizio: string; dataFine: string; stato: Progetto['stato']; colore: string; maxOre: string };
-
-/** "7,5" → 450 minuti; "" → null; testo non numerico → NaN (lo segnala lo schema). */
-const minutiDaOre = (testo: string) => (testo.trim() === '' ? null : Math.round(Number(testo.replace(',', '.')) * 60));
+import { ETICHETTE_STATO_PROGETTO } from './SchedaProgetto';
 
 export function Progetti() {
-  const { dati, errore, caricamento, ricarica } = usaDati<Progetto[]>('/api/progetti');
-  const [filtroStato, setFiltroStato] = useState<Progetto['stato'] | ''>('');
-  const [modifica, setModifica] = useState<Progetto | 'nuovo' | null>(null);
+  const { admin, utente } = useAuth();
+  const naviga = useNavigate();
+  const [parametri] = useSearchParams();
+  // Il dipendente vede solo i suoi progetti (il server rifiuta comunque quelli degli altri).
+  const { dati, errore, caricamento } = usaDati<Progetto[]>(admin ? '/api/progetti' : `/api/progetti?assegnatiA=${utente?.dipendenteId ?? 0}`);
+  const [filtroStato, setFiltroStato] = useState<Progetto['stato'] | ''>(admin ? '' : 'ATTIVO');
 
-  // ?apri=<id>: apre il progetto appena arriva l'elenco, poi toglie il parametro (chiudendo non si riapre).
-  const [parametri, setParametri] = useSearchParams();
   const daAprire = Number(parametri.get('apri')) || null;
-  useEffect(() => {
-    if (!daAprire || !dati) return;
-    const trovato = dati.find((p) => p.id === daAprire);
-    if (trovato) setModifica(trovato);
-    setParametri(
-      (p) => {
-        p.delete('apri');
-        return p;
-      },
-      { replace: true },
-    );
-  }, [daAprire, dati, setParametri]);
+  if (daAprire) return <Navigate to={`/progetti/${daAprire}`} replace />;
 
   const colonne: Colonna<Progetto>[] = [
     {
@@ -64,34 +47,47 @@ export function Progetti() {
         </span>
       ),
     },
-    { chiave: 'nome', titolo: 'Nome', valore: (p) => p.nome },
+    { chiave: 'nome', titolo: 'Nome', valore: (p) => p.nome, principale: true },
     { chiave: 'cliente', titolo: 'Cliente', valore: (p) => p.cliente },
     { chiave: 'inizio', titolo: 'Inizio', valore: (p) => p.dataInizio, render: (p) => formattaData(p.dataInizio) },
     { chiave: 'fine', titolo: 'Fine', valore: (p) => p.dataFine, render: (p) => (p.dataFine ? formattaData(p.dataFine) : '—') },
-    {
-      chiave: 'max',
-      titolo: 'Max ore/giorno',
-      valore: (p) => p.maxMinutiGiorno,
-      render: (p) => (p.maxMinutiGiorno != null ? formattaOre(p.maxMinutiGiorno) : <span className="text-gray-400">nessun limite</span>),
-      allinea: 'destra',
-    },
+    ...(admin
+      ? ([
+          {
+            chiave: 'max',
+            titolo: 'Max ore/giorno',
+            valore: (p) => p.maxMinutiGiorno,
+            render: (p) => (p.maxMinutiGiorno != null ? formattaOre(p.maxMinutiGiorno) : <span className="text-gray-400">nessun limite</span>),
+            allinea: 'destra',
+          },
+          {
+            chiave: 'assegnati',
+            titolo: 'Dipendenti',
+            valore: (p) => p.assegnati ?? 0,
+            render: (p) => (p.assegnati ? p.assegnati : <span className="text-[#8e2a1f]" title="Nessuno può registrare ore">nessuno</span>),
+            allinea: 'destra',
+          },
+        ] satisfies Colonna<Progetto>[])
+      : []),
     {
       chiave: 'stato',
       titolo: 'Stato',
       valore: (p) => p.stato,
-      render: (p) => <Etichetta colore={ETICHETTE_STATO[p.stato].colore}>{ETICHETTE_STATO[p.stato].testo}</Etichetta>,
+      render: (p) => <Etichetta colore={ETICHETTE_STATO_PROGETTO[p.stato].colore}>{ETICHETTE_STATO_PROGETTO[p.stato].testo}</Etichetta>,
     },
   ];
 
   return (
     <>
       <IntestazionePagina
-        titolo="Progetti"
-        sottotitolo="Progetti e commesse su cui si registrano le ore"
+        titolo={admin ? 'Progetti' : 'I miei progetti'}
+        sottotitolo={admin ? 'Progetti e commesse: dati, dipendenti assegnati, documentazione e note' : 'I progetti a cui sei assegnato: apri un progetto per caricare la documentazione di avanzamento'}
         azioni={
-          <Pulsante variante="primario" onClick={() => setModifica('nuovo')}>
-            + Nuovo progetto
-          </Pulsante>
+          admin && (
+            <Pulsante variante="primario" onClick={() => naviga('/progetti/nuovo')}>
+              + Nuovo progetto
+            </Pulsante>
+          )
         }
       />
       {errore && <Avviso tipo="errore">{errore}</Avviso>}
@@ -101,145 +97,22 @@ export function Progetti() {
           righe={dati.filter((p) => !filtroStato || p.stato === filtroStato)}
           colonne={colonne}
           chiaveRiga={(p) => p.id}
-          testoRicerca={(p) => `${p.codice} ${p.nome} ${p.cliente ?? ''}`}
-          onRiga={(p) => setModifica(p)}
+          testoRicerca={(p) => `${p.codice} ${p.nome} ${p.cliente ?? ''} ${p.descrizione ?? ''} ${p.commessaSkytower ?? ''}`}
+          onRiga={(p) => naviga(`/progetti/${p.id}`)}
           ordinamentoIniziale={{ chiave: 'codice', verso: 1 }}
-          vuoto="Nessun progetto"
+          vuoto={admin ? 'Nessun progetto' : 'Non sei assegnato a nessun progetto: rivolgiti a HR'}
           strumenti={
             <select aria-label="Filtra per stato" className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm" value={filtroStato} onChange={(e) => setFiltroStato(e.target.value as typeof filtroStato)}>
               <option value="">Tutti gli stati</option>
               {STATI_PROGETTO.map((s) => (
                 <option key={s} value={s}>
-                  {ETICHETTE_STATO[s].testo}
+                  {ETICHETTE_STATO_PROGETTO[s].testo}
                 </option>
               ))}
             </select>
           }
         />
       )}
-      {modifica && (
-        <ModuloProgetto
-          progetto={modifica === 'nuovo' ? null : modifica}
-          onChiudi={() => setModifica(null)}
-          onSalvato={() => {
-            setModifica(null);
-            ricarica();
-          }}
-        />
-      )}
     </>
-  );
-}
-
-function ModuloProgetto({ progetto, onChiudi, onSalvato }: { progetto: Progetto | null; onChiudi: () => void; onSalvato: () => void }) {
-  const [modulo, setModulo] = useState<Modulo>(
-    progetto
-      ? {
-          codice: progetto.codice, nome: progetto.nome, cliente: progetto.cliente ?? '', dataInizio: progetto.dataInizio, dataFine: progetto.dataFine ?? '',
-          stato: progetto.stato, colore: progetto.colore ?? '',
-          maxOre: progetto.maxMinutiGiorno != null ? String(progetto.maxMinutiGiorno / 60).replace('.', ',') : '',
-        }
-      : { codice: '', nome: '', cliente: '', dataInizio: oggiIso(), dataFine: '', stato: 'ATTIVO', colore: '', maxOre: '' },
-  );
-  const [errori, setErrori] = useState<Record<string, string>>({});
-  const [messaggio, setMessaggio] = useState<string | null>(null);
-
-  const campo = (nome: keyof Modulo) => ({
-    value: modulo[nome],
-    onChange: (e: { target: { value: string } }) => setModulo((m) => ({ ...m, [nome]: e.target.value })),
-  });
-
-  const invia = async (valori: Modulo) => {
-    const { maxOre, ...resto } = valori;
-    const corpo = { ...resto, maxMinutiGiorno: minutiDaOre(maxOre) };
-    const controllo = schemaProgetto.safeParse(corpo);
-    if (!controllo.success) {
-      setErrori(erroriPerCampo(controllo.error));
-      return;
-    }
-    try {
-      if (progetto) await api.put(`/api/progetti/${progetto.id}`, corpo);
-      else await api.post('/api/progetti', corpo);
-      onSalvato();
-    } catch (err) {
-      if (err instanceof ErroreApi) {
-        setErrori(err.campi);
-        setMessaggio(err.message);
-      }
-    }
-  };
-
-  const salva = (e: FormEvent) => {
-    e.preventDefault();
-    setMessaggio(null);
-    invia(modulo);
-  };
-
-  return (
-    <Modale titolo={progetto ? `Progetto ${progetto.codice}` : 'Nuovo progetto'} aperta onChiudi={onChiudi}>
-      <form onSubmit={salva} className="space-y-3" noValidate>
-        {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
-        {/* Campi in righe flex che vanno a capo (24/11/2026): affiancati nella finestra, uno sotto l'altro sul telefono. */}
-        <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_10rem]">
-          <Campo etichetta="Codice" obbligatorio errore={errori.codice}>
-            <input className={`${classiInput(errori.codice)} uppercase`} {...campo('codice')} />
-          </Campo>
-          <Campo etichetta="Stato" errore={errori.stato}>
-            <select className={classiInput(errori.stato)} {...campo('stato')}>
-              {STATI_PROGETTO.map((s) => (
-                <option key={s} value={s}>
-                  {ETICHETTE_STATO[s].testo}
-                </option>
-              ))}
-            </select>
-          </Campo>
-        </div>
-        <Campo etichetta="Nome" obbligatorio errore={errori.nome}>
-          <input className={classiInput(errori.nome)} {...campo('nome')} />
-        </Campo>
-        <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*:first-child]:flex-[2_1_14rem] [&>*:last-child]:flex-[1_1_10rem]">
-          <Campo etichetta="Cliente" errore={errori.cliente}>
-            <input className={classiInput(errori.cliente)} {...campo('cliente')} />
-          </Campo>
-          <Campo etichetta="Ore massime al giorno" errore={errori.maxMinutiGiorno} aiuto="Per dipendente; vuoto = nessun limite">
-            <input inputMode="decimal" placeholder="es. 8" className={`${classiInput(errori.maxMinutiGiorno)} text-right`} {...campo('maxOre')} />
-          </Campo>
-        </div>
-        <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_9rem]">
-          <Campo etichetta="Data inizio" obbligatorio errore={errori.dataInizio}>
-            <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataInizio)} {...campo('dataInizio')} />
-          </Campo>
-          <Campo etichetta="Data fine" errore={errori.dataFine}>
-            <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataFine)} {...campo('dataFine')} />
-          </Campo>
-          {/* Niente <Campo> (che è un <label>): il menu dei colori contiene più pulsanti. */}
-          <div className="text-sm">
-            <span className="mb-1 block font-ui text-[0.82rem] font-semibold text-gray-600">Colore nel calendario</span>
-            <SceltaColore
-              valore={modulo.colore}
-              onCambia={(colore) => setModulo((m) => ({ ...m, colore }))}
-              automatico={coloreProgetto({ id: progetto?.id ?? 0, colore: null })}
-              errore={errori.colore}
-            />
-            {errori.colore && <span className="mt-0.5 block text-xs text-errore">{errori.colore}</span>}
-          </div>
-        </div>
-        <div className="flex justify-between gap-2 border-t border-gray-100 pt-3">
-          <div>
-            {progetto && progetto.stato !== 'CHIUSO' && (
-              <Pulsante variante="pericolo" onClick={() => invia({ ...modulo, stato: 'CHIUSO' })}>
-                Chiudi progetto
-              </Pulsante>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Pulsante onClick={onChiudi}>Annulla</Pulsante>
-            <Pulsante type="submit" variante="primario">
-              Salva
-            </Pulsante>
-          </div>
-        </div>
-      </form>
-    </Modale>
   );
 }

@@ -21,6 +21,7 @@ import { Impostazioni } from './pagine/Impostazioni';
 import { Login } from './pagine/Login';
 import { Progetti } from './pagine/Progetti';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
+import { SchedaProgetto } from './pagine/SchedaProgetto';
 
 function SoloAdmin({ children }: { children: ReactNode }) {
   const { admin } = useAuth();
@@ -38,7 +39,9 @@ function Rotte() {
         <Route path="calendario" element={<Calendario />} />
         <Route path="dipendenti" element={<SoloAdmin><Dipendenti /></SoloAdmin>} />
         <Route path="dipendenti/:id" element={<SoloAdmin><SchedaDipendente /></SoloAdmin>} />
-        <Route path="progetti" element={<SoloAdmin><Progetti /></SoloAdmin>} />
+        {/* Dal Giorno 17 anche il dipendente: "I miei progetti" e la loro documentazione (il server filtra). */}
+        <Route path="progetti" element={<Progetti />} />
+        <Route path="progetti/:id" element={<SchedaProgetto />} />
         <Route path="assenze" element={<Assenze />} />
         <Route path="importa" element={<SoloAdmin><Importa /></SoloAdmin>} />
         <Route path="esporta" element={<SoloAdmin><Esporta /></SoloAdmin>} />
