@@ -13,7 +13,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 11 (23/11):** richieste aggiuntive ✅ (data minima 2020, ore massime per progetto, estratti mensili)
 - **Giorno 12 (23/11):** nuova estetica Cosedil ✅
 - **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti"
-- **Ultimo aggiornamento:** 23/11/2026
+- **Ultimo aggiornamento:** 24/11/2026 (aggiunte le domande aperte sul costo delle festività e sul report della suite)
 
 ## Cosa c'era nella cartella
 
@@ -92,6 +92,11 @@ sessione per riprendere da dove si era rimasti.
   "paese" su festività e dipendente.
 - Da confermare: 4 ottobre (San Francesco) festa nazionale dal 2026 secondo la legge
   approvata a ottobre 2025; se l'azienda non lo applica, HR lo elimina dalle festività.
+- Da confermare: negli estratti "giorni e costi" le **festività non hanno costo** (scelta del
+  Giorno 11). Se vanno pagate come giornata di contratto (ore settimanali / 5), basta
+  cambiare il calcolo in `comune/estratto-mese.ts`.
+- Report della suite: Logbook non è ancora nel foglio "Stato avanzamento programmi.xlsx"
+  (radice del repo, fermo al 23/11): va aggiunto al prossimo aggiornamento.
 - Portale: le modifiche al registro sono nel repository; il portale in esercizio gira da
   una copia esterna (`Documents\suite cosedil`) e va aggiornato per vedere la card.
 - Cartella `Logbook/` → `logbook/`: si può rinominare quando nessun programma la tiene
