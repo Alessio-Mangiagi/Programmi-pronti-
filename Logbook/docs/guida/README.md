@@ -385,6 +385,9 @@ sono indicate senza costo.
 Logbook si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
 aprire lo stesso indirizzo dal browser del telefono.
 
+Su computer e tablet (da 768px) il **menu a sinistra resta fermo** mentre la pagina scorre,
+con tutte le voci sempre visibili; su uno schermo molto basso scorrono solo le voci del menu.
+
 **Sul cellulare**
 
 - Il menu si apre col pulsante **☰ Logbook** in alto a sinistra.

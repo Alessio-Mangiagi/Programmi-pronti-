@@ -20,7 +20,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 18 (24/11):** scheda dipendente in una sola pagina, omonimi distinti dal codice fiscale, scelte con ricerca a caratteri, assenze in pagina ✅
 - **Giorno 19 (24/11):** il dipendente registra solo oggi, i giorni passati solo HR; "oggi" è la data del server, avviso se il PC ha un'altra data ✅
 - **Giorno 20 (24/11):** le ore e la documentazione le inserisce solo HR; segnalazioni dei dipendenti con finestra a HR all'accesso e campanella ✅
-- **Prossimo:** Giorno 21 allegati alle assenze (3b); poi verifica di sicurezza, codice non chiamato e librerie non usate (richiesta del 24/11); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 21 (24/11):** menu laterale fermo durante lo scorrimento, voci sempre visibili ✅
+- **Prossimo:** Giorno 22 allegati alle assenze (3b); poi verifica di sicurezza, codice non chiamato e librerie non usate (richiesta del 24/11); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -600,3 +601,11 @@ la regola "solo HR"; nei test vecchi le scritture di ore le fa l'admin), typeche
 ok; Playwright su Edge 13/13 (giornata del dipendente in sola lettura anche oggi,
 segnalazione inviata, progetto senza documentazione, finestra a HR all'accesso e non al
 ricaricamento, campanella, chiusura con risposta letta dal dipendente).
+
+### Giorno 21 — Menu laterale fermo (24/11/2026) ✅
+
+Richiesta: "quando scrollo le pagine la barra di sinistra deve rimanere ferma e con tutte le
+scelte ben visibili". : da 768px il menu è sticky in alto e alto
+quanto la finestra; le voci scorrono dentro il menu se lo schermo è basso. Sul telefono
+resta il menu a scomparsa. Verifica Playwright su Edge 6/6 (1440×900, 1280×560 e
+3440×1440: menu fermo in alto e «Impostazioni» visibile con la pagina scorsa in fondo).

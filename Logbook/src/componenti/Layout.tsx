@@ -8,6 +8,10 @@
  * Dashboard, Calendario, i propri progetti e le proprie assenze. Sotto i 768px il menu si apre col pulsante
  * a tre righe.
  *
+ * Da 768px il menu resta fermo mentre la pagina scorre (sticky, alto quanto la finestra:
+ * richiesta del 24/11/2026 "la barra di sinistra deve rimanere ferma e con tutte le scelte
+ * ben visibili"); su uno schermo basso scorrono solo le voci del menu, mai fuori vista.
+ *
  * Il contenuto (<main>) usa tutta la larghezza disponibile, anche sugli schermi ultra
  * wide: le pagine dispongono i blocchi in flexbox con a capo automatico (src/index.css,
  * "Layout adattabile"). Fino al 23/11 era fermo a 1400px al centro.
@@ -47,7 +51,7 @@ export function Layout() {
     <div className="flex min-h-[100dvh]">
       {/* Menu laterale */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-60 transform flex-col bg-marchio text-white transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 flex w-60 transform flex-col bg-marchio text-white transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:sticky md:top-0 md:h-[100dvh] md:shrink-0 md:self-start md:translate-x-0 ${
           menuAperto ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -58,7 +62,7 @@ export function Layout() {
             <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/65">Ore e presenze</div>
           </div>
         </div>
-        <nav className="flex-1 py-3" aria-label="Menu principale">
+        <nav className="min-h-0 flex-1 overflow-y-auto py-3" aria-label="Menu principale">
           {voci.map((v) => (
             <NavLink
               key={v.a}
