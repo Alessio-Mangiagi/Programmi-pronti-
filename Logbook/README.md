@@ -94,6 +94,8 @@ come testo sia come valori data/ora di Excel.
 | Export | Calendario lavorato (un foglio per dipendente) e ore per progetto (con costo lordo) |
 | Estratti mensili | Per mese e dipendente: "mese a calendario" (calendario + anagrafica + progetti) e "giorni e costi" (una riga per giorno con costo netto/lordo, ferie e malattia comprese); anteprima, Excel e stampa/PDF |
 | Limiti | Nessun inserimento prima del 01/01/2020; ore massime al giorno per progetto (per dipendente, salvataggio bloccato oltre il limite) |
+| Attestati e documenti | Scheda dipendente divisa in schede; attestati con tipo, rilascio, scadenza e file (in dashboard 30 giorni prima della scadenza), documenti del dipendente; file fino a 20 MB in `data/documenti`, controllati anche nel contenuto |
+| Impostazioni | Solo admin: collegamento facoltativo a SkyTower (indirizzo, token di servizio della suite, email), con prova |
 | Schermi | Interfaccia in flexbox che si adatta da sola: dal cellulare (360px: tabelle a schede, calendario con pallini, editor a riquadri) agli schermi ultra wide (contenuto a tutta larghezza, riquadri affiancati). Regola spiegata in `src/index.css` |
 
 ## Accesso e sicurezza
@@ -134,6 +136,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
 | `LOGBOOK_ADMIN_PASSWORD` | `Admin2026!` | Password dell'admin creato solo se non ne esiste nessuno |
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
+| `LOGBOOK_DOCUMENTI_DIR` | `data/documenti` | Cartella dei file caricati (attestati, documenti, documentazione dei progetti): va nel backup insieme al database |
 | `LOGBOOK_COOKIE_SECURE` | — | `1` dietro HTTPS: il cookie viaggia solo cifrato |
 
 ## Nella suite Cosedil

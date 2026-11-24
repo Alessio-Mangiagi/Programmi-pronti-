@@ -17,6 +17,7 @@ import { Dashboard } from './pagine/Dashboard';
 import { Dipendenti } from './pagine/Dipendenti';
 import { Esporta } from './pagine/Esporta';
 import { Importa } from './pagine/Importa';
+import { Impostazioni } from './pagine/Impostazioni';
 import { Login } from './pagine/Login';
 import { Progetti } from './pagine/Progetti';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
@@ -41,6 +42,7 @@ function Rotte() {
         <Route path="assenze" element={<Assenze />} />
         <Route path="importa" element={<SoloAdmin><Importa /></SoloAdmin>} />
         <Route path="esporta" element={<SoloAdmin><Esporta /></SoloAdmin>} />
+        <Route path="impostazioni" element={<SoloAdmin><Impostazioni /></SoloAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -28,17 +28,24 @@ import { rotteImporta } from './rotte/importa';
 import { rotteDipendenti } from './rotte/dipendenti';
 import { rotteProgetti } from './rotte/progetti';
 import { rotteRegistrazioni } from './rotte/registrazioni';
+import { rotteAttestati, rotteDocumentiDipendente } from './rotte/attestati';
+import { rotteFile } from './rotte/file';
+import { rotteImpostazioni } from './rotte/impostazioni';
+import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
 
 /**
  * Opzioni:
  * - `oggi` fissa la data corrente (test: regole sulle date future, dashboard);
  * - `cartellaInterfaccia`: in produzione la cartella dist/ con l'interfaccia già
- *   compilata, servita dallo stesso server delle API (una sola porta, niente Vite).
+ *   compilata, servita dallo stesso server delle API (una sola porta, niente Vite);
+ * - `cartellaDocumenti`: dove salvare i file caricati (default data/documenti o
+ *   LOGBOOK_DOCUMENTI_DIR; i test ne passano una temporanea).
  */
-export type OpzioniApp = { oggi?: () => string; cartellaInterfaccia?: string };
+export type OpzioniApp = { oggi?: () => string; cartellaInterfaccia?: string; cartellaDocumenti?: string };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const oggi = opzioni.oggi ?? (() => oggiIso());
+  const cartellaDocumenti = opzioni.cartellaDocumenti ?? cartellaDocumentiPredefinita();
   const app = express();
   app.disable('x-powered-by');
   // Dietro un proxy (Vite in sviluppo, Caddy in produzione) req.ip deve essere quello
@@ -68,6 +75,11 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/importa', rotteImporta(prisma, oggi));
   api.use('/esporta', rotteEsporta(prisma));
   api.use('/dashboard', rotteDashboard(prisma, oggi));
+  // Giorno 15 (24/11/2026): file, attestati, documenti del dipendente, impostazioni.
+  api.use('/file', rotteFile(prisma, cartellaDocumenti));
+  api.use('/attestati', rotteAttestati(prisma, cartellaDocumenti, oggi));
+  api.use('/documenti-dipendente', rotteDocumentiDipendente(prisma, cartellaDocumenti));
+  api.use('/impostazioni', rotteImpostazioni(prisma));
 
   /** Conteggi del database (verifica del Giorno 1), riservati a HR. */
   api.get('/stato-dati', richiediAdmin, async (_req, res) => {

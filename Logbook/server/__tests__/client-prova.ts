@@ -6,21 +6,32 @@
  * restituisce un client che rimanda il cookie di sessione e l'intestazione CSRF a ogni
  * chiamata, come fa il frontend vero (src/api.ts).
  */
+import fs from 'node:fs';
 import type { AddressInfo } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { creaApp, type OpzioniApp } from '../app';
 
 export type Risposta = { stato: number; corpo: any; intestazioni: Headers };
 
 export type ClientProva = {
-  chiama: (metodo: string, percorso: string, corpo?: unknown, opzioni?: { senzaCsrf?: boolean; grezzo?: Buffer }) => Promise<Risposta>;
+  chiama: (
+    metodo: string,
+    percorso: string,
+    corpo?: unknown,
+    opzioni?: { senzaCsrf?: boolean; grezzo?: Buffer; intestazioni?: Record<string, string> },
+  ) => Promise<Risposta>;
 };
 
 /** Data "di oggi" usata nei test: la stessa del seed, così i risultati non cambiano nel tempo. */
 export const OGGI_PROVA = '2026-11-23';
 
 export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { oggi: () => OGGI_PROVA }) {
-  const server = creaApp(prisma, opzioni).listen(0, '127.0.0.1');
+  // Mai la cartella vera dei documenti (data/documenti): ogni server di prova ne ha una
+  // temporanea, cancellata da chiudi().
+  const cartellaDocumenti = opzioni.cartellaDocumenti ?? fs.mkdtempSync(path.join(os.tmpdir(), 'logbook-doc-'));
+  const server = creaApp(prisma, { ...opzioni, cartellaDocumenti }).listen(0, '127.0.0.1');
   await new Promise((ok) => server.once('listening', ok));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
@@ -30,6 +41,7 @@ export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { 
       const intestazioni: Record<string, string> = {};
       if (!opzioni.senzaCsrf) intestazioni['X-Logbook'] = '1';
       if (cookie) intestazioni.Cookie = cookie;
+      Object.assign(intestazioni, opzioni.intestazioni);
       let body: RequestInit['body'];
       if (opzioni.grezzo) {
         intestazioni['Content-Type'] = 'application/octet-stream';
@@ -47,6 +59,7 @@ export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { 
 
   return {
     base,
+    cartellaDocumenti,
     anonimo: client(),
     /** Login: restituisce il client autenticato; fallisce il test se il login non riesce. */
     async accedi(username: string, password: string): Promise<ClientProva> {
@@ -55,6 +68,9 @@ export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { 
       const cookie = (r.intestazioni.get('set-cookie') ?? '').split(';')[0];
       return client(cookie);
     },
-    chiudi: () => new Promise<void>((ok) => server.close(() => ok())),
+    chiudi: async () => {
+      await new Promise<void>((ok) => server.close(() => ok()));
+      fs.rmSync(cartellaDocumenti, { recursive: true, force: true });
+    },
   };
 }

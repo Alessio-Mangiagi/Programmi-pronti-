@@ -13,14 +13,14 @@ import { validaCodiceFiscale } from './codiceFiscale';
 import { DATA_MINIMA, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
 
 /** Testo facoltativo: spazi tolti, "" o assente → null. */
-const testoFacoltativo = (max: number) =>
+export const testoFacoltativo = (max: number) =>
   z.preprocess(
     (v) => (typeof v === 'string' ? v.trim() : v) || null,
     z.string().max(max, `Massimo ${max} caratteri`).nullable(),
   );
 
 /** Testo obbligatorio, spazi tolti. */
-const testoObbligatorio = (etichetta: string, max: number) =>
+export const testoObbligatorio = (etichetta: string, max: number) =>
   z
     .string({ error: `${etichetta}: campo obbligatorio` })
     .trim()

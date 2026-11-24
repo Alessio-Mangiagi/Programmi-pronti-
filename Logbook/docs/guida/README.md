@@ -91,6 +91,8 @@ c'è da intervenire:
   (clic: si scende all'elenco).
 - **Ore del mese**: lavorate e attese, con l'avanzamento per dipendente e per progetto.
 - **Assenti oggi** (clic: tutte le assenze).
+- **Attestati da rinnovare**: scaduti o in scadenza entro 30 giorni; il pannello sotto li
+  elenca e il clic apre la scheda Attestati del dipendente.
 
 Ogni voce dei pannelli sotto porta al suo elemento:
 
@@ -127,14 +129,35 @@ per ordinare; filtro attivi/cessati. Clic su una riga per aprire la scheda.
 
 ![Scheda dipendente](img/06-scheda-dipendente.png)
 
-- **Anagrafica e contratto**: il **codice fiscale** viene controllato (un codice sbagliato
-  non si salva); matricola e codice fiscale devono essere unici.
-- **Costi**: costo orario **netto** e **lordo** in euro (es. 14,50). Li vede solo HR e
-  servono al report delle ore per progetto.
-- **Account di accesso**: crea il nome utente e la password del dipendente, o ne
-  reimposta la password. Comunicateli al dipendente.
-- **Disattiva dipendente**: quando il rapporto finisce. Le ore restano nei report e
-  l'account viene bloccato. **Riattiva** lo rimette attivo, ma l'account va riattivato a mano.
+La scheda è divisa in **schede**: Anagrafica, Contratto e costi, Account, Attestati,
+Documenti. Per un dipendente nuovo si compilano le prime due (pulsante **Avanti**) e si
+salva con **Crea dipendente**: dopo si aprono anche le altre. Se un campo ha un errore, la
+sua scheda si apre da sola e ha un pallino rosso.
+
+- **Anagrafica**: il **codice fiscale** viene controllato (un codice sbagliato non si
+  salva); matricola e codice fiscale devono essere unici.
+- **Contratto e costi**: contratto, assunzione, ore settimanali e costo orario **netto** e
+  **lordo** in euro (es. 14,50). I costi li vede solo HR e servono ai report.
+- **Account**: crea il nome utente e la password del dipendente, o ne reimposta la
+  password (comunicateli al dipendente). **Disattiva dipendente** quando il rapporto finisce:
+  le ore restano nei report e l'account viene bloccato. **Riattiva** lo rimette attivo, ma
+  l'account va riattivato a mano.
+- **Attestati**: formazione sicurezza, primo soccorso, antincendio, patentini, visite
+  mediche e altro, con data di rilascio, **scadenza** e file. Lo stato si aggiorna da solo:
+  *Valido*, *In scadenza* (nei 30 giorni prima), *Scaduto*, *Non scade*. Gli attestati in
+  scadenza o scaduti compaiono anche nella dashboard di HR. Per la visita medica si scrive
+  solo l'esito (es. «idoneo»), mai diagnosi.
+
+![Nuovo attestato con il file](img/22-attestato.png)
+
+- **Documenti**: contratto, documenti d'identità e altri file del dipendente (titolo, note,
+  file obbligatorio).
+
+![Documenti del dipendente](img/24-documenti-dipendente.png)
+
+I file si caricano con **Scegli file…**: PDF, immagini, Word, Excel, OpenDocument, testo e
+PDF firmati (.p7m), fino a 20 MB. Clic sul nome per aprirlo. Attestati e documenti del
+dipendente li vede solo HR.
 
 ### Progetti
 
@@ -171,6 +194,19 @@ progetto); **Altro colore…** serve solo per un codice colore particolare.
 Le festività nazionali dell'anno si caricano con un clic (**Carica festività nazionali**).
 Quelle **del paese** (il santo patrono) e le **chiusure aziendali** si aggiungono a mano,
 scegliendo il tipo. Un giorno festivo non conta come giorno lavorativo.
+
+### Impostazioni (solo amministratori)
+
+Qui si registra il **collegamento a SkyTower**, l'archivio documentale della suite:
+indirizzo dell'API (sul server di solito `http://127.0.0.1:8100`), token di servizio della
+suite (file `shared\suite\.token` sul server) ed eventualmente l'email dell'utente SkyTower
+che risulterà autore dei documenti. **Prova collegamento** controlla che SkyTower risponda.
+
+I documenti restano comunque in Logbook. Con il collegamento attivo, nella documentazione
+dei progetti che hanno una commessa SkyTower compare il pulsante **Invia a SkyTower**; senza
+collegamento il pulsante non c'è. Il token, una volta salvato, non si rilegge più.
+
+![Impostazioni: collegamento a SkyTower](img/23-impostazioni.png)
 
 ### Importare le ore da Excel
 

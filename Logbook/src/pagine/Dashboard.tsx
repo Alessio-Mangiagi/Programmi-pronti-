@@ -31,7 +31,8 @@ import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
 import { EditorGiornata } from '../componenti/EditorGiornata';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
-import type { Festivita, TipoAssenza } from '../tipi';
+import type { Festivita, StatoAttestato, TipoAssenza, TipoAttestato } from '../tipi';
+import { ETICHETTE_ATTESTATO } from '../../comune/documenti';
 import { usaDati } from '../usaDati';
 
 type AssenzaBreve = { id: number; tipo: TipoAssenza; dataInizio: string; dataFine: string; minutiPermesso: number | null; dipendente: string };
@@ -45,6 +46,8 @@ type DatiDashboard = {
   richiesteInAttesa: (AssenzaBreve & { creatoIl: string })[];
   prossimeAssenze: AssenzaBreve[];
   prossimeFestivita: Festivita[];
+  /** Solo HR: attestati scaduti o in scadenza entro 30 giorni (vuoto per il dipendente). */
+  attestatiDaRinnovare: { id: number; tipo: TipoAttestato; titolo: string; dataScadenza: string; stato: StatoAttestato; dipendenteId: number; dipendente: string }[];
 };
 
 const nomeMese = (iso: string) => new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(`${iso}T12:00:00`));
@@ -108,8 +111,9 @@ const RigaLink = ({ a, children }: { a: string; children: React.ReactNode }) => 
 /** Stile dei collegamenti dentro il testo (nomi, giorni). */
 const LINK = 'rounded text-marchio hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marchio-chiaro';
 
-/** Porta al pannello dei giorni senza ore (stessa pagina). */
-const scorriAiGiorni = () => document.getElementById('giorni-senza-ore')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+/** Porta a un pannello della stessa pagina (giorni senza ore, attestati da rinnovare). */
+const scorriA = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+const scorriAiGiorni = scorriA('giorni-senza-ore');
 
 const ChipAssenza = ({ tipo }: { tipo: TipoAssenza }) => (
   <span className="rounded border px-1.5 py-0.5 text-xs" style={{ backgroundColor: COLORI_ASSENZA[tipo].sfondo, color: COLORI_ASSENZA[tipo].testo, borderColor: COLORI_ASSENZA[tipo].bordo }}>
@@ -157,6 +161,15 @@ export function Dashboard() {
           vai={giorniMancanti > 0 ? scorriAiGiorni : undefined}
         />
         <Tessera titolo="Assenti oggi" valore={String(assentiOggi.length)} dettaglio={assentiOggi.map((a) => a.dipendente).join(', ') || 'nessuno'} a={admin ? '/assenze?scheda=tutte' : '/assenze'} />
+        {admin && (
+          <Tessera
+            titolo="Attestati da rinnovare"
+            valore={String(dati.attestatiDaRinnovare.length)}
+            dettaglio={dati.attestatiDaRinnovare.length ? `${dati.attestatiDaRinnovare.filter((a) => a.stato === 'SCADUTO').length} scaduti, entro 30 giorni` : 'nessuno nei prossimi 30 giorni'}
+            allarme={dati.attestatiDaRinnovare.length > 0}
+            vai={dati.attestatiDaRinnovare.length ? scorriA('attestati-da-rinnovare') : undefined}
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4">
@@ -269,6 +282,25 @@ export function Dashboard() {
             </div>
           )}
         </Pannello>
+
+        {/* Attestati da rinnovare (HR, risposta 1c): clic → scheda Attestati del dipendente. */}
+        {admin && dati.attestatiDaRinnovare.length > 0 && (
+          <Pannello titolo="Attestati da rinnovare (scaduti o entro 30 giorni)" id="attestati-da-rinnovare">
+            <ul className="divide-y divide-gray-100 text-sm">
+              {dati.attestatiDaRinnovare.map((a) => (
+                <RigaLink key={a.id} a={`/dipendenti/${a.dipendenteId}?scheda=attestati`}>
+                  <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${a.stato === 'SCADUTO' ? 'bg-[#fbe4e1] text-[#8e2a1f]' : 'bg-[#fdf1d6] text-[#6b4a00]'}`}>
+                    {a.stato === 'SCADUTO' ? 'Scaduto' : 'In scadenza'}
+                  </span>
+                  <span className="font-medium text-marchio">{a.dipendente}</span>
+                  <span className="text-gray-700">{a.titolo}</span>
+                  <span className="text-xs text-gray-500">{ETICHETTE_ATTESTATO[a.tipo]}</span>
+                  <span className="ml-auto text-gray-600">{formattaData(a.dataScadenza)}</span>
+                </RigaLink>
+              ))}
+            </ul>
+          </Pannello>
+        )}
 
         {/* Prossimi giorni */}
         <Pannello titolo="In arrivo: assenze (14 giorni) e festività">

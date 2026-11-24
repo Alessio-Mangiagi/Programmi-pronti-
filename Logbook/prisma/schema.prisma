@@ -49,6 +49,14 @@ model Utente {
   /// Richieste di assenza approvate o rifiutate da questo utente (HR).
   assenzeDecise Assenza[]   @relation("DecisioneAssenza")
   sessioni      Sessione[]
+  /// File caricati da questo utente (attestati, documenti, documentazione dei progetti).
+  fileCaricati      FileCaricato[]      @relation("FileCaricati")
+  /// Documentazione di progetto scritta da questo utente.
+  documentiProgetto DocumentoProgetto[] @relation("AutoreDocumentoProgetto")
+  /// Documentazione di progetto segnata come "vista" da questo utente (HR).
+  documentiVisti    DocumentoProgetto[] @relation("VistoDocumentoProgetto")
+  /// Note interne sui progetti scritte da questo utente (HR).
+  noteProgetto      NotaProgetto[]
   creatoIl      DateTime    @default(now())
   aggiornatoIl  DateTime    @updatedAt
 }
@@ -114,6 +122,8 @@ model Dipendente {
   utente               Utente?
   registrazioni        RegistrazioneOraria[]
   assenze              Assenza[]
+  attestati            Attestato[]
+  documenti            DocumentoDipendente[]
   creatoIl             DateTime              @default(now())
   aggiornatoIl         DateTime              @updatedAt
 
@@ -144,7 +154,14 @@ model Progetto {
   /// minuti (richiesta del 23/11/2026, risposta 2b: oltre il limite il salvataggio è
   /// bloccato). Vuoto = nessun limite.
   maxMinutiGiorno Int?
+  /// Descrizione libera del progetto (scheda "Dati", dal 24/11/2026).
+  descrizione   String?
+  /// Codice della commessa di SkyTower in cui inviare la documentazione (pulsante "Invia a
+  /// SkyTower", visibile solo se in Impostazioni c'è il collegamento). Vuoto = non si invia.
+  commessaSkytower String?
   registrazioni RegistrazioneOraria[]
+  documenti     DocumentoProgetto[]
+  note          NotaProgetto[]
   creatoIl      DateTime              @default(now())
   aggiornatoIl  DateTime              @updatedAt
 }
@@ -249,4 +266,146 @@ model Festivita {
   descrizione String
   tipo        TipoFestivita
   creatoIl    DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// File, attestati e documentazione (richieste del 24/11/2026, risposte 1c 2c 3c 4a)
+// ---------------------------------------------------------------------------
+
+/// Un file caricato in Logbook. Il contenuto sta su disco nella cartella dei documenti
+/// (data/documenti, oppure LOGBOOK_DOCUMENTI_DIR: server/servizi/archivio-file.ts), qui
+/// solo i metadati. Sul disco il nome è casuale (nomeDisco), mai quello scelto da chi
+/// carica: niente percorsi pilotabili dall'esterno né nomi doppi.
+model FileCaricato {
+  id                  Int                  @id @default(autoincrement())
+  /// Nome del file sul disco: UUID + estensione ammessa.
+  nomeDisco           String               @unique
+  /// Nome del file come l'ha scelto chi l'ha caricato (solo da mostrare e scaricare).
+  nomeOriginale       String
+  tipoMime            String
+  /// Byte (massimo 20 MB, controllato dal server).
+  dimensione          Int
+  /// Impronta SHA-256 del contenuto (controllo d'integrità).
+  sha256              String
+  caricatoDa          Utente               @relation("FileCaricati", fields: [caricatoDaId], references: [id])
+  caricatoDaId        Int
+  creatoIl            DateTime             @default(now())
+  attestato           Attestato?
+  documentoDipendente DocumentoDipendente?
+  documentoProgetto   DocumentoProgetto?
+}
+
+/// Tipo di attestato (risposta 1c: elenco fisso, ALTRO per tutto il resto).
+enum TipoAttestato {
+  SICUREZZA
+  PRIMO_SOCCORSO
+  ANTINCENDIO
+  PATENTINO
+  VISITA_MEDICA
+  ALTRO
+}
+
+/// Attestato del dipendente (formazione, idoneità, patentini). Con la data di scadenza
+/// compare in dashboard 30 giorni prima (risposta 1c). Lo gestisce solo HR.
+/// Per la VISITA_MEDICA si salva solo l'esito amministrativo (es. "idoneo"), mai dati
+/// sanitari: stessa regola della malattia (GDPR art. 9).
+model Attestato {
+  id           Int           @id @default(autoincrement())
+  dipendente   Dipendente    @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  tipo         TipoAttestato
+  titolo       String
+  /// "AAAA-MM-GG"
+  dataRilascio String
+  /// "AAAA-MM-GG"; vuota = non scade.
+  dataScadenza String?
+  note         String?
+  file         FileCaricato? @relation(fields: [fileId], references: [id])
+  fileId       Int?          @unique
+  creatoIl     DateTime      @default(now())
+  aggiornatoIl DateTime      @updatedAt
+
+  @@index([dipendenteId])
+  @@index([dataScadenza])
+}
+
+/// Altri documenti del dipendente (contratto, documento d'identità, ecc.). Solo HR.
+model DocumentoDipendente {
+  id           Int          @id @default(autoincrement())
+  dipendente   Dipendente   @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  titolo       String
+  note         String?
+  file         FileCaricato @relation(fields: [fileId], references: [id])
+  fileId       Int          @unique
+  creatoIl     DateTime     @default(now())
+
+  @@index([dipendenteId])
+}
+
+/// Da dove arriva la documentazione di un progetto.
+/// PROGETTO = caricata dalla pagina del progetto; GIORNATA = dalla finestra delle ore del giorno.
+enum OrigineDocumento {
+  PROGETTO
+  GIORNATA
+}
+
+/// Documentazione di avanzamento di un progetto (risposte 2c e 3c): un file e/o una nota,
+/// con la percentuale di avanzamento dichiarata da chi la carica. Il dipendente vede solo
+/// la sua; HR vede tutto, la segna "vista" e può rispondere. HR può inviarla a SkyTower.
+model DocumentoProgetto {
+  id                Int              @id @default(autoincrement())
+  progetto          Progetto         @relation(fields: [progettoId], references: [id], onDelete: Restrict)
+  progettoId        Int
+  autore            Utente           @relation("AutoreDocumentoProgetto", fields: [autoreId], references: [id])
+  autoreId          Int
+  /// Giorno a cui si riferisce, "AAAA-MM-GG" (dalla finestra delle ore: il giorno aperto).
+  data              String
+  titolo            String
+  nota              String?
+  /// Avanzamento del progetto dichiarato, 0-100; vuoto = non dichiarato.
+  percentuale       Int?
+  origine           OrigineDocumento @default(PROGETTO)
+  /// Facoltativo: un aggiornamento può essere solo nota e percentuale.
+  file              FileCaricato?    @relation(fields: [fileId], references: [id])
+  fileId            Int?             @unique
+  visto             Boolean          @default(false)
+  vistoIl           DateTime?
+  vistoDa           Utente?          @relation("VistoDocumentoProgetto", fields: [vistoDaId], references: [id])
+  vistoDaId         Int?
+  /// Risposta di HR, visibile a chi ha caricato.
+  rispostaHr        String?
+  /// Invio a SkyTower: identificativo del documento creato, link e quando.
+  skytowerId        String?
+  skytowerUrl       String?
+  skytowerInviatoIl DateTime?
+  creatoIl          DateTime         @default(now())
+  aggiornatoIl      DateTime         @updatedAt
+
+  @@index([progettoId, data])
+  @@index([autoreId])
+  @@index([visto])
+}
+
+/// Nota interna di HR su un progetto (scheda "Note" del progetto). I dipendenti non la vedono.
+model NotaProgetto {
+  id           Int      @id @default(autoincrement())
+  progetto     Progetto @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  progettoId   Int
+  autore       Utente   @relation(fields: [autoreId], references: [id])
+  autoreId     Int
+  testo        String
+  creatoIl     DateTime @default(now())
+  aggiornatoIl DateTime @updatedAt
+
+  @@index([progettoId])
+}
+
+/// Impostazioni dell'applicazione (chiave → valore), modificabili solo dagli admin dalla
+/// pagina Impostazioni. Oggi: collegamento a SkyTower (skytower.url, skytower.token,
+/// skytower.email). Il token non esce mai verso il browser (server/rotte/impostazioni.ts).
+model Impostazione {
+  chiave       String   @id
+  valore       String
+  aggiornatoIl DateTime @updatedAt
 }

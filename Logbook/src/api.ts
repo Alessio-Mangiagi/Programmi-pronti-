@@ -19,8 +19,8 @@ export class ErroreApi extends Error {
   }
 }
 
-async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, grezzo?: Blob | ArrayBuffer): Promise<T> {
-  const intestazioni: Record<string, string> = { 'X-Logbook': '1' };
+async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, grezzo?: Blob | ArrayBuffer, extra: Record<string, string> = {}): Promise<T> {
+  const intestazioni: Record<string, string> = { 'X-Logbook': '1', ...extra };
   let body: BodyInit | undefined;
   if (grezzo !== undefined) {
     intestazioni['Content-Type'] = 'application/octet-stream';
@@ -54,6 +54,12 @@ export const api = {
   delete: <T>(percorso: string) => richiesta<T>('DELETE', percorso),
   /** Invio di un file così com'è (import Excel). */
   file: <T>(percorso: string, file: Blob) => richiesta<T>('POST', percorso, undefined, file),
+  /**
+   * Carica un allegato nell'archivio (POST /api/file, server/rotte/file.ts): byte nel
+   * corpo, nome nell'intestazione X-Nome-File. Restituisce { id, nome, tipo, dimensione }
+   * da collegare poi ad attestato, documento o documentazione di progetto.
+   */
+  carica: <T>(file: File) => richiesta<T>('POST', '/api/file', undefined, file, { 'X-Nome-File': encodeURIComponent(file.name) }),
 };
 
 /**

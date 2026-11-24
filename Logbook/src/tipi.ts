@@ -87,3 +87,33 @@ export type Assenza = {
 export type TipoFestivita = 'NAZIONALE' | 'LOCALE' | 'AZIENDALE';
 
 export type Festivita = { id: number; data: string; descrizione: string; tipo: TipoFestivita };
+
+// ---------------------------------------------------------------------------
+// Giorno 15 (24/11/2026): file, attestati, documenti, impostazioni
+// ---------------------------------------------------------------------------
+
+/** Un file caricato (POST /api/file, campo `file` di attestati e documenti). */
+export type VistaFile = { id: number; nome: string; tipo: string; dimensione: number; caricatoIl: string };
+
+export type TipoAttestato = 'SICUREZZA' | 'PRIMO_SOCCORSO' | 'ANTINCENDIO' | 'PATENTINO' | 'VISITA_MEDICA' | 'ALTRO';
+export type StatoAttestato = 'VALIDO' | 'IN_SCADENZA' | 'SCADUTO' | 'SENZA_SCADENZA';
+
+/** GET /api/attestati */
+export type Attestato = {
+  id: number;
+  dipendenteId: number;
+  tipo: TipoAttestato;
+  titolo: string;
+  dataRilascio: string;
+  dataScadenza: string | null;
+  note: string | null;
+  file: VistaFile | null;
+  /** Calcolato dal server alla data di oggi. */
+  stato: StatoAttestato;
+};
+
+/** GET /api/documenti-dipendente */
+export type DocumentoDipendente = { id: number; dipendenteId: number; titolo: string; note: string | null; file: VistaFile; creatoIl: string };
+
+/** GET /api/impostazioni (solo admin): il token non arriva mai, solo se è impostato. */
+export type Impostazioni = { skytower: { url: string; email: string; tokenImpostato: boolean; attivo: boolean } };

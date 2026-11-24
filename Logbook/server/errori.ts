@@ -56,6 +56,11 @@ export function gestoreErrori(err: unknown, _req: Request, res: Response, _next:
     res.status(400).json({ errore: 'Richiesta non leggibile (JSON non valido)' });
     return;
   }
+  // Corpo oltre il limite di express.raw/express.json (es. file oltre 20 MB): 413 chiaro.
+  if (typeof err === 'object' && err !== null && (err as { type?: string }).type === 'entity.too.large') {
+    res.status(413).json({ errore: 'File troppo grande: massimo 20 MB' });
+    return;
+  }
   console.error('[logbook] errore non gestito:', err);
   res.status(500).json({ errore: 'Errore interno del server' });
 }

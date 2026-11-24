@@ -11,12 +11,16 @@
  *   non conta: la giornata può essere ancora in corso).
  * In più: richieste di assenza in attesa, assenze e festività dei prossimi 14 giorni, ore
  * del mese per progetto. "Oggi" arriva da creaApp (fissabile nei test).
+ *
+ * Solo HR (dal 24/11/2026, risposta 1c): attestati scaduti o in scadenza nei prossimi
+ * 30 giorni (GIORNI_PREAVVISO_ATTESTATI), i più urgenti prima.
  */
 import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { aggiungiGiorni, dataIso, giorniNelMese } from '../../comune/date';
+import { GIORNI_PREAVVISO_ATTESTATI, statoAttestato } from '../../comune/documenti';
 import { calcolaTotali, giorniLavorativi } from '../../comune/riepiloghi';
-import { dipendenteAmmesso } from '../middleware';
+import { dipendenteAmmesso, isAdmin } from '../middleware';
 
 export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
   const router = Router();
@@ -53,6 +57,15 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
     ]);
     const festivi = new Set(festivita.map((f) => f.data));
     const totali = calcolaTotali(fasce);
+
+    // Attestati da rinnovare (HR): scaduti o in scadenza entro il preavviso, dei dipendenti attivi.
+    const attestati = isAdmin(req)
+      ? await prisma.attestato.findMany({
+          where: { dataScadenza: { not: null, lte: aggiungiGiorni(giorno, GIORNI_PREAVVISO_ATTESTATI) }, dipendente: { stato: 'ATTIVO' } },
+          include: { dipendente: { select: { id: true, nome: true, cognome: true } } },
+          orderBy: { dataScadenza: 'asc' },
+        })
+      : [];
 
     const perDipendente = dipendenti.map((d) => {
       const inizio = d.dataAssunzione > inizioMese ? d.dataAssunzione : inizioMese;
@@ -92,6 +105,10 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
         dipendente: `${a.dipendente.cognome} ${a.dipendente.nome}`,
       })),
       prossimeFestivita: festivita.filter((f) => f.data >= giorno).slice(0, 3),
+      attestatiDaRinnovare: attestati.map((a) => ({
+        id: a.id, tipo: a.tipo, titolo: a.titolo, dataScadenza: a.dataScadenza, stato: statoAttestato(a.dataScadenza, giorno),
+        dipendenteId: a.dipendenteId, dipendente: `${a.dipendente.cognome} ${a.dipendente.nome}`,
+      })),
     });
   });
 

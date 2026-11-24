@@ -13,6 +13,7 @@
  *   suite passa HOST alle app che avvia (0.0.0.0 se il portale è in rete).
  * - DATABASE_URL (default data/logbook.db, vedi server/database-url.ts)
  * - LOGBOOK_COOKIE_SECURE=1 dietro HTTPS (reverse proxy della suite)
+ * - LOGBOOK_DOCUMENTI_DIR: cartella dei file caricati (default data/documenti)
  */
 import path from 'node:path';
 
@@ -33,6 +34,13 @@ const porta = Number(produzione ? (process.env.LOGBOOK_PORT ?? 5210) : (process.
 const host = process.env.LOGBOOK_API_HOST ?? process.env.HOST ?? '127.0.0.1';
 
 const app = creaApp(prisma, produzione ? { cartellaInterfaccia: path.join(RADICE_APP, 'dist') } : {});
+
+// File caricati ma mai collegati a un documento (finestra chiusa a metà) da più di un
+// giorno: si tolgono all'avvio. Un errore qui non deve impedire l'avvio.
+const { cartellaDocumentiPredefinita, pulisciFileOrfani } = await import('./servizi/archivio-file');
+pulisciFileOrfani(prisma, cartellaDocumentiPredefinita())
+  .then((n) => n && console.log(`[logbook] tolti ${n} file caricati e mai usati`))
+  .catch((e) => console.warn('[logbook] pulizia dei file non riuscita:', e));
 // Express 5 chiama questa funzione anche quando l'ascolto fallisce, passandole l'errore:
 // in quel caso si tace e ci pensa il gestore 'error' qui sotto (altrimenti il log direbbe
 // "in ascolto" subito prima di "porta occupata").

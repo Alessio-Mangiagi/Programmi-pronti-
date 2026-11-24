@@ -29,6 +29,8 @@ export const MENU: VoceMenu[] = [
   { a: '/assenze', etichetta: 'Assenze', icona: 'assenze', etichettaDipendente: 'Le mie assenze' },
   { a: '/importa', etichetta: 'Importa', icona: 'importa', soloAdmin: true },
   { a: '/esporta', etichetta: 'Esporta', icona: 'esporta', soloAdmin: true },
+  // Dal 24/11/2026: collegamento a SkyTower e altre impostazioni, solo amministratori.
+  { a: '/impostazioni', etichetta: 'Impostazioni', icona: 'impostazioni', soloAdmin: true },
 ];
 
 export function Layout() {

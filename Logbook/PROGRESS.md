@@ -12,10 +12,10 @@ sessione per riprendere da dove si era rimasti.
 - **Modalità:** il 23/11 l'utente ha chiesto di proseguire coi giorni successivi senza fermarsi ("continua fino a che non finisci i crediti")
 - **Giorno 11 (23/11):** richieste aggiuntive ✅ (data minima 2020, ore massime per progetto, estratti mensili)
 - **Giorno 12 (23/11):** nuova estetica Cosedil ✅
-- **Prossimo:** nessun giorno pianificato; vedi "Problemi aperti"
 - **Giorno 13 (24/11):** interfaccia adattabile in flexbox, dal cellulare agli schermi ultra wide ✅
 - **Giorno 14 (24/11):** produzione senza dati di esempio, porta 5210 in firewall e installer, dashboard cliccabile, menu dei colori ✅
-- **In attesa di risposta (24/11):** sezioni di dipendenti e progetti, attestati, documentazione dei progetti caricata dagli utenti, documenti e note nel menu di inserimento
+- **Giorno 15 (24/11):** file, attestati, documenti del dipendente a schede, Impostazioni con collegamento a SkyTower ✅
+- **Prossimo:** calendario solo lun-ven e blocco di sabato, domenica e festivi; poi (dopo le risposte) pannello laterale e assegnazioni ai progetti; documentazione dei progetti (2c, 3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -409,3 +409,34 @@ Verifiche:
   parser di PowerShell senza errori (non eseguito: tocca il firewall del PC).
 - Playwright su Edge (HR e dipendente): 12 verifiche sui collegamenti della dashboard e
   sul menu dei colori, tutte ok; nessun dato salvato (progetto chiuso con Annulla).
+
+### Giorno 15 — File, attestati, documenti del dipendente, Impostazioni (24/11/2026) ✅
+
+Richiesta: "dividi in sezioni l'inserimento dei nuovi dipendenti e dei progetti aggiungendo
+una sezione di inserimento attestati e documenti", risposte 1c (attestati con tipo da
+elenco e avviso 30 giorni prima), 4a + "b come pulsante" (file in Logbook; invio a SkyTower
+solo se un admin registra il collegamento in Impostazioni).
+
+Fatto:
+- Migrazione `20261124100000_documenti`: FileCaricato, Attestato (TipoAttestato),
+  DocumentoDipendente, DocumentoProgetto (OrigineDocumento), NotaProgetto, Impostazione;
+  Progetto.descrizione e Progetto.commessaSkytower. Solo tabelle e colonne nuove.
+- `server/servizi/archivio-file.ts`: file in `data/documenti` (o `LOGBOOK_DOCUMENTI_DIR`),
+  20 MB, estensione + primi byte controllati, nome su disco casuale, pulizia dei file mai
+  collegati all'avvio. `POST/GET/DELETE /api/file` (lettura: HR o chi ha caricato).
+- `/api/attestati` (stato a oggi con `statoAttestato`), `/api/documenti-dipendente`,
+  `/api/impostazioni` (+ `/skytower`, `/skytower/prova`, `/skytower/commesse`; il token non
+  esce mai), `server/servizi/skytower.ts` (contratto della suite: X-Suite-Token,
+  X-Suite-Email, X-Suite-App, POST /suite/commesse/{codice}/documenti). Dashboard HR:
+  `attestatiDaRinnovare`.
+- Interfaccia: `Schede` (ui.tsx), `CaricaFile`/`LinkFile` (File.tsx), scheda dipendente
+  in cinque schede (Anagrafica, Contratto e costi, Account, Attestati, Documenti; le ultime
+  tre dopo il primo salvataggio; `?scheda=`), pagina Impostazioni nel menu degli admin,
+  riquadro e pannello "Attestati da rinnovare" in dashboard.
+
+Verifiche:
+- `npm test` 161/161 (18 nuovi in `documenti.test.ts`, con un finto SkyTower in ascolto).
+- Migrazione applicata al DB demo all'avvio di produzione, dati intatti.
+- Playwright su Edge: 9 verifiche (schede, attestato con file in scadenza, apertura del
+  file, documento, dashboard → scheda Attestati, Impostazioni con errore "non
+  raggiungibile"), con pulizia dei dati di prova a inizio e fine.

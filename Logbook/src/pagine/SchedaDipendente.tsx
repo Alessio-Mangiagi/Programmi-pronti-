@@ -1,22 +1,32 @@
 // "><(((º> sabusabu <º)))><"
 /**
  * Scheda dipendente (solo HR), per creare (/dipendenti/nuovo) o modificare
- * (/dipendenti/:id). Tre blocchi:
- * 1. anagrafica e contratto, con costo orario netto e lordo in euro;
- * 2. account di accesso (nome utente, password, attivo) — solo per schede già salvate;
- * 3. disattivazione (cessazione) o riattivazione.
+ * (/dipendenti/:id). Divisa in schede (richiesta del 24/11/2026 "dividi in sezioni"):
+ * 1. Anagrafica e 2. Contratto e costi: un solo modulo, salvato insieme (con costo
+ *    orario netto e lordo in euro); un errore in una scheda nascosta la segna col pallino
+ *    rosso e la apre;
+ * 3. Account: nome utente, password, attivo + disattivazione/riattivazione;
+ * 4. Attestati e 5. Documenti (componenti/DocumentiDipendente.tsx).
+ * Account, Attestati e Documenti si aprono dopo il primo salvataggio (serve la scheda).
+ * `?scheda=attestati` (link dalla dashboard) apre direttamente quella scheda.
  *
  * Gli errori si controllano prima nel browser con le stesse regole del server
  * (comune/schemi.ts) e poi dal server, che resta l'unico controllo che conta.
  */
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { centesimiDaEuro, euroDaCentesimi } from '../../comune/importi';
 import { erroriPerCampo, ETICHETTE_CONTRATTO, schemaDipendente, TIPI_CONTRATTO } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
-import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
+import { AttestatiDipendente, DocumentiDipendente } from '../componenti/DocumentiDipendente';
+import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante, Schede } from '../componenti/ui';
 import type { Dipendente } from '../tipi';
+
+type Scheda = 'anagrafica' | 'contratto' | 'account' | 'attestati' | 'documenti';
+const SCHEDE: Scheda[] = ['anagrafica', 'contratto', 'account', 'attestati', 'documenti'];
+/** Campi del modulo per scheda: servono a segnare (e aprire) la scheda con errori. */
+const CAMPI_ANAGRAFICA = ['matricola', 'nome', 'cognome', 'codiceFiscale', 'email', 'telefono'];
 
 /** Valori del modulo: tutto testo, come nei campi. */
 type Modulo = Record<
@@ -48,6 +58,13 @@ export function SchedaDipendente() {
   const [messaggio, setMessaggio] = useState<{ tipo: 'errore' | 'successo'; testo: string } | null>(null);
   const [caricamento, setCaricamento] = useState(!nuovo);
   const [invio, setInvio] = useState(false);
+  const [parametri] = useSearchParams();
+  const [scheda, setScheda] = useState<Scheda>(() => {
+    const richiesta = parametri.get('scheda') as Scheda | null;
+    return richiesta && SCHEDE.includes(richiesta) && !nuovo ? richiesta : 'anagrafica';
+  });
+  const erroreAnagrafica = Object.keys(errori).some((k) => CAMPI_ANAGRAFICA.includes(k));
+  const erroreContratto = Object.keys(errori).some((k) => !CAMPI_ANAGRAFICA.includes(k));
 
   useEffect(() => {
     if (nuovo) {
@@ -95,6 +112,8 @@ export function SchedaDipendente() {
     if (Object.keys(erroriLocali).length) {
       setErrori(erroriLocali);
       setMessaggio({ tipo: 'errore', testo: 'Controlla i campi evidenziati' });
+      // Si apre la prima scheda che ha un errore (l'altra resta segnata col pallino).
+      setScheda(Object.keys(erroriLocali).some((k) => CAMPI_ANAGRAFICA.includes(k)) ? 'anagrafica' : 'contratto');
       return;
     }
     setErrori({});
@@ -102,6 +121,7 @@ export function SchedaDipendente() {
     try {
       if (nuovo) {
         const creato = await api.post<Dipendente>('/api/dipendenti', corpo);
+        setMessaggio({ tipo: 'successo', testo: 'Scheda creata: ora puoi creare l\'account e caricare attestati e documenti' });
         naviga(`/dipendenti/${creato.id}`, { replace: true });
       } else {
         const aggiornato = await api.put<Dipendente>(`/api/dipendenti/${id}`, corpo);
@@ -113,6 +133,7 @@ export function SchedaDipendente() {
       if (err instanceof ErroreApi) {
         setErrori(err.campi);
         setMessaggio({ tipo: 'errore', testo: err.message });
+        if (Object.keys(err.campi).some((k) => CAMPI_ANAGRAFICA.includes(k))) setScheda('anagrafica');
       }
     } finally {
       setInvio(false);
@@ -141,14 +162,27 @@ export function SchedaDipendente() {
       />
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
 
+      <Schede<Scheda>
+        attiva={scheda}
+        onCambia={setScheda}
+        voci={[
+          { id: 'anagrafica', etichetta: 'Anagrafica', errore: erroreAnagrafica },
+          { id: 'contratto', etichetta: 'Contratto e costi', errore: erroreContratto },
+          { id: 'account', etichetta: 'Account', disattivata: nuovo ? 'Salva prima la scheda' : undefined },
+          { id: 'attestati', etichetta: 'Attestati', disattivata: nuovo ? 'Salva prima la scheda' : undefined },
+          { id: 'documenti', etichetta: 'Documenti', disattivata: nuovo ? 'Salva prima la scheda' : undefined },
+        ]}
+      />
+
       {/*
-        Layout in flexbox (24/11/2026): le tre sezioni (anagrafica, contratto, costi) partono
-        da 24rem e si affiancano quando c'è spazio (tutte e tre su un ultra wide); dentro
-        ogni sezione i campi partono da 12rem e vanno a capo da soli (uno per riga sul telefono).
+        Anagrafica e Contratto e costi sono lo stesso modulo (si salvano insieme): la scheda
+        scelta mostra solo le sue sezioni. Dentro, layout in flexbox: le sezioni partono da
+        24rem e si affiancano quando c'è spazio, i campi partono da 12rem e vanno a capo.
       */}
+      {(scheda === 'anagrafica' || scheda === 'contratto') && (
       <form onSubmit={salva} className="scheda p-3 sm:p-4" noValidate>
         <div className="flex flex-wrap gap-x-6 gap-y-5">
-          <section className="min-w-0 flex-[1_1_24rem]">
+          <section className={`min-w-0 flex-[1_1_24rem] ${scheda === 'anagrafica' ? '' : 'hidden'}`}>
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Anagrafica</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
               <Campo etichetta="Matricola" obbligatorio errore={err('matricola')}>
@@ -172,7 +206,7 @@ export function SchedaDipendente() {
             </div>
           </section>
 
-          <section className="min-w-0 flex-[1_1_24rem]">
+          <section className={`min-w-0 flex-[1_1_24rem] ${scheda === 'contratto' ? '' : 'hidden'}`}>
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Contratto</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
               <Campo etichetta="Mansione" errore={err('mansione')}>
@@ -210,7 +244,7 @@ export function SchedaDipendente() {
             </div>
           </section>
 
-          <section className="min-w-0 flex-[1_1_24rem]">
+          <section className={`min-w-0 flex-[1_1_24rem] ${scheda === 'contratto' ? '' : 'hidden'}`}>
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Costi (riservati a HR)</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
               <Campo etichetta="Costo orario netto (€)" errore={err('costoOrarioNettoCent')} aiuto="Es. 14,50">
@@ -223,16 +257,25 @@ export function SchedaDipendente() {
           </section>
         </div>
 
-        <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 pt-3">
+          {nuovo && scheda === 'anagrafica' && (
+            <Pulsante variante="leggero" className="mr-auto" onClick={() => setScheda('contratto')}>
+              Avanti: contratto e costi →
+            </Pulsante>
+          )}
           <Pulsante onClick={() => naviga('/dipendenti')}>Annulla</Pulsante>
           <Pulsante type="submit" variante="primario" disabled={invio}>
             {invio ? 'Salvataggio…' : nuovo ? 'Crea dipendente' : 'Salva modifiche'}
           </Pulsante>
         </div>
       </form>
+      )}
 
-      {!nuovo && dipendente && (
-        <div className="mt-4 flex flex-wrap gap-4 [&>*]:min-w-0 [&>*]:flex-[1_1_26rem]">
+      {!nuovo && dipendente && scheda === 'attestati' && <AttestatiDipendente dipendenteId={dipendente.id} />}
+      {!nuovo && dipendente && scheda === 'documenti' && <DocumentiDipendente dipendenteId={dipendente.id} />}
+
+      {!nuovo && dipendente && scheda === 'account' && (
+        <div className="flex flex-wrap gap-4 [&>*]:min-w-0 [&>*]:flex-[1_1_26rem]">
           <BloccoAccount dipendente={dipendente} onAggiornato={(utente) => setDipendente({ ...dipendente, utente })} />
           <BloccoStato
             dipendente={dipendente}
