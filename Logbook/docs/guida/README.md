@@ -168,6 +168,15 @@ in quelli futuri.
 
 ![Fascia eliminata dalla giornata](img/37-elimina-fascia.png)
 
+**Documentazione del giorno.** Sotto le fasce, **+ Aggiungi documentazione** allega a quella
+giornata un file (verbale, foto, rapportino) con una nota e, se serve, la percentuale di
+avanzamento. Il titolo è già proposto («Giornata del 20/11/2026 – Rossi Mario»). Va sul
+progetto di una fascia **già salvata**: con più progetti nel giorno si sceglie quale.
+Si salva subito con **Salva documentazione**, senza «Salva giornata», e compare anche nella
+pagina del progetto con l'etichetta «dalla giornata». **Elimina** la toglie con il suo file.
+
+![Documentazione del giorno](img/40-documentazione-giorno.png)
+
 ### Dashboard HR
 
 ![Dashboard HR](img/02-dashboard-hr.png)

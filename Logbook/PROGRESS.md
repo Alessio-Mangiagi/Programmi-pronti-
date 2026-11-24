@@ -27,7 +27,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 25 (24/11):** sabato e domenica esclusi da tutte le estrazioni (report, estratti, Excel, stampa) ✅
 - **Giorno 26 (24/11):** matricola sigla del contratto + numero, mansioni da elenco che si arricchisce ✅
 - **Giorno 27 (24/11):** pannello a destra del calendario: più giorni (Ctrl/Maiusc) e più dipendenti insieme, tutto o niente ✅
-- **Prossimo:** allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 28 (24/11):** documentazione del giorno (file, nota, avanzamento) dalla finestra delle ore, nella documentazione del progetto ✅
+- **Prossimo:** grafici dell'avanzamento in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -808,3 +809,18 @@ Risposta 1a del 24/11: "clic su un giorno, oppure su più giorni tenendo premuto
   - doppione rifiutato con il motivo;
   - "Apri" verso l'editor.
 - Guida: immagine 39.
+
+### Giorno 28 — Documentazione del giorno nella finestra delle ore (24/11/2026) ✅
+
+Risposta 3c del 24/11 (allegati e nota nella finestra delle ore, "che finiscono anche nella documentazione del progetto della fascia"). Dal Giorno 20 la inserisce solo HR.
+- `GET /api/documenti-progetto?data=` restituisce la documentazione di un giorno.
+- `src/componenti/DocumentazioneGiorno.tsx`, nell'editor della giornata per chi può scrivere:
+  - elenco della documentazione del giorno per i progetti delle fasce, con file ed "Elimina";
+  - "+ Aggiungi documentazione": progetto (solo se nel giorno ce n'è più d'uno), titolo proposto, avanzamento facoltativo, nota e file;
+  - si salva come documentazione del progetto con origine GIORNATA, e nella pagina del progetto compare "dalla giornata".
+- La documentazione va sul progetto SALVATO della fascia (`progettoSalvato` in `EditorGiornata`), non su quello appena cambiato nel menu e non ancora salvato. È un difetto trovato dalla prova dal vivo e corretto.
+
+Verifiche:
+- `npm test` 235/235, di cui 2 nuovi in `giorno28.test.ts`: filtro per giorno, origine, file, il dipendente non vede né crea. Typecheck ok.
+- Playwright su Edge 6/6, su una copia del database: titolo proposto, salvataggio con file, progetto salvato anche dopo un cambio non salvato, "dalla giornata" nella pagina del progetto.
+- Guida: immagine 40.
