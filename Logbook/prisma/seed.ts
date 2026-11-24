@@ -62,11 +62,12 @@ const PROGETTI = [
 /**
  * Dipendenti di esempio con la loro giornata tipo: fasce (inizio-fine) e progetti su
  * cui lavorano (indici in PROGETTI). Ferrari è part-time a 30 ore, una fascia sola.
+ * Matricole nella forma del Giorno 26: sigla del contratto + numero (comune/matricola.ts).
  */
 const DIPENDENTI = [
   {
     dati: {
-      matricola: '0001', nome: 'Mario', cognome: 'Rossi', codiceFiscale: cf('RSSMRA85C15C351'),
+      matricola: 'IND-0001', nome: 'Mario', cognome: 'Rossi', codiceFiscale: cf('RSSMRA85C15C351'),
       email: 'mario.rossi@esempio.it', telefono: '333 000 0001', mansione: 'Capocantiere', reparto: 'Produzione',
       dataAssunzione: '2020-02-03', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1450, costoOrarioLordoCent: 2780,
@@ -75,7 +76,7 @@ const DIPENDENTI = [
   },
   {
     dati: {
-      matricola: '0002', nome: 'Giulia', cognome: 'Bianchi', codiceFiscale: cf('BNCGLI90L62F205'),
+      matricola: 'IND-0002', nome: 'Giulia', cognome: 'Bianchi', codiceFiscale: cf('BNCGLI90L62F205'),
       email: 'giulia.bianchi@esempio.it', telefono: '333 000 0002', mansione: 'Ingegnere di cantiere', reparto: 'Ufficio tecnico',
       dataAssunzione: '2020-09-14', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1620, costoOrarioLordoCent: 3150,
@@ -84,7 +85,7 @@ const DIPENDENTI = [
   },
   {
     dati: {
-      matricola: '0003', nome: 'Luca', cognome: 'Esposito', codiceFiscale: cf('SPSLCU78S03F839'),
+      matricola: 'IND-0003', nome: 'Luca', cognome: 'Esposito', codiceFiscale: cf('SPSLCU78S03F839'),
       email: 'luca.esposito@esempio.it', telefono: '333 000 0003', mansione: 'Operaio specializzato', reparto: 'Produzione',
       dataAssunzione: '2021-03-01', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1180, costoOrarioLordoCent: 2290,
@@ -93,7 +94,7 @@ const DIPENDENTI = [
   },
   {
     dati: {
-      matricola: '0004', nome: 'Chiara', cognome: 'Ferrari', codiceFiscale: cf('FRRCHR95A49H501'),
+      matricola: 'DET-0004', nome: 'Chiara', cognome: 'Ferrari', codiceFiscale: cf('FRRCHR95A49H501'),
       email: 'chiara.ferrari@esempio.it', telefono: '333 000 0004', mansione: 'Geometra', reparto: 'Ufficio tecnico',
       dataAssunzione: '2024-03-04', tipoContratto: 'DETERMINATO', oreSettimanali: 30,
       costoOrarioNettoCent: 1100, costoOrarioLordoCent: 2050,
@@ -102,7 +103,7 @@ const DIPENDENTI = [
   },
   {
     dati: {
-      matricola: '0005', nome: 'Giuseppe', cognome: 'Russo', codiceFiscale: cf('RSSGPP82E28G273'),
+      matricola: 'IND-0005', nome: 'Giuseppe', cognome: 'Russo', codiceFiscale: cf('RSSGPP82E28G273'),
       email: 'giuseppe.russo@esempio.it', telefono: '333 000 0005', mansione: 'Operaio', reparto: 'Produzione',
       dataAssunzione: '2020-06-15', tipoContratto: 'INDETERMINATO', oreSettimanali: 40,
       costoOrarioNettoCent: 1050, costoOrarioLordoCent: 2010,
@@ -176,6 +177,8 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   // --- Dipendenti ----------------------------------------------------------------------
   const dipendenti: Dipendente[] = [];
   for (const d of DIPENDENTI) dipendenti.push(await prisma.dipendente.create({ data: { ...d.dati } }));
+  // Elenco delle mansioni proposte nella scheda (Giorno 26): quelle dei dipendenti di esempio.
+  await prisma.mansione.createMany({ data: [...new Set(DIPENDENTI.map((d) => d.dati.mansione))].map((nome) => ({ nome })) });
   const [rossi, bianchi, esposito, ferrari, russo] = dipendenti;
 
   // --- Assegnazioni ai progetti (Giorno 17): ognuno ai due progetti su cui lavora --------

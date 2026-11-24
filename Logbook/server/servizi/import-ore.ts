@@ -16,6 +16,7 @@
 import ExcelJS from 'exceljs';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { aggiungiGiorni, DATA_MINIMA, formattaData, isFineSettimana, MESSAGGIO_DATA_MINIMA } from '../../comune/date';
+import { numeroMatricola } from '../../comune/matricola';
 import { durataMinuti } from '../../comune/orari';
 import { messaggioMassimo, siSovrappongono } from '../../comune/registrazioni';
 import { caricaContestoOre, erroriRegole } from './regole-ore';
@@ -212,10 +213,25 @@ export async function analizzaFile(prisma: PrismaClient, dati: Buffer, oggi: str
   }
 
   // Seconda passata: dipendenti e progetti per matricola/codice, regole e sovrapposizioni.
-  const [dipendenti, progetti] = await Promise.all([
-    prisma.dipendente.findMany({ where: { matricola: { in: [...new Set(daControllare.map((r) => r.matricola))] } } }),
+  // Giorno 26: il dipendente si riconosce dal NUMERO di matricola (unico fra tutti), così
+  // valgono anche i file vecchi con "0004" o con la sigla del contratto di prima ("DET-0004"
+  // per chi ora è IND-0004). Le matricole senza numero si confrontano com'erano.
+  const [tutti, progetti] = await Promise.all([
+    prisma.dipendente.findMany(),
     prisma.progetto.findMany({ where: { codice: { in: [...new Set(daControllare.map((r) => r.codiceProgetto))] } } }),
   ]);
+  const perNumero = new Map(tutti.flatMap((d) => (numeroMatricola(d.matricola) !== null ? [[numeroMatricola(d.matricola)!, d] as const] : [])));
+  const perTesto = new Map(tutti.map((d) => [d.matricola.toUpperCase(), d]));
+  const trova = (matricola: string) => {
+    const numero = numeroMatricola(matricola);
+    return (numero !== null ? perNumero.get(numero) : undefined) ?? perTesto.get(matricola.trim().toUpperCase());
+  };
+  for (const r of daControllare) {
+    const dip = trova(r.matricola);
+    // Da qui la riga usa la matricola attuale: "0004" e "IND-0004" nello stesso file sono la stessa persona.
+    if (dip) r.matricola = dip.matricola;
+  }
+  const dipendenti = tutti.filter((d) => daControllare.some((r) => r.matricola === d.matricola));
   const perMatricola = new Map(dipendenti.map((d) => [d.matricola, d]));
   const perCodice = new Map(progetti.map((p) => [p.codice, p]));
   const date = daControllare.map((r) => r.data).filter((d): d is string => !!d).sort();

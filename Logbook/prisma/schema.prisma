@@ -103,7 +103,9 @@ enum TipoContratto {
 /// Scheda anagrafica del dipendente.
 model Dipendente {
   id                   Int                    @id @default(autoincrement())
-  /// Matricola aziendale, unica.
+  /// Matricola aziendale, unica. Dal Giorno 26 nella forma SIGLA-NUMERO del contratto
+  /// (es. IND-0001, DET-0004): la sigla segue il contratto, il numero identifica la
+  /// persona ed è unico fra tutti (comune/matricola.ts).
   matricola            String                 @unique
   nome                 String
   cognome              String
@@ -111,6 +113,7 @@ model Dipendente {
   codiceFiscale        String                 @unique
   email                String?
   telefono             String?
+  /// Testo della mansione; l'elenco delle mansioni proposte sta nella tabella Mansione (Giorno 26).
   mansione             String?
   reparto              String?
   /// "AAAA-MM-GG"
@@ -291,6 +294,17 @@ enum TipoFestivita {
   NAZIONALE
   LOCALE
   AZIENDALE
+}
+
+/// Mansioni proposte nella scheda dipendente (Giorno 26, risposta 4a): una mansione nuova
+/// scritta da HR viene aggiunta qui e da quel momento compare nell'elenco per tutti.
+/// Dipendente.mansione resta testo: l'elenco è un aiuto alla scelta, non un vincolo.
+model Mansione {
+  id       Int      @id @default(autoincrement())
+  /// Nome come scritto la prima volta (es. "Capocantiere"); unico senza badare alle maiuscole
+  /// (lo controlla server/rotte/dipendenti.ts prima di aggiungerne una).
+  nome     String   @unique
+  creatoIl DateTime @default(now())
 }
 
 /// Giorno festivo: non lavorativo per tutti i dipendenti.

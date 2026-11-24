@@ -18,11 +18,19 @@
  *
  * Gli errori si controllano prima nel browser con le stesse regole del server
  * (comune/schemi.ts) e poi dal server, che resta l'unico controllo che conta.
+ *
+ * Giorno 26 (risposte 1a 2a 3a 4a del 24/11/2026):
+ * - matricola SIGLA-NUMERO del contratto (comune/matricola.ts): per un dipendente nuovo
+ *   Logbook propone la prossima libera (HR può correggerla); cambiando il contratto cambia
+ *   subito la sigla e il numero resta;
+ * - mansione scelta dall'elenco con ricerca a caratteri (datalist); se se ne scrive una
+ *   nuova compare l'avviso e al salvataggio entra nell'elenco per tutti.
  */
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { centesimiDaEuro, euroDaCentesimi } from '../../comune/importi';
+import { normalizzaMatricola } from '../../comune/matricola';
 import { erroriPerCampo, ETICHETTE_CONTRATTO, schemaDipendente, TIPI_CONTRATTO } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
 import { coloreProgetto } from '../colori';
@@ -87,12 +95,23 @@ export function SchedaDipendente() {
   const [parametri] = useSearchParams();
   // Tutti i dipendenti: servono solo a riconoscere gli omonimi mentre si scrive il nome.
   const { dati: tutti } = usaDati<Dipendente[]>('/api/dipendenti');
+  // Elenco delle mansioni proposte (Giorno 26, risposta 4a); si ricarica dopo il salvataggio.
+  const { dati: mansioni, ricarica: ricaricaMansioni } = usaDati<string[]>('/api/dipendenti/mansioni');
+  const mansioneNuova =
+    modulo.mansione.trim() !== '' && mansioni != null && !mansioni.some((m) => m.toLocaleLowerCase('it') === modulo.mansione.trim().toLocaleLowerCase('it'));
 
   useEffect(() => {
     if (nuovo) {
       setDipendente(null);
       setModulo(VUOTO);
       setCaricamento(false);
+      // Risposta 2a: la prossima matricola libera per il contratto proposto (HR la può cambiare).
+      api
+        .get<{ matricola: string }>(`/api/dipendenti/prossima-matricola?tipoContratto=${VUOTO.tipoContratto}`)
+        .then((r) => setModulo((m) => (m.matricola ? m : { ...m, matricola: r.matricola })))
+        .catch(() => {
+          /* senza proposta HR scrive la matricola a mano */
+        });
       return;
     }
     setCaricamento(true);
@@ -166,6 +185,7 @@ export function SchedaDipendente() {
         setModulo(daDipendente(aggiornato));
         setMessaggio({ tipo: 'successo', testo: 'Scheda salvata' });
       }
+      ricaricaMansioni();
     } catch (err) {
       if (err instanceof ErroreApi) {
         setErrori(err.campi);
@@ -222,8 +242,8 @@ export function SchedaDipendente() {
           <section className="min-w-0 flex-[1_1_24rem]">
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Anagrafica</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
-              <Campo etichetta="Matricola" obbligatorio errore={err('matricola')}>
-                <input className={classiInput(err('matricola'))} {...campo('matricola')} />
+              <Campo etichetta="Matricola" obbligatorio errore={err('matricola')} aiuto="Sigla del contratto e numero; la sigla segue il contratto">
+                <input className={`${classiInput(err('matricola'))} font-mono uppercase`} placeholder="es. IND-0007" {...campo('matricola')} />
               </Campo>
               <Campo etichetta="Nome" obbligatorio errore={err('nome')}>
                 <input className={classiInput(err('nome'))} {...campo('nome')} />
@@ -261,14 +281,31 @@ export function SchedaDipendente() {
           <section className="min-w-0 flex-[1_1_24rem]">
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Contratto</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
-              <Campo etichetta="Mansione" errore={err('mansione')}>
-                <input className={classiInput(err('mansione'))} {...campo('mansione')} />
+              <Campo etichetta="Mansione" errore={err('mansione')} aiuto={mansioneNuova ? undefined : 'Scegli dall\'elenco o scrivine una nuova'}>
+                <input className={classiInput(err('mansione'))} list="elenco-mansioni" autoComplete="off" placeholder="Cerca o scrivi…" {...campo('mansione')} />
+                <datalist id="elenco-mansioni">
+                  {(mansioni ?? []).map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+                {mansioneNuova && <span className="mt-0.5 block text-xs text-[#8a5a00]">Nuova mansione: al salvataggio viene aggiunta all'elenco.</span>}
               </Campo>
               <Campo etichetta="Reparto" errore={err('reparto')}>
                 <input className={classiInput(err('reparto'))} {...campo('reparto')} />
               </Campo>
               <Campo etichetta="Tipo contratto" obbligatorio errore={err('tipoContratto')}>
-                <select className={classiInput(err('tipoContratto'))} {...campo('tipoContratto')}>
+                <select
+                  className={classiInput(err('tipoContratto'))}
+                  value={modulo.tipoContratto}
+                  onChange={(e) => {
+                    const tipo = e.target.value as (typeof TIPI_CONTRATTO)[number];
+                    // Risposta 3a: cambia la sigla della matricola, il numero resta (DET-0004 → IND-0004).
+                    setModulo((m) => {
+                      const n = normalizzaMatricola(m.matricola, tipo);
+                      return { ...m, tipoContratto: tipo, matricola: 'matricola' in n ? n.matricola : m.matricola };
+                    });
+                  }}
+                >
                   {TIPI_CONTRATTO.map((t) => (
                     <option key={t} value={t}>
                       {ETICHETTE_CONTRATTO[t]}

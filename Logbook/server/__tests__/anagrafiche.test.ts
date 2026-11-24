@@ -49,7 +49,8 @@ describe('dipendenti', () => {
   it('crea un dipendente', async () => {
     const r = await admin.chiama('POST', '/api/dipendenti', nuovo);
     expect(r.stato).toBe(201);
-    expect(r.corpo).toMatchObject({ matricola: '0100', stato: 'ATTIVO', costoOrarioLordoCent: 2400 });
+    // Giorno 26: il numero scritto da HR diventa SIGLA-NUMERO del contratto (determinato → DET).
+    expect(r.corpo).toMatchObject({ matricola: 'DET-0100', stato: 'ATTIVO', costoOrarioLordoCent: 2400 });
     id = r.corpo.id;
   });
 
@@ -75,7 +76,7 @@ describe('dipendenti', () => {
   it("l'elenco contiene il nuovo dipendente con i campi per la ricerca", async () => {
     const r = await admin.chiama('GET', '/api/dipendenti');
     const anna = r.corpo.find((d: { id: number }) => d.id === id);
-    expect(anna).toMatchObject({ cognome: 'Verdi', matricola: '0100', codiceFiscale: nuovo.codiceFiscale });
+    expect(anna).toMatchObject({ cognome: 'Verdi', matricola: 'DET-0100', codiceFiscale: nuovo.codiceFiscale });
   });
 
   it('crea l\'account, il dipendente entra; disattivando la scheda l\'account si blocca', async () => {

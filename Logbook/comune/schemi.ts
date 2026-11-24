@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import { validaCodiceFiscale } from './codiceFiscale';
 import { DATA_MINIMA, isDataValida, MESSAGGIO_DATA_MINIMA } from './date';
+import { normalizzaMatricola } from './matricola';
 
 /** Testo facoltativo: spazi tolti, "" o assente → null. */
 export const testoFacoltativo = (max: number) =>
@@ -67,7 +68,9 @@ export const ETICHETTE_CONTRATTO: Record<(typeof TIPI_CONTRATTO)[number], string
 /** Scheda dipendente (creazione e modifica). */
 export const schemaDipendente = z
   .object({
-    matricola: testoObbligatorio('Matricola', 20).regex(/^[A-Za-z0-9._-]+$/, 'Matricola: solo lettere, numeri, punto, trattino'),
+    // Giorno 26: sigla del contratto + numero (comune/matricola.ts). Qui il testo scritto da HR;
+    // il controllo e la forma finale (es. "7" → "IND-0007") li fanno superRefine e transform sotto.
+    matricola: testoObbligatorio('Matricola', 20),
     nome: testoObbligatorio('Nome', 80),
     cognome: testoObbligatorio('Cognome', 80),
     codiceFiscale: z.string({ error: 'Codice fiscale: campo obbligatorio' }).transform((v, ctx) => {
@@ -103,6 +106,13 @@ export const schemaDipendente = z
     if (d.costoOrarioNettoCent != null && d.costoOrarioLordoCent != null && d.costoOrarioLordoCent < d.costoOrarioNettoCent) {
       ctx.addIssue({ code: 'custom', path: ['costoOrarioLordoCent'], message: 'Il costo lordo non può essere inferiore al netto' });
     }
+    const matricola = normalizzaMatricola(d.matricola, d.tipoContratto);
+    if ('errore' in matricola) ctx.addIssue({ code: 'custom', path: ['matricola'], message: matricola.errore });
+  })
+  // Matricola nella forma canonica del contratto: la sigla segue sempre il contratto (risposta 3a).
+  .transform((d) => {
+    const matricola = normalizzaMatricola(d.matricola, d.tipoContratto);
+    return 'matricola' in matricola ? { ...d, matricola: matricola.matricola } : d;
   });
 
 export type DatiDipendente = z.output<typeof schemaDipendente>;

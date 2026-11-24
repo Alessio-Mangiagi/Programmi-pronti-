@@ -9,12 +9,22 @@
  *
  * Validazione: comune/schemi.ts (schemaDipendente, schemaAccount), la stessa usata dai
  * moduli dell'interfaccia. Matricola e codice fiscale unici → 409 con l'errore sul campo.
+ *
+ * Giorno 26 (24/11/2026, risposte 1a 2a 3a 4a):
+ * - la matricola è SIGLA-NUMERO del contratto (comune/matricola.ts) e il NUMERO è unico fra
+ *   tutti, qualunque sia la sigla (IND-0004 e DET-0004 non possono convivere);
+ * - GET /prossima-matricola?tipoContratto=… propone il prossimo numero libero (HR può
+ *   correggerlo);
+ * - GET /mansioni è l'elenco delle mansioni proposte; una mansione nuova scritta in una
+ *   scheda viene aggiunta all'elenco al salvataggio, e una già presente con altre maiuscole
+ *   prende la grafia dell'elenco (niente doppioni "Operaio" / "operaio").
  */
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import type { Dipendente, PrismaClient } from '../../generated/prisma/client';
 import { isDataAmmessa, isDataValida, MESSAGGIO_DATA_MINIMA, oggiIso } from '../../comune/date';
-import { schemaAccount, schemaDipendente, type DatiDipendente } from '../../comune/schemi';
+import { componiMatricola, numeroMatricola, prossimoNumero } from '../../comune/matricola';
+import { schemaAccount, schemaDipendente, TIPI_CONTRATTO, type DatiDipendente } from '../../comune/schemi';
 import { controllaPasswordNuova, creaImpronta } from '../auth/password';
 import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
 import { dipendenteAmmesso, idDaParametro, isAdmin, richiediAdmin } from '../middleware';
@@ -36,21 +46,51 @@ const selezioneAccount = { select: { id: true, username: true, attivo: true, ruo
 export function rotteDipendenti(prisma: PrismaClient) {
   const router = Router();
 
-  /** 409 se matricola o codice fiscale sono già di un altro dipendente. */
+  /**
+   * 409 se il numero di matricola o il codice fiscale sono già di un altro dipendente. Il
+   * numero conta da solo (Giorno 26): DET-0004 è "già usata" se esiste IND-0004.
+   */
   async function controllaUnicita(dati: DatiDipendente, escludiId?: number) {
     const altri = await prisma.dipendente.findMany({
-      where: {
-        OR: [{ matricola: dati.matricola }, { codiceFiscale: dati.codiceFiscale }],
-        ...(escludiId ? { NOT: { id: escludiId } } : {}),
-      },
+      where: escludiId ? { NOT: { id: escludiId } } : {},
+      select: { matricola: true, codiceFiscale: true, nome: true, cognome: true },
     });
+    const numero = numeroMatricola(dati.matricola);
     const campi: Record<string, string> = {};
     for (const a of altri) {
-      if (a.matricola === dati.matricola) campi.matricola = `Matricola già usata da ${a.cognome} ${a.nome}`;
+      if (a.matricola === dati.matricola || (numero !== null && numeroMatricola(a.matricola) === numero)) {
+        campi.matricola = `Numero di matricola già usato da ${a.cognome} ${a.nome} (${a.matricola})`;
+      }
       if (a.codiceFiscale === dati.codiceFiscale) campi.codiceFiscale = `Codice fiscale già registrato per ${a.cognome} ${a.nome}`;
     }
     if (Object.keys(campi).length) throw new ErroreHttp(409, 'Dati già presenti in un\'altra scheda', campi);
   }
+
+  /**
+   * Mansione della scheda → grafia dell'elenco: se c'è già (anche con altre maiuscole) si usa
+   * quella, altrimenti la si aggiunge all'elenco (risposta 4a). Restituisce i dati da salvare.
+   */
+  async function conMansioneDellElenco(dati: DatiDipendente): Promise<DatiDipendente> {
+    if (!dati.mansione) return dati;
+    const elenco = await prisma.mansione.findMany();
+    const uguale = elenco.find((m) => m.nome.toLocaleLowerCase('it') === dati.mansione!.toLocaleLowerCase('it'));
+    if (uguale) return { ...dati, mansione: uguale.nome };
+    await prisma.mansione.create({ data: { nome: dati.mansione } });
+    return dati;
+  }
+
+  /** Prossima matricola libera per il contratto scelto (risposta 2a): la propone il modulo. */
+  router.get('/prossima-matricola', richiediAdmin, async (req, res) => {
+    const { tipoContratto } = z.object({ tipoContratto: z.enum(TIPI_CONTRATTO) }).parse(req.query);
+    const matricole = (await prisma.dipendente.findMany({ select: { matricola: true } })).map((d) => d.matricola);
+    res.json({ matricola: componiMatricola(tipoContratto, prossimoNumero(matricole)) });
+  });
+
+  /** Elenco delle mansioni proposte nella scheda (risposta 4a), in ordine alfabetico. */
+  router.get('/mansioni', richiediAdmin, async (_req, res) => {
+    const elenco = await prisma.mansione.findMany({ select: { nome: true } });
+    res.json(elenco.map((m) => m.nome).sort((a, b) => a.localeCompare(b, 'it')));
+  });
 
   router.get('/', async (req, res) => {
     const soloId = dipendenteAmmesso(req);
@@ -72,7 +112,7 @@ export function rotteDipendenti(prisma: PrismaClient) {
   router.post('/', richiediAdmin, async (req, res) => {
     const dati = schemaDipendente.parse(req.body);
     await controllaUnicita(dati);
-    const creato = await prisma.dipendente.create({ data: dati });
+    const creato = await prisma.dipendente.create({ data: await conMansioneDellElenco(dati) });
     res.status(201).json(creato);
   });
 
@@ -80,8 +120,10 @@ export function rotteDipendenti(prisma: PrismaClient) {
     const id = idDaParametro(req.params.id)!;
     const esistente = await prisma.dipendente.findUnique({ where: { id } });
     if (!esistente) throw nonTrovato('Dipendente');
-    const dati = schemaDipendente.parse(req.body);
-    await controllaUnicita(dati, id);
+    const letti = schemaDipendente.parse(req.body);
+    await controllaUnicita(letti, id);
+    // Mansione aggiunta all'elenco solo dopo i controlli: una scheda rifiutata non lascia tracce.
+    const dati = await conMansioneDellElenco(letti);
     const aggiornato = await prisma.$transaction(async (tx) => {
       const d = await tx.dipendente.update({ where: { id }, data: dati });
       // Un dipendente cessato non deve più poter entrare: si disattiva l'account e si
