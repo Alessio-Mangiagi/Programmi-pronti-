@@ -1,12 +1,15 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Schede "Attestati" e "Documenti" della scheda dipendente (solo HR), Giorno 15
+ * Sezioni "Attestati" e "Documenti" della scheda dipendente (solo HR), Giorno 15
  * (24/11/2026, risposta 1c).
  *
  * Attestati: elenco con stato a oggi (valido, in scadenza nei 30 giorni, scaduto, non
- * scade) e finestra per inserirli o modificarli: tipo da elenco fisso, titolo, rilascio,
+ * scade) e modulo per inserirli o modificarli: tipo da elenco fisso, titolo, rilascio,
  * scadenza, note, file. Per la visita medica si scrive solo l'esito (idoneità), mai
  * diagnosi: stessa regola della malattia.
+ * Dal Giorno 18 il modulo si apre dentro la sezione, sopra l'elenco, e non in una finestra:
+ * la scheda del dipendente resta tutta visibile ("senza perdere la visualizzazione dei
+ * dati precedenti"). Clic su un attestato = lo si modifica nello stesso modulo.
  * Documenti: titolo, note e file obbligatorio (contratto, documento d'identità…).
  *
  * API: /api/attestati, /api/documenti-dipendente (server/rotte/attestati.ts); i file
@@ -21,7 +24,7 @@ import type { Attestato, DocumentoDipendente, StatoAttestato, TipoAttestato, Vis
 import { usaDati } from '../usaDati';
 import { CaricaFile, LinkFile } from './File';
 import { Tabella, type Colonna } from './Tabella';
-import { Avviso, Caricamento, Campo, classiInput, Etichetta, Modale, Pulsante } from './ui';
+import { Avviso, Caricamento, Campo, classiInput, Etichetta, Pulsante } from './ui';
 
 const COLORE_STATO: Record<StatoAttestato, 'verde' | 'giallo' | 'rosso' | 'grigio'> = {
   VALIDO: 'verde',
@@ -44,13 +47,28 @@ export function AttestatiDipendente({ dipendenteId }: { dipendenteId: number }) 
   ];
 
   return (
-    <section>
+    <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-600">Gli attestati in scadenza nei prossimi 30 giorni compaiono anche nella dashboard di HR.</p>
-        <Pulsante variante="primario" onClick={() => setAperto('nuovo')}>
-          + Nuovo attestato
-        </Pulsante>
+        {!aperto && (
+          <Pulsante variante="primario" onClick={() => setAperto('nuovo')}>
+            + Nuovo attestato
+          </Pulsante>
+        )}
       </div>
+      {aperto && (
+        <ModuloAttestato
+          // key: cambiando attestato il modulo riparte dai suoi valori
+          key={aperto === 'nuovo' ? 'nuovo' : aperto.id}
+          dipendenteId={dipendenteId}
+          attestato={aperto === 'nuovo' ? null : aperto}
+          onChiudi={() => setAperto(null)}
+          onSalvato={() => {
+            setAperto(null);
+            ricarica();
+          }}
+        />
+      )}
       {errore && <Avviso tipo="errore">{errore}</Avviso>}
       {caricamento && !dati && <Caricamento />}
       {dati && (
@@ -63,22 +81,12 @@ export function AttestatiDipendente({ dipendenteId }: { dipendenteId: number }) 
           vuoto="Nessun attestato: aggiungi il primo con «Nuovo attestato»"
         />
       )}
-      {aperto && (
-        <FinestraAttestato
-          dipendenteId={dipendenteId}
-          attestato={aperto === 'nuovo' ? null : aperto}
-          onChiudi={() => setAperto(null)}
-          onSalvato={() => {
-            setAperto(null);
-            ricarica();
-          }}
-        />
-      )}
-    </section>
+    </div>
   );
 }
 
-function FinestraAttestato({ dipendenteId, attestato, onChiudi, onSalvato }: { dipendenteId: number; attestato: Attestato | null; onChiudi: () => void; onSalvato: () => void }) {
+/** Modulo dell'attestato dentro la sezione (nuovo o in modifica), con Elimina per quelli esistenti. */
+function ModuloAttestato({ dipendenteId, attestato, onChiudi, onSalvato }: { dipendenteId: number; attestato: Attestato | null; onChiudi: () => void; onSalvato: () => void }) {
   const [m, setM] = useState({
     tipo: (attestato?.tipo ?? 'SICUREZZA') as TipoAttestato,
     titolo: attestato?.titolo ?? '',
@@ -127,8 +135,15 @@ function FinestraAttestato({ dipendenteId, attestato, onChiudi, onSalvato }: { d
   };
 
   return (
-    <Modale titolo={attestato ? `Attestato: ${attestato.titolo}` : 'Nuovo attestato'} aperta onChiudi={onChiudi} larghezza="max-w-xl">
-      <form onSubmit={salva} className="space-y-3" noValidate>
+    <form
+      onSubmit={salva}
+      className="mb-3 space-y-3 rounded border border-marchio-chiaro/40 bg-ghiaccio/40 p-3"
+      aria-label={attestato ? `Modifica attestato ${attestato.titolo}` : 'Nuovo attestato'}
+      noValidate
+      // Esc chiude il modulo, come faceva la finestra.
+      onKeyDown={(e) => e.key === 'Escape' && onChiudi()}
+    >
+        <h3 className="font-display text-[0.95rem] font-medium text-marchio">{attestato ? `Modifica: ${attestato.titolo}` : 'Nuovo attestato'}</h3>
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
         <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
           <Campo etichetta="Tipo" obbligatorio errore={errori.tipo}>
@@ -177,8 +192,7 @@ function FinestraAttestato({ dipendenteId, attestato, onChiudi, onSalvato }: { d
             </Pulsante>
           </div>
         </div>
-      </form>
-    </Modale>
+    </form>
   );
 }
 
@@ -216,8 +230,8 @@ export function DocumentiDipendente({ dipendenteId }: { dipendenteId: number }) 
   };
 
   return (
-    <section className="space-y-3">
-      <form onSubmit={aggiungi} className="scheda flex flex-wrap items-end gap-3 p-3" noValidate>
+    <div className="space-y-3">
+      <form onSubmit={aggiungi} className="flex flex-wrap items-end gap-3 rounded border border-gray-200 bg-fondo p-3" noValidate>
         <Campo etichetta="Titolo" obbligatorio errore={errori.titolo} className="min-w-0 flex-[2_1_14rem]">
           <input className={classiInput(errori.titolo)} placeholder="Es. Contratto di assunzione" value={titolo} onChange={(e) => setTitolo(e.target.value)} maxLength={150} />
         </Campo>
@@ -259,6 +273,6 @@ export function DocumentiDipendente({ dipendenteId }: { dipendenteId: number }) 
           vuoto="Nessun documento"
         />
       )}
-    </section>
+    </div>
   );
 }

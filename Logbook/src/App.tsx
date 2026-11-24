@@ -20,6 +20,7 @@ import { Importa } from './pagine/Importa';
 import { Impostazioni } from './pagine/Impostazioni';
 import { Login } from './pagine/Login';
 import { Progetti } from './pagine/Progetti';
+import { SchedaAssenza } from './pagine/SchedaAssenza';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
 import { SchedaProgetto } from './pagine/SchedaProgetto';
 
@@ -43,6 +44,8 @@ function Rotte() {
         <Route path="progetti" element={<Progetti />} />
         <Route path="progetti/:id" element={<SchedaProgetto />} />
         <Route path="assenze" element={<Assenze />} />
+        {/* Giorno 18: l'assenza si inserisce e si decide in una pagina, come le anagrafiche. */}
+        <Route path="assenze/:id" element={<SchedaAssenza />} />
         <Route path="importa" element={<SoloAdmin><Importa /></SoloAdmin>} />
         <Route path="esporta" element={<SoloAdmin><Esporta /></SoloAdmin>} />
         <Route path="impostazioni" element={<SoloAdmin><Impostazioni /></SoloAdmin>} />

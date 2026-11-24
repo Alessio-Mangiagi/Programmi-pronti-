@@ -35,6 +35,8 @@ import { calcolaTotali, inizioSettimana } from '../../comune/riepiloghi';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreFascia, coloreProgetto } from '../colori';
 import { EditorGiornata } from '../componenti/EditorGiornata';
+import { SceltaConRicerca } from '../componenti/SceltaConRicerca';
+import { dettaglioDipendente, nomiSenzaOmonimie } from '../../comune/omonimi';
 import { Avviso, Caricamento, IntestazionePagina, Modale, Pulsante } from '../componenti/ui';
 import type { Dipendente, Festivita, Progetto, StatoAssenza, TipoAssenza } from '../tipi';
 import { usaDati } from '../usaDati';
@@ -136,10 +138,13 @@ export function Calendario() {
     else setRiferimento(dataIso(mese + verso > 12 ? anno + 1 : mese + verso < 1 ? anno - 1 : anno, ((mese + verso + 11) % 12) + 1, 1));
   };
 
+  // Nomi senza ambiguità: con due omonimi si aggiunge l'inizio del codice fiscale (src/omonimi.ts).
+  const nomi = useMemo(() => nomiSenzaOmonimie(dipendenti ?? []), [dipendenti]);
+
   const nomeDipendenteScelto = () => {
     if (!admin) return utente!.nomeVisualizzato;
     const d = dipendenti?.find((x) => String(x.id) === dipendenteId);
-    return d ? `${d.nome} ${d.cognome}` : '';
+    return d ? (nomi.get(d.id) ?? `${d.cognome} ${d.nome}`) : '';
   };
 
   /** Perché un giorno non accetta ore ("Sabato", "Festività: Natale"), o null se è lavorativo. */
@@ -217,25 +222,37 @@ export function Calendario() {
 
         {/* Filtri: sul telefono uno per riga a tutta larghezza, da 640px in fila a destra. */}
         <div className="flex w-full flex-col gap-2 text-sm sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          {/* Dipendente e progetto: scelta con ricerca a caratteri (Giorno 18), omonimi distinti dal codice fiscale. */}
           {admin && (
-            <select aria-label="Dipendente" className="rounded border border-gray-300 px-2 py-1.5" value={dipendenteId} onChange={(e) => setDipendenteId(e.target.value)}>
-              <option value="">Tutti i dipendenti</option>
-              {dipendenti?.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.cognome} {d.nome}
-                  {d.stato === 'CESSATO' ? ' (cessato)' : ''}
-                </option>
-              ))}
-            </select>
+            <div className="sm:w-60">
+              <SceltaConRicerca
+                etichetta="Dipendente"
+                opzioni={[
+                  { valore: '', etichetta: 'Tutti i dipendenti' },
+                  ...(dipendenti ?? []).map((d) => ({
+                    valore: String(d.id),
+                    etichetta: `${nomi.get(d.id) ?? `${d.cognome} ${d.nome}`}${d.stato === 'CESSATO' ? ' (cessato)' : ''}`,
+                    dettaglio: dettaglioDipendente(d),
+                  })),
+                ]}
+                valore={dipendenteId}
+                onCambia={setDipendenteId}
+                segnaposto="Cerca dipendente…"
+              />
+            </div>
           )}
-          <select aria-label="Progetto" className="rounded border border-gray-300 px-2 py-1.5" value={progettoId} onChange={(e) => setProgettoId(e.target.value)}>
-            <option value="">Tutti i progetti</option>
-            {progetti?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.codice} · {p.nome}
-              </option>
-            ))}
-          </select>
+          <div className="sm:w-60">
+            <SceltaConRicerca
+              etichetta="Progetto"
+              opzioni={[
+                { valore: '', etichetta: 'Tutti i progetti' },
+                ...(progetti ?? []).map((p) => ({ valore: String(p.id), etichetta: `${p.codice} · ${p.nome}`, dettaglio: p.cliente ?? undefined, colore: coloreProgetto(p) })),
+              ]}
+              valore={progettoId}
+              onCambia={setProgettoId}
+              segnaposto="Cerca progetto…"
+            />
+          </div>
           <select aria-label="Tipo di assenza" className="rounded border border-gray-300 px-2 py-1.5" value={tipoAssenza} onChange={(e) => setTipoAssenza(e.target.value)}>
             <option value="">Tutte le assenze</option>
             <option value="FERIE">Solo ferie</option>
@@ -408,10 +425,11 @@ export function Calendario() {
           assenze={perGiorno.assenze(giornoAperto)}
           festivita={perGiorno.festivita.get(giornoAperto)}
           dipendenti={(dipendenti ?? []).filter((d) => d.stato === 'ATTIVO' || (perGiorno.fasce.get(giornoAperto) ?? []).some((f) => f.dipendenteId === d.id))}
+          nomi={nomi}
           onChiudi={() => setGiornoAperto(null)}
           onModifica={(d) => {
             setGiornoAperto(null);
-            setEditor({ dipendenteId: d.id, nome: `${d.nome} ${d.cognome}`, data: giornoAperto });
+            setEditor({ dipendenteId: d.id, nome: nomi.get(d.id) ?? `${d.cognome} ${d.nome}`, data: giornoAperto });
           }}
         />
       )}
@@ -440,9 +458,9 @@ export function Calendario() {
  * telefono) o in mezzo (da 640px), così la finestra si legge anche su uno schermo stretto.
  */
 function RiepilogoGiorno({
-  data, fasce, assenze, festivita, dipendenti, onChiudi, onModifica,
+  data, fasce, assenze, festivita, dipendenti, nomi, onChiudi, onModifica,
 }: {
-  data: string; fasce: FasciaCal[]; assenze: AssenzaCal[]; festivita?: Festivita; dipendenti: Dipendente[];
+  data: string; fasce: FasciaCal[]; assenze: AssenzaCal[]; festivita?: Festivita; dipendenti: Dipendente[]; nomi: Map<number, string>;
   onChiudi: () => void; onModifica: (d: Dipendente) => void;
 }) {
   return (
@@ -454,9 +472,7 @@ function RiepilogoGiorno({
           const sueAssenze = assenze.filter((x) => x.dipendenteId === d.id);
           return (
             <li key={d.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
-              <span className="min-w-0 flex-1 font-medium sm:flex-[0_0_12rem]">
-                {d.cognome} {d.nome}
-              </span>
+              <span className="min-w-0 flex-1 font-medium sm:flex-[0_0_12rem]">{nomi.get(d.id) ?? `${d.cognome} ${d.nome}`}</span>
               {/* Fasce: sul telefono vanno a capo sotto il nome (order), da 640px stanno in mezzo. */}
               <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-0">
                 {sue.map((f) => (

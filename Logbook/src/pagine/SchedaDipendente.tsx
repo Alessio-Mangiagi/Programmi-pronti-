@@ -1,32 +1,37 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Scheda dipendente (solo HR), per creare (/dipendenti/nuovo) o modificare
- * (/dipendenti/:id). Divisa in schede (richiesta del 24/11/2026 "dividi in sezioni"):
- * 1. Anagrafica e 2. Contratto e costi: un solo modulo, salvato insieme (con costo
- *    orario netto e lordo in euro); un errore in una scheda nascosta la segna col pallino
- *    rosso e la apre;
- * 3. Account: nome utente, password, attivo + disattivazione/riattivazione;
- * 4. Attestati e 5. Documenti (componenti/DocumentiDipendente.tsx).
- * Account, Attestati e Documenti si aprono dopo il primo salvataggio (serve la scheda).
- * `?scheda=attestati` (link dalla dashboard) apre direttamente quella scheda.
+ * Scheda dipendente (solo HR), per creare (/dipendenti/nuovo) o modificare (/dipendenti/:id).
+ *
+ * Giorno 18 (24/11/2026): tutto sulla stessa pagina, senza schede ("tutte le aree devono
+ * essere nella stessa pagina, senza cambiare sezione e perdere la visualizzazione dei dati
+ * precedenti"). Le sezioni sono riquadri in flexbox che si affiancano quando c'è spazio:
+ * 1. Anagrafica, Contratto e Costi: un solo modulo, salvato insieme;
+ * 2. Account di accesso, Stato del rapporto, Progetti assegnati;
+ * 3. Attestati e Documenti (componenti/DocumentiDipendente.tsx), con i moduli dentro la
+ *    sezione e non in una finestra sopra la pagina.
+ * Per un dipendente nuovo c'è solo il modulo: il resto compare dopo "Crea dipendente".
+ * In cima, una riga di collegamenti porta alle sezioni (la pagina è lunga sul telefono);
+ * `?scheda=attestati` (link dalla dashboard) scorre fino a quella sezione.
+ *
+ * Omonimi: se esiste già un dipendente con lo stesso cognome e nome, sotto l'anagrafica
+ * compare chi è, con matricola e codice fiscale: è il codice fiscale a distinguerli.
  *
  * Gli errori si controllano prima nel browser con le stesse regole del server
  * (comune/schemi.ts) e poi dal server, che resta l'unico controllo che conta.
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
 import { centesimiDaEuro, euroDaCentesimi } from '../../comune/importi';
 import { erroriPerCampo, ETICHETTE_CONTRATTO, schemaDipendente, TIPI_CONTRATTO } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
+import { coloreProgetto } from '../colori';
 import { AttestatiDipendente, DocumentiDipendente } from '../componenti/DocumentiDipendente';
-import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante, Schede } from '../componenti/ui';
-import type { Dipendente } from '../tipi';
-
-type Scheda = 'anagrafica' | 'contratto' | 'account' | 'attestati' | 'documenti';
-const SCHEDE: Scheda[] = ['anagrafica', 'contratto', 'account', 'attestati', 'documenti'];
-/** Campi del modulo per scheda: servono a segnare (e aprire) la scheda con errori. */
-const CAMPI_ANAGRAFICA = ['matricola', 'nome', 'cognome', 'codiceFiscale', 'email', 'telefono'];
+import { SceltaConRicerca } from '../componenti/SceltaConRicerca';
+import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
+import type { Dipendente, Progetto } from '../tipi';
+import { usaDati } from '../usaDati';
+import { ETICHETTE_STATO_PROGETTO } from './SchedaProgetto';
 
 /** Valori del modulo: tutto testo, come nei campi. */
 type Modulo = Record<
@@ -48,6 +53,27 @@ const daDipendente = (d: Dipendente): Modulo => ({
   costoNetto: euroDaCentesimi(d.costoOrarioNettoCent), costoLordo: euroDaCentesimi(d.costoOrarioLordoCent), stato: d.stato,
 });
 
+/** Sezioni della pagina: id dell'ancora ed etichetta del collegamento in cima. */
+const SEZIONI = [
+  ['anagrafica', 'Anagrafica e contratto'],
+  ['account', 'Account e stato'],
+  ['progetti', 'Progetti'],
+  ['attestati', 'Attestati'],
+  ['documenti', 'Documenti'],
+] as const;
+
+/** Riquadro di una sezione con titolo; `id` serve ai collegamenti in cima e alla dashboard. */
+function Sezione({ id, titolo, children, classe = '' }: { id: string; titolo: string; children: ReactNode; classe?: string }) {
+  return (
+    <section id={id} aria-labelledby={`titolo-${id}`} className={`scheda min-w-0 scroll-mt-20 p-3 sm:p-4 ${classe}`}>
+      <h2 id={`titolo-${id}`} className="mb-3 text-sm font-semibold uppercase text-gray-500">
+        {titolo}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 export function SchedaDipendente() {
   const { id } = useParams();
   const nuovo = id === 'nuovo';
@@ -59,17 +85,14 @@ export function SchedaDipendente() {
   const [caricamento, setCaricamento] = useState(!nuovo);
   const [invio, setInvio] = useState(false);
   const [parametri] = useSearchParams();
-  const [scheda, setScheda] = useState<Scheda>(() => {
-    const richiesta = parametri.get('scheda') as Scheda | null;
-    return richiesta && SCHEDE.includes(richiesta) && !nuovo ? richiesta : 'anagrafica';
-  });
-  const erroreAnagrafica = Object.keys(errori).some((k) => CAMPI_ANAGRAFICA.includes(k));
-  const erroreContratto = Object.keys(errori).some((k) => !CAMPI_ANAGRAFICA.includes(k));
+  // Tutti i dipendenti: servono solo a riconoscere gli omonimi mentre si scrive il nome.
+  const { dati: tutti } = usaDati<Dipendente[]>('/api/dipendenti');
 
   useEffect(() => {
     if (nuovo) {
       setDipendente(null);
       setModulo(VUOTO);
+      setCaricamento(false);
       return;
     }
     setCaricamento(true);
@@ -82,6 +105,22 @@ export function SchedaDipendente() {
       .catch((e: Error) => setMessaggio({ tipo: 'errore', testo: e.message }))
       .finally(() => setCaricamento(false));
   }, [id, nuovo]);
+
+  // ?scheda=attestati (dalla dashboard): a pagina caricata scorre fino alla sezione.
+  const sezioneDaLink = parametri.get('scheda');
+  useEffect(() => {
+    if (!sezioneDaLink || caricamento || !dipendente) return;
+    const t = setTimeout(() => document.getElementById(sezioneDaLink)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    return () => clearTimeout(t);
+  }, [sezioneDaLink, caricamento, dipendente]);
+
+  // Omonimi: altri dipendenti con lo stesso cognome e nome (senza badare a maiuscole e spazi).
+  const omonimi = useMemo(() => {
+    const chiave = (n: string, c: string) => `${c} ${n}`.trim().replace(/\s+/g, ' ').toLowerCase();
+    const mia = chiave(modulo.nome, modulo.cognome);
+    if (!modulo.nome.trim() || !modulo.cognome.trim()) return [];
+    return (tutti ?? []).filter((d) => d.id !== dipendente?.id && chiave(d.nome, d.cognome) === mia);
+  }, [tutti, modulo.nome, modulo.cognome, dipendente?.id]);
 
   const campo = (nome: keyof Modulo) => ({
     value: modulo[nome],
@@ -112,8 +151,6 @@ export function SchedaDipendente() {
     if (Object.keys(erroriLocali).length) {
       setErrori(erroriLocali);
       setMessaggio({ tipo: 'errore', testo: 'Controlla i campi evidenziati' });
-      // Si apre la prima scheda che ha un errore (l'altra resta segnata col pallino).
-      setScheda(Object.keys(erroriLocali).some((k) => CAMPI_ANAGRAFICA.includes(k)) ? 'anagrafica' : 'contratto');
       return;
     }
     setErrori({});
@@ -121,8 +158,8 @@ export function SchedaDipendente() {
     try {
       if (nuovo) {
         const creato = await api.post<Dipendente>('/api/dipendenti', corpo);
-        setMessaggio({ tipo: 'successo', testo: 'Scheda creata: ora puoi creare l\'account e caricare attestati e documenti' });
         naviga(`/dipendenti/${creato.id}`, { replace: true });
+        setMessaggio({ tipo: 'successo', testo: 'Dipendente creato: qui sotto puoi creare l\'account, assegnare i progetti e caricare attestati e documenti' });
       } else {
         const aggiornato = await api.put<Dipendente>(`/api/dipendenti/${id}`, corpo);
         setDipendente((d) => ({ ...aggiornato, utente: d?.utente }));
@@ -133,7 +170,6 @@ export function SchedaDipendente() {
       if (err instanceof ErroreApi) {
         setErrori(err.campi);
         setMessaggio({ tipo: 'errore', testo: err.message });
-        if (Object.keys(err.campi).some((k) => CAMPI_ANAGRAFICA.includes(k))) setScheda('anagrafica');
       }
     } finally {
       setInvio(false);
@@ -150,7 +186,7 @@ export function SchedaDipendente() {
     <>
       <IntestazionePagina
         titolo={titolo}
-        sottotitolo={nuovo ? 'Compila la scheda e salva; poi potrai creare l\'account di accesso' : `Matricola ${dipendente!.matricola}`}
+        sottotitolo={nuovo ? 'Compila anagrafica e contratto e salva: poi potrai creare l\'account, assegnare i progetti e caricare attestati e documenti' : `Matricola ${dipendente!.matricola} · CF ${dipendente!.codiceFiscale}`}
         azioni={
           <>
             {!nuovo && (dipendente!.stato === 'ATTIVO' ? <Etichetta colore="verde">Attivo</Etichetta> : <Etichetta colore="grigio">Cessato</Etichetta>)}
@@ -160,29 +196,30 @@ export function SchedaDipendente() {
           </>
         }
       />
+
+      {/* Collegamenti alle sezioni: non sono schede, la pagina mostra sempre tutto. */}
+      {!nuovo && (
+        <nav aria-label="Sezioni della scheda" className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          {SEZIONI.map(([ancora, etichetta]) => (
+            <a key={ancora} href={`#${ancora}`} className="text-marchio hover:underline" onClick={(e) => {
+              e.preventDefault();
+              document.getElementById(ancora)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}>
+              {etichetta}
+            </a>
+          ))}
+        </nav>
+      )}
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
 
-      <Schede<Scheda>
-        attiva={scheda}
-        onCambia={setScheda}
-        voci={[
-          { id: 'anagrafica', etichetta: 'Anagrafica', errore: erroreAnagrafica },
-          { id: 'contratto', etichetta: 'Contratto e costi', errore: erroreContratto },
-          { id: 'account', etichetta: 'Account', disattivata: nuovo ? 'Salva prima la scheda' : undefined },
-          { id: 'attestati', etichetta: 'Attestati', disattivata: nuovo ? 'Salva prima la scheda' : undefined },
-          { id: 'documenti', etichetta: 'Documenti', disattivata: nuovo ? 'Salva prima la scheda' : undefined },
-        ]}
-      />
-
       {/*
-        Anagrafica e Contratto e costi sono lo stesso modulo (si salvano insieme): la scheda
-        scelta mostra solo le sue sezioni. Dentro, layout in flexbox: le sezioni partono da
-        24rem e si affiancano quando c'è spazio, i campi partono da 12rem e vanno a capo.
+        Anagrafica, Contratto e Costi sono lo stesso modulo (si salvano insieme). Dentro,
+        layout in flexbox: le sezioni partono da 24rem e si affiancano quando c'è spazio, i
+        campi partono da 12rem e vanno a capo.
       */}
-      {(scheda === 'anagrafica' || scheda === 'contratto') && (
-      <form onSubmit={salva} className="scheda p-3 sm:p-4" noValidate>
+      <form id="anagrafica" onSubmit={salva} className="scheda scroll-mt-20 p-3 sm:p-4" noValidate>
         <div className="flex flex-wrap gap-x-6 gap-y-5">
-          <section className={`min-w-0 flex-[1_1_24rem] ${scheda === 'anagrafica' ? '' : 'hidden'}`}>
+          <section className="min-w-0 flex-[1_1_24rem]">
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Anagrafica</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
               <Campo etichetta="Matricola" obbligatorio errore={err('matricola')}>
@@ -204,9 +241,24 @@ export function SchedaDipendente() {
                 <input className={classiInput(err('telefono'))} {...campo('telefono')} />
               </Campo>
             </div>
+            {omonimi.length > 0 && (
+              <Avviso tipo="info" className="mt-3">
+                {omonimi.length === 1 ? 'Esiste già un dipendente' : `Esistono già ${omonimi.length} dipendenti`} con lo stesso nome:{' '}
+                {omonimi.map((o, i) => (
+                  <span key={o.id}>
+                    {i > 0 && '; '}
+                    <Link to={`/dipendenti/${o.id}`} className="font-semibold underline">
+                      {o.cognome} {o.nome}
+                    </Link>{' '}
+                    (matr. {o.matricola}, CF <span className="font-mono">{o.codiceFiscale}</span>{o.stato === 'CESSATO' ? ', cessato' : ''})
+                  </span>
+                ))}
+                . Il codice fiscale distingue le persone: se è la stessa persona, non crearla di nuovo.
+              </Avviso>
+            )}
           </section>
 
-          <section className={`min-w-0 flex-[1_1_24rem] ${scheda === 'contratto' ? '' : 'hidden'}`}>
+          <section className="min-w-0 flex-[1_1_24rem]">
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Contratto</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
               <Campo etichetta="Mansione" errore={err('mansione')}>
@@ -244,7 +296,7 @@ export function SchedaDipendente() {
             </div>
           </section>
 
-          <section className={`min-w-0 flex-[1_1_24rem] ${scheda === 'contratto' ? '' : 'hidden'}`}>
+          <section className="min-w-0 flex-[1_1_24rem]">
             <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Costi (riservati a HR)</h2>
             <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
               <Campo etichetta="Costo orario netto (€)" errore={err('costoOrarioNettoCent')} aiuto="Es. 14,50">
@@ -258,35 +310,45 @@ export function SchedaDipendente() {
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 pt-3">
-          {nuovo && scheda === 'anagrafica' && (
-            <Pulsante variante="leggero" className="mr-auto" onClick={() => setScheda('contratto')}>
-              Avanti: contratto e costi →
-            </Pulsante>
-          )}
-          <Pulsante onClick={() => naviga('/dipendenti')}>Annulla</Pulsante>
+          <Pulsante onClick={() => naviga('/dipendenti')}>{nuovo ? 'Annulla' : 'Chiudi'}</Pulsante>
           <Pulsante type="submit" variante="primario" disabled={invio}>
             {invio ? 'Salvataggio…' : nuovo ? 'Crea dipendente' : 'Salva modifiche'}
           </Pulsante>
         </div>
       </form>
+
+      {nuovo && (
+        <Avviso tipo="info" className="mt-4">
+          Dopo «Crea dipendente» compariranno qui sotto l'account di accesso, i progetti assegnati, gli attestati e i documenti.
+        </Avviso>
       )}
 
-      {!nuovo && dipendente && scheda === 'attestati' && <AttestatiDipendente dipendenteId={dipendente.id} />}
-      {!nuovo && dipendente && scheda === 'documenti' && <DocumentiDipendente dipendenteId={dipendente.id} />}
-
-      {!nuovo && dipendente && scheda === 'account' && (
-        <div className="flex flex-wrap gap-4 [&>*]:min-w-0 [&>*]:flex-[1_1_26rem]">
-          <BloccoAccount dipendente={dipendente} onAggiornato={(utente) => setDipendente({ ...dipendente, utente })} />
-          <BloccoStato
-            dipendente={dipendente}
-            onAggiornato={(d) => {
-              // Disattivare la scheda disattiva anche l'account (lo fa il server).
-              const utente = d.stato === 'CESSATO' && dipendente.utente ? { ...dipendente.utente, attivo: false } : dipendente.utente;
-              setDipendente({ ...d, utente });
-              setModulo(daDipendente(d));
-            }}
-          />
-        </div>
+      {!nuovo && dipendente && (
+        <>
+          <div id="account" className="mt-4 flex scroll-mt-20 flex-wrap items-start gap-4 [&>*]:min-w-0 [&>*]:flex-[1_1_22rem]">
+            <BloccoAccount dipendente={dipendente} onAggiornato={(utente) => setDipendente({ ...dipendente, utente })} />
+            <BloccoStato
+              dipendente={dipendente}
+              onAggiornato={(d) => {
+                // Disattivare la scheda disattiva anche l'account (lo fa il server).
+                const utente = d.stato === 'CESSATO' && dipendente.utente ? { ...dipendente.utente, attivo: false } : dipendente.utente;
+                setDipendente({ ...d, utente });
+                setModulo(daDipendente(d));
+              }}
+            />
+            <Sezione id="progetti" titolo="Progetti assegnati">
+              <ProgettiDelDipendente dipendente={dipendente} />
+            </Sezione>
+          </div>
+          <div className="mt-4 flex flex-wrap items-start gap-4 [&>*]:flex-[1_1_34rem]">
+            <Sezione id="attestati" titolo="Attestati">
+              <AttestatiDipendente dipendenteId={dipendente.id} />
+            </Sezione>
+            <Sezione id="documenti" titolo="Documenti">
+              <DocumentiDipendente dipendenteId={dipendente.id} />
+            </Sezione>
+          </div>
+        </>
       )}
     </>
   );
@@ -318,7 +380,7 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
   };
 
   return (
-    <form onSubmit={salva} className="scheda p-4">
+    <form onSubmit={salva} className="scheda p-3 sm:p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Account di accesso</h2>
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
       {!esistente && <p className="mb-3 text-sm text-gray-600">Il dipendente non ha ancora un account per entrare in Logbook.</p>}
@@ -360,7 +422,7 @@ function BloccoStato({ dipendente, onAggiornato }: { dipendente: Dipendente; onA
   };
 
   return (
-    <div className="scheda p-4">
+    <div className="scheda p-3 sm:p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Stato del rapporto</h2>
       {errore && <Avviso tipo="errore" className="mb-3">{errore}</Avviso>}
       {dipendente.stato === 'ATTIVO' ? (
@@ -379,6 +441,83 @@ function BloccoStato({ dipendente, onAggiornato }: { dipendente: Dipendente; onA
           <Pulsante onClick={() => esegui('riattiva')}>Riattiva dipendente</Pulsante>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Progetti a cui il dipendente è assegnato (Giorno 18): stessa assegnazione della pagina
+ * del progetto, vista dal lato del dipendente. Si aggiunge un progetto alla volta
+ * scegliendolo con la ricerca a caratteri; "Togli" lascia le ore già fatte.
+ */
+function ProgettiDelDipendente({ dipendente }: { dipendente: Dipendente }) {
+  const { dati: suoi, ricarica } = usaDati<Progetto[]>(`/api/progetti?assegnatiA=${dipendente.id}`);
+  const { dati: tutti } = usaDati<Progetto[]>('/api/progetti');
+  const [scelto, setScelto] = useState('');
+  const [messaggio, setMessaggio] = useState<{ tipo: 'errore' | 'successo'; testo: string } | null>(null);
+
+  const giaSuoi = new Set((suoi ?? []).map((p) => p.id));
+  const opzioni = (tutti ?? [])
+    .filter((p) => p.stato !== 'CHIUSO' && !giaSuoi.has(p.id))
+    .map((p) => ({ valore: String(p.id), etichetta: `${p.codice} · ${p.nome}`, dettaglio: p.cliente ?? undefined, colore: coloreProgetto(p) }));
+
+  const esegui = async (azione: () => Promise<string>) => {
+    setMessaggio(null);
+    try {
+      setMessaggio({ tipo: 'successo', testo: await azione() });
+      ricarica();
+    } catch (e) {
+      setMessaggio({ tipo: 'errore', testo: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const assegna = () =>
+    scelto &&
+    esegui(async () => {
+      await api.post(`/api/progetti/${scelto}/dipendenti`, { dipendenteId: dipendente.id });
+      const p = tutti?.find((x) => String(x.id) === scelto);
+      setScelto('');
+      return `Assegnato a ${p?.codice ?? 'progetto'}`;
+    });
+
+  const togli = (p: Progetto) => {
+    if (!window.confirm(`Togliere ${dipendente.cognome} ${dipendente.nome} dal progetto ${p.codice}? Le ore già fatte restano, ma non potrà registrarne altre.`)) return;
+    esegui(async () => {
+      await api.delete(`/api/progetti/${p.id}/dipendenti/${dipendente.id}`);
+      return `Tolto da ${p.codice}`;
+    });
+  };
+
+  return (
+    <div>
+      <p className="mb-2 text-xs text-gray-500">Registra ore solo su questi progetti.</p>
+      {dipendente.stato === 'ATTIVO' && (
+        <div className="mb-2 flex flex-wrap items-start gap-2">
+          <div className="min-w-0 flex-[1_1_12rem]">
+            <SceltaConRicerca etichetta="Progetto da assegnare" segnaposto="Cerca per codice, nome o cliente…" opzioni={opzioni} valore={scelto} onCambia={setScelto} vuoto="Nessun altro progetto aperto" />
+          </div>
+          <Pulsante variante="primario" onClick={assegna} disabled={!scelto}>
+            Assegna
+          </Pulsante>
+        </div>
+      )}
+      {messaggio && <Avviso tipo={messaggio.tipo} className="mb-2">{messaggio.testo}</Avviso>}
+      {!suoi && <Caricamento />}
+      <ul className="divide-y divide-gray-100 text-sm">
+        {suoi?.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center gap-2 py-1.5">
+            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: coloreProgetto(p) }} />
+            <Link to={`/progetti/${p.id}`} className="min-w-0 flex-1 truncate text-testo-forte hover:text-marchio hover:underline">
+              <span className="font-medium">{p.codice}</span> · {p.nome}
+            </Link>
+            {p.stato !== 'ATTIVO' && <Etichetta colore={ETICHETTE_STATO_PROGETTO[p.stato].colore}>{ETICHETTE_STATO_PROGETTO[p.stato].testo}</Etichetta>}
+            <button type="button" className="rounded px-2 py-0.5 text-xs text-errore hover:bg-[#fdf3f2]" onClick={() => togli(p)}>
+              Togli
+            </button>
+          </li>
+        ))}
+        {suoi && suoi.length === 0 && <li className="py-3 text-center text-gray-500">Nessun progetto: non può registrare ore</li>}
+      </ul>
     </div>
   );
 }

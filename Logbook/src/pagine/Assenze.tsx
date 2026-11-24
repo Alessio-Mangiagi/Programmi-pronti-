@@ -2,94 +2,61 @@
 /**
  * Assenze: ferie, permessi e malattia, più (per HR) la gestione delle festività.
  *
- * - Dipendente ("Le mie assenze"): elenco delle proprie richieste con lo stato, nuova
- *   richiesta, modifica o ritiro finché è in attesa.
- * - HR: schede "Da approvare", "Tutte" e "Festività". Dalla richiesta si approva, si
- *   rifiuta (con motivo) o si modifica; si possono registrare assenze già approvate
- *   (es. malattia comunicata per telefono).
+ * - Dipendente ("Le mie assenze"): elenco delle proprie richieste con lo stato.
+ * - HR: schede "Da approvare", "Tutte" e "Festività"; ricerca a caratteri su nome,
+ *   matricola, codice fiscale e note; omonimi distinti dal codice fiscale.
+ * "+ Nuova" e il clic su una riga aprono la pagina dell'assenza (pagine/SchedaAssenza.tsx,
+ * Giorno 18: prima era una finestra), dove si richiede, modifica, approva o rifiuta.
  *
- * Per la malattia il modulo chiede solo il protocollo del certificato: niente note,
- * nessuna informazione sanitaria (vedi comune/assenze.ts).
- *
- * Collegamenti dalla Dashboard (24/11/2026): `?apri=<id>` apre subito quella richiesta,
- * `?scheda=festivita|tutte` sceglie la scheda. Il parametro `apri` si toglie
- * dall'indirizzo dopo l'apertura, così chiudendo la finestra non si riapre.
+ * Collegamenti dalla Dashboard (24/11/2026): `?apri=<id>` porta alla pagina di quella
+ * richiesta, `?scheda=festivita|tutte` sceglie la scheda.
  */
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ETICHETTE_ASSENZA, ETICHETTE_FESTIVITA, ETICHETTE_STATO_ASSENZA, schemaAssenza, schemaFestivita, TIPI_ASSENZA, TIPI_FESTIVITA } from '../../comune/assenze';
+import { useMemo, useState, type FormEvent } from 'react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { ETICHETTE_ASSENZA, ETICHETTE_FESTIVITA, ETICHETTE_STATO_ASSENZA, schemaFestivita, TIPI_ASSENZA, TIPI_FESTIVITA } from '../../comune/assenze';
 import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
-import { formattaOre } from '../../comune/orari';
 import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
 import { useAuth } from '../auth';
-import { COLORE_FESTIVITA, COLORI_ASSENZA } from '../colori';
+import { COLORE_FESTIVITA } from '../colori';
 import { Tabella, type Colonna } from '../componenti/Tabella';
-import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Modale, Pulsante } from '../componenti/ui';
-import type { Assenza, Dipendente, Festivita, StatoAssenza } from '../tipi';
+import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
+import { nomiSenzaOmonimie } from '../../comune/omonimi';
+import type { Dipendente, Festivita } from '../tipi';
 import { usaDati } from '../usaDati';
-
-type AssenzaConGiorni = Assenza & { giorniLavorativi: number };
-
-const COLORE_STATO: Record<StatoAssenza, 'giallo' | 'verde' | 'rosso'> = { RICHIESTA: 'giallo', APPROVATA: 'verde', RIFIUTATA: 'rosso' };
-
-/** "dal 07/12 al 11/12/2026 (4 gg)" oppure "14/12/2026 · 2:00" per i permessi. */
-function periodo(a: AssenzaConGiorni) {
-  if (a.tipo === 'PERMESSO') return `${formattaData(a.dataInizio)} · ${formattaOre(a.minutiPermesso ?? 0)} h`;
-  const gg = `${a.giorniLavorativi} ${a.giorniLavorativi === 1 ? 'giorno' : 'giorni'} lav.`;
-  return a.dataInizio === a.dataFine ? `${formattaData(a.dataInizio)} (${gg})` : `${formattaData(a.dataInizio)} → ${formattaData(a.dataFine)} (${gg})`;
-}
+import { ChipTipoAssenza, COLORE_STATO_ASSENZA, periodoAssenza, type AssenzaConGiorni } from './SchedaAssenza';
 
 export function Assenze() {
   const { admin } = useAuth();
-  const [parametri, setParametri] = useSearchParams();
+  const naviga = useNavigate();
+  const [parametri] = useSearchParams();
   const [scheda, setScheda] = useState<'attesa' | 'tutte' | 'festivita'>(() => {
     const richiesta = parametri.get('scheda');
     if (admin && richiesta === 'festivita') return 'festivita';
     return richiesta === 'tutte' || !admin ? 'tutte' : 'attesa';
   });
-  const { dati, errore, caricamento, ricarica } = usaDati<AssenzaConGiorni[]>('/api/assenze');
+  const { dati, errore, caricamento } = usaDati<AssenzaConGiorni[]>('/api/assenze');
   const { dati: dipendenti } = usaDati<Dipendente[]>(admin ? '/api/dipendenti' : null);
-  const [aperta, setAperta] = useState<AssenzaConGiorni | 'nuova' | null>(null);
   const [filtroTipo, setFiltroTipo] = useState('');
+  // Nomi senza ambiguità (omonimi distinti dal codice fiscale) e codici fiscali per la ricerca.
+  const nomi = useMemo(() => nomiSenzaOmonimie(dipendenti ?? []), [dipendenti]);
+  const codiciFiscali = useMemo(() => new Map((dipendenti ?? []).map((d) => [d.id, d.codiceFiscale])), [dipendenti]);
 
-  // ?apri=<id> (dalla Dashboard): appena arrivano i dati apre quella richiesta; se non è
-  // più in attesa passa alla scheda "Tutte", dove compare nell'elenco.
+  // ?apri=<id> (dalla Dashboard): porta alla pagina di quella richiesta.
   const daAprire = Number(parametri.get('apri')) || null;
-  useEffect(() => {
-    if (!daAprire || !dati) return;
-    const trovata = dati.find((a) => a.id === daAprire);
-    if (trovata) {
-      setAperta(trovata);
-      if (trovata.stato !== 'RICHIESTA') setScheda('tutte');
-    }
-    setParametri(
-      (p) => {
-        p.delete('apri');
-        return p;
-      },
-      { replace: true },
-    );
-  }, [daAprire, dati, setParametri]);
+  if (daAprire) return <Navigate to={`/assenze/${daAprire}`} replace />;
 
   const inAttesa = (dati ?? []).filter((a) => a.stato === 'RICHIESTA');
   const righe = (scheda === 'attesa' ? inAttesa : dati ?? []).filter((a) => !filtroTipo || a.tipo === filtroTipo);
 
   const colonne: Colonna<AssenzaConGiorni>[] = [
-    ...(admin ? [{ chiave: 'dip', titolo: 'Dipendente', valore: (a: AssenzaConGiorni) => `${a.dipendente.cognome} ${a.dipendente.nome}` } satisfies Colonna<AssenzaConGiorni>] : []),
-    {
-      chiave: 'tipo',
-      titolo: 'Tipo',
-      valore: (a) => a.tipo,
-      render: (a) => (
-        <span className="rounded border px-1.5 py-0.5 text-xs" style={{ backgroundColor: COLORI_ASSENZA[a.tipo].sfondo, color: COLORI_ASSENZA[a.tipo].testo, borderColor: COLORI_ASSENZA[a.tipo].bordo }}>
-          {ETICHETTE_ASSENZA[a.tipo]}
-        </span>
-      ),
-    },
-    { chiave: 'periodo', titolo: 'Periodo', valore: (a) => a.dataInizio, render: periodo },
+    ...(admin
+      ? [{ chiave: 'dip', titolo: 'Dipendente', valore: (a: AssenzaConGiorni) => nomi.get(a.dipendenteId) ?? `${a.dipendente.cognome} ${a.dipendente.nome}`, principale: true } satisfies Colonna<AssenzaConGiorni>]
+      : []),
+    { chiave: 'tipo', titolo: 'Tipo', valore: (a) => a.tipo, render: (a) => <ChipTipoAssenza tipo={a.tipo} /> },
+    { chiave: 'periodo', titolo: 'Periodo', valore: (a) => a.dataInizio, render: periodoAssenza },
     { chiave: 'note', titolo: 'Note', valore: (a) => a.noteDipendente ?? (a.protocolloCertificato ? `Prot. ${a.protocolloCertificato}` : null), classe: 'max-w-64 truncate' },
-    { chiave: 'stato', titolo: 'Stato', valore: (a) => a.stato, render: (a) => <Etichetta colore={COLORE_STATO[a.stato]}>{ETICHETTE_STATO_ASSENZA[a.stato]}</Etichetta> },
+    { chiave: 'stato', titolo: 'Stato', valore: (a) => a.stato, render: (a) => <Etichetta colore={COLORE_STATO_ASSENZA[a.stato]}>{ETICHETTE_STATO_ASSENZA[a.stato]}</Etichetta> },
     { chiave: 'hr', titolo: 'Note HR', valore: (a) => a.noteHr, classe: 'max-w-64 truncate text-gray-600' },
     { chiave: 'richiesta', titolo: 'Richiesta il', valore: (a) => a.creatoIl, render: (a) => formattaData(a.creatoIl.slice(0, 10)) },
   ];
@@ -101,7 +68,7 @@ export function Assenze() {
         sottotitolo={admin ? 'Richieste di ferie, permessi e malattia; festività' : 'Richiedi ferie, permessi o comunica la malattia'}
         azioni={
           scheda !== 'festivita' && (
-            <Pulsante variante="primario" onClick={() => setAperta('nuova')}>
+            <Pulsante variante="primario" onClick={() => naviga('/assenze/nuova')}>
               {admin ? '+ Nuova assenza' : '+ Nuova richiesta'}
             </Pulsante>
           )
@@ -142,8 +109,8 @@ export function Assenze() {
               righe={righe}
               colonne={colonne}
               chiaveRiga={(a) => a.id}
-              testoRicerca={admin ? (a) => `${a.dipendente.nome} ${a.dipendente.cognome} ${a.dipendente.matricola} ${a.noteDipendente ?? ''}` : undefined}
-              onRiga={(a) => setAperta(a)}
+              testoRicerca={(a) => `${a.dipendente.nome} ${a.dipendente.cognome} ${a.dipendente.matricola} ${codiciFiscali.get(a.dipendenteId) ?? ''} ${ETICHETTE_ASSENZA[a.tipo]} ${a.noteDipendente ?? ''}`}
+              onRiga={(a) => naviga(`/assenze/${a.id}`)}
               vuoto={scheda === 'attesa' ? 'Nessuna richiesta da approvare' : 'Nessuna assenza'}
               strumenti={
                 <select aria-label="Filtra per tipo" className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
@@ -160,212 +127,7 @@ export function Assenze() {
         </>
       )}
 
-      {aperta && (
-        <ModuloAssenza
-          assenza={aperta === 'nuova' ? null : aperta}
-          dipendenti={dipendenti ?? []}
-          onChiudi={() => setAperta(null)}
-          onFatto={() => {
-            setAperta(null);
-            ricarica();
-          }}
-        />
-      )}
     </>
-  );
-}
-
-/** Creazione, modifica e (per HR) decisione su un'assenza. */
-function ModuloAssenza({
-  assenza, dipendenti, onChiudi, onFatto,
-}: {
-  assenza: AssenzaConGiorni | null; dipendenti: Dipendente[]; onChiudi: () => void; onFatto: () => void;
-}) {
-  const { admin } = useAuth();
-  const modificabile = !assenza || admin || assenza.stato === 'RICHIESTA';
-  const [m, setM] = useState({
-    dipendenteId: assenza ? String(assenza.dipendenteId) : '',
-    tipo: assenza?.tipo ?? 'FERIE',
-    dataInizio: assenza?.dataInizio ?? oggiIso(),
-    dataFine: assenza?.dataFine ?? oggiIso(),
-    ore: assenza?.minutiPermesso ? String(assenza.minutiPermesso / 60) : '',
-    noteDipendente: assenza?.noteDipendente ?? '',
-    protocolloCertificato: assenza?.protocolloCertificato ?? '',
-    noteHr: assenza?.noteHr ?? '',
-    giaApprovata: false,
-  });
-  const [errori, setErrori] = useState<Record<string, string>>({});
-  const [messaggio, setMessaggio] = useState<string | null>(null);
-
-  const imposta = (campo: keyof typeof m, valore: string | boolean) => setM((x) => ({ ...x, [campo]: valore }));
-
-  /** Corpo per le API: il permesso vale un giorno e ha la durata in minuti. */
-  const corpo = () => ({
-    ...(admin ? { dipendenteId: m.dipendenteId || undefined } : {}),
-    tipo: m.tipo,
-    dataInizio: m.dataInizio,
-    dataFine: m.tipo === 'PERMESSO' ? m.dataInizio : m.dataFine,
-    minutiPermesso: m.tipo === 'PERMESSO' && m.ore ? Math.round(Number(m.ore.replace(',', '.')) * 60) : null,
-    noteDipendente: m.tipo === 'MALATTIA' ? null : m.noteDipendente,
-    protocolloCertificato: m.tipo === 'MALATTIA' ? m.protocolloCertificato : null,
-  });
-
-  const esegui = async (azione: () => Promise<unknown>) => {
-    setMessaggio(null);
-    try {
-      await azione();
-      onFatto();
-    } catch (err) {
-      if (err instanceof ErroreApi) {
-        setErrori(err.campi);
-        setMessaggio(err.message);
-      }
-    }
-  };
-
-  const salva = (e: FormEvent) => {
-    e.preventDefault();
-    const c = corpo();
-    const controllo = schemaAssenza.safeParse(c);
-    if (!controllo.success) {
-      setErrori(erroriPerCampo(controllo.error));
-      return;
-    }
-    if (admin && !assenza && !m.dipendenteId) {
-      setErrori({ dipendenteId: 'Scegli il dipendente' });
-      return;
-    }
-    setErrori({});
-    esegui(() =>
-      assenza
-        ? api.put(`/api/assenze/${assenza.id}`, { ...c, ...(admin ? { noteHr: m.noteHr } : {}) })
-        : api.post('/api/assenze', { ...c, ...(m.giaApprovata ? { stato: 'APPROVATA' } : {}) }),
-    );
-  };
-
-  const decidi = (stato: 'APPROVATA' | 'RIFIUTATA') => {
-    if (stato === 'RIFIUTATA' && !m.noteHr.trim()) {
-      setErrori({ noteHr: 'Indica il motivo del rifiuto' });
-      return;
-    }
-    esegui(() => api.post(`/api/assenze/${assenza!.id}/decisione`, { stato, noteHr: m.noteHr }));
-  };
-
-  const elimina = () => {
-    if (!window.confirm(admin ? 'Eliminare definitivamente questa assenza?' : 'Ritirare la richiesta?')) return;
-    esegui(() => api.delete(`/api/assenze/${assenza!.id}`));
-  };
-
-  const titolo = assenza ? `${ETICHETTE_ASSENZA[assenza.tipo]} — ${assenza.dipendente.cognome} ${assenza.dipendente.nome}` : admin ? 'Nuova assenza' : 'Nuova richiesta';
-
-  return (
-    <Modale titolo={titolo} aperta onChiudi={onChiudi}>
-      <form onSubmit={salva} className="space-y-3" noValidate>
-        {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
-        {assenza && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Etichetta colore={COLORE_STATO[assenza.stato]}>{ETICHETTE_STATO_ASSENZA[assenza.stato]}</Etichetta>
-            {assenza.decisoDa && assenza.decisoIl && (
-              <span className="text-gray-500">
-                da {assenza.decisoDa.username} il {formattaData(assenza.decisoIl.slice(0, 10))}
-              </span>
-            )}
-          </div>
-        )}
-        {!modificabile && <Avviso tipo="info">La richiesta è già stata decisa: per cambiarla rivolgiti a HR.</Avviso>}
-
-        <fieldset disabled={!modificabile} className="space-y-3">
-          {admin && !assenza && (
-            <Campo etichetta="Dipendente" obbligatorio errore={errori.dipendenteId}>
-              <select className={classiInput(errori.dipendenteId)} value={m.dipendenteId} onChange={(e) => imposta('dipendenteId', e.target.value)}>
-                <option value="">— scegli —</option>
-                {dipendenti
-                  .filter((d) => d.stato === 'ATTIVO')
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.cognome} {d.nome}
-                    </option>
-                  ))}
-              </select>
-            </Campo>
-          )}
-          <Campo etichetta="Tipo" obbligatorio errore={errori.tipo}>
-            <div className="flex gap-2">
-              {TIPI_ASSENZA.map((t) => (
-                <label key={t} className={`flex-1 cursor-pointer rounded border px-3 py-1.5 text-center text-sm ${m.tipo === t ? 'border-marchio bg-marchio/10 font-semibold text-marchio' : 'border-gray-300'}`}>
-                  <input type="radio" className="sr-only" name="tipo" checked={m.tipo === t} onChange={() => imposta('tipo', t)} />
-                  {ETICHETTE_ASSENZA[t]}
-                </label>
-              ))}
-            </div>
-          </Campo>
-          <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_11rem]">
-            <Campo etichetta={m.tipo === 'PERMESSO' ? 'Giorno' : 'Dal'} obbligatorio errore={errori.dataInizio}>
-              <input type="date" min={DATA_MINIMA} className={classiInput(errori.dataInizio)} value={m.dataInizio} onChange={(e) => imposta('dataInizio', e.target.value)} />
-            </Campo>
-            {m.tipo === 'PERMESSO' ? (
-              <Campo etichetta="Durata (ore)" obbligatorio errore={errori.minutiPermesso} aiuto="Es. 2 oppure 1,5">
-                <input inputMode="decimal" className={classiInput(errori.minutiPermesso)} value={m.ore} onChange={(e) => imposta('ore', e.target.value)} />
-              </Campo>
-            ) : (
-              <Campo etichetta="Al" obbligatorio errore={errori.dataFine}>
-                <input type="date" className={classiInput(errori.dataFine)} value={m.dataFine} min={m.dataInizio} onChange={(e) => imposta('dataFine', e.target.value)} />
-              </Campo>
-            )}
-          </div>
-          {m.tipo === 'MALATTIA' ? (
-            <Campo etichetta="Protocollo del certificato medico" errore={errori.protocolloCertificato} aiuto="Solo il numero di protocollo: non indicare diagnosi o informazioni sanitarie">
-              <input className={classiInput(errori.protocolloCertificato)} value={m.protocolloCertificato} onChange={(e) => imposta('protocolloCertificato', e.target.value)} />
-            </Campo>
-          ) : (
-            <Campo etichetta="Note" errore={errori.noteDipendente}>
-              <textarea rows={2} className={classiInput(errori.noteDipendente)} value={m.noteDipendente} onChange={(e) => imposta('noteDipendente', e.target.value)} maxLength={500} />
-            </Campo>
-          )}
-        </fieldset>
-
-        {admin && (
-          <Campo etichetta="Note HR" errore={errori.noteHr} aiuto="Obbligatorie per rifiutare">
-            <textarea rows={2} className={classiInput(errori.noteHr)} value={m.noteHr} onChange={(e) => imposta('noteHr', e.target.value)} maxLength={500} />
-          </Campo>
-        )}
-        {!admin && assenza?.noteHr && <Avviso tipo="info">Note HR: {assenza.noteHr}</Avviso>}
-        {admin && !assenza && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={m.giaApprovata} onChange={(e) => imposta('giaApprovata', e.target.checked)} />
-            Registra come già approvata
-          </label>
-        )}
-
-        <div className="flex flex-wrap justify-between gap-2 border-t border-gray-100 pt-3">
-          <div className="flex gap-2">
-            {assenza && (admin || assenza.stato === 'RICHIESTA') && (
-              <Pulsante variante="pericolo" onClick={elimina}>
-                {admin ? 'Elimina' : 'Ritira richiesta'}
-              </Pulsante>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Pulsante onClick={onChiudi}>Chiudi</Pulsante>
-            {modificabile && (
-              <Pulsante type="submit" variante={admin && assenza?.stato === 'RICHIESTA' ? 'secondario' : 'primario'}>
-                {assenza ? 'Salva modifiche' : admin ? 'Registra' : 'Invia richiesta'}
-              </Pulsante>
-            )}
-            {admin && assenza && assenza.stato !== 'RIFIUTATA' && (
-              <Pulsante variante="pericolo" onClick={() => decidi('RIFIUTATA')}>
-                Rifiuta
-              </Pulsante>
-            )}
-            {admin && assenza && assenza.stato !== 'APPROVATA' && (
-              <Pulsante variante="primario" onClick={() => decidi('APPROVATA')}>
-                Approva
-              </Pulsante>
-            )}
-          </div>
-        </div>
-      </form>
-    </Modale>
   );
 }
 

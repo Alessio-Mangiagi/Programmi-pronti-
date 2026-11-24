@@ -21,6 +21,7 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import { aggiungiGiorni, dataIso, giorniNelMese } from '../../comune/date';
 import { GIORNI_PREAVVISO_ATTESTATI, statoAttestato } from '../../comune/documenti';
 import { calcolaTotali, giorniLavorativi } from '../../comune/riepiloghi';
+import { nomiSenzaOmonimie } from '../../comune/omonimi';
 import { dipendenteAmmesso, isAdmin } from '../middleware';
 
 export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
@@ -40,6 +41,9 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
       orderBy: [{ cognome: 'asc' }, { nome: 'asc' }],
     });
     const ids = dipendenti.map((d) => d.id);
+    // Nomi da mostrare: con due omonimi si aggiunge l'inizio del codice fiscale (Giorno 18).
+    const nomi = nomiSenzaOmonimie(dipendenti);
+    const nome = (id: number, d: { nome: string; cognome: string }) => nomi.get(id) ?? `${d.cognome} ${d.nome}`;
     const [fasce, assenzeMese, inAttesa, prossimeAssenze, festivita, progetti] = await Promise.all([
       prisma.registrazioneOraria.findMany({ where: { dipendenteId: { in: ids }, data: { gte: inizioMese, lte: giorno } } }),
       prisma.assenza.findMany({ where: { dipendenteId: { in: ids }, stato: 'APPROVATA', dataInizio: { lte: fineMese }, dataFine: { gte: inizioMese } } }),
@@ -90,7 +94,7 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
       const giorniConOre = new Set(fasce.filter((f) => f.dipendenteId === d.id).map((f) => f.data));
       return {
         id: d.id,
-        nome: `${d.cognome} ${d.nome}`,
+        nome: nome(d.id, d),
         oreSettimanali: d.oreSettimanali,
         minutiLavorati: totali.perDipendente[d.id] ?? 0,
         minutiAttesi: Math.max(0, Math.round((lavorativiAOggi.length * d.oreSettimanali * 60) / 5) - permessi),
@@ -110,16 +114,16 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
         .sort((a, b) => b.minuti - a.minuti),
       richiesteInAttesa: inAttesa.map((a) => ({
         id: a.id, tipo: a.tipo, dataInizio: a.dataInizio, dataFine: a.dataFine, minutiPermesso: a.minutiPermesso,
-        dipendente: `${a.dipendente.cognome} ${a.dipendente.nome}`, creatoIl: a.creatoIl,
+        dipendente: nome(a.dipendenteId, a.dipendente), creatoIl: a.creatoIl,
       })),
       prossimeAssenze: prossimeAssenze.map((a) => ({
         id: a.id, tipo: a.tipo, dataInizio: a.dataInizio, dataFine: a.dataFine, minutiPermesso: a.minutiPermesso,
-        dipendente: `${a.dipendente.cognome} ${a.dipendente.nome}`,
+        dipendente: nome(a.dipendenteId, a.dipendente),
       })),
       prossimeFestivita: festivita.filter((f) => f.data >= giorno).slice(0, 3),
       attestatiDaRinnovare: attestati.map((a) => ({
         id: a.id, tipo: a.tipo, titolo: a.titolo, dataScadenza: a.dataScadenza, stato: statoAttestato(a.dataScadenza, giorno),
-        dipendenteId: a.dipendenteId, dipendente: `${a.dipendente.cognome} ${a.dipendente.nome}`,
+        dipendenteId: a.dipendenteId, dipendente: nome(a.dipendenteId, a.dipendente),
       })),
       documentazioneDaVedere: documentazione.map((d) => ({
         id: d.id, titolo: d.titolo, data: d.data, percentuale: d.percentuale, conFile: d.fileId != null,

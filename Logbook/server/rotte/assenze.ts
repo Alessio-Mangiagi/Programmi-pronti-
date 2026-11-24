@@ -101,6 +101,13 @@ export function rotteAssenze(prisma: PrismaClient) {
     res.json(await conGiorni(elenco));
   });
 
+  /** Una sola assenza, per la sua pagina (Giorno 18): il dipendente solo le proprie (403). */
+  router.get('/:id', async (req, res) => {
+    const a = await caricaVisibile(req);
+    const completa = await prisma.assenza.findUniqueOrThrow({ where: { id: a.id }, include });
+    res.json((await conGiorni([completa]))[0]);
+  });
+
   router.post('/', async (req, res) => {
     const dati = schemaAssenza.parse(req.body);
     const admin = isAdmin(req);

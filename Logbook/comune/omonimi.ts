@@ -7,6 +7,9 @@
  * due dipendenti hanno lo stesso cognome e nome, al nome si aggiungono i primi caratteri del
  * codice fiscale che bastano a distinguerli (almeno 6, cioè la parte da cognome e nome,
  * poi quanti servono: data di nascita, comune…). Senza omonimi resta solo "Cognome Nome".
+ *
+ * Sta in comune/ perché lo usano sia l'interfaccia (menu e elenchi) sia il server (nomi
+ * già composti nella dashboard, server/rotte/dashboard.ts).
  */
 type ConNome = { id: number; nome: string; cognome: string; codiceFiscale: string };
 

@@ -84,7 +84,8 @@ del progetto, l'andamento dell'avanzamento che avete dichiarato e la vostra docu
 
 ### Chiedere ferie, permessi o malattia
 
-Da **Le mie assenze** → **+ Nuova richiesta**:
+Da **Le mie assenze** → **+ Nuova richiesta** si apre la pagina della richiesta (a destra
+le vostre altre assenze):
 
 - **Ferie**: dal giorno… al giorno… (sabati, domeniche e festivi non si contano).
 - **Permesso**: un giorno e la durata in ore (es. 2 oppure 1,5).
@@ -139,7 +140,11 @@ della festività.
 - **Lun–Ven** mostra solo i giorni da lunedì a venerdì (in mese e settimana); la scelta
   resta finché non la si toglie.
 - Filtri per **dipendente**, **progetto** e **tipo di assenza**. Col filtro progetto i
-  totali dei giorni sono le ore di quel progetto.
+  totali dei giorni sono le ore di quel progetto. Dipendente e progetto si scelgono
+  **scrivendo alcune lettere** (nome, matricola, codice fiscale; codice, nome o cliente del
+  progetto): l'elenco si restringe mentre si scrive, frecce e Invio per scegliere.
+
+![Filtro del dipendente con la ricerca](img/31-calendario-ricerca.png)
 - Ogni progetto ha il suo colore; ferie in azzurro, permessi in giallo, malattia in rosso,
   festività in verde.
 - Con "Tutti i dipendenti" il clic su un giorno apre il riepilogo per dipendente; da lì
@@ -156,10 +161,17 @@ per ordinare; filtro attivi/cessati. Clic su una riga per aprire la scheda.
 
 ![Scheda dipendente](img/06-scheda-dipendente.png)
 
-La scheda è divisa in **schede**: Anagrafica, Contratto e costi, Account, Attestati,
-Documenti. Per un dipendente nuovo si compilano le prime due (pulsante **Avanti**) e si
-salva con **Crea dipendente**: dopo si aprono anche le altre. Se un campo ha un errore, la
-sua scheda si apre da sola e ha un pallino rosso.
+La scheda mostra **tutto nella stessa pagina**, senza schede da cambiare: anagrafica,
+contratto e costi in alto; sotto account, stato del rapporto e progetti assegnati; in fondo
+attestati e documenti. La riga di collegamenti in cima porta alle sezioni. Per un
+dipendente nuovo c'è solo il modulo in alto: dopo **Crea dipendente** compare il resto.
+
+**Omonimi**: se esiste già un dipendente con lo stesso nome, sotto l'anagrafica compare chi
+è, con matricola e codice fiscale. È il codice fiscale a distinguere le persone: in tutti gli
+elenchi e i menu di Logbook, due omonimi si riconoscono dall'inizio del codice fiscale
+accanto al nome (es. «Rossi Mario (CF RSSMRA8)»).
+
+![Omonimo segnalato nella scheda nuova](img/29-omonimo.png)
 
 - **Anagrafica**: il **codice fiscale** viene controllato (un codice sbagliato non si
   salva); matricola e codice fiscale devono essere unici.
@@ -169,8 +181,13 @@ sua scheda si apre da sola e ha un pallino rosso.
   password (comunicateli al dipendente). **Disattiva dipendente** quando il rapporto finisce:
   le ore restano nei report e l'account viene bloccato. **Riattiva** lo rimette attivo, ma
   l'account va riattivato a mano.
+- **Progetti assegnati**: gli stessi della pagina del progetto, visti dal dipendente. Si
+  aggiunge un progetto alla volta cercandolo per codice, nome o cliente; **Togli** lascia le
+  ore già fatte.
 - **Attestati**: formazione sicurezza, primo soccorso, antincendio, patentini, visite
-  mediche e altro, con data di rilascio, **scadenza** e file. Lo stato si aggiorna da solo:
+  mediche e altro, con data di rilascio, **scadenza** e file. **+ Nuovo attestato** (o il
+  clic su un attestato) apre il modulo dentro la sezione, sopra l'elenco: il resto della
+  scheda resta visibile. Lo stato si aggiorna da solo:
   *Valido*, *In scadenza* (nei 30 giorni prima), *Scaduto*, *Non scade*. Gli attestati in
   scadenza o scaduti compaiono anche nella dashboard di HR. Per la visita medica si scrive
   solo l'esito (es. «idoneo»), mai diagnosi.
@@ -239,14 +256,19 @@ documentazione dalla stessa pagina.
 
 ### Assenze
 
-![Approvazione di una richiesta](img/08-assenze-approvazione.png)
+Il clic su una richiesta (o **+ Nuova assenza**) apre la **pagina dell'assenza**: a sinistra
+i dati con i pulsanti, a destra le altre assenze dello stesso dipendente, per decidere
+vedendo il resto dell'anno. La ricerca dell'elenco trova anche matricola e codice fiscale.
+
+![Pagina dell'assenza](img/30-assenza-pagina.png)
 
 - Scheda **Da approvare**: clic sulla richiesta → **Approva** o **Rifiuta** (il motivo va
   scritto nelle note HR). Si possono anche cambiare le date prima di approvare.
 - Non si approvano ferie o malattia su giorni che hanno già ore registrate: prima vanno
   tolte o spostate (Logbook indica quali giorni).
 - **+ Nuova assenza** registra un'assenza per un dipendente, anche già approvata (es.
-  malattia comunicata per telefono).
+  malattia comunicata per telefono). Il dipendente si sceglie scrivendo nome, matricola o
+  codice fiscale.
 
 ### Festività
 

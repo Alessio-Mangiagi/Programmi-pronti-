@@ -17,7 +17,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 15 (24/11):** file, attestati, documenti del dipendente a schede, Impostazioni con collegamento a SkyTower ✅
 - **Giorno 16 (24/11):** calendario Lun–Ven e niente ore il sabato, la domenica e i festivi ✅
 - **Giorno 17 (24/11):** assegnazione dei dipendenti ai progetti, pagina del progetto con documentazione di avanzamento, grafico e note ✅
-- **Prossimo:** Giorno 18 scheda dipendente su una sola pagina, omonimi distinti dal codice fiscale, scelte con ricerca a caratteri, assenze in pagina; Giorno 19 pannello laterale del calendario con più giorni; poi allegati e note nella giornata (3c) e grafici in dashboard
+- **Giorno 18 (24/11):** scheda dipendente in una sola pagina, omonimi distinti dal codice fiscale, scelte con ricerca a caratteri, assenze in pagina ✅
+- **Prossimo:** Giorno 19 solo HR inserisce ore nelle giornate (richiesta del 24/11); poi pannello laterale del calendario con più giorni; allegati e note nella giornata (3c) e grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -99,6 +100,9 @@ sessione per riprendere da dove si era rimasti.
 | 24/11 | Progetto in **pagina** (non finestra), tutto visibile senza schede: dati, assegnati, note interne, avanzamento, documentazione | "l'inserimento progetto deve aprire una nuova pagina…" + "tutte le aree nella stessa pagina" |
 | 24/11 | Documentazione: il dipendente carica sui progetti ATTIVI assegnati, elimina il suo finché HR non l'ha visto; la risposta di HR segna anche "visto" | Risposta 2c; scelte mie sui casi limite |
 | 24/11 | "Invia a SkyTower" solo per documenti con file, una volta sola | Mia scelta: SkyTower archivia file; nessun doppione |
+| 24/11 | Scheda dipendente senza schede: sezioni sempre visibili, modulo dell'attestato dentro la sezione | "tutte le aree devono essere nella stessa pagina, senza cambiare sezione e perdere la visualizzazione dei dati precedenti" |
+| 24/11 | Omonimi: al nome si aggiunge il prefisso più corto (≥ 6) del codice fiscale che li distingue, in interfaccia e dashboard; avviso nella scheda nuova | "se ci sono omonimie il sistema distingue partendo dal codice fiscale" |
+| 24/11 | Assenze in una pagina (/assenze/nuova, /assenze/:id) con le altre assenze del dipendente a destra; nessun allegato alle assenze per ora | "vale ugualmente per assenze e ferie"; allegati non chiesti (domanda aperta) |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -502,3 +506,31 @@ della pagina, ricerca "ros" con codice fiscale, assegnazione, "I miei progetti",
 documentazione con grafico, dashboard, risposta HR letta dal dipendente, telefono senza
 scorrimento orizzontale). Corretto durante la prova: la tabella per i lettori di schermo
 del grafico allargava la pagina sul telefono.
+
+### Giorno 18 — Scheda dipendente in una pagina, omonimi, ricerca a caratteri, assenze in pagina (24/11/2026) ✅
+
+Richieste del 24/11: "l'inserimento dei dati del dipendente tutte le aree devono essere nella
+stessa pagina", "se ci sono omonimie il sistema distingue partendo dal codice fiscale",
+"vale ugualmente per assenze e ferie", "filtrare tramite filtro a inserimento di caratteri".
+
+Fatto:
+- `pagine/SchedaDipendente.tsx` senza schede: modulo anagrafica/contratto/costi, poi
+  account, stato, **progetti assegnati** (nuova sezione, stessa API del Giorno 17), attestati
+  e documenti; collegamenti alle sezioni in cima; `?scheda=` scorre alla sezione; avviso
+  degli omonimi con matricola e codice fiscale. Tolto il componente `Schede` da ui.tsx.
+- `componenti/DocumentiDipendente.tsx`: modulo dell'attestato dentro la sezione (non più
+  finestra), Esc lo chiude.
+- `comune/omonimi.ts` (spostato da src/): usato in calendario, assenze, esporta, pagina
+  del progetto e nella dashboard del server.
+- `SceltaConRicerca` nei filtri dipendente/progetto del calendario e nella scelta del
+  dipendente delle assenze; filtro a caratteri nelle liste di Esporta (oltre 6 voci).
+- `pagine/SchedaAssenza.tsx` (/assenze/nuova, /assenze/:id) con le altre assenze del
+  dipendente; `GET /api/assenze/:id`; elenco assenze che apre la pagina, ricerca anche per
+  codice fiscale.
+- Guida (immagini 06 e 22 rifatte, 29, 30, 31).
+
+Verifiche: `npm test` 185/185 (4 in `comune/__tests__/omonimi.test.ts`, 2 in
+`giorno18.test.ts`), typecheck e build ok; Playwright su Edge 23/23 (sezioni tutte
+visibili, attestato senza finestra, progetto assegnato e tolto dalla scheda, `?scheda=`,
+omonimo con CF, filtro "bian" nel calendario, assenza in pagina con le altre assenze,
+ricerca per matricola, telefono senza scorrimento orizzontale).

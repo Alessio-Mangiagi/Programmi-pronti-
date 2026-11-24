@@ -162,46 +162,6 @@ export function Etichetta({ colore, children }: { colore: 'verde' | 'rosso' | 'g
   return <span className={`inline-block rounded-full px-2 py-0.5 font-ui text-[0.72rem] font-semibold ${classi}`}>{children}</span>;
 }
 
-/**
- * Schede (tab) per dividere in sezioni una pagina (scheda dipendente, progetto):
- * richiesta del 24/11/2026 "dividi in sezioni l'inserimento". Una scheda può essere
- * disattivata (es. Attestati di un dipendente non ancora salvato, con il motivo nel
- * suggerimento) o segnalare un errore nei suoi campi con un pallino rosso.
- * Sul telefono la barra scorre in orizzontale.
- */
-export function Schede<T extends string>({
-  voci,
-  attiva,
-  onCambia,
-}: {
-  voci: { id: T; etichetta: string; disattivata?: string; errore?: boolean; conteggio?: number }[];
-  attiva: T;
-  onCambia: (id: T) => void;
-}) {
-  return (
-    <div className="mb-3 flex gap-1 overflow-x-auto whitespace-nowrap border-b border-gray-200" role="tablist">
-      {voci.map((v) => (
-        <button
-          key={v.id}
-          type="button"
-          role="tab"
-          aria-selected={attiva === v.id}
-          disabled={Boolean(v.disattivata)}
-          title={v.disattivata}
-          onClick={() => onCambia(v.id)}
-          className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-            attiva === v.id ? 'border-marchio font-semibold text-marchio' : 'border-transparent text-gray-600 hover:text-marchio'
-          }`}
-        >
-          {v.etichetta}
-          {v.conteggio != null && v.conteggio > 0 && <span className="rounded-full bg-ghiaccio px-1.5 text-[0.7rem] font-semibold text-marchio">{v.conteggio}</span>}
-          {v.errore && <span className="h-2 w-2 rounded-full bg-errore" aria-label="campi da correggere" />}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** Placeholder per le pagine non ancora sviluppate (indica il giorno del piano). */
 export function InArrivo({ titolo, giorno }: { titolo: string; giorno: number }) {
   return (

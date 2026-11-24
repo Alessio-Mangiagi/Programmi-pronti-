@@ -10,7 +10,7 @@
  * Layout in flexbox (24/11/2026): le caselle di dipendenti e progetti e i due report
  * partono da 20rem e si affiancano quando c'è spazio, uno sotto l'altro sul telefono.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DATA_MINIMA, aggiungiGiorni, dataIso, formattaData, giorniNelMese, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { api, scaricaFile } from '../api';
@@ -19,6 +19,8 @@ import { Avviso, Campo, classiInput, IntestazionePagina, Pulsante } from '../com
 import type { Dipendente, Progetto } from '../tipi';
 import { usaDati } from '../usaDati';
 import { Icona } from '../componenti/icone';
+import { corrisponde } from '../componenti/SceltaConRicerca';
+import { nomiSenzaOmonimie } from '../../comune/omonimi';
 
 type Riepilogo = { dipendenti: number; fasce: number; minuti: number; perDipendente: { id: number; nome: string; minuti: number }[] };
 
@@ -36,20 +38,39 @@ function periodiRapidi() {
   ];
 }
 
-/** Elenco di caselle con "tutti/nessuno"; nessuna selezione = tutti (come le API). */
+/**
+ * Elenco di caselle con "tutti/nessuno"; nessuna selezione = tutti (come le API).
+ * Con più di 6 voci compare il filtro a caratteri (Giorno 18): restringe solo ciò che si
+ * vede, le voci già spuntate restano scelte anche se nascoste dal filtro.
+ */
 function Selezione<T extends { id: number }>({
-  titolo, elementi, scelti, setScelti, etichetta,
+  titolo, elementi, scelti, setScelti, etichetta, testo,
 }: {
   titolo: string; elementi: T[]; scelti: number[]; setScelti: (v: number[]) => void; etichetta: (e: T) => string;
+  /** Testo su cui cercare (es. nome + matricola + codice fiscale); assente = l'etichetta. */
+  testo?: (e: T) => string;
 }) {
+  const [filtro, setFiltro] = useState('');
+  const visibili = elementi.filter((e) => corrisponde(testo ? testo(e) : etichetta(e), filtro));
   return (
     <div className="scheda p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase text-gray-500">{titolo}</span>
         <span className="text-xs text-gray-500">{scelti.length ? `${scelti.length} scelti` : 'tutti'}</span>
       </div>
+      {elementi.length > 6 && (
+        <input
+          type="search"
+          aria-label={`Filtra ${titolo.toLowerCase()}`}
+          placeholder="Filtra…"
+          className="mb-2 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-marchio focus:outline-none"
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      )}
       <div className="max-h-56 space-y-0.5 overflow-y-auto text-sm">
-        {elementi.map((e) => (
+        {visibili.length === 0 && <p className="px-1 py-2 text-gray-500">Nessuna voce corrisponde al filtro</p>}
+        {visibili.map((e) => (
           <label key={e.id} className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-gray-50">
             <input type="checkbox" checked={scelti.includes(e.id)} onChange={(ev) => setScelti(ev.target.checked ? [...scelti, e.id] : scelti.filter((x) => x !== e.id))} />
             {etichetta(e)}
@@ -76,6 +97,8 @@ export function Esporta() {
   const [scaricamento, setScaricamento] = useState<string | null>(null);
   const { dati: dipendenti } = usaDati<Dipendente[]>('/api/dipendenti');
   const { dati: progetti } = usaDati<Progetto[]>('/api/progetti');
+  // Omonimi distinti dal codice fiscale (src/omonimi.ts).
+  const nomi = useMemo(() => nomiSenzaOmonimie(dipendenti ?? []), [dipendenti]);
 
   const filtri = { da, a, dipendenteIds, progettoIds };
   const chiave = JSON.stringify(filtri);
@@ -129,8 +152,15 @@ export function Esporta() {
       </div>
 
       <div className="mb-3 flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_20rem]">
-        <Selezione titolo="Dipendenti" elementi={dipendenti ?? []} scelti={dipendenteIds} setScelti={setDipendenteIds} etichetta={(d) => `${d.cognome} ${d.nome}${d.stato === 'CESSATO' ? ' (cessato)' : ''}`} />
-        <Selezione titolo="Progetti" elementi={progetti ?? []} scelti={progettoIds} setScelti={setProgettoIds} etichetta={(p) => `${p.codice} · ${p.nome}`} />
+        <Selezione
+          titolo="Dipendenti"
+          elementi={dipendenti ?? []}
+          scelti={dipendenteIds}
+          setScelti={setDipendenteIds}
+          etichetta={(d) => `${nomi.get(d.id) ?? `${d.cognome} ${d.nome}`}${d.stato === 'CESSATO' ? ' (cessato)' : ''}`}
+          testo={(d) => `${d.cognome} ${d.nome} ${d.matricola} ${d.codiceFiscale} ${d.mansione ?? ''}`}
+        />
+        <Selezione titolo="Progetti" elementi={progetti ?? []} scelti={progettoIds} setScelti={setProgettoIds} etichetta={(p) => `${p.codice} · ${p.nome}`} testo={(p) => `${p.codice} ${p.nome} ${p.cliente ?? ''}`} />
       </div>
 
       {errore && <Avviso tipo="errore" className="mb-3">{errore}</Avviso>}

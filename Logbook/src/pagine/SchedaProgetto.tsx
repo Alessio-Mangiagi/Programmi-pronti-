@@ -28,7 +28,7 @@ import { DocumentazioneProgetto } from '../componenti/DocumentazioneProgetto';
 import { SceltaColore } from '../componenti/SceltaColore';
 import { corrisponde, SceltaConRicerca } from '../componenti/SceltaConRicerca';
 import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
-import { dettaglioDipendente, nomiSenzaOmonimie } from '../omonimi';
+import { dettaglioDipendente, nomiSenzaOmonimie } from '../../comune/omonimi';
 import type { Assegnato, Dipendente, Impostazioni, NotaProgetto, Progetto } from '../tipi';
 import { usaDati } from '../usaDati';
 
