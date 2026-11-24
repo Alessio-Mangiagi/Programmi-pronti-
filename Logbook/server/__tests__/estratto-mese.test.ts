@@ -39,7 +39,9 @@ describe('dati dell\'estratto', () => {
     const cal = await admin.chiama('GET', '/api/calendario?da=2026-10-01&a=2026-10-31');
     expect(estratti).toHaveLength(5);
     for (const e of estratti) {
-      expect(e.giorni).toHaveLength(31);
+      // Ottobre 2026 ha 31 giorni, 22 da lunedì a venerdì: sabato e domenica non ci sono (Giorno 25).
+      expect(e.giorni).toHaveLength(22);
+      expect(e.giorni.every((g) => g.giornoSettimana >= 1 && g.giornoSettimana <= 5)).toBe(true);
       expect(e.totali.minutiLavorati).toBe(cal.corpo.totali.perDipendente[e.dipendente.id] ?? 0);
     }
   });
@@ -54,9 +56,9 @@ describe('dati dell\'estratto', () => {
     expect(giornoFerie.costoNettoCent).toBe(8 * 1450);
     const lordoAtteso = Math.round((rossi.totali.minutiRetribuiti * 2780) / 60);
     expect(rossi.totali.costoLordoCent).toBe(lordoAtteso);
-    // Le domeniche non hanno costo né ore attese
-    const domenica = rossi.giorni.find((g) => g.giornoSettimana === 0)!;
-    expect(domenica.costoLordoCent).toBe(0);
+    // Niente sabati e domeniche fra i giorni (Giorno 25), ma il costo del mese resta la somma dei giorni
+    expect(rossi.giorni.find((g) => g.giornoSettimana === 0 || g.giornoSettimana === 6)).toBeUndefined();
+    expect(rossi.giorni.reduce((s, g) => s + (g.costoLordoCent ?? 0), 0)).toBe(rossi.totali.costoLordoCent);
   });
 
   it('permesso: ore lavorate + durata del permesso', async () => {
@@ -93,14 +95,15 @@ describe('Excel', () => {
     expect(libro.worksheets).toHaveLength(5);
     const foglio = libro.getWorksheet('Rossi Mario')!;
     expect(foglio.getCell('A1').value).toBe('Ore di Ottobre 2026');
-    expect(foglio.getCell('A3').value).toBe('Lun');
-    // Anagrafica a destra (colonne I-J)
+    // Griglia da lunedì a venerdì (Giorno 25): A3-E3, niente sabato e domenica
+    expect([1, 2, 3, 4, 5, 6, 7].map((c) => foglio.getCell(3, c).value ?? null)).toEqual(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', null, 'Matricola']);
+    // Anagrafica a destra (colonne G-H)
     const etichette: string[] = [];
-    foglio.getColumn(9).eachCell((c) => etichette.push(String(c.value)));
+    foglio.getColumn(7).eachCell((c) => etichette.push(String(c.value)));
     expect(etichette).toEqual(expect.arrayContaining(['Matricola', 'Codice fiscale', 'Costo orario lordo', 'Ore lavorate']));
     // Ore della griglia = totale del mese
     let somma = 0;
-    for (let r = 5; r < 4 + 6 * 3; r += 3) for (let c = 1; c <= 7; c++) if (foglio.getCell(r, c).value != null) somma += minuti(foglio.getCell(r, c).value);
+    for (let r = 5; r < 4 + 6 * 3; r += 3) for (let c = 1; c <= 5; c++) if (foglio.getCell(r, c).value != null) somma += minuti(foglio.getCell(r, c).value);
     expect(somma).toBe(estratti.find((e) => e.dipendente.cognome === 'Rossi')!.totali.minutiLavorati);
     // Progetti in basso
     const colonnaA: string[] = [];
@@ -118,7 +121,7 @@ describe('Excel', () => {
       if (/^\d{2}\/10\/2026$/.test(String(r.getCell(1).value))) righeGiorno++;
       if (r.getCell(1).value === 'TOTALE') totale = r;
     });
-    expect(righeGiorno).toBe(31);
+    expect(righeGiorno).toBe(22); // solo lunedì-venerdì (Giorno 25)
     expect(minuti(totale!.getCell(3).value)).toBe(rossi.totali.minutiLavorati);
     expect(totale!.getCell(10).value).toBeCloseTo(rossi.totali.costoLordoCent! / 100, 2);
     expect(totale!.getCell(9).value).toBeCloseTo(rossi.totali.costoNettoCent! / 100, 2);

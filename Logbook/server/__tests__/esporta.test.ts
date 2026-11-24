@@ -93,15 +93,30 @@ describe('report calendario lavorato', () => {
     }
   });
 
-  it('riporta assenze approvate e festività nel dettaglio dei giorni', async () => {
+  it('riporta assenze approvate e festività nel dettaglio dei giorni, mai sabato e domenica', async () => {
     const ferie = await db.prisma.assenza.findFirstOrThrow({ where: { tipo: 'FERIE', stato: 'APPROVATA' }, include: { dipendente: true } });
-    const libro = await scarica('/api/esporta/calendario', { ...PERIODO, dipendenteIds: [ferie.dipendenteId] });
-    expect(libro.worksheets).toHaveLength(1);
-    const foglio = libro.worksheets[0];
-    const [a, m, g] = ferie.dataInizio.split('-');
-    expect(rigaCon(foglio, `${g}/${m}/${a}`).getCell(8).value).toBe('Ferie');
-    expect(rigaCon(foglio, '01/11/2026').getCell(9).value).toBe('Ognissanti');
-    expect(rigaCon(foglio, 'Ferie (giorni)').getCell(7).value).toBe(3);
+    // Festività di prova in un giorno feriale fuori dalle ferie (quelle del seed in ottobre e
+    // novembre 2026 cadono di domenica e dal Giorno 25 non compaiono).
+    const festa = await db.prisma.festivita.create({ data: { data: ferie.dataInizio === '2026-10-14' ? '2026-10-15' : '2026-10-14', descrizione: 'Festa di prova', tipo: 'AZIENDALE' } });
+    try {
+      const libro = await scarica('/api/esporta/calendario', { ...PERIODO, dipendenteIds: [ferie.dipendenteId] });
+      expect(libro.worksheets).toHaveLength(1);
+      const foglio = libro.worksheets[0];
+      const [a, m, g] = ferie.dataInizio.split('-');
+      expect(rigaCon(foglio, `${g}/${m}/${a}`).getCell(8).value).toBe('Ferie');
+      const [fa, fm, fg] = festa.data.split('-');
+      expect(rigaCon(foglio, `${fg}/${fm}/${fa}`).getCell(9).value).toBe('Festa di prova');
+      expect(rigaCon(foglio, 'Ferie (giorni)').getCell(7).value).toBe(3);
+      // Giorno 25: nessuna riga di sabato o domenica (01/11/2026, Ognissanti, è domenica)
+      const giorniSettimana = new Set<string>();
+      foglio.eachRow((r) => {
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(String(r.getCell(1).value))) giorniSettimana.add(String(r.getCell(2).value));
+      });
+      expect([...giorniSettimana].sort()).toEqual(['giovedì', 'lunedì', 'martedì', 'mercoledì', 'venerdì']);
+      expect(() => rigaCon(foglio, '01/11/2026')).toThrow();
+    } finally {
+      await db.prisma.festivita.delete({ where: { id: festa.id } });
+    }
   });
 
   it('col filtro progetto i totali coincidono con il calendario filtrato', async () => {

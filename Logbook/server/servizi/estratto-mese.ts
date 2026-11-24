@@ -3,23 +3,23 @@
  * Estratti mensili (richiesta del 23/11/2026): carica i dati del mese e produce i due
  * Excel, un foglio per dipendente.
  *
- * - "Mese a calendario": a sinistra il calendario del mese (settimane in riga, per ogni
- *   giorno: numero, ore lavorate, progetti/assenze/festività), a destra l'anagrafica e il
- *   riepilogo del mese, in basso la descrizione dei progetti lavorati.
+ * - "Mese a calendario": a sinistra il calendario del mese (settimane in riga, da lunedì a
+ *   venerdì; per ogni giorno: numero, ore lavorate, progetti/assenze/festività), a destra
+ *   l'anagrafica e il riepilogo del mese, in basso la descrizione dei progetti lavorati.
  * - "Giorni e costi": in testa l'anagrafica completa, poi una riga per giorno con ore,
  *   progetti, fasce, assenze, festività, ore retribuite e costo netto/lordo del giorno.
  *
  * I numeri vengono da comune/estratto-mese.ts (gli stessi dell'anteprima a schermo e della
  * stampa) e i dati da servizi/report.ts#caricaDatiReport (stessi filtri dei report).
+ * Sabato e domenica non compaiono mai (Giorno 25): li esclude già costruisciEstratto.
  */
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { aggiungiGiorni, formattaData } from '../../comune/date';
-import { costruisciEstratto, ETICHETTE_GIORNI, limitiMese, RE_MESE, type EstrattoDipendente, type GiornoEstratto } from '../../comune/estratto-mese';
+import { costruisciEstratto, ETICHETTE_GIORNI, GIORNI_GRIGLIA, limitiMese, RE_MESE, settimaneDelMese, type EstrattoDipendente, type GiornoEstratto } from '../../comune/estratto-mese';
 import { formattaEuro } from '../../comune/importi';
 import { formattaOre } from '../../comune/orari';
-import { inizioSettimana } from '../../comune/riepiloghi';
 import { ETICHETTE_CONTRATTO } from '../../comune/schemi';
 import { stileIntestazione } from './excel';
 import { caricaDatiReport } from './report';
@@ -89,7 +89,7 @@ function notaGiorno(g: GiornoEstratto): string {
   return parti.join(' · ');
 }
 
-/** Colore di sfondo di un giorno (assenza, festivo/weekend, fuori rapporto) o null. */
+/** Colore di sfondo di un giorno (assenza, festivo, fuori rapporto) o null. */
 function coloreGiorno(g: GiornoEstratto): string | null {
   if (g.fuoriRapporto) return COLORI_GIORNO.fuori;
   const assenza = g.assenze[0]?.tipo;
@@ -127,17 +127,18 @@ export function creaExcelMeseCalendario(estratti: EstrattoDipendente[]): ExcelJS
     const foglio = libro.addWorksheet(nomeFoglio(libro, `${d.cognome} ${d.nome}`), {
       pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1, paperSize: 9 },
     });
-    foglio.columns = [...Array(7).fill({ width: 15 }), { width: 2 }, { width: 22 }, { width: 30 }];
+    // Colonne: A-E i cinque giorni da lunedì a venerdì, F spazio, G-H anagrafica e riepilogo.
+    foglio.columns = [...Array(5).fill({ width: 20 }), { width: 2 }, { width: 22 }, { width: 30 }];
 
-    foglio.mergeCells('A1:G1');
+    foglio.mergeCells('A1:E1');
     Object.assign(foglio.getCell('A1'), { value: `Ore di ${nomeMese(e.mese)}` });
     foglio.getCell('A1').font = { bold: true, size: 14, color: { argb: BLU } };
-    foglio.mergeCells('I1:J1');
-    foglio.getCell('I1').value = `${d.cognome} ${d.nome}`;
-    foglio.getCell('I1').font = { bold: true, size: 14, color: { argb: BLU } };
+    foglio.mergeCells('G1:H1');
+    foglio.getCell('G1').value = `${d.cognome} ${d.nome}`;
+    foglio.getCell('G1').font = { bold: true, size: 14, color: { argb: BLU } };
 
-    // Intestazione dei giorni della settimana (lunedì → domenica)
-    ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].forEach((nome, c) => {
+    // Intestazione dei giorni (lunedì → venerdì: niente sabato e domenica, Giorno 25)
+    GIORNI_GRIGLIA.forEach((nome, c) => {
       const cella = foglio.getCell(3, c + 1);
       cella.value = nome;
       cella.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -145,15 +146,15 @@ export function creaExcelMeseCalendario(estratti: EstrattoDipendente[]): ExcelJS
       cella.alignment = { horizontal: 'center' };
     });
 
-    // Griglia: 3 righe per settimana (numero del giorno, ore, note).
+    // Griglia: 3 righe per settimana (numero del giorno, ore, note), cinque colonne.
     const perData = new Map(e.giorni.map((g) => [g.data, g]));
-    const inizio = inizioSettimana(e.giorni[0].data);
-    const settimane = Math.ceil((e.giorni.length + ((new Date(`${e.giorni[0].data}T12:00:00Z`).getUTCDay() + 6) % 7)) / 7);
+    const lunedi = settimaneDelMese(e.mese);
+    const settimane = lunedi.length;
     for (let w = 0; w < settimane; w++) {
       const base = 4 + w * 3;
       foglio.getRow(base + 2).height = 32;
-      for (let c = 0; c < 7; c++) {
-        const data = aggiungiGiorni(inizio, w * 7 + c);
+      for (let c = 0; c < 5; c++) {
+        const data = aggiungiGiorni(lunedi[w], c);
         const g = perData.get(data);
         const [cNum, cOre, cNota] = [0, 1, 2].map((r) => foglio.getCell(base + r, c + 1));
         const colore = g ? coloreGiorno(g) : COLORI_GIORNO.fuori;
@@ -181,17 +182,17 @@ export function creaExcelMeseCalendario(estratti: EstrattoDipendente[]): ExcelJS
     // A destra: anagrafica e riepilogo del mese
     let r = 3;
     const scriviDestra = (etichetta: string, valore: string | number | null, formato?: string) => {
-      foglio.getCell(r, 9).value = etichetta;
-      foglio.getCell(r, 9).font = { bold: true };
-      const v = foglio.getCell(r, 10);
+      foglio.getCell(r, 7).value = etichetta;
+      foglio.getCell(r, 7).font = { bold: true };
+      const v = foglio.getCell(r, 8);
       v.value = valore;
       if (formato) v.numFmt = formato;
       r++;
     };
     for (const [etichetta, valore] of righeAnagrafica(e).slice(1)) scriviDestra(etichetta, valore);
     r++;
-    foglio.getCell(r, 9).value = 'Riepilogo del mese';
-    foglio.getCell(r, 9).font = { bold: true, color: { argb: BLU } };
+    foglio.getCell(r, 7).value = 'Riepilogo del mese';
+    foglio.getCell(r, 7).font = { bold: true, color: { argb: BLU } };
     r++;
     const t = e.totali;
     scriviDestra('Ore lavorate', durataExcel(t.minutiLavorati), FORMATO_ORE);
@@ -209,25 +210,22 @@ export function creaExcelMeseCalendario(estratti: EstrattoDipendente[]): ExcelJS
     foglio.getCell(rp, 1).value = 'Progetti del mese';
     foglio.getCell(rp, 1).font = { bold: true, color: { argb: BLU } };
     rp++;
+    // Cinque colonne, sotto le cinque della griglia.
     const intestazione = foglio.getRow(rp);
-    intestazione.values = ['Codice', 'Progetto', '', 'Cliente', '', 'Max ore/giorno', 'Ore nel mese'];
-    foglio.mergeCells(rp, 2, rp, 3);
-    foglio.mergeCells(rp, 4, rp, 5);
+    intestazione.values = ['Codice', 'Progetto', 'Cliente', 'Max ore/giorno', 'Ore nel mese'];
     stileIntestazione(intestazione);
-    for (const c of [8, 9, 10]) intestazione.getCell(c).fill = { type: 'pattern', pattern: 'none' };
+    for (const c of [6, 7, 8]) intestazione.getCell(c).fill = { type: 'pattern', pattern: 'none' };
     for (const p of e.progetti) {
       rp++;
       const riga = foglio.getRow(rp);
-      riga.values = [p.codice, p.nome, '', p.cliente ?? '', '', p.maxMinutiGiorno != null ? durataExcel(p.maxMinutiGiorno) : 'nessun limite', durataExcel(p.minuti)];
-      foglio.mergeCells(rp, 2, rp, 3);
-      foglio.mergeCells(rp, 4, rp, 5);
-      if (p.maxMinutiGiorno != null) riga.getCell(6).numFmt = FORMATO_ORE;
-      riga.getCell(7).numFmt = FORMATO_ORE;
+      riga.values = [p.codice, p.nome, p.cliente ?? '', p.maxMinutiGiorno != null ? durataExcel(p.maxMinutiGiorno) : 'nessun limite', durataExcel(p.minuti)];
+      if (p.maxMinutiGiorno != null) riga.getCell(4).numFmt = FORMATO_ORE;
+      riga.getCell(5).numFmt = FORMATO_ORE;
     }
     if (!e.progetti.length) foglio.getCell(rp + 1, 1).value = 'Nessuna ora registrata nel mese';
     // Legenda dei colori
     rp += 2;
-    const legenda: [string, string][] = [['Ferie', COLORI_GIORNO.FERIE], ['Malattia', COLORI_GIORNO.MALATTIA], ['Permesso', COLORI_GIORNO.PERMESSO], ['Festivo / weekend', COLORI_GIORNO.festivo]];
+    const legenda: [string, string][] = [['Ferie', COLORI_GIORNO.FERIE], ['Malattia', COLORI_GIORNO.MALATTIA], ['Permesso', COLORI_GIORNO.PERMESSO], ['Festivo', COLORI_GIORNO.festivo]];
     legenda.forEach(([testo, colore], i) => {
       const cella = foglio.getCell(rp, i + 1);
       cella.value = testo;

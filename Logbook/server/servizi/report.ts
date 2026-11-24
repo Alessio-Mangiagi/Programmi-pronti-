@@ -136,7 +136,9 @@ export function creaReportCalendario(dati: DatiReport): ExcelJS.Workbook {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'Logbook';
   const { filtri } = dati;
-  const giorni = intervalloDate(filtri.da, filtri.a);
+  // Solo lunedì-venerdì (Giorno 25: "nelle estrazioni per la stampa deve sempre essere
+  // escluso sabato e domenica"); i totali sotto restano quelli di tutto il periodo.
+  const giorni = intervalloDate(filtri.da, filtri.a).filter((g) => !isFineSettimana(g));
   const festivi = new Set(dati.festivita.keys());
 
   for (const d of dati.dipendenti) {
@@ -166,7 +168,7 @@ export function creaReportCalendario(dati: DatiReport): ExcelJS.Workbook {
           f ? durataExcel(f.minuti) : null, i === 0 ? assenza : '', i === 0 ? festa : '', f?.note ?? '',
         ]);
         riga.getCell(7).numFmt = FORMATO_ORE;
-        if (isFineSettimana(g) || festa) riga.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+        if (festa) riga.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
         if (assenza) riga.getCell(8).font = { color: { argb: 'FF1E3A8A' } };
       });
     }

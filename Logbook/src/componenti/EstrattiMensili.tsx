@@ -15,16 +15,17 @@
  * Layout in flexbox (24/11/2026): a schermo gli estratti dei dipendenti partono da 56rem
  * e si affiancano sugli schermi molto larghi (due o tre su un ultra wide). In stampa il
  * contenitore torna a blocchi (print:block), così resta un dipendente per pagina A4.
+ * Sabato e domenica non compaiono (Giorno 25, li esclude comune/estratto-mese.ts): la
+ * griglia ha cinque colonne da lunedì a venerdì e la tabella dei giorni solo i feriali.
  * Il calendario del mese è fatto di righe-settimana flex; calendario e anagrafica si
  * affiancano da 44rem di spazio in su, mentre in stampa restano sempre affiancati
  * (print:flex-nowrap).
  */
 import { useEffect, useState } from 'react';
 import { aggiungiGiorni, formattaData, oggiIso } from '../../comune/date';
-import { ETICHETTE_GIORNI, type EstrattoDipendente, type GiornoEstratto } from '../../comune/estratto-mese';
+import { ETICHETTE_GIORNI, GIORNI_GRIGLIA, settimaneDelMese, type EstrattoDipendente, type GiornoEstratto } from '../../comune/estratto-mese';
 import { formattaEuro } from '../../comune/importi';
 import { formattaOre } from '../../comune/orari';
-import { inizioSettimana } from '../../comune/riepiloghi';
 import { api, scaricaFile } from '../api';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
 import { Avviso, Caricamento, Pulsante } from './ui';
@@ -32,7 +33,7 @@ import { Icona } from './icone';
 
 type Risposta = { mese: string; nomeMese: string; estratti: EstrattoDipendente[] };
 
-/** Sfondo del giorno: assenza, festivo/weekend, fuori rapporto. */
+/** Sfondo del giorno: assenza, festivo, fuori rapporto. */
 function sfondoGiorno(g: GiornoEstratto): string | undefined {
   if (g.fuoriRapporto) return '#e5e7eb';
   const tipo = g.assenze[0]?.tipo;
@@ -66,16 +67,11 @@ function righeAnagrafica(e: EstrattoDipendente): [string, string][] {
 
 /** Layout 1: calendario a sinistra, anagrafica a destra, progetti in basso. */
 function MeseACalendario({ e, nomeMese }: { e: EstrattoDipendente; nomeMese: string }) {
-  const inizio = inizioSettimana(e.giorni[0].data);
   const perData = new Map(e.giorni.map((g) => [g.data, g]));
-  // Settimane complete da lunedì a domenica: ogni settimana è una riga flex di sette celle.
-  const settimane: (GiornoEstratto | null)[][] = [];
-  for (let d = inizio; settimane.length < 6; ) {
-    const settimana: (GiornoEstratto | null)[] = [];
-    for (let i = 0; i < 7; i++, d = aggiungiGiorni(d, 1)) settimana.push(perData.get(d) ?? null);
-    settimane.push(settimana);
-    if (d > e.giorni[e.giorni.length - 1].data) break;
-  }
+  // Settimane da lunedì a venerdì (Giorno 25): ogni settimana è una riga flex di cinque celle.
+  const settimane: (GiornoEstratto | null)[][] = settimaneDelMese(e.mese).map((lunedi) =>
+    GIORNI_GRIGLIA.map((_, i) => perData.get(aggiungiGiorni(lunedi, i)) ?? null),
+  );
   const t = e.totali;
   return (
     <section className="pagina-stampa scheda min-w-0 flex-[1_1_56rem] p-3 sm:p-4">
@@ -84,7 +80,7 @@ function MeseACalendario({ e, nomeMese }: { e: EstrattoDipendente; nomeMese: str
           <h3 className="mb-2 text-lg font-semibold text-marchio">Ore di {nomeMese}</h3>
           <div className="border-l border-t border-gray-300 text-xs">
             <div className="flex">
-              {['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((n) => (
+              {GIORNI_GRIGLIA.map((n) => (
                 <div key={n} className="min-w-0 flex-1 basis-0 border-b border-r border-gray-300 bg-marchio py-1 text-center font-semibold text-white">
                   {n}
                 </div>

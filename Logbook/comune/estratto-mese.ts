@@ -13,9 +13,16 @@
  * si indicano ma senza costo. Senza costo orario in scheda il costo resta vuoto (null).
  *
  * Funzione pura (nessun accesso al database): il server le passa i dati del mese.
+ *
+ * Sabato e domenica (Giorno 25, richiesta del 24/11/2026: "nelle estrazioni per la stampa
+ * deve sempre essere escluso sabato e domenica"): `giorni` contiene solo da lunedì a
+ * venerdì, quindi non compaiono in nessun layout. I totali si calcolano comunque su tutti i
+ * giorni del mese: dal 24/11/2026 nel fine settimana non si registrano ore (Giorno 16), e
+ * se ne fossero rimaste da prima resterebbero nei totali invece di sparire dai pagamenti.
  */
-import { dataIso, giorniNelMese, giornoSettimana, isFineSettimana } from './date';
+import { aggiungiGiorni, dataIso, giorniNelMese, giornoSettimana, isFineSettimana } from './date';
 import { durataMinuti } from './orari';
+import { inizioSettimana } from './riepiloghi';
 
 export type TipoAssenzaEstratto = 'FERIE' | 'PERMESSO' | 'MALATTIA';
 
@@ -50,7 +57,7 @@ export type ProgettoEstratto = {
 
 export type GiornoEstratto = {
   data: string;
-  /** 0 = domenica … 6 = sabato */
+  /** 1 = lunedì … 5 = venerdì (sabato e domenica non sono negli estratti, Giorno 25). */
   giornoSettimana: number;
   festivita: string | null;
   /** Lunedì-venerdì, non festivo, dentro il rapporto di lavoro. */
@@ -162,7 +169,8 @@ export function costruisciEstratto(dati: DatiEstratto): EstrattoDipendente {
   return {
     mese: dati.mese,
     dipendente: dip,
-    giorni,
+    // Solo lunedì-venerdì (Giorno 25); i totali qui sotto restano su tutto il mese.
+    giorni: giorni.filter((g) => !isFineSettimana(g.data)),
     progetti: [...minutiProgetto.entries()]
       .map(([id, minuti]) => ({ ...dati.progetti.get(id)!, minuti }))
       .sort((x, y) => x.codice.localeCompare(y.codice)),
@@ -187,3 +195,21 @@ export function costruisciEstratto(dati: DatiEstratto): EstrattoDipendente {
 export const RE_MESE = /^(20[2-9]\d)-(0[1-9]|1[0-2])$/;
 
 export const ETICHETTE_GIORNI = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+
+/** Colonne della griglia "mese a calendario": da lunedì a venerdì (Giorno 25). */
+export const GIORNI_GRIGLIA = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven'];
+
+/**
+ * Lunedì delle settimane da mostrare nella griglia del mese "AAAA-MM": solo quelle con
+ * almeno un giorno feriale del mese (un mese che inizia di sabato non ha una prima riga
+ * vuota, uno che finisce di domenica non ne ha una in fondo).
+ */
+export function settimaneDelMese(mese: string): string[] {
+  const { da, a } = limitiMese(mese);
+  const lunedi: string[] = [];
+  for (let l = inizioSettimana(da); l <= a; l = aggiungiGiorni(l, 7)) {
+    // La settimana entra se il suo lunedì-venerdì tocca il mese.
+    if (aggiungiGiorni(l, 4) >= da) lunedi.push(l);
+  }
+  return lunedi;
+}
