@@ -16,6 +16,9 @@
  * 30 giorni (GIORNI_PREAVVISO_ATTESTATI), i più urgenti prima.
  * Solo HR (Giorno 17): documentazione di progetto caricata e non ancora vista.
  * Giorno 20: segnalazioni dei dipendenti; HR vede le aperte, il dipendente le sue ultime.
+ * Solo HR (Giorno 29, "grafici di avanzamento in dashboard"): per ogni progetto attivo o
+ * sospeso le percentuali di avanzamento dichiarate nella documentazione, in ordine di data
+ * (una per giorno: l'ultima caricata), per il riquadro "Avanzamento dei progetti".
  */
 import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
@@ -79,6 +82,17 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
       orderBy: isAdmin(req) ? { creatoIl: 'asc' } : { creatoIl: 'desc' },
       take: isAdmin(req) ? undefined : 10,
     });
+    // Avanzamento dei progetti non chiusi (Giorno 29): percentuali dichiarate, la più vecchia prima.
+    const conAvanzamento = isAdmin(req)
+      ? await prisma.progetto.findMany({
+          where: { stato: { not: 'CHIUSO' } },
+          select: {
+            id: true, codice: true, nome: true, colore: true, stato: true,
+            documenti: { where: { percentuale: { not: null } }, select: { data: true, percentuale: true }, orderBy: [{ data: 'asc' }, { creatoIl: 'asc' }] },
+          },
+          orderBy: { codice: 'asc' },
+        })
+      : [];
     // Documentazione di progetto non ancora vista da HR (Giorno 17, risposta 2c), la più vecchia prima.
     const documentazione = isAdmin(req)
       ? await prisma.documentoProgetto.findMany({
@@ -136,6 +150,11 @@ export function rotteDashboard(prisma: PrismaClient, oggi: () => string) {
       segnalazioni: segnalazioni.map((s) => ({
         id: s.id, data: s.data, testo: s.testo, stato: s.stato, rispostaHr: s.rispostaHr, creatoIl: s.creatoIl,
         dipendenteId: s.dipendenteId, dipendente: nome(s.dipendenteId, s.dipendente),
+      })),
+      // Un punto per giorno: con più documenti nello stesso giorno vale l'ultimo caricato.
+      avanzamentoProgetti: conAvanzamento.map(({ documenti, ...p }) => ({
+        ...p,
+        punti: [...new Map(documenti.map((d) => [d.data, d.percentuale!])).entries()].map(([data, percentuale]) => ({ data, percentuale })),
       })),
       documentazioneDaVedere: documentazione.map((d) => ({
         id: d.id, titolo: d.titolo, data: d.data, percentuale: d.percentuale, conFile: d.fileId != null,

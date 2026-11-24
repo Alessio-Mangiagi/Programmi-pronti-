@@ -31,6 +31,7 @@ import { formattaData } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
+import { AvanzamentoProgetti, type AvanzamentoProgetto } from '../componenti/AvanzamentoProgetti';
 import { Icona } from '../componenti/icone';
 import { linkGiorno } from '../componenti/Segnalazioni';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
@@ -53,6 +54,8 @@ type DatiDashboard = {
   attestatiDaRinnovare: { id: number; tipo: TipoAttestato; titolo: string; dataScadenza: string; stato: StatoAttestato; dipendenteId: number; dipendente: string }[];
   /** Giorno 20: HR le aperte (la più vecchia prima), il dipendente le sue ultime 10. */
   segnalazioni: { id: number; data: string; testo: string; stato: 'APERTA' | 'RISOLTA'; rispostaHr: string | null; creatoIl: string; dipendenteId: number; dipendente: string }[];
+  /** Solo HR (Giorno 29): percentuali di avanzamento dichiarate, per progetto non chiuso. */
+  avanzamentoProgetti: AvanzamentoProgetto[];
   /** Solo HR (Giorno 17): documentazione di progetto caricata e non ancora vista, la più vecchia prima. */
   documentazioneDaVedere: {
     id: number; titolo: string; data: string; percentuale: number | null; conFile: boolean; autore: string;
@@ -312,6 +315,13 @@ export function Dashboard() {
             </div>
           )}
         </Pannello>
+
+        {/* Avanzamento dei progetti (HR, Giorno 29): andamento delle percentuali dichiarate; clic → progetto. */}
+        {admin && dati.avanzamentoProgetti.length > 0 && (
+          <Pannello titolo="Avanzamento dei progetti" id="avanzamento-progetti" azione={<Link className="text-sm text-marchio hover:underline" to="/progetti">Tutti i progetti →</Link>}>
+            <AvanzamentoProgetti progetti={dati.avanzamentoProgetti} />
+          </Pannello>
+        )}
 
         {/* Attestati da rinnovare (HR, risposta 1c): clic → scheda Attestati del dipendente. */}
         {admin && dati.attestatiDaRinnovare.length > 0 && (
