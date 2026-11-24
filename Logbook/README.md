@@ -31,8 +31,9 @@ launcher usato dal Portale della suite).
 Al primo avvio viene creato `data/logbook.db`:
 
 - con **`npm start` / `avvia.bat`** (produzione) il database parte **vuoto**, con il solo
-  amministratore `admin` (password di `LOGBOOK_ADMIN_PASSWORD`, oppure `Admin2026!` da
-  cambiare subito): HR inserisce dipendenti e progetti veri;
+  amministratore `admin` (password di `LOGBOOK_ADMIN_PASSWORD`, oppure `Admin2026!`):
+  al primo accesso Logbook obbliga a sceglierne una nuova, poi HR inserisce dipendenti e
+  progetti veri;
 - con **`npm run dev`** (sviluppo) arrivano i **dati di esempio** (5 dipendenti, 3 progetti,
   ore dal primo giorno del mese scorso a ieri, qualche assenza, festività nazionali).
 
@@ -47,9 +48,13 @@ vengono mai toccati: le nuove versioni applicano solo le migrazioni mancanti.
 | Amministratore / HR | `admin` | `Admin2026!` |
 | Dipendente | `mario.rossi`, `giulia.bianchi`, `luca.esposito`, `chiara.ferrari`, `giuseppe.russo` | `Logbook2026!` |
 
-Su un database vero cambiarle subito da **Cambia password** (in alto a destra). Se nel
+Sono **provvisorie** (Giorno 24): con `npm start` / `avvia.bat`, a ogni avvio Logbook
+controlla se l'amministratore o gli account di esempio hanno ancora queste password e,
+se sì, al prossimo accesso chiede di sceglierne una nuova prima di mostrare qualsiasi
+dato. Lo stesso vale per le password che HR assegna o reimposta ai dipendenti. Se nel
 database non c'è nessun amministratore attivo, all'avvio ne viene creato uno (`admin`, con
-la password di `LOGBOOK_ADMIN_PASSWORD` o `Admin2026!`).
+la password di `LOGBOOK_ADMIN_PASSWORD` o `Admin2026!`), anche lui da cambiare al primo
+accesso.
 
 ### Partire senza dati di esempio
 

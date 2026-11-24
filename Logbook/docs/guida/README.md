@@ -17,8 +17,15 @@ sfrutta tutta la larghezza degli schermi **ultra wide** (vedi il capitolo 4).
 ![Pagina di accesso](img/01-login.png)
 
 Nome utente e password sono **quelli di Logbook**, non quelli del Portale: li assegna HR
-dalla scheda del dipendente. Al primo accesso conviene cambiare la password da
-**Cambia password**, in alto a destra (almeno 8 caratteri, con lettere e numeri).
+dalla scheda del dipendente.
+
+**Al primo accesso Logbook chiede di scegliere una password nuova**: quella data da HR è
+provvisoria e finché non la si cambia non si vede nient'altro. La nuova deve avere almeno
+8 caratteri, con lettere e numeri, ed essere diversa da quella provvisoria. Lo stesso vale
+per l'amministratore creato all'installazione e per gli account di prova. Dopo, la si
+cambia quando si vuole da **Cambia password**, in alto a destra.
+
+![Scelta della password al primo accesso](img/36-password-provvisoria.png)
 
 Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.
 
@@ -135,7 +142,12 @@ quelli futuri.
 - Se il progetto ha **ore massime al giorno**, sotto le righe compare per ogni progetto
   "ore del giorno / max": oltre il limite il riquadro diventa rosso e **Salva giornata** si
   disattiva (il limite vale per ciascun dipendente).
-- **Salva giornata** salva tutte le righe insieme; con la ✕ si toglie una riga.
+- **Salva giornata** salva tutte le righe insieme.
+- La **✕** di una fascia già salvata la **elimina subito** (dopo la conferma), senza
+  toccare le altre righe; il calendario si aggiorna e la finestra resta aperta. La ✕ di una
+  riga nuova, non ancora salvata, la toglie soltanto.
+
+![Fascia eliminata dalla giornata](img/37-elimina-fascia.png)
 
 ### Dashboard HR
 
@@ -214,7 +226,8 @@ accanto al nome (es. «Rossi Mario (CF RSSMRA8)»).
 - **Contratto e costi**: contratto, assunzione, ore settimanali e costo orario **netto** e
   **lordo** in euro (es. 14,50). I costi li vede solo HR e servono ai report.
 - **Account**: crea il nome utente e la password del dipendente, o ne reimposta la
-  password (comunicateli al dipendente). **Disattiva dipendente** quando il rapporto finisce:
+  password (comunicateli al dipendente). La password è **provvisoria**: al primo accesso il
+  dipendente ne sceglie una sua, e finché non lo fa la scheda lo indica. **Disattiva dipendente** quando il rapporto finisce:
   le ore restano nei report e l'account viene bloccato. **Riattiva** lo rimette attivo, ma
   l'account va riattivato a mano.
 - **Progetti assegnati**: gli stessi della pagina del progetto, visti dal dipendente. Si

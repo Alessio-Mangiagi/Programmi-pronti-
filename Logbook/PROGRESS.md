@@ -23,7 +23,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 21 (24/11):** menu laterale fermo durante lo scorrimento, voci sempre visibili ✅
 - **Giorno 22 (24/11):** allegato facoltativo alle assenze ✅
 - **Giorno 23 (24/11):** verifica di codice, librerie e sicurezza; corrette le falle confermate, tranne la password dell'admin predefinito (da decidere) ✅
-- **Prossimo:** scelta sulla password dell'admin predefinito; pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
+- **Giorno 24 (24/11):** password provvisoria da cambiare al primo accesso, tolte le rotte mai usate (HR elimina la singola fascia), better-sqlite3 dichiarato ✅
+- **Prossimo:** matricola legata al tipo di contratto e mansioni da elenco (domande aperte); pannello laterale del calendario per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -687,3 +688,47 @@ Verifiche:
 - Typecheck ok.
 - Nel database demo nessuna data oltre il 2100.
 - Playwright su Edge 7/7: nessun blocco della CSP su 11 pagine (HR e dipendente), font caricati, Mario vede solo PRG-001 e PRG-003, e l'allegato delle assenze accetta solo PDF e immagini.
+
+### Giorno 24 — Password provvisoria, rotte non usate, dipendenza dei test (24/11/2026) ✅
+
+Risposte dell'utente alle domande del Giorno 23: "1a 2 tengo solo la cancellazione della
+fascia oraria e le altre le tolgo inserendo la possibilità di usarla per HR 3a".
+
+**1a, password provvisoria da cambiare al primo accesso.**
+- `Utente.passwordDaCambiare`, aggiunto con la migrazione `20261124180000_password_da_cambiare`.
+- Il segno viene messo:
+  - quando HR crea un account o ne reimposta la password;
+  - sull'amministratore creato all'avvio (`assicuraAdmin`);
+  - a ogni avvio in produzione, sugli account che hanno ancora le password del README (`segnaPasswordPubblicate`, con admin e `USERNAME_DEMO`).
+- Il codice sta in `server/auth/password-provvisorie.ts`.
+- Finché il segno c'è, `richiediPasswordCambiata` (`server/middleware.ts`) risponde 403 a ogni API tranne `/api/auth`. L'interfaccia mostra solo `src/pagine/PasswordProvvisoria.tsx`, che usa il `ModuloPassword` estratto da `CambiaPassword.tsx`.
+- La nuova password deve essere diversa da quella attuale.
+- HR vede nella scheda se la password è ancora provvisoria.
+
+**2, rotte mai chiamate dall'interfaccia.**
+- Tolte:
+  - `POST /api/registrazioni` e `PUT /api/registrazioni/:id`, con `schemaRegistrazione`, `primaSovrapposizione` e `messaggioSovrapposizione`;
+  - `PUT /api/festivita/:id`;
+  - `DELETE /api/file/:id`;
+  - `GET /api/stato-dati`.
+- Resta `DELETE /api/registrazioni/:id`, che ora è un pulsante per HR: nell'editor della giornata la ✕ di una fascia già salvata la elimina subito, dopo una conferma. Le altre righe e le modifiche in corso restano, e il calendario si aggiorna con `onModificato`.
+- I test che usavano le rotte tolte ora passano dalla giornata intera.
+
+**3a.** `better-sqlite3` è dichiarato tra le dipendenze di sviluppo (`^12.11.1`, la versione già installata), perché lo importa `server/__tests__/db-prova.ts`.
+
+Verifiche:
+- `npm test` 219/219, di cui 6 nuovi in `giorno24.test.ts`; typecheck ok.
+- knip segnala solo il falso allarme di `@prisma/client`.
+- Playwright su Edge 8/8, su una copia del database su un'altra porta, per non cambiare la password vera:
+  - admin e mario vedono solo la pagina della password e le API rispondono 403;
+  - con la stessa password il server rifiuta;
+  - cambiata, Logbook si apre;
+  - HR elimina 07:30-12:30 del 20/11 e resta 13:30-16:30.
+- Avvio sulla copia: segnati admin e i 5 account di esempio.
+- Guida aggiornata con le immagini 36 e 37; README aggiornato.
+
+**Da sapere.** Sul Logbook dimostrativo, al prossimo accesso `admin` e gli account di esempio devono scegliere una password nuova.
+
+**Domande aperte** (nuove richieste dello stesso messaggio):
+- la matricola alfanumerica con riferimento al tipo di contratto;
+- il tipo di mansione da scegliere da un elenco, con le mansioni nuove che restano disponibili.
