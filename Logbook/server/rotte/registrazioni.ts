@@ -5,6 +5,8 @@
  * - GET    /                ?da&a&dipendenteId&progettoId — elenco con `minuti` calcolati
  * - PUT    /giornata        sostituisce tutte le fasce di un dipendente in un giorno
  *                           (è quello che usa l'editor della giornata nel calendario)
+ * - POST   /blocco          stesse fasce sullo stesso progetto per più dipendenti e più
+ *                           giorni (pannello del calendario, Giorno 27): tutto o niente
  * - DELETE /:id             cancella una sola fascia, subito (pulsante "Elimina fascia"
  *                           dell'editor della giornata, Giorno 24)
  *
@@ -24,7 +26,8 @@ import { Router } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { isDataValida } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
-import { messaggioMassimo, schemaGiornata, superamentiMassimo } from '../../comune/registrazioni';
+import { formattaData } from '../../comune/date';
+import { messaggioMassimo, schemaBlocco, schemaGiornata, siSovrappongono, superamentiMassimo, type ProblemaBlocco } from '../../comune/registrazioni';
 import { nonTrovato, richiestaNonValida } from '../errori';
 import { dipendenteAmmesso, idDaParametro, richiediAdmin } from '../middleware';
 import { caricaContestoOre, erroriRegole } from '../servizi/regole-ore';
@@ -102,6 +105,56 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     ]);
     const nuove = await fasceDelGiorno(g.dipendenteId, g.data);
     res.json(nuove.map((f) => ({ ...f, minuti: durataMinuti(f.oraInizio, f.oraFine) })));
+  });
+
+  /**
+   * Inserimento a blocchi (Giorno 27, risposta 1a): per ogni dipendente e ogni giorno si
+   * controllano le stesse regole della giornata (assegnazione al progetto, giorno futuro,
+   * sabato/domenica/festivi, ferie e malattia, sovrapposizioni con le ore già registrate,
+   * massimo del progetto). Tutto o niente: con anche un solo problema non si inserisce nulla
+   * e la risposta 400 elenca chi, quale giorno e perché (al massimo 200 righe).
+   * La tolleranza per i progetti chiusi o tolti vale solo per correggere ore vecchie, non qui.
+   */
+  router.post('/blocco', richiediAdmin, async (req, res) => {
+    const b = schemaBlocco.parse(req.body);
+    const date = [...new Set(b.date)].sort();
+    const dipendenteIds = [...new Set(b.dipendenteIds)];
+    const [ctx, esistenti, progetti] = await Promise.all([
+      caricaContestoOre(prisma, { dipendenteIds, da: date[0], a: date[date.length - 1], oggi: oggi() }),
+      prisma.registrazioneOraria.findMany({ where: { dipendenteId: { in: dipendenteIds }, data: { in: date } }, include: conProgetto }),
+      prisma.progetto.findMany({ select: { id: true, codice: true, maxMinutiGiorno: true } }),
+    ]);
+    const massimi = new Map(progetti.map((p) => [p.id, p.maxMinutiGiorno]));
+    const codice = new Map(progetti.map((p) => [p.id, p.codice]));
+    const nuove = b.fasce.map((f) => ({ ...f, progettoId: b.progettoId }));
+    const problemi: ProblemaBlocco[] = [];
+    for (const dipendenteId of dipendenteIds) {
+      const d = ctx.dipendenti.get(dipendenteId);
+      const nome = d ? `${d.cognome} ${d.nome}` : `Dipendente ${dipendenteId}`;
+      for (const data of date) {
+        const aggiungi = (messaggio: string) => problemi.push({ dipendenteId, dipendente: nome, data, messaggio });
+        for (const e of erroriRegole(ctx, { dipendenteId, data, progettoId: b.progettoId })) aggiungi(e.messaggio);
+        const delGiorno = esistenti.filter((e) => e.dipendenteId === dipendenteId && e.data === data);
+        for (const f of nuove) {
+          const conflitto = delGiorno.find((e) => siSovrappongono(f, e));
+          if (conflitto) aggiungi(`La fascia ${f.oraInizio}-${f.oraFine} si sovrappone a quella già registrata ${conflitto.oraInizio}-${conflitto.oraFine} (${conflitto.progetto.codice})`);
+        }
+        for (const o of superamentiMassimo([...delGiorno, ...nuove], massimi)) aggiungi(messaggioMassimo(codice.get(o.progettoId) ?? '?', o.minuti, o.massimo));
+      }
+    }
+    if (problemi.length) {
+      const giorniCoinvolti = new Set(problemi.map((p) => `${p.dipendenteId}|${p.data}`)).size;
+      res.status(400).json({
+        errore: `Nessuna ora inserita: ${giorniCoinvolti === 1 ? 'una giornata non va bene' : `${giorniCoinvolti} giornate non vanno bene`}. Correggi la scelta e riprova.`,
+        problemi: problemi.slice(0, 200),
+        totaleProblemi: problemi.length,
+      });
+      return;
+    }
+    const righe = dipendenteIds.flatMap((dipendenteId) => date.flatMap((data) => nuove.map((f) => ({ ...f, dipendenteId, data, note: b.note }))));
+    // In una transazione: o tutte le righe o nessuna, anche se Prisma le spezza in più INSERT.
+    await prisma.$transaction([prisma.registrazioneOraria.createMany({ data: righe })]);
+    res.status(201).json({ inserite: righe.length, dipendenti: dipendenteIds.length, giorni: date.length, minuti: righe.reduce((s, f) => s + durataMinuti(f.oraInizio, f.oraFine), 0), dal: formattaData(date[0]), al: formattaData(date[date.length - 1]) });
   });
 
   /**

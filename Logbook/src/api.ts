@@ -14,6 +14,8 @@ export class ErroreApi extends Error {
     public stato: number,
     messaggio: string,
     public campi: Record<string, string> = {},
+    /** Corpo completo della risposta d'errore (es. i 'problemi' dell'inserimento a blocchi, Giorno 27). */
+    public dati: unknown = null,
   ) {
     super(messaggio);
   }
@@ -41,7 +43,7 @@ async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, g
     if (r.status === 401 && !percorso.startsWith('/api/auth/')) {
       window.dispatchEvent(new Event('logbook:sessione-scaduta'));
     }
-    throw new ErroreApi(r.status, dati?.errore ?? `Errore ${r.status}`, dati?.campi ?? {});
+    throw new ErroreApi(r.status, dati?.errore ?? `Errore ${r.status}`, dati?.campi ?? {}, dati);
   }
   return dati as T;
 }

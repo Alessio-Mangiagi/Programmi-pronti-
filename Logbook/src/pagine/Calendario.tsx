@@ -6,8 +6,12 @@
  *   tipo; tratteggiate se ancora in attesa), le festività e il totale del giorno.
  * - Filtri: dipendente (solo HR; "Tutti" somma tutti), progetto, tipo di assenza.
  *   Col filtro progetto i totali sono le ore di quel progetto (li calcola il server).
- * - Clic su un giorno: con un dipendente scelto si apre l'editor della giornata; con
- *   "Tutti" si apre il riepilogo del giorno per dipendente, da cui si entra nell'editor.
+ * - Clic su un giorno (Giorno 27, risposta 1a): per HR il giorno si SCEGLIE e a destra si
+ *   apre il pannello (componenti/PannelloGiorni.tsx). Ctrl+clic aggiunge o toglie un giorno,
+ *   Maiusc+clic sceglie l'intervallo dal giorno cliccato prima (solo i giorni che ricevono
+ *   ore). Nel pannello: progetto, dipendenti assegnati e fasce, inseriti su tutti i giorni
+ *   scelti; con un solo giorno anche "Ore del giorno" con "Apri" verso l'editor della
+ *   giornata. Il dipendente invece apre il suo giorno in sola lettura, come prima.
  *
  * Dati: GET /api/calendario (server/rotte/calendario.ts).
  *
@@ -32,7 +36,7 @@
  * preimpostano filtri e periodo; con `&giorno=<AAAA-MM-GG>` (e un dipendente) si apre
  * subito l'editor di quel giorno. `giorno` si toglie dall'indirizzo dopo l'apertura.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, giornoSettimana, isDataValida, isFineSettimana } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
@@ -40,9 +44,10 @@ import { calcolaTotali, inizioSettimana } from '../../comune/riepiloghi';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreFascia, coloreProgetto } from '../colori';
 import { EditorGiornata } from '../componenti/EditorGiornata';
+import { PannelloGiorni } from '../componenti/PannelloGiorni';
 import { SceltaConRicerca } from '../componenti/SceltaConRicerca';
 import { dettaglioDipendente, nomiSenzaOmonimie } from '../../comune/omonimi';
-import { Avviso, Caricamento, IntestazionePagina, Modale, Pulsante } from '../componenti/ui';
+import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Dipendente, Festivita, Progetto, StatoAssenza, TipoAssenza } from '../tipi';
 import { usaDati } from '../usaDati';
 
@@ -97,7 +102,10 @@ export function Calendario() {
   const [dipendenteId, setDipendenteId] = useState<string>(admin ? (parametri.get('dipendente') ?? '') : String(utente?.dipendenteId ?? ''));
   const [progettoId, setProgettoId] = useState(parametri.get('progetto') ?? '');
   const [tipoAssenza, setTipoAssenza] = useState('');
-  const [giornoAperto, setGiornoAperto] = useState<string | null>(null);
+  // Giorni scelti da HR (Giorno 27) e ultimo cliccato, punto di partenza di Maiusc+clic.
+  const [scelti, setScelti] = useState<string[]>([]);
+  const [ancora, setAncora] = useState<string | null>(null);
+  const pannello = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<{ dipendenteId: number; nome: string; data: string } | null>(null);
 
   const [anno, mese] = riferimento.split('-').map(Number);
@@ -169,12 +177,47 @@ export function Calendario() {
     return null;
   };
 
+  /** Perché un giorno scelto da HR non riceve ore dal pannello (non lavorativo o futuro), o null. */
+  const motivoEscluso = (data: string): string | null => motivoNonLavorativo(data) ?? (data > oggi ? 'Giorno futuro' : null);
+
+  /**
+   * Apertura diretta di un giorno (link della Dashboard e dipendente): con un dipendente
+   * l'editor della giornata, per HR senza dipendente il giorno scelto nel pannello.
+   */
   const apriGiorno = (data: string) => {
     // Giorno non lavorativo senza ore: non c'è nulla da inserire né da togliere.
     if (motivoNonLavorativo(data) && !(perGiorno.fasce.get(data) ?? []).length) return;
     if (dipendenteId) setEditor({ dipendenteId: Number(dipendenteId), nome: nomeDipendenteScelto(), data });
-    else setGiornoAperto(data);
+    else {
+      setScelti([data]);
+      setAncora(data);
+    }
   };
+
+  // Giorni mostrati, in ordine (servono a Maiusc+clic per l'intervallo).
+  const giorniMostrati = useMemo(() => giorni.flatMap((s) => s.slice(0, soloFeriali ? 5 : 7)), [giorni, soloFeriali]);
+
+  /** Clic su una cella: il dipendente apre il giorno; HR sceglie (clic, Ctrl+clic, Maiusc+clic). */
+  const cliccaGiorno = (data: string, e: MouseEvent) => {
+    if (!admin) return apriGiorno(data);
+    if (motivoNonLavorativo(data) && !(perGiorno.fasce.get(data) ?? []).length) return;
+    const aggiungi = e.ctrlKey || e.metaKey;
+    if (e.shiftKey && ancora) {
+      const [x, y] = ancora < data ? [ancora, data] : [data, ancora];
+      const intervallo = giorniMostrati.filter((g) => g >= x && g <= y && !motivoEscluso(g));
+      setScelti((prima) => (aggiungi ? [...new Set([...prima, ...intervallo])].sort() : intervallo));
+      return;
+    }
+    if (aggiungi) setScelti((prima) => (prima.includes(data) ? prima.filter((g) => g !== data) : [...prima, data].sort()));
+    else setScelti([data]);
+    setAncora(data);
+  };
+
+  // Sotto i 1280px il pannello sta sotto il calendario: alla prima scelta ci si porta lì.
+  const conScelta = scelti.length > 0;
+  useEffect(() => {
+    if (conScelta && window.innerWidth < 1280) pannello.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [conScelta]);
 
   // ?giorno=<data> (dalla Dashboard, "giorni senza ore"): apre l'editor appena si conosce
   // il nome del dipendente (per HR serve l'elenco dei dipendenti), poi toglie il parametro.
@@ -280,8 +323,10 @@ export function Calendario() {
       {errore && <Avviso tipo="errore">{errore}</Avviso>}
       {!dati && caricamento && <Caricamento />}
 
+      {/* Calendario e, per HR con giorni scelti, il pannello: affiancati da 1280px, uno sotto l'altro prima. */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
       {dati && (
-        <div className={caricamento ? 'opacity-60 transition-opacity' : ''}>
+        <div className={`min-w-0 flex-1 ${caricamento ? 'opacity-60 transition-opacity' : ''}`}>
           {/* Nomi dei giorni: nella settimana sul telefono non servono (ogni riga dice il suo giorno). */}
           <div className={`${vista === 'settimana' ? 'hidden md:flex' : 'flex'} overflow-hidden rounded-t border border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase text-gray-600`}>
             {NOMI_GIORNI.slice(0, soloFeriali ? 5 : 7).map((g) => (
@@ -306,11 +351,13 @@ export function Calendario() {
                   // Sabato, domenica e festivi senza ore: la cella non si apre (niente da inserire).
                   const motivo = motivoNonLavorativo(d);
                   const chiuso = Boolean(motivo) && fasce.length === 0;
+                  const scelto = admin && scelti.includes(d);
                   return (
                     <button
                       type="button"
                       key={d}
-                      onClick={() => apriGiorno(d)}
+                      onClick={(e) => cliccaGiorno(d, e)}
+                      aria-pressed={admin ? scelto : undefined}
                       aria-disabled={chiuso || undefined}
                       title={motivo ? `${motivo}: non si registrano ore` : undefined}
                       aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore${motivo ? ` (${motivo.toLowerCase()})` : ''}`}
@@ -320,7 +367,7 @@ export function Calendario() {
                         vista === 'mese'
                           ? 'min-h-16 flex-1 basis-0 sm:min-h-24 3xl:min-h-28 4xl:min-h-32'
                           : 'min-h-14 md:min-h-64 md:flex-1 md:basis-0 4xl:min-h-80'
-                      } ${fuoriMese ? 'bg-gray-50 text-gray-400' : isFineSettimana(d) || fest ? 'bg-gray-50/80' : 'bg-white'}`}
+                      } ${scelto ? 'bg-ghiaccio ring-2 ring-inset ring-marchio' : fuoriMese ? 'bg-gray-50 text-gray-400' : isFineSettimana(d) || fest ? 'bg-gray-50/80' : 'bg-white'}`}
                     >
                       {/* Numero e totale: affiancati, ma uno sotto l'altro nelle celle strette del mese sul telefono. */}
                       <div className={`flex justify-between ${vista === 'mese' ? 'flex-col items-start sm:flex-row sm:items-center' : 'items-center'}`}>
@@ -432,21 +479,35 @@ export function Calendario() {
         </div>
       )}
 
-      {giornoAperto && dati && (
-        <RiepilogoGiorno
-          data={giornoAperto}
-          fasce={perGiorno.fasce.get(giornoAperto) ?? []}
-          assenze={perGiorno.assenze(giornoAperto)}
-          festivita={perGiorno.festivita.get(giornoAperto)}
-          dipendenti={(dipendenti ?? []).filter((d) => d.stato === 'ATTIVO' || (perGiorno.fasce.get(giornoAperto) ?? []).some((f) => f.dipendenteId === d.id))}
-          nomi={nomi}
-          onChiudi={() => setGiornoAperto(null)}
-          onModifica={(d) => {
-            setGiornoAperto(null);
-            setEditor({ dipendenteId: d.id, nome: nomi.get(d.id) ?? `${d.cognome} ${d.nome}`, data: giornoAperto });
-          }}
-        />
+      {admin && conScelta && dati && (
+        <div ref={pannello} className="scroll-mt-4 xl:sticky xl:top-4 xl:w-[23rem] xl:shrink-0">
+          <PannelloGiorni
+            giorni={scelti}
+            motivoEscluso={motivoEscluso}
+            progetti={progetti ?? []}
+            progettoFiltrato={progettoId}
+            dipendenteFiltrato={dipendenteId}
+            nomi={nomi}
+            dipendentiDelGiorno={
+              scelti.length === 1
+                ? (dipendenti ?? [])
+                    .filter((d) => (dipendenteId ? String(d.id) === dipendenteId : d.stato === 'ATTIVO' || (perGiorno.fasce.get(scelti[0]) ?? []).some((f) => f.dipendenteId === d.id)))
+                    .map((d) => ({ id: d.id, nome: nomi.get(d.id) ?? `${d.cognome} ${d.nome}` }))
+                : []
+            }
+            fasceDelGiorno={scelti.length === 1 ? (perGiorno.fasce.get(scelti[0]) ?? []) : []}
+            assenzeDelGiorno={scelti.length === 1 ? perGiorno.assenze(scelti[0]).map((x) => ({ id: x.id, dipendenteId: x.dipendenteId, tipo: x.tipo, testo: testoAssenza(x, false) })) : []}
+            onTogli={(d) => setScelti((prima) => prima.filter((g) => g !== d))}
+            onChiudi={() => {
+              setScelti([]);
+              setAncora(null);
+            }}
+            onInserito={ricarica}
+            onApri={(id, data) => setEditor({ dipendenteId: id, nome: nomi.get(id) ?? '', data })}
+          />
+        </div>
       )}
+      </div>
 
       {editor && (
         <EditorGiornata
@@ -465,53 +526,5 @@ export function Calendario() {
         />
       )}
     </>
-  );
-}
-
-/**
- * Riepilogo di un giorno con tutti i dipendenti (vista HR "Tutti").
- * Una riga flex per dipendente: nome, ore e "Modifica" in alto, le fasce sotto (sul
- * telefono) o in mezzo (da 640px), così la finestra si legge anche su uno schermo stretto.
- */
-function RiepilogoGiorno({
-  data, fasce, assenze, festivita, dipendenti, nomi, onChiudi, onModifica,
-}: {
-  data: string; fasce: FasciaCal[]; assenze: AssenzaCal[]; festivita?: Festivita; dipendenti: Dipendente[]; nomi: Map<number, string>;
-  onChiudi: () => void; onModifica: (d: Dipendente) => void;
-}) {
-  return (
-    <Modale titolo={`Giorno ${formattaData(data)}`} aperta onChiudi={onChiudi} larghezza="max-w-2xl">
-      {festivita && <Avviso tipo="attenzione" className="mb-3">Festività: {festivita.descrizione}</Avviso>}
-      <ul className="cifre divide-y divide-gray-100 text-sm">
-        {dipendenti.map((d) => {
-          const sue = fasce.filter((f) => f.dipendenteId === d.id);
-          const sueAssenze = assenze.filter((x) => x.dipendenteId === d.id);
-          return (
-            <li key={d.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
-              <span className="min-w-0 flex-1 font-medium sm:flex-[0_0_12rem]">{nomi.get(d.id) ?? `${d.cognome} ${d.nome}`}</span>
-              {/* Fasce: sul telefono vanno a capo sotto il nome (order), da 640px stanno in mezzo. */}
-              <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-0">
-                {sue.map((f) => (
-                  <div key={f.id} className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: coloreFascia(f) }} />
-                    {f.oraInizio}–{f.oraFine} {f.progetto.codice}
-                  </div>
-                ))}
-                {sueAssenze.map((x) => (
-                  <div key={x.id} style={{ color: COLORI_ASSENZA[x.tipo].testo }}>
-                    {testoAssenza(x, false)}
-                  </div>
-                ))}
-                {sue.length === 0 && sueAssenze.length === 0 && <span className="text-gray-400">—</span>}
-              </div>
-              <span className="w-12 text-right font-semibold">{formattaOre(sue.reduce((s, f) => s + f.minuti, 0))}</span>
-              <Pulsante variante="leggero" className="!px-2 !py-0.5" onClick={() => onModifica(d)}>
-                Modifica
-              </Pulsante>
-            </li>
-          );
-        })}
-      </ul>
-    </Modale>
   );
 }
