@@ -605,7 +605,7 @@ ricaricamento, campanella, chiusura con risposta letta dal dipendente).
 ### Giorno 21 — Menu laterale fermo (24/11/2026) ✅
 
 Richiesta: "quando scrollo le pagine la barra di sinistra deve rimanere ferma e con tutte le
-scelte ben visibili". : da 768px il menu è sticky in alto e alto
+scelte ben visibili". `componenti/Layout.tsx`: da 768px il menu è sticky in alto e alto
 quanto la finestra; le voci scorrono dentro il menu se lo schermo è basso. Sul telefono
 resta il menu a scomparsa. Verifica Playwright su Edge 6/6 (1440×900, 1280×560 e
 3440×1440: menu fermo in alto e «Impostazioni» visibile con la pagina scorsa in fondo).
