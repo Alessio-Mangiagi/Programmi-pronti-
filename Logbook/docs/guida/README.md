@@ -34,12 +34,25 @@ assenze**. Ognuno vede e modifica solo i propri dati.
 ![Dashboard del dipendente](img/12-dashboard-dipendente.png)
 
 Mostra le ore del mese (lavorate e attese in base al contratto), le richieste in attesa e i
-**giorni da registrare**: giorni lavorativi fino a ieri senza ore. Il pulsante
-**Registra ore** apre subito il giorno da compilare.
+**giorni passati senza ore**: giorni lavorativi fino a ieri senza ore, da segnalare a HR
+(i giorni passati li compila HR, vedi sotto). **Registra le ore di oggi** apre la giornata
+di oggi.
 
 ### Registrare le ore
 
-Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata.
+**Le ore si registrano solo nella giornata di oggi.** I giorni passati si possono aprire per
+vedere le ore, ma non si modificano: le ore dei giorni passati le inserisce o corregge solo
+HR. Così nessuno può aggiungere a posteriori ore non lavorate, che finirebbero nei pagamenti.
+Se vi siete dimenticati di registrare un giorno, avvisate HR.
+
+![Giorno passato in sola lettura](img/32-giorno-passato.png)
+
+«Oggi» è la data di Logbook, non quella del computer: cambiare la data del PC non apre i
+giorni passati. Se il PC ha una data diversa, in cima alla pagina compare un avviso giallo.
+
+![Avviso: data del PC diversa da quella di Logbook](img/33-avviso-data-pc.png)
+
+Dal **Calendario** si fa clic su oggi: si apre il dettaglio della giornata.
 
 ![Dettaglio della giornata](img/14-editor-giornata.png)
 
@@ -100,7 +113,9 @@ compaiono tratteggiate, quelle approvate piene, quelle rifiutate non compaiono.
 
 ## 3. Per HR (amministrazione)
 
-HR vede tutte le voci del menu e i dati di tutti i dipendenti.
+HR vede tutte le voci del menu e i dati di tutti i dipendenti. **Solo HR inserisce e
+corregge le ore dei giorni passati** (dal calendario o con l'import Excel); i dipendenti
+scrivono solo nella giornata di oggi.
 
 ### Dashboard HR
 

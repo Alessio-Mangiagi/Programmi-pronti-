@@ -69,7 +69,8 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
   });
 
   it('senza assegnazione niente ore, da nessuna parte', async () => {
-    const r = await mario.chiama('POST', '/api/registrazioni', fascia('2026-11-20', prg2, '18:00', '19:00'));
+    // Oggi, così il dipendente può scrivere: il no arriva dall'assegnazione.
+    const r = await mario.chiama('POST', '/api/registrazioni', fascia(OGGI_PROVA, prg2, '18:00', '19:00'));
     expect(r.stato).toBe(400);
     expect(r.corpo.campi.progettoId).toMatch(/non è assegnato al progetto PRG-002/);
     // Anche HR per conto di Mario
@@ -99,7 +100,8 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
     const r = await admin.chiama('POST', `/api/progetti/${prg2}/dipendenti`, { dipendenteId: idMario });
     expect(r.stato).toBe(201);
     expect((await admin.chiama('POST', `/api/progetti/${prg2}/dipendenti`, { dipendenteId: idMario })).stato).toBe(409);
-    expect((await mario.chiama('POST', '/api/registrazioni', fascia('2026-11-20', prg2, '18:00', '19:00'))).stato).toBe(201);
+    // Giorno passato: lo scrive HR (Giorno 19).
+    expect((await admin.chiama('POST', '/api/registrazioni', fascia('2026-11-20', prg2, '18:00', '19:00'))).stato).toBe(201);
     const elenco = await admin.chiama('GET', `/api/progetti/${prg2}/dipendenti`);
     const rossi = elenco.corpo.find((a: { dipendente: { id: number } }) => a.dipendente.id === idMario);
     expect(rossi.minuti).toBe(60);
@@ -112,9 +114,9 @@ describe('assegnazioni dei dipendenti ai progetti', () => {
     // Stesso giorno: si risalva la giornata con la fascia vecchia (orario corretto) → ammesso
     const giorno = await db.prisma.registrazioneOraria.findMany({ where: { dipendenteId: idMario, data: '2026-11-20' }, orderBy: { oraInizio: 'asc' } });
     const fasce = giorno.map((f) => ({ progettoId: f.progettoId, oraInizio: f.oraInizio, oraFine: f.progettoId === prg2 ? '18:30' : f.oraFine, note: '' }));
-    expect((await mario.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data: '2026-11-20', fasce })).stato).toBe(200);
+    expect((await admin.chiama('PUT', '/api/registrazioni/giornata', { dipendenteId: idMario, data: '2026-11-20', fasce })).stato).toBe(200);
     // Un altro giorno: bloccato
-    expect((await mario.chiama('POST', '/api/registrazioni', fascia('2026-11-19', prg2, '18:00', '19:00'))).stato).toBe(400);
+    expect((await admin.chiama('POST', '/api/registrazioni', fascia('2026-11-19', prg2, '18:00', '19:00'))).stato).toBe(400);
   });
 
   it('un dipendente cessato non si assegna', async () => {
@@ -131,7 +133,7 @@ describe('documentazione di avanzamento (risposta 2c)', () => {
 
   it('il dipendente carica sui suoi progetti attivi, con file, nota e percentuale', async () => {
     const file = (await carica(mario, 'Foto getto solaio.pdf')).corpo.id;
-    const r = await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: '2026-11-20', titolo: 'Getto solaio piano 1', nota: 'Completato il getto', percentuale: 40, fileId: file });
+    const r = await mario.chiama('POST', '/api/documenti-progetto', { progettoId: prg1, data: OGGI_PROVA, titolo: 'Getto solaio piano 1', nota: 'Completato il getto', percentuale: 40, fileId: file });
     expect(r.stato).toBe(201);
     expect(r.corpo).toMatchObject({ titolo: 'Getto solaio piano 1', percentuale: 40, visto: false, autore: { nome: 'Rossi Mario' }, file: { nome: 'Foto getto solaio.pdf' } });
     idDoc = r.corpo.id;

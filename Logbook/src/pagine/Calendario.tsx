@@ -23,13 +23,17 @@
  * accettano ore: la cella senza ore non si apre, e se ci sono ore di prima l'editor
  * permette solo di toglierle (regola anche nel server, server/servizi/regole-ore.ts).
  *
+ * Giorni passati (Giorno 19): il dipendente registra ore solo nella giornata di oggi; i
+ * giorni passati li apre in sola lettura (le ore le inserisce o corregge HR). "Oggi" è la
+ * data di Logbook (useAuth().oggi, dal server), non quella del PC.
+ *
  * Collegamenti dalla Dashboard (24/11/2026): `?dipendente=<id>&progetto=<id>&data=<AAAA-MM-GG>`
  * preimpostano filtri e periodo; con `&giorno=<AAAA-MM-GG>` (e un dipendente) si apre
  * subito l'editor di quel giorno. `giorno` si toglie dall'indirizzo dopo l'apertura.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, giornoSettimana, isDataValida, isFineSettimana, oggiIso } from '../../comune/date';
+import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, giornoSettimana, isDataValida, isFineSettimana } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { calcolaTotali, inizioSettimana } from '../../comune/riepiloghi';
 import { useAuth } from '../auth';
@@ -65,7 +69,7 @@ function testoAssenza(a: AssenzaCal, conNome: boolean) {
 }
 
 export function Calendario() {
-  const { utente, admin } = useAuth();
+  const { utente, admin, oggi } = useAuth();
   const [parametri, setParametri] = useSearchParams();
   const dataDaLink = parametri.get('data') ?? '';
   const [vista, setVista] = useState<'mese' | 'settimana'>('mese');
@@ -87,7 +91,7 @@ export function Calendario() {
       return !v;
     });
   };
-  const [riferimento, setRiferimento] = useState(isDataValida(dataDaLink) ? dataDaLink : oggiIso());
+  const [riferimento, setRiferimento] = useState(isDataValida(dataDaLink) ? dataDaLink : oggi);
   // Il dipendente non sceglie: vede sempre e solo se stesso (lo impone anche il server).
   const [dipendenteId, setDipendenteId] = useState<string>(admin ? (parametri.get('dipendente') ?? '') : String(utente?.dipendenteId ?? ''));
   const [progettoId, setProgettoId] = useState(parametri.get('progetto') ?? '');
@@ -154,6 +158,16 @@ export function Calendario() {
     return fest ? `Festività: ${fest.descrizione}` : null;
   };
 
+  /**
+   * Perché il giorno si guarda soltanto, o null se si può scrivere: futuro per tutti;
+   * passato per il dipendente (lo completa HR: niente ore aggiunte a posteriori).
+   */
+  const motivoSolaLettura = (data: string): string | null => {
+    if (data > oggi) return 'Giorno futuro: le ore si registrano a giornata fatta.';
+    if (!admin && data < oggi) return 'Giorno passato: le ore dei giorni passati le inserisce o corregge solo HR. Se manca qualcosa, avvisa HR.';
+    return null;
+  };
+
   const apriGiorno = (data: string) => {
     // Giorno non lavorativo senza ore: non c'è nulla da inserire né da togliere.
     if (motivoNonLavorativo(data) && !(perGiorno.fasce.get(data) ?? []).length) return;
@@ -191,7 +205,6 @@ export function Calendario() {
   };
 
   const periodo = vista === 'mese' ? nomeMese(anno, mese) : `${formattaData(da)} – ${formattaData(a)}`;
-  const oggi = oggiIso();
 
   return (
     <>
@@ -216,7 +229,7 @@ export function Calendario() {
           Lun–Ven
         </button>
         <Pulsante onClick={() => sposta(-1)} aria-label="Periodo precedente">‹</Pulsante>
-        <Pulsante onClick={() => setRiferimento(oggiIso())}>Oggi</Pulsante>
+        <Pulsante onClick={() => setRiferimento(oggi)}>Oggi</Pulsante>
         <Pulsante onClick={() => sposta(1)} aria-label="Periodo successivo">›</Pulsante>
         <span className="min-w-44 px-2 font-semibold capitalize text-marchio">{periodo}</span>
 
@@ -441,6 +454,7 @@ export function Calendario() {
           data={editor.data}
           avvisi={avvisiGiorno(editor.data, editor.dipendenteId)}
           nonLavorativo={motivoNonLavorativo(editor.data)}
+          solaLettura={motivoSolaLettura(editor.data)}
           onChiudi={() => setEditor(null)}
           onSalvato={() => {
             setEditor(null);

@@ -10,7 +10,10 @@
  * - DELETE /:id             cancella una fascia
  *
  * Il dipendente lavora solo sulle proprie fasce (dipendenteAmmesso → 403); l'admin su
- * tutte. Ogni scrittura controlla forma e sovrapposizioni (comune/registrazioni.ts) e le
+ * tutte. Dal Giorno 19 (24/11/2026) il dipendente scrive solo nella giornata di OGGI (data
+ * del server, non del PC): i giorni passati li inserisce o corregge solo HR, così nessuno
+ * può aggiungere a posteriori ore non lavorate che finirebbero in busta paga (richiesta:
+ * "solo gli admin devono poter inserire i dati nelle giornate già passate"). Ogni scrittura controlla forma e sovrapposizioni (comune/registrazioni.ts) e le
  * regole di contesto (servizi/regole-ore.ts). Una sovrapposizione risponde 409 con il
  * messaggio che indica la fascia in conflitto.
  */
@@ -19,8 +22,9 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import { isDataValida } from '../../comune/date';
 import { durataMinuti } from '../../comune/orari';
 import { messaggioMassimo, messaggioSovrapposizione, primaSovrapposizione, schemaGiornata, schemaRegistrazione, superamentiMassimo } from '../../comune/registrazioni';
-import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
-import { dipendenteAmmesso, idDaParametro } from '../middleware';
+import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
+import { formattaData } from '../../comune/date';
+import { dipendenteAmmesso, idDaParametro, isAdmin } from '../middleware';
 import { caricaContestoOre, erroriRegole } from '../servizi/regole-ore';
 
 /** Legge un parametro data opzionale; 400 se presente ma non "AAAA-MM-GG". */
@@ -34,6 +38,15 @@ const conProgetto = { progetto: { select: { codice: true, nome: true, colore: tr
 
 export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   const router = Router();
+
+  /**
+   * Giorni passati: solo HR. Il dipendente scrive (aggiunge, modifica, toglie) solo oggi;
+   * i giorni futuri li rifiutano le regole (erroriRegole) per tutti, con il loro messaggio.
+   */
+  function soloOggiPerDipendente(req: Parameters<typeof isAdmin>[0], data: string) {
+    if (isAdmin(req) || data >= oggi()) return;
+    throw vietato(`Il ${formattaData(data)} è un giorno passato: le ore dei giorni passati le inserisce o corregge solo HR`);
+  }
 
   /** Fasce già registrate da un dipendente in un giorno (con progetto per i messaggi). */
   const fasceDelGiorno = (dipendenteId: number, data: string) =>
@@ -89,6 +102,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   router.put('/giornata', async (req, res) => {
     const g = schemaGiornata.parse(req.body);
     dipendenteAmmesso(req, g.dipendenteId);
+    soloOggiPerDipendente(req, g.data);
     const esistenti = await fasceDelGiorno(g.dipendenteId, g.data);
     await controllaRegole(g.dipendenteId, g.data, g.fasce.map((f) => f.progettoId), new Set(esistenti.map((e) => e.progettoId)));
     await controllaMassimi(g.fasce, true);
@@ -104,6 +118,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   router.post('/', async (req, res) => {
     const r = schemaRegistrazione.parse(req.body);
     dipendenteAmmesso(req, r.dipendenteId);
+    soloOggiPerDipendente(req, r.data);
     const esistenti = await fasceDelGiorno(r.dipendenteId, r.data);
     await controllaRegole(r.dipendenteId, r.data, [r.progettoId], new Set());
     const conflitto = primaSovrapposizione(r, esistenti);
@@ -121,8 +136,10 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });
     if (!vecchia) throw nonTrovato('Registrazione');
     dipendenteAmmesso(req, vecchia.dipendenteId);
+    soloOggiPerDipendente(req, vecchia.data); // non si sposta a oggi una fascia di un giorno passato
     const r = schemaRegistrazione.parse(req.body);
     dipendenteAmmesso(req, r.dipendenteId);
+    soloOggiPerDipendente(req, r.data);
     const esistenti = await fasceDelGiorno(r.dipendenteId, r.data);
     const stessoGiorno = vecchia.dipendenteId === r.dipendenteId && vecchia.data === r.data;
     await controllaRegole(r.dipendenteId, r.data, [r.progettoId], new Set(stessoGiorno ? [vecchia.progettoId] : []));
@@ -141,6 +158,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });
     if (!vecchia) throw nonTrovato('Registrazione');
     dipendenteAmmesso(req, vecchia.dipendenteId);
+    soloOggiPerDipendente(req, vecchia.data);
     await prisma.registrazioneOraria.delete({ where: { id } });
     res.json({ ok: true });
   });

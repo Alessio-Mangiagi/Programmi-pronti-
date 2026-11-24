@@ -18,7 +18,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 16 (24/11):** calendario Lun–Ven e niente ore il sabato, la domenica e i festivi ✅
 - **Giorno 17 (24/11):** assegnazione dei dipendenti ai progetti, pagina del progetto con documentazione di avanzamento, grafico e note ✅
 - **Giorno 18 (24/11):** scheda dipendente in una sola pagina, omonimi distinti dal codice fiscale, scelte con ricerca a caratteri, assenze in pagina ✅
-- **Prossimo:** Giorno 19 solo HR inserisce ore nelle giornate (richiesta del 24/11); poi pannello laterale del calendario con più giorni; allegati e note nella giornata (3c) e grafici in dashboard
+- **Giorno 19 (24/11):** il dipendente registra solo oggi, i giorni passati solo HR; "oggi" è la data del server, avviso se il PC ha un'altra data ✅
+- **Prossimo:** pannello laterale del calendario con più giorni (Ctrl/Maiusc) per HR; allegati e note nella giornata (3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -103,6 +104,8 @@ sessione per riprendere da dove si era rimasti.
 | 24/11 | Scheda dipendente senza schede: sezioni sempre visibili, modulo dell'attestato dentro la sezione | "tutte le aree devono essere nella stessa pagina, senza cambiare sezione e perdere la visualizzazione dei dati precedenti" |
 | 24/11 | Omonimi: al nome si aggiunge il prefisso più corto (≥ 6) del codice fiscale che li distingue, in interfaccia e dashboard; avviso nella scheda nuova | "se ci sono omonimie il sistema distingue partendo dal codice fiscale" |
 | 24/11 | Assenze in una pagina (/assenze/nuova, /assenze/:id) con le altre assenze del dipendente a destra; nessun allegato alle assenze per ora | "vale ugualmente per assenze e ferie"; allegati non chiesti (domanda aperta) |
+| 24/11 | Il dipendente scrive ore e documentazione solo con la data di oggi; i giorni passati (aggiungere, modificare, togliere) solo HR; i futuri nessuno | "solo gli admin devono poter inserire i dati nelle giornate già passate … per evitare pagamenti errati" (precisa il messaggio "solo gli admin possono inserire elementi nelle giornate") |
+| 24/11 | "Oggi" = data del server (GET /api/oggi); l'interfaccia la usa e avvisa se il PC ha un'altra data | "sincronizzando il calendario del pc con quello dell'app": cambiare la data del PC non deve aprire i giorni passati |
 | 24/11 | Giorni 11 e 12 accettati dall'utente insieme alle tre scelte aperte (festività del paese = città della sede, 4 ottobre nazionale, festività senza costo negli estratti) | Conferma esplicita: "confermo giorno 11 e 12 e le tre integrazioni" |
 
 ## Problemi aperti
@@ -534,3 +537,32 @@ Verifiche: `npm test` 185/185 (4 in `comune/__tests__/omonimi.test.ts`, 2 in
 visibili, attestato senza finestra, progetto assegnato e tolto dalla scheda, `?scheda=`,
 omonimo con CF, filtro "bian" nel calendario, assenza in pagina con le altre assenze,
 ricerca per matricola, telefono senza scorrimento orizzontale).
+
+### Giorno 19 — Giorni passati solo a HR, data di Logbook dal server (24/11/2026) ✅
+
+Richieste del 24/11: "solo gli admin possono inserire elementi nelle giornate", precisata
+subito dopo: "solo gli admin devono poter inserire i dati nelle giornate già passate
+sincronizzando il calendario del pc con quello dell'app, per evitare che chiunque possa
+inserire nei giorni passati lavorazioni che potrebbero non essere avvenute a scopo di
+evitare pagamenti errati".
+
+Fatto:
+- `server/rotte/registrazioni.ts`: `soloOggiPerDipendente` → 403 per il dipendente su
+  giornata, fascia nuova, modifica (anche spostando a oggi una fascia vecchia) e
+  cancellazione di un giorno passato. I futuri restano 400 per tutti (regole-ore).
+- `server/rotte/documentazione-progetto.ts`: il dipendente documenta solo con la data di oggi.
+- `GET /api/oggi` (data e ora del server); `src/auth.tsx` la espone come `oggi`, si
+  riallinea ogni 5 minuti e al ritorno sulla finestra; `Layout` mostra l'avviso giallo se
+  il PC ha un'altra data.
+- Calendario: "oggi" del server; i giorni passati per il dipendente (e i futuri per tutti)
+  si aprono in sola lettura (`EditorGiornata` con `solaLettura`: niente Salva, campi spenti).
+- Dashboard del dipendente: "Giorni passati senza ore" da segnalare a HR (via "Registra
+  ore" sui giorni passati) e "Registra le ore di oggi".
+- Documentazione di progetto: per il dipendente la data è fissa a oggi.
+- Guida aggiornata (sezioni dipendente e HR).
+
+Verifiche: `npm test` 191/191 (6 nuovi in `giorno19.test.ts`; nei test precedenti le
+scritture nei giorni passati ora le fa l'admin), typecheck e build ok; Playwright su Edge
+11/11 (giorno passato del dipendente in sola lettura, oggi scrivibile, 403 dal server, dashboard
+senza "Registra ore" sul passato, HR scrive il passato, PC con data 10/11: avviso con le due
+date e calendario sul 24/11 di Logbook). Guida: immagini 32 e 33.

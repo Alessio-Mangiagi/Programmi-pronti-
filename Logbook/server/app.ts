@@ -63,6 +63,15 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
     res.json({ ok: true, app: 'logbook' });
   });
 
+  /**
+   * Data di Logbook (Giorno 19): l'interfaccia decide cos'è "oggi" con questa, non con
+   * l'orologio del PC, e avvisa se il PC ha un'altra data. Il dipendente registra ore solo
+   * oggi: spostare la data del computer non apre i giorni passati (li controlla il server).
+   */
+  api.get('/oggi', (_req, res) => {
+    res.json({ oggi: oggi(), adesso: new Date().toISOString() });
+  });
+
   api.use('/auth', rotteAuth(prisma));
 
   // Da qui in poi serve il login.

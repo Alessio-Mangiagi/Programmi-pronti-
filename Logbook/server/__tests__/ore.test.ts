@@ -83,7 +83,8 @@ describe('fasce singole', () => {
 
   it('rifiuta ore in un giorno di ferie approvate', async () => {
     const ferie = await db.prisma.assenza.findFirstOrThrow({ where: { dipendenteId: idMario, tipo: 'FERIE', stato: 'APPROVATA' } });
-    const r = await mario.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: ferie.dataInizio, progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' });
+    // Giorno passato: dal Giorno 19 lo scrive solo HR, che riceve comunque il no per le ferie.
+    const r = await admin.chiama('POST', '/api/registrazioni', { dipendenteId: idMario, data: ferie.dataInizio, progettoId: prg1, oraInizio: '08:00', oraFine: '09:00' });
     expect(r.stato).toBe(400);
     expect(r.corpo.errore).toMatch(/ferie/);
   });

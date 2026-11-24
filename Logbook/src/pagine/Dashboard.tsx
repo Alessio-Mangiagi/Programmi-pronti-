@@ -5,8 +5,9 @@
  * HR: richieste di assenza da approvare, dipendenti con giorni lavorativi senza ore,
  * ore del mese lavorate vs attese per dipendente, ore per progetto, assenze e festività
  * dei prossimi giorni.
- * Dipendente: le proprie ore del mese, i giorni ancora da registrare (con pulsante che
- * apre direttamente l'editor della giornata), le proprie richieste e assenze.
+ * Dipendente: le proprie ore del mese, i giorni passati senza ore (da segnalare a HR: dal
+ * Giorno 19 i giorni passati li compila solo HR), il collegamento alle ore di oggi, le
+ * proprie richieste e assenze.
  *
  * Dati: GET /api/dashboard (server/rotte/dashboard.ts).
  *
@@ -23,14 +24,12 @@
  * - documentazione da vedere (HR, Giorno 17) → pagina del progetto;
  * - festività → scheda Festività (HR) o Calendario su quel giorno (dipendente).
  */
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ETICHETTE_ASSENZA } from '../../comune/assenze';
 import { formattaData } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { useAuth } from '../auth';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
-import { EditorGiornata } from '../componenti/EditorGiornata';
 import { Icona } from '../componenti/icone';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Festivita, StatoAttestato, TipoAssenza, TipoAttestato } from '../tipi';
@@ -131,7 +130,6 @@ const ChipAssenza = ({ tipo }: { tipo: TipoAssenza }) => (
 export function Dashboard() {
   const { utente, admin } = useAuth();
   const { dati, errore, caricamento, ricarica } = usaDati<DatiDashboard>('/api/dashboard');
-  const [editor, setEditor] = useState<string | null>(null);
 
   if (errore) return <Avviso tipo="errore">Impossibile caricare la dashboard: {errore}</Avviso>;
   if (caricamento && !dati) return <Caricamento />;
@@ -208,20 +206,29 @@ export function Dashboard() {
             )}
           </Pannello>
         ) : (
-          <Pannello titolo="Giorni da registrare" id="giorni-senza-ore">
+          <Pannello
+            titolo="Giorni passati senza ore"
+            id="giorni-senza-ore"
+            azione={
+              <Link className="text-sm text-marchio hover:underline" to={`/calendario?data=${dati.oggi}&giorno=${dati.oggi}`}>
+                Registra le ore di oggi →
+              </Link>
+            }
+          >
             {!io || io.giorniSenzaOre.length === 0 ? (
               <p className="text-sm text-gray-500">Tutto in ordine: nessun giorno lavorativo senza ore.</p>
             ) : (
-              <ul className="divide-y divide-gray-100 text-sm">
-                {io.giorniSenzaOre.map((g) => (
-                  <li key={g} className="flex items-center justify-between py-1.5">
-                    <span>{new Intl.DateTimeFormat('it-IT', { weekday: 'long' }).format(new Date(`${g}T12:00:00`))} {formattaData(g)}</span>
-                    <Pulsante variante="leggero" onClick={() => setEditor(g)}>
-                      Registra ore
-                    </Pulsante>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {/* Giorno 19: i giorni passati li inserisce solo HR (evita ore dichiarate a posteriori). */}
+                <p className="mb-2 text-sm text-gray-600">Le ore dei giorni passati le inserisce HR: se in questi giorni hai lavorato, avvisa HR.</p>
+                <ul className="divide-y divide-gray-100 text-sm">
+                  {io.giorniSenzaOre.map((g) => (
+                    <li key={g} className="py-1.5">
+                      {new Intl.DateTimeFormat('it-IT', { weekday: 'long' }).format(new Date(`${g}T12:00:00`))} {formattaData(g)}
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </Pannello>
         )}
@@ -363,18 +370,6 @@ export function Dashboard() {
         </Pannello>
       </div>
 
-      {editor && io && (
-        <EditorGiornata
-          dipendenteId={io.id}
-          nomeDipendente={utente!.nomeVisualizzato}
-          data={editor}
-          onChiudi={() => setEditor(null)}
-          onSalvato={() => {
-            setEditor(null);
-            ricarica();
-          }}
-        />
-      )}
     </>
   );
 }

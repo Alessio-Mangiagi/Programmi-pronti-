@@ -8,7 +8,8 @@
  * - GET    ?progettoId=&daVedere=1   HR vede tutto (daVedere = solo i non ancora visti);
  *                                    il dipendente vede solo quello che ha caricato lui
  * - POST   { progettoId, data, titolo, nota?, percentuale?, fileId?, origine? }
- *          il dipendente solo sui progetti ATTIVI a cui è assegnato; nessuna data futura
+ *          il dipendente solo sui progetti ATTIVI a cui è assegnato e solo con la data di
+ *          oggi (Giorno 19); nessuna data futura per nessuno
  * - PATCH  /:id/revisione { visto?, rispostaHr? }   solo HR: "visto" e risposta
  * - DELETE /:id   HR sempre; chi l'ha caricato finché HR non l'ha segnato visto (anche il file)
  * - POST   /:id/skytower   solo HR: invia il file nella commessa SkyTower del progetto
@@ -98,6 +99,9 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
     const d = schemaDocumentoProgetto.parse(req.body);
     await controllaProgetto(req, d.progettoId);
     if (d.data > oggi()) throw richiestaNonValida('La documentazione non può avere una data futura', { data: 'Data futura' });
+    // Giorno 19: come per le ore, il dipendente documenta solo la giornata di oggi; date
+    // passate solo HR (nessun lavoro dichiarato a posteriori).
+    if (!isAdmin(req) && d.data < oggi()) throw vietato('La documentazione dei giorni passati la inserisce solo HR: usa la data di oggi');
     if (d.fileId) await fileCollegabile(prisma, d.fileId, req.utente!.id);
     const creato = await prisma.documentoProgetto.create({ data: { ...d, autoreId: req.utente!.id }, include: COLLEGATI });
     res.status(201).json(vista(creato));

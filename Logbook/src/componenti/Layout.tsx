@@ -14,6 +14,7 @@
  */
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { formattaData, oggiIso } from '../../comune/date';
 import { useAuth } from '../auth';
 import { BloccoErrori } from './BloccoErrori';
 import { CambiaPassword } from './CambiaPassword';
@@ -35,7 +36,7 @@ export const MENU: VoceMenu[] = [
 ];
 
 export function Layout() {
-  const { utente, admin, logout } = useAuth();
+  const { utente, admin, logout, oggi, orologioDiverso } = useAuth();
   const [menuAperto, setMenuAperto] = useState(false);
   const [cambioPassword, setCambioPassword] = useState(false);
   const posizione = useLocation();
@@ -104,6 +105,13 @@ export function Layout() {
             </button>
           </div>
         </header>
+        {/* Giorno 19: Logbook usa la data del server; se il PC ne ha un'altra lo si dice. */}
+        {orologioDiverso && (
+          <div role="alert" className="border-b border-[#e9c46a] bg-[#fdf1d6] px-3 py-2 text-sm text-[#6b4a00] sm:px-4 md:px-6">
+            La data di questo computer ({formattaData(oggiIso())}) è diversa da quella di Logbook ({formattaData(oggi)}). Logbook usa la sua:
+            «oggi» è il {formattaData(oggi)}. Controllate data e ora del PC.
+          </div>
+        )}
         <main className="w-full min-w-0 flex-1 px-3 py-4 sm:px-4 md:px-6 md:py-6 xl:px-8 4xl:px-12">
           <BloccoErrori chiave={posizione.pathname}>
             <Outlet />

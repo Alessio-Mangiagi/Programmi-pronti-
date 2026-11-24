@@ -11,6 +11,10 @@
  * Dal Giorno 17 il menu dei progetti propone solo quelli a cui il dipendente è assegnato
  * (GET /api/progetti?assegnatiA=), più quelli già presenti nel giorno.
  *
+ * `solaLettura` (Giorno 19): motivo per cui il giorno si guarda soltanto (giorno passato
+ * per il dipendente, giorno futuro per tutti). Campi spenti, niente righe nuove né
+ * eliminate, niente "Salva": resta solo "Chiudi". Il server rifiuta comunque (403/400).
+ *
  * `avvisi` sono righe informative passate dal calendario (festività, assenze del giorno).
  *
  * `nonLavorativo` (dal 24/11/2026): motivo per cui il giorno non accetta ore (sabato,
@@ -47,6 +51,7 @@ export function EditorGiornata({
   data,
   avvisi = [],
   nonLavorativo,
+  solaLettura,
   onChiudi,
   onSalvato,
 }: {
@@ -55,10 +60,13 @@ export function EditorGiornata({
   data: string;
   avvisi?: { tipo: 'info' | 'attenzione'; testo: string }[];
   nonLavorativo?: string | null;
+  solaLettura?: string | null;
   onChiudi: () => void;
   onSalvato: () => void;
 }) {
-  const bloccato = Boolean(nonLavorativo);
+  const soloVista = Boolean(solaLettura);
+  // Giorno non lavorativo: si possono solo togliere le ore rimaste; sola lettura: niente di niente.
+  const bloccato = Boolean(nonLavorativo) || soloVista;
   const [righe, setRighe] = useState<Riga[] | null>(null);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
   // Progetti a cui il dipendente è assegnato (Giorno 17): solo su questi si aggiungono ore.
@@ -171,12 +179,13 @@ export function EditorGiornata({
         ))}
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
         {errori.data && <Avviso tipo="errore">{errori.data}</Avviso>}
+        {soloVista && <Avviso tipo="info">{solaLettura}</Avviso>}
         {!bloccato && assegnati.size === 0 && (
           <Avviso tipo="attenzione">
             {nomeDipendente} non è assegnato a nessun progetto: HR lo assegna dalla pagina del progetto (Progetti → progetto → Dipendenti assegnati).
           </Avviso>
         )}
-        {bloccato && (
+        {bloccato && !soloVista && (
           <Avviso tipo="attenzione">
             {nonLavorativo}: non si registrano ore. Le ore rimaste da prima si possono solo togliere, poi «Salva giornata».
           </Avviso>
@@ -234,7 +243,7 @@ export function EditorGiornata({
                     <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Note</span>
                     <input disabled={bloccato} aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
                   </label>
-                  <button type="button" aria-label={`Elimina riga ${i + 1}`} className="flex-[0_0_2.25rem] rounded px-2 py-1.5 text-errore hover:bg-[#fdf3f2]" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
+                  <button type="button" disabled={soloVista} aria-label={`Elimina riga ${i + 1}`} className="flex-[0_0_2.25rem] rounded px-2 py-1.5 text-errore hover:bg-[#fdf3f2] disabled:invisible" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
                     <Icona nome="chiudi" dimensione={16} />
                   </button>
                   {(errRiga || sovrapposte.has(i)) && <div className="basis-full text-xs text-errore">{errRiga ?? 'Fascia sovrapposta a un\'altra riga'}</div>}
@@ -277,11 +286,13 @@ export function EditorGiornata({
         ))}
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
-          <Pulsante onClick={onChiudi}>Annulla</Pulsante>
+          <Pulsante onClick={onChiudi}>{soloVista ? 'Chiudi' : 'Annulla'}</Pulsante>
           {/* Giorno non lavorativo: si salva solo per togliere tutte le ore rimaste da prima. */}
-          <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0 || perProgetto.oltre.length > 0 || (bloccato && righe.length > 0)}>
-            {invio ? 'Salvataggio…' : 'Salva giornata'}
-          </Pulsante>
+          {!soloVista && (
+            <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0 || perProgetto.oltre.length > 0 || (bloccato && righe.length > 0)}>
+              {invio ? 'Salvataggio…' : 'Salva giornata'}
+            </Pulsante>
+          )}
         </div>
       </div>
     </Modale>

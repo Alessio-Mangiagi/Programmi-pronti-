@@ -13,7 +13,8 @@
  * prima da /api/file (CaricaFile).
  */
 import { useMemo, useState, type FormEvent } from 'react';
-import { DATA_MINIMA, formattaData, oggiIso } from '../../comune/date';
+import { DATA_MINIMA, formattaData } from '../../comune/date';
+import { useAuth } from '../auth';
 import { schemaDocumentoProgetto } from '../../comune/documenti';
 import { erroriPerCampo } from '../../comune/schemi';
 import { api, ErroreApi } from '../api';
@@ -25,7 +26,7 @@ import { corrisponde } from './SceltaConRicerca';
 import { Avviso, Caricamento, Campo, classiInput, Etichetta, Pulsante } from './ui';
 
 type Modulo = { titolo: string; data: string; percentuale: string; nota: string };
-const VUOTO = (): Modulo => ({ titolo: '', data: oggiIso(), percentuale: '', nota: '' });
+const VUOTO = (oggi: string): Modulo => ({ titolo: '', data: oggi, percentuale: '', nota: '' });
 
 export function DocumentazioneProgetto({ progetto, admin, skytowerAttivo }: { progetto: Progetto; admin: boolean; skytowerAttivo: boolean }) {
   const { dati, errore, caricamento, ricarica, setDati } = usaDati<DocumentoProgetto[]>(`/api/documenti-progetto?progettoId=${progetto.id}`);
@@ -112,7 +113,9 @@ export function DocumentazioneProgetto({ progetto, admin, skytowerAttivo }: { pr
 
 /** Modulo di caricamento: almeno uno fra file, nota e percentuale (regola dello schema). */
 function NuovoDocumento({ progettoId, onCreato }: { progettoId: number; onCreato: () => void }) {
-  const [m, setM] = useState<Modulo>(VUOTO);
+  // "Oggi" di Logbook (server). Il dipendente documenta solo oggi (Giorno 19): HR anche i giorni passati.
+  const { admin, oggi } = useAuth();
+  const [m, setM] = useState<Modulo>(() => VUOTO(oggi));
   const [file, setFile] = useState<VistaFile | null>(null);
   const [errori, setErrori] = useState<Record<string, string>>({});
   const [messaggio, setMessaggio] = useState<{ tipo: 'errore' | 'successo'; testo: string } | null>(null);
@@ -132,7 +135,7 @@ function NuovoDocumento({ progettoId, onCreato }: { progettoId: number; onCreato
     setInvio(true);
     try {
       await api.post('/api/documenti-progetto', corpo);
-      setM(VUOTO());
+      setM(VUOTO(oggi));
       setFile(null);
       setMessaggio({ tipo: 'successo', testo: 'Documentazione caricata: HR la vedrà nella dashboard' });
       onCreato();
@@ -154,7 +157,7 @@ function NuovoDocumento({ progettoId, onCreato }: { progettoId: number; onCreato
           <input className={classiInput(errori.titolo)} placeholder="Es. Getto solaio piano 1" value={m.titolo} onChange={(e) => imposta('titolo', e.target.value)} maxLength={150} />
         </Campo>
         <Campo etichetta="Giorno" obbligatorio errore={errori.data} className="flex-[1_1_9rem]">
-          <input type="date" min={DATA_MINIMA} max={oggiIso()} className={classiInput(errori.data)} value={m.data} onChange={(e) => imposta('data', e.target.value)} />
+          <input type="date" min={DATA_MINIMA} max={oggi} disabled={!admin} title={admin ? undefined : 'La documentazione dei giorni passati la inserisce HR'} className={`${classiInput(errori.data)} disabled:bg-fondo-alt`} value={m.data} onChange={(e) => imposta('data', e.target.value)} />
         </Campo>
         <Campo etichetta="Avanzamento (%)" errore={errori.percentuale} aiuto="0-100, facoltativo" className="flex-[1_1_8rem]">
           <input type="number" min={0} max={100} step={1} inputMode="numeric" className={`${classiInput(errori.percentuale)} text-right`} value={m.percentuale} onChange={(e) => imposta('percentuale', e.target.value)} />
