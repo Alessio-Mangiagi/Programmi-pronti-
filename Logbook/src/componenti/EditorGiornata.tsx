@@ -9,6 +9,11 @@
  * sulle righe giuste ("fasce.N.campo").
  *
  * `avvisi` sono righe informative passate dal calendario (festività, assenze del giorno).
+ *
+ * `nonLavorativo` (dal 24/11/2026): motivo per cui il giorno non accetta ore (sabato,
+ * domenica, festività). La finestra si apre solo se il giorno ha già ore registrate da
+ * prima della regola: si possono togliere, non aggiungere né cambiare (lo stesso controllo
+ * lo fa il server, server/servizi/regole-ore.ts).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { formattaData, giornoSettimana } from '../../comune/date';
@@ -38,6 +43,7 @@ export function EditorGiornata({
   nomeDipendente,
   data,
   avvisi = [],
+  nonLavorativo,
   onChiudi,
   onSalvato,
 }: {
@@ -45,9 +51,11 @@ export function EditorGiornata({
   nomeDipendente: string;
   data: string;
   avvisi?: { tipo: 'info' | 'attenzione'; testo: string }[];
+  nonLavorativo?: string | null;
   onChiudi: () => void;
   onSalvato: () => void;
 }) {
+  const bloccato = Boolean(nonLavorativo);
   const [righe, setRighe] = useState<Riga[] | null>(null);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
   const [errori, setErrori] = useState<Record<string, string>>({});
@@ -154,6 +162,11 @@ export function EditorGiornata({
         ))}
         {messaggio && <Avviso tipo="errore">{messaggio}</Avviso>}
         {errori.data && <Avviso tipo="errore">{errori.data}</Avviso>}
+        {bloccato && (
+          <Avviso tipo="attenzione">
+            {nonLavorativo}: non si registrano ore. Le ore rimaste da prima si possono solo togliere, poi «Salva giornata».
+          </Avviso>
+        )}
 
         {/*
           Fasce in flexbox (24/11/2026). Ogni riga è un contenitore flex che va a capo: da
@@ -184,7 +197,7 @@ export function EditorGiornata({
                     <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Progetto</span>
                     <span className="flex items-center gap-1.5">
                       <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: progetto ? coloreProgetto(progetto) : '#e5e7eb' }} />
-                      <select aria-label={`Progetto riga ${i + 1}`} className={classiInput(err(i, 'progettoId'))} value={r.progettoId} onChange={(e) => aggiorna(r.chiave, 'progettoId', e.target.value)}>
+                      <select disabled={bloccato} aria-label={`Progetto riga ${i + 1}`} className={classiInput(err(i, 'progettoId'))} value={r.progettoId} onChange={(e) => aggiorna(r.chiave, 'progettoId', e.target.value)}>
                         <option value="">— scegli —</option>
                         {progettiScelta.map((p) => (
                           <option key={p.id} value={p.id}>
@@ -196,16 +209,16 @@ export function EditorGiornata({
                   </label>
                   <label className="min-w-0 flex-[1_0_6.5rem] lg:flex-[0_0_7rem]">
                     <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Dalle</span>
-                    <input type="time" step={300} aria-label={`Inizio riga ${i + 1}`} className={classiInput(err(i, 'oraInizio') || (sovrapposte.has(i) ? 'x' : undefined))} value={r.oraInizio} onChange={(e) => aggiorna(r.chiave, 'oraInizio', e.target.value)} />
+                    <input disabled={bloccato} type="time" step={300} aria-label={`Inizio riga ${i + 1}`} className={classiInput(err(i, 'oraInizio') || (sovrapposte.has(i) ? 'x' : undefined))} value={r.oraInizio} onChange={(e) => aggiorna(r.chiave, 'oraInizio', e.target.value)} />
                   </label>
                   <label className="min-w-0 flex-[1_0_6.5rem] lg:flex-[0_0_7rem]">
                     <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Alle</span>
-                    <input type="time" step={300} aria-label={`Fine riga ${i + 1}`} className={classiInput(err(i, 'oraFine'))} value={r.oraFine} onChange={(e) => aggiorna(r.chiave, 'oraFine', e.target.value)} />
+                    <input disabled={bloccato} type="time" step={300} aria-label={`Fine riga ${i + 1}`} className={classiInput(err(i, 'oraFine'))} value={r.oraFine} onChange={(e) => aggiorna(r.chiave, 'oraFine', e.target.value)} />
                   </label>
                   <span className="flex-[0_0_3.5rem] py-1.5 text-right font-medium">{durata === null ? '—' : formattaOre(durata)}</span>
                   <label className="min-w-0 flex-[3_1_8rem]">
                     <span className="mb-0.5 block text-xs text-gray-500 lg:hidden">Note</span>
-                    <input aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
+                    <input disabled={bloccato} aria-label={`Note riga ${i + 1}`} className={classiInput(err(i, 'note'))} value={r.note} onChange={(e) => aggiorna(r.chiave, 'note', e.target.value)} maxLength={500} />
                   </label>
                   <button type="button" aria-label={`Elimina riga ${i + 1}`} className="flex-[0_0_2.25rem] rounded px-2 py-1.5 text-errore hover:bg-[#fdf3f2]" onClick={() => setRighe(righe.filter((x) => x.chiave !== r.chiave))}>
                     <Icona nome="chiudi" dimensione={16} />
@@ -217,7 +230,7 @@ export function EditorGiornata({
             {righe.length === 0 && <li className="px-1 py-4 text-center text-gray-500">Nessuna fascia registrata in questo giorno.</li>}
           </ul>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-1 pt-2">
-            <Pulsante variante="leggero" onClick={aggiungi}>
+            <Pulsante variante="leggero" onClick={aggiungi} disabled={bloccato}>
               + Aggiungi fascia
             </Pulsante>
             <span>
@@ -251,7 +264,8 @@ export function EditorGiornata({
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
           <Pulsante onClick={onChiudi}>Annulla</Pulsante>
-          <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0 || perProgetto.oltre.length > 0}>
+          {/* Giorno non lavorativo: si salva solo per togliere tutte le ore rimaste da prima. */}
+          <Pulsante variante="primario" onClick={salva} disabled={invio || sovrapposte.size > 0 || perProgetto.oltre.length > 0 || (bloccato && righe.length > 0)}>
             {invio ? 'Salvataggio…' : 'Salva giornata'}
           </Pulsante>
         </div>

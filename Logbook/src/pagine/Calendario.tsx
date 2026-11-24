@@ -18,13 +18,18 @@
  * progetto o assenza. Il dettaglio si legge aprendo il giorno. La settimana sul
  * telefono è un elenco verticale di giorni; da 768px torna a sette colonne affiancate.
  *
+ * Giorni lavorativi (24/11/2026): l'interruttore "Lun–Ven" nasconde sabato e domenica
+ * (in mese e settimana; la scelta resta nel browser). Sabato, domenica e festivi non
+ * accettano ore: la cella senza ore non si apre, e se ci sono ore di prima l'editor
+ * permette solo di toglierle (regola anche nel server, server/servizi/regole-ore.ts).
+ *
  * Collegamenti dalla Dashboard (24/11/2026): `?dipendente=<id>&progetto=<id>&data=<AAAA-MM-GG>`
  * preimpostano filtri e periodo; con `&giorno=<AAAA-MM-GG>` (e un dipendente) si apre
  * subito l'editor di quel giorno. `giorno` si toglie dall'indirizzo dopo l'apertura.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, isDataValida, isFineSettimana, oggiIso } from '../../comune/date';
+import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, giornoSettimana, isDataValida, isFineSettimana, oggiIso } from '../../comune/date';
 import { formattaOre } from '../../comune/orari';
 import { calcolaTotali, inizioSettimana } from '../../comune/riepiloghi';
 import { useAuth } from '../auth';
@@ -62,6 +67,24 @@ export function Calendario() {
   const [parametri, setParametri] = useSearchParams();
   const dataDaLink = parametri.get('data') ?? '';
   const [vista, setVista] = useState<'mese' | 'settimana'>('mese');
+  // "Lun–Ven": preferenza di chi guarda, ricordata nel browser (se il browser lo permette).
+  const [soloFeriali, setSoloFeriali] = useState(() => {
+    try {
+      return localStorage.getItem('logbook.calendario.soloFeriali') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const cambiaFeriali = () => {
+    setSoloFeriali((v) => {
+      try {
+        localStorage.setItem('logbook.calendario.soloFeriali', v ? '0' : '1');
+      } catch {
+        /* archivio del browser non disponibile: vale solo per questa pagina */
+      }
+      return !v;
+    });
+  };
   const [riferimento, setRiferimento] = useState(isDataValida(dataDaLink) ? dataDaLink : oggiIso());
   // Il dipendente non sceglie: vede sempre e solo se stesso (lo impone anche il server).
   const [dipendenteId, setDipendenteId] = useState<string>(admin ? (parametri.get('dipendente') ?? '') : String(utente?.dipendenteId ?? ''));
@@ -119,7 +142,16 @@ export function Calendario() {
     return d ? `${d.nome} ${d.cognome}` : '';
   };
 
+  /** Perché un giorno non accetta ore ("Sabato", "Festività: Natale"), o null se è lavorativo. */
+  const motivoNonLavorativo = (data: string): string | null => {
+    if (isFineSettimana(data)) return giornoSettimana(data) === 6 ? 'Sabato' : 'Domenica';
+    const fest = perGiorno.festivita.get(data);
+    return fest ? `Festività: ${fest.descrizione}` : null;
+  };
+
   const apriGiorno = (data: string) => {
+    // Giorno non lavorativo senza ore: non c'è nulla da inserire né da togliere.
+    if (motivoNonLavorativo(data) && !(perGiorno.fasce.get(data) ?? []).length) return;
     if (dipendenteId) setEditor({ dipendenteId: Number(dipendenteId), nome: nomeDipendenteScelto(), data });
     else setGiornoAperto(data);
   };
@@ -141,11 +173,12 @@ export function Calendario() {
     // apriGiorno cambia a ogni render: l'effetto deve scattare solo all'arrivo del link.
   }, [giornoDaLink, nomePronto]);
 
-  /** Righe informative per l'editor: festività e assenze di quel dipendente in quel giorno. */
+  /**
+   * Righe informative per l'editor: assenze di quel dipendente in quel giorno. La festività
+   * non serve qui: la mostra l'editor stesso col motivo del giorno non lavorativo.
+   */
   const avvisiGiorno = (data: string, idDip: number) => {
     const avvisi: { tipo: 'info' | 'attenzione'; testo: string }[] = [];
-    const fest = perGiorno.festivita.get(data);
-    if (fest) avvisi.push({ tipo: 'attenzione', testo: `Festività: ${fest.descrizione}` });
     for (const x of perGiorno.assenze(data).filter((x) => x.dipendenteId === idDip)) {
       avvisi.push({ tipo: x.stato === 'APPROVATA' ? 'attenzione' : 'info', testo: `${testoAssenza(x, false)}${x.stato === 'APPROVATA' ? ' — approvata' : ''}` });
     }
@@ -168,6 +201,15 @@ export function Calendario() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-pressed={soloFeriali}
+          onClick={cambiaFeriali}
+          title="Mostra solo i giorni da lunedì a venerdì"
+          className={`rounded border px-3 py-1.5 text-sm transition-colors ${soloFeriali ? 'border-marchio bg-marchio text-white' : 'border-gray-300 bg-white hover:bg-gray-50'}`}
+        >
+          Lun–Ven
+        </button>
         <Pulsante onClick={() => sposta(-1)} aria-label="Periodo precedente">‹</Pulsante>
         <Pulsante onClick={() => setRiferimento(oggiIso())}>Oggi</Pulsante>
         <Pulsante onClick={() => sposta(1)} aria-label="Periodo successivo">›</Pulsante>
@@ -211,7 +253,7 @@ export function Calendario() {
         <div className={caricamento ? 'opacity-60 transition-opacity' : ''}>
           {/* Nomi dei giorni: nella settimana sul telefono non servono (ogni riga dice il suo giorno). */}
           <div className={`${vista === 'settimana' ? 'hidden md:flex' : 'flex'} overflow-hidden rounded-t border border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase text-gray-600`}>
-            {NOMI_GIORNI.map((g) => (
+            {NOMI_GIORNI.slice(0, soloFeriali ? 5 : 7).map((g) => (
               <div key={g} className="min-w-0 flex-1 basis-0 py-1.5">
                 {g}
               </div>
@@ -220,7 +262,8 @@ export function Calendario() {
           <div className={`border-l border-gray-200 ${vista === 'settimana' ? 'border-t md:border-t-0' : ''}`}>
             {giorni.map((settimana) => (
               <div key={settimana[0]} className={`flex ${vista === 'settimana' ? 'flex-col md:flex-row' : ''}`}>
-                {settimana.map((d, posizione) => {
+                {/* Le settimane partono di lunedì: con "Lun–Ven" si tengono i primi cinque giorni. */}
+                {settimana.slice(0, soloFeriali ? 5 : 7).map((d, posizione) => {
                   const fuoriMese = vista === 'mese' && (d < primoDelMese || d > ultimoDelMese);
                   const fest = perGiorno.festivita.get(d);
                   const fasce = perGiorno.fasce.get(d) ?? [];
@@ -229,13 +272,20 @@ export function Calendario() {
                   // Ore per progetto nel giorno (vista mese) o fasce una per una (vista settimana).
                   const perProgetto = new Map<number, { minuti: number; f: FasciaCal }>();
                   for (const f of fasce) perProgetto.set(f.progettoId, { minuti: (perProgetto.get(f.progettoId)?.minuti ?? 0) + f.minuti, f });
+                  // Sabato, domenica e festivi senza ore: la cella non si apre (niente da inserire).
+                  const motivo = motivoNonLavorativo(d);
+                  const chiuso = Boolean(motivo) && fasce.length === 0;
                   return (
                     <button
                       type="button"
                       key={d}
                       onClick={() => apriGiorno(d)}
-                      aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore`}
-                      className={`flex min-w-0 flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs hover:bg-ghiaccio focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
+                      aria-disabled={chiuso || undefined}
+                      title={motivo ? `${motivo}: non si registrano ore` : undefined}
+                      aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore${motivo ? ` (${motivo.toLowerCase()})` : ''}`}
+                      className={`flex min-w-0 flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
+                        chiuso ? 'cursor-not-allowed' : 'hover:bg-ghiaccio'
+                      } ${
                         vista === 'mese'
                           ? 'min-h-16 flex-1 basis-0 sm:min-h-24 3xl:min-h-28 4xl:min-h-32'
                           : 'min-h-14 md:min-h-64 md:flex-1 md:basis-0 4xl:min-h-80'
@@ -372,6 +422,7 @@ export function Calendario() {
           nomeDipendente={editor.nome}
           data={editor.data}
           avvisi={avvisiGiorno(editor.data, editor.dipendenteId)}
+          nonLavorativo={motivoNonLavorativo(editor.data)}
           onChiudi={() => setEditor(null)}
           onSalvato={() => {
             setEditor(null);

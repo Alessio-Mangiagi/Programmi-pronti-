@@ -53,6 +53,10 @@ Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata.
 
 - Una fascia non può passare la mezzanotte: un turno di notte va diviso in due giorni.
 - Non si registrano ore nei giorni futuri né nei giorni di ferie o malattia approvate.
+- **Sabato, domenica e festivi non accettano ore**: nel calendario quei giorni non si aprono
+  (passandoci sopra compare il motivo, es. «Sabato: non si registrano ore»). Se in uno di
+  quei giorni sono rimaste ore inserite prima di questa regola, il dettaglio si apre solo
+  per toglierle.
 - Non si inserisce **nulla prima del 01/01/2020** (ore, assenze, festività, date di
   assunzione e dei progetti, righe dell'import).
 - Se il progetto ha **ore massime al giorno**, sotto le righe compare per ogni progetto
@@ -111,6 +115,8 @@ della festività.
 ![Calendario del mese](img/03-calendario-mese.png)
 
 - Vista **Mese** o **Settimana**, frecce per spostarsi, **Oggi** per tornare al presente.
+- **Lun–Ven** mostra solo i giorni da lunedì a venerdì (in mese e settimana); la scelta
+  resta finché non la si toglie.
 - Filtri per **dipendente**, **progetto** e **tipo di assenza**. Col filtro progetto i
   totali dei giorni sono le ore di quel progetto.
 - Ogni progetto ha il suo colore; ferie in azzurro, permessi in giallo, malattia in rosso,

@@ -15,7 +15,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 13 (24/11):** interfaccia adattabile in flexbox, dal cellulare agli schermi ultra wide ✅
 - **Giorno 14 (24/11):** produzione senza dati di esempio, porta 5210 in firewall e installer, dashboard cliccabile, menu dei colori ✅
 - **Giorno 15 (24/11):** file, attestati, documenti del dipendente a schede, Impostazioni con collegamento a SkyTower ✅
-- **Prossimo:** calendario solo lun-ven e blocco di sabato, domenica e festivi; poi (dopo le risposte) pannello laterale e assegnazioni ai progetti; documentazione dei progetti (2c, 3c); grafici in dashboard
+- **Giorno 16 (24/11):** calendario Lun–Ven e niente ore il sabato, la domenica e i festivi ✅
+- **Prossimo:** (dopo le risposte) pannello laterale e assegnazioni ai progetti; documentazione dei progetti (2c, 3c); grafici in dashboard
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -440,3 +441,24 @@ Verifiche:
 - Playwright su Edge: 9 verifiche (schede, attestato con file in scadenza, apertura del
   file, documento, dashboard → scheda Attestati, Impostazioni con errore "non
   raggiungibile"), con pulizia dei dati di prova a inizio e fine.
+
+### Giorno 16 — Calendario: solo lunedì-venerdì, niente ore nel fine settimana e nei festivi (24/11/2026) ✅
+
+Richiesta (arrivata durante il Giorno 15): "il calendario deve avere anche la possibilità di
+selezionare solo la settimana lavorativa e nei giorni festivi, sabato e domenica non deve
+poter essere possibile inserire nulla". Il resto della stessa richiesta (pannello a destra
+con progetti e dipendenti filtrati, assegnazione dei dipendenti ai progetti) aspetta le
+risposte alle domande del 24/11.
+
+Fatto:
+- `server/servizi/regole-ore.ts`: il contesto carica le festività del periodo; errore per
+  sabato, domenica e festivi (con il nome della festa). Vale per giornata, fascia singola e
+  import Excel; togliere ore già presenti resta possibile (giornata vuota).
+- Calendario: interruttore **Lun–Ven** (mese e settimana, preferenza in localStorage);
+  celle dei giorni non lavorativi senza ore non cliccabili, con il motivo nel suggerimento;
+  l'editor in quei giorni permette solo di togliere le ore rimaste (`nonLavorativo`).
+- Guida (immagine 25).
+
+Verifiche: `npm test` 166/166 (5 nuovi in `giorni-lavorativi.test.ts`), typecheck e build
+ok; Playwright su Edge 8/8 (sabato e domenica chiusi, Lun–Ven a cinque colonne e
+ricordato, venerdì normale).
