@@ -28,7 +28,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 26 (24/11):** matricola sigla del contratto + numero, mansioni da elenco che si arricchisce ✅
 - **Giorno 27 (24/11):** pannello a destra del calendario: più giorni (Ctrl/Maiusc) e più dipendenti insieme, tutto o niente ✅
 - **Giorno 28 (24/11):** documentazione del giorno (file, nota, avanzamento) dalla finestra delle ore, nella documentazione del progetto ✅
-- **Prossimo:** grafici dell'avanzamento in dashboard
+- **Giorno 29 (24/11):** grafici dell'avanzamento dei progetti in dashboard ✅
+- **Prossimo:** piano completato; restano installer (InstallaSuite.exe), copia del Portale in suite cosedil e database vero al posto di quello dimostrativo
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 24/11/2026
 
@@ -824,3 +825,19 @@ Verifiche:
 - `npm test` 235/235, di cui 2 nuovi in `giorno28.test.ts`: filtro per giorno, origine, file, il dipendente non vede né crea. Typecheck ok.
 - Playwright su Edge 6/6, su una copia del database: titolo proposto, salvataggio con file, progetto salvato anche dopo un cambio non salvato, "dalla giornata" nella pagina del progetto.
 - Guida: immagine 40.
+
+### Giorno 29 — Grafici dell'avanzamento in dashboard (24/11/2026) ✅
+
+Dal piano: "grafici di avanzamento in dashboard" (risposte del 24/11 sulla documentazione dei progetti, 2c).
+- `GET /api/dashboard`, solo HR: `avanzamentoProgetti`. Per ogni progetto attivo o sospeso dà le percentuali dichiarate nella documentazione, in ordine di data, un punto per giorno (vale l'ultimo caricato). Al dipendente arriva vuoto.
+- `src/componenti/AvanzamentoProgetti.tsx`, riquadro "Avanzamento dei progetti" in dashboard. Una riga per progetto, cliccabile verso la pagina del progetto, con:
+  - un grafico a linea piccolo con asse 0-100% uguale per tutti, nel colore del progetto e con l'ultimo punto marcato;
+  - un suggerimento su ogni punto e una descrizione per i lettori di schermo;
+  - l'ultima percentuale con barra 0-100 e la data;
+  - per i progetti senza dati, "nessun avanzamento dichiarato".
+- SVG fatto a mano, regole della skill dataviz: una serie per riga senza legenda, testi nei colori del testo.
+
+Verifiche:
+- `npm test` 237/237, di cui 2 nuovi in `giorno29.test.ts`: ordine, un punto per giorno, documenti senza percentuale esclusi, progetti chiusi esclusi, niente per il dipendente. Typecheck ok.
+- Playwright su Edge 5/5, su una copia del database con dichiarazioni di prova poi tolte. La prova ha portato a spostare la data sotto la percentuale, perché a riquadro stretto andava a capo.
+- Guida: immagine 41.

@@ -208,6 +208,14 @@ Ogni voce dei pannelli sotto porta al suo elemento:
 Il dipendente, dalla sua dashboard, va al calendario filtrato sul progetto o sul giorno
 della festività.
 
+**Avanzamento dei progetti** (solo HR): una riga per ogni progetto attivo o sospeso con
+l'andamento delle percentuali di avanzamento dichiarate nella documentazione (piccolo
+grafico, sempre da 0 a 100% per confrontare le righe), l'ultima percentuale con la sua barra
+e il giorno in cui è stata dichiarata. Passando sui punti del grafico compare data e
+percentuale; il clic sulla riga apre il progetto. I progetti senza percentuali lo dicono.
+
+![Avanzamento dei progetti in dashboard](img/41-avanzamento-progetti.png)
+
 ### Calendario
 
 ![Calendario del mese](img/03-calendario-mese.png)
