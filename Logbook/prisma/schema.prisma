@@ -44,6 +44,10 @@ model Utente {
   passwordHash        String
   ruolo               Ruolo               @default(DIPENDENTE)
   attivo              Boolean             @default(true)
+  /// Giorno 24 (risposta 1a del 24/11/2026): la password è provvisoria (data da HR, admin
+  /// creato all'avvio o password pubblicata nel README) e va cambiata al primo accesso.
+  /// Finché è true le API rispondono 403, tranne /api/auth (server/middleware.ts).
+  passwordDaCambiare  Boolean             @default(false)
   dipendente          Dipendente?         @relation(fields: [dipendenteId], references: [id])
   dipendenteId        Int?                @unique
   /// Richieste di assenza approvate o rifiutate da questo utente (HR).

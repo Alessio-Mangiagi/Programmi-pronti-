@@ -83,6 +83,9 @@ describe('dipendenti', () => {
     expect(acc.stato).toBe(200);
     const anna = await server.accedi('anna.verdi', 'Prova2026!');
     expect((await anna.chiama('GET', '/api/auth/io')).corpo.dipendenteId).toBe(id);
+    // Giorno 24 (risposta 1a): la password data da HR è provvisoria, prima va cambiata.
+    expect((await anna.chiama('GET', '/api/auth/io')).corpo.passwordDaCambiare).toBe(true);
+    expect((await anna.chiama('GET', '/api/dashboard')).stato).toBe(403);
 
     const dis = await admin.chiama('POST', `/api/dipendenti/${id}/disattiva`, { dataCessazione: '2026-11-30' });
     expect(dis.corpo).toMatchObject({ stato: 'CESSATO', dataCessazione: '2026-11-30' });

@@ -16,7 +16,7 @@ import express from 'express';
 import type { PrismaClient } from '../generated/prisma/client';
 import { oggiIso } from '../comune/date';
 import { gestoreErrori } from './errori';
-import { caricaUtente, controlloCsrf, richiediLogin } from './middleware';
+import { caricaUtente, controlloCsrf, richiediLogin, richiediPasswordCambiata } from './middleware';
 import { rotteAuth } from './rotte/auth';
 import { rotteAssenze } from './rotte/assenze';
 import { rotteCalendario } from './rotte/calendario';
@@ -82,8 +82,9 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
 
   api.use('/auth', rotteAuth(prisma));
 
-  // Da qui in poi serve il login.
+  // Da qui in poi serve il login, e una password non provvisoria (Giorno 24, risposta 1a).
   api.use(richiediLogin);
+  api.use(richiediPasswordCambiata);
   api.use('/dipendenti', rotteDipendenti(prisma));
   api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));

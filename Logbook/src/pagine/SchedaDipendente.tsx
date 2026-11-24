@@ -370,7 +370,12 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
       const account = await api.put<NonNullable<Dipendente['utente']>>(`/api/dipendenti/${dipendente.id}/account`, { username, password, attivo });
       onAggiornato(account);
       setPassword('');
-      setMessaggio({ tipo: 'successo', testo: esistente ? 'Account aggiornato' : 'Account creato: comunica al dipendente nome utente e password' });
+      setMessaggio({
+        tipo: 'successo',
+        testo: password
+          ? `${esistente ? 'Password reimpostata' : 'Account creato'}: comunica al dipendente nome utente e password. È provvisoria: al primo accesso Logbook gli chiede di cambiarla.`
+          : 'Account aggiornato',
+      });
     } catch (err) {
       if (err instanceof ErroreApi) {
         setErrori(err.campi);
@@ -384,6 +389,9 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Account di accesso</h2>
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
       {!esistente && <p className="mb-3 text-sm text-gray-600">Il dipendente non ha ancora un account per entrare in Logbook.</p>}
+      {esistente?.passwordDaCambiare && (
+        <p className="mb-3 text-sm text-gray-600">Password provvisoria: il dipendente non l'ha ancora cambiata al primo accesso.</p>
+      )}
       <div className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">
         <Campo etichetta="Nome utente" obbligatorio errore={errori.username}>
           <input className={classiInput(errori.username)} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />

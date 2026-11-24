@@ -27,6 +27,8 @@ type StatoAuth = {
   orologioDiverso: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Rilegge l'utente collegato (dopo il cambio della password provvisoria, Giorno 24). */
+  ricarica: () => Promise<void>;
 };
 
 const ContestoAuth = createContext<StatoAuth | null>(null);
@@ -107,7 +109,7 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
   return (
     <ContestoAuth.Provider
       value={{
-        utente, caricamento, admin: utente?.ruolo === 'ADMIN', login, logout,
+        utente, caricamento, admin: utente?.ruolo === 'ADMIN', login, logout, ricarica,
         oggi: oggiServer ?? oggiPc,
         orologioDiverso: oggiServer !== null && oggiServer !== oggiPc,
       }}

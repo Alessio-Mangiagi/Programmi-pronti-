@@ -13,6 +13,8 @@ export type UtenteCollegato = {
   ruolo: Ruolo;
   dipendenteId: number | null;
   nomeVisualizzato: string;
+  /** Password provvisoria: finché è true si vede solo la pagina per cambiarla (Giorno 24). */
+  passwordDaCambiare: boolean;
 };
 
 export type TipoContratto = 'INDETERMINATO' | 'DETERMINATO' | 'APPRENDISTATO' | 'SOMMINISTRAZIONE' | 'COLLABORAZIONE' | 'TIROCINIO';
@@ -36,7 +38,7 @@ export type Dipendente = {
   costoOrarioLordoCent?: number | null;
   stato: 'ATTIVO' | 'CESSATO';
   /** Account di accesso collegato (solo admin, elenco e scheda). */
-  utente?: { id: number; username: string; attivo: boolean; ruolo: Ruolo } | null;
+  utente?: { id: number; username: string; attivo: boolean; ruolo: Ruolo; passwordDaCambiare: boolean } | null;
 };
 
 export type Progetto = {

@@ -111,6 +111,13 @@ const DIPENDENTI = [
   },
 ] as const;
 
+/**
+ * Nomi utente degli account di esempio (mario.rossi, …): all'avvio in produzione
+ * scripts/prepara-db.ts controlla se hanno ancora la password pubblicata e, se sì, la fa
+ * cambiare al prossimo accesso (Giorno 24, risposta 1a).
+ */
+export const USERNAME_DEMO = DIPENDENTI.map((d) => usernameDemo(d.dati));
+
 /** Giorni lavorativi (lun-ven, non festivi) di un mese. */
 function giorniLavorativi(anno: number, mese: number, festivi: Set<string>): string[] {
   return intervalloDate(dataIso(anno, mese, 1), dataIso(anno, mese, giorniNelMese(anno, mese))).filter(

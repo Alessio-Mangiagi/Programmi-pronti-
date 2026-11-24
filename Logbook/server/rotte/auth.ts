@@ -111,7 +111,10 @@ export function rotteAuth(prisma: PrismaClient) {
     tentativi.delete(chiave);
     const debolezza = controllaPasswordNuova(nuova);
     if (debolezza) throw richiestaNonValida(debolezza, { nuova: debolezza });
-    await prisma.utente.update({ where: { id: utente.id }, data: { passwordHash: await creaImpronta(nuova) } });
+    // Una password provvisoria "cambiata" con sé stessa resterebbe quella nota a HR o al README.
+    if (nuova === attuale) throw richiestaNonValida('La nuova password deve essere diversa da quella attuale', { nuova: 'Uguale a quella attuale' });
+    // Cambiata dall'utente: non è più provvisoria (Giorno 24, risposta 1a).
+    await prisma.utente.update({ where: { id: utente.id }, data: { passwordHash: await creaImpronta(nuova), passwordDaCambiare: false } });
     // Chi conosceva la vecchia password ed era collegato altrove viene scollegato.
     await prisma.sessione.deleteMany({ where: { utenteId: utente.id } });
     await apriSessione(prisma, res, utente.id);

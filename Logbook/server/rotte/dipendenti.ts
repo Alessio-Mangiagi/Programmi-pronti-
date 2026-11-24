@@ -30,7 +30,8 @@ function vistaDipendente(d: DipendenteConAccount, admin: boolean) {
   return resto;
 }
 
-const selezioneAccount = { select: { id: true, username: true, attivo: true, ruolo: true } } as const;
+// passwordDaCambiare: HR vede se il dipendente ha ancora la password provvisoria (Giorno 24).
+const selezioneAccount = { select: { id: true, username: true, attivo: true, ruolo: true, passwordDaCambiare: true } } as const;
 
 export function rotteDipendenti(prisma: PrismaClient) {
   const router = Router();
@@ -143,14 +144,16 @@ export function rotteDipendenti(prisma: PrismaClient) {
     }
 
     const impronta = password ? await creaImpronta(password) : undefined;
+    // La password che HR comunica al dipendente è provvisoria: al primo accesso Logbook
+    // chiede di cambiarla (Giorno 24, risposta 1a), così la conosce solo il dipendente.
     const account = dipendente.utente
       ? await prisma.utente.update({
           where: { id: dipendente.utente.id },
-          data: { username: dati.username, attivo: dati.attivo, ...(impronta ? { passwordHash: impronta } : {}) },
+          data: { username: dati.username, attivo: dati.attivo, ...(impronta ? { passwordHash: impronta, passwordDaCambiare: true } : {}) },
           select: selezioneAccount.select,
         })
       : await prisma.utente.create({
-          data: { username: dati.username, passwordHash: impronta!, ruolo: 'DIPENDENTE', attivo: dati.attivo, dipendenteId: id },
+          data: { username: dati.username, passwordHash: impronta!, passwordDaCambiare: true, ruolo: 'DIPENDENTE', attivo: dati.attivo, dipendenteId: id },
           select: selezioneAccount.select,
         });
     if (impronta || !dati.attivo) await prisma.sessione.deleteMany({ where: { utenteId: account.id } });

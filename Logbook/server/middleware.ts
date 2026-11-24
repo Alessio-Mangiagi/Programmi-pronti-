@@ -19,6 +19,8 @@ type UtenteSessione = {
   dipendenteId: number | null;
   /** "Nome Cognome" della scheda collegata, oppure lo username per un admin senza scheda. */
   nomeVisualizzato: string;
+  /** Password provvisoria da cambiare prima di usare Logbook (Giorno 24, risposta 1a). */
+  passwordDaCambiare: boolean;
 };
 
 declare global {
@@ -41,6 +43,7 @@ export function caricaUtente(prisma: PrismaClient) {
         ruolo: utente.ruolo,
         dipendenteId: utente.dipendenteId,
         nomeVisualizzato: utente.dipendente ? `${utente.dipendente.nome} ${utente.dipendente.cognome}` : utente.username,
+        passwordDaCambiare: utente.passwordDaCambiare,
       };
     }
     next();
@@ -50,6 +53,17 @@ export function caricaUtente(prisma: PrismaClient) {
 /** 401 se nessuno è collegato. */
 export function richiediLogin(req: Request, _res: Response, next: NextFunction) {
   if (!req.utente) throw new ErroreHttp(401, 'Accesso richiesto: effettua il login');
+  next();
+}
+
+/**
+ * 403 finché l'utente ha una password provvisoria (Giorno 24, risposta 1a): chi entra con
+ * la password data da HR, o con quella di prova scritta nel README, non vede nessun dato
+ * prima di averla cambiata. Va montato dopo /api/auth, che resta libero (io, password,
+ * logout): server/app.ts.
+ */
+export function richiediPasswordCambiata(req: Request, _res: Response, next: NextFunction) {
+  if (req.utente?.passwordDaCambiare) throw vietato('Prima di continuare cambia la password provvisoria');
   next();
 }
 

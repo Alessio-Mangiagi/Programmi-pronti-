@@ -67,15 +67,21 @@ try {
     console.log('[logbook] database pronto.');
   }
 
-  // Senza nessun amministratore nessuno potrebbe creare account: se manca (es. tutti
-  // disattivati per errore, o database migrato da una versione senza utenti) se ne crea
-  // uno con la password di LOGBOOK_ADMIN_PASSWORD o quella di prova, da cambiare subito.
-  if ((await prisma.utente.count({ where: { ruolo: 'ADMIN', attivo: true } })) === 0) {
-    const { creaImpronta } = await import('../server/auth/password');
-    const password = process.env.LOGBOOK_ADMIN_PASSWORD || 'Admin2026!';
-    const username = (await prisma.utente.findUnique({ where: { username: 'admin' } })) ? `admin${Date.now() % 10000}` : 'admin';
-    await prisma.utente.create({ data: { username, passwordHash: await creaImpronta(password), ruolo: 'ADMIN' } });
-    console.log(`[logbook] ATTENZIONE: creato l'amministratore "${username}". Cambiare subito la password dall'app.`);
+  // Senza nessun amministratore nessuno potrebbe creare account: se manca se ne crea uno con
+  // la password di LOGBOOK_ADMIN_PASSWORD o quella di prova. Dal Giorno 24 (risposta 1a)
+  // Logbook obbliga a cambiarla al primo accesso (server/auth/password-provvisorie.ts).
+  const { assicuraAdmin, segnaPasswordPubblicate } = await import('../server/auth/password-provvisorie');
+  const { CREDENZIALI_DEMO, USERNAME_DEMO } = await import('../prisma/seed');
+  const creato = await assicuraAdmin(prisma, process.env.LOGBOOK_ADMIN_PASSWORD || CREDENZIALI_DEMO.admin.password);
+  if (creato) console.log(`[logbook] ATTENZIONE: creato l'amministratore "${creato}": al primo accesso Logbook chiede di cambiare la password.`);
+  // In produzione (Logbook raggiungibile in rete) chi ha ancora una password scritta nel
+  // README la deve cambiare al prossimo accesso: amministratori e account di esempio.
+  if (modo === 'produzione') {
+    const segnati = await segnaPasswordPubblicate(prisma, [
+      { password: CREDENZIALI_DEMO.admin.password, utenti: { ruolo: 'ADMIN' } },
+      { password: CREDENZIALI_DEMO.passwordDipendenti, utenti: { username: { in: USERNAME_DEMO } } },
+    ]);
+    if (segnati.length) console.log(`[logbook] password di prova ancora in uso, da cambiare al prossimo accesso: ${segnati.join(', ')}`);
   }
 } finally {
   await prisma.$disconnect();

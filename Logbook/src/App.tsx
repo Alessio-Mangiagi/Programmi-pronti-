@@ -19,6 +19,7 @@ import { Esporta } from './pagine/Esporta';
 import { Importa } from './pagine/Importa';
 import { Impostazioni } from './pagine/Impostazioni';
 import { Login } from './pagine/Login';
+import { PasswordProvvisoria } from './pagine/PasswordProvvisoria';
 import { Progetti } from './pagine/Progetti';
 import { SchedaAssenza } from './pagine/SchedaAssenza';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
@@ -33,6 +34,9 @@ function Rotte() {
   const { utente, caricamento } = useAuth();
   if (caricamento) return <Caricamento testo="Avvio di Logbook…" />;
   if (!utente) return <Login />;
+  // Giorno 24 (risposta 1a): con la password provvisoria si vede solo la pagina per
+  // cambiarla; anche le API rifiutano tutto il resto (server/middleware.ts).
+  if (utente.passwordDaCambiare) return <PasswordProvvisoria />;
   return (
     <Routes>
       <Route element={<Layout />}>
