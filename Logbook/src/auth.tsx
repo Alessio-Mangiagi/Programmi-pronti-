@@ -25,6 +25,11 @@ type StatoAuth = {
   oggi: string;
   /** true se la data del PC non coincide con quella di Logbook. */
   orologioDiverso: boolean;
+  /**
+   * true se questo è la copia dimostrativa con i dati di esempio (npm run demo /
+   * avvia-demo.bat, dal 25/11/2026): lo dice il server in GET /api/oggi, anche prima del login.
+   */
+  dimostrazione: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Rilegge l'utente collegato (dopo il cambio della password provvisoria, Giorno 24). */
@@ -45,17 +50,24 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
   const [oggiServer, setOggiServer] = useState<string | null>(null);
   // Data del PC al momento dell'ultimo allineamento (per l'avviso "data diversa").
   const [oggiPc, setOggiPc] = useState(oggiIso());
+  const [dimostrazione, setDimostrazione] = useState(false);
 
   /** Chiede la data a Logbook; se il server non risponde resta l'ultima nota. */
   const allineaData = useCallback(async () => {
     try {
-      const r = await api.get<{ oggi: string; adesso: string }>('/api/oggi');
+      const r = await api.get<{ oggi: string; adesso: string; dimostrazione?: boolean }>('/api/oggi');
       setOggiServer(r.oggi);
       setOggiPc(oggiIso());
+      setDimostrazione(r.dimostrazione === true);
     } catch {
       /* server non raggiungibile: lo segnalano già le altre chiamate */
     }
   }, []);
+
+  // Anche il titolo della scheda del browser distingue la copia dimostrativa dal Logbook vero.
+  useEffect(() => {
+    document.title = dimostrazione ? 'Logbook — copia dimostrativa' : 'Logbook — ore e presenze';
+  }, [dimostrazione]);
 
   useEffect(() => {
     allineaData();
@@ -112,6 +124,7 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
         utente, caricamento, admin: utente?.ruolo === 'ADMIN', login, logout, ricarica,
         oggi: oggiServer ?? oggiPc,
         orologioDiverso: oggiServer !== null && oggiServer !== oggiPc,
+        dimostrazione,
       }}
     >
       {children}

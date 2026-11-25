@@ -7,6 +7,7 @@
 import { useState, type FormEvent } from 'react';
 import { ErroreApi } from '../api';
 import { useAuth } from '../auth';
+import { FasciaDimostrazione } from '../componenti/FasciaDimostrazione';
 import { Avviso, Campo, classiInput, Pulsante } from '../componenti/ui';
 
 export function Login() {
@@ -59,6 +60,8 @@ export function Login() {
             <h1 className="font-display text-2xl font-normal text-testo-forte">Entra in Logbook</h1>
             <p className="mt-1 text-sm text-gray-500">Usa il nome utente e la password ricevuti da HR.</p>
           </div>
+          {/* Solo nella copia dimostrativa (25/11/2026): si capisce prima ancora di entrare. */}
+          <FasciaDimostrazione inScheda />
           {errore && <Avviso tipo="errore">{errore}</Avviso>}
           <Campo etichetta="Nome utente">
             <input autoFocus autoComplete="username" className={classiInput()} value={username} onChange={(e) => setUsername(e.target.value)} />
