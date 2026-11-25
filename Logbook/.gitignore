@@ -25,3 +25,5 @@ coverage/
 # Vercel: pacchetto prodotto da scripts/vercel-build.mjs e copia generata dello schema
 .vercel/
 prisma/postgres/
+# Vercel CLI (vercel link): token e variabili scaricate
+.env*.local
