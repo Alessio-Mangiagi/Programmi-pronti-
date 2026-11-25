@@ -219,9 +219,15 @@ accesso alle cartelle e memoria in [src/lib/scansione-cartella.ts](src/lib/scans
 errori (il worker se ne accorge all'avvio, `prova_lettura` in `ocr_worker.py`, e passa alla
 CPU, ~35 s/pagina). Dal 23/11/2026 c'è `.venv-cu129` con paddlepaddle-gpu 3.3.1 per CUDA 12.9:
 `avvia.bat` la crea sui PC con una RTX serie 50 e il server la preferisce alle altre
-(`server/config.ts`). Misura su RTX 5060 Ti 16 GB: **0,7 s/pagina** (prima ~35), testo uguale
-al 99,8% a quello della CPU; banco intero (825 pagine) riletto in 281 s, risultato 417/425 ·
-798/948 · 824/948 contro 417 · 799 · 825 con la lettura della CPU (una voce di differenza).
+(`server/config.ts`). Misura su RTX 5060 Ti 16 GB: **0,7 s/pagina** (prima ~35). Banco
+intero riletto davvero dalla GPU (25/11/2026, `OCR_CACHE=0 npm run harness -- --no-cache`,
+811 pagine in 845 s): testata 417/426, voci esatte **784/948**, Q+P 812/948, contro 417/425 ·
+799 · 825 della lettura CPU. La GPU legge in modo leggermente diverso (stessa confidenza,
+~4% delle cifre diverse sulle pagine col retino di Progetto Costruzioni) e la messa a punto
+dei parser è stata fatta sulle letture CPU: −15 voci, quasi tutte su Progetto (−6), Eureka,
+Gecob e PF Future (−2 ciascuno). La misura del 23/11 (281 s, 798 voci) era sbagliata: 718
+pagine su 811 venivano dalla cache del server (`.ocr-cache`, letture CPU). Il riconoscimento
+va a lotti di 8 anche sulla GPU (`PADDLE_REC_BATCH`): con 16 la testata scendeva a 414.
 Processi in parallelo (`PADDLE_WORKERS`) su 52 pagine, avvio dei modelli compreso: 1 → 24 s,
 2 → 19 s, 3 → 20 s; resta 3.
 

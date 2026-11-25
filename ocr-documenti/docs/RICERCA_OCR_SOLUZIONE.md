@@ -742,10 +742,36 @@ L.Catania a 44/46: voci esatte **799/948** (84%), quantità e prezzo giusti **82
 ## 27. Scheda video e pulizia dell'immagine (23/11/2026)
 
 **Scheda video.** Con paddle per CUDA 12.9 (`.venv-cu129`) la RTX 5060 Ti legge una pagina in
-0,7 s invece di ~35 s sul processore. Banco intero riletto in 281 s: testata **417/425**, voci
-esatte **798/948**, quantità e prezzo **824/948**, righe in più 23 (con la lettura della CPU 417 ·
-799 · 825 · 25). La differenza è una voce: piccoli scarti di arrotondamento fra GPU e CPU (testo
-uguale al 99,8% su 10 pagine campione). Da qui in avanti la cache del banco è quella della GPU.
+0,7 s invece di ~35 s sul processore.
+
+*Correzione del 25/11/2026.* La prima misura del banco (281 s, 798 voci esatte) era sbagliata:
+`--no-cache` salta la cache del banco ma non quella del server (`.ocr-cache`, `server/ocr.ts`),
+e 718 pagine su 811 sono state prese da lì, cioè dalle letture CPU. Rifatta con la lettura vera
+(`OCR_CACHE=0 PADDLE_WORKERS=1 npm run harness -- --no-cache`):
+
+| Lettura | Testata | Voci esatte | Q+P | In più | Tempo banco |
+|---|---|---|---|---|---|
+| CPU (cache del 23/11, griglie ricalcolate) | 417/425 | **799** | **825** | 25 | ore |
+| GPU, lotti di riconoscimento da 16 | 414/426 | 784 | 811 | 22 | 778 s |
+| GPU, lotti da 8 (come la CPU) — **in uso** | **417/426** | 784 | 812 | 22 | 845 s |
+
+- Due letture GPU della stessa pagina sono identiche (0 cifre diverse su 100 pagine): la differenza
+  dalla CPU non è casuale, è il calcolo della scheda. La confidenza media resta la stessa; sulle pagine
+  normali il testo è uguale al 99,1-99,9%, su quelle col retino di Progetto (pag. 39-50) all'89-98%,
+  ~4% delle cifre diverse.
+- Le voci perse (−15) sono soprattutto Progetto 57→51, Eureka 4→2, Gecob 34→32, PF Future uffici
+  65→64: i parser sono stati messi a punto sulle letture CPU e alcuni passaggi sono fragili a una
+  cifra o a una macchia letta diversamente (Eureka perde 1 × 750 e 1 × 6.000 con testo quasi uguale).
+- Lotti da 16 → 8: nel lotto i ritagli si allungano al più largo, quindi la grandezza del lotto
+  cambia la lettura. Con 8 tornano i tre campi di testata della CPU (Sabbie d'oro, Contratto.pdf,
+  TMT) al costo del 9% di tempo; `ocr_worker.py` ora usa 8 su entrambi i dispositivi.
+- Escluso che dipenda dalle griglie: la cache CPU aveva `griglia: null` su pagine dove la regola del
+  17/11 («almeno 6 verticali bastano») oggi trova colonne, ma con le griglie ricalcolate le letture
+  CPU danno ancora 799.
+
+Da qui in avanti la cache del banco è quella della GPU con lotti da 8 (lettura del 25/11), cioè
+quella che ottiene chi usa il programma. Prossimo passo: rimettere a punto i parser sulle letture GPU,
+partendo da Eureka e Gecob.
 
 **Pulizia dell'immagine prima dell'OCR: provata e scartata.** Quattro passi, ognuno applicato
 solo alle pagine che ne avevano bisogno, con la cache del banco separata per variante:
@@ -758,6 +784,11 @@ solo alle pagine che ne avevano bisogno, con la cache del banco separata per var
 | stira il contrasto (inchiostro sbiadito) | 106 | 412 | 775 | 802 |
 | raddrizza + sfondo + contrasto | 242+1+106 | 411 | 713 | 760 |
 | togli il retino (solo Progetto e AQ3 nolo) | 15 | — | Progetto 58→45, AQ3 18→15 | — |
+
+*Nota del 25/11:* la riga «nessuna» (798) usava in gran parte letture CPU, mentre le varianti
+erano lette davvero dalla GPU (lotti da 16). Contro la base giusta (GPU, 784; Progetto 51, AQ3 18)
+le varianti restano tutte peggiori: contrasto −9, raddrizza −59/−72, retino Progetto 51→45 e
+AQ3 18→15. La decisione di scartarle non cambia.
 
 Perché peggiorano, misurato e non supposto:
 - **raddrizza**: la lettura OCR non cambia (confidenza 94-98% prima e dopo, stessi blocchi), cambia
