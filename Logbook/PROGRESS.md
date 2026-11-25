@@ -36,7 +36,8 @@ sessione per riprendere da dove si era rimasti.
 - **Codice via email provato dall'utente (25/11):** arrivato ✅
 - **Giorno 33 (25/11):** seconda verifica di sicurezza su tutta l'app, quattro correzioni ✅
 - **Giorno 34 (25/11):** copie di sicurezza con SQL, blocco progressivo, sessioni a 15 minuti, codice via email per gli amministratori, primo admin all'installazione e ruolo dato solo dal proprietario, registro attività nel menu ✅
-- **Prossimo:** nessun lavoro aperto. Consigliato all'utente: LOGBOOK_BACKUP_DIR su un altro disco, casella di posta dedicata, HTTPS in rete
+- **Giorno 35 (25/11):** Logbook pubblicabile su Vercel: PostgreSQL esterno, file/codici/blocchi nel database, pacchetto con scripts/vercel-build.mjs ✅ (provato in locale, da pubblicare con l'account dell'utente)
+- **Prossimo:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
@@ -976,3 +977,25 @@ Verifiche:
 - Playwright su Edge 10/10 su una copia del database con finto server di posta: accesso in due passi, codice sbagliato rifiutato, PC fidato, registro, ruolo dato e tolto, copia a mano.
 - Installatori: controllo sintattico e prova a secco. La domanda delle credenziali è interattiva e va provata a mano su un PC nuovo.
 - Guida: immagini 44, 45, 46.
+
+### Giorno 35 — Logbook su Vercel (25/11/2026) ✅
+
+Richiesta: "il programma verrà caricato su Vercel per il momento", confermato dopo l'avviso che serviva cambiare struttura (risposta 1b: Vercel con database esterno; 2b: accesso da fuori per HR e dipendenti). Scadenza: il giorno dopo.
+
+Scelta di fondo: **uno schema, due database**. In locale e nella suite resta SQLite con tutti i test; su Vercel PostgreSQL. `scripts/schema-postgres.mjs` copia `prisma/schema.prisma` cambiando solo il provider (`prisma/postgres/schema.prisma`, generato e non versionato); `prisma.config.ts` e `server/db.ts` scelgono dal `DATABASE_URL` (`suPostgres()` in `server/database-url.ts`).
+
+Cosa è stato fatto:
+- **Database**: `server/db.ts` usa l'adapter `pg` con PostgreSQL (nuove dipendenze `@prisma/adapter-pg` 7.10.1, `pg` 8.23.1). Su PostgreSQL la struttura si allinea con `prisma db push` (`scripts/prepara-db.ts`).
+- **Niente memoria che dura**: tre tabelle nuove (migrazione SQLite `20261125150000_stato_per_vercel`).
+  - `StatoTemporaneo` (`servizi/stato-temporaneo.ts`): codici via email e accessi in attesa del codice, ora sempre nel database anche in locale;
+  - `TentativoAccesso` (`servizi/limitatore.ts`): blocco progressivo con incremento in un'operazione sola; in locale resta la versione in memoria;
+  - `ContenutoFile` (`servizi/archivio-file.ts`): contenuto dei file caricati, massimo 4 MB (limite delle richieste su Vercel).
+- **Funzione Vercel**: `server/vercel-funzione.ts` esporta l'app Express; `server/vercel.ts` con `tieniVivo` (waitUntil di `@vercel/functions` 3.11.0) per registro ed email scritti a risposta già inviata; pulizia periodica alla prima richiesta di ogni processo.
+- **Build**: `scripts/vercel-build.mjs` produce `.vercel/output` (Build Output API v3): interfaccia statica, server in un file con esbuild, instradamento e intestazioni di sicurezza; `vercel.json` con regione `fra1`. `scripts/vercel-prova.mjs` lo serve in locale.
+- **Dettagli**: data di oggi nel fuso italiano (`oggiItalia`, su Vercel l'orologio è UTC); `trust proxy` adatto a Vercel; su PostgreSQL niente copia locale (la fa il servizio del database) e il riquadro del proprietario lo dice.
+- `docs/vercel.md`: passi di pubblicazione, variabili, limiti.
+
+Verifiche:
+- `npm test` 264/264 su SQLite, di cui 4 nuovi in `giorno35.test.ts` (file nel database, blocco su database anche in parallelo, stato a scadenza, fuso italiano). Typecheck ok.
+- Prova completa del percorso Vercel in una cartella pulita, contro un PostgreSQL incorporato (PGlite, perché Docker su questo PC non partiva): `npm ci`, `vercel-build` (tabelle, amministratore, festività), poi il pacchetto servito da `vercel-prova`. 14 verifiche su 14 utili: accesso, sessione, dati di esempio (341 fasce), dashboard, calendario, esportazione Excel, file nel database, limite di 4 MB, registro, blocco dopo 10 errori, uscita.
+- NON provato: la pubblicazione vera su Vercel (serve l'account dell'utente) e l'invio email da lì.

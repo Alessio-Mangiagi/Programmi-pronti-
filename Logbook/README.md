@@ -107,6 +107,12 @@ Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Su Vercel (dal 25/11/2026)
+
+Logbook si pubblica anche su Vercel, con un database PostgreSQL esterno al posto del file
+SQLite e i file caricati dentro il database: passi, variabili e limiti in
+[docs/vercel.md](docs/vercel.md). In locale e nella suite non cambia nulla.
+
 ### Sicurezza (dal 25/11/2026)
 
 - **Primo amministratore**: nome utente e password si scelgono all'installazione
@@ -211,6 +217,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
 | `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
+| `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Logbook usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |
 | `LOGBOOK_BACKUP_DIR` | `data/backup` | Cartella delle copie di sicurezza (una al giorno, 30 giorni): meglio un altro disco |
 | `LOGBOOK_CODICE_ACCESSO` | attivo | `0` spegne il codice via email all'accesso degli amministratori |
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
