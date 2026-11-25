@@ -186,7 +186,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_ADMIN_PASSWORD` | `Admin2026!` | Password dell'admin creato solo se non ne esiste nessuno |
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
 | `LOGBOOK_DOCUMENTI_DIR` | `data/documenti` | Cartella dei file caricati (attestati, documenti, documentazione dei progetti): va nel backup insieme al database |
-| `LOGBOOK_COOKIE_SECURE` | — | `1` dietro HTTPS: il cookie viaggia solo cifrato |
+| `LOGBOOK_COOKIE_SECURE` | — | `1` forza il cookie solo cifrato; dal 25/11/2026 lo diventa da solo quando la richiesta arriva in HTTPS |
 | `LOGBOOK_PROPRIETARIO` | — | Username del proprietario (un amministratore): dati di esempio e "Cancella tutti i dati" |
 | `LOGBOOK_PROPRIETARIO_EMAIL` | — | Indirizzo che riceve il codice di conferma |
 | `LOGBOOK_SMTP_HOST` / `_PORT` / `_SICUREZZA` | — / `587` / `starttls` | Server di posta che spedisce il codice (`ssl` sulla 465) |

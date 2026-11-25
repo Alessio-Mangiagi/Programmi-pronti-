@@ -33,7 +33,9 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 31 (25/11):** proprietario (LOGBOOK_PROPRIETARIO): dati di esempio e "Cancella tutti i dati" con codice via email ✅ (manca il server di posta nel .env)
 - **Giorno 32 (25/11):** Logbook dentro e fuori dalla suite: InstallaLogbook.exe (installa-logbook.py), InstallaSuite.exe ricompilato, .env col proprietario anche dalla suite ✅
 - **Posta (25/11):** casella Aruba, smtps.aruba.it porta 465 SSL nel .env locale; password scritta dall'utente nel file. Provati l'accesso al server e l'invio di un'email di prova con la funzione di Logbook ✅
-- **Prossimo:** l'utente prova "Invia il codice per email" dall'interfaccia (inviare il codice non cancella nulla)
+- **Codice via email provato dall'utente (25/11):** arrivato ✅
+- **Giorno 33 (25/11):** seconda verifica di sicurezza su tutta l'app, quattro correzioni ✅
+- **Prossimo:** nessun lavoro aperto; punti lasciati all'utente in fondo al Giorno 33
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
@@ -924,3 +926,29 @@ Verifiche:
   - Nota di metodo: in PowerShell in background `Set-Location` non vale. La prima prova era partita dal repository e aveva fallito per questo, non per l'installatore; rifatta con bash.
 - Dentro la suite: Logbook avviato come fa il Portale (`wscript avvia.vbs` con `PORTALE_APRE_BROWSER=1` e `HOST`); risponde in 5 secondi.
 - `InstallaSuite.exe --dry-run --app logbook` ok; controllata la riga `LOGBOOK_PROPRIETARIO` del `.env`.
+
+### Giorno 33 — Seconda verifica di sicurezza (25/11/2026) ✅
+
+Richiesta: "dobbiamo lavorare sulla sicurezza. Scandaglia tutta l'app e verifica se ci sono dei problemi e chiudili".
+
+Cosa è stato guardato:
+- librerie: `npm audit`, 0 vulnerabilità;
+- tutte le rotte di `server/rotte` con i loro controlli di accesso (chi non è HR vede solo i propri dati, costi e commessa SkyTower nascosti);
+- accesso, sessioni, password, protezione CSRF, gestore degli errori;
+- file caricati e scaricati;
+- il codice nuovo dei Giorni 24-32 (proprietario, codice via email, cancellazione, inserimento a blocchi, installatori);
+- interfaccia: nessun HTML inserito a mano, collegamenti esterni solo http(s);
+- repository: nessun segreto versionato (`.env` e database sono in `.gitignore`).
+
+Problemi trovati e chiusi:
+- **Login senza limite per indirizzo** (`server/rotte/auth.ts`). Il limite era per coppia indirizzo+utente: si poteva provare la stessa password su tanti nomi, o tenere occupato il server cambiando nome a ogni richiesta (ogni verifica costa 16 MB). Ora 30 tentativi falliti in 15 minuti fermano l'indirizzo; i login riusciti non contano.
+- **Cookie di sessione in chiaro dietro HTTPS se si dimenticava `LOGBOOK_COOKIE_SECURE`** (`server/auth/sessioni.ts`). Ora è Secure da solo quando la richiesta arriva in HTTPS. In HTTPS si manda anche `Strict-Transport-Security` (`server/app.ts`).
+- **Risposte delle API conservabili da browser e proxy** (`server/app.ts`): ora `Cache-Control: no-store` su tutte le API.
+- **Account del proprietario modificabile da un altro amministratore** se collegato a una scheda dipendente (`server/rotte/dipendenti.ts`, `proteggiProprietario`): reimpostare la password o disattivarlo ora risponde 403. Il nome del proprietario nel `.env` si legge in minuscolo, come gli username.
+
+Lasciati come sono, con il motivo:
+- `Admin2026!` su un'installazione nuova: provvisoria e da cambiare al primo accesso, ma fino ad allora chi è in rete può entrare per primo. Su un PC nuovo conviene scrivere `LOGBOOK_ADMIN_PASSWORD` nel `.env` prima del primo avvio.
+- La password della casella di posta sta in chiaro in `Logbook\.env`: il file è fuori dal repository e lo legge solo chi accede a questo PC. Aruba non offre una password separata per le applicazioni.
+- Sulla rete locale senza il proxy HTTPS della suite il traffico è in chiaro, come per gli altri programmi della suite.
+
+Verifiche: `npm test` 252/252, di cui 3 nuovi in `giorno33.test.ts` (blocco dell'indirizzo, cookie Secure e HSTS in HTTPS e non in HTTP, niente cache, proprietario protetto). Typecheck ok.
