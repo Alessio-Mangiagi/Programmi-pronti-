@@ -54,6 +54,17 @@ che dura né un server sempre acceso.
 A ogni `git push` sul ramo di produzione Vercel ripubblica da solo. I dati restano: stanno
 nel database, non nel progetto.
 
+## Password dell'amministratore persa
+
+1. In *Settings → Environment Variables* mettere `LOGBOOK_ADMIN_USERNAME`,
+   `LOGBOOK_ADMIN_PASSWORD` (nuova, almeno 12 caratteri con lettere e numeri) e
+   `LOGBOOK_ADMIN_REIMPOSTA` = `1`. `LOGBOOK_PROPRIETARIO` deve avere lo stesso nome utente.
+2. *Deployments → Redeploy*. La build reimposta la password di quell'account (o lo crea) e
+   chiude le sue sessioni.
+3. Entrare: Logbook chiede subito una password nuova.
+4. **Togliere `LOGBOOK_ADMIN_REIMPOSTA`** (e `LOGBOOK_ADMIN_PASSWORD`) dalle variabili,
+   altrimenti ogni build rimette la password provvisoria.
+
 ## Da sapere
 
 - **Dati dei dipendenti.** La funzione gira a Francoforte (`regions: fra1`) e il database

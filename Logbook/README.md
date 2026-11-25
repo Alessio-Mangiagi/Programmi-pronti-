@@ -216,6 +216,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_PORT` | `5210` | Porta in produzione (`npm start`) |
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
+| `LOGBOOK_ADMIN_REIMPOSTA` | — | `1` = alla preparazione del database reimposta la password dell'amministratore indicato (provvisoria). Per il recupero, da togliere subito dopo: docs/vercel.md |
 | `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
 | `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Logbook usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |
 | `LOGBOOK_BACKUP_DIR` | `data/backup` | Cartella delle copie di sicurezza (una al giorno, 30 giorni): meglio un altro disco |

@@ -108,3 +108,21 @@ describe('stato a scadenza nel database', () => {
     expect(await db.prisma.statoTemporaneo.count({ where: { chiave: { startsWith: 'prova:' } } })).toBe(0);
   });
 });
+
+describe('recupero dell\'amministratore', () => {
+  it('reimposta la password (provvisoria), chiude le sessioni, rifiuta password deboli', async () => {
+    const { reimpostaAdmin } = await import('../auth/password-provvisorie');
+    const { verificaPassword } = await import('../auth/password');
+    const prima = await db.prisma.utente.findUniqueOrThrow({ where: { username: 'admin' } });
+    await db.prisma.sessione.create({ data: { id: 'sessione-vecchia', utenteId: prima.id, scadeIl: new Date(Date.now() + 60_000) } });
+    await expect(reimpostaAdmin(db.prisma, 'admin', 'corta1')).rejects.toThrow(/almeno 12/);
+    expect(await reimpostaAdmin(db.prisma, ' Admin ', 'Ponteggio-Nuovo-83')).toEqual({ username: 'admin', creato: false });
+    const dopo = await db.prisma.utente.findUniqueOrThrow({ where: { username: 'admin' } });
+    expect(await verificaPassword('Ponteggio-Nuovo-83', dopo.passwordHash)).toBe(true);
+    expect(dopo.passwordDaCambiare).toBe(true);
+    expect(await db.prisma.sessione.count({ where: { utenteId: prima.id } })).toBe(0);
+    // Un nome che non esiste: nasce come amministratore.
+    expect(await reimpostaAdmin(db.prisma, 'titolare', 'Ponteggio-Nuovo-83')).toEqual({ username: 'titolare', creato: true });
+    expect((await db.prisma.utente.findUniqueOrThrow({ where: { username: 'titolare' } })).ruolo).toBe('ADMIN');
+  });
+});

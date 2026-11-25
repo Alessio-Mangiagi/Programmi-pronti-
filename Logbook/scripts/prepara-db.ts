@@ -86,7 +86,7 @@ try {
   // Senza nessun amministratore nessuno potrebbe creare account: se manca se ne crea uno con
   // la password di LOGBOOK_ADMIN_PASSWORD o quella di prova. Dal Giorno 24 (risposta 1a)
   // Logbook obbliga a cambiarla al primo accesso (server/auth/password-provvisorie.ts).
-  const { assicuraAdmin, segnaPasswordPubblicate } = await import('../server/auth/password-provvisorie');
+  const { assicuraAdmin, reimpostaAdmin, segnaPasswordPubblicate } = await import('../server/auth/password-provvisorie');
   const { CREDENZIALI_DEMO, USERNAME_DEMO } = await import('../prisma/seed');
   // Giorno 34: il primo amministratore nasce con le credenziali scelte all'installazione
   // (l'installatore le passa solo a questo comando, non le scrive nel .env). Senza, "admin"
@@ -101,6 +101,17 @@ try {
     console.log('[logbook] Annotarla ORA: non viene più mostrata. Al primo accesso Logbook chiede di cambiarla.');
   } else if (creato) {
     console.log(`[logbook] creato l'amministratore "${creato.username}" con la password scelta all'installazione.`);
+  }
+  // Recupero dell'amministratore (25/11/2026): con LOGBOOK_ADMIN_REIMPOSTA=1 la password di
+  // LOGBOOK_ADMIN_USERNAME diventa LOGBOOK_ADMIN_PASSWORD, provvisoria. Serve quando la
+  // password è persa (su Vercel quella generata si vede solo nel log della prima build).
+  if (!creato && process.env.LOGBOOK_ADMIN_REIMPOSTA === '1') {
+    if (!process.env.LOGBOOK_ADMIN_USERNAME || !process.env.LOGBOOK_ADMIN_PASSWORD) {
+      throw new Error('LOGBOOK_ADMIN_REIMPOSTA=1 richiede LOGBOOK_ADMIN_USERNAME e LOGBOOK_ADMIN_PASSWORD');
+    }
+    const r = await reimpostaAdmin(prisma, process.env.LOGBOOK_ADMIN_USERNAME, process.env.LOGBOOK_ADMIN_PASSWORD);
+    console.log(`[logbook] amministratore "${r.username}" ${r.creato ? 'creato' : 'reimpostato'} con la password di LOGBOOK_ADMIN_PASSWORD (provvisoria).`);
+    console.log('[logbook] Togliere ora LOGBOOK_ADMIN_REIMPOSTA dalle variabili.');
   }
   // In produzione (Logbook raggiungibile in rete) chi ha ancora una password scritta nel
   // README la deve cambiare al prossimo accesso: amministratori e account di esempio.
