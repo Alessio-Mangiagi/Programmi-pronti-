@@ -31,7 +31,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 29 (24/11):** grafici dell'avanzamento dei progetti in dashboard ✅
 - **Giorno 30 (25/11):** copia dimostrativa separata provata e tolta su richiesta (un solo database); restano le festività nazionali caricate da sole su un database nuovo ✅
 - **Giorno 31 (25/11):** proprietario (LOGBOOK_PROPRIETARIO): dati di esempio e "Cancella tutti i dati" con codice via email ✅ (manca il server di posta nel .env)
-- **Prossimo:** Logbook avviabile dentro e fuori dalla suite (risposta 4b: copia della suite, InstallaSuite.exe, InstallaLogbook.exe)
+- **Giorno 32 (25/11):** Logbook dentro e fuori dalla suite: InstallaLogbook.exe (installa-logbook.py), InstallaSuite.exe ricompilato, .env col proprietario anche dalla suite ✅
+- **Prossimo:** server di posta nel .env (dati dall'utente/IT); conferma dell'indirizzo del proprietario; decidere cosa fare della copia vecchia in Documents\suite cosedil
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
 
@@ -897,3 +898,27 @@ Verifiche:
 - Typecheck ok.
 - Playwright su Edge 8/8, su una copia del database con un finto server di posta locale: l'email passa davvero da `nodemailer`.
 - Guida: immagini 42 e 43.
+
+### Giorno 32 — Logbook dentro e fuori dalla suite (25/11/2026) ✅
+
+Richiesta: "mi serve che il programma possa funzionare fuori dalla suite e quindi si deve poter avviare sia dentro che fuori". Risposta 4b: oltre alla suite, un installatore solo per Logbook.
+
+Cosa è stato fatto:
+- **Fuori dalla suite**: `installa-logbook.py`, compilato in `InstallaLogbook.exe` (PyInstaller 6.22.3 in un ambiente separato, niente installato nel sistema; l'exe è in `.gitignore`). Passi:
+  - controlla Node.js 20.19+, ma non lo installa;
+  - `npm ci`;
+  - crea il `.env` con `LOGBOOK_PROPRIETARIO=admin` e chiede email del proprietario e accesso dalla rete;
+  - `npm run prestart`: database vuoto con admin e festività, interfaccia compilata;
+  - icona "Logbook" sul desktop verso `avvia.bat`.
+  - Opzioni: `--si`, `--senza-collegamento`, `--dry-run`.
+- **Dentro la suite**:
+  - `installa-suite.py` (radice del repository): il `.env` di Logbook nasce con `LOGBOOK_PROPRIETARIO=admin`;
+  - `InstallaSuite.exe` ricompilato nella radice della suite; il vecchio (9/11) è in `Documents\suite cosedil\_backup-installer\InstallaSuite-20261109.exe`;
+  - la card Logbook del Portale c'era già.
+- **Copia `Documents\suite cosedil`**: Logbook NON è stato copiato lì. La suite vera gira dal repository: il Portale parte da `Programmi-pronti-\portale\avvia.bat` e da quella copia prende solo i dati, con `PORTALE_DATA_DIR`. Il codice del Portale in quella copia è di settembre. Una seconda cartella Logbook avrebbe avuto un secondo database. Si è chiesto all'utente.
+
+Verifiche:
+- Fuori dalla suite: copia di Logbook in una cartella vuota (senza `node_modules`, `data`, `.env`), poi `InstallaLogbook.exe --si --senza-collegamento`, in 1 minuto e mezzo. Server avviato su una porta di prova: interfaccia servita, `admin`/`Admin2026!` entra con la password da cambiare.
+  - Nota di metodo: in PowerShell in background `Set-Location` non vale. La prima prova era partita dal repository e aveva fallito per questo, non per l'installatore; rifatta con bash.
+- Dentro la suite: Logbook avviato come fa il Portale (`wscript avvia.vbs` con `PORTALE_APRE_BROWSER=1` e `HOST`); risponde in 5 secondi.
+- `InstallaSuite.exe --dry-run --app logbook` ok; controllata la riga `LOGBOOK_PROPRIETARIO` del `.env`.

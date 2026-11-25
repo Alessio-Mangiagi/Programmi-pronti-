@@ -28,6 +28,25 @@ Su Windows basta il doppio clic su **`avvia.bat`**: la prima volta installa le d
 poi avvia tutto e apre il browser. **`avvia.vbs`** fa lo stesso senza finestra (è il
 launcher usato dal Portale della suite).
 
+### Dentro e fuori dalla suite (dal 25/11/2026)
+
+Logbook non usa niente della suite (né `shared/` né il login del Portale): la stessa
+cartella parte nei due modi, con lo stesso database e lo stesso `.env`.
+
+- **Fuori dalla suite**, su un PC qualsiasi con Node.js 20.19 o successivo:
+  1. copiare la cartella `Logbook` (senza `node_modules` e `data`);
+  2. fare doppio clic su **`InstallaLogbook.exe`**. Controlla Node.js, installa le
+     dipendenze e crea il `.env` (proprietario `admin`; chiede l'email del proprietario e
+     se Logbook va raggiunto dagli altri PC). Poi prepara database e interfaccia e mette
+     l'icona **Logbook** sul desktop, che avvia `avvia.bat`.
+
+  Node.js non lo installa: se manca dice dove scaricarlo. `InstallaLogbook.exe` si
+  ricompila da `installa-logbook.py` (comando in testa al file) e non sta nel repository,
+  come `InstallaSuite.exe`.
+- **Dentro la suite**: lo installa `InstallaSuite.exe` dalla radice della suite (voce
+  Logbook) e lo apre la card **Logbook** del Portale (`avvia.vbs`, senza finestra). Vedi
+  "Nella suite Cosedil" più sotto.
+
 Al primo avvio viene creato `data/logbook.db`:
 
 - con **`npm start` / `avvia.bat`** (produzione) il database parte **vuoto**, con il solo

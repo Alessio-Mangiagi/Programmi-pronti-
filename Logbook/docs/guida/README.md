@@ -7,7 +7,9 @@ progetti, e gestisce **ferie, permessi, malattia e festività**. HR può anche i
 da Excel ed estrarre i report.
 
 Si apre dal browser all'indirizzo che vi ha dato l'ufficio (sul PC: **http://127.0.0.1:5210**)
-oppure dalla card **Logbook** del Portale della suite. Funziona anche dal **cellulare** e
+oppure dalla card **Logbook** del Portale della suite. Funziona anche **senza la suite**: su
+un PC con Node.js si installa con un doppio clic su `InstallaLogbook.exe`, nella cartella di
+Logbook, e si apre dall'icona **Logbook** sul desktop. Funziona anche dal **cellulare** e
 sfrutta tutta la larghezza degli schermi **ultra wide** (vedi il capitolo 4).
 
 ---
