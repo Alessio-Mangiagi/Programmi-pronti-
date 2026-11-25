@@ -31,7 +31,10 @@ export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { 
   // Mai la cartella vera dei documenti (data/documenti): ogni server di prova ne ha una
   // temporanea, cancellata da chiudi().
   const cartellaDocumenti = opzioni.cartellaDocumenti ?? fs.mkdtempSync(path.join(os.tmpdir(), 'logbook-doc-'));
-  const server = creaApp(prisma, { codiceAccesso: false, ...opzioni, cartellaDocumenti }).listen(0, '127.0.0.1');
+  // Mai la cartella vera delle copie di sicurezza (data/backup): anche questa è temporanea.
+  // Il codice via email all'accesso degli amministratori è spento, salvo che il test lo chieda.
+  const cartellaBackup = opzioni.cartellaBackup ?? fs.mkdtempSync(path.join(os.tmpdir(), 'logbook-copie-'));
+  const server = creaApp(prisma, { codiceAccesso: false, ...opzioni, cartellaDocumenti, cartellaBackup }).listen(0, '127.0.0.1');
   await new Promise((ok) => server.once('listening', ok));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
@@ -71,6 +74,7 @@ export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { 
     chiudi: async () => {
       await new Promise<void>((ok) => server.close(() => ok()));
       fs.rmSync(cartellaDocumenti, { recursive: true, force: true });
+      if (!opzioni.cartellaBackup) fs.rmSync(cartellaBackup, { recursive: true, force: true });
     },
   };
 }
