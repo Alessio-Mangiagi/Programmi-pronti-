@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { api, ErroreApi } from '../api';
 import { usaDati } from '../usaDati';
+import { AccountAmministratori } from './AccountAmministratori';
 import { Avviso, Campo, classiInput, Pulsante } from './ui';
 
 type Stato =
@@ -31,14 +32,14 @@ type Stato =
       registrazioni: number;
     };
 
-type Esito = { dipendenti: number; progetti: number; registrazioni: number; assenze: number; account: number; file: number };
+type Esito = { dipendenti: number; progetti: number; registrazioni: number; assenze: number; account: number; file: number; copia?: string };
 
 const ora = (iso: string) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
 export function DatiProgramma() {
   const { dati: stato, ricarica } = usaDati<Stato>('/api/proprietario/stato');
   const [messaggio, setMessaggio] = useState<{ tipo: 'errore' | 'successo' | 'info'; testo: string } | null>(null);
-  const [lavoro, setLavoro] = useState<'esempio' | 'codice' | 'cancella' | null>(null);
+  const [lavoro, setLavoro] = useState<'esempio' | 'codice' | 'cancella' | 'copia' | null>(null);
   const [inviato, setInviato] = useState<{ inviatoA: string; scadeAlle: string } | null>(null);
   const [codice, setCodice] = useState('');
   const [conferma, setConferma] = useState('');
@@ -67,6 +68,12 @@ export function DatiProgramma() {
       await ricarica();
     });
 
+  const copiaOra = () =>
+    esegui('copia', async () => {
+      const r = await api.post<{ file: string; documentiCopiati: number }>('/api/proprietario/backup');
+      setMessaggio({ tipo: 'successo', testo: `Copia di sicurezza fatta: ${r.file} (${r.documentiCopiati} file caricati nuovi).` });
+    });
+
   const chiediCodice = () =>
     esegui('codice', async () => {
       const r = await api.post<{ inviatoA: string; scadeAlle: string }>('/api/proprietario/cancellazione/codice');
@@ -84,7 +91,7 @@ export function DatiProgramma() {
       setConferma('');
       setMessaggio({
         tipo: 'successo',
-        testo: `Cancellati ${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce orarie, ${r.assenze} assenze, ${r.account} account e ${r.file} file. Logbook è come appena installato.`,
+        testo: `Cancellati ${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce orarie, ${r.assenze} assenze, ${r.account} account e ${r.file} file. Logbook è come appena installato.${r.copia ? ` Copia di sicurezza fatta prima: ${r.copia}` : ''}`,
       });
       await ricarica();
     });
@@ -114,11 +121,25 @@ export function DatiProgramma() {
         </Pulsante>
       </div>
 
+      <AccountAmministratori />
+
+      <div className="space-y-2 border-t border-gray-100 pt-3">
+        <h3 className="font-ui text-sm font-semibold text-testo-forte">Copia di sicurezza</h3>
+        <p className="text-sm text-gray-600">
+          Logbook copia da solo il database e i file caricati una volta al giorno e tiene le copie 30 giorni (cartella <code>data\backup</code>, oppure quella di{' '}
+          <code>LOGBOOK_BACKUP_DIR</code> nel file <code>.env</code>: meglio un altro disco). Qui ne fai una subito.
+        </p>
+        <Pulsante onClick={copiaOra} disabled={lavoro !== null}>
+          {lavoro === 'copia' ? 'Copia in corso…' : 'Fai una copia adesso'}
+        </Pulsante>
+      </div>
+
       <div className="space-y-3 rounded border border-errore/30 bg-[#fdf3f2] p-3">
         <h3 className="font-ui text-sm font-semibold text-errore">Cancella tutti i dati</h3>
         <p className="text-sm text-gray-700">
           Cancella dipendenti, progetti, ore, assenze, attestati, documenti e file caricati, mansioni, festività locali e aziendali e tutti gli altri account.{' '}
-          <b>Restano</b> il tuo account con la sua password, il collegamento a SkyTower e le festività nazionali. Non si può annullare.
+          <b>Restano</b> il tuo account con la sua password, il collegamento a SkyTower, le festività nazionali e il registro attività. Prima Logbook fa una copia di
+          sicurezza, che resta 30 giorni.
         </p>
         {!pronto ? (
           <Avviso tipo="attenzione">

@@ -13,7 +13,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { oggiIso } from '../comune/date';
-import { api, ErroreApi } from './api';
+import { api, ErroreApi, ultimaAzioneUtente } from './api';
 import type { UtenteCollegato } from './tipi';
 
 type StatoAuth = {
@@ -25,7 +25,14 @@ type StatoAuth = {
   oggi: string;
   /** true se la data del PC non coincide con quella di Logbook. */
   orologioDiverso: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  /**
+   * Accesso. Restituisce null se si è entrati; per un amministratore da un PC non ancora
+   * riconosciuto restituisce l'indirizzo (mascherato) a cui è andato il codice: serve poi
+   * confermaCodice (Giorno 34).
+   */
+  login: (username: string, password: string) => Promise<{ inviatoA: string } | null>;
+  /** Secondo passo dell'accesso di un amministratore: il codice ricevuto per email. */
+  confermaCodice: (codice: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Rilegge l'utente collegato (dopo il cambio della password provvisoria, Giorno 24). */
   ricarica: () => Promise<void>;
@@ -38,6 +45,11 @@ const ContestoAuth = createContext<StatoAuth | null>(null);
  * mostrata" (componenti/Segnalazioni.tsx). Il login le toglie: a ogni accesso HR la rivede.
  */
 export const PREFISSO_NOTIFICHE_MOSTRATE = 'logbook.segnalazioni.mostrate.';
+
+/** Chiave di sessionStorage: "la sessione si è chiusa per inattività" (lo dice la pagina di accesso). */
+export const CHIAVE_INATTIVITA = 'logbook.sessione.inattivita';
+/** Come il server (server/auth/sessioni.ts): 15 minuti senza azioni e la sessione si chiude. */
+const INATTIVITA_MS = 15 * 60 * 1000;
 
 export function FornitoreAuth({ children }: { children: ReactNode }) {
   const [utente, setUtente] = useState<UtenteCollegato | null>(null);
@@ -86,8 +98,8 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('logbook:sessione-scaduta', scaduta);
   }, [ricarica]);
 
-  const login = async (username: string, password: string) => {
-    await api.post('/api/auth/login', { username, password });
+  /** Dopo un accesso riuscito: HR rivede le segnalazioni e si rilegge l'utente. */
+  const entrato = async () => {
     // Giorno 20: a ogni accesso HR rivede la finestra delle segnalazioni aperte
     // (componenti/Segnalazioni.tsx la mostra una volta e lo ricorda in sessionStorage).
     try {
@@ -97,6 +109,50 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
     }
     await ricarica();
   };
+
+  const login = async (username: string, password: string) => {
+    const r = await api.post<{ ok: boolean; codiceRichiesto?: boolean; inviatoA?: string }>('/api/auth/login', { username, password });
+    if (r.codiceRichiesto) return { inviatoA: r.inviatoA ?? 'la tua email' };
+    await entrato();
+    return null;
+  };
+
+  const confermaCodice = async (codice: string) => {
+    await api.post('/api/auth/codice', { codice });
+    await entrato();
+  };
+
+  // Giorno 34: sessione chiusa dopo 15 minuti senza azioni. Ogni 20 secondi, da collegati:
+  // - utente fermo da 15 minuti: si esce e la pagina di accesso lo spiega;
+  // - utente attivo: una chiamata leggera al minuto dice al server che c'è (chi legge o
+  //   compila un modulo lungo senza salvare non deve essere buttato fuori). Se il server
+  //   risponde 401 la sessione è già chiusa.
+  const collegato = utente !== null;
+  useEffect(() => {
+    if (!collegato) return;
+    let ultimoSegnale = Date.now();
+    const perInattivita = () => {
+      try {
+        sessionStorage.setItem(CHIAVE_INATTIVITA, '1');
+      } catch {
+        /* archivio del browser non disponibile */
+      }
+      setUtente(null);
+    };
+    const controllo = setInterval(() => {
+      const fermoDa = Date.now() - ultimaAzioneUtente();
+      if (fermoDa > INATTIVITA_MS) {
+        api.post('/api/auth/logout').catch(() => undefined);
+        perInattivita();
+      } else if (fermoDa < 60 * 1000 && Date.now() - ultimoSegnale > 60 * 1000) {
+        ultimoSegnale = Date.now();
+        api.get('/api/auth/io').catch((e) => {
+          if (e instanceof ErroreApi && e.stato === 401) perInattivita();
+        });
+      }
+    }, 20 * 1000);
+    return () => clearInterval(controllo);
+  }, [collegato]);
 
   const logout = async () => {
     try {
@@ -109,7 +165,7 @@ export function FornitoreAuth({ children }: { children: ReactNode }) {
   return (
     <ContestoAuth.Provider
       value={{
-        utente, caricamento, admin: utente?.ruolo === 'ADMIN', login, logout, ricarica,
+        utente, caricamento, admin: utente?.ruolo === 'ADMIN', login, confermaCodice, logout, ricarica,
         oggi: oggiServer ?? oggiPc,
         orologioDiverso: oggiServer !== null && oggiServer !== oggiPc,
       }}

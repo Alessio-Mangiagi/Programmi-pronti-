@@ -21,6 +21,7 @@ import { Impostazioni } from './pagine/Impostazioni';
 import { Login } from './pagine/Login';
 import { PasswordProvvisoria } from './pagine/PasswordProvvisoria';
 import { Progetti } from './pagine/Progetti';
+import { Registro } from './pagine/Registro';
 import { SchedaAssenza } from './pagine/SchedaAssenza';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
 import { SchedaProgetto } from './pagine/SchedaProgetto';
@@ -53,6 +54,7 @@ function Rotte() {
         <Route path="importa" element={<SoloAdmin><Importa /></SoloAdmin>} />
         <Route path="esporta" element={<SoloAdmin><Esporta /></SoloAdmin>} />
         <Route path="impostazioni" element={<SoloAdmin><Impostazioni /></SoloAdmin>} />
+        <Route path="registro" element={<SoloAdmin><Registro /></SoloAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

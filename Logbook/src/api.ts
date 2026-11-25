@@ -21,8 +21,25 @@ export class ErroreApi extends Error {
   }
 }
 
+/**
+ * Ultima azione dell'utente su questa pagina (mouse, tastiera, tocco). Giorno 34: il server
+ * chiude la sessione dopo 15 minuti senza azioni (server/auth/sessioni.ts) e considera
+ * "azione" solo le richieste con X-Logbook-Attivo: 1, che qui si aggiunge se l'utente ha
+ * fatto qualcosa nell'ultimo minuto. Le chiamate che l'interfaccia fa da sola (data,
+ * campanella) partono senza, e non tengono aperta la sessione di un PC lasciato acceso.
+ */
+let ultimaAzione = Date.now();
+export const ultimaAzioneUtente = () => ultimaAzione;
+const UTENTE_ATTIVO_MS = 60 * 1000;
+if (typeof window !== 'undefined') {
+  for (const evento of ['pointerdown', 'keydown', 'wheel', 'mousemove', 'touchstart']) {
+    window.addEventListener(evento, () => { ultimaAzione = Date.now(); }, { passive: true, capture: true });
+  }
+}
+
 async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, grezzo?: Blob | ArrayBuffer, extra: Record<string, string> = {}): Promise<T> {
   const intestazioni: Record<string, string> = { 'X-Logbook': '1', ...extra };
+  if (Date.now() - ultimaAzione < UTENTE_ATTIVO_MS) intestazioni['X-Logbook-Attivo'] = '1';
   let body: BodyInit | undefined;
   if (grezzo !== undefined) {
     intestazioni['Content-Type'] = 'application/octet-stream';

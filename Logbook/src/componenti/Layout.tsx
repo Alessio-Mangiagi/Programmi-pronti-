@@ -38,6 +38,8 @@ const MENU: VoceMenu[] = [
   { a: '/esporta', etichetta: 'Esporta', icona: 'esporta', soloAdmin: true },
   // Dal 24/11/2026: collegamento a SkyTower e altre impostazioni, solo amministratori.
   { a: '/impostazioni', etichetta: 'Impostazioni', icona: 'impostazioni', soloAdmin: true },
+  // Giorno 34 (25/11/2026): chi ha fatto cosa e quando, solo amministratori.
+  { a: '/registro', etichetta: 'Registro attività', icona: 'registro', soloAdmin: true },
 ];
 
 export function Layout() {

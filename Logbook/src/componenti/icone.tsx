@@ -32,6 +32,8 @@ const TRATTI = {
   attestato: 'M12 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM8.5 12.5 7 21l5-3 5 3-1.5-8.5',
   // Giorno 20: campanella delle segnalazioni (notifiche di HR).
   campanella: 'M6 9.5a6 6 0 1 1 12 0c0 4.5 2 6 2 6H4s2-1.5 2-6ZM10 19a2 2 0 0 0 4 0',
+  // Giorno 34: registro attività (elenco puntato).
+  registro: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
 } as const;
 
 export type NomeIcona = keyof typeof TRATTI;

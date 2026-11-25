@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 /**
  * Cambio della password (POST /api/auth/password). Chiede la password attuale; la nuova
- * deve avere almeno 8 caratteri con lettere e numeri ed essere diversa da quella attuale
+ * deve avere almeno 8 caratteri (12 per gli amministratori) con lettere e numeri ed essere diversa da quella attuale
  * (regole del server).
  *
  * ModuloPassword è il modulo da solo: lo usano la finestra "Cambia password" del menu in
@@ -69,7 +69,7 @@ export function ModuloPassword({ onCambiata, secondario, testoSalva = 'Salva' }:
       <Campo etichetta="Password attuale" errore={errori.attuale} obbligatorio>
         <input type="password" autoComplete="current-password" className={classiInput(errori.attuale)} value={attuale} onChange={(e) => setAttuale(e.target.value)} />
       </Campo>
-      <Campo etichetta="Nuova password" errore={errori.nuova} obbligatorio aiuto="Almeno 8 caratteri, con lettere e numeri, diversa da quella attuale">
+      <Campo etichetta="Nuova password" errore={errori.nuova} obbligatorio aiuto="Almeno 8 caratteri (12 per gli amministratori), con lettere e numeri, non una password comune, diversa da quella attuale">
         <input type="password" autoComplete="new-password" className={classiInput(errori.nuova)} value={nuova} onChange={(e) => setNuova(e.target.value)} />
       </Campo>
       <Campo etichetta="Ripeti la nuova password" errore={errori.conferma} obbligatorio>
