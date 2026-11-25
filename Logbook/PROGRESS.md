@@ -35,7 +35,8 @@ sessione per riprendere da dove si era rimasti.
 - **Posta (25/11):** casella Aruba, smtps.aruba.it porta 465 SSL nel .env locale; password scritta dall'utente nel file. Provati l'accesso al server e l'invio di un'email di prova con la funzione di Logbook ✅
 - **Codice via email provato dall'utente (25/11):** arrivato ✅
 - **Giorno 33 (25/11):** seconda verifica di sicurezza su tutta l'app, quattro correzioni ✅
-- **Prossimo:** nessun lavoro aperto; punti lasciati all'utente in fondo al Giorno 33
+- **Giorno 34 (25/11):** copie di sicurezza con SQL, blocco progressivo, sessioni a 15 minuti, codice via email per gli amministratori, primo admin all'installazione e ruolo dato solo dal proprietario, registro attività nel menu ✅
+- **Prossimo:** nessun lavoro aperto. Consigliato all'utente: LOGBOOK_BACKUP_DIR su un altro disco, casella di posta dedicata, HTTPS in rete
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
@@ -952,3 +953,26 @@ Lasciati come sono, con il motivo:
 - Sulla rete locale senza il proxy HTTPS della suite il traffico è in chiaro, come per gli altri programmi della suite.
 
 Verifiche: `npm test` 252/252, di cui 3 nuovi in `giorno33.test.ts` (blocco dell'indirizzo, cookie Secure e HSTS in HTTPS e non in HTTP, niente cache, proprietario protetto). Typecheck ok.
+
+### Giorno 34 — Rafforzamento della sicurezza (25/11/2026) ✅
+
+Richiesta: "implementa tutto e come credenziali admin fai in modo che durante l'installazione venga creato il primo admin con le credenziali inserite e poi solo lui possa dare quel ruolo. Parti dal primo punto e crea il db utilizzando sql. Le password dopo 10 tentativi fai aspettare 5 minuti e dopo sali a 10 e così via. Registro attività deve essere visibile nella barra sinistra solo ad admin. Sessioni solo 15 minuti se l'utente non sta facendo nulla".
+
+Interpretazione di "crea il db utilizzando sql": la copia di sicurezza del database è creata con il comando SQL `VACUUM INTO`. Segnalato all'utente perché la corregga se intendeva altro.
+
+Cosa è stato fatto:
+- **Copie di sicurezza** (`server/servizi/backup.ts`): `VACUUM INTO` una volta al giorno (all'avvio e ogni ora, `server/index.ts`), file caricati copiati accanto, 30 giorni; cartella `LOGBOOK_BACKUP_DIR` o `data/backup`. Una copia `prima-cancellazione-…` parte prima di "Cancella tutti i dati": se non riesce non si cancella niente. Copia a mano dal riquadro del proprietario.
+- **Blocco progressivo** (`server/rotte/auth.ts`): 10 password sbagliate per coppia indirizzo+utente, poi 5 minuti, 10, 20… fino a 24 ore; vale anche per il cambio password. Resta il limite di 30 per indirizzo.
+- **Sessioni a 15 minuti** (`server/auth/sessioni.ts`, `src/api.ts`, `src/auth.tsx`): `Sessione.ultimoUsoIl` si aggiorna solo con le richieste che portano `X-Logbook-Attivo: 1`, aggiunta dall'interfaccia se l'utente ha mosso mouse o tastiera nell'ultimo minuto. Le chiamate automatiche non tengono aperta la sessione. La pagina di accesso spiega la chiusura.
+- **Codice via email per gli amministratori**: da un PC non fidato, dopo la password serve il codice (`POST /api/auth/codice`); PC fidato 30 giorni (tabella `DispositivoFidato`), dimenticato al cambio o al reset della password. Solo con posta configurata e indirizzo noto; `LOGBOOK_CODICE_ACCESSO=0` lo spegne.
+- **Primo amministratore** (`server/auth/password-provvisorie.ts`, `scripts/prepara-db.ts`, i due installatori): credenziali chieste all'installazione e passate solo al comando che crea il database; è il proprietario (`LOGBOOK_PROPRIETARIO` nel `.env`). Senza, `admin` con password casuale mostrata una volta. Via `Admin2026!` dalle installazioni vere.
+- **Ruolo di amministratore** (`server/rotte/proprietario.ts`, `src/componenti/AccountAmministratori.tsx`): solo il proprietario lo dà e lo toglie.
+- **Password**: 12 caratteri per gli amministratori, rifiutate le più comuni.
+- **Registro attività** (`server/servizi/registro.ts`, `src/pagine/Registro.tsx`): tabella `RegistroAttivita`, voce del menu solo per gli amministratori, 400 giorni. "Cancella tutti i dati" non lo cancella.
+- Migrazione SQL `20261125120000_registro_dispositivi_inattivita`.
+
+Verifiche:
+- `npm test` 260/260, di cui 8 nuovi in `giorno34.test.ts`; aggiornati i test dei vecchi limiti. Typecheck ok.
+- Playwright su Edge 10/10 su una copia del database con finto server di posta: accesso in due passi, codice sbagliato rifiutato, PC fidato, registro, ruolo dato e tolto, copia a mano.
+- Installatori: controllo sintattico e prova a secco. La domanda delle credenziali è interattiva e va provata a mano su un PC nuovo.
+- Guida: immagini 44, 45, 46.

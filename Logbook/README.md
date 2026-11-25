@@ -65,7 +65,7 @@ vengono mai toccati: le nuove versioni applicano solo le migrazioni mancanti.
 
 | Ruolo | Nome utente | Password |
 |---|---|---|
-| Amministratore / HR | `admin` | `Admin2026!` |
+| Amministratore / HR (solo con i dati di esempio di `npm run dev`) | `admin` | `Admin2026!` |
 | Dipendente | `mario.rossi`, `giulia.bianchi`, `luca.esposito`, `chiara.ferrari`, `giuseppe.russo` | `Logbook2026!` |
 
 Sono **provvisorie** (Giorno 24): con `npm start` / `avvia.bat`, a ogni avvio Logbook
@@ -106,6 +106,33 @@ amministratore può diventarlo, e il codice arriva solo a `LOGBOOK_PROPRIETARIO_
 Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori dalla suite.
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
+
+### Sicurezza (dal 25/11/2026)
+
+- **Primo amministratore**: nome utente e password si scelgono all'installazione
+  (`InstallaLogbook.exe`, `InstallaSuite.exe`). È il **proprietario**: solo lui dà o toglie
+  il ruolo di amministratore (Impostazioni → Dati del programma → Amministratori). Senza
+  installatore (`npm start` su un database nuovo) nasce `admin` con una password casuale
+  scritta una volta nella finestra di avvio, da cambiare al primo accesso.
+- **Password**: almeno 8 caratteri, 12 per gli amministratori, con lettere e numeri; rifiutate
+  quelle più comuni.
+- **Tentativi sbagliati**: dopo 10 password sbagliate si aspettano 5 minuti; dopo altre 10 il
+  doppio (10, 20, 40 minuti… fino a 24 ore). Un accesso riuscito azzera il conto.
+- **Codice via email per gli amministratori**: da un PC non ancora riconosciuto, dopo la
+  password serve un codice di 6 cifre mandato per email; quel PC resta riconosciuto 30
+  giorni. Vale per gli amministratori di cui si conosce l'indirizzo (il proprietario; gli
+  altri con l'email della loro scheda dipendente) e solo con la posta configurata.
+- **Sessioni**: si chiudono dopo 15 minuti senza toccare mouse o tastiera, e comunque dopo
+  12 ore.
+- **Registro attività** (menu, solo amministratori): accessi riusciti e falliti, blocchi,
+  ruoli, e ogni operazione che modifica o esporta dati, per 400 giorni. Non contiene
+  password né il contenuto dei moduli.
+- **Copie di sicurezza**: il database si copia con il comando SQL `VACUUM INTO` (copia
+  coerente anche a programma acceso) una volta al giorno in `data/backup`
+  (`LOGBOOK_BACKUP_DIR`), con i file caricati; restano 30 giorni. Una copia in più parte
+  prima di "Cancella tutti i dati" e il proprietario può farne una a mano.
+  **Ripristino**: fermare Logbook, copiare il file scelto (es. `logbook-2026-11-25.db`) su
+  `data/logbook.db`, riavviare.
 
 ## Il modello Excel per importare le ore
 
@@ -183,7 +210,9 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_PORT` | `5210` | Porta in produzione (`npm start`) |
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
-| `LOGBOOK_ADMIN_PASSWORD` | `Admin2026!` | Password dell'admin creato solo se non ne esiste nessuno |
+| `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
+| `LOGBOOK_BACKUP_DIR` | `data/backup` | Cartella delle copie di sicurezza (una al giorno, 30 giorni): meglio un altro disco |
+| `LOGBOOK_CODICE_ACCESSO` | attivo | `0` spegne il codice via email all'accesso degli amministratori |
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
 | `LOGBOOK_DOCUMENTI_DIR` | `data/documenti` | Cartella dei file caricati (attestati, documenti, documentazione dei progetti): va nel backup insieme al database |
 | `LOGBOOK_COOKIE_SECURE` | — | `1` forza il cookie solo cifrato; dal 25/11/2026 lo diventa da solo quando la richiesta arriva in HTTPS |

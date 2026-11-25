@@ -23,13 +23,24 @@ dalla scheda del dipendente.
 
 **Al primo accesso Logbook chiede di scegliere una password nuova**: quella data da HR è
 provvisoria e finché non la si cambia non si vede nient'altro. La nuova deve avere almeno
-8 caratteri, con lettere e numeri, ed essere diversa da quella provvisoria. Lo stesso vale
+8 caratteri (12 per gli amministratori), con lettere e numeri, non essere una password comune
+ed essere diversa da quella provvisoria. Lo stesso vale
 per l'amministratore creato all'installazione e per gli account di prova. Dopo, la si
 cambia quando si vuole da **Cambia password**, in alto a destra.
 
 ![Scelta della password al primo accesso](img/36-password-provvisoria.png)
 
-Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.
+Dopo **10 password sbagliate** bisogna aspettare 5 minuti; se si sbaglia ancora l'attesa
+raddoppia ogni volta (10, 20, 40 minuti…).
+
+**Sessione**: se per 15 minuti non si tocca mouse o tastiera, Logbook si chiude da solo e
+chiede di rientrare. Un modulo lasciato a metà va salvato prima di allontanarsi.
+
+**Amministratori, codice via email**: la prima volta che un amministratore entra da un PC,
+dopo la password Logbook manda un codice di 6 cifre alla sua email. Su quel PC non lo
+chiede più per 30 giorni.
+
+![Codice di accesso via email](img/44-codice-accesso.png)
 
 ---
 
@@ -417,6 +428,26 @@ Gli altri amministratori non lo vedono.
 ![Dati del programma: codice inviato per email](img/42-dati-programma-codice.png)
 
 ![Dati del programma: dati di esempio caricati](img/43-dati-programma-esempio.png)
+
+Nello stesso riquadro:
+
+- **Amministratori**: solo il proprietario rende amministratore un account o gli toglie il
+  ruolo. Chi cambia ruolo viene scollegato e rientra con i nuovi poteri.
+- **Copia di sicurezza**: Logbook ne fa una da solo ogni giorno e le tiene 30 giorni; con
+  **Fai una copia adesso** se ne fa una subito. Prima di "Cancella tutti i dati" ne parte
+  sempre una.
+
+![Amministratori e copia di sicurezza](img/46-amministratori-copia.png)
+
+### Registro attività (solo amministratori)
+
+Nel menu a sinistra, **Registro attività** elenca dal più recente chi ha fatto cosa: accessi
+riusciti e falliti, blocchi per troppi tentativi, ore salvate, dipendenti modificati, dati
+esportati, ruoli dati o tolti. Per ogni riga ci sono data e ora, utente, esito e indirizzo
+del PC. Si può cercare per utente o azione e filtrare per esito e periodo. Le righe non si
+possono modificare e restano 400 giorni.
+
+![Registro attività](img/45-registro-attivita.png)
 
 ### Importare le ore da Excel
 
