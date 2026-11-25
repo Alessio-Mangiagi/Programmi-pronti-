@@ -7,7 +7,8 @@
  *
  * Regole:
  * - cartella: LOGBOOK_DOCUMENTI_DIR oppure data/documenti dentro l'app (accanto al
- *   database, quindi nello stesso backup); nei test una cartella temporanea;
+ *   database, quindi nello stesso backup); nei test una cartella temporanea; nella copia
+ *   dimostrativa sempre data/demo/documenti (server/dati-demo.ts);
  * - massimo 20 MB a file;
  * - solo i formati di ufficio (PDF, immagini, Word, Excel, OpenDocument, testo, .p7m),
  *   riconosciuti dall'estensione E dai primi byte del contenuto: un .pdf che non comincia
@@ -19,15 +20,20 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PrismaClient } from '../../generated/prisma/client';
-import { RADICE_APP } from '../database-url';
+import { cartellaDati } from '../database-url';
+import { inDimostrazione } from '../dati-demo';
 import { ErroreHttp } from '../errori';
 
 export const MAX_BYTE_FILE = 20 * 1024 * 1024;
 
-/** Cartella dei documenti: variabile d'ambiente o data/documenti dell'app. */
+/**
+ * Cartella dei documenti: variabile d'ambiente o `documenti` nella cartella dei dati
+ * (data/documenti). La copia dimostrativa usa sempre data/demo/documenti, anche se
+ * LOGBOOK_DOCUMENTI_DIR punta alla cartella dei file veri.
+ */
 export function cartellaDocumentiPredefinita(): string {
-  const env = process.env.LOGBOOK_DOCUMENTI_DIR?.trim();
-  return env ? path.resolve(env) : path.join(RADICE_APP, 'data', 'documenti');
+  const env = inDimostrazione() ? undefined : process.env.LOGBOOK_DOCUMENTI_DIR?.trim();
+  return env ? path.resolve(env) : path.join(cartellaDati(), 'documenti');
 }
 
 type Firma = (b: Buffer) => boolean;

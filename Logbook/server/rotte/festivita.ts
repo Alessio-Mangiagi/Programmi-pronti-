@@ -15,9 +15,9 @@ import { z } from 'zod';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { schemaFestivita } from '../../comune/assenze';
 import { formattaData } from '../../comune/date';
-import { festivitaNazionali } from '../../comune/festivita';
 import { ErroreHttp, nonTrovato } from '../errori';
 import { idDaParametro, richiediAdmin } from '../middleware';
+import { aggiungiFestivitaNazionali } from '../servizi/festivita';
 
 export function rotteFestivita(prisma: PrismaClient) {
   const router = Router();
@@ -52,10 +52,8 @@ export function rotteFestivita(prisma: PrismaClient) {
   /** Aggiunge le festività nazionali dell'anno che mancano; non tocca quelle già presenti. */
   router.post('/carica-nazionali', richiediAdmin, async (req, res) => {
     const { anno } = z.object({ anno: z.coerce.number().int().min(2020, 'Non si possono inserire anni precedenti al 2020').max(2100, 'Anno non valido') }).parse(req.body);
-    const presenti = new Set((await prisma.festivita.findMany({ where: { data: { gte: `${anno}-01-01`, lte: `${anno}-12-31` } } })).map((f) => f.data));
-    const nuove = festivitaNazionali(anno).filter((f) => !presenti.has(f.data));
-    if (nuove.length) await prisma.festivita.createMany({ data: nuove.map((f) => ({ ...f, tipo: 'NAZIONALE' as const })) });
-    res.json({ aggiunte: nuove.length });
+    // Stessa funzione che prepara-db usa per il database vero appena creato.
+    res.json({ aggiunte: await aggiungiFestivitaNazionali(prisma, anno) });
   });
 
   return router;

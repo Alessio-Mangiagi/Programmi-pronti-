@@ -40,9 +40,11 @@ import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
  * - `cartellaInterfaccia`: in produzione la cartella dist/ con l'interfaccia già
  *   compilata, servita dallo stesso server delle API (una sola porta, niente Vite);
  * - `cartellaDocumenti`: dove salvare i file caricati (default data/documenti o
- *   LOGBOOK_DOCUMENTI_DIR; i test ne passano una temporanea).
+ *   LOGBOOK_DOCUMENTI_DIR; i test ne passano una temporanea);
+ * - `dimostrazione`: true nella copia dimostrativa (server/dati-demo.ts): l'interfaccia lo
+ *   legge da GET /api/oggi e mostra la fascia "Copia dimostrativa".
  */
-export type OpzioniApp = { oggi?: () => string; cartellaInterfaccia?: string; cartellaDocumenti?: string };
+export type OpzioniApp = { oggi?: () => string; cartellaInterfaccia?: string; cartellaDocumenti?: string; dimostrazione?: boolean };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const oggi = opzioni.oggi ?? (() => oggiIso());
@@ -75,9 +77,12 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
    * l'orologio del PC, e avvisa se il PC ha un'altra data. Dal Giorno 20 le ore le inserisce
    * solo HR e i giorni futuri restano chiusi: spostare la data del computer non apre nulla,
    * perché il controllo lo fa il server. Senza login di proposito: è solo la data.
+   *
+   * Dal 25/11/2026 dice anche se questa è la copia dimostrativa: l'interfaccia lo legge già
+   * prima dell'accesso, così la fascia "Copia dimostrativa" compare anche sulla pagina di login.
    */
   api.get('/oggi', (_req, res) => {
-    res.json({ oggi: oggi(), adesso: new Date().toISOString() });
+    res.json({ oggi: oggi(), adesso: new Date().toISOString(), dimostrazione: opzioni.dimostrazione === true });
   });
 
   api.use('/auth', rotteAuth(prisma));
