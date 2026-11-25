@@ -32,7 +32,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 30 (25/11):** copia dimostrativa separata provata e tolta su richiesta (un solo database); restano le festività nazionali caricate da sole su un database nuovo ✅
 - **Giorno 31 (25/11):** proprietario (LOGBOOK_PROPRIETARIO): dati di esempio e "Cancella tutti i dati" con codice via email ✅ (manca il server di posta nel .env)
 - **Giorno 32 (25/11):** Logbook dentro e fuori dalla suite: InstallaLogbook.exe (installa-logbook.py), InstallaSuite.exe ricompilato, .env col proprietario anche dalla suite ✅
-- **Prossimo:** server di posta nel .env (dati dall'utente/IT); conferma dell'indirizzo del proprietario; decidere cosa fare della copia vecchia in Documents\suite cosedil
+- **Prossimo:** server di posta nel .env: server e porta li dà l'utente (dall'IT, risposta 2a), la password la scrive lui nel file; poi prova del codice vero
+- **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
 
@@ -915,7 +916,7 @@ Cosa è stato fatto:
   - `installa-suite.py` (radice del repository): il `.env` di Logbook nasce con `LOGBOOK_PROPRIETARIO=admin`;
   - `InstallaSuite.exe` ricompilato nella radice della suite; il vecchio (9/11) è in `Documents\suite cosedil\_backup-installer\InstallaSuite-20261109.exe`;
   - la card Logbook del Portale c'era già.
-- **Copia `Documents\suite cosedil`**: Logbook NON è stato copiato lì. La suite vera gira dal repository: il Portale parte da `Programmi-pronti-\portale\avvia.bat` e da quella copia prende solo i dati, con `PORTALE_DATA_DIR`. Il codice del Portale in quella copia è di settembre. Una seconda cartella Logbook avrebbe avuto un secondo database. Si è chiesto all'utente.
+- **Copia `Documents\suite cosedil`**: Logbook NON è stato copiato lì. La suite vera gira dal repository: il Portale parte da `Programmi-pronti-\portale\avvia.bat` e da quella copia prende solo i dati, con `PORTALE_DATA_DIR`. Il codice del Portale in quella copia è di settembre. Una seconda cartella Logbook avrebbe avuto un secondo database. Risposta dell'utente 3a: la copia resta com'è.
 
 Verifiche:
 - Fuori dalla suite: copia di Logbook in una cartella vuota (senza `node_modules`, `data`, `.env`), poi `InstallaLogbook.exe --si --senza-collegamento`, in 1 minuto e mezzo. Server avviato su una porta di prova: interfaccia servita, `admin`/`Admin2026!` entra con la password da cambiare.
