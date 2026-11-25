@@ -29,6 +29,23 @@ cambia quando si vuole da **Cambia password**, in alto a destra.
 
 Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.
 
+### Logbook vero e copia dimostrativa
+
+Ci sono **due Logbook** con lo stesso aspetto ma dati diversi:
+
+- il **Logbook vero** (http://127.0.0.1:5210, `avvia.bat` o la card del Portale): è quello
+  da usare tutti i giorni. È partito **vuoto**, con il solo amministratore e le festività
+  nazionali: HR inserisce dipendenti, progetti e ore veri;
+- la **copia dimostrativa** (http://127.0.0.1:5211, `avvia-demo.bat`): contiene dipendenti,
+  progetti e ore **di esempio** e serve solo a far vedere come si visualizzano i dati. Lo
+  dice la fascia gialla **Copia dimostrativa**, già sulla pagina di accesso, e lo ricorda
+  il menu a sinistra. **Non inserire mai dati veri nella copia dimostrativa**: non
+  finiscono nel Logbook vero.
+
+![Pagina di accesso della copia dimostrativa](img/42-copia-dimostrativa-accesso.png)
+
+![La copia dimostrativa: fascia sotto l'intestazione e menu](img/43-copia-dimostrativa-dashboard.png)
+
 ---
 
 ## 2. Per i dipendenti
@@ -377,7 +394,8 @@ vedendo il resto dell'anno. La ricerca dell'elenco trova anche matricola e codic
 
 ![Festività](img/09-festivita.png)
 
-Le festività nazionali dell'anno si caricano con un clic (**Carica festività nazionali**).
+Il Logbook vero è partito con le festività nazionali del 2026 e del 2027 già caricate. Per
+gli anni successivi si caricano con un clic (**Carica festività nazionali**).
 Quelle **del paese** (il santo patrono) e le **chiusure aziendali** si aggiungono a mano,
 scegliendo il tipo. Un giorno festivo non conta come giorno lavorativo.
 

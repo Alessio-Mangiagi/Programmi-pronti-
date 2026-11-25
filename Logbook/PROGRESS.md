@@ -29,9 +29,10 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 27 (24/11):** pannello a destra del calendario: più giorni (Ctrl/Maiusc) e più dipendenti insieme, tutto o niente ✅
 - **Giorno 28 (24/11):** documentazione del giorno (file, nota, avanzamento) dalla finestra delle ore, nella documentazione del progetto ✅
 - **Giorno 29 (24/11):** grafici dell'avanzamento dei progetti in dashboard ✅
-- **Prossimo:** piano completato; restano installer (InstallaSuite.exe), copia del Portale in suite cosedil e database vero al posto di quello dimostrativo
+- **Giorno 30 (25/11):** database vero vuoto (con festività nazionali) e copia dimostrativa separata in data/demo, con fascia "Copia dimostrativa" ✅
+- **Prossimo:** piano completato; restano installer (InstallaSuite.exe) e copia del Portale in suite cosedil (da confermare con l'utente)
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
-- **Ultimo aggiornamento:** 24/11/2026
+- **Ultimo aggiornamento:** 25/11/2026
 
 ## Cosa c'era nella cartella
 
@@ -841,3 +842,33 @@ Verifiche:
 - `npm test` 237/237, di cui 2 nuovi in `giorno29.test.ts`: ordine, un punto per giorno, documenti senza percentuale esclusi, progetti chiusi esclusi, niente per il dipendente. Typecheck ok.
 - Playwright su Edge 5/5, su una copia del database con dichiarazioni di prova poi tolte. La prova ha portato a spostare la data sotto la percentuale, perché a riquadro stretto andava a capo.
 - Guida: immagine 41.
+
+### Giorno 30 — Database vero vuoto e copia dimostrativa separata (25/11/2026) ✅
+
+Richiesta: "quello d'esempio tienilo solo per fare vedere come si visualizzano i dati e creane uno vuoto per quando andrà in produzione".
+- **Due database.** Il database con i dati di esempio usato fino al 24/11 è stato spostato in `data/demo/logbook.db`. `data/logbook.db` è ripartito vuoto: solo `admin` con la password provvisoria `Admin2026!` da cambiare al primo accesso, più le festività nazionali 2026 e 2027 (26 giorni).
+- **Copia dimostrativa** (`server/dati-demo.ts`), accesa da `--dimostrazione` o da `LOGBOOK_DIMOSTRAZIONE=1`:
+  - usa sempre `data/demo/logbook.db` e `data/demo/documenti`, anche se `DATABASE_URL` o `LOGBOOK_DOCUMENTI_DIR` puntano ai dati veri (`server/database-url.ts` con `cartellaDati()`, `servizi/archivio-file.ts`);
+  - ascolta sulla porta 5211 (`LOGBOOK_DIMOSTRAZIONE_PORT`) con l'interfaccia compilata in `dist-demo/`, quindi gira accanto al Logbook vero senza svuotargli `dist/`;
+  - su un database vuoto carica sempre gli esempi;
+  - si avvia con `npm run demo` o con `avvia-demo.bat`.
+- **Comandi di sviluppo sulla copia.** `npm run dev`, `db:prepara`, `db:seed`, `db:reset`, `db:migra` e `db:studio` lavorano sulla copia dimostrativa (`scripts/prisma-demo.ts` imposta la variabile per la CLI di Prisma): un reset di prova non può più cancellare il database vero. `prepara-db` con `--dimostrazione` passa la variabile anche alla CLI, che gira in un processo a parte.
+- **Festività nel database vero** (`server/servizi/festivita.ts`, `aggiungiFestivitaNazionali`, usata anche dal pulsante di HR). `prepara-db` carica l'anno in corso e il successivo quando il database vero è vuoto e non ha nessuna festività.
+- **Interfaccia.** `GET /api/oggi` restituisce anche `dimostrazione`. Nella copia dimostrativa compaiono:
+  - la fascia gialla "Copia dimostrativa" sotto l'intestazione (`src/componenti/FasciaDimostrazione.tsx`), nella pagina di accesso e nel cambio della password provvisoria;
+  - "Copia dimostrativa" sotto il nome nel menu;
+  - il titolo della scheda "Logbook — copia dimostrativa".
+
+Verifiche:
+- `npm test` 242/242, di cui 5 nuovi in `giorno30.test.ts`:
+  - percorsi forzati della copia anche con le variabili che puntano ai dati veri;
+  - esempi sempre caricati nella copia;
+  - `/api/oggi` con e senza copia;
+  - festività aggiunte una volta sola, senza toccare quelle di HR.
+- Typecheck ok.
+- Playwright su Edge 10/10:
+  - Logbook vero: niente fascia, `admin` obbligato a cambiare password, API in 403 fino al cambio;
+  - copia dimostrativa: fascia su accesso e cambio password, titolo;
+  - pagine interne con fascia e menu, su un server di prova con la copia del database.
+- Nessuna password vera cambiata. La copia della password di `admin` dal database d'esempio a quello vero è stata bloccata dai permessi, perché saltava il cambio obbligatorio: `admin` del database vero entra con `Admin2026!` e ne sceglie una nuova.
+- Guida: immagini 42 e 43, capitolo "Logbook vero e copia dimostrativa".

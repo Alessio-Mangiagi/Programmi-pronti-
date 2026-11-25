@@ -28,18 +28,29 @@ Su Windows basta il doppio clic su **`avvia.bat`**: la prima volta installa le d
 poi avvia tutto e apre il browser. **`avvia.vbs`** fa lo stesso senza finestra (è il
 launcher usato dal Portale della suite).
 
-Al primo avvio viene creato `data/logbook.db`:
+Logbook ha **due database separati** (dal 25/11/2026):
 
-- con **`npm start` / `avvia.bat`** (produzione) il database parte **vuoto**, con il solo
-  amministratore `admin` (password di `LOGBOOK_ADMIN_PASSWORD`, oppure `Admin2026!`):
+| | Database vero | Copia dimostrativa |
+|---|---|---|
+| A cosa serve | l'uso vero di HR | solo far vedere come si visualizzano i dati |
+| Come si avvia | `npm start` / `avvia.bat` / card del Portale | `npm run demo` / `avvia-demo.bat` |
+| Indirizzo | http://127.0.0.1:5210 | http://127.0.0.1:5211 |
+| File | `data/logbook.db`, `data/documenti/` | `data/demo/logbook.db`, `data/demo/documenti/` |
+| Al primo avvio | **vuoto**: solo l'amministratore `admin` e le festività nazionali dell'anno in corso e del successivo | i **dati di esempio** (5 dipendenti, 3 progetti, ore dal primo giorno del mese scorso a ieri, qualche assenza, festività) |
+
+- Nel database vero `admin` ha la password di `LOGBOOK_ADMIN_PASSWORD`, oppure `Admin2026!`:
   al primo accesso Logbook obbliga a sceglierne una nuova, poi HR inserisce dipendenti e
-  progetti veri;
-- con **`npm run dev`** (sviluppo) arrivano i **dati di esempio** (5 dipendenti, 3 progetti,
-  ore dal primo giorno del mese scorso a ieri, qualche assenza, festività nazionali).
+  progetti veri.
+- La copia dimostrativa lo dice in ogni pagina (fascia gialla "Copia dimostrativa", menu e
+  titolo della scheda del browser) e usa **sempre** i file di `data/demo`, anche se
+  `DATABASE_URL` o `LOGBOOK_DOCUMENTI_DIR` puntano altrove: non può aprire il database vero.
+  Le due possono girare insieme. Cancellando `data/demo` la copia riparte dagli esempi.
+- Anche i comandi per chi sviluppa (`npm run dev`, `db:prepara`, `db:seed`, `db:reset`,
+  `db:migra`, `db:studio`) lavorano sulla copia dimostrativa: un reset o un seed di prova
+  non tocca mai il database vero.
 
-`LOGBOOK_DATI_DEMO=1` carica i dati di esempio anche in produzione (copia dimostrativa),
-`LOGBOOK_DATI_DEMO=0` li esclude anche in sviluppo. Agli avvii successivi i dati non
-vengono mai toccati: le nuove versioni applicano solo le migrazioni mancanti.
+Agli avvii successivi i dati non vengono mai toccati: le nuove versioni applicano solo le
+migrazioni mancanti, a tutti e due i database quando vengono avviati.
 
 ### Credenziali di prova (dati di esempio)
 
@@ -58,10 +69,12 @@ accesso.
 
 ### Partire senza dati di esempio
 
-È il comportamento di `npm start` / `avvia.bat` su un database nuovo (dal 24/11/2026). Un
-database che contiene già i dati di esempio non viene svuotato da solo: per ripartire
-puliti, fermare Logbook, spostare altrove `data/logbook.db` e riavviare.
-`npm run db:reset` invece riporta il database ai **soli** dati di esempio (**cancella tutto**).
+È il comportamento di `npm start` / `avvia.bat` su un database nuovo (dal 24/11/2026). Il
+25/11/2026 il database con i dati di esempio usato fino ad allora è stato spostato in
+`data/demo/logbook.db` (la copia dimostrativa) e `data/logbook.db` è ripartito vuoto. Un
+database vero non viene mai svuotato da solo: per ripartire puliti, fermare Logbook,
+spostare altrove `data/logbook.db` e riavviare. `npm run db:reset` riporta la **copia
+dimostrativa** ai soli dati di esempio (cancella quello che c'è in `data/demo`).
 
 ## Il modello Excel per importare le ore
 
@@ -117,17 +130,19 @@ come testo sia come valori data/ora di Excel.
 
 | Comando | Cosa fa |
 |---|---|
-| `npm start` | Produzione: prepara il DB, compila l'interfaccia, un solo server sulla 5210 |
-| `npm run dev` | Sviluppo: API sulla 3012 e interfaccia Vite sulla 5210, si ricaricano a ogni modifica |
+| `npm start` | Logbook vero: prepara il DB (`data/logbook.db`), compila l'interfaccia, un solo server sulla 5210 |
+| `npm run demo` | Copia dimostrativa: database `data/demo/logbook.db`, interfaccia in `dist-demo/`, server sulla 5211 (su Windows `avvia-demo.bat`) |
+| `npm run dev` | Sviluppo sui dati della copia dimostrativa: API sulla 3012 e interfaccia Vite sulla 5210, si ricaricano a ogni modifica |
 | `npm test` | Test automatici (Vitest) |
 | `npm run typecheck` | Controllo dei tipi TypeScript di interfaccia e server |
 | `npm run build` | Controllo tipi + build dell'interfaccia in `dist/` |
-| `npm run db:reset` | **Cancella tutti i dati** e ricarica quelli di esempio (Prisma chiede conferma se lanciato da un assistente AI) |
-| `npm run db:seed` | Carica i dati di esempio (solo su database senza dipendenti) |
-| `npm run db:migra` | Crea una nuova migrazione dopo una modifica a `prisma/schema.prisma` |
-| `npm run db:studio` | Apre Prisma Studio per guardare le tabelle |
+| `npm run db:reset` | **Cancella** la copia dimostrativa e ricarica i dati di esempio (Prisma chiede conferma se lanciato da un assistente AI); il database vero non lo tocca |
+| `npm run db:seed` | Carica i dati di esempio nella copia dimostrativa (solo se non ha dipendenti) |
+| `npm run db:migra` | Crea una nuova migrazione dopo una modifica a `prisma/schema.prisma` (provata sulla copia dimostrativa) |
+| `npm run db:studio` | Apre Prisma Studio sulle tabelle della copia dimostrativa |
 
-`npm start` e `npm run dev` usano entrambi la porta 5210: uno alla volta.
+`npm start` e `npm run dev` usano entrambi la porta 5210: uno alla volta. `npm run demo`
+può girare insieme a `npm start`.
 
 ## Configurazione
 
@@ -140,7 +155,9 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
 | `LOGBOOK_ADMIN_PASSWORD` | `Admin2026!` | Password dell'admin creato solo se non ne esiste nessuno |
-| `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
+| `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso); la copia dimostrativa li carica sempre |
+| `LOGBOOK_DIMOSTRAZIONE` | — | `1`: questo processo è la copia dimostrativa (lo impostano `npm run demo` e `avvia-demo.bat`) |
+| `LOGBOOK_DIMOSTRAZIONE_PORT` | `5211` | Porta della copia dimostrativa |
 | `LOGBOOK_DOCUMENTI_DIR` | `data/documenti` | Cartella dei file caricati (attestati, documenti, documentazione dei progetti): va nel backup insieme al database |
 | `LOGBOOK_COOKIE_SECURE` | — | `1` dietro HTTPS: il cookie viaggia solo cifrato |
 
@@ -162,9 +179,12 @@ server/      API Express: app.ts (rotte), index.ts (avvio), rotte/, servizi/ (re
              Excel, import, report), auth/ (password, sessioni), middleware.ts (ruoli, CSRF)
 src/         interfaccia React + Tailwind: pagine/, componenti/
 prisma/      schema del database, migrazioni, dati di esempio (seed.ts)
-scripts/     prepara-db.ts: migrazioni + dati di esempio prima dell'avvio
+scripts/     prepara-db.ts: migrazioni + dati di esempio prima dell'avvio;
+             prisma-demo.ts: comandi db:* sulla copia dimostrativa
 docs/guida/  guida d'uso con immagini
-data/        database SQLite (fuori da git)
+data/        database SQLite vero e file caricati (fuori da git)
+data/demo/   database e file della copia dimostrativa (fuori da git)
+avvia.bat / avvia-demo.bat   doppio clic: Logbook vero / copia dimostrativa
 generated/   client Prisma generato (fuori da git, lo ricrea npm install)
 ```
 
