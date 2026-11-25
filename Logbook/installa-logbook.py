@@ -15,7 +15,10 @@ Passi:
 1. controlla Node.js;
 2. installa le dipendenze (npm ci con il lock, altrimenti npm install). Il postinstall
    genera anche il client del database (prisma generate);
-3. se manca crea il file .env da .env.example e chiede, facoltativi:
+3. chiede nome utente e password del primo amministratore, che è il proprietario di Logbook
+   (solo lui potrà nominare altri amministratori). Le passa soltanto al comando che prepara
+   il database: non finiscono nel .env né in nessun file. Poi, se manca, crea il file .env
+   da .env.example e chiede, facoltativi:
    - l'email del proprietario, che riceve il codice per "Cancella tutti i dati";
    - se Logbook va raggiunto dagli altri PC della rete (HOST=0.0.0.0).
    Il server di posta (LOGBOOK_SMTP_*) si completa dopo, a mano, nel .env;
@@ -28,7 +31,8 @@ e lo avvia la card del Portale. Le due strade usano la stessa cartella e lo stes
 
 Uso:
   InstallaLogbook.exe                       con domande
-  InstallaLogbook.exe --si                  senza domande (email e rete restano da impostare)
+  InstallaLogbook.exe --si                  senza domande: admin con password casuale mostrata a video
+                                            (o LOGBOOK_ADMIN_USERNAME / LOGBOOK_ADMIN_PASSWORD nell'ambiente)
   InstallaLogbook.exe --senza-collegamento  non crea l'icona sul desktop
   InstallaLogbook.exe --dry-run             mostra i passi senza eseguirli
 
@@ -78,12 +82,13 @@ def chiedi(domanda: str) -> str:
         return ""
 
 
-def run(cmd: str) -> None:
-    """Esegue un comando nella cartella di Logbook mostrando l'output; errore se fallisce."""
+def run(cmd: str, env: dict | None = None) -> None:
+    """Esegue un comando nella cartella di Logbook mostrando l'output; errore se fallisce.
+    `env`: variabili in più solo per questo comando (le credenziali del primo amministratore)."""
     say(f"    $ {cmd}")
     if DRY:
         return
-    r = subprocess.run(cmd, cwd=str(DIR), shell=True)
+    r = subprocess.run(cmd, cwd=str(DIR), shell=True, env={**os.environ, **env} if env else None)
     if r.returncode != 0:
         raise RuntimeError(f"comando fallito (exit {r.returncode}): {cmd}")
 
@@ -106,7 +111,51 @@ def imposta_env(testo: str, chiave: str, valore: str) -> str:
     return testo.rstrip("\n") + "\n" + riga + "\n"
 
 
-def prepara_env() -> str:
+def SENZA_DOMANDE_CREDENZIALI() -> bool:
+    return SENZA_DOMANDE
+
+
+def chiedi_credenziali_admin() -> tuple[str, str] | None:
+    """Nome utente e password del primo amministratore di Logbook, che ne è il proprietario
+    (Giorno 34, 25/11/2026: "durante l'installazione venga creato il primo admin con le
+    credenziali inserite e poi solo lui possa dare quel ruolo").
+
+    Si chiedono a chi installa (la password non compare mentre la si scrive, e va ripetuta).
+    Stesse regole di Logbook per un amministratore: almeno 12 caratteri, lettere e numeri.
+    Senza terminale o con le domande spente restituisce None: allora Logbook crea "admin"
+    con una password casuale, mostrata una volta sola e da cambiare al primo accesso. Per
+    un'installazione senza domande si possono passare LOGBOOK_ADMIN_USERNAME e
+    LOGBOOK_ADMIN_PASSWORD come variabili d'ambiente.
+    """
+    da_ambiente = (os.environ.get("LOGBOOK_ADMIN_USERNAME", "").strip().lower(), os.environ.get("LOGBOOK_ADMIN_PASSWORD", ""))
+    if da_ambiente[1]:
+        return (da_ambiente[0] or "admin", da_ambiente[1])
+    if SENZA_DOMANDE_CREDENZIALI() or not sys.stdin or not sys.stdin.isatty():
+        return None
+    import getpass
+    say("    Primo amministratore di Logbook (sarai il proprietario: solo tu potrai nominarne altri).")
+    while True:
+        try:
+            nome = input("    Nome utente [admin]: ").strip().lower() or "admin"
+        except EOFError:
+            return None
+        if re.fullmatch(r"[a-z0-9._-]{3,40}", nome):
+            break
+        say("    Da 3 a 40 caratteri: lettere minuscole, numeri, punto, trattino.")
+    while True:
+        try:
+            p1 = getpass.getpass("    Password (almeno 12 caratteri, lettere e numeri): ")
+            p2 = getpass.getpass("    Ripeti la password: ")
+        except EOFError:
+            return None
+        if p1 != p2:
+            say("    Le due password sono diverse, riprova.")
+        elif len(p1) < 12 or not re.search(r"[A-Za-z]", p1) or not re.search(r"\d", p1):
+            say("    Troppo debole: almeno 12 caratteri, con lettere e numeri.")
+        else:
+            return (nome, p1)
+
+def prepara_env(proprietario: str = "admin") -> str:
     """Crea .env da .env.example (se manca) con le scelte dell'utente. Restituisce una nota."""
     env = DIR / ".env"
     if env.exists():
@@ -114,14 +163,14 @@ def prepara_env() -> str:
     esempio = DIR / ".env.example"
     testo = esempio.read_text(encoding="utf-8") if esempio.exists() else ""
     # Il proprietario è l'amministratore creato al primo avvio.
-    testo = imposta_env(testo, "LOGBOOK_PROPRIETARIO", "admin")
+    testo = imposta_env(testo, "LOGBOOK_PROPRIETARIO", proprietario)
     email = chiedi("Email del proprietario (riceve il codice per cancellare tutti i dati), invio per saltare:")
     if email:
         testo = imposta_env(testo, "LOGBOOK_PROPRIETARIO_EMAIL", email)
     rete = chiedi("Logbook deve essere raggiungibile dagli altri PC della rete? [s/N]").lower()
     if rete in ("s", "si", "sì", "y", "yes"):
         testo = imposta_env(testo, "HOST", "0.0.0.0")
-    say(f"    creo {env.name}" + (f" (proprietario admin, email {email})" if email else " (proprietario admin)"))
+    say(f"    creo {env.name}" + (f" (proprietario {proprietario}, email {email})" if email else f" (proprietario {proprietario})"))
     if not DRY:
         env.write_text(testo, encoding="utf-8")
     note = "creato .env"
@@ -180,10 +229,13 @@ def main() -> int:
         else:
             run("npm install --no-audit --no-fund")
         say("3. Configurazione")
-        nota_env = prepara_env()
+        # Le credenziali servono solo se il database non esiste ancora (prima installazione).
+        nuovo = not (DIR / "data" / "logbook.db").exists()
+        credenziali = chiedi_credenziali_admin() if nuovo else None
+        nota_env = prepara_env(credenziali[0] if credenziali else "admin")
         say(f"    {nota_env}")
         say("4. Database e interfaccia")
-        run("npm run prestart")
+        run("npm run prestart", env={"LOGBOOK_ADMIN_USERNAME": credenziali[0], "LOGBOOK_ADMIN_PASSWORD": credenziali[1], "LOGBOOK_ADMIN_DEFINITIVA": "1"} if credenziali else None)
         if not args.senza_collegamento:
             say("5. Collegamento sul desktop")
             crea_collegamento()
@@ -197,7 +249,10 @@ def main() -> int:
     say()
     say("Logbook è installato.")
     say("  Avvio: icona Logbook sul desktop (o avvia.bat), poi http://127.0.0.1:5210")
-    say("  Database nuovo: si entra con utente admin e password Admin2026! (Logbook chiede subito di cambiarla)")
+    if credenziali:
+        say(f"  Si entra con l'utente {credenziali[0]} e la password appena scelta: è il proprietario di Logbook.")
+    elif nuovo:
+        say("  Si entra con l'utente admin e la password provvisoria scritta qui sopra (riga ATTENZIONE): annotarla ora.")
     say(f"  {nota_env}")
     say("  Dentro la suite lo stesso Logbook si apre anche dalla card del Portale.")
     if sys.stdin and sys.stdin.isatty() and not SENZA_DOMANDE:

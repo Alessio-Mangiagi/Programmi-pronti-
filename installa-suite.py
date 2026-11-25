@@ -254,6 +254,50 @@ def installa_timbri(d: Path) -> str:
     richiedi_node("Timbri per VFP")
     return "nessuna dipendenza (Node puro). Porta 5205"
 
+def SENZA_DOMANDE_CREDENZIALI() -> bool:
+    return AUTO_SI
+
+
+def chiedi_credenziali_admin() -> tuple[str, str] | None:
+    """Nome utente e password del primo amministratore di Logbook, che ne è il proprietario
+    (Giorno 34, 25/11/2026: "durante l'installazione venga creato il primo admin con le
+    credenziali inserite e poi solo lui possa dare quel ruolo").
+
+    Si chiedono a chi installa (la password non compare mentre la si scrive, e va ripetuta).
+    Stesse regole di Logbook per un amministratore: almeno 12 caratteri, lettere e numeri.
+    Senza terminale o con le domande spente restituisce None: allora Logbook crea "admin"
+    con una password casuale, mostrata una volta sola e da cambiare al primo accesso. Per
+    un'installazione senza domande si possono passare LOGBOOK_ADMIN_USERNAME e
+    LOGBOOK_ADMIN_PASSWORD come variabili d'ambiente.
+    """
+    da_ambiente = (os.environ.get("LOGBOOK_ADMIN_USERNAME", "").strip().lower(), os.environ.get("LOGBOOK_ADMIN_PASSWORD", ""))
+    if da_ambiente[1]:
+        return (da_ambiente[0] or "admin", da_ambiente[1])
+    if SENZA_DOMANDE_CREDENZIALI() or not sys.stdin or not sys.stdin.isatty():
+        return None
+    import getpass
+    say("    Primo amministratore di Logbook (sarai il proprietario: solo tu potrai nominarne altri).")
+    while True:
+        try:
+            nome = input("    Nome utente [admin]: ").strip().lower() or "admin"
+        except EOFError:
+            return None
+        if re.fullmatch(r"[a-z0-9._-]{3,40}", nome):
+            break
+        say("    Da 3 a 40 caratteri: lettere minuscole, numeri, punto, trattino.")
+    while True:
+        try:
+            p1 = getpass.getpass("    Password (almeno 12 caratteri, lettere e numeri): ")
+            p2 = getpass.getpass("    Ripeti la password: ")
+        except EOFError:
+            return None
+        if p1 != p2:
+            say("    Le due password sono diverse, riprova.")
+        elif len(p1) < 12 or not re.search(r"[A-Za-z]", p1) or not re.search(r"\d", p1):
+            say("    Troppo debole: almeno 12 caratteri, con lettere e numeri.")
+        else:
+            return (nome, p1)
+
 def installa_logbook(d: Path) -> str:
     """Logbook, ore e presenze (React + Express + Prisma/SQLite), aggiunto il 24/11/2026.
 
@@ -270,18 +314,29 @@ def installa_logbook(d: Path) -> str:
     """
     richiedi_node("Logbook")                            # Prisma 7: Node >= 20.19
     npm_install(d)
+    # Giorno 34: prima installazione → si chiedono le credenziali del primo amministratore
+    # (il proprietario) e si crea subito il database con quelle. Passano solo a questo
+    # comando, non finiscono nel .env.
+    nuovo = not (d / "data" / "logbook.db").exists()
+    credenziali = chiedi_credenziali_admin() if nuovo and not DRY else None
+    proprietario = credenziali[0] if credenziali else "admin"
     envf = d / ".env"
     if not envf.exists() and (d / ".env.example").exists() and not DRY:
         # .env dai commenti di .env.example: lì si mettono LOGBOOK_ADMIN_PASSWORD, HOST=0.0.0.0
         # (necessario perché gli altri PC e i telefoni lo raggiungano), email del proprietario
         # e server di posta. Il proprietario (admin) si attiva subito.
         testo = (d / ".env.example").read_text(encoding="utf-8")
-        testo = re.sub(r"^#\s*LOGBOOK_PROPRIETARIO=.*$", "LOGBOOK_PROPRIETARIO=admin", testo, count=1, flags=re.MULTILINE)
+        testo = re.sub(r"^#\s*LOGBOOK_PROPRIETARIO=.*$", f"LOGBOOK_PROPRIETARIO={proprietario}", testo, count=1, flags=re.MULTILINE)
         envf.write_text(testo, encoding="utf-8")
         say("    creato .env da .env.example: impostare LOGBOOK_ADMIN_PASSWORD, per la rete HOST=0.0.0.0,"
             " LOGBOOK_PROPRIETARIO_EMAIL e il server di posta LOGBOOK_SMTP_*")
-    return ("dipendenze + client del database. Porta 5210. Primo avvio: database vuoto con l'utente 'admin'"
-            " (password LOGBOOK_ADMIN_PASSWORD del .env, altrimenti Admin2026! da cambiare subito)")
+    if nuovo:
+        run("npm run prestart", cwd=d, env={"LOGBOOK_ADMIN_USERNAME": credenziali[0], "LOGBOOK_ADMIN_PASSWORD": credenziali[1],
+                                              "LOGBOOK_ADMIN_DEFINITIVA": "1"} if credenziali else None)
+    if credenziali:
+        return f"dipendenze + database. Porta 5210. Si entra con l'utente '{credenziali[0]}' e la password scelta: è il proprietario"
+    return ("dipendenze + database. Porta 5210. Database nuovo: utente 'admin' con la password provvisoria"
+            " mostrata qui sopra (riga ATTENZIONE), da cambiare al primo accesso")
 
 def installa_incampo(d: Path) -> str:
     vpy = crea_venv(d)                                  # come installa.bat
