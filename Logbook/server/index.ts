@@ -6,10 +6,6 @@
  *   Vite sulla 5210 e inoltra le chiamate /api qui (vite.config.ts).
  * - PRODUZIONE (`npm start`, `avvia.bat`, card del Portale): con l'opzione --produzione
  *   un solo server sulla porta 5210 serve sia le API sia l'interfaccia compilata in dist/.
- * - COPIA DIMOSTRATIVA (`npm run demo`, `avvia-demo.bat`, dal 25/11/2026): come la
- *   produzione, con --dimostrazione in più: database e file di data/demo, porta 5211,
- *   interfaccia compilata in dist-demo/ e fascia "Copia dimostrativa" (server/dati-demo.ts).
- *   Gira accanto al Logbook vero senza poterne toccare i dati.
  *
  * Variabili d'ambiente (facoltative, anche da file .env):
  * - LOGBOOK_API_PORT (sviluppo, default 3012) / LOGBOOK_PORT (produzione, default 5210)
@@ -32,27 +28,12 @@ try {
 const { creaApp } = await import('./app');
 const { prisma } = await import('./db');
 const { RADICE_APP } = await import('./database-url');
-const { inDimostrazione, PORTA_DIMOSTRAZIONE } = await import('./dati-demo');
 
 const produzione = process.argv.includes('--produzione');
-const dimostrazione = inDimostrazione();
-// La copia dimostrativa ha una variabile di porta sua: un .env con LOGBOOK_PORT=5210 per il
-// Logbook vero non la deve far scontrare con lui.
-const porta = Number(
-  !produzione
-    ? (process.env.LOGBOOK_API_PORT ?? 3012)
-    : dimostrazione
-      ? (process.env.LOGBOOK_DIMOSTRAZIONE_PORT ?? PORTA_DIMOSTRAZIONE)
-      : (process.env.LOGBOOK_PORT ?? 5210),
-);
+const porta = Number(produzione ? (process.env.LOGBOOK_PORT ?? 5210) : (process.env.LOGBOOK_API_PORT ?? 3012));
 const host = process.env.LOGBOOK_API_HOST ?? process.env.HOST ?? '127.0.0.1';
 
-// L'interfaccia della copia dimostrativa è compilata in dist-demo/ (npm run demo): così
-// avviarla non svuota dist/ mentre il Logbook vero la sta servendo.
-const app = creaApp(
-  prisma,
-  produzione ? { cartellaInterfaccia: path.join(RADICE_APP, dimostrazione ? 'dist-demo' : 'dist'), dimostrazione } : { dimostrazione },
-);
+const app = creaApp(prisma, produzione ? { cartellaInterfaccia: path.join(RADICE_APP, 'dist') } : {});
 
 // File caricati ma mai collegati a un documento (finestra chiusa a metà) da più di un
 // giorno: si tolgono all'avvio e poi ogni 6 ore (verifica di sicurezza del Giorno 23: con
@@ -70,8 +51,7 @@ setInterval(pulisci, 6 * 60 * 60 * 1000).unref();
 // "in ascolto" subito prima di "porta occupata").
 const server = app.listen(porta, host, (errore?: Error) => {
   if (errore) return;
-  const nome = produzione ? (dimostrazione ? 'Logbook (copia dimostrativa, data/demo)' : 'Logbook') : 'API';
-  console.log(`[logbook] ${nome} in ascolto su http://${host}:${porta}`);
+  console.log(`[logbook] ${produzione ? 'Logbook' : 'API'} in ascolto su http://${host}:${porta}`);
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

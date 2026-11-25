@@ -9,32 +9,22 @@
  *    mai dati: le migrazioni sono solo quelle già scritte in prisma/migrations.
  * 3. Se non c'è nessun dipendente carica i dati di esempio (prisma/seed.ts), ma solo
  *    dove serve: di default in sviluppo sì, in produzione no (LOGBOOK_DATI_DEMO cambia
- *    la scelta, vedi server/dati-demo.ts). Se resta vuoto (il database vero) e non ha
- *    nessuna festività, carica le festività nazionali dell'anno in corso e del successivo.
+ *    la scelta, vedi server/dati-demo.ts). Se resta vuoto e non ha nessuna festività,
+ *    carica le festività nazionali dell'anno in corso e del successivo.
  * 4. Se non c'è nessun amministratore attivo ne crea uno (vedi sotto).
  *
  * Così "npm run dev" su una copia appena scaricata parte già con dati da guardare,
  * l'installazione per HR parte vuota e su un database in uso non si tocca nulla.
- *
- * Con --dimostrazione in più (`npm run demo`, avvia-demo.bat, dal 25/11/2026) prepara la
- * copia dimostrativa in data/demo/logbook.db, che su un database vuoto riceve sempre i dati
- * di esempio (server/dati-demo.ts).
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { oggiIso } from '../comune/date';
-import { RADICE_APP, urlDatabase } from '../server/database-url';
-import { decidiDatiDemo, inDimostrazione } from '../server/dati-demo';
+import { RADICE_APP } from '../server/database-url';
+import { decidiDatiDemo } from '../server/dati-demo';
 
 // package.json: "prestart" passa --produzione, "predev" no.
 const modo = process.argv.includes('--produzione') ? 'produzione' : 'sviluppo';
-
-// "predemo" passa anche --dimostrazione. La CLI di Prisma lanciata qui sotto è un processo
-// a parte che vede solo le variabili d'ambiente: senza questa riga applicherebbe le
-// migrazioni al database vero invece che a quello della copia dimostrativa.
-if (process.argv.includes('--dimostrazione')) process.env.LOGBOOK_DIMOSTRAZIONE = '1';
-const dimostrazione = inDimostrazione();
 
 try {
   process.loadEnvFile(path.join(RADICE_APP, '.env'));
@@ -53,7 +43,6 @@ if (!fs.existsSync(path.join(RADICE_APP, 'generated', 'prisma', 'client.ts'))) {
   prismaCli('generate');
 }
 
-if (dimostrazione) console.log(`[logbook] copia dimostrativa: ${urlDatabase().replace(/^file:/, '')}`);
 prismaCli('migrate', 'deploy');
 
 // Import dinamici: il client generato esiste solo dopo il passo 1.
@@ -62,7 +51,7 @@ const { semina } = await import('../prisma/seed');
 const prisma = creaPrisma();
 try {
   if ((await prisma.dipendente.count()) === 0) {
-    const demo = decidiDatiDemo(process.env.LOGBOOK_DATI_DEMO, modo, dimostrazione);
+    const demo = decidiDatiDemo(process.env.LOGBOOK_DATI_DEMO, modo);
     if (demo.avviso) console.warn(`[logbook] ${demo.avviso}`);
     if (demo.carica) {
       const r = await semina(prisma);
@@ -73,11 +62,11 @@ try {
     } else {
       console.log(
         `[logbook] database vuoto, nessun dato di esempio (${modo}): entrare come amministratore e inserire ` +
-          'dipendenti e progetti. Per vedere Logbook con i dati di prova: npm run demo (avvia-demo.bat).',
+          'dipendenti e progetti. Per i dati di prova: LOGBOOK_DATI_DEMO=1.',
       );
-      // Il database vero parte senza dati finti ma con le festività nazionali (25/11/2026):
-      // sono date vere e servono da subito a calendario, estratti e conteggio delle ferie.
-      // Solo se non ce n'è nessuna, così quelle tolte o aggiunte da HR non tornano indietro.
+      // Il database parte senza dati finti ma con le festività nazionali (25/11/2026): sono
+      // date vere e servono da subito a calendario, estratti e conteggio delle ferie. Solo
+      // se non ce n'è nessuna, così quelle tolte o aggiunte da HR non tornano indietro.
       if ((await prisma.festivita.count()) === 0) {
         const { aggiungiFestivitaNazionali } = await import('../server/servizi/festivita');
         const anno = Number(oggiIso().slice(0, 4));

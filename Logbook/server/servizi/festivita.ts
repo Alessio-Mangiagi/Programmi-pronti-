@@ -4,7 +4,7 @@
  * - il pulsante di HR "Carica festività nazionali" (POST /api/festivita/carica-nazionali,
  *   server/rotte/festivita.ts), per un anno alla volta;
  * - scripts/prepara-db.ts, che dal 25/11/2026 le carica per l'anno in corso e il successivo
- *   quando il database vero parte vuoto (senza dati di esempio): senza festività il
+ *   quando il database parte vuoto (senza dati di esempio): senza festività il
  *   calendario, gli estratti e il conteggio delle ferie le tratterebbero come giorni lavorativi.
  *
  * Le date sono calcolate da comune/festivita.ts. Si aggiungono solo quelle che mancano: le

@@ -52,7 +52,7 @@ export function rotteFestivita(prisma: PrismaClient) {
   /** Aggiunge le festività nazionali dell'anno che mancano; non tocca quelle già presenti. */
   router.post('/carica-nazionali', richiediAdmin, async (req, res) => {
     const { anno } = z.object({ anno: z.coerce.number().int().min(2020, 'Non si possono inserire anni precedenti al 2020').max(2100, 'Anno non valido') }).parse(req.body);
-    // Stessa funzione che prepara-db usa per il database vero appena creato.
+    // Stessa funzione che prepara-db usa per il database appena creato.
     res.json({ aggiunte: await aggiungiFestivitaNazionali(prisma, anno) });
   });
 

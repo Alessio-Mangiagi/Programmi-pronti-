@@ -4,8 +4,6 @@
 # Dipendenze e build
 node_modules/
 dist/
-# Interfaccia compilata della copia dimostrativa (npm run demo)
-dist-demo/
 
 # Client Prisma generato da `prisma generate` (si rigenera a ogni npm install)
 generated/
