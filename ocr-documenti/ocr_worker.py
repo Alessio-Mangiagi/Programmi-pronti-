@@ -154,16 +154,20 @@ def costruisci_ocr():
     # GPU se disponibile (misurato: la CPU senza oneDNN fa ~55s/pagina, inutilizzabile);
     # se la costruzione GPU fallisce si riprova in CPU più sotto.
     for device in dict.fromkeys([rileva_device(), "cpu"]):
-        # Tuning throughput (stessi modelli, stessa accuratezza — cambia solo lo scheduling):
+        # Tuning throughput (stessi modelli):
         # - cpu_threads: il server lo imposta a cores/POOL così N worker non si contendono
         #   i core (di default ogni processo Paddle ne prenderebbe troppi);
         # - text_recognition_batch_size: crop di testo riconosciuti a lotti anziché uno
-        #   alla volta; sulla GPU ammortizza i lanci kernel (default 16), sulla CPU 8.
+        #   alla volta. 8 anche sulla GPU: nel lotto i ritagli si allungano al più largo,
+        #   quindi la grandezza del lotto cambia la lettura. Misura sul banco dei 31
+        #   contratti (25/11/2026, RTX 5060 Ti, lettura vera senza cache): lotti da 16 →
+        #   testata 414, voci esatte 784, Q+P 811 in 778 s; lotti da 8 → 417 · 784 · 812
+        #   in 845 s (i tre campi di testata tornano quelli letti dalla CPU).
         extra = {}
         cpu_threads = os.environ.get("PADDLE_CPU_THREADS")
         if cpu_threads and device == "cpu":
             extra["cpu_threads"] = int(cpu_threads)
-        rec_batch = os.environ.get("PADDLE_REC_BATCH") or ("16" if device == "gpu" else "8")
+        rec_batch = os.environ.get("PADDLE_REC_BATCH") or "8"
         extra["text_recognition_batch_size"] = int(rec_batch)
         try:
             # enable_mkldnn=False: su Windows CPU l'esecutore oneDNN di Paddle 3.3
