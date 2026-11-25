@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# "><(((º> sabusabu <º)))><"
 """
 Installer interattivo della suite Cosedil.
 
@@ -260,15 +261,25 @@ def installa_logbook(d: Path) -> str:
     generate). Il database lo crea il primo avvio (avvia.bat -> npm start -> prepara-db
     --produzione): vuoto, con il solo amministratore e senza dati di esempio. Login proprio,
     non quello del portale (scelta dell'utente del 23/11).
+
+    Dal 25/11/2026 il .env nasce con LOGBOOK_PROPRIETARIO=admin: l'amministratore creato al
+    primo avvio è il proprietario, l'unico che vede "Dati del programma" (dati di esempio e
+    "Cancella tutti i dati" con codice via email). Restano da scrivere a mano l'email del
+    proprietario e il server di posta. Fuori dalla suite lo stesso lavoro lo fa
+    Logbook\\InstallaLogbook.exe (Logbook/installa-logbook.py).
     """
     richiedi_node("Logbook")                            # Prisma 7: Node >= 20.19
     npm_install(d)
     envf = d / ".env"
     if not envf.exists() and (d / ".env.example").exists() and not DRY:
-        # .env con i soli commenti: lì si mettono LOGBOOK_ADMIN_PASSWORD e HOST=0.0.0.0
-        # (necessario perché gli altri PC e i telefoni lo raggiungano).
-        shutil.copyfile(d / ".env.example", envf)
-        say("    creato .env da .env.example: impostare LOGBOOK_ADMIN_PASSWORD e, per la rete, HOST=0.0.0.0")
+        # .env dai commenti di .env.example: lì si mettono LOGBOOK_ADMIN_PASSWORD, HOST=0.0.0.0
+        # (necessario perché gli altri PC e i telefoni lo raggiungano), email del proprietario
+        # e server di posta. Il proprietario (admin) si attiva subito.
+        testo = (d / ".env.example").read_text(encoding="utf-8")
+        testo = re.sub(r"^#\s*LOGBOOK_PROPRIETARIO=.*$", "LOGBOOK_PROPRIETARIO=admin", testo, count=1, flags=re.MULTILINE)
+        envf.write_text(testo, encoding="utf-8")
+        say("    creato .env da .env.example: impostare LOGBOOK_ADMIN_PASSWORD, per la rete HOST=0.0.0.0,"
+            " LOGBOOK_PROPRIETARIO_EMAIL e il server di posta LOGBOOK_SMTP_*")
     return ("dipendenze + client del database. Porta 5210. Primo avvio: database vuoto con l'utente 'admin'"
             " (password LOGBOOK_ADMIN_PASSWORD del .env, altrimenti Admin2026! da cambiare subito)")
 
