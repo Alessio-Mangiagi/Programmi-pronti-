@@ -8,6 +8,9 @@
  * Regole:
  * - cartella: LOGBOOK_DOCUMENTI_DIR oppure data/documenti dentro l'app (accanto al
  *   database, quindi nello stesso backup); nei test una cartella temporanea;
+ * - dove non c'è un disco che dura (Giorno 35, Vercel: database PostgreSQL) il contenuto sta
+ *   nel database, tabella ContenutoFile: allora la "cartella" è il valore ARCHIVIO_NEL_DATABASE
+ *   e il massimo scende a 4 MB, perché Vercel non accetta richieste più grandi di 4,5 MB;
  * - massimo 20 MB a file;
  * - solo i formati di ufficio (PDF, immagini, Word, Excel, OpenDocument, testo, .p7m),
  *   riconosciuti dall'estensione E dai primi byte del contenuto: un .pdf che non comincia
@@ -19,13 +22,19 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PrismaClient } from '../../generated/prisma/client';
-import { RADICE_APP } from '../database-url';
+import { RADICE_APP, suPostgres } from '../database-url';
 import { ErroreHttp } from '../errori';
 
 export const MAX_BYTE_FILE = 20 * 1024 * 1024;
+/** Valore di "cartella" che significa: contenuti nella tabella ContenutoFile, non su disco. */
+export const ARCHIVIO_NEL_DATABASE = 'database:';
+/** Massimo per file con l'archivio nel database (limite delle richieste su Vercel: 4,5 MB). */
+const MAX_BYTE_FILE_DATABASE = 4 * 1024 * 1024;
+export const maxByteFile = (cartella: string) => (cartella === ARCHIVIO_NEL_DATABASE ? MAX_BYTE_FILE_DATABASE : MAX_BYTE_FILE);
 
 /** Cartella dei documenti: variabile d'ambiente o data/documenti dell'app. */
 export function cartellaDocumentiPredefinita(): string {
+  if (suPostgres()) return ARCHIVIO_NEL_DATABASE;
   const env = process.env.LOGBOOK_DOCUMENTI_DIR?.trim();
   return env ? path.resolve(env) : path.join(RADICE_APP, 'data', 'documenti');
 }
@@ -79,9 +88,9 @@ function pulisciNome(nome: string): string {
 }
 
 /** Controlla dimensione, formato e contenuto; restituisce il formato riconosciuto. */
-function controllaFile(dati: Buffer, nome: string): { ext: string; mime: string } {
+function controllaFile(dati: Buffer, nome: string, massimo: number): { ext: string; mime: string } {
   if (!dati.length) throw new ErroreHttp(400, 'Il file è vuoto');
-  if (dati.length > MAX_BYTE_FILE) throw new ErroreHttp(413, `File troppo grande: massimo ${MAX_BYTE_FILE / 1024 / 1024} MB`);
+  if (dati.length > massimo) throw new ErroreHttp(413, `File troppo grande: massimo ${massimo / 1024 / 1024} MB`);
   const ext = estensione(nome);
   const formato = FORMATI[ext];
   if (!formato) {
@@ -98,13 +107,37 @@ function controllaFile(dati: Buffer, nome: string): { ext: string; mime: string 
  * Prima si scrive su disco, poi nel database: se il database fallisce si cancella il file,
  * così non restano file orfani.
  */
+/** Scrive il contenuto di un file caricato: su disco o, con ARCHIVIO_NEL_DATABASE, nel database. */
+async function scriviContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string, dati: Buffer) {
+  if (cartella === ARCHIVIO_NEL_DATABASE) {
+    await prisma.contenutoFile.create({ data: { nomeDisco, dati: new Uint8Array(dati) } });
+    return;
+  }
+  fs.mkdirSync(cartella, { recursive: true });
+  fs.writeFileSync(path.join(cartella, nomeDisco), dati, { flag: 'wx' });
+}
+
+/** Contenuto di un file caricato, o null se non c'è più. Il nome viene dal database, mai dalla richiesta. */
+export async function leggiContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string): Promise<Buffer | null> {
+  if (cartella === ARCHIVIO_NEL_DATABASE) {
+    const r = await prisma.contenutoFile.findUnique({ where: { nomeDisco } });
+    return r ? Buffer.from(r.dati) : null;
+  }
+  const percorso = percorsoFile(cartella, nomeDisco);
+  return fs.existsSync(percorso) ? fs.readFileSync(percorso) : null;
+}
+
+/** Toglie il contenuto di un file caricato (non i metadati). */
+export async function eliminaContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string) {
+  if (cartella === ARCHIVIO_NEL_DATABASE) await prisma.contenutoFile.deleteMany({ where: { nomeDisco } });
+  else fs.rmSync(percorsoFile(cartella, nomeDisco), { force: true });
+}
+
 export async function salvaFile(prisma: PrismaClient, cartella: string, dati: Buffer, nomeOriginale: string, utenteId: number) {
   const nome = pulisciNome(nomeOriginale);
-  const { ext, mime } = controllaFile(dati, nome);
-  fs.mkdirSync(cartella, { recursive: true });
+  const { ext, mime } = controllaFile(dati, nome, maxByteFile(cartella));
   const nomeDisco = `${crypto.randomUUID()}.${ext}`;
-  const percorso = path.join(cartella, nomeDisco);
-  fs.writeFileSync(percorso, dati, { flag: 'wx' });
+  await scriviContenuto(prisma, cartella, nomeDisco, dati);
   try {
     return await prisma.fileCaricato.create({
       data: {
@@ -117,13 +150,13 @@ export async function salvaFile(prisma: PrismaClient, cartella: string, dati: Bu
       },
     });
   } catch (e) {
-    fs.rmSync(percorso, { force: true });
+    await eliminaContenuto(prisma, cartella, nomeDisco);
     throw e;
   }
 }
 
 /** Percorso del file sul disco (il nome viene dal database, mai dalla richiesta). */
-export function percorsoFile(cartella: string, nomeDisco: string): string {
+function percorsoFile(cartella: string, nomeDisco: string): string {
   return path.join(cartella, path.basename(nomeDisco));
 }
 
@@ -133,7 +166,7 @@ export async function eliminaFile(prisma: PrismaClient, cartella: string, fileId
   const file = await prisma.fileCaricato.findUnique({ where: { id: fileId } });
   if (!file) return;
   await prisma.fileCaricato.delete({ where: { id: fileId } });
-  fs.rmSync(percorsoFile(cartella, file.nomeDisco), { force: true });
+  await eliminaContenuto(prisma, cartella, file.nomeDisco);
 }
 
 /**

@@ -17,7 +17,9 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force && prisma db seed",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "node scripts/schema-postgres.mjs && prisma generate",
+    "vercel-build": "node scripts/vercel-build.mjs",
+    "vercel-prova": "node scripts/vercel-prova.mjs"
   },
   "engines": {
     "node": ">=20.19"
@@ -31,10 +33,13 @@
     "@fontsource/open-sans": "^5.3.0",
     "@fontsource/ubuntu": "^5.3.0",
     "@prisma/adapter-better-sqlite3": "^7.10.1",
+    "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "^7.10.1",
+    "@vercel/functions": "3.11.0",
     "exceljs": "^4.4.0",
     "express": "^5.3.0",
     "nodemailer": "10.4.1",
+    "pg": "8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.6",
@@ -45,6 +50,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.5",
+    "@types/pg": "8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
@@ -55,7 +61,8 @@
     "tsx": "^4.23.15",
     "typescript": "~5.9",
     "vite": "^7.3.8",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "esbuild": "0.28.2"
   },
   "allowScripts": {
     "better-sqlite3": true,

@@ -18,6 +18,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { richiediAdmin } from '../middleware';
+import { tieniVivo } from '../vercel';
 
 export const GIORNI_REGISTRO = 400;
 const RIGHE_PER_PAGINA = 100;
@@ -25,7 +26,14 @@ const RIGHE_PER_PAGINA = 100;
 export type VoceRegistro = { utenteId?: number | null; username: string; azione: string; dettaglio?: string | null; esito?: 'OK' | 'NEGATO' | 'ERRORE'; ip?: string | null };
 
 /** Scrive una riga. Non solleva mai errori: un registro che non si scrive non deve fermare Logbook. */
-export async function registra(prisma: PrismaClient, voce: VoceRegistro): Promise<void> {
+export function registra(prisma: PrismaClient, voce: VoceRegistro): Promise<void> {
+  const lavoro = scrivi(prisma, voce);
+  // Spesso parte a risposta già inviata: su Vercel va tenuta viva (server/vercel.ts).
+  tieniVivo(lavoro);
+  return lavoro;
+}
+
+async function scrivi(prisma: PrismaClient, voce: VoceRegistro): Promise<void> {
   try {
     await prisma.registroAttivita.create({
       data: {

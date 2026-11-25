@@ -21,9 +21,8 @@
  * dalla cartella). L'ordine rispetta i vincoli del database: prima le righe che puntano ad
  * altre (ore, assenze, documenti…), poi dipendenti, progetti e account.
  */
-import fs from 'node:fs';
 import type { PrismaClient } from '../../generated/prisma/client';
-import { percorsoFile } from './archivio-file';
+import { eliminaContenuto } from './archivio-file';
 import { aggiungiFestivitaNazionali } from './festivita';
 
 export type EsitoCancellazione = {
@@ -65,7 +64,7 @@ export async function cancellaTuttiIDati(
     return { dipendenti, progetti, registrazioni, assenze, account, file: file.length };
   });
 
-  for (const f of file) fs.rmSync(percorsoFile(cartellaDocumenti, f.nomeDisco), { force: true });
+  for (const f of file) await eliminaContenuto(prisma, cartellaDocumenti, f.nomeDisco);
   const anno = Number(oggi.slice(0, 4));
   for (const a of [anno, anno + 1]) await aggiungiFestivitaNazionali(prisma, a);
   return esito;

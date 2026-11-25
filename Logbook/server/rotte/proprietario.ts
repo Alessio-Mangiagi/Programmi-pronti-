@@ -30,9 +30,12 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import { CREDENZIALI_DEMO, semina, USERNAME_DEMO } from '../../prisma/seed';
 import { segnaPasswordPubblicate } from '../auth/password-provvisorie';
 import { ErroreHttp, vietato } from '../errori';
+import { suPostgres } from '../database-url';
 import { cartellaBackupPredefinita, creaBackup } from '../servizi/backup';
+import { tieniVivo } from '../vercel';
 import { cancellaTuttiIDati } from '../servizi/cancella-dati';
 import { registroCodici } from '../servizi/codice-conferma';
+import { statoTemporaneo } from '../servizi/stato-temporaneo';
 import { mascheraEmail, type InviaEmail } from '../servizi/email';
 import { registra } from '../servizi/registro';
 
@@ -64,7 +67,8 @@ export function rotteProprietario(
   const router = Router();
   const { proprietario, inviaEmail, cartellaDocumenti, oggi } = opzioni;
   const adesso = opzioni.adesso ?? Date.now;
-  const codici = registroCodici(adesso);
+  // Giorno 35: codici nel database, non in memoria (servizi/stato-temporaneo.ts).
+  const codici = registroCodici(statoTemporaneo(prisma, adesso), 'cancellazione', adesso);
   const cartellaBackup = opzioni.cartellaBackup ?? cartellaBackupPredefinita();
 
   const eProprietario = (req: Request) =>
@@ -100,6 +104,8 @@ export function rotteProprietario(
       emailConfigurata: !!proprietario.email,
       invioConfigurato: !!inviaEmail,
       vuoto: c.dipendenti === 0 && c.progetti === 0 && c.registrazioni === 0,
+      // false su PostgreSQL (Vercel): le copie le fa il servizio del database.
+      copieLocali: !suPostgres(),
       ...c,
     });
   });
@@ -118,7 +124,7 @@ export function rotteProprietario(
 
   router.post('/cancellazione/codice', soloProprietario, async (req, res) => {
     const invia = invioPronto();
-    const nuovo = codici.nuovo(req.utente!.id);
+    const nuovo = await codici.nuovo(req.utente!.id);
     if (!nuovo) throw new ErroreHttp(429, 'Hai chiesto troppi codici nell\'ultima ora: riprova più tardi');
     try {
       await invia({
@@ -132,7 +138,7 @@ export function rotteProprietario(
           `Ti conviene però cambiare la password dell'account "${req.utente!.username}" di Logbook.`,
       });
     } catch (e) {
-      codici.annulla(req.utente!.id);
+      await codici.annulla(req.utente!.id);
       console.error('[logbook] invio del codice non riuscito:', e);
       throw new ErroreHttp(502, 'Invio dell\'email non riuscito: controllare server, porta, utente e password di posta nel file .env');
     }
@@ -148,7 +154,7 @@ export function rotteProprietario(
         conferma: z.string().trim().refine((v) => v === PAROLA_CONFERMA, `Scrivi ${PAROLA_CONFERMA} in maiuscolo per confermare`),
       })
       .parse(req.body);
-    const esito = codici.verifica(req.utente!.id, dati.codice);
+    const esito = await codici.verifica(req.utente!.id, dati.codice);
     if (esito !== 'ok') {
       const messaggi = {
         assente: 'Nessun codice in attesa: chiedine uno nuovo',
@@ -160,8 +166,10 @@ export function rotteProprietario(
     }
     // Giorno 34: prima una copia di sicurezza (database con VACUUM INTO e file caricati). Se la
     // copia non riesce non si cancella niente: senza rete di salvataggio l'operazione non parte.
-    let copia: string;
-    try {
+    // Su PostgreSQL (Vercel) la copia non si può fare qui: non c'è un disco e VACUUM INTO è
+    // di SQLite. Le copie le fa il servizio che ospita il database (ripristino a una data).
+    let copia: string | null = null;
+    if (!suPostgres()) try {
       copia = (await creaBackup(prisma, cartellaDocumenti, { tipo: 'prima-cancellazione', cartella: cartellaBackup })).file;
     } catch (e) {
       console.error('[logbook] copia di sicurezza prima della cancellazione non riuscita:', e);
@@ -170,7 +178,7 @@ export function rotteProprietario(
     const r = await cancellaTuttiIDati(prisma, cartellaDocumenti, req.utente!.id, oggi());
     void registra(prisma, {
       utenteId: req.utente!.id, username: req.utente!.username, azione: 'TUTTI I DATI CANCELLATI', ip: req.ip,
-      dettaglio: `${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce, ${r.account} account; copia: ${copia}`,
+      dettaglio: `${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce, ${r.account} account; copia: ${copia ?? 'del servizio del database'}`,
     });
     console.log(
       `[logbook] TUTTI I DATI CANCELLATI dal proprietario (${req.utente!.username}): ${r.dipendenti} dipendenti, ${r.progetti} progetti, ` +
@@ -178,18 +186,19 @@ export function rotteProprietario(
     );
     // Avviso a cose fatte: se non è stato il proprietario, lo scopre subito. Un errore di
     // invio qui non annulla nulla (i dati sono già stati cancellati).
-    invia({
+    tieniVivo(invia({
       a: proprietario.email!,
       oggetto: 'Logbook: tutti i dati sono stati cancellati',
       testo:
         `Alle ${formatoOra(adesso())} l'account "${req.utente!.username}" ha cancellato tutti i dati di Logbook con il codice di conferma.\n` +
         `Cancellati: ${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce orarie, ${r.assenze} assenze, ${r.account} account, ${r.file} file.`,
-    }).catch((e) => console.error('[logbook] avviso di cancellazione non inviato:', e));
+    }).catch((e) => console.error('[logbook] avviso di cancellazione non inviato:', e)));
     res.json({ ...r, copia });
   });
 
   /** Copia di sicurezza fatta subito, a mano (oltre a quella automatica di ogni giorno). */
   router.post('/backup', soloProprietario, async (_req, res) => {
+    if (suPostgres()) throw new ErroreHttp(409, 'Su questa installazione le copie di sicurezza le fa il servizio che ospita il database');
     const r = await creaBackup(prisma, cartellaDocumenti, { cartella: cartellaBackup });
     res.json(r);
   });

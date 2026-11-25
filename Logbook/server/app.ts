@@ -14,7 +14,7 @@
  */
 import express from 'express';
 import type { PrismaClient } from '../generated/prisma/client';
-import { oggiIso } from '../comune/date';
+import { oggiItalia } from '../comune/date';
 import { gestoreErrori } from './errori';
 import { caricaUtente, controlloCsrf, richiediLogin, richiediPasswordCambiata } from './middleware';
 import { rotteAuth } from './rotte/auth';
@@ -35,7 +35,10 @@ import { rotteSegnalazioni } from './rotte/segnalazioni';
 import { proprietarioDaAmbiente, rotteProprietario, type ConfigProprietario } from './rotte/proprietario';
 import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
 import { invioDaAmbiente, type InviaEmail } from './servizi/email';
+import { limitatoreSuDatabase } from './servizi/limitatore';
 import { registroRichieste, rotteRegistro } from './servizi/registro';
+import { suPostgres } from './database-url';
+import { suVercel } from './vercel';
 
 /**
  * Opzioni:
@@ -57,12 +60,15 @@ export type OpzioniApp = {
   adesso?: () => number;
   /** false spegne il codice via email all'accesso degli amministratori (default: LOGBOOK_CODICE_ACCESSO diverso da 0). */
   codiceAccesso?: boolean;
+  /** true forza il blocco dei tentativi sul database anche su SQLite (test). */
+  limitatoreSuDatabase?: boolean;
   /** Cartella delle copie di sicurezza (i test ne passano una temporanea). */
   cartellaBackup?: string;
 };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
-  const oggi = opzioni.oggi ?? (() => oggiIso());
+  // Data di Logbook nel fuso italiano anche se il server è altrove (su Vercel l'orologio è UTC).
+  const oggi = opzioni.oggi ?? (() => oggiItalia());
   const cartellaDocumenti = opzioni.cartellaDocumenti ?? cartellaDocumentiPredefinita();
   const app = express();
   app.disable('x-powered-by');
@@ -81,7 +87,9 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   });
   // Dietro un proxy (Vite in sviluppo, Caddy in produzione) req.ip deve essere quello
   // del browser, non del proxy: serve al limite dei tentativi di login.
-  app.set('trust proxy', 'loopback');
+  // Su Vercel (Giorno 35) davanti c'è sempre la rete di Vercel, che non è "loopback": lì ci
+  // si fida del primo proxy, altrimenti req.ip sarebbe il suo e req.secure sempre false.
+  app.set('trust proxy', suVercel() ? 1 : 'loopback');
 
   const api = express.Router();
   // Le risposte delle API contengono dati personali (ore, costi, assenze): browser e proxy
@@ -115,7 +123,10 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const inviaEmail = opzioni.inviaEmail !== undefined ? opzioni.inviaEmail : invioDaAmbiente();
   api.use(
     '/auth',
-    rotteAuth(prisma, { proprietario, inviaEmail, adesso: opzioni.adesso, codiceAccesso: opzioni.codiceAccesso ?? process.env.LOGBOOK_CODICE_ACCESSO?.trim() !== '0' }),
+    rotteAuth(prisma, {
+      proprietario, inviaEmail, adesso: opzioni.adesso,
+      // Senza memoria che dura (PostgreSQL = Vercel) il blocco dei tentativi sta nel database.
+      limitatore: opzioni.limitatoreSuDatabase ?? suPostgres() ? limitatoreSuDatabase(prisma, opzioni.adesso) : undefined, codiceAccesso: opzioni.codiceAccesso ?? process.env.LOGBOOK_CODICE_ACCESSO?.trim() !== '0' }),
   );
 
   // Da qui in poi serve il login, e una password non provvisoria (Giorno 24, risposta 1a).

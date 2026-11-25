@@ -7,7 +7,7 @@
  * nativo da Node 20.12, senza la dipendenza dotenv).
  */
 import { defineConfig } from 'prisma/config';
-import { urlDatabase } from './server/database-url';
+import { suPostgres, urlDatabase } from './server/database-url';
 
 try {
   process.loadEnvFile('.env');
@@ -15,8 +15,11 @@ try {
   // Nessun .env: si usano i default di server/database-url.ts.
 }
 
+// Giorno 35: con un DATABASE_URL di PostgreSQL (Vercel) si usa la copia dello schema con
+// quel provider, creata da scripts/vercel-build.mjs. Le migrazioni SQL restano quelle di SQLite:
+// su PostgreSQL la struttura si allinea con `prisma db push` (scripts/prepara-db.ts).
 export default defineConfig({
-  schema: 'prisma/schema.prisma',
+  schema: suPostgres() ? 'prisma/postgres/schema.prisma' : 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
     // Eseguito da `prisma db seed` e da `prisma migrate reset`.

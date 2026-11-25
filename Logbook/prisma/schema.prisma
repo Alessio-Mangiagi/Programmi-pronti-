@@ -1,5 +1,7 @@
 // "><(((º> sabusabu <º)))><"
-// Schema del database di Logbook (SQLite, Prisma 7).
+// Schema del database di Logbook (Prisma 7). In locale e nella suite il database è SQLite;
+// su Vercel è PostgreSQL: scripts/vercel-build.mjs copia questo file cambiando solo il
+// "provider" (prisma/postgres/schema.prisma, generato, non versionato). Uno schema solo.
 //
 // Convenzioni valide per tutto lo schema:
 // - Le DATE di calendario (giorno lavorato, assunzione, ferie, festività) sono stringhe
@@ -531,4 +533,39 @@ model Segnalazione {
 
   @@index([stato])
   @@index([dipendenteId, data])
+}
+
+// ---------------------------------------------------------------------------
+// Stato che su Vercel non può stare in memoria o su disco (Giorno 35, 25/11/2026)
+// ---------------------------------------------------------------------------
+
+/// Dati a scadenza che prima vivevano nella memoria del server: codici di conferma via email
+/// (solo l'impronta), accessi di amministratori in attesa del codice. Su Vercel ogni richiesta
+/// può finire su un processo diverso, quindi stanno qui (server/servizi/stato-temporaneo.ts).
+model StatoTemporaneo {
+  chiave  String   @id
+  /// JSON.
+  valore  String
+  scadeIl DateTime
+
+  @@index([scadeIl])
+}
+
+/// Tentativi di accesso falliti e attese (blocco progressivo, server/servizi/limitatore.ts),
+/// usata quando il server non ha memoria che dura (Vercel). In locale il conto resta in memoria.
+model TentativoAccesso {
+  /// "indirizzo|utente" oppure "password|idUtente".
+  chiave       String   @id
+  conta        Int      @default(0)
+  livello      Int      @default(0)
+  bloccatoFino DateTime @default(now())
+  ultimo       DateTime @default(now())
+}
+
+/// Contenuto dei file caricati quando non c'è un disco che dura (Vercel): al posto della
+/// cartella data/documenti. Chiave = FileCaricato.nomeDisco (server/servizi/archivio-file.ts).
+model ContenutoFile {
+  nomeDisco String   @id
+  dati      Bytes
+  creatoIl  DateTime @default(now())
 }

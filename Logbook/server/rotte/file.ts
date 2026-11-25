@@ -19,12 +19,10 @@
  * del dipendente li carica HR, quindi restano riservati a HR.
  */
 import express, { Router } from 'express';
-import fs from 'node:fs';
-import { pipeline } from 'node:stream';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { ErroreHttp, nonTrovato, vietato } from '../errori';
 import { idDaParametro, isAdmin } from '../middleware';
-import { MAX_BYTE_FILE, percorsoFile, salvaFile, SI_APRE_NEL_BROWSER, vistaFile } from '../servizi/archivio-file';
+import { leggiContenuto, MAX_BYTE_FILE, salvaFile, SI_APRE_NEL_BROWSER, vistaFile } from '../servizi/archivio-file';
 
 /** Content-Disposition con il nome originale (anche accentato): filename ASCII + filename* UTF-8. */
 function intestazioneNomeFile(tipo: 'inline' | 'attachment', nome: string): string {
@@ -75,11 +73,12 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
     // l'allegato, anche se l'ha caricato HR.
     const suaAssenza = file.assenza != null && req.utente!.dipendenteId === file.assenza.dipendenteId;
     if (!isAdmin(req) && file.caricatoDaId !== req.utente!.id && !suaAssenza) throw vietato('Non puoi aprire questo file');
-    const percorso = percorsoFile(cartella, file.nomeDisco);
-    if (!fs.existsSync(percorso)) throw new ErroreHttp(404, 'Il file non è più nella cartella dei documenti: avvisa l\'amministratore');
+    // Giorno 35: il contenuto arriva dall'archivio (cartella dei documenti o, su Vercel, database).
+    const dati = await leggiContenuto(prisma, cartella, file.nomeDisco);
+    if (!dati) throw new ErroreHttp(404, 'Il file non è più nell\'archivio dei documenti: avvisa l\'amministratore');
     const nelBrowser = SI_APRE_NEL_BROWSER.has(file.tipoMime) && req.query.scarica !== '1';
     res.setHeader('Content-Type', file.tipoMime);
-    res.setHeader('Content-Length', String(file.dimensione));
+    res.setHeader('Content-Length', String(dati.length));
     res.setHeader('Content-Disposition', intestazioneNomeFile(nelBrowser ? 'inline' : 'attachment', file.nomeOriginale));
     // Il browser non deve "indovinare" il tipo (un file di testo trattato come pagina web).
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -87,11 +86,7 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
     // visualizzatore PDF dei browser non funziona dentro una sandbox.
     if (file.tipoMime !== 'application/pdf') res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.setHeader('Cache-Control', 'private, no-store');
-    // pipeline e non .pipe(): un errore di lettura (file sparito, bloccato dall'antivirus)
-    // senza gestore farebbe cadere l'intero server. Così si chiude solo questa risposta.
-    pipeline(fs.createReadStream(percorso), res, (errore) => {
-      if (errore && errore.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.warn(`[logbook] lettura del file ${file.id} non riuscita:`, errore.message);
-    });
+    res.end(dati);
   });
 
   return router;

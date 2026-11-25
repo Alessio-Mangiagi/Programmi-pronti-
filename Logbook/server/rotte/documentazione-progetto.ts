@@ -23,14 +23,13 @@
  * Il file si carica prima con POST /api/file e qui si collega per id (fileCollegabile:
  * stesso utente, non già usato).
  */
-import fs from 'node:fs';
 import { Router } from 'express';
 import type { Prisma, PrismaClient } from '../../generated/prisma/client';
 import { formattaData } from '../../comune/date';
 import { schemaDocumentoProgetto, schemaNotaProgetto, schemaRevisioneDocumento } from '../../comune/documenti';
 import { ErroreHttp, nonTrovato, richiestaNonValida } from '../errori';
 import { idDaParametro, isAdmin, richiediAdmin } from '../middleware';
-import { eliminaFile, fileCollegabile, percorsoFile, vistaFile } from '../servizi/archivio-file';
+import { eliminaFile, fileCollegabile, leggiContenuto, vistaFile } from '../servizi/archivio-file';
 import { inviaDocumento, leggiCollegamento } from '../servizi/skytower';
 import { dataDaQuery } from './registrazioni';
 
@@ -137,7 +136,8 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
     if (!d.progetto.commessaSkytower) throw richiestaNonValida(`Il progetto ${d.progetto.codice} non ha la commessa SkyTower: indicala nei dati del progetto`);
     if (!d.file) throw richiestaNonValida('Si inviano a SkyTower solo i documenti con un file allegato');
     if (d.skytowerInviatoIl) throw new ErroreHttp(409, `Documento già inviato a SkyTower il ${formattaData(d.skytowerInviatoIl.toISOString().slice(0, 10))}`);
-    const dati = fs.readFileSync(percorsoFile(cartella, d.file.nomeDisco));
+    const dati = await leggiContenuto(prisma, cartella, d.file.nomeDisco);
+    if (!dati) throw new ErroreHttp(404, 'Il file non è più nell\'archivio dei documenti');
     const esito = await inviaDocumento(collegamento, d.progetto.commessaSkytower, {
       dati,
       tipo: d.file.tipoMime,

@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { oggiIso } from '../comune/date';
-import { RADICE_APP } from '../server/database-url';
+import { RADICE_APP, suPostgres } from '../server/database-url';
 import { decidiDatiDemo } from '../server/dati-demo';
 
 // package.json: "prestart" passa --produzione, "predev" no.
@@ -43,7 +43,11 @@ if (!fs.existsSync(path.join(RADICE_APP, 'generated', 'prisma', 'client.ts'))) {
   prismaCli('generate');
 }
 
-prismaCli('migrate', 'deploy');
+// Giorno 35: su PostgreSQL (Vercel) non ci sono le migrazioni SQL di SQLite: la struttura si
+// allinea allo schema con `db push`, che crea ciò che manca e si ferma (senza toccare nulla)
+// se una modifica farebbe perdere dati.
+if (suPostgres()) prismaCli('db', 'push');
+else prismaCli('migrate', 'deploy');
 
 // Import dinamici: il client generato esiste solo dopo il passo 1.
 const { creaPrisma } = await import('../server/db');

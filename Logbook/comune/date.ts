@@ -39,6 +39,16 @@ export function oggiIso(adesso: Date = new Date()): string {
 }
 
 /**
+ * Data di oggi in Italia ("AAAA-MM-GG"), qualunque sia il fuso del computer. La usa il server
+ * (Giorno 35): su Vercel l'orologio è in UTC e fra mezzanotte e l'una o le due italiane
+ * oggiIso() direbbe ancora il giorno prima.
+ */
+export function oggiItalia(adesso: Date = new Date()): string {
+  // Il formato svedese è già AAAA-MM-GG.
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(adesso);
+}
+
+/**
  * Anno più lontano accettato (verifica di sicurezza del Giorno 23, 24/11/2026). Senza un
  * tetto un dipendente poteva chiedere ferie fino al 9999-12-31: il giorno dopo ("10000-01-01")
  * nel confronto fra stringhe risulta PRIMA di "9999-12-31", i cicli giorno per giorno non

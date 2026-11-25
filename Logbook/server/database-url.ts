@@ -23,6 +23,17 @@ export const RADICE_APP = path.resolve(path.dirname(fileURLToPath(import.meta.ur
  * database distinti. Crea la cartella `data/` se manca, perché SQLite crea il file
  * ma non le cartelle che lo contengono.
  */
+/**
+ * true se il database è PostgreSQL (Giorno 35: Logbook su Vercel, dove un file SQLite non
+ * durerebbe). Lo decide l'indirizzo: DATABASE_URL che comincia con postgres:// o postgresql://.
+ * Da qui dipendono il driver (server/db.ts), dove stanno i file caricati
+ * (servizi/archivio-file.ts), il blocco dei tentativi (servizi/limitatore.ts) e le copie di
+ * sicurezza (servizi/backup.ts: su PostgreSQL le fa il servizio che ospita il database).
+ */
+export function suPostgres(url: string | undefined = process.env.DATABASE_URL): boolean {
+  return /^postgres(ql)?:\/\//i.test(url?.trim() ?? '');
+}
+
 export function urlDatabase(): string {
   const daAmbiente = process.env.DATABASE_URL?.trim();
   if (daAmbiente) return daAmbiente;
