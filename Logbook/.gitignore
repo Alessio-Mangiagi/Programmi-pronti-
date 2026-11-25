@@ -4,6 +4,8 @@
 # Dipendenze e build
 node_modules/
 dist/
+# Installatore compilato (PyInstaller da installa-logbook.py), come InstallaSuite.exe nella radice
+InstallaLogbook.exe
 
 # Client Prisma generato da `prisma generate` (si rigenera a ogni npm install)
 generated/
