@@ -31,7 +31,7 @@ export async function avviaServer(prisma: PrismaClient, opzioni: OpzioniApp = { 
   // Mai la cartella vera dei documenti (data/documenti): ogni server di prova ne ha una
   // temporanea, cancellata da chiudi().
   const cartellaDocumenti = opzioni.cartellaDocumenti ?? fs.mkdtempSync(path.join(os.tmpdir(), 'logbook-doc-'));
-  const server = creaApp(prisma, { ...opzioni, cartellaDocumenti }).listen(0, '127.0.0.1');
+  const server = creaApp(prisma, { codiceAccesso: false, ...opzioni, cartellaDocumenti }).listen(0, '127.0.0.1');
   await new Promise((ok) => server.once('listening', ok));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 

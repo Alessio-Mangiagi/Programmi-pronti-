@@ -53,6 +53,8 @@ model Utente {
   /// Richieste di assenza approvate o rifiutate da questo utente (HR).
   assenzeDecise       Assenza[]           @relation("DecisioneAssenza")
   sessioni            Sessione[]
+  /// PC su cui questo amministratore ha già confermato il codice via email (Giorno 34).
+  dispositiviFidati   DispositivoFidato[]
   /// File caricati da questo utente (attestati, documenti, documentazione dei progetti).
   fileCaricati        FileCaricato[]      @relation("FileCaricati")
   /// Documentazione di progetto scritta da questo utente.
@@ -78,8 +80,45 @@ model Sessione {
   utenteId Int
   scadeIl  DateTime
   creatoIl DateTime @default(now())
+  /// Ultima azione dell'utente (Giorno 34): dopo 15 minuti senza azioni la sessione si chiude
+  /// (server/auth/sessioni.ts). Le chiamate automatiche dell'interfaccia non la aggiornano.
+  ultimoUsoIl DateTime @default(now())
 
   @@index([utenteId])
+}
+
+/// PC "fidato" di un amministratore (Giorno 34): dopo il codice via email all'accesso, il
+/// browser riceve un cookie HttpOnly e qui se ne salva l'impronta SHA-256. Per 30 giorni da
+/// quel PC non si chiede più il codice. Cambiare o reimpostare la password li cancella.
+model DispositivoFidato {
+  /// SHA-256 esadecimale del token del cookie.
+  id       String   @id
+  utente   Utente   @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  utenteId Int
+  scadeIl  DateTime
+  creatoIl DateTime @default(now())
+
+  @@index([utenteId])
+}
+
+/// Registro delle attività (Giorno 34): accessi riusciti e falliti, blocchi, cambi password e
+/// ogni operazione che modifica o esporta dati. Lo leggono solo gli amministratori dalla voce
+/// "Registro attività" del menu. Nessuna relazione con Utente di proposito: le righe restano
+/// anche quando l'account viene cancellato (username copiato qui). Si tengono 400 giorni.
+model RegistroAttivita {
+  id        Int      @id @default(autoincrement())
+  quando    DateTime @default(now())
+  utenteId  Int?
+  /// Nome utente al momento dell'azione (o quello provato in un accesso fallito).
+  username  String
+  /// Descrizione leggibile, es. "Accesso riuscito", "Ore: giornata salvata".
+  azione    String
+  dettaglio String?
+  /// OK, NEGATO (401/403/429) o ERRORE.
+  esito     String   @default("OK")
+  ip        String?
+
+  @@index([quando])
 }
 
 // ---------------------------------------------------------------------------

@@ -46,6 +46,21 @@ const pulisci = () =>
 pulisci();
 // unref: il timer non tiene acceso il processo alla chiusura.
 setInterval(pulisci, 6 * 60 * 60 * 1000).unref();
+
+// Giorno 34: copia di sicurezza di ogni giorno (servizi/backup.ts). All'avvio se quella di
+// oggi manca, poi un controllo ogni ora: con il PC acceso scatta poco dopo mezzanotte. Solo
+// in produzione: in sviluppo il database è di prova. Un errore qui non ferma il server.
+if (produzione) {
+  const { backupSeManca } = await import('./servizi/backup');
+  const { pulisciRegistro } = await import('./servizi/registro');
+  const copia = () =>
+    backupSeManca(prisma, cartellaDocumentiPredefinita())
+      .then((r) => r && console.log(`[logbook] copia di sicurezza: ${r.file} (${r.documentiCopiati} file nuovi, ${r.copieTolte} copie vecchie tolte)`))
+      .catch((e) => console.error('[logbook] COPIA DI SICUREZZA NON RIUSCITA:', e));
+  copia();
+  setInterval(copia, 60 * 60 * 1000).unref();
+  pulisciRegistro(prisma).catch((e) => console.warn('[logbook] pulizia del registro non riuscita:', e));
+}
 // Express 5 chiama questa funzione anche quando l'ascolto fallisce, passandole l'errore:
 // in quel caso si tace e ci pensa il gestore 'error' qui sotto (altrimenti il log direbbe
 // "in ascolto" subito prima di "porta occupata").

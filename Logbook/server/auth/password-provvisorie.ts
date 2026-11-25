@@ -14,20 +14,34 @@
  * Finché il segno c'è, le API rispondono 403 tranne /api/auth (server/middleware.ts) e
  * l'interfaccia mostra solo la pagina per cambiarla (src/pagine/PasswordProvvisoria.tsx).
  */
+import { randomBytes } from 'node:crypto';
 import type { Prisma, PrismaClient } from '../../generated/prisma/client';
 import { creaImpronta, verificaPassword } from './password';
 
 /**
  * Crea un amministratore se non ce n'è nessuno attivo. Senza amministratori nessuno potrebbe
  * creare account (es. tutti disattivati per errore, o database migrato da una versione senza
- * utenti). La password è quella indicata (LOGBOOK_ADMIN_PASSWORD) o quella di prova, e va
- * comunque cambiata al primo accesso. Restituisce il nome utente creato, o null.
+ * utenti). Nome utente e password sono quelli scelti all'installazione (InstallaLogbook.exe,
+ * InstallaSuite.exe: LOGBOOK_ADMIN_USERNAME / LOGBOOK_ADMIN_PASSWORD passati solo a quel
+ * comando) e allora la password è definitiva; altrimenti "admin" con una password casuale
+ * provvisoria. Restituisce il nome utente creato (e la password, se generata), o null.
  */
-export async function assicuraAdmin(prisma: PrismaClient, password: string): Promise<string | null> {
+export async function assicuraAdmin(
+  prisma: PrismaClient,
+  scelte: { username?: string; password?: string; definitiva?: boolean } = {},
+): Promise<{ username: string; passwordGenerata?: string } | null> {
   if ((await prisma.utente.count({ where: { ruolo: 'ADMIN', attivo: true } })) > 0) return null;
-  const username = (await prisma.utente.findUnique({ where: { username: 'admin' } })) ? `admin${Date.now() % 10000}` : 'admin';
-  await prisma.utente.create({ data: { username, passwordHash: await creaImpronta(password), ruolo: 'ADMIN', passwordDaCambiare: true } });
-  return username;
+  const voluto = (scelte.username || 'admin').trim().toLowerCase();
+  const username = (await prisma.utente.findUnique({ where: { username: voluto } })) ? `${voluto}${Date.now() % 10000}` : voluto;
+  // Giorno 34: senza una password indicata se ne genera una a caso, mostrata una volta sola
+  // nella finestra di avvio. Niente più "Admin2026!" uguale su ogni installazione.
+  const passwordGenerata = scelte.password ? undefined : randomBytes(12).toString('base64url');
+  const password = scelte.password ?? passwordGenerata!;
+  // Definitiva solo se l'ha scelta chi installa (installatore): quella generata o scritta
+  // nel .env è provvisoria e va cambiata al primo accesso.
+  const passwordDaCambiare = !(scelte.definitiva && scelte.password);
+  await prisma.utente.create({ data: { username, passwordHash: await creaImpronta(password), ruolo: 'ADMIN', passwordDaCambiare } });
+  return { username, passwordGenerata };
 }
 
 /**

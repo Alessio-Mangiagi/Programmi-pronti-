@@ -102,13 +102,13 @@ describe('allegati delle assenze', () => {
 });
 
 describe('login e password', () => {
-  it('20 tentativi sbagliati in parallelo: solo 5 valgono, gli altri 429', async () => {
+  it('20 tentativi sbagliati in parallelo: solo 10 valgono, gli altri 429', async () => {
     const risposte = await Promise.all(
       Array.from({ length: 20 }, () => server.anonimo.chiama('POST', '/api/auth/login', { username: 'nessuno.qui', password: 'Sbagliata1' })),
     );
     const stati = risposte.map((r) => r.stato);
-    expect(stati.filter((s) => s === 401)).toHaveLength(5);
-    expect(stati.filter((s) => s === 429)).toHaveLength(15);
+    expect(stati.filter((s) => s === 401)).toHaveLength(10);
+    expect(stati.filter((s) => s === 429)).toHaveLength(10);
   });
 
   it('nome utente lunghissimo rifiutato subito (non resta in memoria)', async () => {
@@ -116,10 +116,12 @@ describe('login e password', () => {
     expect(r.stato).toBe(400);
   });
 
-  it('cambio password: dopo 5 password attuali sbagliate, 429', async () => {
-    for (let i = 0; i < 5; i++) {
+  it('cambio password: dopo 10 password attuali sbagliate, 429', async () => {
+    for (let i = 0; i < 10; i++) {
       expect((await giulia.chiama('POST', '/api/auth/password', { attuale: 'Sbagliata1', nuova: 'NuovaPass1' })).stato).toBe(400);
     }
+    // L'undicesima sbagliata fa partire l'attesa: da lì anche quella giusta è rifiutata.
+    expect((await giulia.chiama('POST', '/api/auth/password', { attuale: 'Sbagliata1', nuova: 'NuovaPass1' })).stato).toBe(429);
     expect((await giulia.chiama('POST', '/api/auth/password', { attuale: CREDENZIALI_DEMO.passwordDipendenti, nuova: 'NuovaPass1' })).stato).toBe(429);
   });
 

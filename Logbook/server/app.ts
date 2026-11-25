@@ -35,6 +35,7 @@ import { rotteSegnalazioni } from './rotte/segnalazioni';
 import { proprietarioDaAmbiente, rotteProprietario, type ConfigProprietario } from './rotte/proprietario';
 import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
 import { invioDaAmbiente, type InviaEmail } from './servizi/email';
+import { registroRichieste, rotteRegistro } from './servizi/registro';
 
 /**
  * Opzioni:
@@ -54,6 +55,10 @@ export type OpzioniApp = {
   proprietario?: ConfigProprietario;
   inviaEmail?: InviaEmail | null;
   adesso?: () => number;
+  /** false spegne il codice via email all'accesso degli amministratori (default: LOGBOOK_CODICE_ACCESSO diverso da 0). */
+  codiceAccesso?: boolean;
+  /** Cartella delle copie di sicurezza (i test ne passano una temporanea). */
+  cartellaBackup?: string;
 };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
@@ -104,12 +109,18 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
     res.json({ oggi: oggi(), adesso: new Date().toISOString() });
   });
 
-  api.use('/auth', rotteAuth(prisma));
+  // Giorno 34: ogni operazione che modifica o esporta dati finisce nel registro attività.
+  api.use(registroRichieste(prisma));
+  const proprietario = opzioni.proprietario ?? proprietarioDaAmbiente();
+  const inviaEmail = opzioni.inviaEmail !== undefined ? opzioni.inviaEmail : invioDaAmbiente();
+  api.use(
+    '/auth',
+    rotteAuth(prisma, { proprietario, inviaEmail, adesso: opzioni.adesso, codiceAccesso: opzioni.codiceAccesso ?? process.env.LOGBOOK_CODICE_ACCESSO?.trim() !== '0' }),
+  );
 
   // Da qui in poi serve il login, e una password non provvisoria (Giorno 24, risposta 1a).
   api.use(richiediLogin);
   api.use(richiediPasswordCambiata);
-  const proprietario = opzioni.proprietario ?? proprietarioDaAmbiente();
   api.use('/dipendenti', rotteDipendenti(prisma, proprietario.username));
   api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
@@ -137,10 +148,13 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
       cartellaDocumenti,
       oggi,
       proprietario,
-      inviaEmail: opzioni.inviaEmail !== undefined ? opzioni.inviaEmail : invioDaAmbiente(),
+      inviaEmail,
       adesso: opzioni.adesso,
+      cartellaBackup: opzioni.cartellaBackup,
     }),
   );
+  // Giorno 34: registro attività, solo amministratori (voce del menu).
+  api.use('/registro', rotteRegistro(prisma));
 
   /** Qualsiasi altra /api: 404 in JSON (non la pagina HTML di Express). */
   api.use((_req, res) => {

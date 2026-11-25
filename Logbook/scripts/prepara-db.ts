@@ -84,8 +84,20 @@ try {
   // Logbook obbliga a cambiarla al primo accesso (server/auth/password-provvisorie.ts).
   const { assicuraAdmin, segnaPasswordPubblicate } = await import('../server/auth/password-provvisorie');
   const { CREDENZIALI_DEMO, USERNAME_DEMO } = await import('../prisma/seed');
-  const creato = await assicuraAdmin(prisma, process.env.LOGBOOK_ADMIN_PASSWORD || CREDENZIALI_DEMO.admin.password);
-  if (creato) console.log(`[logbook] ATTENZIONE: creato l'amministratore "${creato}": al primo accesso Logbook chiede di cambiare la password.`);
+  // Giorno 34: il primo amministratore nasce con le credenziali scelte all'installazione
+  // (l'installatore le passa solo a questo comando, non le scrive nel .env). Senza, "admin"
+  // con una password casuale mostrata qui una volta sola e da cambiare al primo accesso.
+  const creato = await assicuraAdmin(prisma, {
+    username: process.env.LOGBOOK_ADMIN_USERNAME,
+    password: process.env.LOGBOOK_ADMIN_PASSWORD || undefined,
+    definitiva: process.env.LOGBOOK_ADMIN_DEFINITIVA === '1',
+  });
+  if (creato?.passwordGenerata) {
+    console.log(`[logbook] ATTENZIONE: creato l'amministratore "${creato.username}" con la password provvisoria  ${creato.passwordGenerata}`);
+    console.log('[logbook] Annotarla ORA: non viene più mostrata. Al primo accesso Logbook chiede di cambiarla.');
+  } else if (creato) {
+    console.log(`[logbook] creato l'amministratore "${creato.username}" con la password scelta all'installazione.`);
+  }
   // In produzione (Logbook raggiungibile in rete) chi ha ancora una password scritta nel
   // README la deve cambiare al prossimo accesso: amministratori e account di esempio.
   if (modo === 'produzione') {

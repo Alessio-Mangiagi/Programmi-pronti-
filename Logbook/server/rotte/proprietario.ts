@@ -30,9 +30,11 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import { CREDENZIALI_DEMO, semina, USERNAME_DEMO } from '../../prisma/seed';
 import { segnaPasswordPubblicate } from '../auth/password-provvisorie';
 import { ErroreHttp, vietato } from '../errori';
+import { cartellaBackupPredefinita, creaBackup } from '../servizi/backup';
 import { cancellaTuttiIDati } from '../servizi/cancella-dati';
 import { registroCodici } from '../servizi/codice-conferma';
 import { mascheraEmail, type InviaEmail } from '../servizi/email';
+import { registra } from '../servizi/registro';
 
 /** Proprietario dal .env: username dell'account e indirizzo che riceve i codici. */
 export type ConfigProprietario = { username?: string; email?: string };
@@ -55,12 +57,15 @@ export function rotteProprietario(
     proprietario: ConfigProprietario;
     inviaEmail: InviaEmail | null;
     adesso?: () => number;
+    /** Cartella delle copie di sicurezza (default LOGBOOK_BACKUP_DIR o data/backup). */
+    cartellaBackup?: string;
   },
 ) {
   const router = Router();
   const { proprietario, inviaEmail, cartellaDocumenti, oggi } = opzioni;
   const adesso = opzioni.adesso ?? Date.now;
   const codici = registroCodici(adesso);
+  const cartellaBackup = opzioni.cartellaBackup ?? cartellaBackupPredefinita();
 
   const eProprietario = (req: Request) =>
     !!proprietario.username && req.utente?.ruolo === 'ADMIN' && req.utente.username === proprietario.username;
@@ -153,7 +158,20 @@ export function rotteProprietario(
       } as const;
       throw new ErroreHttp(400, messaggi[esito], { codice: messaggi[esito] });
     }
+    // Giorno 34: prima una copia di sicurezza (database con VACUUM INTO e file caricati). Se la
+    // copia non riesce non si cancella niente: senza rete di salvataggio l'operazione non parte.
+    let copia: string;
+    try {
+      copia = (await creaBackup(prisma, cartellaDocumenti, { tipo: 'prima-cancellazione', cartella: cartellaBackup })).file;
+    } catch (e) {
+      console.error('[logbook] copia di sicurezza prima della cancellazione non riuscita:', e);
+      throw new ErroreHttp(500, 'Copia di sicurezza non riuscita: non è stato cancellato niente. Controllare la cartella delle copie e chiedere un codice nuovo');
+    }
     const r = await cancellaTuttiIDati(prisma, cartellaDocumenti, req.utente!.id, oggi());
+    void registra(prisma, {
+      utenteId: req.utente!.id, username: req.utente!.username, azione: 'TUTTI I DATI CANCELLATI', ip: req.ip,
+      dettaglio: `${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce, ${r.account} account; copia: ${copia}`,
+    });
     console.log(
       `[logbook] TUTTI I DATI CANCELLATI dal proprietario (${req.utente!.username}): ${r.dipendenti} dipendenti, ${r.progetti} progetti, ` +
         `${r.registrazioni} fasce orarie, ${r.assenze} assenze, ${r.account} account, ${r.file} file`,
@@ -167,7 +185,43 @@ export function rotteProprietario(
         `Alle ${formatoOra(adesso())} l'account "${req.utente!.username}" ha cancellato tutti i dati di Logbook con il codice di conferma.\n` +
         `Cancellati: ${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce orarie, ${r.assenze} assenze, ${r.account} account, ${r.file} file.`,
     }).catch((e) => console.error('[logbook] avviso di cancellazione non inviato:', e));
+    res.json({ ...r, copia });
+  });
+
+  /** Copia di sicurezza fatta subito, a mano (oltre a quella automatica di ogni giorno). */
+  router.post('/backup', soloProprietario, async (_req, res) => {
+    const r = await creaBackup(prisma, cartellaDocumenti, { cartella: cartellaBackup });
     res.json(r);
+  });
+
+  /**
+   * Account di Logbook e loro ruolo (Giorno 34: "solo lui possa dare quel ruolo"). Il primo
+   * amministratore nasce all'installazione ed è il proprietario; solo lui promuove un account
+   * ad amministratore o lo riporta a dipendente. Non può togliere il ruolo a sé stesso.
+   */
+  router.get('/account', soloProprietario, async (_req, res) => {
+    const utenti = await prisma.utente.findMany({
+      select: { id: true, username: true, ruolo: true, attivo: true, dipendente: { select: { nome: true, cognome: true } } },
+      orderBy: [{ ruolo: 'asc' }, { username: 'asc' }],
+    });
+    res.json(utenti.map((u) => ({ id: u.id, username: u.username, ruolo: u.ruolo, attivo: u.attivo, nome: u.dipendente ? `${u.dipendente.cognome} ${u.dipendente.nome}` : null, proprietario: u.username === proprietario.username })));
+  });
+
+  router.put('/account/:id/ruolo', soloProprietario, async (req, res) => {
+    const id = Number(req.params.id);
+    const { ruolo } = z.object({ ruolo: z.enum(['ADMIN', 'DIPENDENTE']) }).parse(req.body);
+    const utente = Number.isInteger(id) ? await prisma.utente.findUnique({ where: { id } }) : null;
+    if (!utente) throw new ErroreHttp(404, 'Account non trovato');
+    if (utente.username === proprietario.username) throw new ErroreHttp(409, 'Il proprietario resta sempre amministratore');
+    if (ruolo === 'ADMIN' && !utente.attivo) throw new ErroreHttp(409, 'Account disattivato: riattivarlo prima di renderlo amministratore');
+    await prisma.utente.update({ where: { id }, data: { ruolo } });
+    // Cambio di poteri: l'utente rientra, così la sessione riparte col ruolo nuovo.
+    await prisma.sessione.deleteMany({ where: { utenteId: id } });
+    void registra(prisma, {
+      utenteId: req.utente!.id, username: req.utente!.username, ip: req.ip,
+      azione: ruolo === 'ADMIN' ? 'Ruolo di amministratore dato' : 'Ruolo di amministratore tolto', dettaglio: `account ${utente.username}`,
+    });
+    res.json({ id, username: utente.username, ruolo });
   });
 
   return router;

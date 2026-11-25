@@ -88,14 +88,14 @@ describe('avvio: amministratore e password pubblicate (scripts/prepara-db.ts)', 
   });
 
   it('senza amministratori attivi ne crea uno con la password da cambiare; con uno attivo nulla', async () => {
-    expect(await assicuraAdmin(db.prisma, 'Qualsiasi2026')).toBeNull();
+    expect(await assicuraAdmin(db.prisma, { password: 'Qualsiasi2026' })).toBeNull();
     await db.prisma.utente.updateMany({ where: { ruolo: 'ADMIN' }, data: { attivo: false } });
-    const creato = await assicuraAdmin(db.prisma, 'DaEnv2026x');
+    const creato = (await assicuraAdmin(db.prisma, { password: 'DaEnv2026x' }))?.username;
     // "admin" esiste già (disattivato): il nuovo ha un nome diverso.
     expect(creato).toMatch(/^admin\d+$/);
     const nuovo = await server.accedi(creato!, 'DaEnv2026x');
     expect((await nuovo.chiama('GET', '/api/auth/io')).corpo).toMatchObject({ ruolo: 'ADMIN', passwordDaCambiare: true });
     expect((await nuovo.chiama('GET', '/api/dipendenti')).stato).toBe(403);
-    expect(await assicuraAdmin(db.prisma, 'DaEnv2026x')).toBeNull();
+    expect(await assicuraAdmin(db.prisma, { password: 'DaEnv2026x' })).toBeNull();
   });
 });

@@ -191,7 +191,7 @@ export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
     }
     const password = dati.password?.trim() ? dati.password : undefined;
     if (password) {
-      const debolezza = controllaPasswordNuova(password);
+      const debolezza = controllaPasswordNuova(password, dipendente.utente?.ruolo ?? 'DIPENDENTE');
       if (debolezza) throw richiestaNonValida(debolezza, { password: debolezza });
     } else if (!dipendente.utente) {
       throw richiestaNonValida('Indica una password per il nuovo account', { password: 'Obbligatoria per un nuovo account' });
@@ -214,6 +214,8 @@ export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
           select: selezioneAccount.select,
         });
     if (impronta || !dati.attivo) await prisma.sessione.deleteMany({ where: { utenteId: account.id } });
+    // Password reimpostata: i PC fidati si dimenticano (Giorno 34, codice via email).
+    if (impronta) await prisma.dispositivoFidato.deleteMany({ where: { utenteId: account.id } });
     res.json(account);
   });
 

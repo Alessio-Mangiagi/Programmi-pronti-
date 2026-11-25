@@ -44,8 +44,8 @@ describe('login', () => {
     expect(r1.corpo.errore).toBe(r2.corpo.errore);
   });
 
-  it('dopo 5 tentativi sbagliati blocca per 15 minuti (429)', async () => {
-    for (let i = 0; i < 5; i++) {
+  it('dopo 10 tentativi sbagliati parte il blocco: undicesimo e successivi 429', async () => {
+    for (let i = 0; i < 11; i++) {
       await server.anonimo.chiama('POST', '/api/auth/login', { username: 'chiara.ferrari', password: 'x' + i });
     }
     const r = await server.anonimo.chiama('POST', '/api/auth/login', {
