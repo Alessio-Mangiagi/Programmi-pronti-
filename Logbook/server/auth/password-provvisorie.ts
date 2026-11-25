@@ -51,12 +51,14 @@ export async function assicuraAdmin(
  * rilanciando la preparazione del database (scripts/prepara-db.ts; su Vercel: Redeploy).
  * - Se l'account esiste: nuova password, ruolo amministratore, riattivato, sessioni chiuse.
  * - Se non esiste: viene creato come amministratore.
- * La password è sempre provvisoria: al primo accesso Logbook chiede di sceglierne un'altra.
+ * La password è provvisoria (al primo accesso Logbook chiede di sceglierne un'altra), a meno
+ * che chi la imposta dica che è definitiva (LOGBOOK_ADMIN_DEFINITIVA=1): è il caso in cui
+ * la password l'ha scelta il proprietario stesso.
  * Chi può scrivere queste variabili ha già in mano il database, quindi non apre porte nuove;
  * la variabile LOGBOOK_ADMIN_REIMPOSTA va comunque tolta subito dopo.
  * Solleva un errore se la password non rispetta le regole degli amministratori.
  */
-export async function reimpostaAdmin(prisma: PrismaClient, usernameVoluto: string, password: string): Promise<{ username: string; creato: boolean }> {
+export async function reimpostaAdmin(prisma: PrismaClient, usernameVoluto: string, password: string, definitiva = false): Promise<{ username: string; creato: boolean }> {
   const username = usernameVoluto.trim().toLowerCase();
   if (!username) throw new Error('LOGBOOK_ADMIN_USERNAME è vuota');
   const problema = controllaPasswordNuova(password, 'ADMIN');
@@ -64,10 +66,10 @@ export async function reimpostaAdmin(prisma: PrismaClient, usernameVoluto: strin
   const passwordHash = await creaImpronta(password);
   const esistente = await prisma.utente.findUnique({ where: { username } });
   if (!esistente) {
-    await prisma.utente.create({ data: { username, passwordHash, ruolo: 'ADMIN', passwordDaCambiare: true } });
+    await prisma.utente.create({ data: { username, passwordHash, ruolo: 'ADMIN', passwordDaCambiare: !definitiva } });
     return { username, creato: true };
   }
-  await prisma.utente.update({ where: { id: esistente.id }, data: { passwordHash, ruolo: 'ADMIN', attivo: true, passwordDaCambiare: true } });
+  await prisma.utente.update({ where: { id: esistente.id }, data: { passwordHash, ruolo: 'ADMIN', attivo: true, passwordDaCambiare: !definitiva } });
   // Chi era dentro con la password vecchia esce.
   await prisma.sessione.deleteMany({ where: { utenteId: esistente.id } });
   return { username, creato: false };

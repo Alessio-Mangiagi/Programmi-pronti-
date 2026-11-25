@@ -109,8 +109,9 @@ try {
     if (!process.env.LOGBOOK_ADMIN_USERNAME || !process.env.LOGBOOK_ADMIN_PASSWORD) {
       throw new Error('LOGBOOK_ADMIN_REIMPOSTA=1 richiede LOGBOOK_ADMIN_USERNAME e LOGBOOK_ADMIN_PASSWORD');
     }
-    const r = await reimpostaAdmin(prisma, process.env.LOGBOOK_ADMIN_USERNAME, process.env.LOGBOOK_ADMIN_PASSWORD);
-    console.log(`[logbook] amministratore "${r.username}" ${r.creato ? 'creato' : 'reimpostato'} con la password di LOGBOOK_ADMIN_PASSWORD (provvisoria).`);
+    const definitiva = process.env.LOGBOOK_ADMIN_DEFINITIVA === '1';
+    const r = await reimpostaAdmin(prisma, process.env.LOGBOOK_ADMIN_USERNAME, process.env.LOGBOOK_ADMIN_PASSWORD, definitiva);
+    console.log(`[logbook] amministratore "${r.username}" ${r.creato ? 'creato' : 'reimpostato'} con la password di LOGBOOK_ADMIN_PASSWORD (${definitiva ? 'definitiva' : 'provvisoria'}).`);
     console.log('[logbook] Togliere ora LOGBOOK_ADMIN_REIMPOSTA dalle variabili.');
   }
   // In produzione (Logbook raggiungibile in rete) chi ha ancora una password scritta nel

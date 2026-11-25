@@ -121,6 +121,9 @@ describe('recupero dell\'amministratore', () => {
     expect(await verificaPassword('Ponteggio-Nuovo-83', dopo.passwordHash)).toBe(true);
     expect(dopo.passwordDaCambiare).toBe(true);
     expect(await db.prisma.sessione.count({ where: { utenteId: prima.id } })).toBe(0);
+    // Password scelta dal proprietario: definitiva, niente cambio al primo accesso.
+    await reimpostaAdmin(db.prisma, 'admin', 'Ponteggio-Nuovo-84.', true);
+    expect((await db.prisma.utente.findUniqueOrThrow({ where: { username: 'admin' } })).passwordDaCambiare).toBe(false);
     // Un nome che non esiste: nasce come amministratore.
     expect(await reimpostaAdmin(db.prisma, 'titolare', 'Ponteggio-Nuovo-83')).toEqual({ username: 'titolare', creato: true });
     expect((await db.prisma.utente.findUniqueOrThrow({ where: { username: 'titolare' } })).ruolo).toBe('ADMIN');
