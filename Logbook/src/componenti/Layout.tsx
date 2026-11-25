@@ -22,7 +22,6 @@ import { formattaData, oggiIso } from '../../comune/date';
 import { useAuth } from '../auth';
 import { BloccoErrori } from './BloccoErrori';
 import { CambiaPassword } from './CambiaPassword';
-import { FasciaDimostrazione } from './FasciaDimostrazione';
 import { Notifiche } from './Segnalazioni';
 import { Icona, type NomeIcona } from './icone';
 
@@ -42,7 +41,7 @@ const MENU: VoceMenu[] = [
 ];
 
 export function Layout() {
-  const { utente, admin, logout, oggi, orologioDiverso, dimostrazione } = useAuth();
+  const { utente, admin, logout, oggi, orologioDiverso } = useAuth();
   const [menuAperto, setMenuAperto] = useState(false);
   const [cambioPassword, setCambioPassword] = useState(false);
   const posizione = useLocation();
@@ -60,8 +59,7 @@ export function Layout() {
           <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
           <div className="leading-tight">
             <div className="font-display text-xl font-medium tracking-wide">Logbook</div>
-            {/* Nella copia dimostrativa lo ricorda anche il menu, che resta sempre in vista. */}
-            <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/65">{dimostrazione ? 'Copia dimostrativa' : 'Ore e presenze'}</div>
+            <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/65">Ore e presenze</div>
           </div>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto py-3" aria-label="Menu principale">
@@ -114,8 +112,6 @@ export function Layout() {
             </button>
           </div>
         </header>
-        {/* 25/11/2026: copia dimostrativa con i dati di esempio (nel Logbook vero non compare). */}
-        <FasciaDimostrazione />
         {/* Giorno 19: Logbook usa la data del server; se il PC ne ha un'altra lo si dice. */}
         {orologioDiverso && (
           <div role="alert" className="border-b border-[#e9c46a] bg-[#fdf1d6] px-3 py-2 text-sm text-[#6b4a00] sm:px-4 md:px-6">

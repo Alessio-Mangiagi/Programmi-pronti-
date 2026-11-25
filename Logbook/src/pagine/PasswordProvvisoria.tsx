@@ -10,7 +10,6 @@
  */
 import { useAuth } from '../auth';
 import { ModuloPassword } from '../componenti/CambiaPassword';
-import { FasciaDimostrazione } from '../componenti/FasciaDimostrazione';
 import { Pulsante } from '../componenti/ui';
 
 export function PasswordProvvisoria() {
@@ -33,8 +32,6 @@ export function PasswordProvvisoria() {
               {utente?.nomeVisualizzato ? `${utente.nomeVisualizzato}, la` : 'La'} password con cui sei entrato è provvisoria. Per usare Logbook
               scegline una tua: da quel momento la conosci solo tu.
             </p>
-            {/* Solo nella copia dimostrativa (25/11/2026). */}
-            <FasciaDimostrazione inScheda />
           </div>
           <ModuloPassword onCambiata={ricarica} testoSalva="Salva ed entra" secondario={<Pulsante onClick={logout}>Esci</Pulsante>} />
         </div>
