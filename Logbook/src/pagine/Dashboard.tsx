@@ -278,7 +278,7 @@ export function Dashboard() {
               <tr>
                 <th className="py-1 text-left">{admin ? 'Dipendente' : ''}</th>
                 <th className="py-1 text-right">Lavorate</th>
-                <th className="py-1 text-right">Attese</th>
+                <th className="py-1 pl-2 text-right">Attese</th>
                 <th className="py-1 pl-3 text-left">Avanzamento</th>
               </tr>
             </thead>
@@ -291,7 +291,7 @@ export function Dashboard() {
                     </Link>
                   </td>
                   <td className="py-1.5 text-right font-medium">{formattaOre(d.minutiLavorati)}</td>
-                  <td className="py-1.5 text-right text-gray-600">{formattaOre(d.minutiAttesi)}</td>
+                  <td className="py-1.5 pl-2 text-right text-gray-600">{formattaOre(d.minutiAttesi)}</td>
                   <td className="py-1.5 pl-3">
                     <Barra lavorati={d.minutiLavorati} attesi={d.minutiAttesi} />
                   </td>

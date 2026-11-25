@@ -19,8 +19,11 @@ che dura né un server sempre acceso.
 1. **Progetto.** Su vercel.com: *Add New → Project*, scegliere il repository GitHub
    `Programmi-pronti-`. In **Root Directory** indicare `Logbook`. Come *Framework Preset*
    lasciare **Other**: i comandi li dà già `Logbook/vercel.json`.
-2. **Ramo.** Il codice oggi è sul ramo `feat/estrazione-dms`. In *Settings → Git → Production
-   Branch* scrivere quel ramo, oppure pubblicare dopo averlo unito a `main`.
+   **La prima pubblicazione fallisce, ed è normale**: Vercel la fa partire subito, quando il
+   database non è ancora collegato, e la build si ferma con "manca DATABASE_URL". Si collega
+   il database (passo 3), si mettono le variabili (passo 4) e si ripubblica (passo 5).
+2. **Ramo.** Dal 25/11/2026 il codice è su `main`, che è già il ramo di produzione di Vercel:
+   non serve cambiare nulla.
 3. **Database.** Nella scheda *Storage* del progetto: *Create Database → Neon (Postgres)*,
    regione **Frankfurt (eu-central-1)**, e collegarlo al progetto. Vercel aggiunge da solo
    `DATABASE_URL` (e `DATABASE_URL_UNPOOLED`) alle variabili d'ambiente.
@@ -41,7 +44,7 @@ che dura né un server sempre acceso.
    La password dell'amministratore scritta qui è **provvisoria**: al primo accesso Logbook
    chiede di sceglierne una nuova. Dopo il primo accesso si può togliere
    `LOGBOOK_ADMIN_PASSWORD` dalle variabili.
-5. **Deploy.** Premere *Deploy*. La build (`scripts/vercel-build.mjs`) crea le tabelle nel
+5. **Deploy.** Scheda *Deployments* → i tre puntini sull'ultima riga → *Redeploy*. La build (`scripts/vercel-build.mjs`) crea le tabelle nel
    database, il primo amministratore e le festività nazionali, compila l'interfaccia e
    impacchetta il server. Dura due o tre minuti.
 6. **Primo accesso.** Aprire l'indirizzo dato da Vercel, entrare con l'amministratore,
