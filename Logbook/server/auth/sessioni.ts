@@ -3,7 +3,7 @@
  * Sessioni di accesso: token casuale nel cookie HttpOnly, impronta SHA-256 nel DB.
  *
  * Cookie `logbook_sessione`: HttpOnly (JavaScript non lo legge), SameSite=Lax (non
- * parte da form di altri siti), Secure solo se LOGBOOK_COOKIE_SECURE=1 (dietro HTTPS).
+ * parte da form di altri siti), Secure se LOGBOOK_COOKIE_SECURE=1 o se la richiesta è in HTTPS.
  * Durata fissa di 12 ore: copre una giornata di lavoro, poi si rifà il login.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -41,7 +41,11 @@ function scriviCookie(res: Response, valore: string, maxAgeSecondi: number) {
     'SameSite=Lax',
     `Max-Age=${maxAgeSecondi}`,
   ];
-  if (process.env.LOGBOOK_COOKIE_SECURE === '1') attributi.push('Secure');
+  // Secure se lo dice il .env oppure se la richiesta è arrivata in HTTPS (req.secure: dietro il
+  // proxy della suite vale l'intestazione X-Forwarded-Proto, vedi 'trust proxy' in app.ts).
+  // Verifica del Giorno 33: prima dipendeva solo dalla variabile, e dimenticarla lasciava il
+  // cookie di sessione libero di viaggiare in chiaro.
+  if (process.env.LOGBOOK_COOKIE_SECURE === '1' || res.req.secure) attributi.push('Secure');
   res.append('Set-Cookie', attributi.join('; '));
 }
 

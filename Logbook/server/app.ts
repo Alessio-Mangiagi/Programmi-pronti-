@@ -68,11 +68,23 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
     res.setHeader('Referrer-Policy', 'same-origin');
     next();
   });
+  // Verifica del Giorno 33: raggiunto in HTTPS (proxy della suite), Logbook dice al browser
+  // di non tornare mai in HTTP per un anno; in HTTP l'intestazione non si manda (sarebbe ignorata).
+  app.use((req, res, next) => {
+    if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+    next();
+  });
   // Dietro un proxy (Vite in sviluppo, Caddy in produzione) req.ip deve essere quello
   // del browser, non del proxy: serve al limite dei tentativi di login.
   app.set('trust proxy', 'loopback');
 
   const api = express.Router();
+  // Le risposte delle API contengono dati personali (ore, costi, assenze): browser e proxy
+  // non le devono conservare (Giorno 33). I file hanno già la loro regola in rotte/file.ts.
+  api.use((_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   api.use(express.json({ limit: '1mb' }));
   api.use(controlloCsrf);
   api.use(caricaUtente(prisma));
@@ -97,7 +109,8 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   // Da qui in poi serve il login, e una password non provvisoria (Giorno 24, risposta 1a).
   api.use(richiediLogin);
   api.use(richiediPasswordCambiata);
-  api.use('/dipendenti', rotteDipendenti(prisma));
+  const proprietario = opzioni.proprietario ?? proprietarioDaAmbiente();
+  api.use('/dipendenti', rotteDipendenti(prisma, proprietario.username));
   api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
   api.use('/calendario', rotteCalendario(prisma));
@@ -123,7 +136,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
     rotteProprietario(prisma, {
       cartellaDocumenti,
       oggi,
-      proprietario: opzioni.proprietario ?? proprietarioDaAmbiente(),
+      proprietario,
       inviaEmail: opzioni.inviaEmail !== undefined ? opzioni.inviaEmail : invioDaAmbiente(),
       adesso: opzioni.adesso,
     }),

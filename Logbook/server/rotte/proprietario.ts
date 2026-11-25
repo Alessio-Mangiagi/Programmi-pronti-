@@ -38,7 +38,8 @@ import { mascheraEmail, type InviaEmail } from '../servizi/email';
 export type ConfigProprietario = { username?: string; email?: string };
 
 export function proprietarioDaAmbiente(env: NodeJS.ProcessEnv = process.env): ConfigProprietario {
-  return { username: env.LOGBOOK_PROPRIETARIO?.trim() || undefined, email: env.LOGBOOK_PROPRIETARIO_EMAIL?.trim() || undefined };
+  // Minuscolo come gli username degli account (schemaAccount, login).
+  return { username: env.LOGBOOK_PROPRIETARIO?.trim().toLowerCase() || undefined, email: env.LOGBOOK_PROPRIETARIO_EMAIL?.trim() || undefined };
 }
 
 /** Parola da scrivere per confermare: un clic sbagliato non basta a cancellare tutto. */

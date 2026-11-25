@@ -43,8 +43,21 @@ function vistaDipendente(d: DipendenteConAccount, admin: boolean) {
 // passwordDaCambiare: HR vede se il dipendente ha ancora la password provvisoria (Giorno 24).
 const selezioneAccount = { select: { id: true, username: true, attivo: true, ruolo: true, passwordDaCambiare: true } } as const;
 
-export function rotteDipendenti(prisma: PrismaClient) {
+export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
   const router = Router();
+
+  /**
+   * L'account del proprietario di Logbook (LOGBOOK_PROPRIETARIO, vedi rotte/proprietario.ts)
+   * lo tocca solo lui (verifica di sicurezza del Giorno 33). Se fosse collegato a una scheda
+   * dipendente, un altro amministratore potrebbe reimpostargli la password o disattivarlo
+   * da qui, e nessun altro nome utente può diventare quello del proprietario.
+   */
+  function proteggiProprietario(req: Request, username: string | undefined | null, nuovoUsername?: string) {
+    if (!proprietario || req.utente?.username === proprietario) return;
+    if (username === proprietario || nuovoUsername === proprietario) {
+      throw new ErroreHttp(403, "L'account del proprietario di Logbook lo può modificare solo il proprietario");
+    }
+  }
 
   /**
    * 409 se il numero di matricola o il codice fiscale sono già di un altro dipendente. Il
@@ -142,6 +155,7 @@ export function rotteDipendenti(prisma: PrismaClient) {
     if (!isDataAmmessa(dataCessazione)) throw richiestaNonValida(MESSAGGIO_DATA_MINIMA, { dataCessazione: MESSAGGIO_DATA_MINIMA });
     const d = await prisma.dipendente.findUnique({ where: { id } });
     if (!d) throw nonTrovato('Dipendente');
+    proteggiProprietario(req, (await prisma.utente.findUnique({ where: { dipendenteId: id } }))?.username);
     if (dataCessazione < d.dataAssunzione) {
       throw richiestaNonValida("La cessazione non può precedere l'assunzione", { dataCessazione: "Prima dell'assunzione" });
     }
@@ -170,6 +184,7 @@ export function rotteDipendenti(prisma: PrismaClient) {
     const dati = schemaAccount.parse(req.body);
     const dipendente = await prisma.dipendente.findUnique({ where: { id }, include: { utente: true } });
     if (!dipendente) throw nonTrovato('Dipendente');
+    proteggiProprietario(req, dipendente.utente?.username, dati.username);
     const omonimo = await prisma.utente.findUnique({ where: { username: dati.username } });
     if (omonimo && omonimo.id !== dipendente.utente?.id) {
       throw new ErroreHttp(409, 'Nome utente già in uso', { username: 'Nome utente già in uso' });

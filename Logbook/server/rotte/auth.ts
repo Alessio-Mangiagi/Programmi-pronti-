@@ -25,6 +25,14 @@ import { ErroreHttp, richiestaNonValida } from '../errori';
 import { richiediLogin } from '../middleware';
 
 const MAX_TENTATIVI = 5;
+/**
+ * Tentativi di login falliti ammessi dallo stesso indirizzo in 15 minuti, qualunque nome
+ * utente provi (verifica di sicurezza del Giorno 33). Il limite per coppia indirizzo+utente
+ * non fermava chi provava la stessa password su tanti nomi diversi, né chi teneva occupato
+ * il server (ogni verifica costa 16 MB di scrypt) cambiando nome a ogni richiesta. 30 basta a
+ * un ufficio dietro lo stesso router dove qualcuno sbaglia password.
+ */
+const MAX_TENTATIVI_INDIRIZZO = 30;
 const FINESTRA_MS = 15 * 60 * 1000;
 /** Oltre questo numero di chiavi il registro dei tentativi si sfoltisce (vedi registraTentativo). */
 const MAX_CHIAVI = 5000;
@@ -53,7 +61,7 @@ export function rotteAuth(prisma: PrismaClient) {
    * parallele non leggono lo stesso contatore. Il tentativo riuscito si cancella con
    * tentativi.delete(chiave).
    */
-  function registraTentativo(chiave: string) {
+  function registraTentativo(chiave: string, massimo = MAX_TENTATIVI) {
     const adesso = Date.now();
     if (tentativi.size >= MAX_CHIAVI) {
       // Prima via le chiavi scadute; se non basta, le più vecchie (la Map tiene l'ordine di inserimento).
@@ -65,7 +73,7 @@ export function rotteAuth(prisma: PrismaClient) {
     }
     let t = tentativi.get(chiave);
     if (!t || adesso - t.dal >= FINESTRA_MS) t = { conta: 0, dal: adesso };
-    if (t.conta >= MAX_TENTATIVI) {
+    if (t.conta >= massimo) {
       const minuti = Math.ceil((FINESTRA_MS - (adesso - t.dal)) / 60000);
       throw new ErroreHttp(429, `Troppi tentativi sbagliati: riprova fra ${minuti} minuti`);
     }
@@ -76,6 +84,9 @@ export function rotteAuth(prisma: PrismaClient) {
   router.post('/login', async (req, res) => {
     const { username, password } = schemaLogin.parse(req.body);
     const chiave = `${req.ip}|${username.toLowerCase()}`;
+    // Prima il limite dell'indirizzo, poi quello della coppia: entrambi prima di ogni await.
+    // Il contatore dell'indirizzo non si azzera con un login riuscito: scade da solo.
+    registraTentativo(`ip|${req.ip}`, MAX_TENTATIVI_INDIRIZZO);
     registraTentativo(chiave);
 
     const utente = await prisma.utente.findUnique({ where: { username: username.toLowerCase() } });
@@ -84,6 +95,9 @@ export function rotteAuth(prisma: PrismaClient) {
     const ok = utente?.attivo ? await verificaPassword(password, utente.passwordHash) : (await verificaPassword(password, await improntaFinta), false);
     if (!ok || !utente) throw new ErroreHttp(401, 'Nome utente o password non corretti');
     tentativi.delete(chiave);
+    // Il login riuscito non conta fra i tentativi dell'indirizzo (tanti colleghi dallo stesso router).
+    const ip = tentativi.get(`ip|${req.ip}`);
+    if (ip) ip.conta -= 1;
     await apriSessione(prisma, res, utente.id);
     res.json({ ok: true });
   });
