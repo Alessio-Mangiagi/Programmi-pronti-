@@ -395,6 +395,27 @@ collegamento il pulsante non c'è. Il token, una volta salvato, non si rilegge p
 
 ![Impostazioni: collegamento a SkyTower](img/23-impostazioni.png)
 
+#### Dati del programma (solo il proprietario)
+
+Il proprietario di Logbook vede in Impostazioni anche il riquadro **Dati del programma**.
+Gli altri amministratori non lo vedono.
+
+- **Carica dati di esempio** riempie Logbook con 5 dipendenti, 3 progetti, le ore dal
+  primo giorno del mese scorso a ieri e qualche assenza, per vedere come si visualizzano
+  i dati. Funziona solo con Logbook vuoto.
+- **Cancella tutti i dati** riporta Logbook come appena installato. Si fa in due passi:
+  1. **Invia il codice per email**: arrivano 6 cifre all'indirizzo del proprietario,
+     valide 10 minuti;
+  2. si scrivono il codice e la parola **CANCELLA**, poi **Cancella tutti i dati**.
+
+  Restano il tuo account con la sua password, il collegamento a SkyTower e le festività
+  nazionali. Va via tutto il resto, compresi gli altri account e i file caricati. Non si
+  può annullare. A cose fatte arriva un'email di avviso.
+
+![Dati del programma: codice inviato per email](img/42-dati-programma-codice.png)
+
+![Dati del programma: dati di esempio caricati](img/43-dati-programma-esempio.png)
+
 ### Importare le ore da Excel
 
 1. **Importa → Scarica il modello .xlsx**. Il foglio "Ore" ha le colonne Matricola, Data

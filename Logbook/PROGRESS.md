@@ -30,7 +30,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 28 (24/11):** documentazione del giorno (file, nota, avanzamento) dalla finestra delle ore, nella documentazione del progetto ✅
 - **Giorno 29 (24/11):** grafici dell'avanzamento dei progetti in dashboard ✅
 - **Giorno 30 (25/11):** copia dimostrativa separata provata e tolta su richiesta (un solo database); restano le festività nazionali caricate da sole su un database nuovo ✅
-- **Prossimo:** comando riservato al proprietario per caricare i dati di esempio e cancellare tutti i dati con codice via email (domande aperte all'utente); Logbook avviabile dentro e fuori dalla suite (InstallaSuite.exe, copia del Portale)
+- **Giorno 31 (25/11):** proprietario (LOGBOOK_PROPRIETARIO): dati di esempio e "Cancella tutti i dati" con codice via email ✅ (manca il server di posta nel .env)
+- **Prossimo:** Logbook avviabile dentro e fuori dalla suite (risposta 4b: copia della suite, InstallaSuite.exe, InstallaLogbook.exe)
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
 
@@ -861,3 +862,38 @@ Prossimo, con domande aperte all'utente:
 - comando riservato al proprietario per caricare i dati di esempio;
 - comando per cancellare tutti i dati, con codice inviato via email;
 - Logbook avviabile dentro e fuori dalla suite.
+
+### Giorno 31 — Dati di esempio e "Cancella tutti i dati" con codice via email (25/11/2026) ✅
+
+Richiesta: "il programma deve potersi popolare con i dati per farmi capire come sta funzionando, all'occorrenza devo poter cancellare tutto … un comando … usabile solo da me … invio di un codice via mail".
+
+Risposte dell'utente:
+- 1b: il codice va a un suo indirizzo, scritto solo nel `.env`;
+- 2a: lo spedisce la casella aziendale, la password la scrive lui nel `.env`;
+- 3a: restano il suo account, il collegamento a SkyTower e le festività nazionali;
+- 4b: Logbook deve partire dentro e fuori dalla suite.
+
+Cosa è stato fatto:
+- **Proprietario** = account di `LOGBOOK_PROPRIETARIO` nel `.env`, amministratore e attivo. Logbook non lo chiede al Portale, perché deve funzionare anche fuori dalla suite. Non si cambia dall'interfaccia. Il codice va a `LOGBOOK_PROPRIETARIO_EMAIL`.
+- **`server/rotte/proprietario.ts`**, rotte sotto `/api/proprietario`:
+  - `GET /stato`: agli altri risponde solo `{ proprietario: false }`;
+  - `POST /dati-esempio`: solo con Logbook vuoto; account di esempio con password provvisoria;
+  - `POST /cancellazione/codice`;
+  - `POST /cancellazione` con `{ codice, conferma: "CANCELLA" }`, poi un'email di avviso a cose fatte.
+- **`server/servizi/codice-conferma.ts`**: 6 cifre da `crypto.randomInt`. In memoria resta solo l'impronta SHA-256, confrontata a tempo costante. Valido 10 minuti, una volta sola, 5 tentativi, al massimo 5 codici all'ora.
+- **`server/servizi/cancella-dati.ts`**: una sola transazione nell'ordine dei vincoli. Poi i file sul disco, solo quelli elencati nel database, e le festività nazionali dell'anno in corso e del successivo.
+- **`server/servizi/email.ts`**: `nodemailer` 10.4.1 (nuova dipendenza, con versione fissa), variabili `LOGBOOK_SMTP_*`. Con starttls la cifratura è obbligatoria. Senza server di posta non c'è una strada di riserva: la cancellazione resta spenta.
+- **`prisma/seed.ts`**: usa l'amministratore che c'è già e aggiunge solo festività e mansioni mancanti.
+- **Interfaccia**: `src/componenti/DatiProgramma.tsx`, riquadro "Dati del programma" in Impostazioni, solo per il proprietario.
+- **`.env`** locale creato (non nel repository): proprietario `admin`, indirizzo del codice, campi del server di posta da completare.
+
+Verifiche:
+- `npm test` 249/249, di cui 11 nuovi in `giorno31.test.ts`:
+  - solo il proprietario: un altro amministratore e un dipendente ricevono 403;
+  - senza server di posta il codice non si chiede;
+  - codice sbagliato, scaduto, esaurito, usato due volte; limite di 5 all'ora;
+  - cosa resta e cosa va via, file sul disco compresi;
+  - dati di esempio dopo la cancellazione.
+- Typecheck ok.
+- Playwright su Edge 8/8, su una copia del database con un finto server di posta locale: l'email passa davvero da `nodemailer`.
+- Guida: immagini 42 e 43.

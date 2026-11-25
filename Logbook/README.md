@@ -64,6 +64,30 @@ database che contiene già i dati di esempio non viene svuotato da solo: per rip
 puliti, fermare Logbook, spostare altrove `data/logbook.db` e riavviare.
 `npm run db:reset` invece riporta il database ai **soli** dati di esempio (**cancella tutto**).
 
+### Dati di esempio e "Cancella tutti i dati" (solo il proprietario)
+
+Dal 25/11/2026 il **proprietario** di Logbook trova in **Impostazioni → Dati del programma**
+due comandi, senza bisogno del terminale:
+
+- **Carica dati di esempio**: gli stessi dati di `npm run dev`, solo con Logbook vuoto.
+  Usano l'amministratore che c'è già e gli account dei dipendenti di esempio chiedono di
+  cambiare la password al primo accesso.
+- **Cancella tutti i dati**: prima Logbook manda un **codice di 6 cifre per email**
+  all'indirizzo del proprietario (valido 10 minuti, una volta sola, 5 tentativi, al massimo
+  5 codici all'ora). Poi servono il codice e la parola `CANCELLA`. A cose fatte arriva
+  un'email di avviso.
+  - Restano l'account del proprietario con la sua password, il collegamento a SkyTower e
+    le festività nazionali.
+  - Va via tutto il resto: dipendenti, progetti, ore, assenze, documenti e file
+    caricati, mansioni, festività locali e aziendali, gli altri account.
+
+Il proprietario è l'account scritto in `LOGBOOK_PROPRIETARIO` nel `.env` del server (deve
+essere un amministratore). Non si cambia dall'interfaccia, quindi nessun altro
+amministratore può diventarlo, e il codice arriva solo a `LOGBOOK_PROPRIETARIO_EMAIL`.
+Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori dalla suite.
+Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
+finisce mai nel log.
+
 ## Il modello Excel per importare le ore
 
 1. In Logbook (HR): **Importa → Scarica il modello .xlsx**.
@@ -144,6 +168,11 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
 | `LOGBOOK_DOCUMENTI_DIR` | `data/documenti` | Cartella dei file caricati (attestati, documenti, documentazione dei progetti): va nel backup insieme al database |
 | `LOGBOOK_COOKIE_SECURE` | — | `1` dietro HTTPS: il cookie viaggia solo cifrato |
+| `LOGBOOK_PROPRIETARIO` | — | Username del proprietario (un amministratore): dati di esempio e "Cancella tutti i dati" |
+| `LOGBOOK_PROPRIETARIO_EMAIL` | — | Indirizzo che riceve il codice di conferma |
+| `LOGBOOK_SMTP_HOST` / `_PORT` / `_SICUREZZA` | — / `587` / `starttls` | Server di posta che spedisce il codice (`ssl` sulla 465) |
+| `LOGBOOK_SMTP_UTENTE` / `_PASSWORD` | — | Credenziali della casella che spedisce |
+| `LOGBOOK_EMAIL_MITTENTE` | utente SMTP | Indirizzo "Da:" delle email |
 
 ## Nella suite Cosedil
 
