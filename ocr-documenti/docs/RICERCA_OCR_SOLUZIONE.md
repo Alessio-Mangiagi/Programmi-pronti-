@@ -739,6 +739,48 @@ Jonico arriva a 32/35: voci esatte **795/948** (84%), righe in più **25**.
 Con il rotolo «RT» e «Mr» per MT nel listino di materiali (§4.26) Nigro arriva a 52/52 e
 L.Catania a 44/46: voci esatte **799/948** (84%), quantità e prezzo giusti **825/948** (87%).
 
+## 27. Scheda video e pulizia dell'immagine (23/11/2026)
+
+**Scheda video.** Con paddle per CUDA 12.9 (`.venv-cu129`) la RTX 5060 Ti legge una pagina in
+0,7 s invece di ~35 s sul processore. Banco intero riletto in 281 s: testata **417/425**, voci
+esatte **798/948**, quantità e prezzo **824/948**, righe in più 23 (con la lettura della CPU 417 ·
+799 · 825 · 25). La differenza è una voce: piccoli scarti di arrotondamento fra GPU e CPU (testo
+uguale al 99,8% su 10 pagine campione). Da qui in avanti la cache del banco è quella della GPU.
+
+**Pulizia dell'immagine prima dell'OCR: provata e scartata.** Quattro passi, ognuno applicato
+solo alle pagine che ne avevano bisogno, con la cache del banco separata per variante:
+
+| Variante | Pagine toccate | Testata | Voci esatte | Q+P |
+|---|---|---|---|---|
+| nessuna | — | 417 | **798** | **824** |
+| raddrizza (gira entro la stessa cornice) | 242 | 414 | 725 | 772 |
+| raddrizza (tela allargata, niente tagli) | 242 | 413 | 712 | 763 |
+| stira il contrasto (inchiostro sbiadito) | 106 | 412 | 775 | 802 |
+| raddrizza + sfondo + contrasto | 242+1+106 | 411 | 713 | 760 |
+| togli il retino (solo Progetto e AQ3 nolo) | 15 | — | Progetto 58→45, AQ3 18→15 | — |
+
+Perché peggiorano, misurato e non supposto:
+- **raddrizza**: la lettura OCR non cambia (confidenza 94-98% prima e dopo, stessi blocchi), cambia
+  la **griglia**. Sull'elenco prezzi Jonico (pag. 6-7), storto di mezzo grado, oggi si trovano solo
+  le 12 linee verticali (12×0) e le voci si dividono sui codici di tariffa (§4.9 e seguenti, messa
+  a punto su questi contratti); raddrizzato, si trovano anche 25-27 orizzontali e la pagina passa
+  alla lettura per celle, che su quella tabella perde voci (Jonico 32 → 7, World service 7 → 0,
+  Sidersipe 5 → 1). Il raddrizzamento può servire solo insieme a una rimessa a punto della lettura
+  per celle su queste tabelle: è un lavoro sui parser, non sull'immagine;
+- **contrasto**: PF Future uffici e residence 65 → 59-61, Progetto 58 → 51. PaddleOCR legge
+  meglio l'immagine resa come oggi (contrasto 1,35 e luminosità 1,08 del rendering);
+- **retino**: togliere i puntini (macchie fino a 6 px nelle zone fitte) fa sparire anche parte delle
+  cifre sottili su quel fondo e cambia quali celle si rileggono: le voci mancanti di Progetto
+  salgono da 9 a 35. La rilettura cella per cella con tre pulizie (§3, `rileggi_celle`) resta la
+  strada migliore per quelle tabelle;
+- **sfondo**: una sola pagina del banco ha la carta grigia (il rendering la schiarisce già).
+
+Il codice della prova (passi in `ocr_worker.py`, chiave di cache con i passi e la versione) non è
+entrato nel programma: sta in [prove/pulizia-pagina-2026-11-23.patch](prove/pulizia-pagina-2026-11-23.patch)
+(`git apply` dalla cartella del repo, poi `PADDLE_PULIZIA=raddrizza npm run harness`), se si vuole
+riprovare con scansioni diverse (foto dal telefono storte di qualche grado, dove raddrizzare
+dovrebbe pesare di più) o dopo aver rimesso a punto la lettura per celle.
+
 ## Fonti
 
 - PaddleOCR, release e documentazione: [GitHub](https://github.com/PaddlePaddle/PaddleOCR), [release 3.0–3.7](https://paddleocr.dev/releases), [PP-StructureV3](https://www.paddleocr.ai/main/en/version3.x/algorithm/PP-StructureV3/PP-StructureV3.html), [PaddleOCR-VL-1.6](https://www.paddleocr.ai/latest/en/version3.x/algorithm/PaddleOCR-VL/PaddleOCR-VL-1.6.html), [PaddleOCR-VL-1.6 ONNX (tempi CPU della comunità)](https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX)
