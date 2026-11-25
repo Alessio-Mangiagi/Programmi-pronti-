@@ -32,7 +32,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 30 (25/11):** copia dimostrativa separata provata e tolta su richiesta (un solo database); restano le festività nazionali caricate da sole su un database nuovo ✅
 - **Giorno 31 (25/11):** proprietario (LOGBOOK_PROPRIETARIO): dati di esempio e "Cancella tutti i dati" con codice via email ✅ (manca il server di posta nel .env)
 - **Giorno 32 (25/11):** Logbook dentro e fuori dalla suite: InstallaLogbook.exe (installa-logbook.py), InstallaSuite.exe ricompilato, .env col proprietario anche dalla suite ✅
-- **Prossimo:** server di posta nel .env: server e porta li dà l'utente (dall'IT, risposta 2a), la password la scrive lui nel file; poi prova del codice vero
+- **Posta (25/11):** casella Aruba, smtps.aruba.it porta 465 SSL nel .env locale; password scritta dall'utente nel file. Provati l'accesso al server e l'invio di un'email di prova con la funzione di Logbook ✅
+- **Prossimo:** l'utente prova "Invia il codice per email" dall'interfaccia (inviare il codice non cancella nulla)
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
