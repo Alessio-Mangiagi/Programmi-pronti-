@@ -32,7 +32,9 @@ import { rotteFile } from './rotte/file';
 import { rotteImpostazioni } from './rotte/impostazioni';
 import { rotteDocumentiProgetto, rotteNoteProgetto } from './rotte/documentazione-progetto';
 import { rotteSegnalazioni } from './rotte/segnalazioni';
+import { proprietarioDaAmbiente, rotteProprietario, type ConfigProprietario } from './rotte/proprietario';
 import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
+import { invioDaAmbiente, type InviaEmail } from './servizi/email';
 
 /**
  * Opzioni:
@@ -40,9 +42,19 @@ import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
  * - `cartellaInterfaccia`: in produzione la cartella dist/ con l'interfaccia già
  *   compilata, servita dallo stesso server delle API (una sola porta, niente Vite);
  * - `cartellaDocumenti`: dove salvare i file caricati (default data/documenti o
- *   LOGBOOK_DOCUMENTI_DIR; i test ne passano una temporanea).
+ *   LOGBOOK_DOCUMENTI_DIR; i test ne passano una temporanea);
+ * - `proprietario`, `inviaEmail`, `adesso`: proprietario di Logbook, invio delle email e
+ *   orologio per i codici di conferma (default dal .env: LOGBOOK_PROPRIETARIO,
+ *   LOGBOOK_PROPRIETARIO_EMAIL, LOGBOOK_SMTP_*; i test passano i loro).
  */
-export type OpzioniApp = { oggi?: () => string; cartellaInterfaccia?: string; cartellaDocumenti?: string };
+export type OpzioniApp = {
+  oggi?: () => string;
+  cartellaInterfaccia?: string;
+  cartellaDocumenti?: string;
+  proprietario?: ConfigProprietario;
+  inviaEmail?: InviaEmail | null;
+  adesso?: () => number;
+};
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const oggi = opzioni.oggi ?? (() => oggiIso());
@@ -104,6 +116,18 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/note-progetto', rotteNoteProgetto(prisma));
   // Giorno 20: segnalazioni dei dipendenti a HR (le ore le inserisce solo HR).
   api.use('/segnalazioni', rotteSegnalazioni(prisma, oggi));
+  // 25/11/2026: dati di esempio e "Cancella tutti i dati" con codice via email, solo per il
+  // proprietario (server/rotte/proprietario.ts).
+  api.use(
+    '/proprietario',
+    rotteProprietario(prisma, {
+      cartellaDocumenti,
+      oggi,
+      proprietario: opzioni.proprietario ?? proprietarioDaAmbiente(),
+      inviaEmail: opzioni.inviaEmail !== undefined ? opzioni.inviaEmail : invioDaAmbiente(),
+      adesso: opzioni.adesso,
+    }),
+  );
 
   /** Qualsiasi altra /api: 404 in JSON (non la pagina HTML di Express). */
   api.use((_req, res) => {

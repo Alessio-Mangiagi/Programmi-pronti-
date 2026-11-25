@@ -8,8 +8,11 @@
  * mai vuoto; la scelta dei progetti usa un generatore pseudo-casuale con seme fisso,
  * quindi lo stesso giorno produce sempre gli stessi dati.
  *
- * Si usa in tre modi:
+ * Si usa in quattro modi:
  * - da solo `npm run dev` la prima volta (scripts/prepara-db.ts, solo se il DB è vuoto);
+ * - dal pulsante "Carica dati di esempio" del proprietario (server/rotte/proprietario.ts, dal
+ *   25/11/2026), solo con Logbook vuoto: allora l'amministratore c'è già e si usa lui, e si
+ *   aggiungono solo le festività e le mansioni che mancano;
  * - `npm run db:reset`: cancella TUTTO e ricarica questi dati;
  * - `npm run db:seed`: rifiuta di partire se il database contiene già dipendenti,
  *   per non mescolare dati di prova e dati veri.
@@ -22,9 +25,9 @@ import { fileURLToPath } from 'node:url';
 import type { Dipendente, Prisma, PrismaClient, Progetto } from '../generated/prisma/client';
 import { carattereControllo } from '../comune/codiceFiscale';
 import { aggiungiGiorni, dataIso, giorniNelMese, intervalloDate, isFineSettimana, oggiIso } from '../comune/date';
-import { festivitaNazionali } from '../comune/festivita';
 import { minutiDaOrario, orarioDaMinuti } from '../comune/orari';
 import { creaImpronta } from '../server/auth/password';
+import { aggiungiFestivitaNazionali } from '../server/servizi/festivita';
 
 /** Generatore pseudo-casuale mulberry32: stessi numeri a ogni esecuzione col seme dato. */
 function generatore(seme: number) {
@@ -159,10 +162,12 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   const fine = aggiungiGiorni(oggi, -1);
 
   // --- Festività nazionali degli anni toccati dai dati (di solito uno solo) ---------
+  // Solo quelle che mancano: su un Logbook già installato le nazionali ci sono già. I giorni
+  // festivi usati qui sotto sono tutti quelli del database (anche locali e aziendali).
   const anni = [...new Set([annoPrec, annoOggi, annoSucc])];
-  const festivita = anni.flatMap((anno) => festivitaNazionali(anno));
-  await prisma.festivita.createMany({ data: festivita.map((f) => ({ ...f, tipo: 'NAZIONALE' as const })) });
-  const festivi = new Set(festivita.map((f) => f.data));
+  let festivita = 0;
+  for (const anno of anni) festivita += await aggiungiFestivitaNazionali(prisma, anno);
+  const festivi = new Set((await prisma.festivita.findMany({ select: { data: true } })).map((f) => f.data));
 
   // --- Progetti: iniziati sei mesi prima dei dati, ancora aperti -----------------------
   const progetti: Progetto[] = [];
@@ -178,7 +183,10 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   const dipendenti: Dipendente[] = [];
   for (const d of DIPENDENTI) dipendenti.push(await prisma.dipendente.create({ data: { ...d.dati } }));
   // Elenco delle mansioni proposte nella scheda (Giorno 26): quelle dei dipendenti di esempio.
-  await prisma.mansione.createMany({ data: [...new Set(DIPENDENTI.map((d) => d.dati.mansione))].map((nome) => ({ nome })) });
+  const mansioniPresenti = new Set((await prisma.mansione.findMany({ select: { nome: true } })).map((m) => m.nome));
+  await prisma.mansione.createMany({
+    data: [...new Set(DIPENDENTI.map((d) => d.dati.mansione))].filter((nome) => !mansioniPresenti.has(nome)).map((nome) => ({ nome })),
+  });
   const [rossi, bianchi, esposito, ferrari, russo] = dipendenti;
 
   // --- Assegnazioni ai progetti (Giorno 17): ognuno ai due progetti su cui lavora --------
@@ -188,9 +196,13 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   });
 
   // --- Account di accesso: un admin (HR) e un account per ogni dipendente ---------------
-  const hr = await prisma.utente.create({
-    data: { username: CREDENZIALI_DEMO.admin.username, passwordHash: await creaImpronta(CREDENZIALI_DEMO.admin.password), ruolo: 'ADMIN' },
-  });
+  // Se un amministratore c'è già (caricamento dal pulsante del proprietario) si usa lui per
+  // le decisioni sulle assenze, senza crearne un secondo con la password del README.
+  const hr =
+    (await prisma.utente.findFirst({ where: { ruolo: 'ADMIN', attivo: true }, orderBy: { id: 'asc' } })) ??
+    (await prisma.utente.create({
+      data: { username: CREDENZIALI_DEMO.admin.username, passwordHash: await creaImpronta(CREDENZIALI_DEMO.admin.password), ruolo: 'ADMIN' },
+    }));
   const improntaDipendenti = await creaImpronta(CREDENZIALI_DEMO.passwordDipendenti);
   for (const d of dipendenti) {
     await prisma.utente.create({
@@ -261,7 +273,7 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
     progetti: progetti.length,
     registrazioni: registrazioni.length,
     assenze: assenze.length,
-    festivita: festivita.length,
+    festivita,
     periodo: { da: inizio, a: fine },
   };
 }
