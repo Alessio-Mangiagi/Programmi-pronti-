@@ -27,6 +27,8 @@ type Stato =
       emailConfigurata: boolean;
       invioConfigurato: boolean;
       vuoto: boolean;
+      /** false su Vercel (PostgreSQL): le copie di sicurezza le fa il servizio del database. */
+      copieLocali?: boolean;
       dipendenti: number;
       progetti: number;
       registrazioni: number;
@@ -125,13 +127,21 @@ export function DatiProgramma() {
 
       <div className="space-y-2 border-t border-gray-100 pt-3">
         <h3 className="font-ui text-sm font-semibold text-testo-forte">Copia di sicurezza</h3>
-        <p className="text-sm text-gray-600">
-          Logbook copia da solo il database e i file caricati una volta al giorno e tiene le copie 30 giorni (cartella <code>data\backup</code>, oppure quella di{' '}
-          <code>LOGBOOK_BACKUP_DIR</code> nel file <code>.env</code>: meglio un altro disco). Qui ne fai una subito.
-        </p>
-        <Pulsante onClick={copiaOra} disabled={lavoro !== null}>
-          {lavoro === 'copia' ? 'Copia in corso…' : 'Fai una copia adesso'}
-        </Pulsante>
+        {stato.copieLocali === false ? (
+          <p className="text-sm text-gray-600">
+            Su questa installazione il database è in rete (PostgreSQL): le copie di sicurezza le fa il servizio che lo ospita, che permette di tornare a una data precedente.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600">
+              Logbook copia da solo il database e i file caricati una volta al giorno e tiene le copie 30 giorni (cartella <code>data\backup</code>, oppure quella di{' '}
+              <code>LOGBOOK_BACKUP_DIR</code> nel file <code>.env</code>: meglio un altro disco). Qui ne fai una subito.
+            </p>
+            <Pulsante onClick={copiaOra} disabled={lavoro !== null}>
+              {lavoro === 'copia' ? 'Copia in corso…' : 'Fai una copia adesso'}
+            </Pulsante>
+          </>
+        )}
       </div>
 
       <div className="space-y-3 rounded border border-errore/30 bg-[#fdf3f2] p-3">
