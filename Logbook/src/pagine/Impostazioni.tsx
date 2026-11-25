@@ -12,9 +12,13 @@
  * email dell'utente SkyTower a nome del quale si caricano i documenti (facoltativa: senza,
  * SkyTower usa il suo utente tecnico). Il token non torna mai al browser.
  * API: /api/impostazioni (server/rotte/impostazioni.ts).
+ *
+ * Dal 25/11/2026 il proprietario vede anche "Dati del programma" (componenti/DatiProgramma.tsx):
+ * dati di esempio e cancellazione di tutti i dati con codice via email.
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ErroreApi } from '../api';
+import { DatiProgramma } from '../componenti/DatiProgramma';
 import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Impostazioni as DatiImpostazioni } from '../tipi';
 import { usaDati } from '../usaDati';
@@ -125,6 +129,8 @@ export function Impostazioni() {
             </Pulsante>
           </div>
         </form>
+        {/* 25/11/2026: dati di esempio e "Cancella tutti i dati", solo per il proprietario. */}
+        <DatiProgramma />
       </div>
     </>
   );
