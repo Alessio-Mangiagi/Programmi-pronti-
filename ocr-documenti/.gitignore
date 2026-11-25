@@ -5,6 +5,8 @@ uploads/
 .venv/
 __pycache__/
 .venv-gpu/
+# paddle per CUDA 12.9 (RTX serie 50), creato da avvia.bat
+.venv-cu129/
 
 # Documenti aziendali di test/archivio: mai versionare
 _archivio/
@@ -18,6 +20,8 @@ contratti/
 .ocr-cache/
 # "><(((º> sabusabu <º)))><"
 _lavori/
+# impostazioni della scansione della cartella sul server (percorsi del PC)
+_cartella/
 tests/out/
 tests/baseline/
 

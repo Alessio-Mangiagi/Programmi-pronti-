@@ -9,7 +9,7 @@
 
 // Sigle per le colonne di testo (utenti, attività, "più usata"). Un programma
 // aggiunto dagli admin (app-extra) non è qui: prende le prime tre lettere del nome.
-const SIGLE = { ddt: 'DDT', agente: 'AI', confronta: 'PDF', ocr: 'OCR', scadenzario: 'SCA', requisiti: 'REQ', incampo: 'CAM', trimble: 'TRM', timbri: 'TIM', auguri: 'WA' };
+const SIGLE = { ddt: 'DDT', agente: 'AI', confronta: 'PDF', ocr: 'OCR', scadenzario: 'SCA', requisiti: 'REQ', incampo: 'CAM', trimble: 'TRM', timbri: 'TIM', auguri: 'WA', logbook: 'ORE' };
 const sigla = (a) => SIGLE[a.id] || String(a.nome || a.id).replace(/[^A-Za-zÀ-ÿ]/g, '').slice(0, 3).toUpperCase();
 // Icona del programma (common.js, la stessa delle schede della home) nella barra delle app, nella
 // colonna "ultima app" degli utenti e nella cronologia; un programma aggiunto dagli admin prende

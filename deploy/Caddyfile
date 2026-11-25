@@ -95,6 +95,12 @@ ponte-trimble.{$SUITE_DOMINIO} {
 	reverse_proxy 127.0.0.1:3011
 }
 
+# Logbook (ore e presenze): login proprio, cookie Secure con SUITE_DOMINIO (avvia.bat).
+logbook.{$SUITE_DOMINIO} {
+	import suite
+	reverse_proxy 127.0.0.1:5210
+}
+
 # Auguri pilota la sessione WhatsApp aziendale: secondo SERVER-ESTERNO.md resta
 # su un PC in ufficio. Se invece gira sul server, togliere il commento.
 # auguri.{$SUITE_DOMINIO} {

@@ -1,0 +1,191 @@
+/* "><(((º> sabusabu <º)))><" */
+/*
+ * Stili globali di Logbook: Tailwind 4 + design system Cosedil (skill Cosedilfrontend,
+ * richiesta del 23/11/2026). Palette, font e componenti seguono il sito cosedilspa.com.
+ *
+ * - I token @theme diventano classi Tailwind (bg-marchio, text-testo-forte, font-display…).
+ * - La scala dei grigi di Tailwind è ridefinita con i neutri del marchio: tutte le classi
+ *   gray-* già usate nelle pagine prendono i colori Cosedil senza toccarle una per una.
+ * - Font Ubuntu (titoli, bottoni, menu), Inter (etichette, intestazioni di tabella),
+ *   Open Sans (testo): pacchetti @fontsource importati in src/main.tsx, serviti dall'app
+ *   stessa e quindi disponibili anche su una rete aziendale senza internet.
+ */
+@import 'tailwindcss';
+
+@theme {
+  /* Marchio */
+  --color-marchio: #0c4577;
+  --color-marchio-hover: #1477b8;
+  --color-marchio-chiaro: #198fd9;
+  --color-marchio-scuro: #08324f;
+  --color-marchio-verde: #65bc7b;
+  --color-verde-testo: #3f8f55;
+  --color-ghiaccio: #eef4fa;
+  /* Superfici e testo */
+  --color-fondo: #f9f9fb;
+  --color-fondo-alt: #f2f3f5;
+  --color-bordo: #e5e7eb;
+  --color-testo: #333333;
+  --color-testo-forte: #212326;
+  --color-errore: #c0392b;
+  /* Neutri del marchio al posto dei grigi di Tailwind */
+  --color-gray-50: #f9f9fb;
+  --color-gray-100: #f2f3f5;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d2d2d2;
+  --color-gray-400: #9a9ca1;
+  --color-gray-500: #6b6e73;
+  --color-gray-600: #434549;
+  --color-gray-700: #3a3c40;
+  --color-gray-800: #333333;
+  --color-gray-900: #212326;
+  /* Caratteri */
+  --font-sans: 'Open Sans', Arial, Helvetica, sans-serif;
+  --font-display: 'Ubuntu', Arial, Helvetica, sans-serif;
+  --font-ui: 'Inter', Arial, Helvetica, sans-serif;
+  /* Ombre tinte di blu, mai nere */
+  --shadow-scheda: 0 2px 12px rgba(12, 69, 119, 0.06);
+  --shadow-scheda-su: 0 8px 24px rgba(12, 69, 119, 0.1);
+  --ease-cosedil: cubic-bezier(0.16, 1, 0.3, 1);
+  /*
+   * Punti di rottura in più per gli schermi ultra wide (richiesta del 24/11/2026).
+   * Tailwind arriva a 2xl = 1536px; 3xl e 4xl servono solo per margini e altezze
+   * (es. celle del calendario più alte). La disposizione dei blocchi invece non dipende
+   * dai punti di rottura: vedi "Layout adattabile" più sotto.
+   */
+  --breakpoint-3xl: 120rem; /* 1920px: monitor Full HD e oltre */
+  --breakpoint-4xl: 160rem; /* 2560px: ultra wide 21:9 (2560, 3440, 3840) */
+}
+
+/*
+ * Layout adattabile (richiesta del 24/11/2026: "l'interfaccia deve adattarsi anche da
+ * cellulare e deve essere in flexbox per adattarsi anche a schermi ultra wide").
+ *
+ * Regola usata in tutte le pagine: i blocchi affiancati stanno in un contenitore
+ * `flex flex-wrap` e ogni blocco ha una larghezza di partenza e cresce per riempire la
+ * riga (classi Tailwind `min-w-0 flex-[1_1_30rem]` e simili). Quanti blocchi stanno su una
+ * riga lo decide lo spazio disponibile, non un numero fisso di colonne:
+ *   - cellulare (360px): un blocco sotto l'altro;
+ *   - monitor normale: due o tre per riga;
+ *   - ultra wide (3440px): tutti affiancati, senza fasce vuote ai lati.
+ * Il contenuto principale (<main> in componenti/Layout.tsx) non ha più una larghezza
+ * massima. Sotto i 640px le tabelle diventano schede (componenti/Tabella.tsx) e le
+ * finestre modali occupano quasi tutto lo schermo (componenti/ui.tsx).
+ */
+
+body {
+  background-color: var(--color-fondo);
+  color: var(--color-testo);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  color: var(--color-testo-forte);
+}
+
+@layer components {
+  /* Scheda (card) del marchio: bordo chiaro, raggio 8px, ombra blu diffusa. */
+  .scheda {
+    background-color: #fff;
+    border: 1px solid var(--color-bordo);
+    border-radius: 8px;
+    box-shadow: var(--shadow-scheda);
+  }
+  /* Scheda cliccabile: si alza leggermente al passaggio del mouse. */
+  .scheda-attiva {
+    transition:
+      transform 0.3s var(--ease-cosedil),
+      box-shadow 0.3s var(--ease-cosedil);
+  }
+  .scheda-attiva:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-scheda-su);
+  }
+  /* Sopratitolo: Inter maiuscolo spaziato, blu del marchio. */
+  .sopratitolo {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-marchio);
+  }
+  /* Intestazioni di tabella: Inter 600 maiuscolo su grigio chiaro. */
+  .intestazione-tabella {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--color-gray-600);
+    background-color: var(--color-fondo-alt);
+  }
+  /* Segnaposto di caricamento con riflesso che scorre (unica animazione continua). */
+  .scheletro {
+    background: linear-gradient(90deg, #eceef1 0%, #f6f7f9 50%, #eceef1 100%);
+    background-size: 200% 100%;
+    animation: riflesso 1.4s ease-in-out infinite;
+    border-radius: 4px;
+  }
+}
+
+@keyframes riflesso {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scheletro {
+    animation: none;
+  }
+  .scheda-attiva,
+  .scheda-attiva:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Numeri allineati in colonna nelle tabelle dense (ore, totali, importi). */
+.cifre {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Stampa / PDF degli estratti mensili (pagina Esporta): spariscono menu, intestazione e
+ * comandi (.no-print); ogni dipendente (.pagina-stampa) va su una pagina A4 orizzontale.
+ * I colori di sfondo (ferie, malattia, festivi) si stampano grazie a print-color-adjust.
+ */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  body {
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  aside.fixed,
+  header,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .pagina-stampa {
+    break-after: page;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -1,0 +1,571 @@
+// "><(((º> sabusabu <º)))><"
+// Schema del database di Logbook (Prisma 7). In locale e nella suite il database è SQLite;
+// su Vercel è PostgreSQL: scripts/vercel-build.mjs copia questo file cambiando solo il
+// "provider" (prisma/postgres/schema.prisma, generato, non versionato). Uno schema solo.
+//
+// Convenzioni valide per tutto lo schema:
+// - Le DATE di calendario (giorno lavorato, assunzione, ferie, festività) sono stringhe
+//   "AAAA-MM-GG". Non DateTime: un DateTime è un istante e, convertito fra fuso del
+//   server, del browser e UTC, sposta i giorni di ±1 a cavallo della mezzanotte. Una
+//   stringa ISO resta il giorno scritto, si confronta e si ordina come testo.
+// - Gli ORARI sono stringhe "HH:MM" a 24 ore, sempre con lo zero davanti, così anche
+//   il confronto come testo è corretto ("08:00" < "13:30").
+// - Le ORE lavorate non sono salvate: si calcolano da ora inizio/fine (comune/orari.ts),
+//   così non possono mai essere in disaccordo con gli orari.
+// - Gli IMPORTI sono interi in centesimi di euro: niente errori di arrotondamento dei float.
+// - DateTime solo per i timbri tecnici (creato/aggiornato/deciso il).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Accesso
+// ---------------------------------------------------------------------------
+
+/// Ruolo di chi entra in Logbook.
+/// ADMIN = Amministratore/HR: vede e gestisce tutto.
+/// DIPENDENTE = vede e inserisce solo i propri dati.
+enum Ruolo {
+  ADMIN
+  DIPENDENTE
+}
+
+/// Account di accesso. Login proprio di Logbook (scelta 1c del 23/11/2026: nessun
+/// collegamento al Portale della suite). Un account DIPENDENTE è legato a una sola
+/// scheda dipendente; un ADMIN può non averne.
+model Utente {
+  id                  Int                 @id @default(autoincrement())
+  username            String              @unique
+  /// Impronta della password (scrypt, mai la password in chiaro). Formato deciso al Giorno 2.
+  passwordHash        String
+  ruolo               Ruolo               @default(DIPENDENTE)
+  attivo              Boolean             @default(true)
+  /// Giorno 24 (risposta 1a del 24/11/2026): la password è provvisoria (data da HR, admin
+  /// creato all'avvio o password pubblicata nel README) e va cambiata al primo accesso.
+  /// Finché è true le API rispondono 403, tranne /api/auth (server/middleware.ts).
+  passwordDaCambiare  Boolean             @default(false)
+  dipendente          Dipendente?         @relation(fields: [dipendenteId], references: [id])
+  dipendenteId        Int?                @unique
+  /// Richieste di assenza approvate o rifiutate da questo utente (HR).
+  assenzeDecise       Assenza[]           @relation("DecisioneAssenza")
+  sessioni            Sessione[]
+  /// PC su cui questo amministratore ha già confermato il codice via email (Giorno 34).
+  dispositiviFidati   DispositivoFidato[]
+  /// File caricati da questo utente (attestati, documenti, documentazione dei progetti).
+  fileCaricati        FileCaricato[]      @relation("FileCaricati")
+  /// Documentazione di progetto scritta da questo utente.
+  documentiProgetto   DocumentoProgetto[] @relation("AutoreDocumentoProgetto")
+  /// Documentazione di progetto segnata come "vista" da questo utente (HR).
+  documentiVisti      DocumentoProgetto[] @relation("VistoDocumentoProgetto")
+  /// Note interne sui progetti scritte da questo utente (HR).
+  noteProgetto        NotaProgetto[]
+  /// Segnalazioni dei dipendenti chiuse da questo utente (HR).
+  segnalazioniRisolte Segnalazione[]      @relation("SegnalazioniRisolte")
+  creatoIl            DateTime            @default(now())
+  aggiornatoIl        DateTime            @updatedAt
+}
+
+/// Sessione di accesso aperta col login (server/auth/sessioni.ts).
+/// Nel browser c'è un cookie HttpOnly con un token casuale; qui si salva solo
+/// l'impronta SHA-256 del token, così chi legge il database non può riusarlo.
+/// Il logout o la disattivazione dell'utente cancellano le sue sessioni.
+model Sessione {
+  /// SHA-256 esadecimale del token del cookie.
+  id       String   @id
+  utente   Utente   @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  utenteId Int
+  scadeIl  DateTime
+  creatoIl DateTime @default(now())
+  /// Ultima azione dell'utente (Giorno 34): dopo 15 minuti senza azioni la sessione si chiude
+  /// (server/auth/sessioni.ts). Le chiamate automatiche dell'interfaccia non la aggiornano.
+  ultimoUsoIl DateTime @default(now())
+
+  @@index([utenteId])
+}
+
+/// PC "fidato" di un amministratore (Giorno 34): dopo il codice via email all'accesso, il
+/// browser riceve un cookie HttpOnly e qui se ne salva l'impronta SHA-256. Per 30 giorni da
+/// quel PC non si chiede più il codice. Cambiare o reimpostare la password li cancella.
+model DispositivoFidato {
+  /// SHA-256 esadecimale del token del cookie.
+  id       String   @id
+  utente   Utente   @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  utenteId Int
+  scadeIl  DateTime
+  creatoIl DateTime @default(now())
+
+  @@index([utenteId])
+}
+
+/// Registro delle attività (Giorno 34): accessi riusciti e falliti, blocchi, cambi password e
+/// ogni operazione che modifica o esporta dati. Lo leggono solo gli amministratori dalla voce
+/// "Registro attività" del menu. Nessuna relazione con Utente di proposito: le righe restano
+/// anche quando l'account viene cancellato (username copiato qui). Si tengono 400 giorni.
+model RegistroAttivita {
+  id        Int      @id @default(autoincrement())
+  quando    DateTime @default(now())
+  utenteId  Int?
+  /// Nome utente al momento dell'azione (o quello provato in un accesso fallito).
+  username  String
+  /// Descrizione leggibile, es. "Accesso riuscito", "Ore: giornata salvata".
+  azione    String
+  dettaglio String?
+  /// OK, NEGATO (401/403/429) o ERRORE.
+  esito     String   @default("OK")
+  ip        String?
+
+  @@index([quando])
+}
+
+// ---------------------------------------------------------------------------
+// Anagrafiche
+// ---------------------------------------------------------------------------
+
+enum StatoDipendente {
+  ATTIVO
+  CESSATO
+}
+
+enum TipoContratto {
+  INDETERMINATO
+  DETERMINATO
+  APPRENDISTATO
+  SOMMINISTRAZIONE
+  COLLABORAZIONE
+  TIROCINIO
+}
+
+/// Scheda anagrafica del dipendente.
+model Dipendente {
+  id                   Int                    @id @default(autoincrement())
+  /// Matricola aziendale, unica. Dal Giorno 26 nella forma SIGLA-NUMERO del contratto
+  /// (es. IND-0001, DET-0004): la sigla segue il contratto, il numero identifica la
+  /// persona ed è unico fra tutti (comune/matricola.ts).
+  matricola            String                 @unique
+  nome                 String
+  cognome              String
+  /// Codice fiscale in maiuscolo, validato (comune/codiceFiscale.ts) prima del salvataggio.
+  codiceFiscale        String                 @unique
+  email                String?
+  telefono             String?
+  /// Testo della mansione; l'elenco delle mansioni proposte sta nella tabella Mansione (Giorno 26).
+  mansione             String?
+  reparto              String?
+  /// "AAAA-MM-GG"
+  dataAssunzione       String
+  /// "AAAA-MM-GG", valorizzata quando lo stato passa a CESSATO.
+  dataCessazione       String?
+  tipoContratto        TipoContratto
+  /// Ore contrattuali settimanali (es. 40, 30 per un part-time).
+  oreSettimanali       Float
+  /// Costo orario netto in centesimi di euro (richiesta del 23/11/2026). Visibile solo a HR.
+  costoOrarioNettoCent Int?
+  /// Costo orario lordo (costo aziendale) in centesimi di euro. Visibile solo a HR.
+  costoOrarioLordoCent Int?
+  stato                StatoDipendente        @default(ATTIVO)
+  utente               Utente?
+  registrazioni        RegistrazioneOraria[]
+  assenze              Assenza[]
+  attestati            Attestato[]
+  documenti            DocumentoDipendente[]
+  /// Progetti a cui HR ha assegnato il dipendente: solo su questi può registrare ore.
+  assegnazioni         AssegnazioneProgetto[]
+  /// Segnalazioni del dipendente a HR sulle proprie giornate.
+  segnalazioni         Segnalazione[]
+  creatoIl             DateTime               @default(now())
+  aggiornatoIl         DateTime               @updatedAt
+
+  @@index([cognome, nome])
+}
+
+enum StatoProgetto {
+  ATTIVO
+  SOSPESO
+  CHIUSO
+}
+
+/// Progetto (o commessa) su cui si registrano le ore.
+model Progetto {
+  id               Int                    @id @default(autoincrement())
+  /// Codice progetto, unico (es. "PRG-001").
+  codice           String                 @unique
+  nome             String
+  cliente          String?
+  /// "AAAA-MM-GG"
+  dataInizio       String
+  /// "AAAA-MM-GG", vuota se il progetto non ha una fine prevista.
+  dataFine         String?
+  stato            StatoProgetto          @default(ATTIVO)
+  /// Colore del progetto nel calendario ("#RRGGBB"); se vuoto il frontend ne sceglie uno.
+  colore           String?
+  /// Ore massime che UN dipendente può registrare su questo progetto in UN giorno, in
+  /// minuti (richiesta del 23/11/2026, risposta 2b: oltre il limite il salvataggio è
+  /// bloccato). Vuoto = nessun limite.
+  maxMinutiGiorno  Int?
+  /// Descrizione libera del progetto (scheda "Dati", dal 24/11/2026).
+  descrizione      String?
+  /// Codice della commessa di SkyTower in cui inviare la documentazione (pulsante "Invia a
+  /// SkyTower", visibile solo se in Impostazioni c'è il collegamento). Vuoto = non si invia.
+  commessaSkytower String?
+  registrazioni    RegistrazioneOraria[]
+  documenti        DocumentoProgetto[]
+  note             NotaProgetto[]
+  /// Dipendenti assegnati (sezione "Dipendenti" della pagina del progetto).
+  assegnazioni     AssegnazioneProgetto[]
+  creatoIl         DateTime               @default(now())
+  aggiornatoIl     DateTime               @updatedAt
+}
+
+/// Assegnazione di un dipendente a un progetto (richiesta del 24/11/2026, risposte 2a e 3a:
+/// "i dipendenti vanno inseriti singolarmente nei progetti prima di tutto"). Senza
+/// assegnazione il dipendente non può registrare ore sul progetto: né dal calendario, né
+/// dall'import Excel, né tramite HR (server/servizi/regole-ore.ts). Assegnazione semplice,
+/// dentro o fuori, senza date (3a). Togliere un dipendente non cancella le ore già fatte.
+/// La migrazione che crea la tabella assegna chi aveva già ore sul progetto (risposta 4a).
+model AssegnazioneProgetto {
+  id           Int        @id @default(autoincrement())
+  progetto     Progetto   @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  progettoId   Int
+  dipendente   Dipendente @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  creatoIl     DateTime   @default(now())
+
+  @@unique([progettoId, dipendenteId])
+  @@index([dipendenteId])
+}
+
+// ---------------------------------------------------------------------------
+// Ore lavorate
+// ---------------------------------------------------------------------------
+
+/// Da dove arriva una registrazione: utile per ritrovare (o annullare) un import Excel.
+enum OrigineRegistrazione {
+  INTERFACCIA
+  IMPORT_EXCEL
+}
+
+/// Una fascia oraria lavorata: un dipendente, un giorno, un progetto, dalle-alle.
+/// Più fasce nello stesso giorno sono ammesse; le sovrapposizioni dello stesso
+/// dipendente sono bloccate dal server (non esprimibili come vincolo SQL).
+/// Le fasce non attraversano la mezzanotte: un turno 22:00-06:00 va spezzato in due.
+model RegistrazioneOraria {
+  id           Int                  @id @default(autoincrement())
+  dipendente   Dipendente           @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
+  dipendenteId Int
+  progetto     Progetto             @relation(fields: [progettoId], references: [id], onDelete: Restrict)
+  progettoId   Int
+  /// "AAAA-MM-GG"
+  data         String
+  /// "HH:MM" 24h
+  oraInizio    String
+  /// "HH:MM" 24h, sempre successiva a oraInizio
+  oraFine      String
+  note         String?
+  origine      OrigineRegistrazione @default(INTERFACCIA)
+  creatoIl     DateTime             @default(now())
+  aggiornatoIl DateTime             @updatedAt
+
+  @@index([dipendenteId, data])
+  @@index([progettoId, data])
+  @@index([data])
+}
+
+// ---------------------------------------------------------------------------
+// Assenze e festività
+// ---------------------------------------------------------------------------
+
+enum TipoAssenza {
+  FERIE
+  PERMESSO
+  MALATTIA
+}
+
+enum StatoAssenza {
+  RICHIESTA
+  APPROVATA
+  RIFIUTATA
+}
+
+/// Richiesta di assenza del dipendente, decisa da HR.
+/// Per la MALATTIA si salva solo il numero di protocollo del certificato: per scelta
+/// (privacy, GDPR art. 9) non esiste alcun campo per diagnosi o informazioni sanitarie.
+model Assenza {
+  id                    Int           @id @default(autoincrement())
+  dipendente            Dipendente    @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
+  dipendenteId          Int
+  tipo                  TipoAssenza
+  /// "AAAA-MM-GG"
+  dataInizio            String
+  /// "AAAA-MM-GG", uguale a dataInizio per un giorno solo
+  dataFine              String
+  /// Durata del permesso in minuti (solo PERMESSO; vuota per ferie e malattia).
+  minutiPermesso        Int?
+  stato                 StatoAssenza  @default(RICHIESTA)
+  /// Note scritte dal dipendente nella richiesta.
+  noteDipendente        String?
+  /// Note di HR (motivo del rifiuto, modifiche fatte).
+  noteHr                String?
+  /// Numero di protocollo del certificato medico (solo MALATTIA).
+  protocolloCertificato String?
+  /// Allegato facoltativo (Giorno 22, risposta 3b), es. il giustificativo di un permesso.
+  /// Per la malattia solo l'attestato per il datore di lavoro, mai referti o diagnosi: lo
+  /// dice l'interfaccia, il file non si può controllare nel contenuto.
+  file                  FileCaricato? @relation(fields: [fileId], references: [id])
+  fileId                Int?          @unique
+  decisoDa              Utente?       @relation("DecisioneAssenza", fields: [decisoDaId], references: [id])
+  decisoDaId            Int?
+  decisoIl              DateTime?
+  creatoIl              DateTime      @default(now())
+  aggiornatoIl          DateTime      @updatedAt
+
+  @@index([dipendenteId, dataInizio])
+  @@index([stato])
+}
+
+/// NAZIONALE = festività civili e religiose valide in tutta Italia (precaricate).
+/// LOCALE = festività del paese/città della sede, es. il santo patrono (inserite da HR).
+/// AZIENDALE = chiusure decise dall'azienda (inserite da HR).
+enum TipoFestivita {
+  NAZIONALE
+  LOCALE
+  AZIENDALE
+}
+
+/// Mansioni proposte nella scheda dipendente (Giorno 26, risposta 4a): una mansione nuova
+/// scritta da HR viene aggiunta qui e da quel momento compare nell'elenco per tutti.
+/// Dipendente.mansione resta testo: l'elenco è un aiuto alla scelta, non un vincolo.
+model Mansione {
+  id       Int      @id @default(autoincrement())
+  /// Nome come scritto la prima volta (es. "Capocantiere"); unico senza badare alle maiuscole
+  /// (lo controlla server/rotte/dipendenti.ts prima di aggiungerne una).
+  nome     String   @unique
+  creatoIl DateTime @default(now())
+}
+
+/// Giorno festivo: non lavorativo per tutti i dipendenti.
+model Festivita {
+  id          Int           @id @default(autoincrement())
+  /// "AAAA-MM-GG", una sola festività per giorno.
+  data        String        @unique
+  descrizione String
+  tipo        TipoFestivita
+  creatoIl    DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// File, attestati e documentazione (richieste del 24/11/2026, risposte 1c 2c 3c 4a)
+// ---------------------------------------------------------------------------
+
+/// Un file caricato in Logbook. Il contenuto sta su disco nella cartella dei documenti
+/// (data/documenti, oppure LOGBOOK_DOCUMENTI_DIR: server/servizi/archivio-file.ts), qui
+/// solo i metadati. Sul disco il nome è casuale (nomeDisco), mai quello scelto da chi
+/// carica: niente percorsi pilotabili dall'esterno né nomi doppi.
+model FileCaricato {
+  id                  Int                  @id @default(autoincrement())
+  /// Nome del file sul disco: UUID + estensione ammessa.
+  nomeDisco           String               @unique
+  /// Nome del file come l'ha scelto chi l'ha caricato (solo da mostrare e scaricare).
+  nomeOriginale       String
+  tipoMime            String
+  /// Byte (massimo 20 MB, controllato dal server).
+  dimensione          Int
+  /// Impronta SHA-256 del contenuto (controllo d'integrità).
+  sha256              String
+  caricatoDa          Utente               @relation("FileCaricati", fields: [caricatoDaId], references: [id])
+  caricatoDaId        Int
+  creatoIl            DateTime             @default(now())
+  attestato           Attestato?
+  documentoDipendente DocumentoDipendente?
+  documentoProgetto   DocumentoProgetto?
+  assenza             Assenza?
+}
+
+/// Tipo di attestato (risposta 1c: elenco fisso, ALTRO per tutto il resto).
+enum TipoAttestato {
+  SICUREZZA
+  PRIMO_SOCCORSO
+  ANTINCENDIO
+  PATENTINO
+  VISITA_MEDICA
+  ALTRO
+}
+
+/// Attestato del dipendente (formazione, idoneità, patentini). Con la data di scadenza
+/// compare in dashboard 30 giorni prima (risposta 1c). Lo gestisce solo HR.
+/// Per la VISITA_MEDICA si salva solo l'esito amministrativo (es. "idoneo"), mai dati
+/// sanitari: stessa regola della malattia (GDPR art. 9).
+model Attestato {
+  id           Int           @id @default(autoincrement())
+  dipendente   Dipendente    @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  tipo         TipoAttestato
+  titolo       String
+  /// "AAAA-MM-GG"
+  dataRilascio String
+  /// "AAAA-MM-GG"; vuota = non scade.
+  dataScadenza String?
+  note         String?
+  file         FileCaricato? @relation(fields: [fileId], references: [id])
+  fileId       Int?          @unique
+  creatoIl     DateTime      @default(now())
+  aggiornatoIl DateTime      @updatedAt
+
+  @@index([dipendenteId])
+  @@index([dataScadenza])
+}
+
+/// Altri documenti del dipendente (contratto, documento d'identità, ecc.). Solo HR.
+model DocumentoDipendente {
+  id           Int          @id @default(autoincrement())
+  dipendente   Dipendente   @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  titolo       String
+  note         String?
+  file         FileCaricato @relation(fields: [fileId], references: [id])
+  fileId       Int          @unique
+  creatoIl     DateTime     @default(now())
+
+  @@index([dipendenteId])
+}
+
+/// Da dove arriva la documentazione di un progetto.
+/// PROGETTO = caricata dalla pagina del progetto; GIORNATA = dalla finestra delle ore del giorno.
+enum OrigineDocumento {
+  PROGETTO
+  GIORNATA
+}
+
+/// Documentazione di avanzamento di un progetto (risposte 2c e 3c): un file e/o una nota,
+/// con la percentuale di avanzamento dichiarata da chi la carica. Il dipendente vede solo
+/// la sua; HR vede tutto, la segna "vista" e può rispondere. HR può inviarla a SkyTower.
+model DocumentoProgetto {
+  id                Int              @id @default(autoincrement())
+  progetto          Progetto         @relation(fields: [progettoId], references: [id], onDelete: Restrict)
+  progettoId        Int
+  autore            Utente           @relation("AutoreDocumentoProgetto", fields: [autoreId], references: [id])
+  autoreId          Int
+  /// Giorno a cui si riferisce, "AAAA-MM-GG" (dalla finestra delle ore: il giorno aperto).
+  data              String
+  titolo            String
+  nota              String?
+  /// Avanzamento del progetto dichiarato, 0-100; vuoto = non dichiarato.
+  percentuale       Int?
+  origine           OrigineDocumento @default(PROGETTO)
+  /// Facoltativo: un aggiornamento può essere solo nota e percentuale.
+  file              FileCaricato?    @relation(fields: [fileId], references: [id])
+  fileId            Int?             @unique
+  visto             Boolean          @default(false)
+  vistoIl           DateTime?
+  vistoDa           Utente?          @relation("VistoDocumentoProgetto", fields: [vistoDaId], references: [id])
+  vistoDaId         Int?
+  /// Risposta di HR, visibile a chi ha caricato.
+  rispostaHr        String?
+  /// Invio a SkyTower: identificativo del documento creato, link e quando.
+  skytowerId        String?
+  skytowerUrl       String?
+  skytowerInviatoIl DateTime?
+  creatoIl          DateTime         @default(now())
+  aggiornatoIl      DateTime         @updatedAt
+
+  @@index([progettoId, data])
+  @@index([autoreId])
+  @@index([visto])
+}
+
+/// Nota interna di HR su un progetto (scheda "Note" del progetto). I dipendenti non la vedono.
+model NotaProgetto {
+  id           Int      @id @default(autoincrement())
+  progetto     Progetto @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  progettoId   Int
+  autore       Utente   @relation(fields: [autoreId], references: [id])
+  autoreId     Int
+  testo        String
+  creatoIl     DateTime @default(now())
+  aggiornatoIl DateTime @updatedAt
+
+  @@index([progettoId])
+}
+
+/// Impostazioni dell'applicazione (chiave → valore), modificabili solo dagli admin dalla
+/// pagina Impostazioni. Oggi: collegamento a SkyTower (skytower.url, skytower.token,
+/// skytower.email). Il token non esce mai verso il browser (server/rotte/impostazioni.ts).
+model Impostazione {
+  chiave       String   @id
+  valore       String
+  aggiornatoIl DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Segnalazioni (Giorno 20, 24/11/2026, risposte 1b e 4)
+// ---------------------------------------------------------------------------
+
+enum StatoSegnalazione {
+  APERTA
+  RISOLTA
+}
+
+/// Segnalazione di un dipendente su una sua giornata ("manca un'ora", "orario sbagliato").
+/// Dal Giorno 20 le ore le inserisce solo HR (risposta 1b): il dipendente non corregge da
+/// sé, segnala; "HR decide e interviene su segnalazione ma il sistema notifica a HR quando
+/// accede" (risposta 4): le APERTE compaiono a HR in una finestra all'accesso, nel contatore
+/// dell'intestazione e in dashboard. HR corregge le ore e la chiude con una risposta.
+model Segnalazione {
+  id           Int               @id @default(autoincrement())
+  dipendente   Dipendente        @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  /// Giorno a cui si riferisce, "AAAA-MM-GG" (mai futuro).
+  data         String
+  testo        String
+  stato        StatoSegnalazione @default(APERTA)
+  /// Risposta di HR, visibile al dipendente.
+  rispostaHr   String?
+  risoltaDa    Utente?           @relation("SegnalazioniRisolte", fields: [risoltaDaId], references: [id])
+  risoltaDaId  Int?
+  risoltaIl    DateTime?
+  creatoIl     DateTime          @default(now())
+  aggiornatoIl DateTime          @updatedAt
+
+  @@index([stato])
+  @@index([dipendenteId, data])
+}
+
+// ---------------------------------------------------------------------------
+// Stato che su Vercel non può stare in memoria o su disco (Giorno 35, 25/11/2026)
+// ---------------------------------------------------------------------------
+
+/// Dati a scadenza che prima vivevano nella memoria del server: codici di conferma via email
+/// (solo l'impronta), accessi di amministratori in attesa del codice. Su Vercel ogni richiesta
+/// può finire su un processo diverso, quindi stanno qui (server/servizi/stato-temporaneo.ts).
+model StatoTemporaneo {
+  chiave  String   @id
+  /// JSON.
+  valore  String
+  scadeIl DateTime
+
+  @@index([scadeIl])
+}
+
+/// Tentativi di accesso falliti e attese (blocco progressivo, server/servizi/limitatore.ts),
+/// usata quando il server non ha memoria che dura (Vercel). In locale il conto resta in memoria.
+model TentativoAccesso {
+  /// "indirizzo|utente" oppure "password|idUtente".
+  chiave       String   @id
+  conta        Int      @default(0)
+  livello      Int      @default(0)
+  bloccatoFino DateTime @default(now())
+  ultimo       DateTime @default(now())
+}
+
+/// Contenuto dei file caricati quando non c'è un disco che dura (Vercel): al posto della
+/// cartella data/documenti. Chiave = FileCaricato.nomeDisco (server/servizi/archivio-file.ts).
+model ContenutoFile {
+  nomeDisco String   @id
+  dati      Bytes
+  creatoIl  DateTime @default(now())
+}

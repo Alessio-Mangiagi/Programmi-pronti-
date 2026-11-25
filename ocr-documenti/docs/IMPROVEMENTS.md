@@ -32,6 +32,17 @@ Stato al 2026-09-18. La versione precedente di questo file descriveva un `server
 
 ## Da fare
 
+### ✅ (23/11/2026) GPU di nuovo in uso, PADDLE_WORKERS misurato
+paddle per CUDA 12.9 in `.venv-cu129`: 0,7 s/pagina sulla RTX 5060 Ti; 1/2/3 worker = 24/19/20 s
+su 52 pagine (avvio compreso), resta 3. Accuratezza misurata il 25/11 con lettura vera (senza
+cache): voci esatte 784/948 contro 799 della CPU, testata 417 (lotti di riconoscimento da 8).
+
+### 🟡 Parser rimessi a punto sulle letture della GPU
+I parser sono stati tarati sulle letture CPU; con la GPU il banco perde 15 voci esatte
+(Progetto 57→51, Eureka 4→2, Gecob 34→32, PF Future uffici 65→64, SICS, GFM, AQ3 nolo,
+Contratto_fornitura). Partire da Eureka (perse le voci 1 × 750 e 1 × 6.000 con testo quasi identico) e
+Gecob: sono le più piccole da capire. Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §27. WDAC risolto dall'IT il 04/11 (sotto, per storia).
+
 ### 🔴 OCR bloccato da Windows App Control (WDAC)
 Policy aziendale in vigore dal 31/08/2026: rifiuta le DLL non firmate dei venv Paddle
 (`WinError 4551`, evento Code Integrity 3077). Nessuna scansione finché l'IT non autorizza

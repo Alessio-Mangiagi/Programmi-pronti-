@@ -21,6 +21,7 @@ import { descriviErrori, eModulo } from './src/lib/modulo-contratto.ts'
 import { risultatoDaModulo } from './server/modulo.ts'
 import { chiDa } from './server/accessoLavori.ts'
 import { montaRottaFirma } from './server/firma.ts'
+import { avviaOrologioCartella, montaRotteCartella } from './server/cartella.ts'
 import cosedilSSO from '../shared/sso/cosedil-sso.mjs'
 import { intercettaConsole } from '../shared/avvisi/avvisi.mjs'
 
@@ -326,6 +327,10 @@ montaRotteLavori(app, express.raw({ type: () => true, limit: MAX_MB }))
 // rapporto della verifica dal motore comune shared/firma (server/firma.ts, CONTRATTI §10).
 montaRottaFirma(app, express.raw({ type: () => true, limit: MAX_MB }))
 
+// Scansione di una cartella SUL SERVER (server/cartella.ts): stessa cosa della scansione
+// nel browser, ma va in ogni browser (anche Firefox) e anche a pagina chiusa. Solo admin.
+montaRotteCartella(app)
+
 // Produzione (avvia.bat): nessun dev server Vite, il frontend compilato lo serve
 // questo processo. DOPO tutte le rotte /api: il catchall prende qualunque GET, e
 // messo prima delle rotte lavori rispondeva index.html a /api/lavori.
@@ -376,7 +381,9 @@ process.once('SIGINT', shutdown)
 
 // OCR_LIB_MODE=1 → il modulo è importato come LIBRERIA (tools/harness.ts): niente
 // listen, niente porta occupata. Il pool PaddleOCR resta disponibile su richiesta.
-if (!process.env.OCR_LIB_MODE) { startServer(); void caricaLavori() }
+// L'orologio della scansione della cartella parte solo col server vero: nel banco di prova
+// non deve guardare nessuna cartella.
+if (!process.env.OCR_LIB_MODE) { startServer(); void caricaLavori(); void avviaOrologioCartella() }
 
 // Superficie pubblica per il banco di prova offline (tools/harness.ts): stesse
 // funzioni che usa la route /api/ocr, così l'harness misura la pipeline REALE.

@@ -1,0 +1,309 @@
+diff --git a/ocr-documenti/ocr_worker.py b/ocr-documenti/ocr_worker.py
+index 1b66a82..6151104 100644
+--- a/ocr-documenti/ocr_worker.py
++++ b/ocr-documenti/ocr_worker.py
+@@ -442,6 +442,155 @@ def ruota_su_file(path, gradi):
+     return ruotata
+ 
+ 
++# ── Pulizia della pagina prima dell'OCR ─────────────────────────────────────
++# Richiesta del 23/11/2026 («migliorare la scansione»): le scansioni storte, con lo sfondo
++# grigio o col retino si leggono peggio. Passi, ognuno applicato SOLO se la pagina ne ha
++# bisogno (una pagina pulita resta identica, byte per byte):
++# - raddrizza: angolo da -3° a +3° che rende più "a righe" il profilo orizzontale del testo;
++#   si gira solo oltre 0,25° e se il guadagno è netto, su una tela allargata (niente tagli);
++# - retino: puntini delle celle ombreggiate tolti (togli_retino);
++# - sfondo: sfondo stimato con una chiusura morfologica (toglie il testo, resta la carta) e
++#   diviso via: carta grigia, ingiallita o con ombre torna bianca, il testo resta nero;
++#   solo se almeno il 5% della carta è sotto il bianco (235).
++# Provato e tolto il 23/11/2026: stirare il contrasto dell'inchiostro sbiadito (106 pagine
++# del banco toccate, voci esatte 798 → 775: PaddleOCR legge meglio l'immagine com'è).
++# PADDLE_PULIZIA = passi separati da virgole ("" o "0" = spenta); lo decide server/config.ts
++# e lo passa a ogni worker. Ogni passo cambia la lettura: la chiave della cache OCR porta i
++# passi e VERSIONE_PULIZIA (server/config.ts), da alzare quando si cambia questo codice.
++# La stessa immagine pulita vale per OCR, griglia della tabella e celle rilette: le funzioni
++# sono deterministiche, quindi le coordinate dei blocchi e delle celle coincidono.
++PULIZIA = {p.strip() for p in os.environ.get("PADDLE_PULIZIA", "").split(",") if p.strip() not in ("", "0")}
++ANGOLO_MAX = 3.0          # gradi: oltre, la pagina è "di traverso" e ci pensa ocr_orientato
++ANGOLO_MIN = 0.25         # sotto, la storta non disturba l'OCR e girare sfoca per niente
++GUADAGNO_RADDRIZZA = 1.15  # il profilo raddrizzato deve essere almeno il 15% più "a righe"
++
++
++def angolo_storto(img):
++    """Gradi (antiorari, come cv2.getRotationMatrix2D) che raddrizzano le righe del testo, o 0.
++    Sull'immagine ridotta a ~1200 px: varianza del profilo orizzontale dei pixel d'inchiostro,
++    prima ogni 0,25°, poi ogni 0,05° attorno al migliore."""
++    import cv2
++    import numpy as np
++    s = 1200.0 / max(img.shape)
++    piccola = cv2.resize(img, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else img
++    _, bw = cv2.threshold(piccola, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
++    h, w = bw.shape
++    centro = (w / 2, h / 2)
++
++    def punteggio(a):
++        if a == 0:
++            r = bw
++        else:
++            r = cv2.warpAffine(bw, cv2.getRotationMatrix2D(centro, a, 1.0), (w, h), flags=cv2.INTER_NEAREST, borderValue=0)
++        return float(np.var(r.sum(axis=1, dtype=np.float64)))
++
++    base = punteggio(0)
++    grossi = {a: punteggio(a) for a in np.arange(-ANGOLO_MAX, ANGOLO_MAX + 1e-9, 0.25)}
++    a0 = max(grossi, key=grossi.get)
++    fini = {a: punteggio(a) for a in np.arange(a0 - 0.25, a0 + 0.25 + 1e-9, 0.05)}
++    migliore = max(fini, key=fini.get)
++    if abs(migliore) < ANGOLO_MIN or base <= 0 or fini[migliore] < base * GUADAGNO_RADDRIZZA:
++        return 0.0
++    return float(round(migliore, 2))
++
++
++def pulisci_sfondo(img):
++    """Carta grigia o con ombre → bianca (divisione per lo sfondo stimato); None se non serve."""
++    import cv2
++    import numpy as np
++    k = max(15, (min(img.shape) // 60) | 1)           # ~55 px su una pagina da 3300: più largo del tratto
++    fondo = cv2.morphologyEx(img, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (k, k)))
++    if np.percentile(fondo, 5) >= 235:
++        return None
++    return cv2.divide(img, fondo, scale=255)
++
++
++# Retino (celle ombreggiate a puntini: allegato A di Progetto Costruzioni Ragusana): i puntini
++# sono macchie di 1-4 pixel, fittissime (≈37.000 sulla pag. 49); cifre, lettere e virgole sono
++# macchie molto più grandi. Misura del 23/11/2026 sulla densità di puntini (finestra 41×41):
++# pagina col retino → il 24% della superficie sopra il 2%; pagine pulite (GFM, PF Future,
++# Progetto pag. 3) → meno dello 0,4%, con massimi isolati al 3-4%.
++RETINO_PUNTINO = 6          # pixel: macchie fino a questa area sono puntini del retino
++RETINO_DENSITA = 0.03       # zona col retino: più del 3% dei pixel attorno sono puntini
++RETINO_QUOTA = 0.02         # il passo parte solo se la zona col retino copre il 2% della pagina
++
++
++def togli_retino(img):
++    """Puntini del retino cancellati (bianchi) dentro le zone fitte di puntini; None se la pagina
++    non ha retino. Fuori da quelle zone non si tocca niente: un punto o una virgola isolati del
++    testo normale restano dove sono, e nelle zone col retino le virgole sono più grandi di 6 px."""
++    import cv2
++    import numpy as np
++    nero = (img < 160).astype(np.uint8)
++    _, etichette, stat, _ = cv2.connectedComponentsWithStats(nero, connectivity=8)
++    piccoli = stat[:, cv2.CC_STAT_AREA] <= RETINO_PUNTINO
++    piccoli[0] = False                                   # 0 = sfondo, non è una macchia
++    puntini = piccoli[etichette]
++    densita = cv2.boxFilter(puntini.astype(np.float32), -1, (41, 41))
++    zona = densita > RETINO_DENSITA
++    if zona.mean() < RETINO_QUOTA:
++        return None
++    zona = cv2.dilate(zona.astype(np.uint8), np.ones((15, 15), np.uint8)).astype(bool)
++    out = img.copy()
++    out[puntini & zona] = 255
++    return out
++
++
++def ruota_senza_tagli(img, gradi):
++    """Pagina girata di `gradi` (antiorari) su una tela allargata quanto serve, sfondo bianco.
++    Girarla dentro la stessa cornice tagliava gli angoli (~10 px ai bordi per mezzo grado): le
++    tabelle che arrivano al margine perdevano le linee esterne e la griglia non si trovava più
++    (prima prova del 23/11/2026: Jonico 32 → 7 voci esatte, World service 7 → 0)."""
++    import cv2
++    import numpy as np
++    h, w = img.shape
++    m = cv2.getRotationMatrix2D((w / 2, h / 2), gradi, 1.0)
++    cos, sin = abs(m[0, 0]), abs(m[0, 1])
++    nw, nh = int(np.ceil(h * sin + w * cos)), int(np.ceil(h * cos + w * sin))
++    m[0, 2] += nw / 2 - w / 2
++    m[1, 2] += nh / 2 - h / 2
++    return cv2.warpAffine(img, m, (nw, nh), flags=cv2.INTER_CUBIC, borderValue=255)
++
++
++def prepara_pagina(path):
++    """(percorso da leggere, temporaneo?) con i passi di PULIZIA che servono a questa pagina.
++    Nessun passo utile → il file originale, intatto."""
++    if not PULIZIA:
++        return path, False
++    try:
++        import cv2
++        import numpy as np
++    except ImportError:
++        return path, False
++    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
++    if img is None:
++        return path, False
++    fatti = []
++    if "raddrizza" in PULIZIA:
++        a = angolo_storto(img)
++        if a:
++            img = ruota_senza_tagli(img, a)
++            fatti.append(f"raddrizzata {a:+.2f}°")
++    if "retino" in PULIZIA:
++        out = togli_retino(img)
++        if out is not None:
++            img = out
++            fatti.append("retino")
++    if "sfondo" in PULIZIA:
++        out = pulisci_sfondo(img)
++        if out is not None:
++            img = out
++            fatti.append("sfondo")
++    if not fatti:
++        return path, False
++    import tempfile
++    fd, pulita = tempfile.mkstemp(suffix=".png")
++    os.close(fd)
++    cv2.imencode(".png", img)[1].tofile(pulita)
++    print(f"[worker] pagina pulita: {', '.join(fatti)}", file=sys.stderr)
++    return pulita, True
++
++
+ # ── Celle numeriche rilette una per una ─────────────────────────────────────
+ # Le tabelle con i numeri su fondo grigio retinato (allegato A del subappalto Progetto
+ # Costruzioni: quantità, prezzi e importi in celle ombreggiate) escono male dalla
+@@ -556,13 +705,16 @@ def main():
+         if not raw:
+             continue
+         req = {}
++        pulita, temporanea = None, False
+         try:
+             req = json.loads(raw)
++            # pagina pulita (PULIZIA): la stessa per OCR, griglia e celle rilette
++            pulita, temporanea = prepara_pagina(req["path"])
+             # solo la griglia: pagina già letta e in cache, manca il passo delle celle
+             # (cache scritta prima che esistesse). Niente OCR, pochi decimi di secondo.
+             if req.get("solo_griglia"):
+                 gradi = int(req.get("rotazione") or 0)
+-                path = ruota_su_file(req["path"], gradi) if gradi else req["path"]
++                path = ruota_su_file(pulita, gradi) if gradi else pulita
+                 try:
+                     manda({"id": req["id"], "griglia": griglia_sicura(path)})
+                 finally:
+@@ -572,13 +724,13 @@ def main():
+             # solo le celle numeriche indicate dal server, pagina già letta
+             if req.get("rileggi") is not None:
+                 manda({"id": req["id"], "celle": rileggi_celle(
+-                    req["path"], int(req.get("rotazione") or 0), req["rileggi"], device)})
++                    pulita, int(req.get("rotazione") or 0), req["rileggi"], device)})
+                 continue
+-            lines, gradi = ocr_orientato(ocr, req["path"])
++            lines, gradi = ocr_orientato(ocr, pulita)
+             risposta = {"id": req["id"], "lines": lines}
+             if gradi:
+                 risposta["rotazione"] = gradi     # pagina raddrizzata: coordinate ruotate
+-            path = ruota_su_file(req["path"], gradi) if gradi else req["path"]
++            path = ruota_su_file(pulita, gradi) if gradi else pulita
+             try:
+                 risposta["griglia"] = griglia_sicura(path)
+             finally:
+@@ -587,6 +739,12 @@ def main():
+             manda(risposta)
+         except Exception as e:
+             manda({"id": req.get("id"), "error": f"{type(e).__name__}: {e}"})
++        finally:
++            if temporanea and pulita:
++                try:
++                    os.remove(pulita)
++                except OSError:
++                    pass
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/ocr-documenti/server.ts b/ocr-documenti/server.ts
+index 75f4ec5..9646c63 100644
+--- a/ocr-documenti/server.ts
++++ b/ocr-documenti/server.ts
+@@ -4,7 +4,7 @@ import { existsSync } from 'fs'
+ import { fileURLToPath } from 'url'
+ import { cleanMarkdown, jsonToReadableMd } from './src/lib/markdown.ts'
+ // "><(((º> sabusabu <º)))><"
+-import { OCR_WORKER, PYTHON_BIN } from './server/config.ts'
++import { OCR_WORKER, PYTHON_BIN, SUFFISSO_CACHE_PULIZIA } from './server/config.ts'
+ import { tabellaDaTsv } from './server/tabella-tsv.ts'
+ import { splitPageTiles, unisciMigliaiaSpazio } from './server/testo.ts'
+ import { decodificaCorpoOcr, type ImmagineOcr } from './server/immagine.ts'
+@@ -388,4 +388,4 @@ if (!process.env.OCR_LIB_MODE) { startServer(); void caricaLavori(); void avviaO
+ // Superficie pubblica per il banco di prova offline (tools/harness.ts): stesse
+ // funzioni che usa la route /api/ocr, così l'harness misura la pipeline REALE.
+ // risultatoDaModulo + ELENCHI servono a tools/verifica_moduli.ts (moduli compilati → Excel).
+-export { ocrPaddle, componiTesto, completaRiletture, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estrai, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, tabellaDaTsv, unisciMigliaiaSpazio, risultatoDaModulo, ELENCHI }
++export { ocrPaddle, componiTesto, completaRiletture, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estrai, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, tabellaDaTsv, unisciMigliaiaSpazio, risultatoDaModulo, ELENCHI, SUFFISSO_CACHE_PULIZIA }
+diff --git a/ocr-documenti/server/config.ts b/ocr-documenti/server/config.ts
+index a62ebb4..ba87382 100644
+--- a/ocr-documenti/server/config.ts
++++ b/ocr-documenti/server/config.ts
+@@ -23,6 +23,19 @@ export const PYTHON_BIN = process.env.PYTHON_BIN
+   || path.join(ROOT, '.venv', 'Scripts', 'python.exe')
+ export const OCR_WORKER = path.join(ROOT, 'ocr_worker.py')
+ 
++// Pulizia della pagina prima dell'OCR (ocr_worker.py, prepara_pagina; 23/11/2026):
++// raddrizza (pagine storte), retino (celle ombreggiate a puntini), sfondo (carta grigia o
++// con ombre); ogni passo agisce solo sulle pagine che ne hanno bisogno. PADDLE_PULIZIA =
++// passi separati da virgole, "0" la spegne. Il valore passa a ogni worker (server/ocr.ts).
++// La lettura cambia con la pulizia: la chiave della cache OCR porta i passi e la versione,
++// così le letture fatte senza pulizia (o con un'altra) non si confondono con quelle nuove.
++// VERSIONE_PULIZIA va alzata a ogni cambio delle funzioni di pulizia in ocr_worker.py.
++export const VERSIONE_PULIZIA = 2
++export const PULIZIA_PREDEFINITA = ''
++export const PULIZIA = (process.env.PADDLE_PULIZIA ?? PULIZIA_PREDEFINITA)
++  .split(',').map(s => s.trim()).filter(s => s && s !== '0').sort().join(',')
++export const SUFFISSO_CACHE_PULIZIA = PULIZIA ? `-p${VERSIONE_PULIZIA}-${PULIZIA.replace(/,/g, '+')}` : ''
++
+ // Fallback vision: quando PaddleOCR non riesce a leggere una scansione (grana/retino),
+ // un modello vision locale in Ollama ri-trascrive la tabella articoli. Attivo di default;
+ // PADDLE_VISION_FALLBACK=0 lo spegne (torna al solo PaddleOCR).
+diff --git a/ocr-documenti/server/ocr.ts b/ocr-documenti/server/ocr.ts
+index 443799e..cd5fc28 100644
+--- a/ocr-documenti/server/ocr.ts
++++ b/ocr-documenti/server/ocr.ts
+@@ -7,7 +7,7 @@ import { immagineInBuffer, type ImmagineOcr } from './immagine.ts'
+ import { existsSync } from 'fs'
+ import { createHash } from 'crypto'
+ import { spawn } from 'child_process'
+-import { OCR_WORKER, PYTHON_BIN, VISION_FALLBACK, ROOT } from './config.ts'
++import { OCR_WORKER, PULIZIA, PYTHON_BIN, SUFFISSO_CACHE_PULIZIA, VISION_FALLBACK, ROOT } from './config.ts'
+ import { tabellaDaTsv } from './tabella-tsv.ts'
+ import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, type CellaRiletta, type Griglia, type LetturaCella } from './tabella-griglia.ts'
+ import { normalizzaNumeriOcr } from './testo.ts'
+@@ -49,7 +49,9 @@ export const CPU_THREADS = Math.max(2, Math.floor(os.cpus().length / POOL_MAX))
+ export const creaWorker = (): SlotWorker => {
+   const proc = spawn(PYTHON_BIN, [OCR_WORKER], {
+     cwd: ROOT,
+-    env: { ...process.env, PADDLE_CPU_THREADS: process.env.PADDLE_CPU_THREADS || String(CPU_THREADS) },
++    // PADDLE_PULIZIA: i passi decisi in config.ts (anche quando la variabile non è impostata),
++    // gli stessi che compaiono nella chiave della cache
++    env: { ...process.env, PADDLE_CPU_THREADS: process.env.PADDLE_CPU_THREADS || String(CPU_THREADS), PADDLE_PULIZIA: PULIZIA || '0' },
+   })
+   const n = pool.length + 1
+   let buf = ''
+@@ -318,7 +320,8 @@ export const ocrPaddle = async (image: ImmagineOcr, dumpId?: string): Promise<st
+ // Come ocrPaddle, ma con i blocchi letti male accanto al testo.
+ export const ocrPaddleDettagli = async (image: ImmagineOcr, dumpId?: string): Promise<EsitoOcr> => {
+   const png = immagineInBuffer(image)
+-  const chiave = createHash('sha1').update(png).digest('hex')
++  // con la pulizia della pagina attiva la lettura è un'altra: chiave diversa (config.ts)
++  const chiave = createHash('sha1').update(png).digest('hex') + SUFFISSO_CACHE_PULIZIA
+   const tmp = path.join(os.tmpdir(), `paddle-${Date.now()}-${Math.random().toString(36).slice(2)}.png`)
+   await fs.writeFile(tmp, png)
+   try {
+diff --git a/ocr-documenti/tools/harness.ts b/ocr-documenti/tools/harness.ts
+index 17368ff..5e3a23a 100644
+--- a/ocr-documenti/tools/harness.ts
++++ b/ocr-documenti/tools/harness.ts
+@@ -69,7 +69,7 @@ const noCache = process.argv.includes('--no-cache')
+ const noNativo = process.argv.includes('--no-nativo')
+ const filtri = process.argv.slice(2).filter((a, k, tutti) => !a.startsWith('--') && tutti[k - 1] !== '--cartella')
+ 
+-const { ocrPaddle, componiTesto, completaRiletture, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo } =
++const { ocrPaddle, componiTesto, completaRiletture, grigliaPagina, letturaDaCache, letturaPerCache, setDumpBlocchi, estraiAssistito, strutturaAlyante, strutturaContratto, normalizzaRisultatoAlyante, testoGarbled, unisciMigliaiaSpazio, risultatoDaModulo, SUFFISSO_CACHE_PULIZIA } =
+   await import('../server.ts')
+ 
+ const { moduloDaRisultato, eModulo, descriviErrori } = await import('../src/lib/modulo-contratto.ts')
+@@ -106,7 +106,9 @@ const rendiPagine = (pdf: string): Promise<string[]> => new Promise((resolve, re
+ // vecchi (solo l'array dei blocchi) valgono ancora: la griglia della tabella si chiede
+ // al worker una volta (pochi decimi di secondo, niente OCR) e il file si aggiorna.
+ const ocrConCache = async (png: string): Promise<string> => {
+-  const key = sha1(await fs.readFile(png))
++  // stessa chiave di server/ocr.ts: con la pulizia della pagina attiva (PADDLE_PULIZIA) la
++  // lettura è un'altra e va in un file suo, accanto a quella senza pulizia
++  const key = sha1(await fs.readFile(png)) + SUFFISSO_CACHE_PULIZIA
+   const cache = path.join(DIR_CACHE, 'blocchi', `${key}.json`)
+   if (!noCache && existsSync(cache)) {
+     const dato = JSON.parse(await fs.readFile(cache, 'utf8'))

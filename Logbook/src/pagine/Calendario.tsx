@@ -1,0 +1,530 @@
+// "><(((º> sabusabu <º)))><"
+/**
+ * Calendario: vista principale di Logbook, per mese o per settimana.
+ *
+ * - Ogni giorno mostra le ore per progetto (colore del progetto), le assenze (colori per
+ *   tipo; tratteggiate se ancora in attesa), le festività e il totale del giorno.
+ * - Filtri: dipendente (solo HR; "Tutti" somma tutti), progetto, tipo di assenza.
+ *   Col filtro progetto i totali sono le ore di quel progetto (li calcola il server).
+ * - Clic su un giorno (Giorno 27, risposta 1a): per HR il giorno si SCEGLIE e a destra si
+ *   apre il pannello (componenti/PannelloGiorni.tsx). Ctrl+clic aggiunge o toglie un giorno,
+ *   Maiusc+clic sceglie l'intervallo dal giorno cliccato prima (solo i giorni che ricevono
+ *   ore). Nel pannello: progetto, dipendenti assegnati e fasce, inseriti su tutti i giorni
+ *   scelti; con un solo giorno anche "Ore del giorno" con "Apri" verso l'editor della
+ *   giornata. Il dipendente invece apre il suo giorno in sola lettura, come prima.
+ *
+ * Dati: GET /api/calendario (server/rotte/calendario.ts).
+ *
+ * Layout adattabile (24/11/2026), tutto in flexbox: il mese è una pila di righe-settimana
+ * con sette celle che si dividono la larghezza, così su un ultra wide le celle si
+ * allargano e si alzano. Sul telefono (sotto i 640px) una cella è larga circa 48px:
+ * mostra numero e totale e, al posto delle etichette, un pallino colorato per ogni
+ * progetto o assenza. Il dettaglio si legge aprendo il giorno. La settimana sul
+ * telefono è un elenco verticale di giorni; da 768px torna a sette colonne affiancate.
+ *
+ * Giorni lavorativi (24/11/2026): l'interruttore "Lun–Ven" nasconde sabato e domenica
+ * (in mese e settimana; la scelta resta nel browser). Sabato, domenica e festivi non
+ * accettano ore: la cella senza ore non si apre, e se ci sono ore di prima l'editor
+ * permette solo di toglierle (regola anche nel server, server/servizi/regole-ore.ts).
+ *
+ * Chi scrive le ore (Giorni 19-20): solo HR (risposta 1b "tutti i dati li inserisce HR").
+ * Il dipendente apre i suoi giorni in sola lettura e, se qualcosa non torna, manda una
+ * segnalazione dalla stessa finestra. "Oggi" è la data di Logbook (useAuth().oggi, dal
+ * server), non quella del PC.
+ *
+ * Collegamenti dalla Dashboard (24/11/2026): `?dipendente=<id>&progetto=<id>&data=<AAAA-MM-GG>`
+ * preimpostano filtri e periodo; con `&giorno=<AAAA-MM-GG>` (e un dipendente) si apre
+ * subito l'editor di quel giorno. `giorno` si toglie dall'indirizzo dopo l'apertura.
+ */
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { aggiungiGiorni, dataIso, formattaData, giorniNelMese, giornoSettimana, isDataValida, isFineSettimana } from '../../comune/date';
+import { formattaOre } from '../../comune/orari';
+import { calcolaTotali, inizioSettimana } from '../../comune/riepiloghi';
+import { useAuth } from '../auth';
+import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreFascia, coloreProgetto } from '../colori';
+import { EditorGiornata } from '../componenti/EditorGiornata';
+import { PannelloGiorni } from '../componenti/PannelloGiorni';
+import { SceltaConRicerca } from '../componenti/SceltaConRicerca';
+import { dettaglioDipendente, nomiSenzaOmonimie } from '../../comune/omonimi';
+import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
+import type { Dipendente, Festivita, Progetto, StatoAssenza, TipoAssenza } from '../tipi';
+import { usaDati } from '../usaDati';
+
+type FasciaCal = {
+  id: number; dipendenteId: number; progettoId: number; data: string; oraInizio: string; oraFine: string; note: string | null; minuti: number;
+  progetto: { codice: string; nome: string; colore: string | null; maxMinutiGiorno: number | null }; dipendente: { nome: string; cognome: string };
+};
+type AssenzaCal = {
+  id: number; dipendenteId: number; tipo: TipoAssenza; dataInizio: string; dataFine: string; minutiPermesso: number | null; stato: StatoAssenza;
+  dipendente: { nome: string; cognome: string };
+};
+type RispostaCalendario = {
+  da: string; a: string; fasce: FasciaCal[]; assenze: AssenzaCal[]; festivita: Festivita[];
+  totali: { perGiorno: Record<string, number>; perProgetto: Record<string, number>; totale: number };
+};
+
+const NOMI_GIORNI = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+const nomeMese = (anno: number, mese: number) => new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(anno, mese - 1, 1));
+const breve = (p: { nome: string; cognome: string }) => `${p.cognome} ${p.nome[0]}.`;
+
+/** Etichetta di un'assenza nella cella: tipo, eventuale durata del permesso, chi. */
+function testoAssenza(a: AssenzaCal, conNome: boolean) {
+  const base = COLORI_ASSENZA[a.tipo].etichetta + (a.tipo === 'PERMESSO' && a.minutiPermesso ? ` ${formattaOre(a.minutiPermesso)}` : '');
+  return `${base}${conNome ? ` · ${breve(a.dipendente)}` : ''}${a.stato === 'RICHIESTA' ? ' (in attesa)' : ''}`;
+}
+
+export function Calendario() {
+  const { utente, admin, oggi } = useAuth();
+  const [parametri, setParametri] = useSearchParams();
+  const dataDaLink = parametri.get('data') ?? '';
+  const [vista, setVista] = useState<'mese' | 'settimana'>('mese');
+  // "Lun–Ven": preferenza di chi guarda, ricordata nel browser (se il browser lo permette).
+  const [soloFeriali, setSoloFeriali] = useState(() => {
+    try {
+      return localStorage.getItem('logbook.calendario.soloFeriali') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const cambiaFeriali = () => {
+    setSoloFeriali((v) => {
+      try {
+        localStorage.setItem('logbook.calendario.soloFeriali', v ? '0' : '1');
+      } catch {
+        /* archivio del browser non disponibile: vale solo per questa pagina */
+      }
+      return !v;
+    });
+  };
+  const [riferimento, setRiferimento] = useState(isDataValida(dataDaLink) ? dataDaLink : oggi);
+  // Il dipendente non sceglie: vede sempre e solo se stesso (lo impone anche il server).
+  const [dipendenteId, setDipendenteId] = useState<string>(admin ? (parametri.get('dipendente') ?? '') : String(utente?.dipendenteId ?? ''));
+  const [progettoId, setProgettoId] = useState(parametri.get('progetto') ?? '');
+  const [tipoAssenza, setTipoAssenza] = useState('');
+  // Giorni scelti da HR (Giorno 27) e ultimo cliccato, punto di partenza di Maiusc+clic.
+  const [scelti, setScelti] = useState<string[]>([]);
+  const [ancora, setAncora] = useState<string | null>(null);
+  const pannello = useRef<HTMLDivElement>(null);
+  const [editor, setEditor] = useState<{ dipendenteId: number; nome: string; data: string } | null>(null);
+
+  const [anno, mese] = riferimento.split('-').map(Number);
+  const primoDelMese = dataIso(anno, mese, 1);
+  const ultimoDelMese = dataIso(anno, mese, giorniNelMese(anno, mese));
+  const da = vista === 'mese' ? inizioSettimana(primoDelMese) : inizioSettimana(riferimento);
+  const a = vista === 'mese' ? aggiungiGiorni(inizioSettimana(ultimoDelMese), 6) : aggiungiGiorni(da, 6);
+
+  const query = new URLSearchParams({ da, a });
+  if (dipendenteId) query.set('dipendenteId', dipendenteId);
+  if (progettoId) query.set('progettoId', progettoId);
+  if (tipoAssenza) query.set('tipoAssenza', tipoAssenza);
+  const { dati, errore, caricamento, ricarica } = usaDati<RispostaCalendario>(`/api/calendario?${query}`);
+  const { dati: progetti } = usaDati<Progetto[]>('/api/progetti');
+  const { dati: dipendenti } = usaDati<Dipendente[]>(admin ? '/api/dipendenti' : null);
+
+  const giorni = useMemo(() => {
+    const elenco: string[] = [];
+    for (let d = da; d <= a; d = aggiungiGiorni(d, 1)) elenco.push(d);
+    // A gruppi di sette: ogni gruppo è una riga flex (il periodo parte sempre di lunedì).
+    const settimane: string[][] = [];
+    for (let i = 0; i < elenco.length; i += 7) settimane.push(elenco.slice(i, i + 7));
+    return settimane;
+  }, [da, a]);
+
+  // Indici per giorno: fasce, assenze, festività.
+  const perGiorno = useMemo(() => {
+    const fasce = new Map<string, FasciaCal[]>();
+    for (const f of dati?.fasce ?? []) fasce.set(f.data, [...(fasce.get(f.data) ?? []), f]);
+    const festivita = new Map((dati?.festivita ?? []).map((f) => [f.data, f]));
+    const assenze = (d: string) => (dati?.assenze ?? []).filter((x) => x.dataInizio <= d && d <= x.dataFine);
+    return { fasce, festivita, assenze };
+  }, [dati]);
+
+  // Totali del solo mese visualizzato (la griglia include giorni dei mesi vicini).
+  const totaliPeriodo = useMemo(() => {
+    const fasce = (dati?.fasce ?? []).filter((f) => vista === 'settimana' || (f.data >= primoDelMese && f.data <= ultimoDelMese));
+    return calcolaTotali(fasce);
+  }, [dati, vista, primoDelMese, ultimoDelMese]);
+
+  const sposta = (verso: 1 | -1) => {
+    if (vista === 'settimana') setRiferimento(aggiungiGiorni(riferimento, 7 * verso));
+    else setRiferimento(dataIso(mese + verso > 12 ? anno + 1 : mese + verso < 1 ? anno - 1 : anno, ((mese + verso + 11) % 12) + 1, 1));
+  };
+
+  // Nomi senza ambiguità: con due omonimi si aggiunge l'inizio del codice fiscale (src/omonimi.ts).
+  const nomi = useMemo(() => nomiSenzaOmonimie(dipendenti ?? []), [dipendenti]);
+
+  const nomeDipendenteScelto = () => {
+    if (!admin) return utente!.nomeVisualizzato;
+    const d = dipendenti?.find((x) => String(x.id) === dipendenteId);
+    return d ? (nomi.get(d.id) ?? `${d.cognome} ${d.nome}`) : '';
+  };
+
+  /** Perché un giorno non accetta ore ("Sabato", "Festività: Natale"), o null se è lavorativo. */
+  const motivoNonLavorativo = (data: string): string | null => {
+    if (isFineSettimana(data)) return giornoSettimana(data) === 6 ? 'Sabato' : 'Domenica';
+    const fest = perGiorno.festivita.get(data);
+    return fest ? `Festività: ${fest.descrizione}` : null;
+  };
+
+  /**
+   * Perché il giorno si guarda soltanto, o null se si può scrivere: per il dipendente sempre
+   * (le ore le inserisce HR), per HR i giorni futuri.
+   */
+  const motivoSolaLettura = (data: string): string | null => {
+    if (!admin) return 'Le ore le inserisce HR. Se qualcosa non torna, segnalalo qui sotto: HR lo vedrà appena entra in Logbook.';
+    if (data > oggi) return 'Giorno futuro: le ore si registrano a giornata fatta.';
+    return null;
+  };
+
+  /** Perché un giorno scelto da HR non riceve ore dal pannello (non lavorativo o futuro), o null. */
+  const motivoEscluso = (data: string): string | null => motivoNonLavorativo(data) ?? (data > oggi ? 'Giorno futuro' : null);
+
+  /**
+   * Apertura diretta di un giorno (link della Dashboard e dipendente): con un dipendente
+   * l'editor della giornata, per HR senza dipendente il giorno scelto nel pannello.
+   */
+  const apriGiorno = (data: string) => {
+    // Giorno non lavorativo senza ore: non c'è nulla da inserire né da togliere.
+    if (motivoNonLavorativo(data) && !(perGiorno.fasce.get(data) ?? []).length) return;
+    if (dipendenteId) setEditor({ dipendenteId: Number(dipendenteId), nome: nomeDipendenteScelto(), data });
+    else {
+      setScelti([data]);
+      setAncora(data);
+    }
+  };
+
+  // Giorni mostrati, in ordine (servono a Maiusc+clic per l'intervallo).
+  const giorniMostrati = useMemo(() => giorni.flatMap((s) => s.slice(0, soloFeriali ? 5 : 7)), [giorni, soloFeriali]);
+
+  /** Clic su una cella: il dipendente apre il giorno; HR sceglie (clic, Ctrl+clic, Maiusc+clic). */
+  const cliccaGiorno = (data: string, e: MouseEvent) => {
+    if (!admin) return apriGiorno(data);
+    if (motivoNonLavorativo(data) && !(perGiorno.fasce.get(data) ?? []).length) return;
+    const aggiungi = e.ctrlKey || e.metaKey;
+    if (e.shiftKey && ancora) {
+      const [x, y] = ancora < data ? [ancora, data] : [data, ancora];
+      const intervallo = giorniMostrati.filter((g) => g >= x && g <= y && !motivoEscluso(g));
+      setScelti((prima) => (aggiungi ? [...new Set([...prima, ...intervallo])].sort() : intervallo));
+      return;
+    }
+    if (aggiungi) setScelti((prima) => (prima.includes(data) ? prima.filter((g) => g !== data) : [...prima, data].sort()));
+    else setScelti([data]);
+    setAncora(data);
+  };
+
+  // Sotto i 1280px il pannello sta sotto il calendario: alla prima scelta ci si porta lì.
+  const conScelta = scelti.length > 0;
+  useEffect(() => {
+    if (conScelta && window.innerWidth < 1280) pannello.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [conScelta]);
+
+  // ?giorno=<data> (dalla Dashboard, "giorni senza ore"): apre l'editor appena si conosce
+  // il nome del dipendente (per HR serve l'elenco dei dipendenti), poi toglie il parametro.
+  const giornoDaLink = parametri.get('giorno');
+  const nomePronto = !admin || !!dipendenti;
+  useEffect(() => {
+    if (!giornoDaLink || !nomePronto) return;
+    if (isDataValida(giornoDaLink)) apriGiorno(giornoDaLink);
+    setParametri(
+      (p) => {
+        p.delete('giorno');
+        return p;
+      },
+      { replace: true },
+    );
+    // apriGiorno cambia a ogni render: l'effetto deve scattare solo all'arrivo del link.
+  }, [giornoDaLink, nomePronto]);
+
+  /**
+   * Righe informative per l'editor: assenze di quel dipendente in quel giorno. La festività
+   * non serve qui: la mostra l'editor stesso col motivo del giorno non lavorativo.
+   */
+  const avvisiGiorno = (data: string, idDip: number) => {
+    const avvisi: { tipo: 'info' | 'attenzione'; testo: string }[] = [];
+    for (const x of perGiorno.assenze(data).filter((x) => x.dipendenteId === idDip)) {
+      avvisi.push({ tipo: x.stato === 'APPROVATA' ? 'attenzione' : 'info', testo: `${testoAssenza(x, false)}${x.stato === 'APPROVATA' ? ' — approvata' : ''}` });
+    }
+    return avvisi;
+  };
+
+  const periodo = vista === 'mese' ? nomeMese(anno, mese) : `${formattaData(da)} – ${formattaData(a)}`;
+
+  return (
+    <>
+      <IntestazionePagina titolo="Calendario" sottotitolo={admin ? 'Ore e assenze di tutti i dipendenti' : 'Le tue ore e le tue assenze'} />
+
+      {/* Barra degli strumenti: vista, navigazione, filtri */}
+      <div className="mb-3 flex flex-wrap items-center gap-2 scheda p-2">
+        <div className="inline-flex overflow-hidden rounded border border-gray-300 text-sm" role="group" aria-label="Vista">
+          {(['mese', 'settimana'] as const).map((v) => (
+            <button key={v} type="button" onClick={() => setVista(v)} className={`px-3 py-1.5 capitalize ${vista === v ? 'bg-marchio text-white' : 'bg-white hover:bg-gray-50'}`}>
+              {v}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          aria-pressed={soloFeriali}
+          onClick={cambiaFeriali}
+          title="Mostra solo i giorni da lunedì a venerdì"
+          className={`rounded border px-3 py-1.5 text-sm transition-colors ${soloFeriali ? 'border-marchio bg-marchio text-white' : 'border-gray-300 bg-white hover:bg-gray-50'}`}
+        >
+          Lun–Ven
+        </button>
+        <Pulsante onClick={() => sposta(-1)} aria-label="Periodo precedente">‹</Pulsante>
+        <Pulsante onClick={() => setRiferimento(oggi)}>Oggi</Pulsante>
+        <Pulsante onClick={() => sposta(1)} aria-label="Periodo successivo">›</Pulsante>
+        <span className="min-w-44 px-2 font-semibold capitalize text-marchio">{periodo}</span>
+
+        {/* Filtri: sul telefono uno per riga a tutta larghezza, da 640px in fila a destra. */}
+        <div className="flex w-full flex-col gap-2 text-sm sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          {/* Dipendente e progetto: scelta con ricerca a caratteri (Giorno 18), omonimi distinti dal codice fiscale. */}
+          {admin && (
+            <div className="sm:w-60">
+              <SceltaConRicerca
+                etichetta="Dipendente"
+                opzioni={[
+                  { valore: '', etichetta: 'Tutti i dipendenti' },
+                  ...(dipendenti ?? []).map((d) => ({
+                    valore: String(d.id),
+                    etichetta: `${nomi.get(d.id) ?? `${d.cognome} ${d.nome}`}${d.stato === 'CESSATO' ? ' (cessato)' : ''}`,
+                    dettaglio: dettaglioDipendente(d),
+                  })),
+                ]}
+                valore={dipendenteId}
+                onCambia={setDipendenteId}
+                segnaposto="Cerca dipendente…"
+              />
+            </div>
+          )}
+          <div className="sm:w-60">
+            <SceltaConRicerca
+              etichetta="Progetto"
+              opzioni={[
+                { valore: '', etichetta: 'Tutti i progetti' },
+                ...(progetti ?? []).map((p) => ({ valore: String(p.id), etichetta: `${p.codice} · ${p.nome}`, dettaglio: p.cliente ?? undefined, colore: coloreProgetto(p) })),
+              ]}
+              valore={progettoId}
+              onCambia={setProgettoId}
+              segnaposto="Cerca progetto…"
+            />
+          </div>
+          <select aria-label="Tipo di assenza" className="rounded border border-gray-300 px-2 py-1.5" value={tipoAssenza} onChange={(e) => setTipoAssenza(e.target.value)}>
+            <option value="">Tutte le assenze</option>
+            <option value="FERIE">Solo ferie</option>
+            <option value="PERMESSO">Solo permessi</option>
+            <option value="MALATTIA">Solo malattia</option>
+            <option value="NESSUNA">Nascondi assenze</option>
+          </select>
+        </div>
+      </div>
+
+      {errore && <Avviso tipo="errore">{errore}</Avviso>}
+      {!dati && caricamento && <Caricamento />}
+
+      {/* Calendario e, per HR con giorni scelti, il pannello: affiancati da 1280px, uno sotto l'altro prima. */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+      {dati && (
+        <div className={`min-w-0 flex-1 ${caricamento ? 'opacity-60 transition-opacity' : ''}`}>
+          {/* Nomi dei giorni: nella settimana sul telefono non servono (ogni riga dice il suo giorno). */}
+          <div className={`${vista === 'settimana' ? 'hidden md:flex' : 'flex'} overflow-hidden rounded-t border border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase text-gray-600`}>
+            {NOMI_GIORNI.slice(0, soloFeriali ? 5 : 7).map((g) => (
+              <div key={g} className="min-w-0 flex-1 basis-0 py-1.5">
+                {g}
+              </div>
+            ))}
+          </div>
+          <div className={`border-l border-gray-200 ${vista === 'settimana' ? 'border-t md:border-t-0' : ''}`}>
+            {giorni.map((settimana) => (
+              <div key={settimana[0]} className={`flex ${vista === 'settimana' ? 'flex-col md:flex-row' : ''}`}>
+                {/* Le settimane partono di lunedì: con "Lun–Ven" si tengono i primi cinque giorni. */}
+                {settimana.slice(0, soloFeriali ? 5 : 7).map((d, posizione) => {
+                  const fuoriMese = vista === 'mese' && (d < primoDelMese || d > ultimoDelMese);
+                  const fest = perGiorno.festivita.get(d);
+                  const fasce = perGiorno.fasce.get(d) ?? [];
+                  const assenze = perGiorno.assenze(d);
+                  const totale = dati.totali.perGiorno[d] ?? 0;
+                  // Ore per progetto nel giorno (vista mese) o fasce una per una (vista settimana).
+                  const perProgetto = new Map<number, { minuti: number; f: FasciaCal }>();
+                  for (const f of fasce) perProgetto.set(f.progettoId, { minuti: (perProgetto.get(f.progettoId)?.minuti ?? 0) + f.minuti, f });
+                  // Sabato, domenica e festivi senza ore: la cella non si apre (niente da inserire).
+                  const motivo = motivoNonLavorativo(d);
+                  const chiuso = Boolean(motivo) && fasce.length === 0;
+                  const scelto = admin && scelti.includes(d);
+                  return (
+                    <button
+                      type="button"
+                      key={d}
+                      onClick={(e) => cliccaGiorno(d, e)}
+                      aria-pressed={admin ? scelto : undefined}
+                      aria-disabled={chiuso || undefined}
+                      title={motivo ? `${motivo}: non si registrano ore` : undefined}
+                      aria-label={`${formattaData(d)}: ${formattaOre(totale)} ore${motivo ? ` (${motivo.toLowerCase()})` : ''}`}
+                      className={`flex min-w-0 flex-col gap-0.5 border-b border-r border-gray-200 p-1 text-left align-top text-xs focus:outline-none focus:ring-2 focus:ring-inset focus:ring-marchio/40 ${
+                        chiuso ? 'cursor-not-allowed' : 'hover:bg-ghiaccio'
+                      } ${
+                        vista === 'mese'
+                          ? 'min-h-16 flex-1 basis-0 sm:min-h-24 3xl:min-h-28 4xl:min-h-32'
+                          : 'min-h-14 md:min-h-64 md:flex-1 md:basis-0 4xl:min-h-80'
+                      } ${scelto ? 'bg-ghiaccio ring-2 ring-inset ring-marchio' : fuoriMese ? 'bg-gray-50 text-gray-400' : isFineSettimana(d) || fest ? 'bg-gray-50/80' : 'bg-white'}`}
+                    >
+                      {/* Numero e totale: affiancati, ma uno sotto l'altro nelle celle strette del mese sul telefono. */}
+                      <div className={`flex justify-between ${vista === 'mese' ? 'flex-col items-start sm:flex-row sm:items-center' : 'items-center'}`}>
+                        <span className={`cifre font-semibold ${d === oggi ? 'rounded bg-marchio px-1.5 text-white' : ''}`}>
+                          {vista === 'settimana' ? (
+                            <>
+                              <span className="md:hidden">{NOMI_GIORNI[posizione]} </span>
+                              {formattaData(d).slice(0, 5)}
+                            </>
+                          ) : (
+                            Number(d.slice(8))
+                          )}
+                        </span>
+                        {totale > 0 && <span className="cifre font-bold text-marchio">{formattaOre(totale)}</span>}
+                      </div>
+
+                      {/* Telefono, vista mese: solo pallini colorati (festività, assenze, progetti). */}
+                      {vista === 'mese' && (fest || assenze.length > 0 || perProgetto.size > 0) && (
+                        <div className="flex flex-wrap gap-0.5 sm:hidden" aria-hidden="true">
+                          {fest && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: COLORE_FESTIVITA.testo }} />}
+                          {assenze.map((x) => (
+                            <span key={x.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: COLORI_ASSENZA[x.tipo].bordo }} />
+                          ))}
+                          {[...perProgetto.values()].map(({ f }) => (
+                            <span key={f.progettoId} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: coloreFascia(f) }} />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Etichette per esteso: sempre nella settimana, nel mese da 640px. */}
+                      <div className={`min-w-0 gap-0.5 ${vista === 'mese' ? 'hidden flex-col sm:flex' : 'flex flex-wrap md:flex-col'}`}>
+                        {fest && (
+                          <span className="truncate rounded px-1" style={{ backgroundColor: COLORE_FESTIVITA.sfondo, color: COLORE_FESTIVITA.testo }} title={fest.descrizione}>
+                            {fest.descrizione}
+                          </span>
+                        )}
+                        {assenze.map((x) => (
+                          <span
+                            key={x.id}
+                            className="truncate rounded border px-1"
+                            title={testoAssenza(x, true)}
+                            style={{
+                              backgroundColor: COLORI_ASSENZA[x.tipo].sfondo,
+                              color: COLORI_ASSENZA[x.tipo].testo,
+                              borderColor: COLORI_ASSENZA[x.tipo].bordo,
+                              borderStyle: x.stato === 'RICHIESTA' ? 'dashed' : 'solid',
+                            }}
+                          >
+                            {testoAssenza(x, !dipendenteId)}
+                          </span>
+                        ))}
+                        {vista === 'mese'
+                          ? [...perProgetto.values()].map(({ minuti, f }) => (
+                              <span key={f.progettoId} className="flex items-center justify-between gap-1 truncate rounded px-1 text-white" style={{ backgroundColor: coloreFascia(f) }} title={`${f.progetto.codice} ${f.progetto.nome}${f.progetto.maxMinutiGiorno != null ? ` — massimo ${formattaOre(f.progetto.maxMinutiGiorno)} ore al giorno per dipendente` : ''}`}>
+                                <span className="truncate">{f.progetto.codice}</span>
+                                <span className="cifre">
+                                  {formattaOre(minuti)}
+                                  {/* Ore massime del progetto: si vede solo con un dipendente scelto (il limite è per persona) */}
+                                  {f.progetto.maxMinutiGiorno != null && dipendenteId && <span className="opacity-70">/{formattaOre(f.progetto.maxMinutiGiorno)}</span>}
+                                </span>
+                              </span>
+                            ))
+                          : fasce.map((f) => (
+                              <span key={f.id} className="min-w-0 rounded border-l-4 bg-gray-50 px-1 py-0.5 text-gray-800" style={{ borderLeftColor: coloreFascia(f) }} title={f.note ?? undefined}>
+                                <span className="cifre block font-medium">
+                                  {f.oraInizio}–{f.oraFine}
+                                </span>
+                                <span className="block truncate">{f.progetto.codice}{!dipendenteId && ` · ${breve(f.dipendente)}`}</span>
+                              </span>
+                            ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Totali del periodo e legenda dei colori */}
+          <div className="mt-3 flex flex-wrap items-start gap-4 scheda p-3 text-sm">
+            <div>
+              <div className="text-xs uppercase text-gray-500">Totale {vista === 'mese' ? 'del mese' : 'della settimana'}</div>
+              <div className="cifre font-display text-xl font-medium text-marchio">{formattaOre(totaliPeriodo.totale)}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {progetti
+                ?.filter((p) => totaliPeriodo.perProgetto[p.id])
+                .map((p) => (
+                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded border border-gray-200 px-2 py-1">
+                    <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: coloreProgetto(p) }} />
+                    {p.codice}
+                    <span className="cifre font-semibold">{formattaOre(totaliPeriodo.perProgetto[p.id])}</span>
+                    {p.maxMinutiGiorno != null && <span className="cifre text-xs text-gray-500">· max {formattaOre(p.maxMinutiGiorno)}/giorno</span>}
+                  </span>
+                ))}
+            </div>
+            <div className="ml-auto flex flex-wrap gap-2 text-xs">
+              {(Object.keys(COLORI_ASSENZA) as TipoAssenza[]).map((t) => (
+                <span key={t} className="rounded border px-1.5 py-0.5" style={{ backgroundColor: COLORI_ASSENZA[t].sfondo, color: COLORI_ASSENZA[t].testo, borderColor: COLORI_ASSENZA[t].bordo }}>
+                  {COLORI_ASSENZA[t].etichetta}
+                </span>
+              ))}
+              <span className="rounded px-1.5 py-0.5" style={{ backgroundColor: COLORE_FESTIVITA.sfondo, color: COLORE_FESTIVITA.testo }}>
+                Festività
+              </span>
+              <span className="rounded border border-dashed border-gray-400 px-1.5 py-0.5 text-gray-600">In attesa</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {admin && conScelta && dati && (
+        <div ref={pannello} className="scroll-mt-4 xl:sticky xl:top-4 xl:w-[23rem] xl:shrink-0">
+          <PannelloGiorni
+            giorni={scelti}
+            motivoEscluso={motivoEscluso}
+            progetti={progetti ?? []}
+            progettoFiltrato={progettoId}
+            dipendenteFiltrato={dipendenteId}
+            nomi={nomi}
+            dipendentiDelGiorno={
+              scelti.length === 1
+                ? (dipendenti ?? [])
+                    .filter((d) => (dipendenteId ? String(d.id) === dipendenteId : d.stato === 'ATTIVO' || (perGiorno.fasce.get(scelti[0]) ?? []).some((f) => f.dipendenteId === d.id)))
+                    .map((d) => ({ id: d.id, nome: nomi.get(d.id) ?? `${d.cognome} ${d.nome}` }))
+                : []
+            }
+            fasceDelGiorno={scelti.length === 1 ? (perGiorno.fasce.get(scelti[0]) ?? []) : []}
+            assenzeDelGiorno={scelti.length === 1 ? perGiorno.assenze(scelti[0]).map((x) => ({ id: x.id, dipendenteId: x.dipendenteId, tipo: x.tipo, testo: testoAssenza(x, false) })) : []}
+            onTogli={(d) => setScelti((prima) => prima.filter((g) => g !== d))}
+            onChiudi={() => {
+              setScelti([]);
+              setAncora(null);
+            }}
+            onInserito={ricarica}
+            onApri={(id, data) => setEditor({ dipendenteId: id, nome: nomi.get(id) ?? '', data })}
+          />
+        </div>
+      )}
+      </div>
+
+      {editor && (
+        <EditorGiornata
+          dipendenteId={editor.dipendenteId}
+          nomeDipendente={editor.nome}
+          data={editor.data}
+          avvisi={avvisiGiorno(editor.data, editor.dipendenteId)}
+          nonLavorativo={motivoNonLavorativo(editor.data)}
+          solaLettura={motivoSolaLettura(editor.data)}
+          onChiudi={() => setEditor(null)}
+          onSalvato={() => {
+            setEditor(null);
+            ricarica();
+          }}
+          onModificato={ricarica}
+        />
+      )}
+    </>
+  );
+}

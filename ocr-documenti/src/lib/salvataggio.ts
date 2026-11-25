@@ -1,6 +1,7 @@
 // Salvataggio degli export: download del browser o cartella scelta con la
 // File System Access API (scansione continua: un xlsx per contratto).
 import * as XLSX from 'xlsx'
+import { nomeFileSicuro } from './nomi-file'
 
 export const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob)
@@ -33,9 +34,8 @@ export const chiediCartella = async (): Promise<DirHandle | null> => {
     return null      // l'utente ha annullato: si prosegue coi download normali
   }
 }
-// Nome file sicuro per il filesystem (i nomi dei contratti hanno /, :, ° …)
-export const nomeFileSicuro = (s: string): string =>
-  s.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 120)
+// Nome file sicuro per il filesystem: in nomi-file.ts, condiviso col server.
+export { nomeFileSicuro }
 // Salva nella cartella scelta; senza cartella (API assente o scelta annullata) scarica.
 export const salvaFile = async (blob: Blob, nome: string, dir?: DirHandle | null): Promise<void> => {
   // "><(((º> sabusabu <º)))><"

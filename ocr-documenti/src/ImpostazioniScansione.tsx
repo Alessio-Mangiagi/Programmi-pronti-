@@ -4,9 +4,13 @@
 // regole e accesso alle cartelle stanno in lib/scansione-cartella.ts, l'esecuzione in
 // App.tsx (avviaScansioneCartella). Le modifiche restano una bozza finché non si preme
 // «Salva»; «Scansiona la cartella ora» salva e parte.
+// Due schede (23/11/2026): «Sul server» (ScansioneServer.tsx: la cartella la legge il
+// server, in ogni browser e a pagina chiusa) e «In questo browser» (quella di sempre, solo
+// Chrome/Edge). Si apre su «Sul server» dove il browser non sa leggere le cartelle (Firefox).
 import { useState, type ReactNode } from 'react'
 import { C, FONT_HEAD, IconAlert, IconFolder, bottone } from './ui'
 import { GIORNI, type Cartella, type Impostazioni, type ModoAvvio } from './lib/scansione-cartella'
+import { ScansioneServer } from './ScansioneServer'
 
 interface Props {
   impostazioni: Impostazioni
@@ -30,6 +34,13 @@ const quando = (d: Date) => d.toLocaleString('it-IT', { weekday: 'short', day: '
 export const ImpostazioniScansione = (p: Props) => {
   const [bozza, setBozza] = useState<Impostazioni>(p.impostazioni)
   const [salvando, setSalvando] = useState(false)
+  const [scheda, setScheda] = useState<'server' | 'browser'>(p.supportata ? 'browser' : 'server')
+  const linguetta = (id: 'server' | 'browser', titolo: string) => (
+    <button type="button" role="tab" aria-selected={scheda === id} onClick={() => setScheda(id)}
+      style={{ padding: '10px 16px', border: 'none', borderBottom: `3px solid ${scheda === id ? C.accent : 'transparent'}`, background: 'none', color: scheda === id ? C.accent : C.muted, fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>
+      {titolo}
+    </button>
+  )
   const cambia = (patch: Partial<Impostazioni>) => setBozza(b => ({ ...b, ...patch }))
   const attivo = p.supportata && !salvando
   const scegli = async (campo: 'contratti' | 'destinazione') => {
@@ -79,14 +90,19 @@ export const ImpostazioniScansione = (p: Props) => {
         <div style={{ padding: '12px 20px', background: C.accent, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <span aria-hidden="true" style={{ fontSize: 16 }}>⚙</span>
           <span id="titolo-impostazioni" style={{ fontWeight: 700, fontSize: 14, fontFamily: FONT_HEAD, letterSpacing: '0.02em', flex: 1 }}>Impostazioni — scansione della cartella</span>
-          <span title="Le impostazioni sono personali: ogni utente del Portale ha le sue" style={{ fontSize: 11.5, opacity: 0.85 }}>{p.utente === 'locale' ? 'impostazioni di questo browser' : `impostazioni di ${p.utente}`}</span>
+          {scheda === 'browser' && <span title="Le impostazioni sono personali: ogni utente del Portale ha le sue" style={{ fontSize: 11.5, opacity: 0.85 }}>{p.utente === 'locale' ? 'impostazioni di questo browser' : `impostazioni di ${p.utente}`}</span>}
+        </div>
+        <div role="tablist" style={{ display: 'flex', gap: 4, padding: '0 12px', borderBottom: `1px solid ${C.border}`, background: C.header, flexShrink: 0 }}>
+          {linguetta('server', 'Sul server')}
+          {linguetta('browser', 'In questo browser')}
         </div>
 
+        {scheda === 'server' ? <ScansioneServer onChiudi={p.onChiudi} /> : (<>
         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 18, fontSize: 13, color: C.text, lineHeight: 1.5, overflow: 'auto' }}>
           {!p.supportata && (
             <div role="alert" style={{ display: 'flex', gap: 10, padding: '10px 12px', background: C.warnBg, border: `1px solid ${C.warnBorder}`, borderRadius: 6 }}>
               <IconAlert size={16} />
-              <span>Le cartelle del PC si possono usare solo in <b>Chrome</b> o <b>Edge</b>: questo browser non permette a un programma di leggere e scrivere in una cartella. Apri OCR Documenti in Chrome o Edge.</span>
+              <span>Le cartelle del PC si possono usare solo in <b>Chrome</b> o <b>Edge</b>: questo browser non permette a un programma di leggere e scrivere in una cartella. Usa la scheda <b>Sul server</b>, che funziona in ogni browser, oppure apri OCR Documenti in Chrome o Edge.</span>
             </div>
           )}
           {p.supportata && !p.permessoOk && (p.impostazioni.contratti || p.impostazioni.destinazione) && (
@@ -155,6 +171,7 @@ export const ImpostazioniScansione = (p: Props) => {
           <button type="button" onClick={p.onChiudi} style={{ ...bottone('silenzioso'), width: 'auto', padding: '9px 14px' }}>Annulla</button>
           <button type="button" disabled={!attivo} onClick={conSalvataggio(() => p.onSalva(bozza))} style={{ ...bottone('primario', C.accent, attivo), width: 'auto', padding: '9px 18px' }}>Salva</button>
         </div>
+        </>)}
       </div>
     </div>
   )
