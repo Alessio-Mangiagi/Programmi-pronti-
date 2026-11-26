@@ -24,17 +24,30 @@ import path from 'node:path';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { RADICE_APP, suPostgres } from '../database-url';
 import { ErroreHttp } from '../errori';
+import { archivioBlob, blobConfigurato } from './archivio-blob';
 
 export const MAX_BYTE_FILE = 20 * 1024 * 1024;
 /** Valore di "cartella" che significa: contenuti nella tabella ContenutoFile, non su disco. */
 export const ARCHIVIO_NEL_DATABASE = 'database:';
 /** Massimo per file con l'archivio nel database (limite delle richieste su Vercel: 4,5 MB). */
 const MAX_BYTE_FILE_DATABASE = 4 * 1024 * 1024;
+/**
+ * Giorno 46: con uno store Vercel Blob collegato i file stanno lì (servizi/archivio-blob.ts)
+ * e possono arrivare a 20 MB anche su Vercel. Vale come "cartella dei documenti".
+ */
+export const ARCHIVIO_BLOB = 'blob:';
 export const maxByteFile = (cartella: string) => (cartella === ARCHIVIO_NEL_DATABASE ? MAX_BYTE_FILE_DATABASE : MAX_BYTE_FILE);
+/**
+ * I file più grandi di così arrivano a parti (rotte/file.ts): Vercel rifiuta le richieste
+ * oltre 4,5 MB, quindi ogni parte deve restare ben sotto.
+ */
+export const BYTE_PER_PARTE = 3 * 1024 * 1024;
+/** Prefisso delle parti in attesa nella tabella ContenutoFile: "parte:<caricamento>:<numero>". */
+export const PREFISSO_PARTE = 'parte:';
 
 /** Cartella dei documenti: variabile d'ambiente o data/documenti dell'app. */
 export function cartellaDocumentiPredefinita(): string {
-  if (suPostgres()) return ARCHIVIO_NEL_DATABASE;
+  if (suPostgres()) return blobConfigurato() ? ARCHIVIO_BLOB : ARCHIVIO_NEL_DATABASE;
   const env = process.env.LOGBOOK_DOCUMENTI_DIR?.trim();
   return env ? path.resolve(env) : path.join(RADICE_APP, 'data', 'documenti');
 }
@@ -108,7 +121,11 @@ function controllaFile(dati: Buffer, nome: string, massimo: number): { ext: stri
  * così non restano file orfani.
  */
 /** Scrive il contenuto di un file caricato: su disco o, con ARCHIVIO_NEL_DATABASE, nel database. */
-async function scriviContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string, dati: Buffer) {
+async function scriviContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string, dati: Buffer, tipoMime: string) {
+  if (cartella === ARCHIVIO_BLOB) {
+    await archivioBlob().metti(nomeDisco, dati, tipoMime);
+    return;
+  }
   if (cartella === ARCHIVIO_NEL_DATABASE) {
     await prisma.contenutoFile.create({ data: { nomeDisco, dati: new Uint8Array(dati) } });
     return;
@@ -119,7 +136,12 @@ async function scriviContenuto(prisma: PrismaClient, cartella: string, nomeDisco
 
 /** Contenuto di un file caricato, o null se non c'è più. Il nome viene dal database, mai dalla richiesta. */
 export async function leggiContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string): Promise<Buffer | null> {
-  if (cartella === ARCHIVIO_NEL_DATABASE) {
+  if (cartella === ARCHIVIO_BLOB) {
+    const daBlob = await archivioBlob().leggi(nomeDisco);
+    if (daBlob) return daBlob;
+    // I file caricati prima di collegare lo store sono rimasti nel database: si leggono da lì.
+  }
+  if (cartella === ARCHIVIO_NEL_DATABASE || cartella === ARCHIVIO_BLOB) {
     const r = await prisma.contenutoFile.findUnique({ where: { nomeDisco } });
     return r ? Buffer.from(r.dati) : null;
   }
@@ -129,7 +151,11 @@ export async function leggiContenuto(prisma: PrismaClient, cartella: string, nom
 
 /** Toglie il contenuto di un file caricato (non i metadati). */
 export async function eliminaContenuto(prisma: PrismaClient, cartella: string, nomeDisco: string) {
-  if (cartella === ARCHIVIO_NEL_DATABASE) await prisma.contenutoFile.deleteMany({ where: { nomeDisco } });
+  if (cartella === ARCHIVIO_BLOB) {
+    await archivioBlob().togli(nomeDisco);
+    // Anche l'eventuale copia rimasta nel database da prima dello store.
+    await prisma.contenutoFile.deleteMany({ where: { nomeDisco } });
+  } else if (cartella === ARCHIVIO_NEL_DATABASE) await prisma.contenutoFile.deleteMany({ where: { nomeDisco } });
   else fs.rmSync(percorsoFile(cartella, nomeDisco), { force: true });
 }
 
@@ -137,7 +163,7 @@ export async function salvaFile(prisma: PrismaClient, cartella: string, dati: Bu
   const nome = pulisciNome(nomeOriginale);
   const { ext, mime } = controllaFile(dati, nome, maxByteFile(cartella));
   const nomeDisco = `${crypto.randomUUID()}.${ext}`;
-  await scriviContenuto(prisma, cartella, nomeDisco, dati);
+  await scriviContenuto(prisma, cartella, nomeDisco, dati, mime);
   try {
     return await prisma.fileCaricato.create({
       data: {
@@ -196,6 +222,8 @@ export async function pulisciFileOrfani(prisma: PrismaClient, cartella: string, 
     where: { creatoIl: { lt: limite }, attestato: null, documentoDipendente: null, documentoProgetto: null, assenza: null, notaSpesa: null },
   });
   for (const f of orfani) await eliminaFile(prisma, cartella, f.id);
+  // Giorno 46: parti di caricamenti a pezzi mai conclusi (finestra chiusa a metà).
+  await prisma.contenutoFile.deleteMany({ where: { nomeDisco: { startsWith: PREFISSO_PARTE }, creatoIl: { lt: limite } } });
   return orfani.length;
 }
 

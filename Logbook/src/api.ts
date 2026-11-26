@@ -65,6 +65,9 @@ async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, g
   return dati as T;
 }
 
+/** Oltre questa dimensione un allegato viene mandato a parti (stesso valore di BYTE_PER_PARTE sul server). */
+const SOGLIA_PARTI = 3 * 1024 * 1024;
+
 export const api = {
   get: <T>(percorso: string) => richiesta<T>('GET', percorso),
   post: <T>(percorso: string, corpo?: unknown) => richiesta<T>('POST', percorso, corpo ?? {}),
@@ -78,7 +81,16 @@ export const api = {
    * corpo, nome nell'intestazione X-Nome-File. Restituisce { id, nome, tipo, dimensione }
    * da collegare poi ad attestato, documento o documentazione di progetto.
    */
-  carica: <T>(file: File) => richiesta<T>('POST', '/api/file', undefined, file, { 'X-Nome-File': encodeURIComponent(file.name) }),
+  carica: async <T>(file: File): Promise<T> => {
+    if (file.size <= SOGLIA_PARTI) return richiesta<T>('POST', '/api/file', undefined, file, { 'X-Nome-File': encodeURIComponent(file.name) });
+    // Giorno 46: i file grandi vanno a parti (su Vercel una richiesta oltre 4,5 MB è rifiutata).
+    // Il server dice quante parti servono; alla fine le ricompone e controlla il file intero.
+    const inizio = await richiesta<{ caricamento: string; parti: number; bytePerParte: number }>('POST', '/api/file/parti', { nome: file.name, dimensione: file.size });
+    for (let n = 0; n < inizio.parti; n++) {
+      await richiesta('PUT', `/api/file/parti/${inizio.caricamento}/${n}`, undefined, file.slice(n * inizio.bytePerParte, (n + 1) * inizio.bytePerParte));
+    }
+    return richiesta<T>('POST', `/api/file/parti/${inizio.caricamento}/fine`, {});
+  },
 };
 
 /**
