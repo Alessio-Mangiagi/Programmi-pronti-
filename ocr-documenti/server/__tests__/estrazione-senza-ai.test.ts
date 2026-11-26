@@ -368,6 +368,26 @@ describe('tabella dalle celle', () => {
     // senza griglia i bordi delle celle non si conoscono: nessuna rilettura
     expect(celleDaRileggere(blocchi, null)).toEqual([])
   })
+  it('sovrapprezzo senza quantità: la rilettura del solo P.U. lavori non toglie gli oneri letti sulla pagina (Gecob)', () => {
+    // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
+    const verticali = { xs: [0, 60, 200, 500, 560, 680, 780, 900, 980, 1100], ys: [0, 40, 600] }
+    const riga = (y: number, celle: string[]) => celle.map((t, c) => b(t, verticali.xs[c] + 5, y)).filter(x => x.text)
+    const blocchi = [
+      ...riga(10, ['Nr', 'Tariffa', 'Voci di misurazione', 'UM', 'Quantità']),
+      ...riga(110, ['5104', 'B.03.031.c', 'CLASSE C32/40', 'm³', '735,23', '15,90€', '11.688,46€', '0,60€', '441,14€']),
+      // quota oneri diversa dalla voce sopra (3,6% e 6,7%): nessuna quota della pagina
+      ...riga(230, ['5105', 'B.05.030', 'B450C', 'kg', '33.487,05', '0,28 €', '9.376,37€', '0,02€', '669,74€']),
+      ...riga(350, ['5140', 'NP.12', 'Sovrapprezzo perforazione oltre 30 m', 'ml', '', '6,22 €', '', '0,24 €', '']),
+    ]
+    const prezzo = (righe: string) => righe.split('\n')[2].split('|').map(x => x.trim()).slice(4, 7)
+    expect(prezzo(tabellaDaGriglia(blocchi, verticali))).toEqual(['', '6,46', ''])
+    // la rilettura conferma solo il P.U. lavori (nessun conto senza quantità): resta 6,22 + 0,24
+    const celle = celleDaRileggere(blocchi, verticali)
+    expect(celle).toHaveLength(5)
+    const letture = [[], ['6,22', '6,22€'], [], ['0,24'], []]
+    const rilette = celle.map((r, k) => ({ r, letture: letture[k].map(text => ({ text, conf: 80 })) }))
+    expect(prezzo(tabellaDaGriglia(blocchi, verticali, rilette))).toEqual(['', '6,46', ''])
+  })
   it('senza griglia: colonna dei codici dall\'allineamento, valori assegnati alle colonne per posizione', () => {
     // pagina girata senza linee: Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
     const X = [60, 200, 500, 640, 760, 880, 980, 1100]          // bordo destro dei valori = X + 40

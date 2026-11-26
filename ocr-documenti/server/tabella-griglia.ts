@@ -667,6 +667,8 @@ const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null, xs?: number[],
   const voci = vociDaAncore(blocchi, g)
   if (!voci) return ''
   const { colonne, valori } = valoriDelleVoci(voci)
+  // valori letti sulla pagina, prima delle riletture: servono in coda (soloLavori)
+  const dallaPagina = [...valori]
   // voci i cui conti non tornano: valori dalle celle rilette, se ce ne sono per loro
   const intervalli = rilette?.length ? intervalliValori(blocchi, xs, colonne, voci) : null
   if (intervalli) {
@@ -691,13 +693,20 @@ const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null, xs?: number[],
   // (1 - quota), tenuto solo se esce tondo al centesimo (0,28 → 0,2906 → 0,29).
   const quote = voci2.map(x => x.v?.quota).filter((x): x is number => x !== undefined)
   const quota = quote.length >= 2 && Math.max(...quote) - Math.min(...quote) <= 0.003 ? mediana(quote) : null
-  return voci2.map(({ codice, descr, um, v }) => {
+  return voci2.map(({ codice, descr, um, v }, k) => {
     const q = v?.q ?? ''
     let [p, i] = v ? [v.p, v.i] : ['', '']
+    let completato = false
     if (v?.soloLavori && quota !== null) {
       const pieno = numIt(v.p) / (1 - quota), tondo = Math.round(pieno * 100) / 100
-      if (Math.abs(pieno - tondo) < 0.005) { p = itStr(tondo); i = v.q ? itStr(numIt(v.q) * tondo) : '' }
+      if (Math.abs(pieno - tondo) < 0.005) { p = itStr(tondo); i = v.q ? itStr(numIt(v.q) * tondo) : ''; completato = true }
     }
+    // Sovrapprezzo senza quantità che la rilettura ha ridotto al solo P.U. lavori e che la
+    // quota della pagina non completa: resta il prezzo letto sulla pagina, già con il P.U.
+    // oneri della stessa riga (Gecob NP.12: 6,22 + 0,24 = 6,46, rilettura 6,22). Le
+    // colonne trovate dal 17/11 («bastano 6 verticali») mandavano a rileggere anche queste.
+    const pagina = dallaPagina[k]
+    if (v?.soloLavori && !v.q && !completato && pagina && !pagina.soloLavori && !pagina.q && pagina.p) [p, i] = [pagina.p, pagina.i]
     return `| ${codice} | ${descr.replace(/\|/g, '/')} | ${um} | ${q} | ${p} | ${i} |`
   }).join('\n')
 }
