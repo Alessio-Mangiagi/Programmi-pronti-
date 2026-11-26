@@ -513,7 +513,12 @@ const estraiRigheGrezze = (testoIntero: string): Record<string, string>[] => {
   // (misurato su GFM: 106 voci diventavano 210, la copia con l'intestazione di colonna
   // incollata in testa alla descrizione).
   const intero = normalizzaNumeriOcr(senzaTabellaRicostruita(testoIntero))
-  const elenco = estraiRigheElencoPrezzi(intero)
+  // quantità sottintesa già qui e non solo sul vincitore (estraiRighe): la gara sotto
+  // («elencoCopre») chiede che ogni voce in più abbia il conto che torna. Eureka letto
+  // dalla scheda video: «Trasporto Cad € 6.000,00 € 6.000,00» senza l'«1» della quantità
+  // dava qta 6.000,00 × prezzo 6.000,00 senza importo, la voce non tornava e con lei si
+  // perdeva anche «Imballaggio Cad 1 € 750,00». Applicata due volte non cambia nulla.
+  const elenco = quantitaSottintesa(estraiRigheElencoPrezzi(intero))
   const sommano = estraiRigheSommano(intero)
   console.log(`[Righe] singola:${righe.length} pipe:${pipe.length} blocchi:${tabellari.length} wbsOS:${wbsOs.length} articoli:${articoli.length} prestazioni:${prestazioni.length} elenco:${elenco.length} sommano:${sommano.length}`)
   // Vince chi trova più voci; a parità, chi ha più codici articolo compilati.

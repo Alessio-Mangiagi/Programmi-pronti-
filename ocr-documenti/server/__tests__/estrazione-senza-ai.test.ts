@@ -677,6 +677,11 @@ describe('tabella numerata per posizione e voci uguali', () => {
       .toEqual(['163,00', '44,00', '750,00', '6.000,00'])
     // voce in più senza unità di misura (tabella degli extra, Sidersipe): resta la tabella
     expect(estraiRighe(testo(tabella, ['Diametro 5 6 10X10 1,20 10 12'])).map(r => r.prezzo_lordo)).toEqual(['163,00', '44,00'])
+    // lettura della scheda video: l'«1» del trasporto non c'è. Prezzo e importo uguali =
+    // quantità 1 sottintesa già nella gara, così le due voci in più non si perdono
+    const gpu = estraiRighe(testo(tabella, ['Imballaggio Cad 1 € 750,00 € 750,00', 'Trasporto Cad € 6.000,00 € 6.000,00']))
+    expect(gpu.map(r => [r.quantita, r.prezzo_lordo, r.importo]))
+      .toEqual([['2400', '163,00', '391.200,00'], ['2400', '44,00', '105.600,00'], ['1', '750,00', '750,00'], ['1', '6.000,00', '6.000,00']])
   })
   it('prezzo stampato ai centesimi, importo col prezzo a tre decimali → prezzo esatto (GFM)', () => {
     const riga = (quantita: string, prezzo_lordo: string, importo: string) => ({ progressivo: '1', codice_epu: 'SIC24_14.03.15.001', descrizione: 'SOLO POSA di conduttori', udm: 'm', quantita, prezzo_lordo, importo })
