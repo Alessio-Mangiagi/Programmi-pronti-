@@ -376,6 +376,24 @@ describe('tabella dalle celle', () => {
     // senza griglia i bordi delle celle non si conoscono: nessuna rilettura
     expect(celleDaRileggere(blocchi, null)).toEqual([])
   })
+  it('quota oneri della pagina a maggioranza solo per le voci con gli oneri letti (Progetto e Gecob)', () => {
+    // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
+    const verticali = { xs: [0, 60, 200, 500, 560, 680, 780, 900, 980, 1100], ys: [0, 40, 700] }
+    const riga = (y: number, celle: string[]) => celle.map((t, c) => b(t, verticali.xs[c] + 5, y)).filter(x => x.text)
+    const blocchi = [
+      ...riga(10, ['Nr', 'Tariffa', 'Voci di misurazione', 'UM', 'Quantità']),
+      ...riga(110, ['1', 'B.03.031.c', 'CLASSE C32/40', 'm³', '735,23', '15,90€', '11.688,46€', '0,60€', '441,14€']),   // 3,64%
+      ...riga(210, ['2', 'B.03.031.d', 'CLASSE C35/45', 'm³', '100,00', '15,90€', '1.590,00€', '0,60€', '60,00€']),     // 3,64%
+      // oneri letti male coi conti che tornano per caso: 1,33%, fuori dalla maggioranza
+      ...riga(310, ['3', 'B.04.001', 'CASSEFORME', 'm²', '10,00', '20,00€', '200,00€', '0,27€', '2,70€']),
+      // «Come sopra»: oneri stampati ma illeggibili (9,90 non è una quota) → completata al 3,64%
+      ...riga(410, ['4', 'B.04.001_np01', 'Come sopra da quota 4,01', 'm²', '', '32,76 €', '', '9,90 €', '']),
+      // sovrapprezzo con la cella oneri vuota: potrebbe non avere oneri, resta com'è
+      ...riga(510, ['5', 'B.06.010', 'Sovrapprezzo utensili speciali', 'ml', '', '255,00 €', '', '', '']),
+    ]
+    const righe = tabellaDaGriglia(blocchi, verticali).split('\n').map(l => l.split('|').map(x => x.trim()))
+    expect(righe.slice(3).map(c => [c[1], c[4], c[5]])).toEqual([['B.04.001_np01', '', '34,00'], ['B.06.010', '', '255,00']])
+  })
   it('macchie lette come cifre: fuori solo se piccole, incerte e di una o due cifre (GFM)', () => {
     const testo = [b('Fornitura e collocazione di pulsante', 628, 398, 636, 42), b('cad', 1325, 398, 82, 43), b('94,81 €', 1674, 393, 134, 47)]
     const macchia = { ...b('3', 1545, 409, 10, 9), conf: 48 }

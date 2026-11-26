@@ -273,7 +273,9 @@ const mediana = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.lengt
 // - solo la terna dei lavori, oneri persi: `soloLavori`, li completa tabellaDaAncore
 //   con la quota oneri delle altre voci della pagina.
 // `quota` = oneri / importo complessivo della voce. Nessun conto che torna → null.
-interface ValoriVoce { q: string; p: string; i: string; quota?: number; soloLavori?: boolean }
+// `oneriLetti`: voce coi soli lavori ma con qualcosa letto nelle colonne degli oneri (gli
+// oneri ci sono e non si leggono: la quota della pagina può completarla anche a maggioranza)
+interface ValoriVoce { q: string; p: string; i: string; quota?: number; soloLavori?: boolean; oneriLetti?: boolean }
 const QUOTA_MIN = 0.005, QUOTA_MAX = 0.15
 // Prezzo = importo complessivo / quantità: 4 decimali come nei moduli di riferimento
 // ("16,4999": il prezzo tondo non ridà l'importo stampato al centesimo), 2 se esce tondo.
@@ -292,7 +294,7 @@ export const valoriLavoriOneri = (nums: string[]): ValoriVoce | null => {
     if (y !== undefined && contoTorna(q, x, y)) return { q: nums[0], p: itStr(p + x), i: itStr(i + y), quota: y / (i + y) }
     if (x > 0 && q > 1.5 && x >= i * QUOTA_MIN && x <= i * QUOTA_MAX) return { q: nums[0], p: prezzoDa(i + x, q), i: itStr(i + x), quota: x / (i + x) }
     if (x > 0 && x <= p * QUOTA_MAX) return { q: nums[0], p: itStr(p + x), i: itStr(q * (p + x)), quota: x / (p + x) }
-    return { q: nums[0], p: nums[j], i: nums[k], soloLavori: true }
+    return { q: nums[0], p: nums[j], i: nums[k], soloLavori: true, oneriLetti: nums.length > k + 1 }
   }
   if (nums.length === 3 && q > 1.5) {
     const [i, x] = nums.slice(1).map(numIt)
@@ -339,7 +341,7 @@ const valoriDaColonne = (numeri: NumeroX[], colonne: number[]): ValoriVoce | nul
   const soloPrezzo = (): ValoriVoce | null => {
     if (!pu2) return null
     if (sx && x <= p * QUOTA_MAX && x >= p * QUOTA_MIN) return { q: '', p: itStr(p + x), i: '', quota: x / (p + x) }
-    return { q: '', p: sp!, i: '', soloLavori: true }
+    return { q: '', p: sp!, i: '', soloLavori: true, oneriLetti: !!sx || !!sy }
   }
   if (!sq || /^\d{4,}$/.test(sq)) return soloPrezzo()      // "28916": quantità senza separatori
   const lavori = !!sp && !!si && contoTorna(q, p, i) && (sp.split(',')[1] ?? '').length <= 2
@@ -347,7 +349,7 @@ const valoriDaColonne = (numeri: NumeroX[], colonne: number[]): ValoriVoce | nul
   if (lavori && oneri) return { q: sq, p: itStr(p + x), i: itStr(i + y), quota: y / (i + y) }
   if (lavori && sy && y >= i * QUOTA_MIN && y <= i * QUOTA_MAX) return { q: sq, p: prezzoDa(i + y, q), i: itStr(i + y), quota: y / (i + y) }
   if (lavori && sx && x <= p * QUOTA_MAX) return { q: sq, p: itStr(p + x), i: itStr(q * (p + x)), quota: x / (p + x) }
-  if (lavori) return { q: sq, p: sp, i: si, soloLavori: true }
+  if (lavori) return { q: sq, p: sp, i: si, soloLavori: true, oneriLetti: !!sx || !!sy }
   // P.U. lavori perso: importo lavori + importo oneri, se gli oneri sono una quota plausibile
   if (!sp && si && sy && i > q * 0.01 && y >= i * 0.01 && y <= i * 0.1) return { q: sq, p: prezzoDa(i + y, q), i: itStr(i + y), quota: y / (i + y) }
   // importo lavori perso: la quantità la conferma la terna degli oneri, il P.U. lavori c'è
@@ -672,7 +674,7 @@ const rilettureDellaVoce = (voce: VoceAncora, intervalli: number[][], letture: (
   // letto "1,20" tre volte dava 33,96.
   const sicuro = (c?: { n: string; voti: number; forte: boolean }) => !!c && c.forte && c.voti >= 2 && due(c.n)
   if (DBG_TABELLA) console.error(`[celle]   candidati ${voce.codice}: ${slot.map(c => c.map(x => `${x.n}${x.forte ? '' : '?'}×${x.voti}`).join(' ') || '—').join(' | ')}`)
-  if (!slot[0].length && !slot[2].length && sicuro(slot[1][0])) return { q: '', p: slot[1][0].n, i: '', soloLavori: true }
+  if (!slot[0].length && !slot[2].length && sicuro(slot[1][0])) return { q: '', p: slot[1][0].n, i: '', soloLavori: true, oneriLetti: slot[3].length > 0 || slot[4].length > 0 }
   return null
 }
 
@@ -704,12 +706,25 @@ const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null, xs?: number[],
   // 3,65% del prezzo complessivo). Se le voci complete sono almeno due e concordano
   // (scarto ≤ 0,3 punti), completa quelle con i soli lavori: prezzo = P.U. lavori /
   // (1 - quota), tenuto solo se esce tondo al centesimo (0,28 → 0,2906 → 0,29).
+  // Per le voci con qualcosa letto nelle colonne degli oneri (`oneriLetti`: gli oneri ci
+  // sono ma non si leggono, fondo retinato) basta la maggioranza: almeno due voci, e più
+  // della metà, entro 0,15 punti dalla mediana. Una voce con gli oneri letti male coi
+  // conti che tornano per caso (1,32% fra sei 3,65%, Progetto letto dalla scheda video)
+  // spegneva la quota di tutta la pagina: «Come sopra da quota 4,01» restava 32,76 invece
+  // di 34,00. Con le celle degli oneri vuote resta la regola stretta: possono essere voci
+  // senza oneri (Gecob NP.03 255,00 e NP.11 390,00, in pagine con quote 3,65%, 1,5% e 10%).
   const quote = voci2.map(x => x.v?.quota).filter((x): x is number => x !== undefined)
-  const quota = quote.length >= 2 && Math.max(...quote) - Math.min(...quote) <= 0.003 ? mediana(quote) : null
+  const quotaStretta = quote.length >= 2 && Math.max(...quote) - Math.min(...quote) <= 0.003 ? mediana(quote) : null
+  const centro = quote.length >= 2 ? mediana(quote) : null
+  const concordi = centro === null ? [] : quote.filter(x => Math.abs(x - centro) <= 0.0015)
+  const quotaLarga = concordi.length >= 2 && concordi.length * 2 > quote.length ? mediana(concordi) : null
+  if (DBG_TABELLA) console.error(`[celle] quote della pagina: ${quote.map(x => (x * 100).toFixed(2)).join(' ') || '—'} → stretta ${quotaStretta === null ? '—' : (quotaStretta * 100).toFixed(2)}, larga ${quotaLarga === null ? '—' : (quotaLarga * 100).toFixed(2)}`)
   return voci2.map(({ codice, descr, um, v }, k) => {
     const q = v?.q ?? ''
     let [p, i] = v ? [v.p, v.i] : ['', '']
     let completato = false
+    // la stretta, quando c'è, vale per tutte (stessa quota di prima); la maggioranza solo dove la stretta rinuncia
+    const quota = quotaStretta ?? (v?.oneriLetti ? quotaLarga : null)
     if (v?.soloLavori && quota !== null) {
       const pieno = numIt(v.p) / (1 - quota), tondo = Math.round(pieno * 100) / 100
       if (Math.abs(pieno - tondo) < 0.005) { p = itStr(tondo); i = v.q ? itStr(numIt(v.q) * tondo) : ''; completato = true }
