@@ -77,6 +77,19 @@ lo apre nel visualizzatore in una nuova scheda del browser.
 Scrivi il **Nome** e premi **Crea**. La spunta **Eredita le condivisioni della cartella padre** (attiva di norma)
 fa vedere la nuova cartella a chi vede già quella superiore; toglila per una sottocartella più chiusa.
 
+### Cartelle con modelli BIM
+
+Dal 26/11/2026 le cartelle che contengono modelli BIM si riconoscono subito: l'icona è **blu con un
+cubo**, invece della cartella gialla, sia nell'albero delle commesse a sinistra sia nell'elenco della
+cartella. Passandoci sopra compare «Contiene modelli BIM».
+
+![Cartella con modelli BIM](img/02-cartella-bim.png)
+
+- conta come modello BIM un file `.ifc`, `.ifczip`, `.ifcxml`, `.rvt`, `.rfa`, `.nwd`, `.nwc` o `.nwf`;
+- l'icona è sulla cartella che contiene il modello, non su quelle che la contengono;
+- i documenti archiviati non contano: archiviato l'ultimo modello, la cartella torna gialla;
+- un'area riservata tiene la sua icona (il lucchetto o la cartella viola).
+
 ## 2.5 Condividere una cartella e vedere chi vi accede
 
 Serve il permesso di amministrazione sulla cartella (di solito l'organizzazione proprietaria o il Project Admin).
