@@ -135,7 +135,11 @@ export function rotteTimbrature(prisma: PrismaClient, oggi: () => string, adesso
       prisma.registrazioneOraria.findMany({ where: { dipendenteId: t.dipendenteId, data: t.data }, include: { progetto: { select: { codice: true } } } }),
       prisma.progetto.findMany({ select: { id: true, codice: true, maxMinutiGiorno: true } }),
     ]);
-    const errori = erroriRegole(ctx, { dipendenteId: t.dipendenteId, data: t.data, progettoId: t.progettoId }, new Set(delGiorno.map((f) => f.progettoId)));
+    // Correzione del 26/11/2026: il progetto della timbratura è sempre tollerato, anche se nel
+    // frattempo è stato CHIUSO o il dipendente ne è stato tolto. Quando ha timbrato era attivo
+    // e assegnato (lo controlla l'entrata); senza questo HR doveva riaprire il progetto solo
+    // per confermare le ore dell'ultimo giorno. Restano tutte le altre regole.
+    const errori = erroriRegole(ctx, { dipendenteId: t.dipendenteId, data: t.data, progettoId: t.progettoId }, new Set([t.progettoId, ...delGiorno.map((f) => f.progettoId)]));
     if (errori.length) throw richiestaNonValida(errori[0].messaggio);
     const nuova = { progettoId: t.progettoId, oraInizio, oraFine };
     const conflitto = delGiorno.find((f) => siSovrappongono(nuova, f));

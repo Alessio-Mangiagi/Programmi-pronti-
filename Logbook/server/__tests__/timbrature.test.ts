@@ -136,5 +136,14 @@ describe('timbratura', () => {
     expect(chiuso.stato).toBe(409);
     expect(chiuso.corpo.errore).toMatch(/novembre 2026 è chiuso/);
     await db.prisma.meseChiuso.deleteMany({});
+
+    // Giorno 48: progetto chiuso dopo la timbratura. HR la conferma lo stesso, senza riaprirlo;
+    // su quel progetto però non si timbra più.
+    await db.prisma.progetto.update({ where: { id: progettoId }, data: { stato: 'CHIUSO' } });
+    const aProgettoChiuso = await admin.chiama('POST', `/api/timbrature/${oggi.corpo.id}/conferma`, { oraFine: '12:00' });
+    expect(aProgettoChiuso.stato).toBe(200);
+    expect(aProgettoChiuso.corpo).toMatchObject({ stato: 'CONFERMATA', oraInizio: '08:00', oraFine: '12:00' });
+    expect((await luca.chiama('POST', '/api/timbrature/entrata', { progettoId })).stato).toBe(400);
+    await db.prisma.progetto.update({ where: { id: progettoId }, data: { stato: 'ATTIVO' } });
   }, 60_000);
 });
