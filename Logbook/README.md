@@ -107,6 +107,14 @@ Copilota non lo chiede al Portale, così funziona allo stesso modo dentro e fuor
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Note spese (dal 26/11/2026)
+
+Il dipendente inserisce le spese anticipate con lo scontrino (`/api/note-spese`,
+`server/rotte/note-spese.ts`, pagina `src/pagine/NoteSpese.tsx`); HR approva o rifiuta con
+il motivo e poi segna "rimborsata". Stati: RICHIESTA, APPROVATA, RIFIUTATA, RIMBORSATA.
+Lo scontrino è un `FileCaricato` (PDF o immagine) caricato prima con `/api/file`: lo aprono
+solo il dipendente interessato e HR. Importo in centesimi, massimo 10.000 euro.
+
 ### File per il consulente paghe (dal 26/11/2026)
 
 `POST /api/esporta/consulente` (Excel) e `/api/esporta/consulente-csv` (CSV con `;`, virgola

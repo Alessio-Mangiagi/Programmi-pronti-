@@ -179,6 +179,22 @@ HR vede tutte le voci del menu e i dati di tutti i dipendenti. **Solo HR inseris
 corregge le ore** (dal calendario o con l'import Excel) e la documentazione dei progetti; i
 dipendenti vedono le loro ore e mandano segnalazioni.
 
+### Note spese
+
+Dal 26/11/2026 chi anticipa una spesa di lavoro (un pranzo in trasferta, il carburante, del
+materiale) la inserisce da **Le mie note spese**, anche dal telefono:
+
+1. **+ Nuova nota spese**;
+2. giorno, importo, categoria, descrizione e, se serve, il progetto;
+3. **Foto o file dello scontrino**: dal telefono si può scattare la foto al momento. Senza
+   scontrino la nota non si può salvare;
+4. **Salva**. La nota resta *In attesa* finché HR non decide.
+
+![Nuova nota spese](img/61-nuova-nota-spese.png)
+
+Finché è in attesa si può **modificare** o **ritirare**. Poi diventa *Approvata, da
+rimborsare*, *Rifiutata* (con il motivo scritto da HR) o *Rimborsata*.
+
 ### Segnalazioni dei dipendenti
 
 Nell'intestazione, la **campanella** mostra quante segnalazioni sono aperte. **Appena si
@@ -527,6 +543,22 @@ Come si calcola:
 
 Il saldo non si scrive a mano: si aggiorna da solo quando una richiesta viene approvata,
 rifiutata o corretta.
+
+### Note spese (HR)
+
+La voce **Note spese** del menu mostra le spese anticipate dai dipendenti. In alto tre
+riquadri con i totali: *Da decidere*, *Da rimborsare*, *Rimborsate*; un clic su un riquadro
+filtra l'elenco.
+
+![Note spese viste da HR](img/62-note-spese-hr.png)
+
+Per ogni nota: lo scontrino si apre con un clic sul nome del file, poi
+- **Approva** oppure **Rifiuta** (chiede il motivo, che il dipendente leggerà);
+- quando la spesa è stata pagata, **Segna rimborsata**: da lì la nota non si modifica più e
+  resta agli atti.
+
+HR può anche inserire una nota a nome di un dipendente con **+ Nuova nota spese**, anche
+senza scontrino.
 
 ### Festività
 

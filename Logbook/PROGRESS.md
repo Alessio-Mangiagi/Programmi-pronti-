@@ -47,6 +47,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 42 (26/11):** timbratura da telefono con conferma di HR (risposta 2a) ✅
 - **Giorno 43 (26/11):** caposquadra: nominato da HR sul progetto, scrive le ore della squadra (risposta 3a) ✅
 - **Giorno 44 (26/11):** file per il consulente paghe, una riga per dipendente e giorno, Excel e CSV (risposta 5a) ✅
+- **Giorno 45 (26/11):** note spese con foto dello scontrino, approvate e rimborsate da HR (risposta 4c, prima parte) ✅
+- **Fermo:** straordinari (4c, seconda parte): servono le regole dall'utente (soglie e maggiorazioni)
 - **Risposte dell'utente del 26/11:** `1c 2a 3a 4c 5a 6b` (nome anche su immagini, installatori e indirizzo; timbratura con ok di HR; caposquadra sui suoi progetti; note spese e straordinari; file per il consulente in Excel/CSV; file grandi con Vercel Blob)
 - **In coda (vecchia riga):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
@@ -1126,3 +1128,14 @@ Punto 8, risposta dell'utente 5a: "Excel/CSV con una riga per dipendente e giorn
 - Ferie e malattia valgono 1 solo nei giorni lavorativi; ore contrattuali = ore settimanali / 5 nei giorni lavorativi.
 - Verifiche: `report-consulente.test.ts` (settimana costruita a mano: ore, permesso, malattia, ferie a cavallo di festa e fine settimana, richiesta non approvata esclusa, testo con `;` e virgolette, Excel con numeri veri, dipendente assunto a metà periodo); prova dal vivo (`scratchpad/giorno44.mjs`, 6 su 6): scaricati CSV e Excel di ottobre, 155 righe per 5 dipendenti. Immagine 60.
 - Da fare quando l'utente saprà il programma del consulente: adattare colonne e formato.
+
+### Giorno 45 — Note spese (26/11/2026) ✅
+
+Punto 7, risposta dell'utente 4c ("tutti e due: prima le note spese, poi mi dai le regole degli straordinari"). Qui la prima parte.
+
+- Modello `NotaSpesa` (categoria, importo in centesimi, progetto facoltativo, scontrino come `FileCaricato`, stati RICHIESTA/APPROVATA/RIFIUTATA/RIMBORSATA); migrazione SQLite `20261126200000_note_spese`.
+- `server/rotte/note-spese.ts` su `/api/note-spese`: elenco con totali per stato, inserimento, modifica e ritiro finché è in attesa, decisione e "rimborsata" (HR). Scontrino obbligatorio per il dipendente, facoltativo per HR.
+- Allegati: `archivio-file.ts` e `rotte/file.ts` sanno che un file può appartenere a una nota spese (non è orfano, non si riusa, lo aprono il dipendente e HR). `cancella-dati.ts` toglie anche le note.
+- Interfaccia: `src/pagine/NoteSpese.tsx`, voce di menu "Note spese" / "Le mie note spese", icona `scontrino`.
+- Verifiche: `note-spese.test.ts` (giro completo, permessi fra colleghi, limiti, file sostituito e file orfani); prova dal vivo sulla copia (`scratchpad/giorno45.mjs`, 7 su 7): inserimento da telefono con una foto, HR apre lo scontrino, approva, rimborsa. Immagini 61 e 62.
+- Non fatto: le note spese non entrano ancora nel file per il consulente; straordinari fermi in attesa delle regole.
