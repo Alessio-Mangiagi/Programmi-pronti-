@@ -36,6 +36,8 @@ const MENU: VoceMenu[] = [
   // Giorno 43: solo per chi HR ha nominato caposquadra di un progetto attivo.
   { a: '/squadra', etichetta: 'La mia squadra', icona: 'dipendenti', soloCaposquadra: true },
   { a: '/assenze', etichetta: 'Assenze', icona: 'assenze', etichettaDipendente: 'Le mie assenze' },
+  // Giorno 45: spese anticipate dai dipendenti, con lo scontrino.
+  { a: '/note-spese', etichetta: 'Note spese', icona: 'scontrino', etichettaDipendente: 'Le mie note spese' },
   { a: '/importa', etichetta: 'Importa', icona: 'importa', soloAdmin: true },
   { a: '/esporta', etichetta: 'Esporta', icona: 'esporta', soloAdmin: true },
   // Dal 24/11/2026: collegamento a SkyTower e altre impostazioni, solo amministratori.

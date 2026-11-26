@@ -20,6 +20,8 @@ const TRATTI = {
   spunta: 'M5 12.5 10 17l9-10',
   aggiungi: 'M12 5v14M5 12h14',
   esci: 'M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15M10 16l4-4-4-4M14 12H4',
+  // Giorno 45: note spese (scontrino con il bordo a zigzag).
+  scontrino: 'M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3ZM9 8h6M9 12h6M9 16h3',
   // Giorno 37: mese chiuso.
   lucchetto: 'M7 11V8a5 5 0 0 1 10 0v3M6.5 11h11A1.5 1.5 0 0 1 19 12.5v6a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-6A1.5 1.5 0 0 1 6.5 11ZM12 15v2',
   chiave: 'M14.5 9.5a4 4 0 1 0-3.9 4L9 15h-2v2H5v2H3v-2.5l6.6-6.6a4 4 0 0 0 4.9-.4ZM15.5 7.5h.01',
