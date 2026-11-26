@@ -23,7 +23,7 @@ import ShareIcon from "@mui/icons-material/Share";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { api, apiDownload, ApiError, Container, Project } from "../../api";
-import { folderTree, useContainers } from "../../components/ProjectTree";
+import { cartelleConBimSotto, folderTree, useContainers } from "../../components/ProjectTree";
 import { ContainerDetail, GrantDialog, NewContainerDialog } from "./Containers";
 import { DocumentDrawer, DocumentRow, formatBytes, UploadDialog } from "./Documents";
 import { STATE_COLOR, STATE_LABEL } from "./Transitions";
@@ -62,6 +62,8 @@ export function FolderView({ project }: { project: Project }) {
   useEffect(() => { setSelected(null); setQ(""); }, [containerId]);
 
   const tree = useMemo(() => folderTree(containers ?? []), [containers]);
+  // cartelle con modelli BIM in una sottocartella: segno leggero, come nell'albero (26/11/2026)
+  const bimSotto = useMemo(() => cartelleConBimSotto(containers ?? []), [containers]);
   const byId = useMemo(() => new Map((containers ?? []).map((c) => [c.id, c])), [containers]);
   const current = containerId ? byId.get(containerId) ?? null : null;
   const path = useMemo(() => {
@@ -167,11 +169,13 @@ export function FolderView({ project }: { project: Project }) {
                   <TableCell padding="checkbox" />
                   <TableCell>
                     <Stack direction="row" spacing={1.25} alignItems="center">
-                      {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : c.has_bim ? <FolderBimIcon /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
+                      {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : c.has_bim ? <FolderBimIcon /> : bimSotto.has(c.id) ? <FolderBimIcon dentro /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
                       {/* link vero: la cartella si apre anche da tastiera (Tab + Invio), non solo cliccando la riga */}
                       <Link component={RouterLink} to={`/progetti/${project.id}/cartelle/${c.id}`} variant="body2" fontWeight={500}
                             color="inherit" underline="hover" onClick={(e) => e.stopPropagation()}>{c.name}</Link>
                       <Chip size="small" variant="outlined" label={c.owner_organization_code} />
+                      {/* etichetta piena accanto al nome: la cartella con i modelli si trova anche scorrendo in fretta */}
+                      {c.has_bim && !c.is_private && <Chip size="small" label="BIM" sx={{ bgcolor: "#0c4577", color: "#fff", fontWeight: 600 }} />}
                     </Stack>
                   </TableCell>
                   <TableCell colSpan={5} sx={{ color: "text.secondary" }}>

@@ -31,6 +31,27 @@ export function folderTree(containers: Container[]) {
   return byParent;
 }
 
+/**
+ * Cartelle che hanno modelli BIM più in basso, in una sottocartella a qualsiasi profondità (26/11/2026).
+ * Servono al segno "leggero" (cartella gialla con il cubo, FolderBimIcon con `dentro`): chi guarda
+ * l'albero chiuso capisce dove scendere. Si risale dai container con `has_bim` lungo `parent_id`;
+ * si lavora solo sulle cartelle che l'utente vede, quindi non si rivela nulla di ciò che la RLS nasconde.
+ * Le aree riservate non contano e non vengono segnate: tengono la loro icona.
+ */
+export function cartelleConBimSotto(containers: Container[]): Set<string> {
+  const byId = new Map(containers.map((c) => [c.id, c]));
+  const sopra = new Set<string>();
+  for (const c of containers) {
+    if (!c.has_bim || c.is_private) continue;
+    // ci si ferma alla prima cartella già segnata: da lì in su è già stato fatto
+    for (let p = c.parent_id ? byId.get(c.parent_id) : undefined; p && !p.is_private && !sopra.has(p.id);
+         p = p.parent_id ? byId.get(p.parent_id) : undefined) {
+      sopra.add(p.id);
+    }
+  }
+  return sopra;
+}
+
 export function useContainers(projectId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ["containers", projectId],
@@ -109,6 +130,7 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
   const { data: containers } = useContainers(project.id, open);
   const { data: areas = [] } = usePrivateAreas(project.id, open);
   const tree = useMemo(() => folderTree(containers ?? []), [containers]);
+  const bimSotto = useMemo(() => cartelleConBimSotto(containers ?? []), [containers]);
   const locked = areas.filter((a) => !a.has_access);
 
   // apre la catena di cartelle fino a quella nell'URL
@@ -128,6 +150,8 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
       // cartella con modelli BIM: icona sua, anche quando è quella aperta (26/11/2026). Le cartelle di
       // un'area riservata tengono il loro colore viola, come nell'elenco della cartella (dove hanno il lucchetto)
       : c.has_bim && !c.is_private ? <FolderBimIcon fontSize="small" open={c.id === currentFolder} />
+      // i modelli stanno in una sottocartella: resta gialla ma porta il cubo, così si sa dove scendere
+      : bimSotto.has(c.id) ? <FolderBimIcon dentro fontSize="small" open={c.id === currentFolder} />
       : c.id === currentFolder ? <FolderOpenIcon fontSize="small" sx={{ color: "#c08a1e" }} />
       : <FolderIcon fontSize="small" sx={{ color: c.is_private ? "#9b7ccc" : "#d9a93c" }} />;
 
