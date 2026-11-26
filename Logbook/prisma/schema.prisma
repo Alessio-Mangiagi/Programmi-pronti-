@@ -569,3 +569,18 @@ model ContenutoFile {
   dati      Bytes
   creatoIl  DateTime @default(now())
 }
+
+// ---------------------------------------------------------------------------
+// Giorno 37 (26/11/2026): chiusura del mese
+// ---------------------------------------------------------------------------
+
+/// Un mese chiuso da HR: da quel momento ore, assenze e festività di quel mese non si
+/// modificano più finché HR non lo riapre (server/servizi/mesi-chiusi.ts). Serve perché
+/// l'estratto mandato al consulente paghe resti uguale a quello che c'è in Logbook.
+model MeseChiuso {
+  /// "AAAA-MM", es. "2026-10".
+  mese     String   @id
+  chiusoIl DateTime @default(now())
+  /// Nome utente di chi ha chiuso (testo e non relazione: resta anche se l'account sparisce).
+  chiusoDa String
+}

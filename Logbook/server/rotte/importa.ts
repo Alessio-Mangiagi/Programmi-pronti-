@@ -20,6 +20,7 @@ import { ErroreHttp, richiestaNonValida } from '../errori';
 import { richiediAdmin } from '../middleware';
 import { inviaExcel } from '../servizi/excel';
 import { analizzaFile, creaModello, type EsitoAnalisi } from '../servizi/import-ore';
+import { controllaMesiAperti } from '../servizi/mesi-chiusi';
 
 /** Toglie dalla risposta gli id interni usati solo per la conferma. */
 const perInterfaccia = (esito: EsitoAnalisi) => ({
@@ -53,6 +54,8 @@ export function rotteImporta(prisma: PrismaClient, oggi: () => string) {
       return;
     }
     const daImportare = esito.righe.filter((r) => !r.ignorata);
+    // Giorno 37: nessuna riga in un mese chiuso da HR (tutto o niente, come il resto dell'import).
+    await controllaMesiAperti(prisma, daImportare.map((r) => r.data!));
     try {
       await prisma.registrazioneOraria.createMany({
         data: daImportare.map((r) => ({

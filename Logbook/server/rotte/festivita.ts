@@ -18,6 +18,7 @@ import { formattaData } from '../../comune/date';
 import { ErroreHttp, nonTrovato } from '../errori';
 import { idDaParametro, richiediAdmin } from '../middleware';
 import { aggiungiFestivitaNazionali } from '../servizi/festivita';
+import { controllaMesiAperti } from '../servizi/mesi-chiusi';
 
 export function rotteFestivita(prisma: PrismaClient) {
   const router = Router();
@@ -38,13 +39,17 @@ export function rotteFestivita(prisma: PrismaClient) {
 
   router.post('/', richiediAdmin, async (req, res) => {
     const dati = schemaFestivita.parse(req.body);
+    // Giorno 37: una festività cambia le ore attese, quindi non si aggiunge in un mese chiuso.
+    await controllaMesiAperti(prisma, [dati.data]);
     await controllaGiornoLibero(dati.data);
     res.status(201).json(await prisma.festivita.create({ data: dati }));
   });
 
   router.delete('/:id', richiediAdmin, async (req, res) => {
     const id = idDaParametro(req.params.id)!;
-    if (!(await prisma.festivita.findUnique({ where: { id } }))) throw nonTrovato('Festività');
+    const vecchia = await prisma.festivita.findUnique({ where: { id } });
+    if (!vecchia) throw nonTrovato('Festività');
+    await controllaMesiAperti(prisma, [vecchia.data]);
     await prisma.festivita.delete({ where: { id } });
     res.json({ ok: true });
   });

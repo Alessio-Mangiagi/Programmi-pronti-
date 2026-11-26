@@ -31,6 +31,7 @@ import { messaggioMassimo, schemaBlocco, schemaGiornata, siSovrappongono, supera
 import { nonTrovato, richiestaNonValida } from '../errori';
 import { dipendenteAmmesso, idDaParametro, richiediAdmin } from '../middleware';
 import { caricaContestoOre, erroriRegole } from '../servizi/regole-ore';
+import { controllaMesiAperti } from '../servizi/mesi-chiusi';
 
 /** Legge un parametro data opzionale; 400 se presente ma non "AAAA-MM-GG". */
 export function dataDaQuery(valore: unknown, nome: string): string | undefined {
@@ -95,6 +96,8 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
 
   router.put('/giornata', richiediAdmin, async (req, res) => {
     const g = schemaGiornata.parse(req.body);
+    // Giorno 37: in un mese chiuso da HR le ore non si toccano (né aggiunte né tolte).
+    await controllaMesiAperti(prisma, [g.data]);
     const esistenti = await fasceDelGiorno(g.dipendenteId, g.data);
     await controllaRegole(g.dipendenteId, g.data, g.fasce.map((f) => f.progettoId), new Set(esistenti.map((e) => e.progettoId)));
     await controllaMassimi(g.fasce);
@@ -118,6 +121,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
   router.post('/blocco', richiediAdmin, async (req, res) => {
     const b = schemaBlocco.parse(req.body);
     const date = [...new Set(b.date)].sort();
+    await controllaMesiAperti(prisma, date);
     const dipendenteIds = [...new Set(b.dipendenteIds)];
     const [ctx, esistenti, progetti] = await Promise.all([
       caricaContestoOre(prisma, { dipendenteIds, da: date[0], a: date[date.length - 1], oggi: oggi() }),
@@ -165,6 +169,7 @@ export function rotteRegistrazioni(prisma: PrismaClient, oggi: () => string) {
     const id = idDaParametro(req.params.id)!;
     const vecchia = await prisma.registrazioneOraria.findUnique({ where: { id } });
     if (!vecchia) throw nonTrovato('Registrazione');
+    await controllaMesiAperti(prisma, [vecchia.data]);
     await prisma.registrazioneOraria.delete({ where: { id } });
     res.json({ ok: true });
   });

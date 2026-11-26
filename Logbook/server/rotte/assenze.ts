@@ -32,6 +32,7 @@ import { eliminaFile, fileCollegabile, vistaFile } from '../servizi/archivio-fil
 import { dataDaQuery } from './registrazioni';
 import type { Avvisi } from '../servizi/avvisi';
 import { tieniVivo } from '../vercel';
+import { controllaPeriodoAperto } from '../servizi/mesi-chiusi';
 
 const include = {
   dipendente: { select: { nome: true, cognome: true, matricola: true } },
@@ -142,6 +143,8 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Av
     const { stato: statoRichiesto } = z.object({ stato: z.enum(['RICHIESTA', 'APPROVATA']).optional() }).parse({ stato: req.body?.stato });
     const stato = admin && statoRichiesto === 'APPROVATA' ? 'APPROVATA' : 'RICHIESTA';
     const completa = { ...dati, dipendenteId };
+    // Giorno 37: un mese chiuso da HR non riceve più assenze, neanche come richiesta.
+    await controllaPeriodoAperto(prisma, completa.dataInizio, completa.dataFine);
     await controllaSovrapposizioni(completa);
     if (stato === 'APPROVATA') await controllaOreNelPeriodo(completa);
     if (dati.fileId) await allegatoAmmesso(dati.fileId, req.utente!.id);
@@ -161,6 +164,9 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Av
     if (!admin && vecchia.stato !== 'RICHIESTA') throw vietato('La richiesta è già stata decisa da HR: per cambiarla rivolgiti a HR');
     const dati = schemaAssenza.parse(req.body);
     const completa = { ...dati, dipendenteId: vecchia.dipendenteId };
+    // Giorno 37: né il periodo di prima né quello nuovo possono toccare un mese chiuso.
+    await controllaPeriodoAperto(prisma, vecchia.dataInizio, vecchia.dataFine);
+    await controllaPeriodoAperto(prisma, completa.dataInizio, completa.dataFine);
     await controllaSovrapposizioni(completa, vecchia.id);
     if (vecchia.stato === 'APPROVATA') await controllaOreNelPeriodo(completa);
     if (dati.fileId && dati.fileId !== vecchia.fileId) await allegatoAmmesso(dati.fileId, req.utente!.id);
@@ -185,6 +191,7 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Av
   router.post('/:id/decisione', richiediAdmin, async (req, res) => {
     const vecchia = await caricaVisibile(req);
     const { stato, noteHr } = schemaDecisione.parse(req.body);
+    await controllaPeriodoAperto(prisma, vecchia.dataInizio, vecchia.dataFine);
     if (stato === 'APPROVATA') {
       await controllaSovrapposizioni({ ...vecchia, noteDipendente: null }, vecchia.id);
       await controllaOreNelPeriodo(vecchia);
@@ -205,6 +212,7 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Av
   router.delete('/:id', async (req, res) => {
     const vecchia = await caricaVisibile(req);
     if (!isAdmin(req) && vecchia.stato !== 'RICHIESTA') throw vietato('Si possono ritirare solo le richieste in attesa');
+    await controllaPeriodoAperto(prisma, vecchia.dataInizio, vecchia.dataFine);
     await prisma.assenza.delete({ where: { id: vecchia.id } });
     await eliminaFile(prisma, cartella, vecchia.fileId);
     res.json({ ok: true });

@@ -40,6 +40,7 @@ import { limitatoreSuDatabase } from './servizi/limitatore';
 import { registroRichieste, rotteRegistro } from './servizi/registro';
 import { suPostgres } from './database-url';
 import { suVercel } from './vercel';
+import { rotteMesiChiusi } from './servizi/mesi-chiusi';
 
 /**
  * Opzioni:
@@ -181,6 +182,8 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
       cartellaBackup: opzioni.cartellaBackup,
     }),
   );
+  // Giorno 37 (26/11/2026): chiusura del mese (servizi/mesi-chiusi.ts).
+  api.use('/mesi-chiusi', rotteMesiChiusi(prisma, oggi));
   // Giorno 34: registro attività, solo amministratori (voce del menu).
   api.use('/registro', rotteRegistro(prisma));
 
