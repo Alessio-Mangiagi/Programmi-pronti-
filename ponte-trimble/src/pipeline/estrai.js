@@ -26,7 +26,7 @@ export async function estrai(contenuto, { tolleranzaRiga = 2.5 } = {}) {
   const compito = getDocument({
     data: new Uint8Array(contenuto),
     useSystemFonts: true,
-    isEvalSupported: false,
+    // isEvalSupported non serve piu': pdfjs-dist 6 non usa eval in nessun caso
     standardFontDataUrl: require.resolve('pdfjs-dist/package.json').replace(/package\.json$/, 'standard_fonts/'),
   });
   const doc = await compito.promise;
