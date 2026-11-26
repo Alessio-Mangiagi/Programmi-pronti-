@@ -25,6 +25,7 @@ import { erroriPerCampo, schemaProgetto, STATI_PROGETTO } from '../../comune/sch
 import { api, ErroreApi } from '../api';
 import { useAuth } from '../auth';
 import { coloreProgetto } from '../colori';
+import { CostoManodopera } from '../componenti/CostoManodopera';
 import { DocumentazioneProgetto } from '../componenti/DocumentazioneProgetto';
 import { SceltaColore } from '../componenti/SceltaColore';
 import { corrisponde, SceltaConRicerca } from '../componenti/SceltaConRicerca';
@@ -111,6 +112,8 @@ export function SchedaProgetto() {
           {admin ? <DatiProgetto key={progetto?.id ?? 'nuovo'} progetto={progetto} skytowerAttivo={skytowerAttivo} onSalvato={setProgetto} /> : <RiepilogoProgetto progetto={progetto!} />}
           {admin && progetto && <DipendentiAssegnati progetto={progetto} />}
           {admin && progetto && <NoteInterne progettoId={progetto.id} />}
+          {/* Giorno 41: costo della manodopera e confronto con il preventivo, solo HR. */}
+          {admin && progetto && <CostoManodopera progettoId={progetto.id} />}
         </div>
         <div className="flex min-w-0 flex-[1.3_1_32rem] flex-col gap-4">
           {progetto && !admin ? (
