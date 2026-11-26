@@ -9,7 +9,7 @@ che dura né un server sempre acceso.
 | | Su un PC / nella suite | Su Vercel |
 |---|---|---|
 | Database | file `data/logbook.db` (SQLite) | PostgreSQL esterno (es. Neon) |
-| File caricati | cartella `data/documenti`, fino a 20 MB | nel database, fino a 4 MB l'uno |
+| File caricati | cartella `data/documenti`, fino a 20 MB | archivio privato Vercel Blob, fino a 20 MB (senza archivio: nel database, fino a 4 MB) |
 | Codici via email, blocco dei tentativi | memoria del server e database | database |
 | Copie di sicurezza | una al giorno in `data/backup` | le fa il servizio del database |
 | Indirizzo | `http://127.0.0.1:5210` | `https://<progetto>.vercel.app`, sempre HTTPS |
@@ -73,8 +73,14 @@ nel database, non nel progetto.
   va creato nella stessa regione: i dati restano nell'Unione europea.
 - **Dati di esempio.** Dopo il primo accesso, in *Impostazioni → Dati del programma* il
   proprietario li carica con un pulsante e li cancella con "Cancella tutti i dati".
-- **File oltre 4 MB.** Vercel rifiuta le richieste più grandi di 4,5 MB: Copilota lo dice con
-  un messaggio. I documenti grandi vanno ridotti (PDF compresso) o tenuti in SkyTower.
+- **File fino a 20 MB (dal 26/11/2026).** I file stanno in uno store **Vercel Blob privato**
+  (`copilota-documenti`, regione Francoforte): non hanno un indirizzo pubblico, li legge solo
+  il server con il token `BLOB_READ_WRITE_TOKEN`, che Vercel aggiunge quando lo store è
+  collegato al progetto. Per crearne uno: `vercel blob create-store <nome> --access private
+  --region fra1 --environment production`. Vercel rifiuta le richieste oltre 4,5 MB, quindi
+  il browser manda i file grandi a parti da 3 MB e il server li ricompone e li controlla.
+  Senza store collegato Copilota torna a tenere i file nel database, con il tetto di 4 MB.
+  Piano gratuito: 1 GB di spazio; superati i limiti lo store si blocca fino al mese dopo.
 - **Copie di sicurezza.** Neon permette di riportare il database a un momento precedente
   (*Restore*): nel piano gratuito per poche ore, nei piani a pagamento per giorni. Prima di
   "Cancella tutti i dati" su Vercel **non** parte la copia automatica che c'è sul PC.

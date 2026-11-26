@@ -48,6 +48,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 43 (26/11):** caposquadra: nominato da HR sul progetto, scrive le ore della squadra (risposta 3a) ✅
 - **Giorno 44 (26/11):** file per il consulente paghe, una riga per dipendente e giorno, Excel e CSV (risposta 5a) ✅
 - **Giorno 45 (26/11):** note spese con foto dello scontrino, approvate e rimborsate da HR (risposta 4c, prima parte) ✅
+- **Giorno 46 (26/11):** file fino a 20 MB anche su Vercel: archivio Vercel Blob privato e caricamento a parti (risposta 6b) ✅
 - **Fermo:** straordinari (4c, seconda parte): servono le regole dall'utente (soglie e maggiorazioni)
 - **Risposte dell'utente del 26/11:** `1c 2a 3a 4c 5a 6b` (nome anche su immagini, installatori e indirizzo; timbratura con ok di HR; caposquadra sui suoi progetti; note spese e straordinari; file per il consulente in Excel/CSV; file grandi con Vercel Blob)
 - **In coda (vecchia riga):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
@@ -1139,3 +1140,14 @@ Punto 7, risposta dell'utente 4c ("tutti e due: prima le note spese, poi mi dai 
 - Interfaccia: `src/pagine/NoteSpese.tsx`, voce di menu "Note spese" / "Le mie note spese", icona `scontrino`.
 - Verifiche: `note-spese.test.ts` (giro completo, permessi fra colleghi, limiti, file sostituito e file orfani); prova dal vivo sulla copia (`scratchpad/giorno45.mjs`, 7 su 7): inserimento da telefono con una foto, HR apre lo scontrino, approva, rimborsa. Immagini 61 e 62.
 - Non fatto: le note spese non entrano ancora nel file per il consulente; straordinari fermi in attesa delle regole.
+
+### Giorno 46 — File grandi su Vercel (26/11/2026) ✅
+
+Punto 11, risposta dell'utente 6b: "uso l'archivio file di Vercel (Blob)".
+
+- Store **privato** `copilota-documenti` creato a Francoforte e collegato alla produzione (`vercel blob create-store … --access private --region fra1 --environment production`): i file non hanno indirizzo pubblico.
+- `server/servizi/archivio-blob.ts`: unico punto che usa `@vercel/blob` (2.4.0: la 2.9.0 porta una dipendenza segnalata da `npm audit`), sostituibile nei test. `archivio-file.ts`: terzo archivio `blob:`, scelto su PostgreSQL quando c'è `BLOB_READ_WRITE_TOKEN`; lettura con ripiego sul database per i file caricati prima.
+- Caricamento a parti in `server/rotte/file.ts` (`/api/file/parti…`, `/api/file/limiti`): parti da 3 MB nella tabella `ContenutoFile`, ricomposte e passate da `salvaFile` (stessi controlli). Scelta rispetto al caricamento diretto dal browser allo store: restano i controlli sul contenuto e non serve aprire la CSP verso altri indirizzi. Lo scaricamento esce a pezzi da 1 MB (risposta in streaming, non soggetta al limite di 4,5 MB).
+- Interfaccia: `api.carica` in `src/api.ts` manda a parti i file oltre 3 MB.
+- Verifiche: `file-grandi.test.ts` con store finto (7 MB in tre parti anche in disordine, impronta, lettura, cancellazione, incompleto, dimensione diversa, contenuto falso, troppo grande, file vecchi nel database, pulizia delle parti); prova sullo store VERO (`scratchpad/prova-blob.mts`: 6 MB scritti, riletti identici, 403 senza token, cancellati); prova dal browser sulla copia (`scratchpad/giorno46.mjs`, 4 su 4: 5 chiamate per 7 MB, riscaricato con la stessa impronta).
+- NON provato: il giro completo dentro Vercel (caricare e riscaricare un file grande dal sito pubblico), perché l'accesso da amministratore chiede il codice via email dell'utente.

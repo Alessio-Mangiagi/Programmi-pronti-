@@ -107,6 +107,15 @@ Copilota non lo chiede al Portale, così funziona allo stesso modo dentro e fuor
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### File grandi e archivio su Vercel (dal 26/11/2026)
+
+Tre archivi per i file caricati, scelti da `cartellaDocumentiPredefinita()`
+(`server/servizi/archivio-file.ts`): la cartella `data/documenti` sul PC; su Vercel uno store
+**Vercel Blob privato** se c'è `BLOB_READ_WRITE_TOKEN` (`server/servizi/archivio-blob.ts`,
+fino a 20 MB), altrimenti il database (fino a 4 MB). I file oltre 3 MB arrivano a parti
+(`POST /api/file/parti`, `PUT /api/file/parti/:id/:n`, `POST …/fine`) e sono ricomposti e
+controllati dal server come un caricamento normale; lo scaricamento esce a pezzi.
+
 ### Note spese (dal 26/11/2026)
 
 Il dipendente inserisce le spese anticipate con lo scontrino (`/api/note-spese`,
@@ -297,6 +306,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Copilota usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |
 | `LOGBOOK_INDIRIZZO_PUBBLICO` | — | Indirizzo a cui si apre Copilota, messo in fondo alle email di avviso (su Vercel lo trova da solo) |
 | `CRON_SECRET` | — | Solo su Vercel: segreto con cui Vercel Cron chiama `/api/cron/avvisi`. Senza, la rotta non risponde e gli avvisi del giorno partono alla prima visita dopo le 7 |
+| `BLOB_READ_WRITE_TOKEN` | — | Solo su Vercel: token dello store Vercel Blob privato dove stanno i file caricati (lo aggiunge Vercel collegando lo store). Senza, i file restano nel database fino a 4 MB |
 | `LOGBOOK_BACKUP_DIR` | `data/backup` | Cartella delle copie di sicurezza (una al giorno, 30 giorni): meglio un altro disco |
 | `LOGBOOK_CODICE_ACCESSO` | attivo | `0` spegne il codice via email all'accesso degli amministratori |
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |
