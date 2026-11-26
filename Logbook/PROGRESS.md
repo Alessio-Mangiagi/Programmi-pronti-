@@ -1151,3 +1151,21 @@ Punto 11, risposta dell'utente 6b: "uso l'archivio file di Vercel (Blob)".
 - Interfaccia: `api.carica` in `src/api.ts` manda a parti i file oltre 3 MB.
 - Verifiche: `file-grandi.test.ts` con store finto (7 MB in tre parti anche in disordine, impronta, lettura, cancellazione, incompleto, dimensione diversa, contenuto falso, troppo grande, file vecchi nel database, pulizia delle parti); prova sullo store VERO (`scratchpad/prova-blob.mts`: 6 MB scritti, riletti identici, 403 senza token, cancellati); prova dal browser sulla copia (`scratchpad/giorno46.mjs`, 4 su 4: 5 chiamate per 7 MB, riscaricato con la stessa impronta).
 - NON provato: il giro completo dentro Vercel (caricare e riscaricare un file grande dal sito pubblico), perché l'accesso da amministratore chiede il codice via email dell'utente.
+
+### Prova sul sito pubblico (26/11/2026) ✅
+
+Chiude il "NON provato" del Giorno 46. Fatta su https://copilota-cosedil.vercel.app con un account dipendente di prova dato dall'utente (`paolino.paperino`).
+
+- Riuscito: accesso senza codice email e cambio della password provvisoria; PDF da 7 MB caricato in tre parti e riscaricato identico (archivio Blob, limite 20 MB); nota spese con allegato; timbratura di entrata e uscita con l'ora italiana giusta; "La mia squadra" con 4 ore scritte dal caposquadra a un collega; funzioni di HR vietate al dipendente (403).
+- Dati di prova scritti direttamente nel database del sito, perché l'accesso da amministratore chiede il codice via email dell'utente: progetto `PROVA-01`, dipendente finto Gastone Paperone (`PROVA-0002`). Da togliere a prove finite.
+- Conferma della timbratura e approvazione della nota spese fatte dall'utente come amministratore.
+
+### Giorno 47 — Email alla chiusura di un progetto (26/11/2026) ✅
+
+Richiesta dell'utente, risposte 1a 2a 3a 4a: a HR e ai dipendenti assegnati, con riepilogo per HR, subito alla chiusura, di nuovo a ogni chiusura.
+
+- `server/servizi/avvisi.ts`: quinto avviso `progettoChiuso(progettoId)` e chiave `avvisi.progettoChiuso`. A HR ore, costo lordo (stesso calcolo di `costi-progetti.ts`), percentuali sul preventivo, periodo lavorato, timbrature e note spese rimaste in attesa; ai dipendenti assegnati attivi e con email solo l'avviso. Nessun segno "già mandato": ogni chiusura avvisa.
+- `server/rotte/progetti.ts`: `PUT /:id` chiama l'avviso solo nel passaggio a `CHIUSO` (con `tieniVivo`, per Vercel). `server/rotte/impostazioni.ts`: interruttore facoltativo nel `PUT /avvisi`, così una pagina non aggiornata non lo cambia.
+- Interfaccia: quinta voce "Progetto chiuso" in *Impostazioni → Avvisi via email* (`src/componenti/AvvisiEmail.tsx`).
+- Verifiche: `progetto-chiuso.test.ts` (riepilogo e avviso, niente costi al dipendente, nessuna email risalvando un progetto chiuso, di nuovo dopo riapertura, interruttore spento); 299 test passati; prova dal vivo sulla copia con posta finta (`scratchpad/giorno47.mjs`): chiuso `PRG-001`, arrivate l'email a HR con "646:45 su 580 preventivate (111,5%)" e quelle ai tre assegnati.
+- Non fatto: l'Excel delle ore in allegato e il promemoria prima della data di fine (opzioni 2c e 3c, non scelte).

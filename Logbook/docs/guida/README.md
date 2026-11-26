@@ -625,8 +625,22 @@ separati da virgola; se il campo è vuoto arrivano al proprietario) e quali avvi
 | Esito della richiesta | dipendente | quando la richiesta viene approvata o rifiutata, con la nota di HR |
 | Giorni senza ore | dipendente, più riepilogo a HR | una volta alla settimana, sui giorni lavorativi scoperti delle ultime due settimane |
 | Attestati in scadenza | dipendente e HR | 30 giorni prima, 7 giorni prima e il giorno della scadenza |
+| Progetto chiuso | ufficio personale e dipendenti assegnati | subito, quando HR mette un progetto su **Chiuso** |
 
 ![Avvisi via email](img/47-avvisi-email.png)
+
+**Progetto chiuso** (dal 26/11/2026). Quando nella scheda di un progetto si sceglie lo stato
+*Chiuso* e si salva, partono due email diverse:
+
+- all'**ufficio personale** il riepilogo: ore registrate e costo lordo della manodopera, con
+  la percentuale sul preventivo se è stato inserito, periodo lavorato, numero di assegnati e
+  quello che è rimasto in attesa su quel progetto (timbrature da confermare, note spese da
+  approvare). Se qualcuno ha ore ma non il costo orario in anagrafica, l'email lo dice;
+- ai **dipendenti assegnati** solo l'avviso che il progetto è chiuso e che non si possono più
+  timbrare né registrare ore. Ore e costi a loro non arrivano.
+
+Se un progetto viene riaperto e poi richiuso, le email partono di nuovo. Salvare altre
+modifiche su un progetto già chiuso non manda niente.
 
 Da sapere:
 - le email ai dipendenti partono solo per chi ha un **indirizzo in anagrafica** (scheda del dipendente);

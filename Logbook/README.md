@@ -184,9 +184,11 @@ ancora in attesa. Riaprire è sempre possibile e resta nel registro attività.
 
 ### Avvisi via email (dal 26/11/2026)
 
-`server/servizi/avvisi.ts` manda quattro avvisi, ognuno si spegne da *Impostazioni → Avvisi
+`server/servizi/avvisi.ts` manda cinque avvisi, ognuno si spegne da *Impostazioni → Avvisi
 via email*: richiesta di assenza (a HR), esito (al dipendente), giorni senza ore (una volta
-alla settimana) e attestati in scadenza (a 30 e 7 giorni e alla scadenza). Gli avvisi del
+alla settimana), attestati in scadenza (a 30 e 7 giorni e alla scadenza) e progetto chiuso
+(a HR il riepilogo di ore, costo e cose in attesa; ai dipendenti assegnati l'avviso: parte da
+`PUT /api/progetti/:id` quando lo stato passa a `CHIUSO`, a ogni chiusura). Gli avvisi del
 giorno partono dal primo controllo dopo le 7: ogni ora sul PC (`server/index.ts`), con Vercel
 Cron su Vercel (`/api/cron/avvisi`, protetta da `CRON_SECRET`). Un segno nel database
 (tabella `StatoTemporaneo`, chiavi `avviso:…`) evita di mandare due volte la stessa email.
