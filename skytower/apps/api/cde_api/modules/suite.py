@@ -413,9 +413,21 @@ def _voce_compito(c: Ctx, k: dict) -> dict:
             "priorita": 3 if k["in_attesa"] else 1 if in_ritardo else 2, "data": _data_iso(k["due_at"])}
 
 
+def _voce_task(c: Ctx, t: dict) -> dict:
+    """Un task assegnato (ADR-59) come voce del "da fare" del portale: in cima se in ritardo o urgente."""
+    parti = [t["code"], t["project_code"], None if t["mio"] else f"da {t['da_chi']}",
+             "in corso" if t["status"] == "IN_PROGRESS" else None,
+             {"URGENT": "urgente", "HIGH": "priorità alta"}.get(t["priority"]), "in ritardo" if t["overdue"] else None]
+    return {"id": f"task:{t['id']}", "titolo": f"Task: {t['title']}", "testo": " · ".join(p for p in parti if p),
+            "url": _url_web(c, f"/progetti/{t['project_id']}/task/{t['id']}"), "tipo": "task",
+            "priorita": 1 if t["overdue"] or t["priority"] == "URGENT" else 2,
+            "data": t["due_on"].isoformat() if t["due_on"] else None}
+
+
 @router.get("/da-fare")
 def suite_da_fare(c: Ctx = Depends(ctx_suite)):
-    """Cosa aspetta l'utente del portale in SkyTower: approvazioni assegnate (compiti aperti) e notifiche non lette."""
+    """Cosa aspetta l'utente del portale in SkyTower: approvazioni assegnate (compiti aperti), task assegnati da
+    altre persone (ADR-59) e notifiche non lette."""
     voci = []
     with c.tx() as conn:
         compiti = conn.execute(
@@ -439,11 +451,24 @@ def suite_da_fare(c: Ctx = Depends(ctx_suite)):
                LEFT JOIN cde.users ua ON ua.id = b.asked_by
                WHERE k.assignee_id = cde.current_app_user() AND k.status = 'OPEN'
                ORDER BY k.due_at NULLS LAST, k.created_at LIMIT 30""").fetchall()
+        # task fra le persone (0047, ADR-59) non ancora fatti, assegnati a chi guarda
+        squadra = conn.execute(
+            """SELECT t.id, t.project_id, cde.team_task_code(t.number) AS code, t.title, t.status, t.priority, t.due_on,
+                      p.code AS project_code, cu.first_name || ' ' || cu.last_name AS da_chi,
+                      t.created_by = cde.current_app_user() AS mio,
+                      (t.due_on IS NOT NULL AND t.due_on < cde.local_date(now(), p.timezone)) AS overdue
+               FROM cde.team_tasks t JOIN cde.projects p ON p.id = t.project_id
+               JOIN cde.team_task_assignees a ON a.task_id = t.id AND a.user_id = cde.current_app_user()
+               LEFT JOIN cde.users cu ON cu.id = t.created_by
+               WHERE t.status <> 'DONE'
+               ORDER BY t.due_on NULLS LAST, t.number LIMIT 30""").fetchall()
         notifiche = conn.execute(
             """SELECT id, kind, title, body, link, created_at FROM cde.notifications
                WHERE user_id = cde.current_app_user() AND read_at IS NULL ORDER BY id DESC LIMIT 30""").fetchall()
     for k in compiti:
         voci.append(_voce_compito(c, k))
+    for t in squadra:
+        voci.append(_voce_task(c, t))
     # Scadenze superate ed escalation (G35) sono compiti da sollecitare, non semplici avvisi:
     # vanno in cima al "da fare" del portale con la data del compito, come chiede CONTRATTI.md §4.
     URGENTI = {"TASK_OVERDUE", "TASK_ESCALATED", "RFI_OVERDUE"}

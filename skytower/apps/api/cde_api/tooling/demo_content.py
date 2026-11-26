@@ -539,6 +539,36 @@ def populate(api: str, password: str = DEMO_PASSWORD) -> dict:
             responder = "com_admin" if to == ["COM"] else "des_lead"
             ld.call(responder, "POST", f"/rfis/{rfi['id']}/messages", json={"body": "Confermiamo, vedere tavola aggiornata.", "is_answer": True})
 
+    # discussioni e task fra le persone (ADR-59): una discussione fra progettista, impiantista e DL con un task nato
+    # da un messaggio, più due task assegnati dal DL e dal Project Admin (uno in ritardo, per vedere il rosso)
+    persone = {m["email"]: m["user_id"] for m in ld.call("com_admin", "GET", f"/projects/{pid}/members") or []}
+
+    def uid(user: str) -> str | None:
+        return persone.get(USERS[user])
+
+    def giorno(delta: int) -> str:
+        return time.strftime("%Y-%m-%d", time.gmtime(time.time() + delta * 86400))
+
+    disc = ld.call("des_lead", "POST", f"/projects/{pid}/discussions", json={
+        "title": "Coordinamento impianti piano primo",
+        "participant_ids": [x for x in (uid("sub1_user"), uid("com_dl"), uid("des_designer")) if x],
+        "body": "Propongo un punto settimanale sulle interferenze fra canaline e travi del piano primo."})
+    if disc:
+        dopo = ld.call("sub1_user", "POST", f"/discussions/{disc['id']}/messages",
+                       json={"body": "D'accordo. Per il corridoio C mi serve la sezione aggiornata con le quote delle travi."})
+        if dopo and uid("des_designer"):
+            ld.call("des_lead", "POST", f"/projects/{pid}/team-tasks", json={
+                "title": "Sezione aggiornata corridoio C", "assignee_ids": [uid("des_designer")], "priority": "HIGH",
+                "due_on": giorno(3), "items": ["Sezione A-A con quote travi", "Sezione B-B", "Verifica con impiantista"],
+                "description": dopo["messages"][-1]["body"], "discussion_id": disc["id"], "message_id": dopo["messages"][-1]["id"]})
+    if uid("sub2_user"):
+        ld.call("com_dl", "POST", f"/projects/{pid}/team-tasks", json={
+            "title": "Verbale prove sui getti del solaio piano primo", "assignee_ids": [uid("sub2_user")], "priority": "URGENT",
+            "due_on": giorno(-1), "items": ["Prelievo cubetti", "Esito laboratorio"]})
+    if uid("com_im"):
+        ld.call("com_admin", "POST", f"/projects/{pid}/team-tasks", json={
+            "title": "Aggiornare il cronoprogramma dopo la variante", "assignee_ids": [uid("com_im")], "due_on": giorno(10)})
+
     # transmittal
     shared = [d for d in docs.values() if d.get("state") in ("SHARED", "PUBLISHED")]
     des = [d["id"] for k, d in docs.items() if d in shared and k.startswith(("pianta", "prosp", "det", "ifc", "relaz"))]

@@ -1,0 +1,19 @@
+{# "><(((º> sabusabu <º)))>< #}Dear {{ first_name }},
+
+here is how the tasks you assigned are progressing: {{ count }} to follow, {% if moved %}{{ moved }} with activity {{ window }}{% else %}no activity {{ window }}{% endif %}.
+{% for p in projects %}
+{{ p.title }}
+{%- for title, tasks in p.groups %}
+
+  {{ title }} ({{ tasks|length }})
+{%- for t in tasks %}
+  - {{ t.line }}
+{%- for e in t.events %}
+      · {{ e }}
+{%- endfor %}
+      {{ t.link }}
+{%- endfor %}
+{%- endfor %}
+{% endfor %}
+--
+CDE ISO 19650 · You receive this summary because you assigned tasks. You can turn it off from your profile, Notifications section.

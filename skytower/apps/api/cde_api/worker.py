@@ -35,7 +35,7 @@ from .anchoring import publish_pending
 from .config import Settings, get_settings
 from .events import security_event
 from .mail import build_mailer
-from .notifier import send_daily_digests, send_notification_email
+from .notifier import send_daily_digests, send_notification_email, send_team_task_digests
 from .scanner import build_scanner
 from .storage import Storage
 
@@ -451,12 +451,14 @@ def ifc_derivatives_task(timestamp: int) -> None:
 @app.task(name="cde.check_deadlines", queue="default")
 def check_deadlines(timestamp: int) -> None:
     """Promemoria −48h/−24h, scadenze superate ed escalation ai responsabili, ripetuta ogni
-    deadline_escalation_repeat_hours finché il compito resta aperto (task e RFI; migrazione 0036)."""
+    deadline_escalation_repeat_hours finché il compito resta aperto (task e RFI; migrazione 0036). Nello stesso
+    giro i task fra le persone (0047, ADR-59): "scade oggi/domani" e "in ritardo", una volta sola."""
     _, _, settings, _ = _runtime()
     with psycopg.connect(settings.database_url_worker, autocommit=True) as conn:
         n = conn.execute("SELECT cde.process_deadlines(to_timestamp(%s), %s)",
                          [timestamp, settings.deadline_escalation_repeat_hours]).fetchone()[0]
-    log.info("scadenze elaborate: %s notifiche", n)
+        squadra = conn.execute("SELECT cde.team_task_deadlines(to_timestamp(%s))", [timestamp]).fetchone()[0]
+    log.info("scadenze elaborate: %s notifiche, %s task fra persone", n, squadra)
 
 
 @app.periodic(cron="* * * * *", periodic_id="audit-seal")
@@ -529,3 +531,14 @@ def daily_digest(timestamp: int) -> None:
     with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
         n = send_daily_digests(conn, mailer, settings.web_base_url)
     log.info("digest inviati: %s", n)
+
+
+@app.periodic(cron="10 7 * * 1-5", periodic_id="team-task-digest")
+@app.task(name="cde.team_task_digest", queue="default")
+def team_task_digest(timestamp: int) -> None:
+    """Riepilogo del mattino (giorni feriali) a chi ha assegnato task: stato e movimenti dall'ultimo riepilogo,
+    quindi il lunedì anche il fine settimana (ADR-59)."""
+    _, _, settings, mailer = _runtime()
+    with psycopg.connect(settings.database_url_worker, row_factory=dict_row) as conn:
+        n = send_team_task_digests(conn, mailer, settings.web_base_url)
+    log.info("riepiloghi dei task assegnati inviati: %s", n)

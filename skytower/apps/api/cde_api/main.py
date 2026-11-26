@@ -23,6 +23,7 @@ from .modules import (
     bundles,
     containers,
     dashboard,
+    discussions,
     documents,
     markups,
     me,
@@ -41,6 +42,7 @@ from .modules import (
     stamps,
     states,
     suite,
+    team_tasks,
     transmittals,
     workflow_library,
     workflows,
@@ -149,7 +151,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
                    rfis, audit, markups, dashboard, transmittals, reports, passkeys, sso, sessions, bundles, bim,
                    naming_profiles, office, suite, portale, workflow_library,   # libreria workflow (ADR-50)
                    project_models,                                               # modelli di commessa (ADR-52)
-                   stamps):                                                      # timbri sui PDF (ADR-56)
+                   stamps,                                                       # timbri sui PDF (ADR-56)
+                   discussions, team_tasks):                                     # discussioni e task (ADR-59)
         app.include_router(module.router)
     app.include_router(passkeys.login_router)
     app.include_router(suite.revisioni)

@@ -1,0 +1,19 @@
+{# "><(((º> sabusabu <º)))>< #}Gentile {{ first_name }},
+
+ecco come procedono i task che hai assegnato: {{ count }} da seguire, {% if moved %}{{ moved }} con movimenti {{ window }}{% else %}nessun movimento {{ window }}{% endif %}.
+{% for p in projects %}
+{{ p.title }}
+{%- for title, tasks in p.groups %}
+
+  {{ title }} ({{ tasks|length }})
+{%- for t in tasks %}
+  - {{ t.line }}
+{%- for e in t.events %}
+      · {{ e }}
+{%- endfor %}
+      {{ t.link }}
+{%- endfor %}
+{%- endfor %}
+{% endfor %}
+--
+CDE ISO 19650 · Ricevi questo riepilogo perché hai assegnato dei task. Puoi spegnerlo dal profilo, sezione Notifiche.
