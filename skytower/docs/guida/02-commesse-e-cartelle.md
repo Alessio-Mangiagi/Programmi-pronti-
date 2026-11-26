@@ -79,16 +79,23 @@ fa vedere la nuova cartella a chi vede già quella superiore; toglila per una so
 
 ### Cartelle con modelli BIM
 
-Dal 26/11/2026 le cartelle che contengono modelli BIM si riconoscono subito: l'icona è **blu con un
-cubo**, invece della cartella gialla, sia nell'albero delle commesse a sinistra sia nell'elenco della
-cartella. Passandoci sopra compare «Contiene modelli BIM».
+Dal 26/11/2026 le cartelle che contengono modelli BIM si riconoscono subito, in ogni commessa, sia
+nell'albero a sinistra sia nell'elenco della cartella:
+
+- **cartella blu con il cubo**: i modelli stanno proprio lì dentro. Nell'elenco ha anche l'etichetta
+  **BIM** accanto al nome. Passandoci sopra compare «Contiene modelli BIM o 3D»;
+- **cartella gialla con il cubo**: i modelli stanno in una sua sottocartella, a qualsiasi profondità.
+  Serve a capire dove scendere anche con l'albero chiuso («Modelli BIM o 3D nelle sottocartelle»).
 
 ![Cartella con modelli BIM](img/02-cartella-bim.png)
 
-- conta come modello BIM un file `.ifc`, `.ifczip`, `.ifcxml`, `.rvt`, `.rfa`, `.nwd`, `.nwc` o `.nwf`;
-- l'icona è sulla cartella che contiene il modello, non su quelle che la contengono;
-- i documenti archiviati non contano: archiviato l'ultimo modello, la cartella torna gialla;
-- un'area riservata tiene la sua icona (il lucchetto o la cartella viola).
+- conta come modello un file `.ifc`, `.ifczip`, `.ifcxml`, `.rvt`, `.rfa`, `.nwd`, `.nwc`, `.nwf` e i
+  modelli 3D `.glb` e `.gltf` (quelli esportati da Blender);
+- i documenti archiviati non contano: archiviato l'ultimo modello, la cartella torna gialla e il cubo
+  sparisce anche dalle cartelle sopra;
+- un'area riservata tiene la sua icona (il lucchetto o la cartella viola);
+- il segno riguarda solo le cartelle che puoi vedere: una sottocartella a cui non hai accesso non fa
+  comparire il cubo su quelle sopra.
 
 ## 2.5 Condividere una cartella e vedere chi vi accede
 
