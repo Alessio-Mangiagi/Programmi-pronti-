@@ -649,6 +649,32 @@ Le ore nei file Excel sono in formato ore:minuti (es. 7:30) e si possono sommare
 **Sabato e domenica non compaiono mai** nelle estrazioni (report, estratti mensili, Excel,
 stampa e PDF): nel fine settimana non si registrano ore.
 
+### Presenze per il consulente paghe
+
+Dal 26/11/2026 nella pagina **Esporta**, scelti periodo e dipendenti, il riquadro *Presenze
+per il consulente paghe* scarica un file con **una riga per dipendente e per giorno**:
+
+| Colonna | Cosa contiene |
+|---|---|
+| Matricola, Cognome, Nome, Codice fiscale | il dipendente |
+| Data, Giorno, Tipo giorno | la data; lavorativo, sabato, domenica o festivo |
+| Ore lavorate | le ore registrate, come numero (7,5) e come ore e minuti (7:30) |
+| Ferie, Malattia | 1 se quel giorno lavorativo è di ferie o di malattia |
+| Permesso (ore) | le ore di permesso del giorno |
+| Festività | il nome della festa |
+| Ore contrattuali | le ore previste dal contratto in un giorno lavorativo |
+| Note | le note scritte sulle ore |
+
+![Presenze per il consulente](img/60-presenze-consulente.png)
+
+- **Scarica Excel**: un foglio solo, con i filtri sulle colonne.
+- **Scarica CSV**: lo stesso contenuto in formato testo (punto e virgola, virgola decimale),
+  che i programmi paghe importano di solito.
+
+Contano solo le ore registrate e le assenze **approvate**. Conviene scaricarlo dopo aver
+**chiuso il mese**, così i numeri non cambiano più. Se il consulente chiede un formato
+diverso (altre colonne, altro ordine) si adatta: va detto a chi segue il programma.
+
 ### Estratti mensili (Excel, stampa e PDF)
 
 In fondo alla pagina **Esporta**: scegliete il **mese** (da gennaio 2020) e, se serve, i

@@ -107,6 +107,13 @@ Copilota non lo chiede al Portale, così funziona allo stesso modo dentro e fuor
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### File per il consulente paghe (dal 26/11/2026)
+
+`POST /api/esporta/consulente` (Excel) e `/api/esporta/consulente-csv` (CSV con `;`, virgola
+decimale, BOM UTF-8): una riga per dipendente e giorno, generata da
+`server/servizi/report-consulente.ts` sugli stessi dati degli altri report. Formato neutro,
+in attesa di sapere quale programma usa il consulente: per adattarlo si cambia `COLONNE`.
+
 ### Caposquadra (dal 26/11/2026)
 
 HR nomina il caposquadra di un progetto con la spunta sulla assegnazione

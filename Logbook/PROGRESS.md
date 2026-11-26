@@ -46,6 +46,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 41 (26/11):** costo della manodopera per commessa con preventivo (euro e ore), solo HR ✅
 - **Giorno 42 (26/11):** timbratura da telefono con conferma di HR (risposta 2a) ✅
 - **Giorno 43 (26/11):** caposquadra: nominato da HR sul progetto, scrive le ore della squadra (risposta 3a) ✅
+- **Giorno 44 (26/11):** file per il consulente paghe, una riga per dipendente e giorno, Excel e CSV (risposta 5a) ✅
 - **Risposte dell'utente del 26/11:** `1c 2a 3a 4c 5a 6b` (nome anche su immagini, installatori e indirizzo; timbratura con ok di HR; caposquadra sui suoi progetti; note spese e straordinari; file per il consulente in Excel/CSV; file grandi con Vercel Blob)
 - **In coda (vecchia riga):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
@@ -1115,3 +1116,13 @@ Punto 6, risposta dell'utente 3a: "inserisce le ore solo per i dipendenti dei su
 - Scelta mia da confermare con l'utente: il limite dei 7 giorni indietro.
 - Interfaccia: `src/pagine/Squadra.tsx`, voce di menu "La mia squadra" solo per i capisquadra (`Layout.tsx`), spunta "Caposquadra" in "Dipendenti assegnati" (`SchedaProgetto.tsx`).
 - Verifiche: `squadra.test.ts` (nomina, permessi, salvataggio, origine, sovrapposizioni, massimo, fuori squadra, futuro, troppo vecchio, mese chiuso, nomina tolta); prova dal vivo sulla copia (`scratchpad/giorno43.mjs`, 8 su 8). Immagini 58 e 59.
+
+### Giorno 44 — File per il consulente paghe (26/11/2026) ✅
+
+Punto 8, risposta dell'utente 5a: "Excel/CSV con una riga per dipendente e giorno, da adattare dopo".
+
+- `server/servizi/report-consulente.ts`: `righeConsulente` (una riga per dipendente e giorno in cui è in forza), `creaExcelConsulente`, `creaCsvConsulente` (separatore `;`, virgola decimale, CRLF, BOM; i testi che iniziano con = + - @ sono disinnescati perché Excel non li legga come formule), `inviaCsv`.
+- Rotte `POST /api/esporta/consulente` e `/consulente-csv` in `server/rotte/esporta.ts` (solo HR); riquadro con due pulsanti in `src/pagine/Esporta.tsx`.
+- Ferie e malattia valgono 1 solo nei giorni lavorativi; ore contrattuali = ore settimanali / 5 nei giorni lavorativi.
+- Verifiche: `report-consulente.test.ts` (settimana costruita a mano: ore, permesso, malattia, ferie a cavallo di festa e fine settimana, richiesta non approvata esclusa, testo con `;` e virgolette, Excel con numeri veri, dipendente assunto a metà periodo); prova dal vivo (`scratchpad/giorno44.mjs`, 6 su 6): scaricati CSV e Excel di ottobre, 155 righe per 5 dipendenti. Immagine 60.
+- Da fare quando l'utente saprà il programma del consulente: adattare colonne e formato.
