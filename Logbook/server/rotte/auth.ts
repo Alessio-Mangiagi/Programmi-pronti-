@@ -43,6 +43,7 @@ import { attesaLeggibile, limitatoreInMemoria, type Limitatore } from '../serviz
 import { statoTemporaneo } from '../servizi/stato-temporaneo';
 import { mascheraEmail, type InviaEmail } from '../servizi/email';
 import { registra } from '../servizi/registro';
+import { tieniVivo } from '../vercel';
 
 /**
  * Tentativi di login falliti ammessi dallo stesso indirizzo in 15 minuti, qualunque nome
@@ -85,6 +86,8 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
   // richiesta dopo può arrivare a un altro processo): chiave "attesa:<impronta del cookie>".
   const stato = statoTemporaneo(prisma, adesso);
   const codici = registroCodici(stato, 'accesso', adesso);
+  // Giorno 40: codici per scegliere una password nuova quando si è dimenticata quella vecchia.
+  const codiciReimposta = registroCodici(stato, 'reimposta', adesso);
   /** Tentativi falliti per indirizzo nella finestra di 15 minuti. */
   const perIndirizzo = new Map<string, { conta: number; dal: number }>();
   /** Impronta di una password casuale: si verifica contro questa quando l'utente non esiste. */
@@ -207,6 +210,91 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
     await fidatiDelPc(prisma, res, utente.id);
     await apriSessione(prisma, res, utente.id);
     void registra(prisma, { utenteId: utente.id, username: utente.username, azione: 'Accesso riuscito con codice via email', ip: req.ip });
+    res.json({ ok: true });
+  });
+
+  /**
+   * Password dimenticata, primo passo (Giorno 40, 26/11/2026): manda un codice di 6 cifre
+   * all'email dell'account (anagrafica del dipendente, o quella del proprietario).
+   * La risposta è sempre la stessa, che l'account esista o no e che abbia un'email o no:
+   * da fuori non si scopre quali nomi utente esistono. Chi non ha un'email in anagrafica
+   * deve rivolgersi a HR, e il messaggio lo dice a tutti.
+   * Freni: limite dei tentativi per indirizzo (lo stesso del login) e al massimo 5 codici
+   * all'ora per account (servizi/codice-conferma.ts).
+   */
+  router.post('/dimenticata', async (req, res) => {
+    const { username } = z.object({ username: z.string().trim().min(1, 'Inserisci il nome utente').max(60, 'Nome utente troppo lungo') }).parse(req.body);
+    const nome = username.toLowerCase();
+    if (!opzioni.inviaEmail) throw new ErroreHttp(400, 'Su questo Logbook la posta non è configurata: per una password nuova rivolgiti a HR');
+    registraIndirizzo(ip(req));
+    const utente = await prisma.utente.findUnique({ where: { username: nome }, include: { dipendente: { select: { email: true } } } });
+    const email = utente?.attivo ? emailDelCodice(utente) : undefined;
+    if (utente && email) {
+      const nuovo = await codiciReimposta.nuovo(utente.id);
+      if (nuovo) {
+        const invio = opzioni
+          .inviaEmail({
+            a: email,
+            oggetto: `Logbook: codice per la password nuova ${nuovo.codice}`,
+            testo:
+              `Codice: ${nuovo.codice}\n\n` +
+              `Qualcuno ha chiesto di scegliere una password nuova per l'account "${utente.username}" di Logbook.\n` +
+              `Il codice vale ${DURATA_CODICE_MS / 60000} minuti e una volta sola.\n\n` +
+              `Se non sei stato tu non fare nulla: la password resta quella di prima.`,
+          })
+          .catch(async (e) => {
+            await codiciReimposta.annulla(utente.id);
+            console.error('[logbook] invio del codice per la password nuova non riuscito:', e);
+          });
+        // A risposta inviata: così il tempo di risposta non rivela se l'account esiste.
+        tieniVivo(invio);
+      }
+      void registra(prisma, { utenteId: utente.id, username: nome, azione: 'Password dimenticata: codice richiesto', esito: nuovo ? 'OK' : 'NEGATO', ip: req.ip });
+    }
+    res.json({ ok: true, messaggio: "Se l'account esiste e ha un'email in anagrafica, il codice è in arrivo a quell'indirizzo. Se non arriva entro qualche minuto, rivolgiti a HR." });
+  });
+
+  /**
+   * Password dimenticata, secondo passo: codice ricevuto + password nuova. Il codice ha 5
+   * tentativi; in più vale il blocco progressivo (10 errori → attese crescenti) sulla coppia
+   * indirizzo + nome utente. Riuscito: password cambiata (non più provvisoria), sessioni e
+   * PC fidati dimenticati. Non apre una sessione: si rientra dal login, e gli amministratori
+   * ripassano dal codice di accesso.
+   */
+  router.post('/reimposta', async (req, res) => {
+    const { username, codice, nuova } = z
+      .object({
+        username: z.string().trim().min(1, 'Inserisci il nome utente').max(60, 'Nome utente troppo lungo'),
+        codice: z.string().trim().regex(/^\d{6}$/, 'Il codice è di 6 cifre'),
+        nuova: z.string().max(200, 'Password troppo lunga'),
+      })
+      .parse(req.body);
+    const nome = username.toLowerCase();
+    const chiave = `reimposta|${ip(req)}|${nome}`;
+    await limitatore.tentativo(chiave);
+    const utente = await prisma.utente.findUnique({ where: { username: nome } });
+    // Prima la password: un codice giusto non va consumato per una password che poi è rifiutata.
+    const debolezza = controllaPasswordNuova(nuova, utente?.ruolo ?? 'DIPENDENTE');
+    if (debolezza) throw richiestaNonValida(debolezza, { nuova: debolezza });
+    const esito = utente?.attivo ? await codiciReimposta.verifica(utente.id, codice) : 'assente';
+    if (esito !== 'ok' || !utente) {
+      const messaggi = {
+        ok: 'Codice non valido',
+        assente: 'Codice non valido: chiedine uno nuovo',
+        scaduto: 'Il codice è scaduto: chiedine uno nuovo',
+        sbagliato: 'Codice sbagliato',
+        esaurito: 'Troppi tentativi sbagliati: chiedi un codice nuovo',
+      } as const;
+      void registra(prisma, { utenteId: utente?.id, username: nome, azione: `Password dimenticata: codice rifiutato (${esito})`, esito: 'NEGATO', ip: req.ip });
+      throw new ErroreHttp(400, messaggi[esito], { codice: messaggi[esito] });
+    }
+    await limitatore.riuscito(chiave);
+    // Il blocco del login per troppi errori non ha più senso: la password è nuova.
+    await limitatore.riuscito(`${ip(req)}|${nome}`);
+    await prisma.utente.update({ where: { id: utente.id }, data: { passwordHash: await creaImpronta(nuova), passwordDaCambiare: false } });
+    await prisma.sessione.deleteMany({ where: { utenteId: utente.id } });
+    await prisma.dispositivoFidato.deleteMany({ where: { utenteId: utente.id } });
+    void registra(prisma, { utenteId: utente.id, username: nome, azione: 'Password dimenticata: password cambiata con il codice', ip: req.ip });
     res.json({ ok: true });
   });
 

@@ -104,7 +104,7 @@ const ETICHETTE: [string, RegExp, string][] = [
 ];
 
 /** Queste rotte scrivono da sole righe più precise (rotte/auth.ts, rotte/proprietario.ts). */
-const GIA_REGISTRATE = /^(auth\/login|auth\/codice|proprietario\/cancellazione|proprietario\/account)/;
+const GIA_REGISTRATE = /^(auth\/login|auth\/codice|auth\/dimenticata|auth\/reimposta|proprietario\/cancellazione|proprietario\/account)/;
 
 /** Annota a risposta finita le richieste che modificano o esportano dati. Da montare dopo caricaUtente. */
 export function registroRichieste(prisma: PrismaClient) {
