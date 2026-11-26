@@ -120,7 +120,7 @@ export function rotteProgetti(prisma: PrismaClient) {
     for (const f of fasce) minuti.set(f.dipendenteId, (minuti.get(f.dipendenteId) ?? 0) + durataMinuti(f.oraInizio, f.oraFine));
     res.json(
       assegnazioni
-        .map((a) => ({ id: a.id, creatoIl: a.creatoIl, dipendente: a.dipendente, minuti: minuti.get(a.dipendenteId) ?? 0 }))
+        .map((a) => ({ id: a.id, creatoIl: a.creatoIl, caposquadra: a.caposquadra, dipendente: a.dipendente, minuti: minuti.get(a.dipendenteId) ?? 0 }))
         .sort((x, y) => `${x.dipendente.cognome} ${x.dipendente.nome}`.localeCompare(`${y.dipendente.cognome} ${y.dipendente.nome}`, 'it')),
     );
   });
@@ -136,6 +136,16 @@ export function rotteProgetti(prisma: PrismaClient) {
     if (esiste) throw new ErroreHttp(409, `${dip.cognome} ${dip.nome} è già assegnato a ${progetto.codice}`, { dipendenteId: 'Già assegnato' });
     const a = await prisma.assegnazioneProgetto.create({ data: { progettoId: progetto.id, dipendenteId } });
     res.status(201).json(a);
+  });
+
+  /** Giorno 43: HR nomina (o toglie) il caposquadra del progetto fra i dipendenti assegnati. */
+  router.put('/:id/dipendenti/:dipendenteId/caposquadra', richiediAdmin, async (req, res) => {
+    const progettoId = idDaParametro(req.params.id)!;
+    const dipendenteId = idDaParametro(req.params.dipendenteId, 'dipendenteId')!;
+    const caposquadra = req.body?.caposquadra === true;
+    const cambiate = await prisma.assegnazioneProgetto.updateMany({ where: { progettoId, dipendenteId }, data: { caposquadra } });
+    if (!cambiate.count) throw nonTrovato('Assegnazione');
+    res.json({ caposquadra });
   });
 
   router.delete('/:id/dipendenti/:dipendenteId', richiediAdmin, async (req, res) => {

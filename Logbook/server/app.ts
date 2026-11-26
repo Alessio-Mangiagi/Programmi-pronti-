@@ -44,6 +44,7 @@ import { rotteMesiChiusi } from './servizi/mesi-chiusi';
 import { rotteSaldi } from './rotte/saldi';
 import { rotteCostiProgetti } from './rotte/costi-progetti';
 import { rotteTimbrature } from './rotte/timbrature';
+import { rotteSquadra } from './rotte/squadra';
 
 /**
  * Opzioni:
@@ -193,6 +194,8 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/costi-progetti', rotteCostiProgetti(prisma));
   // Giorno 42 (26/11/2026): timbratura del dipendente, che diventa ore solo dopo l'ok di HR.
   api.use('/timbrature', rotteTimbrature(prisma, oggi, opzioni.adesso));
+  // Giorno 43 (26/11/2026): il caposquadra scrive le ore della sua squadra sul suo progetto.
+  api.use('/squadra', rotteSquadra(prisma, oggi));
   // Giorno 34: registro attività, solo amministratori (voce del menu).
   api.use('/registro', rotteRegistro(prisma));
 

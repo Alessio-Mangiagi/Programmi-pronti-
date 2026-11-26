@@ -243,6 +243,9 @@ model AssegnazioneProgetto {
   progettoId   Int
   dipendente   Dipendente @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
   dipendenteId Int
+  /// Caposquadra di questo progetto (Giorno 43, risposta 3a): può inserire le ore dei
+  /// dipendenti assegnati a questo progetto, solo su questo progetto. Lo decide HR.
+  caposquadra  Boolean    @default(false)
   creatoIl     DateTime   @default(now())
 
   @@unique([progettoId, dipendenteId])
@@ -259,6 +262,8 @@ enum OrigineRegistrazione {
   IMPORT_EXCEL
   /// Nata da una timbratura del dipendente confermata da HR (Giorno 42).
   TIMBRATURA
+  /// Inserita dal caposquadra per un dipendente della sua squadra (Giorno 43).
+  CAPOSQUADRA
 }
 
 /// Una fascia oraria lavorata: un dipendente, un giorno, un progetto, dalle-alle.

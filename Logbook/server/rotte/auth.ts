@@ -44,6 +44,7 @@ import { statoTemporaneo } from '../servizi/stato-temporaneo';
 import { mascheraEmail, type InviaEmail } from '../servizi/email';
 import { registra } from '../servizi/registro';
 import { tieniVivo } from '../vercel';
+import { isCaposquadra } from './squadra';
 
 /**
  * Tentativi di login falliti ammessi dallo stesso indirizzo in 15 minuti, qualunque nome
@@ -304,8 +305,9 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
   });
 
   /** Chi sono: usato dal frontend all'apertura per sapere se mostrare login o app. */
-  router.get('/io', richiediLogin, (req, res) => {
-    res.json(req.utente);
+  router.get('/io', richiediLogin, async (req, res) => {
+    // Giorno 43: caposquadra di almeno un progetto attivo → l'interfaccia mostra "La mia squadra".
+    res.json({ ...req.utente, caposquadra: await isCaposquadra(prisma, req.utente!.dipendenteId) });
   });
 
   /** Cambio della propria password: chiede quella attuale e chiude le altre sessioni. */
