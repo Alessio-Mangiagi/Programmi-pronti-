@@ -7,7 +7,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['dist/', 'node_modules/', '.venv/', '.venv-gpu/', '_archivio/', '_lavori/', 'tests/', 'public/', 'tools/harness/'] },
+  { ignores: ['dist/', 'node_modules/', '.venv*/', '_archivio/', '_lavori/', 'tests/', 'public/', 'tools/harness/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
