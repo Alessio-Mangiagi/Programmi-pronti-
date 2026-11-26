@@ -21,6 +21,7 @@ import { useAuth } from '../auth';
 import { COLORE_FESTIVITA } from '../colori';
 import { Icona } from '../componenti/icone';
 import { Tabella, type Colonna } from '../componenti/Tabella';
+import { SaldiAssenze } from '../componenti/SaldiAssenze';
 import { Avviso, Caricamento, Campo, classiInput, Etichetta, IntestazionePagina, Pulsante } from '../componenti/ui';
 import { nomiSenzaOmonimie } from '../../comune/omonimi';
 import type { Dipendente, Festivita } from '../tipi';
@@ -81,6 +82,8 @@ export function Assenze() {
           )
         }
       />
+      {/* Giorno 38: saldo ferie e permessi (tessere per il dipendente, riquadro per HR). */}
+      <SaldiAssenze />
       {admin && (
         // Sul telefono le tre schede possono non starci: la barra scorre in orizzontale invece di sforare.
         <div className="mb-3 flex gap-1 overflow-x-auto whitespace-nowrap border-b border-gray-200" role="tablist">
