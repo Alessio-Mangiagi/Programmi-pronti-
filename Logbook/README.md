@@ -107,6 +107,16 @@ Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Avvisi via email (dal 26/11/2026)
+
+`server/servizi/avvisi.ts` manda quattro avvisi, ognuno si spegne da *Impostazioni → Avvisi
+via email*: richiesta di assenza (a HR), esito (al dipendente), giorni senza ore (una volta
+alla settimana) e attestati in scadenza (a 30 e 7 giorni e alla scadenza). Gli avvisi del
+giorno partono dal primo controllo dopo le 7: ogni ora sul PC (`server/index.ts`), con Vercel
+Cron su Vercel (`/api/cron/avvisi`, protetta da `CRON_SECRET`). Un segno nel database
+(tabella `StatoTemporaneo`, chiavi `avviso:…`) evita di mandare due volte la stessa email.
+Senza posta configurata non parte nulla.
+
 ### Su Vercel (dal 25/11/2026)
 
 Logbook si pubblica anche su Vercel, con un database PostgreSQL esterno al posto del file
@@ -219,6 +229,8 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_ADMIN_REIMPOSTA` | — | `1` = alla preparazione del database reimposta la password dell'amministratore indicato (provvisoria). Per il recupero, da togliere subito dopo: docs/vercel.md |
 | `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
 | `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Logbook usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |
+| `LOGBOOK_INDIRIZZO_PUBBLICO` | — | Indirizzo a cui si apre Logbook, messo in fondo alle email di avviso (su Vercel lo trova da solo) |
+| `CRON_SECRET` | — | Solo su Vercel: segreto con cui Vercel Cron chiama `/api/cron/avvisi`. Senza, la rotta non risponde e gli avvisi del giorno partono alla prima visita dopo le 7 |
 | `LOGBOOK_BACKUP_DIR` | `data/backup` | Cartella delle copie di sicurezza (una al giorno, 30 giorni): meglio un altro disco |
 | `LOGBOOK_CODICE_ACCESSO` | attivo | `0` spegne il codice via email all'accesso degli amministratori |
 | `LOGBOOK_DATI_DEMO` | sì in sviluppo, no in produzione | `1` / `0`: dati di esempio su un database vuoto (mai su uno già in uso) |

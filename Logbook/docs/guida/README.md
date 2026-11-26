@@ -439,6 +439,28 @@ Nello stesso riquadro:
 
 ![Amministratori e copia di sicurezza](img/46-amministratori-copia.png)
 
+#### Avvisi via email
+
+Dal 26/11/2026 Logbook scrive da solo quando c'è qualcosa da fare. In **Impostazioni → Avvisi
+via email** si sceglie a chi arrivano gli avvisi per l'ufficio personale (più indirizzi
+separati da virgola; se il campo è vuoto arrivano al proprietario) e quali avvisi mandare:
+
+| Avviso | A chi | Quando |
+|---|---|---|
+| Nuova richiesta di assenza | ufficio personale | appena un dipendente chiede ferie o permessi o comunica una malattia |
+| Esito della richiesta | dipendente | quando la richiesta viene approvata o rifiutata, con la nota di HR |
+| Giorni senza ore | dipendente, più riepilogo a HR | una volta alla settimana, sui giorni lavorativi scoperti delle ultime due settimane |
+| Attestati in scadenza | dipendente e HR | 30 giorni prima, 7 giorni prima e il giorno della scadenza |
+
+![Avvisi via email](img/47-avvisi-email.png)
+
+Da sapere:
+- le email ai dipendenti partono solo per chi ha un **indirizzo in anagrafica** (scheda del dipendente);
+- **Invia email di prova** controlla subito che la posta funzioni;
+- se in alto c'è scritto *Posta non configurata*, le scelte si salvano ma nessuna email parte:
+  la posta si imposta sul server (variabili `LOGBOOK_SMTP_*`);
+- gli indirizzi dei dati di esempio (`@esempio.it`) non ricevono mai nulla.
+
 ### Registro attività (solo amministratori)
 
 Nel menu a sinistra, **Registro attività** elenca dal più recente chi ha fatto cosa: accessi

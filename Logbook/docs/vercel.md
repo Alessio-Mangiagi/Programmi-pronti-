@@ -40,6 +40,7 @@ che dura né un server sempre acceso.
    | `LOGBOOK_SMTP_SICUREZZA` | `ssl` |
    | `LOGBOOK_SMTP_UTENTE` | la casella che spedisce |
    | `LOGBOOK_SMTP_PASSWORD` | la sua password (segnare la variabile come *Sensitive*) |
+   | `CRON_SECRET` | una stringa casuale lunga: la usa Vercel Cron per far partire ogni mattina gli avvisi via email |
 
    La password dell'amministratore scritta qui è **provvisoria**: al primo accesso Logbook
    chiede di sceglierne una nuova. Dopo il primo accesso si può togliere

@@ -37,7 +37,10 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 33 (25/11):** seconda verifica di sicurezza su tutta l'app, quattro correzioni ✅
 - **Giorno 34 (25/11):** copie di sicurezza con SQL, blocco progressivo, sessioni a 15 minuti, codice via email per gli amministratori, primo admin all'installazione e ruolo dato solo dal proprietario, registro attività nel menu ✅
 - **Giorno 35 (25/11):** Logbook pubblicabile su Vercel: PostgreSQL esterno, file/codici/blocchi nel database, pacchetto con scripts/vercel-build.mjs ✅ (provato in locale, da pubblicare con l'account dell'utente)
-- **Prossimo:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
+- **26/11:** Logbook online su https://programmi-pronti.vercel.app (pubblica solo `main`); recupero amministratore con LOGBOOK_ADMIN_REIMPOSTA ✅
+- **Giorno 36 (26/11):** avvisi via email: richieste a HR, esiti al dipendente, giorni senza ore, attestati in scadenza ✅
+- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 2 chiusura del mese, 3 saldo ferie e permessi, 4 timbratura da telefono, 5 icona sul telefono, 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
+- **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
 - **Ultimo aggiornamento:** 25/11/2026
@@ -999,3 +1002,20 @@ Verifiche:
 - `npm test` 264/264 su SQLite, di cui 4 nuovi in `giorno35.test.ts` (file nel database, blocco su database anche in parallelo, stato a scadenza, fuso italiano). Typecheck ok.
 - Prova completa del percorso Vercel in una cartella pulita, contro un PostgreSQL incorporato (PGlite, perché Docker su questo PC non partiva): `npm ci`, `vercel-build` (tabelle, amministratore, festività), poi il pacchetto servito da `vercel-prova`. 14 verifiche su 14 utili: accesso, sessione, dati di esempio (341 fasce), dashboard, calendario, esportazione Excel, file nel database, limite di 4 MB, registro, blocco dopo 10 errori, uscita.
 - NON provato: la pubblicazione vera su Vercel (serve l'account dell'utente) e l'invio email da lì.
+
+### Giorno 36 — Avvisi via email (26/11/2026) ✅
+
+Richiesta: dopo l'elenco di 11 funzioni consigliate, "implementa tutto partendo dal primo punto". Questo è il punto 1.
+
+Cosa è stato fatto:
+- `server/servizi/avvisi.ts` (`creaAvvisi`): `nuovaRichiesta` (a HR), `esitoRichiesta` (al dipendente), `giornaliero(oggi)` (ore mancanti una volta alla settimana sugli ultimi 14 giorni; attestati a 30 e 7 giorni e alla scadenza), `prova`. Mai un errore verso chi chiama: un avviso non partito non blocca il lavoro.
+- "Già mandato": righe `avviso:…` in `StatoTemporaneo` create con una insert sulla chiave unica, così due processi insieme non spediscono due volte. Nessuna migrazione nuova.
+- Scelte in `Impostazione` (`avvisi.*`): indirizzi di HR (vuoto = email del proprietario) e quattro interruttori, tutti accesi finché nessuno li tocca. API `PUT /api/impostazioni/avvisi`, `POST /api/impostazioni/avvisi/prova`; riquadro `src/componenti/AvvisiEmail.tsx`.
+- Agganci: `server/rotte/assenze.ts` (richiesta del dipendente e decisione di HR, a risposta inviata con `tieniVivo`).
+- Pianificazione: ogni ora dopo le 7 in `server/index.ts`; su Vercel cron `0 6 * * *` su `/api/cron/avvisi` (scritto da `scripts/vercel-build.mjs`, protetto da `CRON_SECRET`) più la riserva nella manutenzione di `server/vercel-funzione.ts`.
+- `server/servizi/email.ts`: `invioDaAmbiente` salta gli indirizzi dei dati di esempio (`@esempio.it`).
+
+Verifiche:
+- `npm test` 271/271, di cui 6 nuovi in `avvisi.test.ts` (posta finta): destinatari e testi, interruttori, indirizzo non valido, una volta al giorno anche con due chiamate insieme, soglie degli attestati, cron con e senza segreto. Typecheck ok.
+- Prova dal vivo sulla copia senza posta (`scratchpad/giorno36.mjs`, 7 su 7): riquadro, salvataggio, messaggio d'errore, telefono. Immagine 47 della guida.
+- NON provato dal vivo: l'arrivo vero di un avviso in una casella (in locale e su Vercel la posta è quella vera: lo prova l'utente con "Invia email di prova").
