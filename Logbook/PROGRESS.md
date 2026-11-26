@@ -1169,3 +1169,26 @@ Richiesta dell'utente, risposte 1a 2a 3a 4a: a HR e ai dipendenti assegnati, con
 - Interfaccia: quinta voce "Progetto chiuso" in *Impostazioni → Avvisi via email* (`src/componenti/AvvisiEmail.tsx`).
 - Verifiche: `progetto-chiuso.test.ts` (riepilogo e avviso, niente costi al dipendente, nessuna email risalvando un progetto chiuso, di nuovo dopo riapertura, interruttore spento); 299 test passati; prova dal vivo sulla copia con posta finta (`scratchpad/giorno47.mjs`): chiuso `PRG-001`, arrivate l'email a HR con "646:45 su 580 preventivate (111,5%)" e quelle ai tre assegnati.
 - Non fatto: l'Excel delle ore in allegato e il promemoria prima della data di fine (opzioni 2c e 3c, non scelte).
+
+### Giorno 48 — Giro di prova e correzioni (26/11/2026) ✅
+
+Giro completo sulla copia (`scratchpad/giro48.mjs`): tutte le pagine come HR e come dipendente, su schermo grande e telefono (nessun errore, nessuna pagina più larga dello schermo), dodici funzioni di HR vietate al dipendente, incroci fra timbratura, progetto chiuso, note spese, squadra, file per il consulente, password dimenticata. Trovate e corrette due cose (risposte dell'utente 1a 2a 3c):
+
+- **Timbratura e progetto chiuso**: HR non riusciva a confermare una timbratura se il progetto era stato chiuso dopo ("Il progetto … è chiuso"). Ora il progetto della timbratura è sempre tollerato alla conferma (`server/rotte/timbrature.ts`).
+- **Caposquadra**: il salvataggio cancellava e ricreava tutte le fasce del progetto, anche quelle di HR e delle timbrature, che diventavano "del caposquadra" e perdevano la nota. Ora tocca solo le fasce con origine `CAPOSQUADRA`, le altre le vede come `fisse`; le fasce rimaste uguali tengono id e nota; non scrive più le proprie ore e non compare nella sua squadra (`server/rotte/squadra.ts`, `src/pagine/Squadra.tsx`).
+- Lasciato com'è per scelta (3c): di sabato, domenica e festivi non si timbra.
+- Pulizia: `knip` e `tsc --noUnusedLocals` non trovano codice mai chiamato (solo costanti esportate e usate nel loro file). Tolte `pg` e `@types/pg` dalle dipendenze dirette: nessun file le importa, il driver arriva con `@prisma/adapter-pg` alla stessa versione.
+
+### Giorno 49 — Revisione di sicurezza (26/11/2026) ✅
+
+Revisione in sola lettura di tutto il server fatta da un revisore indipendente; nessuna falla grave (niente accesso anonimo ai dati, niente lettura di dati altrui, niente passaggio da dipendente ad amministratore). Chiuse quelle trovate:
+
+- **Codici a 6 cifre** (`servizi/codice-conferma.ts`, `servizi/stato-temporaneo.ts`): i 5 tentativi si contavano leggendo e riscrivendo il contatore, quindi una raffica di richieste in parallelo ne otteneva molti di più. Ora ogni tentativo prenota uno di 5 posti con una riga a chiave unica prima del confronto. In più un freno per account su `/api/auth/codice` e `/api/auth/reimposta`.
+- **Password dimenticata** (`rotte/auth.ts`): la regola dei 12 caratteri si applica solo a codice giusto (prima il messaggio rivelava chi è amministratore); `/dimenticata` risponde subito e lavora dopo (il tempo di risposta non dice più se l'account esiste).
+- **Caricamento a parti** (`rotte/file.ts`): al massimo 5 caricamenti lasciati a metà per utente nelle 24 ore (prima si potevano aprire all'infinito e riempire il database).
+- **Registro** (`servizi/registro.ts`): le richieste anonime respinte non scrivono più righe. Contatori dei tentativi di accesso puliti dopo un giorno (`pulisciTentativi`, all'avvio e nella manutenzione su Vercel).
+- **Tetti per dipendente**: 30 richieste di assenza in attesa, 30 note spese in attesa, 12 timbrature al giorno.
+- **Proprietario** (`rotte/dipendenti.ts`): un altro amministratore non può più disattivarne l'account mettendo "Cessato" sulla sua scheda.
+- **Dati di esempio su Vercel** (`rotte/proprietario.ts`): gli account di esempio nascono spenti, perché la loro password è pubblica.
+- Verifiche: `sicurezza-2611.test.ts` (7 test che riproducono gli attacchi), 306 test passati, `npm audit` senza segnalazioni.
+- Non chiuso, per scelta: il limite di 30 tentativi per indirizzo resta nella memoria del processo, quindi su Vercel vale per singola istanza (restano i blocchi per account, che stanno nel database); un amministratore può far chiamare al server l'indirizzo di SkyTower che scrive nelle impostazioni (conta solo in rete locale, ed è una funzione riservata agli amministratori).

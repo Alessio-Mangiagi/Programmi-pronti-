@@ -136,6 +136,11 @@ Dal 26/11/2026 chi è stato nominato **caposquadra** di un progetto trova nel me
 ![La mia squadra](img/59-la-mia-squadra.png)
 
 Da sapere:
+- nell'elenco ci sono i colleghi, **non il caposquadra**: le sue ore le inserisce HR, oppure le
+  timbra come tutti;
+- le ore già inserite da HR o nate da una timbratura confermata compaiono come *Già su questo
+  progetto, non modificabili da qui*: il caposquadra le vede, non le cambia e non può
+  sovrapporsi;
 - si scrivono solo le ore **su quel progetto**. Se una persona ha già ore su un altro progetto
   compare *Già occupato su altri progetti* con gli orari, per non sovrapporsi;
 - valgono le regole di sempre (niente festivi, ferie o malattia, massimo di ore del progetto,
@@ -322,6 +327,8 @@ Quando un dipendente ha timbrato entrata e uscita, in cima alla **Dashboard HR**
 
 Una timbratura senza uscita ha il campo dell'uscita evidenziato: va scritto l'orario prima di
 confermare. Finché HR non conferma, le timbrature non contano nelle ore né negli estratti.
+Se nel frattempo il progetto è stato **chiuso**, la timbratura si conferma lo stesso: non
+serve riaprirlo.
 
 ### Calendario
 
@@ -602,6 +609,11 @@ Gli altri amministratori non lo vedono.
 ![Dati del programma: codice inviato per email](img/42-dati-programma-codice.png)
 
 ![Dati del programma: dati di esempio caricati](img/43-dati-programma-esempio.png)
+
+Sul sito pubblico (Vercel) gli account dei dipendenti di esempio nascono **spenti**: la loro
+password provvisoria è scritta nella documentazione, quindi chiunque avrebbe potuto usarla. Per
+provarne uno, aprire la scheda del dipendente e dargli una password nuova. Sul PC e nella
+suite restano accesi come prima.
 
 Nello stesso riquadro:
 
