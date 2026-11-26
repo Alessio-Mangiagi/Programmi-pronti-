@@ -21,12 +21,15 @@ const SOGLIA_SCANSIONE = 40;
  */
 export async function estrai(contenuto, { tolleranzaRiga = 2.5 } = {}) {
   const { getDocument } = await caricaPdfjs();
-  const doc = await getDocument({
+  // Il compito di caricamento va tenuto: da pdfjs-dist 6 il documento non ha piu' destroy() e la
+  // memoria (worker, font) si libera dal compito. Vale anche con le versioni precedenti.
+  const compito = getDocument({
     data: new Uint8Array(contenuto),
     useSystemFonts: true,
     isEvalSupported: false,
     standardFontDataUrl: require.resolve('pdfjs-dist/package.json').replace(/package\.json$/, 'standard_fonts/'),
-  }).promise;
+  });
+  const doc = await compito.promise;
 
   const avvisi = [];
   const pagine = [];
@@ -61,9 +64,11 @@ export async function estrai(contenuto, { tolleranzaRiga = 2.5 } = {}) {
     pagina.cleanup();
   }
 
-  await doc.destroy();
+  // il numero di pagine si legge prima di liberare il documento
+  const numeroPagine = doc.numPages;
+  await compito.destroy();
   return {
-    meta: { pagine: doc.numPages, estrattoIl: new Date().toISOString() },
+    meta: { pagine: numeroPagine, estrattoIl: new Date().toISOString() },
     pagine,
     avvisi,
   };
