@@ -42,6 +42,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 37 (26/11):** chiusura del mese: HR blocca ore, assenze e festività di un mese finito; riapertura ✅
 - **Giorno 38 (26/11):** saldo ferie e permessi: quota per dipendente scritta da HR, maturato/goduto/residuo calcolati ✅
 - **Giorno 39 (26/11):** Logbook installabile sulla schermata del telefono (manifest e icone) ✅
+- **Giorno 40 (26/11):** password dimenticata: codice via email e password nuova dalla pagina di accesso ✅
 - **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
@@ -1060,3 +1061,12 @@ Punto 5 della richiesta "implementa tutto partendo dal primo punto" (il punto 4,
 - `public/logbook.webmanifest` (nome, colori, `display: standalone`, icone 192 e 512 anche "maskable"), `public/icona-192.png`, `icona-512.png`, `icona-180.png` create dal logo chiaro della suite su fondo blu Cosedil; richiami in `index.html` (manifest, apple-touch-icon, meta per iPhone).
 - Nessun service worker: Logbook non lavora senza connessione, e i browser attuali non lo chiedono più per proporre l'installazione.
 - Verifiche: `installabile.test.ts` (manifest valido, misure vere dei PNG, richiami nella pagina); prova nel browser (`scratchpad/giorno39.mjs`, 7 su 7): manifest letto senza errori, nessun ostacolo all'installazione, icone servite, nessun errore di sicurezza in console. NON provato su un telefono vero.
+
+### Giorno 40 — Password dimenticata (26/11/2026) ✅
+
+Punto 10 della richiesta "implementa tutto partendo dal primo punto" (fatto prima dei punti 4, 6, 7, 8, che aspettano risposte dell'utente).
+
+- `server/rotte/auth.ts`: `POST /api/auth/dimenticata` (codice a 6 cifre all'email dell'account, risposta identica in ogni caso, invio a risposta già partita) e `POST /api/auth/reimposta` (codice + password nuova; la password si controlla prima del codice, così una password debole non lo consuma). Codici con scopo `reimposta` in `StatoTemporaneo`, nessuna migrazione.
+- Dopo il cambio: password non più provvisoria, sessioni e PC fidati dimenticati, blocco del login azzerato; nessuna sessione aperta (si rientra dal login, gli amministratori ripassano dal codice di accesso).
+- Interfaccia: `src/componenti/PasswordDimenticata.tsx` e collegamento "Password dimenticata?" in `src/pagine/Login.tsx`.
+- Verifiche: `password-dimenticata.test.ts` (4 test: stessa risposta per account esistente, inesistente e senza email; codice sbagliato, di un altro account, già usato; password debole; sessioni chiuse; 12 caratteri per gli amministratori; 5 codici all'ora; senza posta). Prova dal vivo sulla copia con finta posta (`scratchpad/giorno40.mjs`, 7 su 7). Immagine 53 della guida.

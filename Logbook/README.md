@@ -107,6 +107,14 @@ Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Password dimenticata (dal 26/11/2026)
+
+Dalla pagina di accesso: `POST /api/auth/dimenticata` manda un codice di 6 cifre all'email
+dell'account (risposta sempre uguale, per non rivelare quali nomi utente esistono) e
+`POST /api/auth/reimposta` cambia la password con quel codice (`server/rotte/auth.ts`).
+Freni: 5 tentativi per codice, 5 codici all'ora per account, blocco progressivo e limite per
+indirizzo come al login. Serve la posta configurata; senza, la risposta rimanda a HR.
+
 ### Saldo ferie e permessi (dal 26/11/2026)
 
 HR scrive per ogni dipendente la quota annua e il residuo di partenza (tabella `QuotaAssenze`,

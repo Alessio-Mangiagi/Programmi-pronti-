@@ -44,6 +44,25 @@ chiede più per 30 giorni.
 
 ---
 
+### Password dimenticata
+
+Dal 26/11/2026 chi ha dimenticato la password la cambia da solo, senza chiamare HR:
+
+1. nella pagina di accesso, **Password dimenticata?**;
+2. scrivere il proprio nome utente e premere **Mandami il codice**: arriva un'email con un
+   codice di 6 cifre, all'indirizzo che HR ha scritto nella scheda del dipendente;
+3. scrivere il codice e la password nuova (due volte), poi **Cambia password**;
+4. entrare con la password nuova.
+
+![Password dimenticata](img/53-password-dimenticata.png)
+
+Da sapere:
+- il codice vale 10 minuti e una volta sola; dopo 5 codici sbagliati ne serve uno nuovo;
+- Logbook risponde allo stesso modo anche se il nome utente non esiste: se l'email non
+  arriva, il nome è sbagliato oppure in anagrafica manca l'indirizzo. In quel caso serve HR,
+  che dalla scheda del dipendente dà una password provvisoria;
+- dopo il cambio, chi era collegato con la vecchia password viene scollegato.
+
 ## 2. Per i dipendenti
 
 Il menu ha quattro voci: **Dashboard**, **Calendario**, **I miei progetti**, **Le mie
