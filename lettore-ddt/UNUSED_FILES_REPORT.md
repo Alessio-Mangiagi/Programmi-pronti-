@@ -13,6 +13,13 @@
 
 ### `static/js/enhancements.js` (6.4 KB)
 
+> **Aggiornamento del 26/11/2026: questo file NON va eliminato.** Dal report del 23/06 le cose sono
+> cambiate: `static/js/app.tsx` usa `window.Enhancements` per annulla/ripeti (`UndoRedo`), per l'avviso
+> «Progetto salvato» (`ToastSystem`) e per il tema scuro (`DarkMode`). Togliendolo quelle funzioni
+> smetterebbero di funzionare senza errori visibili. Se un giorno si vuole eliminarlo, prima va portato
+> in TypeScript dentro `app.tsx`.
+
+
 **Status**: Caricato ma non usato  
 **Locazione HTML**: `static/index.html` (riga 61)
 
