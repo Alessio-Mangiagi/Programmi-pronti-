@@ -9,15 +9,24 @@
  * dipendenti hanno su altri progetti (ne riceve solo gli orari occupati, per non sovrapporsi).
  * Le ore nascono con origine CAPOSQUADRA, così HR le riconosce e le può correggere.
  *
+ * Correzioni del 26/11/2026 (Giorno 48):
+ * - il caposquadra NON scrive le proprie ore: non compare nella sua squadra, le sue le mette
+ *   HR o le timbra come tutti;
+ * - tocca solo le fasce nate da un caposquadra. Quelle inserite da HR, importate o nate da
+ *   una timbratura confermata le vede (`fisse`) ma non le cambia e non le toglie;
+ * - salvando, le fasce rimaste uguali non vengono cancellate e ricreate: tengono id e nota.
+ *
  * Limiti (oltre alle regole di tutte le ore: festivi, ferie, massimo del progetto, mese chiuso):
  * - solo progetti ATTIVI di cui si è caposquadra;
  * - solo oggi e i GIORNI_INDIETRO giorni precedenti: le correzioni più vecchie restano a HR.
  *
  * - GET /          i miei progetti da caposquadra, ognuno con la squadra;
- * - GET /giornata  ?progettoId&data: per ogni dipendente le fasce su quel progetto e gli
- *                  orari già occupati da altri progetti;
+ * - GET /giornata  ?progettoId&data: per ogni dipendente le fasce del caposquadra su quel
+ *                  progetto (`fasce`), quelle non sue (`fisse`) e gli orari già occupati da
+ *                  altri progetti (`occupato`);
  * - PUT /giornata  {progettoId, dipendenteId, data, fasce:[{oraInizio, oraFine}]}: sostituisce
- *                  le fasce di quel dipendente su quel progetto in quel giorno (elenco vuoto = le toglie).
+ *                  le fasce del caposquadra per quel dipendente, progetto e giorno (elenco
+ *                  vuoto = le toglie). Le `fisse` non si mandano e non si toccano.
  */
 import { Router, type Request } from 'express';
 import { z } from 'zod';
@@ -75,24 +84,25 @@ export function rotteSquadra(prisma: PrismaClient, oggi: () => string) {
     }
   }
 
-  /** Dipendenti attivi assegnati al progetto: la squadra. */
-  const squadra = (progettoId: number) =>
+  /** Dipendenti attivi assegnati al progetto, senza il caposquadra che chiede: la sua squadra. */
+  const squadra = (progettoId: number, capoId: number) =>
     prisma.dipendente.findMany({
-      where: { stato: 'ATTIVO', assegnazioni: { some: { progettoId } } },
+      where: { stato: 'ATTIVO', id: { not: capoId }, assegnazioni: { some: { progettoId } } },
       select: { id: true, nome: true, cognome: true, matricola: true },
       orderBy: [{ cognome: 'asc' }, { nome: 'asc' }],
     });
 
   router.get('/', async (req, res) => {
+    const capoId = mioDipendente(req);
     const miei = await prisma.assegnazioneProgetto.findMany({
-      where: { dipendenteId: mioDipendente(req), caposquadra: true, progetto: { stato: 'ATTIVO' } },
+      where: { dipendenteId: capoId, caposquadra: true, progetto: { stato: 'ATTIVO' } },
       include: { progetto: { select: { id: true, codice: true, nome: true, colore: true } } },
       orderBy: { progetto: { codice: 'asc' } },
     });
     res.json({
       oggi: oggi(),
       dal: aggiungiGiorni(oggi(), -GIORNI_INDIETRO),
-      progetti: await Promise.all(miei.map(async (a) => ({ ...a.progetto, squadra: await squadra(a.progettoId) }))),
+      progetti: await Promise.all(miei.map(async (a) => ({ ...a.progetto, squadra: await squadra(a.progettoId, capoId) }))),
     });
   });
 
@@ -101,7 +111,7 @@ export function rotteSquadra(prisma: PrismaClient, oggi: () => string) {
     const data = String(req.query.data ?? '');
     if (!progettoId || !isDataValida(data)) throw richiestaNonValida('Servono progetto e data');
     await controllaCaposquadra(req, progettoId);
-    const membri = await squadra(progettoId);
+    const membri = await squadra(progettoId, mioDipendente(req));
     const fasce = await prisma.registrazioneOraria.findMany({
       where: { dipendenteId: { in: membri.map((m) => m.id) }, data },
       select: { id: true, dipendenteId: true, progettoId: true, oraInizio: true, oraFine: true, origine: true },
@@ -112,7 +122,9 @@ export function rotteSquadra(prisma: PrismaClient, oggi: () => string) {
         const sue = fasce.filter((f) => f.dipendenteId === m.id);
         return {
           ...m,
-          fasce: sue.filter((f) => f.progettoId === progettoId).map(({ id, oraInizio, oraFine, origine }) => ({ id, oraInizio, oraFine, origine })),
+          // Modificabili dal caposquadra solo le fasce nate da un caposquadra; le altre sono `fisse`.
+          fasce: sue.filter((f) => f.progettoId === progettoId && f.origine === 'CAPOSQUADRA').map(({ id, oraInizio, oraFine, origine }) => ({ id, oraInizio, oraFine, origine })),
+          fisse: sue.filter((f) => f.progettoId === progettoId && f.origine !== 'CAPOSQUADRA').map(({ oraInizio, oraFine, origine }) => ({ oraInizio, oraFine, origine })),
           // Degli altri progetti solo gli orari: il caposquadra non vede su cosa.
           occupato: sue.filter((f) => f.progettoId !== progettoId).map(({ oraInizio, oraFine }) => ({ oraInizio, oraFine })),
         };
@@ -124,7 +136,9 @@ export function rotteSquadra(prisma: PrismaClient, oggi: () => string) {
     const g = schemaGiornataSquadra.parse(req.body);
     const progetto = await controllaCaposquadra(req, g.progettoId);
     controllaGiorno(g.data);
-    if (!(await squadra(g.progettoId)).some((m) => m.id === g.dipendenteId)) throw vietato('Questo dipendente non è nella squadra del progetto');
+    const capoId = mioDipendente(req);
+    if (g.dipendenteId === capoId) throw vietato('Da caposquadra non puoi scrivere le tue ore: le inserisce HR, oppure usa la timbratura');
+    if (!(await squadra(g.progettoId, capoId)).some((m) => m.id === g.dipendenteId)) throw vietato('Questo dipendente non è nella squadra del progetto');
     for (const [i, f] of g.fasce.entries()) {
       if (f.oraFine <= f.oraInizio) throw richiestaNonValida('L\'ora di fine deve essere dopo l\'inizio', { [`fasce.${i}.oraFine`]: 'Deve essere dopo l\'inizio' });
     }
@@ -136,23 +150,33 @@ export function rotteSquadra(prisma: PrismaClient, oggi: () => string) {
       caricaContestoOre(prisma, { dipendenteIds: [g.dipendenteId], da: g.data, a: g.data, oggi: oggi() }),
       prisma.registrazioneOraria.findMany({ where: { dipendenteId: g.dipendenteId, data: g.data } }),
     ]);
-    const altre = delGiorno.filter((f) => f.progettoId !== g.progettoId);
+    // `altre`: tutto quello che il caposquadra non può toccare, cioè le ore su altri progetti e,
+    // su questo, quelle non nate da un caposquadra. `sue`: le fasce che questo salvataggio sostituisce.
+    const sue = delGiorno.filter((f) => f.progettoId === g.progettoId && f.origine === 'CAPOSQUADRA');
+    const altre = delGiorno.filter((f) => !sue.includes(f));
     if (g.fasce.length) {
       const errori = erroriRegole(ctx, { dipendenteId: g.dipendenteId, data: g.data, progettoId: g.progettoId });
       if (errori.length) throw richiestaNonValida(errori[0].messaggio);
     }
     for (const f of g.fasce) {
       const conflitto = altre.find((a) => siSovrappongono(f, a));
-      if (conflitto) throw new ErroreHttp(409, `La fascia ${f.oraInizio}-${f.oraFine} si sovrappone a ore già registrate su un altro progetto (${conflitto.oraInizio}-${conflitto.oraFine}) il ${formattaData(g.data)}`);
+      if (conflitto) {
+        const dove = conflitto.progettoId === g.progettoId ? 'inserite da HR o timbrate su questo progetto' : 'registrate su un altro progetto';
+        throw new ErroreHttp(409, `La fascia ${f.oraInizio}-${f.oraFine} si sovrappone a ore già ${dove} (${conflitto.oraInizio}-${conflitto.oraFine}) il ${formattaData(g.data)}`);
+      }
     }
     const nuove = g.fasce.map((f) => ({ ...f, progettoId: g.progettoId }));
     const oltre = superamentiMassimo([...altre, ...nuove], new Map([[progetto.id, progetto.maxMinutiGiorno]]));
     if (oltre.length) throw richiestaNonValida(messaggioMassimo(progetto.codice, oltre[0].minuti, oltre[0].massimo));
 
-    // Sostituzione atomica delle sole fasce di questo progetto: le altre non si toccano.
+    // Sostituzione atomica delle sole fasce del caposquadra. Quelle rimaste uguali (stesso
+    // orario) non si cancellano e ricreano: tengono id, nota e data di creazione.
+    const uguale = (a: { oraInizio: string; oraFine: string }, b: { oraInizio: string; oraFine: string }) => a.oraInizio === b.oraInizio && a.oraFine === b.oraFine;
+    const daTogliere = sue.filter((s) => !nuove.some((n) => uguale(n, s)));
+    const daCreare = nuove.filter((n) => !sue.some((s) => uguale(n, s)));
     await prisma.$transaction([
-      prisma.registrazioneOraria.deleteMany({ where: { dipendenteId: g.dipendenteId, data: g.data, progettoId: g.progettoId } }),
-      prisma.registrazioneOraria.createMany({ data: nuove.map((f) => ({ ...f, dipendenteId: g.dipendenteId, data: g.data, origine: 'CAPOSQUADRA' as const })) }),
+      prisma.registrazioneOraria.deleteMany({ where: { id: { in: daTogliere.map((f) => f.id) } } }),
+      prisma.registrazioneOraria.createMany({ data: daCreare.map((f) => ({ ...f, dipendenteId: g.dipendenteId, data: g.data, origine: 'CAPOSQUADRA' as const })) }),
     ]);
     res.json({ salvate: nuove.length, minuti: nuove.reduce((s, f) => s + durataMinuti(f.oraInizio, f.oraFine), 0) });
   });

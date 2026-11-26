@@ -54,7 +54,7 @@ describe('caposquadra', () => {
     const miei = (await mario.chiama('GET', '/api/squadra')).corpo;
     expect(miei.progetti).toHaveLength(1);
     expect(miei.progetti[0]).toMatchObject({ codice: 'PRG-SQUADRA' });
-    expect(miei.progetti[0].squadra.map((m: { cognome: string }) => m.cognome)).toEqual(['Esposito', 'Rossi']);
+    expect(miei.progetti[0].squadra.map((m: { cognome: string }) => m.cognome)).toEqual(['Esposito']); // Giorno 48: il caposquadra non è nella sua squadra
 
     // Vede le fasce sul suo progetto e solo gli orari occupati altrove (non il progetto).
     const prima = (await mario.chiama('GET', `/api/squadra/giornata?progettoId=${p.id}&data=${OGGI_PROVA}`)).corpo;
@@ -95,6 +95,27 @@ describe('caposquadra', () => {
     // Elenco vuoto: toglie solo le fasce del suo progetto.
     expect((await mario.chiama('PUT', '/api/squadra/giornata', giornata([]))).corpo).toEqual({ salvate: 0, minuti: 0 });
     expect(await db.prisma.registrazioneOraria.count({ where: { dipendenteId: esposito.id, data: OGGI_PROVA } })).toBe(1);
+
+    // Giorno 48: le ore messe da HR sul suo progetto il caposquadra le vede ma non le tocca.
+    const diHr = await db.prisma.registrazioneOraria.create({ data: { dipendenteId: esposito.id, progettoId: p.id, data: OGGI_PROVA, oraInizio: '06:00', oraFine: '07:00', origine: 'INTERFACCIA', note: 'Carico materiali' } });
+    expect((await mario.chiama('PUT', '/api/squadra/giornata', giornata([{ oraInizio: '07:00', oraFine: '08:00' }]))).corpo).toEqual({ salvate: 1, minuti: 60 });
+    const prima48 = await db.prisma.registrazioneOraria.findFirstOrThrow({ where: { dipendenteId: esposito.id, data: OGGI_PROVA, origine: 'CAPOSQUADRA' } });
+    // Aggiunge una fascia: quella già salvata non viene cancellata e ricreata (stesso id).
+    expect((await mario.chiama('PUT', '/api/squadra/giornata', giornata([{ oraInizio: '07:00', oraFine: '08:00' }, { oraInizio: '08:00', oraFine: '09:00' }]))).stato).toBe(200);
+    expect(await db.prisma.registrazioneOraria.findUnique({ where: { id: prima48.id } })).toMatchObject({ oraInizio: '07:00', oraFine: '08:00' });
+    const vista48 = (await mario.chiama('GET', `/api/squadra/giornata?progettoId=${p.id}&data=${OGGI_PROVA}`)).corpo.find((m: { id: number }) => m.id === esposito.id);
+    expect(vista48.fisse).toEqual([{ oraInizio: '06:00', oraFine: '07:00', origine: 'INTERFACCIA' }]);
+    expect(vista48.fasce.map((f: { oraInizio: string }) => f.oraInizio)).toEqual(['07:00', '08:00']);
+    // Non può sovrapporsi alla fascia di HR né toglierla svuotando la giornata.
+    const suHr = await mario.chiama('PUT', '/api/squadra/giornata', giornata([{ oraInizio: '06:30', oraFine: '07:30' }]));
+    expect(suHr.stato).toBe(409);
+    expect(suHr.corpo.errore).toMatch(/inserite da HR o timbrate su questo progetto \(06:00-07:00\)/);
+    expect((await mario.chiama('PUT', '/api/squadra/giornata', giornata([]))).stato).toBe(200);
+    expect(await db.prisma.registrazioneOraria.findUnique({ where: { id: diHr.id } })).toMatchObject({ origine: 'INTERFACCIA', note: 'Carico materiali' });
+    // Le proprie ore il caposquadra non le scrive.
+    const mie48 = await mario.chiama('PUT', '/api/squadra/giornata', giornata([{ oraInizio: '08:00', oraFine: '09:00' }], { dipendenteId: rossi.id }));
+    expect(mie48.stato).toBe(403);
+    expect(mie48.corpo.errore).toMatch(/non puoi scrivere le tue ore/);
 
     // Tolta la nomina, torna un dipendente come gli altri.
     await admin.chiama('PUT', `/api/progetti/${p.id}/dipendenti/${rossi.id}/caposquadra`, { caposquadra: false });

@@ -5,6 +5,8 @@
  * Chi è stato nominato caposquadra di un progetto da HR (scheda del progetto → Dipendenti
  * assegnati) sceglie qui progetto e giorno e scrive le ore di ogni dipendente della squadra
  * su quel progetto: una riga per persona, con le sue fasce orarie e il pulsante Salva.
+ * Il caposquadra non compare nell'elenco (le sue ore le mette HR o le timbra) e le fasce
+ * inserite da HR o nate da una timbratura si vedono ma non si modificano (`fisse`).
  * Si possono scrivere solo oggi e i sette giorni prima; il resto resta a HR, che vede tutto
  * nel calendario e può correggere.
  *
@@ -20,7 +22,10 @@ import { Avviso, Caricamento, classiInput, IntestazionePagina, Pulsante } from '
 import { usaDati } from '../usaDati';
 
 type Fascia = { oraInizio: string; oraFine: string };
-type Membro = { id: number; nome: string; cognome: string; matricola: string; fasce: (Fascia & { id: number; origine: string })[]; occupato: Fascia[] };
+type Membro = { id: number; nome: string; cognome: string; matricola: string; fasce: (Fascia & { id: number; origine: string })[]; fisse: (Fascia & { origine: string })[]; occupato: Fascia[] };
+
+/** Da dove viene una fascia che il caposquadra non può cambiare. */
+const DA_CHI: Record<string, string> = { TIMBRATURA: 'timbrata', IMPORT_EXCEL: 'importata da HR' };
 type Squadre = { oggi: string; dal: string; progetti: { id: number; codice: string; nome: string; colore: string | null; squadra: { id: number }[] }[] };
 
 function RigaMembro({ m, progettoId, data, onSalvato }: { m: Membro; progettoId: number; data: string; onSalvato: () => void }) {
@@ -37,7 +42,7 @@ function RigaMembro({ m, progettoId, data, onSalvato }: { m: Membro; progettoId:
   const cambia = (i: number, campo: keyof Fascia, valore: string) => setFasce(fasce.map((f, j) => (j === i ? { ...f, [campo]: valore } : f)));
   const complete = fasce.every((f) => f.oraInizio && f.oraFine);
   const modificato = JSON.stringify(fasce) !== iniziali;
-  const totale = fasce.reduce((s, f) => s + (f.oraInizio && f.oraFine && f.oraFine > f.oraInizio ? durataMinuti(f.oraInizio, f.oraFine) : 0), 0);
+  const totale = [...m.fisse, ...fasce].reduce((s, f) => s + (f.oraInizio && f.oraFine && f.oraFine > f.oraInizio ? durataMinuti(f.oraInizio, f.oraFine) : 0), 0);
 
   const salva = async () => {
     setMessaggio(null);
@@ -63,6 +68,11 @@ function RigaMembro({ m, progettoId, data, onSalvato }: { m: Membro; progettoId:
       </div>
       {m.occupato.length > 0 && (
         <div className="cifre mt-0.5 text-xs text-gray-600">Già occupato su altri progetti: {m.occupato.map((o) => `${o.oraInizio}–${o.oraFine}`).join(', ')}</div>
+      )}
+      {m.fisse.length > 0 && (
+        <div className="cifre mt-0.5 text-xs text-gray-600">
+          Già su questo progetto, non modificabili da qui: {m.fisse.map((f) => `${f.oraInizio}–${f.oraFine} (${DA_CHI[f.origine] ?? 'inserita da HR'})`).join(', ')}
+        </div>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {fasce.map((f, i) => (
