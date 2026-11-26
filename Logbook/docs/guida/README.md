@@ -595,6 +595,21 @@ prova a modificarne le ore riceve il messaggio "Il mese di … è chiuso".
 
 ## 4. Dal cellulare e sugli schermi grandi
 
+### Logbook come un'app sul telefono
+
+Dal 26/11/2026 Logbook si può mettere sulla schermata del telefono, con la sua icona, e
+aprire senza passare dal browser. Non c'è niente da scaricare da uno store.
+
+- **Android (Chrome):** aprire Logbook, menu con i tre puntini → **Aggiungi a schermata Home**
+  (o **Installa app**).
+- **iPhone (Safari):** aprire Logbook, pulsante **Condividi** → **Aggiungi alla schermata Home**.
+- **PC (Chrome o Edge):** icona **Installa** nella barra dell'indirizzo.
+
+Serve che Logbook sia aperto a un indirizzo sicuro (`https://`, come quello su Vercel) oppure
+sullo stesso PC. È sempre lo stesso Logbook: accesso, dati e regole non cambiano, e serve la
+connessione.
+
+
 Logbook si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
 aprire lo stesso indirizzo dal browser del telefono.
 

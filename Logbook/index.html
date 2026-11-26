@@ -9,6 +9,16 @@
     <!-- Icona della Suite Cosedil (copiata da portale/assets/icon) -->
     <link rel="icon" type="image/png" href="/logo-cosedil.png" />
     <meta name="theme-color" content="#0c4577" />
+    <!-- Giorno 39 (26/11/2026): Logbook si può mettere sulla schermata del telefono come
+         un'app ("Aggiungi a schermata Home" / "Installa app"). Il manifest dice nome, icone
+         e colori; le righe apple-* servono a Safari su iPhone, che il manifest lo legge solo
+         in parte. Icone create dal logo della suite (public/icona-*.png). -->
+    <link rel="manifest" href="/logbook.webmanifest" />
+    <link rel="apple-touch-icon" href="/icona-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Logbook" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <div id="radice"></div>

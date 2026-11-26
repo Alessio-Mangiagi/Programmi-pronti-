@@ -41,7 +41,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 36 (26/11):** avvisi via email: richieste a HR, esiti al dipendente, giorni senza ore, attestati in scadenza ✅
 - **Giorno 37 (26/11):** chiusura del mese: HR blocca ore, assenze e festività di un mese finito; riapertura ✅
 - **Giorno 38 (26/11):** saldo ferie e permessi: quota per dipendente scritta da HR, maturato/goduto/residuo calcolati ✅
-- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 4 timbratura da telefono, 5 icona sul telefono, 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
+- **Giorno 39 (26/11):** Logbook installabile sulla schermata del telefono (manifest e icone) ✅
+- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
@@ -1051,3 +1052,11 @@ Verifiche:
 - `npm test` con 4 test nuovi in `saldi.test.ts`: mesi che maturano (soglia dei 15 giorni, cavallo d'anno), conto completo con ferie a cavallo di oggi e di una festività, assunto dopo e cessato, API (permessi, validazione, richiesta nuova che entra "in attesa", quota tolta). Typecheck ok.
 - Prova dal vivo sulla copia (`scratchpad/giorno38.mjs`, 7 su 7): quota di Rossi Mario dal modulo, saldo 21,5 giorni = 2,5 + 22 − 3, tessere del dipendente da telefono. Immagini 50, 51, 52 della guida.
 - Regola da confermare con l'utente: la soglia dei 15 giorni per far maturare un mese è la prassi usuale delle buste paga, non una scelta dichiarata dall'utente.
+
+### Giorno 39 — Logbook sulla schermata del telefono (26/11/2026) ✅
+
+Punto 5 della richiesta "implementa tutto partendo dal primo punto" (il punto 4, timbratura, aspetta una decisione dell'utente).
+
+- `public/logbook.webmanifest` (nome, colori, `display: standalone`, icone 192 e 512 anche "maskable"), `public/icona-192.png`, `icona-512.png`, `icona-180.png` create dal logo chiaro della suite su fondo blu Cosedil; richiami in `index.html` (manifest, apple-touch-icon, meta per iPhone).
+- Nessun service worker: Logbook non lavora senza connessione, e i browser attuali non lo chiedono più per proporre l'installazione.
+- Verifiche: `installabile.test.ts` (manifest valido, misure vere dei PNG, richiami nella pagina); prova nel browser (`scratchpad/giorno39.mjs`, 7 su 7): manifest letto senza errori, nessun ostacolo all'installazione, icone servite, nessun errore di sicurezza in console. NON provato su un telefono vero.

@@ -1,0 +1,17 @@
+{
+  "name": "Logbook — ore e presenze",
+  "short_name": "Logbook",
+  "description": "Ore, presenze e assenze dei dipendenti",
+  "lang": "it",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f9f9fb",
+  "theme_color": "#0c4577",
+  "icons": [
+    { "src": "/icona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
