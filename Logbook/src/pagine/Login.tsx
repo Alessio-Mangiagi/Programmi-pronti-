@@ -14,6 +14,7 @@
 import { useState, type FormEvent } from 'react';
 import { ErroreApi } from '../api';
 import { CHIAVE_INATTIVITA, useAuth } from '../auth';
+import { PasswordDimenticata } from '../componenti/PasswordDimenticata';
 import { Avviso, Campo, classiInput, Pulsante } from '../componenti/ui';
 
 /** Legge e toglie il segno "sessione chiusa per inattività": il messaggio compare una volta sola. */
@@ -37,6 +38,9 @@ export function Login() {
   /** Valorizzato quando il server ha mandato il codice: indirizzo (mascherato) a cui è andato. */
   const [codiceInviatoA, setCodiceInviatoA] = useState<string | null>(null);
   const [codice, setCodice] = useState('');
+  // Giorno 40: modulo "Password dimenticata" al posto dell'accesso; al ritorno, il messaggio di esito.
+  const [dimenticata, setDimenticata] = useState(false);
+  const [esito, setEsito] = useState<string | null>(null);
 
   const entra = async (e: FormEvent) => {
     e.preventDefault();
@@ -98,7 +102,17 @@ export function Login() {
           <div className="font-display text-sm text-white/60">Costruiamo il tuo domani</div>
           <div className="absolute inset-x-0 bottom-0 h-1 bg-marchio-verde" />
         </div>
-        {codiceInviatoA === null ? (
+        {dimenticata ? (
+          <PasswordDimenticata
+            usernameIniziale={username}
+            onFine={(messaggio) => {
+              setDimenticata(false);
+              setEsito(messaggio ?? null);
+              setPassword('');
+              setErrore(null);
+            }}
+          />
+        ) : codiceInviatoA === null ? (
           <form onSubmit={entra} className="min-w-0 flex-1 space-y-4 p-5 sm:p-8">
             <div>
               <div className="sopratitolo">Accesso</div>
@@ -106,6 +120,7 @@ export function Login() {
               <p className="mt-1 text-sm text-gray-500">Usa il nome utente e la password ricevuti da HR.</p>
             </div>
             {inattivita && !errore && <Avviso tipo="info">Sessione chiusa dopo 15 minuti senza attività. Entra di nuovo per continuare.</Avviso>}
+            {esito && !errore && <Avviso tipo="successo">{esito}</Avviso>}
             {errore && <Avviso tipo="errore">{errore}</Avviso>}
             <Campo etichetta="Nome utente">
               <input autoFocus autoComplete="username" className={classiInput()} value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -116,6 +131,9 @@ export function Login() {
             <Pulsante type="submit" variante="primario" className="w-full py-2.5" disabled={invio || !username || !password}>
               {invio ? 'Accesso in corso…' : 'Accedi'}
             </Pulsante>
+            <button type="button" className="text-sm text-marchio underline-offset-2 hover:underline" onClick={() => { setDimenticata(true); setEsito(null); setErrore(null); }}>
+              Password dimenticata?
+            </button>
           </form>
         ) : (
           <form onSubmit={conferma} className="min-w-0 flex-1 space-y-4 p-5 sm:p-8">
