@@ -25,7 +25,7 @@ import { CambiaPassword } from './CambiaPassword';
 import { Notifiche } from './Segnalazioni';
 import { Icona, type NomeIcona } from './icone';
 
-type VoceMenu = { a: string; etichetta: string; icona: NomeIcona; soloAdmin?: boolean; etichettaDipendente?: string };
+type VoceMenu = { a: string; etichetta: string; icona: NomeIcona; soloAdmin?: boolean; soloCaposquadra?: boolean; etichettaDipendente?: string };
 
 const MENU: VoceMenu[] = [
   { a: '/', etichetta: 'Dashboard', icona: 'dashboard' },
@@ -33,6 +33,8 @@ const MENU: VoceMenu[] = [
   { a: '/dipendenti', etichetta: 'Dipendenti', icona: 'dipendenti', soloAdmin: true },
   // Dal Giorno 17 il dipendente vede "I miei progetti" per caricare la documentazione di avanzamento.
   { a: '/progetti', etichetta: 'Progetti', icona: 'progetti', etichettaDipendente: 'I miei progetti' },
+  // Giorno 43: solo per chi HR ha nominato caposquadra di un progetto attivo.
+  { a: '/squadra', etichetta: 'La mia squadra', icona: 'dipendenti', soloCaposquadra: true },
   { a: '/assenze', etichetta: 'Assenze', icona: 'assenze', etichettaDipendente: 'Le mie assenze' },
   { a: '/importa', etichetta: 'Importa', icona: 'importa', soloAdmin: true },
   { a: '/esporta', etichetta: 'Esporta', icona: 'esporta', soloAdmin: true },
@@ -47,7 +49,7 @@ export function Layout() {
   const [menuAperto, setMenuAperto] = useState(false);
   const [cambioPassword, setCambioPassword] = useState(false);
   const posizione = useLocation();
-  const voci = MENU.filter((v) => admin || !v.soloAdmin);
+  const voci = MENU.filter((v) => (admin || !v.soloAdmin) && (!v.soloCaposquadra || utente?.caposquadra === true));
 
   return (
     <div className="flex min-h-[100dvh]">

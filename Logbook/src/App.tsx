@@ -22,6 +22,7 @@ import { Login } from './pagine/Login';
 import { PasswordProvvisoria } from './pagine/PasswordProvvisoria';
 import { Progetti } from './pagine/Progetti';
 import { Registro } from './pagine/Registro';
+import { Squadra } from './pagine/Squadra';
 import { SchedaAssenza } from './pagine/SchedaAssenza';
 import { SchedaDipendente } from './pagine/SchedaDipendente';
 import { SchedaProgetto } from './pagine/SchedaProgetto';
@@ -55,6 +56,8 @@ function Rotte() {
         <Route path="esporta" element={<SoloAdmin><Esporta /></SoloAdmin>} />
         <Route path="impostazioni" element={<SoloAdmin><Impostazioni /></SoloAdmin>} />
         <Route path="registro" element={<SoloAdmin><Registro /></SoloAdmin>} />
+        {/* Giorno 43: pagina del caposquadra (chi non lo è vede un avviso; il server rifiuta comunque). */}
+        <Route path="squadra" element={<Squadra />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

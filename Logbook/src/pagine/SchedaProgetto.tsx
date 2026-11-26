@@ -322,6 +322,15 @@ function DipendentiAssegnati({ progetto }: { progetto: Progetto }) {
     }
   };
 
+  // Giorno 43: HR nomina o toglie il caposquadra del progetto.
+  const cambiaCaposquadra = (a: Assegnato, caposquadra: boolean) => {
+    const nome = `${a.dipendente.cognome} ${a.dipendente.nome}`;
+    esegui(async () => {
+      await api.put(`/api/progetti/${progetto.id}/dipendenti/${a.dipendente.id}/caposquadra`, { caposquadra });
+      return caposquadra ? `${nome} è caposquadra di ${progetto.codice}: può inserire le ore della squadra su questo progetto` : `${nome} non è più caposquadra di ${progetto.codice}`;
+    });
+  };
+
   const aggiungi = () => {
     if (!scelto) return;
     esegui(async () => {
@@ -346,7 +355,7 @@ function DipendentiAssegnati({ progetto }: { progetto: Progetto }) {
       <h2 id="titolo-assegnati" className="mb-1 text-sm font-semibold uppercase text-gray-500">
         Dipendenti assegnati {assegnati && <span className="cifre font-normal normal-case text-gray-400">({assegnati.length})</span>}
       </h2>
-      <p className="mb-3 text-xs text-gray-500">Solo i dipendenti assegnati possono registrare ore su questo progetto.</p>
+      <p className="mb-3 text-xs text-gray-500">Solo i dipendenti assegnati possono avere ore su questo progetto. Chi ha la spunta Caposquadra può inserire le ore della squadra.</p>
       {progetto.stato !== 'CHIUSO' && (
         <div className="mb-3 flex flex-wrap items-start gap-2">
           <div className="min-w-0 flex-[1_1_16rem]">
@@ -393,6 +402,10 @@ function DipendentiAssegnati({ progetto }: { progetto: Progetto }) {
             <span className="w-16 text-right" title="Ore registrate su questo progetto">
               {formattaOre(a.minuti)} h
             </span>
+            <label className="flex cursor-pointer items-center gap-1 text-xs text-gray-700" title="Il caposquadra può inserire le ore dei dipendenti assegnati, solo su questo progetto">
+              <input type="checkbox" className="h-3.5 w-3.5 accent-[#0c4577]" checked={a.caposquadra} disabled={a.dipendente.stato === 'CESSATO'} onChange={(e) => cambiaCaposquadra(a, e.target.checked)} />
+              Caposquadra
+            </label>
             <button type="button" className="rounded px-2 py-0.5 text-xs text-errore hover:bg-[#fdf3f2]" onClick={() => togli(a)}>
               Togli
             </button>

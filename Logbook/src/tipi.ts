@@ -15,6 +15,8 @@ export type UtenteCollegato = {
   nomeVisualizzato: string;
   /** Password provvisoria: finché è true si vede solo la pagina per cambiarla (Giorno 24). */
   passwordDaCambiare: boolean;
+  /** Caposquadra di almeno un progetto attivo (Giorno 43): vede la voce "La mia squadra". */
+  caposquadra?: boolean;
 };
 
 export type TipoContratto = 'INDETERMINATO' | 'DETERMINATO' | 'APPRENDISTATO' | 'SOMMINISTRAZIONE' | 'COLLABORAZIONE' | 'TIROCINIO';
@@ -137,6 +139,8 @@ export type Impostazioni = {
 
 /** GET /api/progetti/:id/dipendenti — un dipendente assegnato, con le ore fatte sul progetto. */
 export type Assegnato = {
+  /** Caposquadra di questo progetto (Giorno 43): lo decide HR. */
+  caposquadra: boolean;
   id: number;
   creatoIl: string;
   minuti: number;
