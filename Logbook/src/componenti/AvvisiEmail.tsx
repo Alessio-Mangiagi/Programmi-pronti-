@@ -4,7 +4,7 @@
  *
  * Qui HR sceglie a chi arrivano gli avvisi per l'ufficio personale e quali avvisi mandare:
  * richieste di assenza (a HR), esito delle richieste (al dipendente), promemoria settimanale
- * dei giorni senza ore, attestati in scadenza. Le regole di invio sono in
+ * dei giorni senza ore, attestati in scadenza, chiusura di un progetto. Le regole di invio sono in
  * server/servizi/avvisi.ts; le API in server/rotte/impostazioni.ts (PUT /avvisi, POST
  * /avvisi/prova).
  *
@@ -17,23 +17,24 @@ import { api, ErroreApi } from '../api';
 import type { Impostazioni } from '../tipi';
 import { Avviso, Campo, classiInput, Etichetta, Pulsante } from './ui';
 
-const VOCI: { chiave: 'richieste' | 'esiti' | 'oreMancanti' | 'attestati'; titolo: string; dettaglio: string }[] = [
+const VOCI: { chiave: 'richieste' | 'esiti' | 'oreMancanti' | 'attestati' | 'progettoChiuso'; titolo: string; dettaglio: string }[] = [
   { chiave: 'richieste', titolo: 'Nuova richiesta di assenza', dettaglio: 'A HR, appena un dipendente chiede ferie o permessi o comunica una malattia' },
   { chiave: 'esiti', titolo: 'Esito della richiesta', dettaglio: 'Al dipendente, quando la richiesta viene approvata o rifiutata' },
   { chiave: 'oreMancanti', titolo: 'Giorni senza ore', dettaglio: 'Una volta alla settimana: al dipendente i suoi giorni scoperti delle ultime due settimane, a HR il riepilogo' },
   { chiave: 'attestati', titolo: 'Attestati in scadenza', dettaglio: 'Al dipendente e a HR: 30 giorni prima, 7 giorni prima e il giorno della scadenza' },
+  { chiave: 'progettoChiuso', titolo: 'Progetto chiuso', dettaglio: 'Quando un progetto passa a "Chiuso": a HR il riepilogo di ore, costo e cose rimaste in attesa; ai dipendenti assegnati l\'avviso che non si registrano più ore' },
 ];
 
 export function AvvisiEmail({ dati, ricarica }: { dati: Impostazioni['avvisi']; ricarica: () => void }) {
   const [emailHr, setEmailHr] = useState('');
-  const [scelte, setScelte] = useState({ richieste: true, esiti: true, oreMancanti: true, attestati: true });
+  const [scelte, setScelte] = useState({ richieste: true, esiti: true, oreMancanti: true, attestati: true, progettoChiuso: true });
   const [erroreCampo, setErroreCampo] = useState<string | undefined>();
   const [messaggio, setMessaggio] = useState<{ tipo: 'errore' | 'successo'; testo: string } | null>(null);
   const [lavoro, setLavoro] = useState<'salva' | 'prova' | null>(null);
 
   useEffect(() => {
     setEmailHr(dati.emailHr);
-    setScelte({ richieste: dati.richieste, esiti: dati.esiti, oreMancanti: dati.oreMancanti, attestati: dati.attestati });
+    setScelte({ richieste: dati.richieste, esiti: dati.esiti, oreMancanti: dati.oreMancanti, attestati: dati.attestati, progettoChiuso: dati.progettoChiuso });
   }, [dati]);
 
   const salva = async (e: FormEvent) => {

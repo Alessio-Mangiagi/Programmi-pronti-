@@ -130,7 +130,7 @@ export type DocumentoDipendente = { id: number; dipendenteId: number; titolo: st
 export type Impostazioni = {
   skytower: { url: string; email: string; tokenImpostato: boolean; attivo: boolean };
   /** Avvisi via email (26/11/2026): emailHr è il testo salvato; vuoto = emailPredefinita (il proprietario). */
-  avvisi: { emailHr: string; emailPredefinita: string | null; postaConfigurata: boolean; richieste: boolean; esiti: boolean; oreMancanti: boolean; attestati: boolean };
+  avvisi: { emailHr: string; emailPredefinita: string | null; postaConfigurata: boolean; richieste: boolean; esiti: boolean; oreMancanti: boolean; attestati: boolean; progettoChiuso: boolean };
 };
 
 // ---------------------------------------------------------------------------
