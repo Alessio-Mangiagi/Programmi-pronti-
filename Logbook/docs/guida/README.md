@@ -386,6 +386,26 @@ con un file, una volta sola; poi compare il link al documento in SkyTower).
 
 **Note interne**: appunti di HR sul progetto, che i dipendenti non vedono.
 
+#### Costo della manodopera di un progetto
+
+Dal 26/11/2026 la scheda di ogni progetto ha il riquadro **Costo della manodopera**, visibile
+solo agli amministratori:
+
+- **costo lordo e netto** delle ore registrate sul progetto (ore di ogni dipendente per il suo
+  costo orario, scritto nella scheda del dipendente);
+- **preventivo**: si scrivono qui gli euro lordi e le ore preventivate, poi **Salva preventivo**.
+  Due barre mostrano quanto è stato consumato: verdi fino all'80%, gialle fino al 100%, rosse
+  quando si sfora;
+- il dettaglio **per dipendente** e **per mese**.
+
+![Costo della manodopera](img/54-costo-manodopera.png)
+
+Da sapere:
+- chi ha ore sul progetto ma **nessun costo orario** in anagrafica conta nelle ore e non negli
+  euro: il riquadro avvisa che il totale è parziale;
+- il costo usa il costo orario che il dipendente ha **oggi**, anche per le ore dei mesi passati;
+- i dipendenti non vedono né questo riquadro né il preventivo.
+
 ### Assenze
 
 Il clic su una richiesta (o **+ Nuova assenza**) apre la **pagina dell'assenza**: a sinistra

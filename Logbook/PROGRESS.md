@@ -43,6 +43,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 38 (26/11):** saldo ferie e permessi: quota per dipendente scritta da HR, maturato/goduto/residuo calcolati ✅
 - **Giorno 39 (26/11):** Logbook installabile sulla schermata del telefono (manifest e icone) ✅
 - **Giorno 40 (26/11):** password dimenticata: codice via email e password nuova dalla pagina di accesso ✅
+- **Giorno 41 (26/11):** costo della manodopera per commessa con preventivo (euro e ore), solo HR ✅
 - **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
@@ -1070,3 +1071,14 @@ Punto 10 della richiesta "implementa tutto partendo dal primo punto" (fatto prim
 - Dopo il cambio: password non più provvisoria, sessioni e PC fidati dimenticati, blocco del login azzerato; nessuna sessione aperta (si rientra dal login, gli amministratori ripassano dal codice di accesso).
 - Interfaccia: `src/componenti/PasswordDimenticata.tsx` e collegamento "Password dimenticata?" in `src/pagine/Login.tsx`.
 - Verifiche: `password-dimenticata.test.ts` (4 test: stessa risposta per account esistente, inesistente e senza email; codice sbagliato, di un altro account, già usato; password debole; sessioni chiuse; 12 caratteri per gli amministratori; 5 codici all'ora; senza posta). Prova dal vivo sulla copia con finta posta (`scratchpad/giorno40.mjs`, 7 su 7). Immagine 53 della guida.
+
+### Giorno 41 — Costo della manodopera per commessa (26/11/2026) ✅
+
+Punto 9 della richiesta "implementa tutto partendo dal primo punto".
+
+- `Progetto.preventivoManodoperaCent` e `preventivoOre` (migrazione SQLite `20261126140000_preventivo_manodopera`; PostgreSQL con `prisma db push`).
+- `server/rotte/costi-progetti.ts` su `/api/costi-progetti`, solo amministratori: elenco di tutti i progetti, dettaglio per dipendente e per mese, `PUT /:id/preventivo`. Chi non ha il costo orario è contato nelle ore e segnalato (`senzaCosto`).
+- `server/rotte/progetti.ts`: i preventivi sono tolti dalle risposte ai dipendenti (elenco e scheda), come già la commessa SkyTower.
+- Interfaccia: `src/componenti/CostoManodopera.tsx` nella scheda del progetto (totali, barre di consumo, modulo del preventivo, due tabelle).
+- Limite dichiarato: si usa il costo orario attuale anche per le ore passate (non c'è storico dei costi).
+- Verifiche: `costi-progetti.test.ts` (conti a mano su un progetto nuovo: 810 minuti, 291,00 € lordi, 190,00 € netti, 29,1% e 67,5% del preventivo; permessi; preventivo tolto; nessun preventivo ai dipendenti). Prova dal vivo sulla copia (`scratchpad/giorno41.mjs`, 8 su 8). Immagine 54 della guida. Trovato e corretto durante la prova: un importo scritto male nel preventivo non mostrava nessun messaggio.

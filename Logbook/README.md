@@ -107,6 +107,14 @@ Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Costo della manodopera per commessa (dal 26/11/2026)
+
+`/api/costi-progetti` (solo amministratori, `server/rotte/costi-progetti.ts`): per ogni
+progetto ore, costo lordo e netto (minuti × costo orario del dipendente) e confronto con il
+preventivo (`Progetto.preventivoManodoperaCent`, `preventivoOre`); dettaglio per dipendente e
+per mese. Riquadro nella scheda del progetto (`src/componenti/CostoManodopera.tsx`). Il costo
+orario usato è quello attuale: non c'è storico. I preventivi non escono mai verso i dipendenti.
+
 ### Password dimenticata (dal 26/11/2026)
 
 Dalla pagina di accesso: `POST /api/auth/dimenticata` manda un codice di 6 cifre all'email
