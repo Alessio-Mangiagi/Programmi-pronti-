@@ -35,6 +35,33 @@ test("pagine della commessa e personali", async ({ page, baseURL }) => {
   expect(found).toEqual([]);
 });
 
+test("discussioni, bacheca dei task e scheda del task", async ({ page, baseURL }) => {
+  // ADR-59: elenco e conversazione, bacheca con una scheda, scheda del task e finestra "Nuovo task"
+  const api = await apiAs(baseURL, "com.admin@com.example");
+  const { projectId } = await projectAndFolder(api, () => true);
+  const membri: { user_id: string; email: string }[] = await (await api.get(`/api/projects/${projectId}/members`)).json();
+  const dl = membri.find((m) => m.email === "com.dl@com.example")!.user_id;
+  const d = await (await api.post(`/api/projects/${projectId}/discussions`, {
+    data: { title: "Accessibilità discussione", body: "Primo messaggio", participant_ids: [dl] } })).json();
+  const t = await (await api.post(`/api/projects/${projectId}/team-tasks`, {
+    data: { title: "Accessibilità task", assignee_ids: [dl], items: ["Prima voce"], due_on: "2031-01-15", priority: "HIGH" } })).json();
+  await loginUi(page, "com.admin@com.example");
+  const found: string[] = [];
+  for (const path of [`/progetti/${projectId}/discussioni`, `/progetti/${projectId}/discussioni/${d.id}`,
+                      `/progetti/${projectId}/task`]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    found.push(...await violations(page, path));
+  }
+  await page.goto(`/progetti/${projectId}/task/${t.id}`);
+  await page.getByRole("dialog", { name: /Task TASK-/ }).getByText("Prima voce").waitFor();
+  found.push(...await violations(page, "scheda del task", ".MuiDrawer-paper"));
+  await page.getByRole("button", { name: "Chiudi la scheda del task" }).click();
+  await page.getByRole("button", { name: "Nuovo task" }).click();
+  found.push(...await violations(page, "nuovo task", '[role="dialog"]'));
+  expect(found).toEqual([]);
+});
+
 test("dialog di caricamento con rinomina e viewer PDF", async ({ page, baseURL }) => {
   const api = await apiAs(baseURL, "com.admin@com.example");
   const { projectId, folderId } = await projectAndFolder(api, (n) => n.startsWith("COM"));

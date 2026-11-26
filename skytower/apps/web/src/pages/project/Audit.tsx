@@ -38,6 +38,10 @@ const EVENT_LABEL: Record<string, string> = {
   REVISION_STATE_CHANGED: "Cambio di stato", BULK_STATE_CHANGE: "Cambio di stato multiplo", WORKFLOW_STARTED: "Workflow avviato", WORKFLOW_TEMPLATE_IMPORTED: "Workflow importato da un altro progetto",
   WORKFLOW_CANCELLED: "Workflow annullato", TASK_COMPLETED: "Esito di revisione", WORKFLOW_TEMPLATE_SAVED: "Template workflow",
   RFI_CREATED: "RFI aperta", RFI_ANSWERED: "RFI risposta", RFI_MESSAGE_POSTED: "RFI messaggio", RFI_CLOSED: "RFI chiusa",
+  // discussioni e task (ADR-59): nel registro solo che esistono e chi li muove, il contenuto resta alle persone coinvolte
+  DISCUSSION_CREATED: "Discussione aperta", DISCUSSION_PARTICIPANTS_CHANGED: "Persone di una discussione cambiate",
+  DISCUSSION_CLOSED: "Discussione chiusa", DISCUSSION_REOPENED: "Discussione riaperta", DISCUSSION_LEFT: "Uscita da una discussione",
+  TEAM_TASK_CREATED: "Task assegnato", TEAM_TASK_UPDATED: "Task modificato", TEAM_TASK_DELETED: "Task eliminato",
   GRANT_CREATED: "Condivisione concessa", GRANT_REVOKED: "Condivisione revocata", CONTAINER_CREATED: "Cartella creata",
   CONTAINER_UPDATED: "Cartella modificata", MEMBER_ADDED: "Membro aggiunto", MEMBER_REMOVED: "Membro rimosso",
   ROLE_CREATED: "Ruolo creato", ROLE_UPDATED: "Ruolo modificato", ROLE_DELETED: "Ruolo eliminato",

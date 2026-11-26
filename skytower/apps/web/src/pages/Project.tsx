@@ -25,6 +25,9 @@ const PrivateAreasTab = lazy(() => import("./project/PrivateAreas").then((m) => 
 const AuditTab = lazy(() => import("./project/Audit").then((m) => ({ default: m.AuditTab })));
 const DashboardTab = lazy(() => import("./project/Dashboard").then((m) => ({ default: m.DashboardTab })));
 const RfisTab = lazy(() => import("./project/Rfis").then((m) => ({ default: m.RfisTab })));
+// Discussioni fra persone invitate e task con la bacheca (ADR-59)
+const DiscussioniTab = lazy(() => import("./project/Discussioni").then((m) => ({ default: m.DiscussioniTab })));
+const TaskTab = lazy(() => import("./project/Task").then((m) => ({ default: m.TaskTab })));
 const TransmittalsTab = lazy(() => import("./project/Transmittals").then((m) => ({ default: m.TransmittalsTab })));
 const WorkflowsTab = lazy(() => import("./project/Workflows").then((m) => ({ default: m.WorkflowsTab })));
 // Processi: workflow a grafo che partono senza documento (docs/workflow-grafo.md §2)
@@ -43,6 +46,8 @@ const TABS = [
   { path: "documenti", label: "Aree CDE" },
   { path: "riservate", label: "Aree riservate" },
   { path: "rfi", label: "RFI", operative: true },
+  { path: "discussioni", label: "Discussioni", operative: true },
+  { path: "task", label: "Task", operative: true },
   { path: "transmittal", label: "Transmittal", operative: true },
   { path: "workflow", label: "Workflow" },
   { path: "processi", label: "Processi", operative: true },
@@ -140,6 +145,10 @@ export function ProjectPage() {
         <Route path="riservate" element={<PrivateAreasTab project={project} />} />
         <Route path="rfi" element={<RfisTab project={project} />} />
         <Route path="rfi/:rfiId" element={<RfisTab project={project} />} />
+        <Route path="discussioni" element={<DiscussioniTab project={project} />} />
+        <Route path="discussioni/:discussionId" element={<DiscussioniTab project={project} />} />
+        <Route path="task" element={<TaskTab project={project} />} />
+        <Route path="task/:taskId" element={<TaskTab project={project} />} />
         <Route path="transmittal" element={<TransmittalsTab project={project} />} />
         <Route path="transmittal/:transmittalId" element={<TransmittalsTab project={project} />} />
         <Route path="workflow" element={<WorkflowsTab project={project} canManage={isProjectAdmin} />} />

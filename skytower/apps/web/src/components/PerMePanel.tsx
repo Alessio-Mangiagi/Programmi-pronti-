@@ -1,5 +1,6 @@
 // "><(((º> sabusabu <º)))><"
-// Colonna destra "Per me": compiti di revisione, trasmissioni da confermare, RFI e notifiche dell'utente su tutte le commesse.
+// Colonna destra "Per me": compiti di revisione, task assegnati, trasmissioni da confermare, RFI, discussioni con messaggi
+// nuovi e notifiche dell'utente su tutte le commesse. "Messaggi" raccoglie RFI e discussioni (ADR-59).
 // Si chiude in una barra di icone con i contatori; lo stato aperto/chiuso resta nel browser.
 import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +13,8 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ForumIcon from "@mui/icons-material/Forum";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import { api, AppNotification, MyTask, Rfi } from "../api";
+import { api, AppNotification, Discussion, MyTask, Rfi, TeamTask } from "../api";
+import { STATUS, giorno } from "./task/common";
 import type { TransmittalRow } from "../pages/project/Transmittals";
 
 type Filter = "ALL" | "TASKS" | "RFI" | "NOTIFICATIONS";
@@ -37,12 +39,16 @@ export function usePerMe() {
     queryKey: ["my-transmittals"], queryFn: () => api<TransmittalRow[]>("/me/transmittals"), refetchInterval: 120_000,
   });
   const rfis = useQuery({ queryKey: ["my-rfis"], queryFn: () => api<Rfi[]>("/me/rfis"), refetchInterval: 120_000 });
+  // task fra le persone assegnati a me, discussioni con messaggi non letti (ADR-59)
+  const teamTasks = useQuery({ queryKey: ["my-team-tasks"], queryFn: () => api<TeamTask[]>("/me/team-tasks"), refetchInterval: 120_000 });
+  const discussions = useQuery({ queryKey: ["my-discussions"], queryFn: () => api<Discussion[]>("/me/discussions"), refetchInterval: 60_000 });
   const notifications = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api<{ items: AppNotification[]; unread: number }>("/notifications?limit=30"),
     refetchInterval: 60_000,
   });
-  return { tasks: tasks.data ?? [], transmittals: transmittals.data ?? [], rfis: rfis.data ?? [], notifications: notifications.data };
+  return { tasks: tasks.data ?? [], transmittals: transmittals.data ?? [], rfis: rfis.data ?? [], notifications: notifications.data,
+           teamTasks: teamTasks.data ?? [], discussions: discussions.data ?? [] };
 }
 
 export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "docked" | "drawer"; onNavigate?: () => void }) {
@@ -50,7 +56,7 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
   const qc = useQueryClient();
   const [open, setOpenState] = useState(variant === "drawer" || remembered());
   const [filter, setFilter] = useState<Filter>("ALL");
-  const { tasks, transmittals, rfis, notifications } = usePerMe();
+  const { tasks, transmittals, rfis, notifications, teamTasks, discussions } = usePerMe();
 
   const setOpen = (v: boolean) => {
     setOpenState(v);
@@ -63,6 +69,9 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
   const urgent = tasks.filter((t) => t.overdue || (t.due_at && new Date(t.due_at).getTime() - Date.now() < DAY));
   const normal = tasks.filter((t) => !urgent.includes(t));
   const unread = notifications?.unread ?? 0;
+  const lateTeam = teamTasks.filter((t) => t.overdue || t.priority === "URGENT");
+  const compiti = tasks.length + transmittals.length + teamTasks.length;
+  const messaggi = rfis.length + discussions.length;
 
   if (!open) {
     return (
@@ -73,9 +82,9 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
             <ChevronLeftIcon />
           </IconButton>
         </Tooltip>
-        <RailButton label="Compiti e trasmissioni" count={tasks.length + transmittals.length} alert={urgent.length > 0}
+        <RailButton label="Compiti, task e trasmissioni" count={compiti} alert={urgent.length + lateTeam.length > 0}
                     onClick={() => { setFilter("TASKS"); setOpen(true); }} icon={<AssignmentTurnedInIcon />} />
-        <RailButton label="RFI" count={toAnswer.length + waiting.length}
+        <RailButton label="RFI e discussioni" count={messaggi}
                     onClick={() => { setFilter("RFI"); setOpen(true); }} icon={<ForumIcon />} />
         <RailButton label="Notifiche" count={unread}
                     onClick={() => { setFilter("NOTIFICATIONS"); setOpen(true); }} icon={<NotificationsIcon />} />
@@ -84,7 +93,7 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
   }
 
   const show = (f: Filter) => filter === "ALL" || filter === f;
-  const empty = tasks.length + transmittals.length + rfis.length + (notifications?.items.length ?? 0) === 0;
+  const empty = compiti + messaggi + (notifications?.items.length ?? 0) === 0;
 
   return (
     <Stack width={variant === "drawer" ? "100%" : 320} height="100%" borderLeft={variant === "docked" ? 1 : 0}
@@ -103,8 +112,8 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
         <ToggleButtonGroup size="small" exclusive value={filter} onChange={(_, v) => v && setFilter(v)} fullWidth
                            aria-label="Tipo di azione">
           <ToggleButton value="ALL">Tutto</ToggleButton>
-          <ToggleButton value="TASKS">Compiti {tasks.length + transmittals.length || ""}</ToggleButton>
-          <ToggleButton value="RFI">RFI {rfis.length || ""}</ToggleButton>
+          <ToggleButton value="TASKS">Compiti {compiti || ""}</ToggleButton>
+          <ToggleButton value="RFI">Messaggi {messaggi || ""}</ToggleButton>
           <ToggleButton value="NOTIFICATIONS" aria-label="Notifiche"><NotificationsIcon fontSize="small" /></ToggleButton>
         </ToggleButtonGroup>
       </Box>
@@ -121,6 +130,14 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
           <Item key={t.id} kicker={`${tipoCompito(t)}${t.due_at ? ` · entro ${when(t.due_at)}` : ""}`}
                 title={titoloCompito(t)} detail={`${t.project_code} · ${t.step_name} · ${t.template_name}`}
                 onClick={() => go(`/compiti?instance=${t.instance_id}&task=${t.id}`)} />
+        ))}
+        {show("TASKS") && teamTasks.length > 0 && <Section title="Task assegnati a me" />}
+        {show("TASKS") && teamTasks.map((t) => (
+          <Item key={t.id} tone={t.overdue ? "urgent" : undefined}
+                kicker={`${t.code} · ${STATUS[t.status].label}${t.due_on ? ` · ${t.overdue ? "scaduto il" : "entro il"} ${giorno(t.due_on)}` : ""}`}
+                title={t.title}
+                detail={`${t.project_code}${t.i_am_creator ? "" : ` · da ${t.created_by_name ?? ""}`}${t.items_total ? ` · sotto-task ${t.items_done}/${t.items_total}` : ""}`}
+                onClick={() => go(`/progetti/${t.project_id}/task/${t.id}`)} />
         ))}
         {show("TASKS") && transmittals.length > 0 && <Section title="Trasmissioni da confermare" />}
         {show("TASKS") && transmittals.map((t) => (
@@ -140,6 +157,12 @@ export function PerMePanel({ variant = "docked", onNavigate }: { variant?: "dock
           <Item key={r.id} kicker={`${r.code} · ${r.status === "ANSWERED" ? "risposta ricevuta" : "in attesa di risposta"}`}
                 title={r.subject} detail={`${r.project_code} · ${r.message_count} messaggi`}
                 onClick={() => go(`/progetti/${r.project_id}/rfi/${r.id}`)} />
+        ))}
+        {show("RFI") && discussions.length > 0 && <Section title="Discussioni con messaggi nuovi" />}
+        {show("RFI") && discussions.map((d) => (
+          <Item key={d.id} kicker={`${d.unread === 1 ? "1 messaggio nuovo" : `${d.unread} messaggi nuovi`}`} title={d.title}
+                detail={`${d.project_code} · ${d.last_author ?? ""}: ${d.last_body ?? ""}`}
+                onClick={() => go(`/progetti/${d.project_id}/discussioni/${d.id}`)} />
         ))}
         {show("NOTIFICATIONS") && (notifications?.items.length ?? 0) > 0 && <Section title="Notifiche" />}
         {show("NOTIFICATIONS") && notifications?.items.slice(0, filter === "ALL" ? 5 : 30).map((n) => (

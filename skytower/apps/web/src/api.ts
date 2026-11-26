@@ -356,3 +356,79 @@ export interface Matrix {
   actions: Action[];
   roles: { role_id: string; code: string; name: string; is_system: boolean; cells: Record<Action, Scope | null> }[];
 }
+
+// ---------------------------------------------------------------------
+// Discussioni e task fra le persone della commessa (ADR-59)
+// ---------------------------------------------------------------------
+/** Riga dell'elenco delle discussioni (GET /projects/{id}/discussions, /me/discussions). */
+export interface Discussion {
+  id: string;
+  project_id: string;
+  number: number;
+  title: string;
+  created_by: string;
+  created_by_name: string | null;
+  created_at: string;
+  last_message_at: string;
+  closed_at: string | null;
+  i_am_creator: boolean;
+  message_count: number;
+  /** messaggi degli altri arrivati dopo l'ultima lettura di chi guarda */
+  unread: number;
+  participant_names: string | null;
+  participant_count: number;
+  last_body: string | null;
+  last_author: string | null;
+  project_code?: string;
+}
+
+export interface DiscussionAttachment { revision_id: string; revision_code: string; identifier: string; title: string; document_id: string }
+
+export interface DiscussionDetail extends Discussion {
+  participants: { user_id: string; name: string; organization_code: string | null; added_at: string; is_creator: boolean }[];
+  messages: {
+    id: string; author_id: string; author_name: string | null; author_org_code: string | null; body: string; created_at: string;
+    /** allegati che chi guarda può vedere; attachment_count li conta tutti */
+    attachments: DiscussionAttachment[]; attachment_count: number;
+    tasks: { id: string; code: string; title: string; status: TeamTaskStatus }[];
+  }[];
+  tasks: { id: string; code: string; title: string; status: TeamTaskStatus; due_on: string | null; message_id: string | null }[];
+}
+
+export type TeamTaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
+export type TeamTaskPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+/** Scheda della bacheca dei task (GET /projects/{id}/team-tasks, /me/team-tasks). */
+export interface TeamTask {
+  id: string;
+  project_id: string;
+  number: number;
+  code: string;
+  title: string;
+  description: string;
+  status: TeamTaskStatus;
+  priority: TeamTaskPriority;
+  due_on: string | null;
+  created_by: string;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  discussion_id: string | null;
+  i_am_creator: boolean;
+  i_am_assignee: boolean;
+  overdue: boolean;
+  assignees: { user_id: string; name: string; organization_code: string | null }[];
+  items_done: number;
+  items_total: number;
+  comment_count: number;
+  project_code: string;
+}
+
+export interface TeamTaskDetail extends TeamTask {
+  items: { id: string; title: string; position: number; done_at: string | null; created_by: string; mine: boolean; done_by_name: string | null }[];
+  comments: { id: string; author_id: string; author_name: string | null; author_org_code: string | null; body: string; created_at: string }[];
+  events: { id: number; kind: string; data: Record<string, any>; created_at: string; actor_name: string | null }[];
+  /** discussione di origine, solo se chi guarda ci partecipa */
+  discussion: { id: string; title: string } | null;
+}
