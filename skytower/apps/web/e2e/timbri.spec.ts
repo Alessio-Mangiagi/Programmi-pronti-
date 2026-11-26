@@ -62,11 +62,12 @@ test("timbro creato dalla libreria, messo sul PDF e salvato come nuova revisione
   await expect(scheda.getByRole("img", { name: "Anteprima di Approvato Des Lead" })).toBeVisible();
   await shot(page, "05-timbri-libreria.png");
 
-  // 2. un PDF da timbrare, aperto nel visualizzatore
-  const doc = await uploadPdf(page, des, projectId, folderId, "PRJ01-DES-ZZ-02-DR-A-0856.pdf", "Pianta piano secondo e2e",
+  // 2. un PDF da timbrare, aperto nel visualizzatore. Titolo solo suo: approvazione.spec.ts carica nella stessa cartella
+  // "Pianta piano secondo e2e" e nel giro completo (stesso database) il doppio clic trovava due righe uguali.
+  const doc = await uploadPdf(page, des, projectId, folderId, "PRJ01-DES-ZZ-02-DR-A-0856.pdf", "Pianta piano secondo da timbrare e2e",
                               ["Pianta piano secondo", "Scala 1:50"]);
   await page.reload();
-  const tab = await openInTab(page, () => page.getByText("Pianta piano secondo e2e").dblclick());
+  const tab = await openInTab(page, () => page.getByText("Pianta piano secondo da timbrare e2e").dblclick());
   const pagina = tab.locator('[data-page="1"]');
   await expect(pagina.locator("canvas")).toBeVisible({ timeout: 15_000 });
 
