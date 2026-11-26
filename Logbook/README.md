@@ -107,6 +107,14 @@ Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Chiusura del mese (dal 26/11/2026)
+
+HR chiude un mese finito da *Esporta → Estratti mensili*: tabella `MeseChiuso`, API
+`/api/mesi-chiusi` (`server/servizi/mesi-chiusi.ts`). In un mese chiuso il server rifiuta con
+409 ore (giornata, blocco, cancellazione, import), assenze (richiesta, modifica, decisione,
+cancellazione) e festività; la chiusura è rifiutata se nel mese ci sono richieste di assenza
+ancora in attesa. Riaprire è sempre possibile e resta nel registro attività.
+
 ### Avvisi via email (dal 26/11/2026)
 
 `server/servizi/avvisi.ts` manda quattro avvisi, ognuno si spegne da *Impostazioni → Avvisi

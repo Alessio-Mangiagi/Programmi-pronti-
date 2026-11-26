@@ -39,7 +39,8 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 35 (25/11):** Logbook pubblicabile su Vercel: PostgreSQL esterno, file/codici/blocchi nel database, pacchetto con scripts/vercel-build.mjs ✅ (provato in locale, da pubblicare con l'account dell'utente)
 - **26/11:** Logbook online su https://programmi-pronti.vercel.app (pubblica solo `main`); recupero amministratore con LOGBOOK_ADMIN_REIMPOSTA ✅
 - **Giorno 36 (26/11):** avvisi via email: richieste a HR, esiti al dipendente, giorni senza ore, attestati in scadenza ✅
-- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 2 chiusura del mese, 3 saldo ferie e permessi, 4 timbratura da telefono, 5 icona sul telefono, 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
+- **Giorno 37 (26/11):** chiusura del mese: HR blocca ore, assenze e festività di un mese finito; riapertura ✅
+- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 3 saldo ferie e permessi, 4 timbratura da telefono, 5 icona sul telefono, 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
@@ -1019,3 +1020,18 @@ Verifiche:
 - `npm test` 271/271, di cui 6 nuovi in `avvisi.test.ts` (posta finta): destinatari e testi, interruttori, indirizzo non valido, una volta al giorno anche con due chiamate insieme, soglie degli attestati, cron con e senza segreto. Typecheck ok.
 - Prova dal vivo sulla copia senza posta (`scratchpad/giorno36.mjs`, 7 su 7): riquadro, salvataggio, messaggio d'errore, telefono. Immagine 47 della guida.
 - NON provato dal vivo: l'arrivo vero di un avviso in una casella (in locale e su Vercel la posta è quella vera: lo prova l'utente con "Invia email di prova").
+
+### Giorno 37 — Chiusura del mese (26/11/2026) ✅
+
+Punto 2 della richiesta "implementa tutto partendo dal primo punto".
+
+Cosa è stato fatto:
+- Modello `MeseChiuso` (mese "AAAA-MM", chiusoIl, chiusoDa come testo) e migrazione SQLite `20261126090000_mese_chiuso`; su PostgreSQL arriva con `prisma db push` alla build.
+- `server/servizi/mesi-chiusi.ts`: `controllaMesiAperti` / `controllaPeriodoAperto` (409 con il nome del mese) e `rotteMesiChiusi` (`GET /`, `GET /:mese/controllo`, `POST /`, `DELETE /:mese`). Si chiude solo un mese finito e senza richieste di assenza in attesa; i giorni senza ore sono un avviso.
+- Controllo aggiunto in `rotte/registrazioni.ts` (giornata, blocco, cancellazione), `rotte/importa.ts` (conferma), `rotte/assenze.ts` (richiesta, modifica su periodo vecchio e nuovo, decisione, cancellazione), `rotte/festivita.ts` (aggiunta, cancellazione). "Carica festività nazionali" non è bloccato: aggiunge solo quelle mancanti.
+- `servizi/cancella-dati.ts` toglie anche le chiusure; `servizi/registro.ts` con le etichette "Mese chiuso" / "Mese riaperto".
+- Interfaccia: `src/componenti/ChiusuraMese.tsx` dentro `EstrattiMensili.tsx` (stato, finestra con i controlli, riapertura); lucchetto "Mese chiuso" in `src/pagine/Calendario.tsx`; icona `lucchetto`.
+
+Verifiche:
+- `npm test` 274/274, di cui 3 nuovi in `mesi-chiusi.test.ts` (chi può chiudere, mese non finito, richieste in attesa, ogni scrittura rifiutata nel mese chiuso, mese dopo libero, riapertura, cancellazione dati). Typecheck ok.
+- Prova dal vivo sulla copia (`scratchpad/giorno37.mjs`, 8 su 8): chiusura di ottobre 2026 dalla finestra, novembre non chiudibile, lucchetto nel calendario, cancellazione di un'ora rifiutata con il messaggio, riapertura, telefono. Immagini 48 e 49 della guida.

@@ -536,6 +536,29 @@ sono indicate senza costo.
 
 ---
 
+### Chiusura del mese (solo amministratori)
+
+Dal 26/11/2026 HR può **chiudere** un mese dopo averlo controllato. Da quel momento ore,
+assenze e festività di quel mese non si modificano più: l'estratto mandato al consulente
+paghe resta uguale a quello che c'è in Logbook.
+
+1. **Esporta → Estratti mensili**, scegliere il mese. Sotto i pulsanti c'è la riga
+   *Chiusura di …* con lo stato: **Aperto** o **Chiuso** (con chi l'ha chiuso e quando).
+2. **Chiudi mese** apre una finestra con i controlli:
+   - le **richieste di assenza ancora in attesa** bloccano la chiusura: vanno prima approvate o rifiutate;
+   - i **giorni lavorativi senza ore né assenza** sono solo un avviso: si può chiudere lo stesso.
+
+![Chiusura del mese](img/48-chiusura-mese.png)
+
+3. Un mese si può chiudere solo quando è **finito** (dal primo giorno del mese dopo).
+4. Per correggere qualcosa in un mese chiuso: **Riapri mese**, correzione, di nuovo **Chiudi mese**.
+   Chiusure e riaperture restano nel registro attività.
+
+![Mese chiuso](img/49-mese-chiuso.png)
+
+Nel **Calendario** accanto al nome di un mese chiuso compare un lucchetto con *Mese chiuso*; chi
+prova a modificarne le ore riceve il messaggio "Il mese di … è chiuso".
+
 ## 4. Dal cellulare e sugli schermi grandi
 
 Logbook si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
