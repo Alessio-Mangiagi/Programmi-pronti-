@@ -276,7 +276,7 @@ def chiedi_credenziali_admin() -> tuple[str, str] | None:
     if SENZA_DOMANDE_CREDENZIALI() or not sys.stdin or not sys.stdin.isatty():
         return None
     import getpass
-    say("    Primo amministratore di Logbook (sarai il proprietario: solo tu potrai nominarne altri).")
+    say("    Primo amministratore di Copilota (sarai il proprietario: solo tu potrai nominarne altri).")
     while True:
         try:
             nome = input("    Nome utente [admin]: ").strip().lower() or "admin"
@@ -420,7 +420,7 @@ APPS = [
     ("skytower",    "SkyTower - documenti di commessa CDE ISO 19650 (porta 5195)", "skytower",          installa_skytower),
     ("magazzino",   "Magazzino Operativo - parte di DDT e Magazzino (porta interna 5200)", "magazzino-operativo", installa_magazzino),
     ("timbri",      "Timbri per VFP - da PNG a timbro .stamp (porta 5205)",       "timbri-vfp",          installa_timbri),
-    ("logbook",     "Logbook - ore, presenze e assenze dei dipendenti (porta 5210)", "Logbook",           installa_logbook),
+    ("logbook",     "Copilota - ore, presenze e assenze dei dipendenti (porta 5210)", "Logbook",           installa_logbook),
     ("auguri",      "Auguri - compleanni su WhatsApp (porta 3000)",              "auguri",              installa_auguri),
     ("trimble",     "Ponte Trimble - PDF verso Trimble (porta 3011)",            "ponte-trimble",       installa_trimble),
     ("credenziali", "Credenziali admin (account unico in tutta la suite)",       ".",                   installa_credenziali),
