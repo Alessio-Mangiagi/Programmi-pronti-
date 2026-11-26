@@ -65,8 +65,8 @@ export function DatiProgramma() {
   const caricaEsempio = () =>
     esegui('esempio', async () => {
       if (!window.confirm('Caricare in Copilota i dati di esempio (5 dipendenti, 3 progetti, ore e assenze finte)?')) return;
-      const r = await api.post<{ dipendenti: number; progetti: number; registrazioni: number }>('/api/proprietario/dati-esempio');
-      setMessaggio({ tipo: 'successo', testo: `Caricati ${r.dipendenti} dipendenti, ${r.progetti} progetti e ${r.registrazioni} fasce orarie di esempio.` });
+      const r = await api.post<{ dipendenti: number; progetti: number; registrazioni: number; accountSpenti?: boolean }>('/api/proprietario/dati-esempio');
+      setMessaggio({ tipo: 'successo', testo: `Caricati ${r.dipendenti} dipendenti, ${r.progetti} progetti e ${r.registrazioni} fasce orarie di esempio.${r.accountSpenti ? ' Su questo sito gli account dei dipendenti di esempio sono spenti: per usarne uno, dagli una password dalla sua scheda.' : ''}` });
       await ricarica();
     });
 

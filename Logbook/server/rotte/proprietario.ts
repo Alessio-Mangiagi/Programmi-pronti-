@@ -118,8 +118,14 @@ export function rotteProprietario(
     const r = await semina(prisma, oggi());
     // Le password degli account di esempio sono scritte nel README: provvisorie da subito.
     await segnaPasswordPubblicate(prisma, [{ password: CREDENZIALI_DEMO.passwordDipendenti, utenti: { username: { in: USERNAME_DEMO } } }]);
+    // Su un Copilota raggiungibile da Internet (PostgreSQL, cioè Vercel) gli account di esempio
+    // nascono spenti (26/11/2026): la loro password è scritta nel README pubblico e chiunque
+    // sarebbe potuto entrare come dipendente. Chi serve si riaccende dalla scheda del
+    // dipendente, dando una password nuova.
+    const accountSpenti = suPostgres();
+    if (accountSpenti) await prisma.utente.updateMany({ where: { username: { in: USERNAME_DEMO } }, data: { attivo: false } });
     console.log(`[logbook] dati di esempio caricati dal proprietario: ${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce orarie`);
-    res.status(201).json(r);
+    res.status(201).json({ ...r, accountSpenti });
   });
 
   router.post('/cancellazione/codice', soloProprietario, async (req, res) => {

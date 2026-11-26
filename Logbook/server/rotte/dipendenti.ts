@@ -134,6 +134,9 @@ export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
     const esistente = await prisma.dipendente.findUnique({ where: { id } });
     if (!esistente) throw nonTrovato('Dipendente');
     const letti = schemaDipendente.parse(req.body);
+    // Cessare la scheda disattiva l'account: se è quello del proprietario lo può fare solo lui
+    // (26/11/2026: questa strada non era protetta come /disattiva e /account).
+    if (letti.stato === 'CESSATO') proteggiProprietario(req, (await prisma.utente.findUnique({ where: { dipendenteId: id } }))?.username);
     await controllaUnicita(letti, id);
     // Mansione aggiunta all'elenco solo dopo i controlli: una scheda rifiutata non lascia tracce.
     const dati = await conMansioneDellElenco(letti);
