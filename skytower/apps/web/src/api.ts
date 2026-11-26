@@ -251,6 +251,8 @@ export interface Project {
   /** Modello di commessa dell'organizzazione (ADR-52): struttura da cui aprire commesse nuove, senza funzioni operative */
   is_model?: boolean;
   model_source_id?: string | null;
+  /** solo nell'elenco GET /me/projects: la commessa contiene modelli BIM o 3D (cubo nell'albero) */
+  has_bim?: boolean;
 }
 
 /** Modello di commessa nell'elenco "Modelli di commessa" (GET /organizations/{id}/project-models) */
@@ -274,6 +276,8 @@ export interface Container {
   is_private: boolean;
   /** contiene almeno un modello BIM (IFC, Revit, Navisworks) che chi guarda può leggere: icona dedicata */
   has_bim?: boolean;
+  /** altri contenuti della cartella: "CAD", "COMPUTI", "RELAZIONI" (FolderContentMarks.tsx) */
+  content_kinds?: string[];
   /** schema di naming per cartelle assegnato (null = quello della commessa) */
   naming_profile_id?: string | null;
   my_actions: Action[];

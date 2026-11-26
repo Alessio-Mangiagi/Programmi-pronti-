@@ -13,6 +13,7 @@ import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import DownloadIcon from "@mui/icons-material/Download";
 import FolderIcon from "@mui/icons-material/Folder";
 import FolderBimIcon from "../../components/FolderBimIcon";
+import FolderContentMarks, { contenutiSotto } from "../../components/FolderContentMarks";
 import FolderZipIcon from "@mui/icons-material/FolderZip";
 import GroupIcon from "@mui/icons-material/Group";
 import HistoryIcon from "@mui/icons-material/History";
@@ -64,6 +65,7 @@ export function FolderView({ project }: { project: Project }) {
   const tree = useMemo(() => folderTree(containers ?? []), [containers]);
   // cartelle con modelli BIM in una sottocartella: segno leggero, come nell'albero (26/11/2026)
   const bimSotto = useMemo(() => cartelleConBimSotto(containers ?? []), [containers]);
+  const altriSotto = useMemo(() => contenutiSotto(containers ?? []), [containers]);
   const byId = useMemo(() => new Map((containers ?? []).map((c) => [c.id, c])), [containers]);
   const current = containerId ? byId.get(containerId) ?? null : null;
   const path = useMemo(() => {
@@ -176,6 +178,8 @@ export function FolderView({ project }: { project: Project }) {
                       <Chip size="small" variant="outlined" label={c.owner_organization_code} />
                       {/* etichetta piena accanto al nome: la cartella con i modelli si trova anche scorrendo in fretta */}
                       {c.has_bim && !c.is_private && <Chip size="small" label="BIM" sx={{ bgcolor: "#0c4577", color: "#fff", fontWeight: 600 }} />}
+                      {/* disegni CAD, computi, relazioni: etichetta se stanno qui, icona sbiadita se stanno più sotto */}
+                      {!c.is_private && <FolderContentMarks variante="elenco" qui={c.content_kinds} sotto={altriSotto.get(c.id)} />}
                     </Stack>
                   </TableCell>
                   <TableCell colSpan={5} sx={{ color: "text.secondary" }}>

@@ -4,12 +4,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Box, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
+import { Box, CircularProgress, InputAdornment, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import FolderIcon from "@mui/icons-material/Folder";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import FolderSpecialIcon from "@mui/icons-material/FolderSpecial";
 import FolderBimIcon from "./FolderBimIcon";
+import FolderContentMarks, { contenutiSotto } from "./FolderContentMarks";
+import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import LockIcon from "@mui/icons-material/Lock";
 import SearchIcon from "@mui/icons-material/Search";
 import { api, Container, PrivateArea, Project } from "../api";
@@ -131,6 +133,8 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
   const { data: areas = [] } = usePrivateAreas(project.id, open);
   const tree = useMemo(() => folderTree(containers ?? []), [containers]);
   const bimSotto = useMemo(() => cartelleConBimSotto(containers ?? []), [containers]);
+  // disegni CAD, computi, relazioni nelle sottocartelle: icone sbiadite accanto al nome
+  const altriSotto = useMemo(() => contenutiSotto(containers ?? []), [containers]);
   const locked = areas.filter((a) => !a.has_access);
 
   // apre la catena di cartelle fino a quella nell'URL
@@ -161,6 +165,7 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
                 label={<Stack direction="row" alignItems="center" spacing={1} py={0.25}>
                   {icon(c)}
                   <Typography variant="body2" noWrap>{c.name}</Typography>
+                  {!c.is_private && <FolderContentMarks variante="albero" qui={c.content_kinds} sotto={altriSotto.get(c.id)} />}
                 </Stack>}>
         {renderFolders(c.id)}
       </TreeItem>
@@ -171,6 +176,15 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
               label={<Stack direction="row" alignItems="baseline" spacing={1} py={0.5}>
                 <Typography variant="caption" fontFamily="monospace" color="primary.main" fontWeight={600}>{project.code}</Typography>
                 <Typography variant="body2" fontWeight={500} noWrap>{project.name}</Typography>
+                {/* la commessa contiene modelli: il cubo si vede anche con la commessa chiusa (26/11/2026) */}
+                {project.has_bim && (
+                  <Tooltip title="Contiene modelli BIM o 3D">
+                    <Box component="span" role="img" aria-label="Commessa con modelli BIM o 3D" data-bim="commessa"
+                         sx={{ display: "inline-flex", alignSelf: "center", flexShrink: 0 }}>
+                      <ViewInArIcon sx={{ fontSize: 18, color: "#0c4577" }} />
+                    </Box>
+                  </Tooltip>
+                )}
               </Stack>}>
       {containers === undefined
         ? <TreeItem itemId={`p:${project.id}:loading`} label={<Typography variant="caption" color="text.secondary">caricamento…</Typography>} />
