@@ -9,7 +9,7 @@ import { createHash } from 'crypto'
 import { spawn } from 'child_process'
 import { OCR_WORKER, PYTHON_BIN, VISION_FALLBACK, ROOT } from './config.ts'
 import { tabellaDaTsv } from './tabella-tsv.ts'
-import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, type CellaRiletta, type Griglia, type LetturaCella } from './tabella-griglia.ts'
+import { TITOLO_CELLE, celleDaRileggere, senzaMacchieNumeriche, tabellaDaGriglia, type CellaRiletta, type Griglia, type LetturaCella } from './tabella-griglia.ts'
 import { normalizzaNumeriOcr } from './testo.ts'
 import { modelloVisionAttivo, ocrVisionArticoli, visionOff } from './ollama.ts'
 
@@ -175,7 +175,9 @@ export const testoGarbled = (testo: string): boolean => {
 // escono voci resta la ricostruzione geometrica di sempre.
 // `rilette`: celle numeriche rilette una per una (completaRiletture), per le voci i cui
 // conti non tornano nella lettura della pagina intera.
-export const componiTesto = (blocchi: BloccoOcr[], griglia?: Griglia | null, rilette?: CellaRiletta[]): string => {
+export const componiTesto = (tuttiBlocchi: BloccoOcr[], griglia?: Griglia | null, rilette?: CellaRiletta[]): string => {
+  // macchie lette come cifre fuori da testo, tabella e riletture (tabella-griglia.ts)
+  const blocchi = senzaMacchieNumeriche(tuttiBlocchi)
   for (const b of blocchi) b.text = normalizzaNumeriOcr(b.text)
   const righe = righeDaBlocchi(blocchi)
   const testo = righe.map(r => r.map(b => b.text).join(' ')).join('\n')

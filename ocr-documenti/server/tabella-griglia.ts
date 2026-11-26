@@ -101,6 +101,19 @@ const conRigaSopra = (blocchi: BloccoOcr[], g: Griglia): Griglia => {
 // (tabellaDaAncore). Nessuna delle due → '' e vale la ricostruzione geometrica.
 // `rilette`: celle numeriche rilette una per una (celleDaRileggere): servono solo alla
 // lettura per ancore, che le usa sulle voci i cui conti non tornano.
+// Macchie lette come cifre: una o due cifre, alte meno di metà del testo della pagina e
+// lette con poca sicurezza. GFM pag. 25 letta dalla scheda video: un «3» alto 9 pixel
+// (testo ~42) al 48% fra «cad» e «94,81 €» finiva nella colonna dell'importo e la
+// quantità usciva 3 / 94,81 = 0,032. Sui 31 contratti sono ~57 blocchi così per lettura,
+// nessuno è un valore vero (le quantità stampate hanno l'altezza del testo). Lettere e
+// segni sparsi restano: non toccano i numeri e sono materia delle descrizioni.
+export const senzaMacchieNumeriche = (blocchi: BloccoOcr[]): BloccoOcr[] => {
+  const alti = blocchi.filter(b => b.text.trim().length >= 3).map(b => b.h).sort((a, b) => a - b)
+  if (!alti.length) return blocchi
+  const tipica = alti[Math.floor(alti.length / 2)]
+  return blocchi.filter(b => !(/^\d{1,2}$/.test(b.text.trim()) && b.conf < 60 && b.h < tipica * 0.5))
+}
+
 export const tabellaDaGriglia = (blocchi: BloccoOcr[], griglia: Griglia | null | undefined, rilette?: CellaRiletta[]): string => {
   if (!griglia || griglia.xs.length < 3 || griglia.ys.length < 3) return tabellaDaAncore(blocchi, null, griglia?.xs, rilette)
   const g = conRigaSopra(blocchi, griglia)
@@ -558,7 +571,7 @@ const chiaveCella = (r: number[]) => r.join(',')
  */
 export const celleDaRileggere = (blocchi: BloccoOcr[], griglia: Griglia | null | undefined): number[][] => {
   if (!griglia || griglia.xs.length < 6) return []
-  const bs = blocchi.map(b => ({ ...b, text: normalizzaNumeriOcr(b.text) }))
+  const bs = senzaMacchieNumeriche(blocchi).map(b => ({ ...b, text: normalizzaNumeriOcr(b.text) }))
   const g = griglia.ys.length >= 3 ? conRigaSopra(bs, griglia) : null
   const voci = vociDaAncore(bs, g)
   if (!voci) return []

@@ -37,11 +37,16 @@ export const unisciMigliaiaSpazio = (t: string): string =>
 //      righe non scatta): lì il carattere staccato in coda non è una quantità ("6" dopo il
 //      prezzo nella sua cella), e con due decimali non è nemmeno una cifra dell'importo.
 //      Altrimenti "22,59 6" dava quantità 22,59 × prezzo 6.
+//   4) bordo della cella letto come "|" attaccato all'importo: "204,20 €|" (SICS letto
+//      dalla scheda video). Stessa guardia della 3: solo un blocco che contiene SOLO
+//      quell'importo. Il "|" nel testo spezzava la cella della tabella ricostruita e il
+//      prezzo si perdeva (2.193 × 447.810,60 al posto di 2.193 × 204,20 = 447.810,60).
 export const normalizzaNumeriOcr = (t: string): string => t
   .replace(/\b(\d{1,3}(?:\.\d{3})+,\d{2})(\d+,\d{1,3})(?!\d)/g, '$1 $2')
   .replace(/\b\d{1,3}(?:,\d{3})+,\d{2}(?!\d)/g, m =>
     m.slice(0, m.lastIndexOf(',')).replace(/,/g, '.') + m.slice(m.lastIndexOf(',')))
   .replace(/^(\s*(?:€\s*)?\d{1,3}(?:\.\d{3})*,\d{2}) [68eEcC]\s*$/, '$1 €')
+  .replace(/^\s*([|¦]\s*)?((?:€\s*)?\d{1,3}(?:\.\d{3})*,\d{2}(?:\s*€)?)(\s*[|¦])?\s*$/, (m, prima, importo, dopo) => (prima || dopo ? importo : m))
 
 // Spezza un markdown multi-pagina in tiles per pagina. Riconosce il separatore dell'app
 // (riga di soli "---") e l'eventuale marcatore "--- PAGE n ---". Vuoti scartati.

@@ -17,7 +17,7 @@ import { normalizzaCodice, strutturaAlyante } from '../struttura.ts'
 import { ELENCHI, commessaDaPremesse, matchCondPagamento, matchDivisione } from '../alyante.ts'
 import { tabellaArticoliElenco, tabellaColonne, valoriRiga } from '../tabella-tsv.ts'
 import { normalizzaNumeriOcr } from '../testo.ts'
-import { TITOLO_CELLE, celleDaRileggere, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
+import { TITOLO_CELLE, celleDaRileggere, senzaMacchieNumeriche, tabellaDaGriglia, valoriLavoriOneri } from '../tabella-griglia.ts'
 import type { BloccoOcr } from '../ocr.ts'
 import type { RigaTsv } from '../tabella-tsv.ts'
 
@@ -197,6 +197,11 @@ describe('righe', () => {
       .toEqual(['135,41 €', '367,76 €', '163,75 €', '1.045,13 €', '77,03 €'])
     // non sul testo di più righe, non dopo un numero senza due decimali, non dentro una riga
     for (const t of ['135,41 e\n22,59 6', '12 6', 'aree. 135,41 € 135,41 e']) expect(normalizzaNumeriOcr(t)).toBe(t)
+    // bordo della cella letto come "|" attaccato all'importo (SICS, scheda video): via, solo
+    // sul blocco con il solo importo; le righe di tabella con le sbarrette restano com'erano
+    expect(['204,20 €|', '|447.810,60 €', '¦ 2.193,00', '204,20 €'].map(normalizzaNumeriOcr))
+      .toEqual(['204,20 €', '447.810,60 €', '2.193,00', '204,20 €'])
+    for (const t of ['| 2.193,00 | 204,20 |', '204,20 €|\n447.810,60 €', 'm 204,20 €|']) expect(normalizzaNumeriOcr(t)).toBe(t)
     const r = quantitaSottintesa([
       { quantita: '270,94', prezzo_lordo: '270,94', importo: '' },      // prezzo e importo letti come q e p
       { quantita: '2', prezzo_lordo: '251,92', importo: '251,92' },     // "2" dalla descrizione
@@ -367,6 +372,14 @@ describe('tabella dalle celle', () => {
     expect(tabellaDaGriglia(blocchi, verticali, storte).split('\n')[2].split('|')[4].trim()).toBe('')
     // senza griglia i bordi delle celle non si conoscono: nessuna rilettura
     expect(celleDaRileggere(blocchi, null)).toEqual([])
+  })
+  it('macchie lette come cifre: fuori solo se piccole, incerte e di una o due cifre (GFM)', () => {
+    const testo = [b('Fornitura e collocazione di pulsante', 628, 398, 636, 42), b('cad', 1325, 398, 82, 43), b('94,81 €', 1674, 393, 134, 47)]
+    const macchia = { ...b('3', 1545, 409, 10, 9), conf: 48 }
+    expect(senzaMacchieNumeriche([...testo, macchia])).toEqual(testo)
+    // alta come il testo, letta sicura o con lettere: resta
+    for (const x of [{ ...macchia, h: 40 }, { ...macchia, conf: 90 }, { ...macchia, text: 'e' }, { ...macchia, text: '123' }])
+      expect(senzaMacchieNumeriche([...testo, x])).toHaveLength(4)
   })
   it('sovrapprezzo senza quantità: la rilettura del solo P.U. lavori non toglie gli oneri letti sulla pagina (Gecob)', () => {
     // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
