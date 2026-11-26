@@ -276,7 +276,7 @@ export interface Container {
   is_private: boolean;
   /** contiene almeno un modello BIM (IFC, Revit, Navisworks) che chi guarda può leggere: icona dedicata */
   has_bim?: boolean;
-  /** altri contenuti della cartella: "CAD", "COMPUTI", "RELAZIONI" (FolderContentMarks.tsx) */
+  /** altri contenuti della cartella: "TAVOLE", "CAD", "COMPUTI", "RELAZIONI", "FOTO" (FolderContentMarks.tsx) */
   content_kinds?: string[];
   /** schema di naming per cartelle assegnato (null = quello della commessa) */
   naming_profile_id?: string | null;

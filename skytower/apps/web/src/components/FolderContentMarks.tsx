@@ -1,11 +1,13 @@
 // "><(((º> sabusabu <º)))><"
 // Segni di contenuto delle cartelle (26/11/2026): oltre ai modelli BIM (che hanno la loro icona,
-// FolderBimIcon.tsx) una cartella dice a colpo d'occhio se contiene disegni CAD, computi o relazioni.
+// FolderBimIcon.tsx) una cartella dice a colpo d'occhio se contiene tavole, disegni CAD, computi,
+// relazioni o foto.
 // Così in ogni commessa si trova la cartella giusta senza aprirle una per una.
 //
 // Da dove arrivano i dati: `content_kinds` di GET /projects/{id}/containers
 // (apps/api/cde_api/modules/containers.py, CONTENT_KINDS: l'elenco delle estensioni sta solo lì).
-// I PDF non hanno un segno: stanno in quasi tutte le cartelle e non distinguerebbero nulla.
+// I PDF contano solo se il nome segue la codifica: il server guarda il tipo documento (DR = tavola,
+// RP = relazione, BQ = computo…), perché l'estensione .pdf da sola non distinguerebbe nulla.
 //
 // Due intensità, come per il BIM:
 // - `qui`: i file stanno proprio in questa cartella (segno pieno; nell'elenco è un'etichetta col nome);
@@ -15,6 +17,8 @@ import { Box, Chip, Tooltip } from "@mui/material";
 import ArchitectureIcon from "@mui/icons-material/Architecture";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import DescriptionIcon from "@mui/icons-material/Description";
+import DesignServicesIcon from "@mui/icons-material/DesignServices";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import type { SvgIconComponent } from "@mui/icons-material";
 import type { Container } from "../api";
 
@@ -22,9 +26,11 @@ type Tipo = { etichetta: string; cosa: string; colore: string; Icona: SvgIconCom
 
 /** I tipi nell'ordine in cui si mostrano; le chiavi sono quelle che manda il server. */
 export const TIPI_CONTENUTO: Record<string, Tipo> = {
+  TAVOLE: { etichetta: "Tavole", cosa: "tavole", colore: "#0e7c86", Icona: DesignServicesIcon },
   CAD: { etichetta: "CAD", cosa: "disegni CAD", colore: "#b45f06", Icona: ArchitectureIcon },
   COMPUTI: { etichetta: "Computi", cosa: "computi e fogli di calcolo", colore: "#2f7d46", Icona: CalculateIcon },
   RELAZIONI: { etichetta: "Relazioni", cosa: "relazioni e documenti di testo", colore: "#55606b", Icona: DescriptionIcon },
+  FOTO: { etichetta: "Foto", cosa: "foto e immagini", colore: "#a8436b", Icona: PhotoCameraIcon },
 };
 const ORDINE = Object.keys(TIPI_CONTENUTO);
 

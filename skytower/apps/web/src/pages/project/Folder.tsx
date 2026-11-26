@@ -170,11 +170,12 @@ export function FolderView({ project }: { project: Project }) {
                 <TableRow key={c.id} hover sx={{ cursor: "pointer" }} onClick={() => navigate(`/progetti/${project.id}/cartelle/${c.id}`)}>
                   <TableCell padding="checkbox" />
                   <TableCell>
-                    <Stack direction="row" spacing={1.25} alignItems="center">
+                    {/* il nome resta su una riga; le etichette del contenuto vanno a capo sotto se non ci stanno (26/11/2026) */}
+                    <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap rowGap={0.5}>
                       {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : c.has_bim ? <FolderBimIcon /> : bimSotto.has(c.id) ? <FolderBimIcon dentro /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
                       {/* link vero: la cartella si apre anche da tastiera (Tab + Invio), non solo cliccando la riga */}
                       <Link component={RouterLink} to={`/progetti/${project.id}/cartelle/${c.id}`} variant="body2" fontWeight={500}
-                            color="inherit" underline="hover" onClick={(e) => e.stopPropagation()}>{c.name}</Link>
+                            color="inherit" underline="hover" whiteSpace="nowrap" onClick={(e) => e.stopPropagation()}>{c.name}</Link>
                       <Chip size="small" variant="outlined" label={c.owner_organization_code} />
                       {/* etichetta piena accanto al nome: la cartella con i modelli si trova anche scorrendo in fretta */}
                       {c.has_bim && !c.is_private && <Chip size="small" label="BIM" sx={{ bgcolor: "#0c4577", color: "#fff", fontWeight: 600 }} />}
