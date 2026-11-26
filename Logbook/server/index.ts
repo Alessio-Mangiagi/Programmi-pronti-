@@ -60,6 +60,24 @@ if (produzione) {
   copia();
   setInterval(copia, 60 * 60 * 1000).unref();
   pulisciRegistro(prisma).catch((e) => console.warn('[logbook] pulizia del registro non riuscita:', e));
+
+  // 26/11/2026: avvisi via email del giorno (ore mancanti, attestati in scadenza). Un controllo
+  // all'avvio e poi ogni ora: partono al primo controllo dopo le 7 e una volta sola al giorno
+  // (servizi/avvisi.ts tiene il segno nel database). Senza posta configurata non fanno nulla.
+  const { creaAvvisi, indirizzoDaAmbiente, oraItalia, ORA_AVVISI } = await import('./servizi/avvisi');
+  const { invioDaAmbiente } = await import('./servizi/email');
+  const { proprietarioDaAmbiente } = await import('./rotte/proprietario');
+  const { oggiItalia } = await import('../comune/date');
+  const avvisi = creaAvvisi(prisma, { inviaEmail: invioDaAmbiente(), emailProprietario: proprietarioDaAmbiente().email, indirizzo: indirizzoDaAmbiente() });
+  const avvisa = () => {
+    if (oraItalia() < ORA_AVVISI) return;
+    avvisi
+      .giornaliero(oggiItalia())
+      .then((r) => r.fatto && console.log(`[logbook] avvisi del giorno: ${r.oreMancanti} promemoria ore, ${r.attestati} attestati`))
+      .catch((e) => console.warn('[logbook] avvisi del giorno non riusciti:', e));
+  };
+  avvisa();
+  setInterval(avvisa, 60 * 60 * 1000).unref();
 }
 // Express 5 chiama questa funzione anche quando l'ascolto fallisce, passandole l'errore:
 // in quel caso si tace e ci pensa il gestore 'error' qui sotto (altrimenti il log direbbe

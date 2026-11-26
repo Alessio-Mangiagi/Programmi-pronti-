@@ -98,6 +98,9 @@ fs.writeFileSync(
   JSON.stringify(
     {
       version: 3,
+      // Avvisi via email del giorno (26/11/2026): le 6:00 UTC sono le 7 o le 8 in Italia.
+      // Vercel chiama la rotta con Authorization: Bearer <CRON_SECRET> (variabile del progetto).
+      crons: [{ path: '/api/cron/avvisi', schedule: '0 6 * * *' }],
       routes: [
         // Tutte le API alla funzione (Express riceve l'indirizzo originale, es. /api/auth/login).
         { src: '^/api(?:/.*)?$', dest: '/api' },

@@ -34,6 +34,7 @@ import { rotteDocumentiProgetto, rotteNoteProgetto } from './rotte/documentazion
 import { rotteSegnalazioni } from './rotte/segnalazioni';
 import { proprietarioDaAmbiente, rotteProprietario, type ConfigProprietario } from './rotte/proprietario';
 import { cartellaDocumentiPredefinita } from './servizi/archivio-file';
+import { creaAvvisi, indirizzoDaAmbiente } from './servizi/avvisi';
 import { invioDaAmbiente, type InviaEmail } from './servizi/email';
 import { limitatoreSuDatabase } from './servizi/limitatore';
 import { registroRichieste, rotteRegistro } from './servizi/registro';
@@ -121,6 +122,22 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use(registroRichieste(prisma));
   const proprietario = opzioni.proprietario ?? proprietarioDaAmbiente();
   const inviaEmail = opzioni.inviaEmail !== undefined ? opzioni.inviaEmail : invioDaAmbiente();
+  // 26/11/2026: avvisi via email (richieste, esiti, ore mancanti, attestati): servizi/avvisi.ts.
+  const avvisi = creaAvvisi(prisma, { inviaEmail, emailProprietario: proprietario.email, indirizzo: indirizzoDaAmbiente(), adesso: opzioni.adesso });
+
+  /**
+   * Avvisi del giorno chiamati da Vercel Cron (vercel-build.mjs li pianifica ogni mattina).
+   * Vercel manda "Authorization: Bearer <CRON_SECRET>": senza la variabile, o con un valore
+   * diverso, la rotta risponde come se non esistesse. Sta prima del login di proposito.
+   */
+  api.get('/cron/avvisi', async (req, res) => {
+    const segreto = process.env.CRON_SECRET;
+    if (!segreto || req.get('authorization') !== `Bearer ${segreto}`) {
+      res.status(404).json({ errore: 'Risorsa non trovata' });
+      return;
+    }
+    res.json(await avvisi.giornaliero(oggi()));
+  });
   api.use(
     '/auth',
     rotteAuth(prisma, {
@@ -136,7 +153,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/progetti', rotteProgetti(prisma));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
   api.use('/calendario', rotteCalendario(prisma));
-  api.use('/assenze', rotteAssenze(prisma, cartellaDocumenti));
+  api.use('/assenze', rotteAssenze(prisma, cartellaDocumenti, avvisi));
   api.use('/festivita', rotteFestivita(prisma));
   api.use('/importa', rotteImporta(prisma, oggi));
   api.use('/esporta', rotteEsporta(prisma));
@@ -145,7 +162,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/file', rotteFile(prisma, cartellaDocumenti));
   api.use('/attestati', rotteAttestati(prisma, cartellaDocumenti, oggi));
   api.use('/documenti-dipendente', rotteDocumentiDipendente(prisma, cartellaDocumenti));
-  api.use('/impostazioni', rotteImpostazioni(prisma));
+  api.use('/impostazioni', rotteImpostazioni(prisma, { avvisi, emailProprietario: proprietario.email, postaConfigurata: Boolean(inviaEmail) }));
   // Giorno 17 (24/11/2026): documentazione di avanzamento e note interne dei progetti.
   api.use('/documenti-progetto', rotteDocumentiProgetto(prisma, cartellaDocumenti, oggi));
   api.use('/note-progetto', rotteNoteProgetto(prisma));

@@ -64,10 +64,27 @@ export function creaInvioSmtp(config: ConfigSmtp): InviaEmail {
   };
 }
 
-/** Invio configurato dal .env, oppure null se il server di posta non è impostato. */
+/**
+ * true per gli indirizzi dei dati di esempio (prisma/seed.ts li crea tutti su @esempio.it).
+ * Non sono caselle vere: scriverci produce solo messaggi tornati indietro.
+ */
+export function indirizzoDiEsempio(email: string): boolean {
+  return /@esempio.it$/i.test(email.trim());
+}
+
+/**
+ * Invio configurato dal .env, oppure null se il server di posta non è impostato.
+ * Dal 26/11/2026 (avvisi via email) gli indirizzi dei dati di esempio vengono saltati in
+ * silenzio: con i dati di prova caricati Logbook non deve scrivere a caselle inventate.
+ */
 export function invioDaAmbiente(env: NodeJS.ProcessEnv = process.env): InviaEmail | null {
   const config = configurazioneSmtp(env);
-  return config ? creaInvioSmtp(config) : null;
+  if (!config) return null;
+  const invia = creaInvioSmtp(config);
+  return async (email) => {
+    if (indirizzoDiEsempio(email.a)) return;
+    await invia(email);
+  };
 }
 
 /**

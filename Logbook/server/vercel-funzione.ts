@@ -19,8 +19,15 @@ import { cartellaDocumentiPredefinita, pulisciFileOrfani } from './servizi/archi
 import { pulisciRegistro } from './servizi/registro';
 import { statoTemporaneo } from './servizi/stato-temporaneo';
 import { tieniVivo } from './vercel';
+import { oggiItalia } from '../comune/date';
+import { proprietarioDaAmbiente } from './rotte/proprietario';
+import { creaAvvisi, indirizzoDaAmbiente, oraItalia, ORA_AVVISI } from './servizi/avvisi';
+import { invioDaAmbiente } from './servizi/email';
 
 const app = creaApp(prisma);
+// Avvisi via email del giorno (26/11/2026): li fa partire Vercel Cron (/api/cron/avvisi); qui
+// c'è la riserva, alla prima richiesta dopo le 7 se il cron non è passato. Mai due volte.
+const avvisi = creaAvvisi(prisma, { inviaEmail: invioDaAmbiente(), emailProprietario: proprietarioDaAmbiente().email, indirizzo: indirizzoDaAmbiente() });
 
 let ultimaManutenzione = 0;
 /** File caricati e mai usati, codici scaduti, righe vecchie del registro: al massimo una volta l'ora per processo. */
@@ -32,6 +39,7 @@ function manutenzione() {
       console.warn('[logbook] manutenzione non riuscita:', e),
     ),
   );
+  if (oraItalia() >= ORA_AVVISI) tieniVivo(avvisi.giornaliero(oggiItalia()).catch((e) => console.warn('[logbook] avvisi del giorno non riusciti:', e)));
 }
 
 export default function logbook(req: Parameters<typeof app>[0], res: Parameters<typeof app>[1]) {

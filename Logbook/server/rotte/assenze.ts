@@ -30,6 +30,8 @@ import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
 import { dipendenteAmmesso, idDaParametro, isAdmin, richiediAdmin } from '../middleware';
 import { eliminaFile, fileCollegabile, vistaFile } from '../servizi/archivio-file';
 import { dataDaQuery } from './registrazioni';
+import type { Avvisi } from '../servizi/avvisi';
+import { tieniVivo } from '../vercel';
 
 const include = {
   dipendente: { select: { nome: true, cognome: true, matricola: true } },
@@ -38,7 +40,7 @@ const include = {
 } as const;
 
 /** `cartella`: dove stanno i file caricati (per cancellare l'allegato sostituito o dell'assenza eliminata). */
-export function rotteAssenze(prisma: PrismaClient, cartella: string) {
+export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Avvisi) {
   const router = Router();
 
   /** Aggiunge a ogni assenza il numero di giorni lavorativi che copre (festivi e weekend esclusi). */
@@ -147,6 +149,9 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string) {
       data: { ...completa, stato, ...(stato === 'APPROVATA' ? { decisoDaId: req.utente!.id, decisoIl: new Date() } : {}) },
       include,
     });
+    // Avviso a HR (26/11/2026) solo per le richieste dei dipendenti: quelle che inserisce HR
+    // le conosce già. Parte a risposta inviata: se la posta è lenta il dipendente non aspetta.
+    if (!admin && avvisi) tieniVivo(avvisi.nuovaRichiesta(creata));
     res.status(201).json((await conGiorni([creata]))[0]);
   });
 
@@ -189,6 +194,11 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string) {
       data: { stato, noteHr: noteHr ?? vecchia.noteHr, decisoDaId: req.utente!.id, decisoIl: new Date() },
       include,
     });
+    // Esito al dipendente (26/11/2026), se in anagrafica ha un'email.
+    if (avvisi) {
+      const destinatario = await prisma.dipendente.findUnique({ where: { id: decisa.dipendenteId }, select: { nome: true, cognome: true, email: true } });
+      if (destinatario) tieniVivo(avvisi.esitoRichiesta({ ...decisa, dipendente: destinatario }));
+    }
     res.json((await conGiorni([decisa]))[0]);
   });
 

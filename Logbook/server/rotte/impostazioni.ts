@@ -21,6 +21,7 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import { ErroreHttp } from '../errori';
 import { richiediAdmin } from '../middleware';
 import { CHIAVI_SKYTOWER, commesseSkytower, leggiCollegamento, origineDi, problemaIndirizzo } from '../servizi/skytower';
+import { CHIAVI_AVVISI, leggiScelteAvvisi, separaIndirizzi, type Avvisi } from '../servizi/avvisi';
 
 const schemaSkytower = z.object({
   url: z
@@ -35,7 +36,23 @@ const schemaSkytower = z.object({
   token: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v) || null, z.string().min(16, 'Token troppo corto: copialo intero').max(500).nullable()),
 });
 
-export function rotteImpostazioni(prisma: PrismaClient) {
+/** Scelte sugli avvisi via email (26/11/2026): indirizzi di HR in un campo solo, quattro interruttori. */
+const schemaAvvisi = z.object({
+  emailHr: z
+    .string()
+    .max(500, 'Troppi indirizzi')
+    .transform(separaIndirizzi)
+    .refine((lista) => lista.every((e) => z.string().email().safeParse(e).success), 'Uno degli indirizzi non è valido')
+    .refine((lista) => lista.length <= 10, 'Al massimo 10 indirizzi'),
+  richieste: z.boolean(),
+  esiti: z.boolean(),
+  oreMancanti: z.boolean(),
+  attestati: z.boolean(),
+});
+
+export type OpzioniImpostazioni = { avvisi?: Avvisi; emailProprietario?: string; postaConfigurata?: boolean };
+
+export function rotteImpostazioni(prisma: PrismaClient, opzioni: OpzioniImpostazioni = {}) {
   const router = Router();
   router.use(richiediAdmin);
 
@@ -46,9 +63,36 @@ export function rotteImpostazioni(prisma: PrismaClient) {
     const righe = await prisma.impostazione.findMany({ where: { chiave: { in: Object.values(CHIAVI_SKYTOWER) } } });
     const v = (k: string) => righe.find((r) => r.chiave === k)?.valore ?? '';
     const collegamento = await leggiCollegamento(prisma);
+    const scelte = await leggiScelteAvvisi(prisma, opzioni.emailProprietario);
+    const emailHrSalvata = (await prisma.impostazione.findUnique({ where: { chiave: CHIAVI_AVVISI.emailHr } }))?.valore ?? '';
     res.json({
+      // emailHr: quella scritta da HR; se è vuota gli avvisi vanno a emailPredefinita (il proprietario).
+      avvisi: { ...scelte, emailHr: emailHrSalvata, emailPredefinita: opzioni.emailProprietario ?? null, postaConfigurata: Boolean(opzioni.postaConfigurata) },
       skytower: { url: v(CHIAVI_SKYTOWER.url), email: v(CHIAVI_SKYTOWER.email), tokenImpostato: Boolean(v(CHIAVI_SKYTOWER.token)), attivo: Boolean(collegamento) },
     });
+  });
+
+  router.put('/avvisi', async (req, res) => {
+    const d = schemaAvvisi.parse(req.body);
+    const si = (v: boolean) => (v ? '1' : '0');
+    await prisma.$transaction([
+      salva(CHIAVI_AVVISI.emailHr, d.emailHr.join(', ')),
+      salva(CHIAVI_AVVISI.richieste, si(d.richieste)),
+      salva(CHIAVI_AVVISI.esiti, si(d.esiti)),
+      salva(CHIAVI_AVVISI.oreMancanti, si(d.oreMancanti)),
+      salva(CHIAVI_AVVISI.attestati, si(d.attestati)),
+    ]);
+    res.json({ ok: true });
+  });
+
+  /** Email di prova agli indirizzi di HR: dice subito se la posta funziona. */
+  router.post('/avvisi/prova', async (_req, res) => {
+    if (!opzioni.avvisi) throw new ErroreHttp(400, 'Avvisi non disponibili');
+    try {
+      res.json({ ok: true, inviataA: await opzioni.avvisi.prova() });
+    } catch (e) {
+      throw new ErroreHttp(502, `Email di prova non inviata: ${e instanceof Error ? e.message : 'errore sconosciuto'}`);
+    }
   });
 
   router.put('/skytower', async (req, res) => {
