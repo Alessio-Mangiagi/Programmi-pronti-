@@ -36,7 +36,7 @@ const schemaSkytower = z.object({
   token: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v) || null, z.string().min(16, 'Token troppo corto: copialo intero').max(500).nullable()),
 });
 
-/** Scelte sugli avvisi via email (26/11/2026): indirizzi di HR in un campo solo, quattro interruttori. */
+/** Scelte sugli avvisi via email (26/11/2026): indirizzi di HR in un campo solo, cinque interruttori. */
 const schemaAvvisi = z.object({
   emailHr: z
     .string()
@@ -48,6 +48,8 @@ const schemaAvvisi = z.object({
   esiti: z.boolean(),
   oreMancanti: z.boolean(),
   attestati: z.boolean(),
+  // Giorno 47. Facoltativo: una pagina aperta prima dell'aggiornamento non lo manda e la scelta resta com'è.
+  progettoChiuso: z.boolean().optional(),
 });
 
 export type OpzioniImpostazioni = { avvisi?: Avvisi; emailProprietario?: string; postaConfigurata?: boolean };
@@ -81,6 +83,7 @@ export function rotteImpostazioni(prisma: PrismaClient, opzioni: OpzioniImpostaz
       salva(CHIAVI_AVVISI.esiti, si(d.esiti)),
       salva(CHIAVI_AVVISI.oreMancanti, si(d.oreMancanti)),
       salva(CHIAVI_AVVISI.attestati, si(d.attestati)),
+      ...(d.progettoChiuso === undefined ? [] : [salva(CHIAVI_AVVISI.progettoChiuso, si(d.progettoChiuso))]),
     ]);
     res.json({ ok: true });
   });

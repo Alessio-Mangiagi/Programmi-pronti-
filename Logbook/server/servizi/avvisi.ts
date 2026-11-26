@@ -4,13 +4,17 @@
  * in Copilota: una richiesta di ferie restava ferma finché HR non apriva la dashboard, e il
  * dipendente scopriva l'esito solo tornando a guardare.
  *
- * Quattro avvisi, ognuno si accende e si spegne da Impostazioni → Avvisi via email:
+ * Cinque avvisi, ognuno si accende e si spegne da Impostazioni → Avvisi via email:
  * - `richieste`:   a HR, quando un dipendente chiede ferie/permesso o comunica una malattia;
  * - `esiti`:       al dipendente, quando HR approva o rifiuta la sua richiesta;
  * - `oreMancanti`: al dipendente, una volta alla settimana, se negli ultimi 14 giorni ha
  *                  giorni lavorativi senza ore (più un riepilogo a HR);
  * - `attestati`:   al dipendente e a HR, quando un attestato entra nei 30 giorni dalla
- *                  scadenza, poi a 7 giorni e il giorno in cui scade. Una volta per soglia.
+ *                  scadenza, poi a 7 giorni e il giorno in cui scade. Una volta per soglia;
+ * - `progettoChiuso`: quando HR mette un progetto in stato CHIUSO (Giorno 47): a HR il
+ *                  riepilogo (ore, costo rispetto al preventivo, cose rimaste in attesa),
+ *                  ai dipendenti assegnati l'avviso che non si registrano più ore. Parte a
+ *                  ogni chiusura: un progetto riaperto e richiuso avvisa di nuovo.
  *
  * Dove stanno le scelte: tabella Impostazione, chiavi `avvisi.*` (CHIAVI_AVVISI). Gli
  * indirizzi di HR sono `avvisi.emailHr` (più indirizzi separati da virgola); se è vuota vale
@@ -28,6 +32,8 @@
  */
 import type { PrismaClient } from '../../generated/prisma/client';
 import { aggiungiGiorni, formattaData, giornoSettimana } from '../../comune/date';
+import { formattaEuro } from '../../comune/importi';
+import { durataMinuti, formattaOre } from '../../comune/orari';
 import { GIORNI_PREAVVISO_ATTESTATI } from '../../comune/documenti';
 import { giorniLavorativi } from '../../comune/riepiloghi';
 import type { InviaEmail } from './email';
@@ -38,9 +44,10 @@ export const CHIAVI_AVVISI = {
   esiti: 'avvisi.esiti',
   oreMancanti: 'avvisi.oreMancanti',
   attestati: 'avvisi.attestati',
+  progettoChiuso: 'avvisi.progettoChiuso',
 } as const;
 
-export type ScelteAvvisi = { emailHr: string[]; richieste: boolean; esiti: boolean; oreMancanti: boolean; attestati: boolean };
+export type ScelteAvvisi = { emailHr: string[]; richieste: boolean; esiti: boolean; oreMancanti: boolean; attestati: boolean; progettoChiuso: boolean };
 
 /** Giorni indietro in cui si cercano i giorni senza ore (due settimane: copre anche il cambio di mese). */
 export const GIORNI_CONTROLLO_ORE = 14;
@@ -74,6 +81,7 @@ export async function leggiScelteAvvisi(prisma: PrismaClient, emailProprietario?
     esiti: acceso(CHIAVI_AVVISI.esiti),
     oreMancanti: acceso(CHIAVI_AVVISI.oreMancanti),
     attestati: acceso(CHIAVI_AVVISI.attestati),
+    progettoChiuso: acceso(CHIAVI_AVVISI.progettoChiuso),
   };
 }
 
@@ -168,6 +176,76 @@ export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
         `Ciao ${a.dipendente.nome},\n\nla tua richiesta di ${tipo} (${periodo(a)}) è stata ${esito}.` +
         (a.noteHr ? `\n\nNota dell'ufficio personale: ${a.noteHr}` : '');
       return (await spedisci(indirizzo, `richiesta di ${tipo} ${esito}`, testo)) ? 1 : 0;
+    },
+
+    /**
+     * Un progetto è appena passato a CHIUSO (server/rotte/progetti.ts, PUT /:id).
+     * - A HR (indirizzi dell'ufficio personale): ore totali, costo lordo della manodopera
+     *   rispetto al preventivo, e quello che è rimasto in attesa sul progetto (timbrature da
+     *   confermare, note spese da decidere), perché a progetto chiuso si tende a dimenticarlo.
+     * - Ai dipendenti assegnati, attivi e con email: solo l'avviso di chiusura. Niente ore né
+     *   costi: sono dati di HR.
+     * Nessun "già mandato": ogni chiusura è un fatto nuovo (scelta dell'utente, 26/11/2026).
+     */
+    async progettoChiuso(progettoId: number): Promise<{ hr: number; dipendenti: number }> {
+      const esito = { hr: 0, dipendenti: 0 };
+      const s = await scelte();
+      if (!invia || !s.progettoChiuso) return esito;
+      const p = await prisma.progetto.findUnique({
+        where: { id: progettoId },
+        include: { assegnazioni: { include: { dipendente: { select: { nome: true, cognome: true, email: true, stato: true } } } } },
+      });
+      if (!p) return esito;
+      const [fasce, costi, timbrature, noteSpese] = await Promise.all([
+        prisma.registrazioneOraria.findMany({ where: { progettoId }, select: { dipendenteId: true, data: true, oraInizio: true, oraFine: true } }),
+        prisma.dipendente.findMany({ select: { id: true, costoOrarioLordoCent: true } }),
+        prisma.timbratura.count({ where: { progettoId, stato: { in: ['APERTA', 'DA_CONFERMARE'] } } }),
+        prisma.notaSpesa.count({ where: { progettoId, stato: 'RICHIESTA' } }),
+      ]);
+      // Stesso calcolo di server/rotte/costi-progetti.ts: minuti × costo orario lordo di oggi.
+      const costoOra = new Map(costi.map((d) => [d.id, d.costoOrarioLordoCent] as const));
+      let minuti = 0;
+      let lordo = 0;
+      const senzaCosto = new Set<number>();
+      for (const f of fasce) {
+        const m = durataMinuti(f.oraInizio, f.oraFine);
+        minuti += m;
+        const c = costoOra.get(f.dipendenteId);
+        if (c != null) lordo += (m * c) / 60;
+        else senzaCosto.add(f.dipendenteId);
+      }
+      const costoCent = Math.round(lordo);
+      const giorni = fasce.map((f) => f.data).sort();
+      const pct = (consumato: number, preventivo: number) => `${String(Math.round((consumato / preventivo) * 1000) / 10).replace('.', ',')}%`;
+      const nome = `${p.codice} · ${p.nome}`;
+
+      const righe = [
+        `Il progetto ${nome} è stato chiuso: non si possono più registrare ore né assegnare dipendenti.`,
+        '',
+        `Ore registrate: ${formattaOre(minuti)}` + (p.preventivoOre ? ` su ${String(p.preventivoOre).replace('.', ',')} preventivate (${pct(minuti / 60, p.preventivoOre)})` : ''),
+        `Costo lordo della manodopera: ${formattaEuro(costoCent)}` +
+          (p.preventivoManodoperaCent ? ` su ${formattaEuro(p.preventivoManodoperaCent)} di preventivo (${pct(costoCent, p.preventivoManodoperaCent)})` : ' (nessun preventivo inserito)'),
+        ...(senzaCosto.size ? [`Attenzione: ${senzaCosto.size === 1 ? 'un dipendente ha' : `${senzaCosto.size} dipendenti hanno`} ore ma non il costo orario in anagrafica, quindi il costo è parziale.`] : []),
+        ...(giorni.length ? [`Periodo lavorato: dal ${formattaData(giorni[0])} al ${formattaData(giorni[giorni.length - 1])}`] : []),
+        `Dipendenti assegnati: ${p.assegnazioni.length}`,
+      ];
+      const sospesi = [
+        ...(timbrature ? [`- ${timbrature === 1 ? 'una timbratura' : `${timbrature} timbrature`} da confermare (Dashboard)`] : []),
+        ...(noteSpese ? [`- ${noteSpese === 1 ? 'una nota spese' : `${noteSpese} note spese`} da approvare o rifiutare (Note spese)`] : []),
+      ];
+      righe.push('', sospesi.length ? `Rimasto in attesa su questo progetto:\n${sospesi.join('\n')}` : 'Niente in attesa su questo progetto.');
+      righe.push('', 'Se è stato chiuso per errore si riapre dalla scheda del progetto, rimettendo lo stato "Attivo".');
+      for (const indirizzo of s.emailHr) if (await spedisci(indirizzo, `progetto ${p.codice} chiuso`, righe.join('\n'))) esito.hr++;
+
+      for (const a of p.assegnazioni) {
+        const indirizzo = a.dipendente.email?.trim();
+        if (!indirizzo || a.dipendente.stato !== 'ATTIVO') continue;
+        const testo =
+          `Ciao ${a.dipendente.nome},\n\nil progetto ${nome} è stato chiuso: da oggi non puoi più timbrare né registrare ore su questo progetto.\n\n` +
+          `Le ore già registrate restano. Se ne manca qualcuna o hai una nota spese ancora da inviare, scrivi all'ufficio personale.`;
+        if (await spedisci(indirizzo, `progetto ${p.codice} chiuso`, testo)) esito.dipendenti++;
+      }
+      return esito;
     },
 
     /** Email di prova agli indirizzi di HR, dal pulsante delle impostazioni. Solleva se non parte. */

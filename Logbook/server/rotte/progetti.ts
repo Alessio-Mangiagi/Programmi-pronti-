@@ -8,7 +8,8 @@
  *                                (un DIPENDENTE può chiedere solo i propri). Ogni progetto ha
  *                                `assegnati` = quanti dipendenti ci sono assegnati.
  * - GET    /:id                  un progetto; un DIPENDENTE solo se ci è assegnato
- * - POST   /, PUT /:id           creazione e modifica (admin)
+ * - POST   /, PUT /:id           creazione e modifica (admin); se la modifica porta lo stato
+ *                                a CHIUSO parte l'email di chiusura (Giorno 47, servizi/avvisi.ts)
  * - GET    /:id/dipendenti       dipendenti assegnati con le ore registrate sul progetto (admin)
  * - POST   /:id/dipendenti       { dipendenteId } assegna UN dipendente (admin)
  * - DELETE /:id/dipendenti/:dipendenteId   toglie l'assegnazione (admin); le ore già
@@ -27,8 +28,10 @@ import { durataMinuti } from '../../comune/orari';
 import { schemaAssegnazione, schemaProgetto, type DatiProgetto } from '../../comune/schemi';
 import { ErroreHttp, nonTrovato, richiestaNonValida, vietato } from '../errori';
 import { dipendenteAmmesso, idDaParametro, isAdmin, richiediAdmin } from '../middleware';
+import type { Avvisi } from '../servizi/avvisi';
+import { tieniVivo } from '../vercel';
 
-export function rotteProgetti(prisma: PrismaClient) {
+export function rotteProgetti(prisma: PrismaClient, avvisi?: Avvisi) {
   const router = Router();
 
   async function controllaCodice(dati: DatiProgetto, escludiId?: number) {
@@ -94,10 +97,14 @@ export function rotteProgetti(prisma: PrismaClient) {
 
   router.put('/:id', richiediAdmin, async (req, res) => {
     const id = idDaParametro(req.params.id)!;
-    await progettoOppure404(id);
+    const prima = await progettoOppure404(id);
     const dati = schemaProgetto.parse(req.body);
     await controllaCodice(dati, id);
-    res.json(await prisma.progetto.update({ where: { id }, data: dati }));
+    const dopo = await prisma.progetto.update({ where: { id }, data: dati });
+    // Giorno 47: solo il passaggio a CHIUSO avvisa (non ogni salvataggio di un progetto già chiuso).
+    // L'email parte a risposta già data: tieniVivo impedisce a Vercel di fermare la funzione prima.
+    if (avvisi && prima.stato !== 'CHIUSO' && dopo.stato === 'CHIUSO') tieniVivo(avvisi.progettoChiuso(id));
+    res.json(dopo);
   });
 
   // --- Dipendenti assegnati (Giorno 17, risposte 2a 3a) --------------------------------

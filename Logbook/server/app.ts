@@ -156,7 +156,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use(richiediLogin);
   api.use(richiediPasswordCambiata);
   api.use('/dipendenti', rotteDipendenti(prisma, proprietario.username));
-  api.use('/progetti', rotteProgetti(prisma));
+  api.use('/progetti', rotteProgetti(prisma, avvisi));
   api.use('/registrazioni', rotteRegistrazioni(prisma, oggi));
   api.use('/calendario', rotteCalendario(prisma));
   api.use('/assenze', rotteAssenze(prisma, cartellaDocumenti, avvisi));
