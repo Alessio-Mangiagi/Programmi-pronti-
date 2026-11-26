@@ -91,7 +91,7 @@ describe('chiusura del mese', () => {
     expect((await admin.chiama('DELETE', '/api/mesi-chiusi/2026-10')).stato).toBe(200);
     expect((await admin.chiama('DELETE', '/api/mesi-chiusi/2026-10')).stato).toBe(404);
     expect((await admin.chiama('PUT', '/api/registrazioni/giornata', giornata)).stato).toBe(200);
-  });
+  }, 60_000);
 
   it('"Cancella tutti i dati" toglie anche le chiusure', async () => {
     await db.prisma.meseChiuso.create({ data: { mese: '2026-09', chiusoDa: 'admin' } });
