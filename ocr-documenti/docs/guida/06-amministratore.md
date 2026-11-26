@@ -13,8 +13,8 @@ l'Assist AI (`ollama pull qwen2.5:3b`).
 
 **Scheda video.** Con una scheda NVIDIA l'OCR legge una pagina in meno di un secondo
 invece di circa 35 (misura del 23/11/2026 su RTX 5060 Ti: 0,7 s/pagina). La lettura non è
-identica a quella senza scheda: sui 31 contratti di prova le voci giuste sono 784 su 948
-invece di 799, la testata è uguale (misura del 25/11/2026). Le schede **RTX serie 50** vogliono il PaddleOCR per CUDA 12.9:
+identica a quella senza scheda, ma dal 26/11/2026 dà risultati un po' migliori: sui 31
+contratti di prova le voci giuste sono 800 su 948 invece di 799, la testata è uguale. Le schede **RTX serie 50** vogliono il PaddleOCR per CUDA 12.9:
 `avvia.bat` lo installa da solo al primo avvio nella cartella `.venv-cu129` (circa 3 GB
 da scaricare); le schede più vecchie usano `.venv-gpu`. In `avvio.log` la riga
 *PaddleOCR GPU (CUDA 12.9) pronto* dice che la scheda è in uso; nella pagina il motore

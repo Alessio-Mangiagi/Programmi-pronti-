@@ -36,12 +36,14 @@ Stato al 2026-09-18. La versione precedente di questo file descriveva un `server
 paddle per CUDA 12.9 in `.venv-cu129`: 0,7 s/pagina sulla RTX 5060 Ti; 1/2/3 worker = 24/19/20 s
 su 52 pagine (avvio compreso), resta 3. Accuratezza misurata il 25/11 con lettura vera (senza
 cache): voci esatte 784/948 contro 799 della CPU, testata 417 (lotti di riconoscimento da 8).
+WDAC risolto dall'IT il 04/11 (sotto, per storia).
 
-### 🟡 Parser rimessi a punto sulle letture della GPU
-I parser sono stati tarati sulle letture CPU; con la GPU il banco perde 15 voci esatte
-(Progetto 57→51, Eureka 4→2, Gecob 34→32, PF Future uffici 65→64, SICS, GFM, AQ3 nolo,
-Contratto_fornitura). Partire da Eureka (perse le voci 1 × 750 e 1 × 6.000 con testo quasi identico) e
-Gecob: sono le più piccole da capire. Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §27. WDAC risolto dall'IT il 04/11 (sotto, per storia).
+### ✅ (26/11/2026) Parser rimessi a punto sulle letture della GPU
+I parser erano tarati sulle letture CPU; con la GPU il banco perdeva 15 voci esatte. Sei
+correzioni (quantità 1 sottintesa nella gara, oneri dei sovrapprezzi dopo la rilettura, «|» del
+bordo cella, macchie lette come cifre, «S10 24» per SIC24, quota oneri a maggioranza): con la GPU
+**800/948** voci esatte e 827 Q+P, più della CPU (799 · 825). Restano AQ3 nolo «L50.00 €» e il
+codice G.01.064.3 di Contratto_fornitura sulla riga sotto. Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §27.
 
 ### 🔴 OCR bloccato da Windows App Control (WDAC)
 Policy aziendale in vigore dal 31/08/2026: rifiuta le DLL non firmate dei venv Paddle

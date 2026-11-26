@@ -765,13 +765,39 @@ e 718 pagine su 811 sono state prese da lì, cioè dalle letture CPU. Rifatta co
 - Lotti da 16 → 8: nel lotto i ritagli si allungano al più largo, quindi la grandezza del lotto
   cambia la lettura. Con 8 tornano i tre campi di testata della CPU (Sabbie d'oro, Contratto.pdf,
   TMT) al costo del 9% di tempo; `ocr_worker.py` ora usa 8 su entrambi i dispositivi.
-- Escluso che dipenda dalle griglie: la cache CPU aveva `griglia: null` su pagine dove la regola del
-  17/11 («almeno 6 verticali bastano») oggi trova colonne, ma con le griglie ricalcolate le letture
-  CPU danno ancora 799.
+- Le griglie c'entrano per Gecob (correzione del 26/11: la verifica del 25/11 era sbagliata). La cache
+  CPU aveva `griglia: null` salvato prima della regola del 17/11 («almeno 6 verticali bastano»), e
+  `letturaDaCache` (`server/ocr.ts`) trasforma una griglia mancante in `null`, quindi non la ricalcola
+  mai: la prova «griglie ricalcolate» non le aveva ricalcolate. Forzando il ricalcolo (cache in formato
+  vecchio, solo l'elenco dei blocchi) le letture CPU fanno 797: Gecob 34 → 32 per la regola del 17/11,
+  che il banco non mostrava. Le altre 11 voci erano davvero della lettura GPU.
 
 Da qui in avanti la cache del banco è quella della GPU con lotti da 8 (lettura del 25/11), cioè
-quella che ottiene chi usa il programma. Prossimo passo: rimettere a punto i parser sulle letture GPU,
-partendo da Eureka e Gecob.
+quella che ottiene chi usa il programma.
+
+**Parser rimessi a punto sulle letture GPU (26/11/2026).** Sei correzioni, una per causa, ognuna
+misurata sul banco intero (nessun altro contratto cambia) e con il suo test:
+
+| Correzione | Dove | Contratto | Voci esatte |
+|---|---|---|---|
+| quantità 1 sottintesa già nella gara dei parser («Trasporto Cad € 6.000,00 € 6.000,00» senza l'«1») | `parser-contratti.ts` `estraiRigheGrezze` | Eureka 2 → 4 | 784 → 786 |
+| sovrapprezzo senza quantità: la rilettura del solo P.U. lavori non toglie gli oneri letti sulla pagina (6,22 + 0,24) | `tabella-griglia.ts` `tabellaDaAncore` | Gecob 32 → 34 | 788 |
+| bordo della cella letto «\|» attaccato all'importo («204,20 €\|») | `testo.ts` regola 4 | SICS 27 → 28 | |
+| macchie lette come cifre (un «3» alto 9 px al 48% fra «cad» e il prezzo) | `tabella-griglia.ts` `senzaMacchieNumeriche` | GFM 104 → 105 | 790 |
+| spazio fra sigla e anno nel codice del computo («S10 24 14.4.6.2») | `parser-contratti.ts` `RE_CODICE_SIGLA` | PF Future uffici 64 → 65 | 791 |
+| quota oneri della pagina a maggioranza per le voci con gli oneri letti (una voce all'1,32% fra le 3,65% spegneva la quota) | `tabella-griglia.ts` `tabellaDaAncore` | Progetto 51 → 60 | **800** |
+
+Risultato: con la GPU testata **417/426**, voci esatte **800/948** (84%), Q+P **827/948** (87%), una
+voce in più della CPU col codice di prima (799). Le stesse regole sulle letture CPU danno 799 · 825
+(Gecob 32 → 34, nient'altro cambia). Restano due voci GPU: AQ3 nolo «L50.00 €» (il bordo letto «L»
+davanti al prezzo: togliere una lettera davanti a un numero è rischioso, «l» e «I» sono spesso un «1»)
+e Contratto_fornitura G.01.064.3 (il codice, centrato in una cella alta, finisce sulla riga sotto quella
+dei valori).
+
+Nota di metodo: per confrontare letture CPU e GPU sullo stesso codice si scambia la cartella
+`.harness-cache/blocchi`; per far ricalcolare le griglie a una cache vecchia bisogna togliere anche la
+chiave `griglia` dal file *e* salvarlo come solo elenco dei blocchi, perché `letturaDaCache` rende
+`null` una griglia mancante.
 
 **Pulizia dell'immagine prima dell'OCR: provata e scartata.** Quattro passi, ognuno applicato
 solo alle pagine che ne avevano bisogno, con la cache del banco separata per variante:

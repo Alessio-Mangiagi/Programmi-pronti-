@@ -224,8 +224,10 @@ intero riletto davvero dalla GPU (25/11/2026, `OCR_CACHE=0 npm run harness -- --
 811 pagine in 845 s): testata 417/426, voci esatte **784/948**, Q+P 812/948, contro 417/425 ·
 799 · 825 della lettura CPU. La GPU legge in modo leggermente diverso (stessa confidenza,
 ~4% delle cifre diverse sulle pagine col retino di Progetto Costruzioni) e la messa a punto
-dei parser è stata fatta sulle letture CPU: −15 voci, quasi tutte su Progetto (−6), Eureka,
-Gecob e PF Future (−2 ciascuno). La misura del 23/11 (281 s, 798 voci) era sbagliata: 718
+dei parser era stata fatta sulle letture CPU: −15 voci, quasi tutte su Progetto (−6), Eureka,
+Gecob e PF Future (−2 ciascuno). Il 26/11 i parser sono stati rimessi a punto sulle letture
+GPU (sei correzioni, `docs/RICERCA_OCR_SOLUZIONE.md` §27): voci esatte **800/948**, Q+P
+827/948, più della CPU. La misura del 23/11 (281 s, 798 voci) era sbagliata: 718
 pagine su 811 venivano dalla cache del server (`.ocr-cache`, letture CPU). Il riconoscimento
 va a lotti di 8 anche sulla GPU (`PADDLE_REC_BATCH`): con 16 la testata scendeva a 414.
 Processi in parallelo (`PADDLE_WORKERS`) su 52 pagine, avvio dei modelli compreso: 1 → 24 s,
