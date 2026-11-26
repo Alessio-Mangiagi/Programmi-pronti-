@@ -6,7 +6,7 @@
  * ritrova le stesse cose negli stessi posti.
  */
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
 import logger from '../utils/logger';
@@ -25,14 +25,16 @@ const router = express.Router();
 // ── Rate limiter ────────────────────────────────────────────────────────────
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: (req) => {
+  limit: (req) => {
     // Boost solo per chi sta sulla macchina: dietro il reverse proxy il socket è sempre 127.0.0.1
     // (ma con gli header di inoltro), e senza questo controllo nessuno avrebbe un limite.
     return richiestaLocale(req) ? 10000 : 60;
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ipReale(req),
+  // ipKeyGenerator (express-rate-limit 8): raggruppa gli indirizzi IPv6 per sottorete /56, altrimenti
+  // chi ha un blocco IPv6 aggirerebbe il limite cambiando indirizzo a ogni richiesta.
+  keyGenerator: (req) => ipKeyGenerator(ipReale(req)),
   handler: (req, res) => {
     res.status(429).json({ error: 'Troppe richieste. Attendi qualche secondo e riprova.' });
   },

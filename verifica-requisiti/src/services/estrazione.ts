@@ -91,13 +91,16 @@ function caricaPdfjs() {
 async function testoNativoPdf(percorso: string): Promise<PaginaTesto[]> {
   const buffer = fs.readFileSync(percorso);
   const pdfjs = await caricaPdfjs();
-  const documento = await pdfjs.getDocument({
+  // Il compito di caricamento va tenuto: da pdfjs-dist 6 il documento non ha più destroy() e la
+  // memoria (worker, font) si libera dal compito.
+  const compito = pdfjs.getDocument({
     data: new Uint8Array(buffer),
-    // I PDF arrivano da fuori: niente eval, niente font di sistema.
-    isEvalSupported: false,
+    // I PDF arrivano da fuori: niente font di sistema. L'opzione isEvalSupported non esiste più:
+    // pdfjs-dist 6 non usa eval in nessun caso.
     useSystemFonts: false,
     standardFontDataUrl: FONT_STANDARD,
-  }).promise;
+  });
+  const documento = await compito.promise;
 
   const pagine: PaginaTesto[] = [];
   try {
@@ -113,7 +116,7 @@ async function testoNativoPdf(percorso: string): Promise<PaginaTesto[]> {
       pagina.cleanup();
     }
   } finally {
-    await documento.destroy();
+    await compito.destroy();
   }
 
   return pagine;
