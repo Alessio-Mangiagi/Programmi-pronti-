@@ -65,7 +65,7 @@ Da sapere:
 
 ## 2. Per i dipendenti
 
-Il menu ha quattro voci: **Dashboard**, **Calendario**, **I miei progetti**, **Le mie
+Il menu ha quattro voci (cinque per i capisquadra, con **La mia squadra**): **Dashboard**, **Calendario**, **I miei progetti**, **Le mie
 assenze**. Ognuno vede solo i propri dati.
 
 **Le ore le inserisce HR.** Il dipendente le vede nel calendario ma non le scrive né le
@@ -744,7 +744,7 @@ sullo stesso PC. È sempre lo stesso Copilota: accesso, dati e regole non cambia
 connessione.
 
 
-Copilota si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
+Copilota si adatta da solo alla larghezza dello schermo: non serve scaricare nulla da uno store, basta
 aprire lo stesso indirizzo dal browser del telefono.
 
 Su computer e tablet (da 768px) il **menu a sinistra resta fermo** mentre la pagina scorre,
