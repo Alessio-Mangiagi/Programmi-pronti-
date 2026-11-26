@@ -14,5 +14,8 @@ export default defineConfig({
     // cifrate scrypt) e fa più login nel beforeAll. Con 24 file in parallelo i 10 secondi
     // predefiniti a volte non bastano (fallimento intermittente visto il 24/11/2026).
     hookTimeout: 30_000,
+    // 26/11/2026: i test con molti login (scrypt) durano meno di un secondo da soli, ma con
+    // 40 file in parallelo e il PC occupato hanno superato più volte i 5 secondi predefiniti.
+    testTimeout: 30_000,
   },
 });
