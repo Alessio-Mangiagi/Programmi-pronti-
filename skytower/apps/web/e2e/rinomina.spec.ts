@@ -36,6 +36,13 @@ test.beforeAll(async ({ baseURL }) => {
 test("file con nomi qualsiasi rinominati con progressivi consecutivi", async ({ page }) => {
   await login(page, ADMIN);
   await page.goto(`/progetti/${projectId}/cartelle/${folderId}`);
+  // La naming della cartella arriva apposta in ritardo: i file sono scelti prima che il dialog la conosca. È il caso
+  // che faceva fallire questo test ogni tanto nel giro completo (server più lento) e che capita a chi trascina i file
+  // appena aperto il dialog: la rinomina va proposta comunque, appena la naming arriva.
+  await page.route("**/api/containers/*/naming", async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
   await page.getByRole("button", { name: "Carica" }).first().click();
   await page.locator('input[type="file"]').setInputFiles([
     { name: "1 - ADDENDUM N° 1 AL CONTRATTO.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%a\n") },
@@ -88,4 +95,19 @@ test("prenotazione di numeri dalla scheda Naming", async ({ page }) => {
   await page.locator('input[type="file"]').setInputFiles({ name: "PRJ01-COM-ZZ-00-CO-Z-0003.pdf", mimeType: "application/pdf",
                                                            buffer: Buffer.from("%PDF-1.4\n") });
   await expect(page.getByRole("dialog").getByText("Prenotato", { exact: true })).toBeVisible();
+});
+
+test("la rinomina spenta a mano non torna da sola", async ({ page }) => {
+  await login(page, ADMIN);
+  await page.goto(`/progetti/${projectId}/cartelle/${folderId}`);
+  await page.getByRole("button", { name: "Carica" }).first().click();
+  await page.locator('input[type="file"]').setInputFiles({ name: "appunti di cantiere.pdf", mimeType: "application/pdf",
+                                                           buffer: Buffer.from("%PDF-1.4\n%c\n") });
+  const rinomina = page.getByLabel("Rinomina secondo naming");
+  await expect(rinomina).toBeChecked();          // proposta da sola: il nome non è conforme
+  await rinomina.uncheck();
+  // la proposta automatica scatta a ogni cambio della lista: dopo il debounce dell'anteprima deve restare spenta
+  await page.waitForTimeout(1000);
+  await expect(rinomina).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Rinomina con progressivo" })).toBeVisible();
 });

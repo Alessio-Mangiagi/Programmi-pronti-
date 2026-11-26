@@ -164,6 +164,8 @@ interface Item {
   controller?: AbortController;
   /** Rinomina attiva: valori scelti e nome proposto dal server (progressivo riservato solo all'avvio). */
   auto?: { fields: Record<string, string>; proposal?: Proposal; error?: string; pending?: boolean };
+  /** Rinomina già proposta (o già decisa dall'utente) per questo file: se la spegne, non torna da sola. */
+  autoOffered?: boolean;
 }
 
 export function UploadDialog({ project, container, onClose }: { project: Project; container: Container; onClose: () => void }) {
@@ -187,8 +189,8 @@ export function UploadDialog({ project, container, onClose }: { project: Project
       if (check.valid && check.existing_container_id && check.existing_container_id !== container.id)
         message = "Documento esistente in un altro container";
       if (check.valid && check.reserved_elsewhere) message = "Identificativo prenotato da un'altra organizzazione";
+      // nome non conforme: la rinomina la propone l'effetto qui sotto, appena c'è anche la naming della cartella
       update(file, { check, phase: check.valid && !message ? "ready" : "error", message });
-      if (!check.valid && autoNumber) propose(file, defaultFields());   // nome non conforme: rinomina subito proposta
     });
   };
 
@@ -201,6 +203,19 @@ export function UploadDialog({ project, container, onClose }: { project: Project
     setItems((list) => list.map((i) => (i.file === file ? { ...i, auto: { fields, proposal: i.auto?.proposal, pending: true } } : i)));
 
   const idle = (i: Item) => i.phase === "check" || i.phase === "ready" || i.phase === "error";
+
+  // Rinomina proposta da sola ai nomi non conformi appena si sanno due cose: l'esito del controllo del nome e la
+  // naming della cartella. Le due risposte arrivano in un ordine qualsiasi. Prima la proposta partiva solo dalla
+  // risposta del controllo, con la naming letta in quel momento: i file scelti appena aperto il dialog, prima che la
+  // naming arrivasse, restavano senza proposta. Per questo il test e2e "rinomina" falliva ogni tanto nel giro completo.
+  // Una volta sola per file: se l'utente spegne la rinomina, non torna.
+  useEffect(() => {
+    if (!settings || !autoNumber) return;
+    const offer = (i: Item) => !i.autoOffered && !i.auto && idle(i) && !!i.check && !i.check.valid;
+    if (!items.some(offer)) return;
+    setItems((list) => list.map((i) => (offer(i) ? { ...i, autoOffered: true, auto: { fields: defaultFields(), pending: true } } : i)));
+  }, [settings, autoNumber, items]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toPropose = items.filter((i) => i.auto && idle(i));
   const proposeKey = JSON.stringify(toPropose.map((i) => [i.file.name, i.file.size, i.auto!.fields]));
   useEffect(() => {
@@ -231,7 +246,9 @@ export function UploadDialog({ project, container, onClose }: { project: Project
       ? { ...i, auto: { fields: { ...source.auto!.fields }, proposal: i.auto.proposal, pending: true } } : i)));
 
   const toggleAuto = (item: Item, on: boolean) => {
-    if (!on || !autoNumber) return update(item.file, { auto: undefined });
+    // spenta a mano: autoOffered impedisce all'effetto qui sopra di riproporla
+    if (!on || !autoNumber) return update(item.file, { auto: undefined, autoOffered: true });
+    update(item.file, { autoOffered: true });
     propose(item.file, defaultFields());
   };
 
