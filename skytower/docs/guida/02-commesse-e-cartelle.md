@@ -77,25 +77,44 @@ lo apre nel visualizzatore in una nuova scheda del browser.
 Scrivi il **Nome** e premi **Crea**. La spunta **Eredita le condivisioni della cartella padre** (attiva di norma)
 fa vedere la nuova cartella a chi vede già quella superiore; toglila per una sottocartella più chiusa.
 
-### Cartelle con modelli BIM
+### Riconoscere le cartelle dal contenuto (BIM, CAD, computi, relazioni)
 
-Dal 26/11/2026 le cartelle che contengono modelli BIM si riconoscono subito, in ogni commessa, sia
-nell'albero a sinistra sia nell'elenco della cartella:
+Dal 26/11/2026 le cartelle dicono a colpo d'occhio che cosa contengono, in ogni commessa, sia
+nell'albero a sinistra sia nell'elenco della cartella.
+
+![Cartelle con i segni del contenuto](img/02-cartella-bim.png)
+
+**Modelli BIM e 3D**
 
 - **cartella blu con il cubo**: i modelli stanno proprio lì dentro. Nell'elenco ha anche l'etichetta
   **BIM** accanto al nome. Passandoci sopra compare «Contiene modelli BIM o 3D»;
 - **cartella gialla con il cubo**: i modelli stanno in una sua sottocartella, a qualsiasi profondità.
-  Serve a capire dove scendere anche con l'albero chiuso («Modelli BIM o 3D nelle sottocartelle»).
+  Serve a capire dove scendere anche con l'albero chiuso;
+- **cubo accanto al nome della commessa**: la commessa contiene modelli. Si vede anche con la
+  commessa chiusa nell'albero.
 
-![Cartella con modelli BIM](img/02-cartella-bim.png)
+**Altri contenuti**, con un'icona accanto al nome della cartella:
+
+| Segno | Colore | Che cosa contiene | Formati |
+|-------|--------|-------------------|---------|
+| compasso | arancio | disegni CAD | `.dwg`, `.dxf`, `.dwf`, `.dgn` |
+| calcolatrice | verde | computi e fogli di calcolo | `.xls`, `.xlsx`, `.xlsm`, `.ods`, `.csv`, `.dcf`, `.pwe`, `.xpwe` |
+| foglio | grigio | relazioni e documenti di testo | `.doc`, `.docx`, `.odt`, `.rtf` |
+
+L'icona a colore pieno dice che i file stanno in quella cartella (nell'elenco diventa un'etichetta con
+il nome: **CAD**, **Computi**, **Relazioni**); l'icona più chiara dice che stanno in una sottocartella.
+Passando sopra a un segno compare la spiegazione.
+
+Da sapere:
 
 - conta come modello un file `.ifc`, `.ifczip`, `.ifcxml`, `.rvt`, `.rfa`, `.nwd`, `.nwc`, `.nwf` e i
   modelli 3D `.glb` e `.gltf` (quelli esportati da Blender);
-- i documenti archiviati non contano: archiviato l'ultimo modello, la cartella torna gialla e il cubo
-  sparisce anche dalle cartelle sopra;
-- un'area riservata tiene la sua icona (il lucchetto o la cartella viola);
-- il segno riguarda solo le cartelle che puoi vedere: una sottocartella a cui non hai accesso non fa
-  comparire il cubo su quelle sopra.
+- i **PDF non hanno un segno**: stanno in quasi tutte le cartelle e non aiuterebbero a distinguerle;
+- i documenti archiviati non contano: archiviato l'ultimo file di un tipo, il segno sparisce dalla
+  cartella e da quelle sopra;
+- un'area riservata tiene la sua icona (il lucchetto o la cartella viola) e non porta segni;
+- i segni riguardano solo le cartelle che puoi vedere: una sottocartella a cui non hai accesso non
+  fa comparire nulla su quelle sopra.
 
 ## 2.5 Condividere una cartella e vedere chi vi accede
 
