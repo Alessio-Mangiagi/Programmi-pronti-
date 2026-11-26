@@ -28,6 +28,7 @@ import { formattaEuro } from '../../comune/importi';
 import { formattaOre } from '../../comune/orari';
 import { api, scaricaFile } from '../api';
 import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
+import { ChiusuraMese } from './ChiusuraMese';
 import { Avviso, Caricamento, Pulsante } from './ui';
 import { Icona } from './icone';
 
@@ -305,6 +306,8 @@ export function EstrattiMensili({ dipendenteIds, progettoIds }: { dipendenteIds:
             <Icona nome="stampa" dimensione={16} /> Stampa / PDF
           </Pulsante>
         </div>
+        {/* Giorno 37: stato del mese e pulsanti "Chiudi mese" / "Riapri mese". */}
+        <ChiusuraMese mese={mese} />
         <p className="mt-2 text-xs text-gray-500">Per il PDF: "Stampa / PDF" e, come stampante, "Salva come PDF" (orientamento orizzontale).</p>
       </div>
       {errore && <Avviso tipo="errore">{errore}</Avviso>}

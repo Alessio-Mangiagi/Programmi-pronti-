@@ -48,6 +48,7 @@ import { PannelloGiorni } from '../componenti/PannelloGiorni';
 import { SceltaConRicerca } from '../componenti/SceltaConRicerca';
 import { dettaglioDipendente, nomiSenzaOmonimie } from '../../comune/omonimi';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
+import { Icona } from '../componenti/icone';
 import type { Dipendente, Festivita, Progetto, StatoAssenza, TipoAssenza } from '../tipi';
 import { usaDati } from '../usaDati';
 
@@ -120,6 +121,8 @@ export function Calendario() {
   if (tipoAssenza) query.set('tipoAssenza', tipoAssenza);
   const { dati, errore, caricamento, ricarica } = usaDati<RispostaCalendario>(`/api/calendario?${query}`);
   const { dati: progetti } = usaDati<Progetto[]>('/api/progetti');
+  // Giorno 37: mesi chiusi da HR, per il lucchetto accanto al nome del mese.
+  const { dati: mesiChiusi } = usaDati<{ mese: string }[]>('/api/mesi-chiusi');
   const { dati: dipendenti } = usaDati<Dipendente[]>(admin ? '/api/dipendenti' : null);
 
   const giorni = useMemo(() => {
@@ -276,6 +279,11 @@ export function Calendario() {
         <Pulsante onClick={() => setRiferimento(oggi)}>Oggi</Pulsante>
         <Pulsante onClick={() => sposta(1)} aria-label="Periodo successivo">›</Pulsante>
         <span className="min-w-44 px-2 font-semibold capitalize text-marchio">{periodo}</span>
+        {vista === 'mese' && mesiChiusi?.some((m) => m.mese === primoDelMese.slice(0, 7)) && (
+          <span className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700" title="Mese chiuso da HR: ore e assenze non si modificano più">
+            <Icona nome="lucchetto" dimensione={14} /> Mese chiuso
+          </span>
+        )}
 
         {/* Filtri: sul telefono uno per riga a tutta larghezza, da 640px in fila a destra. */}
         <div className="flex w-full flex-col gap-2 text-sm sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
