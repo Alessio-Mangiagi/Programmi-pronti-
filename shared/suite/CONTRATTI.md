@@ -85,7 +85,10 @@ restano valide come riserva.
   * `200 {ok, username, nome, ruolo, email, admin, proprietario}` (`admin` = ruolo admin del
     portale, mai l'elevazione per IP; `proprietario` § 12); `401` credenziali; `403 {motivo}` con `disattivato`,
     `cambia-password` (password temporanea non ancora cambiata nel portale) o
-    `non-abilitato` (programma non fra i suoi nel portale); `429` bloccato; `400` campi o
+    `non-abilitato` (programma non fra i suoi nel portale); `429` bloccato (per tentativi della
+    persona, oppure `{motivo: "tetto-programma"}`: dal 26/11/2026 oltre 500 password sbagliate in
+    15 minuti dallo stesso programma, qualunque `ip` dichiari, quel programma aspetta la fine della
+    finestra; si regola con `PORTALE_VERIFICA_MAX_ERRORI` sul portale); `400` campi o
     programma sconosciuto; senza token `403`;
   * stessi contatori del login del portale (15 errori per utente da quel PC, 50 per PC,
     15 minuti) e stesso sblocco dell'admin; nel Registro accessi `login-app`.

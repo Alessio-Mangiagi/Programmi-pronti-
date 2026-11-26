@@ -43,6 +43,7 @@ Persa prima di cambiarla: fermare il portale, cancellare `data/utenti.json` e ri
 - `HOST` — indirizzo di ascolto (default `127.0.0.1`). Per un **server centrale in LAN** usare `0.0.0.0`: gli altri PC si collegano a `http://IP-DEL-SERVER:8080`.
 - `DATA_DIR` — cartella dei dati (default `./data`).
 - `ADMIN_USER` — nome dell'amministratore creato al primo avvio (default `admin`); nasce **proprietario della suite**.
+- `PORTALE_VERIFICA_MAX_ERRORI` — password sbagliate che un programma può mandare a `/api/verifica-password` in 15 minuti prima di ricevere 429 fino alla fine della finestra (predefinito 500). Rete di sicurezza: l'IP della persona lo dichiara il programma che chiama, quindi i blocchi per IP da soli si aggirano cambiandolo. Il conto è in memoria e riparte a ogni riavvio; nel registro accessi compare una riga `verifica-tetto`.
 - `PORTALE_PROPRIETARIO` — username del **proprietario della suite** (vince sul campo `proprietario` di `data/utenti.json`; deve essere un admin attivo). Vedi *Proprietario della suite e profilo valido ovunque*.
 - `SUITE_DOMINIO` — dominio del server (es. `esempio.lan`): app su `https://<cartella>.<dominio>`, portale su `https://portale.<dominio>`, cookie di sessione per tutto il dominio. `SUITE_SCHEMA=http` solo se il proxy non fa TLS.
 - `WARM_APPS` — app da **avviare a caldo** e tenere accese, separate da virgola (es. `ocr,agente`), oppure `all`. In alternativa si usa `data/warm.json`.

@@ -958,7 +958,7 @@ test('freno al login: lo stato finisce su file (condiviso fra 8080 e 8090)', () 
 // Password del portale negli altri programmi (POST /api/verifica-password):
 // SkyTower, InCampo e VFP Transfer chiedono al portale se la password è giusta.
 // ---------------------------------------------------------------------------
-const { verificaPasswordApp, trovaUtentePerLogin, ipValido } = require('./server.js');
+const { verificaPasswordApp, trovaUtentePerLogin, ipValido, erroriVerificaApp, VERIFICA_MAX_ERRORI_APP, VERIFICA_FINESTRA_MS } = require('./server.js');
 
 // Utenti con password vera (scrypt come makeUser), aggiunti per questi test e poi tolti:
 // gli altri test leggono utenti.json e si aspettano solo mrossi, gverdi e tneri.
@@ -1021,6 +1021,31 @@ test('verifica-password: disattivato, password temporanea, programma non abilita
   const adm = chiedi('capo', 'Gru-a-torre-9', 'skytower');
   assert.equal(adm.status, 200, 'l\'admin del portale entra ovunque');
   assert.equal(adm.body.admin, true);
+}));
+
+// Tetto per programma (26/11/2026): l'IP lo dichiara chi chiama, quindi cambiandolo a ogni richiesta i
+// blocchi per IP non scattano mai. Il conto per programma ferma comunque la raffica.
+test('verifica-password: troppe password sbagliate da un programma → 429 per quel programma, qualunque IP dichiari', () => conUtentiPassword(() => {
+  const ora = Date.now();
+  erroriVerificaApp.clear();
+  const ipUsati = [];
+  // un IP diverso a ogni tentativo e un nome diverso: nessun blocco per utente o per IP può scattare
+  for (let i = 0; i < VERIFICA_MAX_ERRORI_APP; i++) {
+    const ip = `10.${50 + (i >> 8)}.${i & 255}.9`;
+    ipUsati.push([`fantasma${i}`, ip]);
+    assert.equal(verificaPasswordApp({ login: `fantasma${i}`, password: 'sbagliata', app: 'incampo', ip }, '127.0.0.1', ora).status, 401);
+  }
+  const fermo = verificaPasswordApp({ login: 'lbianchi', password: 'Cantiere-2026!', app: 'incampo', ip: '10.60.0.1' }, '127.0.0.1', ora + 1000);
+  assert.equal(fermo.status, 429, 'anche la password giusta aspetta la fine della finestra');
+  assert.equal(fermo.body.motivo, 'tetto-programma');
+  assert.ok(Number(fermo.headers['Retry-After']) > 0);
+  // un altro programma non ne risente
+  assert.equal(verificaPasswordApp({ login: 'capo', password: 'Gru-a-torre-9', app: 'skytower', ip: '10.60.0.2' }, '127.0.0.1', ora + 1000).status, 200);
+  // finita la finestra il programma torna a funzionare
+  const dopo = verificaPasswordApp({ login: 'lbianchi', password: 'Cantiere-2026!', app: 'incampo', ip: '10.60.0.1' }, '127.0.0.1', ora + VERIFICA_FINESTRA_MS + 1);
+  assert.equal(dopo.status, 200);
+  erroriVerificaApp.clear();
+  for (const [nome, ip] of ipUsati) { clearLoginFails(loginKey(nome, ip)); clearLoginFails(loginKey('*', ip)); }
 }));
 
 // Dall'11/11/2026 VFP Transfer è nel registro (riservato, senza tessera): passa solo chi ha la spunta o è admin.

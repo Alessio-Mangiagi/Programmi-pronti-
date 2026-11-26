@@ -1436,6 +1436,33 @@ function applicaSblocco(user, chiavi) {
 // verifica la password senza essere un programma del portale: qui non si controlla l'abilitazione.
 const APP_FUORI_PORTALE = {};
 
+// Tetto agli errori per programma chiamante (26/11/2026, revisione di sicurezza del 13/11).
+// I blocchi per tentativi contano sull'IP della persona, ma quell'IP lo dichiara il programma che
+// chiama: chi avesse il token della suite potrebbe provare password all'infinito cambiando `ip` a
+// ogni chiamata. Qui si contano le password sbagliate PER PROGRAMMA, qualunque IP dichiari: oltre
+// VERIFICA_MAX_ERRORI_APP in VERIFICA_FINESTRA_MS quel programma riceve 429 fino alla fine della
+// finestra (gli altri programmi e il login del portale continuano a funzionare). 500 in 15 minuti
+// è molto sopra l'uso vero di un'azienda e molto sotto quello che serve a indovinare una password.
+// Il conto sta in memoria: un riavvio del portale lo azzera. Si regola con PORTALE_VERIFICA_MAX_ERRORI.
+const VERIFICA_MAX_ERRORI_APP = Math.max(1, Number(process.env.PORTALE_VERIFICA_MAX_ERRORI) || 500);
+const VERIFICA_FINESTRA_MS = 15 * 60 * 1000;
+const erroriVerificaApp = new Map();   // appId -> { inizio, n, segnalato }
+
+/** Millisecondi che mancano alla fine del blocco del programma, 0 se non è bloccato. */
+function verificaAppBloccataMs(appId, now = Date.now()) {
+  const e = erroriVerificaApp.get(appId);
+  if (!e) return 0;
+  if (now - e.inizio >= VERIFICA_FINESTRA_MS) { erroriVerificaApp.delete(appId); return 0; }
+  return e.n >= VERIFICA_MAX_ERRORI_APP ? e.inizio + VERIFICA_FINESTRA_MS - now : 0;
+}
+
+/** Una password sbagliata in più per il programma; la finestra parte dal primo errore. */
+function notaErroreVerificaApp(appId, now = Date.now()) {
+  const e = erroriVerificaApp.get(appId);
+  if (!e || now - e.inizio >= VERIFICA_FINESTRA_MS) erroriVerificaApp.set(appId, { inizio: now, n: 1, segnalato: false });
+  else e.n += 1;
+}
+
 // L'utente del portale per quello che la persona ha scritto nel login dell'altro
 // programma: lo username, oppure l'email (quella impostata dall'admin o quella
 // dedotta username@dominio, la stessa che /api/verify manda a SkyTower e InCampo).
@@ -1480,6 +1507,25 @@ function verificaPasswordApp(corpo, ipChiamante, now = Date.now()) {
   if (!login || !password) return { status: 400, body: { ok: false, error: 'Login e password obbligatori' } };
   const ip = ipValido(c.ip) || ipChiamante || '';
 
+  // Tetto per programma: si controlla prima di guardare la password, così durante il blocco non si
+  // può più provare nulla da quel programma (nemmeno la password giusta: tornerà a fine finestra).
+  const tettoMs = verificaAppBloccataMs(appId, now);
+  if (tettoMs > 0) {
+    const e = erroriVerificaApp.get(appId);
+    // nel registro una riga sola per finestra, non una per chiamata respinta
+    if (!e.segnalato) {
+      e.segnalato = true;
+      logAccesso({ ts: new Date(now).toISOString(), username: null, nome: null, appId, appNome: nomeApp, azione: 'verifica-tetto', ip });
+      console.warn(`[portale] verifica-password: ${nomeApp} ha superato ${VERIFICA_MAX_ERRORI_APP} password sbagliate in 15 minuti, bloccato fino a fine finestra`);
+    }
+    const min = Math.ceil(tettoMs / 60000);
+    return {
+      status: 429,
+      body: { ok: false, motivo: 'tetto-programma', error: `Troppi accessi falliti da ${nomeApp}. Riprova tra ${min} ${min === 1 ? 'minuto' : 'minuti'} o entra dal Portale.` },
+      headers: { 'Retry-After': String(Math.ceil(tettoMs / 1000)) },
+    };
+  }
+
   const lista = loadUtenti();
   const user = trovaUtentePerLogin(lista, login);
   // Contatore sullo username vero quando la persona è riconosciuta (email o nome
@@ -1502,6 +1548,7 @@ function verificaPasswordApp(corpo, ipChiamante, now = Date.now()) {
   if (!pwOk) {
     noteLoginFail(key, now);
     noteLoginFail(keyIp, now, LOGIN_MAX_FAIL_IP);
+    notaErroreVerificaApp(appId, now);
     return { status: 401, body: { ok: false, error: 'Credenziali non valide' } };
   }
   clearLoginFails(key);
@@ -3403,7 +3450,7 @@ module.exports = {
   getWarmList,                                     // pre-warm (testabile)
   portalHostname, appUrl, isSuiteOrigin, daFarePerHost,   // URL/CORS in LAN, link del "da fare" con l'host giusto
   loginKey, loginBlockedMs, noteLoginFail, clearLoginFails, LOGIN_MAX_FAIL, LOGIN_MAX_FAIL_IP,   // freno al brute force
-  verificaPasswordApp, trovaUtentePerLogin, ipValido,   // password del portale negli altri programmi
+  verificaPasswordApp, trovaUtentePerLogin, ipValido, erroriVerificaApp, VERIFICA_MAX_ERRORI_APP, VERIFICA_FINESTRA_MS,   // password del portale negli altri programmi
   fileDocumentazione,                              // guida e README per /doc
   descriviAbilitazioni, descriviUtente, descriviImport,   // dettaglio di abilitazioni e utenti nel registro
   parseNetstatPid,                                 // spegnimento app
