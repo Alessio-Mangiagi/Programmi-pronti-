@@ -47,3 +47,22 @@ def test_modello_3d_glb_conta_come_bim(client, api_world, as_user):  # noqa: F81
     r = upload(client, lead, stru, nome, b"glTF" + bytes(20), title="Modello 3D")
     assert r.status_code == 200, r.text
     assert _bim(client, w, lead)[stru] is True
+
+
+def test_altri_contenuti_e_commessa_con_modelli(client, api_world, as_user):  # noqa: F811
+    """`content_kinds` elenca disegni CAD, computi e relazioni della cartella (i PDF no), e l'elenco
+    delle proprie commesse (GET /me/projects) dice quale contiene modelli (`has_bim`), per il cubo sulla riga della commessa."""
+    _, w = api_world
+    lead = as_user("des_lead")
+    arch = str(w.containers["des_arch"])
+    for ext, tipo in (("dwg", "DR"), ("xlsx", "SH"), ("docx", "RP")):
+        r = upload(client, lead, arch, des_name(ext=ext).replace("-DR-", f"-{tipo}-"), b"contenuto di prova " + ext.encode(), title="Prova " + ext)
+        assert r.status_code == 200, r.text
+    righe = client.get(f"/projects/{w.project_id}/containers", headers=lead).json()
+    per_id = {c["id"]: c["content_kinds"] for c in righe}
+    assert per_id[arch] == ["CAD", "COMPUTI", "RELAZIONI"]
+    assert per_id[str(w.containers["des_root"])] == []
+
+    # la commessa: il modello caricato nei test sopra la segna
+    commesse = {p["id"]: p["has_bim"] for p in client.get("/me/projects", headers=lead).json()}
+    assert commesse[str(w.project_id)] is True

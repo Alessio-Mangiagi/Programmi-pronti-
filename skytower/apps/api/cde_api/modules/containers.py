@@ -25,13 +25,49 @@ GrantAction = Literal["READ", "WRITE", "DOWNLOAD", "APPROVE"]
 # sempre generico. Le righe passano dalla RLS, quindi chi non può leggere la cartella vede false.
 BIM_EXTENSIONS = ("ifc", "ifczip", "ifcxml", "rvt", "rfa", "nwd", "nwc", "nwf", "glb", "gltf")
 
+# Altri contenuti che una cartella dichiara (26/11/2026), con lo stesso criterio del BIM: escono in
+# `content_kinds` e il frontend li disegna accanto al nome (apps/web/src/components/FolderContentMarks.tsx,
+# che deve conoscere le stesse chiavi). I PDF restano fuori di proposito: stanno in quasi tutte le
+# cartelle e non distinguerebbero nulla. .dcf, .pwe e .xpwe sono i computi di PriMus.
+CONTENT_KINDS: dict[str, tuple[str, ...]] = {
+    "CAD": ("dwg", "dxf", "dwf", "dgn"),
+    "COMPUTI": ("xls", "xlsx", "xlsm", "ods", "csv", "dcf", "pwe", "xpwe"),
+    "RELAZIONI": ("doc", "docx", "odt", "rtf"),
+}
+
+
+def _ext_regex(exts: tuple[str, ...]) -> str:
+    """Espressione regolare (letterale SQL) per i nomi di file che finiscono con una delle estensioni."""
+    return "'[.](" + "|".join(exts) + ")$'"
+
+
+# CASE che traduce il nome del file (già in minuscolo, colonna f) nella chiave del suo tipo di contenuto.
+_KIND_CASE = "CASE " + " ".join(f"WHEN f ~ {_ext_regex(e)} THEN '{k}'" for k, e in CONTENT_KINDS.items()) + " END"
+
+BIM_FILENAME_MATCH = "lower(r.original_filename) ~ " + _ext_regex(BIM_EXTENSIONS)
+
+# La commessa `p` contiene almeno un modello BIM o 3D: lo usa GET /me/projects (me.py) per il cubo sulla
+# riga della commessa nell'albero, visibile anche a commessa chiusa. Stesso criterio delle cartelle; le
+# aree riservate non contano. Cartelle e documenti passano dalla RLS: vale solo ciò che chi guarda può leggere.
+PROJECT_HAS_BIM_SQL = (
+    "EXISTS (SELECT 1 FROM cde.containers bc JOIN cde.documents d ON d.container_id = bc.id "
+    "JOIN cde.document_revisions r ON r.document_id = d.id "
+    "WHERE bc.project_id = p.id AND NOT bc.is_private AND d.archived_at IS NULL AND " + BIM_FILENAME_MATCH + ")"
+)
+
 CONTAINER_SQL = """
     SELECT c.id, c.project_id, c.parent_id, c.owner_organization_id, o.code AS owner_organization_code,
            c.name, c.inherit_permissions, c.is_private, c.naming_profile_id, c.created_by, c.created_at, c.updated_at,
            cde.my_container_actions(c.id)::text[] AS my_actions,
            EXISTS (SELECT 1 FROM cde.documents d JOIN cde.document_revisions r ON r.document_id = d.id
                    WHERE d.container_id = c.id AND d.archived_at IS NULL
-                     AND lower(r.original_filename) ~ '[.](""" + "|".join(BIM_EXTENSIONS) + """)$') AS has_bim
+                     AND """ + BIM_FILENAME_MATCH + """) AS has_bim,
+           ARRAY(SELECT DISTINCT k FROM (
+                   SELECT """ + _KIND_CASE + """ AS k
+                   FROM (SELECT lower(r.original_filename) AS f
+                         FROM cde.documents d JOIN cde.document_revisions r ON r.document_id = d.id
+                         WHERE d.container_id = c.id AND d.archived_at IS NULL) nomi) tipi
+                 WHERE k IS NOT NULL ORDER BY k)::text[] AS content_kinds
     FROM cde.containers c
     JOIN cde.organizations o ON o.id = c.owner_organization_id"""
 

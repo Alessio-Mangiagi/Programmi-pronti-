@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from ..deps import Ctx, ctx
 from ..errors import unauthorized
+from .containers import PROJECT_HAS_BIM_SQL
 
 router = APIRouter(tags=["me"])
 
@@ -64,7 +65,9 @@ def my_projects(c: Ctx = Depends(ctx)):
     with c.tx() as conn:
         return conn.execute(
             """SELECT p.id, p.code, p.name, p.status, p.owner_organization_id, o.legal_name AS owner_name,
-                      coalesce(array_agg(DISTINCT r.code) FILTER (WHERE r.code IS NOT NULL), '{}') AS my_roles
+                      coalesce(array_agg(DISTINCT r.code) FILTER (WHERE r.code IS NOT NULL), '{}') AS my_roles,
+                      -- la commessa contiene modelli BIM o 3D: cubo sulla sua riga nell'albero (26/11/2026)
+                      """ + PROJECT_HAS_BIM_SQL + """ AS has_bim
                FROM cde.projects p
                JOIN cde.organizations o ON o.id = p.owner_organization_id
                LEFT JOIN cde.project_memberships pm
