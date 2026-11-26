@@ -77,7 +77,7 @@ lo apre nel visualizzatore in una nuova scheda del browser.
 Scrivi il **Nome** e premi **Crea**. La spunta **Eredita le condivisioni della cartella padre** (attiva di norma)
 fa vedere la nuova cartella a chi vede già quella superiore; toglila per una sottocartella più chiusa.
 
-### Riconoscere le cartelle dal contenuto (BIM, CAD, computi, relazioni)
+### Riconoscere le cartelle dal contenuto (BIM, tavole, CAD, computi, relazioni, foto)
 
 Dal 26/11/2026 le cartelle dicono a colpo d'occhio che cosa contengono, in ogni commessa, sia
 nell'albero a sinistra sia nell'elenco della cartella.
@@ -95,21 +95,27 @@ nell'albero a sinistra sia nell'elenco della cartella.
 
 **Altri contenuti**, con un'icona accanto al nome della cartella:
 
-| Segno | Colore | Che cosa contiene | Formati |
-|-------|--------|-------------------|---------|
+| Segno | Colore | Che cosa contiene | Si riconosce da |
+|-------|--------|-------------------|-----------------|
+| matita e righello | verde acqua | tavole | PDF con tipo documento `DR` o `SK` nel nome |
 | compasso | arancio | disegni CAD | `.dwg`, `.dxf`, `.dwf`, `.dgn` |
-| calcolatrice | verde | computi e fogli di calcolo | `.xls`, `.xlsx`, `.xlsm`, `.ods`, `.csv`, `.dcf`, `.pwe`, `.xpwe` |
-| foglio | grigio | relazioni e documenti di testo | `.doc`, `.docx`, `.odt`, `.rtf` |
+| calcolatrice | verde | computi e fogli di calcolo | `.xls`, `.xlsx`, `.xlsm`, `.ods`, `.csv`, `.dcf`, `.pwe`, `.xpwe`; PDF con tipo `BQ`, `CP` o `SH` |
+| foglio | grigio | relazioni e documenti di testo | `.doc`, `.docx`, `.odt`, `.rtf`; PDF con tipo `RP`, `SP`, `MS` o `CA` |
+| macchina fotografica | rosa scuro | foto e immagini | `.jpg`, `.jpeg`, `.png`, `.heic`, `.webp` |
 
 L'icona a colore pieno dice che i file stanno in quella cartella (nell'elenco diventa un'etichetta con
-il nome: **CAD**, **Computi**, **Relazioni**); l'icona più chiara dice che stanno in una sottocartella.
-Passando sopra a un segno compare la spiegazione.
+il nome: **Tavole**, **CAD**, **Computi**, **Relazioni**, **Foto**); l'icona più chiara dice che stanno
+in una sottocartella. Passando sopra a un segno compare la spiegazione.
+
+**I PDF e la codifica dei nomi.** Un PDF da solo non dice se è una tavola o una relazione, quindi per
+i PDF conta il **tipo documento** scritto nel nome codificato: in `PRJ01-DES-ZZ-01-DR-A-0001.pdf` è
+`DR`, cioè una tavola. Un PDF caricato in una cartella senza codifica, o con un tipo diverso da quelli
+in tabella, non fa comparire nessun segno. Vale anche per i PDF firmati `.pdf.p7m`.
 
 Da sapere:
 
 - conta come modello un file `.ifc`, `.ifczip`, `.ifcxml`, `.rvt`, `.rfa`, `.nwd`, `.nwc`, `.nwf` e i
   modelli 3D `.glb` e `.gltf` (quelli esportati da Blender);
-- i **PDF non hanno un segno**: stanno in quasi tutte le cartelle e non aiuterebbero a distinguerle;
 - i documenti archiviati non contano: archiviato l'ultimo file di un tipo, il segno sparisce dalla
   cartella e da quelle sopra;
 - un'area riservata tiene la sua icona (il lucchetto o la cartella viola) e non porta segni;
