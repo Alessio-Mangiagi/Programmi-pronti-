@@ -177,10 +177,10 @@ export async function eliminaFile(prisma: PrismaClient, cartella: string, fileId
 export async function fileCollegabile(prisma: PrismaClient, fileId: number, utenteId: number) {
   const file = await prisma.fileCaricato.findUnique({
     where: { id: fileId },
-    include: { attestato: true, documentoDipendente: true, documentoProgetto: true, assenza: true },
+    include: { attestato: true, documentoDipendente: true, documentoProgetto: true, assenza: true, notaSpesa: true },
   });
   if (!file || file.caricatoDaId !== utenteId) throw new ErroreHttp(400, 'File non trovato: caricalo di nuovo', { fileId: 'File non trovato' });
-  if (file.attestato || file.documentoDipendente || file.documentoProgetto || file.assenza) {
+  if (file.attestato || file.documentoDipendente || file.documentoProgetto || file.assenza || file.notaSpesa) {
     throw new ErroreHttp(409, 'Questo file è già collegato a un altro documento', { fileId: 'File già usato' });
   }
   return file;
@@ -193,7 +193,7 @@ export async function fileCollegabile(prisma: PrismaClient, fileId: number, uten
 export async function pulisciFileOrfani(prisma: PrismaClient, cartella: string, oraRiferimento = new Date()) {
   const limite = new Date(oraRiferimento.getTime() - 24 * 60 * 60 * 1000);
   const orfani = await prisma.fileCaricato.findMany({
-    where: { creatoIl: { lt: limite }, attestato: null, documentoDipendente: null, documentoProgetto: null, assenza: null },
+    where: { creatoIl: { lt: limite }, attestato: null, documentoDipendente: null, documentoProgetto: null, assenza: null, notaSpesa: null },
   });
   for (const f of orfani) await eliminaFile(prisma, cartella, f.id);
   return orfani.length;

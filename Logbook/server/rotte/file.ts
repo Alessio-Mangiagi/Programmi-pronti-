@@ -46,7 +46,7 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
   /** Prima di leggere il corpo (fino a 20 MB in memoria): troppi file in sospeso → 429 subito. */
   const controllaSospesi: express.RequestHandler = async (req, _res, next) => {
     const inSospeso = await prisma.fileCaricato.count({
-      where: { caricatoDaId: req.utente!.id, attestato: null, documentoDipendente: null, documentoProgetto: null, assenza: null },
+      where: { caricatoDaId: req.utente!.id, attestato: null, documentoDipendente: null, documentoProgetto: null, assenza: null, notaSpesa: null },
     });
     if (inSospeso >= MAX_FILE_IN_SOSPESO) {
       throw new ErroreHttp(429, `Hai già ${inSospeso} file caricati e non ancora salvati in una scheda: salva o chiudi i moduli aperti, oppure riprova domani`);
@@ -67,11 +67,14 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
   });
 
   router.get('/:id', async (req, res) => {
-    const file = await prisma.fileCaricato.findUnique({ where: { id: idDaParametro(req.params.id)! }, include: { assenza: { select: { dipendenteId: true } } } });
+    const file = await prisma.fileCaricato.findUnique({ where: { id: idDaParametro(req.params.id)! }, include: { assenza: { select: { dipendenteId: true } }, notaSpesa: { select: { dipendenteId: true } } } });
     if (!file) throw nonTrovato('File');
     // Lo aprono HR, chi l'ha caricato e (Giorno 22) il dipendente della cui assenza è
     // l'allegato, anche se l'ha caricato HR.
-    const suaAssenza = file.assenza != null && req.utente!.dipendenteId === file.assenza.dipendenteId;
+    // Giorno 45: lo stesso vale per lo scontrino di una sua nota spese.
+    const suaAssenza =
+      (file.assenza != null && req.utente!.dipendenteId === file.assenza.dipendenteId) ||
+      (file.notaSpesa != null && req.utente!.dipendenteId === file.notaSpesa.dipendenteId);
     if (!isAdmin(req) && file.caricatoDaId !== req.utente!.id && !suaAssenza) throw vietato('Non puoi aprire questo file');
     // Giorno 35: il contenuto arriva dall'archivio (cartella dei documenti o, su Vercel, database).
     const dati = await leggiContenuto(prisma, cartella, file.nomeDisco);

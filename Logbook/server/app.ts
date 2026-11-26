@@ -45,6 +45,7 @@ import { rotteSaldi } from './rotte/saldi';
 import { rotteCostiProgetti } from './rotte/costi-progetti';
 import { rotteTimbrature } from './rotte/timbrature';
 import { rotteSquadra } from './rotte/squadra';
+import { rotteNoteSpese } from './rotte/note-spese';
 
 /**
  * Opzioni:
@@ -196,6 +197,8 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/timbrature', rotteTimbrature(prisma, oggi, opzioni.adesso));
   // Giorno 43 (26/11/2026): il caposquadra scrive le ore della sua squadra sul suo progetto.
   api.use('/squadra', rotteSquadra(prisma, oggi));
+  // Giorno 45 (26/11/2026): note spese con scontrino, approvate e rimborsate da HR.
+  api.use('/note-spese', rotteNoteSpese(prisma, cartellaDocumenti, oggi));
   // Giorno 34: registro attività, solo amministratori (voce del menu).
   api.use('/registro', rotteRegistro(prisma));
 

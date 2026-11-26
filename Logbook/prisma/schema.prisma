@@ -176,6 +176,7 @@ model Dipendente {
   /// Quote annue e residuo di partenza per il saldo ferie e permessi (Giorno 38).
   quotaAssenze         QuotaAssenze?
   timbrature           Timbratura[]
+  noteSpese            NotaSpesa[]
   documenti            DocumentoDipendente[]
   /// Progetti a cui HR ha assegnato il dipendente: solo su questi può registrare ore.
   assegnazioni         AssegnazioneProgetto[]
@@ -227,6 +228,7 @@ model Progetto {
   /// Dipendenti assegnati (sezione "Dipendenti" della pagina del progetto).
   assegnazioni     AssegnazioneProgetto[]
   timbrature       Timbratura[]
+  noteSpese        NotaSpesa[]
   creatoIl         DateTime               @default(now())
   aggiornatoIl     DateTime               @updatedAt
 }
@@ -400,6 +402,8 @@ model FileCaricato {
   documentoDipendente DocumentoDipendente?
   documentoProgetto   DocumentoProgetto?
   assenza             Assenza?
+  /// Scontrino o ricevuta di una nota spese (Giorno 45).
+  notaSpesa           NotaSpesa?
 }
 
 /// Tipo di attestato (risposta 1c: elenco fisso, ALTRO per tutto il resto).
@@ -660,6 +664,58 @@ model Timbratura {
   decisoDa     String?
   decisoIl     DateTime?
   creatoIl     DateTime        @default(now())
+
+  @@index([dipendenteId, stato])
+  @@index([stato])
+}
+
+// ---------------------------------------------------------------------------
+// Giorno 45 (26/11/2026): note spese
+// ---------------------------------------------------------------------------
+
+enum CategoriaSpesa {
+  VITTO
+  ALLOGGIO
+  TRASPORTO
+  CARBURANTE
+  MATERIALE
+  ALTRO
+}
+
+enum StatoNotaSpesa {
+  RICHIESTA
+  APPROVATA
+  RIFIUTATA
+  /// Approvata e già pagata al dipendente.
+  RIMBORSATA
+}
+
+/// Una spesa anticipata dal dipendente, con la foto dello scontrino (risposta 4c del
+/// 26/11/2026). HR la approva o la rifiuta e poi la segna come rimborsata. Vedi
+/// server/rotte/note-spese.ts.
+model NotaSpesa {
+  id           Int            @id @default(autoincrement())
+  dipendente   Dipendente     @relation(fields: [dipendenteId], references: [id], onDelete: Restrict)
+  dipendenteId Int
+  /// Progetto a cui va imputata la spesa (facoltativo).
+  progetto     Progetto?      @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  progettoId   Int?
+  /// Giorno della spesa (AAAA-MM-GG).
+  data         String
+  categoria    CategoriaSpesa
+  /// Importo in centesimi di euro, IVA compresa.
+  importoCent  Int
+  descrizione  String
+  /// Scontrino o ricevuta.
+  file         FileCaricato?  @relation(fields: [fileId], references: [id])
+  fileId       Int?           @unique
+  stato        StatoNotaSpesa @default(RICHIESTA)
+  noteHr       String?
+  /// Nome utente di HR che ha deciso.
+  decisoDa     String?
+  decisoIl     DateTime?
+  rimborsataIl DateTime?
+  creatoIl     DateTime       @default(now())
 
   @@index([dipendenteId, stato])
   @@index([stato])
