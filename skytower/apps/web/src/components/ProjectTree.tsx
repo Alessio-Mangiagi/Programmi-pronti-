@@ -9,6 +9,7 @@ import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import FolderIcon from "@mui/icons-material/Folder";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import FolderSpecialIcon from "@mui/icons-material/FolderSpecial";
+import FolderBimIcon from "./FolderBimIcon";
 import LockIcon from "@mui/icons-material/Lock";
 import SearchIcon from "@mui/icons-material/Search";
 import { api, Container, PrivateArea, Project } from "../api";
@@ -124,6 +125,9 @@ function ProjectNode({ project, open, currentFolder, onExpand }: {
 
   const icon = (c: Container) =>
     c.is_private && !c.parent_id ? <FolderSpecialIcon fontSize="small" sx={{ color: "#7a4fb5" }} />
+      // cartella con modelli BIM: icona sua, anche quando è quella aperta (26/11/2026). Le cartelle di
+      // un'area riservata tengono il loro colore viola, come nell'elenco della cartella (dove hanno il lucchetto)
+      : c.has_bim && !c.is_private ? <FolderBimIcon fontSize="small" open={c.id === currentFolder} />
       : c.id === currentFolder ? <FolderOpenIcon fontSize="small" sx={{ color: "#c08a1e" }} />
       : <FolderIcon fontSize="small" sx={{ color: c.is_private ? "#9b7ccc" : "#d9a93c" }} />;
 

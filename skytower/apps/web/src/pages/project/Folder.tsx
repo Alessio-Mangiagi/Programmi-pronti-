@@ -12,6 +12,7 @@ import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import DownloadIcon from "@mui/icons-material/Download";
 import FolderIcon from "@mui/icons-material/Folder";
+import FolderBimIcon from "../../components/FolderBimIcon";
 import FolderZipIcon from "@mui/icons-material/FolderZip";
 import GroupIcon from "@mui/icons-material/Group";
 import HistoryIcon from "@mui/icons-material/History";
@@ -166,7 +167,7 @@ export function FolderView({ project }: { project: Project }) {
                   <TableCell padding="checkbox" />
                   <TableCell>
                     <Stack direction="row" spacing={1.25} alignItems="center">
-                      {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
+                      {c.is_private ? <LockIcon sx={{ color: "#7a4fb5" }} /> : c.has_bim ? <FolderBimIcon /> : <FolderIcon sx={{ color: "#d9a93c" }} />}
                       {/* link vero: la cartella si apre anche da tastiera (Tab + Invio), non solo cliccando la riga */}
                       <Link component={RouterLink} to={`/progetti/${project.id}/cartelle/${c.id}`} variant="body2" fontWeight={500}
                             color="inherit" underline="hover" onClick={(e) => e.stopPropagation()}>{c.name}</Link>

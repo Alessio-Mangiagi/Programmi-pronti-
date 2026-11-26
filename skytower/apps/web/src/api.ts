@@ -272,6 +272,8 @@ export interface Container {
   name: string;
   inherit_permissions: boolean;
   is_private: boolean;
+  /** contiene almeno un modello BIM (IFC, Revit, Navisworks) che chi guarda può leggere: icona dedicata */
+  has_bim?: boolean;
   /** schema di naming per cartelle assegnato (null = quello della commessa) */
   naming_profile_id?: string | null;
   my_actions: Action[];
