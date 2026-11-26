@@ -60,9 +60,33 @@ def test_altri_contenuti_e_commessa_con_modelli(client, api_world, as_user):  # 
         assert r.status_code == 200, r.text
     righe = client.get(f"/projects/{w.project_id}/containers", headers=lead).json()
     per_id = {c["id"]: c["content_kinds"] for c in righe}
-    assert per_id[arch] == ["CAD", "COMPUTI", "RELAZIONI"]
+    # c'è anche "TAVOLE": la pianta PDF del primo test ha tipo documento DR nella codifica
+    assert per_id[arch] == ["CAD", "COMPUTI", "RELAZIONI", "TAVOLE"]
     assert per_id[str(w.containers["des_root"])] == []
 
     # la commessa: il modello caricato nei test sopra la segna
     commesse = {p["id"]: p["has_bim"] for p in client.get("/me/projects", headers=lead).json()}
     assert commesse[str(w.project_id)] is True
+
+
+def test_pdf_dal_tipo_documento_e_foto(client, api_world, as_user):  # noqa: F811
+    """Un PDF segna la cartella secondo il tipo documento della codifica (RP = relazione, BQ = computo);
+    con un tipo non elencato non la segna. Le immagini la segnano come foto."""
+    _, w = api_world
+    lead = as_user("des_lead")
+    det = str(w.containers["des_arch_det"])
+
+    def tipi() -> list:
+        righe = client.get(f"/projects/{w.project_id}/containers", headers=lead).json()
+        return next(c["content_kinds"] for c in righe if c["id"] == det)
+
+    prima = tipi()
+    assert "RELAZIONI" not in prima and "COMPUTI" not in prima and "FOTO" not in prima
+    # tipo documento non elencato (M2 = modello 2D): il PDF non dice nulla
+    assert upload(client, lead, det, des_name().replace("-DR-", "-M2-"), PDF, title="Altro").status_code == 200
+    assert tipi() == prima
+    assert upload(client, lead, det, des_name().replace("-DR-", "-RP-"), PDF, title="Relazione").status_code == 200
+    assert upload(client, lead, det, des_name().replace("-DR-", "-BQ-"), PDF, title="Computo").status_code == 200
+    assert upload(client, lead, det, des_name(ext="jpg"), b"\xff\xd8\xff\xe0" + bytes(64), title="Foto").status_code == 200
+    dopo = tipi()
+    assert {"RELAZIONI", "COMPUTI", "FOTO"} <= set(dopo)

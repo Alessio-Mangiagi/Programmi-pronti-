@@ -27,12 +27,24 @@ BIM_EXTENSIONS = ("ifc", "ifczip", "ifcxml", "rvt", "rfa", "nwd", "nwc", "nwf", 
 
 # Altri contenuti che una cartella dichiara (26/11/2026), con lo stesso criterio del BIM: escono in
 # `content_kinds` e il frontend li disegna accanto al nome (apps/web/src/components/FolderContentMarks.tsx,
-# che deve conoscere le stesse chiavi). I PDF restano fuori di proposito: stanno in quasi tutte le
-# cartelle e non distinguerebbero nulla. .dcf, .pwe e .xpwe sono i computi di PriMus.
+# che deve conoscere le stesse chiavi). .dcf, .pwe e .xpwe sono i computi di PriMus.
 CONTENT_KINDS: dict[str, tuple[str, ...]] = {
     "CAD": ("dwg", "dxf", "dwf", "dgn"),
     "COMPUTI": ("xls", "xlsx", "xlsm", "ods", "csv", "dcf", "pwe", "xpwe"),
     "RELAZIONI": ("doc", "docx", "odt", "rtf"),
+    "FOTO": ("jpg", "jpeg", "png", "heic", "webp"),
+}
+
+# I PDF stanno in quasi tutte le cartelle, quindi l'estensione da sola non distingue nulla: per loro
+# conta il TIPO DOCUMENTO della codifica (campo `type` di documents.naming_fields, es. il DR di
+# PRJ01-DES-ZZ-01-DR-A-0001.pdf). Codici della ISO 19650: DR disegno, SK schizzo; RP relazione,
+# SP specifica/capitolato, MS procedura, CA calcoli; BQ computo metrico, CP piano dei costi, SH abaco.
+# Un PDF senza codifica, o con un tipo non elencato, non segna la cartella. Vale anche per il PDF
+# firmato (.pdf.p7m). "TAVOLE" esiste solo così: non ha estensioni proprie.
+PDF_KINDS: dict[str, tuple[str, ...]] = {
+    "TAVOLE": ("DR", "SK"),
+    "RELAZIONI": ("RP", "SP", "MS", "CA"),
+    "COMPUTI": ("BQ", "CP", "SH"),
 }
 
 
@@ -41,8 +53,16 @@ def _ext_regex(exts: tuple[str, ...]) -> str:
     return "'[.](" + "|".join(exts) + ")$'"
 
 
-# CASE che traduce il nome del file (già in minuscolo, colonna f) nella chiave del suo tipo di contenuto.
-_KIND_CASE = "CASE " + " ".join(f"WHEN f ~ {_ext_regex(e)} THEN '{k}'" for k, e in CONTENT_KINDS.items()) + " END"
+# CASE che traduce il nome del file (già in minuscolo, colonna f) e, per i PDF, il tipo documento della
+# codifica (in maiuscolo, colonna t) nella chiave del tipo di contenuto.
+_KIND_CASE = (
+    "CASE "
+    + " ".join(f"WHEN f ~ {_ext_regex(e)} THEN '{k}'" for k, e in CONTENT_KINDS.items())
+    + " "
+    + " ".join("WHEN f ~ '[.]pdf([.]p7m)?$' AND t IN (" + ", ".join(f"'{c}'" for c in codes) + f") THEN '{k}'"
+               for k, codes in PDF_KINDS.items())
+    + " END"
+)
 
 BIM_FILENAME_MATCH = "lower(r.original_filename) ~ " + _ext_regex(BIM_EXTENSIONS)
 
@@ -64,7 +84,7 @@ CONTAINER_SQL = """
                      AND """ + BIM_FILENAME_MATCH + """) AS has_bim,
            ARRAY(SELECT DISTINCT k FROM (
                    SELECT """ + _KIND_CASE + """ AS k
-                   FROM (SELECT lower(r.original_filename) AS f
+                   FROM (SELECT lower(r.original_filename) AS f, upper(d.naming_fields->>'type') AS t
                          FROM cde.documents d JOIN cde.document_revisions r ON r.document_id = d.id
                          WHERE d.container_id = c.id AND d.archived_at IS NULL) nomi) tipi
                  WHERE k IS NOT NULL ORDER BY k)::text[] AS content_kinds
