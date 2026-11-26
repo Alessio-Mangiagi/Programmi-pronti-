@@ -49,6 +49,7 @@ export async function cancellaTuttiIDati(
     const assenze = (await tx.assenza.deleteMany()).count;
     await tx.segnalazione.deleteMany();
     await tx.meseChiuso.deleteMany();
+    await tx.quotaAssenze.deleteMany();
     // Il registro delle attività NON si cancella: deve restare traccia anche di questa operazione.
     await tx.attestato.deleteMany();
     await tx.documentoDipendente.deleteMany();

@@ -173,6 +173,8 @@ model Dipendente {
   registrazioni        RegistrazioneOraria[]
   assenze              Assenza[]
   attestati            Attestato[]
+  /// Quote annue e residuo di partenza per il saldo ferie e permessi (Giorno 38).
+  quotaAssenze         QuotaAssenze?
   documenti            DocumentoDipendente[]
   /// Progetti a cui HR ha assegnato il dipendente: solo su questi può registrare ore.
   assegnazioni         AssegnazioneProgetto[]
@@ -583,4 +585,27 @@ model MeseChiuso {
   chiusoIl DateTime @default(now())
   /// Nome utente di chi ha chiuso (testo e non relazione: resta anche se l'account sparisce).
   chiusoDa String
+}
+
+// ---------------------------------------------------------------------------
+// Giorno 38 (26/11/2026): saldo ferie e permessi
+// ---------------------------------------------------------------------------
+
+/// Quanto matura un dipendente in un anno e da che residuo parte: lo scrive HR (Assenze →
+/// Saldi). Senza questa riga il saldo del dipendente non si calcola: Logbook non inventa
+/// numeri di contratto. Il calcolo è in comune/saldi.ts.
+model QuotaAssenze {
+  dipendente       Dipendente @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId     Int        @id
+  /// Giorni di ferie maturati in un anno intero.
+  ferieGiorniAnno  Float
+  /// Ore di permesso (ROL, ex festività) maturate in un anno intero.
+  permessiOreAnno  Float
+  /// Data da cui Logbook conta (AAAA-MM-GG): di solito il 1° gennaio dell'anno di avvio.
+  contaDal         String
+  /// Giorni di ferie residui alla data contaDal (riportati dal sistema precedente).
+  ferieIniziali    Float      @default(0)
+  /// Ore di permesso residue alla data contaDal.
+  permessiIniziali Float      @default(0)
+  aggiornatoIl     DateTime   @updatedAt
 }
