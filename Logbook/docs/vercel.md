@@ -1,8 +1,8 @@
 <!-- "><(((º> sabusabu <º)))><" -->
 
-# Logbook su Vercel
+# Copilota su Vercel
 
-Dal 25/11/2026 Logbook si può pubblicare su Vercel, oltre che installare su un PC o nella
+Dal 25/11/2026 Copilota si può pubblicare su Vercel, oltre che installare su un PC o nella
 suite. Il programma è lo stesso; cambia dove tiene i dati, perché su Vercel non c'è un disco
 che dura né un server sempre acceso.
 
@@ -42,7 +42,7 @@ che dura né un server sempre acceso.
    | `LOGBOOK_SMTP_PASSWORD` | la sua password (segnare la variabile come *Sensitive*) |
    | `CRON_SECRET` | una stringa casuale lunga: la usa Vercel Cron per far partire ogni mattina gli avvisi via email |
 
-   La password dell'amministratore scritta qui è **provvisoria**: al primo accesso Logbook
+   La password dell'amministratore scritta qui è **provvisoria**: al primo accesso Copilota
    chiede di sceglierne una nuova. Dopo il primo accesso si può togliere
    `LOGBOOK_ADMIN_PASSWORD` dalle variabili.
 5. **Deploy.** Scheda *Deployments* → i tre puntini sull'ultima riga → *Redeploy*. La build (`scripts/vercel-build.mjs`) crea le tabelle nel
@@ -62,7 +62,7 @@ nel database, non nel progetto.
    `LOGBOOK_ADMIN_REIMPOSTA` = `1`. `LOGBOOK_PROPRIETARIO` deve avere lo stesso nome utente.
 2. *Deployments → Redeploy*. La build reimposta la password di quell'account (o lo crea) e
    chiude le sue sessioni.
-3. Entrare: Logbook chiede subito una password nuova. Con `LOGBOOK_ADMIN_DEFINITIVA` = `1`
+3. Entrare: Copilota chiede subito una password nuova. Con `LOGBOOK_ADMIN_DEFINITIVA` = `1`
    la password scritta nella variabile vale invece come definitiva e non viene chiesto nulla.
 4. **Togliere `LOGBOOK_ADMIN_REIMPOSTA`** (e `LOGBOOK_ADMIN_PASSWORD`) dalle variabili,
    altrimenti ogni build rimette quella password.
@@ -73,7 +73,7 @@ nel database, non nel progetto.
   va creato nella stessa regione: i dati restano nell'Unione europea.
 - **Dati di esempio.** Dopo il primo accesso, in *Impostazioni → Dati del programma* il
   proprietario li carica con un pulsante e li cancella con "Cancella tutti i dati".
-- **File oltre 4 MB.** Vercel rifiuta le richieste più grandi di 4,5 MB: Logbook lo dice con
+- **File oltre 4 MB.** Vercel rifiuta le richieste più grandi di 4,5 MB: Copilota lo dice con
   un messaggio. I documenti grandi vanno ridotti (PDF compresso) o tenuti in SkyTower.
 - **Copie di sicurezza.** Neon permette di riportare il database a un momento precedente
   (*Restore*): nel piano gratuito per poche ore, nei piani a pagamento per giorni. Prima di

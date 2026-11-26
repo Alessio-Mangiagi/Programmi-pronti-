@@ -1082,3 +1082,11 @@ Punto 9 della richiesta "implementa tutto partendo dal primo punto".
 - Interfaccia: `src/componenti/CostoManodopera.tsx` nella scheda del progetto (totali, barre di consumo, modulo del preventivo, due tabelle).
 - Limite dichiarato: si usa il costo orario attuale anche per le ore passate (non c'è storico dei costi).
 - Verifiche: `costi-progetti.test.ts` (conti a mano su un progetto nuovo: 810 minuti, 291,00 € lordi, 190,00 € netti, 29,1% e 67,5% del preventivo; permessi; preventivo tolto; nessun preventivo ai dipendenti). Prova dal vivo sulla copia (`scratchpad/giorno41.mjs`, 8 su 8). Immagine 54 della guida. Trovato e corretto durante la prova: un importo scritto male nel preventivo non mostrava nessun messaggio.
+
+### 26/11/2026 — L'app si chiama Copilota
+
+Richiesta dell'utente: "cambia il nome della app in 'copilota'". Da qui in avanti il nome che si legge è **Copilota** (interfaccia, titolo, icona sul telefono, email, messaggi, guida, scheda nel Portale, domande degli installatori). In questo file le voci precedenti restano scritte com'erano, con il nome Logbook.
+
+Non sono cambiati i nomi tecnici, perché cambiarli romperebbe installazioni e pubblicazione: cartella `Logbook/` (è la Root Directory su Vercel), variabili `LOGBOOK_*`, cookie `logbook_*`, intestazione `X-Logbook`, etichetta `[logbook]` nei log, `data/logbook.db`, `InstallaLogbook.exe`, `logbook.webmanifest`, progetto Vercel `programmi-pronti`. La password degli account di esempio resta `Logbook2026!`.
+
+Come: sostituzione della parola con regola (mai dopo `X-` o `Installa`, mai dentro un percorso) su 74 file, poi controllo a mano dei riferimenti alla cartella. Verifica: typecheck, 285 test su 285 (i test che controllano oggetto e testo delle email ora aspettano "Copilota: …").

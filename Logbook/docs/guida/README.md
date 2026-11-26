@@ -1,15 +1,15 @@
 <!-- "><(((º> sabusabu <º)))><" -->
 
-# Logbook — guida d'uso
+# Copilota — guida d'uso
 
-Logbook raccoglie le **ore lavorate** di ogni dipendente, divise per fasce orarie e
+Copilota raccoglie le **ore lavorate** di ogni dipendente, divise per fasce orarie e
 progetti, e gestisce **ferie, permessi, malattia e festività**. HR può anche importare le ore
 da Excel ed estrarre i report.
 
 Si apre dal browser all'indirizzo che vi ha dato l'ufficio (sul PC: **http://127.0.0.1:5210**)
-oppure dalla card **Logbook** del Portale della suite. Funziona anche **senza la suite**: su
+oppure dalla card **Copilota** del Portale della suite. Funziona anche **senza la suite**: su
 un PC con Node.js si installa con un doppio clic su `InstallaLogbook.exe`, nella cartella di
-Logbook, e si apre dall'icona **Logbook** sul desktop. Funziona anche dal **cellulare** e
+Copilota, e si apre dall'icona **Copilota** sul desktop. Funziona anche dal **cellulare** e
 sfrutta tutta la larghezza degli schermi **ultra wide** (vedi il capitolo 4).
 
 ---
@@ -18,10 +18,10 @@ sfrutta tutta la larghezza degli schermi **ultra wide** (vedi il capitolo 4).
 
 ![Pagina di accesso](img/01-login.png)
 
-Nome utente e password sono **quelli di Logbook**, non quelli del Portale: li assegna HR
+Nome utente e password sono **quelli di Copilota**, non quelli del Portale: li assegna HR
 dalla scheda del dipendente.
 
-**Al primo accesso Logbook chiede di scegliere una password nuova**: quella data da HR è
+**Al primo accesso Copilota chiede di scegliere una password nuova**: quella data da HR è
 provvisoria e finché non la si cambia non si vede nient'altro. La nuova deve avere almeno
 8 caratteri (12 per gli amministratori), con lettere e numeri, non essere una password comune
 ed essere diversa da quella provvisoria. Lo stesso vale
@@ -33,11 +33,11 @@ cambia quando si vuole da **Cambia password**, in alto a destra.
 Dopo **10 password sbagliate** bisogna aspettare 5 minuti; se si sbaglia ancora l'attesa
 raddoppia ogni volta (10, 20, 40 minuti…).
 
-**Sessione**: se per 15 minuti non si tocca mouse o tastiera, Logbook si chiude da solo e
+**Sessione**: se per 15 minuti non si tocca mouse o tastiera, Copilota si chiude da solo e
 chiede di rientrare. Un modulo lasciato a metà va salvato prima di allontanarsi.
 
 **Amministratori, codice via email**: la prima volta che un amministratore entra da un PC,
-dopo la password Logbook manda un codice di 6 cifre alla sua email. Su quel PC non lo
+dopo la password Copilota manda un codice di 6 cifre alla sua email. Su quel PC non lo
 chiede più per 30 giorni.
 
 ![Codice di accesso via email](img/44-codice-accesso.png)
@@ -58,7 +58,7 @@ Dal 26/11/2026 chi ha dimenticato la password la cambia da solo, senza chiamare 
 
 Da sapere:
 - il codice vale 10 minuti e una volta sola; dopo 5 codici sbagliati ne serve uno nuovo;
-- Logbook risponde allo stesso modo anche se il nome utente non esiste: se l'email non
+- Copilota risponde allo stesso modo anche se il nome utente non esiste: se l'email non
   arriva, il nome è sbagliato oppure in anagrafica manca l'indirizzo. In quel caso serve HR,
   che dalla scheda del dipendente dà una password provvisoria;
 - dopo il cambio, chi era collegato con la vecchia password viene scollegato.
@@ -89,15 +89,15 @@ lettura**, con le fasce (progetto, dalle, alle, note) e il totale. In fondo c'è
 
 ![Giorno in sola lettura con la segnalazione](img/32-giorno-passato.png)
 
-- HR vede la segnalazione appena entra in Logbook, corregge le ore se serve e la chiude con
+- HR vede la segnalazione appena entra in Copilota, corregge le ore se serve e la chiude con
   una risposta, che compare sotto la segnalazione e in dashboard.
 - Finché è **aperta** la potete ritirare; una volta **risolta** resta come promemoria.
 - Si segnala sui giorni fino a oggi, non su quelli futuri.
 
-«Oggi» è la data di Logbook, non quella del computer. Se il PC ha una data diversa, in cima
+«Oggi» è la data di Copilota, non quella del computer. Se il PC ha una data diversa, in cima
 alla pagina compare un avviso giallo.
 
-![Avviso: data del PC diversa da quella di Logbook](img/33-avviso-data-pc.png)
+![Avviso: data del PC diversa da quella di Copilota](img/33-avviso-data-pc.png)
 
 ### I miei progetti
 
@@ -115,7 +115,7 @@ le vostre altre assenze):
 - **Ferie**: dal giorno… al giorno… (sabati, domeniche e festivi non si contano).
 - **Permesso**: un giorno e la durata in ore (es. 2 oppure 1,5).
 - **Malattia**: le date e solo il **numero di protocollo del certificato**. Non scrivete
-  diagnosi né altre informazioni sanitarie: Logbook non ha campi per questo, di proposito.
+  diagnosi né altre informazioni sanitarie: Copilota non ha campi per questo, di proposito.
 - **Allegato** (facoltativo): con **Allega file…** si aggiunge un file, es. il giustificativo
   di un permesso: **solo PDF o immagini** (niente Word o Excel, che possono contenere
   macro). Per la malattia solo l'attestato per il datore di lavoro, **mai referti o
@@ -138,7 +138,7 @@ dipendenti vedono le loro ore e mandano segnalazioni.
 ### Segnalazioni dei dipendenti
 
 Nell'intestazione, la **campanella** mostra quante segnalazioni sono aperte. **Appena si
-entra in Logbook**, se ce ne sono, si apre da sola la finestra con l'elenco: chi, che giorno,
+entra in Copilota**, se ce ne sono, si apre da sola la finestra con l'elenco: chi, che giorno,
 cosa non torna. **Apri il giorno →** porta al dettaglio di quella giornata: si correggono le
 fasce, si scrive la risposta e si preme **Segna risolta**. La finestra si riapre con la
 campanella; in dashboard c'è anche il riquadro **Segnalazioni aperte**.
@@ -285,7 +285,7 @@ dipendente nuovo c'è solo il modulo in alto: dopo **Crea dipendente** compare i
 
 **Omonimi**: se esiste già un dipendente con lo stesso nome, sotto l'anagrafica compare chi
 è, con matricola e codice fiscale. È il codice fiscale a distinguere le persone: in tutti gli
-elenchi e i menu di Logbook, due omonimi si riconoscono dall'inizio del codice fiscale
+elenchi e i menu di Copilota, due omonimi si riconoscono dall'inizio del codice fiscale
 accanto al nome (es. «Rossi Mario (CF RSSMRA8)»).
 
 ![Omonimo segnalato nella scheda nuova](img/29-omonimo.png)
@@ -295,8 +295,8 @@ accanto al nome (es. «Rossi Mario (CF RSSMRA8)»).
 - **Matricola**: è la **sigla del contratto + un numero**, così si riconosce subito il tipo
   di rapporto: IND (indeterminato), DET (determinato), APP (apprendistato), SOM
   (somministrazione), COL (collaborazione), TIR (tirocinio). Esempi: IND-0001, DET-0004.
-  Per un dipendente nuovo Logbook propone il **prossimo numero libero**, che si può
-  correggere (basta scrivere il numero, la sigla la mette Logbook). Se cambia il contratto
+  Per un dipendente nuovo Copilota propone il **prossimo numero libero**, che si può
+  correggere (basta scrivere il numero, la sigla la mette Copilota). Se cambia il contratto
   **cambia solo la sigla** e il numero resta (DET-0004 diventa IND-0004). Il numero è unico:
   IND-0004 e DET-0004 non possono esistere insieme.
 - **Mansione**: si sceglie dall'**elenco**, scrivendo alcune lettere. Se se ne scrive una
@@ -355,7 +355,7 @@ interfaccia né da import. **Chiudi progetto** lo toglie dai progetti selezionab
 nuove ore; quelle già registrate restano.
 
 Il **colore nel calendario** si sceglie da un menu con i colori del marchio, ognuno col suo
-nome. **Automatico** lascia scegliere a Logbook (sempre lo stesso colore per quel
+nome. **Automatico** lascia scegliere a Copilota (sempre lo stesso colore per quel
 progetto); **Altro colore…** serve solo per un codice colore particolare.
 
 ![Menu dei colori del progetto](img/21-menu-colori.png)
@@ -417,7 +417,7 @@ vedendo il resto dell'anno. La ricerca dell'elenco trova anche matricola e codic
 - Scheda **Da approvare**: clic sulla richiesta → **Approva** o **Rifiuta** (il motivo va
   scritto nelle note HR). Si possono anche cambiare le date prima di approvare.
 - Non si approvano ferie o malattia su giorni che hanno già ore registrate: prima vanno
-  tolte o spostate (Logbook indica quali giorni).
+  tolte o spostate (Copilota indica quali giorni).
 - **+ Nuova assenza** registra un'assenza per un dipendente, anche già approvata (es.
   malattia comunicata per telefono). Il dipendente si sceglie scrivendo nome, matricola o
   codice fiscale.
@@ -433,13 +433,13 @@ Dal 26/11/2026 la pagina **Assenze** mostra quante ferie e quanti permessi resta
 Per ogni dipendente il pulsante **Quota** apre il modulo con i numeri del suo contratto:
 
 - giorni di ferie e ore di permesso che maturano in un anno;
-- **Conta dal**: la data da cui Logbook comincia a contare (di solito il 1° gennaio);
+- **Conta dal**: la data da cui Copilota comincia a contare (di solito il 1° gennaio);
 - ferie e permessi **residui a quella data**, riportati da come si contava prima.
 
 ![Quota di ferie e permessi](img/50-quota-ferie.png)
 
 Finché la quota non è scritta, per quel dipendente c'è *quota non impostata* e nessun saldo:
-Logbook non inventa i numeri del contratto.
+Copilota non inventa i numeri del contratto.
 
 ![Saldi visti da HR](img/51-saldi-hr.png)
 
@@ -463,7 +463,7 @@ rifiutata o corretta.
 
 ![Festività](img/09-festivita.png)
 
-Su un Logbook appena installato le festività nazionali dell'anno in corso e del successivo
+Su un Copilota appena installato le festività nazionali dell'anno in corso e del successivo
 ci sono già. Per gli anni dopo si caricano con un clic (**Carica festività nazionali**).
 Quelle **del paese** (il santo patrono) e le **chiusure aziendali** si aggiungono a mano,
 scegliendo il tipo. Un giorno festivo non conta come giorno lavorativo.
@@ -475,7 +475,7 @@ indirizzo dell'API (sul server di solito `http://127.0.0.1:8100`), token di serv
 suite (file `shared\suite\.token` sul server) ed eventualmente l'email dell'utente SkyTower
 che risulterà autore dei documenti. **Prova collegamento** controlla che SkyTower risponda.
 
-I documenti restano comunque in Logbook. Con il collegamento attivo, nella documentazione
+I documenti restano comunque in Copilota. Con il collegamento attivo, nella documentazione
 dei progetti che hanno una commessa SkyTower compare il pulsante **Invia a SkyTower**; senza
 collegamento il pulsante non c'è. Il token, una volta salvato, non si rilegge più.
 
@@ -483,13 +483,13 @@ collegamento il pulsante non c'è. Il token, una volta salvato, non si rilegge p
 
 #### Dati del programma (solo il proprietario)
 
-Il proprietario di Logbook vede in Impostazioni anche il riquadro **Dati del programma**.
+Il proprietario di Copilota vede in Impostazioni anche il riquadro **Dati del programma**.
 Gli altri amministratori non lo vedono.
 
-- **Carica dati di esempio** riempie Logbook con 5 dipendenti, 3 progetti, le ore dal
+- **Carica dati di esempio** riempie Copilota con 5 dipendenti, 3 progetti, le ore dal
   primo giorno del mese scorso a ieri e qualche assenza, per vedere come si visualizzano
-  i dati. Funziona solo con Logbook vuoto.
-- **Cancella tutti i dati** riporta Logbook come appena installato. Si fa in due passi:
+  i dati. Funziona solo con Copilota vuoto.
+- **Cancella tutti i dati** riporta Copilota come appena installato. Si fa in due passi:
   1. **Invia il codice per email**: arrivano 6 cifre all'indirizzo del proprietario,
      valide 10 minuti;
   2. si scrivono il codice e la parola **CANCELLA**, poi **Cancella tutti i dati**.
@@ -506,7 +506,7 @@ Nello stesso riquadro:
 
 - **Amministratori**: solo il proprietario rende amministratore un account o gli toglie il
   ruolo. Chi cambia ruolo viene scollegato e rientra con i nuovi poteri.
-- **Copia di sicurezza**: Logbook ne fa una da solo ogni giorno e le tiene 30 giorni; con
+- **Copia di sicurezza**: Copilota ne fa una da solo ogni giorno e le tiene 30 giorni; con
   **Fai una copia adesso** se ne fa una subito. Prima di "Cancella tutti i dati" ne parte
   sempre una.
 
@@ -514,7 +514,7 @@ Nello stesso riquadro:
 
 #### Avvisi via email
 
-Dal 26/11/2026 Logbook scrive da solo quando c'è qualcosa da fare. In **Impostazioni → Avvisi
+Dal 26/11/2026 Copilota scrive da solo quando c'è qualcosa da fare. In **Impostazioni → Avvisi
 via email** si sceglie a chi arrivano gli avvisi per l'ufficio personale (più indirizzi
 separati da virgola; se il campo è vuoto arrivano al proprietario) e quali avvisi mandare:
 
@@ -552,7 +552,7 @@ possono modificare e restano 400 giorni.
    Il dipendente si riconosce dal **numero** della matricola: valgono anche i file vecchi
    con «0004» o con la sigla del contratto di prima.
 2. Compilate una riga per ogni fascia oraria. La riga di esempio viene ignorata.
-3. Scegliete il file: Logbook mostra l'**anteprima** e controlla ogni riga.
+3. Scegliete il file: Copilota mostra l'**anteprima** e controlla ogni riga.
 
 ![Anteprima dell'import con errori](img/10-importa-anteprima.png)
 
@@ -613,7 +613,7 @@ sono indicate senza costo.
 
 Dal 26/11/2026 HR può **chiudere** un mese dopo averlo controllato. Da quel momento ore,
 assenze e festività di quel mese non si modificano più: l'estratto mandato al consulente
-paghe resta uguale a quello che c'è in Logbook.
+paghe resta uguale a quello che c'è in Copilota.
 
 1. **Esporta → Estratti mensili**, scegliere il mese. Sotto i pulsanti c'è la riga
    *Chiusura di …* con lo stato: **Aperto** o **Chiuso** (con chi l'ha chiuso e quando).
@@ -634,22 +634,22 @@ prova a modificarne le ore riceve il messaggio "Il mese di … è chiuso".
 
 ## 4. Dal cellulare e sugli schermi grandi
 
-### Logbook come un'app sul telefono
+### Copilota come un'app sul telefono
 
-Dal 26/11/2026 Logbook si può mettere sulla schermata del telefono, con la sua icona, e
+Dal 26/11/2026 Copilota si può mettere sulla schermata del telefono, con la sua icona, e
 aprire senza passare dal browser. Non c'è niente da scaricare da uno store.
 
-- **Android (Chrome):** aprire Logbook, menu con i tre puntini → **Aggiungi a schermata Home**
+- **Android (Chrome):** aprire Copilota, menu con i tre puntini → **Aggiungi a schermata Home**
   (o **Installa app**).
-- **iPhone (Safari):** aprire Logbook, pulsante **Condividi** → **Aggiungi alla schermata Home**.
+- **iPhone (Safari):** aprire Copilota, pulsante **Condividi** → **Aggiungi alla schermata Home**.
 - **PC (Chrome o Edge):** icona **Installa** nella barra dell'indirizzo.
 
-Serve che Logbook sia aperto a un indirizzo sicuro (`https://`, come quello su Vercel) oppure
-sullo stesso PC. È sempre lo stesso Logbook: accesso, dati e regole non cambiano, e serve la
+Serve che Copilota sia aperto a un indirizzo sicuro (`https://`, come quello su Vercel) oppure
+sullo stesso PC. È sempre lo stesso Copilota: accesso, dati e regole non cambiano, e serve la
 connessione.
 
 
-Logbook si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
+Copilota si adatta da solo alla larghezza dello schermo: non c'è un'app da installare, basta
 aprire lo stesso indirizzo dal browser del telefono.
 
 Su computer e tablet (da 768px) il **menu a sinistra resta fermo** mentre la pagina scorre,
@@ -657,7 +657,7 @@ con tutte le voci sempre visibili; su uno schermo molto basso scorrono solo le v
 
 **Sul cellulare**
 
-- Il menu si apre col pulsante **☰ Logbook** in alto a sinistra.
+- Il menu si apre col pulsante **☰ Copilota** in alto a sinistra.
 - Nel **calendario del mese** ogni giorno mostra il numero, le ore totali e un **pallino
   colorato** per ogni progetto, ferie, permesso, malattia o festività. Toccate il giorno per
   vedere e modificare il dettaglio.

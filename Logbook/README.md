@@ -1,6 +1,6 @@
 <!-- "><(((º> sabusabu <º)))><" -->
 
-# Logbook — ore e presenze dipendenti
+# Copilota — ore e presenze dipendenti
 
 Gestionale web per registrare e consultare le ore lavorate dai dipendenti, divise per
 fasce orarie e progetti, e per gestire ferie, permessi, malattia e festività. Import delle
@@ -19,7 +19,7 @@ ore da Excel ed estrazioni in Excel.
 
 ```bash
 npm install     # dipendenze + client del database (Prisma)
-npm start       # prepara il database, compila l'interfaccia e avvia Logbook
+npm start       # prepara il database, compila l'interfaccia e avvia Copilota
 ```
 
 Poi aprire **http://127.0.0.1:5210**.
@@ -30,21 +30,21 @@ launcher usato dal Portale della suite).
 
 ### Dentro e fuori dalla suite (dal 25/11/2026)
 
-Logbook non usa niente della suite (né `shared/` né il login del Portale): la stessa
+Copilota non usa niente della suite (né `shared/` né il login del Portale): la stessa
 cartella parte nei due modi, con lo stesso database e lo stesso `.env`.
 
 - **Fuori dalla suite**, su un PC qualsiasi con Node.js 20.19 o successivo:
   1. copiare la cartella `Logbook` (senza `node_modules` e `data`);
   2. fare doppio clic su **`InstallaLogbook.exe`**. Controlla Node.js, installa le
      dipendenze e crea il `.env` (proprietario `admin`; chiede l'email del proprietario e
-     se Logbook va raggiunto dagli altri PC). Poi prepara database e interfaccia e mette
-     l'icona **Logbook** sul desktop, che avvia `avvia.bat`.
+     se Copilota va raggiunto dagli altri PC). Poi prepara database e interfaccia e mette
+     l'icona **Copilota** sul desktop, che avvia `avvia.bat`.
 
   Node.js non lo installa: se manca dice dove scaricarlo. `InstallaLogbook.exe` si
   ricompila da `installa-logbook.py` (comando in testa al file) e non sta nel repository,
   come `InstallaSuite.exe`.
 - **Dentro la suite**: lo installa `InstallaSuite.exe` dalla radice della suite (voce
-  Logbook) e lo apre la card **Logbook** del Portale (`avvia.vbs`, senza finestra). Vedi
+  Copilota) e lo apre la card **Copilota** del Portale (`avvia.vbs`, senza finestra). Vedi
   "Nella suite Cosedil" più sotto.
 
 Al primo avvio viene creato `data/logbook.db`:
@@ -52,7 +52,7 @@ Al primo avvio viene creato `data/logbook.db`:
 - con **`npm start` / `avvia.bat`** (produzione) il database parte **vuoto**, con il solo
   amministratore `admin` (password di `LOGBOOK_ADMIN_PASSWORD`, oppure `Admin2026!`) e le
   festività nazionali dell'anno in corso e del successivo (dal 25/11/2026): al primo
-  accesso Logbook obbliga a scegliere una password nuova, poi HR inserisce dipendenti e
+  accesso Copilota obbliga a scegliere una password nuova, poi HR inserisce dipendenti e
   progetti veri;
 - con **`npm run dev`** (sviluppo) arrivano i **dati di esempio** (5 dipendenti, 3 progetti,
   ore dal primo giorno del mese scorso a ieri, qualche assenza, festività nazionali).
@@ -68,7 +68,7 @@ vengono mai toccati: le nuove versioni applicano solo le migrazioni mancanti.
 | Amministratore / HR (solo con i dati di esempio di `npm run dev`) | `admin` | `Admin2026!` |
 | Dipendente | `mario.rossi`, `giulia.bianchi`, `luca.esposito`, `chiara.ferrari`, `giuseppe.russo` | `Logbook2026!` |
 
-Sono **provvisorie** (Giorno 24): con `npm start` / `avvia.bat`, a ogni avvio Logbook
+Sono **provvisorie** (Giorno 24): con `npm start` / `avvia.bat`, a ogni avvio Copilota
 controlla se l'amministratore o gli account di esempio hanno ancora queste password e,
 se sì, al prossimo accesso chiede di sceglierne una nuova prima di mostrare qualsiasi
 dato. Lo stesso vale per le password che HR assegna o reimposta ai dipendenti. Se nel
@@ -80,18 +80,18 @@ accesso.
 
 È il comportamento di `npm start` / `avvia.bat` su un database nuovo (dal 24/11/2026). Un
 database che contiene già i dati di esempio non viene svuotato da solo: per ripartire
-puliti, fermare Logbook, spostare altrove `data/logbook.db` e riavviare.
+puliti, fermare Copilota, spostare altrove `data/logbook.db` e riavviare.
 `npm run db:reset` invece riporta il database ai **soli** dati di esempio (**cancella tutto**).
 
 ### Dati di esempio e "Cancella tutti i dati" (solo il proprietario)
 
-Dal 25/11/2026 il **proprietario** di Logbook trova in **Impostazioni → Dati del programma**
+Dal 25/11/2026 il **proprietario** di Copilota trova in **Impostazioni → Dati del programma**
 due comandi, senza bisogno del terminale:
 
-- **Carica dati di esempio**: gli stessi dati di `npm run dev`, solo con Logbook vuoto.
+- **Carica dati di esempio**: gli stessi dati di `npm run dev`, solo con Copilota vuoto.
   Usano l'amministratore che c'è già e gli account dei dipendenti di esempio chiedono di
   cambiare la password al primo accesso.
-- **Cancella tutti i dati**: prima Logbook manda un **codice di 6 cifre per email**
+- **Cancella tutti i dati**: prima Copilota manda un **codice di 6 cifre per email**
   all'indirizzo del proprietario (valido 10 minuti, una volta sola, 5 tentativi, al massimo
   5 codici all'ora). Poi servono il codice e la parola `CANCELLA`. A cose fatte arriva
   un'email di avviso.
@@ -103,7 +103,7 @@ due comandi, senza bisogno del terminale:
 Il proprietario è l'account scritto in `LOGBOOK_PROPRIETARIO` nel `.env` del server (deve
 essere un amministratore). Non si cambia dall'interfaccia, quindi nessun altro
 amministratore può diventarlo, e il codice arriva solo a `LOGBOOK_PROPRIETARIO_EMAIL`.
-Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori dalla suite.
+Copilota non lo chiede al Portale, così funziona allo stesso modo dentro e fuori dalla suite.
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
@@ -129,7 +129,7 @@ HR scrive per ogni dipendente la quota annua e il residuo di partenza (tabella `
 API `/api/saldi`, riquadro in cima alla pagina Assenze). Il saldo non è salvato: lo calcola
 `comune/saldi.ts` a ogni lettura (un dodicesimo della quota per ogni mese lavorato almeno 15
 giorni; goduto = assenze approvate fino a oggi, ferie in giorni lavorativi e permessi in
-ore). Senza quota non c'è saldo: Logbook non conosce il contratto.
+ore). Senza quota non c'è saldo: Copilota non conosce il contratto.
 
 ### Chiusura del mese (dal 26/11/2026)
 
@@ -151,7 +151,7 @@ Senza posta configurata non parte nulla.
 
 ### Su Vercel (dal 25/11/2026)
 
-Logbook si pubblica anche su Vercel, con un database PostgreSQL esterno al posto del file
+Copilota si pubblica anche su Vercel, con un database PostgreSQL esterno al posto del file
 SQLite e i file caricati dentro il database: passi, variabili e limiti in
 [docs/vercel.md](docs/vercel.md). In locale e nella suite non cambia nulla.
 
@@ -179,12 +179,12 @@ SQLite e i file caricati dentro il database: passi, variabili e limiti in
   coerente anche a programma acceso) una volta al giorno in `data/backup`
   (`LOGBOOK_BACKUP_DIR`), con i file caricati; restano 30 giorni. Una copia in più parte
   prima di "Cancella tutti i dati" e il proprietario può farne una a mano.
-  **Ripristino**: fermare Logbook, copiare il file scelto (es. `logbook-2026-11-25.db`) su
+  **Ripristino**: fermare Copilota, copiare il file scelto (es. `logbook-2026-11-25.db`) su
   `data/logbook.db`, riavviare.
 
 ## Il modello Excel per importare le ore
 
-1. In Logbook (HR): **Importa → Scarica il modello .xlsx**.
+1. In Copilota (HR): **Importa → Scarica il modello .xlsx**.
 2. Foglio **Ore**, una riga per fascia oraria:
 
    | Matricola | Data (gg/mm/aaaa) | Ora inizio (HH:MM) | Ora fine (HH:MM) | Codice progetto | Note |
@@ -224,7 +224,7 @@ come testo sia come valori data/ora di Excel.
 
 ## Accesso e sicurezza
 
-- Utenti e password propri di Logbook (non quelli del Portale della suite).
+- Utenti e password propri di Copilota (non quelli del Portale della suite).
 - Password salvate come impronta scrypt; sessione in un cookie HttpOnly; nel database
   solo l'impronta SHA-256 del token di sessione.
 - Un **dipendente** vede e modifica solo i propri dati: il controllo è nelle API, quindi
@@ -260,8 +260,8 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
 | `LOGBOOK_ADMIN_REIMPOSTA` | — | `1` = alla preparazione del database reimposta la password dell'amministratore indicato (provvisoria). Per il recupero, da togliere subito dopo: docs/vercel.md |
 | `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
-| `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Logbook usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |
-| `LOGBOOK_INDIRIZZO_PUBBLICO` | — | Indirizzo a cui si apre Logbook, messo in fondo alle email di avviso (su Vercel lo trova da solo) |
+| `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Copilota usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |
+| `LOGBOOK_INDIRIZZO_PUBBLICO` | — | Indirizzo a cui si apre Copilota, messo in fondo alle email di avviso (su Vercel lo trova da solo) |
 | `CRON_SECRET` | — | Solo su Vercel: segreto con cui Vercel Cron chiama `/api/cron/avvisi`. Senza, la rotta non risponde e gli avvisi del giorno partono alla prima visita dopo le 7 |
 | `LOGBOOK_BACKUP_DIR` | `data/backup` | Cartella delle copie di sicurezza (una al giorno, 30 giorni): meglio un altro disco |
 | `LOGBOOK_CODICE_ACCESSO` | attivo | `0` spegne il codice via email all'accesso degli amministratori |
@@ -276,9 +276,9 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 
 ## Nella suite Cosedil
 
-Logbook ha la sua card nel **Portale** (id `logbook`, porta 5210, launcher `avvia.vbs`):
-il Portale la avvia e la apre, poi si entra con l'account Logbook. Il Portale passa
-`HOST` e, con `SUITE_DOMINIO`, Logbook risponde su `https://logbook.<dominio>` dietro Caddy
+Copilota ha la sua card nel **Portale** (id `logbook`, porta 5210, launcher `avvia.vbs`):
+il Portale la avvia e la apre, poi si entra con l'account Copilota. Il Portale passa
+`HOST` e, con `SUITE_DOMINIO`, Copilota risponde su `https://logbook.<dominio>` dietro Caddy
 (`deploy/Caddyfile`) con cookie `Secure`. La cartella nel repository si chiama `Logbook/`;
 nel registro del Portale `dir` è `logbook` perché fa anche da sottodominio (su Windows i
 percorsi non distinguono maiuscole).
