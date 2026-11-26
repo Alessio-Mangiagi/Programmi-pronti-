@@ -107,6 +107,14 @@ Logbook non lo chiede al Portale, così funziona allo stesso modo dentro e fuori
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Saldo ferie e permessi (dal 26/11/2026)
+
+HR scrive per ogni dipendente la quota annua e il residuo di partenza (tabella `QuotaAssenze`,
+API `/api/saldi`, riquadro in cima alla pagina Assenze). Il saldo non è salvato: lo calcola
+`comune/saldi.ts` a ogni lettura (un dodicesimo della quota per ogni mese lavorato almeno 15
+giorni; goduto = assenze approvate fino a oggi, ferie in giorni lavorativi e permessi in
+ore). Senza quota non c'è saldo: Logbook non conosce il contratto.
+
 ### Chiusura del mese (dal 26/11/2026)
 
 HR chiude un mese finito da *Esporta → Estratti mensili*: tabella `MeseChiuso`, API

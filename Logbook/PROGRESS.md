@@ -40,7 +40,8 @@ sessione per riprendere da dove si era rimasti.
 - **26/11:** Logbook online su https://programmi-pronti.vercel.app (pubblica solo `main`); recupero amministratore con LOGBOOK_ADMIN_REIMPOSTA ✅
 - **Giorno 36 (26/11):** avvisi via email: richieste a HR, esiti al dipendente, giorni senza ore, attestati in scadenza ✅
 - **Giorno 37 (26/11):** chiusura del mese: HR blocca ore, assenze e festività di un mese finito; riapertura ✅
-- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 3 saldo ferie e permessi, 4 timbratura da telefono, 5 icona sul telefono, 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
+- **Giorno 38 (26/11):** saldo ferie e permessi: quota per dipendente scritta da HR, maturato/goduto/residuo calcolati ✅
+- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 4 timbratura da telefono, 5 icona sul telefono, 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
@@ -1035,3 +1036,18 @@ Cosa è stato fatto:
 Verifiche:
 - `npm test` 274/274, di cui 3 nuovi in `mesi-chiusi.test.ts` (chi può chiudere, mese non finito, richieste in attesa, ogni scrittura rifiutata nel mese chiuso, mese dopo libero, riapertura, cancellazione dati). Typecheck ok.
 - Prova dal vivo sulla copia (`scratchpad/giorno37.mjs`, 8 su 8): chiusura di ottobre 2026 dalla finestra, novembre non chiudibile, lucchetto nel calendario, cancellazione di un'ora rifiutata con il messaggio, riapertura, telefono. Immagini 48 e 49 della guida.
+
+### Giorno 38 — Saldo ferie e permessi (26/11/2026) ✅
+
+Punto 3 della richiesta "implementa tutto partendo dal primo punto". Alla domanda "quanto matura ogni dipendente" l'utente non aveva ancora risposto: fatta la strada che non inventa numeri (quota scritta da HR per ogni dipendente, vuota di partenza), che copre anche il caso "uguale per tutti".
+
+Cosa è stato fatto:
+- Modello `QuotaAssenze` (uno per dipendente: giorni di ferie e ore di permesso all'anno, `contaDal`, residui di partenza) e migrazione SQLite `20261126110000_quota_assenze`; su PostgreSQL con `prisma db push`.
+- `comune/saldi.ts`: `mesiMaturati` (un mese conta se coperto almeno 15 giorni) e `calcolaSaldo` (di partenza, maturato, goduto, residuo, programmato, in attesa, disponibile). Il saldo non si salva: si ricalcola dalle assenze.
+- `server/rotte/saldi.ts` su `/api/saldi`: GET (HR tutti gli attivi, dipendente solo il suo), PUT e DELETE della quota (HR). `cancella-dati.ts` toglie anche le quote; etichette nel registro attività.
+- Interfaccia: `src/componenti/SaldiAssenze.tsx` in cima a `src/pagine/Assenze.tsx` (tessere per il dipendente, riquadro richiudibile e modulo "Quota" per HR).
+
+Verifiche:
+- `npm test` con 4 test nuovi in `saldi.test.ts`: mesi che maturano (soglia dei 15 giorni, cavallo d'anno), conto completo con ferie a cavallo di oggi e di una festività, assunto dopo e cessato, API (permessi, validazione, richiesta nuova che entra "in attesa", quota tolta). Typecheck ok.
+- Prova dal vivo sulla copia (`scratchpad/giorno38.mjs`, 7 su 7): quota di Rossi Mario dal modulo, saldo 21,5 giorni = 2,5 + 22 − 3, tessere del dipendente da telefono. Immagini 50, 51, 52 della guida.
+- Regola da confermare con l'utente: la soglia dei 15 giorni per far maturare un mese è la prassi usuale delle buste paga, non una scelta dichiarata dall'utente.

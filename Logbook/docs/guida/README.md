@@ -386,6 +386,40 @@ vedendo il resto dell'anno. La ricerca dell'elenco trova anche matricola e codic
   dell'assenza. HR può allegarne o sostituirne uno anche a una richiesta già decisa; il
   dipendente lo apre dalla sua richiesta.
 
+#### Saldo ferie e permessi
+
+Dal 26/11/2026 la pagina **Assenze** mostra quante ferie e quanti permessi restano.
+
+**Per HR.** In cima alla pagina c'è il riquadro *Saldi ferie e permessi* (si apre con un clic).
+Per ogni dipendente il pulsante **Quota** apre il modulo con i numeri del suo contratto:
+
+- giorni di ferie e ore di permesso che maturano in un anno;
+- **Conta dal**: la data da cui Logbook comincia a contare (di solito il 1° gennaio);
+- ferie e permessi **residui a quella data**, riportati da come si contava prima.
+
+![Quota di ferie e permessi](img/50-quota-ferie.png)
+
+Finché la quota non è scritta, per quel dipendente c'è *quota non impostata* e nessun saldo:
+Logbook non inventa i numeri del contratto.
+
+![Saldi visti da HR](img/51-saldi-hr.png)
+
+**Per il dipendente.** Due tessere con ferie (giorni) e permessi (ore) residui e il conto che
+porta a quel numero. Se ha ferie già approvate per il futuro o richieste in attesa, compare
+anche *Ancora da chiedere*.
+
+![Il mio saldo](img/52-mio-saldo.png)
+
+Come si calcola:
+- ogni mese matura **un dodicesimo** della quota annua; un mese conta se il dipendente è in
+  forza per **almeno 15 giorni** di quel mese (il mese in corso matura dal giorno 15);
+- **goduto**: le assenze *approvate* fino a oggi. Le ferie si contano in giorni lavorativi
+  (sabati, domeniche e festività non contano), i permessi in ore;
+- **residuo** = residuo di partenza + maturato − goduto. Può andare sotto zero (in rosso).
+
+Il saldo non si scrive a mano: si aggiorna da solo quando una richiesta viene approvata,
+rifiutata o corretta.
+
 ### Festività
 
 ![Festività](img/09-festivita.png)
