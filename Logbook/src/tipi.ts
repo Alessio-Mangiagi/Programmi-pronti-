@@ -125,7 +125,11 @@ export type Attestato = {
 export type DocumentoDipendente = { id: number; dipendenteId: number; titolo: string; note: string | null; file: VistaFile; creatoIl: string };
 
 /** GET /api/impostazioni (solo admin): il token non arriva mai, solo se è impostato. */
-export type Impostazioni = { skytower: { url: string; email: string; tokenImpostato: boolean; attivo: boolean } };
+export type Impostazioni = {
+  skytower: { url: string; email: string; tokenImpostato: boolean; attivo: boolean };
+  /** Avvisi via email (26/11/2026): emailHr è il testo salvato; vuoto = emailPredefinita (il proprietario). */
+  avvisi: { emailHr: string; emailPredefinita: string | null; postaConfigurata: boolean; richieste: boolean; esiti: boolean; oreMancanti: boolean; attestati: boolean };
+};
 
 // ---------------------------------------------------------------------------
 // Giorno 17 (24/11/2026): assegnazioni, documentazione e note dei progetti
