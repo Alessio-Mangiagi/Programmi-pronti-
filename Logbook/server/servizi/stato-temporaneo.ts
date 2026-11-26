@@ -36,6 +36,30 @@ export function statoTemporaneo(prisma: PrismaClient, adesso: () => number = Dat
       await prisma.statoTemporaneo.deleteMany({ where: { chiave } });
     },
 
+    /**
+     * Crea la chiave solo se non c'è già: true a chi la crea, false a tutti gli altri. La
+     * chiave è unica nel database, quindi fra richieste arrivate insieme una sola passa.
+     * Serve a contare senza corse (tentativi sui codici, servizi/codice-conferma.ts).
+     */
+    async prenota(chiave: string, scade: number): Promise<boolean> {
+      try {
+        await prisma.statoTemporaneo.create({ data: { chiave, valore: '1', scadeIl: new Date(scade) } });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    /** Toglie tutte le chiavi che cominciano con `prefisso`. */
+    async togliConPrefisso(prefisso: string): Promise<void> {
+      await prisma.statoTemporaneo.deleteMany({ where: { chiave: { startsWith: prefisso } } });
+    },
+
+    /** Quante chiavi non scadute cominciano con `prefisso`. */
+    async conta(prefisso: string): Promise<number> {
+      return prisma.statoTemporaneo.count({ where: { chiave: { startsWith: prefisso }, scadeIl: { gte: new Date(adesso()) } } });
+    },
+
     /** Toglie tutto quello che è scaduto (manutenzione). */
     async pulisci(): Promise<number> {
       return (await prisma.statoTemporaneo.deleteMany({ where: { scadeIl: { lt: new Date(adesso()) } } })).count;

@@ -192,7 +192,12 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
     const chiaveAttesa = token ? `attesa:${improntaToken(token)}` : '';
     const attesa = token ? await stato.leggi<{ utenteId: number }>(chiaveAttesa) : null;
     if (!token || !attesa) throw new ErroreHttp(400, 'Nessun accesso in attesa del codice: rifai il login', { codice: 'Rifai il login' });
+    // Freno per account (26/11/2026), oltre ai 5 tentativi per codice: chi ha la password non
+    // può provare codici all'infinito chiedendone sempre di nuovi.
+    const chiaveAccount = `codice|${attesa.utenteId}`;
+    await limitatore.tentativo(chiaveAccount);
     const esito = await codici.verifica(attesa.utenteId, codice);
+    if (esito === 'ok') await limitatore.riuscito(chiaveAccount);
     const utente = await prisma.utente.findUnique({ where: { id: attesa.utenteId } });
     if (esito !== 'ok' || !utente?.attivo) {
       const messaggi = {
@@ -228,13 +233,17 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
     const nome = username.toLowerCase();
     if (!opzioni.inviaEmail) throw new ErroreHttp(400, 'Su questo Copilota la posta non è configurata: per una password nuova rivolgiti a HR');
     registraIndirizzo(ip(req));
+    const inviaEmail = opzioni.inviaEmail;
+    // Tutto il lavoro parte a risposta già data (26/11/2026): prima la ricerca dell'account e
+    // la creazione del codice avvenivano prima di rispondere, e il tempo in più rivelava a un
+    // anonimo quali nomi utente esistono.
+    const lavoro = (async () => {
     const utente = await prisma.utente.findUnique({ where: { username: nome }, include: { dipendente: { select: { email: true } } } });
     const email = utente?.attivo ? emailDelCodice(utente) : undefined;
     if (utente && email) {
       const nuovo = await codiciReimposta.nuovo(utente.id);
       if (nuovo) {
-        const invio = opzioni
-          .inviaEmail({
+        await inviaEmail({
             a: email,
             oggetto: `Copilota: codice per la password nuova ${nuovo.codice}`,
             testo:
@@ -247,11 +256,11 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
             await codiciReimposta.annulla(utente.id);
             console.error('[logbook] invio del codice per la password nuova non riuscito:', e);
           });
-        // A risposta inviata: così il tempo di risposta non rivela se l'account esiste.
-        tieniVivo(invio);
       }
       void registra(prisma, { utenteId: utente.id, username: nome, azione: 'Password dimenticata: codice richiesto', esito: nuovo ? 'OK' : 'NEGATO', ip: req.ip });
     }
+    })().catch((e) => console.error('[logbook] richiesta di password nuova non riuscita:', e));
+    tieniVivo(lavoro);
     res.json({ ok: true, messaggio: "Se l'account esiste e ha un'email in anagrafica, il codice è in arrivo a quell'indirizzo. Se non arriva entro qualche minuto, rivolgiti a HR." });
   });
 
@@ -273,11 +282,17 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
     const nome = username.toLowerCase();
     const chiave = `reimposta|${ip(req)}|${nome}`;
     await limitatore.tentativo(chiave);
+    // Freno anche per account, senza indirizzo (26/11/2026): con molti indirizzi diversi i
+    // tentativi sul codice di una stessa persona non devono moltiplicarsi.
+    const chiaveAccount = `reimposta-account|${nome}`;
+    await limitatore.tentativo(chiaveAccount);
     const utente = await prisma.utente.findUnique({ where: { username: nome } });
-    // Prima la password: un codice giusto non va consumato per una password che poi è rifiutata.
-    const debolezza = controllaPasswordNuova(nuova, utente?.ruolo ?? 'DIPENDENTE');
+    // Prima le regole uguali per tutti: un codice giusto non va consumato per una password
+    // che poi è rifiutata. La regola più severa degli amministratori si applica solo a codice
+    // giusto: prima il messaggio "almeno 12 caratteri" diceva a un anonimo chi è amministratore.
+    const debolezza = controllaPasswordNuova(nuova, 'DIPENDENTE');
     if (debolezza) throw richiestaNonValida(debolezza, { nuova: debolezza });
-    const esito = utente?.attivo ? await codiciReimposta.verifica(utente.id, codice) : 'assente';
+    const esito = utente?.attivo ? await codiciReimposta.verifica(utente.id, codice, { consuma: false }) : 'assente';
     if (esito !== 'ok' || !utente) {
       const messaggi = {
         ok: 'Codice non valido',
@@ -289,7 +304,11 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
       void registra(prisma, { utenteId: utente?.id, username: nome, azione: `Password dimenticata: codice rifiutato (${esito})`, esito: 'NEGATO', ip: req.ip });
       throw new ErroreHttp(400, messaggi[esito], { codice: messaggi[esito] });
     }
+    const debolezzaRuolo = controllaPasswordNuova(nuova, utente.ruolo);
+    if (debolezzaRuolo) throw richiestaNonValida(debolezzaRuolo, { nuova: debolezzaRuolo });
+    await codiciReimposta.annulla(utente.id);
     await limitatore.riuscito(chiave);
+    await limitatore.riuscito(chiaveAccount);
     // Il blocco del login per troppi errori non ha più senso: la password è nuova.
     await limitatore.riuscito(`${ip(req)}|${nome}`);
     await prisma.utente.update({ where: { id: utente.id }, data: { passwordHash: await creaImpronta(nuova), passwordDaCambiare: false } });
