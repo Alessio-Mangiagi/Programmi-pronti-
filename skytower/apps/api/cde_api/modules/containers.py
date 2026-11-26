@@ -17,12 +17,13 @@ router = APIRouter(tags=["containers"])
 
 GrantAction = Literal["READ", "WRITE", "DOWNLOAD", "APPROVE"]
 
-# Formati dei modelli BIM (26/11/2026): IFC aperto e i formati nativi più comuni (Revit, Navisworks).
+# Formati dei modelli BIM (26/11/2026): IFC aperto, i formati nativi più comuni (Revit, Navisworks)
+# e i modelli 3D glTF (.glb/.gltf, quelli esportati da Blender), che il viewer apre come gli IFC.
 # Una cartella che ne contiene almeno uno esce con has_bim = true e il frontend le dà un'icona sua
 # (apps/web/src/components/FolderBimIcon.tsx). Si guarda l'estensione del nome originale di OGNI
 # revisione dei documenti non archiviati: il tipo dichiarato dal browser per questi file è quasi
 # sempre generico. Le righe passano dalla RLS, quindi chi non può leggere la cartella vede false.
-BIM_EXTENSIONS = ("ifc", "ifczip", "ifcxml", "rvt", "rfa", "nwd", "nwc", "nwf")
+BIM_EXTENSIONS = ("ifc", "ifczip", "ifcxml", "rvt", "rfa", "nwd", "nwc", "nwf", "glb", "gltf")
 
 CONTAINER_SQL = """
     SELECT c.id, c.project_id, c.parent_id, c.owner_organization_id, o.code AS owner_organization_code,
