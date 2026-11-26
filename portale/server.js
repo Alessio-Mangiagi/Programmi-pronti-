@@ -333,15 +333,15 @@ const APPS = [
   },
   // Logbook (23/11/2026): gestionale ore e presenze. Ha un login suo (scelta dell'utente:
   // utenti e password propri, NON il gate SSO del portale), quindi dal portale si apre e
-  // poi si entra con l'account Logbook. La cartella nel repo è "Logbook": `dir` è in
+  // poi si entra con l'account Copilota (il nome dell'app dal 26/11/2026; prima Logbook). La cartella nel repo è "Logbook": `dir` è in
   // minuscolo perché qui fa anche da sottodominio (sottodominio() vuole dir già minuscola);
   // su Windows il percorso non distingue maiuscole, quindi path.join(ROOT, dir) la trova.
   {
     id: 'logbook',
-    nome: 'Logbook',
+    nome: 'Copilota',
     sottotitolo: 'Ore e presenze dei dipendenti',
     fai: 'Registrare ore, ferie e permessi',
-    guida: 'Registri le ore per fascia e progetto, chiedi ferie e permessi; HR approva, importa da Excel ed estrae i report. Si entra con l’account Logbook.',
+    guida: 'Registri le ore per fascia e progetto, chiedi ferie e permessi; HR approva, importa da Excel ed estrae i report. Si entra con l’account Copilota.',
     desc: 'Ore lavorate per fasce e progetti, ferie, permessi, malattia e festività, con import ed export Excel. Login proprio.',
     porta: 5210,
     dir: 'logbook',
