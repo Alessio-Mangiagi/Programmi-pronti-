@@ -175,6 +175,7 @@ model Dipendente {
   attestati            Attestato[]
   /// Quote annue e residuo di partenza per il saldo ferie e permessi (Giorno 38).
   quotaAssenze         QuotaAssenze?
+  timbrature           Timbratura[]
   documenti            DocumentoDipendente[]
   /// Progetti a cui HR ha assegnato il dipendente: solo su questi può registrare ore.
   assegnazioni         AssegnazioneProgetto[]
@@ -225,6 +226,7 @@ model Progetto {
   note             NotaProgetto[]
   /// Dipendenti assegnati (sezione "Dipendenti" della pagina del progetto).
   assegnazioni     AssegnazioneProgetto[]
+  timbrature       Timbratura[]
   creatoIl         DateTime               @default(now())
   aggiornatoIl     DateTime               @updatedAt
 }
@@ -255,6 +257,8 @@ model AssegnazioneProgetto {
 enum OrigineRegistrazione {
   INTERFACCIA
   IMPORT_EXCEL
+  /// Nata da una timbratura del dipendente confermata da HR (Giorno 42).
+  TIMBRATURA
 }
 
 /// Una fascia oraria lavorata: un dipendente, un giorno, un progetto, dalle-alle.
@@ -613,4 +617,45 @@ model QuotaAssenze {
   /// Ore di permesso residue alla data contaDal.
   permessiIniziali Float      @default(0)
   aggiornatoIl     DateTime   @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Giorno 42 (26/11/2026): timbratura da telefono
+// ---------------------------------------------------------------------------
+
+enum StatoTimbratura {
+  /// Entrata timbrata, uscita non ancora.
+  APERTA
+  /// Chiusa dal dipendente (o rimasta senza uscita): aspetta HR.
+  DA_CONFERMARE
+  /// HR l'ha confermata: è diventata una fascia oraria (RegistrazioneOraria).
+  CONFERMATA
+  RIFIUTATA
+}
+
+/// Entrata e uscita timbrate dal dipendente (risposta 2a del 26/11/2026). Non è una fascia
+/// oraria: lo diventa solo quando HR la conferma, così resta vero che nei pagamenti entrano
+/// solo ore viste da HR (regola del Giorno 20). Vedi server/rotte/timbrature.ts.
+model Timbratura {
+  id           Int             @id @default(autoincrement())
+  dipendente   Dipendente      @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
+  dipendenteId Int
+  progetto     Progetto        @relation(fields: [progettoId], references: [id], onDelete: Restrict)
+  progettoId   Int
+  /// Giorno dell'entrata (AAAA-MM-GG, fuso italiano).
+  data         String
+  /// "HH:MM" dell'entrata.
+  oraInizio    String
+  /// "HH:MM" dell'uscita; vuota finché è aperta, o se l'uscita non è stata timbrata.
+  oraFine      String?
+  stato        StatoTimbratura @default(APERTA)
+  /// Nota di HR (motivo del rifiuto, o cosa ha corretto).
+  noteHr       String?
+  /// Nome utente di HR che ha deciso.
+  decisoDa     String?
+  decisoIl     DateTime?
+  creatoIl     DateTime        @default(now())
+
+  @@index([dipendenteId, stato])
+  @@index([stato])
 }

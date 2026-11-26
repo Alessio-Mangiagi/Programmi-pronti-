@@ -43,6 +43,7 @@ import { suVercel } from './vercel';
 import { rotteMesiChiusi } from './servizi/mesi-chiusi';
 import { rotteSaldi } from './rotte/saldi';
 import { rotteCostiProgetti } from './rotte/costi-progetti';
+import { rotteTimbrature } from './rotte/timbrature';
 
 /**
  * Opzioni:
@@ -190,6 +191,8 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/saldi', rotteSaldi(prisma, oggi));
   // Giorno 41 (26/11/2026): costo della manodopera per commessa, solo HR (rotte/costi-progetti.ts).
   api.use('/costi-progetti', rotteCostiProgetti(prisma));
+  // Giorno 42 (26/11/2026): timbratura del dipendente, che diventa ore solo dopo l'ok di HR.
+  api.use('/timbrature', rotteTimbrature(prisma, oggi, opzioni.adesso));
   // Giorno 34: registro attività, solo amministratori (voce del menu).
   api.use('/registro', rotteRegistro(prisma));
 
