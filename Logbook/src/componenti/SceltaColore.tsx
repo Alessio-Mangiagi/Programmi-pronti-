@@ -8,7 +8,7 @@
  * - un pulsante che sembra un campo del modulo: campione del colore, nome, freccia;
  * - un pannello a scheda (bordo chiaro, ombra blu) con i colori della tavolozza del
  *   marchio (COLORI_PROGETTO in src/colori.ts), ognuno col suo nome;
- * - "Automatico" (nessun colore salvato: lo sceglie Logbook dalla tavolozza, sempre lo
+ * - "Automatico" (nessun colore salvato: lo sceglie Copilota dalla tavolozza, sempre lo
  *   stesso per progetto) e "Altro colore…" per un codice libero, se proprio serve.
  *
  * Valore: '' = automatico, altrimenti '#RRGGBB' (lo stesso formato che il server valida
@@ -27,7 +27,7 @@ export function SceltaColore({
 }: {
   valore: string;
   onCambia: (v: string) => void;
-  /** Colore che Logbook userebbe con "Automatico" (per mostrarlo nel campione). */
+  /** Colore che Copilota userebbe con "Automatico" (per mostrarlo nel campione). */
   automatico: string;
   errore?: string;
   etichetta?: string;

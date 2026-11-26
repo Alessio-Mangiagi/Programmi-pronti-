@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 /**
  * Dati a scadenza tenuti nel database invece che nella memoria del server (Giorno 35,
- * 25/11/2026: Logbook pubblicato su Vercel).
+ * 25/11/2026: Copilota pubblicato su Vercel).
  *
  * Su Vercel il server non è un processo sempre acceso: ogni richiesta può finire su un
  * processo diverso, appena nato. Quello che prima stava in una Map (il codice via email in

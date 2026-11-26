@@ -45,7 +45,7 @@ describe('password dimenticata', () => {
     await new Promise((ok) => setTimeout(ok, 150));
     expect(posta).toHaveLength(1);
     expect(posta[0].a).toBe('mario.rossi@esempio.it');
-    expect(posta[0].oggetto).toMatch(/^Logbook: codice per la password nuova \d{6}$/);
+    expect(posta[0].oggetto).toMatch(/^Copilota: codice per la password nuova \d{6}$/);
   });
 
   it('codice sbagliato e password debole rifiutati; con il codice giusto la password cambia e le sessioni si chiudono', async () => {

@@ -85,7 +85,7 @@ try {
 
   // Senza nessun amministratore nessuno potrebbe creare account: se manca se ne crea uno con
   // la password di LOGBOOK_ADMIN_PASSWORD o quella di prova. Dal Giorno 24 (risposta 1a)
-  // Logbook obbliga a cambiarla al primo accesso (server/auth/password-provvisorie.ts).
+  // Copilota obbliga a cambiarla al primo accesso (server/auth/password-provvisorie.ts).
   const { assicuraAdmin, reimpostaAdmin, segnaPasswordPubblicate } = await import('../server/auth/password-provvisorie');
   const { CREDENZIALI_DEMO, USERNAME_DEMO } = await import('../prisma/seed');
   // Giorno 34: il primo amministratore nasce con le credenziali scelte all'installazione
@@ -98,7 +98,7 @@ try {
   });
   if (creato?.passwordGenerata) {
     console.log(`[logbook] ATTENZIONE: creato l'amministratore "${creato.username}" con la password provvisoria  ${creato.passwordGenerata}`);
-    console.log('[logbook] Annotarla ORA: non viene più mostrata. Al primo accesso Logbook chiede di cambiarla.');
+    console.log('[logbook] Annotarla ORA: non viene più mostrata. Al primo accesso Copilota chiede di cambiarla.');
   } else if (creato) {
     console.log(`[logbook] creato l'amministratore "${creato.username}" con la password scelta all'installazione.`);
   }
@@ -114,7 +114,7 @@ try {
     console.log(`[logbook] amministratore "${r.username}" ${r.creato ? 'creato' : 'reimpostato'} con la password di LOGBOOK_ADMIN_PASSWORD (${definitiva ? 'definitiva' : 'provvisoria'}).`);
     console.log('[logbook] Togliere ora LOGBOOK_ADMIN_REIMPOSTA dalle variabili.');
   }
-  // In produzione (Logbook raggiungibile in rete) chi ha ancora una password scritta nel
+  // In produzione (Copilota raggiungibile in rete) chi ha ancora una password scritta nel
   // README la deve cambiare al prossimo accesso: amministratori e account di esempio.
   if (modo === 'produzione') {
     const segnati = await segnaPasswordPubblicate(prisma, [

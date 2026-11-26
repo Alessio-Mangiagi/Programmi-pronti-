@@ -72,7 +72,7 @@ export function SegnalazioniGiorno({ dipendenteId, data }: { dipendenteId: numbe
         {admin ? 'Segnalazioni del dipendente su questo giorno' : 'Qualcosa non torna? Segnalalo a HR'}
       </h3>
       {errore && <Avviso tipo="errore" className="mb-2">{errore}</Avviso>}
-      {inviata && <Avviso tipo="successo" className="mb-2">Segnalazione inviata: HR la vedrà appena entra in Logbook.</Avviso>}
+      {inviata && <Avviso tipo="successo" className="mb-2">Segnalazione inviata: HR la vedrà appena entra in Copilota.</Avviso>}
       <ul className="space-y-2">
         {elenco.map((s) => (
           <VoceSegnalazione key={s.id} segnalazione={s} admin={admin} onCambio={() => { ricarica(); avvisaCambio(); }} onErrore={setErrore} />

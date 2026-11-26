@@ -6,7 +6,7 @@
  *
  * Forma: SIGLA-NUMERO, es. IND-0001 (indeterminato), DET-0004 (determinato).
  * - 1a: la sigla viene dal contratto (SIGLE_CONTRATTO), il numero ha almeno 4 cifre;
- * - 2a: Logbook propone il prossimo numero libero (GET /api/dipendenti/prossima-matricola),
+ * - 2a: Copilota propone il prossimo numero libero (GET /api/dipendenti/prossima-matricola),
  *   HR lo può correggere;
  * - 3a: se cambia il contratto cambia solo la sigla, il numero resta (DET-0004 → IND-0004).
  *

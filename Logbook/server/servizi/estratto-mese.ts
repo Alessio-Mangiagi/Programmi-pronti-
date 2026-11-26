@@ -121,7 +121,7 @@ function righeAnagrafica(e: EstrattoDipendente): [string, string][] {
 /** Excel 1: mese a calendario con anagrafica a destra e progetti in basso. */
 export function creaExcelMeseCalendario(estratti: EstrattoDipendente[]): ExcelJS.Workbook {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'Logbook';
+  libro.creator = 'Copilota';
   for (const e of estratti) {
     const d = e.dipendente;
     const foglio = libro.addWorksheet(nomeFoglio(libro, `${d.cognome} ${d.nome}`), {
@@ -240,7 +240,7 @@ export function creaExcelMeseCalendario(estratti: EstrattoDipendente[]): ExcelJS
 /** Excel 2: giorni in verticale con ore, assenze e costo del giorno. */
 export function creaExcelMeseGiorni(estratti: EstrattoDipendente[]): ExcelJS.Workbook {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'Logbook';
+  libro.creator = 'Copilota';
   for (const e of estratti) {
     const d = e.dipendente;
     const foglio = libro.addWorksheet(nomeFoglio(libro, `${d.cognome} ${d.nome}`), {

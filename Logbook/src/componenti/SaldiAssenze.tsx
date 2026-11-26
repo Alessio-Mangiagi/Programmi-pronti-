@@ -7,7 +7,7 @@
  * - HR: riquadro richiudibile con una riga per dipendente attivo e il pulsante "Quota", che
  *   apre il modulo con giorni di ferie e ore di permesso all'anno, data da cui contare e
  *   residui di partenza. Finché HR non scrive la quota, il saldo di quel dipendente non
- *   esiste: Logbook non inventa i numeri del contratto.
+ *   esiste: Copilota non inventa i numeri del contratto.
  *
  * Il saldo non è salvato: lo calcola il server a ogni lettura (comune/saldi.ts), quindi una
  * richiesta approvata o corretta lo cambia subito. API: /api/saldi (server/rotte/saldi.ts).
@@ -100,7 +100,7 @@ function ModuloQuota({ riga, onChiudi, onSalvato }: { riga: RigaSaldo; onChiudi:
   return (
     <Modale titolo={`Quota di ${riga.nome}`} aperta onChiudi={onChiudi}>
       <form onSubmit={salva} className="space-y-3" noValidate>
-        <p className="text-sm text-gray-600">Sono i numeri del contratto: Logbook li usa per calcolare quanto matura ogni mese (un dodicesimo della quota, per i mesi lavorati almeno 15 giorni).</p>
+        <p className="text-sm text-gray-600">Sono i numeri del contratto: Copilota li usa per calcolare quanto matura ogni mese (un dodicesimo della quota, per i mesi lavorati almeno 15 giorni).</p>
         {errore && <Avviso tipo="errore">{errore}</Avviso>}
         <div className="flex flex-wrap gap-3">
           <div className="min-w-0 flex-[1_1_12rem]">
@@ -114,7 +114,7 @@ function ModuloQuota({ riga, onChiudi, onSalvato }: { riga: RigaSaldo; onChiudi:
             </Campo>
           </div>
         </div>
-        <Campo etichetta="Conta dal" obbligatorio errore={errori.contaDal} aiuto="Da questa data Logbook conta maturato e goduto. Di solito il 1° gennaio dell'anno in cui si comincia a usarlo.">
+        <Campo etichetta="Conta dal" obbligatorio errore={errori.contaDal} aiuto="Da questa data Copilota conta maturato e goduto. Di solito il 1° gennaio dell'anno in cui si comincia a usarlo.">
           <input type="date" className={classiInput(errori.contaDal)} {...campo('contaDal')} />
         </Campo>
         <div className="flex flex-wrap gap-3">

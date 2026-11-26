@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Archivio dei file caricati in Logbook (risposta 4a del 24/11/2026: i file stanno sul
- * server di Logbook). Lo usano attestati, documenti del dipendente e documentazione dei
+ * Archivio dei file caricati in Copilota (risposta 4a del 24/11/2026: i file stanno sul
+ * server di Copilota). Lo usano attestati, documenti del dipendente e documentazione dei
  * progetti: prima si carica il file (POST /api/file, server/rotte/file.ts), poi lo si
  * collega alla scheda con il suo id.
  *

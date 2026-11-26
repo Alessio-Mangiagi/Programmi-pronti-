@@ -9,7 +9,7 @@
  * Regola (richiesta del 24/11/2026: "partire senza dati finti" per l'uso vero):
  * - LOGBOOK_DATI_DEMO=1 / si / true  → dati di esempio sempre (es. una copia dimostrativa);
  * - LOGBOOK_DATI_DEMO=0 / no / false → mai;
- * - variabile assente → sì in sviluppo, NO in produzione: chi installa Logbook per HR
+ * - variabile assente → sì in sviluppo, NO in produzione: chi installa Copilota per HR
  *   parte da un database vuoto con il solo amministratore.
  * Su un database che ha già dipendenti non cambia nulla: i dati non si toccano mai.
  */

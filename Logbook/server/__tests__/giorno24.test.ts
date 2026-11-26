@@ -44,7 +44,7 @@ describe('password provvisoria data da HR', () => {
     }
   });
 
-  it('la nuova deve essere diversa; cambiata, Logbook si apre e HR lo vede', async () => {
+  it('la nuova deve essere diversa; cambiata, Copilota si apre e HR lo vede', async () => {
     const mario = await server.accedi('mario.rossi', 'Provvisoria1');
     const uguale = await mario.chiama('POST', '/api/auth/password', { attuale: 'Provvisoria1', nuova: 'Provvisoria1' });
     expect(uguale.stato).toBe(400);

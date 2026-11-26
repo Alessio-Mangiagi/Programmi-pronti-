@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * "Cancella tutti i dati" del proprietario (25/11/2026, risposta 3a): riporta Logbook come
+ * "Cancella tutti i dati" del proprietario (25/11/2026, risposta 3a): riporta Copilota come
  * appena installato.
  *
  * Restano:

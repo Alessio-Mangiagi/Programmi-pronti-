@@ -3,8 +3,8 @@
  * Saldo ferie e permessi (Giorno 38, 26/11/2026): maturato, goduto, residuo.
  *
  * I numeri di partenza li scrive HR per ogni dipendente (tabella QuotaAssenze): quanti giorni
- * di ferie e quante ore di permesso maturano in un anno intero, da che data Logbook conta
- * (`contaDal`) e con che residuo si parte. Logbook non conosce il contratto: senza quota il
+ * di ferie e quante ore di permesso maturano in un anno intero, da che data Copilota conta
+ * (`contaDal`) e con che residuo si parte. Copilota non conosce il contratto: senza quota il
  * saldo non si calcola.
  *
  * Regole del calcolo (uguali per ferie e permessi):

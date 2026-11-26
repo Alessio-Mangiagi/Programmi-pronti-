@@ -3,7 +3,7 @@
  * Giorno 26 (24/11/2026) — matricola legata al contratto e mansioni da elenco (risposte
  * 1a 2a 3a 4a):
  * - matricola SIGLA-NUMERO (IND-0001, DET-0004…); il numero è unico fra tutti, la sigla
- *   segue il contratto, Logbook propone il prossimo numero libero;
+ *   segue il contratto, Copilota propone il prossimo numero libero;
  * - l'import delle ore riconosce il dipendente dal numero (file vecchi con "0004" o con la
  *   sigla di prima);
  * - mansioni: elenco proposto, le nuove entrano al salvataggio, niente doppioni per maiuscole;
@@ -65,7 +65,7 @@ describe('matricola: regole comuni', () => {
 });
 
 describe('matricola nelle schede', () => {
-  it('Logbook propone la prossima libera per il contratto (solo HR)', async () => {
+  it('Copilota propone la prossima libera per il contratto (solo HR)', async () => {
     expect((await admin.chiama('GET', '/api/dipendenti/prossima-matricola?tipoContratto=APPRENDISTATO')).corpo).toEqual({ matricola: 'APP-0006' });
     expect((await admin.chiama('GET', '/api/dipendenti/prossima-matricola?tipoContratto=ALTRO')).stato).toBe(400);
     const mario = await server.accedi('mario.rossi', CREDENZIALI_DEMO.passwordDipendenti);

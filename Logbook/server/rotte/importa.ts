@@ -40,7 +40,7 @@ export function rotteImporta(prisma: PrismaClient, oggi: () => string) {
 
   router.get('/modello', async (_req, res) => {
     const libro = await creaModello(prisma, oggi());
-    await inviaExcel(res, libro, 'Logbook - modello import ore.xlsx');
+    await inviaExcel(res, libro, 'Copilota - modello import ore.xlsx');
   });
 
   router.post('/anteprima', corpoFile, async (req, res) => {

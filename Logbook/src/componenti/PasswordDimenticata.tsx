@@ -3,7 +3,7 @@
  * "Password dimenticata" (Giorno 40, 26/11/2026), dentro la pagina di accesso.
  *
  * Due passi, senza passare da HR:
- * 1. il nome utente → Logbook manda un codice di 6 cifre all'email dell'account (quella in
+ * 1. il nome utente → Copilota manda un codice di 6 cifre all'email dell'account (quella in
  *    anagrafica). La risposta è sempre la stessa, che l'account esista o no: non si può
  *    usare questo modulo per scoprire i nomi utente;
  * 2. codice + password nuova (scritta due volte). Poi si torna all'accesso.

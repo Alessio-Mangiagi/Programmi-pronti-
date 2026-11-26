@@ -1,10 +1,10 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Copie di sicurezza di Logbook (Giorno 34, 25/11/2026: "parti dal primo punto e crea il db
+ * Copie di sicurezza di Copilota (Giorno 34, 25/11/2026: "parti dal primo punto e crea il db
  * utilizzando sql").
  *
  * - La copia del database si fa con un comando SQL di SQLite, `VACUUM INTO 'file'`: scrive
- *   un database completo e coerente anche mentre Logbook è acceso e qualcuno sta salvando
+ *   un database completo e coerente anche mentre Copilota è acceso e qualcuno sta salvando
  *   (copiare il file a mano potrebbe prenderlo a metà di una scrittura).
  * - Una copia al giorno, `logbook-AAAA-MM-GG.db`, fatta all'avvio se quella di oggi manca e
  *   poi controllata ogni ora (server/index.ts): con il PC acceso di notte scatta poco dopo
@@ -19,7 +19,7 @@
  *
  * Cartella: LOGBOOK_BACKUP_DIR, altrimenti data/backup. Per essere al riparo da un guasto
  * del disco va puntata a un altro disco o a una cartella di rete.
- * Ripristino: fermare Logbook, copiare il file scelto su data/logbook.db, riavviare.
+ * Ripristino: fermare Copilota, copiare il file scelto su data/logbook.db, riavviare.
  */
 import fs from 'node:fs';
 import path from 'node:path';

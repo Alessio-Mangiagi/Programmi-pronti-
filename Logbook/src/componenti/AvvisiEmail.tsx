@@ -8,7 +8,7 @@
  * server/servizi/avvisi.ts; le API in server/rotte/impostazioni.ts (PUT /avvisi, POST
  * /avvisi/prova).
  *
- * Se su questo Logbook la posta non è configurata (variabili LOGBOOK_SMTP_*) il riquadro lo
+ * Se su questo Copilota la posta non è configurata (variabili LOGBOOK_SMTP_*) il riquadro lo
  * dice e le scelte restano salvabili: varranno quando la posta ci sarà.
  * Le email ai dipendenti partono solo per chi ha un indirizzo in anagrafica.
  */
@@ -75,10 +75,10 @@ export function AvvisiEmail({ dati, ricarica }: { dati: Impostazioni['avvisi']; 
         {dati.postaConfigurata ? <Etichetta colore="verde">Posta attiva</Etichetta> : <Etichetta colore="giallo">Posta non configurata</Etichetta>}
       </div>
       <p className="text-sm text-gray-600">
-        Logbook scrive da solo quando c'è qualcosa da fare. Le email ai dipendenti partono solo per chi ha un indirizzo in anagrafica.
+        Copilota scrive da solo quando c'è qualcosa da fare. Le email ai dipendenti partono solo per chi ha un indirizzo in anagrafica.
       </p>
       {!dati.postaConfigurata && (
-        <Avviso tipo="info">Su questo Logbook la posta non è configurata: le scelte si possono salvare, ma nessuna email parte finché non lo è.</Avviso>
+        <Avviso tipo="info">Su questo Copilota la posta non è configurata: le scelte si possono salvare, ma nessuna email parte finché non lo è.</Avviso>
       )}
       {messaggio && <Avviso tipo={messaggio.tipo}>{messaggio.testo}</Avviso>}
       <Campo

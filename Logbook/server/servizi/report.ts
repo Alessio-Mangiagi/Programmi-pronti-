@@ -134,7 +134,7 @@ function scriviAnagrafica(foglio: ExcelJS.Worksheet, d: Dipendente, filtri: Filt
 /** Report 1: calendario lavorato, un foglio per dipendente. */
 export function creaReportCalendario(dati: DatiReport): ExcelJS.Workbook {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'Logbook';
+  libro.creator = 'Copilota';
   const { filtri } = dati;
   // Solo lunedì-venerdì (Giorno 25: "nelle estrazioni per la stampa deve sempre essere
   // escluso sabato e domenica"); i totali sotto restano quelli di tutto il periodo.
@@ -214,7 +214,7 @@ export function creaReportCalendario(dati: DatiReport): ExcelJS.Workbook {
 /** Report 2: progetti lavorati per dipendente, con totali e foglio riassuntivo. */
 export function creaReportProgetti(dati: DatiReport): ExcelJS.Workbook {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'Logbook';
+  libro.creator = 'Copilota';
   const { filtri, totali } = dati;
   const coppie = Object.entries(totali.perDipendenteProgetto).map(([chiave, minuti]) => {
     const [dipendenteId, progettoId] = chiave.split('|').map(Number);

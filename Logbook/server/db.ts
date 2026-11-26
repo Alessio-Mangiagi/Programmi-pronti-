@@ -5,7 +5,7 @@
  * Prisma 7 parla col database tramite un "driver adapter", scelto dall'indirizzo:
  * - file SQLite (PC, suite, test): better-sqlite3, modulo nativo, sincrono e veloce per un
  *   gestionale con pochi utenti contemporanei;
- * - PostgreSQL (Giorno 35, Logbook su Vercel): il driver pg. Poche connessioni per processo,
+ * - PostgreSQL (Giorno 35, Copilota su Vercel): il driver pg. Poche connessioni per processo,
  *   perché su Vercel i processi sono tanti e brevi e il database ha un tetto di connessioni.
  *
  * L'adapter di SQLite si carica solo quando serve (createRequire): è un modulo nativo e nel

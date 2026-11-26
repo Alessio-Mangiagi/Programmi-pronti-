@@ -3,7 +3,7 @@
  * Giorni 19 e 20 (24/11/2026) — chi scrive le ore.
  *
  * Giorno 19: "solo gli admin devono poter inserire i dati nelle giornate già passate …
- * per evitare pagamenti errati", con la data di Logbook presa dal server (GET /api/oggi).
+ * per evitare pagamenti errati", con la data di Copilota presa dal server (GET /api/oggi).
  * Giorno 20 (risposte 1b e 2): "tutti i dati li inserisce HR" — il dipendente non scrive
  * più ore né documentazione, nemmeno oggi; vede le sue giornate e, se qualcosa non torna,
  * le segnala (test in giorno20.test.ts). Qui OGGI_PROVA = lunedì 23/11/2026.
@@ -39,7 +39,7 @@ afterAll(async () => {
 const giornata = (data: string) => ({ dipendenteId: idMario, data, fasce: [{ progettoId: prg1, oraInizio: '08:00', oraFine: '12:00', note: '' }] });
 
 describe('le ore le inserisce solo HR', () => {
-  it('la data di Logbook è quella del server', async () => {
+  it('la data di Copilota è quella del server', async () => {
     const r = await mario.chiama('GET', '/api/oggi');
     expect(r.stato).toBe(200);
     expect(r.corpo.oggi).toBe(OGGI_PROVA);

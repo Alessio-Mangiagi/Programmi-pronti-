@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Calendario: vista principale di Logbook, per mese o per settimana.
+ * Calendario: vista principale di Copilota, per mese o per settimana.
  *
  * - Ogni giorno mostra le ore per progetto (colore del progetto), le assenze (colori per
  *   tipo; tratteggiate se ancora in attesa), le festività e il totale del giorno.
@@ -29,7 +29,7 @@
  *
  * Chi scrive le ore (Giorni 19-20): solo HR (risposta 1b "tutti i dati li inserisce HR").
  * Il dipendente apre i suoi giorni in sola lettura e, se qualcosa non torna, manda una
- * segnalazione dalla stessa finestra. "Oggi" è la data di Logbook (useAuth().oggi, dal
+ * segnalazione dalla stessa finestra. "Oggi" è la data di Copilota (useAuth().oggi, dal
  * server), non quella del PC.
  *
  * Collegamenti dalla Dashboard (24/11/2026): `?dipendente=<id>&progetto=<id>&data=<AAAA-MM-GG>`
@@ -175,7 +175,7 @@ export function Calendario() {
    * (le ore le inserisce HR), per HR i giorni futuri.
    */
   const motivoSolaLettura = (data: string): string | null => {
-    if (!admin) return 'Le ore le inserisce HR. Se qualcosa non torna, segnalalo qui sotto: HR lo vedrà appena entra in Logbook.';
+    if (!admin) return 'Le ore le inserisce HR. Se qualcosa non torna, segnalalo qui sotto: HR lo vedrà appena entra in Copilota.';
     if (data > oggi) return 'Giorno futuro: le ore si registrano a giornata fatta.';
     return null;
   };

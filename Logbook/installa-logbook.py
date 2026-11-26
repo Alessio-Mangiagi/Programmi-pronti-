@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # "><(((º> sabusabu <º)))><"
 """
-Installatore di Logbook da solo, FUORI dalla suite Cosedil (25/11/2026, risposta 4b:
+Installatore di Copilota da solo, FUORI dalla suite Cosedil (25/11/2026, risposta 4b:
 "il programma deve poter funzionare fuori dalla suite e quindi si deve poter avviare sia
 dentro che fuori").
 
 Compilato in InstallaLogbook.exe (PyInstaller --onefile, vedi in fondo) e tenuto nella
-cartella di Logbook, accanto ad avvia.bat. Su un PC qualsiasi basta copiare la cartella
+cartella di Copilota, accanto ad avvia.bat. Su un PC qualsiasi basta copiare la cartella
 Logbook (senza node_modules e data) e fare doppio clic su InstallaLogbook.exe. Serve solo
 Node.js 20.19 o successivo: l'installatore NON lo installa (sarebbe software di sistema),
 dice dove scaricarlo.
@@ -15,16 +15,16 @@ Passi:
 1. controlla Node.js;
 2. installa le dipendenze (npm ci con il lock, altrimenti npm install). Il postinstall
    genera anche il client del database (prisma generate);
-3. chiede nome utente e password del primo amministratore, che è il proprietario di Logbook
+3. chiede nome utente e password del primo amministratore, che è il proprietario di Copilota
    (solo lui potrà nominare altri amministratori). Le passa soltanto al comando che prepara
    il database: non finiscono nel .env né in nessun file. Poi, se manca, crea il file .env
    da .env.example e chiede, facoltativi:
    - l'email del proprietario, che riceve il codice per "Cancella tutti i dati";
-   - se Logbook va raggiunto dagli altri PC della rete (HOST=0.0.0.0).
+   - se Copilota va raggiunto dagli altri PC della rete (HOST=0.0.0.0).
    Il server di posta (LOGBOOK_SMTP_*) si completa dopo, a mano, nel .env;
 4. prepara il database e compila l'interfaccia (come il primo avvio: npm run prestart).
    Il database nuovo è vuoto, con l'utente admin e le festività nazionali;
-5. crea sul desktop il collegamento "Logbook" ad avvia.bat.
+5. crea sul desktop il collegamento "Copilota" ad avvia.bat.
 
 Dentro la suite non serve: lo installa InstallaSuite.exe (installa-suite.py, voce "logbook")
 e lo avvia la card del Portale. Le due strade usano la stessa cartella e lo stesso avvia.bat.
@@ -83,7 +83,7 @@ def chiedi(domanda: str) -> str:
 
 
 def run(cmd: str, env: dict | None = None) -> None:
-    """Esegue un comando nella cartella di Logbook mostrando l'output; errore se fallisce.
+    """Esegue un comando nella cartella di Copilota mostrando l'output; errore se fallisce.
     `env`: variabili in più solo per questo comando (le credenziali del primo amministratore)."""
     say(f"    $ {cmd}")
     if DRY:
@@ -116,13 +116,13 @@ def SENZA_DOMANDE_CREDENZIALI() -> bool:
 
 
 def chiedi_credenziali_admin() -> tuple[str, str] | None:
-    """Nome utente e password del primo amministratore di Logbook, che ne è il proprietario
+    """Nome utente e password del primo amministratore di Copilota, che ne è il proprietario
     (Giorno 34, 25/11/2026: "durante l'installazione venga creato il primo admin con le
     credenziali inserite e poi solo lui possa dare quel ruolo").
 
     Si chiedono a chi installa (la password non compare mentre la si scrive, e va ripetuta).
-    Stesse regole di Logbook per un amministratore: almeno 12 caratteri, lettere e numeri.
-    Senza terminale o con le domande spente restituisce None: allora Logbook crea "admin"
+    Stesse regole di Copilota per un amministratore: almeno 12 caratteri, lettere e numeri.
+    Senza terminale o con le domande spente restituisce None: allora Copilota crea "admin"
     con una password casuale, mostrata una volta sola e da cambiare al primo accesso. Per
     un'installazione senza domande si possono passare LOGBOOK_ADMIN_USERNAME e
     LOGBOOK_ADMIN_PASSWORD come variabili d'ambiente.
@@ -133,7 +133,7 @@ def chiedi_credenziali_admin() -> tuple[str, str] | None:
     if SENZA_DOMANDE_CREDENZIALI() or not sys.stdin or not sys.stdin.isatty():
         return None
     import getpass
-    say("    Primo amministratore di Logbook (sarai il proprietario: solo tu potrai nominarne altri).")
+    say("    Primo amministratore di Copilota (sarai il proprietario: solo tu potrai nominarne altri).")
     while True:
         try:
             nome = input("    Nome utente [admin]: ").strip().lower() or "admin"
@@ -167,7 +167,7 @@ def prepara_env(proprietario: str = "admin") -> str:
     email = chiedi("Email del proprietario (riceve il codice per cancellare tutti i dati), invio per saltare:")
     if email:
         testo = imposta_env(testo, "LOGBOOK_PROPRIETARIO_EMAIL", email)
-    rete = chiedi("Logbook deve essere raggiungibile dagli altri PC della rete? [s/N]").lower()
+    rete = chiedi("Copilota deve essere raggiungibile dagli altri PC della rete? [s/N]").lower()
     if rete in ("s", "si", "sì", "y", "yes"):
         testo = imposta_env(testo, "HOST", "0.0.0.0")
     say(f"    creo {env.name}" + (f" (proprietario {proprietario}, email {email})" if email else f" (proprietario {proprietario})"))
@@ -180,15 +180,15 @@ def prepara_env(proprietario: str = "admin") -> str:
 
 
 def crea_collegamento() -> None:
-    """Icona "Logbook" sul desktop dell'utente che punta ad avvia.bat (niente diritti di amministratore)."""
+    """Icona "Copilota" sul desktop dell'utente che punta ad avvia.bat (niente diritti di amministratore)."""
     bat = DIR / "avvia.bat"
     icona = DIR / "public" / "favicon.ico"
     ps = (
         "$s=(New-Object -ComObject WScript.Shell);"
         "$d=[Environment]::GetFolderPath('Desktop');"
-        "$l=$s.CreateShortcut((Join-Path $d 'Logbook.lnk'));"
+        "$l=$s.CreateShortcut((Join-Path $d 'Copilota.lnk'));"
         f"$l.TargetPath='{bat}';$l.WorkingDirectory='{DIR}';"
-        "$l.Description='Logbook - ore e presenze';"
+        "$l.Description='Copilota - ore e presenze';"
         + (f"$l.IconLocation='{icona}';" if icona.exists() else "")
         + "$l.Save()"
     )
@@ -197,7 +197,7 @@ def crea_collegamento() -> None:
 
 def main() -> int:
     global DRY, SENZA_DOMANDE
-    ap = argparse.ArgumentParser(description="Installatore di Logbook fuori dalla suite")
+    ap = argparse.ArgumentParser(description="Installatore di Copilota fuori dalla suite")
     ap.add_argument("--si", action="store_true", help="nessuna domanda")
     ap.add_argument("--senza-collegamento", action="store_true", help="non crea l'icona sul desktop")
     ap.add_argument("--dry-run", action="store_true", help="mostra i passi senza eseguirli")
@@ -205,12 +205,12 @@ def main() -> int:
     DRY, SENZA_DOMANDE = args.dry_run, args.si
 
     say("=" * 62)
-    say("  Installazione di Logbook (ore e presenze)")
+    say("  Installazione di Copilota (ore e presenze)")
     say(f"  Cartella: {DIR}")
     say("=" * 62)
     try:
         if not (DIR / "package.json").exists():
-            raise RuntimeError("package.json non trovato: InstallaLogbook.exe va tenuto nella cartella di Logbook")
+            raise RuntimeError("package.json non trovato: InstallaLogbook.exe va tenuto nella cartella di Copilota")
         say("1. Node.js")
         v = versione_node()
         if not v or v < NODE_MIN:
@@ -247,14 +247,14 @@ def main() -> int:
         return 1
 
     say()
-    say("Logbook è installato.")
-    say("  Avvio: icona Logbook sul desktop (o avvia.bat), poi http://127.0.0.1:5210")
+    say("Copilota è installato.")
+    say("  Avvio: icona Copilota sul desktop (o avvia.bat), poi http://127.0.0.1:5210")
     if credenziali:
-        say(f"  Si entra con l'utente {credenziali[0]} e la password appena scelta: è il proprietario di Logbook.")
+        say(f"  Si entra con l'utente {credenziali[0]} e la password appena scelta: è il proprietario di Copilota.")
     elif nuovo:
         say("  Si entra con l'utente admin e la password provvisoria scritta qui sopra (riga ATTENZIONE): annotarla ora.")
     say(f"  {nota_env}")
-    say("  Dentro la suite lo stesso Logbook si apre anche dalla card del Portale.")
+    say("  Dentro la suite lo stesso Copilota si apre anche dalla card del Portale.")
     if sys.stdin and sys.stdin.isatty() and not SENZA_DOMANDE:
         input("Premi Invio per chiudere...")
     return 0

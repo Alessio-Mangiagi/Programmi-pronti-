@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Frontend di Logbook (React + Tailwind) servito da Vite sulla porta 5210.
+ * Frontend di Copilota (React + Tailwind) servito da Vite sulla porta 5210.
  *
  * In sviluppo le chiamate /api vanno al backend Express (porta 3012, server/index.ts):
  * il browser parla con una sola origine, quindi niente CORS e, dal Giorno 2, il cookie

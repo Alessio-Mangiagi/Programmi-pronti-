@@ -1,9 +1,9 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Logbook su Vercel (Giorno 35, 25/11/2026).
+ * Copilota su Vercel (Giorno 35, 25/11/2026).
  *
  * Su Vercel il server non è un processo sempre acceso ma una funzione: appena la risposta è
- * partita il processo può essere messo in pausa. Il lavoro che Logbook fa "dopo" (la riga nel
+ * partita il processo può essere messo in pausa. Il lavoro che Copilota fa "dopo" (la riga nel
  * registro attività, l'email di avviso) verrebbe troncato. `tieniVivo` lo affida a waitUntil
  * di Vercel, che tiene sveglia la funzione finché la promessa non finisce. Fuori da Vercel
  * non fa nulla: il processo resta acceso comunque.

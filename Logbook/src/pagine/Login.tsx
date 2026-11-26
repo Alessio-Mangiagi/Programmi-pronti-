@@ -2,7 +2,7 @@
 /**
  * Pagina di accesso nello stile Cosedil: pannello blu del marchio con logo della Suite e
  * motto aziendale a sinistra, modulo a destra (su schermi stretti solo il modulo).
- * Nome utente e password sono quelli propri di Logbook, non quelli del Portale.
+ * Nome utente e password sono quelli propri di Copilota, non quelli del Portale.
  *
  * Giorno 34 (25/11/2026):
  * - per un amministratore che entra da un PC non ancora riconosciuto, dopo la password
@@ -86,7 +86,7 @@ export function Login() {
         <div className="flex items-center gap-3 bg-marchio px-5 py-4 text-white md:hidden">
           <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
           <div className="leading-tight">
-            <div className="font-display text-xl font-medium">Logbook</div>
+            <div className="font-display text-xl font-medium">Copilota</div>
             <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>
           </div>
         </div>
@@ -96,7 +96,7 @@ export function Login() {
             <div className="font-ui text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>
           </div>
           <div>
-            <div className="font-display text-4xl font-normal tracking-[-0.01em]">Logbook</div>
+            <div className="font-display text-4xl font-normal tracking-[-0.01em]">Copilota</div>
             <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/80">Ore per cantiere e commessa, ferie, permessi e presenze del personale.</p>
           </div>
           <div className="font-display text-sm text-white/60">Costruiamo il tuo domani</div>
@@ -116,7 +116,7 @@ export function Login() {
           <form onSubmit={entra} className="min-w-0 flex-1 space-y-4 p-5 sm:p-8">
             <div>
               <div className="sopratitolo">Accesso</div>
-              <h1 className="font-display text-2xl font-normal text-testo-forte">Entra in Logbook</h1>
+              <h1 className="font-display text-2xl font-normal text-testo-forte">Entra in Copilota</h1>
               <p className="mt-1 text-sm text-gray-500">Usa il nome utente e la password ricevuti da HR.</p>
             </div>
             {inattivita && !errore && <Avviso tipo="info">Sessione chiusa dopo 15 minuti senza attività. Entra di nuovo per continuare.</Avviso>}

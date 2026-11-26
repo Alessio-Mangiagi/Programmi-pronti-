@@ -54,7 +54,7 @@ describe('richieste di assenza', () => {
     await attendi(1);
     expect(posta).toHaveLength(1);
     expect(posta[0].a).toBe(HR);
-    expect(posta[0].oggetto).toBe('Logbook: richiesta di ferie da Rossi Mario');
+    expect(posta[0].oggetto).toBe('Copilota: richiesta di ferie da Rossi Mario');
     expect(posta[0].testo).toContain('dal 01/02/2027 al 03/02/2027');
     expect(posta[0].testo).toContain('Settimana bianca');
 
@@ -62,7 +62,7 @@ describe('richieste di assenza', () => {
     expect(decisa.stato).toBe(200);
     await attendi(2);
     expect(posta[1].a).toBe('mario.rossi@esempio.it');
-    expect(posta[1].oggetto).toBe('Logbook: richiesta di ferie rifiutata');
+    expect(posta[1].oggetto).toBe('Copilota: richiesta di ferie rifiutata');
     expect(posta[1].testo).toContain('Cantiere in consegna');
 
     // Un'assenza inserita da HR non avvisa HR.
@@ -117,7 +117,7 @@ describe('avvisi del giorno', () => {
     const primo = await avvisi.giornaliero(OGGI_PROVA);
     expect(primo).toEqual({ fatto: true, oreMancanti: 1, attestati: 1 });
     const aLuca = posta.find((e) => e.a === 'luca.esposito@esempio.it')!;
-    expect(aLuca.oggetto).toBe('Logbook: giorni senza ore registrate');
+    expect(aLuca.oggetto).toBe('Copilota: giorni senza ore registrate');
     expect(aLuca.testo).toContain('19/11/2026');
     expect(aLuca.testo).toContain('https://logbook.esempio.it');
     expect(posta.find((e) => e.a === HR && /giorni senza ore/.test(e.oggetto))!.testo).toContain('Esposito Luca: 19/11/2026');

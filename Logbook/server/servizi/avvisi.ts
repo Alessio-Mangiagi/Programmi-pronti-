@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 /**
  * Avvisi via email (26/11/2026). Prima di questo modulo ogni novità si vedeva solo entrando
- * in Logbook: una richiesta di ferie restava ferma finché HR non apriva la dashboard, e il
+ * in Copilota: una richiesta di ferie restava ferma finché HR non apriva la dashboard, e il
  * dipendente scopriva l'esito solo tornando a guardare.
  *
  * Quattro avvisi, ognuno si accende e si spegne da Impostazioni → Avvisi via email:
@@ -91,12 +91,12 @@ type AssenzaAvviso = {
 export type OpzioniAvvisi = {
   inviaEmail?: InviaEmail | null;
   emailProprietario?: string;
-  /** Indirizzo a cui si apre Logbook, messo in fondo alle email (es. https://…vercel.app). */
+  /** Indirizzo a cui si apre Copilota, messo in fondo alle email (es. https://…vercel.app). */
   indirizzo?: string;
   adesso?: () => number;
 };
 
-/** Indirizzo pubblico di Logbook: variabile esplicita, oppure quello di produzione dato da Vercel. */
+/** Indirizzo pubblico di Copilota: variabile esplicita, oppure quello di produzione dato da Vercel. */
 export function indirizzoDaAmbiente(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const scelto = env.LOGBOOK_INDIRIZZO_PUBBLICO?.trim().replace(/\/+$/, '');
   if (scelto) return scelto;
@@ -106,14 +106,14 @@ export function indirizzoDaAmbiente(env: NodeJS.ProcessEnv = process.env): strin
 export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
   const invia = opzioni.inviaEmail ?? null;
   const adesso = opzioni.adesso ?? Date.now;
-  const piede = `\n\n--\nLogbook, ore e presenze${opzioni.indirizzo ? `\n${opzioni.indirizzo}` : ''}\nMessaggio automatico: non rispondere a questa email.`;
+  const piede = `\n\n--\nCopilota, ore e presenze${opzioni.indirizzo ? `\n${opzioni.indirizzo}` : ''}\nMessaggio automatico: non rispondere a questa email.`;
   const scelte = () => leggiScelteAvvisi(prisma, opzioni.emailProprietario);
 
   /** Spedisce senza mai sollevare errori: un avviso non partito non deve bloccare il lavoro. */
   async function spedisci(a: string, oggetto: string, testo: string): Promise<boolean> {
     if (!invia) return false;
     try {
-      await invia({ a, oggetto: `Logbook: ${oggetto}`, testo: testo + piede });
+      await invia({ a, oggetto: `Copilota: ${oggetto}`, testo: testo + piede });
       return true;
     } catch (e) {
       console.warn(`[logbook] avviso "${oggetto}" non inviato:`, e instanceof Error ? e.message : e);
@@ -151,7 +151,7 @@ export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
       const testo =
         `${chi} ha ${a.tipo === 'MALATTIA' ? 'comunicato una malattia' : `chiesto ${tipo}`}: ${periodo(a)}.` +
         (a.noteDipendente ? `\n\nNota del dipendente: ${a.noteDipendente}` : '') +
-        `\n\nPer approvare o rifiutare: Logbook → Assenze.`;
+        `\n\nPer approvare o rifiutare: Copilota → Assenze.`;
       let mandate = 0;
       for (const indirizzo of s.emailHr) if (await spedisci(indirizzo, `richiesta di ${tipo} da ${chi}`, testo)) mandate++;
       return mandate;
@@ -173,10 +173,10 @@ export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
     /** Email di prova agli indirizzi di HR, dal pulsante delle impostazioni. Solleva se non parte. */
     async prova(): Promise<string[]> {
       const s = await scelte();
-      if (!invia) throw new Error('La posta non è configurata su questo Logbook');
+      if (!invia) throw new Error('La posta non è configurata su questo Copilota');
       if (!s.emailHr.length) throw new Error('Nessun indirizzo di HR a cui scrivere');
       for (const indirizzo of s.emailHr) {
-        await invia({ a: indirizzo, oggetto: 'Logbook: email di prova', testo: `Questa è l'email di prova degli avvisi di Logbook: l'invio funziona.${piede}` });
+        await invia({ a: indirizzo, oggetto: 'Copilota: email di prova', testo: `Questa è l'email di prova degli avvisi di Copilota: l'invio funziona.${piede}` });
       }
       return s.emailHr;
     },
@@ -184,7 +184,7 @@ export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
     /**
      * Avvisi del giorno: promemoria delle ore mancanti (una volta alla settimana) e attestati
      * in scadenza. Si può chiamare quante volte si vuole: lavora una volta sola per giorno.
-     * `oggi` è la data di Logbook (AAAA-MM-GG, fuso italiano).
+     * `oggi` è la data di Copilota (AAAA-MM-GG, fuso italiano).
      */
     async giornaliero(oggi: string): Promise<{ fatto: boolean; oreMancanti: number; attestati: number }> {
       const niente = { fatto: false, oreMancanti: 0, attestati: 0 };
@@ -220,11 +220,11 @@ export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
           if (!indirizzo) continue;
           const testo =
             `Ciao ${d.nome},\n\nnegli ultimi ${GIORNI_CONTROLLO_ORE} giorni ${mancanti.length === 1 ? 'risulta un giorno lavorativo' : `risultano ${mancanti.length} giorni lavorativi`} senza ore registrate:\n${elenco}\n\n` +
-            `Se hai lavorato, comunica le ore all'ufficio personale; se eri assente, inserisci la richiesta in Logbook → Assenze.`;
+            `Se hai lavorato, comunica le ore all'ufficio personale; se eri assente, inserisci la richiesta in Copilota → Assenze.`;
           if (await spedisci(indirizzo, 'giorni senza ore registrate', testo)) esito.oreMancanti++;
         }
         if (riepilogo.length) {
-          const testo = `Giorni lavorativi senza ore negli ultimi ${GIORNI_CONTROLLO_ORE} giorni (fino al ${formattaData(ieri)}):\n\n${riepilogo.join('\n')}\n\nDettaglio in Logbook → Dashboard.`;
+          const testo = `Giorni lavorativi senza ore negli ultimi ${GIORNI_CONTROLLO_ORE} giorni (fino al ${formattaData(ieri)}):\n\n${riepilogo.join('\n')}\n\nDettaglio in Copilota → Dashboard.`;
           for (const indirizzo of s.emailHr) await spedisci(indirizzo, `giorni senza ore, ${riepilogo.length} ${riepilogo.length === 1 ? 'dipendente' : 'dipendenti'}`, testo);
         }
       }
@@ -251,7 +251,7 @@ export function creaAvvisi(prisma: PrismaClient, opzioni: OpzioniAvvisi = {}) {
           }
         }
         if (perHr.length) {
-          for (const indirizzo of s.emailHr) await spedisci(indirizzo, `attestati da rinnovare (${perHr.length})`, `Attestati scaduti o in scadenza:\n\n${perHr.join('\n')}\n\nDettaglio in Logbook → Dashboard.`);
+          for (const indirizzo of s.emailHr) await spedisci(indirizzo, `attestati da rinnovare (${perHr.length})`, `Attestati scaduti o in scadenza:\n\n${perHr.join('\n')}\n\nDettaglio in Copilota → Dashboard.`);
         }
       }
       return esito;

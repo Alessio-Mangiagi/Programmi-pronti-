@@ -47,7 +47,7 @@ export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
   const router = Router();
 
   /**
-   * L'account del proprietario di Logbook (LOGBOOK_PROPRIETARIO, vedi rotte/proprietario.ts)
+   * L'account del proprietario di Copilota (LOGBOOK_PROPRIETARIO, vedi rotte/proprietario.ts)
    * lo tocca solo lui (verifica di sicurezza del Giorno 33). Se fosse collegato a una scheda
    * dipendente, un altro amministratore potrebbe reimpostargli la password o disattivarlo
    * da qui, e nessun altro nome utente può diventare quello del proprietario.
@@ -55,7 +55,7 @@ export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
   function proteggiProprietario(req: Request, username: string | undefined | null, nuovoUsername?: string) {
     if (!proprietario || req.utente?.username === proprietario) return;
     if (username === proprietario || nuovoUsername === proprietario) {
-      throw new ErroreHttp(403, "L'account del proprietario di Logbook lo può modificare solo il proprietario");
+      throw new ErroreHttp(403, "L'account del proprietario di Copilota lo può modificare solo il proprietario");
     }
   }
 
@@ -201,7 +201,7 @@ export function rotteDipendenti(prisma: PrismaClient, proprietario?: string) {
     }
 
     const impronta = password ? await creaImpronta(password) : undefined;
-    // La password che HR comunica al dipendente è provvisoria: al primo accesso Logbook
+    // La password che HR comunica al dipendente è provvisoria: al primo accesso Copilota
     // chiede di cambiarla (Giorno 24, risposta 1a), così la conosce solo il dipendente.
     const account = dipendente.utente
       ? await prisma.utente.update({

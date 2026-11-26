@@ -127,7 +127,7 @@ export function rotteDocumentiProgetto(prisma: PrismaClient, cartella: string, o
 
   /**
    * Invio a SkyTower (risposta 4a "b come pulsante"): il file va nella commessa indicata nel
-   * progetto, come documento di tipo RP con gli estremi di Logbook negli attributi.
+   * progetto, come documento di tipo RP con gli estremi di Copilota negli attributi.
    */
   router.post('/:id/skytower', richiediAdmin, async (req, res) => {
     const d = await documento(idDaParametro(req.params.id)!);

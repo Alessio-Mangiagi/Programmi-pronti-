@@ -3,7 +3,7 @@
  * Chiusura del mese (Giorno 37, 26/11/2026).
  *
  * Il problema: HR manda l'estratto del mese al consulente paghe, poi qualcuno corregge
- * un'ora di quel mese e i numeri in Logbook non coincidono più con quelli pagati. Con la
+ * un'ora di quel mese e i numeri in Copilota non coincidono più con quelli pagati. Con la
  * chiusura HR "blocca" il mese dopo averlo controllato: da lì ore, assenze e festività di
  * quel mese non si toccano più. Se serve una correzione HR riapre il mese, corregge e
  * richiude: l'operazione resta nel registro attività.

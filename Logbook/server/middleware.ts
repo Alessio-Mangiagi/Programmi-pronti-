@@ -19,7 +19,7 @@ type UtenteSessione = {
   dipendenteId: number | null;
   /** "Nome Cognome" della scheda collegata, oppure lo username per un admin senza scheda. */
   nomeVisualizzato: string;
-  /** Password provvisoria da cambiare prima di usare Logbook (Giorno 24, risposta 1a). */
+  /** Password provvisoria da cambiare prima di usare Copilota (Giorno 24, risposta 1a). */
   passwordDaCambiare: boolean;
 };
 

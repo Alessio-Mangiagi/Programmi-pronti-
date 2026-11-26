@@ -21,7 +21,7 @@
  *
  * Giorno 26 (risposte 1a 2a 3a 4a del 24/11/2026):
  * - matricola SIGLA-NUMERO del contratto (comune/matricola.ts): per un dipendente nuovo
- *   Logbook propone la prossima libera (HR può correggerla); cambiando il contratto cambia
+ *   Copilota propone la prossima libera (HR può correggerla); cambiando il contratto cambia
  *   subito la sigla e il numero resta;
  * - mansione scelta dall'elenco con ricerca a caratteri (datalist); se se ne scrive una
  *   nuova compare l'avviso e al salvataggio entra nell'elenco per tutti.
@@ -410,7 +410,7 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
       setMessaggio({
         tipo: 'successo',
         testo: password
-          ? `${esistente ? 'Password reimpostata' : 'Account creato'}: comunica al dipendente nome utente e password. È provvisoria: al primo accesso Logbook gli chiede di cambiarla.`
+          ? `${esistente ? 'Password reimpostata' : 'Account creato'}: comunica al dipendente nome utente e password. È provvisoria: al primo accesso Copilota gli chiede di cambiarla.`
           : 'Account aggiornato',
       });
     } catch (err) {
@@ -425,7 +425,7 @@ function BloccoAccount({ dipendente, onAggiornato }: { dipendente: Dipendente; o
     <form onSubmit={salva} className="scheda p-3 sm:p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase text-gray-500">Account di accesso</h2>
       {messaggio && <Avviso tipo={messaggio.tipo} className="mb-3">{messaggio.testo}</Avviso>}
-      {!esistente && <p className="mb-3 text-sm text-gray-600">Il dipendente non ha ancora un account per entrare in Logbook.</p>}
+      {!esistente && <p className="mb-3 text-sm text-gray-600">Il dipendente non ha ancora un account per entrare in Copilota.</p>}
       {esistente?.passwordDaCambiare && (
         <p className="mb-3 text-sm text-gray-600">Password provvisoria: il dipendente non l'ha ancora cambiata al primo accesso.</p>
       )}

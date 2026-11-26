@@ -3,7 +3,7 @@
  * Impostazioni (solo amministratori), Giorno 15 (24/11/2026).
  *
  * Oggi c'è il collegamento a SkyTower, l'archivio documentale della suite (risposta
- * "4a e b come pulsante"): i file di Logbook restano sul suo server; se qui si registra il
+ * "4a e b come pulsante"): i file di Copilota restano sul suo server; se qui si registra il
  * collegamento, HR vede "Invia a SkyTower" sulla documentazione dei progetti che hanno una
  * commessa SkyTower. Senza collegamento il pulsante non compare da nessuna parte.
  *
@@ -97,7 +97,7 @@ export function Impostazioni() {
             {s.attivo ? <Etichetta colore="verde">Attivo</Etichetta> : <Etichetta colore="grigio">Non collegato</Etichetta>}
           </div>
           <p className="text-sm text-gray-600">
-            I documenti restano in Logbook. Con il collegamento attivo, nella documentazione dei progetti che hanno una commessa SkyTower compare il pulsante{' '}
+            I documenti restano in Copilota. Con il collegamento attivo, nella documentazione dei progetti che hanno una commessa SkyTower compare il pulsante{' '}
             <b>Invia a SkyTower</b>: il file diventa un documento WIP della commessa, nella cartella «Suite Cosedil».
           </p>
           {messaggio && <Avviso tipo={messaggio.tipo}>{messaggio.testo}</Avviso>}

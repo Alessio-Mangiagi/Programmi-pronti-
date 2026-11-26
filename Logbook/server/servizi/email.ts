@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Invio delle email di Logbook (dal 25/11/2026). Oggi serve solo al proprietario:
+ * Invio delle email di Copilota (dal 25/11/2026). Oggi serve solo al proprietario:
  * - codice di conferma per "Cancella tutti i dati" (server/rotte/proprietario.ts);
  * - avviso a cancellazione avvenuta.
  *
@@ -60,7 +60,7 @@ export function creaInvioSmtp(config: ConfigSmtp): InviaEmail {
     socketTimeout: 30_000,
   });
   return async ({ a, oggetto, testo }) => {
-    await trasporto.sendMail({ from: `Logbook <${config.mittente}>`, to: a, subject: oggetto, text: testo });
+    await trasporto.sendMail({ from: `Copilota <${config.mittente}>`, to: a, subject: oggetto, text: testo });
   };
 }
 
@@ -75,7 +75,7 @@ export function indirizzoDiEsempio(email: string): boolean {
 /**
  * Invio configurato dal .env, oppure null se il server di posta non è impostato.
  * Dal 26/11/2026 (avvisi via email) gli indirizzi dei dati di esempio vengono saltati in
- * silenzio: con i dati di prova caricati Logbook non deve scrivere a caselle inventate.
+ * silenzio: con i dati di prova caricati Copilota non deve scrivere a caselle inventate.
  */
 export function invioDaAmbiente(env: NodeJS.ProcessEnv = process.env): InviaEmail | null {
   const config = configurazioneSmtp(env);

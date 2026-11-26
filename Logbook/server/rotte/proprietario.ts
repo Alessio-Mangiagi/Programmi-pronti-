@@ -1,12 +1,12 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Rotte /api/proprietario: le operazioni riservate al proprietario di Logbook (25/11/2026).
+ * Rotte /api/proprietario: le operazioni riservate al proprietario di Copilota (25/11/2026).
  *
  * Richiesta dell'utente: "il programma deve potersi popolare con i dati per farmi capire come
  * sta funzionando, all'occorrenza devo poter cancellare tutto … un comando che mi permetta di
  * cancellare tutti i dati ma che sia usabile solo da me … inserisci l'invio di un codice via mail".
  *
- * Chi è il proprietario. Logbook deve funzionare anche fuori dalla suite (risposta 4b),
+ * Chi è il proprietario. Copilota deve funzionare anche fuori dalla suite (risposta 4b),
  * quindi non lo chiede al Portale: è l'account il cui username è in LOGBOOK_PROPRIETARIO
  * (file .env sul server), purché amministratore e attivo. Non si cambia dall'interfaccia, così
  * nessun altro amministratore può diventarlo. L'email che riceve i codici è
@@ -15,7 +15,7 @@
  * Rotte:
  * - GET  /stato: dice all'interfaccia se mostrare la sezione "Dati del programma" e cosa
  *   manca nella configurazione. A chi non è il proprietario risponde solo { proprietario: false };
- * - POST /dati-esempio: carica i dati di esempio (prisma/seed.ts), solo con Logbook vuoto
+ * - POST /dati-esempio: carica i dati di esempio (prisma/seed.ts), solo con Copilota vuoto
  *   (nessun dipendente, progetto o ora). Gli account di esempio nascono con la password
  *   provvisoria da cambiare al primo accesso (Giorno 24);
  * - POST /cancellazione/codice: manda il codice di 6 cifre all'email del proprietario
@@ -75,11 +75,11 @@ export function rotteProprietario(
     !!proprietario.username && req.utente?.ruolo === 'ADMIN' && req.utente.username === proprietario.username;
 
   function soloProprietario(req: Request, _res: Response, next: NextFunction) {
-    if (!eProprietario(req)) throw vietato('Funzione riservata al proprietario di Logbook');
+    if (!eProprietario(req)) throw vietato('Funzione riservata al proprietario di Copilota');
     next();
   }
 
-  /** Logbook è "vuoto" se non ha né dipendenti né progetti né ore. */
+  /** Copilota è "vuoto" se non ha né dipendenti né progetti né ore. */
   const conteggi = async () => {
     const [dipendenti, progetti, registrazioni] = await Promise.all([prisma.dipendente.count(), prisma.progetto.count(), prisma.registrazioneOraria.count()]);
     return { dipendenti, progetti, registrazioni };
@@ -113,7 +113,7 @@ export function rotteProprietario(
   router.post('/dati-esempio', soloProprietario, async (_req, res) => {
     const c = await conteggi();
     if (c.dipendenti || c.progetti || c.registrazioni) {
-      throw new ErroreHttp(409, 'I dati di esempio si caricano solo con Logbook vuoto: prima cancella tutti i dati');
+      throw new ErroreHttp(409, 'I dati di esempio si caricano solo con Copilota vuoto: prima cancella tutti i dati');
     }
     const r = await semina(prisma, oggi());
     // Le password degli account di esempio sono scritte nel README: provvisorie da subito.
@@ -129,13 +129,13 @@ export function rotteProprietario(
     try {
       await invia({
         a: proprietario.email!,
-        oggetto: `Logbook: codice ${nuovo.codice} per cancellare tutti i dati`,
+        oggetto: `Copilota: codice ${nuovo.codice} per cancellare tutti i dati`,
         testo:
           `Codice di conferma: ${nuovo.codice}\n\n` +
-          `Serve a cancellare TUTTI i dati di Logbook (dipendenti, progetti, ore, assenze, documenti e gli altri account).\n` +
+          `Serve a cancellare TUTTI i dati di Copilota (dipendenti, progetti, ore, assenze, documenti e gli altri account).\n` +
           `È valido fino alle ${formatoOra(nuovo.scade)} e si può usare una volta sola.\n\n` +
           `Se non l'hai chiesto tu, non fare nulla: senza questo codice non si cancella niente. ` +
-          `Ti conviene però cambiare la password dell'account "${req.utente!.username}" di Logbook.`,
+          `Ti conviene però cambiare la password dell'account "${req.utente!.username}" di Copilota.`,
       });
     } catch (e) {
       await codici.annulla(req.utente!.id);
@@ -188,9 +188,9 @@ export function rotteProprietario(
     // invio qui non annulla nulla (i dati sono già stati cancellati).
     tieniVivo(invia({
       a: proprietario.email!,
-      oggetto: 'Logbook: tutti i dati sono stati cancellati',
+      oggetto: 'Copilota: tutti i dati sono stati cancellati',
       testo:
-        `Alle ${formatoOra(adesso())} l'account "${req.utente!.username}" ha cancellato tutti i dati di Logbook con il codice di conferma.\n` +
+        `Alle ${formatoOra(adesso())} l'account "${req.utente!.username}" ha cancellato tutti i dati di Copilota con il codice di conferma.\n` +
         `Cancellati: ${r.dipendenti} dipendenti, ${r.progetti} progetti, ${r.registrazioni} fasce orarie, ${r.assenze} assenze, ${r.account} account, ${r.file} file.`,
     }).catch((e) => console.error('[logbook] avviso di cancellazione non inviato:', e)));
     res.json({ ...r, copia });
@@ -204,7 +204,7 @@ export function rotteProprietario(
   });
 
   /**
-   * Account di Logbook e loro ruolo (Giorno 34: "solo lui possa dare quel ruolo"). Il primo
+   * Account di Copilota e loro ruolo (Giorno 34: "solo lui possa dare quel ruolo"). Il primo
    * amministratore nasce all'installazione ed è il proprietario; solo lui promuove un account
    * ad amministratore o lo riporta a dipendente. Non può togliere il ruolo a sé stesso.
    */

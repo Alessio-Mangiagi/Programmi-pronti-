@@ -93,7 +93,7 @@ describe('solo il proprietario', () => {
     expect(posta).toHaveLength(0);
   });
 
-  it('i dati di esempio si caricano solo con Logbook vuoto', async () => {
+  it('i dati di esempio si caricano solo con Copilota vuoto', async () => {
     const r = await admin.chiama('POST', '/api/proprietario/dati-esempio');
     expect(r.stato).toBe(409);
   });
@@ -157,7 +157,7 @@ describe('cancella tutti i dati', () => {
 
     // Avviso a cose fatte e proprietario ancora collegato.
     await new Promise((ok) => setTimeout(ok, 50));
-    expect(posta.at(-1)?.oggetto).toBe('Logbook: tutti i dati sono stati cancellati');
+    expect(posta.at(-1)?.oggetto).toBe('Copilota: tutti i dati sono stati cancellati');
     expect((await admin.chiama('GET', '/api/proprietario/stato')).corpo.vuoto).toBe(true);
     // Il secondo amministratore non esiste più.
     expect((await server.anonimo.chiama('POST', '/api/auth/login', { username: 'hr.due', password: 'SecondoHr2026' })).stato).toBe(401);
@@ -197,7 +197,7 @@ describe('dati di esempio dopo la cancellazione', () => {
     expect(esempio.every((u) => u.passwordDaCambiare)).toBe(true);
     // Le assenze decise risultano decise dal proprietario.
     expect(await db.prisma.assenza.count({ where: { decisoDa: { username: 'admin' } } })).toBeGreaterThan(0);
-    // Un secondo caricamento è rifiutato: Logbook non è più vuoto.
+    // Un secondo caricamento è rifiutato: Copilota non è più vuoto.
     expect((await admin.chiama('POST', '/api/proprietario/dati-esempio')).stato).toBe(409);
   });
 });

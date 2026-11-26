@@ -7,7 +7,7 @@
  * diverse: una data come testo "05/11/2026", come data Excel (ExcelJS la dà come Date
  * in UTC) o come numero seriale; un orario come "8:00", "08.00", frazione di giorno o
  * Date del 30/12/1899. Le funzioni `testoCella`, `dataCella`, `orarioCella` riportano
- * tutto ai formati di Logbook ("AAAA-MM-GG", "HH:MM") o a null se non interpretabile.
+ * tutto ai formati di Copilota ("AAAA-MM-GG", "HH:MM") o a null se non interpretabile.
  */
 import type { Response } from 'express';
 import ExcelJS from 'exceljs';

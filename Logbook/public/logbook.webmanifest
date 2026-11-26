@@ -1,6 +1,6 @@
 {
-  "name": "Logbook — ore e presenze",
-  "short_name": "Logbook",
+  "name": "Copilota — ore e presenze",
+  "short_name": "Copilota",
   "description": "Ore, presenze e assenze dei dipendenti",
   "lang": "it",
   "start_url": "/",

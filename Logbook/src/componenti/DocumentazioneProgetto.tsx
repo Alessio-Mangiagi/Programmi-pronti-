@@ -112,7 +112,7 @@ export function DocumentazioneProgetto({ progetto, skytowerAttivo }: { progetto:
 
 /** Modulo di caricamento: almeno uno fra file, nota e percentuale (regola dello schema). */
 function NuovoDocumento({ progettoId, onCreato }: { progettoId: number; onCreato: () => void }) {
-  // "Oggi" di Logbook (server): nessuna documentazione con data futura.
+  // "Oggi" di Copilota (server): nessuna documentazione con data futura.
   const { oggi } = useAuth();
   const [m, setM] = useState<Modulo>(() => VUOTO(oggi));
   const [file, setFile] = useState<VistaFile | null>(null);

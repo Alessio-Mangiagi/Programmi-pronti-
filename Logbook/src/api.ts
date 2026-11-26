@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Client delle API di Logbook usato da tutte le pagine.
+ * Client delle API di Copilota usato da tutte le pagine.
  *
  * - Aggiunge sempre l'intestazione `X-Logbook: 1` richiesta dal controllo CSRF del
  *   server (server/middleware.ts) e manda il cookie di sessione (stessa origine).
@@ -52,7 +52,7 @@ async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, g
   try {
     r = await fetch(percorso, { method: metodo, headers: intestazioni, body, credentials: 'same-origin' });
   } catch {
-    throw new ErroreApi(0, 'Server non raggiungibile: controlla che Logbook sia avviato');
+    throw new ErroreApi(0, 'Server non raggiungibile: controlla che Copilota sia avviato');
   }
   const tipo = r.headers.get('content-type') ?? '';
   const dati = tipo.includes('application/json') ? await r.json() : null;

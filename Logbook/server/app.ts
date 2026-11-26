@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Applicazione Express di Logbook: monta le rotte /api e la gestione degli errori.
+ * Applicazione Express di Copilota: monta le rotte /api e la gestione degli errori.
  *
  * Separata da server/index.ts (che la mette in ascolto) così i test possono usarla
  * senza aprire porte. Il client Prisma si passa da fuori: i test ne danno uno legato
@@ -51,7 +51,7 @@ import { rotteCostiProgetti } from './rotte/costi-progetti';
  *   compilata, servita dallo stesso server delle API (una sola porta, niente Vite);
  * - `cartellaDocumenti`: dove salvare i file caricati (default data/documenti o
  *   LOGBOOK_DOCUMENTI_DIR; i test ne passano una temporanea);
- * - `proprietario`, `inviaEmail`, `adesso`: proprietario di Logbook, invio delle email e
+ * - `proprietario`, `inviaEmail`, `adesso`: proprietario di Copilota, invio delle email e
  *   orologio per i codici di conferma (default dal .env: LOGBOOK_PROPRIETARIO,
  *   LOGBOOK_PROPRIETARIO_EMAIL, LOGBOOK_SMTP_*; i test passano i loro).
  */
@@ -71,7 +71,7 @@ export type OpzioniApp = {
 };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
-  // Data di Logbook nel fuso italiano anche se il server è altrove (su Vercel l'orologio è UTC).
+  // Data di Copilota nel fuso italiano anche se il server è altrove (su Vercel l'orologio è UTC).
   const oggi = opzioni.oggi ?? (() => oggiItalia());
   const cartellaDocumenti = opzioni.cartellaDocumenti ?? cartellaDocumentiPredefinita();
   const app = express();
@@ -83,7 +83,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
     res.setHeader('Referrer-Policy', 'same-origin');
     next();
   });
-  // Verifica del Giorno 33: raggiunto in HTTPS (proxy della suite), Logbook dice al browser
+  // Verifica del Giorno 33: raggiunto in HTTPS (proxy della suite), Copilota dice al browser
   // di non tornare mai in HTTP per un anno; in HTTP l'intestazione non si manda (sarebbe ignorata).
   app.use((req, res, next) => {
     if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
@@ -112,7 +112,7 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   });
 
   /**
-   * Data di Logbook (Giorno 19): l'interfaccia decide cos'è "oggi" con questa, non con
+   * Data di Copilota (Giorno 19): l'interfaccia decide cos'è "oggi" con questa, non con
    * l'orologio del PC, e avvisa se il PC ha un'altra data. Dal Giorno 20 le ore le inserisce
    * solo HR e i giorni futuri restano chiusi: spostare la data del computer non apre nulla,
    * perché il controllo lo fa il server. Senza login di proposito: è solo la data.
@@ -206,9 +206,9 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
     const cartella = opzioni.cartellaInterfaccia;
     // Pagine dell'interfaccia (verifica di sicurezza del Giorno 23):
     // - frame-ancestors 'none' + X-Frame-Options: nessun sito (nemmeno un'altra app della
-    //   suite sullo stesso indirizzo) può mostrare Logbook dentro un riquadro e far cliccare
-    //   l'utente collegato senza che se ne accorga. Il Portale apre Logbook in una scheda sua;
-    // - script, fogli di stile e chiamate solo da Logbook stesso; 'unsafe-inline' sugli
+    //   suite sullo stesso indirizzo) può mostrare Copilota dentro un riquadro e far cliccare
+    //   l'utente collegato senza che se ne accorga. Il Portale apre Copilota in una scheda sua;
+    // - script, fogli di stile e chiamate solo da Copilota stesso; 'unsafe-inline' sugli
     //   stili serve alle proprietà style di React. I file caricati hanno una politica loro
     //   (server/rotte/file.ts).
     app.use((_req, res, next) => {

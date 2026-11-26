@@ -9,7 +9,7 @@
  *
  * Un mese chiuso non si modifica più: ore, assenze e festività di quel mese sono rifiutate
  * dal server (server/servizi/mesi-chiusi.ts), così l'estratto dato al consulente paghe resta
- * uguale a quello in Logbook. API: /api/mesi-chiusi.
+ * uguale a quello in Copilota. API: /api/mesi-chiusi.
  */
 import { useState } from 'react';
 import { formattaData } from '../../comune/date';

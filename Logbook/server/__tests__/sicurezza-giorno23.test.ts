@@ -231,9 +231,9 @@ describe('tetti contro chi riempie disco e avvisi', () => {
 });
 
 describe('intestazioni di sicurezza dell\'interfaccia', () => {
-  it('nessun riquadro da altri siti, script solo da Logbook', async () => {
+  it('nessun riquadro da altri siti, script solo da Copilota', async () => {
     const cartella = fs.mkdtempSync(path.join(os.tmpdir(), 'logbook-ui-'));
-    fs.writeFileSync(path.join(cartella, 'index.html'), '<!doctype html><title>Logbook</title>');
+    fs.writeFileSync(path.join(cartella, 'index.html'), '<!doctype html><title>Copilota</title>');
     const conUi = await avviaServer(db.prisma, { oggi: () => OGGI_PROVA, cartellaInterfaccia: cartella });
     try {
       const r = await conUi.anonimo.chiama('GET', '/calendario');

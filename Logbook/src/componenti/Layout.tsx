@@ -60,7 +60,7 @@ export function Layout() {
         <div className="flex items-center gap-3 border-b border-white/15 px-4 py-4">
           <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
           <div className="leading-tight">
-            <div className="font-display text-xl font-medium tracking-wide">Logbook</div>
+            <div className="font-display text-xl font-medium tracking-wide">Copilota</div>
             <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/65">Ore e presenze</div>
           </div>
         </div>
@@ -95,7 +95,7 @@ export function Layout() {
           <button type="button" className="flex items-center gap-2 rounded p-1.5 text-marchio hover:bg-ghiaccio md:hidden" onClick={() => setMenuAperto(true)} aria-label="Apri menu">
             <Icona nome="menu" dimensione={22} />
             {/* Sul telefono il menu laterale è chiuso: il nome del programma resta visibile qui. */}
-            <span className="font-display text-base font-medium">Logbook</span>
+            <span className="font-display text-base font-medium">Copilota</span>
           </button>
           <div className="ml-auto flex min-w-0 items-center gap-2 text-sm sm:gap-4">
             <span className="hidden rounded-full bg-ghiaccio px-2.5 py-0.5 font-ui text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-marchio sm:inline">
@@ -114,10 +114,10 @@ export function Layout() {
             </button>
           </div>
         </header>
-        {/* Giorno 19: Logbook usa la data del server; se il PC ne ha un'altra lo si dice. */}
+        {/* Giorno 19: Copilota usa la data del server; se il PC ne ha un'altra lo si dice. */}
         {orologioDiverso && (
           <div role="alert" className="border-b border-[#e9c46a] bg-[#fdf1d6] px-3 py-2 text-sm text-[#6b4a00] sm:px-4 md:px-6">
-            La data di questo computer ({formattaData(oggiIso())}) è diversa da quella di Logbook ({formattaData(oggi)}). Logbook usa la sua:
+            La data di questo computer ({formattaData(oggiIso())}) è diversa da quella di Copilota ({formattaData(oggi)}). Copilota usa la sua:
             «oggi» è il {formattaData(oggi)}. Controllate data e ora del PC.
           </div>
         )}

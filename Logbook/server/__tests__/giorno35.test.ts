@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Giorno 35 (25/11/2026) — Logbook su Vercel: quello che lì non può stare in memoria o su
+ * Giorno 35 (25/11/2026) — Copilota su Vercel: quello che lì non può stare in memoria o su
  * disco sta nel database. Questi test girano su SQLite ma usano le stesse strade che su
  * Vercel girano su PostgreSQL:
  * - file caricati nella tabella ContenutoFile (cartella = ARCHIVIO_NEL_DATABASE), massimo 4 MB;

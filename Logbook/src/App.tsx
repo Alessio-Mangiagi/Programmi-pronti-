@@ -33,7 +33,7 @@ function SoloAdmin({ children }: { children: ReactNode }) {
 
 function Rotte() {
   const { utente, caricamento } = useAuth();
-  if (caricamento) return <Caricamento testo="Avvio di Logbook…" />;
+  if (caricamento) return <Caricamento testo="Avvio di Copilota…" />;
   if (!utente) return <Login />;
   // Giorno 24 (risposta 1a): con la password provvisoria si vede solo la pagina per
   // cambiarla; anche le API rifiutano tutto il resto (server/middleware.ts).

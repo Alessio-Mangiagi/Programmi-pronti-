@@ -32,7 +32,7 @@ export function rotteEsporta(prisma: PrismaClient) {
   router.post('/calendario', async (req, res) => {
     const filtri = schemaFiltriReport.parse(req.body);
     const libro = creaReportCalendario(await caricaDatiReport(prisma, filtri));
-    await inviaExcel(res, libro, `Logbook - calendario lavorato ${filtri.da} ${filtri.a}.xlsx`);
+    await inviaExcel(res, libro, `Copilota - calendario lavorato ${filtri.da} ${filtri.a}.xlsx`);
   });
 
   // --- Estratti mensili (23/11/2026): corpo { mese: "AAAA-MM", dipendenteIds, progettoIds } ---
@@ -46,19 +46,19 @@ export function rotteEsporta(prisma: PrismaClient) {
   router.post('/mese/calendario', async (req, res) => {
     const filtri = schemaFiltriMese.parse(req.body);
     const libro = creaExcelMeseCalendario(await caricaEstratti(prisma, filtri));
-    await inviaExcel(res, libro, `Logbook - mese a calendario ${filtri.mese}.xlsx`);
+    await inviaExcel(res, libro, `Copilota - mese a calendario ${filtri.mese}.xlsx`);
   });
 
   router.post('/mese/giorni', async (req, res) => {
     const filtri = schemaFiltriMese.parse(req.body);
     const libro = creaExcelMeseGiorni(await caricaEstratti(prisma, filtri));
-    await inviaExcel(res, libro, `Logbook - giorni e costi ${filtri.mese}.xlsx`);
+    await inviaExcel(res, libro, `Copilota - giorni e costi ${filtri.mese}.xlsx`);
   });
 
   router.post('/progetti', async (req, res) => {
     const filtri = schemaFiltriReport.parse(req.body);
     const libro = creaReportProgetti(await caricaDatiReport(prisma, filtri));
-    await inviaExcel(res, libro, `Logbook - ore per progetto ${filtri.da} ${filtri.a}.xlsx`);
+    await inviaExcel(res, libro, `Copilota - ore per progetto ${filtri.da} ${filtri.a}.xlsx`);
   });
 
   return router;

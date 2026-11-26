@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Avvio del server di Logbook, in due modalità:
+ * Avvio del server di Copilota, in due modalità:
  *
  * - SVILUPPO (`npm run dev`): solo API su http://127.0.0.1:3012; l'interfaccia la serve
  *   Vite sulla 5210 e inoltra le chiamate /api qui (vite.config.ts).
@@ -84,12 +84,12 @@ if (produzione) {
 // "in ascolto" subito prima di "porta occupata").
 const server = app.listen(porta, host, (errore?: Error) => {
   if (errore) return;
-  console.log(`[logbook] ${produzione ? 'Logbook' : 'API'} in ascolto su http://${host}:${porta}`);
+  console.log(`[logbook] ${produzione ? 'Copilota' : 'API'} in ascolto su http://${host}:${porta}`);
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`[logbook] la porta ${porta} è già occupata: Logbook è già aperto in un'altra finestra?`);
+    console.error(`[logbook] la porta ${porta} è già occupata: Copilota è già aperto in un'altra finestra?`);
   } else {
     console.error('[logbook] impossibile avviare il server:', err);
   }

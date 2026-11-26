@@ -2,7 +2,7 @@
 /**
  * Rotte di accesso: /api/auth/login, /codice, /logout, /io, /password.
  *
- * Login con username e password propri di Logbook (scelta 1c).
+ * Login con username e password propri di Copilota (scelta 1c).
  *
  * Blocco progressivo dei tentativi (Giorno 34, 25/11/2026: "dopo 10 tentativi fai aspettare
  * 5 minuti e dopo sali a 10 e così via"): per la stessa coppia indirizzo+utente, dopo 10
@@ -24,7 +24,7 @@
  * Codice via email per gli amministratori (Giorno 34): se l'invio delle email è configurato
  * e dell'amministratore si conosce l'indirizzo (il proprietario: LOGBOOK_PROPRIETARIO_EMAIL;
  * gli altri: l'email della loro scheda dipendente), dopo la password giusta da un PC non
- * ancora "fidato" Logbook manda un codice di 6 cifre e apre la sessione solo con quello
+ * ancora "fidato" Copilota manda un codice di 6 cifre e apre la sessione solo con quello
  * (POST /codice). Il PC resta fidato 30 giorni. Così una password rubata non basta. Si
  * spegne con LOGBOOK_CODICE_ACCESSO=0 nel .env (es. se la posta non funziona più).
  *
@@ -158,10 +158,10 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
       try {
         await opzioni.inviaEmail!({
           a: email,
-          oggetto: `Logbook: codice di accesso ${nuovo.codice}`,
+          oggetto: `Copilota: codice di accesso ${nuovo.codice}`,
           testo:
             `Codice di accesso: ${nuovo.codice}\n\n` +
-            `Qualcuno ha inserito la password dell'account "${utente.username}" di Logbook da un PC non ancora riconosciuto.\n` +
+            `Qualcuno ha inserito la password dell'account "${utente.username}" di Copilota da un PC non ancora riconosciuto.\n` +
             `Il codice vale ${DURATA_CODICE_MS / 60000} minuti e una volta sola.\n\n` +
             `Se non sei stato tu, la tua password è conosciuta da altri: entra e cambiala subito.`,
         });
@@ -225,7 +225,7 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
   router.post('/dimenticata', async (req, res) => {
     const { username } = z.object({ username: z.string().trim().min(1, 'Inserisci il nome utente').max(60, 'Nome utente troppo lungo') }).parse(req.body);
     const nome = username.toLowerCase();
-    if (!opzioni.inviaEmail) throw new ErroreHttp(400, 'Su questo Logbook la posta non è configurata: per una password nuova rivolgiti a HR');
+    if (!opzioni.inviaEmail) throw new ErroreHttp(400, 'Su questo Copilota la posta non è configurata: per una password nuova rivolgiti a HR');
     registraIndirizzo(ip(req));
     const utente = await prisma.utente.findUnique({ where: { username: nome }, include: { dipendente: { select: { email: true } } } });
     const email = utente?.attivo ? emailDelCodice(utente) : undefined;
@@ -235,10 +235,10 @@ export function rotteAuth(prisma: PrismaClient, opzioni: OpzioniAuth = {}) {
         const invio = opzioni
           .inviaEmail({
             a: email,
-            oggetto: `Logbook: codice per la password nuova ${nuovo.codice}`,
+            oggetto: `Copilota: codice per la password nuova ${nuovo.codice}`,
             testo:
               `Codice: ${nuovo.codice}\n\n` +
-              `Qualcuno ha chiesto di scegliere una password nuova per l'account "${utente.username}" di Logbook.\n` +
+              `Qualcuno ha chiesto di scegliere una password nuova per l'account "${utente.username}" di Copilota.\n` +
               `Il codice vale ${DURATA_CODICE_MS / 60000} minuti e una volta sola.\n\n` +
               `Se non sei stato tu non fare nulla: la password resta quella di prima.`,
           })

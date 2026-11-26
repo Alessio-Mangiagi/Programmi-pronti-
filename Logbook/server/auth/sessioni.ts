@@ -11,7 +11,7 @@
  * una richiesta con l'intestazione `X-Logbook-Attivo: 1`, che l'interfaccia aggiunge solo se
  * l'utente ha mosso mouse o tastiera nell'ultimo minuto (src/api.ts). Le chiamate che
  * l'interfaccia fa da sola (data, campanella) non la tengono aperta: un PC lasciato acceso
- * su Logbook si scollega da solo.
+ * su Copilota si scollega da solo.
  *
  * Qui stanno anche i cookie del codice via email degli amministratori (rotte/auth.ts):
  * `logbook_attesa` (accesso in attesa del codice) e `logbook_pc` (PC fidato per 30 giorni,
@@ -51,7 +51,7 @@ export function leggiCookie(req: Request, nome: string): string | undefined {
   return undefined;
 }
 
-/** Scrive (o, con maxAge 0, cancella) un cookie HttpOnly di Logbook. */
+/** Scrive (o, con maxAge 0, cancella) un cookie HttpOnly di Copilota. */
 export function scriviCookie(res: Response, nome: string, valore: string, maxAgeSecondi: number) {
   const attributi = [`${nome}=${encodeURIComponent(valore)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${Math.round(maxAgeSecondi)}`];
   // Secure se lo dice il .env oppure se la richiesta è arrivata in HTTPS (req.secure: dietro il

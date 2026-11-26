@@ -9,7 +9,7 @@
  *
  * Come si calcola il costo: minuti registrati sul progetto × costo orario del dipendente
  * (scheda del dipendente: lordo e netto). Si usa il costo orario di OGGI anche per le ore
- * passate: Logbook non conserva lo storico dei costi, quindi dopo un aumento il costo dei
+ * passate: Copilota non conserva lo storico dei costi, quindi dopo un aumento il costo dei
  * mesi precedenti risulta ricalcolato. Chi non ha il costo orario in anagrafica conta nelle
  * ore ma non negli euro, e viene segnalato (`senzaCosto`): il totale in quel caso è parziale.
  */

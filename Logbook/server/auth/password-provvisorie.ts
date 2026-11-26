@@ -51,7 +51,7 @@ export async function assicuraAdmin(
  * rilanciando la preparazione del database (scripts/prepara-db.ts; su Vercel: Redeploy).
  * - Se l'account esiste: nuova password, ruolo amministratore, riattivato, sessioni chiuse.
  * - Se non esiste: viene creato come amministratore.
- * La password è provvisoria (al primo accesso Logbook chiede di sceglierne un'altra), a meno
+ * La password è provvisoria (al primo accesso Copilota chiede di sceglierne un'altra), a meno
  * che chi la imposta dica che è definitiva (LOGBOOK_ADMIN_DEFINITIVA=1): è il caso in cui
  * la password l'ha scelta il proprietario stesso.
  * Chi può scrivere queste variabili ha già in mano il database, quindi non apre porte nuove;

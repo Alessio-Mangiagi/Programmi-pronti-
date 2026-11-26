@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Dati di esempio di Logbook: 5 dipendenti, 3 progetti, festività nazionali e ore
+ * Dati di esempio di Copilota: 5 dipendenti, 3 progetti, festività nazionali e ore
  * lavorate dal primo giorno del mese scorso fino a ieri (almeno un mese pieno), con
  * qualche assenza in ogni stato (approvata, richiesta, rifiutata).
  *
@@ -11,7 +11,7 @@
  * Si usa in quattro modi:
  * - da solo `npm run dev` la prima volta (scripts/prepara-db.ts, solo se il DB è vuoto);
  * - dal pulsante "Carica dati di esempio" del proprietario (server/rotte/proprietario.ts, dal
- *   25/11/2026), solo con Logbook vuoto: allora l'amministratore c'è già e si usa lui, e si
+ *   25/11/2026), solo con Copilota vuoto: allora l'amministratore c'è già e si usa lui, e si
  *   aggiungono solo le festività e le mansioni che mancano;
  * - `npm run db:reset`: cancella TUTTO e ricarica questi dati;
  * - `npm run db:seed`: rifiuta di partire se il database contiene già dipendenti,
@@ -162,7 +162,7 @@ export async function semina(prisma: PrismaClient, oggi: string = oggiIso()): Pr
   const fine = aggiungiGiorni(oggi, -1);
 
   // --- Festività nazionali degli anni toccati dai dati (di solito uno solo) ---------
-  // Solo quelle che mancano: su un Logbook già installato le nazionali ci sono già. I giorni
+  // Solo quelle che mancano: su un Copilota già installato le nazionali ci sono già. I giorni
   // festivi usati qui sotto sono tutti quelli del database (anche locali e aziendali).
   const anni = [...new Set([annoPrec, annoOggi, annoSucc])];
   let festivita = 0;

@@ -1,8 +1,8 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Punto d'ingresso di Logbook come funzione Vercel (Giorno 35, 25/11/2026).
+ * Punto d'ingresso di Copilota come funzione Vercel (Giorno 35, 25/11/2026).
  *
- * Su un PC o nella suite Logbook parte da server/index.ts: un processo sempre acceso che
+ * Su un PC o nella suite Copilota parte da server/index.ts: un processo sempre acceso che
  * ascolta su una porta e serve anche l'interfaccia. Su Vercel non si ascolta su nessuna porta:
  * la piattaforma chiama questa funzione per ogni richiesta a /api/… e le passa richiesta e
  * risposta. Un'app Express è proprio una funzione (richiesta, risposta), quindi basta esportarla.

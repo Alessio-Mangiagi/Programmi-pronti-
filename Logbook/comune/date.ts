@@ -11,7 +11,7 @@
 const RE_DATA_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
- * Data più vecchia che si può inserire in Logbook (richiesta del 23/11/2026, risposta 1b):
+ * Data più vecchia che si può inserire in Copilota (richiesta del 23/11/2026, risposta 1b):
  * vale per TUTTI gli inserimenti — ore, assenze, festività, import, date di assunzione e
  * cessazione, date dei progetti. La lettura di dati già presenti non è limitata.
  */

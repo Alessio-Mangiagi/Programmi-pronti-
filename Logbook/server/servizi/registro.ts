@@ -25,7 +25,7 @@ const RIGHE_PER_PAGINA = 100;
 
 export type VoceRegistro = { utenteId?: number | null; username: string; azione: string; dettaglio?: string | null; esito?: 'OK' | 'NEGATO' | 'ERRORE'; ip?: string | null };
 
-/** Scrive una riga. Non solleva mai errori: un registro che non si scrive non deve fermare Logbook. */
+/** Scrive una riga. Non solleva mai errori: un registro che non si scrive non deve fermare Copilota. */
 export function registra(prisma: PrismaClient, voce: VoceRegistro): Promise<void> {
   const lavoro = scrivi(prisma, voce);
   // Spesso parte a risposta già inviata: su Vercel va tenuta viva (server/vercel.ts).

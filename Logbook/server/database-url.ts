@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Dove sta il database SQLite di Logbook.
+ * Dove sta il database SQLite di Copilota.
  *
  * Unico punto che decide il percorso, usato sia dal server (server/db.ts) sia dalla
  * CLI di Prisma (prisma.config.ts) e dallo script di preparazione: così migrazioni,
@@ -24,7 +24,7 @@ export const RADICE_APP = path.resolve(path.dirname(fileURLToPath(import.meta.ur
  * ma non le cartelle che lo contengono.
  */
 /**
- * true se il database è PostgreSQL (Giorno 35: Logbook su Vercel, dove un file SQLite non
+ * true se il database è PostgreSQL (Giorno 35: Copilota su Vercel, dove un file SQLite non
  * durerebbe). Lo decide l'indirizzo: DATABASE_URL che comincia con postgres:// o postgresql://.
  * Da qui dipendono il driver (server/db.ts), dove stanno i file caricati
  * (servizi/archivio-file.ts), il blocco dei tentativi (servizi/limitatore.ts) e le copie di

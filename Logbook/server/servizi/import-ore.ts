@@ -75,7 +75,7 @@ export async function creaModello(prisma: PrismaClient, oggi: string): Promise<E
     prisma.progetto.findMany({ where: { stato: { not: 'CHIUSO' } }, orderBy: { codice: 'asc' } }),
   ]);
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'Logbook';
+  libro.creator = 'Copilota';
 
   const ore = libro.addWorksheet('Ore', { views: [{ state: 'frozen', ySplit: 1 }] });
   ore.columns = COLONNE.map((c) => ({ header: c.titolo, key: c.chiave, width: c.chiave === 'note' ? 40 : 20, style: { numFmt: '@' } }));
@@ -100,7 +100,7 @@ export async function creaModello(prisma: PrismaClient, oggi: string): Promise<E
 
   const istruzioni = libro.addWorksheet('Istruzioni');
   istruzioni.columns = [{ width: 24 }, { width: 90 }];
-  istruzioni.addRow(['Logbook — import delle ore']).font = { bold: true, size: 14 };
+  istruzioni.addRow(['Copilota — import delle ore']).font = { bold: true, size: 14 };
   istruzioni.addRow([]);
   const righeIstruzioni: [string, string][] = [
     ['Foglio', 'Compila il foglio "Ore": una riga per ogni fascia oraria lavorata.'],
@@ -111,7 +111,7 @@ export async function creaModello(prisma: PrismaClient, oggi: string): Promise<E
     ['Note', 'Facoltative, massimo 500 caratteri.'],
     ['Più fasce', 'Per lo stesso giorno si possono inserire più righe (es. mattina e pomeriggio), purché non si sovrappongano fra loro né con ore già registrate.'],
     ['Riga di esempio', `La riga con la nota "${MARCATORE_ESEMPIO}" viene ignorata: puoi cancellarla o sovrascriverla.`],
-    ['Import', 'In Logbook: Importa → scegli il file → controlla l\'anteprima. Se una riga ha errori il file viene rifiutato e si vedono le righe da correggere; altrimenti si conferma e si importa tutto.'],
+    ['Import', 'In Copilota: Importa → scegli il file → controlla l\'anteprima. Se una riga ha errori il file viene rifiutato e si vedono le righe da correggere; altrimenti si conferma e si importa tutto.'],
   ];
   for (const r of righeIstruzioni) {
     const riga = istruzioni.addRow(r);
@@ -162,7 +162,7 @@ export async function analizzaFile(prisma: PrismaClient, dati: Buffer, oggi: str
     if (colonna && !posizioni.has(colonna.chiave)) posizioni.set(colonna.chiave, numero);
   });
   const mancanti = COLONNE.filter((c) => c.chiave !== 'note' && !posizioni.has(c.chiave)).map((c) => c.titolo);
-  if (mancanti.length) return vuoto(`Mancano le colonne: ${mancanti.join(', ')}. Usa il modello scaricabile da Logbook.`);
+  if (mancanti.length) return vuoto(`Mancano le colonne: ${mancanti.join(', ')}. Usa il modello scaricabile da Copilota.`);
 
   // Prima passata: lettura e controlli di forma.
   const righe: RigaImport[] = [];

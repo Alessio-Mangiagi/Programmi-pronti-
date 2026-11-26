@@ -1,7 +1,7 @@
 // "><(((º> sabusabu <º)))><"
 /**
  * Crea prisma/postgres/schema.prisma: una copia di prisma/schema.prisma con il database
- * PostgreSQL al posto di SQLite (Giorno 35, 25/11/2026: Logbook su Vercel).
+ * PostgreSQL al posto di SQLite (Giorno 35, 25/11/2026: Copilota su Vercel).
  *
  * Lo schema vero resta uno solo, prisma/schema.prisma. Qui cambiano soltanto due righe: il
  * "provider" del database e il percorso del client generato (la copia sta una cartella più

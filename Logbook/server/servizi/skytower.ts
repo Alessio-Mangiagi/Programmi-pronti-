@@ -3,7 +3,7 @@
  * Collegamento facoltativo a SkyTower, l'archivio documentale (CDE) della suite
  * (risposta "4a e b come pulsante" del 24/11/2026).
  *
- * I file di Logbook restano sul suo server (4a). Se un admin registra il collegamento in
+ * I file di Copilota restano sul suo server (4a). Se un admin registra il collegamento in
  * Impostazioni, HR vede il pulsante "Invia a SkyTower" sulla documentazione dei progetti
  * che hanno una commessa SkyTower; senza collegamento il pulsante non esiste.
  *
@@ -40,7 +40,7 @@ export async function leggiCollegamento(prisma: PrismaClient): Promise<Collegame
 /**
  * Controlla l'indirizzo di SkyTower salvato in Impostazioni: solo http(s), senza utente e
  * password, parametri (?…) o frammento (#…). Con "?" o "#" in fondo il percorso fisso
- * aggiunto dopo (/suite/commesse) finiva nei parametri o veniva scartato, e Logbook
+ * aggiunto dopo (/suite/commesse) finiva nei parametri o veniva scartato, e Copilota
  * chiamava col token un indirizzo qualunque (verifica di sicurezza del Giorno 23).
  * Restituisce il messaggio d'errore, oppure null se l'indirizzo va bene.
  */

@@ -3,7 +3,7 @@
  * Blocco progressivo dei tentativi di accesso (Giorno 34: "dopo 10 tentativi fai aspettare 5
  * minuti e dopo sali a 10 e così via"), in due versioni con la stessa interfaccia:
  *
- * - `limitatoreInMemoria`: il conto sta in una Map del processo. È la versione di Logbook
+ * - `limitatoreInMemoria`: il conto sta in una Map del processo. È la versione di Copilota
  *   installato su un PC o nella suite, dove il server è un processo solo e sempre acceso.
  *   Il conto si fa prima di qualunque attesa, così 500 richieste insieme non passano tutte;
  * - `limitatoreSuDatabase` (Giorno 35, Vercel): lì ogni richiesta può finire su un processo

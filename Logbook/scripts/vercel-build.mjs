@@ -1,6 +1,6 @@
 // "><(((º> sabusabu <º)))><"
 /**
- * Build di Logbook per Vercel (Giorno 35, 25/11/2026). È il "Build Command" del progetto
+ * Build di Copilota per Vercel (Giorno 35, 25/11/2026). È il "Build Command" del progetto
  * (vercel.json) e produce la cartella .vercel/output nel formato che Vercel pubblica così
  * com'è (Build Output API v3):
  *

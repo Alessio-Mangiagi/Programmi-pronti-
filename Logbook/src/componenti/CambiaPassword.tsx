@@ -28,7 +28,7 @@ export function CambiaPassword({ aperta, onChiudi }: { aperta: boolean; onChiudi
 
 /**
  * Modulo del cambio password. `onCambiata` dopo il salvataggio (la pagina obbligatoria
- * rilegge l'utente ed entra in Logbook); `secondario` è il pulsante accanto a "Salva".
+ * rilegge l'utente ed entra in Copilota); `secondario` è il pulsante accanto a "Salva".
  */
 export function ModuloPassword({ onCambiata, secondario, testoSalva = 'Salva' }: { onCambiata?: () => void; secondario?: ReactNode; testoSalva?: string }) {
   const [attuale, setAttuale] = useState('');
