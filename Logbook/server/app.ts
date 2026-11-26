@@ -42,6 +42,7 @@ import { suPostgres } from './database-url';
 import { suVercel } from './vercel';
 import { rotteMesiChiusi } from './servizi/mesi-chiusi';
 import { rotteSaldi } from './rotte/saldi';
+import { rotteCostiProgetti } from './rotte/costi-progetti';
 
 /**
  * Opzioni:
@@ -187,6 +188,8 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   api.use('/mesi-chiusi', rotteMesiChiusi(prisma, oggi));
   // Giorno 38 (26/11/2026): saldo ferie e permessi (rotte/saldi.ts, calcolo in comune/saldi.ts).
   api.use('/saldi', rotteSaldi(prisma, oggi));
+  // Giorno 41 (26/11/2026): costo della manodopera per commessa, solo HR (rotte/costi-progetti.ts).
+  api.use('/costi-progetti', rotteCostiProgetti(prisma));
   // Giorno 34: registro attività, solo amministratori (voce del menu).
   api.use('/registro', rotteRegistro(prisma));
 

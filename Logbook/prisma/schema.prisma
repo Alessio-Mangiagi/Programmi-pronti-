@@ -215,6 +215,11 @@ model Progetto {
   /// Codice della commessa di SkyTower in cui inviare la documentazione (pulsante "Invia a
   /// SkyTower", visibile solo se in Impostazioni c'è il collegamento). Vuoto = non si invia.
   commessaSkytower String?
+  /// Preventivo della manodopera in centesimi di euro, lordo (Giorno 41): lo scrive HR nella
+  /// scheda del progetto; serve al confronto con il costo delle ore registrate.
+  preventivoManodoperaCent Int?
+  /// Ore di lavoro preventivate (Giorno 41).
+  preventivoOre            Float?
   registrazioni    RegistrazioneOraria[]
   documenti        DocumentoProgetto[]
   note             NotaProgetto[]

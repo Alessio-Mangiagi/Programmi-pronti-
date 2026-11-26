@@ -64,7 +64,12 @@ export function rotteProgetti(prisma: PrismaClient) {
       include: { _count: { select: { assegnazioni: true } } },
       orderBy: { codice: 'asc' },
     });
-    res.json(elenco.map(({ _count, commessaSkytower, ...p }) => (admin ? { ...p, commessaSkytower, assegnati: _count.assegnazioni } : p)));
+    // Commessa SkyTower e preventivi (Giorno 41) sono dati di HR: ai dipendenti non arrivano.
+    res.json(
+      elenco.map(({ _count, commessaSkytower, preventivoManodoperaCent, preventivoOre, ...p }) =>
+        admin ? { ...p, commessaSkytower, preventivoManodoperaCent, preventivoOre, assegnati: _count.assegnazioni } : p,
+      ),
+    );
   });
 
   router.get('/:id', async (req, res) => {
@@ -74,7 +79,7 @@ export function rotteProgetti(prisma: PrismaClient) {
       const assegnato = await prisma.assegnazioneProgetto.findUnique({ where: { progettoId_dipendenteId: { progettoId: p.id, dipendenteId: mioId } } });
       if (!assegnato) throw vietato('Non sei assegnato a questo progetto');
       // Come nell'elenco: la commessa SkyTower è un dato di HR.
-      const { commessaSkytower: _nascosta, ...perDipendente } = p;
+      const { commessaSkytower: _nascosta, preventivoManodoperaCent: _euro, preventivoOre: _ore, ...perDipendente } = p;
       res.json(perDipendente);
       return;
     }

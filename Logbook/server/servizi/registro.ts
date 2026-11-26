@@ -93,6 +93,7 @@ const ETICHETTE: [string, RegExp, string][] = [
   ['POST', /^impostazioni\/skytower\/prova/, 'Collegamento a SkyTower provato'],
   ['PUT', /^saldi\//, 'Saldo ferie e permessi: quota salvata'],
   ['DELETE', /^saldi\//, 'Saldo ferie e permessi: quota tolta'],
+  ['PUT', /^costi-progetti\/\d+\/preventivo/,'Progetto: preventivo della manodopera salvato'],
   ['POST', /^mesi-chiusi/, 'Mese chiuso'],
   ['DELETE', /^mesi-chiusi/, 'Mese riaperto'],
   ['PUT', /^impostazioni\/avvisi/, 'Avvisi via email modificati'],
