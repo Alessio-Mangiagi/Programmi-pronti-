@@ -44,7 +44,9 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 39 (26/11):** Logbook installabile sulla schermata del telefono (manifest e icone) ✅
 - **Giorno 40 (26/11):** password dimenticata: codice via email e password nuova dalla pagina di accesso ✅
 - **Giorno 41 (26/11):** costo della manodopera per commessa con preventivo (euro e ore), solo HR ✅
-- **In coda (richiesta del 26/11, "implementa tutto partendo dal primo punto"):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
+- **Giorno 42 (26/11):** timbratura da telefono con conferma di HR (risposta 2a) ✅
+- **Risposte dell'utente del 26/11:** `1c 2a 3a 4c 5a 6b` (nome anche su immagini, installatori e indirizzo; timbratura con ok di HR; caposquadra sui suoi progetti; note spese e straordinari; file per il consulente in Excel/CSV; file grandi con Vercel Blob)
+- **In coda (vecchia riga):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
 - **Risposte del 25/11 (1a 2a 3a):** indirizzo del proprietario corretto nel .env (quello con la n, scritto solo lì); copia vecchia in Documents\suite cosedil lasciata com'è
 - **Conferma dell'utente (24/11):** Giorni 11 e 12 accettati; confermate le tre scelte aperte (festività del paese = città della sede, 4 ottobre festa nazionale, festività senza costo negli estratti)
@@ -1090,3 +1092,14 @@ Richiesta dell'utente: "cambia il nome della app in 'copilota'". Da qui in avant
 Non sono cambiati i nomi tecnici, perché cambiarli romperebbe installazioni e pubblicazione: cartella `Logbook/` (è la Root Directory su Vercel), variabili `LOGBOOK_*`, cookie `logbook_*`, intestazione `X-Logbook`, etichetta `[logbook]` nei log, `data/logbook.db`, `InstallaLogbook.exe`, `logbook.webmanifest`, progetto Vercel `programmi-pronti`. La password degli account di esempio resta `Logbook2026!`.
 
 Come: sostituzione della parola con regola (mai dopo `X-` o `Installa`, mai dentro un percorso) su 74 file, poi controllo a mano dei riferimenti alla cartella. Verifica: typecheck, 285 test su 285 (i test che controllano oggetto e testo delle email ora aspettano "Copilota: …").
+
+### Giorno 42 — Timbratura da telefono (26/11/2026) ✅
+
+Punto 4, risposta dell'utente 2a: "il dipendente timbra, la fascia vale solo dopo l'ok di HR".
+
+- Modello `Timbratura` (APERTA, DA_CONFERMARE, CONFERMATA, RIFIUTATA) e valore `TIMBRATURA` in `OrigineRegistrazione`; migrazione SQLite `20261126160000_timbrature`.
+- `server/rotte/timbrature.ts` su `/api/timbrature`: `GET /mie`, `POST /entrata`, `POST /uscita` (dipendente); `GET /`, `POST /:id/conferma`, `POST /:id/rifiuta` (HR). La conferma crea la `RegistrazioneOraria` in transazione dopo i controlli di `regole-ore.ts`, sovrapposizioni, massimo del progetto e mese chiuso.
+- Casi curati: una sola entrata aperta; uscita dimenticata (il giorno dopo la vecchia va a HR senza orario di uscita); uscita nello stesso minuto dell'entrata (senza orario, lo completa HR); HR non timbra.
+- Interfaccia: `src/componenti/Timbratura.tsx` (`TimbraturaDipendente`, `TimbratureDaConfermare`) in cima a `src/pagine/Dashboard.tsx`.
+- Verifiche: `timbrature.test.ts` con orologio finto (3 test); prova dal vivo sulla copia (`scratchpad/giorno42.mjs`, 7 su 7): entrata e uscita da telefono, nessuna ora prima della conferma, conferma di HR con orario corretto, fascia nata con origine "timbratura". Immagini 55, 56, 57.
+- Non fatto: posizione del telefono (non richiesta), avviso email a HR per ogni timbratura.

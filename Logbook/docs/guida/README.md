@@ -80,6 +80,30 @@ Mostra le ore del mese (lavorate e attese in base al contratto), le richieste in
 **giorni passati senza ore** (giorni lavorativi fino a ieri senza ore: il clic apre il
 giorno, da cui si può segnalare) e **Le mie segnalazioni**, con lo stato e la risposta di HR.
 
+### Timbrare entrata e uscita
+
+Dal 26/11/2026 in cima alla dashboard c'è il riquadro **Timbratura**, pensato per il telefono.
+
+1. All'arrivo: scegliere il progetto (se ne hai uno solo è già scelto) e premere **Timbra entrata**.
+
+![Timbra entrata](img/55-timbratura-entrata.png)
+
+2. A fine lavoro: **Timbra uscita**.
+
+![Timbra uscita](img/56-timbratura-uscita.png)
+
+3. La timbratura passa a HR con la scritta **In attesa di HR**. Diventa ore lavorate solo
+   quando HR la conferma: allora compare **Confermata** e le ore si vedono nel calendario.
+   Se HR la rifiuta, sotto c'è il motivo.
+
+Da sapere:
+- l'ora è quella del server, non quella del telefono;
+- si può timbrare solo su un progetto attivo a cui si è assegnati, e non nei giorni festivi
+  o mentre si è in ferie o malattia;
+- se dimentichi l'uscita, il giorno dopo puoi timbrare di nuovo: la timbratura vecchia va a
+  HR senza orario di uscita, e l'orario lo completa HR;
+- le pause si fanno con due timbrature: uscita prima della pausa, entrata dopo.
+
 ### Le tue ore e le segnalazioni
 
 Dal **Calendario** si fa clic su un giorno: si apre il dettaglio della giornata in **sola
@@ -247,6 +271,21 @@ e il giorno in cui è stata dichiarata. Passando sui punti del grafico compare d
 percentuale; il clic sulla riga apre il progetto. I progetti senza percentuali lo dicono.
 
 ![Avanzamento dei progetti in dashboard](img/41-avanzamento-progetti.png)
+
+#### Timbrature da confermare
+
+Quando un dipendente ha timbrato entrata e uscita, in cima alla **Dashboard HR** compare
+*Timbrature da confermare*. Per ogni riga si possono correggere gli orari, poi:
+
+- **Conferma**: la timbratura diventa una fascia oraria del dipendente, come se fosse stata
+  inserita a mano (stessi controlli: sovrapposizioni, festivi, ferie, massimo del progetto,
+  mese chiuso). Se l'orario è stato corretto, resta scritto quello timbrato;
+- **Rifiuta**: chiede il motivo, che il dipendente leggerà. Non nasce nessuna ora.
+
+![Timbrature da confermare](img/57-timbrature-hr.png)
+
+Una timbratura senza uscita ha il campo dell'uscita evidenziato: va scritto l'orario prima di
+confermare. Finché HR non conferma, le timbrature non contano nelle ore né negli estratti.
 
 ### Calendario
 

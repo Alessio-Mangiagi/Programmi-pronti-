@@ -107,6 +107,15 @@ Copilota non lo chiede al Portale, così funziona allo stesso modo dentro e fuor
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Timbratura (dal 26/11/2026)
+
+Il dipendente timbra entrata e uscita dalla dashboard (`/api/timbrature/entrata`, `/uscita`);
+nasce una riga `Timbratura` "da confermare", non una fascia oraria. HR la conferma
+(`POST /api/timbrature/:id/conferma`, anche correggendo gli orari) e solo allora viene creata
+la `RegistrazioneOraria` con origine `TIMBRATURA`, dopo gli stessi controlli delle ore
+inserite a mano; oppure la rifiuta con il motivo. Resta vera la regola del Giorno 20: nei
+pagamenti entrano solo ore viste da HR. L'ora è quella del server nel fuso italiano.
+
 ### Costo della manodopera per commessa (dal 26/11/2026)
 
 `/api/costi-progetti` (solo amministratori, `server/rotte/costi-progetti.ts`): per ogni
