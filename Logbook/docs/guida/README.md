@@ -123,6 +123,26 @@ alla pagina compare un avviso giallo.
 
 ![Avviso: data del PC diversa da quella di Copilota](img/33-avviso-data-pc.png)
 
+### La mia squadra (per i capisquadra)
+
+Dal 26/11/2026 chi è stato nominato **caposquadra** di un progetto trova nel menu la voce
+**La mia squadra**. Da lì scrive le ore dei colleghi assegnati a quel progetto:
+
+1. scegliere il **progetto** e il **giorno** (oggi o uno dei sette giorni precedenti);
+2. per ogni persona: **+ Fascia**, orario di inizio e di fine, poi **Salva** sulla sua riga;
+3. per correggere, cambiare gli orari e salvare di nuovo; togliendo tutte le fasce e
+   salvando, le ore di quella persona su quel progetto vengono tolte.
+
+![La mia squadra](img/59-la-mia-squadra.png)
+
+Da sapere:
+- si scrivono solo le ore **su quel progetto**. Se una persona ha già ore su un altro progetto
+  compare *Già occupato su altri progetti* con gli orari, per non sovrapporsi;
+- valgono le regole di sempre (niente festivi, ferie o malattia, massimo di ore del progetto,
+  mesi chiusi);
+- per date più vecchie di sette giorni, o per qualsiasi dubbio, serve HR, che vede tutto e
+  può correggere.
+
 ### I miei progetti
 
 **I miei progetti** elenca i progetti a cui siete assegnati: sono quelli su cui HR registra le
@@ -424,6 +444,16 @@ c'è il collegamento e il progetto ha la commessa, **inviare a SkyTower** (solo 
 con un file, una volta sola; poi compare il link al documento in SkyTower).
 
 **Note interne**: appunti di HR sul progetto, che i dipendenti non vedono.
+
+#### Nominare un caposquadra
+
+Nella scheda del progetto, riquadro **Dipendenti assegnati**, ogni riga ha la spunta
+**Caposquadra**. Chi ce l'ha può inserire le ore di tutti i dipendenti assegnati a quel
+progetto, solo su quel progetto, per oggi e i sette giorni precedenti (pagina *La mia
+squadra*). Le ore inserite così si riconoscono dall'origine "caposquadra" e HR può sempre
+correggerle. Togliendo la spunta, torna un dipendente come gli altri.
+
+![Nomina del caposquadra](img/58-nomina-caposquadra.png)
 
 #### Costo della manodopera di un progetto
 

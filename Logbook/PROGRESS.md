@@ -45,6 +45,7 @@ sessione per riprendere da dove si era rimasti.
 - **Giorno 40 (26/11):** password dimenticata: codice via email e password nuova dalla pagina di accesso ✅
 - **Giorno 41 (26/11):** costo della manodopera per commessa con preventivo (euro e ore), solo HR ✅
 - **Giorno 42 (26/11):** timbratura da telefono con conferma di HR (risposta 2a) ✅
+- **Giorno 43 (26/11):** caposquadra: nominato da HR sul progetto, scrive le ore della squadra (risposta 3a) ✅
 - **Risposte dell'utente del 26/11:** `1c 2a 3a 4c 5a 6b` (nome anche su immagini, installatori e indirizzo; timbratura con ok di HR; caposquadra sui suoi progetti; note spese e straordinari; file per il consulente in Excel/CSV; file grandi con Vercel Blob)
 - **In coda (vecchia riga):** 4 timbratura da telefono (serve una decisione dell'utente: dal Giorno 20 le ore le inserisce solo HR), 6 caposquadra, 7 straordinari/trasferte/rimborsi, 8 esportazione per il consulente paghe, 9 costo manodopera per commessa, 10 password dimenticata, 11 file oltre 4 MB su Vercel
 - **Fatto prima:** pubblicazione su Vercel seguendo docs/vercel.md (progetto, database Neon a Francoforte, variabili); poi prova dal vivo sull'indirizzo pubblico
@@ -1103,3 +1104,14 @@ Punto 4, risposta dell'utente 2a: "il dipendente timbra, la fascia vale solo dop
 - Interfaccia: `src/componenti/Timbratura.tsx` (`TimbraturaDipendente`, `TimbratureDaConfermare`) in cima a `src/pagine/Dashboard.tsx`.
 - Verifiche: `timbrature.test.ts` con orologio finto (3 test); prova dal vivo sulla copia (`scratchpad/giorno42.mjs`, 7 su 7): entrata e uscita da telefono, nessuna ora prima della conferma, conferma di HR con orario corretto, fascia nata con origine "timbratura". Immagini 55, 56, 57.
 - Non fatto: posizione del telefono (non richiesta), avviso email a HR per ogni timbratura.
+
+### Giorno 43 — Caposquadra (26/11/2026) ✅
+
+Punto 6, risposta dell'utente 3a: "inserisce le ore solo per i dipendenti dei suoi progetti; HR vede e corregge tutto".
+
+- `AssegnazioneProgetto.caposquadra` e valore `CAPOSQUADRA` in `OrigineRegistrazione`; migrazione SQLite `20261126180000_caposquadra` (ricrea la tabella copiando i dati).
+- `server/rotte/squadra.ts` su `/api/squadra`: `GET /` (i miei progetti con la squadra), `GET /giornata`, `PUT /giornata` (sostituisce le fasce di un dipendente su quel progetto in quel giorno). `server/rotte/progetti.ts`: nomina con `PUT …/caposquadra`. `/api/auth/io` restituisce `caposquadra`.
+- Limiti: solo progetti attivi di cui si è caposquadra, solo dipendenti assegnati, solo oggi e 7 giorni indietro (`GIORNI_INDIETRO`), più tutte le regole delle ore. Degli altri progetti si vedono solo gli orari occupati.
+- Scelta mia da confermare con l'utente: il limite dei 7 giorni indietro.
+- Interfaccia: `src/pagine/Squadra.tsx`, voce di menu "La mia squadra" solo per i capisquadra (`Layout.tsx`), spunta "Caposquadra" in "Dipendenti assegnati" (`SchedaProgetto.tsx`).
+- Verifiche: `squadra.test.ts` (nomina, permessi, salvataggio, origine, sovrapposizioni, massimo, fuori squadra, futuro, troppo vecchio, mese chiuso, nomina tolta); prova dal vivo sulla copia (`scratchpad/giorno43.mjs`, 8 su 8). Immagini 58 e 59.

@@ -107,6 +107,16 @@ Copilota non lo chiede al Portale, così funziona allo stesso modo dentro e fuor
 Senza server di posta (`LOGBOOK_SMTP_*`) la cancellazione resta spenta: il codice non
 finisce mai nel log.
 
+### Caposquadra (dal 26/11/2026)
+
+HR nomina il caposquadra di un progetto con la spunta sulla assegnazione
+(`AssegnazioneProgetto.caposquadra`, `PUT /api/progetti/:id/dipendenti/:dipendenteId/caposquadra`).
+Il caposquadra scrive le ore dei dipendenti assegnati a quel progetto, solo su quel progetto,
+per oggi e i 7 giorni precedenti: `/api/squadra` (`server/rotte/squadra.ts`), pagina
+`src/pagine/Squadra.tsx`. Le ore nascono con origine `CAPOSQUADRA` e passano gli stessi
+controlli delle altre. Degli altri progetti del dipendente vede solo gli orari occupati.
+`/api/auth/io` dice se l'utente è caposquadra (voce di menu).
+
 ### Timbratura (dal 26/11/2026)
 
 Il dipendente timbra entrata e uscita dalla dashboard (`/api/timbrature/entrata`, `/uscita`);
