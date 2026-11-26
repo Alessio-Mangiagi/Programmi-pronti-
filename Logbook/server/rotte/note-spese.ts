@@ -33,6 +33,8 @@ import { eliminaFile, fileCollegabile, vistaFile } from '../servizi/archivio-fil
 
 export const CATEGORIE_SPESA = ['VITTO', 'ALLOGGIO', 'TRASPORTO', 'CARBURANTE', 'MATERIALE', 'ALTRO'] as const;
 export const IMPORTO_MASSIMO_CENT = 10_000_00;
+/** Note spese in attesa che un dipendente può avere insieme: oltre, deve aspettare HR. */
+export const MAX_NOTE_IN_ATTESA = 30;
 
 const idFacoltativo = z.preprocess((v) => (v === '' || v === undefined ? null : v), z.coerce.number().int().positive().nullable());
 const schemaNota = z.object({
@@ -115,6 +117,9 @@ export function rotteNoteSpese(prisma: PrismaClient, cartella: string, oggi: () 
     const dipendenteId = dipendenteAmmesso(req, richiesto) ?? richiesto;
     if (!dipendenteId) throw richiestaNonValida('Scegli il dipendente', { dipendenteId: 'Scegli il dipendente' });
     if (!(await prisma.dipendente.findUnique({ where: { id: dipendenteId } }))) throw richiestaNonValida('Dipendente inesistente', { dipendenteId: 'Dipendente inesistente' });
+    if (!isAdmin(req) && (await prisma.notaSpesa.count({ where: { dipendenteId, stato: 'RICHIESTA' } })) >= MAX_NOTE_IN_ATTESA) {
+      throw new ErroreHttp(429, `Hai già ${MAX_NOTE_IN_ATTESA} note spese in attesa: aspetta che HR le decida prima di inserirne altre`);
+    }
     const dati = await prepara(req, dipendenteId, null);
     const creata = await prisma.notaSpesa.create({ data: { ...dati, dipendenteId }, include });
     res.status(201).json(vista(creata));

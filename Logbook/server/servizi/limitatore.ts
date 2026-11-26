@@ -103,3 +103,13 @@ export function limitatoreSuDatabase(prisma: PrismaClient, adesso: () => number 
     },
   };
 }
+
+/**
+ * Toglie i contatori fermi da più di un giorno e non più bloccati (manutenzione, 26/11/2026).
+ * Ogni login con un nome utente diverso crea una riga: senza pulizia chiunque, anche senza
+ * account, poteva far crescere la tabella all'infinito.
+ */
+export async function pulisciTentativi(prisma: PrismaClient, adesso: number = Date.now()): Promise<number> {
+  const r = await prisma.tentativoAccesso.deleteMany({ where: { ultimo: { lt: new Date(adesso - DIMENTICA_DOPO_MS) }, bloccatoFino: { lt: new Date(adesso) } } });
+  return r.count;
+}

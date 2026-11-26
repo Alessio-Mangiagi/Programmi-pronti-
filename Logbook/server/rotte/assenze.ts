@@ -41,6 +41,9 @@ const include = {
 } as const;
 
 /** `cartella`: dove stanno i file caricati (per cancellare l'allegato sostituito o dell'assenza eliminata). */
+/** Richieste di assenza in attesa che un dipendente può avere insieme. */
+export const MAX_RICHIESTE_IN_ATTESA = 30;
+
 export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Avvisi) {
   const router = Router();
 
@@ -142,6 +145,12 @@ export function rotteAssenze(prisma: PrismaClient, cartella: string, avvisi?: Av
     // HR può registrare direttamente un'assenza già approvata; il dipendente no.
     const { stato: statoRichiesto } = z.object({ stato: z.enum(['RICHIESTA', 'APPROVATA']).optional() }).parse({ stato: req.body?.stato });
     const stato = admin && statoRichiesto === 'APPROVATA' ? 'APPROVATA' : 'RICHIESTA';
+    // Tetto alle richieste in attesa di un dipendente (26/11/2026): ogni richiesta manda
+    // un'email a HR e può tenere un allegato, quindi senza tetto un account poteva intasare
+    // la casella dell'ufficio personale e l'archivio.
+    if (!admin && (await prisma.assenza.count({ where: { dipendenteId, stato: 'RICHIESTA' } })) >= MAX_RICHIESTE_IN_ATTESA) {
+      throw new ErroreHttp(429, `Hai già ${MAX_RICHIESTE_IN_ATTESA} richieste in attesa: aspetta che HR le decida prima di mandarne altre`);
+    }
     const completa = { ...dati, dipendenteId };
     // Giorno 37: un mese chiuso da HR non riceve più assenze, neanche come richiesta.
     await controllaPeriodoAperto(prisma, completa.dataInizio, completa.dataFine);

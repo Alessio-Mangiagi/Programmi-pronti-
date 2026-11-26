@@ -79,6 +79,10 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
   const stato = statoTemporaneo(prisma);
   const corpoParte = express.raw({ type: 'application/octet-stream', limit: BYTE_PER_PARTE + 1024 });
   const UN_ORA = 60 * 60 * 1000;
+  /** Caricamenti a parti lasciati a metà che un utente può avere nelle ultime 24 ore. */
+  const MAX_CARICAMENTI_APERTI = 5;
+  /** Il segno di un caricamento aperto dura quanto le sue parti, che la pulizia toglie dopo un giorno. */
+  const UN_GIORNO = 24 * UN_ORA;
   type Caricamento = { utenteId: number; nome: string; dimensione: number; parti: number };
   const idCaricamento = (v: unknown) => z.string().regex(/^[a-f0-9]{32}$/, 'Caricamento non valido').parse(v);
 
@@ -101,9 +105,17 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
       .parse(req.body);
     const massimo = maxByteFile(cartella);
     if (dimensione > massimo) throw new ErroreHttp(413, `File troppo grande: massimo ${massimo / 1024 / 1024} MB`);
+    // Al massimo MAX_CARICAMENTI_APERTI per utente (26/11/2026): senza tetto un account poteva
+    // aprire caricamenti all'infinito senza mai chiuderli e riempire il database di parti.
+    // `caricamento-di:<utente>:<id>` è il segno, tolto alla fine o alla scadenza.
+    const miei = `caricamento-di:${req.utente!.id}:`;
+    if ((await stato.conta(miei)) >= MAX_CARICAMENTI_APERTI) {
+      throw new ErroreHttp(429, 'Hai già altri file in caricamento: aspetta che finiscano, poi riprova');
+    }
     const id = randomBytes(16).toString('hex');
     const parti = Math.ceil(dimensione / BYTE_PER_PARTE);
     await stato.scrivi(`caricamento:${id}`, { utenteId: req.utente!.id, nome, dimensione, parti } satisfies Caricamento, Date.now() + UN_ORA);
+    await stato.scrivi(`${miei}${id}`, 1, Date.now() + UN_GIORNO);
     res.status(201).json({ caricamento: id, parti, bytePerParte: BYTE_PER_PARTE });
   });
 
@@ -126,6 +138,7 @@ export function rotteFile(prisma: PrismaClient, cartella: string) {
     const pulisci = async () => {
       await prisma.contenutoFile.deleteMany({ where: { nomeDisco: { startsWith: prefisso } } });
       await stato.togli(`caricamento:${id}`);
+      await stato.togli(`caricamento-di:${c.utenteId}:${id}`);
     };
     try {
       const perNumero = new Map(righe.map((r) => [Number(r.nomeDisco.slice(prefisso.length)), Buffer.from(r.dati)]));

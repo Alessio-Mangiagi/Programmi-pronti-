@@ -44,6 +44,9 @@ const nota = z.string().trim().max(500, 'Nota: massimo 500 caratteri').optional(
 const schemaConferma = z.object({ oraInizio: ora('Entrata').optional(), oraFine: ora('Uscita').optional(), noteHr: nota });
 const schemaRifiuto = z.object({ noteHr: z.string({ error: 'Scrivi il motivo del rifiuto' }).trim().min(3, 'Scrivi il motivo del rifiuto').max(500, 'Nota: massimo 500 caratteri') });
 
+/** Timbrature che un dipendente può fare in un giorno (pause comprese): oltre è un errore o un abuso. */
+export const MAX_TIMBRATURE_GIORNO = 12;
+
 const conNomi = {
   dipendente: { select: { nome: true, cognome: true, matricola: true } },
   progetto: { select: { id: true, codice: true, nome: true, colore: true } },
@@ -88,6 +91,9 @@ export function rotteTimbrature(prisma: PrismaClient, oggi: () => string, adesso
     if (aperta) await prisma.timbratura.update({ where: { id: aperta.id }, data: { stato: 'DA_CONFERMARE' } });
     if (!(await progettiTimbrabili(dipendenteId)).some((p) => p.id === progettoId)) {
       throw richiestaNonValida('Non puoi timbrare su questo progetto: non ti è assegnato o non è attivo', { progettoId: 'Progetto non disponibile' });
+    }
+    if ((await prisma.timbratura.count({ where: { dipendenteId, data: giorno } })) >= MAX_TIMBRATURE_GIORNO) {
+      throw new ErroreHttp(429, `Hai già timbrato ${MAX_TIMBRATURE_GIORNO} volte oggi: per altre ore rivolgiti a HR`);
     }
     // Stesse regole delle ore (festivo, sabato e domenica, ferie, cessazione): meglio dirlo
     // subito al dipendente che scoprirlo quando HR prova a confermare.

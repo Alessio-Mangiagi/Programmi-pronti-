@@ -17,6 +17,7 @@ import { creaApp } from './app';
 import { prisma } from './db';
 import { cartellaDocumentiPredefinita, pulisciFileOrfani } from './servizi/archivio-file';
 import { pulisciRegistro } from './servizi/registro';
+import { pulisciTentativi } from './servizi/limitatore';
 import { statoTemporaneo } from './servizi/stato-temporaneo';
 import { tieniVivo } from './vercel';
 import { oggiItalia } from '../comune/date';
@@ -35,7 +36,7 @@ function manutenzione() {
   if (Date.now() - ultimaManutenzione < 60 * 60 * 1000) return;
   ultimaManutenzione = Date.now();
   tieniVivo(
-    Promise.all([pulisciFileOrfani(prisma, cartellaDocumentiPredefinita()), statoTemporaneo(prisma).pulisci(), pulisciRegistro(prisma)]).catch((e) =>
+    Promise.all([pulisciFileOrfani(prisma, cartellaDocumentiPredefinita()), statoTemporaneo(prisma).pulisci(), pulisciRegistro(prisma), pulisciTentativi(prisma)]).catch((e) =>
       console.warn('[logbook] manutenzione non riuscita:', e),
     ),
   );

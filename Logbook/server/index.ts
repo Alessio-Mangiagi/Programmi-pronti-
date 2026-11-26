@@ -60,6 +60,9 @@ if (produzione) {
   copia();
   setInterval(copia, 60 * 60 * 1000).unref();
   pulisciRegistro(prisma).catch((e) => console.warn('[logbook] pulizia del registro non riuscita:', e));
+  // 26/11/2026: contatori dei tentativi di accesso fermi da più di un giorno (servizi/limitatore.ts).
+  const { pulisciTentativi } = await import('./servizi/limitatore');
+  pulisciTentativi(prisma).catch((e) => console.warn('[logbook] pulizia dei tentativi di accesso non riuscita:', e));
 
   // 26/11/2026: avvisi via email del giorno (ore mancanti, attestati in scadenza). Un controllo
   // all'avvio e poi ogni ora: partono al primo controllo dopo le 7 e una volta sola al giorno

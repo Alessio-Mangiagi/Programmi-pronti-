@@ -128,6 +128,10 @@ export function registroRichieste(prisma: PrismaClient) {
       if (GIA_REGISTRATE.test(percorso)) return;
       const negato = res.statusCode === 401 || res.statusCode === 403 || res.statusCode === 429;
       if (res.statusCode >= 400 && !negato) return;
+      // Chi non è collegato e viene respinto non lascia righe (26/11/2026): bastava uno script
+      // anonimo per riempire il registro e il database. I tentativi di accesso veri li
+      // registrano già le rotte di /auth, con il nome utente provato.
+      if (!req.utente) return;
       const etichetta = ETICHETTE.find(([m, r]) => m === req.method && r.test(percorso))?.[2] ?? `${req.method} ${percorso}`;
       void registra(prisma, {
         utenteId: req.utente?.id,
