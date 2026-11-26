@@ -1323,3 +1323,78 @@ nessuno può dare o togliere admin finché non torna. Migrazione 0046 (applicata
 `tests/test_api_profilo_portale.py` (collegamento ed email cambiata, admin dato e tolto con i ruoli di prima, regola IP
 alla creazione, login con password propria disattivato / non abilitato / eliminato / portale spento, account trovato
 per email, reset della password, tetto del rinnovo, admin solo dal proprietario), `tests/test_api_portale.py`.
+
+## ADR-59 — Discussioni fra persone invitate e task con bacheca, riepilogo del mattino a chi assegna
+
+**Contesto.** Il 26/11/2026 l'utente chiede "una funzione per avviare delle discussioni che possono essere condivise
+tra gli utenti e un sistema di task sempre per gli utenti", con le scelte **1b** (in SkyTower, per commessa), **2a**
+(una discussione la vedono solo gli invitati), **3b** (task con priorità, sotto-task e bacheca a colonne con
+trascinamento) e **4c** (avvisi nel programma ed email a chi è coinvolto, più un riepilogo giornaliero "solo per chi ha
+assegnato il task, per supervisionare l'avanzamento"). Fino ad allora in SkyTower c'erano solo canali formali: RFI
+(domanda all'organizzazione, risposta ufficiale), workflow (compiti sui documenti e processi), annotazioni sulle
+revisioni.
+
+**Decisione.**
+- **Discussioni** (migrazione 0047, `modules/discussions.py`): `cde.discussions`, `cde.discussion_participants`
+  (togliere una persona = `removed_at`, riaggiungerla la riattiva; `last_read_at` per i non letti),
+  `cde.discussion_messages` (immutabili: nessun privilegio all'API; allegati = revisioni di documenti della commessa
+  come nelle RFI, e chi non vede il documento non vede l'allegato). Visibilità (RLS, `cde.discussion_participant`):
+  partecipante attivo **e** membro della commessa. Nessuna eccezione per Project Admin, admin dell'organizzazione o
+  platform admin: sono conversazioni fra persone. Chi apre la discussione cambia titolo e persone (`PATCH`, elenco
+  completo degli invitati) e la chiude o riapre. Gli altri scrivono ed escono (`/leave`).
+- **Task** (`cde.team_tasks` e tabelle collegate, `modules/team_tasks.py`; `cde.tasks` resta ai compiti dei workflow):
+  codice `TASK-0001` per commessa, una o più persone assegnate (membri della commessa, anche sé stessi), priorità
+  LOW/NORMAL/HIGH/URGENT, scadenza come **giorno** (`due_on date`, nessun fuso nella scheda), stato TODO / IN_PROGRESS
+  / DONE (`completed_at` coerente, vincolo `team_tasks_done`), sotto-task (`team_task_items`), commenti, storia
+  (`team_task_events`: chi, cosa, quando; `actor_id` NULL = sistema). Visibilità (`cde.team_task_visible`): chi l'ha
+  assegnato e le persone assegnate, membri della commessa, task non eliminato. **Lo stato** lo cambiano tutti e due
+  (bacheca). **Titolo, descrizione, priorità, scadenza e persone** solo chi l'ha assegnato. Sotto-task: li aggiungono e
+  spuntano tutti, li toglie chi ha assegnato il task o chi li ha scritti. Eliminare = `deleted_at` (sparisce per tutti,
+  il registro lo conserva). Un task può nascere da un messaggio (`discussion_id`, `message_id`): serve partecipare
+  alla discussione, e il collegamento si mostra solo a chi vi partecipa.
+- **Scritture solo da funzioni SECURITY DEFINER** (`cde.discussion_*`, `cde.team_task_*`), come le RFI: controllano i
+  permessi, scrivono la storia e creano gli avvisi con `cde.notify` (che l'API non può chiamare). L'API ha solo
+  `SELECT` sulle tabelle nuove.
+- **Avvisi** (in-app + email con le preferenze di sempre, sezioni «Task» e «Discussioni» nel riepilogo giornaliero
+  generale): `DISCUSSION_ADDED`, `DISCUSSION_MESSAGE`, `TEAM_TASK_ASSIGNED`, `TEAM_TASK_COMMENT`, `TEAM_TASK_COMPLETED`
+  (a chi ha assegnato, subito), `TEAM_TASK_REOPENED`, `TEAM_TASK_DUE_CHANGED`, `TEAM_TASK_REMINDER` (scade oggi o
+  domani), `TEAM_TASK_OVERDUE` (anche a chi ha assegnato). Messaggi e commenti passano da `cde.notify_once`: finché
+  l'avviso precedente della stessa discussione o dello stesso task non è letto, non ne parte un altro (niente raffiche
+  di email). Aprire la discussione o il task li segna letti (`POST …/read`).
+- **Scadenze**: `cde.team_task_deadlines`, nello stesso giro del worker delle altre scadenze (ogni 15 minuti). Il
+  giorno è quello del fuso della commessa con `cde.local_date`: il PostgreSQL integrato di Windows non ha l'archivio
+  dei fusi, quindi lì vale la regola POSIX CET/CEST (`CET-1CEST,M3.5.0,M10.5.0/3`), che PostgreSQL capisce da solo.
+- **Riepilogo di chi supervisiona** (`notifier.send_team_task_digests`, job `cde.team_task_digest` alle 7:10 dei giorni
+  feriali): a chi ha dato task **ad altri** ancora aperti o completati dall'ultimo riepilogo arriva l'email
+  «Avanzamento dei task che hai assegnato». È divisa per commessa in completati / in ritardo / in corso / da fare, con
+  persone, sotto-task fatti, scadenza, priorità e link. Sotto ogni task, i movimenti delle altre persone dall'ultimo
+  riepilogo (spostamenti, sotto-task, commenti contati per persona, scadenza superata). Chi riceve e da quando lo
+  decide `cde.team_task_supervision`: email attive, preferenza `team_task_digest` (accesa di serie, si spegne dal
+  profilo), non già servito nelle ultime 20 ore (`cde.team_task_digest_log`: niente doppioni se il job riparte;
+  finestra al massimo 7 giorni, quindi il lunedì comprende il fine settimana). Le persone assegnate non lo ricevono.
+- **Dove si vedono**: schede «Discussioni» e «Task» della commessa (non nei modelli di commessa); bacheca con HTML5
+  drag and drop e, per tastiera e lettori di schermo, il menu «Sposta in «…»»; scheda del task a destra con indirizzo
+  proprio (`/progetti/:id/task/:taskId`). Pannello «Per me»: «Task assegnati a me», e il filtro «Messaggi» (prima «RFI»)
+  con le discussioni con messaggi nuovi. «Da fare oggi» del portale (`/suite/da-fare`): i task assegnati, tipo `task`,
+  priorità 1 se in ritardo o urgenti.
+- **Registro attività** della commessa: `DISCUSSION_CREATED`, `DISCUSSION_PARTICIPANTS_CHANGED`, `DISCUSSION_CLOSED`,
+  `DISCUSSION_REOPENED`, `DISCUSSION_LEFT` (solo che esiste e quante persone ha, mai il contenuto),
+  `TEAM_TASK_CREATED`, `TEAM_TASK_UPDATED` (quali campi, stato, priorità, scadenza), `TEAM_TASK_DELETED`.
+
+**Alternative scartate.** Discussioni e task nel Portale per tutta la suite (1a) o in Copilota (1c): scelta dell'utente
+per SkyTower, dove ci sono le persone della commessa e i documenti da citare. Discussioni aperte a tutta la commessa
+(2b) o a scelta (2c): scartate dall'utente. Task semplici senza bacheca (3a): scartata. Messaggi modificabili o
+cancellabili: una discussione di lavoro deve restare come è stata scritta, come le RFI. Allegare file caricati nella
+discussione: i file del CDE stanno nelle cartelle, con naming, stati e antivirus; la discussione li cita. Riepilogo
+giornaliero a tutti i coinvolti (4c pieno): l'utente lo vuole solo per chi assegna. Ordine manuale delle schede nella
+bacheca: ognuno vede un insieme diverso di task, un ordine condiviso non avrebbe senso; le schede si ordinano per
+priorità e scadenza.
+
+**Conseguenze.** Il Project Admin non ha visibilità sulle discussioni e sui task altrui: è voluto (2a), e il registro
+dice comunque che esistono. Chi esce dalla commessa perde l'accesso a discussioni e task, che restano agli altri; un
+task assegnato solo a lui resta a chi l'ha dato, che può riassegnarlo. Non gestiti per ora: menzioni @, risposte a un
+messaggio specifico, modifica dei messaggi, task ricorrenti, copia di discussioni e task nei modelli di commessa
+(ADR-52). Migrazione 0047 (applicata da `cde dev` all'avvio). Test: `tests/test_api_discussioni_task.py` (solo gli
+invitati, non letti e un solo avviso per raffica, persone, chiusura e uscita, permessi del task e storia, valori non
+validi, task da un messaggio, scadenze, riepilogo solo a chi assegna con finestra e doppioni, inglese, da fare del
+portale), e2e `discussioni-task.spec.ts` (tre persone, trascinamento nella bacheca) e `a11y.spec.ts`; scenario U60.

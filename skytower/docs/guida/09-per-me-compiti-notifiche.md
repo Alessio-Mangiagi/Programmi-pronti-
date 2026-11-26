@@ -10,24 +10,28 @@ destra. Le notifiche arrivano anche dalla campanella e, se vuoi, per email.
 
 ![Pannello Per me](img/09-per-me.png)
 
-In alto i filtri **Tutto**, **Compiti** (con il numero), **RFI** (con il numero) e la campanella (solo notifiche).
-Le sezioni:
+In alto i filtri **Tutto**, **Compiti** (con il numero), **Messaggi** (RFI e discussioni, con il numero) e la
+campanella (solo notifiche). Le sezioni:
 
 - **In scadenza** (in rosso): compiti scaduti o che scadono entro un giorno, con «scaduto …» o «scade …»;
 - **Compiti**: revisioni da fare sui documenti («Revisione») e nodi dei processi («Processo»), con commessa, nome
   del passo e scadenza («entro …»);
+- **Task assegnati a me**: i task fra le persone non ancora fatti ([capitolo 15](15-discussioni-e-task.md)), con
+  codice, stato, scadenza (in rosso se in ritardo), chi li ha assegnati e sotto-task fatti;
 - **Trasmissioni da confermare**: transmittal ricevuti, con protocollo e numero di documenti;
 - **RFI da rispondere** e **RFI che ho aperto** («risposta ricevuta» / «in attesa di risposta»);
+- **Discussioni con messaggi nuovi**: quante novità e l'ultimo messaggio;
 - **Notifiche**: le ultime cinque (con il filtro della campanella tutte).
 
 Un clic su una voce porta all'oggetto: un compito apre la pagina **I miei compiti** con la finestra del compito già
-aperta ([capitolo 6](06-workflow-e-processi.md#64-svolgere-un-compito)), un transmittal la sua pagina, una RFI il
-suo thread. Quando non c'è nulla: «Niente da fare. Ottimo lavoro.»
+aperta ([capitolo 6](06-workflow-e-processi.md#64-svolgere-un-compito)), un task la sua scheda sopra la bacheca, un
+transmittal la sua pagina, una RFI il suo thread, una discussione i suoi messaggi. Quando non c'è nulla: «Niente da fare. Ottimo lavoro.»
 
 ![Solo le RFI](img/09-per-me-rfi.png)
 
-La freccia **›** in alto chiude il pannello in una barra di icone con i contatori (compiti e trasmissioni, RFI,
-notifiche); il contatore dei compiti diventa rosso se qualcosa è in scadenza. Un clic su un'icona riapre il pannello
+La freccia **›** in alto chiude il pannello in una barra di icone con i contatori (compiti, task e trasmissioni; RFI
+e discussioni; notifiche); il contatore dei compiti diventa rosso se qualcosa è in scadenza o un task è in ritardo o
+urgente. Un clic su un'icona riapre il pannello
 già filtrato. Il browser ricorda se lo tieni aperto o chiuso.
 
 ![Pannello chiuso](img/09-per-me-chiuso.png)
@@ -50,6 +54,8 @@ Ricevi una notifica, fra l'altro, quando:
 - ti viene assegnato un compito, quando sta per scadere, quando è scaduto («Scadenza superata»);
 - un workflow che riguarda un tuo documento è approvato o rifiutato;
 - ricevi una RFI, una risposta, un promemoria di scadenza;
+- ti invitano in una discussione o arriva un messaggio nuovo; ti assegnano un task, lo commentano, sta per scadere o
+  è in ritardo; una persona completa un task che le hai dato ([capitolo 15](15-discussioni-e-task.md#158-avvisi-scadenze-e-riepilogo-di-chi-supervisiona));
 - ricevi un transmittal o qualcuno conferma la ricezione del tuo;
 - cambia un documento che segui;
 - qualcuno chiede l'accesso a un'area riservata che amministri.
@@ -61,5 +67,6 @@ alta.
 
 ![Notifiche](img/09-notifiche.png)
 
-Le preferenze (email sì/no, un solo riepilogo al giorno, documenti seguiti solo nel riepilogo del mattino, lingua)
+Le preferenze (email sì/no, un solo riepilogo al giorno, documenti seguiti solo nel riepilogo del mattino, riepilogo
+del mattino dei task che assegni, lingua)
 si cambiano da **Modifica il mio profilo** ([capitolo 1](01-accesso-e-interfaccia.md#17-il-mio-profilo-e-le-preferenze-delle-notifiche)).

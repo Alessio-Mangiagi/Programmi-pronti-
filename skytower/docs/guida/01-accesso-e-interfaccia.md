@@ -134,6 +134,9 @@ l'amministratore. Nella parte **Notifiche**:
 - **Un solo riepilogo al giorno invece di un'email per ogni notifica**;
 - **Documenti che seguo: via email solo nel riepilogo del mattino**: gli avvisi dei documenti che segui
   ([capitolo 3](03-documenti-e-revisioni.md#39-seguire-un-documento)) compaiono subito nel pannello ma per
-  email arrivano solo nel riepilogo; i compiti arrivano comunque subito.
+  email arrivano solo nel riepilogo; i compiti arrivano comunque subito;
+- **Task che assegno: riepilogo dell'avanzamento ogni mattina**: se hai dato task ad altri, ogni mattina dei giorni
+  feriali ricevi lo stato di ciascuno e cosa è cambiato ([capitolo 15](15-discussioni-e-task.md#158-avvisi-scadenze-e-riepilogo-di-chi-supervisiona)).
+  Acceso di serie.
 
 Premi **Salva**.

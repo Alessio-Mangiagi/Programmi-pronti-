@@ -14,9 +14,9 @@ con gli utenti di prova (Com Admin, Com Im, Des Lead, Sub1 User…).
 
 | Se sei… | Leggi soprattutto |
 |---|---|
-| **Progettista** (carichi tavole e modelli, rispondi alle RFI) | 1, 2, 3, 4, 5, 7, 12 |
-| **Direzione lavori / Information Manager** (verifichi, commenti, approvi) | 1, 3, 5, 6, 7, 8, 9 |
-| **Subappaltatore / impresa** (consulti i documenti pubblicati, fai domande) | 1, 2, 3, 5, 7, 8 |
+| **Progettista** (carichi tavole e modelli, rispondi alle RFI) | 1, 2, 3, 4, 5, 7, 12, 15 |
+| **Direzione lavori / Information Manager** (verifichi, commenti, approvi) | 1, 3, 5, 6, 7, 8, 9, 15 |
+| **Subappaltatore / impresa** (consulti i documenti pubblicati, fai domande) | 1, 2, 3, 5, 7, 8, 15 |
 | **Project Admin / BIM Manager** (governi la commessa) | tutti, in particolare 2, 4, 6, 10, 11 |
 | **Amministratore dell'organizzazione** (gestisci colleghi e accessi della tua azienda) | 1, 10, 11, libreria workflow nel 6 |
 | **Committente** (ricevi, approvi, controlli) | 1, 3, 6, 8, 9, cruscotto nel 10 |
@@ -37,6 +37,7 @@ con gli utenti di prova (Com Admin, Com Im, Des Lead, Sub1 User…).
 12. [Modelli BIM, IFC e disegni DWG/DXF](12-bim-ifc-dwg.md)
 13. [Appendice per l'amministratore di sistema](13-appendice-amministratore-di-sistema.md)
 14. [Modelli di commessa](14-modelli-di-commessa.md) — salvare una commessa come modello, aprire commesse nuove da lì, il file di sicurezza
+15. [Discussioni e task](15-discussioni-e-task.md) — conversazioni fra persone invitate, task con la bacheca, riepilogo del mattino per chi assegna
 
 ## Come si entra, in breve
 
