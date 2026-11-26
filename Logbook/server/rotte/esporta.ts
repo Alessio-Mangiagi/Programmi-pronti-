@@ -14,6 +14,7 @@ import { richiediAdmin } from '../middleware';
 import { inviaExcel } from '../servizi/excel';
 import { caricaEstratti, creaExcelMeseCalendario, creaExcelMeseGiorni, nomeMese, schemaFiltriMese } from '../servizi/estratto-mese';
 import { caricaDatiReport, creaReportCalendario, creaReportProgetti, schemaFiltriReport } from '../servizi/report';
+import { creaCsvConsulente, creaExcelConsulente, inviaCsv } from '../servizi/report-consulente';
 
 export function rotteEsporta(prisma: PrismaClient) {
   const router = Router();
@@ -27,6 +28,17 @@ export function rotteEsporta(prisma: PrismaClient) {
       minuti: dati.totali.totale,
       perDipendente: dati.dipendenti.map((d) => ({ id: d.id, nome: `${d.cognome} ${d.nome}`, minuti: dati.totali.perDipendente[d.id] ?? 0 })),
     });
+  });
+
+  // --- File per il consulente paghe (Giorno 44): una riga per dipendente e giorno ---
+  router.post('/consulente', async (req, res) => {
+    const filtri = schemaFiltriReport.parse(req.body);
+    await inviaExcel(res, creaExcelConsulente(await caricaDatiReport(prisma, filtri)), `Copilota - presenze per il consulente ${filtri.da} ${filtri.a}.xlsx`);
+  });
+
+  router.post('/consulente-csv', async (req, res) => {
+    const filtri = schemaFiltriReport.parse(req.body);
+    inviaCsv(res, creaCsvConsulente(await caricaDatiReport(prisma, filtri)), `Copilota - presenze per il consulente ${filtri.da} ${filtri.a}.csv`);
   });
 
   router.post('/calendario', async (req, res) => {

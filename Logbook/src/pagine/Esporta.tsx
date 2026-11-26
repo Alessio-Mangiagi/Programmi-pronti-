@@ -115,7 +115,7 @@ export function Esporta() {
     return () => clearTimeout(timer);
   }, [chiave]);
 
-  const scarica = async (tipo: 'calendario' | 'progetti') => {
+  const scarica = async (tipo: 'calendario' | 'progetti' | 'consulente' | 'consulente-csv') => {
     setScaricamento(tipo);
     setErrore(null);
     try {
@@ -197,6 +197,19 @@ export function Esporta() {
           <Pulsante variante="primario" disabled={!!scaricamento || !riepilogo} onClick={() => scarica('progetti')}>
             {scaricamento === 'progetti' ? 'Preparazione…' : <><Icona nome="scarica" dimensione={16} /> Scarica ore per progetto</>}
           </Pulsante>
+        </div>
+        {/* Giorno 44: file per il consulente paghe, una riga per dipendente e giorno. */}
+        <div className="scheda p-4">
+          <h2 className="font-semibold text-marchio">Presenze per il consulente paghe</h2>
+          <p className="mb-3 text-sm text-gray-600">Una riga per dipendente e giorno: ore lavorate, ferie, malattia, permessi, festività e ore contrattuali. In Excel o in CSV per i programmi paghe.</p>
+          <div className="flex flex-wrap gap-2">
+            <Pulsante variante="primario" disabled={!!scaricamento || !riepilogo} onClick={() => scarica('consulente')}>
+              {scaricamento === 'consulente' ? 'Preparazione…' : <><Icona nome="scarica" dimensione={16} /> Scarica Excel</>}
+            </Pulsante>
+            <Pulsante disabled={!!scaricamento || !riepilogo} onClick={() => scarica('consulente-csv')}>
+              {scaricamento === 'consulente-csv' ? 'Preparazione…' : <><Icona nome="scarica" dimensione={16} /> Scarica CSV</>}
+            </Pulsante>
+          </div>
         </div>
       </div>
       </div>
