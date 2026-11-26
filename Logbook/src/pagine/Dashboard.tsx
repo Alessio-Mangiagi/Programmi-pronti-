@@ -34,6 +34,7 @@ import { COLORE_FESTIVITA, COLORI_ASSENZA, coloreProgetto } from '../colori';
 import { AvanzamentoProgetti, type AvanzamentoProgetto } from '../componenti/AvanzamentoProgetti';
 import { Icona } from '../componenti/icone';
 import { linkGiorno } from '../componenti/Segnalazioni';
+import { TimbraturaDipendente, TimbratureDaConfermare } from '../componenti/Timbratura';
 import { Avviso, Caricamento, IntestazionePagina, Pulsante } from '../componenti/ui';
 import type { Festivita, StatoAttestato, TipoAssenza, TipoAttestato } from '../tipi';
 import { ETICHETTE_ATTESTATO } from '../../comune/documenti';
@@ -154,6 +155,9 @@ export function Dashboard() {
         sottotitolo={`Situazione di ${nomeMese(dati.oggi)} al ${formattaData(dati.oggi)}`}
         azioni={<Pulsante onClick={ricarica}>Aggiorna</Pulsante>}
       />
+
+      {/* Giorno 42: il dipendente timbra entrata e uscita; HR conferma o rifiuta. */}
+      {admin ? <TimbratureDaConfermare onCambio={ricarica} /> : <TimbraturaDipendente />}
 
       {/* Numeri principali */}
       <div className="mb-4 flex flex-wrap gap-3">
