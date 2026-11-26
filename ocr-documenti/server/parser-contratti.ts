@@ -1615,8 +1615,9 @@ export const staccaQtaIncollata = (v1: string, v2: string): [string, string, str
 // lettere puntate persa.
 
 // codice "sigla + anno + tariffa" in una riga sporca: la sigla può avere 1 o 0 per I o C,
-// i separatori della tariffa possono essere spazi ("SIC24 14.4 5.34")
-const RE_CODICE_SIGLA = /([A-Z][A-Z01]{1,5})(\d{2})[\s_]?(\d{1,5}(?:[.\s]\d{1,3}){0,3})(?![\d,\-/])/
+// i separatori della tariffa possono essere spazi ("SIC24 14.4 5.34"), e fra sigla e anno
+// può entrare uno spazio ("S10 24 14.4.6.2", PF Future uffici letto dalla scheda video)
+const RE_CODICE_SIGLA = /([A-Z][A-Z01]{1,5}) ?(\d{2})[\s_]?(\d{1,5}(?:[.\s]\d{1,3}){0,3})(?![\d,\-/])/
 // lettere puntate + numero, con punti persi o spazi e lo zero letto O o D ("AN.E.D09")
 const RE_CODICE_PUNTATO = /[A-Z][A-Z.\s]*?[.\s]?[\dOD]{2,3}(?![\dA-Za-z,\-/])/
 // Riga che porta solo il codice, anche con sporco intorno: corta, con un codice, e

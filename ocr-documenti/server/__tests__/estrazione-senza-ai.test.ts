@@ -173,6 +173,8 @@ describe('righe', () => {
       '6 SIC24 144.16.5', 'Fornitura in opera in quadro elettrico di accessori', 'SOMMANO cad 0,5 17,3234932 8,66 €',
       '25 27 SIC24 144.637 a', 'Fornitura e posa in opera di blocco differenziale tetrapolare', 'SOMMANO cad 1 113,861483 113,86 €',
       'S1C24 1445.16', 'Fornitura e posa in opera all\'interno di quadro elettrico', 'SOMMANO cad 0,5 102,471252 51,24 €',
+      // scheda video: sigla con 1 e 0 per I e C e uno spazio prima dell'anno
+      'S10 24 14.4.6.2', 'Fornitura e posa in opera di relè', 'SOMMANO cad 1 38,920024 38,92 €',
       'A.N.E.001', 'Fornitura montaggio su interruttore di sganciatore', 'SOMMANO cad 0,5 80,9631758 40,48 €',
       'A.N.E.002', 'Fornitura e posa in opera di quadro di cantiere', 'SOMMANO cad 0,5 508,069614 254,03 €',
       'A.N.E.006', 'Fornitura e montaggio su profilati DIN', 'SOMMANO cad 0,5 267,282584 133,64 €',
@@ -187,9 +189,10 @@ describe('righe', () => {
       'SIC24 14.4.16.5',      // punto perso dopo 14
       'SIC24 14.4.6.37',      // due punti persi: 14.4.6 c'è nel documento, 14.4.63 no
       'SIC24 14.4.5.16',      // sigla con 1 per I
+      'SIC24 14.4.6.2',       // «S10 24»
       'A.N.E.001', 'A.N.E.002', 'A.N.E.006', 'A.N.E.009', '',
     ])
-    expect(r[9].descrizione).toMatch(/^Fornitura e montaggio entro quadro/)
+    expect(r[10].descrizione).toMatch(/^Fornitura e montaggio entro quadro/)
   })
   it('elenco a corpo: "€" letto come lettera o cifra, quantità 1 sottintesa (PF Future)', () => {
     // blocco OCR con il solo importo: il carattere in coda è il "€"
