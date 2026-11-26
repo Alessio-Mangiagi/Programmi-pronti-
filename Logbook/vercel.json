@@ -5,5 +5,10 @@
   "buildCommand": "node scripts/vercel-build.mjs",
   "regions": [
     "fra1"
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "feat/estrazione-dms": false
+    }
+  }
 }

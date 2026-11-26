@@ -83,6 +83,10 @@ nel database, non nel progetto.
 - **Limite per indirizzo.** Il blocco progressivo dei tentativi (10 errori, poi 5, 10, 20
   minuti…) sta nel database e vale ovunque. Il limite in più "30 tentativi per indirizzo"
   resta nella memoria di ogni processo: su Vercel è meno preciso.
+- **Solo `main` pubblica.** `vercel.json` (`git.deploymentEnabled`) spegne le pubblicazioni
+  di anteprima del ramo di lavoro `feat/estrazione-dms`: ogni anteprima rifaceva la build, e
+  la build allinea la struttura del database. Con un solo database, una modifica allo schema
+  ancora in lavorazione lo avrebbe toccato prima di arrivare su `main`.
 - **SkyTower.** Il collegamento funziona solo se SkyTower è raggiungibile da internet: dal
   server di Vercel `http://127.0.0.1:8100` non esiste.
 
