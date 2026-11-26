@@ -17,10 +17,20 @@ router = APIRouter(tags=["containers"])
 
 GrantAction = Literal["READ", "WRITE", "DOWNLOAD", "APPROVE"]
 
+# Formati dei modelli BIM (26/11/2026): IFC aperto e i formati nativi più comuni (Revit, Navisworks).
+# Una cartella che ne contiene almeno uno esce con has_bim = true e il frontend le dà un'icona sua
+# (apps/web/src/components/FolderBimIcon.tsx). Si guarda l'estensione del nome originale di OGNI
+# revisione dei documenti non archiviati: il tipo dichiarato dal browser per questi file è quasi
+# sempre generico. Le righe passano dalla RLS, quindi chi non può leggere la cartella vede false.
+BIM_EXTENSIONS = ("ifc", "ifczip", "ifcxml", "rvt", "rfa", "nwd", "nwc", "nwf")
+
 CONTAINER_SQL = """
     SELECT c.id, c.project_id, c.parent_id, c.owner_organization_id, o.code AS owner_organization_code,
            c.name, c.inherit_permissions, c.is_private, c.naming_profile_id, c.created_by, c.created_at, c.updated_at,
-           cde.my_container_actions(c.id)::text[] AS my_actions
+           cde.my_container_actions(c.id)::text[] AS my_actions,
+           EXISTS (SELECT 1 FROM cde.documents d JOIN cde.document_revisions r ON r.document_id = d.id
+                   WHERE d.container_id = c.id AND d.archived_at IS NULL
+                     AND lower(r.original_filename) ~ '[.](""" + "|".join(BIM_EXTENSIONS) + """)$') AS has_bim
     FROM cde.containers c
     JOIN cde.organizations o ON o.id = c.owner_organization_id"""
 
