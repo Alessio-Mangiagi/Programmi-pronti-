@@ -38,7 +38,11 @@ cartella parte nei due modi, con lo stesso database e lo stesso `.env`.
   2. fare doppio clic su **`InstallaLogbook.exe`**. Controlla Node.js, installa le
      dipendenze e crea il `.env` (proprietario `admin`; chiede l'email del proprietario e
      se Copilota va raggiunto dagli altri PC). Poi prepara database e interfaccia e mette
-     l'icona **Copilota** sul desktop, che avvia `avvia.bat`.
+     l'icona **Copilota** sul desktop. L'icona lancia `apri-copilota.vbs` (dal 27/11/2026):
+     se Copilota è spento lo avvia senza finestra del terminale, poi lo apre in una
+     finestra propria, senza barra degli indirizzi (Edge o Chrome in modalità "app";
+     senza nessuno dei due, nel browser predefinito). Chi lo usa non scrive indirizzi né
+     porte. `avvia.bat` resta per vedere gli errori di avvio.
   3. **Rete dell'ufficio (dal 27/11/2026)**, solo se alla domanda si risponde sì (o con
      `--rete`): scrive `LOGBOOK_API_HOST=0.0.0.0` nel `.env`, crea la regola del firewall
      di Windows **"Copilota 5210 (rete locale)"** (porta di Copilota in entrata, solo dalla

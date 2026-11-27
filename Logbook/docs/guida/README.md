@@ -9,7 +9,9 @@ da Excel ed estrarre i report.
 Si apre dal browser all'indirizzo che vi ha dato l'ufficio (sul PC: **http://127.0.0.1:5210**)
 oppure dalla card **Copilota** del Portale della suite. Funziona anche **senza la suite**: su
 un PC con Node.js si installa con un doppio clic su `InstallaLogbook.exe`, nella cartella di
-Copilota, e si apre dall'icona **Copilota** sul desktop. Funziona anche dal **cellulare** e
+Copilota, e si apre dall'icona **Copilota** sul desktop: un doppio clic e compare in una
+finestra sua, come un programma qualsiasi, senza indirizzi da scrivere (se era spento lo
+avvia da sola: la prima volta può volerci un minuto). Funziona anche dal **cellulare** e
 sfrutta tutta la larghezza degli schermi **ultra wide** (vedi il capitolo 4).
 
 ---

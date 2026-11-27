@@ -1237,3 +1237,14 @@ Richiesta dell'utente: "verificare quanti utenti in simultanea può supportare e
 - Trovato: più di 30 login nello stesso istante dallo stesso indirizzo vengono respinti con 429 anche a password giusta (`registraIndirizzo` in `server/rotte/auth.ts` conta prima e scala dopo). In rete locale non capita; da internet, dietro un solo router, sì.
 - Trovato: un Excel di HR ferma tutti per la sua durata (0,5 s un mese, 1,5 s tre mesi con 300 dipendenti).
 - Non toccato il codice: i quattro limiti non pesano alle dimensioni attese. Migliorie possibili scritte in fondo al documento (WAL, contare solo i login falliti, Excel fuori dal filo principale).
+
+### Icona sul desktop che apre Copilota come un programma, e account del proprietario in locale (27/11/2026)
+
+Richieste dell'utente: "vorrei che il programma potesse essere chiamato via nome e non via porta… o tramite tasto a schermo come programma tradizionale" e "le mie credenziali devono essere alessio_mangiagi".
+
+- **`apri-copilota.vbs`** (nuovo): controlla `/api/salute`; se Copilota è spento lancia `avvia.bat` nascosto e aspetta fino a tre minuti; poi apre Copilota in una finestra propria (Edge o Chrome con `--app=`, altrimenti il browser predefinito). La porta la legge dal `.env`.
+- **`public/favicon.ico`** (nuovo, 16–256 px dal logo `icona-512.png`): l'installatore lo cercava già per l'icona del collegamento ma il file non esisteva.
+- **`installa-logbook.py`**: `crea_collegamento` punta a `wscript.exe apri-copilota.vbs` (ripiega su `avvia.bat` se il file manca). `InstallaLogbook.exe` ricompilato.
+- Provato su questo PC: icona "Copilota" creata sul desktop; con Copilota acceso il launcher apre la finestra "Copilota - ore e presenze" in Edge. NON provato il ramo "Copilota spento" (avvio nascosto e attesa).
+- **Per nome invece che per porta, dagli altri PC**: oggi funziona già `http://ws-sviluppoia:5210` (nome di questo PC) dai PC Windows della rete. Per togliere anche la porta e avere un nome come `copilota` servono scelte dell'utente (porta 80, nome nella rete): chieste, in attesa.
+- **Account in locale**: l'utente `admin` del database di questo PC è stato rinominato `alessio_mangiagi` (stessa riga, stesso storico) e `LOGBOOK_PROPRIETARIO` nel `.env` aggiornato; Copilota riavviato. La password chiesta dall'utente ha 11 caratteri e la regola degli amministratori ne vuole 12 (`PASSWORD_MIN_ADMIN` in `server/auth/password.ts`): non impostata, chiesto all'utente come procedere.
