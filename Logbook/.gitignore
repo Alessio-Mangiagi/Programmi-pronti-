@@ -27,3 +27,6 @@ coverage/
 prisma/postgres/
 # Vercel CLI (vercel link): token e variabili scaricate
 .env*.local
+
+# Test di carico: numeri dell'ultima prova (scripts/carico/carico.mjs), si rigenerano
+scripts/carico/esito-*.json
