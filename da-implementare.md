@@ -11,7 +11,10 @@ non sono qui: restano nel foglio.
 - Il numero fra parentesi è l'ID dell'attività nel foglio.
 - **Auguri è escluso dal giro di lavoro** (indicazione del 26/11/2026): le sue due voci restano in elenco
   ma non si toccano.
-- **Copilota** resta com'è fino all'approvazione per lo spostamento sul server privato.
+- **Copilota è finito** (dichiarato dall'utente il 27/11/2026): la voce degli straordinari esce dal giro di
+  lavoro e resta nel foglio come «dopo la consegna, solo se richiesto». Il sito su Vercel resta com'è fino
+  all'approvazione per lo spostamento sul server privato.
+- Il 27/11/2026 le chiusure del registro qui sotto sono state riportate nel foglio: 75 attività aperte.
 
 Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
@@ -43,7 +46,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 | [ ] | Verifica Requisiti | Confidenza per pagina da Tesseract (tsv) per la soglia `CONFIDENZA_MINIMA` (22) | — |
 | [ ] | Verifica Requisiti | Test di integrazione delle rotte HTTP (24) | — |
 | [ ] | OCR Documenti | Provare i modelli PP-OCRv5 server, misurati sul banco (167) | — |
-| [ ] | Copilota | Straordinari nel calcolo delle ore e negli estratti (174) | regole degli straordinari |
+| [-] | Copilota | Straordinari nel calcolo delle ore e negli estratti (174) | fuori dal progetto, finito il 27/11: solo se il committente li chiede |
 | [ ] | VFP Transfer | Nolo a caldo e righe INPS/INAIL a puntini nei format contrattuali (62) | format veri |
 | [ ] | VFP Transfer | Agganciare `sorgente_sql.py` a GUI e servizio con `TRANSFER_LOCK` (69) | driver ODBC 18 |
 | [ ] | InCampo | Deploy staging e produzione: `.env`, SMTP, storage, compose, primo admin (27) | server Linux |
