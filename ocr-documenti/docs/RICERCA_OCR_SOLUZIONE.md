@@ -794,6 +794,21 @@ davanti al prezzo: togliere una lettera davanti a un numero è rischioso, «l» 
 e Contratto_fornitura G.01.064.3 (il codice, centrato in una cella alta, finisce sulla riga sotto quella
 dei valori).
 
+**Le ultime due voci GPU, e cinque in più (27/11/2026).** Quattro correzioni, misurate sul banco
+intero (cambiano solo i tre contratti in tabella, tutti in meglio) e con i loro test:
+
+| Correzione | Dove | Contratto | Voci esatte |
+|---|---|---|---|
+| angolo della cella (bordo sinistro + bordo di sotto) letto «L» davanti al prezzo: «L50.00 €» → «50.00 €». Solo la L maiuscola, solo sul blocco con il solo importo chiuso da «€»; «l» e «I» restano perché spesso sono un «1». Sulle 825 pagine il caso c'è una volta sola | `testo.ts` regola 5 | AQ3 nolo, Q+P 827 → 828 | 800 |
+| codice come etichetta corta nella colonna Tariffa («Miniapala», «Miniescavatore_9 Q», «SIC24 26.01.14», «Sic. Amb/qual»): dopo il numero di riga o, se il numero manca, nella prima cella, purché a destra ci sia la descrizione lunga almeno una volta e mezza. Con più parole serve un segno da codice (cifra, «_», «.», «/»): «VOCE OPZIONALE» resta una nota. Prima il codice restava vuoto o diventava il numero di riga | `tabella-griglia.ts` `eEtichettaCodice`, `leggiCelle` | AQ3 nolo 17 → 20, Contratto.pdf 0 → 4 | 807 |
+| virgola al posto del punto in un codice puntato («G.01,064.3»): codeRe non ammette virgole | `tabella-tsv.ts` `tabellaColonne` | Contratto_fornitura | 808 |
+| la griglia elenco prezzi letta dal testo prende i codici della ricostruzione geometrica sulle voci con la stessa quantità e lo stesso prezzo, prima del confronto «il testo copre la tabella». Senza, la tabella aveva un codice in più, vinceva lei e si perdeva la seconda voce «3,00 × 120,00» | `parser-contratti.ts` `codiceDaPipe` | Contratto_fornitura 1 → 3 | **809** |
+
+Risultato con la GPU: testata **417/426**, voci esatte **809/948** (85%), Q+P **828/948**; sui cinque
+moduli scritti a mano (`contratti/moduli`) 114 → 116/134. Il codice centrato nella cella alta
+di Contratto_fornitura (§ sopra) si aggancia già alla sua voce nella ricostruzione geometrica:
+mancava solo la virgola.
+
 Nota di metodo: per confrontare letture CPU e GPU sullo stesso codice si scambia la cartella
 `.harness-cache/blocchi`; per far ricalcolare le griglie a una cache vecchia bisogna togliere anche la
 chiave `griglia` dal file *e* salvarlo come solo elenco dei blocchi, perché `letturaDaCache` rende

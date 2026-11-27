@@ -45,6 +45,12 @@ bordo cella, macchie lette come cifre, «S10 24» per SIC24, quota oneri a maggi
 **800/948** voci esatte e 827 Q+P, più della CPU (799 · 825). Restano AQ3 nolo «L50.00 €» e il
 codice G.01.064.3 di Contratto_fornitura sulla riga sotto. Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §27.
 
+### ✅ (27/11/2026) Le ultime due voci della scheda video, e cinque in più
+«L» dell'angolo della cella davanti al prezzo (AQ3 nolo), codici scritti come etichetta nella
+colonna Tariffa al posto del numero di riga («Miniapala», «SIC24 26.01.14», «Sic. ASPP»), virgola
+dentro un codice puntato («G.01,064.3») e codici della tabella passati alla griglia letta dal testo:
+**809/948** voci esatte e 828 Q+P con la GPU. Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §27.
+
 ### 🔴 OCR bloccato da Windows App Control (WDAC)
 Policy aziendale in vigore dal 31/08/2026: rifiuta le DLL non firmate dei venv Paddle
 (`WinError 4551`, evento Code Integrity 3077). Nessuna scansione finché l'IT non autorizza
