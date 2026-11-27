@@ -43,7 +43,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 |---|---|---|---|
 | [ ] | Analista Dati | Tuning del filtro di pertinenza (`scope.ts`) e `LLM_CONCURRENCY` più alto (10) | — |
 | [x] | Analista Dati, OCR Documenti, form-core | Salto a vitest 5 e strumenti di sviluppo con avvisi (148) | — |
-| [ ] | Verifica Requisiti | Confidenza per pagina da Tesseract (tsv) per la soglia `CONFIDENZA_MINIMA` (22) | — |
+| [x] | Verifica Requisiti | Confidenza per pagina da Tesseract (tsv) per la soglia `CONFIDENZA_MINIMA` (22) | — |
 | [x] | Verifica Requisiti | Test di integrazione delle rotte HTTP (24) | — |
 | [ ] | OCR Documenti | Provare i modelli PP-OCRv5 server, misurati sul banco (167) | — |
 | [-] | Copilota | Straordinari nel calcolo delle ore e negli estratti (174) | fuori dal progetto, finito il 27/11: solo se il committente li chiede |
@@ -76,7 +76,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
 ## In sintesi
 
-- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166 e la 24: restano 12).
+- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166, la 24 e la 22: restano 11).
 - Ferme in attesa di server, credenziali esterne o decisioni: 10.
 - Escluse: le 2 di Auguri.
 
@@ -98,6 +98,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 | 26/11/2026 | Portale, tetto su `/api/verifica-password` (147) | 500 password sbagliate in 15 minuti per programma, poi 429. 126 test passati. Vale dal prossimo riavvio del Portale |
 | 27/11/2026 | OCR Documenti, ultime 2 voci della scheda video (166) | Recuperate tutte e due, più cinque voci con lo stesso difetto: voci esatte 800 → 809/948, Q+P 827 → 828; cambiano solo AQ3 nolo, Contratto.pdf e Contratto_fornitura, tutti in meglio. 295 test passati |
 | 27/11/2026 | Verifica Requisiti, test di integrazione delle rotte (24) | 8 casi su HTTP vero: checklist, documenti, verifiche, report, ricerca, gate acceso col token della suite. Cartella temporanea, `data/` mai toccata. 63 test passati, nessun difetto trovato nelle rotte |
+| 27/11/2026 | Verifica Requisiti, confidenza per pagina da Tesseract (22) | Una lettura, due uscite (txt e tsv); confidenza = media delle parole pesata sulla lunghezza. Provata su pagine vere: contratto pulito 0,85, pagina di traverso 0,24 (sotto la soglia 0,6 → «dubbio»). 66 test passati |
 
 Gli aggiornamenti delle librerie sono stati applicati sul ramo di lavoro `feat/estrazione-dms`, non unendo le
 PR di Dependabot su `main`: le PR si chiuderanno da sole quando il ramo arriverà su `main`. Restano fuori le
