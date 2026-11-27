@@ -20,6 +20,10 @@ Il confronto si può lanciare anche **da SkyTower**, dal dettaglio di un
 documento («confronta con la revisione precedente»): SkyTower manda i due
 file a Confronto documenti e apre il report descritto in questa guida.
 
+Chi **non ha la suite** può usare la **versione autonoma**: una cartella che
+si riceve come zip e si avvia con un doppio clic, senza installare niente.
+Vedi [Versione autonoma](07-versione-autonoma.md).
+
 ## Capitoli
 
 1. [Il primo confronto](01-primo-confronto.md) — scegliere i due documenti e avviare
@@ -28,6 +32,7 @@ file a Confronto documenti e apre il report descritto in questa guida.
 4. [Più confronti insieme e Storico](04-lotti-e-storico.md)
 5. [Se qualcosa non va](05-problemi.md)
 6. [Per l'amministratore di sistema](06-amministratore.md)
+7. [Versione autonoma](07-versione-autonoma.md) — il programma ricevuto come zip, senza suite
 
 ## In breve
 

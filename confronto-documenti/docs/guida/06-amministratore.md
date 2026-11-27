@@ -20,6 +20,13 @@ ufficiali degli enti certificatori). Senza il motore i soli `.p7m` danno un
 messaggio chiaro; tutto il resto funziona. L'exe PyInstaller e l'immagine Docker
 non contengono `shared/`: lì i `.p7m` non si aprono.
 
+**Versione autonoma da inviare.** `build-autonomo.bat` produce
+`dist\Confronto-Documenti-autonomo.zip`: programma e OCR in una cartella, per
+un collega che non ha la suite. Niente login, solo sul suo PC, dati in
+`%LOCALAPPDATA%\Confronto Documenti`; i `.p7m` si aprono ma la firma **non**
+viene verificata. Dettagli in INSTALLAZIONE.md, «Versione autonoma»; per chi la
+riceve c'è il capitolo [Versione autonoma](07-versione-autonoma.md).
+
 **Accesso.** Dietro il Portale l'accesso passa dal login del Portale.
 `COSEDIL_SSO=off` lo spegne (solo per uso isolato o sviluppo). Il server di
 rete (`installa-server-rete.ps1`) e Docker hanno opzioni proprie (login del

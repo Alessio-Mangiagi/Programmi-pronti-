@@ -6,6 +6,11 @@ Il portale Suite Cosedil serve all'app solo per il login (gate SSO di
 modi di installarla (server in ufficio, Docker, cloud) vedi
 [INSTALLAZIONE.md](INSTALLAZIONE.md).
 
+> **Da inviare a un collega?** C'è la versione autonoma, già pronta e senza
+> niente da configurare: `build-autonomo.bat` produce uno zip con l'exe e
+> l'OCR dentro (vedi INSTALLAZIONE.md, «Versione autonoma»). Quello che segue
+> serve solo per far girare il programma **dai sorgenti** fuori dalla suite.
+
 ## 1. Disattivare il gate SSO
 
 Il gate si regola con variabili d'ambiente:

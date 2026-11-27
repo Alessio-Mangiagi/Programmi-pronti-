@@ -1,14 +1,63 @@
 <!-- "><(((º> sabusabu <º)))><" -->
 # Installazione — Confronto Documenti
 
-Tre modi di installarla, dal più semplice al più esteso. Per l'uso quotidiano
+Quattro modi di averla, dal più semplice al più esteso. Per l'uso quotidiano
 vedi [GUIDA_UTILIZZO.md](GUIDA_UTILIZZO.md).
 
 | Modo | Per chi | Login | Documenti |
 |------|---------|-------|-----------|
+| [0. Versione autonoma](#0-versione-autonoma-da-inviare) | un collega senza suite né Python | nessuno | restano sul suo PC |
 | [1. PC singolo](#1-pc-singolo) | una persona | nessuno o portale | restano sul PC |
 | [2. Server in ufficio](#2-server-in-ufficio-rete-interna) | più colleghi in rete | nessuno o portale | restano in azienda |
 | [3. Docker / cloud](#3-docker-e-cloud) | accesso da fuori ufficio | password | passano dal server cloud |
+
+---
+
+## 0. Versione autonoma (da inviare)
+
+Una cartella zip che si manda a un collega: estrae, doppio clic su
+`Confronto Documenti.exe`, si apre la pagina nel browser. Sul suo PC **non
+serve niente**: né la suite, né il portale, né Python, né Tesseract, né la rete.
+
+**Costruirla** (su un PC con il repository, `Installa.bat` già lanciato e
+Tesseract installato con l'italiano):
+
+```bat
+build-autonomo.bat
+```
+
+Risultato: `dist\Confronto-Documenti-autonomo.zip` (circa 160 MB), da inviare
+così com'è. Dentro: `Confronto Documenti.exe`, `_internal\` (il programma),
+`Tesseract-OCR\` (OCR in italiano e inglese) e `LEGGIMI.txt` con le istruzioni
+per chi lo riceve (testo in `LEGGIMI-autonomo.txt`). Variabili della build:
+`BUILD_PYTHON`, `TESSERACT_DIR` (vedi l'intestazione di `build-autonomo.bat`).
+
+**Come si comporta** (lo decide `autonomo.py`, punto d'ingresso dell'exe):
+
+| Cosa | Nella versione autonoma |
+|------|-------------------------|
+| Login | Spento (`COSEDIL_SSO=off`); una `CONFRONTO_PASSWORD` nell'ambiente viene ignorata. |
+| Rete | Ascolta solo su `127.0.0.1`: non è raggiungibile dagli altri PC. |
+| Porta | `5001`; se è di un altro programma, la prima libera fino a `5020`. |
+| Già aperto | Un secondo doppio clic non avvia un altro programma: riapre la pagina. |
+| Dati | Storico e cache OCR in `%LOCALAPPDATA%\Confronto Documenti` (o `CONFRONTO_DATI`). |
+| PDF firmati `.p7m` | Estrae il documento e legge i firmatari, **senza verificare la firma** (`busta_autonoma.py`): in pagina e nei report compare «Firma non verificata». |
+| Chiusura | Si chiude la finestra nera del programma. |
+
+Per avere anche la verifica completa delle firme si può copiare accanto all'exe
+la cartella `shared\firma` (`shared\firma\copia-motore.bat`): se c'è, il
+programma usa quella, ma sul PC servono Python 3.12 e la rete la prima volta.
+
+L'exe non ha una firma commerciale: al primo avvio Windows SmartScreen può
+mostrare «PC protetto da Windows» (*Ulteriori informazioni* → *Esegui
+comunque*); è scritto anche nel `LEGGIMI.txt`.
+
+**Prova prima di inviare:** estrarre lo zip in una cartella nuova, avviare
+l'exe, confrontare due PDF e due scansioni. Si può provare anche senza
+costruire: `.venv\Scripts\python.exe autonomo.py`. Test: `tests/test_autonomo.py`.
+
+`build-exe.bat` (più sotto) resta per l'exe dei PC **dentro** la suite: lì il
+login del portale è attivo e le firme si verificano col motore comune.
 
 ---
 
