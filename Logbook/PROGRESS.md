@@ -1227,3 +1227,13 @@ Richiesta dell'utente: "metti tutte le nuove istruzioni nell'installer". Quello 
 - NON provato: la creazione vera della regola dall'installatore (qui c'era già, creata a mano con lo stesso comando) e l'installazione di cloudflared da zero; servirebbe un PC pulito.
 - Non toccato: `installa-suite.py`. Nella suite l'indirizzo di ascolto lo decide il Portale e le porte le apre `firewall-suite.ps1`.
 - `InstallaLogbook.exe` ricompilato il 27/11 (PyInstaller 6.22, fuori dal repository come sempre).
+
+### Test di carico della versione su PC (27/11/2026)
+
+Richiesta dell'utente: "verificare quanti utenti in simultanea può supportare e fare un test di carico". Fatto su una copia del database (porta 5299, posta spenta), 300 dipendenti e sei mesi di ore. Numeri, metodo e come rifarla in `docs/test-di-carico.md`; programmi in `scripts/carico/` (`semina.cjs`, `carico.mjs`).
+
+- **Regge fino a 600 utenti insieme** in uso normale (pagine entro 375 ms, zero errori); a 1000 le pagine passano i 4 secondi e il 7% delle richieste è rifiutato. Il server non cade.
+- Tetto: circa 295 richieste al secondo (un core solo), 65 login al secondo, 70 scritture al secondo. 300 timbrature nello stesso istante: 4,3 secondi, nessuna persa.
+- Trovato: più di 30 login nello stesso istante dallo stesso indirizzo vengono respinti con 429 anche a password giusta (`registraIndirizzo` in `server/rotte/auth.ts` conta prima e scala dopo). In rete locale non capita; da internet, dietro un solo router, sì.
+- Trovato: un Excel di HR ferma tutti per la sua durata (0,5 s un mese, 1,5 s tre mesi con 300 dipendenti).
+- Non toccato il codice: i quattro limiti non pesano alle dimensioni attese. Migliorie possibili scritte in fondo al documento (WAL, contare solo i login falliti, Excel fuori dal filo principale).
