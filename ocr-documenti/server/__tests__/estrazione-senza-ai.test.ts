@@ -402,6 +402,30 @@ describe('tabella dalle celle', () => {
     // senza griglia i bordi delle celle non si conoscono: nessuna rilettura
     expect(celleDaRileggere(blocchi, null)).toEqual([])
   })
+  it('celle rilette: solo P.U. lavori e P.U. oneri sicuri, il prezzo è la loro somma e non la stima della quota (Gecob NP.19)', () => {
+    // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
+    const verticali = { xs: [0, 60, 200, 500, 560, 680, 780, 900, 980, 1100], ys: [0, 40, 600] }
+    const riga = (y: number, celle: string[]) => celle.map((t, c) => b(t, verticali.xs[c] + 5, y)).filter(x => x.text)
+    const blocchi = [
+      ...riga(10, ['Nr', 'Tariffa', 'Voci di misurazione', 'UM', 'Quantità']),
+      ...riga(110, ['1', 'NP.01', 'Perforazione', 'ml', '100,00', '96,34€', '9.634,00€', '3,66€', '366,00€']),   // quota 3,66%
+      ...riga(230, ['2', 'NP.02', 'Trivellazione', 'ml', '10,00', '192,68€', '1.926,80€', '7,32€', '73,20€']),  // quota 3,66%
+      ...riga(350, ['3', 'NP.19', 'Sovrapprezzo perforazioni', 'ml']),                                          // fondo retinato
+    ]
+    const celle = celleDaRileggere(blocchi, verticali)
+    expect(celle).toHaveLength(5)
+    const conLetture = (os: string[]) => {
+      const letture = [[], ['22,55', '22,55', '22.556'], [], os, []]
+      const rilette = celle.map((r, k) => ({ r, letture: letture[k].map(text => ({ text, conf: 90 })) }))
+      return tabellaDaGriglia(blocchi, verticali, rilette).split('\n')[2].split('|').map(x => x.trim())
+    }
+    // 22,55 / (1 − 3,66%) = 23,41: la quota stima, la somma 22,55 + 0,85 = 23,40 è il prezzo stampato
+    expect(conLetture(['0,85', '0,85', '0,85']).slice(1, 6)).toEqual(['NP.19', 'Sovrapprezzo perforazioni', 'ml', '', '23,40'])
+    // P.U. oneri letto una volta sola (non sicuro): resta la stima della quota
+    expect(conLetture(['0,85'])[5]).toBe('23,41')
+    // somma lontana dalla stima (oneri letti male tre volte uguali): vale la quota
+    expect(conLetture(['0,55', '0,55', '0,55'])[5]).toBe('23,41')
+  })
   it('quota oneri della pagina a maggioranza solo per le voci con gli oneri letti (Progetto e Gecob)', () => {
     // colonne: Nr | Tariffa | Voce | UM | Quantità | P.U. | Importo | P.U. O.S. | Importo O.S.
     const verticali = { xs: [0, 60, 200, 500, 560, 680, 780, 900, 980, 1100], ys: [0, 40, 700] }

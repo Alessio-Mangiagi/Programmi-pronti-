@@ -23,7 +23,8 @@
  * legge come fanno i lavori lato server: alla lettera, righe a capo ricucite, niente
  * parser euristici (server/modulo.ts). Un modulo con errori finisce come errore del file.
  *
- * Cache OCR in .harness-cache/blocchi/<sha1 del PNG>.json, stesso formato di .ocr-cache:
+ * Cache OCR in .harness-cache/blocchi/<sha1 del PNG>.json (o nella cartella di
+ * HARNESS_BLOCCHI, per provare un altro modello), stesso formato di .ocr-cache:
  * { v: 2, blocchi, griglia, rotazione } (griglia = linee della tabella con i bordi,
  * rotazione = pagina capovolta riletta). I file vecchi (solo l'array dei blocchi) valgono:
  * la griglia si chiede al worker una volta, senza rifare l'OCR. Per rileggere da capo una
@@ -57,6 +58,12 @@ const DIR_CONTRATTI = iCartella > 0 && process.argv[iCartella + 1]
   : path.join(ROOT, 'contratti')
 const DIR_CACHE = path.join(ROOT, '.harness-cache')
 const DIR_PAGINE = path.join(DIR_CACHE, 'pagine')
+// HARNESS_BLOCCHI=<cartella>: la cache dell'OCR in un'altra cartella. Serve a provare un
+// modello diverso (PADDLE_DET_MODEL / PADDLE_REC_MODEL) senza toccare la cache buona, che
+// resta il riferimento per il prima/dopo. Le pagine rese (PNG) restano in comune.
+const DIR_BLOCCHI = process.env.HARNESS_BLOCCHI
+  ? path.resolve(process.env.HARNESS_BLOCCHI)
+  : path.join(DIR_CACHE, 'blocchi')
 const DIR_OUT = path.join(ROOT, 'tests', 'out')
 const PYTHON_BIN = process.env.PYTHON_BIN
   || (existsSync(path.join(ROOT, '.venv-gpu', 'Scripts', 'python.exe'))
@@ -107,7 +114,7 @@ const rendiPagine = (pdf: string): Promise<string[]> => new Promise((resolve, re
 // al worker una volta (pochi decimi di secondo, niente OCR) e il file si aggiorna.
 const ocrConCache = async (png: string): Promise<string> => {
   const key = sha1(await fs.readFile(png))
-  const cache = path.join(DIR_CACHE, 'blocchi', `${key}.json`)
+  const cache = path.join(DIR_BLOCCHI, `${key}.json`)
   if (!noCache && existsSync(cache)) {
     const dato = JSON.parse(await fs.readFile(cache, 'utf8'))
     // pagina bianca già letta: nessun blocco, niente da rifare (vedi sotto)
@@ -294,7 +301,7 @@ if (!documenti.length) {
   process.exit(1)
 }
 
-console.log(`Banco di prova su ${documenti.length} contratti — cache: ${noCache ? 'IGNORATA' : DIR_CACHE}\n`)
+console.log(`Banco di prova su ${documenti.length} contratti — cache: ${noCache ? 'IGNORATA' : DIR_BLOCCHI}\n`)
 const esiti: Esito[] = []
 // Busta .p7m → documento estratto in .harness-cache/firmati/ (stesso motore della pagina,
 // server/firma.ts → shared/firma). Il nome resta quello del contratto senza ".p7m".

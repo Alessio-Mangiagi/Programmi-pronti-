@@ -459,19 +459,30 @@ def ruota_su_file(path, gradi):
 # e sceglie il server, tenendo solo la combinazione che fa tornare i conti
 # (server/tabella-griglia.ts, rilettureDellaVoce). Quali celle rileggere lo decide il
 # server: qui si ritaglia e si legge e basta.
-_REC = None
+#
+# Modelli delle riletture (PADDLE_REC_CELLE, nomi separati da virgola; lo passa il server,
+# server/config.ts MODELLI_CELLE): ogni modello dà le sue tre letture per cella e il voto
+# del server le somma. Misura del 27/11/2026 sul banco dei 31 contratti, pagine lette dal
+# modello di sempre (latin mobile) e sole celle rilette: col latin mobile 809 voci esatte
+# su 948; col PP-OCRv5_server_rec 823 (sull'italiano legge male, «accialo», ma le cifre sul
+# fondo retinato le legge meglio); con tutti e due insieme 819 (sei letture per cella: i
+# conti tornano anche per caso). Vedi docs/RICERCA_OCR_SOLUZIONE.md §28.
+MODELLI_CELLE_DEFAULT = "PP-OCRv5_server_rec"
+_REC = {}
 
 
-def riconoscitore(device):
-    """Modello di solo riconoscimento (lo stesso della pagina), caricato al primo uso:
-    i worker che non rileggono celle non lo caricano mai."""
-    global _REC
-    if _REC is None:
+def modelli_celle():
+    nomi = os.environ.get("PADDLE_REC_CELLE") or MODELLI_CELLE_DEFAULT
+    return [m.strip() for m in nomi.split(",") if m.strip()]
+
+
+def riconoscitore(device, modello):
+    """Modello di solo riconoscimento, caricato al primo uso: i worker che non rileggono
+    celle non lo caricano mai."""
+    if modello not in _REC:
         from paddleocr import TextRecognition
-        _REC = TextRecognition(
-            model_name=os.environ.get("PADDLE_REC_MODEL", "latin_PP-OCRv5_mobile_rec"),
-            device=device, enable_mkldnn=False)
-    return _REC
+        _REC[modello] = TextRecognition(model_name=modello, device=device, enable_mkldnn=False)
+    return _REC[modello]
 
 
 def pulisci_cella(cella, modo):
@@ -519,10 +530,11 @@ def rileggi_celle(path, gradi, celle, device):
             dove.append(k)
     risposta = [[] for _ in celle]
     if immagini:
-        for k, r in zip(dove, riconoscitore(device).predict(immagini, batch_size=16)):
-            testo = (r.get("rec_text") or "").strip()
-            if testo:
-                risposta[k].append({"text": testo, "conf": round(float(r.get("rec_score") or 0) * 100, 1)})
+        for modello in modelli_celle():
+            for k, r in zip(dove, riconoscitore(device, modello).predict(immagini, batch_size=16)):
+                testo = (r.get("rec_text") or "").strip()
+                if testo:
+                    risposta[k].append({"text": testo, "conf": round(float(r.get("rec_score") or 0) * 100, 1)})
     return risposta
 
 

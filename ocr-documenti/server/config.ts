@@ -22,6 +22,12 @@ export const PYTHON_BIN = process.env.PYTHON_BIN
   || [VENV_CU129_BIN, VENV_GPU_BIN].find(p => existsSync(p))
   || path.join(ROOT, '.venv', 'Scripts', 'python.exe')
 export const OCR_WORKER = path.join(ROOT, 'ocr_worker.py')
+// Modelli con cui il worker rilegge le celle dei numeri che non tornano (PADDLE_REC_CELLE,
+// nomi separati da virgola; stesso default di MODELLI_CELLE_DEFAULT in ocr_worker.py). Il
+// server lo passa a ogni worker e lo scrive in cache accanto alle letture: se cambia, le
+// celle già lette si rileggono (server/ocr.ts, completaRiletture). Misura e scelta:
+// docs/RICERCA_OCR_SOLUZIONE.md §28.
+export const MODELLI_CELLE = process.env.PADDLE_REC_CELLE || 'PP-OCRv5_server_rec'
 
 // Fallback vision: quando PaddleOCR non riesce a leggere una scansione (grana/retino),
 // un modello vision locale in Ollama ri-trascrive la tabella articoli. Attivo di default;

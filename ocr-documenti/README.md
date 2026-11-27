@@ -42,6 +42,7 @@ Pipeline ibrida:
 | `PADDLE_SOGLIA_ROTAZIONE` | `60` | pagina letta sotto questa confidenza media (%), o con le righe in verticale (di traverso) → riletta a 180°/90°/270°, vince la lettura con più testo letto bene in righe orizzontali (pagine scansionate capovolte o di traverso). `0` spegne la prova |
 | `PADDLE_GRIGLIA` | acceso | linee della tabella trovate con OpenCV: le voci si leggono dalle celle (`server/tabella-griglia.ts`). `0` spegne il passo |
 | `PADDLE_RILEGGI_CELLE` | acceso | per le voci i cui conti non tornano il worker rilegge le sole celle dei valori, ritagliate e ripulite dal retino (`rileggi_celle` in `ocr_worker.py`, scelta in `tabella-griglia.ts`); letture in cache con la pagina. `0` spegne il passo |
+| `PADDLE_REC_CELLE` | `PP-OCRv5_server_rec` | modelli con cui si rileggono le celle dei numeri (separati da virgola). Il riconoscitore grande legge meglio le cifre sul fondo retinato: banco dei 31 contratti 809 → 823 voci esatte (docs/RICERCA_OCR_SOLUZIONE.md §28). Si scarica da solo al primo uso (82 MB). Le celle in cache lette con altri modelli si rileggono una volta |
 | `PORT` | `3007` | porta backend Express |
 | `OLLAMA_BASE` | `http://localhost:11434` | endpoint Ollama |
 | `ASSIST_MODEL` | `qwen2.5:3b` | modello assist |

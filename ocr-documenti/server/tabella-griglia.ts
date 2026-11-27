@@ -301,7 +301,9 @@ const mediana = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.lengt
 // `quota` = oneri / importo complessivo della voce. Nessun conto che torna → null.
 // `oneriLetti`: voce coi soli lavori ma con qualcosa letto nelle colonne degli oneri (gli
 // oneri ci sono e non si leggono: la quota della pagina può completarla anche a maggioranza)
-interface ValoriVoce { q: string; p: string; i: string; quota?: number; soloLavori?: boolean; oneriLetti?: boolean }
+// `oneri`: P.U. oneri riletto sicuro accanto al solo P.U. lavori (rilettureDellaVoce): dà il
+// prezzo esatto al centesimo quando la quota della pagina lo stima (tabellaDaAncore).
+interface ValoriVoce { q: string; p: string; i: string; quota?: number; soloLavori?: boolean; oneriLetti?: boolean; oneri?: string }
 const QUOTA_MIN = 0.005, QUOTA_MAX = 0.15
 // Prezzo = importo complessivo / quantità: 4 decimali come nei moduli di riferimento
 // ("16,4999": il prezzo tondo non ridà l'importo stampato al centesimo), 2 se esce tondo.
@@ -700,7 +702,12 @@ const rilettureDellaVoce = (voce: VoceAncora, intervalli: number[][], letture: (
   // letto "1,20" tre volte dava 33,96.
   const sicuro = (c?: { n: string; voti: number; forte: boolean }) => !!c && c.forte && c.voti >= 2 && due(c.n)
   if (DBG_TABELLA) console.error(`[celle]   candidati ${voce.codice}: ${slot.map(c => c.map(x => `${x.n}${x.forte ? '' : '?'}×${x.voti}`).join(' ') || '—').join(' | ')}`)
-  if (!slot[0].length && !slot[2].length && sicuro(slot[1][0])) return { q: '', p: slot[1][0].n, i: '', soloLavori: true, oneriLetti: slot[3].length > 0 || slot[4].length > 0 }
+  if (!slot[0].length && !slot[2].length && sicuro(slot[1][0])) {
+    return {
+      q: '', p: slot[1][0].n, i: '', soloLavori: true, oneriLetti: slot[3].length > 0 || slot[4].length > 0,
+      ...(sicuro(slot[3][0]) ? { oneri: slot[3][0].n } : {}),
+    }
+  }
   return null
 }
 
@@ -753,7 +760,13 @@ const tabellaDaAncore = (blocchi: BloccoOcr[], g: Griglia | null, xs?: number[],
     const quota = quotaStretta ?? (v?.oneriLetti ? quotaLarga : null)
     if (v?.soloLavori && quota !== null) {
       const pieno = numIt(v.p) / (1 - quota), tondo = Math.round(pieno * 100) / 100
-      if (Math.abs(pieno - tondo) < 0.005) { p = itStr(tondo); i = v.q ? itStr(numIt(v.q) * tondo) : ''; completato = true }
+      // P.U. oneri riletto sicuro: il prezzo stampato è P.U. lavori + P.U. oneri, che la quota
+      // (calcolata, non stampata) stima a un centesimo: Gecob NP.19 22,55 / (1 − quota) = 23,41
+      // contro 22,55 + 0,85 = 23,40, NP.21 180,01 contro 173,43 + 6,57 = 180,00. Vale la somma
+      // solo vicina alla stima: «1,24» letto «1,20» tre volte (33,96 contro 34,00) resta fuori.
+      const somma = v.oneri ? Math.round((numIt(v.p) + numIt(v.oneri)) * 100) / 100 : NaN
+      const prezzo = Math.abs(somma - tondo) <= 0.015 ? somma : tondo
+      if (Math.abs(pieno - tondo) < 0.005) { p = itStr(prezzo); i = v.q ? itStr(numIt(v.q) * prezzo) : ''; completato = true }
     }
     // Sovrapprezzo senza quantità che la rilettura ha ridotto al solo P.U. lavori e che la
     // quota della pagina non completa: resta il prezzo letto sulla pagina, già con il P.U.

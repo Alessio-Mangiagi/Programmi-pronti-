@@ -7,7 +7,7 @@ import { immagineInBuffer, type ImmagineOcr } from './immagine.ts'
 import { existsSync } from 'fs'
 import { createHash } from 'crypto'
 import { spawn } from 'child_process'
-import { OCR_WORKER, PYTHON_BIN, VISION_FALLBACK, ROOT } from './config.ts'
+import { MODELLI_CELLE, OCR_WORKER, PYTHON_BIN, VISION_FALLBACK, ROOT } from './config.ts'
 import { tabellaDaTsv } from './tabella-tsv.ts'
 import { TITOLO_CELLE, celleDaRileggere, senzaMacchieNumeriche, tabellaDaGriglia, type CellaRiletta, type Griglia, type LetturaCella } from './tabella-griglia.ts'
 import { normalizzaNumeriOcr } from './testo.ts'
@@ -25,7 +25,8 @@ export type BloccoOcr = { text: string; conf: number; x: number; y: number; w: n
 // griglia: null = cercata e assente; undefined = non ancora cercata (cache vecchia).
 // celle: celle numeriche rilette una per una (completaRiletture); undefined = mai chieste.
 // letture: risposta grezza del worker a una richiesta "rileggi" (una lista per cella).
-export type LetturaOcr = { blocchi: BloccoOcr[]; griglia?: Griglia | null; rotazione?: number; celle?: CellaRiletta[]; letture?: LetturaCella[][] }
+// modelliCelle: i modelli con cui sono state rilette le celle (MODELLI_CELLE di quel momento).
+export type LetturaOcr = { blocchi: BloccoOcr[]; griglia?: Griglia | null; rotazione?: number; celle?: CellaRiletta[]; modelliCelle?: string; letture?: LetturaCella[][] }
 export type SlotWorker = {
   proc: ReturnType<typeof spawn>
   ready: Promise<void>
@@ -49,7 +50,7 @@ export const CPU_THREADS = Math.max(2, Math.floor(os.cpus().length / POOL_MAX))
 export const creaWorker = (): SlotWorker => {
   const proc = spawn(PYTHON_BIN, [OCR_WORKER], {
     cwd: ROOT,
-    env: { ...process.env, PADDLE_CPU_THREADS: process.env.PADDLE_CPU_THREADS || String(CPU_THREADS) },
+    env: { ...process.env, PADDLE_CPU_THREADS: process.env.PADDLE_CPU_THREADS || String(CPU_THREADS), PADDLE_REC_CELLE: MODELLI_CELLE },
   })
   const n = pool.length + 1
   let buf = ''
@@ -223,10 +224,15 @@ export const letturaDaCache = (dato: unknown): LetturaOcr | null => {
   if (Array.isArray(dato)) return dato.length ? { blocchi: dato as BloccoOcr[] } : null
   const l = dato as (Partial<LetturaOcr> & { v?: number }) | null
   if (!l || !Array.isArray(l.blocchi) || !l.blocchi.length) return null
-  return { blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0, ...(Array.isArray(l.celle) ? { celle: l.celle } : {}) }
+  return {
+    blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0,
+    ...(Array.isArray(l.celle) ? { celle: l.celle } : {}),
+    ...(typeof l.modelliCelle === 'string' ? { modelliCelle: l.modelliCelle } : {}),
+  }
 }
 export const letturaPerCache = (l: LetturaOcr): string =>
-  JSON.stringify({ v: 2, blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0, ...(l.celle ? { celle: l.celle } : {}) })
+  // celle appena rilette (lettura nuova o completaRiletture): sono dei modelli di adesso
+  JSON.stringify({ v: 2, blocchi: l.blocchi, griglia: l.griglia ?? null, rotazione: l.rotazione ?? 0, ...(l.celle ? { celle: l.celle, modelliCelle: l.modelliCelle ?? MODELLI_CELLE } : {}) })
 const leggiCache = async (chiave: string): Promise<LetturaOcr | null> => {
   if (!OCR_CACHE_DIR) return null
   const f = path.join(OCR_CACHE_DIR, `${chiave}.json`)
@@ -280,15 +286,20 @@ export const grigliaPagina = async (pngPath: string, rotazione = 0): Promise<Gri
 // pagina si rilegge una volta sola, e se le regole cambiano si chiedono solo le celle
 // nuove. PADDLE_RILEGGI_CELLE=0 spegne il passo. Errore o worker assente → la pagina si
 // compone come prima.
+// Celle rilette con modelli diversi da MODELLI_CELLE (o prima che i modelli si scrivessero
+// in cache, 27/11/2026): si rileggono tutte, una volta, così le pagine già lette prendono
+// anche loro le letture migliori.
 export const RILEGGI_CELLE = process.env.PADDLE_RILEGGI_CELLE !== '0'
 /** true se ha aggiunto celle a `lettura.celle` (la cache va riscritta). */
 export const completaRiletture = async (lettura: LetturaOcr, pngPath: string): Promise<boolean> => {
   if (!RILEGGI_CELLE) return false
+  if (lettura.celle && lettura.modelliCelle !== MODELLI_CELLE) lettura.celle = undefined
   const gia = new Set((lettura.celle ?? []).map(c => c.r.join(',')))
   const mancano = celleDaRileggere(lettura.blocchi, lettura.griglia).filter(r => !gia.has(r.join(',')))
   if (!mancano.length) {
     if (lettura.celle) return false
     lettura.celle = []                       // cercate, nessuna da rileggere: non si ripete
+    lettura.modelliCelle = MODELLI_CELLE
     return true
   }
   try {
@@ -296,6 +307,7 @@ export const completaRiletture = async (lettura: LetturaOcr, pngPath: string): P
     const risposta = await chiediAlWorker({ path: pngPath, rileggi: mancano, rotazione: lettura.rotazione ?? 0 })
     const letture = risposta.letture ?? []
     lettura.celle = [...(lettura.celle ?? []), ...mancano.map((r, k) => ({ r, letture: letture[k] ?? [] }))]
+    lettura.modelliCelle = MODELLI_CELLE
     console.log(`[OCR] ${mancano.length} celle numeriche rilette (${Math.round((Date.now() - t0) / 1000)} s)`)
     return true
   } catch (e) {
