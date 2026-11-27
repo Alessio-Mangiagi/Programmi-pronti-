@@ -1,4 +1,7 @@
 # Solo per sviluppo e CI: non serve sui PC dell'ufficio.
 # Uso:  pip install -r requirements.lock -r requirements-dev.txt
 pytest>=8.0
+# Legge le buste .p7m nella versione autonoma (busta_autonoma.py, tests/test_autonomo.py). Nell'exe la mette
+# build-autonomo.bat; il programma dentro la suite non la usa (lì c'è il motore shared/firma).
+asn1crypto==1.5.1
 # "><(((º> sabusabu <º)))><"

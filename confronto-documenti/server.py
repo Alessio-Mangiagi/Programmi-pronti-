@@ -1413,7 +1413,14 @@ def job_revisione(job_id: str):
     return jsonify({"ok": True, "revisione": rev})
 
 
-if __name__ == "__main__":
+def avvia():
+    """Fa partire il server e non torna finché il processo non viene chiuso.
+
+    È il corpo di `python server.py`, messo in una funzione perché lo richiama anche autonomo.py (la versione
+    autonoma da inviare, costruita da build-autonomo.bat): quello prepara le variabili d'ambiente (login spento,
+    porta, cartella dei dati) PRIMA di importare questo modulo, poi chiama avvia(). HOST e PORT si leggono qui e
+    non all'import proprio per questo.
+    """
     # Ascolto locale di default; in LAN il portale passa il proprio HOST alle app
     # che avvia, così i PC della rete raggiungono l'app invece di trovarsi un
     # link morto. L'accesso resta protetto dal gate SSO.
@@ -1438,8 +1445,8 @@ if __name__ == "__main__":
               f" · confronti in parallelo: {MAX_PARALLELI} · dati: {storico.DATI}", flush=True)
     prune_cache(max_age_days=30)
     storico.pulisci()
-    if getattr(sys, "frozen", False):
-        # exe standalone: apri il browser da solo dopo l'avvio
+    if getattr(sys, "frozen", False) and os.environ.get("CONFRONTO_BROWSER", "on").lower() != "off":
+        # exe standalone: apri il browser da solo dopo l'avvio (CONFRONTO_BROWSER=off per le prove automatiche)
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(indirizzo)).start()
     try:
@@ -1447,3 +1454,7 @@ if __name__ == "__main__":
         serve(app, host=HOST, port=PORT, threads=8)
     except ImportError:
         app.run(host=HOST, port=PORT, debug=False)
+
+
+if __name__ == "__main__":
+    avvia()
