@@ -41,11 +41,11 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
 | Stato | Programma | Cosa | Aspetta |
 |---|---|---|---|
-| [ ] | Analista Dati | Tuning del filtro di pertinenza (`scope.ts`) e `LLM_CONCURRENCY` più alto (10) | — |
+| [-] | Analista Dati | Tuning del filtro di pertinenza (`scope.ts`) e `LLM_CONCURRENCY` più alto (10) | rimandata il 27/11: manca un obiettivo |
 | [x] | Analista Dati, OCR Documenti, form-core | Salto a vitest 5 e strumenti di sviluppo con avvisi (148) | — |
 | [x] | Verifica Requisiti | Confidenza per pagina da Tesseract (tsv) per la soglia `CONFIDENZA_MINIMA` (22) | — |
 | [x] | Verifica Requisiti | Test di integrazione delle rotte HTTP (24) | — |
-| [ ] | OCR Documenti | Provare i modelli PP-OCRv5 server, misurati sul banco (167) | — |
+| [x] | OCR Documenti | Provare i modelli PP-OCRv5 server, misurati sul banco (167) | — |
 | [-] | Copilota | Straordinari nel calcolo delle ore e negli estratti (174) | fuori dal progetto, finito il 27/11: solo se il committente li chiede |
 | [ ] | VFP Transfer | Nolo a caldo e righe INPS/INAIL a puntini nei format contrattuali (62) | format veri |
 | [ ] | VFP Transfer | Agganciare `sorgente_sql.py` a GUI e servizio con `TRANSFER_LOCK` (69) | driver ODBC 18 |
@@ -76,7 +76,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
 ## In sintesi
 
-- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166, la 24, la 22 e la 32: restano 10).
+- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166, la 24, la 22, la 32 e la 167, rimandata la 10: restano 8).
 - Ferme in attesa di server, credenziali esterne o decisioni: 10.
 - Escluse: le 2 di Auguri.
 
@@ -100,6 +100,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 | 27/11/2026 | Verifica Requisiti, test di integrazione delle rotte (24) | 8 casi su HTTP vero: checklist, documenti, verifiche, report, ricerca, gate acceso col token della suite. Cartella temporanea, `data/` mai toccata. 63 test passati, nessun difetto trovato nelle rotte |
 | 27/11/2026 | Verifica Requisiti, confidenza per pagina da Tesseract (22) | Una lettura, due uscite (txt e tsv); confidenza = media delle parole pesata sulla lunghezza. Provata su pagine vere: contratto pulito 0,85, pagina di traverso 0,24 (sotto la soglia 0,6 → «dubbio»). 66 test passati |
 | 27/11/2026 | InCampo, PDF del modulo e CSV dei task (32) | Già fatti prima dell'arrivo nella suite («Scarica PDF» con la firma, «Esporta CSV» nella pagina Task): il foglio era indietro. Controllandoli: nei CSV un testo che inizia con «=» Excel lo eseguiva, ora esce con l'apostrofo davanti (anche il CSV del registro operazioni); testata del PDF «INCAMPO» al posto di «FIELD VIEW»; test della firma nel PDF ed e2e dell'esportazione. 389 test, e2e 15/15 |
+| 27/11/2026 | OCR Documenti, modelli PP-OCRv5 server (167) | Per la pagina intera no: il riconoscitore grande legge peggio l'italiano, il rilevamento grande costa 31 s a pagina. Entrato il riconoscitore grande per le sole celle dei numeri che non tornano, più la somma P.U. lavori + P.U. oneri: voci esatte 809 → 823/948, Q+P 828 → 842, senza tempo in più. Misurato e non collegato: rilevamento grande sulle 11 pagine retinate di Progetto, banco 844/948 ma ~6 minuti in più su quel contratto (da decidere). 300 test |
 
 Gli aggiornamenti delle librerie sono stati applicati sul ramo di lavoro `feat/estrazione-dms`, non unendo le
 PR di Dependabot su `main`: le PR si chiuderanno da sole quando il ramo arriverà su `main`. Restano fuori le
