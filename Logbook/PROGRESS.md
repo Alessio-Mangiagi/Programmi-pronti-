@@ -1215,3 +1215,15 @@ Risposte dell'utente `1a+b 2b`: aprirlo ai PC e ai telefoni dell'ufficio, più u
 - **Tunnel di prova (pronto, da lanciare a mano).** `cloudflared` installato con winget; `tunnel-prova.bat` apre un tunnel veloce verso `127.0.0.1:5210` e mostra l'indirizzo `https://….trycloudflare.com`, che cambia a ogni avvio e vive finché la finestra resta aperta. Nessuna modifica al codice: cookie `Secure` e indirizzo del client arrivano già giusti dietro un proxy locale. Non ancora provato dal telefono.
 - **Attenzione ai dati.** Il database di questo PC è quello dimostrativo: 5 dipendenti di esempio con account attivi e la password provvisoria scritta nel README. Finché Copilota è raggiungibile da altri, chi la conosce entra come uno di loro (dati finti). Da spegnere o cambiare prima di metterci dati veri.
 - Per tornare al solo PC: togliere `LOGBOOK_API_HOST` dal `.env`, riavviare, cancellare la regola del firewall.
+
+### Installatore con rete dell'ufficio, firewall e tunnel di prova (27/11/2026)
+
+Richiesta dell'utente: "metti tutte le nuove istruzioni nell'installer". Quello fatto a mano la mattina su questo PC ora lo fa `InstallaLogbook.exe`.
+
+- `installa-logbook.py`: la domanda sulla rete scrive `LOGBOOK_API_HOST=0.0.0.0` (prima `HOST`, che il Portale sovrascrive). Passo 6 nuovo, solo se il `.env` apre alla rete: `apri_firewall` crea la regola "Copilota 5210 (rete locale)" (TCP, porta da `LOGBOOK_PORT`, `LocalSubnet`, tutti i profili) in un PowerShell elevato e non la ricrea se c'è; `installa_cloudflared` (a richiesta) lo installa con winget; il riepilogo finale mostra l'indirizzo di rete del PC (`indirizzo_di_rete`), i limiti senza HTTPS, come tornare indietro e come usare `tunnel-prova.bat`.
+- Opzioni nuove: `--rete` (senza domande; su un `.env` già presente aggiunge solo quella riga) e `--tunnel`.
+- `.env.example`: spiegato `LOGBOOK_API_HOST` rispetto a `HOST`. README: passo 3 dell'installazione fuori dalla suite.
+- Verifiche: prova a vuoto dal sorgente e dall'exe ricompilato (`--dry-run --si --rete --tunnel`); su una copia in scratchpad `.env` nuovo con la riga giusta, `.env` già presente a cui viene aggiunta solo quella, porta letta dal `.env`; su questo PC `apri_firewall` riconosce la regola già presente e `installa_cloudflared` lo trova installato.
+- NON provato: la creazione vera della regola dall'installatore (qui c'era già, creata a mano con lo stesso comando) e l'installazione di cloudflared da zero; servirebbe un PC pulito.
+- Non toccato: `installa-suite.py`. Nella suite l'indirizzo di ascolto lo decide il Portale e le porte le apre `firewall-suite.ps1`.
+- `InstallaLogbook.exe` ricompilato il 27/11 (PyInstaller 6.22, fuori dal repository come sempre).

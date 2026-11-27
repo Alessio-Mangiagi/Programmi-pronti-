@@ -39,6 +39,22 @@ cartella parte nei due modi, con lo stesso database e lo stesso `.env`.
      dipendenze e crea il `.env` (proprietario `admin`; chiede l'email del proprietario e
      se Copilota va raggiunto dagli altri PC). Poi prepara database e interfaccia e mette
      l'icona **Copilota** sul desktop, che avvia `avvia.bat`.
+  3. **Rete dell'ufficio (dal 27/11/2026)**, solo se alla domanda si risponde sì (o con
+     `--rete`): scrive `LOGBOOK_API_HOST=0.0.0.0` nel `.env`, crea la regola del firewall
+     di Windows **"Copilota 5210 (rete locale)"** (porta di Copilota in entrata, solo dalla
+     stessa sottorete; Windows chiede il consenso da amministratore) e alla fine mostra
+     l'indirizzo da dare ai colleghi, `http://<indirizzo del PC>:5210`. A richiesta (o con
+     `--tunnel`) installa anche `cloudflared`, che serve a **`tunnel-prova.bat`**: doppio
+     clic con Copilota avviato e si ottiene un indirizzo `https://….trycloudflare.com`
+     temporaneo per provarlo dal telefono fuori ufficio; cambia a ogni avvio e si spegne
+     chiudendo la finestra. Rilanciato su un'installazione già fatta, l'installatore non
+     tocca il `.env` (con `--rete` aggiunge solo quella riga) e non ricrea la regola.
+
+  Da sapere sulla rete: senza HTTPS la password viaggia in chiaro sulla rete interna e il
+  telefono non propone l'installazione sulla schermata; l'indirizzo del PC lo dà il router
+  e può cambiare; Copilota non parte da solo all'accensione. Per tornare al solo PC:
+  togliere `LOGBOOK_API_HOST` dal `.env`, riavviare, cancellare la regola dal firewall.
+  Per un indirizzo https fisso vedi `accesso-da-internet.md` nella radice del repository.
 
   Node.js non lo installa: se manca dice dove scaricarlo. `InstallaLogbook.exe` si
   ricompila da `installa-logbook.py` (comando in testa al file) e non sta nel repository,
