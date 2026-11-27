@@ -311,8 +311,13 @@ export const tabellaColonne = (words: ParolaTsv[]): string => {
     // Il bordo o una macchia davanti alla continuazione si legge come segno (":17.007",
     // "-17.051" sotto "SIC24_14.03", GFM): nella colonna codice si toglie prima di
     // riconoscerla, altrimenti il codice restava "SIC24_14.03".
+    // Virgola letta al posto di un punto dentro un codice puntato: "G.01,064.3"
+    // (Contratto_fornitura pag. 4 letto dalla scheda video). codeRe non ammette virgole e il
+    // codice si perdeva; comincia con le lettere e ha già un punto, quindi non è un numero.
     const codici = ws.slice(0, iVal).filter(w => w.left < xDescr - 20)
       .map(w => /^[:;\-–—'`]+\d{2}\.\d{3}$/.test(w.text) ? { ...w, text: w.text.replace(/^[:;\-–—'`]+/, '') } : w)
+      .map(w => /^[A-Za-z]{1,6}\d{0,2}\.\d{1,3}(?:[.,]\d{1,3}){1,3}(?:[._][A-Za-z0-9]{1,4})?$/.test(w.text) && w.text.includes(',')
+        ? { ...w, text: w.text.replace(/,/g, '.') } : w)
       .filter(w => (codeRe.test(w.text) || RE_CODA_CODICE.test(w.text)) && /\d/.test(w.text) &&
         !/^art[.\s\-]*\d*[.\s\-]*$/i.test(w.text))   // "ART.5-" è il titolo dell'articolo di contratto, non un codice
     const descrWs = ws.slice(0, iVal).filter(w => w.left >= xDescr - 20)

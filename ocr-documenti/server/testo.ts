@@ -41,12 +41,20 @@ export const unisciMigliaiaSpazio = (t: string): string =>
 //      dalla scheda video). Stessa guardia della 3: solo un blocco che contiene SOLO
 //      quell'importo. Il "|" nel testo spezzava la cella della tabella ricostruita e il
 //      prezzo si perdeva (2.193 × 447.810,60 al posto di 2.193 × 204,20 = 447.810,60).
+//   5) angolo della cella (bordo sinistro + bordo di sotto) letto come "L" attaccata al
+//      prezzo: "L50.00 €" (AQ3 nolo a caldo letto dalla scheda video, 400 × 50 = 20.000).
+//      Solo la "L" MAIUSCOLA e solo su un blocco che contiene SOLO un importo con due
+//      decimali chiuso da "€": "l", "I" e "|" davanti a una cifra sono spesso un "1" letto
+//      male ("l50,00" può valere 150), la "L" no. Sulle 825 pagine del banco il caso c'è
+//      una volta sola e nessun altro blocco ha una lettera davanti a un importo con l'€.
+//      Senza la regola il blocco non era un numero e la riga usciva 50 × 400 senza codice.
 export const normalizzaNumeriOcr = (t: string): string => t
   .replace(/\b(\d{1,3}(?:\.\d{3})+,\d{2})(\d+,\d{1,3})(?!\d)/g, '$1 $2')
   .replace(/\b\d{1,3}(?:,\d{3})+,\d{2}(?!\d)/g, m =>
     m.slice(0, m.lastIndexOf(',')).replace(/,/g, '.') + m.slice(m.lastIndexOf(',')))
   .replace(/^(\s*(?:€\s*)?\d{1,3}(?:\.\d{3})*,\d{2}) [68eEcC]\s*$/, '$1 €')
   .replace(/^\s*([|¦]\s*)?((?:€\s*)?\d{1,3}(?:\.\d{3})*,\d{2}(?:\s*€)?)(\s*[|¦])?\s*$/, (m, prima, importo, dopo) => (prima || dopo ? importo : m))
+  .replace(/^\s*L(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*€)\s*$/, '$1')
 
 // Spezza un markdown multi-pagina in tiles per pagina. Riconosce il separatore dell'app
 // (riga di soli "---") e l'eventuale marcatore "--- PAGE n ---". Vuoti scartati.

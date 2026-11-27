@@ -50,6 +50,19 @@ const RE_COD = /^(?=[^\s]*\d)[A-Za-z0-9][A-Za-z0-9._\-\/]{0,24}$/
 const RE_INTEST_VALORE = /quantit|q\.?\s?t[àa']|\bqty\b|prezz|p\.\s?u\b|unitari|importo|totale|oneri/i
 const RE_INTEST_DESCR = /descri|lavorazion|indicazione/i
 
+// Codice scritto come etichetta corta nella colonna Tariffa: "Miniapala", "Miniescavatore_9 Q",
+// "SIC24 26.01.14" (AQ3 nolo a caldo letto dalla scheda video). Non ha la forma di RE_COD
+// (niente cifra, o uno spazio dentro): una o due parole, al massimo tre, con almeno tre
+// lettere di fila, che non siano un numero, un'unità di misura o una parola d'intestazione.
+// Con più parole serve un segno da codice (cifra, "_", "." o "/": "Sic. Amb/qual",
+// "Sic. ASPP" di Contratto.pdf): "VOCE OPZIONALE" nella colonna Articolo
+// (Contratto_subappalto) è una nota, non un codice, e la voce del modulo non ne ha.
+const eEtichettaCodice = (t: string): boolean =>
+  t.length >= 3 && t.length <= 30 && t.split(/\s+/).length <= 3 && /[A-Za-z]{3}/.test(t) &&
+  (!/\s/.test(t) || /[\d_./]/.test(t)) &&
+  numeroCella(t) === null && !RE_UM.test(t.replace(/[^A-Za-z0-9²³°.]/g, '')) &&
+  !RE_INTEST_VALORE.test(t) && !RE_INTEST_DESCR.test(t) && !/^(?:totale|sommano|tariffa|codice|voci)\b/i.test(t)
+
 const indiceIn = (lim: number[], v: number): number => {
   for (let i = 0; i + 1 < lim.length; i++) if (lim[i] <= v && v < lim[i + 1]) return i
   return -1
@@ -164,14 +177,27 @@ const leggiCelle = (blocchi: BloccoOcr[], g: Griglia): string => {
     // BAGGIOLI/RITEGNI" (SICS). Codice in due pezzi, con lettera e punto interno; il resto
     // della cella va in testa alla descrizione, come nel modulo di riferimento.
     const inTesta = kCod === undefined && prima >= 0 && prima <= 2 ? RE_COD_GRIGLIA.exec(testi[prima]) : null
-    let etichetta = ''
+    // codice come etichetta corta (eEtichettaCodice), subito dopo il numero di riga o, se il
+    // numero manca, nella prima cella: vale solo se più a destra c'è la descrizione vera,
+    // lunga almeno una volta e mezza l'etichetta ("Sic. Amb/qual" accanto a "Oneri della
+    // Sicurezza"). Senza questa regola il codice restava vuoto
+    // ("Miniapala") o diventava il numero di riga ("2", "9", "17" al posto di
+    // "Miniescavatore_9 Q", "SIC24 26.01.14", "SIC24 26.01.26"). Il numero di riga, se
+    // c'è, non deve poi finire fra i valori: si salta come la cella del codice (iNr).
+    const conNr = prima >= 0 && prima <= 1 && /^\d{1,3}$/.test(testi[prima])
+    const kEt = conNr ? prima + 1 : prima
+    const conEtichetta = kCod === undefined && kEt >= 0 && kEt <= 2 && kEt < nc && eEtichettaCodice(testi[kEt]) &&
+      testi.some((t, c) => c > kEt && numeroCella(t) === null && t.length >= testi[kEt].length * 1.5 && t.length >= testi[kEt].length + 6)
+    const inTestaOk = !!inTesta && /[A-Za-z]/.test(inTesta[2]) && /[A-Za-z0-9]\.[A-Za-z0-9]/.test(inTesta[2])
+    let etichetta = '', iNr = -1
     if (kCod !== undefined) { codice = testi[kCod]; iCod = kCod }
-    else if (prima >= 0 && prima <= 1 && /^\d{1,3}$/.test(testi[prima])) { codice = testi[prima]; iCod = prima }
-    else if (inTesta && /[A-Za-z]/.test(inTesta[2]) && /[A-Za-z0-9]\.[A-Za-z0-9]/.test(inTesta[2])) {
+    else if (conEtichetta && (conNr || !inTestaOk)) { codice = testi[kEt]; iCod = kEt; if (conNr) iNr = prima }
+    else if (conNr) { codice = testi[prima]; iCod = prima }
+    else if (inTesta && inTestaOk) {
       codice = inTesta[2].replace(/[.,]+$/, ''); iCod = prima; etichetta = testi[prima].slice(inTesta[0].length).trim()
     }
     for (let c = 0; c < nc; c++) {
-      if (c === iCod || !testi[c]) continue
+      if (c === iCod || c === iNr || !testi[c]) continue
       // incidenza % (colonna degli oneri): si toglie la percentuale e resta l'eventuale
       // numero della stessa cella. Senza la linea fra "% O.S." e "P.U. O.S." la cella è
       // "3,448% 0,05 €" (Jonico) e scartandola tutta il P.U. oneri si perdeva (1,40

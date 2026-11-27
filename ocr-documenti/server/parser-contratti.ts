@@ -563,11 +563,24 @@ const estraiRigheGrezze = (testoIntero: string): Record<string, string>[] => {
   const stessiValori = (a: Record<string, string>, b: Record<string, string>) =>
     numIt(a.quantita) === numIt(b.quantita) && numIt(a.prezzo_lordo) === numIt(b.prezzo_lordo)
   const conCodice = (rs: Record<string, string>[]) => rs.filter(r => String(r.codice_epu ?? '').trim()).length
-  const aggiunte = elenco.filter(x => !pipe.some(r => stessiValori(x, r)))
+  // La voce del testo senza codice prende quello della ricostruzione geometrica con la
+  // stessa quantità e lo stesso prezzo (un solo codice possibile per quella coppia).
+  // Contratto_fornitura letto dalla scheda video: «G.01,064.3» sta una riga sotto i
+  // valori, la tabella della pagina lo aggancia e il testo no; senza questo passaggio la
+  // tabella aveva un codice in più, il testo non la copriva più e si perdeva la seconda
+  // voce «3,00 × 120,00» che solo il testo legge.
+  const codiceDaPipe = (x: Record<string, string>): string => {
+    const codici = [...new Set(pipe.filter(r => stessiValori(x, r)).map(r => String(r.codice_epu ?? '').trim()).filter(Boolean))]
+    return codici.length === 1 ? codici[0] : ''
+  }
+  const elencoC = elenco.map(x => (String(x.codice_epu ?? '').trim() || !codiceDaPipe(x) ? x : { ...x, codice_epu: codiceDaPipe(x) }))
+  const aggiunte = elencoC.filter(x => !pipe.some(r => stessiValori(x, r)))
   const elencoCopre = pipe.length > 0 && aggiunte.length > 0 &&
-    pipe.every(r => elenco.some(x => stessiValori(x, r))) && conCodice(elenco) >= conCodice(pipe) &&
+    pipe.every(r => elencoC.some(x => stessiValori(x, r))) && conCodice(elencoC) >= conCodice(pipe) &&
     aggiunte.every(x => !!x.udm && contoTorna(numIt(x.quantita), numIt(x.prezzo_lordo), numIt(x.importo)))
-  if (elenco.length && !wbsOs.length && (!pipe.length || elencoCopre) && punti(elenco) >= punti(best)) best = elenco
+  // i codici presi dalla tabella valgono solo quando il testo la copre: senza tabella o
+  // con il testo che non vince resta tutto come prima
+  if (elenco.length && !wbsOs.length && (!pipe.length || elencoCopre) && punti(elencoC) >= punti(best)) best = pipe.length ? elencoC : elenco
   // Righe dalle celle della tabella (pagine con i bordi): colonne certe, quindi vincono
   // anche con qualche voce in meno degli altri parser (che contano pure righe spurie o
   // spezzate), ma non se ne hanno molte meno: un documento con le linee solo su alcune

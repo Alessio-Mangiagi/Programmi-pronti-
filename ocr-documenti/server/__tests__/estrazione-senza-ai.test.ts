@@ -205,6 +205,11 @@ describe('righe', () => {
     expect(['204,20 €|', '|447.810,60 €', '¦ 2.193,00', '204,20 €'].map(normalizzaNumeriOcr))
       .toEqual(['204,20 €', '447.810,60 €', '2.193,00', '204,20 €'])
     for (const t of ['| 2.193,00 | 204,20 |', '204,20 €|\n447.810,60 €', 'm 204,20 €|']) expect(normalizzaNumeriOcr(t)).toBe(t)
+    // angolo della cella letto come "L" attaccata al prezzo (AQ3 nolo, scheda video): via,
+    // solo la L maiuscola e solo sul blocco con il solo importo chiuso da "€"
+    expect(['L50.00 €', 'L1.234,56 €'].map(normalizzaNumeriOcr)).toEqual(['50.00 €', '1.234,56 €'])
+    // "l" e "I" possono essere un "1"; senza "€", dentro una riga o col punto del lotto restano
+    for (const t of ['l50,00 €', 'I50,00 €', 'L50,00', 'AQ3 L50,00 €', 'L. 6', 'L50,00 €\n20.000,00 €']) expect(normalizzaNumeriOcr(t)).toBe(t)
     const r = quantitaSottintesa([
       { quantita: '270,94', prezzo_lordo: '270,94', importo: '' },      // prezzo e importo letti come q e p
       { quantita: '2', prezzo_lordo: '251,92', importo: '251,92' },     // "2" dalla descrizione
@@ -289,6 +294,27 @@ describe('tabella dalle celle', () => {
     expect(lette.map(r => [r.codice_epu, r.udm, r.quantita, r.prezzo_lordo, r.importo])).toEqual([
       ['1', 'mc', '80,45', '16,00', '1.287,26'], ['8', 'm', '', '12,00', ''],
     ])
+  })
+  it('codice come etichetta corta nella colonna Tariffa, con o senza il numero di riga (AQ3 nolo, Contratto.pdf)', () => {
+    // colonne: NR | Tariffa | Voci | UM | Q.tà | Prezzo | Importo
+    const g = { xs: [0, 40, 200, 500, 560, 660, 760, 900], ys: [0, 50, 120, 190, 260, 330, 400, 470] }
+    const riga = (y: number, nr: string, tariffa: string, voce: string, um: string, q: string, p: string, i: string) =>
+      [b(nr, 5, y), b(tariffa, 45, y), b(voce, 205, y), b(um, 505, y), b(q, 565, y), b(p, 665, y), b(i, 765, y)].filter(x => x.text)
+    const blocchi = [
+      ...riga(10, 'NR', 'Tariffa', 'Voci di MISURAZIONE', 'Unità di misura', 'Quantità', 'Prezzo unitario', 'Importo totale'),
+      ...riga(70, '', 'Miniapala', 'Nolo a caldo di minipala JCB matr 0680943', '', '400,00', '50,00 €', '20.000,00 €'),   // numero di riga non letto
+      ...riga(140, '2', 'Miniescavatore_9 Q', 'Nolo a caldo di miniescavatore da 9 quintali', 'h', '400,00', '48,00 €', '19.200,00 €'),
+      ...riga(210, '9', 'SIC24 26.01.14', 'Tettoia a protezione zone di lavoro', 'm²', '100,00', '12,96 €', '1.295,83 €'),
+      ...riga(280, '', 'Sic. ASPP', 'Oneri della Sicurezza', 'ore', '240,00', '1,05 €', '252,00 €'),
+      // nota nella colonna Articolo (Contratto_subappalto) e descrizione corta senza altro testo: nessun codice
+      ...riga(350, '', 'VOCE OPZIONALE', 'Mantello posteriore lamiera sp.2mm', 'ml', '295,00', '24,00 €', '7.080,00 €'),
+      ...riga(420, '', 'Trasporto', '', 'cad', '2,00', '2.400,00 €', '4.800,00 €'),
+    ]
+    const righe = tabellaDaGriglia(blocchi, g).split('\n').map(l => l.split('|').map(x => x.trim()).slice(1, 7))
+    expect(righe.map(r => r[0])).toEqual(['Miniapala', 'Miniescavatore_9 Q', 'SIC24 26.01.14', 'Sic. ASPP', '', ''])
+    // il numero di riga saltato non finisce fra i valori
+    expect(righe[2].slice(3)).toEqual(['100,00', '12,96', '1.295,83'])
+    expect(righe[5][1]).toBe('Trasporto')
   })
   it('più numeri impilati nella stessa cella = voci senza linee fra loro → nessuna tabella', () => {
     const blocchi = [b('A.01', 10, 60), b('Scavo', 60, 60), b('mc', 410, 60), b('10,00', 470, 60), b('20,00', 470, 90), b('2,00', 670, 60), b('20,00', 770, 60)]
@@ -582,6 +608,16 @@ describe('codice andato a capo nella sua colonna', () => {
   const riga = (top: number, parole: [string, number][]) =>
     parole.map(([text, left]) => ({ text, left, top, width: text.length * 8, height: 18 }))
   const piena = (top: number) => riga(top, [['conduttori', 200], ['elettrici', 300], ['in', 390], ['rame', 420], ['con', 470], ['isolante', 500]])
+  it('virgola al posto del punto nel codice, una riga sotto i valori ("G.01,064.3", Contratto_fornitura)', () => {
+    const words = [
+      ...riga(100, [['ad', 200], ['interasse', 230], ['ad', 320], ['ogni', 350], ['montante', 400], ['ml', 900], ['100,00', 980], ['45,00', 1060], ['4.500,00', 1160]]),
+      ...riga(125, [['G.01,064.3', 50], ['esistenti,', 200], ['di', 290], ['1,50', 320], ['metri;', 370]]),
+      ...riga(150, [['PALI', 200], ['DI', 250], ['CAPOSALDO', 280], ['in', 380], ['profilato', 410]]),
+      ...riga(175, [['a', 200], ['freddo', 220], ['sezione', 290], ['ad', 360], ['U', 390]]),
+      ...riga(200, [['zincati', 200], ['a', 270], ['caldo', 290], ['da', 350], ['porre', 380]]),
+    ]
+    expect(tabellaColonne(words).split('\n').map(l => l.split('|')[1].trim())).toEqual(['G.01.064.3'])
+  })
   it('segno davanti alla continuazione (":17.007", GFM) e continuazione dopo una riga corta (".03")', () => {
     const words = [
       ...riga(100, [['SIC24_14.03', 50], ['Fornitura', 200], ['e', 290], ['collocazione', 310], ['entro', 420], ['tubi,', 470], ['posati', 515], ['m', 900], ['100', 980], ['5,52', 1060], ['552,00', 1160]]),
@@ -736,6 +772,16 @@ describe('tabella numerata per posizione e voci uguali', () => {
     const gpu = estraiRighe(testo(tabella, ['Imballaggio Cad 1 € 750,00 € 750,00', 'Trasporto Cad € 6.000,00 € 6.000,00']))
     expect(gpu.map(r => [r.quantita, r.prezzo_lordo, r.importo]))
       .toEqual([['2400', '163,00', '391.200,00'], ['2400', '44,00', '105.600,00'], ['1', '750,00', '750,00'], ['1', '6.000,00', '6.000,00']])
+  })
+  it('il testo copre la tabella e prende i suoi codici sulle voci con gli stessi valori (Contratto_fornitura)', () => {
+    const testo = ['ART. 5 - ELENCO DEI PREZZI UNITARI', 'DESCRIZIONE U.M Quantità P.U. Importo',
+      'Fornitura pannelli di parapetti modulari zincati Mq 2400 € 163,00 € 391.200,00',
+      'Posa in opera Mq 2400 € 44,00 € 105.600,00', 'Chiusura spalla ml 3,00 € 120,00 € 360,00', 'Totale € 496.800,00', '',
+      '### TABELLA ARTICOLI (ricostruita dalla scansione)',
+      // la tabella aggancia il codice della posa (riga sotto i valori), il testo no
+      '|  | Fornitura pannelli di parapetti modulari zincati | Mq | 2400 | 163,00 | 391.200,00 |',
+      '| G.01.064.3 | Posa in opera | Mq | 2400 | 44,00 | 105.600,00 |'].join('\n')
+    expect(estraiRighe(testo).map(r => [r.codice_epu, r.prezzo_lordo])).toEqual([['', '163,00'], ['G.01.064.3', '44,00'], ['', '120,00']])
   })
   it('prezzo stampato ai centesimi, importo col prezzo a tre decimali → prezzo esatto (GFM)', () => {
     const riga = (quantita: string, prezzo_lordo: string, importo: string) => ({ progressivo: '1', codice_epu: 'SIC24_14.03.15.001', descrizione: 'SOLO POSA di conduttori', udm: 'm', quantita, prezzo_lordo, importo })
