@@ -56,7 +56,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
 | Stato | Programma | Cosa | Aspetta |
 |---|---|---|---|
-| [ ] | InCampo | Export PDF del modulo inviato (report firmato) e CSV dei task (32) | — |
+| [x] | InCampo | Export PDF del modulo inviato (report firmato) e CSV dei task (32) | già fatto: vedi registro |
 | [ ] | InCampo | Notifiche in-app (badge, lista) e riepilogo giornaliero via email (33) | — |
 | [ ] | Scadenzario | Notifiche WhatsApp reali (18) | scelta del provider |
 | [ ] | SkyTower | Test di carico su staging: 500 utenti, upload 1 GB, 1M documenti (44) | server con Docker |
@@ -76,7 +76,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
 ## In sintesi
 
-- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166, la 24 e la 22: restano 11).
+- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166, la 24, la 22 e la 32: restano 10).
 - Ferme in attesa di server, credenziali esterne o decisioni: 10.
 - Escluse: le 2 di Auguri.
 
@@ -99,6 +99,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 | 27/11/2026 | OCR Documenti, ultime 2 voci della scheda video (166) | Recuperate tutte e due, più cinque voci con lo stesso difetto: voci esatte 800 → 809/948, Q+P 827 → 828; cambiano solo AQ3 nolo, Contratto.pdf e Contratto_fornitura, tutti in meglio. 295 test passati |
 | 27/11/2026 | Verifica Requisiti, test di integrazione delle rotte (24) | 8 casi su HTTP vero: checklist, documenti, verifiche, report, ricerca, gate acceso col token della suite. Cartella temporanea, `data/` mai toccata. 63 test passati, nessun difetto trovato nelle rotte |
 | 27/11/2026 | Verifica Requisiti, confidenza per pagina da Tesseract (22) | Una lettura, due uscite (txt e tsv); confidenza = media delle parole pesata sulla lunghezza. Provata su pagine vere: contratto pulito 0,85, pagina di traverso 0,24 (sotto la soglia 0,6 → «dubbio»). 66 test passati |
+| 27/11/2026 | InCampo, PDF del modulo e CSV dei task (32) | Già fatti prima dell'arrivo nella suite («Scarica PDF» con la firma, «Esporta CSV» nella pagina Task): il foglio era indietro. Controllandoli: nei CSV un testo che inizia con «=» Excel lo eseguiva, ora esce con l'apostrofo davanti (anche il CSV del registro operazioni); testata del PDF «INCAMPO» al posto di «FIELD VIEW»; test della firma nel PDF ed e2e dell'esportazione. 389 test, e2e 15/15 |
 
 Gli aggiornamenti delle librerie sono stati applicati sul ramo di lavoro `feat/estrazione-dms`, non unendo le
 PR di Dependabot su `main`: le PR si chiuderanno da sole quando il ramo arriverà su `main`. Restano fuori le
