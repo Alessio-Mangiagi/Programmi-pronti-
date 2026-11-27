@@ -20,11 +20,20 @@ Passi:
    il database: non finiscono nel .env né in nessun file. Poi, se manca, crea il file .env
    da .env.example e chiede, facoltativi:
    - l'email del proprietario, che riceve il codice per "Cancella tutti i dati";
-   - se Copilota va raggiunto dagli altri PC della rete (HOST=0.0.0.0).
+   - se Copilota va raggiunto dagli altri PC e dai telefoni della rete dell'ufficio
+     (LOGBOOK_API_HOST=0.0.0.0).
    Il server di posta (LOGBOOK_SMTP_*) si completa dopo, a mano, nel .env;
 4. prepara il database e compila l'interfaccia (come il primo avvio: npm run prestart).
    Il database nuovo è vuoto, con l'utente admin e le festività nazionali;
-5. crea sul desktop il collegamento "Copilota" ad avvia.bat.
+5. crea sul desktop il collegamento "Copilota" ad avvia.bat;
+6. rete (dal 27/11/2026), solo se al passo 3 si è scelto di aprirlo alla rete, o se il .env
+   che c'era già lo apre:
+   - regola del firewall di Windows "Copilota 5210 (rete locale)": porta di Copilota in
+     entrata, SOLO dalla stessa sottorete. Windows chiede il consenso da amministratore;
+   - mostra l'indirizzo da dare ai colleghi (http://<indirizzo del PC>:5210);
+   - a richiesta installa "cloudflared" (winget), che serve a tunnel-prova.bat per provare
+     Copilota dal telefono fuori dall'ufficio su un indirizzo https temporaneo.
+   Non imposta l'avvio automatico all'accensione: Copilota parte dall'icona o dal Portale.
 
 Dentro la suite non serve: lo installa InstallaSuite.exe (installa-suite.py, voce "logbook")
 e lo avvia la card del Portale. Le due strade usano la stessa cartella e lo stesso avvia.bat.
@@ -34,15 +43,20 @@ Uso:
   InstallaLogbook.exe --si                  senza domande: admin con password casuale mostrata a video
                                             (o LOGBOOK_ADMIN_USERNAME / LOGBOOK_ADMIN_PASSWORD nell'ambiente)
   InstallaLogbook.exe --senza-collegamento  non crea l'icona sul desktop
+  InstallaLogbook.exe --rete                apre Copilota alla rete dell'ufficio senza chiederlo
+                                            (su un .env già presente aggiunge solo LOGBOOK_API_HOST)
+  InstallaLogbook.exe --tunnel              installa anche cloudflared per tunnel-prova.bat
   InstallaLogbook.exe --dry-run             mostra i passi senza eseguirli
 
 Compilazione (dalla cartella Logbook, con PyInstaller in un ambiente Python qualsiasi):
   python -m PyInstaller --onefile --name InstallaLogbook --distpath . installa-logbook.py
 """
 import argparse
+import base64
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -54,6 +68,10 @@ if os.name == "nt":
     os.system("chcp 65001 >nul")
 
 NODE_MIN = (20, 19)  # Prisma 7: "engines" di package.json
+# Nome della regola del firewall: lo stesso scritto in PROGRESS.md e nel README, così chi la
+# cerca in "Windows Defender Firewall" la riconosce e la può togliere.
+REGOLA_FIREWALL = "Copilota 5210 (rete locale)"
+SI = ("s", "si", "sì", "y", "yes")
 
 
 def cartella_logbook() -> Path:
@@ -155,10 +173,20 @@ def chiedi_credenziali_admin() -> tuple[str, str] | None:
         else:
             return (nome, p1)
 
-def prepara_env(proprietario: str = "admin") -> str:
-    """Crea .env da .env.example (se manca) con le scelte dell'utente. Restituisce una nota."""
+def prepara_env(proprietario: str = "admin", rete: bool = False) -> str:
+    """Crea .env da .env.example (se manca) con le scelte dell'utente. Restituisce una nota.
+
+    `rete` (opzione --rete): apre Copilota alla rete senza chiederlo. È l'unica cosa che si
+    scrive anche in un .env già presente, e solo aggiungendo LOGBOOK_API_HOST: il resto del
+    file è di chi l'ha compilato e non si tocca.
+    """
     env = DIR / ".env"
     if env.exists():
+        if rete and not rete_aperta():
+            say(f"    aggiungo LOGBOOK_API_HOST=0.0.0.0 a {env.name}")
+            if not DRY:
+                env.write_text(imposta_env(env.read_text(encoding="utf-8"), "LOGBOOK_API_HOST", "0.0.0.0"), encoding="utf-8")
+            return ".env già presente: aggiunta solo l'apertura alla rete (LOGBOOK_API_HOST)"
         return ".env già presente: lasciato com'è"
     esempio = DIR / ".env.example"
     testo = esempio.read_text(encoding="utf-8") if esempio.exists() else ""
@@ -167,9 +195,13 @@ def prepara_env(proprietario: str = "admin") -> str:
     email = chiedi("Email del proprietario (riceve il codice per cancellare tutti i dati), invio per saltare:")
     if email:
         testo = imposta_env(testo, "LOGBOOK_PROPRIETARIO_EMAIL", email)
-    rete = chiedi("Copilota deve essere raggiungibile dagli altri PC della rete? [s/N]").lower()
-    if rete in ("s", "si", "sì", "y", "yes"):
-        testo = imposta_env(testo, "HOST", "0.0.0.0")
+    if not rete:
+        rete = chiedi("Copilota deve essere raggiungibile dagli altri PC e dai telefoni della rete dell'ufficio? [s/N]").lower() in SI
+    if rete:
+        # LOGBOOK_API_HOST e non HOST: il Portale della suite passa HOST=127.0.0.1 alle app che
+        # avvia, e una variabile già presente vince sul .env (server/index.ts legge prima
+        # LOGBOOK_API_HOST). Così l'apertura vale sia dall'icona sia dalla card del Portale.
+        testo = imposta_env(testo, "LOGBOOK_API_HOST", "0.0.0.0")
     say(f"    creo {env.name}" + (f" (proprietario {proprietario}, email {email})" if email else f" (proprietario {proprietario})"))
     if not DRY:
         env.write_text(testo, encoding="utf-8")
@@ -177,6 +209,101 @@ def prepara_env(proprietario: str = "admin") -> str:
     if not email:
         note += ": scrivere LOGBOOK_PROPRIETARIO_EMAIL"
     return note + " e completare LOGBOOK_SMTP_* (server di posta) per il codice via email"
+
+
+def rete_aperta() -> bool:
+    """True se il .env fa ascoltare Copilota su tutta la rete (LOGBOOK_API_HOST o HOST = 0.0.0.0).
+    Si legge il file e non la risposta data al passo 3, così vale anche per un .env che c'era già."""
+    try:
+        testo = (DIR / ".env").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return bool(re.search(r"^\s*(LOGBOOK_API_HOST|HOST)\s*=\s*0\.0\.0\.0\s*$", testo, re.MULTILINE))
+
+
+def porta_copilota() -> int:
+    """Porta di Copilota: LOGBOOK_PORT dal .env, altrimenti 5210 (come server/index.ts)."""
+    try:
+        m = re.search(r"^\s*LOGBOOK_PORT\s*=\s*(\d+)\s*$", (DIR / ".env").read_text(encoding="utf-8"), re.MULTILINE)
+    except OSError:
+        m = None
+    return int(m.group(1)) if m else 5210
+
+
+def indirizzo_di_rete() -> str | None:
+    """Indirizzo IPv4 di questo PC sulla rete locale, quello da dare ai colleghi.
+    Il "connect" su UDP non spedisce nulla: serve solo a farsi dire da Windows quale scheda
+    userebbe per uscire. None se il PC non è in rete."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))  # indirizzo di documentazione (RFC 5737), mai raggiunto
+            ip = s.getsockname()[0]
+        return None if ip.startswith("127.") else ip
+    except OSError:
+        return None
+
+
+def powershell(script: str) -> subprocess.CompletedProcess:
+    """Esegue uno script PowerShell senza passare da cmd (niente problemi di virgolette)."""
+    return subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], capture_output=True, text=True, timeout=300)
+
+
+def apri_firewall(porta: int) -> str:
+    """Crea la regola del firewall di Windows che lascia entrare gli altri dispositivi sulla
+    porta di Copilota. Restituisce una nota per il riepilogo finale; non solleva mai: senza
+    regola Copilota funziona lo stesso su questo PC, e la si può creare dopo a mano.
+
+    - Solo TCP sulla porta di Copilota e solo dalla stessa sottorete (RemoteAddress
+      LocalSubnet): chi sta su un'altra rete non passa nemmeno se il router lo inoltrasse.
+    - Tutti i profili (Any): in molti uffici Windows classifica la rete come "Pubblica", e una
+      regola limitata a "Privata" non avrebbe effetto.
+    - Serve il consenso da amministratore: la regola si crea in un PowerShell elevato
+      (finestra "Vuoi consentire…?"). Il comando viaggia in -EncodedCommand (base64 UTF-16)
+      per non dover annidare virgolette dentro virgolette.
+    - Se la regola c'è già non si chiede nulla.
+    """
+    if os.name != "nt":
+        return "firewall: non è Windows, niente da fare"
+    say(f'    regola del firewall "{REGOLA_FIREWALL}" (porta {porta}, solo dalla stessa rete)')
+    if DRY:
+        return "firewall: prova a vuoto, regola non creata"
+    regola_presente = f"if (Get-NetFirewallRule -DisplayName '{REGOLA_FIREWALL}' -ErrorAction SilentlyContinue) {{ 'SI' }} else {{ 'NO' }}"
+    try:
+        if "SI" in powershell(regola_presente).stdout:
+            return "firewall: la regola c'era già"
+        crea = (
+            f"New-NetFirewallRule -DisplayName '{REGOLA_FIREWALL}' "
+            "-Description 'Copilota (ore e presenze): accesso dagli altri PC e telefoni della stessa rete. Creata da InstallaLogbook.' "
+            f"-Direction Inbound -Action Allow -Protocol TCP -LocalPort {porta} -RemoteAddress LocalSubnet -Profile Any"
+        )
+        codificato = base64.b64encode(crea.encode("utf-16-le")).decode("ascii")
+        say("    Windows chiede il consenso da amministratore: rispondere Sì.")
+        powershell(f"Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','{codificato}'")
+        if "SI" in powershell(regola_presente).stdout:
+            return "firewall: regola creata"
+    except Exception as e:  # noqa: BLE001 - PowerShell assente, consenso negato, tempo scaduto
+        say(f"    firewall: {e}")
+    return (
+        f"firewall: regola NON creata (consenso negato?). Gli altri dispositivi non arrivano a Copilota finché non si apre "
+        f"la porta {porta} TCP in entrata, o si rilancia l'installatore"
+    )
+
+
+def installa_cloudflared() -> str:
+    """Installa cloudflared (Cloudflare Tunnel) con winget, se manca. Lo usa tunnel-prova.bat
+    per dare a Copilota un indirizzo https temporaneo raggiungibile da fuori ufficio. Qui si
+    installa soltanto: il tunnel lo apre chi usa il PC, quando serve, e si chiude con la finestra.
+    Restituisce una nota per il riepilogo; non solleva mai."""
+    predefinito = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "cloudflared" / "cloudflared.exe"
+    if shutil.which("cloudflared") or predefinito.exists():
+        return "tunnel di prova: cloudflared c'era già, si apre con tunnel-prova.bat"
+    if not shutil.which("winget"):
+        return "tunnel di prova: winget non trovato, installare cloudflared a mano dal sito di Cloudflare"
+    try:
+        run("winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements --disable-interactivity")
+    except RuntimeError as e:
+        return f"tunnel di prova: cloudflared non installato ({e})"
+    return "tunnel di prova: cloudflared installato, si apre con tunnel-prova.bat"
 
 
 def crea_collegamento() -> None:
@@ -200,6 +327,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Installatore di Copilota fuori dalla suite")
     ap.add_argument("--si", action="store_true", help="nessuna domanda")
     ap.add_argument("--senza-collegamento", action="store_true", help="non crea l'icona sul desktop")
+    ap.add_argument("--rete", action="store_true", help="apre Copilota alla rete dell'ufficio (firewall compreso) senza chiederlo")
+    ap.add_argument("--tunnel", action="store_true", help="installa cloudflared per provare Copilota da fuori ufficio (tunnel-prova.bat)")
     ap.add_argument("--dry-run", action="store_true", help="mostra i passi senza eseguirli")
     args = ap.parse_args()
     DRY, SENZA_DOMANDE = args.dry_run, args.si
@@ -232,13 +361,26 @@ def main() -> int:
         # Le credenziali servono solo se il database non esiste ancora (prima installazione).
         nuovo = not (DIR / "data" / "logbook.db").exists()
         credenziali = chiedi_credenziali_admin() if nuovo else None
-        nota_env = prepara_env(credenziali[0] if credenziali else "admin")
+        nota_env = prepara_env(credenziali[0] if credenziali else "admin", rete=args.rete)
         say(f"    {nota_env}")
         say("4. Database e interfaccia")
         run("npm run prestart", env={"LOGBOOK_ADMIN_USERNAME": credenziali[0], "LOGBOOK_ADMIN_PASSWORD": credenziali[1], "LOGBOOK_ADMIN_DEFINITIVA": "1"} if credenziali else None)
         if not args.senza_collegamento:
             say("5. Collegamento sul desktop")
             crea_collegamento()
+        # Passo 6: solo se Copilota ascolta sulla rete (scelta appena fatta, --rete, o .env di prima).
+        # In prova a vuoto il .env non viene scritto: vale l'opzione.
+        porta = porta_copilota()
+        in_rete = rete_aperta() or (DRY and args.rete)
+        note_rete: list[str] = []
+        if in_rete:
+            say("6. Rete dell'ufficio")
+            note_rete.append(apri_firewall(porta))
+            if args.tunnel or chiedi("Vuoi poter provare Copilota anche da fuori ufficio, dal telefono (tunnel temporaneo)? [s/N]").lower() in SI:
+                note_rete.append(installa_cloudflared())
+        elif args.tunnel:
+            say("6. Tunnel di prova")
+            note_rete.append(installa_cloudflared())
     except Exception as e:  # noqa: BLE001 - qualsiasi errore va mostrato a chi installa
         say()
         say(f"ERRORE: {e}")
@@ -248,12 +390,29 @@ def main() -> int:
 
     say()
     say("Copilota è installato.")
-    say("  Avvio: icona Copilota sul desktop (o avvia.bat), poi http://127.0.0.1:5210")
+    say(f"  Avvio: icona Copilota sul desktop (o avvia.bat), poi http://127.0.0.1:{porta}")
     if credenziali:
         say(f"  Si entra con l'utente {credenziali[0]} e la password appena scelta: è il proprietario di Copilota.")
     elif nuovo:
         say("  Si entra con l'utente admin e la password provvisoria scritta qui sopra (riga ATTENZIONE): annotarla ora.")
     say(f"  {nota_env}")
+    if in_rete:
+        ip = indirizzo_di_rete()
+        say()
+        say("  Dagli altri PC e dai telefoni collegati alla rete dell'ufficio:")
+        say(f"    http://{ip}:{porta}" if ip else f"    http://<indirizzo di questo PC>:{porta} (il PC ora non risulta in rete)")
+        say("    L'indirizzo lo dà il router e può cambiare: conviene farlo fissare da chi gestisce la rete.")
+        say("    Senza HTTPS la password viaggia in chiaro sulla rete interna e il telefono non propone")
+        say("    l'installazione sulla schermata: per quello serve un indirizzo https (accesso-da-internet.md).")
+        say("    Questo PC deve restare acceso e con Copilota avviato: non parte da solo all'accensione.")
+        say("    Per tornare al solo PC: togliere LOGBOOK_API_HOST dal .env, riavviare Copilota e cancellare")
+        say(f'    la regola "{REGOLA_FIREWALL}" dal firewall di Windows.')
+    for nota in note_rete:
+        say(f"  {nota}")
+    if any("tunnel-prova.bat" in n for n in note_rete):
+        say("    tunnel-prova.bat: doppio clic con Copilota avviato; l'indirizzo https://….trycloudflare.com compare")
+        say("    nella finestra, cambia a ogni avvio e si spegne chiudendola. È per provare, non per i dipendenti.")
+        say("    Prima di aprirlo controllare che non ci siano account di esempio attivi (Impostazioni → Dati del programma).")
     say("  Dentro la suite lo stesso Copilota si apre anche dalla card del Portale.")
     if sys.stdin and sys.stdin.isatty() and not SENZA_DOMANDE:
         input("Premi Invio per chiudere...")
