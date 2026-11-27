@@ -53,6 +53,12 @@ cartella parte nei due modi, con lo stesso database e lo stesso `.env`.
      temporaneo per provarlo dal telefono fuori ufficio; cambia a ogni avvio e si spegne
      chiudendo la finestra. Rilanciato su un'installazione già fatta, l'installatore non
      tocca il `.env` (con `--rete` aggiunge solo quella riga) e non ricrea la regola.
+  4. **Per nome, senza numero di porta (dal 27/11/2026)**: alla domanda "Vuoi che si apra per
+     nome?" (o con `--rete --nome`) scrive `LOGBOOK_PERCORSO=/copilota` e
+     `LOGBOOK_PORTA_WEB=80` e apre nel firewall anche la porta 80 (regola **"Copilota 80
+     (rete locale)"**). L'indirizzo per i colleghi diventa **`http://<nome del PC>/copilota`**.
+     Il nome del PC lo riconoscono i PC Windows della stessa rete; sui telefoni può non
+     funzionare, e lì resta valido l'indirizzo con i numeri (`http://<indirizzo>:5210`).
 
   Da sapere sulla rete: senza HTTPS la password viaggia in chiaro sulla rete interna e il
   telefono non propone l'installazione sulla schermata; l'indirizzo del PC lo dà il router
@@ -323,6 +329,8 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `LOGBOOK_PORT` | `5210` | Porta in produzione (`npm start`) |
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
 | `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale. Avviato dal Portale usare `LOGBOOK_API_HOST`: il Portale passa `HOST` e vince sul `.env`. Serve anche la porta 5210 aperta nel firewall di Windows. Per provarlo da fuori ufficio: `tunnel-prova.bat` (indirizzo temporaneo) |
+| `LOGBOOK_PERCORSO` | — | Copilota sotto un nome: con `/copilota` l'indirizzo è `http://<nome del PC>/copilota`. Il server toglie il prefisso (`server/app.ts`), l'interfaccia viene compilata con quella base (`vite.config.ts`). Le pagine aperte senza prefisso vengono mandate a quelle col prefisso. Non su Vercel |
+| `LOGBOOK_PORTA_WEB` | — | Seconda porta su cui risponde lo stesso Copilota, di solito `80`, per non scrivere il numero nell'indirizzo. Se è occupata Copilota avvisa e resta sulla principale. Va aperta nel firewall |
 | `LOGBOOK_ADMIN_REIMPOSTA` | — | `1` = alla preparazione del database reimposta la password dell'amministratore indicato (provvisoria). Per il recupero, da togliere subito dopo: docs/vercel.md |
 | `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
 | `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Copilota usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |

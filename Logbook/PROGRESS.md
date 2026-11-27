@@ -1248,3 +1248,17 @@ Richieste dell'utente: "vorrei che il programma potesse essere chiamato via nome
 - Provato su questo PC: icona "Copilota" creata sul desktop; con Copilota acceso il launcher apre la finestra "Copilota - ore e presenze" in Edge. NON provato il ramo "Copilota spento" (avvio nascosto e attesa).
 - **Per nome invece che per porta, dagli altri PC**: oggi funziona già `http://ws-sviluppoia:5210` (nome di questo PC) dai PC Windows della rete. Per togliere anche la porta e avere un nome come `copilota` servono scelte dell'utente (porta 80, nome nella rete): chieste, in attesa.
 - **Account in locale**: l'utente `admin` del database di questo PC è stato rinominato `alessio_mangiagi` (stessa riga, stesso storico) e `LOGBOOK_PROPRIETARIO` nel `.env` aggiornato; Copilota riavviato. La password chiesta dall'utente ha 11 caratteri e la regola degli amministratori ne vuole 12 (`PASSWORD_MIN_ADMIN` in `server/auth/password.ts`): non impostata, chiesto all'utente come procedere.
+
+### Copilota aperto per nome: `http://ws-sviluppoia/copilota` (27/11/2026)
+
+Risposte dell'utente `1c 2 http://ws-sviluppoia/copilota 3b`.
+
+- **Percorso.** Variabile nuova `LOGBOOK_PERCORSO` (regola in `comune/percorso.ts`, `normalizzaPercorso`). `server/app.ts` toglie il prefisso dall'indirizzo prima di tutto il resto, quindi rotte, file e API restano scritti come alla radice; le pagine chieste senza prefisso vengono mandate (302) a quelle col prefisso, API e file no. `vite.config.ts` usa lo stesso valore come `base` (letto anche dal `.env`); nel browser `src/percorso.ts` (`PERCORSO`, `conPercorso`) lo antepone alle chiamate di `src/api.ts`, al link dei file e ai loghi, e `App.tsx` lo passa al router come `basename`. Manifest con indirizzi relativi, validi in tutti e due i casi.
+- **Porta.** Variabile nuova `LOGBOOK_PORTA_WEB`: `server/index.ts` apre un secondo ascolto sulla stessa app; se la porta è occupata avvisa e continua. La 5210 resta per Portale, icona e controlli di avvio.
+- **Senza le due variabili non cambia nulla** (anche su Vercel): `percorso.test.ts` lo controlla.
+- **Installatore**: domanda "per nome" e opzione `--nome`, regola del firewall "Copilota 80 (rete locale)", indirizzo col nome nel riepilogo. `InstallaLogbook.exe` ricompilato.
+- **Su questo PC**: `.env` con `/copilota` e porta 80, regola del firewall creata, Copilota riavviato.
+- Verifiche: 312 test passati (6 nuovi in `percorso.test.ts`), typecheck pulito; da browser vero (Edge, `scratchpad/prova-nome.mjs`) 11 controlli su 11: pagina di accesso su `http://ws-sviluppoia/copilota/`, tutte le richieste sotto il prefisso, login rifiutato col messaggio del server, `/calendario` portato sotto il prefisso, porta 5210 ancora valida.
+- NON provato: l'uso da collegato sotto il prefisso nel browser (l'accesso dell'amministratore chiede il codice via email; le API da collegato sono coperte dai test) e l'apertura da un altro PC o da un telefono. I telefoni di solito non risolvono il nome di un PC Windows.
+- Nota per i test: `vitest` va lanciato da un percorso con la lettera del disco maiuscola (`C:/…`); da `c:\…` fallisce con "Vitest failed to find the runner".
+- **Password del proprietario in locale** impostata come chiesto (risposta 1c), definitiva. **Limite dei 30 accessi per indirizzo** lasciato com'è (risposta 3b).
