@@ -63,6 +63,13 @@ Le scansioni vanno sempre ricontrollate sul file: un "Da controllare" su una
 scansione storta è voluto, per non respingere un fornitore in regola per un
 errore di lettura.
 
+Come lo decide il programma: per ogni pagina scansionata l'OCR dice anche quanto è
+sicuro di quello che ha letto. Se in media è sotto il 60%, un requisito obbligatorio
+che il programma non trova esce **Da controllare** e non **Non conforme**, con il
+motivo «Testo da OCR poco affidabile: da controllare a mano». Una pagina pulita sta
+di solito sopra l'80%; una pagina stampata di traverso o molto sbiadita scende sotto
+il 30%.
+
 ## 4.4 Il report Excel
 
 Il pulsante **Excel** dello Storico scarica il report della verifica (documento,

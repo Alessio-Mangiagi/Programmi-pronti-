@@ -45,7 +45,11 @@ upload  ->  archivio (data/archivio)  ->  estrazione testo  ->  indice + verific
   solo testo.
 - **OCR** (`src/services/ocr/`): motori intercambiabili, si sceglie con `motoreOcr` in
   `config.json`.
-  - `tesseract` — funzionante; per i PDF serve `pdftoppm` (poppler) nel PATH;
+  - `tesseract` — funzionante; per i PDF serve `pdftoppm` (poppler) nel PATH. Dal
+    27/11/2026 ogni pagina porta anche la sua **confidenza** (0-1, dal TSV di Tesseract:
+    media delle parole pesata sulla lunghezza, `confidenzaDaTsv`). Sotto `CONFIDENZA_MINIMA`
+    (0,6, in `regole.ts`) un requisito che non si trova su una scansione è «dubbio» e non
+    «ko». Provato su pagine vere: contratto pulito 0,85, pagina stampata di traverso 0,24;
   - `paddle` — segnaposto, da collegare al worker di `ocr-documenti`;
   - `claude` — segnaposto, vision a pagamento: serve chiave API e tetto di spesa.
 - **indice** (`src/services/indice.ts`): full-text in memoria, ricostruito all'avvio.
@@ -124,14 +128,12 @@ data/verifiche.json   storico esiti
 ## Da fare (lo scheletro si ferma qui)
 
 - collegare PaddleOCR e/o Claude vision (i due adattatori segnaposto);
-- confidenza per pagina: Tesseract la sa dare (`tsv`), ora non viene letta e la soglia
-  `CONFIDENZA_MINIMA` in `regole.ts` lavora quindi solo sui motori che la forniranno;
 - editor a campi per le checklist (oggi si modifica il JSON).
 
 ## Test
 
-`npm test` (63 casi): motore delle regole, ricerca, import da Claude, fogli, firma, token della
-suite e, dal 27/11/2026, i **test di integrazione delle rotte**:
+`npm test` (66 casi): motore delle regole, ricerca, import da Claude, fogli, firma, token della
+suite, confidenza delle pagine di Tesseract e, dal 27/11/2026, i **test di integrazione delle rotte**:
 
 - `src/__tests__/rotte.test.ts`: l'app vera in ascolto su una porta libera, chiamata con
   `fetch` come fa la pagina. Checklist (crea, modifica, elimina, errori di compilazione),
