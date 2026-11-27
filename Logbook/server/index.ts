@@ -90,6 +90,22 @@ const server = app.listen(porta, host, (errore?: Error) => {
   console.log(`[logbook] ${produzione ? 'Copilota' : 'API'} in ascolto su http://${host}:${porta}`);
 });
 
+// Seconda porta (27/11/2026): con LOGBOOK_PORTA_WEB=80 lo stesso Copilota risponde anche
+// sulla porta predefinita del web, così dagli altri PC si scrive http://<nome del PC>/copilota
+// senza numero. La porta principale resta quella di sempre (la usano il Portale, l'icona
+// del desktop e i controlli di avvio). Se la porta web è occupata o vietata si avvisa e
+// basta: Copilota continua a funzionare sulla principale.
+const portaWeb = produzione ? Number(process.env.LOGBOOK_PORTA_WEB) || 0 : 0;
+const serverWeb =
+  portaWeb && portaWeb !== porta
+    ? app.listen(portaWeb, host, (errore?: Error) => {
+        if (!errore) console.log(`[logbook] Copilota anche su http://${host}:${portaWeb} (LOGBOOK_PORTA_WEB)`);
+      })
+    : null;
+serverWeb?.on('error', (err: NodeJS.ErrnoException) => {
+  console.warn(`[logbook] porta ${portaWeb} non disponibile (${err.code ?? err.message}): Copilota resta raggiungibile solo sulla ${porta}`);
+});
+
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`[logbook] la porta ${porta} è già occupata: Copilota è già aperto in un'altra finestra?`);
@@ -102,6 +118,7 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 /** Chiusura pulita (Ctrl+C, riavvio di tsx watch): rilascia il file SQLite. */
 async function chiudi() {
   server.close();
+  serverWeb?.close();
   await prisma.$disconnect();
   process.exit(0);
 }

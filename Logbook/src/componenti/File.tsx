@@ -10,6 +10,7 @@
  * LinkFile: nome, dimensione e link che apre il file in una nuova scheda (PDF e immagini)
  * o lo scarica (gli altri formati). Il server decide chi può aprirlo (server/rotte/file.ts).
  */
+import { conPercorso } from '../percorso';
 import { useRef, useState } from 'react';
 import { ESTENSIONI_FILE, formattaDimensione, MAX_MB_FILE } from '../../comune/documenti';
 import { api } from '../api';
@@ -23,7 +24,7 @@ const AIUTO_TUTTI = 'PDF, immagini, Word, Excel';
 export function LinkFile({ file, compatto = false }: { file: VistaFile; compatto?: boolean }) {
   return (
     <a
-      href={`/api/file/${file.id}`}
+      href={conPercorso(`/api/file/${file.id}`)}
       target="_blank"
       rel="noopener"
       onClick={(e) => e.stopPropagation()}

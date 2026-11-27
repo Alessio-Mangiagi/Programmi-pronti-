@@ -13,6 +13,7 @@
  *    (richiediAdmin) o per dipendente (dipendenteAmmesso).
  */
 import express from 'express';
+import { normalizzaPercorso } from '../comune/percorso';
 import type { PrismaClient } from '../generated/prisma/client';
 import { oggiItalia } from '../comune/date';
 import { gestoreErrori } from './errori';
@@ -71,6 +72,8 @@ export type OpzioniApp = {
   limitatoreSuDatabase?: boolean;
   /** Cartella delle copie di sicurezza (i test ne passano una temporanea). */
   cartellaBackup?: string;
+  /** Percorso sotto cui vive Copilota, es. "/copilota" (default: LOGBOOK_PERCORSO; vuoto = radice). */
+  percorso?: string;
 };
 
 export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
@@ -79,6 +82,30 @@ export function creaApp(prisma: PrismaClient, opzioni: OpzioniApp = {}) {
   const cartellaDocumenti = opzioni.cartellaDocumenti ?? cartellaDocumentiPredefinita();
   const app = express();
   app.disable('x-powered-by');
+  // Copilota aperto per nome (27/11/2026): con LOGBOOK_PERCORSO=/copilota l'indirizzo è
+  // http://<nome del PC>/copilota. Qui, prima di tutto il resto, il prefisso viene TOLTO
+  // dall'indirizzo della richiesta: rotte, file statici e API restano scritti come alla
+  // radice e non sanno nulla del percorso. La pagina compilata punta già agli indirizzi col
+  // prefisso (base di vite.config.ts) e il browser li aggiunge alle API (src/percorso.ts).
+  // Chi arriva senza prefisso su una pagina (vecchio segnalibro, icona del desktop, card del
+  // Portale su http://127.0.0.1:5210) viene mandato a quella col prefisso: senza, il router
+  // del browser non riconoscerebbe l'indirizzo. Le API e i file (indirizzi con estensione)
+  // rispondono anche senza prefisso: servono ai controlli di avvio (/api/salute).
+  const percorso = normalizzaPercorso(opzioni.percorso ?? process.env.LOGBOOK_PERCORSO);
+  if (percorso) {
+    app.use((req, res, next) => {
+      if (req.url === percorso || req.url.startsWith(`${percorso}/`) || req.url.startsWith(`${percorso}?`)) {
+        const resto = req.url.slice(percorso.length);
+        req.url = resto.startsWith('/') ? resto : `/${resto}`;
+        return next();
+      }
+      const soloPercorso = req.path;
+      const pagina = (req.method === 'GET' || req.method === 'HEAD') && soloPercorso !== '/api' && !soloPercorso.startsWith('/api/') && !/\.[A-Za-z0-9]+$/.test(soloPercorso);
+      // Solo indirizzi che cominciano con una barra sola: "//altro.sito" in Location sarebbe un salto a un altro sito.
+      if (pagina && !req.url.startsWith('//')) return res.redirect(302, `${percorso}${req.url}`);
+      next();
+    });
+  }
   // Intestazioni di sicurezza su ogni risposta (verifica del Giorno 23): niente indirizzo
   // della pagina mandato ad altri siti, niente "indovinare" il tipo dei file.
   app.use((_req, res, next) => {

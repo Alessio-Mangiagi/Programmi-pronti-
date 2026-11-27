@@ -11,6 +11,7 @@
  * - se la sessione si è chiusa da sola dopo 15 minuti senza fare nulla, lo si dice
  *   (auth.tsx lo ricorda in sessionStorage con la chiave CHIAVE_INATTIVITA).
  */
+import { conPercorso } from '../percorso';
 import { useState, type FormEvent } from 'react';
 import { ErroreApi } from '../api';
 import { CHIAVE_INATTIVITA, useAuth } from '../auth';
@@ -84,7 +85,7 @@ export function Login() {
     <div className="flex min-h-[100dvh] items-center justify-center bg-fondo p-3 sm:p-4">
       <div className="scheda flex w-full max-w-3xl flex-col overflow-hidden md:flex-row">
         <div className="flex items-center gap-3 bg-marchio px-5 py-4 text-white md:hidden">
-          <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
+          <img src={conPercorso('/logo-cosedil-chiaro.png')} alt="" className="h-10 w-10 rounded-lg" />
           <div className="leading-tight">
             <div className="font-display text-xl font-medium">Copilota</div>
             <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>
@@ -92,7 +93,7 @@ export function Login() {
         </div>
         <div className="relative hidden min-w-0 flex-[1.05_1_0%] flex-col justify-between gap-6 bg-marchio p-8 text-white md:flex">
           <div className="flex items-center gap-3">
-            <img src="/logo-cosedil-chiaro.png" alt="" className="h-12 w-12 rounded-lg" />
+            <img src={conPercorso('/logo-cosedil-chiaro.png')} alt="" className="h-12 w-12 rounded-lg" />
             <div className="font-ui text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>
           </div>
           <div>

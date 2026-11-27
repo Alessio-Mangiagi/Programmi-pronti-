@@ -8,6 +8,7 @@
  * rispondono 403, server/middleware.ts); dopo il salvataggio si rilegge l'utente e si entra.
  * Stessa impaginazione della pagina di accesso (Login.tsx).
  */
+import { conPercorso } from '../percorso';
 import { useAuth } from '../auth';
 import { ModuloPassword } from '../componenti/CambiaPassword';
 import { Pulsante } from '../componenti/ui';
@@ -18,7 +19,7 @@ export function PasswordProvvisoria() {
     <div className="flex min-h-[100dvh] items-center justify-center bg-fondo p-3 sm:p-4">
       <div className="scheda w-full max-w-md overflow-hidden">
         <div className="flex items-center gap-3 bg-marchio px-5 py-4 text-white">
-          <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
+          <img src={conPercorso('/logo-cosedil-chiaro.png')} alt="" className="h-10 w-10 rounded-lg" />
           <div className="leading-tight">
             <div className="font-display text-xl font-medium">Copilota</div>
             <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/70">Suite Cosedil</div>

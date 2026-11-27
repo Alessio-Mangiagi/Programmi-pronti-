@@ -9,6 +9,7 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { FornitoreAuth, useAuth } from './auth';
+import { PERCORSO } from './percorso';
 import { Layout } from './componenti/Layout';
 import { Caricamento } from './componenti/ui';
 import { Assenze } from './pagine/Assenze';
@@ -70,7 +71,8 @@ function Rotte() {
 export default function App() {
   return (
     <FornitoreAuth>
-      <BrowserRouter>
+      {/* basename: sotto LOGBOOK_PERCORSO le pagine sono /copilota/calendario e così via (src/percorso.ts). */}
+      <BrowserRouter basename={PERCORSO || undefined}>
         <Rotte />
       </BrowserRouter>
     </FornitoreAuth>

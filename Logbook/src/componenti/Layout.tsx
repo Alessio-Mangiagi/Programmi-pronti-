@@ -16,6 +16,7 @@
  * wide: le pagine dispongono i blocchi in flexbox con a capo automatico (src/index.css,
  * "Layout adattabile"). Fino al 23/11 era fermo a 1400px al centro.
  */
+import { conPercorso } from '../percorso';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { formattaData, oggiIso } from '../../comune/date';
@@ -62,7 +63,7 @@ export function Layout() {
         }`}
       >
         <div className="flex items-center gap-3 border-b border-white/15 px-4 py-4">
-          <img src="/logo-cosedil-chiaro.png" alt="" className="h-10 w-10 rounded-lg" />
+          <img src={conPercorso('/logo-cosedil-chiaro.png')} alt="" className="h-10 w-10 rounded-lg" />
           <div className="leading-tight">
             <div className="font-display text-xl font-medium tracking-wide">Copilota</div>
             <div className="font-ui text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/65">Ore e presenze</div>

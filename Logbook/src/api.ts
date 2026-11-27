@@ -8,6 +8,7 @@
  *   e gli eventuali errori per campo, da mostrare nei moduli.
  * - Un 401 avvisa l'app (evento "logbook:sessione-scaduta") che torna al login.
  */
+import { conPercorso } from './percorso';
 
 export class ErroreApi extends Error {
   constructor(
@@ -50,7 +51,8 @@ async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown, g
   }
   let r: Response;
   try {
-    r = await fetch(percorso, { method: metodo, headers: intestazioni, body, credentials: 'same-origin' });
+    // conPercorso: sotto LOGBOOK_PERCORSO le API stanno in /copilota/api/… (src/percorso.ts).
+    r = await fetch(conPercorso(percorso), { method: metodo, headers: intestazioni, body, credentials: 'same-origin' });
   } catch {
     throw new ErroreApi(0, 'Server non raggiungibile: controlla che Copilota sia avviato');
   }
@@ -98,7 +100,7 @@ export const api = {
  * Usa POST se c'è un corpo (filtri dei report), GET altrimenti.
  */
 export async function scaricaFile(percorso: string, corpo?: unknown): Promise<void> {
-  const r = await fetch(percorso, {
+  const r = await fetch(conPercorso(percorso), {
     method: corpo ? 'POST' : 'GET',
     headers: { 'X-Logbook': '1', ...(corpo ? { 'Content-Type': 'application/json' } : {}) },
     body: corpo ? JSON.stringify(corpo) : undefined,
