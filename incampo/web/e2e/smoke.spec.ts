@@ -1,4 +1,5 @@
 // "><(((º> sabusabu <º)))><"
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 // Utenti del seed demo (scripts/seed.py).
@@ -240,6 +241,43 @@ test('vista task: filtri, cambio stato/assegnatario inline, link alla planimetri
   await expect(page).not.toHaveURL(/pin=/) // parametro consumato
   const zoom = await page.locator('.plan-zoom').textContent()
   expect(Number(zoom!.replace('%', ''))).toBeGreaterThanOrEqual(100)
+})
+
+test('vista task: Esporta CSV del filtro corrente, con le formule disinnescate', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: /Cantiere demo/ }).click()
+  await page.getByRole('link', { name: 'Task', exact: true }).click()
+  await page.waitForURL('**/tasks')
+  const projectId = page.url().split('/projects/')[1].split('/')[0]
+  const token = await page.evaluate(() => localStorage.getItem('fieldview.token'))
+  const auth = { Authorization: `Bearer ${token}` }
+
+  // titolo scritto in cantiere che Excel eseguirebbe come formula (link cliccabile)
+  const titolo = '=COLLEG.IPERTESTUALE("http://esempio.invalid";"clic") csv-e2e'
+  const res = await page.request.post('/api/tasks', {
+    headers: auth,
+    data: { project_id: projectId, title: titolo, description: 'con "virgolette"; e punto e virgola' },
+  })
+  expect(res.status()).toBe(201)
+  const taskId = (await res.json()).id
+
+  // il CSV prende il filtro della pagina (qui la ricerca), non solo la pagina visibile
+  await page.getByLabel('Cerca').fill('csv-e2e')
+  await expect(page).toHaveURL(/q=csv-e2e/)
+  await expect(page.locator('.tasks-table tbody tr')).toHaveCount(1)
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Esporta CSV' }).click()])
+  expect(download.suggestedFilename()).toMatch(/^task-\d{4}-\d{2}-\d{2}\.csv$/)
+  const testo = readFileSync(await download.path(), 'utf-8')
+  expect(testo.charCodeAt(0)).toBe(0xfeff) // BOM: Excel legge gli accenti
+  const righe = testo.slice(1).split('\r\n')
+  expect(righe[0]).toBe('"titolo";"descrizione";"stato";"assegnato_a";"scadenza";"dove";"creato_da";"creato_il";"risolto_il"')
+  expect(righe).toHaveLength(2)
+  // apostrofo davanti alla formula, virgolette raddoppiate, punto e virgola dentro la cella
+  expect(righe[1].startsWith(`"'=COLLEG.IPERTESTUALE(""http://esempio.invalid"";""clic"") csv-e2e";"con ""virgolette""; e punto e virgola";"Aperto";`)).toBe(true)
+  expect(righe[1]).toContain('"Cantiere (generale)";"Maria Manager"')
+
+  // pulizia
+  expect((await page.request.delete(`/api/tasks/${taskId}`, { headers: auth })).status()).toBe(204)
 })
 
 test('il responsabile non crea moduli: niente "Nuovo modulo", "Duplica" né editor vuoto', async ({ page }) => {

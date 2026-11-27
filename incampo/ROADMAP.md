@@ -1,3 +1,4 @@
+<!-- "><(((º> sabusabu <º)))>< -->
 # Roadmap MVP Field View — piano giornaliero
 
 Piano operativo in 30 giorni lavorativi (6 settimane) + settimana 0 di discovery.
@@ -233,7 +234,7 @@ Non blocca la settimana 1 (il backend si consolida comunque). Blocca il giorno 5
 - Form builder con drag&drop e logica condizionale (mostra campo X se Y = ...).
 - Conflitti con `version` incrementale e risoluzione manuale invece di LWW.
 - Ruoli e permessi granulari per modulo.
-- Export PDF di submission (report ispezione firmato) e CSV task.
+- ✅ Export PDF di submission (report ispezione firmato) e CSV task: `GET /submissions/{id}/pdf` (pulsante "Scarica PDF", con la firma) ed "Esporta CSV" nella pagina Task, fatti prima dell'arrivo nella suite. Il 27/11/2026: formule disinnescate nei CSV, testata del PDF "INCAMPO", firma nel PDF coperta da test.
 - Pin su più pagine PDF / più livelli per planimetria.
 - Notifiche in-app e digest giornaliero.
 - Clustering pin per planimetrie con migliaia di segnalazioni.

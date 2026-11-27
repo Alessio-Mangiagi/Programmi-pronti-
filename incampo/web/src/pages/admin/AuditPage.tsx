@@ -1,6 +1,8 @@
+// "><(((º> sabusabu <º)))><"
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../../api/client'
+import { downloadCsv } from '../../csv'
 import type { components } from '../../api/schema'
 import type { Project, User } from '../../api/types'
 import { useAuth } from '../../auth/useAuth'
@@ -91,13 +93,10 @@ function summarize(it: AuditItem): string {
   }
 }
 
-function toCsv(items: AuditItem[], label: (a: string) => string): string {
-  const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const head = ['data', 'utente', 'email', 'azione', 'dettaglio', 'progetto', 'entita', 'entita_id', 'ip']
-  const rows = items.map((it) =>
-    [fmtDateTime(it.created_at), it.actor_name, it.actor_email, label(it.action), summarize(it), it.project_name, it.entity_type, it.entity_id, it.ip].map(esc).join(';'),
-  )
-  return [head.join(';'), ...rows].join('\r\n')
+// Righe del CSV del registro: la scrittura (virgolette, formule disinnescate, BOM) è in ../../csv.
+const CSV_HEAD = ['data', 'utente', 'email', 'azione', 'dettaglio', 'progetto', 'entita', 'entita_id', 'ip']
+function csvRows(items: AuditItem[], label: (a: string) => string): unknown[][] {
+  return items.map((it) => [fmtDateTime(it.created_at), it.actor_name, it.actor_email, label(it.action), summarize(it), it.project_name, it.entity_type, it.entity_id, it.ip])
 }
 
 /**
@@ -181,12 +180,7 @@ export default function AuditPage() {
   async function exportCsv() {
     const { data, error } = await api.GET('/audit', { params: { query: { ...query, limit: 500, offset: 0 } } })
     if (error || !data) return toast.error(errorMessage(error))
-    const blob = new Blob(['﻿' + toCsv(data.items, label)], { type: 'text/csv;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `registro-operazioni-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    downloadCsv(`registro-operazioni-${new Date().toISOString().slice(0, 10)}.csv`, CSV_HEAD, csvRows(data.items, label))
     if (data.total > 500) toast.info(`Esportate le prime 500 righe di ${data.total}: restringi il filtro per il resto`)
   }
 

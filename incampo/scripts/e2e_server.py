@@ -34,6 +34,9 @@ def main():
     os.environ.setdefault("SECRET_KEY", "e2e-secret-key-not-for-production-0000000000")
     # Dentro la suite app.server monta il gate del portale: nei test non c'è portale.
     os.environ.setdefault("COSEDIL_SSO", "off")
+    # DB e storage usa-e-getta con gli account demo: non è mai produzione. Senza, dentro la suite il
+    # .env creato da scripts/suite_env.py (APP_ENV=production) fa rifiutare il seed e l'e2e non parte.
+    os.environ["APP_ENV"] = "e2e"
 
     from alembic import command
     from alembic.config import Config

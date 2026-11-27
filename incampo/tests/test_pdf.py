@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """PDF del modulo compilato: contenuto, note per campo, foto dallo storage, permessi."""
 import io
 
@@ -50,6 +51,54 @@ def test_submission_pdf_with_notes_and_photos(client, project, pin, users):
     doc = PdfDocument(io.BytesIO(r.content))
     images = [o for page in doc for o in page.get_objects() if o.type == 3]  # 3 = FPDF_PAGEOBJ_IMAGE
     assert len(images) == 2
+
+
+def _firma_png() -> bytes:
+    """Firma come la manda l'app: PNG con trasparenza (RGBA), tratto nero su fondo trasparente."""
+    img = Image.new("RGBA", (400, 160), (0, 0, 0, 0))
+    for x in range(40, 360):
+        img.putpixel((x, 80 + (x % 30) - 15), (0, 0, 0, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_submission_pdf_report_firmato(client, project, pin, users):
+    """Il report d'ispezione firmato: la firma del campo "signature" entra nel PDF come immagine
+    (fondo trasparente reso bianco), in testa il nome del programma; firma mai caricata → didascalia."""
+    tpl = client.post("/form-templates", json={
+        "name": "Ispezione firmata",
+        "schema_def": {"fields": [
+            {"id": "esito", "type": "text", "label": "Esito"},
+            {"id": "firma", "type": "signature", "label": "Firma del preposto", "required": True},
+        ]},
+    }).json()
+    field = users["field"]["headers"]
+    firma_id = "33333333-3333-4333-8333-333333333333"
+    sub = client.post("/submissions", headers=field, json={
+        "template_id": tpl["id"], "pin_id": pin, "data_json": {"esito": "Conforme", "firma": firma_id}})
+    assert sub.status_code == 201, sub.text
+    sub = sub.json()
+    assert client.post("/attachments", headers=field,
+                       json={"id": firma_id, "submission_id": sub["id"], "file_type": "signature"}).status_code == 201
+    up = client.post(f"/attachments/{firma_id}/upload", headers=field, files={"file": ("firma.png", _firma_png(), "image/png")})
+    assert up.status_code == 200, up.text
+
+    r = client.get(f"/submissions/{sub['id']}/pdf", headers=field)
+    assert r.status_code == 200
+    text = _pdf_text(r.content)
+    for expected in ("INCAMPO · COSEDIL S.P.A.", "Ispezione firmata", "Firma del preposto *", "Conforme"):
+        assert expected in text, expected
+    assert "FIELD VIEW" not in text
+    assert "firma non disponibile" not in text
+    doc = PdfDocument(io.BytesIO(r.content))
+    assert len([o for page in doc for o in page.get_objects() if o.type == 3]) == 1
+
+    # firma registrata ma il file non è mai arrivato (telefono senza rete): il PDF esce lo stesso
+    altra = client.post("/submissions", headers=field, json={
+        "template_id": tpl["id"], "pin_id": pin, "data_json": {"esito": "Conforme", "firma": "mai-caricata"}}).json()
+    r = client.get(f"/submissions/{altra['id']}/pdf", headers=field)
+    assert r.status_code == 200 and "firma non disponibile" in _pdf_text(r.content)
 
 
 def test_submission_pdf_missing_photo_and_access(client, project, pin, users):

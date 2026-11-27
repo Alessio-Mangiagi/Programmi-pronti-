@@ -59,6 +59,18 @@ Nel cantiere clicca **Task**.
   planimetria centrata sul pin), *WBS · voce* oppure *Cantiere (generale)*.
 - Con molti task, in fondo ci sono i pulsanti per andare alla pagina successiva.
 
+### Il file CSV
+
+**Esporta CSV** scarica un file `task-AAAA-MM-GG.csv` che si apre con un doppio clic in
+Excel, accenti compresi. Contiene i task che vedi con i filtri di quel momento (tutte le
+pagine, non solo quella a video), una riga per task: titolo, descrizione, stato,
+assegnato a, scadenza, dove, creato da, creato il, risolto il.
+
+Un testo che comincia con `=`, `+`, `-` o `@` (per esempio un titolo scritto
+«=verificare ancoraggi») esce con un apostrofo davanti: senza, Excel lo prenderebbe per
+una formula e la eseguirebbe. In Excel l'apostrofo non si vede. Lo stesso vale per il CSV
+dei moduli compilati e per quello del registro operazioni.
+
 ### Cambiare stato, assegnatario e scadenza
 
 Si fa direttamente nella riga, senza aprire niente:

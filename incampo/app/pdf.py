@@ -1,3 +1,4 @@
+# "><(((º> sabusabu <º)))><"
 """
 PDF di un modulo compilato (GET /submissions/{id}/pdf).
 
@@ -186,7 +187,8 @@ def _header_block(sub: models.FormSubmission, template: models.FormTemplate, db:
     table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                                ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
     return [
-        _p("FIELD VIEW · COSEDIL S.P.A.", "eyebrow"),
+        # nome del programma: InCampo (Field View era il nome di lavoro, ed è un prodotto Trimble)
+        _p("INCAMPO · COSEDIL S.P.A.", "eyebrow"),
         _p(template.name, "title"),
         table,
         Spacer(1, 4 * mm),

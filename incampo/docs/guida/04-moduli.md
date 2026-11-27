@@ -99,7 +99,11 @@ In fondo ci sono i pulsanti:
 - **Modifica**: per chi ha compilato il modulo e per l'Ufficio. Si salva con **Salva modifiche**
   (*Modulo aggiornato*).
 - **Crea task da questo modulo**: compare quando non c'è non conformità.
-- **Scarica PDF**: il modulo in PDF, con foto e firma (*Preparo il PDF…*).
+- **Scarica PDF**: il modulo in PDF (*Preparo il PDF…*), il report da allegare o stampare:
+  in testa *INCAMPO · COSEDIL S.P.A.*, commessa, cantiere, dove (pin, voce WBS o cantiere),
+  chi l'ha compilato e quando; poi ogni campo con la risposta, le foto, le note e la **firma**
+  disegnata sul telefono. Se la firma non è ancora arrivata dal telefono (era senza rete),
+  al suo posto c'è la scritta *firma non disponibile*: riscarica il PDF dopo la sincronizzazione.
 - **Invia a SkyTower**: dopo la conferma *Caricare il PDF di questo modulo su SkyTower come
   documento della commessa?* il PDF diventa un documento della commessa in SkyTower
   (messaggio *Caricato su SkyTower: ...*). Serve che la commessa esista anche in SkyTower
