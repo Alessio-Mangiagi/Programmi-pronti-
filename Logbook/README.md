@@ -302,7 +302,7 @@ Tutto ha un default; per cambiarlo copiare `.env.example` in `.env`.
 | `DATABASE_URL` | `data/logbook.db` | Percorso del database (`file:C:/percorso/logbook.db`) |
 | `LOGBOOK_PORT` | `5210` | Porta in produzione (`npm start`) |
 | `LOGBOOK_API_PORT` | `3012` | Porta delle API in sviluppo (`npm run dev`) |
-| `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale |
+| `HOST` / `LOGBOOK_API_HOST` | `127.0.0.1` | Indirizzo di ascolto; `0.0.0.0` per la rete locale. Avviato dal Portale usare `LOGBOOK_API_HOST`: il Portale passa `HOST` e vince sul `.env`. Serve anche la porta 5210 aperta nel firewall di Windows. Per provarlo da fuori ufficio: `tunnel-prova.bat` (indirizzo temporaneo) |
 | `LOGBOOK_ADMIN_REIMPOSTA` | — | `1` = alla preparazione del database reimposta la password dell'amministratore indicato (provvisoria). Per il recupero, da togliere subito dopo: docs/vercel.md |
 | `LOGBOOK_ADMIN_USERNAME` / `LOGBOOK_ADMIN_PASSWORD` | `admin` / casuale | Primo amministratore, creato solo se non ne esiste nessuno. Li chiede l'installatore; senza password ne nasce una casuale mostrata una volta all'avvio |
 | `DATABASE_URL` (PostgreSQL) | — | Con un indirizzo `postgres://…` Copilota usa PostgreSQL: è la configurazione di Vercel (docs/vercel.md) |

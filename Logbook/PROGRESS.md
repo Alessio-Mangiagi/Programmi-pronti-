@@ -1205,3 +1205,13 @@ Chiude il "non provato sul sito pubblico" del Giorno 47. La chiusura l'ha fatta 
 - Notato nei log, non urgente: su `POST /api/documenti-progetto` il driver `pg` avvisa "Calling client.query() when the client is already executing a query is deprecated" (sarà un errore in pg 9). Oggi funziona; da guardare prima di aggiornare `@prisma/adapter-pg` a una versione che porta pg 9.
 - Il piano gratuito di Vercel tiene i log della funzione per circa 30 minuti: le prove sul sito pubblico vanno controllate subito.
 - Ancora da togliere a prove finite, quando l'utente lo dice: `PROVA-01`, Gastone Paperone, nota spese di prova.
+
+### Copilota di questo PC aperto alla rete dell'ufficio e tunnel di prova (27/11/2026)
+
+Risposte dell'utente `1a+b 2b`: aprirlo ai PC e ai telefoni dell'ufficio, più un tunnel temporaneo per provarlo da fuori; niente avvio automatico all'accensione.
+
+- **Rete dell'ufficio (fatto, attivo).** Nel `.env` locale `LOGBOOK_API_HOST=0.0.0.0` (non `HOST`: il Portale lo passa alle app che avvia e avrebbe la precedenza). Regola del firewall di Windows "Copilota 5210 (rete locale)": TCP 5210 in entrata, solo dalla stessa sottorete (`LocalSubnet`), tutti i profili perché la rete dell'ufficio su questo PC risulta "Pubblica". Copilota riavviato con `avvia.vbs`; risponde su `http://192.168.101.176:5210` (indirizzo di oggi, dato dal router: può cambiare).
+- **Limiti senza HTTPS**: la password viaggia in chiaro sulla rete interna e il telefono non propone l'installazione sulla schermata.
+- **Tunnel di prova (pronto, da lanciare a mano).** `cloudflared` installato con winget; `tunnel-prova.bat` apre un tunnel veloce verso `127.0.0.1:5210` e mostra l'indirizzo `https://….trycloudflare.com`, che cambia a ogni avvio e vive finché la finestra resta aperta. Nessuna modifica al codice: cookie `Secure` e indirizzo del client arrivano già giusti dietro un proxy locale. Non ancora provato dal telefono.
+- **Attenzione ai dati.** Il database di questo PC è quello dimostrativo: 5 dipendenti di esempio con account attivi e la password provvisoria scritta nel README. Finché Copilota è raggiungibile da altri, chi la conosce entra come uno di loro (dati finti). Da spegnere o cambiare prima di metterci dati veri.
+- Per tornare al solo PC: togliere `LOGBOOK_API_HOST` dal `.env`, riavviare, cancellare la regola del firewall.
