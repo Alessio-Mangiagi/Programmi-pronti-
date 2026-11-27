@@ -25,7 +25,8 @@ Passi:
    Il server di posta (LOGBOOK_SMTP_*) si completa dopo, a mano, nel .env;
 4. prepara il database e compila l'interfaccia (come il primo avvio: npm run prestart).
    Il database nuovo è vuoto, con l'utente admin e le festività nazionali;
-5. crea sul desktop il collegamento "Copilota" ad avvia.bat;
+5. crea sul desktop l'icona "Copilota", che lancia apri-copilota.vbs: avvia Copilota senza
+   finestra del terminale e lo apre in una finestra propria, come un programma tradizionale;
 6. rete (dal 27/11/2026), solo se al passo 3 si è scelto di aprirlo alla rete, o se il .env
    che c'era già lo apre:
    - regola del firewall di Windows "Copilota 5210 (rete locale)": porta di Copilota in
@@ -307,14 +308,25 @@ def installa_cloudflared() -> str:
 
 
 def crea_collegamento() -> None:
-    """Icona "Copilota" sul desktop dell'utente che punta ad avvia.bat (niente diritti di amministratore)."""
+    """Icona "Copilota" sul desktop dell'utente (niente diritti di amministratore).
+
+    Dal 27/11/2026 punta ad apri-copilota.vbs, lanciato con wscript.exe: avvia Copilota senza
+    finestra del terminale se è spento e lo apre in una finestra propria (Edge o Chrome in
+    modalità "app"), come un programma tradizionale. Chi lo usa non vede porte né indirizzi.
+    Se apri-copilota.vbs manca (cartella copiata da una versione vecchia) ripiega su avvia.bat.
+    """
+    vbs = DIR / "apri-copilota.vbs"
     bat = DIR / "avvia.bat"
     icona = DIR / "public" / "favicon.ico"
+    if vbs.exists():
+        bersaglio = f"$l.TargetPath=(Join-Path $env:WINDIR 'System32\\wscript.exe');$l.Arguments='\\\"{vbs}\\\"';"
+    else:
+        bersaglio = f"$l.TargetPath='{bat}';"
     ps = (
         "$s=(New-Object -ComObject WScript.Shell);"
         "$d=[Environment]::GetFolderPath('Desktop');"
         "$l=$s.CreateShortcut((Join-Path $d 'Copilota.lnk'));"
-        f"$l.TargetPath='{bat}';$l.WorkingDirectory='{DIR}';"
+        f"{bersaglio}$l.WorkingDirectory='{DIR}';"
         "$l.Description='Copilota - ore e presenze';"
         + (f"$l.IconLocation='{icona}';" if icona.exists() else "")
         + "$l.Save()"
@@ -390,7 +402,8 @@ def main() -> int:
 
     say()
     say("Copilota è installato.")
-    say(f"  Avvio: icona Copilota sul desktop (o avvia.bat), poi http://127.0.0.1:{porta}")
+    say("  Avvio: icona Copilota sul desktop. Si apre da sola in una finestra propria, senza indirizzi da scrivere.")
+    say(f"  (In alternativa avvia.bat, poi http://127.0.0.1:{porta} nel browser.)")
     if credenziali:
         say(f"  Si entra con l'utente {credenziali[0]} e la password appena scelta: è il proprietario di Copilota.")
     elif nuovo:
