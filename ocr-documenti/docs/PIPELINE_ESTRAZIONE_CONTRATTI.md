@@ -432,10 +432,12 @@ quantità o prezzo giusti. Il retino è fatto di puntini isolati, le cifre di tr
    quanto il codice (±1,3 volte la sua altezza).
 2. **Rilettura** (`rileggi_celle`, `ocr_worker.py`, richiesta `{"rileggi": [[x0, y0, x1,
    y1], ...]}`): ritaglio, tre pulizie (mediana 3×3; gaussiana σ 1,5 + soglia 110; via le
-   macchie sotto 25 pixel), ingrandimento 2×, solo riconoscimento (modello
-   `latin_PP-OCRv5_mobile_rec`, caricato al primo uso). Le letture vanno in cache con la
-   pagina (`celle` nel file della cache); se le regole cambiano si chiedono solo le celle
-   nuove (`completaRiletture`, `server/ocr.ts`, anche dal banco).
+   macchie sotto 25 pixel), ingrandimento 2×, solo riconoscimento. Modello: dal 27/11/2026
+   `PP-OCRv5_server_rec` (`PADDLE_REC_CELLE`, `server/config.ts` MODELLI_CELLE), caricato al
+   primo uso: sulle cifre retinate legge meglio del `latin_PP-OCRv5_mobile_rec` della pagina
+   (RICERCA §28). Le letture vanno in cache con la pagina (`celle` e `modelliCelle` nel file
+   della cache); se le regole cambiano si chiedono solo le celle nuove, se cambiano i modelli
+   si rileggono tutte (`completaRiletture`, `server/ocr.ts`, anche dal banco).
 3. **Scelta** (`rilettureDellaVoce`): per colonna i candidati — la lettura ripulita, con
    la virgola rimessa se ha solo cifre («23035» → 230,35, peso 1), senza l'ultima cifra
    per il «€» letto come cifra («357276» → 357,27, peso ½). Si tiene la combinazione con

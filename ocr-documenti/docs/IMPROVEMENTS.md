@@ -51,6 +51,18 @@ colonna Tariffa al posto del numero di riga («Miniapala», «SIC24 26.01.14», 
 dentro un codice puntato («G.01,064.3») e codici della tabella passati alla griglia letta dal testo:
 **809/948** voci esatte e 828 Q+P con la GPU. Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §27.
 
+### ✅ (27/11/2026) Celle dei numeri rilette col riconoscitore grande
+Prova dei modelli PP-OCRv5 server: per la pagina intera il riconoscitore grande legge peggio
+l'italiano, ma sulle celle dei numeri che non tornano (fondo retinato) legge meglio. Celle rilette
+con `PP-OCRv5_server_rec` (`PADDLE_REC_CELLE`), prezzo = P.U. lavori + P.U. oneri quando gli oneri
+sono riletti sicuri: **823/948** voci esatte e 842 Q+P (erano 809 · 828), senza tempo in più.
+Dettaglio in `RICERCA_OCR_SOLUZIONE.md` §28.
+
+### 🟡 Rilevamento grande sulle pagine retinate (da decidere)
+`PP-OCRv5_server_det` sulle sole 11 pagine di Progetto con celle da rileggere: banco **844/948**
+(+21), ma 31 s a pagina invece di 2,4 s su quelle pagine (~6 minuti in più su Progetto). Misura in
+`RICERCA_OCR_SOLUZIONE.md` §28; non collegato finché non si decide.
+
 ### 🔴 OCR bloccato da Windows App Control (WDAC)
 Policy aziendale in vigore dal 31/08/2026: rifiuta le DLL non firmate dei venv Paddle
 (`WinError 4551`, evento Code Integrity 3077). Nessuna scansione finché l'IT non autorizza

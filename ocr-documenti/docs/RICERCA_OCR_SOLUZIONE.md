@@ -853,6 +853,82 @@ entrato nel programma: sta in [prove/pulizia-pagina-2026-11-23.patch](prove/puli
 riprovare con scansioni diverse (foto dal telefono storte di qualche grado, dove raddrizzare
 dovrebbe pesare di più) o dopo aver rimesso a punto la lettura per celle.
 
+## 28. Modelli PP-OCRv5 server (27/11/2026)
+
+Prova della voce 167 dell'elenco della suite: i modelli grandi di PaddleOCR al posto dei
+`mobile` in uso, sulla scheda video (`.venv-cu129`; il vecchio `.venv-gpu` su questa scheda non
+legge niente, 0 righe). Scaricati da soli al primo uso in `~/.paddlex/official_models`:
+`PP-OCRv5_server_det` 85 MB, `PP-OCRv5_server_rec` 82 MB.
+
+**Su una pagina** (Progetto Costruzioni, pag. 3):
+
+| Modelli | Tempo a pagina | Righe | Lettura |
+|---|---|---|---|
+| mobile det + latin mobile rec (in uso) | 1-2 s | 63 | giusta |
+| **server det** + latin mobile rec | 20-24 s | 60 | «B45oc» al posto di «B450c» |
+| mobile det + **server rec** | 1,5-2,4 s | 63 | «calcesfruzzo», «Lavorazloni», «accialo», «conformita» |
+
+Il riconoscitore grande è fatto per cinese e inglese: sull'italiano legge peggio del `latin`
+specializzato, quindi per la pagina intera resta il `latin_PP-OCRv5_mobile_rec`.
+
+**Sulle sole celle rilette.** Le cifre sul fondo retinato dell'allegato A di Progetto erano il
+problema rimasto (§ sopra, «Cosa resta»): il riconoscitore grande lo legge meglio. Prova sul banco
+dei 31 contratti con le pagine lette come sempre (cache del banco) e le sole celle dei numeri che
+non tornano (§3, `rileggi_celle`) rilette con un modello o con l'altro (`HARNESS_BLOCCHI` su una
+copia della cache senza le celle; `tools/harness.ts`):
+
+| Celle rilette con | Testata | Voci esatte | Q+P | Tempo banco |
+|---|---|---|---|---|
+| latin mobile (com'era; controllo) | 417/426 | 809/948 | 828 | 246 s |
+| **PP-OCRv5_server_rec** — **in uso** | 417/426 | **823/948** | **842** | 255 s |
+| tutti e due (sei letture per cella) | 417/426 | 819/948 | 838 | 309 s |
+
+- Il controllo ridà esattamente i numeri di prima: le riletture sono deterministiche e il
+  confronto vale.
+- Cambia solo Progetto Costruzioni: 60 → 74 voci esatte su 142 (quantità e prezzo giusti 43 →
+  54). Fra le voci recuperate «396,37 × 22,50», «165,42 × 16,50», «232,04 × 22,50» (prima
+  «2891 × 4,6755»). Quattro voci peggiorano (due B.03.035.c, B.05.030 11.029,88, I.01.009 8,80),
+  il saldo è +14.
+- Tutti e due insieme va peggio del solo grande: con sei letture per cella i conti tornano anche
+  per caso, come già visto con le varianti accorciate (§3).
+- Gecob perdeva due prezzi di un centesimo (NP.19 23,41 invece di 23,40, NP.21 180,01 invece di
+  180,00): il grande legge giusto il P.U. dei lavori (22,55 e 173,43, prima illeggibili) e la
+  quota oneri della pagina, che è calcolata e non stampata, lo completava arrotondando male. Ora,
+  quando anche il P.U. oneri è riletto sicuro (stesso valore da almeno due pulizie), il prezzo è
+  la somma P.U. lavori + P.U. oneri, se sta entro un centesimo e mezzo dalla stima della quota
+  (`tabellaDaAncore`, campo `oneri` di `ValoriVoce`). Il caso per cui la somma non si faceva
+  («1,24» letto «1,20» tre volte: 33,96 contro 34,00) resta fuori.
+
+Misura finale sulla cache buona coi default nuovi: **823/948** voci esatte, **842** Q+P, testata
+417/426; moduli compilati a mano (`contratti/moduli`) 116/134 come prima.
+
+Nel programma: `PADDLE_REC_CELLE` (default `PP-OCRv5_server_rec`, `server/config.ts`
+MODELLI_CELLE) passato dal server a ogni worker (`ocr_worker.py`, `modelli_celle`). In cache, accanto
+alle celle, i modelli con cui sono state lette (`modelliCelle`): se cambiano, le celle si rileggono
+tutte una volta (`completaRiletture`). Le pagine già in cache del programma prendono così le letture
+nuove alla prima riapertura, senza rifare l'OCR della pagina.
+
+**Rilevamento grande sulla pagina intera** (`PADDLE_DET_MODEL=PP-OCRv5_server_det`, rilettura
+vera: `OCR_CACHE=0`, altrimenti le pagine arrivano dalla cache del server, §27). Solo su Progetto
+Costruzioni, il contratto con le cifre retinate, con le celle già rilette dal riconoscitore grande:
+
+| Rilevamento | Pagine | Voci esatte Progetto | Banco intero | Tempo |
+|---|---|---|---|---|
+| mobile (in uso) | 50 | 74/142 | 823/948 | 120 s (2,4 s a pagina) |
+| server, tutte le pagine | 50 | 95/142 | 844/948 | 1.560 s (31 s a pagina) |
+| server sulle sole pagine con celle da rileggere (39-49) | 11 server + 39 mobile | 95/142 | **844/948** | ~6 min in più su Progetto |
+
+- Il controllo (mobile riletto da capo) ridà i numeri della cache: la differenza è del modello.
+- Sul banco solo 19 pagine OCR su 748 hanno celle da rileggere (Progetto 11, Gecob 3, Jonico 2+2,
+  Progetto sub 1): con il rilevamento grande solo lì il costo sarebbe ~10 minuti su tutto il banco,
+  zero sui contratti puliti.
+- Delle 11 pagine: 29 voci migliorano e 8 peggiorano (valori presi dalla riga accanto, «165,42 ×
+  16,50» diventa «40,6 × 16,50»), saldo +21.
+- **Non entrato nel programma**: 31 s a pagina sulle pagine retinate vuol dire 6 minuti in più su
+  un contratto come Progetto. Da decidere se vale (seconda passata col rilevamento grande sulle
+  sole pagine con voci che non tornano, spegnibile). Le pagine rese sono 2333×3300: un limite al
+  lato lungo per il solo rilevamento grande ridurrebbe il tempo, da misurare.
+
 ## Fonti
 
 - PaddleOCR, release e documentazione: [GitHub](https://github.com/PaddlePaddle/PaddleOCR), [release 3.0–3.7](https://paddleocr.dev/releases), [PP-StructureV3](https://www.paddleocr.ai/main/en/version3.x/algorithm/PP-StructureV3/PP-StructureV3.html), [PaddleOCR-VL-1.6](https://www.paddleocr.ai/latest/en/version3.x/algorithm/PaddleOCR-VL/PaddleOCR-VL-1.6.html), [PaddleOCR-VL-1.6 ONNX (tempi CPU della comunità)](https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX)
