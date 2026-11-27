@@ -1262,3 +1262,13 @@ Risposte dell'utente `1c 2 http://ws-sviluppoia/copilota 3b`.
 - NON provato: l'uso da collegato sotto il prefisso nel browser (l'accesso dell'amministratore chiede il codice via email; le API da collegato sono coperte dai test) e l'apertura da un altro PC o da un telefono. I telefoni di solito non risolvono il nome di un PC Windows.
 - Nota per i test: `vitest` va lanciato da un percorso con la lettera del disco maiuscola (`C:/…`); da `c:\…` fallisce con "Vitest failed to find the runner".
 - **Password del proprietario in locale** impostata come chiesto (risposta 1c), definitiva. **Limite dei 30 accessi per indirizzo** lasciato com'è (risposta 3b).
+
+### Progetto finito: istruzioni, pacchetto di distribuzione e avanzamenti (27/11/2026)
+
+Richiesta dell'utente: "metti in un file .md le info che servono per avviare questo programma e crea una cartella con installer e questo file per distribuirlo. poi aggiorna gli avanzamenti delle app e questo progetto è finito".
+
+- **`AVVIO.md`** (nuovo): foglio per chi installa, senza termini da sviluppatore. Cosa serve, domande dell'installatore, avvio dal PC e dagli altri dispositivi, primo accesso, posta, dati e copie di sicurezza, spegnere e aggiornare, problemi comuni, limiti.
+- **`scripts/crea-distribuzione.py`** (nuovo): crea fuori dal repository `Documenti\Copilota - distribuzione` con `AVVIO.md`, la cartella `Copilota` (file dell'ultimo commit da `git archive`, senza test, diario e file di Vercel, più `InstallaLogbook.exe` e `VERSIONE.txt`) e `Copilota.zip` (13 MB). Si ferma se l'exe manca o è più vecchio del sorgente.
+- **Provato da zero**: zip estratto in una cartella di prova, `InstallaLogbook.exe --si --senza-collegamento` (dipendenze, database vuoto con le festività, amministratore con password provvisoria, interfaccia compilata), server avviato su una porta a parte, pagina servita e accesso dell'amministratore riuscito. Non provate su un PC pulito le domande a mano, l'icona e la parte di rete.
+- **Avanzamenti**: `Stato avanzamento programmi.xlsx` al 27/11. Copilota al 100%, stato "Finito il 27/11/2026". Restano tre voci segnate "dopo la consegna": dati veri e un mese con HR, e gli straordinari (decisione e sviluppo) solo se il committente li chiede. Suite al 92,7%, 75 attività aperte, fine stimata 09/04/2027.
+- Da qui in poi su Copilota: solo richieste nuove dell'utente o del committente. Il sito su Vercel resta fermo alla versione del 26/11 finché l'utente non riapre le pubblicazioni su `main`.
