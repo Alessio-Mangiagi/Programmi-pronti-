@@ -1,0 +1,72 @@
+CONFRONTO DOCUMENTI - versione autonoma
+=======================================
+
+Mette a confronto due versioni dello stesso documento (computo, capitolato,
+offerta, contratto...) e mostra ogni differenza: righe tolte, righe aggiunte,
+numeri e date cambiati. Legge PDF (anche scansionati o firmati .p7m),
+immagini, Word (.docx) e file di testo.
+
+Non serve installare niente: né Python, né altri programmi, né internet.
+I documenti restano su questo computer.
+
+
+COME SI AVVIA
+-------------
+1. Estrai TUTTA la cartella "Confronto Documenti" dallo zip (tasto destro
+   sullo zip > Estrai tutto). Non avviare il programma da dentro lo zip.
+2. Doppio clic su "Confronto Documenti.exe".
+3. Si apre una finestra nera e, dopo qualche secondo, la pagina del programma
+   nel browser. La finestra nera deve restare aperta mentre lo usi.
+
+La prima volta Windows può mostrare "PC protetto da Windows": fai clic su
+"Ulteriori informazioni" e poi su "Esegui comunque". Succede perché il
+programma è fatto in azienda e non ha una firma commerciale.
+
+Se Windows chiede il permesso per la rete (firewall) puoi rispondere
+"Annulla": il programma parla solo con il browser di questo computer.
+
+
+COME SI USA
+-----------
+1. Metti il documento vecchio nel riquadro A e quello nuovo nel riquadro B.
+2. Premi "Avvia confronto".
+3. Leggi il report: in cima i numeri e le date cambiati, sotto tutte le
+   differenze. Un clic su una differenza apre l'anteprima della pagina.
+4. Per mandarlo a un collega: Report Word, Report PDF o Elenco Excel.
+
+I confronti fatti si ritrovano in "Storico" (in alto a destra) per 30 giorni.
+
+
+COME SI CHIUDE
+--------------
+Chiudi la finestra nera. La pagina nel browser smette di rispondere: puoi
+chiudere anche quella. Per riaprirlo, di nuovo doppio clic sull'exe.
+
+
+DA SAPERE
+---------
+- PDF firmati (.p7m): il programma apre il documento firmato e dice chi l'ha
+  firmato, ma NON controlla se la firma è valida. Per la verifica usa un
+  programma di firma (Dike, ArubaSign, FirmaCerta...).
+- Scansioni e foto vengono lette con l'OCR: ci vuole più tempo (anche qualche
+  minuto per documenti lunghi) e qualche carattere può essere letto male.
+- Le cartelle "_internal" e "Tesseract-OCR" servono al programma: vanno
+  lasciate accanto all'exe. Per spostare il programma sposta tutta la cartella.
+- Storico e file di lavoro stanno in
+  %LOCALAPPDATA%\Confronto Documenti
+  (incolla questa riga nella barra di Esplora file per aprirla). Per
+  cancellare tutto basta eliminare quella cartella a programma chiuso.
+- Per disinstallare: elimina la cartella del programma e quella qui sopra.
+
+
+SE QUALCOSA NON VA
+------------------
+- La pagina non si apre da sola: apri il browser e scrivi l'indirizzo che
+  compare nella finestra nera (di solito http://127.0.0.1:5001).
+- La finestra nera si chiude subito: estrai di nuovo lo zip in una cartella
+  nuova (es. sul Desktop) e riprova; se l'antivirus ha messo in quarantena
+  dei file, chiedi all'assistenza informatica di sbloccarli.
+- "Tesseract non installato" o le scansioni non vengono lette: manca la
+  cartella "Tesseract-OCR" accanto all'exe. Estrai di nuovo lo zip.
+
+Il riconoscimento del testo usa Tesseract OCR (licenza Apache 2.0).
