@@ -35,7 +35,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 | [x] | Ponte Trimble | Unire gli aggiornamenti Dependabot: express, pdfjs-dist (57) | 0,5 | — |
 | [-] | Auguri | Aggiornare express 5.3.0 (58) | 0,5 | escluso |
 | [x] | Codice condiviso | Tetto agli errori per programma chiamante su `/api/verifica-password` (147) | 0,5 | — |
-| [ ] | OCR Documenti | Ultime 2 voci che la scheda video perde rispetto alla CPU: AQ3 nolo «L50.00 €» e codice G.01.064.3 (166) | 0,5 | — |
+| [x] | OCR Documenti | Ultime 2 voci che la scheda video perde rispetto alla CPU: AQ3 nolo «L50.00 €» e codice G.01.064.3 (166) | 0,5 | — |
 
 ## 2. Una giornata
 
@@ -76,7 +76,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 
 ## In sintesi
 
-- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12: restano 14).
+- Fattibili subito, senza aspettare nessuno: 26 attività, circa 26 giorni di lavoro (al 26/11 sera ne sono chiuse 12, il 27/11 la 166: restano 13).
 - Ferme in attesa di server, credenziali esterne o decisioni: 10.
 - Escluse: le 2 di Auguri.
 
@@ -96,6 +96,7 @@ Stato: `[ ]` da fare, `[x]` fatto, `[-]` escluso o rimandato.
 | 26/11/2026 | form-core di InCampo (148) | vitest 5. 187 test passati |
 | 26/11/2026 | Lettore DDT (7) | helmet 8.3.0, SDK Anthropic 1.6.0, jest 30, supertest 7, React 19.3. 341 test passati. Non applicati eslint 10 (serve la configurazione nel formato nuovo), vite 8 e plugin-react 6 (conflitto con Babel 7 di jest), TypeScript 7. Da provare una conversione vera con Claude |
 | 26/11/2026 | Portale, tetto su `/api/verifica-password` (147) | 500 password sbagliate in 15 minuti per programma, poi 429. 126 test passati. Vale dal prossimo riavvio del Portale |
+| 27/11/2026 | OCR Documenti, ultime 2 voci della scheda video (166) | Recuperate tutte e due, più cinque voci con lo stesso difetto: voci esatte 800 → 809/948, Q+P 827 → 828; cambiano solo AQ3 nolo, Contratto.pdf e Contratto_fornitura, tutti in meglio. 295 test passati |
 
 Gli aggiornamenti delle librerie sono stati applicati sul ramo di lavoro `feat/estrazione-dms`, non unendo le
 PR di Dependabot su `main`: le PR si chiuderanno da sole quando il ramo arriverà su `main`. Restano fuori le
