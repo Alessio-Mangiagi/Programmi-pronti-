@@ -126,6 +126,22 @@ data/verifiche.json   storico esiti
 - collegare PaddleOCR e/o Claude vision (i due adattatori segnaposto);
 - confidenza per pagina: Tesseract la sa dare (`tsv`), ora non viene letta e la soglia
   `CONFIDENZA_MINIMA` in `regole.ts` lavora quindi solo sui motori che la forniranno;
-- editor a campi per le checklist (oggi si modifica il JSON);
-- test di integrazione delle rotte (ci sono quelli del motore regole, della ricerca e
-  dell'import da Claude: `npm test`, 43 casi).
+- editor a campi per le checklist (oggi si modifica il JSON).
+
+## Test
+
+`npm test` (63 casi): motore delle regole, ricerca, import da Claude, fogli, firma, token della
+suite e, dal 27/11/2026, i **test di integrazione delle rotte**:
+
+- `src/__tests__/rotte.test.ts`: l'app vera in ascolto su una porta libera, chiamata con
+  `fetch` come fa la pagina. Checklist (crea, modifica, elimina, errori di compilazione),
+  documenti (caricamento multipart, doppioni, file non ammessi, scheda, file in sandbox,
+  eliminazione), verifiche (esito per requisito, documenti saltati, report Excel), ricerca,
+  esito incollato da Claude, intestazioni di sicurezza. Gate spento.
+- `src/__tests__/rotte-gate.test.ts`: gate acceso e portale irraggiungibile. Senza sessione
+  nessuna API dà dati; il token della suite apre solo le rotte del suo elenco e vede solo i
+  documenti caricati col token.
+
+Tutti e due lavorano su una cartella temporanea (`config` sostituito nel test), quindi non
+toccano `data/`. L'estrazione del testo non gira sotto Jest (pdfjs-dist è solo ESM): la coda è
+finta e il testo «estratto» si scrive col modello.
