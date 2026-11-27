@@ -1192,3 +1192,16 @@ Revisione in sola lettura di tutto il server fatta da un revisore indipendente; 
 - **Dati di esempio su Vercel** (`rotte/proprietario.ts`): gli account di esempio nascono spenti, perché la loro password è pubblica.
 - Verifiche: `sicurezza-2611.test.ts` (7 test che riproducono gli attacchi), 306 test passati, `npm audit` senza segnalazioni.
 - Non chiuso, per scelta: il limite di 30 tentativi per indirizzo resta nella memoria del processo, quindi su Vercel vale per singola istanza (restano i blocchi per account, che stanno nel database); un amministratore può far chiamare al server l'indirizzo di SkyTower che scrive nelle impostazioni (conta solo in rete locale, ed è una funzione riservata agli amministratori).
+
+### Email di chiusura progetto provata sul sito pubblico (27/11/2026)
+
+Chiude il "non provato sul sito pubblico" del Giorno 47. La chiusura l'ha fatta l'utente da amministratore (l'accesso chiede il codice via email, che arriva solo a lui); prima e dopo, controllo in sola lettura sul database del sito.
+
+- Prima: `PROVA-01` attivo, nessuna riga `avvisi.*` nelle impostazioni (quindi tutti gli avvisi accesi e HR = indirizzo del proprietario), una timbratura ancora da confermare sul progetto.
+- Trovato un errore nei dati di prova: l'email di Paolino Paperino finiva con `.conm`, quindi l'avviso al dipendente non sarebbe mai arrivato. Corretta dall'utente dalla scheda dipendente prima della chiusura.
+- L'utente ha anche inserito un preventivo della manodopera e una documentazione su `PROVA-01`, poi ha messo lo stato "Chiuso" (registro attività: "Progetto modificato", 27/11 ore 9:19).
+- Dopo: `PROVA-01` in stato `CHIUSO`; nei log della funzione su Vercel nessuna riga `[logbook] avviso … non inviato` (è quella che scrive `spedisci` in `server/servizi/avvisi.ts` quando la posta rifiuta).
+- Da confermare dall'utente: l'arrivo in casella delle due email "Copilota: progetto PROVA-01 chiuso" (riepilogo a HR, avviso a Paolino Paperino). Gastone Paperone non ha email in anagrafica e non riceve nulla, come previsto.
+- Notato nei log, non urgente: su `POST /api/documenti-progetto` il driver `pg` avvisa "Calling client.query() when the client is already executing a query is deprecated" (sarà un errore in pg 9). Oggi funziona; da guardare prima di aggiornare `@prisma/adapter-pg` a una versione che porta pg 9.
+- Il piano gratuito di Vercel tiene i log della funzione per circa 30 minuti: le prove sul sito pubblico vanno controllate subito.
+- Ancora da togliere a prove finite, quando l'utente lo dice: `PROVA-01`, Gastone Paperone, nota spese di prova.
